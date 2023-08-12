@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34004.107
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Engine", "Engine\Engine.vcxproj", "{36BC17A9-B4BD-4434-9C80-25370791488E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Editor", "Editor\Editor.vcxproj", "{06298859-BE25-4EEC-963E-1D4696152F99}"
+	ProjectSection(ProjectDependencies) = postProject
+		{36BC17A9-B4BD-4434-9C80-25370791488E} = {36BC17A9-B4BD-4434-9C80-25370791488E}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{36BC17A9-B4BD-4434-9C80-25370791488E}.Debug|x64.ActiveCfg = Debug|x64
+		{36BC17A9-B4BD-4434-9C80-25370791488E}.Debug|x64.Build.0 = Debug|x64
+		{36BC17A9-B4BD-4434-9C80-25370791488E}.Release|x64.ActiveCfg = Release|x64
+		{36BC17A9-B4BD-4434-9C80-25370791488E}.Release|x64.Build.0 = Release|x64
+		{06298859-BE25-4EEC-963E-1D4696152F99}.Debug|x64.ActiveCfg = Debug|x64
+		{06298859-BE25-4EEC-963E-1D4696152F99}.Debug|x64.Build.0 = Debug|x64
+		{06298859-BE25-4EEC-963E-1D4696152F99}.Release|x64.ActiveCfg = Release|x64
+		{06298859-BE25-4EEC-963E-1D4696152F99}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AFADEC81-3125-4A22-8C5B-590C95CDDAAB}
+	EndGlobalSection
+EndGlobal
