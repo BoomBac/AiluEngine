@@ -8,6 +8,14 @@
 #define PCH_H
 
 // 添加要在此处预编译的标头
-#include "framework.h"
+#include "../framework.h"
+#include <cstdint>
+#include <cstdlib>
+#include <cwchar>
+#include <shellapi.h>
+
+#include <string>
+#include <sstream>
+
 
 #endif //PCH_H

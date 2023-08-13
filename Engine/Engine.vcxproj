@@ -73,6 +73,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)Bin\$(Configuration)\Engine\</OutDir>
     <IntDir>$(SolutionDir)Obj\$(Configuration)\Engine\</IntDir>
+    <IncludePath>$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -112,11 +113,12 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Engine\;$(SolutionDir)\Engine\Inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -150,19 +152,27 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="framework.h" />
-    <ClInclude Include="inc\ailu.h" />
-    <ClInclude Include="inc\global_marco.h" />
-    <ClInclude Include="pch.h" />
+    <ClInclude Include="Ailu.h" />
+    <ClInclude Include="Inc\Framework\Common\CommandLineApp.h" />
+    <ClInclude Include="Inc\Framework\Common\EntryPoint.h" />
+    <ClInclude Include="Inc\Framework\Common\GfxConfiguration.h" />
+    <ClInclude Include="Inc\Framework\Common\Utils.h" />
+    <ClInclude Include="Inc\Framework\Common\WindowsApp.h" />
+    <ClInclude Include="Inc\Framework\Interface\IApplication.h" />
+    <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
+    <ClInclude Include="Inc\GlobalMarco.h" />
+    <ClInclude Include="Inc\pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="pch.cpp">
+    <ClCompile Include="Src\Framework\Common\WindowsApp.cpp" />
+    <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="src\ailu.cpp" />
+    <ClCompile Include="Ailu.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat" />
