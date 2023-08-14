@@ -19,5 +19,7 @@
 #include <thread>
 #include <queue>
 #include <mutex>
+#include <iostream>
+#include <fstream>
 
 #endif //PCH_H

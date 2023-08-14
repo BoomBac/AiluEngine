@@ -1,6 +1,6 @@
 #ifndef __GLOBAL_MARCO_H__
 #define __GLOBAL_MARCO_H__
-#define COMPANY_ENV		//delete this line in home
+#include "CompanyEnv.h"
 
 #ifdef AILU_BUILD_DLL
 #define AILU_API __declspec(dllexport)

@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "Framework/Common/WindowsApp.h"
 #include "Framework/Common/Utils.h"
+#include "Framework/Common/Log.h"
+
+//#pragma execution_character_set("utf-8")
 
 namespace Ailu
 {
@@ -9,14 +12,20 @@ namespace Ailu
         static const wchar_t* kAppTitleIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_title_icon.ico);
         static const wchar_t* kAppIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_icon.ico);
 
+        LogManager* g_pLogManager;
+
         WindowsApp::WindowsApp(HINSTANCE hinstance, int argc) : _hinstance(hinstance),_argc(argc)
         {
             WCHAR** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
             _b_exit = false;
-            _argv = nullptr;
+            _argv = nullptr;         
         }
         int WindowsApp::Initialize()
         {
+            g_pLogManager = new LogManager();
+            g_pLogManager->Initialize();
+            LOG_WARNING(" WindowsApp::Initialize{}  {}", 20, "aaa")
+            LOG_WARNING(L" 程序初始化  {}", 20, "aaa")
             // Initialize the window class.
             WNDCLASSEX windowClass = { 0 };
             windowClass.cbSize = sizeof(WNDCLASSEX);
@@ -59,6 +68,10 @@ namespace Ailu
                 SendMessage(GetWindow(_hwnd, GW_OWNER), WM_SETICON, ICON_SMALL, (LPARAM)hTitleIcon);
                 SendMessage(GetWindow(_hwnd, GW_OWNER), WM_SETICON, ICON_BIG, (LPARAM)hIcon);
             }
+            else
+            {
+                LOG_WARNING("TitleIcon or AppIcon load failed,please check out the path!")
+            }
 
             _b_exit = false;
             return 0;
@@ -67,6 +80,7 @@ namespace Ailu
         }
         void WindowsApp::Finalize()
         {
+            g_pLogManager->Finalize();
         }
         void WindowsApp::Tick()
         {
