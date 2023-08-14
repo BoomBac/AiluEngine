@@ -16,6 +16,8 @@
 
 #include <string>
 #include <sstream>
-
+#include <thread>
+#include <queue>
+#include <mutex>
 
 #endif //PCH_H

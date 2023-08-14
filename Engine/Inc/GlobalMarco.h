@@ -1,6 +1,6 @@
 #ifndef __GLOBAL_MARCO_H__
 #define __GLOBAL_MARCO_H__
-
+#define COMPANY_ENV		//delete this line in home
 
 #ifdef AILU_BUILD_DLL
 #define AILU_API __declspec(dllexport)
@@ -12,8 +12,14 @@
 #define CONTACT2(x,y) CONTACT(x,y)
 #define STR2(x) STR(x)
 
-#define SOLUTION_DIR F:/ProjectCpp/AiluEngine/
-#define PROJECT_DIR F:/ProjectCpp/AiluEngine/Engine/
+#ifdef COMPANY_ENV
+	#define SOLUTION_DIR E:/AiluEngine/
+	#define PROJECT_DIR E:/AiluEngine/Engine/
+#else
+	#define SOLUTION_DIR F:/ProjectCpp/AiluEngine/
+	#define PROJECT_DIR F:/ProjectCpp/AiluEngine/Engine/
+#endif // COMPANY_ENV
+
 #define GET_ENGINE_FULL_PATH(file) STR2(CONTACT2(PROJECT_DIR,file))
 
 #define CONTACTW(x,y) x##y

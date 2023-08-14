@@ -50,7 +50,7 @@ namespace Ailu
             ShowWindow(_hwnd, _argc);
             HANDLE hTitleIcon = LoadImage(0, kAppTitleIconPath, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
             HANDLE hIcon = LoadImage(0, kAppIconPath, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
-            if (hTitleIcon && hTitleIcon) {
+            if (hTitleIcon && hIcon) {
                 //Change both icons to the same icon handle.
                 SendMessage(_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hTitleIcon);
                 SendMessage(_hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
