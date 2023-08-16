@@ -3,24 +3,21 @@
 
 namespace Ailu
 {
-    namespace Engine
+    int Renderer::Initialize()
     {
-        int Renderer::Initialize()
-        {
-            _p_renderer = new DXBaseRenderer(1280,720);
-            return 0;
-        }
-        void Renderer::Finalize()
-        {
-            delete _p_renderer;
-        }
-        void Renderer::Tick()
-        {
-            Render();
-        }
-        void Renderer::Render()
-        {
+        _p_renderer = new DXBaseRenderer(1280, 720);
+        return 0;
+    }
+    void Renderer::Finalize()
+    {
+        delete _p_renderer;
+    }
+    void Renderer::Tick()
+    {
+        Render();
+    }
+    void Renderer::Render()
+    {
 
-        }
     }
 }

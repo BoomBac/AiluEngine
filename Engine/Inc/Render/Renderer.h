@@ -6,19 +6,16 @@
 
 namespace Ailu
 {
-    namespace Engine
+    class AILU_API Renderer : public IRuntimeModule
     {
-        class AILU_API Renderer : public IRuntimeModule
-        {
-        public:
-            int Initialize() override;
-            void Finalize() override;
-            void Tick() override;
-        private:
-            void Render();
-            DXBaseRenderer* _p_renderer = nullptr;
-        };
-    }
+    public:
+        int Initialize() override;
+        void Finalize() override;
+        void Tick() override;
+    private:
+        void Render();
+        DXBaseRenderer* _p_renderer = nullptr;
+    };
 }
 
 #endif // !RENDERER_H__

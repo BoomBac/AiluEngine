@@ -8,97 +8,94 @@
 
 namespace Ailu
 {
-    namespace Engine
-    {
-		template<typename T>
-		static void format_helper(std::wostringstream& oss, std::wstring_view& str, const T& value)
-		{
-			std::size_t openBracket = str.find('{');
-			if (openBracket == std::wstring::npos) { return; }
-			std::size_t closeBracket = str.find('}', openBracket + 1);
-			if (closeBracket == std::wstring::npos) { return; }
-			oss << str.substr(0, openBracket) << value;
-			str = str.substr(closeBracket + 1);
-		}
-		template<typename... Targs>
-		static std::wstring format(std::wstring_view str, Targs...args)
-		{
-			std::wostringstream oss;
-			(format_helper(oss, str, args), ...);
-			oss << str;
-			return oss.str();
-		}
-		template<typename T>
-		static void format_helper(std::ostringstream& oss, std::string_view& str, const T& value)
-		{
-			std::size_t openBracket = str.find('{');
-			if (openBracket == std::string::npos) { return; }
-			std::size_t closeBracket = str.find('}', openBracket + 1);
-			if (closeBracket == std::string::npos) { return; }
-			oss << str.substr(0, openBracket) << value;
-			str = str.substr(closeBracket + 1);
-		}
-		template<typename... Targs>
-		static std::string format(std::string_view str, Targs...args)
-		{
-			std::ostringstream oss;
-			(format_helper(oss, str, args), ...);
-			oss << str;
-			return oss.str();
-		}
-		static const char* log_str[]{ "Normal","Warning","Error" };
-		static const wchar_t* log_strw[]{ L"Normal",L"Warning",L"Error" };
-		using TraceLevle = uint8_t;
-		constexpr TraceLevle TRACE_ALL = 0;
-		constexpr TraceLevle TRACE_1 = 1 << 0;
-		constexpr TraceLevle TRACE_2 = 1 << 1;
-		constexpr TraceLevle TRACE_3 = 1 << 2;
-		enum ELogLevel
-		{
-			kNormal,
-			kWarning,
-			kError,
-		};
-		static constexpr ELogLevel kLogLevel = ELogLevel::kNormal;
-		static constexpr TraceLevle kTraceLevel = TRACE_ALL;
+	template<typename T>
+	static void format_helper(std::wostringstream& oss, std::wstring_view& str, const T& value)
+	{
+		std::size_t openBracket = str.find('{');
+		if (openBracket == std::wstring::npos) { return; }
+		std::size_t closeBracket = str.find('}', openBracket + 1);
+		if (closeBracket == std::wstring::npos) { return; }
+		oss << str.substr(0, openBracket) << value;
+		str = str.substr(closeBracket + 1);
+	}
+	template<typename... Targs>
+	static std::wstring format(std::wstring_view str, Targs...args)
+	{
+		std::wostringstream oss;
+		(format_helper(oss, str, args), ...);
+		oss << str;
+		return oss.str();
+	}
+	template<typename T>
+	static void format_helper(std::ostringstream& oss, std::string_view& str, const T& value)
+	{
+		std::size_t openBracket = str.find('{');
+		if (openBracket == std::string::npos) { return; }
+		std::size_t closeBracket = str.find('}', openBracket + 1);
+		if (closeBracket == std::string::npos) { return; }
+		oss << str.substr(0, openBracket) << value;
+		str = str.substr(closeBracket + 1);
+	}
+	template<typename... Targs>
+	static std::string format(std::string_view str, Targs...args)
+	{
+		std::ostringstream oss;
+		(format_helper(oss, str, args), ...);
+		oss << str;
+		return oss.str();
+	}
+	static const char* log_str[]{ "Normal","Warning","Error" };
+	static const wchar_t* log_strw[]{ L"Normal",L"Warning",L"Error" };
+	using TraceLevle = uint8_t;
+	constexpr TraceLevle TRACE_ALL = 0;
+	constexpr TraceLevle TRACE_1 = 1 << 0;
+	constexpr TraceLevle TRACE_2 = 1 << 1;
+	constexpr TraceLevle TRACE_3 = 1 << 2;
+	enum ELogLevel
+	{
+		kNormal,
+		kWarning,
+		kError,
+	};
+	static constexpr ELogLevel kLogLevel = ELogLevel::kNormal;
+	static constexpr TraceLevle kTraceLevel = TRACE_ALL;
 
-		template<typename... Targs>
-		static std::wstring BuildLogMsg(ELogLevel level, std::wstring_view str, Targs... args)
+	template<typename... Targs>
+	static std::wstring BuildLogMsg(ELogLevel level, std::wstring_view str, Targs... args)
+	{
+		std::wstring s = log_strw[level];
+		s.append(L": ");
+		s.append(format(str, args...));
+		return s;
+	}
+	template<typename... Targs>
+	static std::string BuildLogMsg(ELogLevel level, std::string_view str, Targs... args)
+	{
+		std::string s = log_str[level];
+		s.append(": ");
+		s.append(format(str, args...));
+		return s;
+	}
+	template<typename... Targs>
+	static void Log(uint8_t maker, ELogLevel level, std::string_view str, Targs... args)
+	{
+		if (level >= kLogLevel && (maker == 0 || (maker & kTraceLevel) != 0))
 		{
-			std::wstring s = log_strw[level];
-			s.append(L": ");
-			s.append(format(str, args...));
-			return s;
+			OutputDebugStringA(BuildLogMsg(level, str, args...).append("\r\n").c_str());
 		}
-		template<typename... Targs>
-		static std::string BuildLogMsg(ELogLevel level, std::string_view str, Targs... args)
+	}
+	template<typename... Targs>
+	static void Log(uint8_t maker, ELogLevel level, std::wstring_view str, Targs... args)
+	{
+		if (level >= kLogLevel && (maker == 0 || (maker & kTraceLevel) != 0))
 		{
-			std::string s = log_str[level];
-			s.append(": ");
-			s.append(format(str, args...));
-			return s;
+			OutputDebugStringW(BuildLogMsg(level, str, args...).append(L"\r\n").c_str());
 		}
-		template<typename... Targs>
-		static void Log(uint8_t maker, ELogLevel level, std::string_view str, Targs... args)
-		{
-			if (level >= kLogLevel && (maker == 0 || (maker & kTraceLevel) != 0))
-			{
-				OutputDebugStringA(BuildLogMsg(level, str, args...).append("\r\n").c_str());
-			}
-		}
-		template<typename... Targs>
-		static void Log(uint8_t maker, ELogLevel level, std::wstring_view str, Targs... args)
-		{
-			if (level >= kLogLevel && (maker == 0 || (maker & kTraceLevel) != 0))
-			{
-				OutputDebugStringW(BuildLogMsg(level, str, args...).append(L"\r\n").c_str());
-			}
-		}
-		#define AE_LOG(maker,Level,msg,...) Log(maker,Level,msg,##__VA_ARGS__);
-		#define LOG(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
-		#define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
-		#define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
-    }
+	}
+#define AE_LOG(maker,Level,msg,...) Log(maker,Level,msg,##__VA_ARGS__);
+#define LOG(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
+#define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
+#define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
 }
 
 #endif // !LOG_H__

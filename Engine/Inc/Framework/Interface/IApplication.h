@@ -6,25 +6,22 @@
 
 namespace Ailu
 {
-	namespace Engine
+	class AILU_API IApplication : public IRuntimeModule
 	{
-		class AILU_API IApplication : public IRuntimeModule
-		{
-		public:
-			int Initialize() override = 0;
-			void Finalize() override = 0;
-			void Tick() override = 0;
+	public:
+		int Initialize() override = 0;
+		void Finalize() override = 0;
+		void Tick() override = 0;
 
-			virtual void SetCommandLineParameters(int argc, char** argv) = 0;
-			[[nodiscard]] virtual int GetCommandLineArgumentsCount() const = 0;
-			[[nodiscard]] virtual const char* GetCommandLineArgument(int index) const = 0;
-			[[nodiscard]] virtual const GfxConfiguration& GetConfiguration() const = 0;
+		virtual void SetCommandLineParameters(int argc, char** argv) = 0;
+		[[nodiscard]] virtual int GetCommandLineArgumentsCount() const = 0;
+		[[nodiscard]] virtual const char* GetCommandLineArgument(int index) const = 0;
+		[[nodiscard]] virtual const GfxConfiguration& GetConfiguration() const = 0;
 
-			virtual void Run() = 0;
-		protected:
-			bool _b_exit = false;
-		};
-	}
+		virtual void Run() = 0;
+	protected:
+		bool _b_exit = false;
+	};
 }
 
 

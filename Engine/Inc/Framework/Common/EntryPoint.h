@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 #else 
 int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR cmdline, _In_ int cmdshow)
 {
-	auto app = new Ailu::Engine::WindowsApp(hInst,cmdshow);
+	auto app = new Ailu::WindowsApp(hInst,cmdshow);
 	app->Initialize();
 	app->Run();
 	app->Finalize();

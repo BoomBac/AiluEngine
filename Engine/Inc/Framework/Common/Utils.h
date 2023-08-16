@@ -5,6 +5,11 @@
 
 namespace Ailu
 {
+    /// <summary>
+    /// 返回的指针需要在使用后销毁
+    /// </summary>
+    /// <param name="multiByteStr"></param>
+    /// <returns></returns>
     static wchar_t* ToWChar(const char* multiByteStr)
     {
         int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
@@ -14,7 +19,6 @@ namespace Ailu
         }
         wchar_t* wideStr = new wchar_t[size];
         MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, wideStr, size);
-
         return wideStr;
     }
 

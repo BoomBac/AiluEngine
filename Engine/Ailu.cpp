@@ -3,10 +3,7 @@
 
 namespace Ailu
 {
-	namespace Engine
-	{
 
-	}
 }
 
 
