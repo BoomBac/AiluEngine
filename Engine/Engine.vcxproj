@@ -118,7 +118,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Engine\;$(SolutionDir)\Engine\Inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Engine\;$(SolutionDir)\Engine\Inc\;$(SolutionDir)\Engine\Ext\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -126,7 +126,9 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>
+      </DelayLoadDLLs>
     </Link>
     <PostBuildEvent>
       <Command>.\after_build.bat</Command>
@@ -152,6 +154,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Ext\d3dx12.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Ailu.h" />
     <ClInclude Include="Inc\CompanyEnv.h" />
@@ -159,16 +162,20 @@
     <ClInclude Include="Inc\Framework\Common\EntryPoint.h" />
     <ClInclude Include="Inc\Framework\Common\GfxConfiguration.h" />
     <ClInclude Include="Inc\Framework\Common\Log.h" />
+    <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Utils.h" />
     <ClInclude Include="Inc\Framework\Common\WindowsApp.h" />
     <ClInclude Include="Inc\Framework\Interface\IApplication.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\pch.h" />
+    <ClInclude Include="Inc\Render\Renderer.h" />
+    <ClInclude Include="Inc\RHI\DX12\BaseRenderer.h" />
+    <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="Src\Framework\Common\Log.cpp" />
+    <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\WindowsApp.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -177,6 +184,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Ailu.cpp" />
+    <ClCompile Include="Src\Render\Renderer.cpp" />
+    <ClCompile Include="Src\RHI\DX12\BaseRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat" />

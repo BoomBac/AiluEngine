@@ -21,6 +21,7 @@ namespace Ailu
 			[[nodiscard]] const GfxConfiguration& GetConfiguration() const override;
 
 			void Run() override;
+			static HWND GetMainWindowHandle();
 		protected:
 			static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 		private:

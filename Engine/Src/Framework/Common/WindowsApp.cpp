@@ -1,9 +1,9 @@
 #include "pch.h"
 #include "Framework/Common/WindowsApp.h"
 #include "Framework/Common/Utils.h"
-#include "Framework/Common/Log.h"
+#include "Framework/Common/LogMgr.h"
+#include "RHI/DX12/BaseRenderer.h"
 
-//#pragma execution_character_set("utf-8")
 
 namespace Ailu
 {
@@ -12,7 +12,8 @@ namespace Ailu
         static const wchar_t* kAppTitleIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_title_icon.ico);
         static const wchar_t* kAppIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_icon.ico);
 
-        LogManager* g_pLogManager;
+        LogMgr* g_pLogMgr;
+        DXBaseRenderer* renderer = new DXBaseRenderer(1280,720);
 
         WindowsApp::WindowsApp(HINSTANCE hinstance, int argc) : _hinstance(hinstance),_argc(argc)
         {
@@ -22,10 +23,11 @@ namespace Ailu
         }
         int WindowsApp::Initialize()
         {
-            g_pLogManager = new LogManager();
-            g_pLogManager->Initialize();
+            g_pLogMgr = new LogMgr();
+            g_pLogMgr->Initialize();
             LOG_WARNING(" WindowsApp::Initialize{}  {}", 20, "aaa")
-            LOG_WARNING(L" 程序初始化  {}", 20, "aaa")
+                LOG_WARNING(L" 程序初始化  {}", 20, "aaa")
+            g_pLogMgr->LogFormat("fdfs{}",20);
             // Initialize the window class.
             WNDCLASSEX windowClass = { 0 };
             windowClass.cbSize = sizeof(WNDCLASSEX);
@@ -72,15 +74,16 @@ namespace Ailu
             {
                 LOG_WARNING("TitleIcon or AppIcon load failed,please check out the path!")
             }
-
             _b_exit = false;
+            renderer->OnInit();
             return 0;
             // Return this part of the WM_QUIT message to Windows.
             //return static_cast<char>(msg.wParam);
         }
         void WindowsApp::Finalize()
         {
-            g_pLogManager->Finalize();
+            g_pLogMgr->Finalize();
+            renderer->OnDestroy();
         }
         void WindowsApp::Tick()
         {
@@ -117,6 +120,10 @@ namespace Ailu
         {
             Tick();
         }
+        HWND WindowsApp::GetMainWindowHandle()
+        {
+            return _hwnd;
+        }
         LRESULT WindowsApp::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             switch (message)
@@ -136,6 +143,9 @@ namespace Ailu
                 return 0;
 
             case WM_PAINT:
+            {
+                renderer->OnRender();
+            }
                 return 0;
             case WM_DESTROY:
                 PostQuitMessage(0);

@@ -54,6 +54,21 @@
     <ClInclude Include="Inc\CompanyEnv.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\LogMgr.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\Renderer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\BaseRenderer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\d3dx12.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\dxhelper.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -68,7 +83,13 @@
     <ClCompile Include="Src\Framework\Common\WindowsApp.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\Common\Log.cpp">
+    <ClCompile Include="Src\Framework\Common\LogMgr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\Renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\BaseRenderer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
