@@ -29,5 +29,7 @@
 
 #define GET_ENGINE_FULL_PATHW(file) STRW2(CONTACTW2(PROJECT_DIR,file))
 
+#define BIT(x) (1 << x)
+
 #endif // !__GLOBAL_MARCO_H__
 

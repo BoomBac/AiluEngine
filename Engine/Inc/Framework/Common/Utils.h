@@ -13,11 +13,11 @@ namespace Ailu
     static wchar_t* ToWChar(const char* multiByteStr)
     {
         int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
-        if (size == 0) {
-            // Error handling
+        if (size == 0 || size > 256) {
+            throw std::runtime_error("to wstring error!");
             return nullptr;
         }
-        wchar_t* wideStr = new wchar_t[size];
+        static wchar_t wideStr[256];
         MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, wideStr, size);
         return wideStr;
     }
@@ -25,11 +25,11 @@ namespace Ailu
     static char* ToChar(const wchar_t* wideStr)
     {
         int size = WideCharToMultiByte(CP_UTF8, 0, wideStr, -1, nullptr, 0, nullptr, nullptr);
-        if (size == 0) {
-            // Error handling
+        if (size == 0 || size > 256) {
+            throw std::runtime_error("to nstring error!");
             return nullptr;
         }
-        char* multiByteStr = new char[size];
+        static char multiByteStr[256];
         WideCharToMultiByte(CP_UTF8, 0, wideStr, -1, multiByteStr, size, nullptr, nullptr);
         return multiByteStr;
     }

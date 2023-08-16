@@ -11,6 +11,7 @@
 #include "../framework.h"
 #include <cstdint>
 #include <cstdlib>
+#include <stdexcept>
 #include <cwchar>
 #include <shellapi.h>
 

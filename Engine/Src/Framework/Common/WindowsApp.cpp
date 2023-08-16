@@ -3,6 +3,7 @@
 #include "Framework/Common/Utils.h"
 #include "Framework/Common/LogMgr.h"
 #include "RHI/DX12/BaseRenderer.h"
+#include "Framework/Events/KeyEvent.h"
 
 
 namespace Ailu
@@ -38,11 +39,10 @@ namespace Ailu
 
         RECT windowRect = { 0, 0, static_cast<LONG>(GetConfiguration().viewport_width_), static_cast<LONG>(GetConfiguration().viewport_height_) };
         AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
-        auto title = ToWChar(GfxConfiguration().window_name_);
         // Create the window and store a handle to it.
         _hwnd = CreateWindow(
             windowClass.lpszClassName,
-            title,
+            ToWChar(GfxConfiguration().window_name_),
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -52,7 +52,6 @@ namespace Ailu
             nullptr,        // We aren't using menus.
             _hinstance,
             nullptr);
-        delete title;
         // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
         //pSample->OnInit();
 
@@ -122,6 +121,7 @@ namespace Ailu
     {
         return _hwnd;
     }
+
     LRESULT WindowsApp::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         switch (message)
@@ -135,6 +135,14 @@ namespace Ailu
         return 0;
 
         case WM_KEYDOWN:
+        {
+            Event* e = new KeyPressedEvent(0,1);
+            static EventDispather dispater(*e);
+            dispater.CommitEvent(*e);
+            dispater.Dispatch<KeyPressedEvent>([e](KeyPressedEvent& e) {
+                LOG(e.ToString())
+                return true; });           
+        }
             return 0;
 
         case WM_KEYUP:

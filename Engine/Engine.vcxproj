@@ -165,6 +165,10 @@
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Utils.h" />
     <ClInclude Include="Inc\Framework\Common\WindowsApp.h" />
+    <ClInclude Include="Inc\Framework\Events\Event.h" />
+    <ClInclude Include="Inc\Framework\Events\KeyEvent.h" />
+    <ClInclude Include="Inc\Framework\Events\MouseEvent.h" />
+    <ClInclude Include="Inc\Framework\Events\WindowEvent.h" />
     <ClInclude Include="Inc\Framework\Interface\IApplication.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
