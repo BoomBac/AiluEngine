@@ -1,48 +1,52 @@
-#include "pch.h"
-#include "Framework/Common/WindowsApp.h"
-#include "Framework/Common/Utils.h"
-#include "Framework/Common/LogMgr.h"
-#include "RHI/DX12/BaseRenderer.h"
+#include "pch.h"	
+#include "Platform/WinWindow.h"
+#include "Framework/Common/Log.h"
 #include "Framework/Events/KeyEvent.h"
-
+#include "RHI/DX12/BaseRenderer.h"
 
 namespace Ailu
 {
-    static const wchar_t* kAppTitleIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_title_icon.ico);
-    static const wchar_t* kAppIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_icon.ico);
-
-    LogMgr* g_pLogMgr;
+	static const wchar_t* kAppTitleIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_title_icon.ico);
+	static const wchar_t* kAppIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_icon.ico);
     DXBaseRenderer* renderer = new DXBaseRenderer(1280, 720);
+	static Window* Create(const WindowProps& props)
+	{
+		return new WinWindow(props);
+	}
+	WinWindow::WinWindow(const WindowProps& prop)
+	{
+		Init(prop);
+	}
 
-    WindowsApp::WindowsApp(HINSTANCE hinstance, int argc) : _hinstance(hinstance), _argc(argc)
+	WinWindow::~WinWindow()
+	{
+	}
+    HWND WinWindow::GetWindowHwnd()
     {
-        WCHAR** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-        _b_exit = false;
-        _argv = nullptr;
+        return _hwnd;
     }
-    int WindowsApp::Initialize()
-    {
-        g_pLogMgr = new LogMgr();
-        g_pLogMgr->Initialize();
-        LOG_WARNING(" WindowsApp::Initialize{}  {}", 20, "aaa")
-            LOG_WARNING(L" 程序初始化  {}", 20, "aaa")
-            g_pLogMgr->LogFormat("fdfs{}", 20);
+    void WinWindow::Init(const WindowProps& prop)
+	{
+		_data.Width = prop.Width;
+		_data.Height = prop.Height;
+		_data.Title = prop.Title;
+		LOG(L"Create window {}, ({},{})",prop.Title,prop.Width,prop.Height)
         // Initialize the window class.
         WNDCLASSEX windowClass = { 0 };
         windowClass.cbSize = sizeof(WNDCLASSEX);
         windowClass.style = CS_HREDRAW | CS_VREDRAW;
         windowClass.lpfnWndProc = WindowProc;
-        windowClass.hInstance = _hinstance;
+        windowClass.hInstance = _sp_hinstance;
         windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
         windowClass.lpszClassName = L"AiluEngineClass";
         RegisterClassEx(&windowClass);
 
-        RECT windowRect = { 0, 0, static_cast<LONG>(GetConfiguration().viewport_width_), static_cast<LONG>(GetConfiguration().viewport_height_) };
+        RECT windowRect = { 0, 0, static_cast<LONG>(prop.Width), static_cast<LONG>(prop.Height) };
         AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
         // Create the window and store a handle to it.
         _hwnd = CreateWindow(
             windowClass.lpszClassName,
-            ToWChar(GfxConfiguration().window_name_),
+            prop.Title.c_str(),
             WS_OVERLAPPEDWINDOW,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -50,12 +54,12 @@ namespace Ailu
             windowRect.bottom - windowRect.top,
             nullptr,        // We have no parent window.
             nullptr,        // We aren't using menus.
-            _hinstance,
+            _sp_hinstance,
             nullptr);
         // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
         //pSample->OnInit();
 
-        ShowWindow(_hwnd, _argc);
+        auto a = ShowWindow(_hwnd, _s_argc);
         HANDLE hTitleIcon = LoadImage(0, kAppTitleIconPath, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         HANDLE hIcon = LoadImage(0, kAppIconPath, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         if (hTitleIcon && hIcon) {
@@ -71,20 +75,10 @@ namespace Ailu
         {
             LOG_WARNING("TitleIcon or AppIcon load failed,please check out the path!")
         }
-        _b_exit = false;
         renderer->OnInit();
-        return 0;
-        // Return this part of the WM_QUIT message to Windows.
-        //return static_cast<char>(msg.wParam);
-    }
-    void WindowsApp::Finalize()
-    {
-        g_pLogMgr->Finalize();
-        renderer->OnDestroy();
-    }
-    void WindowsApp::Tick()
-    {
-        // Main sample loop.
+	}
+	void WinWindow::OnUpdate()
+	{
         MSG msg = {};
         while (msg.message != WM_QUIT)
         {
@@ -95,34 +89,33 @@ namespace Ailu
                 DispatchMessage(&msg);
             }
         }
-        _b_exit = true;
-    }
-    void WindowsApp::SetCommandLineParameters(int argc, char** argv)
-    {
-    }
-    int WindowsApp::GetCommandLineArgumentsCount() const
-    {
-        return 0;
-    }
-    const char* WindowsApp::GetCommandLineArgument(int index) const
-    {
-        return nullptr;
-    }
-    const GfxConfiguration& WindowsApp::GetConfiguration() const
-    {
-        static GfxConfiguration cfg;
-        return cfg;
-    }
-    void WindowsApp::Run()
-    {
-        Tick();
-    }
-    HWND WindowsApp::GetMainWindowHandle()
-    {
-        return _hwnd;
-    }
 
-    LRESULT WindowsApp::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+	}
+	uint32_t WinWindow::GetWidth() const
+	{
+		return 0;
+	}
+	uint32_t WinWindow::GetHeight() const
+	{
+		return 0;
+	}
+	void WinWindow::SetEventHandler(const EventHandler& handler)
+	{
+	}
+	void WinWindow::SetVSync(bool enabled)
+	{
+	}
+	bool WinWindow::IsVSync() const
+	{
+		return false;
+	}
+
+	void WinWindow::Shutdown()
+	{
+        renderer->OnDestroy();
+        delete renderer;
+	}
+    LRESULT WinWindow::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         switch (message)
         {
@@ -136,14 +129,14 @@ namespace Ailu
 
         case WM_KEYDOWN:
         {
-            Event* e = new KeyPressedEvent(0,1);
+            Event* e = new KeyPressedEvent(0, 1);
             static EventDispather dispater(*e);
             dispater.CommitEvent(*e);
             dispater.Dispatch<KeyPressedEvent>([e](KeyPressedEvent& e) {
                 LOG(e.ToString())
-                return true; });           
+                    return true; });
         }
-            return 0;
+        return 0;
 
         case WM_KEYUP:
             return 0;

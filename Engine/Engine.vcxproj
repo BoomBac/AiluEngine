@@ -164,7 +164,7 @@
     <ClInclude Include="Inc\Framework\Common\Log.h" />
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Utils.h" />
-    <ClInclude Include="Inc\Framework\Common\WindowsApp.h" />
+    <ClInclude Include="Inc\Framework\Common\Window.h" />
     <ClInclude Include="Inc\Framework\Events\Event.h" />
     <ClInclude Include="Inc\Framework\Events\KeyEvent.h" />
     <ClInclude Include="Inc\Framework\Events\MouseEvent.h" />
@@ -172,6 +172,7 @@
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\pch.h" />
+    <ClInclude Include="Inc\Platform\WinWindow.h" />
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\RHI\DX12\BaseRenderer.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
@@ -179,7 +180,6 @@
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
-    <ClCompile Include="Src\Framework\Common\WindowsApp.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -187,6 +187,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Ailu.cpp" />
+    <ClCompile Include="Src\Platform\WinWindow.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\RHI\DX12\BaseRenderer.cpp" />
   </ItemGroup>

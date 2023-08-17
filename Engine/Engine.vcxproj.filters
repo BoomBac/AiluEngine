@@ -42,9 +42,6 @@
     <ClInclude Include="Ailu.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Common\WindowsApp.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Framework\Common\Utils.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -78,7 +75,10 @@
     <ClInclude Include="Inc\Framework\Events\MouseEvent.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Events\WindowEvent.h">
+    <ClInclude Include="Inc\Framework\Common\Window.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Platform\WinWindow.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -92,9 +92,6 @@
     <ClCompile Include="Ailu.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\Common\WindowsApp.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -102,6 +99,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\RHI\DX12\BaseRenderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Platform\WinWindow.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,8 +1,9 @@
 #pragma once
 #ifndef __ENTRY_POINT_H__
 #define __ENTRY_POINT_H__
-#include "Inc/Framework/Common/CommandLineApp.h"
-#include "Inc/Framework/Common/WindowsApp.h"
+#include "pch.h"
+#include "Framework/Common/CommandLineApp.h"
+#include "Platform/WinWindow.h"
 
 //#define __COMMANDLINE_APP_
 
@@ -20,11 +21,11 @@ int main(int argc, char** argv)
 #else 
 int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR cmdline, _In_ int cmdshow)
 {
-	auto app = new Ailu::WindowsApp(hInst,cmdshow);
-	app->Initialize();
-	app->Run();
-	app->Finalize();
-	delete app;
+	Ailu::WinWindow::_sp_hinstance = hInst;
+	Ailu::WinWindow::_s_argc = cmdshow;
+	auto window = new Ailu::WinWindow(Ailu::WindowProps());
+	window->OnUpdate();
+	delete window;
 }
 #endif
 
