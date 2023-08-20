@@ -15,6 +15,7 @@ namespace Ailu
     private:
         void Render();
         DXBaseRenderer* _p_renderer = nullptr;
+        bool _b_init = false;
     };
 }
 

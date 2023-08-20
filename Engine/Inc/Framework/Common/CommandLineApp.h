@@ -2,12 +2,12 @@
 #define __COMMANDLINE_APP_H___
 #pragma once
 #include "Inc/GlobalMarco.h"
-#include "Inc/Framework/Interface/IApplication.h"
+#include "Framework/Interface/IRuntimeModule.h"
 #include <iostream>
 
 namespace Ailu
 {
-	class AILU_API CommandLineApp : public IApplication
+	class AILU_API CommandLineApp : public IRuntimeModule
 	{
 	public:
 		int Initialize() override
@@ -20,29 +20,6 @@ namespace Ailu
 			std::cout << "Ailu Engine Finalize" << std::endl;
 		};
 		void Tick() override {};
-
-		void SetCommandLineParameters(int argc, char** argv) override {};
-		[[nodiscard]] int GetCommandLineArgumentsCount() const override
-		{
-			return 0;
-		};
-		[[nodiscard]] const char* GetCommandLineArgument(int index) const override
-		{
-			return nullptr;
-		}
-		[[nodiscard]] const GfxConfiguration& GetConfiguration() const override
-		{
-			static GfxConfiguration cfg;
-			return cfg;
-		};
-
-		void Run() override
-		{
-			while (true)
-			{
-
-			}
-		}
 	};
 }
 

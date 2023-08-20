@@ -17,7 +17,7 @@ namespace Ailu
             if (SUCCEEDED(pAdapter->QueryInterface(IID_PPV_ARGS(&pAdapter4))))
             {
                 pAdapter4->GetDesc3(&desc);
-                LOG(desc.Description);
+                LOG_INFO(desc.Description);
             }
             if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
             {

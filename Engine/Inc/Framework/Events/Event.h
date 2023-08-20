@@ -40,7 +40,7 @@ namespace Ailu
 		virtual const char* GetName() const = 0;
 		virtual int GetCategoryFlags() const = 0;
 		virtual std::string ToString() const { return GetName();  }
-
+		const bool Handled() const { return _handled; }
 		inline bool IsInCategory(EEventCategory category) const
 		{
 			return GetCategoryFlags() & category;

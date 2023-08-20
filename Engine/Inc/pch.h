@@ -22,5 +22,6 @@
 #include <mutex>
 #include <iostream>
 #include <fstream>
+#include <functional>
 
 #endif //PCH_H

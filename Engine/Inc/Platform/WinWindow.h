@@ -16,13 +16,12 @@ namespace Ailu
 		void SetVSync(bool enabled) override;
 		bool IsVSync() const override;
 	public:
-		inline static HINSTANCE _sp_hinstance = nullptr;
-		inline static int _s_argc = 0;
 		static HWND GetWindowHwnd();
 	private:
 		void Init(const WindowProps& prop);
 		void Shutdown();
 		static LRESULT WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		LRESULT WindowProcImpl(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	private:
 		struct WindowData
 		{

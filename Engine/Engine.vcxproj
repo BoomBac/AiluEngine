@@ -158,6 +158,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="Ailu.h" />
     <ClInclude Include="Inc\CompanyEnv.h" />
+    <ClInclude Include="Inc\Framework\Common\Application.h" />
     <ClInclude Include="Inc\Framework\Common\CommandLineApp.h" />
     <ClInclude Include="Inc\Framework\Common\EntryPoint.h" />
     <ClInclude Include="Inc\Framework\Common\GfxConfiguration.h" />
@@ -167,8 +168,9 @@
     <ClInclude Include="Inc\Framework\Common\Window.h" />
     <ClInclude Include="Inc\Framework\Events\Event.h" />
     <ClInclude Include="Inc\Framework\Events\KeyEvent.h" />
+    <ClInclude Include="Inc\Framework\Events\Layer.h" />
+    <ClInclude Include="Inc\Framework\Events\LayerStack.h" />
     <ClInclude Include="Inc\Framework\Events\MouseEvent.h" />
-    <ClInclude Include="Inc\Framework\Interface\IApplication.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\pch.h" />
@@ -179,7 +181,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
+    <ClCompile Include="Src\Framework\Events\Layer.cpp" />
+    <ClCompile Include="Src\Framework\Events\LayerStack.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

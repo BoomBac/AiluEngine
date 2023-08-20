@@ -93,7 +93,7 @@ namespace Ailu
 		}
 	}
 #define AE_LOG(maker,Level,msg,...) Log(maker,Level,msg,##__VA_ARGS__);
-#define LOG(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
+#define LOG_INFO(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
 #define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
 #define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
 }

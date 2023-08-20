@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "Framework/Common/CommandLineApp.h"
 #include "Platform/WinWindow.h"
+#include "Framework/Common/Application.h"
 
 //#define __COMMANDLINE_APP_
 
@@ -21,11 +22,11 @@ int main(int argc, char** argv)
 #else 
 int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR cmdline, _In_ int cmdshow)
 {
-	Ailu::WinWindow::_sp_hinstance = hInst;
-	Ailu::WinWindow::_s_argc = cmdshow;
-	auto window = new Ailu::WinWindow(Ailu::WindowProps());
-	window->OnUpdate();
-	delete window;
+	Ailu::Application* app = new Ailu::Application();
+	app->Initialize();
+	app->Tick();
+	app->Finalize();
+	DESTORY_PTR(app)
 }
 #endif
 

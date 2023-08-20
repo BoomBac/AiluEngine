@@ -58,13 +58,16 @@ namespace Ailu
 	class AILU_API MouseButtonReleasedEvent : public Event
 	{
 	public:
-		MouseButtonReleasedEvent() {};
+		MouseButtonReleasedEvent(uint8_t button) : _mouse_btn(button) {}
+		inline uint8_t GetButton() const { return _mouse_btn; }
 		std::string ToString() const override
 		{
-			return "MouseButtonReleasedEvent";
+			return std::format("MouseButtonReleasedEvent : {} be released", _mouse_btn);
 		}
 		EVENT_CLASS_TYPE(kMouseButtonReleased)
 		EVENT_CLASS_CATEGORY(kEventCategoryMouse | kEventCategoryInput)
+	private:
+		uint8_t _mouse_btn;
 	};
 }
 
