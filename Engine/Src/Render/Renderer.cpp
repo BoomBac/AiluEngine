@@ -1,12 +1,15 @@
 #include "pch.h"
 #include "Render/Renderer.h"
+#include "Framework/Common/GfxConfiguration.h"
 
 namespace Ailu
 {
     int Renderer::Initialize()
     {
-        _p_renderer = new DXBaseRenderer(1280, 720);
+        auto config = GfxConfiguration();
+        _p_renderer = new DXBaseRenderer(config.viewport_width_, config.viewport_height_);
         _b_init = true;
+        _p_renderer->OnInit();
         return 0;
     }
     void Renderer::Finalize()

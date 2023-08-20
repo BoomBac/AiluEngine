@@ -4,6 +4,8 @@
 #include "Framework/Common/Log.h"
 #include "Platform/WinWindow.h"
 
+#include "Platform/ImGuiDX12Renderer.h"
+
 namespace Ailu
 {
     static void GetHardwareAdapter(IDXGIFactory6* pFactory, IDXGIAdapter4** ppAdapter)
@@ -41,6 +43,20 @@ namespace Ailu
     {
         LoadPipeline();
         LoadAssets();
+
+        //init imgui
+        D3D12_DESCRIPTOR_HEAP_DESC SrvHeapDesc;
+        SrvHeapDesc.NumDescriptors = 1;
+        SrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        SrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        SrvHeapDesc.NodeMask = 0;
+        ThrowIfFailed(m_device->CreateDescriptorHeap(
+            &SrvHeapDesc, IID_PPV_ARGS(&g_pd3dSrvDescHeapImGui)));
+
+        auto ret = ImGui_ImplDX12_Init(m_device.Get(), FrameCount,
+            DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeapImGui,
+            g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart(),
+            g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart());
     }
     void DXBaseRenderer::OnUpdate()
     {
@@ -61,6 +77,7 @@ namespace Ailu
     }
     void DXBaseRenderer::OnDestroy()
     {
+        g_pd3dSrvDescHeapImGui->Release();
         // Ensure that the GPU is no longer referencing resources that are about to be
 // cleaned up by the destructor.
         WaitForPreviousFrame();
@@ -199,8 +216,13 @@ namespace Ailu
 
         // Record commands.
         const float clearColor[] = { 0.3f, 0.2f, 0.4f, 1.0f };
-        m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+
         auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+        m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+        m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+        m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);
+
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
         // Indicate that the back buffer will now be used to present.
         m_commandList->ResourceBarrier(1, &bar_after);
 

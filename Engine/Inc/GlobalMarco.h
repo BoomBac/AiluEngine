@@ -34,7 +34,7 @@
 
 #define DESTORY_PTR(ptr) if(ptr != nullptr) {delete ptr;ptr = nullptr;}
 
-#define INIT_CHECK(obj,class) if(!obj->_b_init) LOG_ERROR("{} hasn't been init!",#class) return;
+#define INIT_CHECK(obj,class) if(!obj->_b_init) {LOG_ERROR("{} hasn't been init!",#class) return;}
 
 #define HIGH_BIT(x, n) ((x) >> (n))
 #define LOW_BIT(x, n) ((x) & ((1 << (n)) - 1))

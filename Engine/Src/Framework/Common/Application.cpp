@@ -3,14 +3,22 @@
 #include "Platform/WinWindow.h"
 #include "Framework/Common/Log.h"
 
+#include "Framework/ImGui/ImGuiLayer.h"
+
+#define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
+
 namespace Ailu
 {
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
 	{
+		AL_ASSERT(_sp_instance,"Application already init!")
+		_sp_instance = this;
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
+		PushLayer(new ImGUILayer());
 		_p_renderer = new Renderer();
+		_p_renderer->Initialize();
 		_b_running = true;
 		return 0;
 	}
@@ -28,16 +36,22 @@ namespace Ailu
 				layer->OnUpdate();
 			_p_window->OnUpdate();
 			std::cout << "hello" << std::endl;
-			//_p_renderer->Tick();
+			_p_renderer->Tick();
 		}
 	}
 	void Application::PushLayer(Layer* layer)
 	{
 		_layer_stack.PushLayer(layer);
+		layer->OnAttach();
 	}
 	void Application::PushOverLayer(Layer* layer)
 	{
 		_layer_stack.PushOverLayer(layer);
+		layer->OnAttach();
+	}
+	Application* Application::GetInstance()
+	{
+		return _sp_instance;
 	}
 	bool Application::OnWindowClose(WindowCloseEvent& e)
 	{

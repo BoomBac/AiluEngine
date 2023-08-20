@@ -19,6 +19,10 @@ namespace Ailu
 
         void PushLayer(Layer* layer);
         void PushOverLayer(Layer* layer);
+
+        const Window& GetWindow() const { return *_p_window; }
+
+        static Application* GetInstance();
     private:
         bool OnWindowClose(WindowCloseEvent& e);
     private:
@@ -27,6 +31,7 @@ namespace Ailu
         Renderer* _p_renderer = nullptr;
         void OnEvent(Event& e);
         bool _b_running;
+        inline static Application* _sp_instance = nullptr;
     };
 }
 

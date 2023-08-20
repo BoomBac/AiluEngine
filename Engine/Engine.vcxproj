@@ -155,6 +155,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Ext\d3dx12.h" />
+    <ClInclude Include="Ext\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="Ext\imgui\imconfig.h" />
+    <ClInclude Include="Ext\imgui\imgui.h" />
+    <ClInclude Include="Ext\imgui\imgui_internal.h" />
+    <ClInclude Include="Ext\imgui\imstb_rectpack.h" />
+    <ClInclude Include="Ext\imgui\imstb_textedit.h" />
+    <ClInclude Include="Ext\imgui\imstb_truetype.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Ailu.h" />
     <ClInclude Include="Inc\CompanyEnv.h" />
@@ -171,9 +178,11 @@
     <ClInclude Include="Inc\Framework\Events\Layer.h" />
     <ClInclude Include="Inc\Framework\Events\LayerStack.h" />
     <ClInclude Include="Inc\Framework\Events\MouseEvent.h" />
+    <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\pch.h" />
+    <ClInclude Include="Inc\Platform\ImGuiDX12Renderer.h" />
     <ClInclude Include="Inc\Platform\WinWindow.h" />
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\RHI\DX12\BaseRenderer.h" />
@@ -181,10 +190,17 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="Ext\imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="Ext\imgui\imgui.cpp" />
+    <ClCompile Include="Ext\imgui\imgui_demo.cpp" />
+    <ClCompile Include="Ext\imgui\imgui_draw.cpp" />
+    <ClCompile Include="Ext\imgui\imgui_tables.cpp" />
+    <ClCompile Include="Ext\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
     <ClCompile Include="Src\Framework\Events\Layer.cpp" />
     <ClCompile Include="Src\Framework\Events\LayerStack.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -192,6 +208,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Ailu.cpp" />
+    <ClCompile Include="Src\Platform\ImGuiDX12Renderer.cpp" />
     <ClCompile Include="Src\Platform\WinWindow.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\RHI\DX12\BaseRenderer.cpp" />

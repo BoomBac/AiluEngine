@@ -23,5 +23,6 @@
 #include <iostream>
 #include <fstream>
 #include <functional>
-
+#define _CRT_SECURE_NO_WARNINGS
+#define IMGUI_DEFINE_MATH_OPERATORS
 #endif //PCH_H

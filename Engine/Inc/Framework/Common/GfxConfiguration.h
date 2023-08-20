@@ -25,8 +25,8 @@ namespace Ailu
         /// <param name="window_name">the window name</param>
         explicit GfxConfiguration(int32_t r = 8, int32_t g = 8, int32_t b = 8,
             int32_t a = 8, int32_t d = 24, int32_t s = 0,
-            int32_t msaa = 1, int32_t width = 1280,
-            int32_t height = 720)
+            int32_t msaa = 1, int32_t width = 1600,
+            int32_t height = 900)
             : red_bits_(r),
             green_bits_(g),
             blue_bits_(b),
@@ -47,8 +47,8 @@ namespace Ailu
         int32_t depth_bits_{ 24 };   ///< depth buffer depth in bits
         int32_t stencil_bits_{ 8 };  ///< stencil buffer depth in bits
         int32_t msaa_samples_{ 4 };  ///< MSAA samples
-        int32_t viewport_width_{ 1280 };
-        int32_t viewport_height_{ 720 };
+        int32_t viewport_width_{ 1600 };
+        int32_t viewport_height_{ 900 };
 
         inline std::wstring GetInfo()
         {

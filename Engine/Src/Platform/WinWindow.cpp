@@ -5,6 +5,7 @@
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/MouseEvent.h"
 
+
 namespace Ailu
 {
 	static const wchar_t* kAppTitleIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_title_icon.ico);
@@ -21,6 +22,7 @@ namespace Ailu
 
 	WinWindow::~WinWindow()
 	{
+
 	}
     HWND WinWindow::GetWindowHwnd()
     {
@@ -80,6 +82,7 @@ namespace Ailu
         {
             LOG_WARNING("TitleIcon or AppIcon load failed,please check out the path!")
         }
+
 	}
 	void WinWindow::OnUpdate()
 	{
