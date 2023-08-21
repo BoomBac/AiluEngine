@@ -2,8 +2,8 @@
 #include "Framework/Common/Application.h"
 #include "Platform/WinWindow.h"
 #include "Framework/Common/Log.h"
-
 #include "Framework/ImGui/ImGuiLayer.h"
+#include "Framework/Common/ThreadPool.h"
 
 #define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
 
@@ -20,6 +20,7 @@ namespace Ailu
 		_p_renderer = new Renderer();
 		_p_renderer->Initialize();
 		_b_running = true;
+		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
 		return 0;
 	}
 	void Application::Finalize()

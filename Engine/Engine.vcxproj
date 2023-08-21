@@ -171,6 +171,8 @@
     <ClInclude Include="Inc\Framework\Common\GfxConfiguration.h" />
     <ClInclude Include="Inc\Framework\Common\Log.h" />
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
+    <ClInclude Include="Inc\Framework\Common\ThreadPool.h" />
+    <ClInclude Include="Inc\Framework\Common\TimeMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Utils.h" />
     <ClInclude Include="Inc\Framework\Common\Window.h" />
     <ClInclude Include="Inc\Framework\Events\Event.h" />
@@ -178,6 +180,7 @@
     <ClInclude Include="Inc\Framework\Events\Layer.h" />
     <ClInclude Include="Inc\Framework\Events\LayerStack.h" />
     <ClInclude Include="Inc\Framework\Events\MouseEvent.h" />
+    <ClInclude Include="Inc\Framework\Events\WindowEvent.h" />
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
@@ -198,6 +201,7 @@
     <ClCompile Include="Ext\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
+    <ClCompile Include="Src\Framework\Common\TimeMgr.cpp" />
     <ClCompile Include="Src\Framework\Events\Layer.cpp" />
     <ClCompile Include="Src\Framework\Events\LayerStack.cpp" />
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
