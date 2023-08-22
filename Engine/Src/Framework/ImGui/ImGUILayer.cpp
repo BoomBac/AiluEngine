@@ -17,6 +17,7 @@ Ailu::ImGUILayer::~ImGUILayer()
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
+static ImFont* font0 = nullptr;
 
 void Ailu::ImGUILayer::OnAttach()
 {
@@ -24,8 +25,11 @@ void Ailu::ImGUILayer::OnAttach()
     auto context = ImGui::CreateContext();
     ImGui::SetCurrentContext(context);
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+    //io.MouseDrawCursor = true;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    font0 = io.Fonts->AddFontFromFileTTF(GET_ENGINE_FULL_PATH(Res/Fonts/VictorMono-Regular.ttf), 13.0f);
+    io.Fonts->Build();
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -38,31 +42,33 @@ void Ailu::ImGUILayer::OnDetach()
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
 }
-
+#pragma warning(push)
+#pragma warning(disable: 4244)
 void Ailu::ImGUILayer::OnUpdate()
 {
     const Window& window = Application::GetInstance()->GetWindow();
     ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(window.GetWidth(), window.GetHeight());
+    io.DisplaySize = ImVec2(static_cast<float>(window.GetWidth()), static_cast<float>(window.GetHeight()));
 
     // Start the Dear ImGui frame
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-
+    ImGui::PushFont(font0);
     ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
     ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
     ImGui::End();
-
+    ImGui::PopFont();
     static bool show = true;
     ImGui::ShowDemoWindow(&show);
     ImGui::EndFrame();
     ImGui::Render();
 
 }
-
+#pragma warning(pop)
 void Ailu::ImGUILayer::OnEvent(Event& e)
 {
 }
+

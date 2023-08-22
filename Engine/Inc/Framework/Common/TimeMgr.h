@@ -1,3 +1,5 @@
+#pragma warning(push)
+#pragma warning(disable: 4251) //std库直接暴露为接口dll在客户端上使用时可能会有问题，禁用该编译警告
 #pragma once
 #ifndef __TIMEMGR_H__
 #define __TIMEMGR_H__
@@ -33,6 +35,6 @@ namespace Ailu
 		bool _b_stop = false;
 	};
 }
-
+#pragma warning(pop)
 
 #endif // !TIMEMGR_H__

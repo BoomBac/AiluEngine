@@ -15,7 +15,7 @@ namespace Ailu
         *ppAdapter = nullptr;
         for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters(adapterIndex, &pAdapter); adapterIndex++)
         {
-            DXGI_ADAPTER_DESC3 desc;
+            DXGI_ADAPTER_DESC3 desc{};
             if (SUCCEEDED(pAdapter->QueryInterface(IID_PPV_ARGS(&pAdapter4))))
             {
                 pAdapter4->GetDesc3(&desc);
@@ -144,8 +144,9 @@ namespace Ailu
 
         // This sample does not support fullscreen transitions.
         ThrowIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
-
+        ThrowIfFailed(swapChain->SetFullscreenState(FALSE, nullptr));
         ThrowIfFailed(swapChain.As(&m_swapChain));
+
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
         // Create descriptor heaps.

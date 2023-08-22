@@ -1,4 +1,6 @@
+#pragma warning(push)
 #pragma warning(disable: 4251) //std库直接暴露为接口dll在客户端上使用时可能会有问题，禁用该编译警告
+
 #pragma once
 #ifndef __LAYER_H__
 #define __LAYER_H__
@@ -22,6 +24,6 @@ namespace Ailu
 	};
 }
 
-
+#pragma warning(pop)
 #endif // !LAYER_H__
 

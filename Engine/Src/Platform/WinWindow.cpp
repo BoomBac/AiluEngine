@@ -5,7 +5,10 @@
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/MouseEvent.h"
 
+#include "Ext/imgui/backends/imgui_impl_win32.h"
+#include "Ext/imgui/imgui.h"
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 namespace Ailu
 {
 	static const wchar_t* kAppTitleIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_title_icon.ico);
@@ -66,7 +69,13 @@ namespace Ailu
             hinstance,
             this);
 
+         //移除调整窗口大小的样式
+        LONG_PTR style = GetWindowLongPtr(_hwnd, GWL_STYLE);
+        style = style & ~WS_THICKFRAME;
+        SetWindowLongPtr(_hwnd, GWL_STYLE, style);
         ShowWindow(_hwnd, SW_SHOW);
+        UpdateWindow(_hwnd);
+
         HANDLE hTitleIcon = LoadImage(0, kAppTitleIconPath, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         HANDLE hIcon = LoadImage(0, kAppIconPath, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         if (hTitleIcon && hIcon) {
@@ -122,8 +131,11 @@ namespace Ailu
 	{
 
 	}
+
     LRESULT WinWindow::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
+        if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+            return true;
         //return DefWindowProc(hWnd, message, wParam, lParam);
         //if (message == WM_NCCREATE)
         //{
@@ -133,10 +145,15 @@ namespace Ailu
         return ((WinWindow*)GetWindowLongPtr(hWnd, GWLP_USERDATA))->WindowProcImpl(hWnd, message, wParam, lParam);
     }
 
+#pragma warning(push)
+#pragma warning(disable: 4244)
     LRESULT WinWindow::WindowProcImpl(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         switch (message)
         {
+        //case WM_NCCALCSIZE:
+        //    // 移除窗口边框，使客户区占据整个窗口
+        //    return 0;
         case WM_CREATE:
         {
             // Save the DXSample* passed in to CreateWindow.
@@ -253,4 +270,6 @@ namespace Ailu
         // Handle any messages the switch statement didn't.
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
+
+#pragma warning(pop)
 }
