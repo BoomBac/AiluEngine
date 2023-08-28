@@ -183,6 +183,7 @@
     <ClInclude Include="Inc\Framework\Events\WindowEvent.h" />
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
+    <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\pch.h" />
     <ClInclude Include="Inc\Platform\ImGuiDX12Renderer.h" />
@@ -222,6 +223,11 @@
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Res\Shaders\shaders.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

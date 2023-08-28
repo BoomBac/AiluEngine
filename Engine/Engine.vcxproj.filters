@@ -123,6 +123,9 @@
     <ClInclude Include="Inc\Framework\Common\TimeMgr.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Math\ALMath.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -187,6 +190,7 @@
     <None Include="after_build.bat">
       <Filter>源文件</Filter>
     </None>
+    <None Include="Res\Shaders\shaders.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

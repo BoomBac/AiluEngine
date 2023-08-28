@@ -21,14 +21,22 @@
 	#define PROJECT_DIR F:/ProjectCpp/AiluEngine/Engine/
 #endif // COMPANY_ENV
 
-#define GET_ENGINE_FULL_PATH(file) STR2(CONTACT2(PROJECT_DIR,file))
+
+
+
 
 #define CONTACTW(x,y) x##y
 #define STRW(x) L#x
 #define CONTACTW2(x,y) CONTACT(x,y)
 #define STRW2(x) STRW(x)
+#define RES_PATH CONTACT2(PROJECT_DIR,Res/)
 
+#define GET_ENGINE_FULL_PATH(file) STR2(CONTACT2(PROJECT_DIR,file))
 #define GET_ENGINE_FULL_PATHW(file) STRW2(CONTACTW2(PROJECT_DIR,file))
+
+#define GET_RES_PATH(file) STR2(CONTACT2(RES_PATH,file))
+#define GET_RES_PATHW(file) STRW2(CONTACTW2(RES_PATH,file))
+
 
 #define BIT(x) (1 << x)
 
