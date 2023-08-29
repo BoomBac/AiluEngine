@@ -3,17 +3,16 @@
 #include "Platform/WinWindow.h"
 #include "Framework/Common/Log.h"
 #include "Framework/ImGui/ImGuiLayer.h"
-#include "Framework/Common/ThreadPool.h"
-
-#define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
+#include "Platform/WinInput.h"
 
 namespace Ailu
 {
+
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
 	{
-		AL_ASSERT(_sp_instance,"Application already init!")
-		_sp_instance = this;
+		AL_ASSERT(sp_instance,"Application already init!")
+		sp_instance = this;
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		PushLayer(new ImGUILayer());
@@ -21,6 +20,7 @@ namespace Ailu
 		_p_renderer->Initialize();
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
+		WinInput::Create();
 		return 0;
 	}
 	void Application::Finalize()
@@ -52,7 +52,7 @@ namespace Ailu
 	}
 	Application* Application::GetInstance()
 	{
-		return _sp_instance;
+		return sp_instance;
 	}
 	bool Application::OnWindowClose(WindowCloseEvent& e)
 	{

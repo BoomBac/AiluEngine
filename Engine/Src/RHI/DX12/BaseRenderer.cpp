@@ -4,8 +4,8 @@
 #include "RHI/DX12/BaseRenderer.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Framework/Common/Log.h"
-#include "Platform/WinWindow.h"
 #include "Platform/ImGuiDX12Renderer.h"
+#include "Framework/Common/Application.h"
 
 
 namespace Ailu
@@ -146,7 +146,7 @@ namespace Ailu
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
-        auto hwnd = WinWindow::GetWindowHwnd();
+        auto hwnd = static_cast<HWND>(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
         ComPtr<IDXGISwapChain1> swapChain;
         ThrowIfFailed(factory->CreateSwapChainForHwnd(
             m_commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.

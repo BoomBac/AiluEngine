@@ -15,8 +15,7 @@ namespace Ailu
 		void SetEventHandler(const EventHandler& handler) override;
 		void SetVSync(bool enabled) override;
 		bool IsVSync() const override;
-	public:
-		static HWND GetWindowHwnd();
+		void* GetNativeWindowPtr() const override;
 	private:
 		void Init(const WindowProps& prop);
 		void Shutdown();
@@ -31,7 +30,7 @@ namespace Ailu
 			EventHandler Handler;
 		};
 		WindowData _data;
-		inline static HWND _hwnd = nullptr;
+		HWND _hwnd;
 	};
 }
 

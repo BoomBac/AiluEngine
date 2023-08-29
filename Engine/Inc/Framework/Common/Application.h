@@ -31,7 +31,7 @@ namespace Ailu
         Renderer* _p_renderer = nullptr;
         void OnEvent(Event& e);
         bool _b_running;
-        inline static Application* _sp_instance = nullptr;
+        inline static Application* sp_instance = nullptr;
     };
 }
 

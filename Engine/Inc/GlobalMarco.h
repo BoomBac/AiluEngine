@@ -21,10 +21,6 @@
 	#define PROJECT_DIR F:/ProjectCpp/AiluEngine/Engine/
 #endif // COMPANY_ENV
 
-
-
-
-
 #define CONTACTW(x,y) x##y
 #define STRW(x) L#x
 #define CONTACTW2(x,y) CONTACT(x,y)
@@ -46,6 +42,8 @@
 
 #define HIGH_BIT(x, n) ((x) >> (n))
 #define LOW_BIT(x, n) ((x) & ((1 << (n)) - 1))
+
+#define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
 
 #endif // !__GLOBAL_MARCO_H__
 

@@ -33,7 +33,7 @@ void Ailu::ImGUILayer::OnAttach()
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    ImGui_ImplWin32_Init(WinWindow::GetWindowHwnd());
+    ImGui_ImplWin32_Init(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
 }
 
 void Ailu::ImGUILayer::OnDetach()

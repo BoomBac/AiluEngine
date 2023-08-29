@@ -33,6 +33,7 @@ namespace Ailu
 		virtual void SetEventHandler(const EventHandler& handler) = 0;
 		virtual void SetVSync(bool enabled) = 0;
 		virtual bool IsVSync() const = 0;
+		virtual void* GetNativeWindowPtr() const = 0;
 		//template<class T>
 		//static auto Create(const WindowProps& props = WindowProps(), T window)
 		//{

@@ -27,10 +27,7 @@ namespace Ailu
 	{
 
 	}
-    HWND WinWindow::GetWindowHwnd()
-    {
-        return _hwnd;
-    }
+
     void WinWindow::Init(const WindowProps& prop)
 	{
 		_data.Width = prop.Width;
@@ -126,6 +123,11 @@ namespace Ailu
 	{
 		return false;
 	}
+
+    void* WinWindow::GetNativeWindowPtr() const
+    {
+        return static_cast<void*>(_hwnd);
+    }
 
 	void WinWindow::Shutdown()
 	{
