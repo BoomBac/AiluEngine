@@ -118,7 +118,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Engine\;$(SolutionDir)\Engine\Inc\;$(SolutionDir)\Engine\Ext\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\Engine\;$(SolutionDir)\Engine\Inc\;$(SolutionDir)\Engine\Ext\;E:\AiluEngine\Engine\Ext\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -155,6 +155,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Ext\d3dx12.h" />
+    <ClInclude Include="Ext\imgui\backends\imgui_impl_dx12.h" />
     <ClInclude Include="Ext\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="Ext\imgui\imconfig.h" />
     <ClInclude Include="Ext\imgui\imgui.h" />
@@ -187,7 +188,6 @@
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\pch.h" />
-    <ClInclude Include="Inc\Platform\ImGuiDX12Renderer.h" />
     <ClInclude Include="Inc\Platform\WinInput.h" />
     <ClInclude Include="Inc\Platform\WinWindow.h" />
     <ClInclude Include="Inc\Render\Renderer.h" />
@@ -196,6 +196,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="Ext\imgui\backends\imgui_impl_dx12.cpp" />
     <ClCompile Include="Ext\imgui\backends\imgui_impl_win32.cpp" />
     <ClCompile Include="Ext\imgui\imgui.cpp" />
     <ClCompile Include="Ext\imgui\imgui_demo.cpp" />
@@ -215,7 +216,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Ailu.cpp" />
-    <ClCompile Include="Src\Platform\ImGuiDX12Renderer.cpp" />
     <ClCompile Include="Src\Platform\WinInput.cpp" />
     <ClCompile Include="Src\Platform\WinWindow.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
