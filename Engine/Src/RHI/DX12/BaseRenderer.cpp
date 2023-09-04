@@ -1,10 +1,10 @@
 #include "pch.h"
 #include <d3dcompiler.h>
 
+#include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "RHI/DX12/BaseRenderer.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Framework/Common/Log.h"
-#include "Platform/ImGuiDX12Renderer.h"
 #include "Framework/Common/Application.h"
 
 
@@ -83,6 +83,13 @@ namespace Ailu
         // Execute the command list.
         ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+        ImGuiIO& io = ImGui::GetIO();
+        // Update and Render additional Platform Windows
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
+        }
 
         // Present the frame.
         ThrowIfFailed(m_swapChain->Present(1, 0));
