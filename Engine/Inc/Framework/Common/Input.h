@@ -2,6 +2,7 @@
 #ifndef __INPUT_H__
 #define __INPUT_H__
 #include "GlobalMarco.h"
+#include "Framework/Math/ALMath.hpp"
 
 namespace Ailu
 {
@@ -23,12 +24,17 @@ namespace Ailu
         { 
             return sp_instance->GetMouseYImpl();
         };
+        inline static Vector2f GetMousePos()
+        {
+            return sp_instance->GetMousePosImpl();
+        }
     protected:
         virtual bool IsKeyPressedImpl(int keycode) = 0;
 
         virtual bool IsMouseButtonPressedImpl(uint8_t button) = 0;
         virtual float GetMouseXImpl() = 0;
         virtual float GetMouseYImpl() = 0;
+        virtual Vector2f GetMousePosImpl() = 0;
     protected:
         inline static Input* sp_instance;
     };

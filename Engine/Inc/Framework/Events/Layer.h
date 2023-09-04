@@ -15,8 +15,9 @@ namespace Ailu
 		virtual ~Layer();
 		virtual void OnAttach() {}
 		virtual void OnDetach() {}
-		virtual void OnUpdate() {}
 		virtual void OnEvent(Event& e) {}
+		virtual void OnUpdate(float delta_time) {}
+		virtual void OnImguiRender() {}
 
 		inline const std::string GetName() const { return _debug_name; }
 	protected:

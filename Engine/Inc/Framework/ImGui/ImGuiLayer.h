@@ -12,8 +12,11 @@ namespace Ailu
 
 		void OnAttach() override;
 		void OnDetach() override;
-		void OnUpdate() override;
 		void OnEvent(Event& e) override;
+		void OnImguiRender() override;
+
+		void Begin();
+		void End();
 	};
 }
 

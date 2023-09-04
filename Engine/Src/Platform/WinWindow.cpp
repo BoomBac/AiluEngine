@@ -4,6 +4,7 @@
 #include "Framework/Events/KeyEvent.h"
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/MouseEvent.h"
+#include "Platform/WinInput.h"
 
 #include "Ext/imgui/backends/imgui_impl_win32.h"
 #include "Ext/imgui/imgui.h"
@@ -88,7 +89,7 @@ namespace Ailu
         {
             LOG_WARNING("TitleIcon or AppIcon load failed,please check out the path!")
         }
-
+        WinInput::Create(_hwnd);
 	}
 	void WinWindow::OnUpdate()
 	{

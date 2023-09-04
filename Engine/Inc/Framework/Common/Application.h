@@ -7,6 +7,7 @@
 #include "Render/Renderer.h"
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/LayerStack.h"
+#include "Framework/ImGui/ImGuiLayer.h"
 
 namespace Ailu
 {
@@ -27,6 +28,7 @@ namespace Ailu
         bool OnWindowClose(WindowCloseEvent& e);
     private:
         LayerStack _layer_stack;
+        ImGUILayer* _p_imgui_layer;
         Window* _p_window = nullptr;
         Renderer* _p_renderer = nullptr;
         void OnEvent(Event& e);

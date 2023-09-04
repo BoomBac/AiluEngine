@@ -3,7 +3,8 @@
 #include "Platform/WinWindow.h"
 #include "Framework/Common/Log.h"
 #include "Framework/ImGui/ImGuiLayer.h"
-#include "Platform/WinInput.h"
+#include "Framework/Common/KeyCode.h"
+#include "Framework/Common/Input.h"
 
 namespace Ailu
 {
@@ -15,12 +16,12 @@ namespace Ailu
 		sp_instance = this;
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
-		PushLayer(new ImGUILayer());
+		_p_imgui_layer = new ImGUILayer();
+		PushLayer(_p_imgui_layer);
 		_p_renderer = new Renderer();
 		_p_renderer->Initialize();
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
-		WinInput::Create();
 		return 0;
 	}
 	void Application::Finalize()
@@ -34,9 +35,13 @@ namespace Ailu
 		while (_b_running)
 		{
 			for (Layer* layer : _layer_stack)
-				layer->OnUpdate();
+				layer->OnUpdate(16.66);
+			_p_imgui_layer->Begin();
+			for (Layer* layer : _layer_stack)
+				layer->OnImguiRender();
+			_p_imgui_layer->End();
+
 			_p_window->OnUpdate();
-			std::cout << "hello" << std::endl;
 			_p_renderer->Tick();
 		}
 	}
@@ -63,7 +68,11 @@ namespace Ailu
 	{
 		EventDispather dispather(e);
 		dispather.Dispatch<WindowCloseEvent>(BIND_EVENT_HANDLER(OnWindowClose));
-		LOG_INFO(e.ToString());
+		//auto pos = Input::GetMousePos();
+		//LOG_INFO("pos: {},{}",pos.x,pos.y)
+		if(Input::IsKeyPressed(AL_KEY_A))
+			LOG_INFO(e.ToString())
+		//LOG_INFO(e.ToString());
 		for (auto it = _layer_stack.end(); it != _layer_stack.begin();)
 		{
 			(*--it)->OnEvent(e);

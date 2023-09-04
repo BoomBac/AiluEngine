@@ -10,10 +10,21 @@ namespace Ailu
 		sp_instance = &input;
 		return;
 	}
+	void WinInput::Create(HWND hwnd)
+	{
+		static WinInput input(hwnd);
+		sp_instance = &input;
+		return;
+	}
 	WinInput::WinInput()
 	{
 		_hwnd = static_cast<HWND>(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
 		_mouse_point = {0,0};
+	}
+	WinInput::WinInput(HWND hwnd)
+	{
+		_hwnd = hwnd;
+		_mouse_point = { 0,0 };
 	}
 	bool WinInput::IsKeyPressedImpl(int keycode)
 	{
@@ -40,5 +51,11 @@ namespace Ailu
 		GetCursorPos(&_mouse_point); // 获取鼠标的屏幕坐标
 		ScreenToClient(_hwnd, &_mouse_point); // 将屏幕坐标转换为客户区坐标
 		return static_cast<float>(_mouse_point.y);
+	}
+	Vector2f WinInput::GetMousePosImpl()
+	{
+		GetCursorPos(&_mouse_point); // 获取鼠标的屏幕坐标
+		ScreenToClient(_hwnd, &_mouse_point); // 将屏幕坐标转换为客户区坐标
+		return Vector2f((float)_mouse_point.x, (float)_mouse_point.y);
 	}
 }
