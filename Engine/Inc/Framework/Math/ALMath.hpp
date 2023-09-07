@@ -653,9 +653,9 @@ namespace Ailu
 		}} };
 		return translation;
 	}
-	static void MatrixRotationX(Matrix4x4f& matrix, const float angle)
+	static void MatrixRotationX(Matrix4x4f& matrix, const float radius)
 	{
-		float c = cosf(angle), s = sinf(angle);
+		float c = cosf(radius), s = sinf(radius);
 
 		Matrix4x4f rotation = { {{
 			{  1.0f, 0.0f, 0.0f, 0.0f },
@@ -668,9 +668,9 @@ namespace Ailu
 
 		return;
 	}
-	static void MatrixRotationY(Matrix4x4f& matrix, const float angle)
+	static void MatrixRotationY(Matrix4x4f& matrix, const float radius)
 	{
-		float c = cosf(angle), s = sinf(angle);
+		float c = cosf(radius), s = sinf(radius);
 
 		Matrix4x4f rotation = { {{
 			{    c, 0.0f,   -s, 0.0f },
@@ -693,9 +693,9 @@ namespace Ailu
 		matrix = rotation;
 		return;
 	}
-	static void MatrixRotationAxis(Matrix4x4f& matrix, const Vector3f& axis, const float angle)
+	static void MatrixRotationAxis(Matrix4x4f& matrix, const Vector3f& axis, const float radius)
 	{
-		float c = cosf(angle), s = sinf(angle), one_minus_c = 1.0f - c;
+		float c = cosf(radius), s = sinf(radius), one_minus_c = 1.0f - c;
 		Matrix4x4f rotation = { {{
 			{   c + axis.x * axis.x * one_minus_c,  axis.x * axis.y * one_minus_c + axis.z * s, axis.x * axis.z * one_minus_c - axis.y * s, 0.0f    },
 			{   axis.x * axis.y * one_minus_c - axis.z * s, c + axis.y * axis.y * one_minus_c,  axis.y * axis.z * one_minus_c + axis.x * s, 0.0f    },
@@ -736,8 +736,8 @@ namespace Ailu
 		matrix = rotation;
 	}
 
-	static float AngleToRadius(const float& angle) { return angle * kPi / 180.f; }
-	static float RadiusToAngle(const float& radius) { return 180.f * radius / kPi; }
+	static float ToRadius(const float& angle) { return angle * kPi / 180.f; }
+	static float ToAngle(const float& radius) { return 180.f * radius / kPi; }
 	template<typename V>
 	static V lerp(const V& src, const V& des, const float& weight)
 	{

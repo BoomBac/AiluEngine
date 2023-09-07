@@ -166,7 +166,6 @@ namespace Ailu
         return 0;
         case WM_KEYDOWN:
         {
-            Sleep(50);
             KeyPressedEvent e(static_cast<uint8_t>(wParam), lParam & 0xFFFF);
             _data.Handler(e);
         }

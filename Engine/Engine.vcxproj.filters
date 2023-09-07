@@ -132,6 +132,15 @@
     <ClInclude Include="Ext\imgui\backends\imgui_impl_dx12.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Render\Camera.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Events\InputLayer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\KeyCode.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -192,6 +201,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Ext\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\Camera.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Events\InputLayer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
