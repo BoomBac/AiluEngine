@@ -45,10 +45,10 @@ namespace Ailu
 		ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f,"%.2f");
 		ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.1f, 2.0f,"%.2f");
 		ImGui::Text("Position:");
-		ImGui::SameLine(); // 将下一个元素放在同一行
+		ImGui::SameLine(); // ����һ��Ԫ�ط���ͬһ��
 		ImGui::Text(VectorToString(camera_pos).c_str());
 		ImGui::Text("Rotation:");
-		ImGui::SameLine(); // 将下一个元素放在同一行
+		ImGui::SameLine(); // ����һ��Ԫ�ط���ͬһ��
 		ImGui::Text(VectorToString(camera_rotation).c_str());
 		ImGui::End();
 	}

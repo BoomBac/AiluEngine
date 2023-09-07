@@ -21,10 +21,6 @@ namespace Ailu
 	private:
 		CameraState* _origin_cam_state;
 		CameraState* _target_cam_state;
-
-		float _camera_move_speed = 0.06f;
-		float _camera_wander_speed = 0.6f;
-		float _lerp_speed_multifactor = 1.28f;
 	};
 }
 
