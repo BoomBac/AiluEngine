@@ -62,17 +62,18 @@ namespace Ailu
             DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeapImGui,
             g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart(),
             g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart());
+
+        //scene data
+        _p_scene_camera = std::make_unique<Camera>(16.0F / 9.0F);
+        _p_scene_camera->SetPosition(0, 0, -50);
+        _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 0.1f, 1000.f);
+        Camera::sCurrent = _p_scene_camera.get();
     }
     void DXBaseRenderer::OnUpdate()
     {
-        const float translationSpeed = 0.001f;
-        const float offsetBounds = 1.25f;
-
-        m_constantBufferData.offset.x += translationSpeed;
-        if (m_constantBufferData.offset.x > offsetBounds)
-        {
-            m_constantBufferData.offset.x = -offsetBounds;
-        }
+        //m_constantBufferData.CameraViewProj = Transpose(_p_scene_camera->GetProjection() * _p_scene_camera->GetView());
+        m_constantBufferData._MatrixV = Transpose(_p_scene_camera->GetView());
+        m_constantBufferData._MatrixVP = Transpose(_p_scene_camera->GetProjection()) * Transpose(_p_scene_camera->GetView());
         memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
     }
     void DXBaseRenderer::OnRender()
@@ -92,7 +93,8 @@ namespace Ailu
         }
 
         // Present the frame.
-        ThrowIfFailed(m_swapChain->Present(1, 0));
+       ThrowIfFailed(m_swapChain->Present(1, 0));
+        //hrowIfFailed(m_swapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
         WaitForGpu();
         MoveToNextFrame();
     }
@@ -153,6 +155,7 @@ namespace Ailu
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
+        swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
         auto hwnd = static_cast<HWND>(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
         ComPtr<IDXGISwapChain1> swapChain;
         ThrowIfFailed(factory->CreateSwapChainForHwnd(
@@ -295,14 +298,60 @@ namespace Ailu
         // Create the vertex buffer.
         {
             // Define the geometry for a triangle.
-            SimpleVertex triangleVertices[] =
+            //SimpleVertex testMesh[] =
+            //{
+            //    { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+            //    { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+            //    { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+            //};
+
+            SimpleVertex testMesh[] =
             {
-                { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-                { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-                { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+                // Front face
+                { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+                { { 0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+                { { 0.5f, 0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+                { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+                { { 0.5f, 0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+                { { -0.5f, 0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
+                // Back face
+                { { -0.5f, -0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, -0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+                { { -0.5f, -0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+                { { -0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
+                // Left face
+                { { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+                { { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+                { { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+                { { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+                { { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+                { { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
+                // Right face
+                { { 0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, 0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, 0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, 0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, -0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                // Top face
+                { { -0.5f, 0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
+                { { 0.5f, 0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
+                { { 0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
+                { { -0.5f, 0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
+                { { 0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
+                { { -0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
+                // Bottom face
+                { { -0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, -0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { -0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { 0.5f, -0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
+                { { -0.5f, -0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } }
             };
 
-            const UINT vertexBufferSize = sizeof(triangleVertices);
+            const UINT vertexBufferSize = sizeof(testMesh);
 
             // Note: using upload heaps to transfer static data like vert buffers is not 
             // recommended. Every time the GPU needs it, the upload heap will be marshalled 
@@ -322,7 +371,7 @@ namespace Ailu
             UINT8* pVertexDataBegin;
             CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
             ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-            memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
+            memcpy(pVertexDataBegin, testMesh, sizeof(testMesh));
             m_vertexBuffer->Unmap(0, nullptr);
 
             // Initialize the vertex buffer view.
@@ -407,7 +456,7 @@ namespace Ailu
         m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
         m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-        m_commandList->DrawInstanced(3, 1, 0, 0);
+        m_commandList->DrawInstanced(36, 1, 0, 0);
 
         m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());

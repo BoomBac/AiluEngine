@@ -4,6 +4,9 @@
 
 #include <d3dx12.h>
 #include <dxgi1_6.h>
+
+#include "Render/Camera.h"
+
 #include "Framework/Math/ALMath.hpp"
 
 using Microsoft::WRL::ComPtr;
@@ -17,8 +20,9 @@ namespace Ailu
 
     struct SceneConstantBuffer
     {
-        Vector4f offset;
-        float padding[60]; // Padding so the constant buffer is 256-byte aligned.
+        Matrix4x4f _MatrixV;
+        Matrix4x4f _MatrixVP;
+        float padding[32]; // Padding so the constant buffer is 256-byte aligned.
     };
     static_assert((sizeof(SceneConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
@@ -65,6 +69,8 @@ namespace Ailu
         UINT _width;
         UINT _height;
         float m_aspectRatio;
+
+        std::unique_ptr<Camera> _p_scene_camera;
 
         void LoadPipeline();
         void LoadAssets();

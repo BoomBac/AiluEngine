@@ -5,6 +5,7 @@
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Framework/Common/KeyCode.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Events/InputLayer.h"
 
 namespace Ailu
 {
@@ -18,8 +19,11 @@ namespace Ailu
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
+
 		_p_renderer = new Renderer();
 		_p_renderer->Initialize();
+
+		PushLayer(new InputLayer());
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
 		return 0;

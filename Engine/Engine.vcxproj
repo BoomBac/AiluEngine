@@ -171,6 +171,7 @@
     <ClInclude Include="Inc\Framework\Common\EntryPoint.h" />
     <ClInclude Include="Inc\Framework\Common\GfxConfiguration.h" />
     <ClInclude Include="Inc\Framework\Common\Input.h" />
+    <ClInclude Include="Inc\Framework\Common\KeyCode.h" />
     <ClInclude Include="Inc\Framework\Common\Log.h" />
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
     <ClInclude Include="Inc\Framework\Common\ThreadPool.h" />
@@ -178,6 +179,7 @@
     <ClInclude Include="Inc\Framework\Common\Utils.h" />
     <ClInclude Include="Inc\Framework\Common\Window.h" />
     <ClInclude Include="Inc\Framework\Events\Event.h" />
+    <ClInclude Include="Inc\Framework\Events\InputLayer.h" />
     <ClInclude Include="Inc\Framework\Events\KeyEvent.h" />
     <ClInclude Include="Inc\Framework\Events\Layer.h" />
     <ClInclude Include="Inc\Framework\Events\LayerStack.h" />
@@ -190,6 +192,7 @@
     <ClInclude Include="Inc\pch.h" />
     <ClInclude Include="Inc\Platform\WinInput.h" />
     <ClInclude Include="Inc\Platform\WinWindow.h" />
+    <ClInclude Include="Inc\Render\Camera.h" />
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\RHI\DX12\BaseRenderer.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
@@ -206,6 +209,7 @@
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\TimeMgr.cpp" />
+    <ClCompile Include="Src\Framework\Events\InputLayer.cpp" />
     <ClCompile Include="Src\Framework\Events\Layer.cpp" />
     <ClCompile Include="Src\Framework\Events\LayerStack.cpp" />
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
@@ -218,6 +222,7 @@
     <ClCompile Include="Ailu.cpp" />
     <ClCompile Include="Src\Platform\WinInput.cpp" />
     <ClCompile Include="Src\Platform\WinWindow.cpp" />
+    <ClCompile Include="Src\Render\Camera.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\RHI\DX12\BaseRenderer.cpp" />
   </ItemGroup>

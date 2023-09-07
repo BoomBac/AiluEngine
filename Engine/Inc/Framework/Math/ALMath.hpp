@@ -5,6 +5,7 @@
 #include <sstream>
 #include <string>
 #include <limits>
+#include <format>
 
 namespace Ailu
 {
@@ -154,17 +155,23 @@ namespace Ailu
 	template<template<typename> typename TT, typename T>
 	std::string VectorToString(TT<T> arr)
 	{
-		std::string str;
-		std::stringstream ss;
-		ss << "(";
-		for (uint32_t i = 0; i < CountOf(arr.data); i++)
+		auto dimension = CountOf(arr.data);
+		if (dimension == 2)
 		{
-			ss << arr.data[i];
-			if (CountOf(arr.data) - 1 == i) ss << " ";
-			else ss << ",";
+			return std::format("({:.2f},{:.2f})", arr.data[0],arr.data[1]);
 		}
-		ss >> str; str.append(")\n");
-		return str;
+		else if(dimension == 3)
+		{
+			return std::format("({:.2f},{:.2f},{:.2f})", arr.data[0], arr.data[1], arr.data[2]);
+		}
+		else if(dimension == 4)
+		{
+			return std::format("({:.2f},{:.2f},{:.2f},{:.2f})", arr.data[0], arr.data[1], arr.data[2], arr.data[3]);
+		}
+		else
+		{
+			throw std::runtime_error("VectorToString unsupported dimension!");
+		}
 	}
 	template<template<typename> typename TT, typename T>
 	TT<T> operator+(const TT<T> v1, const TT<T> v2)
@@ -453,6 +460,14 @@ namespace Ailu
 		vector[2] = temp[2];
 		return;
 	}
+
+	static Vector3f TransformCoord(const Vector3f& vector, const Matrix4x4f& matrix)
+	{
+		Vector4f temp{ vector,1.f };
+		Transform(temp, matrix);
+		return temp.xyz;
+	}
+
 	//	//Transform for normal,w is 0.f
 	static void TransformNormal(Vector3f& vector, const Matrix4x4f& matrix)
 	{
@@ -653,9 +668,9 @@ namespace Ailu
 		}} };
 		return translation;
 	}
-	static void MatrixRotationX(Matrix4x4f& matrix, const float angle)
+	static void MatrixRotationX(Matrix4x4f& matrix, const float radius)
 	{
-		float c = cosf(angle), s = sinf(angle);
+		float c = cosf(radius), s = sinf(radius);
 
 		Matrix4x4f rotation = { {{
 			{  1.0f, 0.0f, 0.0f, 0.0f },
@@ -668,9 +683,9 @@ namespace Ailu
 
 		return;
 	}
-	static void MatrixRotationY(Matrix4x4f& matrix, const float angle)
+	static void MatrixRotationY(Matrix4x4f& matrix, const float radius)
 	{
-		float c = cosf(angle), s = sinf(angle);
+		float c = cosf(radius), s = sinf(radius);
 
 		Matrix4x4f rotation = { {{
 			{    c, 0.0f,   -s, 0.0f },
@@ -693,9 +708,9 @@ namespace Ailu
 		matrix = rotation;
 		return;
 	}
-	static void MatrixRotationAxis(Matrix4x4f& matrix, const Vector3f& axis, const float angle)
+	static void MatrixRotationAxis(Matrix4x4f& matrix, const Vector3f& axis, const float radius)
 	{
-		float c = cosf(angle), s = sinf(angle), one_minus_c = 1.0f - c;
+		float c = cosf(radius), s = sinf(radius), one_minus_c = 1.0f - c;
 		Matrix4x4f rotation = { {{
 			{   c + axis.x * axis.x * one_minus_c,  axis.x * axis.y * one_minus_c + axis.z * s, axis.x * axis.z * one_minus_c - axis.y * s, 0.0f    },
 			{   axis.x * axis.y * one_minus_c - axis.z * s, c + axis.y * axis.y * one_minus_c,  axis.y * axis.z * one_minus_c + axis.x * s, 0.0f    },
@@ -736,8 +751,8 @@ namespace Ailu
 		matrix = rotation;
 	}
 
-	static float AngleToRadius(const float& angle) { return angle * kPi / 180.f; }
-	static float RadiusToAngle(const float& radius) { return 180.f * radius / kPi; }
+	static float ToRadius(const float& angle) { return angle * kPi / 180.f; }
+	static float ToAngle(const float& radius) { return 180.f * radius / kPi; }
 	template<typename V>
 	static V lerp(const V& src, const V& des, const float& weight)
 	{

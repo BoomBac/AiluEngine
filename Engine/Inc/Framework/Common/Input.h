@@ -3,6 +3,8 @@
 #define __INPUT_H__
 #include "GlobalMarco.h"
 #include "Framework/Math/ALMath.hpp"
+#include "KeyCode.h"
+#include <tuple>
 
 namespace Ailu
 {

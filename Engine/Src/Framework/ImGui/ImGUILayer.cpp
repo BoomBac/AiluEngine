@@ -62,6 +62,7 @@ void Ailu::ImGUILayer::OnImguiRender()
 {
     ImGui::PushFont(font0);
     ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+    ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
     ImGui::End();
     ImGui::PopFont();
     static bool show = true;
