@@ -5,6 +5,7 @@
 #include "Ext/imgui/backends/imgui_impl_win32.h"
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/TimeMgr.h"
 
 Ailu::ImGUILayer::ImGUILayer()
 {
@@ -63,6 +64,7 @@ void Ailu::ImGUILayer::OnImguiRender()
     ImGui::PushFont(font0);
     ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
     ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
+    ImGui::Text("FrameTime: %.2f ms", ModuleTimeStatics::RenderDeltatime);
     ImGui::End();
     ImGui::PopFont();
     static bool show = true;

@@ -6,9 +6,11 @@
 #include "Framework/Common/KeyCode.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Events/InputLayer.h"
+#include "Framework/Common/TimeMgr.h"
 
 namespace Ailu
 {
+	TimeMgr* g_pTimeMgr = new TimeMgr();
 
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
@@ -17,6 +19,7 @@ namespace Ailu
 		sp_instance = this;
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
+		g_pTimeMgr->Initialize();
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
 
@@ -26,6 +29,7 @@ namespace Ailu
 		PushLayer(new InputLayer());
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
+		g_pTimeMgr->Mark();
 		return 0;
 	}
 	void Application::Finalize()
@@ -33,20 +37,36 @@ namespace Ailu
 		DESTORY_PTR(_p_window)
 		_p_renderer->Finalize();
 		DESTORY_PTR(_p_renderer)
+		g_pTimeMgr->Finalize();
+		DESTORY_PTR(g_pTimeMgr)
 	}
+	double render_lag = 0.0;
+	double update_lag = 0.0;
+	constexpr double kTargetFrameRate = 170;
+	constexpr double kMsPerUpdate = 16.66;
+	constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
 	void Application::Tick()
 	{
 		while (_b_running)
 		{
-			for (Layer* layer : _layer_stack)
-				layer->OnUpdate(16.66);
-			_p_imgui_layer->Begin();
-			for (Layer* layer : _layer_stack)
-				layer->OnImguiRender();
-			_p_imgui_layer->End();
+			g_pTimeMgr->Tick();
+			render_lag += g_pTimeMgr->GetElapsedSinceLastMark();
+			update_lag += g_pTimeMgr->GetElapsedSinceLastMark();
+			g_pTimeMgr->Mark();
 
+			for (Layer* layer : _layer_stack)
+				layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
 			_p_window->OnUpdate();
-			_p_renderer->Tick();
+
+			while (render_lag > kMsPerRender)
+			{		
+				_p_imgui_layer->Begin();
+				for (Layer* layer : _layer_stack)
+					layer->OnImguiRender();
+				_p_imgui_layer->End();
+				_p_renderer->Tick();
+				render_lag -= kMsPerRender;
+			}
 		}
 	}
 	void Application::PushLayer(Layer* layer)

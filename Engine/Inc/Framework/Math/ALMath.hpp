@@ -6,6 +6,7 @@
 #include <string>
 #include <limits>
 #include <format>
+#include "GlobalMarco.h"
 
 namespace Ailu
 {
@@ -70,6 +71,8 @@ namespace Ailu
 	template<typename T>
 	struct Vector2D
 	{
+		static const Vector2D<T> Zero;
+		static const Vector2D<T> One;
 		union
 		{
 			T data[2];
@@ -84,12 +87,46 @@ namespace Ailu
 		Vector2D<T>(const T& v, const T& w) : x(v), y(w) {};
 		operator T* () { return data; };
 		operator const T* () { return static_cast<const T*>(data); };
+		Vector2D<T>& operator+=(const Vector2D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] += other.data[i];
+			}
+			return *this;
+		}
+
+		Vector2D<T>& operator-=(const Vector2D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] -= other.data[i];
+			}
+			return *this;
+		}
+
+		Vector2D<T>& operator*=(const Vector2D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] *= other.data[i];
+			}
+			return *this;
+		}
+
+		Vector2D<T>& operator/=(const Vector2D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				//AL_ASSERT(other.data[i] == 0.f, "vector divide by zero commpoent!")
+					data[i] /= other.data[i];
+			}
+			return *this;
+		}
 	};
+	template <typename T>
+	const Vector2D<T> Vector2D<T>::Zero(0, 0);
+	template <typename T>
+	const Vector2D<T> Vector2D<T>::One(1, 1);
 	using Vector2f = Vector2D<float>;
 
 	template <typename T>
 	struct Vector3D
 	{
+		static const Vector3D<T> Zero;
+		static const Vector3D<T> One;
 		union {
 			T data[3];
 			struct { T x, y, z; };
@@ -112,15 +149,62 @@ namespace Ailu
 		Vector3D<T>(const T& _v) : x(_v), y(_v), z(_v) {};
 		Vector3D<T>(const T& _x, const T& _y, const T& _z) : x(_x), y(_y), z(_z) {};
 
+		Vector3D<T>& operator+=(const Vector3D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] += other.data[i];
+			}
+			return *this;
+		}
+
+		Vector3D<T>& operator-=(const Vector3D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] -= other.data[i];
+			}
+			return *this;
+		}
+
+		Vector3D<T>& operator*=(const Vector3D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] *= other.data[i];
+			}
+			return *this;
+		}
+
+		Vector3D<T>& operator/=(const Vector3D<T>& other) {
+			try
+			{
+				for (uint8_t i = 0; i < CountOf(data); i++) {
+					AL_ASSERT(other.data[i] == 0.f, "vector divide by zero commpoent!")
+					//if (other.data[i] == 0.f) throw(std::runtime_error("vector divide by zero commpoent!"));
+					data[i] /= other.data[i];
+				}
+			}
+			catch (const std::exception& e)
+			{
+				LOG_ERROR(e.what());
+			}
+			return *this;
+		}
+
 		operator T* () { return data; };
 		operator const T* () const { return static_cast<const T*>(data); };
+		std::string ToString(int precision = 2) 
+		{
+			return std::format("({:.{}f},{:.{}f},{:.{}f})", data[0], precision, data[1], precision, data[2], precision);
+		}
 	};
+	template <typename T>
+	const Vector3D<T> Vector3D<T>::Zero(0, 0, 0);
+	template <typename T>
+	const Vector3D<T> Vector3D<T>::One (1, 1, 1);
 
 	using Vector3f = Vector3D<float>;
 
 	template <typename T>
 	struct Vector4D
 	{
+		static const Vector4D<T> Zero;
+		static const Vector4D<T> One;
 		union {
 			T data[4];
 			struct { T x, y, z, w; };
@@ -142,7 +226,43 @@ namespace Ailu
 
 		operator T* () { return data; };
 		operator const T* () const { return static_cast<const T*>(data); };
+		Vector4D<T>& operator+=(const Vector4D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] += other.data[i];
+			}
+			return *this;
+		}
+
+		Vector4D<T>& operator-=(const Vector4D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] -= other.data[i];
+			}
+			return *this;
+		}
+
+		Vector4D<T>& operator*=(const Vector4D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] *= other.data[i];
+			}
+			return *this;
+		}
+
+		Vector4D<T>& operator/=(const Vector4D<T>& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) 
+			{
+				if (other.data[i] == 0.f)
+				{
+					throw(std::runtime_error("vector divide by zero commpoent!"));
+				}
+				data[i] /= other.data[i];
+			}
+			return *this;
+		}
 	};
+	template <typename T>
+	const Vector4D<T> Vector4D<T>::Zero(0, 0, 0, 0);
+	template <typename T>
+	const Vector4D<T> Vector4D<T>::One(1, 1, 1, 1);
 
 	using Vector4f = Vector4D<float>;
 	using Quaternion = Vector4D<float>;
@@ -153,27 +273,6 @@ namespace Ailu
 	using Vector4i = Vector4D<uint8_t>;
 
 	template<template<typename> typename TT, typename T>
-	std::string VectorToString(TT<T> arr)
-	{
-		auto dimension = CountOf(arr.data);
-		if (dimension == 2)
-		{
-			return std::format("({:.2f},{:.2f})", arr.data[0],arr.data[1]);
-		}
-		else if(dimension == 3)
-		{
-			return std::format("({:.2f},{:.2f},{:.2f})", arr.data[0], arr.data[1], arr.data[2]);
-		}
-		else if(dimension == 4)
-		{
-			return std::format("({:.2f},{:.2f},{:.2f},{:.2f})", arr.data[0], arr.data[1], arr.data[2], arr.data[3]);
-		}
-		else
-		{
-			throw std::runtime_error("VectorToString unsupported dimension!");
-		}
-	}
-	template<template<typename> typename TT, typename T>
 	TT<T> operator+(const TT<T> v1, const TT<T> v2)
 	{
 		TT<T> res;
@@ -183,6 +282,7 @@ namespace Ailu
 		}
 		return res;
 	}
+
 	template<template<typename> typename TT, typename T>
 	TT<T> operator*(const T& scalar, const TT<T>& v)
 	{
@@ -417,6 +517,15 @@ namespace Ailu
 		MatrixMultipy(ret, m1, m2);
 		return ret;
 	}
+
+	static float NormalizeAngle(float angle) 
+	{
+		float normalizedAngle = std::fmod(angle, 360.0f);
+		if (normalizedAngle > 180.0f)  normalizedAngle -= 360.0f;
+		else if (normalizedAngle < -180.0f) normalizedAngle += 360.0f;
+		return normalizedAngle;
+	}
+
 	static void MatrixRotationYawPitchRoll(Matrix4x4f& matrix, const float yaw, const float pitch, const float roll)
 	{
 		float cYaw, cPitch, cRoll, sYaw, sPitch, sRoll;
@@ -814,6 +923,7 @@ namespace Ailu
 		return out_mat;
 	}
 #pragma warning(pop)
+	using Color = Vector4D<uint8_t>;
 	namespace Colors
 	{
 		static const Vector3f kBlue = { 0.f,0.f,1.f };

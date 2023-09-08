@@ -23,11 +23,13 @@ namespace Ailu
         };
 
         void SetLens(float fovy, float aspect, float nz, float fz);
+        void SetFovH(float angle);
+        void SetFovV(float angle);
         float GetNearZ() const { return _near_clip; };
         float GetFarZ() const { return _far_clip; };
         float GetAspect() const { return _aspect; };
-        float GetFovX() const;
-        float GetFovY() const;
+        float GetFovH() const { return _hfov; };
+        float GetFovV() const { return _vfov; };
         float GetNearPlaneWidth() const;
         float GetFarPlaneWidth() const;
         float GetNearPlaneHeight() const;
@@ -60,7 +62,8 @@ namespace Ailu
         float _aspect;
         float _near_clip;
         float _far_clip;
-        float _fov;
+        float _hfov;
+        float _vfov;
         float _near_plane_height;
         float _far_plane_height;
         Matrix4x4f _view_matrix{};

@@ -8,20 +8,26 @@
 
 namespace Ailu
 {
+	class ModuleTimeStatics
+	{
+	public:
+		inline static float RenderDeltatime = 0.0f;
+	};
 	class AILU_API TimeMgr : IRuntimeModule
 	{
 	public:
 		using ALSecond = std::chrono::seconds;
 		using ALMSecond = std::chrono::duration<float, std::ratio<1, 1000>>;
 		using ALTimeStamp = std::chrono::high_resolution_clock::time_point;
-		inline static float _s_delta_time = 0.0f;
-		inline static float _s_time_since_load = 0.0f;
+		inline static float DeltaTime = 0.0f;
+		inline static float TimeSinceLoad = 0.0f;
 
 		int Initialize() override;
 		void Finalize() override;
 		void Tick() override;
 		void Pause();
 		void Mark();
+		float GetElapsedSinceLastMark() const;
 		void Resume();
 		void Reset();
 	private:
@@ -34,6 +40,7 @@ namespace Ailu
 		float _pause_time = 0.0f;
 		bool _b_stop = false;
 	};
+	extern TimeMgr* g_pTimeMgr;
 }
 #pragma warning(pop)
 

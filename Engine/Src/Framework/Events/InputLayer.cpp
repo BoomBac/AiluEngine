@@ -44,12 +44,13 @@ namespace Ailu
 		ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 1.0f,"%.2f");
 		ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f,"%.2f");
 		ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.1f, 2.0f,"%.2f");
+		ImGui::SliderFloat("FovH", &_camera_fov_h, 0.0f, 120.0f,"%.2f");
 		ImGui::Text("Position:");
-		ImGui::SameLine(); // ����һ��Ԫ�ط���ͬһ��
-		ImGui::Text(VectorToString(camera_pos).c_str());
+		ImGui::SameLine();
+		ImGui::Text(camera_pos.ToString().c_str());
 		ImGui::Text("Rotation:");
-		ImGui::SameLine(); // ����һ��Ԫ�ط���ͬһ��
-		ImGui::Text(VectorToString(camera_rotation).c_str());
+		ImGui::SameLine();
+		ImGui::Text(camera_rotation.ToString().c_str());
 		ImGui::End();
 	}
 	void InputLayer::OnUpdate(float delta_time)
@@ -68,29 +69,29 @@ namespace Ailu
 			Vector3f move_dis{0,0,0};
 			if (Input::IsKeyPressed(AL_KEY_W))
 			{
-				move_dis = move_dis + Camera::sCurrent->GetForward()* _camera_move_speed * _camera_move_speed;
+				move_dis += Camera::sCurrent->GetForward()* _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_S))
 			{
-				move_dis = move_dis - Camera::sCurrent->GetForward() * _camera_move_speed * _camera_move_speed;
+				move_dis -= Camera::sCurrent->GetForward() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_D))
 			{
-				move_dis = move_dis + Camera::sCurrent->GetRight() * _camera_move_speed * _camera_move_speed;
+				move_dis += Camera::sCurrent->GetRight() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_A))
 			{
-				move_dis = move_dis - Camera::sCurrent->GetRight() * _camera_move_speed * _camera_move_speed;
+				move_dis -= Camera::sCurrent->GetRight() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_E))
 			{
-				move_dis = move_dis + Camera::sCurrent->GetUp() * _camera_move_speed * _camera_move_speed;
+				move_dis += Camera::sCurrent->GetUp() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_Q))
 			{
-				move_dis = move_dis - Camera::sCurrent->GetUp() * _camera_move_speed * _camera_move_speed;
+				move_dis -= Camera::sCurrent->GetUp() * _camera_move_speed * _camera_move_speed;
 			}
-			_target_cam_state->position = _target_cam_state->position + move_dis;
+			_target_cam_state->position += move_dis;
 			auto cur_mouse_pos = Input::GetMousePos();
 			if (Input::IsKeyPressed(AL_KEY_RBUTTON))
 			{
@@ -100,6 +101,7 @@ namespace Ailu
 			pre_mouse_pos = cur_mouse_pos;
 			_origin_cam_state->LerpTo(*_target_cam_state, lerp_speed * _lerp_speed_multifactor);
 			_origin_cam_state->UpdateCamrea(*Camera::sCurrent);
+			Camera::sCurrent->SetFovH(_camera_fov_h);
 		}
 
 	}

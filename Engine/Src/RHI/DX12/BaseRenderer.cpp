@@ -65,7 +65,7 @@ namespace Ailu
 
         //scene data
         _p_scene_camera = std::make_unique<Camera>(16.0F / 9.0F);
-        _p_scene_camera->SetPosition(0, 0, -50);
+        _p_scene_camera->SetPosition(0, 0, -5.0f);
         _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 0.1f, 1000.f);
         Camera::sCurrent = _p_scene_camera.get();
     }
@@ -281,7 +281,8 @@ namespace Ailu
             psoDesc.DepthStencilState.DepthEnable = FALSE;
             psoDesc.DepthStencilState.StencilEnable = FALSE;
             psoDesc.SampleMask = UINT_MAX;
-            psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+            //psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+            psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
             psoDesc.NumRenderTargets = 1;
             psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
             psoDesc.SampleDesc.Count = 1;
@@ -304,52 +305,63 @@ namespace Ailu
             //    { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
             //    { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
             //};
-
+            Vector4f front_normal = { 0,0,1,0 };
+            Vector4f back_normal = { 0,0,-1,0 };
+            Vector4f up_normal = { 0,1,0,0 };
+            Vector4f bottom_normal = { 0,-1,0,0 };
+            Vector4f left_normal = { -1,0,0,0 };
+            Vector4f right_normal = { 1,0,0,0 };
             SimpleVertex testMesh[] =
             {
-                // Front face
-                { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-                { { 0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-                { { 0.5f, 0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-                { { -0.5f, -0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-                { { 0.5f, 0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-                { { -0.5f, 0.5f, -0.5f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-                // Back face
-                { { -0.5f, -0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, -0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-                { { -0.5f, -0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-                { { -0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-                // Left face
-                { { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-                { { -0.5f, 0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-                { { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-                { { -0.5f, -0.5f, -0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-                { { -0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-                { { -0.5f, -0.5f, 0.5f }, { 0.0f, 0.0f, 1.0f, 1.0f } },
-                // Right face
-                { { 0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, 0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, 0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, 0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, -0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                // Top face
-                { { -0.5f, 0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
-                { { 0.5f, 0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
-                { { 0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
-                { { -0.5f, 0.5f, -0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
-                { { 0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
-                { { -0.5f, 0.5f, 0.5f }, { 0.0f, 1.0f, 1.0f, 1.0f } },
-                // Bottom face
-                { { -0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, -0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { -0.5f, -0.5f, -0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { 0.5f, -0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } },
-                { { -0.5f, -0.5f, 0.5f }, { 1.0f, 1.0f, 0.0f, 1.0f } }
+                // Front face (CCW)
+                { { -0.5f, -0.5f, -0.5f }, front_normal },
+                { { 0.5f, -0.5f, -0.5f },  front_normal },
+                { { 0.5f, 0.5f, -0.5f },   front_normal },
+                { { -0.5f, -0.5f, -0.5f }, front_normal },
+                { { 0.5f, 0.5f, -0.5f },   front_normal },
+                { { -0.5f, 0.5f, -0.5f },  front_normal },
+
+                // Back face (CCW)
+                { { -0.5f, -0.5f, 0.5f },  back_normal },
+                { { 0.5f, -0.5f, 0.5f },   back_normal },
+                { { 0.5f, 0.5f, 0.5f },    back_normal },
+                { { -0.5f, -0.5f, 0.5f },  back_normal },
+                { { 0.5f, 0.5f, 0.5f },    back_normal },
+                { { -0.5f, 0.5f, 0.5f },   back_normal },
+
+                // Left face (CCW)
+                { { -0.5f, -0.5f, -0.5f }, left_normal },
+                { { -0.5f, 0.5f, -0.5f },  left_normal },
+                { { -0.5f, 0.5f, 0.5f },   left_normal },
+                { { -0.5f, -0.5f, -0.5f }, left_normal },
+                { { -0.5f, 0.5f, 0.5f },   left_normal },
+                { { -0.5f, -0.5f, 0.5f },  left_normal },
+
+                // Right face (CCW)
+                { { 0.5f, -0.5f, -0.5f },  right_normal },
+                { { 0.5f, 0.5f, -0.5f },   right_normal },
+                { { 0.5f, 0.5f, 0.5f },    right_normal },
+                { { 0.5f, -0.5f, -0.5f },  right_normal },
+                { { 0.5f, 0.5f, 0.5f },    right_normal },
+                { { 0.5f, -0.5f, 0.5f },   right_normal },
+
+                // Top face (CCW)
+                { { -0.5f, 0.5f, -0.5f },  up_normal },
+                { { 0.5f, 0.5f, -0.5f },   up_normal },
+                { { 0.5f, 0.5f, 0.5f },    up_normal },
+                { { -0.5f, 0.5f, -0.5f },  up_normal },
+                { { 0.5f, 0.5f, 0.5f },    up_normal },
+                { { -0.5f, 0.5f, 0.5f },   up_normal },
+
+                // Bottom face (CCW)
+                { { -0.5f, -0.5f, -0.5f }, bottom_normal },
+                { { 0.5f, -0.5f, -0.5f },  bottom_normal },
+                { { 0.5f, -0.5f, 0.5f },   bottom_normal },
+                { { -0.5f, -0.5f, -0.5f }, bottom_normal },
+                { { 0.5f, -0.5f, 0.5f },   bottom_normal },
+                { { -0.5f, -0.5f, 0.5f },  bottom_normal }
             };
+
 
             const UINT vertexBufferSize = sizeof(testMesh);
 

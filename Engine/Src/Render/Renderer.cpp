@@ -10,6 +10,8 @@ namespace Ailu
         _p_renderer = new DXBaseRenderer(config.viewport_width_, config.viewport_height_);
         _b_init = true;
         _p_renderer->OnInit();
+        _p_timemgr = new TimeMgr();
+        _p_timemgr->Initialize();
         return 0;
     }
     void Renderer::Finalize()
@@ -17,12 +19,20 @@ namespace Ailu
         INIT_CHECK(this, Renderer)
         _p_renderer->OnDestroy();
         DESTORY_PTR(_p_renderer)
+        _p_timemgr->Finalize();
+        DESTORY_PTR(_p_timemgr)
     }
     void Renderer::Tick()
     {
-        INIT_CHECK(this,Renderer)
+        INIT_CHECK(this, Renderer)
+        ModuleTimeStatics::RenderDeltatime = _p_timemgr->GetElapsedSinceLastMark();
+        _p_timemgr->Mark();
         _p_renderer->OnUpdate();
         Render();
+    }
+    float Renderer::GetDeltaTime() const
+    {
+        return _p_timemgr->GetElapsedSinceLastMark();
     }
     void Renderer::Render()
     {

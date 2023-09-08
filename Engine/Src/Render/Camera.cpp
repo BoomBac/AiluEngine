@@ -5,23 +5,27 @@ namespace Ailu
 {
 	void Camera::SetLens(float fovy, float aspect, float nz, float fz)
 	{
-		_fov = fovy;
+		_hfov = fovy;
 		_aspect = aspect;
 		_near_clip = nz;
 		_far_clip = fz;
-		_near_plane_height = 2.f * nz * tanf(0.5f * _fov);
-		_near_plane_height = 2.f * fz * tanf(0.5f * _fov);
-		BuildPerspectiveFovLHMatrix(_proj_matrix, _fov, _aspect, nz, fz);
+		_near_plane_height = 2.f * nz * tanf(0.5f * _hfov);
+		_far_plane_height = 2.f * fz * tanf(0.5f * _hfov);
+		BuildPerspectiveFovLHMatrix(_proj_matrix, _hfov, _aspect, nz, fz);
 	}
-	float Camera::GetFovX() const
+	void Camera::SetFovV(float angle)
 	{
-		float half = 0.5f * GetNearPlaneWidth();
-		return 2.f * atan(half / _near_clip);
+		_vfov = angle;
+		_hfov = ToAngle(2.0f * atanf(tanf(ToRadius(_vfov) / 2.0f) * _aspect));
+		BuildPerspectiveFovLHMatrix(_proj_matrix, ToRadius(_hfov), _aspect, _near_clip, _far_clip);
 	}
-	float Camera::GetFovY() const
+	void Camera::SetFovH(float angle)
 	{
-		return 0.0f;
+		_hfov = angle;
+		_vfov = ToAngle(2.0f * atanf(tanf(ToRadius(_hfov) / 2.0f) / _aspect));
+		BuildPerspectiveFovLHMatrix(_proj_matrix, ToRadius(_hfov), _aspect, _near_clip, _far_clip);
 	}
+
 	float Camera::GetNearPlaneWidth() const
 	{
 		return _aspect * _near_plane_height;
@@ -93,9 +97,8 @@ namespace Ailu
 	}
 	void Camera::Rotate(float vertical, float horizontal)
 	{
-
-		_rotation.x = horizontal;
-		_rotation.y = vertical;
+		_rotation.x = NormalizeAngle(horizontal);
+		_rotation.y = NormalizeAngle(vertical);
 		Matrix4x4f m{};
 		MatrixRotationY(m, ToRadius(_rotation.x));
 		right_ = TransformCoord(kRight, m);

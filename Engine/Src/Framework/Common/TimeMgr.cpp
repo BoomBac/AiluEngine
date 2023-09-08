@@ -7,6 +7,7 @@ namespace Ailu
 	{
 		int ret = 0;
 		_init_stamp = std::chrono::high_resolution_clock::now();
+		_mark_stamp = _init_stamp;
 		_pre_stamp = _init_stamp;
 		_total_time = 0.f;
 		_pause_time = 0.f;
@@ -20,11 +21,11 @@ namespace Ailu
 	void TimeMgr::Tick()
 	{
 		_cur_stamp = std::chrono::high_resolution_clock::now();
-		_s_delta_time = ALMSecond(_cur_stamp - _pre_stamp).count();
+		DeltaTime = ALMSecond(_cur_stamp - _pre_stamp).count();
 		_pre_stamp = _cur_stamp;
 		if (!_b_stop)
 		{
-			_s_time_since_load += _s_delta_time;
+			TimeSinceLoad += DeltaTime;
 		}
 		else
 		{
@@ -43,6 +44,11 @@ namespace Ailu
 	{
 		_mark_stamp = std::chrono::high_resolution_clock::now();
 	}
+	float TimeMgr::GetElapsedSinceLastMark() const
+	{
+		return ALMSecond(std::chrono::high_resolution_clock::now() - _mark_stamp).count();
+	}
+
 	void TimeMgr::Resume()
 	{
 		if (_b_stop)
