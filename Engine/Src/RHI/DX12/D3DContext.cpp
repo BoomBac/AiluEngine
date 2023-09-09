@@ -2,10 +2,11 @@
 #include <d3dcompiler.h>
 
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
-#include "RHI/DX12/BaseRenderer.h"
+#include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Application.h"
+#include "RHI/DX12/D3DBuffer.h"
 
 
 namespace Ailu
@@ -38,17 +39,67 @@ namespace Ailu
         *ppAdapter = pAdapter4;
     }
 
-    DXBaseRenderer::DXBaseRenderer(UINT width, UINT height) : _width(width), _height(height),
-        m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
-        m_scissorRect(0, 0, static_cast<LONG>(width), static_cast<LONG>(height))
+    static DXGI_FORMAT ShaderDataTypeToDGXIFormat(EShaderDateType type)
     {
-
+        switch (type)
+        {
+            case Ailu::EShaderDateType::kFloat:   return DXGI_FORMAT_R32_FLOAT;
+            case Ailu::EShaderDateType::kFloat2:  return DXGI_FORMAT_R32G32_FLOAT;
+            case Ailu::EShaderDateType::kFloat3:  return DXGI_FORMAT_R32G32B32_FLOAT;
+            case Ailu::EShaderDateType::kFloat4:  return DXGI_FORMAT_R32G32B32A32_FLOAT;
+            case Ailu::EShaderDateType::kMat3:    return DXGI_FORMAT_UNKNOWN;
+            case Ailu::EShaderDateType::kMat4:    return DXGI_FORMAT_UNKNOWN;
+            case Ailu::EShaderDateType::kInt:     return DXGI_FORMAT_R32_SINT;
+            case Ailu::EShaderDateType::kInt2:    return DXGI_FORMAT_R32G32_SINT;
+            case Ailu::EShaderDateType::kInt3:    return DXGI_FORMAT_R32G32B32_SINT;
+            case Ailu::EShaderDateType::kInt4:    return DXGI_FORMAT_R32G32B32A32_SINT;
+            case Ailu::EShaderDateType::kuInt:     return DXGI_FORMAT_R32_UINT;
+            case Ailu::EShaderDateType::kuInt2:    return DXGI_FORMAT_R32G32_UINT;
+            case Ailu::EShaderDateType::kuInt3:    return DXGI_FORMAT_R32G32B32_UINT;
+            case Ailu::EShaderDateType::kuInt4:    return DXGI_FORMAT_R32G32B32A32_UINT;
+            case Ailu::EShaderDateType::kBool:    return DXGI_FORMAT_R8_UINT;
+        }
+        AL_ASSERT(true, "Unknown ShaderDateType or DGXI format");
+        return DXGI_FORMAT_UNKNOWN;
     }
-    void DXBaseRenderer::OnInit()
+
+    static std::tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t> GenerateD3DInputLayout(const VertexBufferLayout& layout)
+    {
+        static D3D12_INPUT_ELEMENT_DESC cache_desc[10]{};
+        if (layout.GetDescCount() > 10)
+        {
+            AL_ASSERT(true, "LayoutDesc count must less than 10");
+            return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t>(nullptr, 0);
+        }
+        uint32_t desc_count = 0u;
+        for (const auto& desc : layout)
+        {
+            cache_desc[desc_count++] = { desc.Name.c_str(), 0, ShaderDataTypeToDGXIFormat(desc.Type), desc.Stream, desc.Offset, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+        }
+        return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t>(&cache_desc[0], std::move(desc_count));
+    }
+
+    D3DContext::D3DContext(WinWindow* window)
+    {
+        _window = window;
+        _width = _window->GetWidth();
+        _height = _window->GetHeight();
+        m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(_width), static_cast<float>(_height));
+        m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(_width), static_cast<LONG>(_height));
+    }
+
+    D3DContext::~D3DContext()
+    {
+        Destroy();
+    }
+
+    void D3DContext::Init()
     {
         LoadPipeline();
+        s_p_device = m_device.Get();
+        s_p_cmdlist = m_commandList.Get();
         LoadAssets();
-
+        
         //init imgui
         D3D12_DESCRIPTOR_HEAP_DESC SrvHeapDesc;
         SrvHeapDesc.NumDescriptors = 1;
@@ -58,7 +109,7 @@ namespace Ailu
         ThrowIfFailed(m_device->CreateDescriptorHeap(
             &SrvHeapDesc, IID_PPV_ARGS(&g_pd3dSrvDescHeapImGui)));
 
-        auto ret = ImGui_ImplDX12_Init(m_device.Get(), FrameCount,
+        auto ret = ImGui_ImplDX12_Init(m_device.Get(), kFrameCount,
             DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeapImGui,
             g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart(),
             g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart());
@@ -68,16 +119,21 @@ namespace Ailu
         _p_scene_camera->SetPosition(0, 0, -5.0f);
         _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 0.1f, 1000.f);
         Camera::sCurrent = _p_scene_camera.get();
+
+        m_commandList->Close();
+        ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+        m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+        WaitForGpu();
     }
-    void DXBaseRenderer::OnUpdate()
+
+    void D3DContext::Present()
     {
         //m_constantBufferData.CameraViewProj = Transpose(_p_scene_camera->GetProjection() * _p_scene_camera->GetView());
         m_constantBufferData._MatrixV = Transpose(_p_scene_camera->GetView());
         m_constantBufferData._MatrixVP = Transpose(_p_scene_camera->GetProjection()) * Transpose(_p_scene_camera->GetView());
         memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-    }
-    void DXBaseRenderer::OnRender()
-    {
+
+
         // Record all the commands we need to render the scene into the command list.
         PopulateCommandList();
 
@@ -91,7 +147,6 @@ namespace Ailu
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
         }
-
         // Present the frame.
        ThrowIfFailed(m_swapChain->Present(1, 0));
         //hrowIfFailed(m_swapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
@@ -99,7 +154,19 @@ namespace Ailu
         MoveToNextFrame();
     }
 
-    void DXBaseRenderer::OnDestroy()
+    ID3D12Device* D3DContext::GetDevice()
+    {
+        AL_ASSERT(s_p_device == nullptr,"Global D3D device hasn't been init!")
+        return s_p_device;
+    }
+
+    ID3D12GraphicsCommandList* D3DContext::GetCmdList()
+    {
+        AL_ASSERT(s_p_cmdlist == nullptr, "Global D3D cmdlist hasn't been init!")
+        return s_p_cmdlist;
+    }
+
+    void D3DContext::Destroy()
     {
         g_pd3dSrvDescHeapImGui->Release();
         // Ensure that the GPU is no longer referencing resources that are about to be
@@ -109,7 +176,7 @@ namespace Ailu
         CloseHandle(m_fenceEvent);
     }
 
-    void DXBaseRenderer::LoadPipeline()
+    void D3DContext::LoadPipeline()
     {
         UINT dxgiFactoryFlags = 0;
 
@@ -148,7 +215,7 @@ namespace Ailu
 
         // Describe and create the swap chain.
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-        swapChainDesc.BufferCount = FrameCount;
+        swapChainDesc.BufferCount = kFrameCount;
         swapChainDesc.Width = _width;
         swapChainDesc.Height = _height;
         swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -156,7 +223,7 @@ namespace Ailu
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
         swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
-        auto hwnd = static_cast<HWND>(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
+        auto hwnd = static_cast<HWND>(_window->GetNativeWindowPtr());
         ComPtr<IDXGISwapChain1> swapChain;
         ThrowIfFailed(factory->CreateSwapChainForHwnd(
             m_commandQueue.Get(),        // Swap chain needs the queue so that it can force a flush on it.
@@ -178,7 +245,7 @@ namespace Ailu
         {
             // Describe and create a render target view (RTV) descriptor heap.
             D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-            rtvHeapDesc.NumDescriptors = FrameCount;
+            rtvHeapDesc.NumDescriptors = kFrameCount;
             rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
             rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
             ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
@@ -200,7 +267,7 @@ namespace Ailu
             CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
             // Create a RTV for each frame.
-            for (UINT n = 0; n < FrameCount; n++)
+            for (UINT n = 0; n < kFrameCount; n++)
             {
                 ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
                 m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
@@ -208,8 +275,15 @@ namespace Ailu
                 ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
             }
         }
+
+        // Create the command list.
+        ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
+        // Command lists are created in the recording state, but there is nothing
+        // to record yet. The main loop expects it to be closed, so close it now.
+        //ThrowIfFailed(m_commandList->Close());
     }
-    void DXBaseRenderer::LoadAssets()
+
+    void D3DContext::LoadAssets()
     {
         // Create a root signature consisting of a descriptor table with a single CBV.
         {
@@ -256,23 +330,23 @@ namespace Ailu
             UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else
             UINT compileFlags = 0;
-#endif
-            
+#endif         
             ThrowIfFailed(D3DCompileFromFile(GET_RES_PATHW(Shaders/shaders.hlsl), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
             ThrowIfFailed(D3DCompileFromFile(GET_RES_PATHW(Shaders/shaders.hlsl), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
 
             // Define the vertex input layout.
-            D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+            VertexBufferLayout layout0
             {
-                { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-                { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+                {"POSITION",EShaderDateType::kFloat3,0},
+                {"COLOR",EShaderDateType::kFloat4,1},
             };
 
+            auto [desc, count] = GenerateD3DInputLayout(layout0);
             // Describe and create the graphics pipeline state object (PSO).
             auto raster_state = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
             raster_state.CullMode = D3D12_CULL_MODE_NONE;
             D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-            psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+            psoDesc.InputLayout = { desc, count };
             psoDesc.pRootSignature = m_rootSignature.Get();
             psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
             psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
@@ -281,115 +355,90 @@ namespace Ailu
             psoDesc.DepthStencilState.DepthEnable = FALSE;
             psoDesc.DepthStencilState.StencilEnable = FALSE;
             psoDesc.SampleMask = UINT_MAX;
-            //psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+            psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
             psoDesc.NumRenderTargets = 1;
             psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
             psoDesc.SampleDesc.Count = 1;
             ThrowIfFailed(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+//            delete[] inputElementDescs;
         }
 
-        // Create the command list.
-        ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
-
-        // Command lists are created in the recording state, but there is nothing
-        // to record yet. The main loop expects it to be closed, so close it now.
-        ThrowIfFailed(m_commandList->Close());
         m_aspectRatio = (float)_width / (float)_height;
         // Create the vertex buffer.
         {
-            // Define the geometry for a triangle.
-            //SimpleVertex testMesh[] =
-            //{
-            //    { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f, 1.0f } },
-            //    { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f } },
-            //    { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f, 1.0f } }
+            float size = 0.5f;
+            Vector3f origin_pos = { 0.f,0.f,0.f };
+            Vector3f testMesh[8]{ 
+                origin_pos + Vector3f{size, size, size},
+                origin_pos + Vector3f{size, size, -size},
+                origin_pos + Vector3f{-size, size, -size},
+                origin_pos + Vector3f{-size, size, size},
+                origin_pos + Vector3f{size, -size, size},
+                origin_pos + Vector3f{size, -size, -size},
+                origin_pos + Vector3f{-size, -size, -size},
+                origin_pos + Vector3f{-size, -size, size} 
+            };
+            origin_pos.y = 5.0f;
+            Vector3f testMesh0[8]{
+                origin_pos + Vector3f{size, size, size},
+                origin_pos + Vector3f{size, size, -size},
+                origin_pos + Vector3f{-size, size, -size},
+                origin_pos + Vector3f{-size, size, size},
+                origin_pos + Vector3f{size, -size, size},
+                origin_pos + Vector3f{size, -size, -size},
+                origin_pos + Vector3f{-size, -size, -size},
+                origin_pos + Vector3f{-size, -size, size}
+            };
+            //SimpleVertex testMesh[8]{
+            //    {{size, size, size}   ,{1,1,0,1}},
+            //    {{size, size, -size}  ,{1,1,0,1}},
+            //    {{-size, size, -size} ,{1,1,0,1}},
+            //    {{-size, size, size}  ,{1,1,0,1}},
+            //    {{size, -size, size}  ,{1,0,0,1}},
+            //    {{size, -size, -size} ,{1,0,0,1}},
+            //    {{-size, -size, -size},{1,0,0,1}},
+            //    {{-size, -size, size} ,{1,0,0,1}}
             //};
-            Vector4f front_normal = { 0,0,1,0 };
-            Vector4f back_normal = { 0,0,-1,0 };
-            Vector4f up_normal = { 0,1,0,0 };
-            Vector4f bottom_normal = { 0,-1,0,0 };
-            Vector4f left_normal = { -1,0,0,0 };
-            Vector4f right_normal = { 1,0,0,0 };
-            SimpleVertex testMesh[] =
-            {
-                // Front face (CCW)
-                { { -0.5f, -0.5f, -0.5f }, front_normal },
-                { { 0.5f, -0.5f, -0.5f },  front_normal },
-                { { 0.5f, 0.5f, -0.5f },   front_normal },
-                { { -0.5f, -0.5f, -0.5f }, front_normal },
-                { { 0.5f, 0.5f, -0.5f },   front_normal },
-                { { -0.5f, 0.5f, -0.5f },  front_normal },
-
-                // Back face (CCW)
-                { { -0.5f, -0.5f, 0.5f },  back_normal },
-                { { 0.5f, -0.5f, 0.5f },   back_normal },
-                { { 0.5f, 0.5f, 0.5f },    back_normal },
-                { { -0.5f, -0.5f, 0.5f },  back_normal },
-                { { 0.5f, 0.5f, 0.5f },    back_normal },
-                { { -0.5f, 0.5f, 0.5f },   back_normal },
-
-                // Left face (CCW)
-                { { -0.5f, -0.5f, -0.5f }, left_normal },
-                { { -0.5f, 0.5f, -0.5f },  left_normal },
-                { { -0.5f, 0.5f, 0.5f },   left_normal },
-                { { -0.5f, -0.5f, -0.5f }, left_normal },
-                { { -0.5f, 0.5f, 0.5f },   left_normal },
-                { { -0.5f, -0.5f, 0.5f },  left_normal },
-
-                // Right face (CCW)
-                { { 0.5f, -0.5f, -0.5f },  right_normal },
-                { { 0.5f, 0.5f, -0.5f },   right_normal },
-                { { 0.5f, 0.5f, 0.5f },    right_normal },
-                { { 0.5f, -0.5f, -0.5f },  right_normal },
-                { { 0.5f, 0.5f, 0.5f },    right_normal },
-                { { 0.5f, -0.5f, 0.5f },   right_normal },
-
-                // Top face (CCW)
-                { { -0.5f, 0.5f, -0.5f },  up_normal },
-                { { 0.5f, 0.5f, -0.5f },   up_normal },
-                { { 0.5f, 0.5f, 0.5f },    up_normal },
-                { { -0.5f, 0.5f, -0.5f },  up_normal },
-                { { 0.5f, 0.5f, 0.5f },    up_normal },
-                { { -0.5f, 0.5f, 0.5f },   up_normal },
-
-                // Bottom face (CCW)
-                { { -0.5f, -0.5f, -0.5f }, bottom_normal },
-                { { 0.5f, -0.5f, -0.5f },  bottom_normal },
-                { { 0.5f, -0.5f, 0.5f },   bottom_normal },
-                { { -0.5f, -0.5f, -0.5f }, bottom_normal },
-                { { 0.5f, -0.5f, 0.5f },   bottom_normal },
-                { { -0.5f, -0.5f, 0.5f },  bottom_normal }
+            Vector4f color[8]{
+            {1,1,0,1},
+            {1,1,0,1},
+            {1,1,0,1},
+            {1,1,0,1},
+            {1,0,0,1},
+            {1,0,0,1},
+            {1,0,0,1},
+            {1,0,0,1}
             };
 
+            uint32_t indices[36]{
+                3,0,1,
+                3,1,2,//top
+                1,0,4,
+                1,4,5,//right
+                2,1,5,
+                2,5,6,//front
+                6,5,4,
+                6,4,7,//bot
+                3,2,6,
+                3,6,7,//left
+                0,3,7,
+                7,4,0//back
+            };
+            _p_vertex_buf.reset(VertexBuffer::Create({
+                {"POSITION",EShaderDateType::kFloat3,0},
+                {"COLOR",EShaderDateType::kFloat4,1},
+                }));
+            _p_vertex_buf0.reset(VertexBuffer::Create({
+                {"POSITION",EShaderDateType::kFloat3,0},
+                {"COLOR",EShaderDateType::kFloat4,1},
+                }));
+            _p_vertex_buf->SetStream(reinterpret_cast<float*>(testMesh), sizeof(testMesh), 0);
+            _p_vertex_buf->SetStream(reinterpret_cast<float*>(color), sizeof(color), 1);
 
-            const UINT vertexBufferSize = sizeof(testMesh);
+            _p_vertex_buf0->SetStream(reinterpret_cast<float*>(testMesh0), sizeof(testMesh0), 0);
+            _p_vertex_buf0->SetStream(reinterpret_cast<float*>(color), sizeof(color), 1);
 
-            // Note: using upload heaps to transfer static data like vert buffers is not 
-            // recommended. Every time the GPU needs it, the upload heap will be marshalled 
-            // over. Please read up on Default Heap usage. An upload heap is used here for 
-            // code simplicity and because there are very few verts to actually transfer.
-            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-            auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(vertexBufferSize);
-            ThrowIfFailed(m_device->CreateCommittedResource(
-                &heap_prop,
-                D3D12_HEAP_FLAG_NONE,
-                &res_desc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&m_vertexBuffer)));
-
-            // Copy the triangle data to the vertex buffer.
-            UINT8* pVertexDataBegin;
-            CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-            ThrowIfFailed(m_vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-            memcpy(pVertexDataBegin, testMesh, sizeof(testMesh));
-            m_vertexBuffer->Unmap(0, nullptr);
-
-            // Initialize the vertex buffer view.
-            m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-            m_vertexBufferView.StrideInBytes = sizeof(SimpleVertex);
-            m_vertexBufferView.SizeInBytes = vertexBufferSize;
+            _p_index_buf.reset(IndexBuffer::Create(indices, 36));
         }
 
         // Create the constant buffer.
@@ -432,7 +481,8 @@ namespace Ailu
             WaitForGpu();
         }
     }
-    void DXBaseRenderer::PopulateCommandList()
+
+    void D3DContext::PopulateCommandList()
     {
         // Command list allocators can only be reset when the associated 
 // command lists have finished execution on the GPU; apps should use 
@@ -467,8 +517,13 @@ namespace Ailu
         m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
         m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-        m_commandList->DrawInstanced(36, 1, 0, 0);
+        _p_vertex_buf->Bind();
+        _p_index_buf->Bind();
+        //m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+        //m_commandList->DrawInstanced(36, 1, 0, 0);
+        m_commandList->DrawIndexedInstanced(_p_index_buf->GetCount(), 1, 0, 0, 0);
+        _p_vertex_buf0->Bind();
+        m_commandList->DrawIndexedInstanced(_p_index_buf->GetCount(), 1, 0, 0, 0);
 
         m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
@@ -478,7 +533,7 @@ namespace Ailu
         ThrowIfFailed(m_commandList->Close());
     }
 
-    void DXBaseRenderer::WaitForGpu()
+    void D3DContext::WaitForGpu()
     {
         // Schedule a Signal command in the queue.
         ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValues[m_frameIndex]));
@@ -491,7 +546,7 @@ namespace Ailu
         m_fenceValues[m_frameIndex]++;
     }
 
-    void DXBaseRenderer::MoveToNextFrame()
+    void D3DContext::MoveToNextFrame()
     {
         // Schedule a Signal command in the queue.
         const UINT64 currentFenceValue = m_fenceValues[m_frameIndex];

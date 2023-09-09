@@ -92,11 +92,7 @@ namespace Ailu
 	{
 		EventDispather dispather(e);
 		dispather.Dispatch<WindowCloseEvent>(BIND_EVENT_HANDLER(OnWindowClose));
-		//auto pos = Input::GetMousePos();
-		//LOG_INFO("pos: {},{}",pos.x,pos.y)
-		if(Input::IsKeyPressed(AL_KEY_A))
-			LOG_INFO(e.ToString())
-		//LOG_INFO(e.ToString());
+
 		for (auto it = _layer_stack.end(); it != _layer_stack.begin();)
 		{
 			(*--it)->OnEvent(e);

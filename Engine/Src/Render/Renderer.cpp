@@ -1,15 +1,18 @@
 #include "pch.h"
 #include "Render/Renderer.h"
-#include "Framework/Common/GfxConfiguration.h"
+#include "Framework/Common/Application.h"
 
 namespace Ailu
 {
+    ERenderAPI Renderer::GetAPI()
+    {
+        return sAPI;
+    }
     int Renderer::Initialize()
     {
-        auto config = GfxConfiguration();
-        _p_renderer = new DXBaseRenderer(config.viewport_width_, config.viewport_height_);
+        _p_context = new D3DContext(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
         _b_init = true;
-        _p_renderer->OnInit();
+        _p_context->Init();
         _p_timemgr = new TimeMgr();
         _p_timemgr->Initialize();
         return 0;
@@ -17,8 +20,7 @@ namespace Ailu
     void Renderer::Finalize()
     {
         INIT_CHECK(this, Renderer)
-        _p_renderer->OnDestroy();
-        DESTORY_PTR(_p_renderer)
+        DESTORY_PTR(_p_context)
         _p_timemgr->Finalize();
         DESTORY_PTR(_p_timemgr)
     }
@@ -27,7 +29,6 @@ namespace Ailu
         INIT_CHECK(this, Renderer)
         ModuleTimeStatics::RenderDeltatime = _p_timemgr->GetElapsedSinceLastMark();
         _p_timemgr->Mark();
-        _p_renderer->OnUpdate();
         Render();
     }
     float Renderer::GetDeltaTime() const
@@ -36,6 +37,6 @@ namespace Ailu
     }
     void Renderer::Render()
     {
-        _p_renderer->OnRender();
+        _p_context->Present();
     }
 }

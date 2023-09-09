@@ -54,7 +54,7 @@
     <ClInclude Include="Inc\Render\Renderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\RHI\DX12\BaseRenderer.h">
+    <ClInclude Include="Inc\RHI\DX12\D3DContext.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Ext\d3dx12.h">
@@ -144,6 +144,15 @@
     <ClInclude Include="Inc\Render\Mesh.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Render\GraphicsContext.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\Buffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\D3DBuffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -161,7 +170,7 @@
     <ClCompile Include="Src\Render\Renderer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\RHI\DX12\BaseRenderer.cpp">
+    <ClCompile Include="Src\RHI\DX12\D3DContext.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Platform\WinWindow.cpp">
@@ -213,6 +222,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\Mesh.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\Buffer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\D3DBuffer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

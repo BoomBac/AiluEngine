@@ -107,11 +107,11 @@ namespace Ailu
 	}
 	uint32_t WinWindow::GetWidth() const
 	{
-		return 0;
+        return _data.Width;
 	}
 	uint32_t WinWindow::GetHeight() const
 	{
-		return 0;
+        return _data.Height;
 	}
 	void WinWindow::SetEventHandler(const EventHandler& handler)
 	{

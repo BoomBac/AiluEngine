@@ -22,6 +22,7 @@ namespace Ailu
         void PushOverLayer(Layer* layer);
 
         const Window& GetWindow() const { return *_p_window; }
+        Window* GetWindowPtr() { return _p_window; }
 
         static Application* GetInstance();
     private:

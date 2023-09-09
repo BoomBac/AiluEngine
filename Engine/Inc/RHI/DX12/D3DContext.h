@@ -1,13 +1,15 @@
 #pragma once
-#ifndef __DX12BASE_RENDERER_H__
-#define __DX12BASE_RENDERER_H__
+#ifndef __D3D_CONTEXT_H__
+#define __D3D_CONTEXT_H__
 
 #include <d3dx12.h>
 #include <dxgi1_6.h>
 
 #include "Render/Camera.h"
-
+#include "Render/GraphicsContext.h"
+#include "Platform/WinWindow.h"
 #include "Framework/Math/ALMath.hpp"
+#include "Render/Buffer.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -26,59 +28,74 @@ namespace Ailu
     };
     static_assert((sizeof(SceneConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
-    class DXBaseRenderer
+    class D3DContext : public GraphicsContext
     {
     public:
-        DXBaseRenderer(UINT width, UINT height);
-        void OnInit();
-        void OnUpdate();
-        void OnRender();
-        void OnDestroy();
+        D3DContext(WinWindow* window);
+        ~D3DContext();
+        void Init() override;
+        void Present() override;
+
+        static ID3D12Device* GetDevice();
+        static ID3D12GraphicsCommandList* GetCmdList();
     private:
-        static const UINT FrameCount = 2;
+        void Destroy();
+        void LoadPipeline();
+        void LoadAssets();
+        void PopulateCommandList();
+        void WaitForGpu();
+        void MoveToNextFrame();
+
+    private:
+        static const uint8_t kFrameCount = 2;
+        inline static ID3D12Device* s_p_device = nullptr;
+        inline static ID3D12GraphicsCommandList* s_p_cmdlist = nullptr;
+        WinWindow* _window;
 
         // Pipeline objects.
         CD3DX12_VIEWPORT m_viewport;
         CD3DX12_RECT m_scissorRect;
         ComPtr<IDXGISwapChain3> m_swapChain;
         ComPtr<ID3D12Device> m_device;
-        ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
-        ComPtr<ID3D12CommandAllocator> m_commandAllocators[FrameCount];
+        ComPtr<ID3D12Resource> m_renderTargets[kFrameCount];
+        ComPtr<ID3D12CommandAllocator> m_commandAllocators[kFrameCount];
         ComPtr<ID3D12CommandQueue> m_commandQueue;
         ComPtr<ID3D12RootSignature> m_rootSignature;
         ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
         ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
         ComPtr<ID3D12PipelineState> m_pipelineState;
         ComPtr<ID3D12GraphicsCommandList> m_commandList;
-        UINT m_rtvDescriptorSize;
+        uint8_t m_rtvDescriptorSize;
 
         // App resources.
         ComPtr<ID3D12Resource> m_vertexBuffer;
         D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
+        std::unique_ptr<VertexBuffer> _p_vertex_buf;
+        std::unique_ptr<VertexBuffer> _p_vertex_buf0;
+        std::unique_ptr<IndexBuffer> _p_index_buf;
+
+
         ComPtr<ID3D12Resource> m_constantBuffer;
         SceneConstantBuffer m_constantBufferData;
-        UINT8* m_pCbvDataBegin;
+        uint8_t* m_pCbvDataBegin;
 
         // Synchronization objects.
-        UINT m_frameIndex;
+        uint8_t m_frameIndex;
         HANDLE m_fenceEvent;
         ComPtr<ID3D12Fence> m_fence;
-        UINT64 m_fenceValues[FrameCount];
+        uint64_t m_fenceValues[kFrameCount];
 
-        UINT _width;
-        UINT _height;
+
+        uint32_t _width;
+        uint32_t _height;
         float m_aspectRatio;
 
         std::unique_ptr<Camera> _p_scene_camera;
 
-        void LoadPipeline();
-        void LoadAssets();
-        void PopulateCommandList();
-        void WaitForGpu();
-        void MoveToNextFrame();
+
     };
 }
 
-#endif // !DX12BASE_RENDERER_H__
+#endif // !__D3D_CONTEXT_H__
 

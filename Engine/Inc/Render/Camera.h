@@ -81,7 +81,7 @@ namespace Ailu
         void LerpTo(const CameraState& target,float speed)
         {
             position = lerp(position, target.position, speed);
-            rotation = lerp(rotation, target.rotation, speed);
+            rotation = lerp(rotation, target.rotation, speed * 2.0f);
         }
         void UpdateCamrea(Camera& camera) const
         {
