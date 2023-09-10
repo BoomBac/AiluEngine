@@ -100,6 +100,7 @@ namespace Ailu
 		virtual void SetLayout(VertexBufferLayout layout) = 0;
 		virtual void SetStream(float* vertices, uint32_t size, uint8_t stream_index) = 0;
 		virtual const VertexBufferLayout& GetLayout() const = 0;
+		virtual uint32_t GetVertexCount() const = 0;
 	};
 	
 	class IndexBuffer

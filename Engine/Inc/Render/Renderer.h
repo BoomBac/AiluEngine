@@ -4,24 +4,24 @@
 #include "Framework/Interface/IRuntimeModule.h"
 #include "RHI/DX12/D3DContext.h"
 #include "Framework/Common/TimeMgr.h"
+#include "RendererAPI.h"
 
 namespace Ailu
 {
-    enum class ERenderAPI
-    {
-        kNone,kDirectX12
-    };
-
     class AILU_API Renderer : public IRuntimeModule
     {
     public:
-        static ERenderAPI GetAPI();
+        static void BeginScene();
+        static void EndScene();
+        static void Submit(const std::shared_ptr<VertexBuffer>& vertex_buf, const std::shared_ptr<IndexBuffer>& index_buffer,uint32_t instance_count = 1);
+        static void Submit(const std::shared_ptr<VertexBuffer>& vertex_buf, uint32_t instance_count = 1);
         int Initialize() override;
         void Finalize() override;
         void Tick() override;
         float GetDeltaTime() const;
+        inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
     private:
-        inline static ERenderAPI sAPI = ERenderAPI::kDirectX12;
+
         void Render();
         GraphicsContext* _p_context = nullptr;
         bool _b_init = false;

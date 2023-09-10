@@ -1,12 +1,26 @@
 #include "pch.h"
 #include "Render/Renderer.h"
 #include "Framework/Common/Application.h"
+#include "Render/RenderCommand.h"
 
 namespace Ailu
 {
-    ERenderAPI Renderer::GetAPI()
+    void Renderer::BeginScene()
     {
-        return sAPI;
+    }
+    void Renderer::EndScene()
+    {
+    }
+    void Renderer::Submit(const std::shared_ptr<VertexBuffer>& vertex_buf, const std::shared_ptr<IndexBuffer>& index_buffer, uint32_t instance_count)
+    {
+        vertex_buf->Bind();
+        index_buffer->Bind();
+        RenderCommand::DrawIndexedInstanced(index_buffer, instance_count);
+    }
+    void Renderer::Submit(const std::shared_ptr<VertexBuffer>& vertex_buf, uint32_t instance_count)
+    {
+        vertex_buf->Bind();
+        RenderCommand::DrawInstanced(vertex_buf, instance_count);
     }
     int Renderer::Initialize()
     {

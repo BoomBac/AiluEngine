@@ -1,0 +1,29 @@
+#pragma once
+#ifndef __SHADER_H__
+#define __SHADER_H__
+#include <string>
+#include "Framework/Math/ALMath.hpp"
+
+namespace Ailu
+{
+	enum class EShaderType : uint8_t
+	{
+		kVertex,kPixel
+	};
+	class Shader
+	{
+	public:
+		virtual ~Shader() = default;
+		virtual void Bind() = 0;
+		virtual void SetGlobalVector(const std::string_view name, const Vector4f& vector) = 0;
+		virtual void SetGlobalVector(const std::string_view name, const Vector3f& vector) = 0;
+		virtual void SetGlobalVector(const std::string_view name, const Vector2f& vector) = 0;
+		virtual void SetGlobalMatrix(const std::string_view name, const Matrix4x4f& mat) = 0;
+		virtual void SetGlobalMatrix(const std::string_view name, const Matrix3x3f& mat) = 0;
+		static Shader* Create(const std::string_view file_name, EShaderType type);
+	};
+}
+
+
+#endif // !SHADER_H__
+

@@ -2,6 +2,7 @@
 #define __GLOBAL_MARCO_H__
 #include "CompanyEnv.h"
 #include "Framework/Common/Log.h"
+#include <memory>
 
 #ifdef AILU_BUILD_DLL
 #define AILU_API __declspec(dllexport)
@@ -44,6 +45,12 @@
 #define LOW_BIT(x, n) ((x) & ((1 << (n)) - 1))
 
 #define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
+
+template<typename T>
+using Scope = std::unique_ptr<T>;
+
+template<typename T>
+using Ref = std::shared_ptr<T>;
 
 #endif // !__GLOBAL_MARCO_H__
 
