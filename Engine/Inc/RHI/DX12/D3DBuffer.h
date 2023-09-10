@@ -18,8 +18,10 @@ namespace Ailu
 		void SetLayout(VertexBufferLayout layout) override;
 		const VertexBufferLayout& GetLayout() const override;
 		void SetStream(float* vertices, uint32_t size,uint8_t stream_index) override;
+		uint32_t GetVertexCount() const override;
 	private:
 		VertexBufferLayout _buffer_layout;
+		uint32_t _vertices_count;
 		uint32_t _buf_start;
 		uint8_t _buf_num;
 		inline static std::vector<ComPtr<ID3D12Resource>> s_vertex_bufs{};

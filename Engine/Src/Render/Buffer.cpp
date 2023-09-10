@@ -22,10 +22,10 @@ namespace Ailu
 	{
 		switch (Renderer::GetAPI())
 		{
-		case ERenderAPI::kNone:
+		case RendererAPI::ERenderAPI::kNone:
 			AL_ASSERT(false, "None render api used!")
 				return nullptr;
-		case ERenderAPI::kDirectX12:
+		case RendererAPI::ERenderAPI::kDirectX12:
 			return new D3DVectexBuffer(layout);
 		}
 		AL_ASSERT(false, "Unsupport render api!")
@@ -35,10 +35,10 @@ namespace Ailu
 	{
 		switch (Renderer::GetAPI())
 		{
-		case ERenderAPI::kNone:
+		case RendererAPI::ERenderAPI::kNone:
 			AL_ASSERT(false, "None render api used!")
 				return nullptr;
-		case ERenderAPI::kDirectX12:
+		case RendererAPI::ERenderAPI::kDirectX12:
 			return new D3DIndexBuffer(indices, count);
 		}
 		AL_ASSERT(false, "Unsupport render api!")

@@ -7,6 +7,9 @@
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Application.h"
 #include "RHI/DX12/D3DBuffer.h"
+#include "Render/RenderCommand.h"
+#include "RHI/DX12/D3DShader.h"
+
 
 
 namespace Ailu
@@ -95,9 +98,8 @@ namespace Ailu
 
     void D3DContext::Init()
     {
+        s_p_d3dcontext = this;
         LoadPipeline();
-        s_p_device = m_device.Get();
-        s_p_cmdlist = m_commandList.Get();
         LoadAssets();
         
         //init imgui
@@ -109,7 +111,7 @@ namespace Ailu
         ThrowIfFailed(m_device->CreateDescriptorHeap(
             &SrvHeapDesc, IID_PPV_ARGS(&g_pd3dSrvDescHeapImGui)));
 
-        auto ret = ImGui_ImplDX12_Init(m_device.Get(), kFrameCount,
+        auto ret = ImGui_ImplDX12_Init(m_device.Get(), D3DConstants::kFrameCount,
             DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeapImGui,
             g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart(),
             g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart());
@@ -131,7 +133,12 @@ namespace Ailu
         //m_constantBufferData.CameraViewProj = Transpose(_p_scene_camera->GetProjection() * _p_scene_camera->GetView());
         m_constantBufferData._MatrixV = Transpose(_p_scene_camera->GetView());
         m_constantBufferData._MatrixVP = Transpose(_p_scene_camera->GetProjection()) * Transpose(_p_scene_camera->GetView());
-        memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+        //memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+        _p_vs->SetGlobalMatrix("_MatrixV", m_constantBufferData._MatrixV);
+        _p_vs->SetGlobalMatrix("_MatrixVP", m_constantBufferData._MatrixVP);
+        //_p_vs->SetGlobalVector("_Color", Vector4f{ 1.0f,0.3f,0.4f,1.0f });
+        _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
+        _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
 
 
         // Record all the commands we need to render the scene into the command list.
@@ -154,16 +161,31 @@ namespace Ailu
         MoveToNextFrame();
     }
 
+    D3DContext* D3DContext::GetInstance()
+    {
+        return s_p_d3dcontext;
+    }
+
     ID3D12Device* D3DContext::GetDevice()
     {
-        AL_ASSERT(s_p_device == nullptr,"Global D3D device hasn't been init!")
-        return s_p_device;
+        AL_ASSERT(m_device == nullptr,"Global D3D device hasn't been init!")
+        return m_device.Get();
     }
 
     ID3D12GraphicsCommandList* D3DContext::GetCmdList()
     {
-        AL_ASSERT(s_p_cmdlist == nullptr, "Global D3D cmdlist hasn't been init!")
-        return s_p_cmdlist;
+        AL_ASSERT(m_commandList == nullptr, "Global D3D cmdlist hasn't been init!")
+        return m_commandList.Get();
+    }
+
+    void D3DContext::Clear(Vector4f color, float depth, bool clear_color, bool clear_depth)
+    {
+        if (clear_color)
+        {
+            CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+            m_commandList->ClearRenderTargetView(rtvHandle, color, 0, nullptr);
+        }
+
     }
 
     void D3DContext::Destroy()
@@ -215,7 +237,7 @@ namespace Ailu
 
         // Describe and create the swap chain.
         DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-        swapChainDesc.BufferCount = kFrameCount;
+        swapChainDesc.BufferCount = D3DConstants::kFrameCount;
         swapChainDesc.Width = _width;
         swapChainDesc.Height = _height;
         swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -245,7 +267,7 @@ namespace Ailu
         {
             // Describe and create a render target view (RTV) descriptor heap.
             D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-            rtvHeapDesc.NumDescriptors = kFrameCount;
+            rtvHeapDesc.NumDescriptors = D3DConstants::kFrameCount;
             rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
             rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
             ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
@@ -253,8 +275,8 @@ namespace Ailu
             m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
             // Describe and create a constant buffer view (CBV) descriptor heap.
-// Flags indicate that this descriptor heap can be bound to the pipeline 
-// and that descriptors contained in it can be referenced by a root table.
+            // Flags indicate that this descriptor heap can be bound to the pipeline 
+            // and that descriptors contained in it can be referenced by a root table.
             D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
             cbvHeapDesc.NumDescriptors = 1;
             cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -267,7 +289,7 @@ namespace Ailu
             CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
             // Create a RTV for each frame.
-            for (UINT n = 0; n < kFrameCount; n++)
+            for (UINT n = 0; n < D3DConstants::kFrameCount; n++)
             {
                 ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
                 m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
@@ -297,11 +319,14 @@ namespace Ailu
                 featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
             }
 
-            CD3DX12_DESCRIPTOR_RANGE1 ranges[1]{};
-            CD3DX12_ROOT_PARAMETER1 rootParameters[1]{};
+            CD3DX12_DESCRIPTOR_RANGE1 ranges[2]{};
+            CD3DX12_ROOT_PARAMETER1 rootParameters[2]{};
 
             ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
             rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
+
+            ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+            rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
 
             // Allow input layout and deny uneccessary access to certain pipeline stages.
             D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
@@ -341,15 +366,23 @@ namespace Ailu
                 {"COLOR",EShaderDateType::kFloat4,1},
             };
 
+            _p_vs.reset(Shader::Create(GET_RES_PATH(Shaders/shaders.hlsl), EShaderType::kVertex));
+            _p_ps.reset(Shader::Create(GET_RES_PATH(Shaders/shaders.hlsl), EShaderType::kPixel));
+            _mat_red = std::make_shared<Material>(_p_ps);
+            _mat_green = std::make_shared<Material>(_p_ps);
+
             auto [desc, count] = GenerateD3DInputLayout(layout0);
             // Describe and create the graphics pipeline state object (PSO).
             auto raster_state = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
             raster_state.CullMode = D3D12_CULL_MODE_NONE;
             D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
             psoDesc.InputLayout = { desc, count };
-            psoDesc.pRootSignature = m_rootSignature.Get();
-            psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
-            psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
+            //psoDesc.pRootSignature = m_rootSignature.Get();
+            //psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
+            //psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
+            psoDesc.pRootSignature = static_cast<D3DShader*>(_p_vs.get())->GetSignature().Get();
+            psoDesc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_vs->GetByteCode()));
+            psoDesc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_ps->GetByteCode()));
             psoDesc.RasterizerState = raster_state;
             psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
             psoDesc.DepthStencilState.DepthEnable = FALSE;
@@ -494,12 +527,13 @@ namespace Ailu
         // re-recording.
         ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), m_pipelineState.Get()));
 
+        //_p_vs->Bind();
         // Set necessary state.
-        m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-        ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
-        m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        //m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+        //ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
+        //m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-        m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+        //m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 
         m_commandList->RSSetViewports(1, &m_viewport);
         m_commandList->RSSetScissorRects(1, &m_scissorRect);
@@ -508,26 +542,26 @@ namespace Ailu
         // Indicate that the back buffer will be used as a render target.
         m_commandList->ResourceBarrier(1, &bar_before);
 
+        RenderCommand::SetClearColor({ 0.3f, 0.2f, 0.4f, 1.0f });
+        RenderCommand::Clear();
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+        {
+            Renderer::BeginScene();
+            m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+            m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        }
 
-        // Record commands.
-        const float clearColor[] = { 0.3f, 0.2f, 0.4f, 1.0f };
+        //_p_ps->Bind();
+        Renderer::Submit(_p_vertex_buf, _p_index_buf,_mat_red);
 
-        auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-        m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-        m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-        m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        _p_vertex_buf->Bind();
-        _p_index_buf->Bind();
-        //m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-        //m_commandList->DrawInstanced(36, 1, 0, 0);
-        m_commandList->DrawIndexedInstanced(_p_index_buf->GetCount(), 1, 0, 0, 0);
-        _p_vertex_buf0->Bind();
-        m_commandList->DrawIndexedInstanced(_p_index_buf->GetCount(), 1, 0, 0, 0);
+        Renderer::Submit(_p_vertex_buf0, _p_index_buf, _mat_green);
 
+
+        Renderer::EndScene();
         m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
         // Indicate that the back buffer will now be used to present.
+        auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
         m_commandList->ResourceBarrier(1, &bar_after);
 
         ThrowIfFailed(m_commandList->Close());

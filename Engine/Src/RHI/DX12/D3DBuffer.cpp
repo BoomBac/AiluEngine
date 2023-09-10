@@ -36,7 +36,7 @@ namespace Ailu
 			AL_ASSERT(false, "Try to bind a vertex buffer with an invalid index");
 			return;
 		}
-		D3DContext::GetCmdList()->IASetVertexBuffers(0, _buf_num, &s_vertex_buf_views[_buf_start]);
+		D3DContext::GetInstance()->GetCmdList()->IASetVertexBuffers(0, _buf_num, &s_vertex_buf_views[_buf_start]);
 	}
 
 	void D3DVectexBuffer::SetLayout(VertexBufferLayout layout)
@@ -51,15 +51,17 @@ namespace Ailu
 
 	void D3DVectexBuffer::SetStream(float* vertices, uint32_t size,uint8_t stream_index)
 	{
+		auto d3d_conetxt = D3DContext::GetInstance();
 		if (_buffer_layout.GetStride(stream_index) == 0)
 		{
 			AL_ASSERT(true, "Try to set a null stream!");
 			return;
 		}
+		_vertices_count = size / _buffer_layout.GetStride(stream_index);
 		ComPtr<ID3D12Resource> upload_heap;
 		auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-		ThrowIfFailed(D3DContext::GetDevice()->CreateCommittedResource(
+		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(
 			&heap_prop,
 			D3D12_HEAP_FLAG_NONE,
 			&res_desc,
@@ -77,17 +79,17 @@ namespace Ailu
 		uint32_t cur_buffer_index = _buf_start + stream_index;
 		s_vertex_bufs[cur_buffer_index].Reset();
 		heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		ThrowIfFailed(D3DContext::GetDevice()->CreateCommittedResource(
+		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(
 			&heap_prop,
 			D3D12_HEAP_FLAG_NONE,
 			&res_desc,
 			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
 			IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
-		D3DContext::GetCmdList()->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
+		d3d_conetxt->GetCmdList()->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
 		auto buf_state = CD3DX12_RESOURCE_BARRIER::Transition(s_vertex_bufs[cur_buffer_index].Get(),
 			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-		D3DContext::GetCmdList()->ResourceBarrier(1, &buf_state);
+		d3d_conetxt->GetCmdList()->ResourceBarrier(1, &buf_state);
 		// Initialize the vertex buffer view.
 		s_vertex_buf_views[cur_buffer_index].BufferLocation = s_vertex_bufs[cur_buffer_index]->GetGPUVirtualAddress();
 		s_vertex_buf_views[cur_buffer_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
@@ -96,14 +98,20 @@ namespace Ailu
 		s_vertex_upload_bufs.emplace_back(upload_heap);
 	}
 
+	uint32_t D3DVectexBuffer::GetVertexCount() const
+	{
+		return _vertices_count;
+	}
+
 	//-----------------------------------------------------------------IndexBuffer----------------------------------------------------------
 	D3DIndexBuffer::D3DIndexBuffer(uint32_t* indices, uint32_t count) : _count(count)
 	{
+		auto d3d_conetxt = D3DContext::GetInstance();
 		auto size = sizeof(uint32_t) * count;
 		auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
 		ComPtr<ID3D12Resource> temp_buffer = nullptr;
-		ThrowIfFailed(D3DContext::GetDevice()->CreateCommittedResource(
+		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(
 			&heap_prop,
 			D3D12_HEAP_FLAG_NONE,
 			&res_desc,
@@ -135,7 +143,7 @@ namespace Ailu
 			AL_ASSERT(false, "Try to bind a index buffer with an invalid index");
 			return;
 		}
-		D3DContext::GetCmdList()->IASetIndexBuffer(&s_index_buf_views[_buf_view_index]);
+		D3DContext::GetInstance()->GetCmdList()->IASetIndexBuffer(&s_index_buf_views[_buf_view_index]);
 	}
 	uint32_t D3DIndexBuffer::GetCount() const
 	{

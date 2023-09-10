@@ -43,7 +43,7 @@ namespace Ailu
 		ImGui::Begin("CameraDetail");
 		ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 1.0f,"%.2f");
 		ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f,"%.2f");
-		ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.1f, 2.0f,"%.2f");
+		ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.0f, 1.0f,"%.2f");
 		ImGui::SliderFloat("FovH", &_camera_fov_h, 0.0f, 120.0f,"%.2f");
 		ImGui::Text("Position:");
 		ImGui::SameLine();
