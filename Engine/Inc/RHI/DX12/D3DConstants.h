@@ -37,6 +37,10 @@ namespace Ailu
 		constexpr static uint32_t kPerFrameDataSize = sizeof(ScenePerFrameData);
 		constexpr static uint32_t kPerMaterialDataSize = sizeof(ScenePerMaterialData);
 		constexpr static uint32_t kPeObjectDataSize = sizeof(ScenePerObjectData);
+		constexpr static wchar_t kVSModel_5_0[] = L"vs_5_0";
+		constexpr static wchar_t kPSModel_5_0[] = L"ps_5_0";
+		constexpr static wchar_t kVSModel_6_1[] = L"vs_6_1";
+		constexpr static wchar_t kPSModel_6_1[] = L"ps_6_1";
 	};
 }
 

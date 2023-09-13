@@ -9,7 +9,7 @@ namespace Ailu
 	{
 	public:
 		Material(Ref<Shader> shader);
-		void SetVector(std::string_view name, Vector4f vector);
+		void SetVector(const std::string& name, const Vector4f& vector);
 		void Bind();
 		Shader* GetShader() const;
 	private:

@@ -546,7 +546,7 @@ namespace Ailu
             m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
             m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         }
-        m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount));
+        //m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount));
         //_p_ps->Bind();
         Renderer::Submit(_p_vertex_buf, _p_index_buf,_mat_red, Transpose(MatrixTranslation(sin(TimeMgr::TimeSinceLoad * 0.01), 0.0f, 0.0f)));
         Renderer::Submit(_p_vertex_buf0, _p_index_buf, _mat_green, Transpose(MatrixTranslation(-sin(TimeMgr::TimeSinceLoad * 0.01), 0.0f, 0.0f)));

@@ -8,10 +8,12 @@ namespace Ailu
 		_cbuf_index = s_current_cbuf_offset++;
 		_p_cbuf = _p_shader->GetCBufferPtr(_cbuf_index);
 	}
-	void Material::SetVector(std::string_view name, Vector4f vector)
+
+	void Material::SetVector(const std::string& name, const Vector4f& vector)
 	{
-		memcpy(_p_cbuf, &vector, sizeof(vector));
+		memcpy(_p_cbuf + _p_shader->GetVariableOffset(name), &vector, sizeof(vector));
 	}
+
 	void Material::Bind()
 	{
 		_p_shader->Bind(_cbuf_index);
