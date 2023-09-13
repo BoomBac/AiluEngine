@@ -43,6 +43,10 @@ namespace Ailu
 
         ID3D12Device* GetDevice();
         ID3D12GraphicsCommandList* GetCmdList();
+        ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
+        uint8_t* GetCBufferPtr();
+
+        void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
 
     private:
         void Destroy();
@@ -51,6 +55,8 @@ namespace Ailu
         void PopulateCommandList();
         void WaitForGpu();
         void MoveToNextFrame();
+        void InitCBVSRVUAVDescHeap();
+        D3D12_GPU_DESCRIPTOR_HANDLE GetCBVGPUDescHandle(uint32_t index) const;
 
     private:
         inline static D3DContext* s_p_d3dcontext = nullptr;
@@ -70,6 +76,8 @@ namespace Ailu
         ComPtr<ID3D12PipelineState> m_pipelineState;
         ComPtr<ID3D12GraphicsCommandList> m_commandList;
         uint8_t m_rtvDescriptorSize;
+        uint8_t _cbv_desc_size;
+        uint8_t* _p_cbuffer = nullptr;
 
         // App resources.
         ComPtr<ID3D12Resource> m_vertexBuffer;
@@ -84,9 +92,10 @@ namespace Ailu
         Ref<Material> _mat_red;
         Ref<Material> _mat_green;
 
+        uint32_t _render_object_index = 0u;
+
         ComPtr<ID3D12Resource> m_constantBuffer;
         SceneConstantBuffer m_constantBufferData;
-        uint8_t* m_pCbvDataBegin;
 
         // Synchronization objects.
         uint8_t m_frameIndex;

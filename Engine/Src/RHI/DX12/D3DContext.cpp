@@ -82,6 +82,11 @@ namespace Ailu
         return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t>(&cache_desc[0], std::move(desc_count));
     }
 
+    static uint8_t* GetPerRenderObjectCbufferPtr(uint8_t* begin, uint32_t object_index)
+    {
+        return begin + D3DConstants::kPerFrameDataSize + D3DConstants::kPerMaterialDataSize * D3DConstants::kMaxMaterialDataCount + object_index * D3DConstants::kPeObjectDataSize;
+    }
+
     D3DContext::D3DContext(WinWindow* window)
     {
         _window = window;
@@ -130,16 +135,13 @@ namespace Ailu
 
     void D3DContext::Present()
     {
-        //m_constantBufferData.CameraViewProj = Transpose(_p_scene_camera->GetProjection() * _p_scene_camera->GetView());
         m_constantBufferData._MatrixV = Transpose(_p_scene_camera->GetView());
         m_constantBufferData._MatrixVP = Transpose(_p_scene_camera->GetProjection()) * Transpose(_p_scene_camera->GetView());
-        //memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-        _p_vs->SetGlobalMatrix("_MatrixV", m_constantBufferData._MatrixV);
-        _p_vs->SetGlobalMatrix("_MatrixVP", m_constantBufferData._MatrixVP);
-        //_p_vs->SetGlobalVector("_Color", Vector4f{ 1.0f,0.3f,0.4f,1.0f });
+
         _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
         _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
 
+        memcpy(_p_cbuffer, &m_constantBufferData, sizeof(m_constantBufferData));
 
         // Record all the commands we need to render the scene into the command list.
         PopulateCommandList();
@@ -176,6 +178,24 @@ namespace Ailu
     {
         AL_ASSERT(m_commandList == nullptr, "Global D3D cmdlist hasn't been init!")
         return m_commandList.Get();
+    }
+
+    ComPtr<ID3D12DescriptorHeap> D3DContext::GetDescriptorHeap()
+    {
+        return m_cbvHeap;
+    }
+
+    uint8_t* D3DContext::GetCBufferPtr()
+    {
+        return _p_cbuffer;
+    }
+
+    void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform)
+    {
+        m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
+        memcpy(_p_cbuffer + D3DConstants::kPerFrameDataSize + D3DConstants::kPerMaterialDataSize * D3DConstants::kMaxMaterialDataCount + D3DConstants::kPerFrameDataSize * (_render_object_index++),
+            &transform, sizeof(transform));
+        m_commandList->DrawIndexedInstanced(index_count, instance_count, 0, 0, 0);
     }
 
     void D3DContext::Clear(Vector4f color, float depth, bool clear_color, bool clear_depth)
@@ -307,6 +327,7 @@ namespace Ailu
 
     void D3DContext::LoadAssets()
     {
+        InitCBVSRVUAVDescHeap();
         // Create a root signature consisting of a descriptor table with a single CBV.
         {
             D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
@@ -347,17 +368,17 @@ namespace Ailu
 
         // Create the pipeline state, which includes compiling and loading shaders.
         {
-            ComPtr<ID3DBlob> vertexShader;
-            ComPtr<ID3DBlob> pixelShader;
-
-#if defined(_DEBUG)
-            // Enable better shader debugging with the graphics debugging tools.
-            UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-            UINT compileFlags = 0;
-#endif         
-            ThrowIfFailed(D3DCompileFromFile(GET_RES_PATHW(Shaders/shaders.hlsl), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
-            ThrowIfFailed(D3DCompileFromFile(GET_RES_PATHW(Shaders/shaders.hlsl), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
+//            ComPtr<ID3DBlob> vertexShader;
+//            ComPtr<ID3DBlob> pixelShader;
+//
+//#if defined(_DEBUG)
+//            // Enable better shader debugging with the graphics debugging tools.
+//            UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+//#else
+//            UINT compileFlags = 0;
+//#endif         
+//            ThrowIfFailed(D3DCompileFromFile(GET_RES_PATHW(Shaders/shaders.hlsl), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
+//            ThrowIfFailed(D3DCompileFromFile(GET_RES_PATHW(Shaders/shaders.hlsl), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
 
             // Define the vertex input layout.
             VertexBufferLayout layout0
@@ -474,32 +495,6 @@ namespace Ailu
             _p_index_buf.reset(IndexBuffer::Create(indices, 36));
         }
 
-        // Create the constant buffer.
-        {
-            const UINT constantBufferSize = sizeof(SceneConstantBuffer);    // CB size is required to be 256-byte aligned.
-            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-            auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(constantBufferSize);
-            ThrowIfFailed(m_device->CreateCommittedResource(
-                &heap_prop,
-                D3D12_HEAP_FLAG_NONE,
-                &res_desc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&m_constantBuffer)));
-
-            // Describe and create a constant buffer view.
-            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-            cbvDesc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress();
-            cbvDesc.SizeInBytes = constantBufferSize;
-            m_device->CreateConstantBufferView(&cbvDesc, m_cbvHeap->GetCPUDescriptorHandleForHeapStart());
-
-            // Map and initialize the constant buffer. We don't unmap this until the
-            // app closes. Keeping things mapped for the lifetime of the resource is okay.
-            CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-            ThrowIfFailed(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
-            memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-        }
-
         // Create synchronization objects.
         {
             ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
@@ -518,8 +513,8 @@ namespace Ailu
     void D3DContext::PopulateCommandList()
     {
         // Command list allocators can only be reset when the associated 
-// command lists have finished execution on the GPU; apps should use 
-// fences to determine GPU execution progress.
+        // command lists have finished execution on the GPU; apps should use 
+        // fences to determine GPU execution progress.
         ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
 
         // However, when ExecuteCommandList() is called on a particular command 
@@ -527,11 +522,11 @@ namespace Ailu
         // re-recording.
         ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), m_pipelineState.Get()));
 
-        //_p_vs->Bind();
-        // Set necessary state.
-        //m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-        //ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
-        //m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        m_commandList->SetGraphicsRootSignature(D3DShader::GetCurrentActiveSignature().Get());
+
+        ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
+        m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+        m_commandList->SetGraphicsRootDescriptorTable(2, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 
         //m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 
@@ -547,19 +542,24 @@ namespace Ailu
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         {
             Renderer::BeginScene();
+            _render_object_index = 0;
             m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
             m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         }
-
+        m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount));
         //_p_ps->Bind();
-        Renderer::Submit(_p_vertex_buf, _p_index_buf,_mat_red);
+        Renderer::Submit(_p_vertex_buf, _p_index_buf,_mat_red, Transpose(MatrixTranslation(sin(TimeMgr::TimeSinceLoad * 0.01), 0.0f, 0.0f)));
+        Renderer::Submit(_p_vertex_buf0, _p_index_buf, _mat_green, Transpose(MatrixTranslation(-sin(TimeMgr::TimeSinceLoad * 0.01), 0.0f, 0.0f)));
 
-        Renderer::Submit(_p_vertex_buf0, _p_index_buf, _mat_green);
+        {
+            Renderer::EndScene();
+        }
 
-
-        Renderer::EndScene();
-        m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+        //imgui draw
+        {
+            m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);
+            ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+        }
         // Indicate that the back buffer will now be used to present.
         auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
         m_commandList->ResourceBarrier(1, &bar_after);
@@ -598,6 +598,61 @@ namespace Ailu
 
         // Set the fence value for the next frame.
         m_fenceValues[m_frameIndex] = currentFenceValue + 1;
+    }
+
+    void D3DContext::InitCBVSRVUAVDescHeap()
+    {
+        auto device = D3DContext::GetInstance()->GetDevice();
+        //constbuffer desc heap
+        D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
+        cbvHeapDesc.NumDescriptors = (1u + D3DConstants::kMaxMaterialDataCount + D3DConstants::kMaxRenderObjectCount) * D3DConstants::kFrameCount;
+        cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        ThrowIfFailed(device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
+        _cbv_desc_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        //constbuffer
+        auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+        auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(D3DConstants::kPerFrameTotalSize * D3DConstants::kFrameCount);
+        ThrowIfFailed(device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_constantBuffer)));
+        // Describe and create a constant buffer view.
+        for (uint32_t i = 0; i < D3DConstants::kFrameCount; i++)
+        {
+            D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
+            cbvHandle.ptr = m_cbvHeap->GetCPUDescriptorHandleForHeapStart().ptr + i * (1 + D3DConstants::kMaxMaterialDataCount + D3DConstants::kMaxRenderObjectCount) * _cbv_desc_size;
+            D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
+            cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * D3DConstants::kPerFrameTotalSize;
+            cbv_desc.SizeInBytes = D3DConstants::kPerFrameDataSize;
+            device->CreateConstantBufferView(&cbv_desc, cbvHandle);
+
+            for (uint32_t j = 0; j < D3DConstants::kMaxMaterialDataCount; j++)
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
+                cbvHandle2.ptr = cbvHandle.ptr + (j + 1) * _cbv_desc_size;
+                cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * D3DConstants::kPerFrameTotalSize + D3DConstants::kPerFrameDataSize + j * D3DConstants::kPerMaterialDataSize;
+                cbv_desc.SizeInBytes = D3DConstants::kPerMaterialDataSize;
+                device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
+            }
+            for (uint32_t k = 0; k < D3DConstants::kMaxRenderObjectCount; k++)
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
+                cbvHandle2.ptr = cbvHandle.ptr + (1 + D3DConstants::kMaxMaterialDataCount + k) * _cbv_desc_size;
+                cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + D3DConstants::kPerFrameTotalSize * i + D3DConstants::kPerFrameDataSize +
+                    D3DConstants::kMaxMaterialDataCount * D3DConstants::kPerMaterialDataSize + k * D3DConstants::kPeObjectDataSize;
+                cbv_desc.SizeInBytes = D3DConstants::kPeObjectDataSize;
+                device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
+            }
+        }
+        // Map and initialize the constant buffer. We don't unmap this until the
+        // app closes. Keeping things mapped for the lifetime of the resource is okay.
+        CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
+        ThrowIfFailed(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&_p_cbuffer)));
+    }
+
+    D3D12_GPU_DESCRIPTOR_HANDLE D3DContext::GetCBVGPUDescHandle(uint32_t index) const
+    {
+        D3D12_GPU_DESCRIPTOR_HANDLE handle{};
+        handle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _cbv_desc_size * index;
+        return handle;
     }
 
 }

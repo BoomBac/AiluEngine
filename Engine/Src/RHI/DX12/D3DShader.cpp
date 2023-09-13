@@ -20,50 +20,9 @@ namespace Ailu
 	{		
 		if (!_b_init_buffer)
 		{
-			auto device = D3DContext::GetInstance()->GetDevice();
-			//constbuffer desc heap
-			D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-			cbvHeapDesc.NumDescriptors = (1u + D3DConstants::kMaxMaterialDataCount + D3DConstants::kMaxRenderObjectCount) * D3DConstants::kFrameCount;
-			cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-			cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-			ThrowIfFailed(device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
-			_desc_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			//constbuffer
-			auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-			auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(D3DConstants::kPerFrameTotalSize * D3DConstants::kFrameCount);
-			ThrowIfFailed(device->CreateCommittedResource(&heap_prop,D3D12_HEAP_FLAG_NONE,&res_desc,D3D12_RESOURCE_STATE_GENERIC_READ,nullptr,IID_PPV_ARGS(&m_constantBuffer)));
-			// Describe and create a constant buffer view.
-			for (uint32_t i = 0; i < D3DConstants::kFrameCount; i++)
-			{
-				D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
-				cbvHandle.ptr = m_cbvHeap->GetCPUDescriptorHandleForHeapStart().ptr + i * (1 + D3DConstants::kMaxMaterialDataCount + D3DConstants::kMaxRenderObjectCount) * _desc_size;
-				D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
-				cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * D3DConstants::kPerFrameTotalSize;
-				cbv_desc.SizeInBytes = D3DConstants::kPerFrameDataSize;
-				device->CreateConstantBufferView(&cbv_desc, cbvHandle);
-
-				for (uint32_t j = 0; j < D3DConstants::kMaxMaterialDataCount; j++)
-				{
-					D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
-					cbvHandle2.ptr = cbvHandle.ptr + (j + 1) * _desc_size;
-					cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i *  D3DConstants::kPerFrameTotalSize + D3DConstants::kPerFrameDataSize + j * D3DConstants::kPerMaterialDataSize;
-					cbv_desc.SizeInBytes = D3DConstants::kPerMaterialDataSize;
-					device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
-				}
-				for (uint32_t k = 0; k < D3DConstants::kMaxRenderObjectCount; k++)
-				{
-					D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
-					cbvHandle2.ptr = cbvHandle.ptr + (D3DConstants::kMaxMaterialDataCount + 1) * _desc_size;
-					cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + D3DConstants::kPerFrameTotalSize * i + D3DConstants::kPerFrameDataSize + 
-						D3DConstants::kMaxMaterialDataCount * D3DConstants::kPerMaterialDataSize + k * D3DConstants::kPeObjectDataSize;
-					cbv_desc.SizeInBytes = D3DConstants::kPeObjectDataSize;
-					device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
-				}
-			}
-			// Map and initialize the constant buffer. We don't unmap this until the
-			// app closes. Keeping things mapped for the lifetime of the resource is okay.
-			CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-			ThrowIfFailed(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&_p_cbuffer)));
+			m_cbvHeap = D3DContext::GetInstance()->GetDescriptorHeap();
+			_desc_size = D3DContext::GetInstance()->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_p_cbuffer = D3DContext::GetInstance()->GetCBufferPtr();
 			_b_init_buffer = true;
 		}
 #if defined(_DEBUG)
@@ -74,11 +33,11 @@ namespace Ailu
 #endif         
 		if (type == EShaderType::kVertex)
 		{
-			ThrowIfFailed(D3DCompileFromFile(ToWChar(file_name.data()), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, _p_blob.GetAddressOf(), nullptr));
+			ThrowIfFailed(D3DCompileFromFile(ToWChar(file_name.data()), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "VSMain", "vs_5_0", compileFlags, 0, _p_blob.GetAddressOf(), nullptr));
 		}
 		else if (type == EShaderType::kPixel)
 		{
-			ThrowIfFailed(D3DCompileFromFile(ToWChar(file_name.data()), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, _p_blob.GetAddressOf(), nullptr));
+			ThrowIfFailed(D3DCompileFromFile(ToWChar(file_name.data()), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "PSMain", "ps_5_0", compileFlags, 0, _p_blob.GetAddressOf(), nullptr));
 		}
 
 		{
@@ -92,14 +51,15 @@ namespace Ailu
 				featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 			}
 
-			CD3DX12_DESCRIPTOR_RANGE1 ranges[2]{};
-			CD3DX12_ROOT_PARAMETER1 rootParameters[2]{};
+			CD3DX12_DESCRIPTOR_RANGE1 ranges[3]{};
+			CD3DX12_ROOT_PARAMETER1 rootParameters[3]{};
 
 			ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 			rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
-
 			ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 			rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+			ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 2, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+			rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_VERTEX);
 
 			// Allow input layout and deny uneccessary access to certain pipeline stages.
 			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
@@ -115,6 +75,7 @@ namespace Ailu
 			ComPtr<ID3DBlob> error;
 			ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
 			ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(_p_sig.GetAddressOf())));
+			s_active_sig = _p_sig;
 		}
 	}
 	D3DShader::~D3DShader()
@@ -128,6 +89,11 @@ namespace Ailu
 
 	uint8_t* D3DShader::GetCBufferPtr(uint32_t index)
 	{
+		if (index > D3DConstants::kMaxMaterialDataCount)
+		{
+			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
+			return nullptr;
+		}
 		return _p_cbuffer + D3DConstants::kPerFrameDataSize + index * D3DConstants::kPerMaterialDataSize;
 	}
 
@@ -135,9 +101,6 @@ namespace Ailu
 	{
 		auto cmdlist = D3DContext::GetInstance()->GetCmdList();
 		cmdlist->SetGraphicsRootSignature(_p_sig.Get());
-		ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
-		cmdlist->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-		cmdlist->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 		D3D12_GPU_DESCRIPTOR_HANDLE matHandle;
 		matHandle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _desc_size;	
 		cmdlist->SetGraphicsRootDescriptorTable(1, matHandle);
@@ -152,9 +115,6 @@ namespace Ailu
 		}
 		auto cmdlist = D3DContext::GetInstance()->GetCmdList();
 		cmdlist->SetGraphicsRootSignature(_p_sig.Get());
-		ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
-		cmdlist->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-		cmdlist->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 		D3D12_GPU_DESCRIPTOR_HANDLE matHandle;
 		matHandle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _desc_size + _desc_size * index;
 		cmdlist->SetGraphicsRootDescriptorTable(1, matHandle);
@@ -184,5 +144,9 @@ namespace Ailu
 	ComPtr<ID3D12RootSignature> D3DShader::GetSignature() const
 	{
 		return _p_sig;
+	}
+	ComPtr<ID3D12RootSignature> D3DShader::GetCurrentActiveSignature()
+	{
+		return s_active_sig;
 	}
 }

@@ -19,6 +19,7 @@ namespace Ailu
         static void Submit(const Ref<VertexBuffer>& vertex_buf, uint32_t instance_count = 1);
         static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, uint32_t instance_count = 1);
         static void Submit(const Ref<VertexBuffer>& vertex_buf, Ref<Material> mat ,uint32_t instance_count = 1);
+        static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat,Matrix4x4f transform ,uint32_t instance_count = 1);
         int Initialize() override;
         void Finalize() override;
         void Tick() override;

@@ -676,6 +676,15 @@ namespace Ailu
 		return ret;
 	}
 
+	static Matrix4x4f BuildIdentityMatrix()
+	{
+		return { {{
+			{ 1.0f, 0.0f, 0.0f, 0.0f},
+			{ 0.0f, 1.0f, 0.0f, 0.0f},
+			{ 0.0f, 0.0f, 1.0f, 0.0f},
+			{ 0.0f, 0.0f, 0.0f, 1.0f}
+		}} };
+	}
 
 	static void BuildIdentityMatrix(Matrix4x4f& matrix)
 	{
@@ -687,16 +696,6 @@ namespace Ailu
 		}} };
 		matrix = identity;
 		return;
-	}
-	static Matrix4x4f BuildIdentityMatrix()
-	{
-		Matrix4x4f identity = { {{
-			{ 1.0f, 0.0f, 0.0f, 0.0f},
-			{ 0.0f, 1.0f, 0.0f, 0.0f},
-			{ 0.0f, 0.0f, 1.0f, 0.0f},
-			{ 0.0f, 0.0f, 0.0f, 1.0f}
-		}} };
-		return identity;
 	}
 
 	static void MatrixInverse(Matrix4x4f& mat)

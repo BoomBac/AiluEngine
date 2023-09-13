@@ -207,6 +207,9 @@
     <ClInclude Include="Inc\RHI\DX12\D3DRendererAPI.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
+    <None Include="Res\Shaders\cbuffer.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />

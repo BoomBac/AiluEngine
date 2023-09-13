@@ -24,6 +24,7 @@ namespace Ailu
 		void SetGlobalMatrix(const std::string_view name, const Matrix3x3f& mat) override;
 		void* GetByteCode() override;
 		ComPtr<ID3D12RootSignature> GetSignature() const;
+		static ComPtr<ID3D12RootSignature> GetCurrentActiveSignature();
 	private:
 		void Bind(uint32_t index) override;
 		uint8_t* GetCBufferPtr(uint32_t index) override;
@@ -35,6 +36,7 @@ namespace Ailu
 		inline static ComPtr<ID3D12DescriptorHeap> m_cbvHeap = nullptr;
 		inline static ComPtr<ID3D12Resource> m_constantBuffer = nullptr;
 		ComPtr<ID3D12RootSignature> _p_sig;
+		inline static ComPtr<ID3D12RootSignature> s_active_sig;
 	};
 }
 

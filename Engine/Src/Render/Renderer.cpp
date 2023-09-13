@@ -35,6 +35,13 @@ namespace Ailu
         mat->Bind();
         RenderCommand::DrawInstanced(vertex_buf, instance_count);
     }
+    void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, Matrix4x4f transform, uint32_t instance_count)
+    {
+        vertex_buf->Bind();
+        index_buffer->Bind();
+        mat->Bind();
+        RenderCommand::DrawIndexedInstanced(index_buffer, instance_count, transform);
+    }
     int Renderer::Initialize()
     {
         _p_context = new D3DContext(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
