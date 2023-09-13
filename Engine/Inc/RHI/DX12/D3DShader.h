@@ -4,6 +4,7 @@
 #include "Render/Shader.h"
 #include "D3DConstants.h"
 #include <d3dx12.h>
+#include <d3d12shader.h>
 
 using Microsoft::WRL::ComPtr;
 
@@ -35,6 +36,8 @@ namespace Ailu
 		inline static ComPtr<ID3D12DescriptorHeap> m_cbvHeap = nullptr;
 		inline static ComPtr<ID3D12Resource> m_constantBuffer = nullptr;
 		ComPtr<ID3D12RootSignature> _p_sig;
+		ComPtr<ID3D12ShaderReflection> _p_reflection;
+
 	};
 }
 
