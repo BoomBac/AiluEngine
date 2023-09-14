@@ -9,6 +9,7 @@
 #include "RHI/DX12/D3DBuffer.h"
 #include "Render/RenderCommand.h"
 #include "RHI/DX12/D3DShader.h"
+#include "RHI/DX12/D3DGraphicsPipelineState.h"
 
 
 
@@ -40,46 +41,6 @@ namespace Ailu
             }
         }
         *ppAdapter = pAdapter4;
-    }
-
-    static DXGI_FORMAT ShaderDataTypeToDGXIFormat(EShaderDateType type)
-    {
-        switch (type)
-        {
-            case Ailu::EShaderDateType::kFloat:   return DXGI_FORMAT_R32_FLOAT;
-            case Ailu::EShaderDateType::kFloat2:  return DXGI_FORMAT_R32G32_FLOAT;
-            case Ailu::EShaderDateType::kFloat3:  return DXGI_FORMAT_R32G32B32_FLOAT;
-            case Ailu::EShaderDateType::kFloat4:  return DXGI_FORMAT_R32G32B32A32_FLOAT;
-            case Ailu::EShaderDateType::kMat3:    return DXGI_FORMAT_UNKNOWN;
-            case Ailu::EShaderDateType::kMat4:    return DXGI_FORMAT_UNKNOWN;
-            case Ailu::EShaderDateType::kInt:     return DXGI_FORMAT_R32_SINT;
-            case Ailu::EShaderDateType::kInt2:    return DXGI_FORMAT_R32G32_SINT;
-            case Ailu::EShaderDateType::kInt3:    return DXGI_FORMAT_R32G32B32_SINT;
-            case Ailu::EShaderDateType::kInt4:    return DXGI_FORMAT_R32G32B32A32_SINT;
-            case Ailu::EShaderDateType::kuInt:     return DXGI_FORMAT_R32_UINT;
-            case Ailu::EShaderDateType::kuInt2:    return DXGI_FORMAT_R32G32_UINT;
-            case Ailu::EShaderDateType::kuInt3:    return DXGI_FORMAT_R32G32B32_UINT;
-            case Ailu::EShaderDateType::kuInt4:    return DXGI_FORMAT_R32G32B32A32_UINT;
-            case Ailu::EShaderDateType::kBool:    return DXGI_FORMAT_R8_UINT;
-        }
-        AL_ASSERT(true, "Unknown ShaderDateType or DGXI format");
-        return DXGI_FORMAT_UNKNOWN;
-    }
-
-    static std::tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t> GenerateD3DInputLayout(const VertexBufferLayout& layout)
-    {
-        static D3D12_INPUT_ELEMENT_DESC cache_desc[10]{};
-        if (layout.GetDescCount() > 10)
-        {
-            AL_ASSERT(true, "LayoutDesc count must less than 10");
-            return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t>(nullptr, 0);
-        }
-        uint32_t desc_count = 0u;
-        for (const auto& desc : layout)
-        {
-            cache_desc[desc_count++] = { desc.Name.c_str(), 0, ShaderDataTypeToDGXIFormat(desc.Type), desc.Stream, desc.Offset, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-        }
-        return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t>(&cache_desc[0], std::move(desc_count));
     }
 
     static uint8_t* GetPerRenderObjectCbufferPtr(uint8_t* begin, uint32_t object_index)
@@ -135,14 +96,6 @@ namespace Ailu
 
     void D3DContext::Present()
     {
-        m_constantBufferData._MatrixV = Transpose(_p_scene_camera->GetView());
-        m_constantBufferData._MatrixVP = Transpose(_p_scene_camera->GetProjection()) * Transpose(_p_scene_camera->GetView());
-
-        _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
-        _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
-
-        memcpy(_p_cbuffer, &m_constantBufferData, sizeof(m_constantBufferData));
-
         // Record all the commands we need to render the scene into the command list.
         PopulateCommandList();
 
@@ -205,7 +158,6 @@ namespace Ailu
             CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
             m_commandList->ClearRenderTargetView(rtvHandle, color, 0, nullptr);
         }
-
     }
 
     void D3DContext::Destroy()
@@ -386,13 +338,11 @@ namespace Ailu
                 {"POSITION",EShaderDateType::kFloat3,0},
                 {"COLOR",EShaderDateType::kFloat4,1},
             };
+            _p_standard_shader.reset(Shader::Create(GET_RES_PATH(Shaders/shaders.hlsl), "StandardShader"));
+            _mat_red = std::make_shared<Material>(_p_standard_shader);
+            _mat_green = std::make_shared<Material>(_p_standard_shader);
 
-            _p_vs.reset(Shader::Create(GET_RES_PATH(Shaders/shaders.hlsl), EShaderType::kVertex));
-            _p_ps.reset(Shader::Create(GET_RES_PATH(Shaders/shaders.hlsl), EShaderType::kPixel));
-            _mat_red = std::make_shared<Material>(_p_ps);
-            _mat_green = std::make_shared<Material>(_p_ps);
-
-            auto [desc, count] = GenerateD3DInputLayout(layout0);
+            auto [desc, count] = ConvertToD3DInputLayout(layout0);
             // Describe and create the graphics pipeline state object (PSO).
             auto raster_state = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
             raster_state.CullMode = D3D12_CULL_MODE_NONE;
@@ -401,9 +351,9 @@ namespace Ailu
             //psoDesc.pRootSignature = m_rootSignature.Get();
             //psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
             //psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-            psoDesc.pRootSignature = static_cast<D3DShader*>(_p_vs.get())->GetSignature().Get();
-            psoDesc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_vs->GetByteCode()));
-            psoDesc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_ps->GetByteCode()));
+            psoDesc.pRootSignature = static_cast<D3DShader*>(_p_standard_shader.get())->GetSignature().Get();
+            psoDesc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_standard_shader->GetByteCode(EShaderType::kVertex)));
+            psoDesc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_standard_shader->GetByteCode(EShaderType::kPixel)));
             psoDesc.RasterizerState = raster_state;
             psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
             psoDesc.DepthStencilState.DepthEnable = FALSE;
@@ -539,9 +489,18 @@ namespace Ailu
 
         RenderCommand::SetClearColor({ 0.3f, 0.2f, 0.4f, 1.0f });
         RenderCommand::Clear();
+        RenderCommand::SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
+
+        _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
+        _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
+
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         {
+            
             Renderer::BeginScene();
+            _perframe_scene_data._MatrixVP = _perframe_scene_data._MatrixP * _perframe_scene_data._MatrixV;
+            memcpy(_p_cbuffer, &_perframe_scene_data, sizeof(_perframe_scene_data));
+
             _render_object_index = 0;
             m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
             m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

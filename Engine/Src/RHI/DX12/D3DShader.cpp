@@ -160,8 +160,13 @@ namespace Ailu
 		return it->second;
 	}
 
-	D3DShader::D3DShader(const std::string_view file_name, EShaderType type)
-	{		
+	D3DShader::D3DShader(const std::string_view file_name, const std::string_view shader_name, const uint32_t& id, EShaderType type)
+	{
+
+	}
+
+	D3DShader::D3DShader(const std::string_view file_name, const std::string_view shader_name, const uint32_t& id) : _name(shader_name) , _id(id)
+	{
 		if (!_b_init_buffer)
 		{
 			m_cbvHeap = D3DContext::GetInstance()->GetDescriptorHeap();
@@ -175,25 +180,14 @@ namespace Ailu
 #else
 		UINT compileFlags = 0;
 #endif         
-		if (type == EShaderType::kVertex)
-		{
-			//ThrowIfFailed(D3DCompileFromFile(ToWChar(file_name.data()), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, _p_blob.GetAddressOf(), nullptr));
-			D3D12_SHADER_DESC vs_desc;
-
-			CComPtr<IDxcBlob> vs_plob;
-			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_blob, _p_reflection);
-			//ThrowIfFailed(vs_plob->QueryInterface(IID_PPV_ARGS(_p_blob.GetAddressOf())));
-			LoadShaderRelfection(_p_reflection.Get());
-		}
-		else if (type == EShaderType::kPixel)
-		{
-			//ThrowIfFailed(D3DCompileFromFile(ToWChar(file_name.data()), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, _p_blob.GetAddressOf(), nullptr));
-			D3D12_SHADER_DESC ps_desc;
-			CComPtr<IDxcBlob> ps_plob;
-			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_blob, _p_reflection);
-			LoadShaderRelfection(_p_reflection.Get());
-		}
-
+		D3D12_SHADER_DESC vs_desc;
+		CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
+		LoadShaderRelfection(_p_reflection.Get());
+		
+		D3D12_SHADER_DESC ps_desc;
+		CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
+		LoadShaderRelfection(_p_reflection.Get());
+		
 		{
 			D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 
@@ -237,11 +231,6 @@ namespace Ailu
 	{
 	}
 
-	void* D3DShader::GetByteCode()
-	{
-		return reinterpret_cast<void*>(_p_blob.Get());
-	}
-
 	uint8_t* D3DShader::GetCBufferPtr(uint32_t index)
 	{
 		if (index > D3DConstants::kMaxMaterialDataCount)
@@ -259,6 +248,16 @@ namespace Ailu
 		D3D12_GPU_DESCRIPTOR_HANDLE matHandle;
 		matHandle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _desc_size;	
 		cmdlist->SetGraphicsRootDescriptorTable(1, matHandle);
+	}
+
+	inline std::string D3DShader::GetName() const
+	{
+		return _name;
+	}
+
+	inline uint32_t D3DShader::GetID() const
+	{
+		return _id;
 	}
 
 	void D3DShader::Bind(uint32_t index)
@@ -300,6 +299,18 @@ namespace Ailu
 	}
 	void D3DShader::SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat)
 	{
+	}
+
+	void* D3DShader::GetByteCode(EShaderType type)
+	{
+		switch (type)
+		{
+		case Ailu::EShaderType::kVertex:
+			return reinterpret_cast<void*>(_p_vblob.Get());
+		case Ailu::EShaderType::kPixel:
+			return reinterpret_cast<void*>(_p_pblob.Get());
+		}
+		return nullptr;
 	}
 
 	ComPtr<ID3D12RootSignature> D3DShader::GetSignature() const

@@ -90,6 +90,8 @@ namespace Ailu
 		uint8_t _stride[kMaxStreamCount]{};
 	};
 
+	using VertexInputLayout = VertexBufferLayout;
+
 	class VertexBuffer
 	{
 	public:

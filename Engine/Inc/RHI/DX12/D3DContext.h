@@ -26,13 +26,15 @@ namespace Ailu
     struct SceneConstantBuffer
     {
         Matrix4x4f _MatrixV;
+        Matrix4x4f _MatrixP;
         Matrix4x4f _MatrixVP;
-        float padding[32]; // Padding so the constant buffer is 256-byte aligned.
+        float padding[16]; // Padding so the constant buffer is 256-byte aligned.
     };
     static_assert((sizeof(SceneConstantBuffer) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
     class D3DContext : public GraphicsContext
     {
+        friend class D3DRendererAPI;
     public:
         D3DContext(WinWindow* window);
         ~D3DContext();
@@ -87,15 +89,14 @@ namespace Ailu
         Ref<VertexBuffer> _p_vertex_buf0;
         Ref<IndexBuffer> _p_index_buf;
 
-        Ref<Shader> _p_vs;
-        Ref<Shader> _p_ps;
+        Ref<Shader> _p_standard_shader;
         Ref<Material> _mat_red;
         Ref<Material> _mat_green;
 
         uint32_t _render_object_index = 0u;
 
         ComPtr<ID3D12Resource> m_constantBuffer;
-        SceneConstantBuffer m_constantBufferData;
+        SceneConstantBuffer _perframe_scene_data;
 
         // Synchronization objects.
         uint8_t m_frameIndex;

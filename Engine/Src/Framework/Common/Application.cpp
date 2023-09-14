@@ -7,6 +7,7 @@
 #include "Framework/Common/Input.h"
 #include "Framework/Events/InputLayer.h"
 #include "Framework/Common/TimeMgr.h"
+#include "CompanyEnv.h"
 
 namespace Ailu
 {
@@ -42,7 +43,13 @@ namespace Ailu
 	}
 	double render_lag = 0.0;
 	double update_lag = 0.0;
+#ifdef __COMPANY_ENV_H__
+	constexpr double kTargetFrameRate = 60;
+#else
 	constexpr double kTargetFrameRate = 170;
+#endif // COMPLY
+
+
 	constexpr double kMsPerUpdate = 16.66;
 	constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
 	void Application::Tick()

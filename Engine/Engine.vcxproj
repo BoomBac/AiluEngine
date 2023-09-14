@@ -192,9 +192,11 @@
     <ClInclude Include="Inc\pch.h" />
     <ClInclude Include="Inc\Platform\WinInput.h" />
     <ClInclude Include="Inc\Platform\WinWindow.h" />
+    <ClInclude Include="Inc\Render\AlgFormat.h" />
     <ClInclude Include="Inc\Render\Buffer.h" />
     <ClInclude Include="Inc\Render\Camera.h" />
     <ClInclude Include="Inc\Render\GraphicsContext.h" />
+    <ClInclude Include="Inc\Render\GraphicsPipelineState.h" />
     <ClInclude Include="Inc\Render\Material.h" />
     <ClInclude Include="Inc\Render\Mesh.h" />
     <ClInclude Include="Inc\Render\RenderCommand.h" />
@@ -204,6 +206,7 @@
     <ClInclude Include="Inc\RHI\DX12\D3DBuffer.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DConstants.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DContext.h" />
+    <ClInclude Include="Inc\RHI\DX12\D3DGraphicsPipelineState.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DRendererAPI.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
@@ -238,12 +241,15 @@
     <ClCompile Include="Src\Platform\WinWindow.cpp" />
     <ClCompile Include="Src\Render\Buffer.cpp" />
     <ClCompile Include="Src\Render\Camera.cpp" />
+    <ClCompile Include="Src\Render\GraphicsPipelineState.cpp" />
     <ClCompile Include="Src\Render\Material.cpp" />
     <ClCompile Include="Src\Render\Mesh.cpp" />
+    <ClCompile Include="Src\Render\RenderCommand.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\Render\Shader.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DBuffer.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DContext.cpp" />
+    <ClCompile Include="Src\RHI\DX12\D3DGraphicsPipelineState.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DRendererAPI.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DShader.cpp" />
   </ItemGroup>
