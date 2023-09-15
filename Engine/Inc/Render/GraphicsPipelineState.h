@@ -1,9 +1,13 @@
 #pragma once
 #ifndef __GFX_PIPELINE_STATE_H__
 #define __GFX_PIPELINE_STATE_H__
+#include <map>
+
+#include "GlobalMarco.h"
 #include "Buffer.h"
 #include "Shader.h"
 #include "AlgFormat.h"
+
 
 //ref
 //https://zhuanlan.zhihu.com/p/582020846
@@ -63,6 +67,11 @@ namespace Ailu
     enum class EFillMode : uint8_t
     {
         kWireframe = 0, kSolid
+    };
+
+    enum class EBindResourceType : uint8_t
+    {
+        kConstBuffer = 0,kTexture
     };
 
     struct RasterizerState
@@ -173,24 +182,15 @@ namespace Ailu
 	class GraphicsPipelineState
 	{
     public:
+        static GraphicsPipelineState* sCurrent;
         static GraphicsPipelineState* Create();
-    public:
-
-        GraphicsPipelineState() = default;
-        virtual void Build();
         virtual ~GraphicsPipelineState() = default;
-	public:
-		VertexInputLayout _input_layout;
-        Ref<Shader> _p_vertex_shader;
-        Ref<Shader> _p_pixel_shader;
-        ETopology _topology;
-        BlendState _blend_state;
-        RasterizerState _raster_state;
-        DepthStencilState _depth_stencil_state;
-        bool _b_has_rt;
-        uint8_t _rt_nums;
-        EALGFormat _rt_formats[8];
-        EALGFormat _ds_format;
+        virtual void Build() = 0;
+        virtual void Bind() = 0;
+        virtual void CommitBindResource(uint16_t slot, void* res, EBindResourceType res_type) = 0;
+    private:
+        inline static std::map<uint32_t, Scope<GraphicsPipelineState>> s_pipelinestates{};
+        inline static uint32_t s_pso_index = 0u;
 	};
 }
 

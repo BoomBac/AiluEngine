@@ -41,11 +41,12 @@ namespace Ailu
         void Init() override;
         void Present() override;
         void Clear(Vector4f color, float depth, bool clear_color, bool clear_depth);
-        static D3DContext* GetInstance();
+        inline static D3DContext* GetInstance() { return s_p_d3dcontext; };
 
         ID3D12Device* GetDevice();
         ID3D12GraphicsCommandList* GetCmdList();
         ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
+        const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
         uint8_t* GetCBufferPtr();
 
         void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
@@ -59,6 +60,7 @@ namespace Ailu
         void MoveToNextFrame();
         void InitCBVSRVUAVDescHeap();
         D3D12_GPU_DESCRIPTOR_HANDLE GetCBVGPUDescHandle(uint32_t index) const;
+
 
     private:
         inline static D3DContext* s_p_d3dcontext = nullptr;
@@ -97,6 +99,7 @@ namespace Ailu
 
         ComPtr<ID3D12Resource> m_constantBuffer;
         SceneConstantBuffer _perframe_scene_data;
+        std::vector<D3D12_CONSTANT_BUFFER_VIEW_DESC> _cbuf_views;
 
         // Synchronization objects.
         uint8_t m_frameIndex;

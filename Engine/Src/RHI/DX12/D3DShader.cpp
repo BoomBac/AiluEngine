@@ -145,8 +145,7 @@ namespace Ailu
 				_variable_offset.insert(std::make_pair(vdesc.Name,vdesc.StartOffset));
 				LOG_INFO("{}", vdesc.Name);
 			}
-		}
-			
+		}	
 	}
 
 	uint16_t D3DShader::GetVariableOffset(const std::string& name) const
@@ -203,11 +202,15 @@ namespace Ailu
 			CD3DX12_ROOT_PARAMETER1 rootParameters[3]{};
 
 			ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-			rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
 			ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-			rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
 			ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 2, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-			rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_VERTEX);
+			//rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
+			//rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+			//rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_VERTEX);
+
+			rootParameters[0].InitAsConstantBufferView(0);
+			rootParameters[1].InitAsConstantBufferView(1);
+			rootParameters[2].InitAsConstantBufferView(2);
 
 			// Allow input layout and deny uneccessary access to certain pipeline stages.
 			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
@@ -267,11 +270,8 @@ namespace Ailu
 			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
 			return;
 		}
-		auto cmdlist = D3DContext::GetInstance()->GetCmdList();
-		cmdlist->SetGraphicsRootSignature(_p_sig.Get());
-		D3D12_GPU_DESCRIPTOR_HANDLE matHandle;
-		matHandle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _desc_size + _desc_size * index;
-		cmdlist->SetGraphicsRootDescriptorTable(1, matHandle);
+		auto context = D3DContext::GetInstance();
+		context->GetCmdList()->SetGraphicsRootConstantBufferView(1, context->GetCBufferViewDesc(1 + index).BufferLocation);
 	}
 
 	void D3DShader::SetGlobalVector(const std::string& name, const Vector4f& vector)
@@ -316,6 +316,10 @@ namespace Ailu
 	ComPtr<ID3D12RootSignature> D3DShader::GetSignature() const
 	{
 		return _p_sig;
+	}
+	ID3D12ShaderReflection* D3DShader::GetD3DReflectionInfo() const
+	{
+		return _p_reflection.Get();
 	}
 	ComPtr<ID3D12RootSignature> D3DShader::GetCurrentActiveSignature()
 	{

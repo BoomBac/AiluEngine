@@ -21,6 +21,7 @@ namespace Ailu
 		D3DShader(const std::string_view file_name, const std::string_view shader_name,const uint32_t& id);
 		~D3DShader();
 		void Bind() override;
+		void Bind(uint32_t index) override;
 
 		inline std::string GetName() const override;
 		inline uint32_t GetID() const override;
@@ -32,9 +33,9 @@ namespace Ailu
 		void SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat) override;
 		void* GetByteCode(EShaderType type) override;
 		ComPtr<ID3D12RootSignature> GetSignature() const;
+		ID3D12ShaderReflection* GetD3DReflectionInfo() const;
 		static ComPtr<ID3D12RootSignature> GetCurrentActiveSignature();
 	private:
-		void Bind(uint32_t index) override;
 		uint8_t* GetCBufferPtr(uint32_t index) override;
 		void LoadShaderRelfection(ID3D12ShaderReflection* reflection);
 		uint16_t GetVariableOffset(const std::string& name) const override;

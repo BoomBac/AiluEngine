@@ -47,25 +47,110 @@ namespace Ailu
         return DXGI_FORMAT_UNKNOWN;
     }
 
+    static D3D12_PRIMITIVE_TOPOLOGY_TYPE ConvertToDXTopologyType(const ETopology& Topology)
+    {
+        switch (Topology)
+        {
+        case ETopology::kPoint: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+        case ETopology::kLine: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+        case ETopology::kTriangle: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        case ETopology::kPatch: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;       
+        }
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    }
+
+    static ID3D12RootSignature* GenerateRootSignature(std::initializer_list<Ref<Shader>> shaders)
+    {
+        bool b_render_object_scene = true;
+        if (b_render_object_scene)
+        {
+            ID3D12RootSignature* p_signature = nullptr;
+            D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+            featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+            auto device = D3DContext::GetInstance()->GetDevice();
+            if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+            {
+                featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+            }
+            static CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
+            static CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
+            rootParameters[0].InitAsConstantBufferView(0u);
+            rootParameters[1].InitAsConstantBufferView(1u);
+            rootParameters[2].InitAsConstantBufferView(2u);
+
+            for (auto it = shaders.begin(); it != shaders.end(); it++)
+            {             
+                auto reflection = static_cast<D3DShader*>(it->get())->GetD3DReflectionInfo();
+                D3D12_SHADER_DESC desc{};
+                reflection->GetDesc(&desc);
+                std::vector<D3D12_SHADER_INPUT_BIND_DESC> bind_desc(desc.BoundResources);
+                for (size_t i = 0; i < desc.BoundResources; i++)
+                {
+                    auto resc_desc = reflection->GetResourceBindingDesc(i, &bind_desc[i]);
+                    if (bind_desc[i].Type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+                    {
+
+                    }
+                }
+            }
+            D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+                D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+                D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+                D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+            CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+            rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
+            ComPtr<ID3DBlob> signature;
+            ComPtr<ID3DBlob> error;
+            ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
+            ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&p_signature)));
+            return p_signature;
+        }
+    }
+
     void D3DGraphicsPipelineState::Build()
 	{
         auto [desc, count] = ConvertToD3DInputLayout(_input_layout);
         D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
         psoDesc.InputLayout = { desc, count };
-        psoDesc.pRootSignature = static_cast<D3DShader*>(_p_pixel_shader.get())->GetSignature().Get();
+        psoDesc.pRootSignature = GenerateRootSignature({_p_vertex_shader,_p_pixel_shader});
         psoDesc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_vertex_shader->GetByteCode(EShaderType::kVertex)));
         psoDesc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_pixel_shader->GetByteCode(EShaderType::kPixel)));
         psoDesc.RasterizerState = ConvertToD3D12RasterizerDesc(_raster_state);
         psoDesc.BlendState = ConvertToD3D12BlendDesc(_blend_state);
         psoDesc.DepthStencilState = ConvertToD3D12DepthStencilDesc(_depth_stencil_state);
         psoDesc.SampleMask = UINT_MAX;
-        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        psoDesc.PrimitiveTopologyType = ConvertToDXTopologyType(_topology);
         psoDesc.NumRenderTargets = _rt_nums;
         for (int i = 0; i < _rt_nums; i++)
         {
             psoDesc.RTVFormats[i] = ConvertToDXGIFormat(_rt_formats[i]);
         }
         psoDesc.SampleDesc.Count = 1;    
-        ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+        ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_p_plstate)));
 	}
+    void D3DGraphicsPipelineState::Bind()
+    {
+        if (!_b_build)
+        {
+            LOG_ERROR("PipelineState must be build before it been bind!");
+            return;
+        }
+        D3DContext::GetInstance()->GetCmdList()->SetPipelineState(_p_plstate.Get());
+    }
+    void D3DGraphicsPipelineState::CommitBindResource(uint16_t slot, void* res, EBindResourceType res_type)
+    {
+        static auto context = D3DContext::GetInstance();
+        switch (res_type)
+        {
+        case Ailu::EBindResourceType::kConstBuffer:
+        {
+            D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
+            context->GetCmdList()->SetGraphicsRootConstantBufferView(slot, view.BufferLocation);
+            return;
+        }
+        case Ailu::EBindResourceType::kTexture: return;
+        }
+        return;
+    }
 }

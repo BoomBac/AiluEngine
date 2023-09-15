@@ -14,16 +14,13 @@ namespace Ailu
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			return new D3DGraphicsPipelineState();
+			s_pipelinestates.insert(std::make_pair(s_pso_index, std::make_unique<D3DGraphicsPipelineState>()));
+			sCurrent = s_pipelinestates[s_pso_index++].get();
+			return sCurrent;
 		}
 		}
-		AL_ASSERT(false, "Unsupport render api!")
-			return nullptr;
-	}
-
-	void GraphicsPipelineState::Build()
-	{
-
+		AL_ASSERT(false, "Unsupport render api!");
+		return nullptr;
 	}
 }
 

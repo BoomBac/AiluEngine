@@ -116,11 +116,6 @@ namespace Ailu
         MoveToNextFrame();
     }
 
-    D3DContext* D3DContext::GetInstance()
-    {
-        return s_p_d3dcontext;
-    }
-
     ID3D12Device* D3DContext::GetDevice()
     {
         AL_ASSERT(m_device == nullptr,"Global D3D device hasn't been init!")
@@ -145,7 +140,8 @@ namespace Ailu
 
     void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform)
     {
-        m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
+        m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
+        //m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
         memcpy(_p_cbuffer + D3DConstants::kPerFrameDataSize + D3DConstants::kPerMaterialDataSize * D3DConstants::kMaxMaterialDataCount + D3DConstants::kPerFrameDataSize * (_render_object_index++),
             &transform, sizeof(transform));
         m_commandList->DrawIndexedInstanced(index_count, instance_count, 0, 0, 0);
@@ -476,7 +472,8 @@ namespace Ailu
 
         ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
         m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-        m_commandList->SetGraphicsRootDescriptorTable(2, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
+        m_commandList->SetGraphicsRootConstantBufferView(2, _cbuf_views[0].BufferLocation);
+        //m_commandList->SetGraphicsRootDescriptorTable(2, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 
         //m_commandList->SetGraphicsRootDescriptorTable(0, m_cbvHeap->GetGPUDescriptorHandleForHeapStart());
 
@@ -569,6 +566,7 @@ namespace Ailu
         cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         ThrowIfFailed(device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
         _cbv_desc_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        _cbuf_views.reserve(cbvHeapDesc.NumDescriptors);
         //constbuffer
         auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
         auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(D3DConstants::kPerFrameTotalSize * D3DConstants::kFrameCount);
@@ -582,7 +580,7 @@ namespace Ailu
             cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * D3DConstants::kPerFrameTotalSize;
             cbv_desc.SizeInBytes = D3DConstants::kPerFrameDataSize;
             device->CreateConstantBufferView(&cbv_desc, cbvHandle);
-
+            _cbuf_views.emplace_back(cbv_desc);
             for (uint32_t j = 0; j < D3DConstants::kMaxMaterialDataCount; j++)
             {
                 D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
@@ -590,6 +588,7 @@ namespace Ailu
                 cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * D3DConstants::kPerFrameTotalSize + D3DConstants::kPerFrameDataSize + j * D3DConstants::kPerMaterialDataSize;
                 cbv_desc.SizeInBytes = D3DConstants::kPerMaterialDataSize;
                 device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
+                _cbuf_views.emplace_back(cbv_desc);
             }
             for (uint32_t k = 0; k < D3DConstants::kMaxRenderObjectCount; k++)
             {
@@ -599,6 +598,7 @@ namespace Ailu
                     D3DConstants::kMaxMaterialDataCount * D3DConstants::kPerMaterialDataSize + k * D3DConstants::kPeObjectDataSize;
                 cbv_desc.SizeInBytes = D3DConstants::kPeObjectDataSize;
                 device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
+                _cbuf_views.emplace_back(cbv_desc);
             }
         }
         // Map and initialize the constant buffer. We don't unmap this until the
@@ -612,6 +612,11 @@ namespace Ailu
         D3D12_GPU_DESCRIPTOR_HANDLE handle{};
         handle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _cbv_desc_size * index;
         return handle;
+    }
+
+    const D3D12_CONSTANT_BUFFER_VIEW_DESC& D3DContext::GetCBufferViewDesc(uint32_t index) const
+    {
+        return _cbuf_views[index];
     }
 
 }
