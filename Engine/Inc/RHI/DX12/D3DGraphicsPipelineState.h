@@ -52,25 +52,18 @@ namespace Ailu
 	class D3DGraphicsPipelineState : public GraphicsPipelineState
 	{
 	public:
-        D3DGraphicsPipelineState() = default;
+        D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer);
 		void Build() override;
         void Bind() override;
         void CommitBindResource(uint16_t slot, void* res, EBindResourceType res_type) override;
     public:
-        VertexInputLayout _input_layout;
-        Ref<Shader> _p_vertex_shader;
-        Ref<Shader> _p_pixel_shader;
-        ETopology _topology;
-        BlendState _blend_state;
-        RasterizerState _raster_state;
-        DepthStencilState _depth_stencil_state;
-        bool _b_has_rt;
-        uint8_t _rt_nums;
-        EALGFormat _rt_formats[8];
-        EALGFormat _ds_format;
+
 	private:
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC _d3d_pso_desc;
+        GraphicsPipelineStateInitializer _state_desc;
         bool _b_build = false;
 		ComPtr<ID3D12PipelineState> _p_plstate;
+        ComPtr<ID3D12RootSignature>_p_sig;
 	};
 }
 

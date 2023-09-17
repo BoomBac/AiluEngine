@@ -13,6 +13,7 @@
 #include "Render/Buffer.h"
 #include "Render/Shader.h"
 #include "Render/Material.h"
+#include "Framework/Assets/Mesh.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -50,6 +51,7 @@ namespace Ailu
         uint8_t* GetCBufferPtr();
 
         void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
+        void DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform);
 
     private:
         void Destroy();
@@ -59,6 +61,8 @@ namespace Ailu
         void WaitForGpu();
         void MoveToNextFrame();
         void InitCBVSRVUAVDescHeap();
+        void CreateDepthStencilTarget();
+        void CreateDescriptorHeap();
         D3D12_GPU_DESCRIPTOR_HANDLE GetCBVGPUDescHandle(uint32_t index) const;
 
 
@@ -67,19 +71,20 @@ namespace Ailu
         WinWindow* _window;
 
         // Pipeline objects.
-        CD3DX12_VIEWPORT m_viewport;
-        CD3DX12_RECT m_scissorRect;
         ComPtr<IDXGISwapChain3> m_swapChain;
         ComPtr<ID3D12Device> m_device;
-        ComPtr<ID3D12Resource> m_renderTargets[D3DConstants::kFrameCount];
+        ComPtr<ID3D12Resource> _color_buffer[D3DConstants::kFrameCount];
+        ComPtr<ID3D12Resource> _depth_buffer[D3DConstants::kFrameCount];
         ComPtr<ID3D12CommandAllocator> m_commandAllocators[D3DConstants::kFrameCount];
         ComPtr<ID3D12CommandQueue> m_commandQueue;
         ComPtr<ID3D12RootSignature> m_rootSignature;
-        ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
-        ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
         ComPtr<ID3D12PipelineState> m_pipelineState;
         ComPtr<ID3D12GraphicsCommandList> m_commandList;
+        ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+        ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
+        ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
         uint8_t m_rtvDescriptorSize;
+        uint8_t _dsv_desc_size;
         uint8_t _cbv_desc_size;
         uint8_t* _p_cbuffer = nullptr;
 
@@ -94,6 +99,8 @@ namespace Ailu
         Ref<Shader> _p_standard_shader;
         Ref<Material> _mat_red;
         Ref<Material> _mat_green;
+
+        Ref<Mesh> _plane;
 
         uint32_t _render_object_index = 0u;
 

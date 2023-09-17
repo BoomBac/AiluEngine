@@ -33,15 +33,16 @@ void Ailu::ImGUILayer::OnAttach()
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
     font0 = io.Fonts->AddFontFromFileTTF(GET_ENGINE_FULL_PATH(Res/Fonts/VictorMono-Regular.ttf), 13.0f);
     io.Fonts->Build();
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
     ImGuiStyle& style = ImGui::GetStyle();
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark(&style);
+    // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
-        style.WindowRounding = 0.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+        style.WindowRounding = 10.0f;
+        style.ChildRounding = 10.0f;
+        style.FrameRounding = 10.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 0.8f;
     }
 
     ImGui_ImplWin32_Init(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
@@ -58,17 +59,20 @@ void Ailu::ImGUILayer::OnEvent(Event& e)
 {
 
 }
-
+static bool show = false;
 void Ailu::ImGUILayer::OnImguiRender()
 {
     ImGui::PushFont(font0);
-    ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+    ImGui::Begin("Performace Statics");                          // Create a window called "Hello, world!" and append into it.
     ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
     ImGui::Text("FrameTime: %.2f ms", ModuleTimeStatics::RenderDeltatime);
+    ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 0.2f);
+    ImGui::Checkbox("Expand", &show);
     ImGui::End();
     ImGui::PopFont();
-    static bool show = true;
-    ImGui::ShowDemoWindow(&show);
+
+    if(show) ImGui::ShowDemoWindow(&show);
+    
 }
 
 void Ailu::ImGUILayer::Begin()

@@ -17,6 +17,8 @@ namespace Ailu
 		static void SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj);
 		static void SetProjectionMatrix(const Matrix4x4f& proj);
 		static void SetViewMatrix(const Matrix4x4f& view);
+		static void SetViewports(const std::initializer_list<Viewport>& viewports);
+		static void SetScissorRects(const std::initializer_list<Viewport>& rects);
 	private:
 		static inline RendererAPI* s_p_renderer_api = new D3DRendererAPI();
 	};

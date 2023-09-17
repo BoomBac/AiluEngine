@@ -5,7 +5,7 @@
 
 namespace Ailu
 {
-	GraphicsPipelineState* GraphicsPipelineState::Create()
+	GraphicsPipelineState* GraphicsPipelineState::Create(const GraphicsPipelineStateInitializer& initializer)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -14,7 +14,7 @@ namespace Ailu
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			s_pipelinestates.insert(std::make_pair(s_pso_index, std::make_unique<D3DGraphicsPipelineState>()));
+			s_pipelinestates.insert(std::make_pair(s_pso_index, std::make_unique<D3DGraphicsPipelineState>(initializer)));
 			sCurrent = s_pipelinestates[s_pso_index++].get();
 			return sCurrent;
 		}

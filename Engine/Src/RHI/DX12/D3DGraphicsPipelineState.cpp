@@ -39,10 +39,10 @@ namespace Ailu
     {
         switch (format)
         {
-        case EALGFormat::kALGFormatR8G8B8A8_UNORM:
-            return DXGI_FORMAT_R8G8B8A8_UNORM;
-        case EALGFormat::kALGFormatR24G8_TYPELESS:
-            return DXGI_FORMAT_R24G8_TYPELESS;
+        case EALGFormat::kALGFormatR8G8B8A8_UNORM: return DXGI_FORMAT_R8G8B8A8_UNORM;
+        case EALGFormat::kALGFormatR24G8_TYPELESS: return DXGI_FORMAT_R24G8_TYPELESS;
+        case EALGFormat::kALGFormatR32_FLOAT: return DXGI_FORMAT_R32_FLOAT;
+        case EALGFormat::kALGFormatD32_FLOAT: return DXGI_FORMAT_D32_FLOAT;
         }
         return DXGI_FORMAT_UNKNOWN;
     }
@@ -81,10 +81,15 @@ namespace Ailu
             for (auto it = shaders.begin(); it != shaders.end(); it++)
             {             
                 auto reflection = static_cast<D3DShader*>(it->get())->GetD3DReflectionInfo();
+                if (reflection == nullptr)
+                {
+                    LOG_WARNING(L"未获取到着色器反射信息！");
+                    continue;
+                }
                 D3D12_SHADER_DESC desc{};
                 reflection->GetDesc(&desc);
                 std::vector<D3D12_SHADER_INPUT_BIND_DESC> bind_desc(desc.BoundResources);
-                for (size_t i = 0; i < desc.BoundResources; i++)
+                for (uint32_t i = 0u; i < desc.BoundResources; i++)
                 {
                     auto resc_desc = reflection->GetResourceBindingDesc(i, &bind_desc[i]);
                     if (bind_desc[i].Type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
@@ -99,35 +104,46 @@ namespace Ailu
                 D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
                 D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
             CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-            rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
+            uint16_t root_param_count = 3u;
+            rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 0, nullptr, rootSignatureFlags);
             ComPtr<ID3DBlob> signature;
             ComPtr<ID3DBlob> error;
             ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
             ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&p_signature)));
             return p_signature;
         }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    D3DGraphicsPipelineState::D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer) : _state_desc(initializer)
+    {
     }
 
     void D3DGraphicsPipelineState::Build()
 	{
-        auto [desc, count] = ConvertToD3DInputLayout(_input_layout);
-        D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
-        psoDesc.InputLayout = { desc, count };
-        psoDesc.pRootSignature = GenerateRootSignature({_p_vertex_shader,_p_pixel_shader});
-        psoDesc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_vertex_shader->GetByteCode(EShaderType::kVertex)));
-        psoDesc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_p_pixel_shader->GetByteCode(EShaderType::kPixel)));
-        psoDesc.RasterizerState = ConvertToD3D12RasterizerDesc(_raster_state);
-        psoDesc.BlendState = ConvertToD3D12BlendDesc(_blend_state);
-        psoDesc.DepthStencilState = ConvertToD3D12DepthStencilDesc(_depth_stencil_state);
-        psoDesc.SampleMask = UINT_MAX;
-        psoDesc.PrimitiveTopologyType = ConvertToDXTopologyType(_topology);
-        psoDesc.NumRenderTargets = _rt_nums;
-        for (int i = 0; i < _rt_nums; i++)
+        auto [desc, count] = ConvertToD3DInputLayout(_state_desc._input_layout);
+        _p_sig = GenerateRootSignature({ _state_desc._p_vertex_shader,_state_desc._p_pixel_shader });
+        _d3d_pso_desc.InputLayout = { desc, count };
+        _d3d_pso_desc.pRootSignature = _p_sig.Get();
+        _d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex)));
+        _d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel)));
+        _d3d_pso_desc.RasterizerState = ConvertToD3D12RasterizerDesc(_state_desc._raster_state);
+        _d3d_pso_desc.BlendState = ConvertToD3D12BlendDesc(_state_desc._blend_state);
+        _d3d_pso_desc.DepthStencilState = ConvertToD3D12DepthStencilDesc(_state_desc._depth_stencil_state);
+        _d3d_pso_desc.SampleMask = UINT_MAX;
+        _d3d_pso_desc.PrimitiveTopologyType = ConvertToDXTopologyType(_state_desc._topology);
+        _d3d_pso_desc.NumRenderTargets = _state_desc._rt_nums;
+        if (_state_desc._depth_stencil_state._b_depth_write) _d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._ds_format);
+        for (int i = 0; i < _state_desc._rt_nums; i++)
         {
-            psoDesc.RTVFormats[i] = ConvertToDXGIFormat(_rt_formats[i]);
+            _d3d_pso_desc.RTVFormats[i] = ConvertToDXGIFormat(_state_desc._rt_formats[i]);
         }
-        psoDesc.SampleDesc.Count = 1;    
-        ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&_p_plstate)));
+        _d3d_pso_desc.SampleDesc.Count = 1;
+        ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
+        _b_build = true;
 	}
     void D3DGraphicsPipelineState::Bind()
     {
@@ -136,7 +152,9 @@ namespace Ailu
             LOG_ERROR("PipelineState must be build before it been bind!");
             return;
         }
+        D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootSignature(_p_sig.Get());
         D3DContext::GetInstance()->GetCmdList()->SetPipelineState(_p_plstate.Get());
+        D3DContext::GetInstance()->GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     }
     void D3DGraphicsPipelineState::CommitBindResource(uint16_t slot, void* res, EBindResourceType res_type)
     {

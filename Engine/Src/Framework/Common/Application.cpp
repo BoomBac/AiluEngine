@@ -40,7 +40,7 @@ namespace Ailu
 	}
 	double render_lag = 0.0;
 	double update_lag = 0.0;
-#ifdef __COMPANY_ENV_H__
+#ifdef COMPANY_ENV
 	constexpr double kTargetFrameRate = 60;
 #else
 	constexpr double kTargetFrameRate = 170;

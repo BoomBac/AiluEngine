@@ -15,6 +15,7 @@
 #include <cwchar>
 #include <shellapi.h>
 
+#include <unordered_map>
 #include <string>
 #include <sstream>
 #include <thread>

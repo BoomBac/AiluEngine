@@ -929,6 +929,66 @@ namespace Ailu
 		static const Vector3f kRed = { 1.f,0.f,0.f };
 		static const Vector3f kGreen = { 0.f,1.f,0.f };
 	}
+
+	namespace ALHash
+	{
+		struct Vector2fHash
+		{
+			std::size_t operator()(const Vector2f& v) const
+			{
+				std::size_t h1 = std::hash<float>{}(v.x);
+				std::size_t h2 = std::hash<float>{}(v.y);
+				return h1 ^ (h2 << 1);
+			}
+		};
+
+		struct Vector2Equal
+		{
+			bool operator()(const Vector2f& v1, const Vector2f& v2) const
+			{
+				return v1.x == v2.x && v1.y == v2.y;
+			}
+		};
+
+		struct Vector3fHash
+		{
+			std::size_t operator()(const Vector3f& v) const
+			{
+				std::size_t h1 = std::hash<float>{}(v.x);
+				std::size_t h2 = std::hash<float>{}(v.y);
+				std::size_t h3 = std::hash<float>{}(v.z);
+				return h1 ^ (h2 << 1) ^ (h3 << 2);
+			}
+		};
+
+		struct Vector3Equal
+		{
+			bool operator()(const Vector3f& v1, const Vector3f& v2) const
+			{
+				return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z;
+			}
+		};
+
+		struct Vector4fHash
+		{
+			std::size_t operator()(const Vector4f& v) const
+			{
+				std::size_t h1 = std::hash<float>{}(v.x);
+				std::size_t h2 = std::hash<float>{}(v.y);
+				std::size_t h3 = std::hash<float>{}(v.z);
+				std::size_t h4 = std::hash<float>{}(v.w);
+				return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
+			}
+		};
+
+		struct Vector4Equal
+		{
+			bool operator()(const Vector4f& v1, const Vector4f& v2) const
+			{
+				return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z && v1.w == v2.w;
+			}
+		};
+	}
 }
 
 #endif // __AL_MATH_H__

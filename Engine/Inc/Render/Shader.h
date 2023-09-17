@@ -11,6 +11,12 @@ namespace Ailu
 	{
 		kVertex,kPixel
 	};
+
+	struct ShaderSemanic
+	{
+
+	};
+
 	class Shader
 	{
 		friend class Material;

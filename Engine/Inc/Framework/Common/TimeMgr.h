@@ -21,6 +21,7 @@ namespace Ailu
 		using ALTimeStamp = std::chrono::high_resolution_clock::time_point;
 		inline static float DeltaTime = 0.0f;
 		inline static float TimeSinceLoad = 0.0f;
+		inline static float TimeScale = 0.01f;
 
 		int Initialize() override;
 		void Finalize() override;
@@ -28,6 +29,7 @@ namespace Ailu
 		void Pause();
 		void Mark();
 		float GetElapsedSinceLastMark() const;
+		static float GetScaledWorldTime(float scale = TimeMgr::TimeScale,bool smooth_scale = true);
 		void Resume();
 		void Reset();
 	private:

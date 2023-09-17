@@ -1,0 +1,85 @@
+#include "pch.h"
+#include "Framework/Assets/Mesh.h"
+
+namespace Ailu
+{
+	Mesh::Mesh()
+	{
+		_vertices = nullptr;
+		_normals = nullptr;
+		_colors = nullptr;
+		_tangents = nullptr;
+		_uv = new Vector2f*[8];
+		for (size_t i = 0; i < 8; i++)
+		{
+			_uv[i] = nullptr;
+		}
+		_vertex_count = 0;
+	}
+	Mesh::~Mesh()
+	{
+		Clear();
+		DESTORY_PTRARR(_uv)
+	}
+	void Mesh::SetVertices(Vector3f* vertices)
+	{
+		_vertices = vertices;
+	}
+	void Ailu::Mesh::SetNormals(Vector3f* normals)
+	{
+		_normals = normals;
+	}
+	void Mesh::SetTangents(Vector3f* tangents)
+	{
+		_tangents = tangents;
+	}
+	void Mesh::SetUVs(Vector2f* uv, uint8_t index)
+	{
+		if (index >= 8)
+		{
+			AL_ASSERT(true, "Uv index in mesh must be less than 8!");
+			return;
+		}
+		_uv[index] = uv;
+	}
+	void Mesh::Clear()
+	{
+		DESTORY_PTRARR(_vertices);
+		DESTORY_PTRARR(_normals);
+		DESTORY_PTRARR(_colors);
+		DESTORY_PTRARR(_tangents);
+		if (_uv != nullptr)
+		{
+			for (size_t i = 0; i < 8; i++)
+			{
+				DESTORY_PTRARR(_uv[i]);
+			}
+		}
+		_vertex_count = 0;
+		_index_count = 0;
+	}
+	void Mesh::SetIndices(uint32_t* indices)
+	{
+		_p_indices = indices;
+	}
+	const Ref<VertexBuffer>& Mesh::GetVertexBuffer() const
+	{
+		return _p_vbuf;
+	}
+	const Ref<IndexBuffer>& Mesh::GetIndexBuffer() const
+	{
+		return _p_ibuf;
+	}
+	void Mesh::Build()
+	{
+		_p_vbuf.reset(VertexBuffer::Create({
+				{"POSITION",EShaderDateType::kFloat3,0},
+				{"NORMAL",EShaderDateType::kFloat3,1},
+				{"TEXCOORD",EShaderDateType::kFloat2,2}
+			}));
+		_p_vbuf->SetStream(reinterpret_cast<float*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), 0);
+		_p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), 1);
+		_p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), 2);
+		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
+	}
+}

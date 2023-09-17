@@ -165,7 +165,7 @@ namespace Ailu
     public:
         static DepthStencilState GetRHI()
         {
-            return DepthStencilState(DepthTest, DepthWrite);
+            return DepthStencilState(DepthWrite, DepthTest);
         }
     };
 
@@ -175,15 +175,30 @@ namespace Ailu
     public:
         static DepthStencilState GetRHI()
         {
-            return DepthStencilState(DepthTest, DepthWrite);
+            return DepthStencilState(DepthWrite, DepthTest);
         }
+    };
+
+    struct GraphicsPipelineStateInitializer
+    {
+        VertexInputLayout _input_layout;
+        Ref<Shader> _p_vertex_shader;
+        Ref<Shader> _p_pixel_shader;
+        ETopology _topology;
+        BlendState _blend_state;
+        RasterizerState _raster_state;
+        DepthStencilState _depth_stencil_state;
+        bool _b_has_rt;
+        uint8_t _rt_nums;
+        EALGFormat _rt_formats[8];
+        EALGFormat _ds_format;
     };
 
 	class GraphicsPipelineState
 	{
     public:
-        static GraphicsPipelineState* sCurrent;
-        static GraphicsPipelineState* Create();
+        inline static GraphicsPipelineState* sCurrent = 0;
+        static GraphicsPipelineState* Create(const GraphicsPipelineStateInitializer& initializer);
         virtual ~GraphicsPipelineState() = default;
         virtual void Build() = 0;
         virtual void Bind() = 0;

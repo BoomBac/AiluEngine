@@ -37,4 +37,12 @@ namespace Ailu
 	{
 		s_p_renderer_api->SetViewMatrix(view);
 	}
+	void Ailu::RenderCommand::SetViewports(const std::initializer_list<Viewport>& viewports)
+	{
+		s_p_renderer_api->SetViewports(viewports);
+	}
+	void RenderCommand::SetScissorRects(const std::initializer_list<Viewport>& rects)
+	{
+		s_p_renderer_api->SetScissorRects(rects);
+	}
 }

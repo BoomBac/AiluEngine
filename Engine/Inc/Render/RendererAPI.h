@@ -6,6 +6,21 @@
 #include "Framework/Math/ALMath.hpp"
 namespace Ailu
 {
+
+	struct Viewport
+	{
+		uint16_t left;
+		uint16_t top;
+		uint16_t width;
+		uint16_t height;
+		Viewport(uint16_t l, uint16_t t, uint16_t w, uint16_t h)
+			: left(l), top(t), width(w), height(h)
+		{
+		}
+	};
+
+	using ScissorRect = Viewport;
+
 	class RendererAPI
 	{
 	public:
@@ -23,7 +38,8 @@ namespace Ailu
 		virtual void SetViewMatrix(const Matrix4x4f& view) = 0;
 		virtual void SetProjectionMatrix(const Matrix4x4f& proj) = 0;
 		virtual void SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj) = 0;
-
+		virtual void SetViewports(const std::initializer_list<Viewport>& viewports) = 0;
+		virtual void SetScissorRects(const std::initializer_list<Viewport>& rects) = 0;
 
 	private:
 		inline static ERenderAPI sAPI = ERenderAPI::kDirectX12;

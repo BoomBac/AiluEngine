@@ -7,6 +7,7 @@
 #include "RendererAPI.h"
 #include "GlobalMarco.h"
 #include "Material.h"
+#include "Framework/Assets/Mesh.h"
 
 namespace Ailu
 {
@@ -20,6 +21,7 @@ namespace Ailu
         static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, uint32_t instance_count = 1);
         static void Submit(const Ref<VertexBuffer>& vertex_buf, Ref<Material> mat ,uint32_t instance_count = 1);
         static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat,Matrix4x4f transform ,uint32_t instance_count = 1);
+        static void Submit(const Ref<Mesh> mesh, Ref<Material> mat,Matrix4x4f transform ,uint32_t instance_count = 1);
         int Initialize() override;
         void Finalize() override;
         void Tick() override;

@@ -38,6 +38,7 @@
 #define BIT(x) (1 << x)
 
 #define DESTORY_PTR(ptr) if(ptr != nullptr) {delete ptr;ptr = nullptr;}
+#define DESTORY_PTRARR(ptr) if(ptr != nullptr) {delete[] ptr;ptr = nullptr;}
 
 #define INIT_CHECK(obj,class) if(!obj->_b_init) {LOG_ERROR("{} hasn't been init!",#class) return;}
 
@@ -46,11 +47,38 @@
 
 #define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
 
+//使用dxc编译高版本着色器(>=6.0)，这样的话无法在PIX中看到cbuffer信息
+//#define SHADER_DXC
+
 template<typename T>
 using Scope = std::unique_ptr<T>;
 
 template<typename T>
+Scope<T> MakeScope()
+{
+	return std::move(std::make_unique<T>());
+}
+
+template<typename T, typename... Args>
+Scope<T> MakeScope(Args&&... args) 
+{
+	return std::make_unique<T>(std::forward<Args>(args)...);
+}
+
+template<typename T>
 using Ref = std::shared_ptr<T>;
+
+template<typename T>
+Ref<T> MakeRef() 
+{
+	return std::make_shared<T>();
+}
+
+template<typename T, typename... Args>
+Ref<T> MakeRef(Args&&... args)
+{
+	return std::make_shared<T>(std::forward<Args>(args)...);
+}
 
 #endif // !__GLOBAL_MARCO_H__
 

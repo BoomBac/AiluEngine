@@ -49,6 +49,13 @@ namespace Ailu
 		return ALMSecond(std::chrono::high_resolution_clock::now() - _mark_stamp).count();
 	}
 
+	float TimeMgr::GetScaledWorldTime(float scale, bool smooth_scale)
+	{
+		if (smooth_scale) return TimeSinceLoad * TimeScale * TimeScale;
+		else return TimeSinceLoad * TimeScale;
+	}
+
+
 	void TimeMgr::Resume()
 	{
 		if (_b_stop)

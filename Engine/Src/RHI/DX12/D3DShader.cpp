@@ -3,6 +3,7 @@
 #include <dxcapi.h>
 #include <atlcomcli.h>
 
+#include "GlobalMarco.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Framework/Common/Utils.h"
@@ -21,8 +22,9 @@ namespace Ailu
 			return 64;
 		else if (name == "_Color")
 			return D3DConstants::kPerFrameDataSize;
+		return 0;
 	}
-
+	//shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
 	static bool CreateFromFileDXC(const std::wstring& filename, const std::wstring& entryPoint, const std::wstring& pTarget, ComPtr<ID3DBlob>& p_blob,
 		ComPtr<ID3D12ShaderReflection>& shader_reflection)
 	{
@@ -114,17 +116,31 @@ namespace Ailu
 		return true;
 	}
 
+	static void CreateFromFileFXC(const std::wstring& filename, const std::string& entryPoint, const std::string& pTarget, ComPtr<ID3DBlob>& p_blob, 
+		ComPtr<ID3D12ShaderReflection>& shader_reflection)
+	{
+		ID3DBlob* pErrorBlob = nullptr;
+		D3DCompileFromFile(filename.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), 0, 0, &p_blob, &pErrorBlob);
+		if (pErrorBlob)
+		{
+			OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+			pErrorBlob->Release();
+		}
+		ID3D12ShaderReflection* pReflection = NULL;
+		D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void**)&shader_reflection);
+	}
+
 	void D3DShader::LoadShaderRelfection(ID3D12ShaderReflection* reflection)
 	{
 		D3D12_SHADER_DESC desc{};
 		reflection->GetDesc(&desc);
 		std::vector<D3D12_SIGNATURE_PARAMETER_DESC> inputparams(desc.InputParameters);
-		for (size_t i = 0; i < desc.InputParameters; i++)
+		for (uint32_t i = 0u; i < desc.InputParameters; i++)
 		{
 			auto inputparam_desc = reflection->GetInputParameterDesc(i,&inputparams[i]);
 		}
 		std::vector<D3D12_SHADER_INPUT_BIND_DESC> bind_desc(desc.BoundResources);
-		for (size_t i = 0; i < desc.BoundResources; i++)
+		for (uint32_t i = 0u; i < desc.BoundResources; i++)
 		{
 			auto resc_desc = reflection->GetResourceBindingDesc(i, &bind_desc[i]);
 			if (bind_desc[i].Type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
@@ -132,12 +148,12 @@ namespace Ailu
 
 			}
 		}
-		for (size_t i = 0; i < desc.ConstantBuffers; i++)
+		for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
 		{
 			auto cbuf = reflection->GetConstantBufferByIndex(i);
 			D3D12_SHADER_BUFFER_DESC desc{};
 			cbuf->GetDesc(&desc);
-			for (size_t j = 0; j < desc.Variables; j++)
+			for (uint32_t j = 0u; j < desc.Variables; j++)
 			{
 				auto variable = cbuf->GetVariableByIndex(j);
 				D3D12_SHADER_VARIABLE_DESC vdesc{};
@@ -178,56 +194,19 @@ namespace Ailu
 		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #else
 		UINT compileFlags = 0;
-#endif         
-		D3D12_SHADER_DESC vs_desc;
+#endif
+
+#ifdef SHADER_DXC
 		CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
 		LoadShaderRelfection(_p_reflection.Get());
-		
-		D3D12_SHADER_DESC ps_desc;
 		CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
 		LoadShaderRelfection(_p_reflection.Get());
-		
-		{
-			D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-
-			// This is the highest version the sample supports. If CheckFeatureSupport succeeds, the HighestVersion returned will not be greater than this.
-			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-			auto device = D3DContext::GetInstance()->GetDevice();
-			if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-			{
-				featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-			}
-
-			CD3DX12_DESCRIPTOR_RANGE1 ranges[3]{};
-			CD3DX12_ROOT_PARAMETER1 rootParameters[3]{};
-
-			ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-			ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-			ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 2, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-			//rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
-			//rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
-			//rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_VERTEX);
-
-			rootParameters[0].InitAsConstantBufferView(0);
-			rootParameters[1].InitAsConstantBufferView(1);
-			rootParameters[2].InitAsConstantBufferView(2);
-
-			// Allow input layout and deny uneccessary access to certain pipeline stages.
-			D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-				D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-				D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-
-			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-			rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
-
-			ComPtr<ID3DBlob> signature;
-			ComPtr<ID3DBlob> error;
-			ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
-			ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(_p_sig.GetAddressOf())));
-			s_active_sig = _p_sig;
-		}
+#else
+		CreateFromFileFXC(ToWChar(file_name.data()), "VSMain", "vs_5_0", _p_vblob, _p_reflection);
+		LoadShaderRelfection(_p_reflection.Get());
+		CreateFromFileFXC(ToWChar(file_name.data()), "PSMain", "ps_5_0", _p_pblob, _p_reflection);
+		LoadShaderRelfection(_p_reflection.Get());
+#endif // SHADER_DXC
 	}
 
 	D3DShader::~D3DShader()

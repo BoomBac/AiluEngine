@@ -15,6 +15,16 @@ namespace Ailu
 	static const wchar_t* kAppTitleIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_title_icon.ico);
 	static const wchar_t* kAppIconPath = GET_ENGINE_FULL_PATHW(Res/Ico/app_icon.ico);
 
+    static void HideCursor()
+    {
+        while (::ShowCursor(FALSE) >= 0); // 隐藏鼠标指针，直到它不再可见
+    }
+
+    static void ShowCursor()
+    {
+        while (::ShowCursor(TRUE) < 0); // 显示鼠标指针，直到它可见
+    }
+
 	static Window* Create(const WindowProps& props)
 	{
 		return new WinWindow(props);
