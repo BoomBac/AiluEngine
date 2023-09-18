@@ -489,12 +489,14 @@
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\Render\RendererAPI.h" />
     <ClInclude Include="Inc\Render\Shader.h" />
+    <ClInclude Include="Inc\Render\Texture.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DBuffer.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DConstants.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DContext.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DGraphicsPipelineState.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DRendererAPI.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h" />
+    <ClInclude Include="Inc\RHI\DX12\D3DTexture.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
     <None Include="Res\Shaders\cbuffer.hlsl">
       <FileType>Document</FileType>
@@ -534,11 +536,13 @@
     <ClCompile Include="Src\Render\RenderCommand.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\Render\Shader.cpp" />
+    <ClCompile Include="Src\Render\Texture.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DBuffer.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DContext.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DGraphicsPipelineState.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DRendererAPI.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DShader.cpp" />
+    <ClCompile Include="Src\RHI\DX12\D3DTexture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat" />

@@ -316,11 +316,6 @@ namespace Ailu
 		return false;
 	}
 
-	static std::size_t CombineHashes(std::size_t hash1, std::size_t hash2)
-	{
-		return hash1 ^ (hash2 + 0x9e3779b9 + (hash1 << 6) + (hash1 >> 2));
-	}
-
 	void FbxParser::GenerateIndexdMesh(Ref<Mesh>& mesh)
 	{
 		uint32_t vertex_count = mesh->_vertex_count;
@@ -342,7 +337,7 @@ namespace Ailu
 			auto p = raw_pos[i], n = raw_normals[i];
 			auto uv = raw_uv0[i];
 			auto hash0 = v3hash(n), hash1 = v2hash(uv);
-			auto vertex_hash = CombineHashes(hash0, hash1);
+			auto vertex_hash = ALHash::CombineHashes(hash0, hash1);
 			auto it = vertex_map.find(vertex_hash);
 			if (it == vertex_map.end())
 			{

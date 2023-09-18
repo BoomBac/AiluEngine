@@ -1890,6 +1890,12 @@
     <ClInclude Include="Ext\fbxsdk\include\fbxsdk.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Render\Texture.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\D3DTexture.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -1989,6 +1995,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\Texture.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\D3DTexture.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

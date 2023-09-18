@@ -35,18 +35,6 @@ namespace Ailu
         return ds_state;
     }
 
-    static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat& format)
-    {
-        switch (format)
-        {
-        case EALGFormat::kALGFormatR8G8B8A8_UNORM: return DXGI_FORMAT_R8G8B8A8_UNORM;
-        case EALGFormat::kALGFormatR24G8_TYPELESS: return DXGI_FORMAT_R24G8_TYPELESS;
-        case EALGFormat::kALGFormatR32_FLOAT: return DXGI_FORMAT_R32_FLOAT;
-        case EALGFormat::kALGFormatD32_FLOAT: return DXGI_FORMAT_D32_FLOAT;
-        }
-        return DXGI_FORMAT_UNKNOWN;
-    }
-
     static D3D12_PRIMITIVE_TOPOLOGY_TYPE ConvertToDXTopologyType(const ETopology& Topology)
     {
         switch (Topology)
