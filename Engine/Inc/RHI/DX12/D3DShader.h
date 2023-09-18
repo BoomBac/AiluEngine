@@ -34,6 +34,7 @@ namespace Ailu
 		void* GetByteCode(EShaderType type) override;
 		ComPtr<ID3D12RootSignature> GetSignature() const;
 		ID3D12ShaderReflection* GetD3DReflectionInfo() const;
+		ID3D12ShaderReflection* GetD3DReflectionInfo(const EShaderType& type) const;
 		static ComPtr<ID3D12RootSignature> GetCurrentActiveSignature();
 	private:
 		uint8_t* GetCBufferPtr(uint32_t index) override;
@@ -51,7 +52,8 @@ namespace Ailu
 		inline static ComPtr<ID3D12DescriptorHeap> m_cbvHeap = nullptr;
 		inline static ComPtr<ID3D12Resource> m_constantBuffer = nullptr;
 		ComPtr<ID3D12RootSignature> _p_sig;
-		ComPtr<ID3D12ShaderReflection> _p_reflection;
+		ComPtr<ID3D12ShaderReflection> _p_v_reflection;
+		ComPtr<ID3D12ShaderReflection> _p_p_reflection;
 		std::map<std::string, uint16_t> _variable_offset;
 		inline static ComPtr<ID3D12RootSignature> s_active_sig;
 	};

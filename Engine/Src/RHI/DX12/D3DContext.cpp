@@ -49,6 +49,43 @@ namespace Ailu
         return begin + D3DConstants::kPerFrameDataSize + D3DConstants::kPerMaterialDataSize * D3DConstants::kMaxMaterialDataCount + object_index * D3DConstants::kPeObjectDataSize;
     }
 
+    static std::vector<UINT8> GenerateTextureData()
+    {
+        UINT TextureWidth = 256, TextureHeight = 256,TexturePixelSize = 4;
+        const UINT rowPitch = TextureWidth * TexturePixelSize;
+        const UINT cellPitch = rowPitch >> 3;        // The width of a cell in the checkboard texture.
+        const UINT cellHeight = TextureWidth >> 3;    // The height of a cell in the checkerboard texture.
+        const UINT textureSize = rowPitch * TextureHeight;
+
+        std::vector<UINT8> data(textureSize);
+        UINT8* pData = &data[0];
+
+        for (UINT n = 0; n < textureSize; n += TexturePixelSize)
+        {
+            UINT x = n % rowPitch;
+            UINT y = n / rowPitch;
+            UINT i = x / cellPitch;
+            UINT j = y / cellHeight;
+
+            if (i % 2 == j % 2)
+            {
+                pData[n] = 0x00;        // R
+                pData[n + 1] = 0x00;    // G
+                pData[n + 2] = 0x00;    // B
+                pData[n + 3] = 0xff;    // A
+            }
+            else
+            {
+                pData[n] = 0xff;        // R
+                pData[n + 1] = 0xff;    // G
+                pData[n + 2] = 0xff;    // B
+                pData[n + 3] = 0xff;    // A
+            }
+        }
+
+        return data;
+    }
+
     D3DContext::D3DContext(WinWindow* window) : _window(window),_width(window->GetWidth()),_height(window->GetHeight())
     {
         m_aspectRatio = (float)_width / (float)_height;
@@ -128,6 +165,25 @@ namespace Ailu
     ComPtr<ID3D12DescriptorHeap> D3DContext::GetDescriptorHeap()
     {
         return m_cbvHeap;
+    }
+
+    D3D12_CPU_DESCRIPTOR_HANDLE& D3DContext::GetSRVCPUDescriptorHandle(uint32_t index)
+    {
+        static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount + 
+            D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
+        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+        auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+        cpu_handle.ptr += _cbv_desc_size * (base + index);
+        return cpu_handle;
+    }
+
+    D3D12_GPU_DESCRIPTOR_HANDLE& D3DContext::GetSRVGPUDescriptorHandle(uint32_t index)
+    {
+        static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount +
+            D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
+        auto cpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
+        cpu_handle.ptr += _cbv_desc_size * (base + index);
+        return cpu_handle;
     }
 
     uint8_t* D3DContext::GetCBufferPtr()
@@ -355,10 +411,13 @@ namespace Ailu
                 0,3,7,
                 7,4,0//back
             };
-            auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader::kFbx>::GetParser();
-
+            auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+            
             _plane = parser->Parser(GET_RES_PATH(Meshs/monkey.fbx));
             _plane->Build();
+
+            _tex_checkboard = Texture2D::Create(256,256,EALGFormat::kALGFormatR8G8B8A8_UNORM);
+            _tex_checkboard->FillData(GenerateTextureData().data());
 
             _p_vertex_buf.reset(VertexBuffer::Create({
                 {"POSITION",EShaderDateType::kFloat3,0},
@@ -419,6 +478,7 @@ namespace Ailu
 
         _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
         _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
+        _tex_checkboard->Bind(0);
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);

@@ -202,10 +202,10 @@ namespace Ailu
 		CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
 		LoadShaderRelfection(_p_reflection.Get());
 #else
-		CreateFromFileFXC(ToWChar(file_name.data()), "VSMain", "vs_5_0", _p_vblob, _p_reflection);
-		LoadShaderRelfection(_p_reflection.Get());
-		CreateFromFileFXC(ToWChar(file_name.data()), "PSMain", "ps_5_0", _p_pblob, _p_reflection);
-		LoadShaderRelfection(_p_reflection.Get());
+		CreateFromFileFXC(ToWChar(file_name.data()), "VSMain", "vs_5_0", _p_vblob, _p_v_reflection);
+		LoadShaderRelfection(_p_v_reflection.Get());
+		CreateFromFileFXC(ToWChar(file_name.data()), "PSMain", "ps_5_0", _p_pblob, _p_p_reflection);
+		LoadShaderRelfection(_p_p_reflection.Get());
 #endif // SHADER_DXC
 	}
 
@@ -298,7 +298,17 @@ namespace Ailu
 	}
 	ID3D12ShaderReflection* D3DShader::GetD3DReflectionInfo() const
 	{
-		return _p_reflection.Get();
+		return _p_p_reflection.Get();
+	}
+	ID3D12ShaderReflection* D3DShader::GetD3DReflectionInfo(const EShaderType& type) const
+	{
+		switch (type)
+		{
+		case Ailu::EShaderType::kVertex:
+			return _p_v_reflection.Get();
+		case Ailu::EShaderType::kPixel:
+			return _p_p_reflection.Get();
+		}
 	}
 	ComPtr<ID3D12RootSignature> D3DShader::GetCurrentActiveSignature()
 	{

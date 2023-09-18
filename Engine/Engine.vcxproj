@@ -446,6 +446,26 @@
     <ClInclude Include="Ext\imgui\imstb_rectpack.h" />
     <ClInclude Include="Ext\imgui\imstb_textedit.h" />
     <ClInclude Include="Ext\imgui\imstb_truetype.h" />
+    <ClInclude Include="Ext\stb\stb_connected_components.h" />
+    <ClInclude Include="Ext\stb\stb_c_lexer.h" />
+    <ClInclude Include="Ext\stb\stb_divide.h" />
+    <ClInclude Include="Ext\stb\stb_ds.h" />
+    <ClInclude Include="Ext\stb\stb_dxt.h" />
+    <ClInclude Include="Ext\stb\stb_easy_font.h" />
+    <ClInclude Include="Ext\stb\stb_herringbone_wang_tile.h" />
+    <ClInclude Include="Ext\stb\stb_hexwave.h" />
+    <ClInclude Include="Ext\stb\stb_image.h" />
+    <ClInclude Include="Ext\stb\stb_image_resize.h" />
+    <ClInclude Include="Ext\stb\stb_image_write.h" />
+    <ClInclude Include="Ext\stb\stb_include.h" />
+    <ClInclude Include="Ext\stb\stb_leakcheck.h" />
+    <ClInclude Include="Ext\stb\stb_perlin.h" />
+    <ClInclude Include="Ext\stb\stb_rect_pack.h" />
+    <ClInclude Include="Ext\stb\stb_sprintf.h" />
+    <ClInclude Include="Ext\stb\stb_textedit.h" />
+    <ClInclude Include="Ext\stb\stb_tilemap_editor.h" />
+    <ClInclude Include="Ext\stb\stb_truetype.h" />
+    <ClInclude Include="Ext\stb\stb_voxel_render.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Ailu.h" />
     <ClInclude Include="Inc\CompanyEnv.h" />
@@ -474,6 +494,7 @@
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
     <ClInclude Include="Inc\Framework\Parser\AssetParser.h" />
     <ClInclude Include="Inc\Framework\Parser\FbxParser.h" />
+    <ClInclude Include="Inc\Framework\Parser\PngParser.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\pch.h" />
     <ClInclude Include="Inc\Platform\WinInput.h" />
@@ -489,12 +510,14 @@
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\Render\RendererAPI.h" />
     <ClInclude Include="Inc\Render\Shader.h" />
+    <ClInclude Include="Inc\Render\Texture.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DBuffer.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DConstants.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DContext.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DGraphicsPipelineState.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DRendererAPI.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h" />
+    <ClInclude Include="Inc\RHI\DX12\D3DTexture.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
     <None Include="Res\Shaders\cbuffer.hlsl">
       <FileType>Document</FileType>
@@ -517,6 +540,7 @@
     <ClCompile Include="Src\Framework\Events\LayerStack.cpp" />
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
+    <ClCompile Include="Src\Framework\Parser\PngParser.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -534,11 +558,13 @@
     <ClCompile Include="Src\Render\RenderCommand.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\Render\Shader.cpp" />
+    <ClCompile Include="Src\Render\Texture.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DBuffer.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DContext.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DGraphicsPipelineState.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DRendererAPI.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DShader.cpp" />
+    <ClCompile Include="Src\RHI\DX12\D3DTexture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat" />

@@ -14,6 +14,17 @@ struct PSInput
 	float2 uv0 : TEXCOORD0;
 };
 
+Texture2D g_texture : register(t0);
+
+//SamplerState g_sampler : register(s0);
+
+SamplerState MeshTextureSampler
+{
+	Filter = MIN_MAG_MIP_LINEAR;
+	AddressU = Wrap;
+	AddressV = Wrap;
+};
+
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
@@ -26,5 +37,6 @@ PSInput VSMain(VSInput v)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	return float4(input.normal,1.0f);
+	return g_texture.Sample(MeshTextureSampler, input.uv0);
+	//return float4(input.normal,1.0f);
 }

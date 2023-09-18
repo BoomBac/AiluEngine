@@ -14,6 +14,7 @@
 #include "Render/Shader.h"
 #include "Render/Material.h"
 #include "Framework/Assets/Mesh.h"
+#include "Render/Texture.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -47,6 +48,8 @@ namespace Ailu
         ID3D12Device* GetDevice();
         ID3D12GraphicsCommandList* GetCmdList();
         ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
+        D3D12_CPU_DESCRIPTOR_HANDLE& GetSRVCPUDescriptorHandle(uint32_t index);
+        D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUDescriptorHandle(uint32_t index);
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
         uint8_t* GetCBufferPtr();
 
@@ -99,6 +102,8 @@ namespace Ailu
         Ref<Shader> _p_standard_shader;
         Ref<Material> _mat_red;
         Ref<Material> _mat_green;
+
+        Ref<Texture2D> _tex_checkboard;
 
         Ref<Mesh> _plane;
 
