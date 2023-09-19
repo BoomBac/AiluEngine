@@ -32,6 +32,7 @@ namespace Ailu
 		constexpr static uint8_t  kFrameCount = 2u;
 		constexpr static uint16_t kMaxMaterialDataCount = 4u;
 		constexpr static uint32_t kMaxRenderObjectCount = 8u;
+		constexpr static uint32_t kMaxTextureCount = 8u;
 
 		constexpr static uint32_t kPerFrameTotalSize = sizeof(ScenePerFrameData) + sizeof(ScenePerMaterialData) * kMaxMaterialDataCount + sizeof(ScenePerObjectData) * kMaxRenderObjectCount;
 		constexpr static uint32_t kPerFrameDataSize = sizeof(ScenePerFrameData);

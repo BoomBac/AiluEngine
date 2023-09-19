@@ -416,8 +416,11 @@ namespace Ailu
             _plane = parser->Parser(GET_RES_PATH(Meshs/monkey.fbx));
             _plane->Build();
 
-            _tex_checkboard = Texture2D::Create(256,256,EALGFormat::kALGFormatR8G8B8A8_UNORM);
-            _tex_checkboard->FillData(GenerateTextureData().data());
+            //_tex_checkboard = Texture2D::Create(256,256,EALGFormat::kALGFormatR8G8B8A8_UNORM);
+            //_tex_checkboard->FillData(GenerateTextureData().data());
+
+            auto img_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+            _tex_water = img_parser->Parser(GET_RES_PATH(Textures/water.png));
 
             _p_vertex_buf.reset(VertexBuffer::Create({
                 {"POSITION",EShaderDateType::kFloat3,0},
@@ -478,7 +481,8 @@ namespace Ailu
 
         _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
         _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
-        _tex_checkboard->Bind(0);
+        //_tex_checkboard->Bind(3);
+        _tex_water->Bind(3);
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
@@ -547,7 +551,7 @@ namespace Ailu
         auto device = D3DContext::GetInstance()->GetDevice();
         //constbuffer desc heap
         D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-        cbvHeapDesc.NumDescriptors = (1u + D3DConstants::kMaxMaterialDataCount + D3DConstants::kMaxRenderObjectCount) * D3DConstants::kFrameCount;
+        cbvHeapDesc.NumDescriptors = (1u + D3DConstants::kMaxMaterialDataCount + D3DConstants::kMaxRenderObjectCount) * D3DConstants::kFrameCount + D3DConstants::kMaxTextureCount;
         cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         ThrowIfFailed(device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));

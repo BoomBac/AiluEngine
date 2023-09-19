@@ -104,6 +104,7 @@ namespace Ailu
         Ref<Material> _mat_green;
 
         Ref<Texture2D> _tex_checkboard;
+        Ref<Texture2D> _tex_water;
 
         Ref<Mesh> _plane;
 

@@ -14,6 +14,7 @@ namespace Ailu
 	{
 	public:
 		D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format);
+		~D3DTexture2D();
 		void FillData(uint8_t* data) final;
 		void Bind(uint8_t slot) const final;
 		void Release() final;

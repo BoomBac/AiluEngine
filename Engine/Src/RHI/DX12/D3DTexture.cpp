@@ -1,5 +1,4 @@
 #include "pch.h"
-#include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DTexture.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
@@ -11,10 +10,17 @@ namespace Ailu
 		_width = width;
 		_height = height;
 		_format = format;
+		_channel = 4;
+	}
+
+	D3DTexture2D::~D3DTexture2D()
+	{
+		Release();
 	}
 
 	void D3DTexture2D::FillData(uint8_t* data)
 	{
+		Texture2D::FillData(data);
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
 		auto p_cmdlist{ D3DContext::GetInstance()->GetCmdList() };
 		ComPtr<ID3D12Resource> pTextureGPU;
@@ -45,7 +51,7 @@ namespace Ailu
 		textureData.SlicePitch = textureData.RowPitch * _height;
 		UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, &textureData);
 
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		p_cmdlist->ResourceBarrier(1, &barrier);
 
 		// Describe and create a SRV for the texture.
@@ -63,16 +69,10 @@ namespace Ailu
 	}
 	void D3DTexture2D::Bind(uint8_t slot) const
 	{
-		//D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot,_gpu_handle);
-		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootShaderResourceView(slot, _gpu_handle.ptr);
+		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot,_gpu_handle);
 	}
 	void D3DTexture2D::Release()
 	{
-
-		//srvHandle.ptr = p_cbv_heap_->GetCPUDescriptorHandleForHeapStart().ptr + (kTextureDescStartIndex + texture_id) * cbv_srv_uav_desc_size_;
-		//p_device_->CreateShaderResourceView(pTextureGPU.Get(), &srvDesc, srvHandle);
-		//texture_index_[texture.GetName()] = texture_id;
-		//buffers_.push_back(pTextureUpload.Get());
-		//textures_[texture_id++] = pTextureGPU.Get();
+		DESTORY_PTR(_p_data);
 	}
 }

@@ -15,15 +15,7 @@ struct PSInput
 };
 
 Texture2D g_texture : register(t0);
-
-//SamplerState g_sampler : register(s0);
-
-SamplerState MeshTextureSampler
-{
-	Filter = MIN_MAG_MIP_LINEAR;
-	AddressU = Wrap;
-	AddressV = Wrap;
-};
+SamplerState g_LinearSampler : register(s0);
 
 PSInput VSMain(VSInput v)
 {
@@ -37,6 +29,6 @@ PSInput VSMain(VSInput v)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	return g_texture.Sample(MeshTextureSampler, input.uv0);
+	return g_texture.Sample(g_LinearSampler, input.uv0);
 	//return float4(input.normal,1.0f);
 }

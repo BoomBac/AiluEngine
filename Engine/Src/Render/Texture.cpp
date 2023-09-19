@@ -22,7 +22,9 @@ namespace Ailu
 	}
 	void Texture2D::FillData(uint8_t* data)
 	{
-
+		//_p_data = new uint8_t[_width * _height * _channel];
+		//memcpy(_p_data,data, _width * _height * _channel);
+		_p_data = data;
 	}
 	void Texture2D::Bind(uint8_t slot) const
 	{

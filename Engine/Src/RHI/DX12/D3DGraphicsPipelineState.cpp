@@ -187,13 +187,15 @@ namespace Ailu
             uint16_t root_param_index = 0u;
             for (auto& [slot, name] : ps_tex_bind_info)
             {
-                //ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, slot, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, slot, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+                rootParameters[root_param_index + 3].InitAsDescriptorTable(1,&ranges[root_param_index]);
+                root_param_index++;
                 //rootParameters[root_param_index + 3].InitAsShaderResourceView(slot, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_PIXEL);
-                rootParameters[root_param_index + 3].InitAsShaderResourceView(slot, 0);
+                //rootParameters[root_param_index++ + 3].InitAsShaderResourceView(slot, 0);
             }
-
+            //rootParameters[3].InitAsShaderResourceView(0);
             D3D12_STATIC_SAMPLER_DESC sampler = {};
-            sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+            sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
             sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
             sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
             sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
@@ -214,8 +216,8 @@ namespace Ailu
                 D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
             CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
             uint16_t root_param_count = 3u + root_param_index;
-            //rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 1u, &sampler, rootSignatureFlags);
-            rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 0u, nullptr, rootSignatureFlags);
+            rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 1u, &sampler, rootSignatureFlags);
+            //rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 0u, nullptr, rootSignatureFlags);
             ComPtr<ID3DBlob> signature;
             ComPtr<ID3DBlob> error;
             ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
