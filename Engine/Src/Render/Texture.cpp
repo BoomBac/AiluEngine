@@ -13,7 +13,7 @@ namespace Ailu
 			AL_ASSERT(false, "None render api used!")
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-		{
+	{
 			return MakeRef<D3DTexture2D>(width, height, format);
 		}
 		}

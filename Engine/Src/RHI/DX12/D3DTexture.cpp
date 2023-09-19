@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DTexture.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
@@ -68,5 +69,10 @@ namespace Ailu
 	void D3DTexture2D::Release()
 	{
 
+		//srvHandle.ptr = p_cbv_heap_->GetCPUDescriptorHandleForHeapStart().ptr + (kTextureDescStartIndex + texture_id) * cbv_srv_uav_desc_size_;
+		//p_device_->CreateShaderResourceView(pTextureGPU.Get(), &srvDesc, srvHandle);
+		//texture_index_[texture.GetName()] = texture_id;
+		//buffers_.push_back(pTextureUpload.Get());
+		//textures_[texture_id++] = pTextureGPU.Get();
 	}
 }
