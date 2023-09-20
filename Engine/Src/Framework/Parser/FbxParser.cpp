@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Framework/Parser/FbxParser.h"
+#include "Framework/Common/ThreadPool.h"
 
 using fbxsdk::FbxNodeAttribute;
 using fbxsdk::FbxCast;
@@ -16,6 +17,7 @@ namespace Ailu
 		fbx_manager_->SetIOSettings(fbx_ios_);
 		fbx_importer_ = FbxImporter::Create(fbx_manager_, "");
 	}
+	static Vector3f scale_factor{};
 	Ref<Mesh> FbxParser::Parser(const std::string_view& path)
 	{
 		_time_mgr.Mark();
@@ -51,8 +53,14 @@ namespace Ailu
 				{
 					fbxsdk::FbxMesh* fbx_mesh = FbxCast<fbxsdk::FbxMesh>(attribute);
 					Ref<Mesh> mesh = MakeRef<Mesh>(node_name);
+					FbxAMatrix transformMatrix = fbx_node->EvaluateGlobalTransform();
+					FbxVector4 scale = transformMatrix.GetS();
+					scale_factor.x = scale[0];
+					scale_factor.y = scale[1];
+					scale_factor.z = scale[2];
+					//memcpy(&scale_factor, &scale, sizeof(scale_factor));
 					if (!GenerateMesh(mesh, fbx_mesh)) continue;
-					LOG_INFO("Loading mesh: {} takes {}ms", node_name, _time_mgr.GetElapsedSinceLastMark());
+//					LOG_INFO("Loading mesh: {} takes {}ms", node_name, _time_mgr.GetElapsedSinceLastMark());
 					mesh->Build();
 					MeshPool::AddMesh(mesh);
 					meshs.emplace_back(mesh);
@@ -77,27 +85,43 @@ namespace Ailu
 			fbx_mesh = FbxCast<fbxsdk::FbxMesh>(convert.Triangulate(fbx_mesh, true));
 		}
 		
-		//The vertex must be added to the MeshObject's vector before the normal, 
-		//because the input layout is passed in the vertex-normal order
-		//not thread safe now 
-		auto ret1 = ReadVertex(*fbx_mesh, mesh);
-		auto ret2 = ReadNormal(*fbx_mesh, mesh);
-		auto ret3 = ReadUVs(*fbx_mesh, mesh);
-		auto ret4 = ReadTangent(*fbx_mesh, mesh);
-		GenerateIndexdMesh(mesh);
-		CalculateTangant(mesh);
-		//auto ret1 = p_thread_pool_->Enqueue(&FbxParser::ReadVertex, this, std::ref(*mesh), nut_mesh);
-		//auto ret2 = p_thread_pool_->Enqueue(&FbxParser::ReadNormal, this, std::ref(*mesh), nut_mesh);
-		//auto ret3 = p_thread_pool_->Enqueue(&FbxParser::ReadUVs, this, std::ref(*mesh), nut_mesh);
-		//	auto ret4 = p_thread_pool_->Enqueue(&FbxParser::ReadTangent, this, std::ref(*mesh), nut_mesh);
-		//if (ret1.get() && ret2.get() && ret3.get())
-		//{
-		//	CalculateTangant(nut_mesh);
-		//	geo->AddMesh(nut_mesh);
-		//	scene.Geometries[mesh->GetName()] = geo;
-		//	return true;
-		//}
-		return ret1 && ret2 && ret3 && ret4;
+		bool use_multi_thread = true;
+		if (use_multi_thread)
+		{
+			_time_mgr.Mark();
+			auto ret1 = g_thread_pool->Enqueue(&FbxParser::ReadVertex, this, std::ref(*fbx_mesh), mesh);
+			auto ret2 = g_thread_pool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), mesh);
+			auto ret3 = g_thread_pool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), mesh);
+			//auto ret4 = g_thread_pool->Enqueue(&FbxParser::ReadTangent, this, std::ref(*fbx_mesh), mesh);
+			if (ret1.get() && ret2.get() && ret3.get())
+			{
+				LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				_time_mgr.Mark();
+				GenerateIndexdMesh(mesh);
+				CalculateTangant(mesh);
+				LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				return true;
+			}
+			return false;
+		}
+		else
+		{
+			_time_mgr.Mark();
+			auto ret1 = ReadVertex(*fbx_mesh, mesh);
+			auto ret2 = ReadNormal(*fbx_mesh, mesh);
+			auto ret3 = ReadUVs(*fbx_mesh, mesh);
+			LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+			//auto ret4 = ReadTangent(*fbx_mesh, mesh);
+			if (ret1 && ret2 && ret3)
+			{
+				_time_mgr.Mark();
+				GenerateIndexdMesh(mesh);
+				CalculateTangant(mesh);
+				LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				return true;
+			}
+			return false;
+		}
 	}
 
 	bool FbxParser::ReadNormal(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh)
@@ -192,6 +216,7 @@ namespace Ailu
 			{
 				auto p = points[fbx_mesh.GetPolygonVertex(i, j)];
 				Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
+				position *= scale_factor;
 				positions.emplace_back(position);
 			}
 		}
@@ -323,30 +348,74 @@ namespace Ailu
 		Vector3f* pos = mesh->GetVertices();
 		Vector2f* uv0 = mesh->GetUVs(0);
 		Vector4f* tangents = new Vector4f[mesh->_vertex_count];
-		for (size_t trangle_count = 0; trangle_count < mesh->_index_count / 3; trangle_count++)
+		//ZeroMemory(tangents, sizeof(Vector4f) * mesh->_vertex_count);
+		//for (size_t trangle_count = 0; trangle_count < mesh->_index_count; trangle_count+=3)
+		//{
+		//	const Vector3f& pos1 = pos[indices[trangle_count]];
+		//	const Vector3f& pos2 = pos[indices[trangle_count + 1]];
+		//	const Vector3f& pos3 = pos[indices[trangle_count + 2]];
+		//	const Vector2f& uv1 = uv0[indices[trangle_count]];
+		//	const Vector2f& uv2 = uv0[indices[trangle_count + 1]];
+		//	const Vector2f& uv3 = uv0[indices[trangle_count + 2]];
+		//	Vector3f edge1 = pos2 - pos1;
+		//	Vector3f edge2 = pos3 - pos1;
+		//	Vector2f duv1 = uv2 - uv1;
+		//	Vector2f duv2 = uv3 - uv1;
+		//	Vector4f tangent{};
+		//	float f = 1.f / (duv1.x * duv2.y - duv2.x * duv1.y);
+		//	tangent.x = f * (duv2.y * edge1.x - duv1.y * edge2.x);
+		//	tangent.y = f * (duv2.y * edge1.y - duv1.y * edge2.y);
+		//	tangent.z = f * (duv2.y * edge1.z - duv1.y * edge2.z);
+		//	Normalize(tangent);
+		//	tangents[indices[trangle_count]] = tangent;
+		//	tangents[indices[trangle_count + 1]] = tangent;
+		//	tangents[indices[trangle_count + 2]] = tangent;
+		//	tangent.w = 1.0f;
+		//}
+
+		auto vertexCount = mesh->_vertex_count;
+		Vector3f* tan1 = new Vector3f[vertexCount * 2];
+		Vector3f* tan2 = tan1 + vertexCount;
+		ZeroMemory(tan1, vertexCount * sizeof(Vector3f) * 2);
+		for (size_t i = 0; i < mesh->_index_count; i += 3)
 		{
-			const Vector3f& pos1 = pos[indices[trangle_count]];
-			const Vector3f& pos2 = pos[indices[trangle_count + 1]];
-			const Vector3f& pos3 = pos[indices[trangle_count + 2]];
-			const Vector2f& uv1 = uv0[indices[trangle_count]];
-			const Vector2f& uv2 = uv0[indices[trangle_count + 1]];
-			const Vector2f& uv3 = uv0[indices[trangle_count + 2]];
-			Vector3f edge1 = pos2 - pos1;
-			Vector3f edge2 = pos3 - pos1;
-			Vector2f duv1 = uv2 - uv1;
-			Vector2f duv2 = uv3 - uv1;
-			Vector4f tangent{};
-			float f = 1.f / (duv1.x * duv2.y - duv2.x * duv1.y);
-			tangent.x = f * (duv2.y * edge1.x - duv1.y * edge2.x);
-			tangent.y = f * (duv2.y * edge1.y - duv1.y * edge2.y);
-			tangent.z = f * (duv2.y * edge1.z - duv1.y * edge2.z);
-			tangent.w = 1.0f;
-			Normalize(tangent);
-			tangents[indices[trangle_count]] = tangent;
-			tangents[indices[trangle_count + 1]] = tangent;
-			tangents[indices[trangle_count + 2]] = tangent;
+			uint32_t i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
+			const Vector3f& pos1 = pos[i1];
+			const Vector3f& pos2 = pos[i2];
+			const Vector3f& pos3 = pos[i3];
+			const Vector2f& uv1 = uv0[i1];
+			const Vector2f& uv2 = uv0[i2];
+			const Vector2f& uv3 = uv0[i3];
+			float x1 = pos2.x - pos1.x;
+			float x2 = pos3.x - pos1.x;
+			float y1 = pos2.y - pos1.y;
+			float y2 = pos3.y - pos1.y;
+			float z2 = pos3.z - pos1.z;
+			float z1 = pos2.z - pos1.z;
+			float s1 = uv2.x - uv1.x;
+			float s2 = uv3.x - uv1.x;
+			float t1 = uv2.y - uv1.y;
+			float t2 = uv3.y - uv1.y;
+			float r = 1.0f / (s1 * t2 - s2 * t1);
+			Vector3f sdir{ (t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r,(t2 * z1 - t1 * z2) * r };
+			Vector3f tdir{ (s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r,(s1 * z2 - s2 * z1) * r };
+			tan1[i1] += sdir;
+			tan1[i2] += sdir;
+			tan1[i3] += sdir;
+			tan2[i1] += tdir;
+			tan2[i2] += tdir;
+			tan2[i3] += tdir;
+		}
+		Vector3f* normal = mesh->GetNormals();
+		for (size_t i = 0; i < mesh->_vertex_count; i++)
+		{
+			const Vector3f& n = normal[i];
+			const Vector3f& t = tan1[i];
+			tangents[i].xyz = Normalize(t - n * DotProduct(n, t));
+			tangents[i].w = (DotProduct(CrossProduct(n, t), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
 		}
 		mesh->SetTangents(std::move(tangents));
+		delete[] tan1;
 		return true;
 	}
 
@@ -366,6 +435,8 @@ namespace Ailu
 		auto raw_pos = mesh->GetVertices();
 		ALHash::Vector3fHash v3hash{};
 		ALHash::Vector2fHash v2hash{};
+		TimeMgr mgr;
+		mgr.Mark();
 		for (size_t i = 0; i < vertex_count; i++)
 		{
 			auto p = raw_pos[i], n = raw_normals[i];
@@ -382,35 +453,27 @@ namespace Ailu
 				uv0s.emplace_back(uv);
 			}
 			else indices.emplace_back(it->second);
-			//auto it0 = normal_map.find(n);
-			//auto it1 = uv_map.find(uv);
-			//if (it0 == normal_map.end() || it1 == uv_map.end())
-			//{
-			//	normal_map[n] = cur_index_count;
-			//	uv_map[uv] = cur_index_count;
-			//	indices.emplace_back(cur_index_count++);
-			//	normals.emplace_back(n);
-			//	positions.emplace_back(p);
-			//	uv0s.emplace_back(uv);
-			//}
-			//else indices.emplace_back(it0->second);
 		}
+		LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
 		mesh->Clear();
 		vertex_count = positions.size();
 		auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;
 		mesh->_index_count = index_count;
+
+
 		float* vertex_buf = new float[vertex_count * 3];
-		memcpy(vertex_buf, positions.data(), sizeof(Vector3f) * vertex_count);
-		mesh->SetVertices(std::move(reinterpret_cast<Vector3f*>(vertex_buf)));
 		float* normal_buf = new float[vertex_count * 3];
-		memcpy(normal_buf, normals.data(), sizeof(Vector3f) * vertex_count);
-		mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(normal_buf)));
 		float* uv0_buf = new float[vertex_count * 2];
-		memcpy(uv0_buf, uv0s.data(), sizeof(Vector2f) * vertex_count);
-		mesh->SetUVs(std::move(reinterpret_cast<Vector2f*>(uv0_buf)),0u);
 		uint32_t* index_buf = new uint32_t[index_count];
+		memcpy(uv0_buf, uv0s.data(), sizeof(Vector2f) * vertex_count);
+		memcpy(normal_buf, normals.data(), sizeof(Vector3f) * vertex_count);
+		memcpy(vertex_buf, positions.data(), sizeof(Vector3f) * vertex_count);
 		memcpy(index_buf, indices.data(), sizeof(uint32_t) * index_count);
+
+		mesh->SetUVs(std::move(reinterpret_cast<Vector2f*>(uv0_buf)), 0u);
+		mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(normal_buf)));
+		mesh->SetVertices(std::move(reinterpret_cast<Vector3f*>(vertex_buf)));
 		mesh->SetIndices(std::move(reinterpret_cast<uint32_t*>(index_buf)));
 	}
 #pragma warning(pop)

@@ -12,6 +12,7 @@
 #include <windows.h>
 #include <format>
 
+#include "TimeMgr.h"
 #include "GlobalMarco.h"
 
 using std::unique_lock;
@@ -124,11 +125,13 @@ namespace Ailu
 	private:
 		void Start(size_t num_threads)
 		{
+			_timers.resize(num_threads, TimeMgr());
 			_thread_status.resize(num_threads, EThreadStatus::kNotStarted);
 			for (auto i = 0u; i < num_threads; ++i)
 			{
+				std::wstring thread_name = std::format(L"ALEngineWorkThread{0}", i);
 				_threads.emplace_back([=]() {
-					SetThreadDescription(GetCurrentThread(), std::format(L"ALEngineWorkThread{0}",i).c_str());
+					SetThreadDescription(GetCurrentThread(), thread_name.c_str());
 					while (true)
 					{
 						Task task;
@@ -141,7 +144,9 @@ namespace Ailu
 							task = std::move(_tasks.front());
 							_tasks.pop();
 						}
+						_timers[i].Mark();
 						task();
+						LOG_INFO(L"{} has finish task after {}ms!", thread_name.c_str(),_timers[i].GetElapsedSinceLastMark());
 						_thread_status[i] = EThreadStatus::kCompleted;
 					}
 					});
@@ -166,7 +171,9 @@ namespace Ailu
 		std::queue<Task> _tasks;
 		std::vector<EThreadStatus> _thread_status;
 		std::string _pool_name;
+		std::vector<TimeMgr> _timers;
 	};
+	Scope<ThreadPool> g_thread_pool = MakeScope<ThreadPool>(8,"GlobalThreadPool");
 }
 
 

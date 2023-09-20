@@ -33,5 +33,5 @@ PSInput VSMain(VSInput v)
 float4 PSMain(PSInput input) : SV_TARGET
 {
 	//return albedo.Sample(g_LinearSampler, input.uv0);
-	return float4(input.tangent);
+	return float4(input.normal.xyz * 0.5 + 0.5,1.0);
 }

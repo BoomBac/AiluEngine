@@ -119,7 +119,7 @@ namespace Ailu
         //scene data
         _p_scene_camera = std::make_unique<Camera>(16.0F / 9.0F);
         _p_scene_camera->SetPosition(0, 0, -5.0f);
-        _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 0.1f, 10000.f);
+        _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
         Camera::sCurrent = _p_scene_camera.get();
 
         m_commandList->Close();
@@ -415,18 +415,19 @@ namespace Ailu
             };
             auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
             
-            _plane = parser->Parser(GET_RES_PATH(Meshs/plane.fbx));
-            //_plane = parser->Parser(GET_RES_PATH(Meshs/Tree_Songshu02.FBX));
+            //_plane = parser->Parser(GET_RES_PATH(Meshs/plane.fbx));
+            _plane = parser->Parser(GET_RES_PATH(Meshs/gizmo.fbx));
 
-            _tree = parser->Parser(GET_RES_PATH(Meshs/Tree_Songshu02.FBX));
+            _tree = parser->Parser(GET_RES_PATH(Meshs/monkey.fbx));
 
             //_tex_checkboard = Texture2D::Create(256,256,EALGFormat::kALGFormatR8G8B8A8_UNORM);
             //_tex_checkboard->FillData(GenerateTextureData().data());
 
             auto img_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
             //_tex_water = img_parser->Parser(GET_RES_PATH(Textures/water.png));
-            _mat_green->SetTexture("albedo", img_parser->Parser(GET_RES_PATH(Textures/Tree_Songshu02_Bark_D.png)));
-            //_mat_green->SetTexture("albedo", _tex_water);
+            //_mat_green->SetTexture("albedo", img_parser->Parser(GET_RES_PATH(Textures/Tree_Songshu02_Bark_D.png)));
+            //_mat_green->SetTexture("albedo", img_parser->Parser(GET_RES_PATH(Textures/water.png)));
+            //_mat_green->SetTexture("albedo", img_parser->Parser(GET_RES_PATH(Textures/test.png)));
 
             _p_vertex_buf.reset(VertexBuffer::Create({
                 {"POSITION",EShaderDateType::kFloat3,0},

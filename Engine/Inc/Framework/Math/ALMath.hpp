@@ -33,8 +33,24 @@ namespace Ailu
 #pragma warning(push)
 #pragma warning(disable: 4244)
 
+	//template<typename T>
+	//T Normalize(T& var)
+	//{
+	//	size_t len = CountOf(var.data);
+	//	double sum = 0.f;
+	//	T temp{};
+	//	for (uint32_t i = 0; i < len; i++)
+	//		sum += pow(var[i], 2.f);
+	//	sum = sqrt(sum);
+	//	for (uint32_t i = 0; i < len; i++) {
+	//		var[i] /= sum;
+	//		temp[i] = var[i];
+	//	}
+	//	return temp;
+	//}
+
 	template<typename T>
-	T Normalize(T& var)
+	T Normalize(T var)
 	{
 		size_t len = CountOf(var.data);
 		double sum = 0.f;
@@ -934,7 +950,7 @@ namespace Ailu
 	{
 		struct Vector2fHash
 		{
-			std::size_t operator()(const Vector2f& v) const
+			inline std::size_t operator()(const Vector2f& v) const
 			{
 				std::size_t h1 = std::hash<float>{}(v.x);
 				std::size_t h2 = std::hash<float>{}(v.y);
@@ -944,7 +960,7 @@ namespace Ailu
 
 		struct Vector2Equal
 		{
-			bool operator()(const Vector2f& v1, const Vector2f& v2) const
+			inline bool operator()(const Vector2f& v1, const Vector2f& v2) const
 			{
 				return v1.x == v2.x && v1.y == v2.y;
 			}
@@ -952,7 +968,7 @@ namespace Ailu
 
 		struct Vector3fHash
 		{
-			std::size_t operator()(const Vector3f& v) const
+			inline std::size_t operator()(const Vector3f& v) const
 			{
 				std::size_t h1 = std::hash<float>{}(v.x);
 				std::size_t h2 = std::hash<float>{}(v.y);
@@ -963,7 +979,7 @@ namespace Ailu
 
 		struct Vector3Equal
 		{
-			bool operator()(const Vector3f& v1, const Vector3f& v2) const
+			inline bool operator()(const Vector3f& v1, const Vector3f& v2) const
 			{
 				return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z;
 			}
@@ -971,7 +987,7 @@ namespace Ailu
 
 		struct Vector4fHash
 		{
-			std::size_t operator()(const Vector4f& v) const
+			inline std::size_t operator()(const Vector4f& v) const
 			{
 				std::size_t h1 = std::hash<float>{}(v.x);
 				std::size_t h2 = std::hash<float>{}(v.y);
@@ -983,13 +999,13 @@ namespace Ailu
 
 		struct Vector4Equal
 		{
-			bool operator()(const Vector4f& v1, const Vector4f& v2) const
+			inline bool operator()(const Vector4f& v1, const Vector4f& v2) const
 			{
 				return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z && v1.w == v2.w;
 			}
 		};
 
-		static std::size_t CombineHashes(const std::size_t& hash1, const std::size_t& hash2)
+		static inline std::size_t CombineHashes(const std::size_t& hash1, const std::size_t& hash2)
 		{
 			return hash1 ^ (hash2 + 0x9e3779b9 + (hash1 << 6) + (hash1 >> 2));
 		}

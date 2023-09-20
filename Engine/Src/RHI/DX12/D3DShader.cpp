@@ -174,7 +174,7 @@ namespace Ailu
 		auto it = _variable_offset.find(name);
 		if (it == _variable_offset.end())
 		{
-			LOG_WARNING("variable: {} don't exist in shader: {}", name, _name);
+			//LOG_WARNING("variable: {} don't exist in shader: {}", name, _name);
 			return 0;
 		}
 		return it->second;
