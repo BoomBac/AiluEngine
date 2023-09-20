@@ -119,7 +119,7 @@ namespace Ailu
         //scene data
         _p_scene_camera = std::make_unique<Camera>(16.0F / 9.0F);
         _p_scene_camera->SetPosition(0, 0, -5.0f);
-        _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 0.1f, 1000.f);
+        _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 0.1f, 10000.f);
         Camera::sCurrent = _p_scene_camera.get();
 
         m_commandList->Close();
@@ -330,11 +330,13 @@ namespace Ailu
         {
             {"POSITION",EShaderDateType::kFloat3,0},
             {"NORMAL",EShaderDateType::kFloat3,1},
-            {"TEXCOORD",EShaderDateType::kFloat2,2}
+            {"TEXCOORD",EShaderDateType::kFloat2,2},
+            {"TANGENT",EShaderDateType::kFloat4,3}
         };
         _p_standard_shader.reset(Shader::Create(GET_RES_PATH(Shaders/shaders.hlsl), "StandardShader"));
-        _mat_red = std::make_shared<Material>(_p_standard_shader);
-        _mat_green = std::make_shared<Material>(_p_standard_shader);
+
+        _mat_red = MakeRef<Material>(_p_standard_shader,"RedColor");
+        _mat_green = MakeRef<Material>(_p_standard_shader, "GreenColor");
 
         GraphicsPipelineStateInitializer pso_initializer{};
         pso_initializer._blend_state = BlendState{};
@@ -413,14 +415,18 @@ namespace Ailu
             };
             auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
             
-            _plane = parser->Parser(GET_RES_PATH(Meshs/monkey.fbx));
-            _plane->Build();
+            _plane = parser->Parser(GET_RES_PATH(Meshs/plane.fbx));
+            //_plane = parser->Parser(GET_RES_PATH(Meshs/Tree_Songshu02.FBX));
+
+            _tree = parser->Parser(GET_RES_PATH(Meshs/Tree_Songshu02.FBX));
 
             //_tex_checkboard = Texture2D::Create(256,256,EALGFormat::kALGFormatR8G8B8A8_UNORM);
             //_tex_checkboard->FillData(GenerateTextureData().data());
 
             auto img_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-            _tex_water = img_parser->Parser(GET_RES_PATH(Textures/water.png));
+            //_tex_water = img_parser->Parser(GET_RES_PATH(Textures/water.png));
+            _mat_green->SetTexture("albedo", img_parser->Parser(GET_RES_PATH(Textures/Tree_Songshu02_Bark_D.png)));
+            //_mat_green->SetTexture("albedo", _tex_water);
 
             _p_vertex_buf.reset(VertexBuffer::Create({
                 {"POSITION",EShaderDateType::kFloat3,0},
@@ -482,7 +488,7 @@ namespace Ailu
         _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
         _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
         //_tex_checkboard->Bind(3);
-        _tex_water->Bind(3);
+        //_tex_water->Bind(3);
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
@@ -494,7 +500,8 @@ namespace Ailu
             _render_object_index = 0;
             m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         }
-        Renderer::Submit(_plane, _mat_green, Transpose(MatrixTranslation(0.0f, -(float)sin(TimeMgr::GetScaledWorldTime()) * 10.0f, 0.0f)));
+        Renderer::Submit(_tree, _mat_green, Transpose(MatrixTranslation(0.0f, -(float)sin(TimeMgr::GetScaledWorldTime()) * 0.0f, 0.0f)));
+        Renderer::Submit(_plane, _mat_red,Transpose(BuildIdentityMatrix()));
         //Renderer::Submit(_p_vertex_buf, _p_index_buf, _mat_red, Transpose(MatrixTranslation((float)sin(TimeMgr::GetScaledWorldTime()), 0.0f, 0.0f)));
         //Renderer::Submit(_p_vertex_buf0, _p_index_buf, _mat_green, Transpose(MatrixTranslation(-(float)sin(TimeMgr::GetScaledWorldTime()), 0.0f, 0.0f)));
         {

@@ -142,10 +142,15 @@ namespace Ailu
 		std::vector<D3D12_SHADER_INPUT_BIND_DESC> bind_desc(desc.BoundResources);
 		for (uint32_t i = 0u; i < desc.BoundResources; i++)
 		{
-			auto resc_desc = reflection->GetResourceBindingDesc(i, &bind_desc[i]);
-			if (bind_desc[i].Type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+			reflection->GetResourceBindingDesc(i, &bind_desc[i]);
+			auto res_type = bind_desc[i].Type;
+			if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
 			{
-
+				
+			}
+			else if (res_type == D3D_SHADER_INPUT_TYPE::D3D10_SIT_TEXTURE)
+			{
+				_bind_res_infos.emplace_back(EBindResouceType::kTexture2D, bind_desc[i].BindPoint, bind_desc[i].Name);
 			}
 		}
 		for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
@@ -161,7 +166,7 @@ namespace Ailu
 				_variable_offset.insert(std::make_pair(vdesc.Name,vdesc.StartOffset));
 				LOG_INFO("{}", vdesc.Name);
 			}
-		}	
+		}
 	}
 
 	uint16_t D3DShader::GetVariableOffset(const std::string& name) const
@@ -207,6 +212,7 @@ namespace Ailu
 		CreateFromFileFXC(ToWChar(file_name.data()), "PSMain", "ps_5_0", _p_pblob, _p_p_reflection);
 		LoadShaderRelfection(_p_p_reflection.Get());
 #endif // SHADER_DXC
+		_base_tex_slot_offset = 3u;
 	}
 
 	D3DShader::~D3DShader()
@@ -242,6 +248,16 @@ namespace Ailu
 		return _id;
 	}
 
+	inline const std::vector<ShaderBindResourceInfo>& D3DShader::GetBindResInfo() const
+	{
+		return _bind_res_infos;
+	}
+
+	inline uint8_t D3DShader::GetTextureSlotBaseOffset() const
+	{
+		return _base_tex_slot_offset;
+	}
+
 	void D3DShader::Bind(uint32_t index)
 	{
 		if (index > D3DConstants::kMaxMaterialDataCount)
@@ -258,7 +274,7 @@ namespace Ailu
 		auto it = _variable_offset.find(name);
 		if (it == _variable_offset.end())
 		{
-			LOG_WARNING("variable: {} don't exist in shader: {}",name,_name);
+			//LOG_WARNING("variable: {} don't exist in shader: {}",name,_name);
 			return;
 		}
 		memcpy(_p_cbuffer + GetPerFramePropertyOffset(name), &vector, sizeof(vector));

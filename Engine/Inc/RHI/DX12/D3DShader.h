@@ -25,7 +25,8 @@ namespace Ailu
 
 		inline std::string GetName() const override;
 		inline uint32_t GetID() const override;
-
+		inline const std::vector<ShaderBindResourceInfo>& GetBindResInfo() const final;
+		inline uint8_t GetTextureSlotBaseOffset() const final;
 		void SetGlobalVector(const std::string& name, const Vector4f& vector) override;
 		void SetGlobalVector(const std::string& name, const Vector3f& vector) override;
 		void SetGlobalVector(const std::string& name, const Vector2f& vector) override;
@@ -35,6 +36,7 @@ namespace Ailu
 		ComPtr<ID3D12RootSignature> GetSignature() const;
 		ID3D12ShaderReflection* GetD3DReflectionInfo() const;
 		ID3D12ShaderReflection* GetD3DReflectionInfo(const EShaderType& type) const;
+
 		static ComPtr<ID3D12RootSignature> GetCurrentActiveSignature();
 	private:
 		uint8_t* GetCBufferPtr(uint32_t index) override;
@@ -42,7 +44,9 @@ namespace Ailu
 		uint16_t GetVariableOffset(const std::string& name) const override;
 
 	private:
+		std::vector<ShaderBindResourceInfo> _bind_res_infos{};
 		std::string _name = "DefaultShader";
+		uint8_t _base_tex_slot_offset = 0u;
 		uint32_t _id;
 		bool _b_init_buffer = false;
 		uint32_t _desc_size = 0;

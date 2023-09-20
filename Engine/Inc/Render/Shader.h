@@ -17,6 +17,20 @@ namespace Ailu
 
 	};
 
+	enum class EBindResouceType : uint8_t
+	{
+		kConstBuffer = 0,kTexture2D,kSampler
+	};
+
+	struct ShaderBindResourceInfo
+	{
+		EBindResouceType _res_type;
+		uint8_t _slot;
+		std::string _name;
+		ShaderBindResourceInfo(EBindResouceType res_type, uint8_t slot, const std::string& name)
+			: _res_type(res_type), _slot(slot), _name(name) {}
+	};
+
 	class Shader
 	{
 		friend class Material;
@@ -37,6 +51,8 @@ namespace Ailu
 		virtual void Bind(uint32_t index) = 0;
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;
 		virtual uint16_t GetVariableOffset(const std::string& name) const = 0;
+		virtual uint8_t GetTextureSlotBaseOffset() const = 0;
+		virtual const std::vector<ShaderBindResourceInfo>& GetBindResInfo() const = 0;
 	};
 	class ShaderLibrary
 	{

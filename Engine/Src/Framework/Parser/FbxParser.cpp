@@ -37,6 +37,7 @@ namespace Ailu
 			};
 			fbxsdk::FbxSystemUnit::cm.ConvertScene(fbx_scene, lConversionOptions);
 		}
+		std::vector<Ref<Mesh>> meshs{};
 		if (fbx_rt != nullptr)
 		{
 			auto child_num = fbx_rt->GetChildCount();
@@ -45,21 +46,25 @@ namespace Ailu
 				FbxNode* fbx_node = fbx_rt->GetChild(i);
 				FbxNodeAttribute* attribute = fbx_node->GetNodeAttribute();
 				std::string node_name = fbx_node->GetName();
+				auto type = attribute->GetAttributeType();
 				if (attribute->GetAttributeType() == FbxNodeAttribute::eMesh)
 				{
 					fbxsdk::FbxMesh* fbx_mesh = FbxCast<fbxsdk::FbxMesh>(attribute);
-					Ref<Mesh> mesh = MakeRef<Mesh>();
-					if (!GenerateMesh(mesh, fbx_mesh))
-					{
-						AL_ASSERT(true, "Load mesh failed!");
-						return nullptr;
-					}
+					Ref<Mesh> mesh = MakeRef<Mesh>(node_name);
+					if (!GenerateMesh(mesh, fbx_mesh)) continue;
 					LOG_INFO("Loading mesh: {} takes {}ms", node_name, _time_mgr.GetElapsedSinceLastMark());
-					return mesh;
+					mesh->Build();
+					MeshPool::AddMesh(mesh);
+					meshs.emplace_back(mesh);
 				}
 			}
 		}
-
+		if (meshs.empty())
+		{
+			AL_ASSERT(true, "Load mesh failed!");
+			return nullptr;
+		}
+		else return *(meshs.end()-1);
 	}
 	Ailu::FbxParser::~FbxParser()
 	{
@@ -80,6 +85,7 @@ namespace Ailu
 		auto ret3 = ReadUVs(*fbx_mesh, mesh);
 		auto ret4 = ReadTangent(*fbx_mesh, mesh);
 		GenerateIndexdMesh(mesh);
+		CalculateTangant(mesh);
 		//auto ret1 = p_thread_pool_->Enqueue(&FbxParser::ReadVertex, this, std::ref(*mesh), nut_mesh);
 		//auto ret2 = p_thread_pool_->Enqueue(&FbxParser::ReadNormal, this, std::ref(*mesh), nut_mesh);
 		//auto ret3 = p_thread_pool_->Enqueue(&FbxParser::ReadUVs, this, std::ref(*mesh), nut_mesh);
@@ -271,7 +277,7 @@ namespace Ailu
 		{
 			int trangle_count = fbx_mesh.GetPolygonCount();
 			vertex_count = trangle_count * 3;
-			data = new float[vertex_count * 3];
+			data = new float[vertex_count * 4];
 			int cur_vertex_id = 0;
 			for (int trangle_id = 0; trangle_id < trangle_count; ++trangle_id)
 			{
@@ -307,13 +313,41 @@ namespace Ailu
 			}
 
 		}
-		mesh->SetTangents(std::move(reinterpret_cast<Vector3f*>(data)));
+		mesh->SetTangents(std::move(reinterpret_cast<Vector4f*>(data)));
 		return true;
 	}
 
 	bool FbxParser::CalculateTangant(Ref<Mesh>& mesh)
 	{
-		return false;
+		uint32_t* indices = mesh->GetIndices();
+		Vector3f* pos = mesh->GetVertices();
+		Vector2f* uv0 = mesh->GetUVs(0);
+		Vector4f* tangents = new Vector4f[mesh->_vertex_count];
+		for (size_t trangle_count = 0; trangle_count < mesh->_index_count / 3; trangle_count++)
+		{
+			const Vector3f& pos1 = pos[indices[trangle_count]];
+			const Vector3f& pos2 = pos[indices[trangle_count + 1]];
+			const Vector3f& pos3 = pos[indices[trangle_count + 2]];
+			const Vector2f& uv1 = uv0[indices[trangle_count]];
+			const Vector2f& uv2 = uv0[indices[trangle_count + 1]];
+			const Vector2f& uv3 = uv0[indices[trangle_count + 2]];
+			Vector3f edge1 = pos2 - pos1;
+			Vector3f edge2 = pos3 - pos1;
+			Vector2f duv1 = uv2 - uv1;
+			Vector2f duv2 = uv3 - uv1;
+			Vector4f tangent{};
+			float f = 1.f / (duv1.x * duv2.y - duv2.x * duv1.y);
+			tangent.x = f * (duv2.y * edge1.x - duv1.y * edge2.x);
+			tangent.y = f * (duv2.y * edge1.y - duv1.y * edge2.y);
+			tangent.z = f * (duv2.y * edge1.z - duv1.y * edge2.z);
+			tangent.w = 1.0f;
+			Normalize(tangent);
+			tangents[indices[trangle_count]] = tangent;
+			tangents[indices[trangle_count + 1]] = tangent;
+			tangents[indices[trangle_count + 2]] = tangent;
+		}
+		mesh->SetTangents(std::move(tangents));
+		return true;
 	}
 
 	void FbxParser::GenerateIndexdMesh(Ref<Mesh>& mesh)

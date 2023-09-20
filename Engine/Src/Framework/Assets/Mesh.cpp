@@ -14,7 +14,12 @@ namespace Ailu
 		{
 			_uv[i] = nullptr;
 		}
-		_vertex_count = 0;
+		_vertex_count = 0u;
+		_index_count = 0u;
+	}
+	Mesh::Mesh(const std::string& name) : Mesh()
+	{
+		_name = name;
 	}
 	Mesh::~Mesh()
 	{
@@ -29,7 +34,7 @@ namespace Ailu
 	{
 		_normals = normals;
 	}
-	void Mesh::SetTangents(Vector3f* tangents)
+	void Mesh::SetTangents(Vector4f* tangents)
 	{
 		_tangents = tangents;
 	}
@@ -75,11 +80,27 @@ namespace Ailu
 		_p_vbuf.reset(VertexBuffer::Create({
 				{"POSITION",EShaderDateType::kFloat3,0},
 				{"NORMAL",EShaderDateType::kFloat3,1},
-				{"TEXCOORD",EShaderDateType::kFloat2,2}
+				{"TEXCOORD",EShaderDateType::kFloat2,2},
+				{"TANGENT",EShaderDateType::kFloat4,3}
 			}));
 		_p_vbuf->SetStream(reinterpret_cast<float*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), 0);
 		_p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), 1);
 		_p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), 2);
+		_p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4),3);
 		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
+	}
+	Ref<Mesh> MeshPool::FindMesh(const std::string& name)
+	{
+		auto it = s_mesh_pool.find(name);
+		if (it != s_mesh_pool.end()) return it->second;
+		else
+		{
+			LOG_WARNING("Can't find mesh: {}!,will return a empty mesh!", name);
+			return MakeRef<Mesh>("empty");
+		}
+	}
+	void MeshPool::AddMesh(Ref<Mesh> mesh)
+	{
+		s_mesh_pool.insert(std::make_pair(mesh->_name,mesh));
 	}
 }

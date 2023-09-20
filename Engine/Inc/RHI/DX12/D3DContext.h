@@ -107,6 +107,7 @@ namespace Ailu
         Ref<Texture2D> _tex_water;
 
         Ref<Mesh> _plane;
+        Ref<Mesh> _tree;
 
         uint32_t _render_object_index = 0u;
 
