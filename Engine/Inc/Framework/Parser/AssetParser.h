@@ -3,6 +3,7 @@
 #define __ASSET_PARSER_H__
 #include "FbxParser.h"
 #include "PngParser.h"
+#include "TgaParser.h"
 
 namespace Ailu
 {
@@ -45,6 +46,7 @@ namespace Ailu
         static Scope<ITextureParser> GetParser(EImageLoader loader)
         {
             if (loader == EImageLoader::kPNG) return MakeScope<PngParser>();
+            else if (loader == EImageLoader::kTGA) return MakeScope<TagParser>();
         }
     };
 }

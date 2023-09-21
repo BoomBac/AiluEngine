@@ -19,6 +19,8 @@ namespace Ailu
 		else
 		{
 			auto tex = Texture2D::Create(x, y, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			tex->Name(GetFileName(path));
+			TexturePool::Add(tex->Name(), tex);
 			tex->FillData(std::move(data));
 			//stbi_image_free(data);
 			return tex;

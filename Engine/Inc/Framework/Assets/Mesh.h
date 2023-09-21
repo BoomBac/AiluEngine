@@ -6,6 +6,7 @@
 #include "GlobalMarco.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/Buffer.h"
+#include "Framework/Common/ResourcePool.h"
 
 namespace Ailu
 {
@@ -29,12 +30,12 @@ namespace Ailu
 		const Ref<VertexBuffer>& GetVertexBuffer() const;
 		const Ref<IndexBuffer>& GetIndexBuffer() const;
 		void Build();
-
+		DECLARE_PROPERTY(Name, std::string)
 	public:
 		uint32_t _vertex_count;
 		uint16_t _index_count;
-		std::string _name = "mesh";
 	private:
+		std::string _name = "mesh";
 		Ref<VertexBuffer> _p_vbuf;
 		Ref<IndexBuffer> _p_ibuf;
 		Vector3f* _vertices;
@@ -45,14 +46,15 @@ namespace Ailu
 		uint32_t* _p_indices;
 	};
 
-	class MeshPool
-	{
-	public:
-		static Ref<Mesh> FindMesh(const std::string& name);
-		static void AddMesh(Ref<Mesh> mesh);
-	private:
-		inline static std::map<std::string, Ref<Mesh>> s_mesh_pool{};
-	};
+	//class MeshPool
+	//{
+	//public:
+	//	static Ref<Mesh> FindMesh(const std::string& name);
+	//	static void AddMesh(Ref<Mesh> mesh);
+	//private:
+	//	inline static std::map<std::string, Ref<Mesh>> s_mesh_pool{};
+	//};
+	using MeshPool = ResourcePool<Mesh>;
 }
 
 

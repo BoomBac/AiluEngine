@@ -416,18 +416,20 @@ namespace Ailu
             auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
             
             //_plane = parser->Parser(GET_RES_PATH(Meshs/plane.fbx));
-            _plane = parser->Parser(GET_RES_PATH(Meshs/gizmo.fbx));
+            //_plane = parser->Parser(GET_RES_PATH(Meshs/gizmo.fbx));
 
-            _tree = parser->Parser(GET_RES_PATH(Meshs/monkey.fbx));
+            _tree = parser->Parser(GetResPath("Meshs/stone.fbx"));
 
-            //_tex_checkboard = Texture2D::Create(256,256,EALGFormat::kALGFormatR8G8B8A8_UNORM);
-            //_tex_checkboard->FillData(GenerateTextureData().data());
+            auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+            auto tga_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kTGA);
 
-            auto img_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-            //_tex_water = img_parser->Parser(GET_RES_PATH(Textures/water.png));
-            //_mat_green->SetTexture("albedo", img_parser->Parser(GET_RES_PATH(Textures/Tree_Songshu02_Bark_D.png)));
-            //_mat_green->SetTexture("albedo", img_parser->Parser(GET_RES_PATH(Textures/water.png)));
-            //_mat_green->SetTexture("albedo", img_parser->Parser(GET_RES_PATH(Textures/test.png)));
+            //_tex_water = tga_parser->Parser(GET_RES_PATH(Textures/PK_stone03_static_0_D.tga));
+            tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
+            tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
+
+            _mat_green->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D.tga"));
+            _mat_green->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N.tga"));
+
 
             _p_vertex_buf.reset(VertexBuffer::Create({
                 {"POSITION",EShaderDateType::kFloat3,0},
@@ -440,7 +442,6 @@ namespace Ailu
 
             _p_vertex_buf0->SetStream(reinterpret_cast<float*>(testMesh0), sizeof(testMesh0), 0);
             //_p_vertex_buf0->SetStream(reinterpret_cast<float*>(color), sizeof(color), 1);
-
             _p_index_buf.reset(IndexBuffer::Create(indices, 36));
         }
 
@@ -448,8 +449,6 @@ namespace Ailu
         {
             ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
             m_fenceValues[m_frameIndex]++;
-
-            // Create an event handle to use for frame synchronization.
             m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
             if (m_fenceEvent == nullptr)
             {
@@ -488,8 +487,6 @@ namespace Ailu
 
         _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
         _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
-        //_tex_checkboard->Bind(3);
-        //_tex_water->Bind(3);
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
@@ -501,8 +498,11 @@ namespace Ailu
             _render_object_index = 0;
             m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         }
-        Renderer::Submit(_tree, _mat_green, Transpose(MatrixTranslation(0.0f, -(float)sin(TimeMgr::GetScaledWorldTime()) * 0.0f, 0.0f)));
-        Renderer::Submit(_plane, _mat_red,Transpose(BuildIdentityMatrix()));
+        Matrix4x4f rot{};
+
+        MatrixRotationY(rot, TimeMgr::GetScaledWorldTime());
+        Renderer::Submit(_tree, _mat_green, Transpose(rot));
+        //Renderer::Submit(_plane, _mat_red,Transpose(BuildIdentityMatrix()));
         //Renderer::Submit(_p_vertex_buf, _p_index_buf, _mat_red, Transpose(MatrixTranslation((float)sin(TimeMgr::GetScaledWorldTime()), 0.0f, 0.0f)));
         //Renderer::Submit(_p_vertex_buf0, _p_index_buf, _mat_green, Transpose(MatrixTranslation(-(float)sin(TimeMgr::GetScaledWorldTime()), 0.0f, 0.0f)));
         {

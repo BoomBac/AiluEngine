@@ -34,4 +34,12 @@ namespace Ailu
 	{
 		return _p_data;
 	}
+	void Texture2D::Name(const std::string& name)
+	{
+		_name = name;
+	}
+	const std::string& Texture2D::Name() const
+	{
+		return _name;
+	}
 }

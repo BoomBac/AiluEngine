@@ -140,6 +140,7 @@ namespace Ailu
 			auto inputparam_desc = reflection->GetInputParameterDesc(i,&inputparams[i]);
 		}
 		std::vector<D3D12_SHADER_INPUT_BIND_DESC> bind_desc(desc.BoundResources);
+		int texture_bind_slot = 0;
 		for (uint32_t i = 0u; i < desc.BoundResources; i++)
 		{
 			reflection->GetResourceBindingDesc(i, &bind_desc[i]);
@@ -150,7 +151,9 @@ namespace Ailu
 			}
 			else if (res_type == D3D_SHADER_INPUT_TYPE::D3D10_SIT_TEXTURE)
 			{
-				_bind_res_infos.emplace_back(EBindResouceType::kTexture2D, bind_desc[i].BindPoint, bind_desc[i].Name);
+				//使用贴图的计数代替shader中的写的slot，防止shader中引用的插槽和跟签名插槽无法对应
+				_bind_res_infos.emplace_back(EBindResouceType::kTexture2D, texture_bind_slot++, bind_desc[i].Name);
+				//_bind_res_infos.emplace_back(EBindResouceType::kTexture2D, bind_desc[i].BindPoint, bind_desc[i].Name);
 			}
 		}
 		for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)

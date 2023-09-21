@@ -89,18 +89,18 @@ namespace Ailu
 		_p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4),3);
 		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
 	}
-	Ref<Mesh> MeshPool::FindMesh(const std::string& name)
-	{
-		auto it = s_mesh_pool.find(name);
-		if (it != s_mesh_pool.end()) return it->second;
-		else
-		{
-			LOG_WARNING("Can't find mesh: {}!,will return a empty mesh!", name);
-			return MakeRef<Mesh>("empty");
-		}
-	}
-	void MeshPool::AddMesh(Ref<Mesh> mesh)
-	{
-		s_mesh_pool.insert(std::make_pair(mesh->_name,mesh));
-	}
+	//Ref<Mesh> MeshPool::FindMesh(const std::string& name)
+	//{
+	//	auto it = s_mesh_pool.find(name);
+	//	if (it != s_mesh_pool.end()) return it->second;
+	//	else
+	//	{
+	//		LOG_WARNING("Can't find mesh: {}!,will return a empty mesh!", name);
+	//		return MakeRef<Mesh>("empty");
+	//	}
+	//}
+	//void MeshPool::AddMesh(Ref<Mesh> mesh)
+	//{
+	//	s_mesh_pool.insert(std::make_pair(mesh->_name,mesh));
+	//}
 }

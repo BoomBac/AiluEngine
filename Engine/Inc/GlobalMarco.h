@@ -47,6 +47,16 @@
 
 #define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
 
+#define DECLARE_PROPERTY(Name,type) \
+public: \
+    void Name(const type& name) { _##Name = name; } \
+    const type& Name() const { return _##Name; } \
+private: \
+    type _##Name;
+
+	
+
+
 //使用dxc编译高版本着色器(>=6.0)，这样的话无法在PIX中看到cbuffer信息
 //#define SHADER_DXC
 

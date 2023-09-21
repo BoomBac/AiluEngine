@@ -1959,6 +1959,12 @@
     <ClInclude Include="Inc\Framework\Parser\PngParser.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Parser\TgaParser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\ResourcePool.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2067,6 +2073,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Parser\TgaParser.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

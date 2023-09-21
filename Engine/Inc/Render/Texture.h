@@ -3,6 +3,7 @@
 #define __TEXTURE_H__
 
 #include <stdint.h>
+#include "Framework/Common/ResourcePool.h"
 #include "GlobalMarco.h"
 #include "AlgFormat.h"
 
@@ -17,6 +18,8 @@ namespace Ailu
 		virtual const uint16_t& GetHeight() const = 0;
 		virtual void Release() = 0;
 		virtual void Bind(uint8_t slot) const = 0;
+		virtual void Name(const std::string& name) = 0;
+		virtual const std::string& Name() const = 0;
 	};
 
 	class Texture2D : public Texture
@@ -28,12 +31,18 @@ namespace Ailu
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
 		uint8_t* GetNativePtr() override;
+	public:
+		void Name(const std::string& name) override;
+		const std::string& Name() const override;
 	protected:
+		std::string _name;
 		uint8_t* _p_data;
 		uint16_t _width,_height;
 		uint8_t _channel;
 		EALGFormat _format;
 	};
+
+	using TexturePool = ResourcePool<Texture2D>;
 }
 
 #endif // !TEXTURE_H__

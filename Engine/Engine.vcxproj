@@ -477,6 +477,7 @@
     <ClInclude Include="Inc\Framework\Common\KeyCode.h" />
     <ClInclude Include="Inc\Framework\Common\Log.h" />
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
+    <ClInclude Include="Inc\Framework\Common\ResourcePool.h" />
     <ClInclude Include="Inc\Framework\Common\ThreadPool.h" />
     <ClInclude Include="Inc\Framework\Common\TimeMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Utils.h" />
@@ -495,6 +496,7 @@
     <ClInclude Include="Inc\Framework\Parser\AssetParser.h" />
     <ClInclude Include="Inc\Framework\Parser\FbxParser.h" />
     <ClInclude Include="Inc\Framework\Parser\PngParser.h" />
+    <ClInclude Include="Inc\Framework\Parser\TgaParser.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\pch.h" />
     <ClInclude Include="Inc\Platform\WinInput.h" />
@@ -541,6 +543,7 @@
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp" />
+    <ClCompile Include="Src\Framework\Parser\TgaParser.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
