@@ -14,7 +14,6 @@
 #include "Render/Shader.h"
 #include "Render/Material.h"
 #include "Framework/Assets/Mesh.h"
-#include "Render/Texture.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -37,6 +36,7 @@ namespace Ailu
     class D3DContext : public GraphicsContext
     {
         friend class D3DRendererAPI;
+        friend class D3DComandBuffer;
     public:
         D3DContext(WinWindow* window);
         ~D3DContext();
@@ -52,7 +52,7 @@ namespace Ailu
         D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUDescriptorHandle(uint32_t index);
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
         uint8_t* GetCBufferPtr();
-
+        void ExecuteCommandBuffer(Ref<D3DComandBuffer> cmd);
         void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
         void DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform);
 

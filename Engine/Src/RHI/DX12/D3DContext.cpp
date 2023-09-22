@@ -11,6 +11,7 @@
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
 #include "Framework/Parser/AssetParser.h"
+#include <RHI/DX12/D3DCommandBuffer.h>
 
 
 
@@ -191,6 +192,14 @@ namespace Ailu
         return _p_cbuffer;
     }
 
+    void D3DContext::ExecuteCommandBuffer(Ref<D3DComandBuffer> cmd)
+    {
+        for (auto& call : cmd->_commands)
+        {
+            call();
+        }
+    }
+
     void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform)
     {
         m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
@@ -349,7 +358,7 @@ namespace Ailu
         pso_initializer._topology = ETopology::kTriangle;
         pso_initializer._p_vertex_shader = _p_standard_shader;
         pso_initializer._p_pixel_shader = _p_standard_shader;
-        pso_initializer._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kSolid>::GetRHI();
+        pso_initializer._raster_state = TStaticRasterizerState<ECullMode::kNone, EFillMode::kSolid>::GetRHI();
         GraphicsPipelineState* pso = GraphicsPipelineState::Create(pso_initializer);
         pso->Build();
         
@@ -470,45 +479,40 @@ namespace Ailu
         ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
         ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
         m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-
+        auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        m_commandList->ResourceBarrier(1, &bar_before);
         GraphicsPipelineState::sCurrent->Bind();
         GraphicsPipelineState::sCurrent->CommitBindResource(2u, &_cbuf_views[0], EBindResourceType::kConstBuffer);
 
 
-        RenderCommand::SetViewports({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()}});
-        RenderCommand::SetScissorRects({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()}});
-
-        auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        m_commandList->ResourceBarrier(1, &bar_before);
-
-        RenderCommand::SetClearColor({ 0.3f, 0.2f, 0.4f, 1.0f });
-        RenderCommand::Clear();
-        RenderCommand::SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
-
-        _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
-        _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
+        m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         {          
             Renderer::BeginScene();
-            _perframe_scene_data._MatrixVP = _perframe_scene_data._MatrixP * _perframe_scene_data._MatrixV;
-            memcpy(_p_cbuffer, &_perframe_scene_data, sizeof(_perframe_scene_data));
-
             _render_object_index = 0;
-            m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         }
-        Matrix4x4f rot{};
+        auto cmd = D3DComandBufferPool::GetCommandBuffer();
+        cmd->Clear();
+        cmd->SetViewports({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
+        cmd->SetScissorRects({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
+        cmd->SetClearColor({ 0.3f, 0.2f, 0.4f, 1.0f });
+        cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
+        cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
 
+        _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
+        _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
+        Matrix4x4f rot{};
         MatrixRotationY(rot, TimeMgr::GetScaledWorldTime());
-        Renderer::Submit(_tree, _mat_green, Transpose(rot));
-        //Renderer::Submit(_plane, _mat_red,Transpose(BuildIdentityMatrix()));
-        //Renderer::Submit(_p_vertex_buf, _p_index_buf, _mat_red, Transpose(MatrixTranslation((float)sin(TimeMgr::GetScaledWorldTime()), 0.0f, 0.0f)));
-        //Renderer::Submit(_p_vertex_buf0, _p_index_buf, _mat_green, Transpose(MatrixTranslation(-(float)sin(TimeMgr::GetScaledWorldTime()), 0.0f, 0.0f)));
+//        Renderer::Submit(_tree, _mat_green, Transpose(rot));
+        cmd->DrawRenderer(_tree,Transpose(rot),_mat_green);
+        ExecuteCommandBuffer(cmd);
+
         {
             Renderer::EndScene();
         }
-
+        D3DComandBufferPool::ReleaseCommandBuffer(cmd);
         //imgui draw
         {
             m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);

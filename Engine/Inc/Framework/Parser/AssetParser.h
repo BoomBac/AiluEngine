@@ -35,7 +35,8 @@ namespace Ailu
     public:
         static Scope<IMeshParser> GetParser(EMeshLoader loader) 
         { 
-            if(loader == EMeshLoader::kFbx) return MakeScope<FbxParser>();
+            if (loader == EMeshLoader::kFbx) return MakeScope<FbxParser>();
+            else return nullptr;
         }
     };
 
@@ -47,6 +48,7 @@ namespace Ailu
         {
             if (loader == EImageLoader::kPNG) return MakeScope<PngParser>();
             else if (loader == EImageLoader::kTGA) return MakeScope<TagParser>();
+            else return nullptr;
         }
     };
 }

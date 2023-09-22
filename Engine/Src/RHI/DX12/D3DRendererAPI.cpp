@@ -22,16 +22,26 @@ namespace Ailu
 	}
 	void Ailu::D3DRendererAPI::SetViewMatrix(const Matrix4x4f& view)
 	{
-		D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixV = view;
+		auto device = D3DContext::s_p_d3dcontext;
+		device->_perframe_scene_data._MatrixV = view;
+		device->_perframe_scene_data._MatrixVP = device->_perframe_scene_data._MatrixP * view;
+		memcpy(device->_p_cbuffer, &device->_perframe_scene_data, sizeof(device->_perframe_scene_data));
 	}
 	void D3DRendererAPI::SetProjectionMatrix(const Matrix4x4f& proj)
 	{
-		D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixP = proj;
+		auto device = D3DContext::s_p_d3dcontext;
+		device->_perframe_scene_data._MatrixP = proj;
+		device->_perframe_scene_data._MatrixVP = proj * device->_perframe_scene_data._MatrixV;
+		memcpy(device->_p_cbuffer, &device->_perframe_scene_data, sizeof(device->_perframe_scene_data));
 	}
 	void D3DRendererAPI::SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj)
 	{
-		D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixV = view;
-		D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixP = proj;
+		auto device = D3DContext::s_p_d3dcontext;
+		device->_perframe_scene_data._MatrixV = view;
+		device->_perframe_scene_data._MatrixP = proj;
+		device->_perframe_scene_data._MatrixVP = proj * view;
+		memcpy(device->_p_cbuffer, &device->_perframe_scene_data, sizeof(device->_perframe_scene_data));
+
 	}
 	void D3DRendererAPI::SetViewports(const std::initializer_list<Viewport>& viewports)
 	{

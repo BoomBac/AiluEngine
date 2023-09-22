@@ -3,7 +3,7 @@
 #pragma once
 #ifndef __TIMEMGR_H__
 #define __TIMEMGR_H__
-
+#include <stack>
 #include "Framework/Interface/IRuntimeModule.h"
 
 namespace Ailu
@@ -28,7 +28,7 @@ namespace Ailu
 		void Tick() override;
 		void Pause();
 		void Mark();
-		float GetElapsedSinceLastMark() const;
+		float GetElapsedSinceLastMark();
 		static float GetScaledWorldTime(float scale = TimeMgr::TimeScale,bool smooth_scale = true);
 		void Resume();
 		void Reset();
@@ -37,7 +37,7 @@ namespace Ailu
 		ALTimeStamp _cur_stamp;
 		ALTimeStamp _init_stamp;
 		ALTimeStamp _pause_stamp;
-		ALTimeStamp _mark_stamp;
+		std::stack<ALTimeStamp> _mark_stamps{};
 		float _total_time = 0.0f;
 		float _pause_time = 0.0f;
 		bool _b_stop = false;

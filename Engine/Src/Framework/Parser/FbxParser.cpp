@@ -220,7 +220,7 @@ namespace Ailu
 				positions.emplace_back(position);
 			}
 		}
-		uint32_t vertex_count = positions.size();
+		uint32_t vertex_count = (uint32_t)positions.size();
 		float* vertex_buf = new float[vertex_count * 3];
 		memcpy(vertex_buf, positions.data(), sizeof(Vector3f) * vertex_count);
 		mesh->_vertex_count = vertex_count;
@@ -288,7 +288,7 @@ namespace Ailu
 
 	bool FbxParser::ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh)
 	{
-		int tangent_num = fbx_mesh.GetElementTangentCount();
+		uint32_t tangent_num = fbx_mesh.GetElementTangentCount();
 		AL_ASSERT(tangent_num < 0,"ReadTangent");
 		auto* tangents = fbx_mesh.GetElementTangent();
 		if (tangents == nullptr)
@@ -296,7 +296,7 @@ namespace Ailu
 			LOG_WARNING("FbxMesh: {} don't contain tangent info!", fbx_mesh.GetName());
 			return true;
 		}
-		int vertex_count = fbx_mesh.GetControlPointsCount(), data_size = 0;
+		uint32_t vertex_count = fbx_mesh.GetControlPointsCount(), data_size = 0;
 		void* data = nullptr;
 		if (tangents->GetMappingMode() == fbxsdk::FbxGeometryElement::eByPolygonVertex)
 		{
@@ -324,9 +324,9 @@ namespace Ailu
 		else if (tangents->GetMappingMode() == fbxsdk::FbxGeometryElement::eByControlPoint)
 		{
 			data = new float[vertex_count * 3];
-			for (UINT vertex_id = 0; vertex_id < vertex_count; ++vertex_id)
+			for (uint32_t vertex_id = 0; vertex_id < vertex_count; ++vertex_id)
 			{
-				UINT tangent_id = 0;
+				uint32_t tangent_id = 0;
 				if (tangents->GetReferenceMode() == fbxsdk::FbxGeometryElement::eDirect)
 					tangent_id = vertex_id;
 				else if (tangents->GetReferenceMode() == fbxsdk::FbxGeometryElement::eIndexToDirect)
@@ -456,10 +456,10 @@ namespace Ailu
 		}
 		LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
 		mesh->Clear();
-		vertex_count = positions.size();
+		vertex_count = (uint32_t)positions.size();
 		auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;
-		mesh->_index_count = index_count;
+		mesh->_index_count = (uint32_t)index_count;
 
 
 		float* vertex_buf = new float[vertex_count * 3];

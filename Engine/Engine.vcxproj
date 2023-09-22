@@ -514,6 +514,7 @@
     <ClInclude Include="Inc\Render\Shader.h" />
     <ClInclude Include="Inc\Render\Texture.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DBuffer.h" />
+    <ClInclude Include="Inc\RHI\DX12\D3DCommandBuffer.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DConstants.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DContext.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DGraphicsPipelineState.h" />
@@ -563,6 +564,7 @@
     <ClCompile Include="Src\Render\Shader.cpp" />
     <ClCompile Include="Src\Render\Texture.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DBuffer.cpp" />
+    <ClCompile Include="Src\RHI\DX12\D3DCommandBuffer.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DContext.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DGraphicsPipelineState.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DRendererAPI.cpp" />

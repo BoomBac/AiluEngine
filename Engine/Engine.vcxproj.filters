@@ -1965,6 +1965,9 @@
     <ClInclude Include="Inc\Framework\Common\ResourcePool.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\D3DCommandBuffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2076,6 +2079,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\Parser\TgaParser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\D3DCommandBuffer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
