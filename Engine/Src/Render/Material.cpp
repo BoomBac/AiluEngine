@@ -9,9 +9,9 @@ namespace Ailu
 		_p_cbuf = _p_shader->GetCBufferPtr(_cbuf_index);
 		for (auto& bind_info : _p_shader->GetBindResInfo())
 		{
-			if (bind_info._res_type == EBindResouceType::kTexture2D)
+			if (bind_info.second._res_type == EBindResDescType::kTexture2D)
 			{
-				_textures.insert(std::make_pair(bind_info._name, std::make_tuple(bind_info._slot, nullptr)));
+				_textures.insert(std::make_pair(bind_info.first, std::make_tuple(bind_info.second._bind_slot, nullptr)));
 			}
 		}
 		_base_texture_slot_offset = _p_shader->GetTextureSlotBaseOffset();
@@ -38,10 +38,10 @@ namespace Ailu
 		{
 			auto [slot, texture] = it->second;
 			if(texture != nullptr)
-				texture->Bind(slot + _base_texture_slot_offset);
+				texture->Bind(slot);
 			else
 			{
-				LOG_WARNING("Material: {} haven't set texture on solt {}",_name,(short)slot);
+				LOG_WARNING("Material: {} haven't set texture on bind slot {}",_name,(short)slot);
 			}
 		}
 		_p_shader->Bind(_cbuf_index);

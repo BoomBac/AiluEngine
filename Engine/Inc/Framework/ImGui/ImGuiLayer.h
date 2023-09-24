@@ -17,6 +17,9 @@ namespace Ailu
 
 		void Begin();
 		void End();
+
+	private:
+		void ShowWorldOutline();
 	};
 }
 

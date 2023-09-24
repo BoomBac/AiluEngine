@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Render/RenderingData.h"
 #include "RHI/DX12/D3DBuffer.h"
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DContext.h"
@@ -36,6 +37,7 @@ namespace Ailu
 			AL_ASSERT(false, "Try to bind a vertex buffer with an invalid index");
 			return;
 		}
+		RenderingStates::s_vertex_num += _vertices_count;
 		D3DContext::GetInstance()->GetCmdList()->IASetVertexBuffers(0, _buf_num, &s_vertex_buf_views[_buf_start]);
 	}
 
@@ -103,8 +105,60 @@ namespace Ailu
 		return _vertices_count;
 	}
 
+	//-----------------------------------------------------------------D3DDynamicVertexBuffer----------------------------------------------------------
+	D3DDynamicVertexBuffer::D3DDynamicVertexBuffer(VertexBufferLayout layout)
+	{
+		_size_pos_buf = D3DConstants::KMaxDynamicVertexNum * sizeof(Vector3f);
+		_size_color_buf = D3DConstants::KMaxDynamicVertexNum * sizeof(Vector4f);
+		_ime_vertex_data_offset = _ime_color_data_offset = 0;
+		_p_ime_vertex_data = new uint8_t[12 * D3DConstants::KMaxDynamicVertexNum];
+		_p_ime_color_data = new uint8_t[16 * D3DConstants::KMaxDynamicVertexNum];
+		auto device = D3DContext::GetInstance()->GetDevice();
+		D3D12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		D3D12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(_size_pos_buf);
+		ThrowIfFailed(device->CreateCommittedResource(&heapProps,D3D12_HEAP_FLAG_NONE,&bufferDesc,D3D12_RESOURCE_STATE_GENERIC_READ,nullptr,IID_PPV_ARGS(&_p_vertex_buf)));
+		bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(_size_color_buf);
+		ThrowIfFailed(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&_p_color_buf)));
+		_p_vertex_buf->Map(0,nullptr, reinterpret_cast<void**>(&_p_vertex_data));
+		_p_color_buf->Map(0,nullptr, reinterpret_cast<void**>(&_p_color_data));
+		D3D12_VERTEX_BUFFER_VIEW buf_view{};
+		buf_view.BufferLocation = _p_vertex_buf->GetGPUVirtualAddress();
+		buf_view.StrideInBytes = sizeof(Vector3f);
+		buf_view.SizeInBytes = _size_pos_buf;
+		_buf_views[0] = buf_view;
+		buf_view.BufferLocation = _p_color_buf->GetGPUVirtualAddress();
+		buf_view.StrideInBytes = sizeof(Vector4f);
+		buf_view.SizeInBytes = _size_color_buf;
+		_buf_views[1] = buf_view;
+	}
+	D3DDynamicVertexBuffer::~D3DDynamicVertexBuffer()
+	{
+		delete[] _p_ime_vertex_data;
+		delete[] _p_ime_color_data;
+	}
+	void D3DDynamicVertexBuffer::Bind() const
+	{
+		RenderingStates::s_vertex_num += _vertex_num;
+		D3DContext::GetInstance()->GetCmdList()->IASetVertexBuffers(0, 2, _buf_views);
+	}
+	void D3DDynamicVertexBuffer::UploadData()
+	{
+		_vertex_num = _ime_vertex_data_offset / 12;
+		memcpy(_p_vertex_data,_p_ime_vertex_data, _size_pos_buf);
+		memcpy(_p_color_data,_p_ime_color_data, _size_color_buf);
+		_ime_vertex_data_offset = 0;
+		_ime_color_data_offset = 0;
+	}
+	void D3DDynamicVertexBuffer::AppendData(float* data0, uint32_t num0, float* data1, uint32_t num1)
+	{
+		memcpy(_p_ime_vertex_data + _ime_vertex_data_offset, data0, num0 * 4);
+		memcpy(_p_ime_color_data + _ime_color_data_offset, data1, num1 * 4);
+		_ime_vertex_data_offset += num0 * 4;
+		_ime_color_data_offset += num1 * 4;
+	}
+
 	//-----------------------------------------------------------------IndexBuffer----------------------------------------------------------
-	D3DIndexBuffer::D3DIndexBuffer(uint32_t* indices, uint32_t count) : _count(count)
+	D3DIndexBuffer::D3DIndexBuffer(uint32_t* indices, uint32_t count) : _index_count(count)
 	{
 		auto d3d_conetxt = D3DContext::GetInstance();
 		auto size = sizeof(uint32_t) * count;
@@ -143,10 +197,11 @@ namespace Ailu
 			AL_ASSERT(false, "Try to bind a index buffer with an invalid index");
 			return;
 		}
+		RenderingStates::s_triangle_num += _index_count / 3;
 		D3DContext::GetInstance()->GetCmdList()->IASetIndexBuffer(&s_index_buf_views[_buf_view_index]);
 	}
 	uint32_t D3DIndexBuffer::GetCount() const
 	{
-		return _count;
+		return _index_count;
 	}
 }

@@ -30,6 +30,30 @@ namespace Ailu
 		inline static uint32_t s_cur_offset = 0u;
 	};
 
+	class D3DDynamicVertexBuffer : public DynamicVertexBuffer
+	{
+	public:
+		D3DDynamicVertexBuffer(VertexBufferLayout layout = {
+				{"POSITION",EShaderDateType::kFloat3,0},
+				{"COLOR",EShaderDateType::kFloat4,1},
+			});
+		~D3DDynamicVertexBuffer();
+		void Bind() const final;
+		void UploadData() final;
+		void AppendData(float* data0, uint32_t num0, float* data1, uint32_t num1) final;
+	private:
+		uint32_t _vertex_num = 0u;
+		uint32_t _size_pos_buf, _size_color_buf;
+		uint32_t _ime_vertex_data_offset, _ime_color_data_offset;
+		uint8_t* _p_vertex_data = nullptr; 
+		uint8_t* _p_color_data = nullptr;
+		uint8_t* _p_ime_vertex_data = nullptr;
+		uint8_t* _p_ime_color_data = nullptr;
+		ComPtr<ID3D12Resource> _p_vertex_buf;
+		ComPtr<ID3D12Resource> _p_color_buf;
+		D3D12_VERTEX_BUFFER_VIEW _buf_views[2];
+	};
+
 	class D3DIndexBuffer : public IndexBuffer
 	{
 	public:
@@ -38,7 +62,7 @@ namespace Ailu
 		void Bind() const override;
 		uint32_t GetCount() const override;
 	private:
-		uint32_t _count;
+		uint32_t _index_count;
 		uint32_t _buf_view_index;
 		ComPtr<ID3D12Resource> _index_buf;
 		inline static std::vector<D3D12_INDEX_BUFFER_VIEW> s_index_buf_views{};

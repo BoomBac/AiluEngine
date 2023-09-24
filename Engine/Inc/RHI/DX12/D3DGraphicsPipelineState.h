@@ -55,9 +55,9 @@ namespace Ailu
         D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer);
 		void Build() override;
         void Bind() override;
-        void CommitBindResource(uint16_t slot, void* res, EBindResourceType res_type) override;
+        void CommitBindResource(uint16_t slot, void* res, EBindResDescType res_type) override;
     public:
-
+        static Ref<D3DGraphicsPipelineState> GetGizmoPSO();
 	private:
         D3D12_GRAPHICS_PIPELINE_STATE_DESC _d3d_pso_desc;
         GraphicsPipelineStateInitializer _state_desc;

@@ -280,6 +280,18 @@ namespace Ailu
 	template <typename T>
 	const Vector4D<T> Vector4D<T>::One(1, 1, 1, 1);
 
+	template<template<typename> class TT, typename T>
+	static float Distance(const TT<T>& from, const TT<T>& to)
+	{
+		float dis = 0;
+		for (uint32_t i = 0; i < CountOf(from.data); i++)
+		{
+			dis += (to.data[i] - from.data[i]) * (to.data[i] - from.data[i]);
+		}
+		return sqrt(dis);
+	}
+
+
 	using Vector4f = Vector4D<float>;
 	using Quaternion = Vector4D<float>;
 	using R8G8B8A8Unorm = Vector4D<uint8_t>;
@@ -792,6 +804,17 @@ namespace Ailu
 		}} };
 		return translation;
 	}
+
+	static Matrix4x4f MatrixTranslation(const Vector3f& translation)
+	{
+		return { {{
+			{ 1.0f, 0.0f, 0.0f, 0.0f},
+			{ 0.0f, 1.0f, 0.0f, 0.0f},
+			{ 0.0f, 0.0f, 1.0f, 0.0f},
+			{ translation.x, translation.y, translation.z, 1.0f}
+		}} };
+	}
+
 	static void MatrixRotationX(Matrix4x4f& matrix, const float radius)
 	{
 		float c = cosf(radius), s = sinf(radius);
@@ -864,6 +887,18 @@ namespace Ailu
 		}} };
 		return scale;
 	}
+
+	static Matrix4x4f MatrixScale(const Vector3f& scale)
+	{
+		Matrix4x4f mat = { {{
+		{    scale.x, 0.0f, 0.0f, 0.0f},
+		{ 0.0f,    scale.y, 0.0f, 0.0f},
+		{ 0.0f, 0.0f,	scale.z, 0.0f},
+		{ 0.0f, 0.0f, 0.0f, 1.0f},
+		}} };
+		return mat;
+	}
+
 	static void MatrixRotationQuaternion(Matrix4x4f& matrix, Quaternion q)
 	{
 		Matrix4x4f rotation = { {{
@@ -887,8 +922,13 @@ namespace Ailu
 		}
 		return res;
 	}
-	template<>
+	template<float>
 	static float lerp(const float& src, const float& des, const float& weight)
+	{
+		return (1.f - weight) * src + weight * des;
+	}
+
+	static float lerpf(const float& src, const float& des, const float& weight)
 	{
 		return (1.f - weight) * src + weight * des;
 	}
@@ -938,12 +978,16 @@ namespace Ailu
 		return out_mat;
 	}
 #pragma warning(pop)
-	using Color = Vector4D<uint8_t>;
+	using Color = Vector4D<float>;
+	using Color32 = Vector4D<uint8_t>;
 	namespace Colors
 	{
-		static const Vector3f kBlue = { 0.f,0.f,1.f };
-		static const Vector3f kRed = { 1.f,0.f,0.f };
-		static const Vector3f kGreen = { 0.f,1.f,0.f };
+		static const Color kBlue = { 0.f,0.f,1.f ,1.0f};
+		static const Color kRed = { 1.f,0.f,0.f ,1.0f };
+		static const Color kGreen = { 0.f,1.f,0.f ,1.0f };
+		static const Color kWhite = { 1.f,1.f,1.f ,1.0f };
+		static const Color kBlack = { 0.f,0.f,0.f ,1.0f };
+		static const Color kGray = { 0.3f,0.3f,0.3f ,1.0f};
 	}
 
 	namespace ALHash

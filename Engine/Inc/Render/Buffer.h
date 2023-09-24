@@ -105,6 +105,16 @@ namespace Ailu
 		virtual uint32_t GetVertexCount() const = 0;
 	};
 	
+	class DynamicVertexBuffer
+	{
+	public:
+		virtual ~DynamicVertexBuffer() = default;
+		virtual void Bind() const = 0;
+		static Ref<DynamicVertexBuffer> Create(const VertexBufferLayout& layout);
+		static Ref<DynamicVertexBuffer> Create();
+		virtual void UploadData() = 0;
+		virtual void AppendData(float* data0, uint32_t num0,float* data1,uint32_t num1) = 0;
+	};
 	class IndexBuffer
 	{
 	public:

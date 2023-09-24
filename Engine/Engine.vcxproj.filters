@@ -1968,6 +1968,18 @@
     <ClInclude Include="Inc\RHI\DX12\D3DCommandBuffer.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Objects\Actor.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Objects\Component.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Objects\TransformComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\RenderingData.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2084,6 +2096,15 @@
     <ClCompile Include="Src\RHI\DX12\D3DCommandBuffer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Src\Objects\Actor.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Objects\Component.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Objects\TransformComponent.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat">
@@ -2093,6 +2114,7 @@
     <None Include="Res\Shaders\cbuffer.hlsl">
       <Filter>头文件</Filter>
     </None>
+    <None Include="Res\Shaders\gizmo.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

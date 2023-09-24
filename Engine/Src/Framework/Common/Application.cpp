@@ -54,8 +54,9 @@ namespace Ailu
 		while (_b_running)
 		{
 			g_pTimeMgr->Tick();
-			render_lag += g_pTimeMgr->GetElapsedSinceLastMark();
-			update_lag += g_pTimeMgr->GetElapsedSinceLastMark();
+			auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
+			render_lag += last_mark;
+			update_lag += last_mark;
 			g_pTimeMgr->Mark();
 
 			for (Layer* layer : _layer_stack)

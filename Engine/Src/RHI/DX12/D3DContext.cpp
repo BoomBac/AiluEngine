@@ -11,7 +11,9 @@
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
 #include "Framework/Parser/AssetParser.h"
-#include <RHI/DX12/D3DCommandBuffer.h>
+#include "RHI/DX12/D3DCommandBuffer.h"
+#include "Render/RenderingData.h"
+#include "Objects/TransformComponent.h"
 
 
 
@@ -102,7 +104,7 @@ namespace Ailu
         s_p_d3dcontext = this;
         LoadPipeline();
         LoadAssets();
-        
+        Gizmo::Init();
         //init imgui
         D3D12_DESCRIPTOR_HEAP_DESC SrvHeapDesc;
         SrvHeapDesc.NumDescriptors = 1;
@@ -202,6 +204,7 @@ namespace Ailu
 
     void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform)
     {
+        ++RenderingStates::s_draw_call;
         m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
         //m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
         memcpy(_p_cbuffer + D3DConstants::kPerFrameDataSize + D3DConstants::kPerMaterialDataSize * D3DConstants::kMaxMaterialDataCount + D3DConstants::kPerFrameDataSize * (_render_object_index++),
@@ -211,10 +214,17 @@ namespace Ailu
 
     void D3DContext::DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform)
     {
+        ++RenderingStates::s_draw_call;
         m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
         //m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
         memcpy(_p_cbuffer + D3DConstants::kPerFrameDataSize + D3DConstants::kPerMaterialDataSize * D3DConstants::kMaxMaterialDataCount + D3DConstants::kPerFrameDataSize * (_render_object_index++),
             &transform, sizeof(transform));
+        m_commandList->DrawInstanced(vertex_count, instance_count, 0, 0);
+    }
+
+    void D3DContext::DrawInstanced(uint32_t vertex_count, uint32_t instance_count)
+    {
+        ++RenderingStates::s_draw_call;
         m_commandList->DrawInstanced(vertex_count, instance_count, 0, 0);
     }
 
@@ -330,6 +340,8 @@ namespace Ailu
         //ThrowIfFailed(m_commandList->Close());
     }
 
+    Ref<GraphicsPipelineState> _p_gizmo_pso;
+
     void D3DContext::LoadAssets()
     {
         //InitCBVSRVUAVDescHeap();
@@ -342,7 +354,7 @@ namespace Ailu
             {"TEXCOORD",EShaderDateType::kFloat2,2},
             {"TANGENT",EShaderDateType::kFloat4,3}
         };
-        _p_standard_shader.reset(Shader::Create(GET_RES_PATH(Shaders/shaders.hlsl), "StandardShader"));
+        _p_standard_shader.reset(Shader::Create(GetResPath("Shaders/shaders.hlsl"), "StandardShader"));
 
         _mat_red = MakeRef<Material>(_p_standard_shader,"RedColor");
         _mat_green = MakeRef<Material>(_p_standard_shader, "GreenColor");
@@ -362,6 +374,7 @@ namespace Ailu
         GraphicsPipelineState* pso = GraphicsPipelineState::Create(pso_initializer);
         pso->Build();
         
+        //_p_gizmo_pso = D3DGraphicsPipelineState::GetGizmoPSO();
         // Create the vertex buffer.
         {
             float size = 0.5f;
@@ -440,6 +453,11 @@ namespace Ailu
             _mat_green->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N.tga"));
 
 
+            _p_actor = Actor::Create<Actor>();
+            ;
+            _p_actor->AddChild(Actor::Create<Actor>());
+            _p_actor->AddComponent<TransformComponent>();
+
             _p_vertex_buf.reset(VertexBuffer::Create({
                 {"POSITION",EShaderDateType::kFloat3,0},
                 }));
@@ -482,9 +500,7 @@ namespace Ailu
         auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
         m_commandList->ResourceBarrier(1, &bar_before);
         GraphicsPipelineState::sCurrent->Bind();
-        GraphicsPipelineState::sCurrent->CommitBindResource(2u, &_cbuf_views[0], EBindResourceType::kConstBuffer);
-
-
+        GraphicsPipelineState::sCurrent->CommitBindResource(1u, &_cbuf_views[0], EBindResDescType::kConstBuffer);
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
@@ -497,22 +513,34 @@ namespace Ailu
         cmd->Clear();
         cmd->SetViewports({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
         cmd->SetScissorRects({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
-        cmd->SetClearColor({ 0.3f, 0.2f, 0.4f, 1.0f });
+        //cmd->SetClearColor({ 0.3f, 0.2f, 0.4f, 1.0f });
         cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
+        //cmd->ClearRenderTarget({ 0.0f, 0.0f, 0.0f, 1.0f }, 1.0, true, true);
         cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
 
         _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
         _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
         Matrix4x4f rot{};
-        MatrixRotationY(rot, TimeMgr::GetScaledWorldTime());
-//        Renderer::Submit(_tree, _mat_green, Transpose(rot));
-        cmd->DrawRenderer(_tree,Transpose(rot),_mat_green);
+        auto* transf = _p_actor->GetComponent<TransformComponent>();
+        //transf->Position({0.0f,sin(TimeMgr::GetScaledWorldTime()) * 10.0f,0.0f});
+        
+        //MatrixRotationY(rot, TimeMgr::GetScaledWorldTime());
+        cmd->DrawRenderer(_tree,Transpose(transf->GetWorldMatrix()),_mat_green);
         ExecuteCommandBuffer(cmd);
-
+        auto draw_call = &RenderingStates::s_draw_call;
         {
             Renderer::EndScene();
         }
         D3DComandBufferPool::ReleaseCommandBuffer(cmd);
+        
+        //DrawGizmo
+        //{
+        //    _p_gizmo_pso->Bind();
+        //    _p_gizmo_pso->CommitBindResource(0u, &_cbuf_views[0], EBindResDescType::kConstBuffer);
+
+        //    Gizmo::Submit();
+        //}
+
         //imgui draw
         {
             m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);

@@ -33,6 +33,8 @@ namespace Ailu
 		constexpr static uint16_t kMaxMaterialDataCount = 4u;
 		constexpr static uint32_t kMaxRenderObjectCount = 8u;
 		constexpr static uint32_t kMaxTextureCount = 8u;
+		constexpr static uint32_t KMaxDynamicVertexNum = 1024u;
+		constexpr static uint8_t kMaxVertexAttrNum = 10u;
 
 		constexpr static uint32_t kPerFrameTotalSize = sizeof(ScenePerFrameData) + sizeof(ScenePerMaterialData) * kMaxMaterialDataCount + sizeof(ScenePerObjectData) * kMaxRenderObjectCount;
 		constexpr static uint32_t kPerFrameDataSize = sizeof(ScenePerFrameData);
@@ -42,6 +44,16 @@ namespace Ailu
 		constexpr static wchar_t kPSModel_5_0[] = L"ps_5_0";
 		constexpr static wchar_t kVSModel_6_1[] = L"vs_6_1";
 		constexpr static wchar_t kPSModel_6_1[] = L"ps_6_1";
+
+		inline const static char* kSemanticPosition =   "POSITION";
+		inline const static char* kSemanticColor =      "COLOR";
+		inline const static char* kSemanticTangent =	"TANGENT";
+		inline const static char* kSemanticNormal =		"NORMAL";
+		inline const static char* kSemanticUV =			"UV";
+
+		constexpr static char kCBufNameSceneObject[] = "SceneObjectBuffer";
+		constexpr static char kCBufNameSceneMaterial[] = "SceneMaterialBuffer";
+		constexpr static char kCBufNameSceneState[] = "SceneStatetBuffer";
 	};
 }
 

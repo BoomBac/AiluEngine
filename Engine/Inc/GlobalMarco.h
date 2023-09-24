@@ -47,13 +47,26 @@
 
 #define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
 
-#define DECLARE_PROPERTY(Name,type) \
+#define DECLARE__PRIVATE_PROPERTY(Name,type) \
 public: \
-    void Name(const type& name) { _##Name = name; } \
+    void Name(const type& value) { _##Name = value; } \
     const type& Name() const { return _##Name; } \
 private: \
     type _##Name;
 
+#define DECLARE__PROTECTED_PROPERTY(Name,type) \
+public: \
+    void Name(const type& value) { _##Name = value; } \
+    const type& Name() const { return _##Name; } \
+private: \
+    type _##Name;
+
+#define DECLARE__PROTECTED_PROPERTY_PTR(Name,type) \
+public: \
+    void Name(type* value) { _##Name = value; } \
+    const type* Name() const { return _##Name; } \
+private: \
+    type* _##Name;
 	
 
 

@@ -30,7 +30,7 @@ namespace Ailu
 		const Ref<VertexBuffer>& GetVertexBuffer() const;
 		const Ref<IndexBuffer>& GetIndexBuffer() const;
 		void Build();
-		DECLARE_PROPERTY(Name, std::string)
+		DECLARE__PRIVATE_PROPERTY(Name, std::string)
 	public:
 		uint32_t _vertex_count;
 		uint16_t _index_count;

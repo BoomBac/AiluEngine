@@ -17,18 +17,32 @@ namespace Ailu
 
 	};
 
-	enum class EBindResouceType : uint8_t
+	enum class EBindResDescType : uint8_t
 	{
-		kConstBuffer = 0,kTexture2D,kSampler
+		kConstBuffer = 0, kTexture2D, kSampler, kCBufferAttribute
 	};
 
 	struct ShaderBindResourceInfo
 	{
-		EBindResouceType _res_type;
-		uint8_t _slot;
+		EBindResDescType _res_type;
+		union
+		{
+			uint16_t _res_slot;
+			uint16_t _cbuf_member_offset;
+		};
+		uint8_t _bind_slot;
 		std::string _name;
-		ShaderBindResourceInfo(EBindResouceType res_type, uint8_t slot, const std::string& name)
-			: _res_type(res_type), _slot(slot), _name(name) {}
+		ShaderBindResourceInfo() = default;
+		ShaderBindResourceInfo(EBindResDescType res_type, uint16_t slot_or_offset, uint8_t bind_slot, const std::string& name)
+			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
+		{
+			if (res_type == EBindResDescType::kCBufferAttribute)
+				_cbuf_member_offset = slot_or_offset;
+			else
+			{
+				_res_slot = slot_or_offset;
+			}
+		}
 	};
 
 	class Shader
@@ -52,7 +66,7 @@ namespace Ailu
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;
 		virtual uint16_t GetVariableOffset(const std::string& name) const = 0;
 		virtual uint8_t GetTextureSlotBaseOffset() const = 0;
-		virtual const std::vector<ShaderBindResourceInfo>& GetBindResInfo() const = 0;
+		virtual const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() const = 0;
 	};
 	class ShaderLibrary
 	{

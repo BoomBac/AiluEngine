@@ -12,7 +12,7 @@ cbuffer SceneMaterialBuffer : register(b1)
 //	float padding[32];
 };
 
-cbuffer SceneConstantBuffer : register(b2)
+cbuffer SceneStatetBuffer : register(b2)
 {
 	float4x4 _MatrixV;
 	float4x4 _MatrixP;

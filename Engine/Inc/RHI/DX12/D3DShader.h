@@ -4,6 +4,7 @@
 #include <d3dx12.h>
 #include <d3d12shader.h>
 #include <map>
+#include <unordered_map>
 
 #include "Render/Shader.h"
 #include "D3DConstants.h"
@@ -25,7 +26,7 @@ namespace Ailu
 
 		inline std::string GetName() const override;
 		inline uint32_t GetID() const override;
-		inline const std::vector<ShaderBindResourceInfo>& GetBindResInfo() const final;
+		inline const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() const final;
 		inline uint8_t GetTextureSlotBaseOffset() const final;
 		void SetGlobalVector(const std::string& name, const Vector4f& vector) override;
 		void SetGlobalVector(const std::string& name, const Vector3f& vector) override;
@@ -37,14 +38,22 @@ namespace Ailu
 		ID3D12ShaderReflection* GetD3DReflectionInfo() const;
 		ID3D12ShaderReflection* GetD3DReflectionInfo(const EShaderType& type) const;
 
-		static ComPtr<ID3D12RootSignature> GetCurrentActiveSignature();
+
+		std::pair<D3D12_INPUT_ELEMENT_DESC*,uint8_t> GetVertexInputLayout();
 	private:
 		uint8_t* GetCBufferPtr(uint32_t index) override;
-		void LoadShaderRelfection(ID3D12ShaderReflection* reflection);
+		void LoadShaderRelfection(ID3D12ShaderReflection* reflection,const EShaderType& type);
+
 		uint16_t GetVariableOffset(const std::string& name) const override;
 
+		void GenerateRootSignature();
+
 	private:
-		std::vector<ShaderBindResourceInfo> _bind_res_infos{};
+		D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[D3DConstants::kMaxVertexAttrNum];
+		uint8_t _vertex_input_num = 0u;
+
+		std::unordered_map<std::string,ShaderBindResourceInfo> _bind_res_infos{};
+
 		std::string _name = "DefaultShader";
 		uint8_t _base_tex_slot_offset = 0u;
 		uint32_t _id;

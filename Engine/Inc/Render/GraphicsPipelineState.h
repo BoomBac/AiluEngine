@@ -69,11 +69,6 @@ namespace Ailu
         kWireframe = 0, kSolid
     };
 
-    enum class EBindResourceType : uint8_t
-    {
-        kConstBuffer = 0,kTexture
-    };
-
     struct RasterizerState
     {
         ECullMode _cull_mode;
@@ -123,10 +118,10 @@ namespace Ailu
         EBlendOp _alpha_op;
         EColorMask _color_mask;
         BlendState(bool enable = false,
-            EBlendFactor dstAlpha = EBlendFactor::kOne,
-            EBlendFactor dstColor = EBlendFactor::kOne,
+            EBlendFactor srcColor = EBlendFactor::kSrcAlpha,
             EBlendFactor srcAlpha = EBlendFactor::kOne,
-            EBlendFactor srcColor = EBlendFactor::kOne,
+            EBlendFactor dstColor = EBlendFactor::kOneMinusSrcAlpha,
+            EBlendFactor dstAlpha = EBlendFactor::kZero,
             EBlendOp colorOp = EBlendOp::kAdd,
             EBlendOp alphaOp = EBlendOp::kAdd,
             EColorMask colorMask = EColorMask::k_RGBA)
@@ -141,6 +136,22 @@ namespace Ailu
         {
         }
     };
+
+
+
+    template<bool enable,EBlendFactor src_color, EBlendFactor src_alpha, typename... Rest>
+    class TStaticBlendState;
+
+    template<bool enable,EBlendFactor src_color,EBlendFactor src_alpha>
+    class TStaticBlendState<enable, src_color, src_alpha>
+    {
+    public:
+        static BlendState GetRHI()
+        {
+            return BlendState(enable, src_color, src_alpha);
+        }
+    };
+
 
     template<ECullMode cull_mode, EFillMode fill_mode, typename... Rest>
     class TStaticRasterizerState;
@@ -202,11 +213,19 @@ namespace Ailu
         virtual ~GraphicsPipelineState() = default;
         virtual void Build() = 0;
         virtual void Bind() = 0;
-        virtual void CommitBindResource(uint16_t slot, void* res, EBindResourceType res_type) = 0;
+        virtual void CommitBindResource(uint16_t slot, void* res, EBindResDescType res_type) = 0;
     private:
         inline static std::map<uint32_t, Scope<GraphicsPipelineState>> s_pipelinestates{};
         inline static uint32_t s_pso_index = 0u;
 	};
+
+    class GraphicsPipelineStateMgr
+    {
+    //public:
+    //    static void BuildPSOCache();
+    //private:
+    //    inline static 
+    };
 }
 
 

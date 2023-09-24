@@ -498,6 +498,9 @@
     <ClInclude Include="Inc\Framework\Parser\PngParser.h" />
     <ClInclude Include="Inc\Framework\Parser\TgaParser.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
+    <ClInclude Include="Inc\Objects\Actor.h" />
+    <ClInclude Include="Inc\Objects\Component.h" />
+    <ClInclude Include="Inc\Objects\TransformComponent.h" />
     <ClInclude Include="Inc\pch.h" />
     <ClInclude Include="Inc\Platform\WinInput.h" />
     <ClInclude Include="Inc\Platform\WinWindow.h" />
@@ -511,6 +514,7 @@
     <ClInclude Include="Inc\Render\RenderCommand.h" />
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\Render\RendererAPI.h" />
+    <ClInclude Include="Inc\Render\RenderingData.h" />
     <ClInclude Include="Inc\Render\Shader.h" />
     <ClInclude Include="Inc\Render\Texture.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DBuffer.h" />
@@ -545,6 +549,9 @@
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\TgaParser.cpp" />
+    <ClCompile Include="Src\Objects\Actor.cpp" />
+    <ClCompile Include="Src\Objects\Component.cpp" />
+    <ClCompile Include="Src\Objects\TransformComponent.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -579,6 +586,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Res\Shaders\shaders.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Res\Shaders\gizmo.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

@@ -130,44 +130,172 @@ namespace Ailu
 		D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void**)&shader_reflection);
 	}
 
-	void D3DShader::LoadShaderRelfection(ID3D12ShaderReflection* reflection)
+	static DXGI_FORMAT GetFormatBySemanticName(const char* semantic)
+	{
+		if (strcmp(semantic, D3DConstants::kSemanticPosition))	return DXGI_FORMAT_R32G32B32_FLOAT;
+		else if(strcmp(semantic, D3DConstants::kSemanticNormal)) return DXGI_FORMAT_R32G32B32_FLOAT;
+		else if(strcmp(semantic, D3DConstants::kSemanticTangent)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		else if(strcmp(semantic, D3DConstants::kSemanticColor)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		else if(strcmp(semantic, D3DConstants::kSemanticUV)) return DXGI_FORMAT_R32G32_FLOAT;
+	}
+
+	void D3DShader::GenerateRootSignature()
+	{
+		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		auto device = D3DContext::GetInstance()->GetDevice();
+		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+		{
+			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+		}
+		static CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
+		static CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
+		int cbuf_mask = 0,texture_count = 0;
+		for (auto it = _bind_res_infos.begin(); it != _bind_res_infos.end(); it++)
+		{
+			auto& desc = it->second;
+			if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
+			if (desc._res_type == EBindResDescType::kConstBuffer)
+			{
+				if (desc._name == D3DConstants::kCBufNameSceneObject) cbuf_mask |= 0x01;
+				else if (desc._name == D3DConstants::kCBufNameSceneMaterial) cbuf_mask |= 0x02;
+				else if (desc._name == D3DConstants::kCBufNameSceneState) cbuf_mask |= 0x04;
+			}
+		}
+		uint8_t root_param_index = 0;
+		if (cbuf_mask & 0x01)
+		{
+			_bind_res_infos[D3DConstants::kCBufNameSceneObject]._bind_slot = root_param_index;
+			rootParameters[root_param_index++].InitAsConstantBufferView(0u);
+		}
+		if (cbuf_mask & 0x02)
+		{
+			_bind_res_infos[D3DConstants::kCBufNameSceneMaterial]._bind_slot = root_param_index;
+			rootParameters[root_param_index++].InitAsConstantBufferView(1u);
+		}
+		if (cbuf_mask & 0x04)
+		{
+			_bind_res_infos[D3DConstants::kCBufNameSceneState]._bind_slot = root_param_index;
+			rootParameters[root_param_index++].InitAsConstantBufferView(2u);
+		}
+		for (auto it = _bind_res_infos.begin(); it != _bind_res_infos.end(); it++)
+		{
+			auto& desc = it->second;
+			if (desc._res_type == EBindResDescType::kTexture2D)
+			{
+				++texture_count;
+				ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+				rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
+				desc._bind_slot = root_param_index;
+				++root_param_index;
+			}
+		}
+		D3D12_STATIC_SAMPLER_DESC* p_sampler = nullptr;
+		if (texture_count > 0)
+		{
+			D3D12_STATIC_SAMPLER_DESC sampler = {};
+			sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+			sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+			sampler.MipLODBias = 0;
+			sampler.MaxAnisotropy = 0;
+			sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+			sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+			sampler.MinLOD = 0.0f;
+			sampler.MaxLOD = D3D12_FLOAT32_MAX;
+			sampler.ShaderRegister = 0;
+			sampler.RegisterSpace = 0;
+			sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+			p_sampler = &sampler;
+		}
+		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, 1u, p_sampler, rootSignatureFlags);
+		//rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 0u, nullptr, rootSignatureFlags);
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
+		ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_p_sig)));
+	}
+
+	void D3DShader::LoadShaderRelfection(ID3D12ShaderReflection* reflection, const EShaderType& type)
 	{
 		D3D12_SHADER_DESC desc{};
 		reflection->GetDesc(&desc);
-		std::vector<D3D12_SIGNATURE_PARAMETER_DESC> inputparams(desc.InputParameters);
-		for (uint32_t i = 0u; i < desc.InputParameters; i++)
+		switch (type)
 		{
-			auto inputparam_desc = reflection->GetInputParameterDesc(i,&inputparams[i]);
-		}
-		std::vector<D3D12_SHADER_INPUT_BIND_DESC> bind_desc(desc.BoundResources);
-		int texture_bind_slot = 0;
-		for (uint32_t i = 0u; i < desc.BoundResources; i++)
-		{
-			reflection->GetResourceBindingDesc(i, &bind_desc[i]);
-			auto res_type = bind_desc[i].Type;
-			if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+			case Ailu::EShaderType::kVertex:
 			{
-				
+				if (desc.InputParameters > 10)
+				{
+					AL_ASSERT(true, "LayoutDesc count must less than 10");
+					return;
+				}
+				for (uint32_t i = 0u; i < desc.InputParameters; i++)
+				{
+					D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
+					reflection->GetInputParameterDesc(i, &input_desc);
+					_vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+					++_vertex_input_num;
+				}
+				for (uint32_t i = 0u; i < desc.BoundResources; i++)
+				{
+					D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
+					reflection->GetResourceBindingDesc(i, &bind_desc);
+					auto res_type = bind_desc.Type;
+					if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+					{
+						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name}));
+					}
+					else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
+					{
+						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+					}
+					else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
+					{
+						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+					}
+				}
 			}
-			else if (res_type == D3D_SHADER_INPUT_TYPE::D3D10_SIT_TEXTURE)
-			{
-				//使用贴图的计数代替shader中的写的slot，防止shader中引用的插槽和跟签名插槽无法对应
-				_bind_res_infos.emplace_back(EBindResouceType::kTexture2D, texture_bind_slot++, bind_desc[i].Name);
-				//_bind_res_infos.emplace_back(EBindResouceType::kTexture2D, bind_desc[i].BindPoint, bind_desc[i].Name);
-			}
-		}
-		for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
-		{
-			auto cbuf = reflection->GetConstantBufferByIndex(i);
-			D3D12_SHADER_BUFFER_DESC desc{};
-			cbuf->GetDesc(&desc);
-			for (uint32_t j = 0u; j < desc.Variables; j++)
-			{
-				auto variable = cbuf->GetVariableByIndex(j);
-				D3D12_SHADER_VARIABLE_DESC vdesc{};
-				variable->GetDesc(&vdesc);
-				_variable_offset.insert(std::make_pair(vdesc.Name,vdesc.StartOffset));
-				LOG_INFO("{}", vdesc.Name);
+			case Ailu::EShaderType::kPixel:
+			{			
+				for (uint32_t i = 0u; i < desc.BoundResources; i++)
+				{
+					D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
+					reflection->GetResourceBindingDesc(i, &bind_desc);
+					auto res_type = bind_desc.Type;
+					if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+					{
+						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+					}
+					else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
+					{
+						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+					}
+					else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
+					{
+						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+					}
+				}
+				for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
+				{
+					auto cbuf = reflection->GetConstantBufferByIndex(i);
+					D3D12_SHADER_BUFFER_DESC desc{};
+					cbuf->GetDesc(&desc);
+					for (uint32_t j = 0u; j < desc.Variables; j++)
+					{
+						auto variable = cbuf->GetVariableByIndex(j);
+						D3D12_SHADER_VARIABLE_DESC vdesc{};
+						variable->GetDesc(&vdesc);
+						_bind_res_infos.insert(std::make_pair(vdesc.Name, ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,static_cast<uint16_t>(vdesc.StartOffset),0u,vdesc.Name }));
+						LOG_INFO("{}", vdesc.Name);
+					}
+				}
 			}
 		}
 	}
@@ -211,15 +339,21 @@ namespace Ailu
 		LoadShaderRelfection(_p_reflection.Get());
 #else
 		CreateFromFileFXC(ToWChar(file_name.data()), "VSMain", "vs_5_0", _p_vblob, _p_v_reflection);
-		LoadShaderRelfection(_p_v_reflection.Get());
+		LoadShaderRelfection(_p_v_reflection.Get(),EShaderType::kVertex);
 		CreateFromFileFXC(ToWChar(file_name.data()), "PSMain", "ps_5_0", _p_pblob, _p_p_reflection);
-		LoadShaderRelfection(_p_p_reflection.Get());
+		LoadShaderRelfection(_p_p_reflection.Get(),EShaderType::kPixel);
 #endif // SHADER_DXC
 		_base_tex_slot_offset = 3u;
+		GenerateRootSignature();
 	}
 
 	D3DShader::~D3DShader()
 	{
+	}
+
+	std::pair<D3D12_INPUT_ELEMENT_DESC*, uint8_t> D3DShader::GetVertexInputLayout()
+	{
+		return std::make_pair(_vertex_input_layout, _vertex_input_num);
 	}
 
 	uint8_t* D3DShader::GetCBufferPtr(uint32_t index)
@@ -251,7 +385,7 @@ namespace Ailu
 		return _id;
 	}
 
-	inline const std::vector<ShaderBindResourceInfo>& D3DShader::GetBindResInfo() const
+	inline const std::unordered_map<std::string, ShaderBindResourceInfo>& D3DShader::GetBindResInfo() const
 	{
 		return _bind_res_infos;
 	}
@@ -295,6 +429,7 @@ namespace Ailu
 	{
 		memcpy(_p_cbuffer + GetPerFramePropertyOffset(name), &mat, sizeof(mat));
 	}
+
 	void D3DShader::SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat)
 	{
 	}
@@ -328,9 +463,5 @@ namespace Ailu
 		case Ailu::EShaderType::kPixel:
 			return _p_p_reflection.Get();
 		}
-	}
-	ComPtr<ID3D12RootSignature> D3DShader::GetCurrentActiveSignature()
-	{
-		return s_active_sig;
 	}
 }
