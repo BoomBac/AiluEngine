@@ -105,7 +105,6 @@ namespace Ailu
         Ref<IndexBuffer> _p_index_buf;
 
         Ref<Shader> _p_standard_shader;
-        Ref<Material> _mat_red;
         Ref<Material> _mat_green;
         Ref<Actor> _p_actor;
 

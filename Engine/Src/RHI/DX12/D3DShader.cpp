@@ -148,8 +148,8 @@ namespace Ailu
 		{
 			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 		}
-		static CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
-		static CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
+		CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
+		CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
 		int cbuf_mask = 0,texture_count = 0;
 		for (auto it = _bind_res_infos.begin(); it != _bind_res_infos.end(); it++)
 		{
@@ -191,6 +191,7 @@ namespace Ailu
 			}
 		}
 		D3D12_STATIC_SAMPLER_DESC* p_sampler = nullptr;
+		uint8_t sampler_num = 0;
 		if (texture_count > 0)
 		{
 			D3D12_STATIC_SAMPLER_DESC sampler = {};
@@ -208,6 +209,7 @@ namespace Ailu
 			sampler.RegisterSpace = 0;
 			sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 			p_sampler = &sampler;
+			++sampler_num;
 		}
 		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
@@ -215,7 +217,7 @@ namespace Ailu
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, 1u, p_sampler, rootSignatureFlags);
+		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, sampler_num, p_sampler, rootSignatureFlags);
 		//rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 0u, nullptr, rootSignatureFlags);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;

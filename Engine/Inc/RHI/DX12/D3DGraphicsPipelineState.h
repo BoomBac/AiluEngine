@@ -53,17 +53,20 @@ namespace Ailu
 	{
 	public:
         D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer);
-		void Build() override;
-        void Bind() override;
-        void CommitBindResource(uint16_t slot, void* res, EBindResDescType res_type) override;
+		void Build() final;
+        void Bind() final;
+        void SubmitBindResource(void* res, const EBindResDescType& res_type, short slot = -1) final;
+        void SubmitBindResource(void* res, const EBindResDescType& res_type, const std::string& name) final;
     public:
         static Ref<D3DGraphicsPipelineState> GetGizmoPSO();
 	private:
+        uint8_t _per_frame_cbuf_bind_slot = 255u;
         D3D12_GRAPHICS_PIPELINE_STATE_DESC _d3d_pso_desc;
         GraphicsPipelineStateInitializer _state_desc;
         bool _b_build = false;
 		ComPtr<ID3D12PipelineState> _p_plstate;
         ComPtr<ID3D12RootSignature>_p_sig;
+        std::unordered_map<std::string, ShaderBindResourceInfo>* _p_bind_res_desc_infos = nullptr;
 	};
 }
 

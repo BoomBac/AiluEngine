@@ -354,9 +354,8 @@ namespace Ailu
             {"TEXCOORD",EShaderDateType::kFloat2,2},
             {"TANGENT",EShaderDateType::kFloat4,3}
         };
-        _p_standard_shader.reset(Shader::Create(GetResPath("Shaders/shaders.hlsl"), "StandardShader"));
+        _p_standard_shader.reset(Shader::Create(GetResPath("Shaders/shaders.hlsl")));
 
-        _mat_red = MakeRef<Material>(_p_standard_shader,"RedColor");
         _mat_green = MakeRef<Material>(_p_standard_shader, "GreenColor");
 
         GraphicsPipelineStateInitializer pso_initializer{};
@@ -374,7 +373,7 @@ namespace Ailu
         GraphicsPipelineState* pso = GraphicsPipelineState::Create(pso_initializer);
         pso->Build();
         
-        //_p_gizmo_pso = D3DGraphicsPipelineState::GetGizmoPSO();
+        _p_gizmo_pso = D3DGraphicsPipelineState::GetGizmoPSO();
         // Create the vertex buffer.
         {
             float size = 0.5f;
@@ -449,8 +448,8 @@ namespace Ailu
             tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
             tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
 
-            _mat_green->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D.tga"));
-            _mat_green->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N.tga"));
+            _mat_green->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D"));
+            _mat_green->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N"));
 
 
             _p_actor = Actor::Create<Actor>();
@@ -500,7 +499,7 @@ namespace Ailu
         auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
         m_commandList->ResourceBarrier(1, &bar_before);
         GraphicsPipelineState::sCurrent->Bind();
-        GraphicsPipelineState::sCurrent->CommitBindResource(1u, &_cbuf_views[0], EBindResDescType::kConstBuffer);
+        GraphicsPipelineState::sCurrent->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
@@ -509,6 +508,7 @@ namespace Ailu
             Renderer::BeginScene();
             _render_object_index = 0;
         }
+        //Clear({ 0.3f, 0.2f, 0.4f, 1.0f },1.0f,true,true);
         auto cmd = D3DComandBufferPool::GetCommandBuffer();
         cmd->Clear();
         cmd->SetViewports({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
@@ -518,7 +518,6 @@ namespace Ailu
         //cmd->ClearRenderTarget({ 0.0f, 0.0f, 0.0f, 1.0f }, 1.0, true, true);
         cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
 
-        _mat_red->SetVector("_Color", Vector4f{ 1.0f,0.0f,0.0f,1.0f });
         _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
         Matrix4x4f rot{};
         auto* transf = _p_actor->GetComponent<TransformComponent>();
@@ -534,12 +533,12 @@ namespace Ailu
         D3DComandBufferPool::ReleaseCommandBuffer(cmd);
         
         //DrawGizmo
-        //{
-        //    _p_gizmo_pso->Bind();
-        //    _p_gizmo_pso->CommitBindResource(0u, &_cbuf_views[0], EBindResDescType::kConstBuffer);
+        {
+            _p_gizmo_pso->Bind();
+            _p_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer,0u);
 
-        //    Gizmo::Submit();
-        //}
+            Gizmo::Submit();
+        }
 
         //imgui draw
         {

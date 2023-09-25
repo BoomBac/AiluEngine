@@ -117,7 +117,7 @@ namespace Ailu
         case ETopology::kPoint: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
         case ETopology::kLine: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
         case ETopology::kTriangle: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-        case ETopology::kPatch: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;       
+        case ETopology::kPatch: return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
         }
         return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     }
@@ -331,6 +331,7 @@ namespace Ailu
 
     D3DGraphicsPipelineState::D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer) : _state_desc(initializer)
     {
+        
     }
 
     void D3DGraphicsPipelineState::Build()
@@ -342,9 +343,16 @@ namespace Ailu
 
         auto d3dshader = std::static_pointer_cast<D3DShader>(_state_desc._p_vertex_shader);
         _p_sig = d3dshader->GetSignature().Get();
+        _p_bind_res_desc_infos = const_cast<std::unordered_map<std::string, ShaderBindResourceInfo>*>(&d3dshader->GetBindResInfo());
+        auto it = _p_bind_res_desc_infos->find(D3DConstants::kCBufNameSceneState);
+        if (it != _p_bind_res_desc_infos->end())
+        {
+            _per_frame_cbuf_bind_slot = it->second._bind_slot;
+        }
         auto [desc, count] = d3dshader->GetVertexInputLayout();
         _d3d_pso_desc.InputLayout = { desc, count };
         _d3d_pso_desc.pRootSignature = _p_sig.Get();
+
         _d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex)));
         _d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel)));
         _d3d_pso_desc.RasterizerState = ConvertToD3D12RasterizerDesc(_state_desc._raster_state);
@@ -375,20 +383,56 @@ namespace Ailu
         D3DContext::GetInstance()->GetCmdList()->IASetPrimitiveTopology(ConvertToDXTopology(_state_desc._topology));
     }
 
-    void D3DGraphicsPipelineState::CommitBindResource(uint16_t slot, void* res, EBindResDescType res_type)
+    void D3DGraphicsPipelineState::SubmitBindResource(void* res, const EBindResDescType& res_type, short slot)
     {
         static auto context = D3DContext::GetInstance();
         switch (res_type)
         {
         case Ailu::EBindResDescType::kConstBuffer:
         {
+            short bind_slot = slot == -1 ? _per_frame_cbuf_bind_slot : slot;
             D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
-            context->GetCmdList()->SetGraphicsRootConstantBufferView(slot, view.BufferLocation);
+            context->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, view.BufferLocation);
             return;
         }
-        case Ailu::EBindResDescType::kTexture2D: return;
+            break;
+        case Ailu::EBindResDescType::kTexture2D:
+            break;
+        case Ailu::EBindResDescType::kSampler:
+            break;
+        case Ailu::EBindResDescType::kCBufferAttribute:
+            break;
         }
-        return;
+    }
+
+    void D3DGraphicsPipelineState::SubmitBindResource(void* res, const EBindResDescType& res_type, const std::string& name)
+    {
+        static auto context = D3DContext::GetInstance();
+        if (_p_bind_res_desc_infos == nullptr)
+        {
+            AL_ASSERT(true, "SubmitBindResource: bind shader missing!");
+            return;
+        }
+        auto it = _p_bind_res_desc_infos->find(name);
+        if (it != _p_bind_res_desc_infos->end())
+        {
+            switch (res_type)
+            {
+            case Ailu::EBindResDescType::kConstBuffer:
+            {
+                D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
+                context->GetCmdList()->SetGraphicsRootConstantBufferView(it->second._bind_slot, view.BufferLocation);
+                return;
+            }
+            break;
+            case Ailu::EBindResDescType::kTexture2D:
+                break;
+            case Ailu::EBindResDescType::kSampler:
+                break;
+            case Ailu::EBindResDescType::kCBufferAttribute:
+                break;
+            }
+        }
     }
 
     Ref<D3DGraphicsPipelineState> D3DGraphicsPipelineState::GetGizmoPSO()
@@ -414,7 +458,8 @@ namespace Ailu
             {"COLOR",EShaderDateType::kFloat4,1}
         };
         Ref<Shader> shader;
-        shader.reset(Shader::Create(GetResPath("Shaders/gizmo.hlsl"), "GizmoShader"));
+        shader.reset(Shader::Create(GetResPath("Shaders/gizmo.hlsl")));
+
         GraphicsPipelineStateInitializer pso_initializer{};
         pso_initializer._blend_state = TStaticBlendState<true,EBlendFactor::kSrcAlpha,EBlendFactor::kOneMinusSrcAlpha>::GetRHI();
         pso_initializer._b_has_rt = true;
@@ -426,12 +471,12 @@ namespace Ailu
         pso_initializer._topology = ETopology::kLine;
         pso_initializer._p_vertex_shader = shader;
         pso_initializer._p_pixel_shader = shader;
-        pso_initializer._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
+        pso_initializer._raster_state = TStaticRasterizerState<ECullMode::kNone, EFillMode::kWireframe>::GetRHI();
         auto d3dpso = Ref<D3DGraphicsPipelineState>(new D3DGraphicsPipelineState(pso_initializer));
         auto [desc, count] = ConvertToD3DInputLayout(d3dpso->_state_desc._input_layout);
         d3dpso->_p_sig = p_signature;
-        d3dpso->_d3d_pso_desc.InputLayout = { desc, count };
         d3dpso->_d3d_pso_desc.pRootSignature = d3dpso->_p_sig.Get();
+        d3dpso->_d3d_pso_desc.InputLayout = { desc, count };
         d3dpso->_d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(d3dpso->_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex)));
         d3dpso->_d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(d3dpso->_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel)));
         d3dpso->_d3d_pso_desc.RasterizerState = ConvertToD3D12RasterizerDesc(d3dpso->_state_desc._raster_state);

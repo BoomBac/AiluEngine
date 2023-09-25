@@ -43,7 +43,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 	float3 light_color = float3(1, 1, 1);
 	float3 base_color = TexAlbedo.Sample(g_LinearSampler, input.uv0);
 	//return float4(dot(input.normal, normalize(light_pos)) * base_color, 1.0f);
-	return float4(dot(n, normalize(light_pos)) * base_color, 1.0f);
+	return float4(dot(n, normalize(light_pos)) * base_color, 1.0f) + _Color * 0.00001;
 	//return normal.Sample(g_LinearSampler, input.uv0) + albedo.Sample(g_LinearSampler, input.uv0) * 0.0001;
 	//return float4(input.normal.xyz * 0.5 + 0.5,1.0);
 }

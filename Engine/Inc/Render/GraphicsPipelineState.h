@@ -213,7 +213,9 @@ namespace Ailu
         virtual ~GraphicsPipelineState() = default;
         virtual void Build() = 0;
         virtual void Bind() = 0;
-        virtual void CommitBindResource(uint16_t slot, void* res, EBindResDescType res_type) = 0;
+        virtual void SubmitBindResource(void* res, const EBindResDescType& res_type, short slot = -1) = 0;
+        virtual void SubmitBindResource(void* res, const EBindResDescType& res_type, const std::string& name) = 0;
+
     private:
         inline static std::map<uint32_t, Scope<GraphicsPipelineState>> s_pipelinestates{};
         inline static uint32_t s_pso_index = 0u;

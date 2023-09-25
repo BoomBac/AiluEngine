@@ -60,7 +60,7 @@ namespace Ailu
 		virtual void SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat) = 0;
 		virtual void* GetByteCode(EShaderType type) = 0;
 		[[deprecated("combine vertex and pixel shader")]] static Shader* Create(const std::string_view file_name,const std::string& shader_name,EShaderType type);
-		static Shader* Create(const std::string_view file_name, const std::string& shader_name = "DefaultShader");
+		static Shader* Create(const std::string_view file_name);
 	protected:
 		virtual void Bind(uint32_t index) = 0;
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;

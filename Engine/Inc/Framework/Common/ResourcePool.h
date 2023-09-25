@@ -36,18 +36,27 @@ namespace Ailu
 		return STR2(RES_PATH) + sub_path;
 	}
 
-	static std::string GetFileName(const std::string_view& filePath)
+	static std::string GetFileName(const std::string_view& filePath, bool include_ext = false)
 	{
 		size_t found = filePath.find_last_of("/\\");
-		if (found != std::string::npos) 
+		size_t dot_pos = filePath.find_last_of(".");
+
+		if (found != std::string::npos && dot_pos != std::string::npos)
 		{
-			return filePath.substr(found + 1).data();
+			if (include_ext)
+				return std::string(filePath.substr(found + 1).data());
+			else
+			{
+				size_t name_length = dot_pos - (found + 1);
+				return std::string(filePath.substr(found + 1, name_length).data(), name_length);
+			}
 		}
-		else 
+		else
 		{
-			return filePath.data();
+			return std::string(filePath.data(), filePath.length());
 		}
 	}
+
 }
 
 

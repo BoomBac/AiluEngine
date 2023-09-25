@@ -57,7 +57,7 @@ namespace Ailu
 		std::string _name = "DefaultShader";
 		uint8_t _base_tex_slot_offset = 0u;
 		uint32_t _id;
-		bool _b_init_buffer = false;
+		inline static bool _b_init_buffer = false;
 		uint32_t _desc_size = 0;
 		ComPtr<ID3DBlob> _p_vblob = nullptr;
 		ComPtr<ID3DBlob> _p_pblob = nullptr;
