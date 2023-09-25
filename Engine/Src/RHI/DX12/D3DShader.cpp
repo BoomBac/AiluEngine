@@ -323,10 +323,10 @@ namespace Ailu
 		if (!_b_init_buffer)
 		{
 			m_cbvHeap = D3DContext::GetInstance()->GetDescriptorHeap();
-			_desc_size = D3DContext::GetInstance()->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_p_cbuffer = D3DContext::GetInstance()->GetCBufferPtr();
 			_b_init_buffer = true;
 		}
+		_desc_size = D3DContext::GetInstance()->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		_p_cbuffer = D3DContext::GetInstance()->GetCBufferPtr();
 #if defined(_DEBUG)
 		// Enable better shader debugging with the graphics debugging tools.
 		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -345,8 +345,9 @@ namespace Ailu
 		CreateFromFileFXC(ToWChar(file_name.data()), "PSMain", "ps_5_0", _p_pblob, _p_p_reflection);
 		LoadShaderRelfection(_p_p_reflection.Get(),EShaderType::kPixel);
 #endif // SHADER_DXC
-		_base_tex_slot_offset = 3u;
 		GenerateRootSignature();
+		auto it = _bind_res_infos.find(D3DConstants::kCBufNameSceneMaterial);
+		if (it != _bind_res_infos.end()) _per_mat_buf_bind_slot = it->second._bind_slot;
 	}
 
 	D3DShader::~D3DShader()
@@ -372,9 +373,10 @@ namespace Ailu
 	{
 		auto cmdlist = D3DContext::GetInstance()->GetCmdList();
 		cmdlist->SetGraphicsRootSignature(_p_sig.Get());
+		if (_per_mat_buf_bind_slot == -1) return;
 		D3D12_GPU_DESCRIPTOR_HANDLE matHandle;
 		matHandle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _desc_size;	
-		cmdlist->SetGraphicsRootDescriptorTable(1, matHandle);
+		cmdlist->SetGraphicsRootDescriptorTable(_per_mat_buf_bind_slot, matHandle);
 	}
 
 	inline std::string D3DShader::GetName() const
@@ -392,20 +394,16 @@ namespace Ailu
 		return _bind_res_infos;
 	}
 
-	inline uint8_t D3DShader::GetTextureSlotBaseOffset() const
-	{
-		return _base_tex_slot_offset;
-	}
-
 	void D3DShader::Bind(uint32_t index)
 	{
+		if (_per_mat_buf_bind_slot == -1) return;
 		if (index > D3DConstants::kMaxMaterialDataCount)
 		{
 			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
 			return;
 		}
 		auto context = D3DContext::GetInstance();
-		context->GetCmdList()->SetGraphicsRootConstantBufferView(1, context->GetCBufferViewDesc(1 + index).BufferLocation);
+		context->GetCmdList()->SetGraphicsRootConstantBufferView(_per_mat_buf_bind_slot, context->GetCBufferViewDesc(1 + index).BufferLocation);
 	}
 
 	void D3DShader::SetGlobalVector(const std::string& name, const Vector4f& vector)

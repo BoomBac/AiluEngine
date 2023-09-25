@@ -6,12 +6,15 @@
 
 namespace Ailu
 {
+
 	struct ScenePerFrameData
 	{
 		Matrix4x4f _MatrixV;
+		Matrix4x4f _MatrixP;
 		Matrix4x4f _MatrixVP;
-		float padding[32]; // Padding so the constant buffer is 256-byte aligned.
+		float padding[16]; // Padding so the constant buffer is 256-byte aligned.
 	};
+
 	static_assert((sizeof(ScenePerFrameData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
 	struct ScenePerMaterialData

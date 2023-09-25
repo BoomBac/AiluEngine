@@ -18,7 +18,6 @@ namespace Ailu
 		Shader* GetShader() const;
 	private:
 		std::string _name;
-		uint8_t _base_texture_slot_offset = 0u;
 		std::map<std::string, std::tuple<uint8_t, Ref<Texture>>> _textures{};
 		Ref<Shader> _p_shader;
 		uint8_t* _p_cbuf = nullptr;

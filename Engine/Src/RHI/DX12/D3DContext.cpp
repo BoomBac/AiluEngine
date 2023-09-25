@@ -204,6 +204,7 @@ namespace Ailu
 
     void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform)
     {
+        //TODO:默认将每个物体的cbuf视作绑定在 0 槽位上，当着色器没有PerObjectBuf时，PerFrameBuf会在0槽位上，此时这里会把PSO绑定的结果覆盖
         ++RenderingStates::s_draw_call;
         m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
         //m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
@@ -346,24 +347,9 @@ namespace Ailu
     {
         GraphicsPipelineStateMgr::BuildPSOCache();
 
-        _p_standard_shader = ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl"));
-        _mat_green = MakeRef<Material>(_p_standard_shader, "GreenColor");
-
-        GraphicsPipelineStateInitializer pso_initializer{};
-        pso_initializer._blend_state = BlendState{};
-        pso_initializer._b_has_rt = true;
-        pso_initializer._depth_stencil_state = TStaticDepthStencilState<true, ECompareFunc::kLess>::GetRHI();
-        pso_initializer._ds_format = EALGFormat::kALGFormatD32_FLOAT;
-        pso_initializer._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
-        pso_initializer._rt_nums = 1;
-        pso_initializer._topology = ETopology::kTriangle;
-        pso_initializer._p_vertex_shader = _p_standard_shader;
-        pso_initializer._p_pixel_shader = _p_standard_shader;
-        pso_initializer._raster_state = TStaticRasterizerState<ECullMode::kNone, EFillMode::kSolid>::GetRHI();
-        GraphicsPipelineState* pso = GraphicsPipelineState::Create(pso_initializer);
-        pso->Build();
-        
-        _p_gizmo_pso = D3DGraphicsPipelineState::GetGizmoPSO();
+        _mat_standard = MakeRef<Material>(ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl")), "StandardPBR");
+        _mat_wireframe = MakeRef<Material>(ShaderLibrary::Add(GetResPath("Shaders/PureColor.hlsl")), "WireFrame");
+  
         // Create the vertex buffer.
         {
             float size = 0.5f;
@@ -438,27 +424,27 @@ namespace Ailu
             tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
             tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
 
-            _mat_green->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D"));
-            _mat_green->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N"));
+            _mat_standard->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D"));
+            _mat_standard->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N"));
 
 
             _p_actor = Actor::Create<Actor>();
-            ;
+
             _p_actor->AddChild(Actor::Create<Actor>());
             _p_actor->AddComponent<TransformComponent>();
 
-            _p_vertex_buf.reset(VertexBuffer::Create({
-                {"POSITION",EShaderDateType::kFloat3,0},
-                }));
-            _p_vertex_buf0.reset(VertexBuffer::Create({
-                {"POSITION",EShaderDateType::kFloat3,0},
-                }));
-            _p_vertex_buf->SetStream(reinterpret_cast<float*>(testMesh), sizeof(testMesh), 0);
-            //_p_vertex_buf->SetStream(reinterpret_cast<float*>(color), sizeof(color), 1);
+            //_p_vertex_buf.reset(VertexBuffer::Create({
+            //    {"POSITION",EShaderDateType::kFloat3,0},
+            //    }));
+            //_p_vertex_buf0.reset(VertexBuffer::Create({
+            //    {"POSITION",EShaderDateType::kFloat3,0},
+            //    }));
+            //_p_vertex_buf->SetStream(reinterpret_cast<float*>(testMesh), sizeof(testMesh), 0);
+            ////_p_vertex_buf->SetStream(reinterpret_cast<float*>(color), sizeof(color), 1);
 
-            _p_vertex_buf0->SetStream(reinterpret_cast<float*>(testMesh0), sizeof(testMesh0), 0);
-            //_p_vertex_buf0->SetStream(reinterpret_cast<float*>(color), sizeof(color), 1);
-            _p_index_buf.reset(IndexBuffer::Create(indices, 36));
+            //_p_vertex_buf0->SetStream(reinterpret_cast<float*>(testMesh0), sizeof(testMesh0), 0);
+            ////_p_vertex_buf0->SetStream(reinterpret_cast<float*>(color), sizeof(color), 1);
+            //_p_index_buf.reset(IndexBuffer::Create(indices, 36));
         }
 
         // Create synchronization objects.
@@ -489,10 +475,6 @@ namespace Ailu
         auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
         m_commandList->ResourceBarrier(1, &bar_before);
 
-        auto pos0 = GraphicsPipelineStateMgr::GetPso(EGraphicsPSO::kStandShaded);
-        pos0->Bind();
-        pos0->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
         m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
@@ -500,24 +482,36 @@ namespace Ailu
             Renderer::BeginScene();
             _render_object_index = 0;
         }
-        //Clear({ 0.3f, 0.2f, 0.4f, 1.0f },1.0f,true,true);
         auto cmd = D3DComandBufferPool::GetCommandBuffer();
         cmd->Clear();
         cmd->SetViewports({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
         cmd->SetScissorRects({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
-        //cmd->SetClearColor({ 0.3f, 0.2f, 0.4f, 1.0f });
         cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
-        //cmd->ClearRenderTarget({ 0.0f, 0.0f, 0.0f, 1.0f }, 1.0, true, true);
         cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
 
-        _mat_green->SetVector("_Color", Vector4f{ 0.0f,1.0f,0.0f,1.0f });
-        Matrix4x4f rot{};
         auto* transf = _p_actor->GetComponent<TransformComponent>();
-        //transf->Position({0.0f,sin(TimeMgr::GetScaledWorldTime()) * 10.0f,0.0f});
-        
-        //MatrixRotationY(rot, TimeMgr::GetScaledWorldTime());
-        cmd->DrawRenderer(_tree,Transpose(transf->GetWorldMatrix()),_mat_green);
+        if (RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShader)
+        {
+            GraphicsPipelineStateMgr::s_standard_shadering_pso->Bind();
+            GraphicsPipelineStateMgr::s_standard_shadering_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
+            cmd->DrawRenderer(_tree, Transpose(transf->GetWorldMatrix()), _mat_standard);
+        }
+        else
+        {
+            GraphicsPipelineStateMgr::s_wireframe_pso->Bind();
+            GraphicsPipelineStateMgr::s_wireframe_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
+            cmd->DrawRenderer(_tree, Transpose(transf->GetWorldMatrix()), _mat_wireframe);
+        }   
         ExecuteCommandBuffer(cmd);
+        cmd->Clear();
+        if (RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
+        {
+            GraphicsPipelineStateMgr::s_wireframe_pso->Bind();
+            GraphicsPipelineStateMgr::s_wireframe_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
+            cmd->DrawRenderer(_tree, Transpose(transf->GetWorldMatrix()), _mat_wireframe);
+        }
+        ExecuteCommandBuffer(cmd);
+
         auto draw_call = &RenderingStates::s_draw_call;
         {
             Renderer::EndScene();
@@ -526,10 +520,8 @@ namespace Ailu
         
         //DrawGizmo
         {
-            _p_gizmo_pso->Bind();
-            //_p_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer,0u);
-            _p_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-
+            GraphicsPipelineStateMgr::s_gizmo_pso->Bind();
+            GraphicsPipelineStateMgr::s_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
             Gizmo::Submit();
         }
 

@@ -14,7 +14,6 @@ namespace Ailu
 				_textures.insert(std::make_pair(bind_info.first, std::make_tuple(bind_info.second._bind_slot, nullptr)));
 			}
 		}
-		_base_texture_slot_offset = _p_shader->GetTextureSlotBaseOffset();
 	}
 
 	void Material::SetVector(const std::string& name, const Vector4f& vector)

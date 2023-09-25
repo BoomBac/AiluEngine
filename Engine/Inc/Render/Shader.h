@@ -62,7 +62,6 @@ namespace Ailu
 		virtual void Bind(uint32_t index) = 0;
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;
 		virtual uint16_t GetVariableOffset(const std::string& name) const = 0;
-		virtual uint8_t GetTextureSlotBaseOffset() const = 0;
 		virtual const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() const = 0;
 	};
 	class ShaderLibrary

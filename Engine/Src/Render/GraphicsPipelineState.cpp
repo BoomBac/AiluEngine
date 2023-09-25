@@ -6,7 +6,7 @@
 
 namespace Ailu
 {
-	GraphicsPipelineState* GraphicsPipelineState::Create(const GraphicsPipelineStateInitializer& initializer)
+	Scope<GraphicsPipelineState> GraphicsPipelineState::Create(const GraphicsPipelineStateInitializer& initializer)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -14,11 +14,7 @@ namespace Ailu
 			AL_ASSERT(false, "None render api used!");
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-		{
-			s_pipelinestates.insert(std::make_pair(s_pso_index, std::make_unique<D3DGraphicsPipelineState>(initializer)));
-			sCurrent = s_pipelinestates[s_pso_index++].get();
-			return sCurrent;
-		}
+			return std::move(MakeScope<D3DGraphicsPipelineState>(initializer));
 		}
 		AL_ASSERT(false, "Unsupport render api!");
 		return nullptr;
@@ -26,29 +22,48 @@ namespace Ailu
 	void GraphicsPipelineStateMgr::BuildPSOCache()
 	{
 		LOG_WARNING("Begin initialize PSO cache...");
-		auto p_standard_shader = ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl"));
-		GraphicsPipelineStateInitializer pso_initializer{};
-		pso_initializer._blend_state = BlendState{};
-		pso_initializer._b_has_rt = true;
-		pso_initializer._depth_stencil_state = TStaticDepthStencilState<true, ECompareFunc::kLess>::GetRHI();
-		pso_initializer._ds_format = EALGFormat::kALGFormatD32_FLOAT;
-		pso_initializer._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
-		pso_initializer._rt_nums = 1;
-		pso_initializer._topology = ETopology::kTriangle;
-		pso_initializer._p_vertex_shader = p_standard_shader;
-		pso_initializer._p_pixel_shader = p_standard_shader;
-		pso_initializer._raster_state = TStaticRasterizerState<ECullMode::kNone, EFillMode::kSolid>::GetRHI();
-		GraphicsPipelineState* pso = GraphicsPipelineState::Create(pso_initializer);
-		pso->Build();
-		s_pso_pool.insert(EGraphicsPSO::kStandShaded,MakeScope<GraphicsPipelineState>(pso));
-
 		g_pTimeMgr->Mark();
+		auto p_standard_shader = ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl"));
+		auto pso_desc0 = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
+		pso_desc0._p_vertex_shader = p_standard_shader;
+		pso_desc0._p_pixel_shader = p_standard_shader;
+		auto stand_pso = GraphicsPipelineState::Create(pso_desc0);
+		stand_pso->Build();
+		s_standard_shadering_pso = stand_pso.get();
+		s_pso_pool.insert(std::make_pair(EGraphicsPSO::kStandShadering,std::move(stand_pso)));
+
+		auto p_wireframe_shader = ShaderLibrary::Add(GetResPath("Shaders/PureColor.hlsl"));
+		pso_desc0._p_vertex_shader = p_wireframe_shader;
+		pso_desc0._p_pixel_shader = p_wireframe_shader;
+		pso_desc0._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
+		pso_desc0._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
+		auto wireframe_pso = GraphicsPipelineState::Create(pso_desc0);
+		wireframe_pso->Build();
+		s_wireframe_pso = wireframe_pso.get();
+		s_pso_pool.insert(std::make_pair(EGraphicsPSO::kWireFrame, std::move(wireframe_pso)));
+
+		auto p_gizmo_shader = ShaderLibrary::Add(GetResPath("Shaders/gizmo.hlsl"));
+		auto pso_desc1 = GraphicsPipelineStateInitializer::GetNormalTransparentPSODesc();
+		pso_desc1._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
+		pso_desc1._topology = ETopology::kLine;
+		pso_desc1._p_vertex_shader = p_gizmo_shader;
+		pso_desc1._p_pixel_shader = p_gizmo_shader;
+		auto gizmo_pso = GraphicsPipelineState::Create(pso_desc1);
+		gizmo_pso->Build();
+		s_gizmo_pso = gizmo_pso.get();
+		s_pso_pool.insert(std::make_pair(EGraphicsPSO::kGizmo, std::move(gizmo_pso)));
 
 		LOG_WARNING("Initialize PSO cache done after {}ms!",g_pTimeMgr->GetElapsedSinceLastMark());
 	}
 	GraphicsPipelineState* GraphicsPipelineStateMgr::GetPso(const uint32_t& id)
 	{
-		return nullptr;
+		auto it = s_pso_pool.find(id);
+		if (it != s_pso_pool.end()) return it->second.get();
+		else
+		{
+			LOG_WARNING("Pso id: {} can't find!", id);
+			return nullptr;
+		}
 	}
 }
 

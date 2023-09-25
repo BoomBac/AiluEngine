@@ -203,27 +203,50 @@ namespace Ailu
         uint8_t _rt_nums;
         EALGFormat _rt_formats[8];
         EALGFormat _ds_format;
+        static GraphicsPipelineStateInitializer GetNormalOpaquePSODesc()
+        {
+            GraphicsPipelineStateInitializer pso_desc{};
+            pso_desc._blend_state = BlendState{};
+            pso_desc._b_has_rt = true;
+            pso_desc._depth_stencil_state = TStaticDepthStencilState<true, ECompareFunc::kLess>::GetRHI();
+            pso_desc._ds_format = EALGFormat::kALGFormatD32_FLOAT;
+            pso_desc._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
+            pso_desc._rt_nums = 1;
+            pso_desc._topology = ETopology::kTriangle;
+            pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kSolid>::GetRHI();
+            return pso_desc;
+        }
+
+        static GraphicsPipelineStateInitializer GetNormalTransparentPSODesc()
+        {
+            GraphicsPipelineStateInitializer pso_desc{};
+            pso_desc._blend_state = TStaticBlendState<true, EBlendFactor::kSrcAlpha, EBlendFactor::kOneMinusSrcAlpha>::GetRHI();
+            pso_desc._b_has_rt = true;
+            pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
+            pso_desc._ds_format = EALGFormat::kALGFormatD32_FLOAT;
+            pso_desc._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
+            pso_desc._rt_nums = 1;
+            pso_desc._topology = ETopology::kTriangle;
+            pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kSolid>::GetRHI();
+            return pso_desc;
+        }
     };
 
 	class GraphicsPipelineState
 	{
     public:
         inline static GraphicsPipelineState* sCurrent = 0;
-        static GraphicsPipelineState* Create(const GraphicsPipelineStateInitializer& initializer);
+        static Scope<GraphicsPipelineState> Create(const GraphicsPipelineStateInitializer& initializer);
         virtual ~GraphicsPipelineState() = default;
         virtual void Build() = 0;
         virtual void Bind() = 0;
         virtual void SubmitBindResource(void* res, const EBindResDescType& res_type, short slot = -1) = 0;
         virtual void SubmitBindResource(void* res, const EBindResDescType& res_type, const std::string& name) = 0;
-
-    private:
-        inline static std::map<uint32_t, Scope<GraphicsPipelineState>> s_pipelinestates{};
-        inline static uint32_t s_pso_index = 0u;
 	};
 
     enum EGraphicsPSO : uint32_t
     {
-        kStandShaded = 0u,
+        kStandShadering = 0u,
         kWireFrame = 1u,
         kShadedWireFrame = 3u,
         kGizmo = 4u,
@@ -234,6 +257,9 @@ namespace Ailu
     public:
         static void BuildPSOCache();
         static GraphicsPipelineState* GetPso(const uint32_t& id);
+        inline static GraphicsPipelineState* s_standard_shadering_pso = nullptr;
+        inline static GraphicsPipelineState* s_gizmo_pso = nullptr;
+        inline static GraphicsPipelineState* s_wireframe_pso = nullptr;
     private:
         inline static std::unordered_map<uint32_t, Scope<GraphicsPipelineState>> s_pso_pool{};
         inline static uint32_t s_reserved_pso_id = 32u;
@@ -242,4 +268,3 @@ namespace Ailu
 
 
 #endif // !GFX_PIPELINE_STATE_H__
-

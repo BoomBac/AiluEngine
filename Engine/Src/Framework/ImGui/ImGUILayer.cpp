@@ -118,6 +118,26 @@ namespace Ailu
         ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
         ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
         ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
+
+        static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame"};
+        static int item_current_idx = 0; // Here we store our selection data as an index.
+        const char* combo_preview_value = items[item_current_idx];  // Pass in the preview value visible before opening the combo (it could be anything)
+        if (ImGui::BeginCombo("Shadering Mode", combo_preview_value, 0))
+        {
+            for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+            {
+                const bool is_selected = (item_current_idx == n);
+                if (ImGui::Selectable(items[n], is_selected))
+                    item_current_idx = n;
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        if (item_current_idx == 0) RenderingStates::s_shadering_mode = EShaderingMode::kShader;
+        else if (item_current_idx == 1) RenderingStates::s_shadering_mode = EShaderingMode::kWireFrame;
+        else RenderingStates::s_shadering_mode = EShaderingMode::kShaderedWireFrame;
+
         ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.2f, 1.0f,"%.2f");
         ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 0.2f,"%.2f");
 

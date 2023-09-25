@@ -2115,6 +2115,8 @@
       <Filter>头文件</Filter>
     </None>
     <None Include="Res\Shaders\gizmo.hlsl" />
+    <None Include="Res\Shaders\PureColor.hlsl" />
+    <None Include="Res\Shaders\common.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

@@ -1,4 +1,5 @@
 #include "cbuffer.hlsl"
+#include "common.hlsl"
 
 struct VSInput
 {
@@ -23,8 +24,7 @@ SamplerState g_LinearSampler : register(s0);
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	float4x4 mvp = mul(_MatrixWorld, _MatrixVP);
-	result.position = mul(float4(v.position,1.0f), mvp);
+	result.position = TransformToClipSpace(v.position);
 	result.normal = v.normal;
 	result.uv0 = v.uv0;
 	float3 B = normalize(mul(float4(cross(v.tangent.xyz, v.normal), 0.0f), _MatrixWorld).xyz);

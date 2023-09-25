@@ -27,7 +27,6 @@ namespace Ailu
 		inline std::string GetName() const override;
 		inline uint32_t GetID() const override;
 		inline const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() const final;
-		inline uint8_t GetTextureSlotBaseOffset() const final;
 		void SetGlobalVector(const std::string& name, const Vector4f& vector) override;
 		void SetGlobalVector(const std::string& name, const Vector3f& vector) override;
 		void SetGlobalVector(const std::string& name, const Vector2f& vector) override;
@@ -52,10 +51,11 @@ namespace Ailu
 		D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[D3DConstants::kMaxVertexAttrNum];
 		uint8_t _vertex_input_num = 0u;
 
+		short _per_mat_buf_bind_slot = -1;
 		std::unordered_map<std::string,ShaderBindResourceInfo> _bind_res_infos{};
 
 		std::string _name = "DefaultShader";
-		uint8_t _base_tex_slot_offset = 0u;
+
 		uint32_t _id;
 		inline static bool _b_init_buffer = false;
 		uint32_t _desc_size = 0;
