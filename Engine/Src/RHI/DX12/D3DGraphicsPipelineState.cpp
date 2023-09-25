@@ -74,10 +74,10 @@ namespace Ailu
         return D3D12_COLOR_WRITE_ENABLE_ALL;
     }
 
-    static D3D12_BLEND_DESC ConvertToD3D12BlendDesc(const BlendState& state)
+    static D3D12_BLEND_DESC ConvertToD3D12BlendDesc(const BlendState& state,const uint8_t& rt_num)
     {
         auto blend_state = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-        for (size_t i = 0; i < 8; i++)
+        for (size_t i = 0; i < rt_num; i++)
         {
             blend_state.RenderTarget[i].BlendEnable = state._b_enable;
             blend_state.RenderTarget[i].BlendOp = ConvertToD3D12BlendOp(state._color_op);
@@ -336,39 +336,36 @@ namespace Ailu
 
     void D3DGraphicsPipelineState::Build()
 	{
-        //auto [desc, count] = ConvertToD3DInputLayout(_state_desc._input_layout);
-        //_p_sig = GenerateRootSignature(_state_desc._p_vertex_shader, _state_desc._p_pixel_shader);
-        //_d3d_pso_desc.InputLayout = { desc, count };
-        //_d3d_pso_desc.pRootSignature = _p_sig.Get();
-
-        auto d3dshader = std::static_pointer_cast<D3DShader>(_state_desc._p_vertex_shader);
-        _p_sig = d3dshader->GetSignature().Get();
-        _p_bind_res_desc_infos = const_cast<std::unordered_map<std::string, ShaderBindResourceInfo>*>(&d3dshader->GetBindResInfo());
-        auto it = _p_bind_res_desc_infos->find(D3DConstants::kCBufNameSceneState);
-        if (it != _p_bind_res_desc_infos->end())
+        if (!_b_build)
         {
-            _per_frame_cbuf_bind_slot = it->second._bind_slot;
+            auto d3dshader = std::static_pointer_cast<D3DShader>(_state_desc._p_vertex_shader);
+            _p_sig = d3dshader->GetSignature().Get();
+            _p_bind_res_desc_infos = const_cast<std::unordered_map<std::string, ShaderBindResourceInfo>*>(&d3dshader->GetBindResInfo());
+            auto it = _p_bind_res_desc_infos->find(D3DConstants::kCBufNameSceneState);
+            if (it != _p_bind_res_desc_infos->end())
+            {
+                _per_frame_cbuf_bind_slot = it->second._bind_slot;
+            }
+            auto [desc, count] = d3dshader->GetVertexInputLayout();
+            _d3d_pso_desc.InputLayout = { desc, count };
+            _d3d_pso_desc.pRootSignature = _p_sig.Get();
+            _d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex)));
+            _d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel)));
+            _d3d_pso_desc.RasterizerState = ConvertToD3D12RasterizerDesc(_state_desc._raster_state);
+            _d3d_pso_desc.BlendState = ConvertToD3D12BlendDesc(_state_desc._blend_state, _state_desc._rt_nums);
+            _d3d_pso_desc.DepthStencilState = ConvertToD3D12DepthStencilDesc(_state_desc._depth_stencil_state);
+            _d3d_pso_desc.SampleMask = UINT_MAX;
+            _d3d_pso_desc.PrimitiveTopologyType = ConvertToDXTopologyType(_state_desc._topology);
+            _d3d_pso_desc.NumRenderTargets = _state_desc._rt_nums;
+            if (_state_desc._depth_stencil_state._b_depth_write) _d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._ds_format);
+            for (int i = 0; i < _state_desc._rt_nums; i++)
+            {
+                _d3d_pso_desc.RTVFormats[i] = ConvertToDXGIFormat(_state_desc._rt_formats[i]);
+            }
+            _d3d_pso_desc.SampleDesc.Count = 1;
+            ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
+            _b_build = true;
         }
-        auto [desc, count] = d3dshader->GetVertexInputLayout();
-        _d3d_pso_desc.InputLayout = { desc, count };
-        _d3d_pso_desc.pRootSignature = _p_sig.Get();
-
-        _d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex)));
-        _d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel)));
-        _d3d_pso_desc.RasterizerState = ConvertToD3D12RasterizerDesc(_state_desc._raster_state);
-        _d3d_pso_desc.BlendState = ConvertToD3D12BlendDesc(_state_desc._blend_state);
-        _d3d_pso_desc.DepthStencilState = ConvertToD3D12DepthStencilDesc(_state_desc._depth_stencil_state);
-        _d3d_pso_desc.SampleMask = UINT_MAX;
-        _d3d_pso_desc.PrimitiveTopologyType = ConvertToDXTopologyType(_state_desc._topology);
-        _d3d_pso_desc.NumRenderTargets = _state_desc._rt_nums;
-        if (_state_desc._depth_stencil_state._b_depth_write) _d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._ds_format);
-        for (int i = 0; i < _state_desc._rt_nums; i++)
-        {
-            _d3d_pso_desc.RTVFormats[i] = ConvertToDXGIFormat(_state_desc._rt_formats[i]);
-        }
-        _d3d_pso_desc.SampleDesc.Count = 1;
-        ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
-        _b_build = true;
 	}
 
     void D3DGraphicsPipelineState::Bind()
@@ -437,62 +434,21 @@ namespace Ailu
 
     Ref<D3DGraphicsPipelineState> D3DGraphicsPipelineState::GetGizmoPSO()
     {
-        auto device = D3DContext::GetInstance()->GetDevice();
-        CD3DX12_ROOT_PARAMETER1 rootParameters[1]{};
-        rootParameters[0].InitAsConstantBufferView(2u);
-        ID3D12RootSignature* p_signature = nullptr;
-        D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
-            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-        CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-        rootSignatureDesc.Init_1_1(1, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-        ComPtr<ID3DBlob> signature;
-        ComPtr<ID3DBlob> error;
-        ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
-        ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&p_signature)));
-        VertexBufferLayout layout0
-        {
-            {"POSITION",EShaderDateType::kFloat3,0},
-            {"COLOR",EShaderDateType::kFloat4,1}
-        };
         Ref<Shader> shader;
-        shader.reset(Shader::Create(GetResPath("Shaders/gizmo.hlsl")));
-
+        shader = ShaderLibrary::Add(GetResPath("Shaders/gizmo.hlsl"));
         GraphicsPipelineStateInitializer pso_initializer{};
         pso_initializer._blend_state = TStaticBlendState<true,EBlendFactor::kSrcAlpha,EBlendFactor::kOneMinusSrcAlpha>::GetRHI();
         pso_initializer._b_has_rt = true;
         pso_initializer._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
         pso_initializer._ds_format = EALGFormat::kALGFormatD32_FLOAT;
-        pso_initializer._input_layout = layout0;
         pso_initializer._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
         pso_initializer._rt_nums = 1;
         pso_initializer._topology = ETopology::kLine;
         pso_initializer._p_vertex_shader = shader;
         pso_initializer._p_pixel_shader = shader;
-        pso_initializer._raster_state = TStaticRasterizerState<ECullMode::kNone, EFillMode::kWireframe>::GetRHI();
+        pso_initializer._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
         auto d3dpso = Ref<D3DGraphicsPipelineState>(new D3DGraphicsPipelineState(pso_initializer));
-        auto [desc, count] = ConvertToD3DInputLayout(d3dpso->_state_desc._input_layout);
-        d3dpso->_p_sig = p_signature;
-        d3dpso->_d3d_pso_desc.pRootSignature = d3dpso->_p_sig.Get();
-        d3dpso->_d3d_pso_desc.InputLayout = { desc, count };
-        d3dpso->_d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(d3dpso->_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex)));
-        d3dpso->_d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(d3dpso->_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel)));
-        d3dpso->_d3d_pso_desc.RasterizerState = ConvertToD3D12RasterizerDesc(d3dpso->_state_desc._raster_state);
-        d3dpso->_d3d_pso_desc.BlendState = ConvertToD3D12BlendDesc(d3dpso->_state_desc._blend_state);
-        d3dpso->_d3d_pso_desc.DepthStencilState = ConvertToD3D12DepthStencilDesc(d3dpso->_state_desc._depth_stencil_state);
-        d3dpso->_d3d_pso_desc.SampleMask = UINT_MAX;
-        d3dpso->_d3d_pso_desc.PrimitiveTopologyType = ConvertToDXTopologyType(d3dpso->_state_desc._topology);
-        d3dpso->_d3d_pso_desc.NumRenderTargets = d3dpso->_state_desc._rt_nums;
-        if (d3dpso->_state_desc._depth_stencil_state._b_depth_write) d3dpso->_d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(d3dpso->_state_desc._ds_format);
-        for (int i = 0; i < d3dpso->_state_desc._rt_nums; i++)
-        {
-            d3dpso->_d3d_pso_desc.RTVFormats[i] = ConvertToDXGIFormat(d3dpso->_state_desc._rt_formats[i]);
-        }
-        d3dpso->_d3d_pso_desc.SampleDesc.Count = 1;
-        d3dpso->_b_build = true;
-        ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&d3dpso->_d3d_pso_desc, IID_PPV_ARGS(&d3dpso->_p_plstate)));
+        d3dpso->Build();
         return d3dpso;
     }
 }

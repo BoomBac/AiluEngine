@@ -49,7 +49,7 @@ namespace Ailu
 		inline const static char* kSemanticColor =      "COLOR";
 		inline const static char* kSemanticTangent =	"TANGENT";
 		inline const static char* kSemanticNormal =		"NORMAL";
-		inline const static char* kSemanticUV =			"UV";
+		inline const static char* kSemanticTexcoord =	"TEXCOORD";
 
 		constexpr static char kCBufNameSceneObject[] = "SceneObjectBuffer";
 		constexpr static char kCBufNameSceneMaterial[] = "SceneMaterialBuffer";

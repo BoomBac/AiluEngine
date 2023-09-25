@@ -119,8 +119,8 @@ namespace Ailu
         EColorMask _color_mask;
         BlendState(bool enable = false,
             EBlendFactor srcColor = EBlendFactor::kSrcAlpha,
-            EBlendFactor srcAlpha = EBlendFactor::kOne,
             EBlendFactor dstColor = EBlendFactor::kOneMinusSrcAlpha,
+            EBlendFactor srcAlpha = EBlendFactor::kOne,
             EBlendFactor dstAlpha = EBlendFactor::kZero,
             EBlendOp colorOp = EBlendOp::kAdd,
             EBlendOp alphaOp = EBlendOp::kAdd,
@@ -221,12 +221,22 @@ namespace Ailu
         inline static uint32_t s_pso_index = 0u;
 	};
 
+    enum EGraphicsPSO : uint32_t
+    {
+        kStandShaded = 0u,
+        kWireFrame = 1u,
+        kShadedWireFrame = 3u,
+        kGizmo = 4u,
+    };
+
     class GraphicsPipelineStateMgr
     {
-    //public:
-    //    static void BuildPSOCache();
-    //private:
-    //    inline static 
+    public:
+        static void BuildPSOCache();
+        static GraphicsPipelineState* GetPso(const uint32_t& id);
+    private:
+        inline static std::unordered_map<uint32_t, Scope<GraphicsPipelineState>> s_pso_pool{};
+        inline static uint32_t s_reserved_pso_id = 32u;
     };
 }
 

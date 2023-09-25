@@ -24,7 +24,7 @@ namespace Ailu
 		AL_ASSERT(false, "Unsupport render api!")
 			return nullptr;
 	}
-	Shader* Shader::Create(const std::string_view file_name)
+	Ref<Shader> Shader::Create(const std::string_view file_name)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -34,7 +34,7 @@ namespace Ailu
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
 			std::string  shader_name = GetFileName(file_name);
-			auto shader = new D3DShader(file_name, shader_name, ShaderLibrary::s_shader_id++);
+			auto shader = MakeRef<D3DShader>(file_name, shader_name, ShaderLibrary::s_shader_id++);
 			ShaderLibrary::s_shader_name.insert(std::make_pair(shader_name, shader->GetID()));
 			ShaderLibrary::s_shader_library.insert(std::make_pair(shader->GetID(), shader));
 			return shader;

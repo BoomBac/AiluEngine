@@ -2,8 +2,9 @@
 #ifndef __SHADER_H__
 #define __SHADER_H__
 #include <string>
-#include <map>
+#include <unordered_map>
 #include "Framework/Math/ALMath.hpp"
+#include "Framework/Common/ResourcePool.h"
 
 namespace Ailu
 {
@@ -36,12 +37,8 @@ namespace Ailu
 		ShaderBindResourceInfo(EBindResDescType res_type, uint16_t slot_or_offset, uint8_t bind_slot, const std::string& name)
 			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
 		{
-			if (res_type == EBindResDescType::kCBufferAttribute)
-				_cbuf_member_offset = slot_or_offset;
-			else
-			{
-				_res_slot = slot_or_offset;
-			}
+			if (res_type == EBindResDescType::kCBufferAttribute) _cbuf_member_offset = slot_or_offset;	
+			else _res_slot = slot_or_offset;
 		}
 	};
 
@@ -60,7 +57,7 @@ namespace Ailu
 		virtual void SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat) = 0;
 		virtual void* GetByteCode(EShaderType type) = 0;
 		[[deprecated("combine vertex and pixel shader")]] static Shader* Create(const std::string_view file_name,const std::string& shader_name,EShaderType type);
-		static Shader* Create(const std::string_view file_name);
+		static Ref<Shader> Create(const std::string_view file_name);
 	protected:
 		virtual void Bind(uint32_t index) = 0;
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;
@@ -70,22 +67,40 @@ namespace Ailu
 	};
 	class ShaderLibrary
 	{
+#define VAILD_SHADER_ID(id) id != ShaderLibrary::s_error_id
 		friend class Shader;
 	public:
-		static Ref<Shader> GetShader(std::string& shader_name)
+		static Ref<Shader> Get(std::string& shader_name)
 		{
-			auto it = s_shader_name.find(shader_name);
-			if (it == s_shader_name.end())
+			uint32_t shader_id = NameToId(shader_name);
+			if(VAILD_SHADER_ID(shader_id)) return s_shader_library.find(shader_id)->second;
+			else
 			{
-				AL_ASSERT(true, std::format("Shader: {} dont's exist in ShaderLibrary!",shader_name ));
+				LOG_ERROR("Shader: {} dont's exist in ShaderLibrary!", shader_name);
 				return nullptr;
-			}
-			return s_shader_library.find(it->second)->second;
+			}		
+		}
+		static bool Exist(const std::string& name)
+		{
+			return NameToId(name) != s_error_id;
+		}
+		static Ref<Shader> Add(const std::string& file_path)
+		{
+			auto name = GetFileName(file_path);
+			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
+			else return Shader::Create(file_path);
+		}
+		inline static uint32_t NameToId(const std::string& name)
+		{
+			auto it = s_shader_name.find(name);
+			if (it != s_shader_name.end()) return it->second;
+			else return s_error_id;
 		}
 	private:
 		inline static uint32_t s_shader_id = 0u;
-		inline static std::map<uint32_t, Ref<Shader>> s_shader_library;
-		inline static std::map<std::string, uint32_t> s_shader_name;
+		inline static uint32_t s_error_id = 9999u;
+		inline static std::unordered_map<uint32_t, Ref<Shader>> s_shader_library;
+		inline static std::unordered_map<std::string, uint32_t> s_shader_name;
 	};
 }
 

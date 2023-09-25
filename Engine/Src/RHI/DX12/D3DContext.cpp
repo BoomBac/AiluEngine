@@ -344,18 +344,9 @@ namespace Ailu
 
     void D3DContext::LoadAssets()
     {
-        //InitCBVSRVUAVDescHeap();
+        GraphicsPipelineStateMgr::BuildPSOCache();
 
-        // Define the vertex input layout.
-        VertexBufferLayout layout0
-        {
-            {"POSITION",EShaderDateType::kFloat3,0},
-            {"NORMAL",EShaderDateType::kFloat3,1},
-            {"TEXCOORD",EShaderDateType::kFloat2,2},
-            {"TANGENT",EShaderDateType::kFloat4,3}
-        };
-        _p_standard_shader.reset(Shader::Create(GetResPath("Shaders/shaders.hlsl")));
-
+        _p_standard_shader = ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl"));
         _mat_green = MakeRef<Material>(_p_standard_shader, "GreenColor");
 
         GraphicsPipelineStateInitializer pso_initializer{};
@@ -363,7 +354,6 @@ namespace Ailu
         pso_initializer._b_has_rt = true;
         pso_initializer._depth_stencil_state = TStaticDepthStencilState<true, ECompareFunc::kLess>::GetRHI();
         pso_initializer._ds_format = EALGFormat::kALGFormatD32_FLOAT;
-        pso_initializer._input_layout = layout0;
         pso_initializer._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
         pso_initializer._rt_nums = 1;
         pso_initializer._topology = ETopology::kTriangle;
@@ -498,8 +488,10 @@ namespace Ailu
         m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
         auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
         m_commandList->ResourceBarrier(1, &bar_before);
-        GraphicsPipelineState::sCurrent->Bind();
-        GraphicsPipelineState::sCurrent->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
+
+        auto pos0 = GraphicsPipelineStateMgr::GetPso(EGraphicsPSO::kStandShaded);
+        pos0->Bind();
+        pos0->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
 
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
@@ -535,7 +527,8 @@ namespace Ailu
         //DrawGizmo
         {
             _p_gizmo_pso->Bind();
-            _p_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer,0u);
+            //_p_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer,0u);
+            _p_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
 
             Gizmo::Submit();
         }

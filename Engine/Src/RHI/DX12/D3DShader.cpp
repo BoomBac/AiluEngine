@@ -132,11 +132,11 @@ namespace Ailu
 
 	static DXGI_FORMAT GetFormatBySemanticName(const char* semantic)
 	{
-		if (strcmp(semantic, D3DConstants::kSemanticPosition))	return DXGI_FORMAT_R32G32B32_FLOAT;
-		else if(strcmp(semantic, D3DConstants::kSemanticNormal)) return DXGI_FORMAT_R32G32B32_FLOAT;
-		else if(strcmp(semantic, D3DConstants::kSemanticTangent)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		else if(strcmp(semantic, D3DConstants::kSemanticColor)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		else if(strcmp(semantic, D3DConstants::kSemanticUV)) return DXGI_FORMAT_R32G32_FLOAT;
+		if (!std::strcmp(semantic, D3DConstants::kSemanticPosition)) return DXGI_FORMAT_R32G32B32_FLOAT;
+		else if (!std::strcmp(semantic, D3DConstants::kSemanticNormal)) return DXGI_FORMAT_R32G32B32_FLOAT;
+		else if (!std::strcmp(semantic, D3DConstants::kSemanticTangent)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		else if (!std::strcmp(semantic, D3DConstants::kSemanticColor)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		else if (!std::strcmp(semantic, D3DConstants::kSemanticTexcoord)) return DXGI_FORMAT_R32G32_FLOAT;
 	}
 
 	void D3DShader::GenerateRootSignature()
