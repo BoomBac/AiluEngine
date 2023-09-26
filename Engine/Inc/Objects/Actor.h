@@ -23,7 +23,7 @@ namespace Ailu
 		template <typename Type>
 		Type* GetComponent();
 		template <typename Type>
-		void AddComponent();
+		inline Type* AddComponent();
 
 
 		const std::list<Ref<Actor>>& GetAllChildren() const;
@@ -31,9 +31,9 @@ namespace Ailu
 		void AddChild(Ref<Actor> child);
 		void ClearChildren();
 
-		DECLARE__PROTECTED_PROPERTY(Name,std::string)
-		DECLARE__PROTECTED_PROPERTY(Id,uint32_t)
-		DECLARE__PROTECTED_PROPERTY_PTR(Parent,Actor)
+		DECLARE_PROTECTED_PROPERTY(Name,std::string)
+		DECLARE_PROTECTED_PROPERTY(Id,uint32_t)
+		DECLARE_PROTECTED_PROPERTY_PTR(Parent,Actor)
 	public:
 		inline static std::vector<Ref<Actor>> s_global_actors{};
 	protected:
@@ -69,14 +69,15 @@ namespace Ailu
 	}
 
 	template<typename Type>
-	inline void Actor::AddComponent()
+	inline Type* Actor::AddComponent()
 	{
 		for (auto& component : _components)
 		{
 			if (std::is_same<decltype(*component.get()), Type>::value)
-				return;
+				return static_cast<Type*>(component.get());
 		}
 		_components.emplace_back(std::move(MakeScope<Type>()));
+		return static_cast<Type*>((*_components.end()).get());
 	}
 }
 

@@ -2,6 +2,7 @@
 #ifndef __TRANSFORM_COMP_H__
 #define __TRANSFORM_COMP_H__
 #include "Component.h"
+#include "Framework/Common/Reflect.h"
 #include "Framework/Math/ALMath.hpp"
 
 namespace Ailu
@@ -12,13 +13,16 @@ namespace Ailu
 		TransformComponent();
 		~TransformComponent();
 		const Matrix4x4f& GetWorldMatrix();
-		DECLARE__PRIVATE_PROPERTY(Position,Vector3f)
-		DECLARE__PRIVATE_PROPERTY(Scale,Vector3f)
-		DECLARE__PRIVATE_PROPERTY(Rotation,Quaternion)
+		DECLARE_PRIVATE_PROPERTY(Position,Vector3f)
+		DECLARE_PRIVATE_PROPERTY(Scale,Vector3f)
+		DECLARE_PRIVATE_PROPERTY(Rotation,Vector3f)
 		COMPONENT_CLASS_TYPE(TransformComponent);
+
+		DECLARE_REFLECT_FIELD(TransformComponent)
 	private:
 		void CalculateMatrix();
 	private:
+		Quaternion _inner_rot;
 		Matrix4x4f _world_mat;
 	};
 }

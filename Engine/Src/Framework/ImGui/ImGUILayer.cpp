@@ -55,6 +55,13 @@ namespace ImguiTree
 
 namespace Ailu
 {
+    static void DrawProperty(SerializableProperty& prop)
+    {
+        if (prop._type_name == "Vector3f")
+        {
+            ImGui::DragFloat3(prop._name.c_str(), static_cast<Vector3f*>(prop._value_ptr)->data);
+        }
+    }
     Ailu::ImGUILayer::ImGUILayer()
     {
     }
@@ -236,9 +243,13 @@ namespace Ailu
         //}
         cur_tree_node_index = 0;
         auto transform = object_list[0]->GetComponent<Ailu::TransformComponent>();
-        Vector3f new_pos = transform->Position();
-        ImGui::DragFloat3("Position", new_pos);
-        transform->Position(new_pos);
+
+        DrawProperty(transform->GetProperty("Position"));
+        DrawProperty(transform->GetProperty("Scale"));
+        DrawProperty(transform->GetProperty("Rotation"));
+        //Vector3f new_pos = transform->Position();
+        
+        //transform->Position(new_pos);
 
         ImGui::End();
     }

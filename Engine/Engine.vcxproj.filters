@@ -1980,6 +1980,18 @@
     <ClInclude Include="Inc\Render\RenderingData.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\Reflect.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Objects\SceneActor.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Objects\LightComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Objects\CommonActor.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2103,6 +2115,15 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Objects\TransformComponent.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Common\Reflect.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Objects\SceneActor.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Objects\LightComponent.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

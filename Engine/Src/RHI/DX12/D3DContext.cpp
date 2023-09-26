@@ -13,7 +13,7 @@
 #include "Framework/Parser/AssetParser.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "Render/RenderingData.h"
-#include "Objects/TransformComponent.h"
+
 
 
 
@@ -428,10 +428,7 @@ namespace Ailu
             _mat_standard->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N"));
 
 
-            _p_actor = Actor::Create<Actor>();
-
-            _p_actor->AddChild(Actor::Create<Actor>());
-            _p_actor->AddComponent<TransformComponent>();
+            _p_actor = Actor::Create<SceneActor>();
 
             //_p_vertex_buf.reset(VertexBuffer::Create({
             //    {"POSITION",EShaderDateType::kFloat3,0},
@@ -489,18 +486,17 @@ namespace Ailu
         cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
         cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
 
-        auto* transf = _p_actor->GetComponent<TransformComponent>();
         if (RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShader)
         {
             GraphicsPipelineStateMgr::s_standard_shadering_pso->Bind();
             GraphicsPipelineStateMgr::s_standard_shadering_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(transf->GetWorldMatrix()), _mat_standard);
+            cmd->DrawRenderer(_tree, Transpose(_p_actor->_p_transform->GetWorldMatrix()), _mat_standard);
         }
         else
         {
             GraphicsPipelineStateMgr::s_wireframe_pso->Bind();
             GraphicsPipelineStateMgr::s_wireframe_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(transf->GetWorldMatrix()), _mat_wireframe);
+            cmd->DrawRenderer(_tree, Transpose(_p_actor->_p_transform->GetWorldMatrix()), _mat_wireframe);
         }   
         ExecuteCommandBuffer(cmd);
         cmd->Clear();
@@ -508,7 +504,7 @@ namespace Ailu
         {
             GraphicsPipelineStateMgr::s_wireframe_pso->Bind();
             GraphicsPipelineStateMgr::s_wireframe_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(transf->GetWorldMatrix()), _mat_wireframe);
+            cmd->DrawRenderer(_tree, Transpose(_p_actor->_p_transform->GetWorldMatrix()), _mat_wireframe);
         }
         ExecuteCommandBuffer(cmd);
 

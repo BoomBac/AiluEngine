@@ -300,6 +300,16 @@ namespace Ailu
 	using R32G32B32A32Float = Vector3D<float>;
 	using Vector4i = Vector4D<uint8_t>;
 
+	inline static float ToRadius(const float& angle) { return angle * kPi / 180.f; }
+	inline static float ToAngle(const float& radius) { return 180.f * radius / kPi; }
+	inline static float Clamp(const float& value, const float& max, const float& min)
+	{
+		if (value > max) return max;
+		else if (value < min) return min;
+		else return value;
+	}
+
+
 	template<template<typename> typename TT, typename T>
 	TT<T> operator+(const TT<T> v1, const TT<T> v2)
 	{
@@ -554,26 +564,6 @@ namespace Ailu
 		return normalizedAngle;
 	}
 
-	static void MatrixRotationYawPitchRoll(Matrix4x4f& matrix, const float yaw, const float pitch, const float roll)
-	{
-		float cYaw, cPitch, cRoll, sYaw, sPitch, sRoll;
-		// Get the cosine and sin of the yaw, pitch, and roll.
-		cYaw = cosf(yaw);
-		cPitch = cosf(pitch);
-		cRoll = cosf(roll);
-		sYaw = sinf(yaw);
-		sPitch = sinf(pitch);
-		sRoll = sinf(roll);
-		// Calculate the yaw, pitch, roll rotation matrix.
-		Matrix4x4f tmp = { {{
-			{ (cRoll * cYaw) + (sRoll * sPitch * sYaw), (sRoll * cPitch), (cRoll * -sYaw) + (sRoll * sPitch * cYaw), 0.0f },
-			{ (-sRoll * cYaw) + (cRoll * sPitch * sYaw), (cRoll * cPitch), (sRoll * sYaw) + (cRoll * sPitch * cYaw), 0.0f },
-			{ (cPitch * sYaw), -sPitch, (cPitch * cYaw), 0.0f },
-			{ 0.0f, 0.0f, 0.0f, 1.0f }
-		}} };
-		matrix = tmp;
-		return;
-	}
 	static void Transform(Vector4f& vector, const Matrix4x4f& matrix)
 	{
 		Vector4f temp{};
@@ -818,22 +808,30 @@ namespace Ailu
 	static void MatrixRotationX(Matrix4x4f& matrix, const float radius)
 	{
 		float c = cosf(radius), s = sinf(radius);
-
 		Matrix4x4f rotation = { {{
 			{  1.0f, 0.0f, 0.0f, 0.0f },
 			{  0.0f,    c,    s, 0.0f },
 			{  0.0f,   -s,    c, 0.0f },
 			{  0.0f, 0.0f, 0.0f, 1.0f },
 		}} };
-
 		matrix = rotation;
-
 		return;
 	}
+
+	static Matrix4x4f MatrixRotationX(const float& radius)
+	{
+		float c = cosf(radius), s = sinf(radius);
+		return { {{
+			{  1.0f, 0.0f, 0.0f, 0.0f },
+			{  0.0f,    c,    s, 0.0f },
+			{  0.0f,   -s,    c, 0.0f },
+			{  0.0f, 0.0f, 0.0f, 1.0f },
+		}} };
+	}
+
 	static void MatrixRotationY(Matrix4x4f& matrix, const float radius)
 	{
 		float c = cosf(radius), s = sinf(radius);
-
 		Matrix4x4f rotation = { {{
 			{    c, 0.0f,   -s, 0.0f },
 			{ 0.0f, 1.0f, 0.0f, 0.0f },
@@ -843,7 +841,19 @@ namespace Ailu
 		matrix = rotation;
 		return;
 	}
-	static void MatrixRotationZ(Matrix4x4f& matrix, const float angle)
+
+	static Matrix4x4f MatrixRotationY(const float& radius)
+	{
+		float c = cosf(radius), s = sinf(radius);
+		return { {{
+			{    c, 0.0f,   -s, 0.0f },
+			{ 0.0f, 1.0f, 0.0f, 0.0f },
+			{    s, 0.0f,    c, 0.0f },
+			{ 0.0f, 0.0f, 0.0f, 1.0f },
+		}} };
+	}
+
+	static void MatrixRotationZ(Matrix4x4f& matrix, const float& radius)
 	{
 		float c = cosf(angle), s = sinf(angle);
 		Matrix4x4f rotation = { {{
@@ -855,6 +865,18 @@ namespace Ailu
 		matrix = rotation;
 		return;
 	}
+
+	static Matrix4x4f MatrixRotationZ(const float& radius)
+	{
+		float c = cosf(radius), s = sinf(radius);
+		return { {{
+			{    c,    s, 0.0f, 0.0f },
+			{   -s,    c, 0.0f, 0.0f },
+			{ 0.0f, 0.0f, 1.0f, 0.0f },
+			{ 0.0f, 0.0f, 0.0f, 1.0f }
+		}} };;
+	}
+
 	static void MatrixRotationAxis(Matrix4x4f& matrix, const Vector3f& axis, const float radius)
 	{
 		float c = cosf(radius), s = sinf(radius), one_minus_c = 1.0f - c;
@@ -865,6 +887,65 @@ namespace Ailu
 			{   0.0f,  0.0f,  0.0f,  1.0f   }
 		}} };
 		matrix = rotation;
+	}
+
+	static void MatrixRotationYawPitchRoll(Matrix4x4f& matrix, const float& yaw, const float& pitch, const float& roll)
+	{
+		float cYaw, cPitch, cRoll, sYaw, sPitch, sRoll;
+		// Get the cosine and sin of the yaw, pitch, and roll.
+		cYaw = cosf(yaw);
+		cPitch = cosf(pitch);
+		cRoll = cosf(roll);
+		sYaw = sinf(yaw);
+		sPitch = sinf(pitch);
+		sRoll = sinf(roll);
+		// Calculate the yaw, pitch, roll rotation matrix.
+		Matrix4x4f tmp = { {{
+			{ (cRoll * cYaw) + (sRoll * sPitch * sYaw), (sRoll * cPitch), (cRoll * -sYaw) + (sRoll * sPitch * cYaw), 0.0f },
+			{ (-sRoll * cYaw) + (cRoll * sPitch * sYaw), (cRoll * cPitch), (sRoll * sYaw) + (cRoll * sPitch * cYaw), 0.0f },
+			{ (cPitch * sYaw), -sPitch, (cPitch * cYaw), 0.0f },
+			{ 0.0f, 0.0f, 0.0f, 1.0f }
+		}} };
+		matrix = tmp;
+		return;
+	}
+	static Matrix4x4f MatrixRotationYawPitchRoll(const float& yaw, const float& pitch, const float& roll)
+	{
+		float cYaw, cPitch, cRoll, sYaw, sPitch, sRoll;
+		// Get the cosine and sin of the yaw, pitch, and roll.
+		cYaw = cosf(yaw);
+		cPitch = cosf(pitch);
+		cRoll = cosf(roll);
+		sYaw = sinf(yaw);
+		sPitch = sinf(pitch);
+		sRoll = sinf(roll);
+		// Calculate the yaw, pitch, roll rotation matrix.
+		return{ {{
+			{ (cRoll * cYaw) + (sRoll * sPitch * sYaw), (sRoll * cPitch), (cRoll * -sYaw) + (sRoll * sPitch * cYaw), 0.0f },
+			{ (-sRoll * cYaw) + (cRoll * sPitch * sYaw), (cRoll * cPitch), (sRoll * sYaw) + (cRoll * sPitch * cYaw), 0.0f },
+			{ (cPitch * sYaw), -sPitch, (cPitch * cYaw), 0.0f },
+			{ 0.0f, 0.0f, 0.0f, 1.0f }
+		}} };
+	}
+
+	static Matrix4x4f MatrixRotationYawPitchRoll(const Vector3f& rotation)
+	{
+		float yaw = ToRadius(rotation.y), pitch = ToRadius(rotation.x), roll = ToRadius(rotation.z);
+		float cYaw, cPitch, cRoll, sYaw, sPitch, sRoll;
+		// Get the cosine and sin of the yaw, pitch, and roll.
+		cYaw = cosf(yaw);
+		cPitch = cosf(pitch);
+		cRoll = cosf(roll);
+		sYaw = sinf(yaw);
+		sPitch = sinf(pitch);
+		sRoll = sinf(roll);
+		// Calculate the yaw, pitch, roll rotation matrix.
+		return{ {{
+			{ (cRoll * cYaw) + (sRoll * sPitch * sYaw), (sRoll * cPitch), (cRoll * -sYaw) + (sRoll * sPitch * cYaw), 0.0f },
+			{ (-sRoll * cYaw) + (cRoll * sPitch * sYaw), (cRoll * cPitch), (sRoll * sYaw) + (cRoll * sPitch * cYaw), 0.0f },
+			{ (cPitch * sYaw), -sPitch, (cPitch * cYaw), 0.0f },
+			{ 0.0f, 0.0f, 0.0f, 1.0f }
+		}} };
 	}
 
 	static void MatrixScale(Matrix4x4f& matrix, const float x, const float y, const float z)
@@ -910,8 +991,6 @@ namespace Ailu
 		matrix = rotation;
 	}
 
-	static float ToRadius(const float& angle) { return angle * kPi / 180.f; }
-	static float ToAngle(const float& radius) { return 180.f * radius / kPi; }
 	template<typename V>
 	static V lerp(const V& src, const V& des, const float& weight)
 	{

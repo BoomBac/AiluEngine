@@ -477,6 +477,7 @@
     <ClInclude Include="Inc\Framework\Common\KeyCode.h" />
     <ClInclude Include="Inc\Framework\Common\Log.h" />
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
+    <ClInclude Include="Inc\Framework\Common\Reflect.h" />
     <ClInclude Include="Inc\Framework\Common\ResourcePool.h" />
     <ClInclude Include="Inc\Framework\Common\ThreadPool.h" />
     <ClInclude Include="Inc\Framework\Common\TimeMgr.h" />
@@ -499,7 +500,10 @@
     <ClInclude Include="Inc\Framework\Parser\TgaParser.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\Objects\Actor.h" />
+    <ClInclude Include="Inc\Objects\CommonActor.h" />
     <ClInclude Include="Inc\Objects\Component.h" />
+    <ClInclude Include="Inc\Objects\LightComponent.h" />
+    <ClInclude Include="Inc\Objects\SceneActor.h" />
     <ClInclude Include="Inc\Objects\TransformComponent.h" />
     <ClInclude Include="Inc\pch.h" />
     <ClInclude Include="Inc\Platform\WinInput.h" />
@@ -541,6 +545,7 @@
     <ClCompile Include="Ext\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
+    <ClCompile Include="Src\Framework\Common\Reflect.cpp" />
     <ClCompile Include="Src\Framework\Common\TimeMgr.cpp" />
     <ClCompile Include="Src\Framework\Events\InputLayer.cpp" />
     <ClCompile Include="Src\Framework\Events\Layer.cpp" />
@@ -551,6 +556,8 @@
     <ClCompile Include="Src\Framework\Parser\TgaParser.cpp" />
     <ClCompile Include="Src\Objects\Actor.cpp" />
     <ClCompile Include="Src\Objects\Component.cpp" />
+    <ClCompile Include="Src\Objects\LightComponent.cpp" />
+    <ClCompile Include="Src\Objects\SceneActor.cpp" />
     <ClCompile Include="Src\Objects\TransformComponent.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

@@ -16,7 +16,7 @@
 #include "Framework/Assets/Mesh.h"
 #include "D3DCommandBuffer.h"
 
-#include "Objects/Actor.h"
+#include "Objects/SceneActor.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -94,7 +94,7 @@ namespace Ailu
         Ref<Mesh> _tree;
         Ref<Material> _mat_standard;
         Ref<Material> _mat_wireframe;
-        Ref<Actor> _p_actor;
+        Ref<SceneActor> _p_actor;
 
 
         uint32_t _render_object_index = 0u;
