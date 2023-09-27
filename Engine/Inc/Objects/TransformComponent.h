@@ -13,9 +13,9 @@ namespace Ailu
 		TransformComponent();
 		~TransformComponent();
 		const Matrix4x4f& GetWorldMatrix();
-		DECLARE_PRIVATE_PROPERTY(Position,Vector3f)
-		DECLARE_PRIVATE_PROPERTY(Scale,Vector3f)
-		DECLARE_PRIVATE_PROPERTY(Rotation,Vector3f)
+		DECLARE_PRIVATE_PROPERTY(position,Position,Vector3f)
+		DECLARE_PRIVATE_PROPERTY(scale,Scale,Vector3f)
+		DECLARE_PRIVATE_PROPERTY(rotation,Rotation,Vector3f)
 		COMPONENT_CLASS_TYPE(TransformComponent);
 
 		DECLARE_REFLECT_FIELD(TransformComponent)

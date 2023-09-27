@@ -10,6 +10,7 @@
 
 #include "Objects/Actor.h"
 #include "Objects/TransformComponent.h"
+#include "Framework/Common/SceneMgr.h"
 
 namespace ImguiTree
 {
@@ -180,11 +181,16 @@ namespace Ailu
 
     static uint32_t cur_tree_node_index = 0u;
 
-    void DrawTreeNode(Ref<Ailu::Actor>& actor)
+    static uint32_t s_pre_frame_selected_actor_id = 10;
+    static uint32_t s_cur_frame_selected_actor_id = 0;
+    static Ref<SceneActor> s_cur_selected_actor = nullptr;
+
+    void DrawTreeNode(Ref<SceneActor>& actor)
     {
         ImGui::PushID(cur_object_index);
         if (ImGui::TreeNode((void*)(intptr_t)cur_tree_node_index, actor->Name().c_str()))
         {
+            s_cur_frame_selected_actor_id = actor->Id();
             cur_tree_node_index++;
             for (auto node : actor->GetAllChildren())
             {
@@ -192,6 +198,7 @@ namespace Ailu
                 cur_tree_node_index++;
                 if (ImGui::TreeNode((void*)(intptr_t)cur_tree_node_index, node->Name().c_str()))
                 {
+                    s_cur_frame_selected_actor_id = node->Id();
                     ImGui::Text("占位符");
                     ImGui::SameLine();
                     if (ImGui::SmallButton("button")) {}
@@ -204,7 +211,7 @@ namespace Ailu
         ImGui::PopID(); // PopID 需要与对应的 PushID 配对
     }
 
-    void ShowObjectDetail(Ref<Ailu::Actor>& actor)
+    void ShowObjectDetail(Ref<Ailu::SceneActor>& actor)
     {
         
         ImGui::Begin("WorldOutline");
@@ -219,7 +226,14 @@ namespace Ailu
         auto object_list = Actor::s_global_actors;
         uint32_t index = 0;
         //ImGui::Checkbox("Show Child", &expand_child);
-        DrawTreeNode(object_list[0]);
+
+
+        DrawTreeNode(g_pSceneMgr->_p_current->GetSceneRoot());
+        if (s_pre_frame_selected_actor_id != s_cur_frame_selected_actor_id)
+        {
+            s_cur_selected_actor = g_pSceneMgr->_p_current->GetSceneActorByID(s_cur_frame_selected_actor_id);
+        }
+        s_pre_frame_selected_actor_id = s_cur_frame_selected_actor_id;
         //if (ImGui::TreeNode("Basic trees"))
         //{
         //    for (int i = 0; i < 5; i++)

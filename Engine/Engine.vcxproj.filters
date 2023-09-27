@@ -1992,6 +1992,9 @@
     <ClInclude Include="Inc\Objects\CommonActor.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\SceneMgr.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2124,6 +2127,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Objects\LightComponent.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Common\SceneMgr.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

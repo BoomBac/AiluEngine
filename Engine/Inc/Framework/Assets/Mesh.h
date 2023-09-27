@@ -30,12 +30,11 @@ namespace Ailu
 		const Ref<VertexBuffer>& GetVertexBuffer() const;
 		const Ref<IndexBuffer>& GetIndexBuffer() const;
 		void Build();
-		DECLARE_PRIVATE_PROPERTY(Name, std::string)
+		DECLARE_PRIVATE_PROPERTY(name,Name, std::string)
 	public:
 		uint32_t _vertex_count;
 		uint16_t _index_count;
 	private:
-		std::string _name = "mesh";
 		Ref<VertexBuffer> _p_vbuf;
 		Ref<IndexBuffer> _p_ibuf;
 		Vector3f* _vertices;

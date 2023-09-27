@@ -21,18 +21,21 @@ namespace Ailu
 		template <typename Type>
 		static Ref<Type> Create();
 		template <typename Type>
+		static Ref<Type> Create(const std::string& name);
+		template <typename Type>
 		Type* GetComponent();
 		template <typename Type>
 		inline Type* AddComponent();
 
 
-		const std::list<Ref<Actor>>& GetAllChildren() const;
+		std::list<Ref<Actor>>& GetAllChildren();
 		void RemoveChild(Ref<Actor> child);
-		void AddChild(Ref<Actor> child);
+		void AddChild(Ref<Actor>& child);
+		uint16_t GetChildNum() const { return _chilren_num; };
 		void ClearChildren();
 
-		DECLARE_PROTECTED_PROPERTY(Name,std::string)
-		DECLARE_PROTECTED_PROPERTY(Id,uint32_t)
+		DECLARE_PROTECTED_PROPERTY(name, Name, std::string)
+		DECLARE_PROTECTED_PROPERTY(Id,Id,uint32_t)
 		DECLARE_PROTECTED_PROPERTY_PTR(Parent,Actor)
 	public:
 		inline static std::vector<Ref<Actor>> s_global_actors{};
@@ -43,7 +46,7 @@ namespace Ailu
 		std::list<Ref<Actor>> _children{};
 		std::list<Scope<Component>> _components{};
 		inline static uint32_t s_actor_count = 0u;
-
+		uint16_t _chilren_num = 0u;
 	};
 
 	template<typename Type>
@@ -52,6 +55,17 @@ namespace Ailu
 		auto actor = MakeRef<Type>();
 		actor->Id(Actor::s_actor_count);
 		actor->Name(std::format("Actor{0}", Actor::s_actor_count++));
+		s_global_actors.emplace_back(actor);
+		return actor;
+	}
+
+	template<typename Type>
+	inline Ref<Type> Actor::Create(const std::string& name)
+	{
+		auto actor = MakeRef<Type>();
+		actor->Id(Actor::s_actor_count);
+		actor->Name(name);
+		++s_actor_count;
 		s_global_actors.emplace_back(actor);
 		return actor;
 	}
@@ -77,7 +91,7 @@ namespace Ailu
 				return static_cast<Type*>(component.get());
 		}
 		_components.emplace_back(std::move(MakeScope<Type>()));
-		return static_cast<Type*>((*_components.end()).get());
+		return static_cast<Type*>(_components.back().get());
 	}
 }
 

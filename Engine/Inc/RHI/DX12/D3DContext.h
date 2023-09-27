@@ -94,7 +94,9 @@ namespace Ailu
         Ref<Mesh> _tree;
         Ref<Material> _mat_standard;
         Ref<Material> _mat_wireframe;
+
         Ref<SceneActor> _p_actor;
+        Ref<SceneActor> _p_light;
 
 
         uint32_t _render_object_index = 0u;

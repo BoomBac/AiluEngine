@@ -47,19 +47,33 @@
 
 #define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
 
-#define DECLARE_PRIVATE_PROPERTY(Name,type) \
-public: \
-    void Name(const type& value) { _##Name = value; } \
-    const type& Name() const { return _##Name; } \
-private: \
-    type _##Name;
+//#define DECLARE_PRIVATE_PROPERTY(Name,type) \
+//public: \
+//    void Name(const type& value) { _##Name = value; } \
+//    const type& Name() const { return _##Name; } \
+//private: \
+//    type _##Name;
 
-#define DECLARE_PROTECTED_PROPERTY(Name,type) \
+#define DECLARE_PRIVATE_PROPERTY(member_name,prop_name,type) \
 public: \
-    void Name(const type& value) { _##Name = value; } \
-    const type& Name() const { return _##Name; } \
+    void prop_name(const type& value) { _##member_name = value; } \
+    const type& prop_name() const { return _##member_name; } \
 private: \
-    type _##Name;
+    type _##member_name;
+
+//#define DECLARE_PROTECTED_PROPERTY(Name,type) \
+//public: \
+//    void Name(const type& value) { _##Name = value; } \
+//    const type& Name() const { return _##Name; } \
+//protected: \
+//    type _##Name;
+
+#define DECLARE_PROTECTED_PROPERTY(member_name,prop_name,type) \
+public: \
+    void prop_name(const type& value) { _##member_name = value; } \
+    const type& prop_name() const { return _##member_name; } \
+protected: \
+    type _##member_name;
 
 #define DECLARE_PROTECTED_PROPERTY_PTR(Name,type) \
 public: \

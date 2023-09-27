@@ -479,6 +479,7 @@
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Reflect.h" />
     <ClInclude Include="Inc\Framework\Common\ResourcePool.h" />
+    <ClInclude Include="Inc\Framework\Common\SceneMgr.h" />
     <ClInclude Include="Inc\Framework\Common\ThreadPool.h" />
     <ClInclude Include="Inc\Framework\Common\TimeMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Utils.h" />
@@ -546,6 +547,7 @@
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\Reflect.cpp" />
+    <ClCompile Include="Src\Framework\Common\SceneMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\TimeMgr.cpp" />
     <ClCompile Include="Src\Framework\Events\InputLayer.cpp" />
     <ClCompile Include="Src\Framework\Events\Layer.cpp" />

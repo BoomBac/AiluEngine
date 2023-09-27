@@ -13,6 +13,8 @@
 #include "Framework/Parser/AssetParser.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "Render/RenderingData.h"
+#include "Framework/Common/SceneMgr.h"
+#include "Objects/CommonActor.h"
 
 
 
@@ -427,8 +429,14 @@ namespace Ailu
             _mat_standard->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D"));
             _mat_standard->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N"));
 
+            _p_actor = Actor::Create<SceneActor>("stone");
+            _p_light = Actor::Create<LightActor>("directional_light");
+            
 
-            _p_actor = Actor::Create<SceneActor>();
+            g_pSceneMgr->_p_current = SceneMgr::Create("default_scene");
+            g_pSceneMgr->_p_current->AddObject(_p_actor);
+            g_pSceneMgr->_p_current->AddObject(_p_light);
+
 
             //_p_vertex_buf.reset(VertexBuffer::Create({
             //    {"POSITION",EShaderDateType::kFloat3,0},

@@ -855,7 +855,7 @@ namespace Ailu
 
 	static void MatrixRotationZ(Matrix4x4f& matrix, const float& radius)
 	{
-		float c = cosf(angle), s = sinf(angle);
+		float c = cosf(radius), s = sinf(radius);
 		Matrix4x4f rotation = { {{
 			{    c,    s, 0.0f, 0.0f },
 			{   -s,    c, 0.0f, 0.0f },

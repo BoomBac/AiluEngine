@@ -41,23 +41,26 @@ namespace Ailu
 		}
 	}
 
-	const std::list<Ref<Actor>>& Actor::GetAllChildren() const
+	std::list<Ref<Actor>>& Actor::GetAllChildren()
 	{
 		return _children;
 	}
 
 	void Actor::RemoveChild(Ref<Actor> child)
 	{
+		--_chilren_num;
 		_children.remove(child);
 	}
 
-	void Actor::AddChild(Ref<Actor> child)
+	void Actor::AddChild(Ref<Actor>& child)
 	{
+		++_chilren_num;
 		_children.emplace_back(child);
 	}
 
 	void Actor::ClearChildren()
 	{
+		_chilren_num = 0;
 		_children.clear();
 	}
 

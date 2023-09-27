@@ -4,11 +4,13 @@
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Framework/Events/InputLayer.h"
 #include "Framework/Common/TimeMgr.h"
+#include "Framework/Common/SceneMgr.h"
 #include "CompanyEnv.h"
 
 namespace Ailu
 {
 	TimeMgr* g_pTimeMgr = new TimeMgr();
+	SceneMgr* g_pSceneMgr = new SceneMgr();
 
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
@@ -18,6 +20,7 @@ namespace Ailu
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		g_pTimeMgr->Initialize();
+		g_pSceneMgr->Initialize();
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
 
@@ -36,7 +39,9 @@ namespace Ailu
 		_p_renderer->Finalize();
 		DESTORY_PTR(_p_renderer)
 		g_pTimeMgr->Finalize();
-		DESTORY_PTR(g_pTimeMgr)
+		DESTORY_PTR(g_pTimeMgr);
+		g_pSceneMgr->Finalize();
+		DESTORY_PTR(g_pSceneMgr);
 	}
 	double render_lag = 0.0;
 	double update_lag = 0.0;
@@ -62,7 +67,7 @@ namespace Ailu
 			for (Layer* layer : _layer_stack)
 				layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
 			_p_window->OnUpdate();
-
+			g_pSceneMgr->Tick();
 			while (render_lag > kMsPerRender)
 			{		
 				_p_imgui_layer->Begin();
