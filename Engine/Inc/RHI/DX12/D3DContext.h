@@ -21,12 +21,6 @@
 using Microsoft::WRL::ComPtr;
 namespace Ailu
 {
-    struct SimpleVertex
-    {
-        Vector3f position;
-        Vector4f color;
-    };
-
     class D3DContext : public GraphicsContext
     {
         friend class D3DRendererAPI;
@@ -91,6 +85,8 @@ namespace Ailu
         ComPtr<ID3D12Resource> m_vertexBuffer;
         D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
+        std::list<std::function<void()>> _all_commands{};
+
         Ref<Mesh> _tree;
         Ref<Material> _mat_standard;
         Ref<Material> _mat_wireframe;
@@ -131,6 +127,26 @@ namespace Ailu
         static void DrawLine(const Vector3f& from, const Vector3f& to, Color color = Gizmo::s_color)
         {
             DrawLine(from,to, color, color);
+        }
+
+        static void DrawCircle(const Vector3f& center, float radius, int num_segments, Color color = Gizmo::s_color,Matrix4x4f mat = BuildIdentityMatrix())
+        {
+            float angleIncrement = 360.0f / static_cast<float>(num_segments);
+
+            for (int i = 0; i < num_segments; ++i)
+            {
+                float angle1 = ToRadius(angleIncrement * static_cast<float>(i));
+                float angle2 = ToRadius(angleIncrement * static_cast<float>(i + 1));
+                Vector3f point1(center.x + radius * cos(angle1),center.y,center.z + radius * sin(angle1));
+                Vector3f point2(center.x + radius * cos(angle2),center.y,center.z + radius * sin(angle2));
+                point1 -= center;
+                point2 -= center;
+                TransformCoord(point1, mat);
+                TransformCoord(point2, mat);
+                point1 += center;
+                point2 += center;
+                DrawLine(point1, point2, color);
+            }
         }
 
         static void DrawLine(const Vector3f& from, const Vector3f& to, const Color& color_from, const Color& color_to)

@@ -20,6 +20,7 @@ namespace Ailu
 
 	private:
 		void ShowWorldOutline();
+		void ShowObjectDetail();
 	};
 }
 

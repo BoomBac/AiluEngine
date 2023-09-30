@@ -123,7 +123,8 @@ namespace Ailu
 
         //scene data
         _p_scene_camera = std::make_unique<Camera>(16.0F / 9.0F);
-        _p_scene_camera->SetPosition(0, 0, -5.0f);
+        _p_scene_camera->SetPosition(1356.43f,604.0f,-613.45f);
+        _p_scene_camera->Rotate(11.80,-59.76);
         _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
         Camera::sCurrent = _p_scene_camera.get();
 
@@ -202,6 +203,10 @@ namespace Ailu
         {
             call();
         }
+        //for (auto& cache_cmd : cmd->_commands)
+        //{
+        //    _all_commands.emplace_back(cache_cmd);
+        //}
     }
 
     void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform)
@@ -417,7 +422,8 @@ namespace Ailu
             //_plane = parser->Parser(GET_RES_PATH(Meshs/plane.fbx));
             //_plane = parser->Parser(GET_RES_PATH(Meshs/gizmo.fbx));
 
-            _tree = parser->Parser(GetResPath("Meshs/stone.fbx"));
+            //_tree = parser->Parser(GetResPath("Meshs/stone.fbx"));
+            _tree = parser->Parser(GetResPath("Meshs/plane.fbx"));
 
             auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
             auto tga_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kTGA);
@@ -426,16 +432,30 @@ namespace Ailu
             tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
             tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
 
-            _mat_standard->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D"));
-            _mat_standard->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N"));
+            //_mat_standard->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D"));
+            //_mat_standard->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N"));
 
             _p_actor = Actor::Create<SceneActor>("stone");
             _p_light = Actor::Create<LightActor>("directional_light");
-            
+            Ref<SceneActor> point_light = Actor::Create<LightActor>("point_light");
+            point_light->GetComponent<LightComponent>()->_light_type = ELightType::kPoint;
+            point_light->GetComponent<LightComponent>()->_light._light_param.x = 500.0f;
+
+            Ref<SceneActor> spot_light = Actor::Create<LightActor>("spot_light");
+            auto spot_tranform = spot_light->GetComponent<TransformComponent>();
+            spot_tranform->Position({0.0,500.0,0.0});
+            spot_tranform->Rotation({82.0,0.0,0.0});
+            auto light_comp = spot_light->GetComponent<LightComponent>();
+            light_comp->_light_type = ELightType::kSpot;
+            light_comp->_light._light_param.x = 500.0f;
+            light_comp->_light._light_param.y = 45.0f;
+            light_comp->_light._light_param.z = 60.0f;
 
             g_pSceneMgr->_p_current = SceneMgr::Create("default_scene");
             g_pSceneMgr->_p_current->AddObject(_p_actor);
             g_pSceneMgr->_p_current->AddObject(_p_light);
+            g_pSceneMgr->_p_current->AddObject(point_light);
+            g_pSceneMgr->_p_current->AddObject(spot_light);
 
 
             //_p_vertex_buf.reset(VertexBuffer::Create({
@@ -485,6 +505,63 @@ namespace Ailu
         m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         {          
             Renderer::BeginScene();
+            auto& light_comps = g_pSceneMgr->_p_current->GetAllLight();
+            uint16_t updated_light_num = 0u;
+            uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0;
+            for (auto light : light_comps)
+            {
+                auto& light_data = light->_light;
+                Color color = light_data._light_color;
+                color.r *= color.a;
+                color.g *= color.a;
+                color.b *= color.a;
+                if (light->_light_type == ELightType::kDirectional)
+                {
+                    if (!light->Active())
+                    {
+                        _perframe_scene_data._DirectionalLights[direction_light_index]._LightDir = Vector3f::Zero;
+                        _perframe_scene_data._DirectionalLights[direction_light_index++]._LightColor = Colors::kBlack.xyz;
+                        continue;
+                    }
+                    _perframe_scene_data._DirectionalLights[direction_light_index]._LightColor = color.xyz;
+                    _perframe_scene_data._DirectionalLights[direction_light_index++]._LightDir = light_data._light_dir.xyz;
+                }
+                else if (light->_light_type == ELightType::kPoint)
+                {
+                    if (!light->Active())
+                    {
+                        _perframe_scene_data._PointLights[point_light_index]._LightParam0 = 0.0;
+                        _perframe_scene_data._PointLights[point_light_index++]._LightColor = Colors::kBlack.xyz;
+                        continue;
+                    }
+                    _perframe_scene_data._PointLights[point_light_index]._LightColor = color.xyz;
+                    _perframe_scene_data._PointLights[point_light_index]._LightPos = light_data._light_pos.xyz;
+                    _perframe_scene_data._PointLights[point_light_index]._LightParam0 = light_data._light_param.x;
+                    _perframe_scene_data._PointLights[point_light_index++]._LightParam1 = light_data._light_param.y;
+                }
+                else if (light->_light_type == ELightType::kSpot)
+                {
+                    if (!light->Active())
+                    {
+                        _perframe_scene_data._SpotLights[spot_light_index++]._LightColor = Colors::kBlack.xyz;
+                        continue;
+                    }
+                    _perframe_scene_data._SpotLights[spot_light_index]._LightColor = color.xyz;
+                    _perframe_scene_data._SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;
+                    _perframe_scene_data._SpotLights[spot_light_index]._LightDir = light_data._light_dir.xyz;
+                    _perframe_scene_data._SpotLights[spot_light_index]._Rdius = light_data._light_param.x;
+                    _perframe_scene_data._SpotLights[spot_light_index]._InnerAngle = light_data._light_param.y;
+                    _perframe_scene_data._SpotLights[spot_light_index]._OuterAngle = light_data._light_param.z;
+                }
+                ++updated_light_num;
+            }
+            if(updated_light_num == 0)
+            {
+                _perframe_scene_data._DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
+                _perframe_scene_data._DirectionalLights[0]._LightDir = {0.0f,0.0f,0.0f};
+            }
+            _perframe_scene_data._CameraPos = Camera::sCurrent->GetPosition();
+            memcpy(D3DContext::s_p_d3dcontext->_p_cbuffer, &D3DContext::s_p_d3dcontext->_perframe_scene_data, sizeof(D3DContext::s_p_d3dcontext->_perframe_scene_data));
             _render_object_index = 0;
         }
         auto cmd = D3DComandBufferPool::GetCommandBuffer();

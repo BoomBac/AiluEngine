@@ -22,9 +22,9 @@ namespace Ailu
 	}
 	void TransformComponent::CalculateMatrix()
 	{
-		_rotation.x = Clamp(_rotation.x, 180.0f, -180.0f);
-		_rotation.y = Clamp(_rotation.y, 180.0f, -180.0f);
-		_rotation.z = Clamp(_rotation.z, 180.0f, -180.0f);
+		Clamp(_rotation.x, -180.0f, 180.0f);
+		Clamp(_rotation.y, -180.0f, 180.0f);
+		Clamp(_rotation.z, -180.0f, 180.0f);
 		_world_mat = MatrixScale(_scale) * MatrixTranslation(_position) * MatrixRotationYawPitchRoll(_rotation);
 	}
 }

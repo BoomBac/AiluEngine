@@ -4,6 +4,7 @@
 #include <vector>
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Objects/SceneActor.h"
+#include "Objects/LightComponent.h"
 
 namespace Ailu
 {
@@ -16,11 +17,14 @@ namespace Ailu
 		std::list<Ref<SceneActor>>& GetAllActor();
 		Ref<SceneActor>& GetSceneRoot() { return _p_root; }
 		Ref<SceneActor>& GetSceneActorByID(const uint32_t& id);
+		Ref<SceneActor>& GetSceneActorByIndex(const uint32_t& index);
+		std::list<LightComponent*>& GetAllLight();
 		DECLARE_PRIVATE_PROPERTY(b_dirty, Dirty, bool)
 		DECLARE_PRIVATE_PROPERTY(name, Name, std::string)
 	private:
 		Ref<SceneActor> _p_root;
 		std::list<Ref<SceneActor>> _all_objects{};
+		std::list<LightComponent*> _all_lights{};
 		void TravelAllActor(Ref<SceneActor>& actor, ActorEvent& e);
 		ActorEvent FillActorList;
 	};

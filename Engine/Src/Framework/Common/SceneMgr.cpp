@@ -16,7 +16,7 @@ namespace Ailu
 		{
 			for (auto& actor : _p_current->GetAllActor())
 			{
-				actor->Tick();
+				actor->Tick(16.6f);
 			}
 		}
 	}
@@ -33,7 +33,14 @@ namespace Ailu
 	{
 		_p_root = Actor::Create<SceneActor>(name);
 		_name = name;
-		FillActorList = [this](Ref<SceneActor>& actor) {_all_objects.emplace_back(actor); };
+		FillActorList = [this](Ref<SceneActor>& actor) {
+			_all_objects.emplace_back(actor); 
+			auto light = actor->GetComponent<LightComponent>();
+			if (light != nullptr)
+			{
+				_all_lights.emplace_back(light);
+			}
+			};
 	}
 
 	void Scene::AddObject(Ref<SceneActor>& actor)
@@ -48,6 +55,7 @@ namespace Ailu
 		if (_b_dirty)
 		{
 			_all_objects.clear();
+			_all_lights.clear();
 			TravelAllActor(_p_root,FillActorList);
 			_b_dirty = false;
 		}
@@ -62,6 +70,29 @@ namespace Ailu
 		}
 		LOG_WARNING("Can't find actor with id: {} in scene {},will return first actor",id,_name);
 		return _all_objects.front();
+	}
+
+	Ref<SceneActor>& Scene::GetSceneActorByIndex(const uint32_t& index)
+	{
+		if (index >= _all_objects.size())
+		{
+			return _all_objects.front();
+			LOG_WARNING("Can't find actor with index: {} in scene {},will return first actor",index,_name);
+		}
+		else
+		{
+			int cur_index = 0;
+			for (auto it = _all_objects.begin(); it!= _all_objects.end();it++)
+			{
+				if (cur_index == index) return *it;
+				else ++cur_index;
+			}
+		}
+	}
+
+	std::list<LightComponent*>& Scene::GetAllLight()
+	{
+		return _all_lights;
 	}
 
 	void Scene::TravelAllActor(Ref<SceneActor>& actor,ActorEvent& e)

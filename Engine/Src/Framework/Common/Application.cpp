@@ -67,9 +67,10 @@ namespace Ailu
 			for (Layer* layer : _layer_stack)
 				layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
 			_p_window->OnUpdate();
-			g_pSceneMgr->Tick();
+
 			while (render_lag > kMsPerRender)
-			{		
+			{	
+				g_pSceneMgr->Tick();
 				_p_imgui_layer->Begin();
 				for (Layer* layer : _layer_stack)
 					layer->OnImguiRender();

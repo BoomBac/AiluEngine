@@ -3,17 +3,26 @@
 
 namespace Ailu
 {
+	Component::Component()
+	{
+		_b_enable = true;
+	}
 	Component::~Component()
 	{
 	}
 	void Component::BeginPlay()
 	{
 	}
-	void Component::Tick()
+	void Component::Tick(const float& delta_time)
 	{
 	}
+
 	void Component::Destroy()
 	{
+	}
+	void Component::SetOwner(Actor* onwer)
+	{
+		_p_onwer = onwer;
 	}
 	std::string Component::GetTypeName()
 	{

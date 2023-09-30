@@ -21,12 +21,16 @@ namespace Ailu
 	{
 	public:
 		LightComponent();
+		void Tick(const float& delta_time) final;
+		COMPONENT_CLASS_TYPE(LightComponent)
 	public:
-		inline static Vector3f kDefaultDirectionalLightDir = { 0.0f,-1.0f,0.0f };
+		const inline static Vector3f kDefaultDirectionalLightDir = { 0.0f,-1.0f,0.0f };
 		ELightType _light_type;
 		LightData _light;
 		float _intensity;
-		bool _shadow;
+		bool _b_shadow;
+	private:
+		void DrawLightGizmo();
 	};
 }
 

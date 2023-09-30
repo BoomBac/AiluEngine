@@ -13,12 +13,6 @@ namespace Ailu
 		{		
 			_p_light_comp = AddComponent<LightComponent>();
 		}
-		void Tick() final
-		{
-			_p_light_comp->_light._light_pos = _p_transform->Position();
-			auto rot = _p_transform->Rotation();
-			//MatrixRotationX(rot.x) * MatrixRotationY(rot.y)
-		}
 	private:
 		LightComponent* _p_light_comp;
 	};

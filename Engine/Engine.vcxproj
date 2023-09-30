@@ -505,6 +505,7 @@
     <ClInclude Include="Inc\Objects\Component.h" />
     <ClInclude Include="Inc\Objects\LightComponent.h" />
     <ClInclude Include="Inc\Objects\SceneActor.h" />
+    <ClInclude Include="Inc\Objects\StaticMeshComponent.h" />
     <ClInclude Include="Inc\Objects\TransformComponent.h" />
     <ClInclude Include="Inc\pch.h" />
     <ClInclude Include="Inc\Platform\WinInput.h" />
@@ -531,6 +532,9 @@
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DTexture.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
+    <None Include="Res\Shaders\lighting.hlsl">
+      <FileType>Document</FileType>
+    </None>
     <None Include="Res\Shaders\cbuffer.hlsl">
       <FileType>Document</FileType>
     </None>
@@ -560,6 +564,7 @@
     <ClCompile Include="Src\Objects\Component.cpp" />
     <ClCompile Include="Src\Objects\LightComponent.cpp" />
     <ClCompile Include="Src\Objects\SceneActor.cpp" />
+    <ClCompile Include="Src\Objects\StaticMeshComponent.cpp" />
     <ClCompile Include="Src\Objects\TransformComponent.cpp" />
     <ClCompile Include="Src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

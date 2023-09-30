@@ -3,21 +3,30 @@
 #define __COMPONENT_H__
 #include <string>
 #include "GlobalMarco.h"
+#include "Framework/Common/Reflect.h"
+
 namespace Ailu
 {
 #define COMPONENT_CLASS_TYPE(type)\
 	static std::string GetType() {return #type;};\
 	inline std::string GetTypeName() override {return GetType();};
 
+	class Actor;
 	class Component
 	{
 	public:
+		Component();
 		virtual ~Component();
 		virtual void BeginPlay();
-		virtual void Tick();
+		virtual void Tick(const float& delta_time);
 		virtual void Destroy();
+		virtual void SetOwner(Actor* onwer);
 		virtual std::string GetTypeName();
+		DECLARE_PROTECTED_PROPERTY(b_enable,Active,bool)
+		DECLARE_REFLECT_FIELD(Component)
 	protected:
+		Actor* _p_onwer = nullptr;
+		
 	};
 }
 

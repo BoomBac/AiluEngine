@@ -1995,6 +1995,9 @@
     <ClInclude Include="Inc\Framework\Common\SceneMgr.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Objects\StaticMeshComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2132,6 +2135,9 @@
     <ClCompile Include="Src\Framework\Common\SceneMgr.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Src\Objects\StaticMeshComponent.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat">
@@ -2144,6 +2150,9 @@
     <None Include="Res\Shaders\gizmo.hlsl" />
     <None Include="Res\Shaders\PureColor.hlsl" />
     <None Include="Res\Shaders\common.hlsl" />
+    <None Include="Res\Shaders\lighting.hlsl">
+      <Filter>头文件</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

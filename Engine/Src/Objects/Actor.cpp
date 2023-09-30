@@ -33,13 +33,14 @@ namespace Ailu
 		}
 	}
 
-	void Actor::Tick()
+	void Actor::Tick(const float& delta_time)
 	{
 		for (auto& component : _components)
 		{
-			component->Tick();
+			component->Tick(delta_time);
 		}
 	}
+
 
 	std::list<Ref<Actor>>& Actor::GetAllChildren()
 	{

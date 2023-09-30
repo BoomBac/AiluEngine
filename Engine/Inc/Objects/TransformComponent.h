@@ -18,7 +18,7 @@ namespace Ailu
 		DECLARE_PRIVATE_PROPERTY(rotation,Rotation,Vector3f)
 		COMPONENT_CLASS_TYPE(TransformComponent);
 
-		DECLARE_REFLECT_FIELD(TransformComponent)
+		//DECLARE_REFLECT_FIELD(TransformComponent)
 	private:
 		void CalculateMatrix();
 	private:

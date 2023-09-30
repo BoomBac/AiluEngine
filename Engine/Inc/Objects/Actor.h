@@ -16,7 +16,7 @@ namespace Ailu
 		virtual ~Actor();
 		Actor();
 		virtual void BeginPlay();
-		virtual void Tick();
+		virtual void Tick(const float& delta_time);
 		
 		template <typename Type>
 		static Ref<Type> Create();
@@ -27,6 +27,7 @@ namespace Ailu
 		template <typename Type>
 		inline Type* AddComponent();
 
+		std::list<Scope<Component>>& GetAllComponent() { return _components; }
 
 		std::list<Ref<Actor>>& GetAllChildren();
 		void RemoveChild(Ref<Actor> child);
@@ -91,6 +92,7 @@ namespace Ailu
 				return static_cast<Type*>(component.get());
 		}
 		_components.emplace_back(std::move(MakeScope<Type>()));
+		_components.back()->SetOwner(this);
 		return static_cast<Type*>(_components.back().get());
 	}
 }

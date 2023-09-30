@@ -1,3 +1,7 @@
+#pragma once
+#ifndef __REFLECT_H__
+#define __REFLECT_H__
+
 #include <vector>
 #include <iostream>
 #include <string>
@@ -21,12 +25,13 @@ namespace Ailu
         if (std::is_same<T, float>()) return std::format("{}", value);
     }
 
-#define DECLARE_REFLECT_FIELD(class_name) private: std::unordered_map<std::string,SerializableProperty> properties{};\
+#define DECLARE_REFLECT_FIELD(class_name) protected: std::unordered_map<std::string,SerializableProperty> properties{};\
 public:\
     template<typename T>\
     T GetProperty(const std::string& name){return *reinterpret_cast<T*>(properties.find(name)->second._value_ptr);}\
      SerializableProperty& GetProperty(const std::string& name){return properties.find(name)->second;}\
     std::unordered_map<std::string,SerializableProperty>& GetAllProperties(){return properties;}
+
 #define DECLARE_REFLECT_PROPERTY(type_name,name,value) properties.insert(std::make_pair(#name,SerializableProperty{&value,#name,#type_name}));
 
     namespace reflect {
@@ -186,3 +191,6 @@ public:\
 
     } // namespace reflect
 }
+
+
+#endif // !REFLECT_H__

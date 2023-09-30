@@ -186,6 +186,13 @@ namespace Ailu
 			return *this;
 		}
 
+		Vector3D<T>& operator*=(const float& other) {
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] *= other;
+			}
+			return *this;
+		}
+
 		Vector3D<T>& operator/=(const Vector3D<T>& other) {
 			try
 			{
@@ -302,13 +309,16 @@ namespace Ailu
 
 	inline static float ToRadius(const float& angle) { return angle * kPi / 180.f; }
 	inline static float ToAngle(const float& radius) { return 180.f * radius / kPi; }
-	inline static float Clamp(const float& value, const float& max, const float& min)
-	{
-		if (value > max) return max;
-		else if (value < min) return min;
-		else return value;
-	}
 
+	//inline static float Clamp(const float& value, const float& max, const float& min)
+	//{
+	//	return (value > max) ? max : (value < min) ? min : value;
+	//}
+
+	inline static void Clamp(float& value, const float& min, const float& max)
+	{
+		value = (value > max) ? max : (value < min) ? min : value;
+	}
 
 	template<template<typename> typename TT, typename T>
 	TT<T> operator+(const TT<T> v1, const TT<T> v2)
