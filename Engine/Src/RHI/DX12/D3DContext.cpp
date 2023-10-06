@@ -15,6 +15,7 @@
 #include "Render/RenderingData.h"
 #include "Framework/Common/SceneMgr.h"
 #include "Objects/CommonActor.h"
+#include "Objects/StaticMeshComponent.h"
 
 
 
@@ -105,11 +106,9 @@ namespace Ailu
     {
         s_p_d3dcontext = this;
         LoadPipeline();
-        LoadAssets();
-        Gizmo::Init();
         //init imgui
         D3D12_DESCRIPTOR_HEAP_DESC SrvHeapDesc;
-        SrvHeapDesc.NumDescriptors = 1;
+        SrvHeapDesc.NumDescriptors = 2;
         SrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         SrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         SrvHeapDesc.NodeMask = 0;
@@ -120,6 +119,9 @@ namespace Ailu
             DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeapImGui,
             g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart(),
             g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart());
+        LoadAssets();
+        Gizmo::Init();
+
 
         //scene data
         _p_scene_camera = std::make_unique<Camera>(16.0F / 9.0F);
@@ -175,21 +177,25 @@ namespace Ailu
 
     D3D12_CPU_DESCRIPTOR_HANDLE& D3DContext::GetSRVCPUDescriptorHandle(uint32_t index)
     {
-        static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount + 
-            D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
-        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-        auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
-        cpu_handle.ptr += _cbv_desc_size * (base + index);
+        //static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount + 
+        //    D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
+        ////CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+        //auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+        //cpu_handle.ptr += _cbv_desc_size * (base + index);
+        auto cpu_handle = g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart();
+        cpu_handle.ptr += _cbv_desc_size * 1;
         return cpu_handle;
     }
 
     D3D12_GPU_DESCRIPTOR_HANDLE& D3DContext::GetSRVGPUDescriptorHandle(uint32_t index)
     {
-        static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount +
-            D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
-        auto cpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
-        cpu_handle.ptr += _cbv_desc_size * (base + index);
-        return cpu_handle;
+        //static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount +
+        //    D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
+        //auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
+        //gpu_handle.ptr += _cbv_desc_size * (base + index);
+        auto gpu_handle = g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart();
+        gpu_handle.ptr += _cbv_desc_size * 1;
+        return gpu_handle;
     }
 
     uint8_t* D3DContext::GetCBufferPtr()
@@ -423,28 +429,35 @@ namespace Ailu
             //_plane = parser->Parser(GET_RES_PATH(Meshs/gizmo.fbx));
 
             //_tree = parser->Parser(GetResPath("Meshs/stone.fbx"));
-            _tree = parser->Parser(GetResPath("Meshs/plane.fbx"));
+            //_tree = parser->Parser(GetResPath("Meshs/plane.fbx"));
+            //_tree = parser->Parser(GetResPath("Meshs/space_ship.fbx"));
+            _tree = parser->Parser(GetResPath("Meshs/sphere.fbx"));
 
             auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
             auto tga_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kTGA);
 
             //_tex_water = tga_parser->Parser(GET_RES_PATH(Textures/PK_stone03_static_0_D.tga));
-            tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
-            tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
+            //tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
+            //tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
+            //png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_color_4.png"));
+            png_parser->Parser(GetResPath("Textures/MyImage01.jpg"));
+            //png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_emi.jpg"));
+            //png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_nmap_2_Tris.jpg"));
 
-            //_mat_standard->SetTexture("TexAlbedo", TexturePool::Get("PK_stone03_static_0_D"));
-            //_mat_standard->SetTexture("TexNormal", TexturePool::Get("PK_stone03_static_0_N"));
+            //_mat_standard->SetTexture("TexAlbedo", TexturePool::Get("Intergalactic Spaceship_color_4"));
+            //_mat_standard->SetTexture("TexNormal", TexturePool::Get("Intergalactic Spaceship_nmap_2_Tris"));
+            //_mat_standard->SetTexture("TexEmssive", TexturePool::Get("Intergalactic Spaceship_emi"));
 
             _p_actor = Actor::Create<SceneActor>("stone");
+            _p_actor->AddComponent<StaticMeshComponent>(_tree, _mat_standard);
             _p_light = Actor::Create<LightActor>("directional_light");
             Ref<SceneActor> point_light = Actor::Create<LightActor>("point_light");
             point_light->GetComponent<LightComponent>()->_light_type = ELightType::kPoint;
             point_light->GetComponent<LightComponent>()->_light._light_param.x = 500.0f;
 
             Ref<SceneActor> spot_light = Actor::Create<LightActor>("spot_light");
-            auto spot_tranform = spot_light->GetComponent<TransformComponent>();
-            spot_tranform->Position({0.0,500.0,0.0});
-            spot_tranform->Rotation({82.0,0.0,0.0});
+            spot_light->GetTransform().Position({0.0,500.0,0.0});
+            spot_light->GetTransform().Rotation({82.0,0.0,0.0});
             auto light_comp = spot_light->GetComponent<LightComponent>();
             light_comp->_light_type = ELightType::kSpot;
             light_comp->_light._light_param.x = 500.0f;
@@ -505,6 +518,7 @@ namespace Ailu
         m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         {          
             Renderer::BeginScene();
+            memset(reinterpret_cast<void*>(&_perframe_scene_data), 0, sizeof(_perframe_scene_data));
             auto& light_comps = g_pSceneMgr->_p_current->GetAllLight();
             uint16_t updated_light_num = 0u;
             uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0;
@@ -575,13 +589,13 @@ namespace Ailu
         {
             GraphicsPipelineStateMgr::s_standard_shadering_pso->Bind();
             GraphicsPipelineStateMgr::s_standard_shadering_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(_p_actor->_p_transform->GetWorldMatrix()), _mat_standard);
+            cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_standard);
         }
         else
         {
             GraphicsPipelineStateMgr::s_wireframe_pso->Bind();
             GraphicsPipelineStateMgr::s_wireframe_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(_p_actor->_p_transform->GetWorldMatrix()), _mat_wireframe);
+            cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_wireframe);
         }   
         ExecuteCommandBuffer(cmd);
         cmd->Clear();
@@ -589,7 +603,7 @@ namespace Ailu
         {
             GraphicsPipelineStateMgr::s_wireframe_pso->Bind();
             GraphicsPipelineStateMgr::s_wireframe_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(_p_actor->_p_transform->GetWorldMatrix()), _mat_wireframe);
+            cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_wireframe);
         }
         ExecuteCommandBuffer(cmd);
 
@@ -598,7 +612,11 @@ namespace Ailu
             Renderer::EndScene();
         }
         D3DComandBufferPool::ReleaseCommandBuffer(cmd);
-        
+        auto& aabb = _tree->_bound_box;
+        auto [bmin,bmax] = AABB::CaclulateBoundBox(aabb, _p_actor->GetTransform().GetTransformMat());
+        Gizmo::DrawAABB(bmin, bmax,Colors::kRed);
+        //Gizmo::DrawAABB(aabb._min, aabb._max,Colors::kGreen);
+        //Gizmo::DrawLine(bmin, bmax,Colors::kWhite);
         //DrawGizmo
         {
             GraphicsPipelineStateMgr::s_gizmo_pso->Bind();

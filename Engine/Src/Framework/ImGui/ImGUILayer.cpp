@@ -10,7 +10,9 @@
 
 #include "Objects/Actor.h"
 #include "Objects/TransformComponent.h"
+#include "Objects/StaticMeshComponent.h"
 #include "Framework/Common/SceneMgr.h"
+#include "RHI/DX12/D3DTexture.h"
 
 namespace ImguiTree
 {
@@ -207,6 +209,112 @@ namespace Ailu
         ImGui::Render();
     }
 
+    static void DrawComponentProperty(Component* comp)
+    {
+        if (ImGui::CollapsingHeader(comp->GetTypeName().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            if (comp->GetTypeName() == LightComponent::GetStaticType())
+            {
+                auto light = static_cast<LightComponent*>(comp);
+                static const char* items[] = { "Directional", "Point", "Spot" };
+                int item_current_idx = 0;
+                switch (light->_light_type)
+                {
+                case Ailu::ELightType::kDirectional: item_current_idx = 0;
+                    break;
+                case Ailu::ELightType::kPoint: item_current_idx = 1;
+                    break;
+                case Ailu::ELightType::kSpot: item_current_idx = 2;
+                    break;
+                }
+                const char* combo_preview_value = items[item_current_idx];
+                if (ImGui::BeginCombo("LightType", combo_preview_value, 0))
+                {
+                    for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+                    {
+                        const bool is_selected = (item_current_idx == n);
+                        if (ImGui::Selectable(items[n], is_selected))
+                            item_current_idx = n;
+                        if (is_selected)
+                            ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::SliderFloat("Intensity", &light->_intensity, 0.0f, 16.0f);
+                ImGui::ColorEdit3("Color", static_cast<float*>(light->_light._light_color.data));
+                if (item_current_idx == 0) light->_light_type = ELightType::kDirectional;
+                else if (item_current_idx == 1) light->_light_type = ELightType::kPoint;
+                else light->_light_type = ELightType::kSpot;
+                if (light->_light_type == ELightType::kDirectional) return;
+                else if (light->_light_type == ELightType::kPoint)
+                {
+                    auto& light_data = light->_light;
+                    ImGui::DragFloat("Radius", &light_data._light_param.x,1.0,0.0,5000.0f);
+                }
+                else
+                {
+                    auto& light_data = light->_light;
+                    ImGui::DragFloat("Radius", &light_data._light_param.x);
+                    ImGui::SliderFloat("InnerAngle", &light_data._light_param.y,0.0f, light_data._light_param.z);
+                    ImGui::SliderFloat("OuterAngle", &light_data._light_param.z, 1.0f,180.0f);
+                }
+            }
+            else if(comp->GetTypeName() == TransformComponent::GetStaticType())
+            {
+                auto transf = static_cast<TransformComponent*>(comp);
+                auto& pos = transf->GetProperty("Position");
+                ImGui::DragFloat3(pos._name.c_str(),static_cast<Vector3f*>(pos._value_ptr)->data);
+                auto& rot = transf->GetProperty("Rotation");
+                ImGui::SliderFloat3(rot._name.c_str(), static_cast<Vector3f*>(rot._value_ptr)->data,-180.f,180.f,"%.2f",ImGuiSliderFlags_AlwaysClamp);
+                auto& scale = transf->GetProperty("Scale");
+                ImGui::DragFloat3(scale._name.c_str(), static_cast<Vector3f*>(scale._value_ptr)->data);
+            }
+            else if (comp->GetTypeName() == StaticMeshComponent::GetStaticType())
+            {
+                auto static_mesh_comp = static_cast<StaticMeshComponent*>(comp);
+                for (auto& prop : static_mesh_comp->GetAllProperties())
+                {
+                    if (prop.second._type_name == "StaticMesh")
+                    {
+                        ImGui::Text("StaticMesh: %s", prop.second._name.c_str());
+                    }
+                }
+                int mat_prop_index = 0;
+                static bool use_textures[10]{};
+                for (auto& prop : static_mesh_comp->GetMaterial()->GetAllProperties())
+                {
+                    ImGui::PushID(mat_prop_index);
+                    ImGui::Checkbox("Texture", &use_textures[mat_prop_index++]);
+                    ImGui::PopID();
+                    ImGui::SameLine();
+                    if (prop.second._type_name == "Color")
+                    {
+                        ImGui::ColorEdit3(prop.second._name.c_str(),static_cast<float*>(prop.second._value_ptr));
+                        if (use_textures[mat_prop_index - 1])
+                        {
+                            auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
+                            // 获取当前ImGui窗口的内容区域宽度
+                            float contentWidth = ImGui::GetWindowContentRegionWidth();
+                            // 计算使图像水平居中的X坐标
+                            float centerX = (contentWidth - 256) * 0.5f;
+                            // 设置光标的X坐标，使图像水平居中
+                            ImGui::SetCursorPosX(centerX);
+                            ImGui::Image((void*)(intptr_t)desc.ptr, ImVec2(256, 256));
+                        }
+                    }
+                    else if (prop.second._type_name == "Color4")
+                    {
+                        ImGui::ColorEdit4(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr));
+                    }
+                    else if (prop.second._type_name == "Float")
+                    {
+                        //ImGui::DragFloat(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr));
+                        ImGui::SliderFloat(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr), 0.0f, 1.0f, "%.2f");
+                    }
+                }
+            }
+        }
+    }
 
 
     void DrawTreeNode(Ref<SceneActor>& actor)
@@ -291,39 +399,11 @@ namespace Ailu
             {
                 ImGui::PushID(comp_index);
                 bool b_active = comp->Active();
-                ImGui::Checkbox(" ", &b_active);
-                ImGui::SameLine();
-                ImGui::Text(comp->GetTypeName().c_str());
+                ImGui::Checkbox("", &b_active);
                 ImGui::PopID();
                 comp->Active(b_active);
-                if (comp->GetTypeName() == "LightComponent")
-                {
-                    for (auto& prop : comp->GetAllProperties())
-                    {
-                        DrawProperty(prop.second);
-                    }
-                    auto light = static_cast<LightComponent*>(comp.get());
-                    if (light->_light_type == ELightType::kDirectional) continue;
-                    else if (light->_light_type == ELightType::kPoint)
-                    {
-                        auto& light_data = light->_light;
-                        ImGui::DragFloat("Radius", &light_data._light_param.x);
-                    }
-                    else
-                    {
-                        auto& light_data = light->_light;
-                        ImGui::DragFloat("Radius", &light_data._light_param.x);
-                        ImGui::DragFloat("InnerAngle", &light_data._light_param.y);
-                        ImGui::DragFloat("OuterAngle", &light_data._light_param.z);
-                    }
-                }
-                else
-                {
-                    for (auto& prop : comp->GetAllProperties())
-                    {
-                        DrawProperty(prop.second);
-                    }
-                }
+                ImGui::SameLine();
+                DrawComponentProperty(comp.get());
                 ++comp_index;
             }
         }

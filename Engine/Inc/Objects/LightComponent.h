@@ -3,6 +3,7 @@
 #define __LIGHT_COMP_H__
 #include "Component.h"
 #include "Framework/Math/ALMath.hpp"
+
 namespace Ailu
 {
 	struct LightData
@@ -19,10 +20,10 @@ namespace Ailu
 	};
 	class LightComponent : public Component
 	{
+		COMPONENT_CLASS_TYPE(LightComponent)
 	public:
 		LightComponent();
 		void Tick(const float& delta_time) final;
-		COMPONENT_CLASS_TYPE(LightComponent)
 	public:
 		const inline static Vector3f kDefaultDirectionalLightDir = { 0.0f,-1.0f,0.0f };
 		ELightType _light_type;
@@ -31,6 +32,7 @@ namespace Ailu
 		bool _b_shadow;
 	private:
 		void DrawLightGizmo();
+		
 	};
 }
 

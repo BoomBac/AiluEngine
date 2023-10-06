@@ -1998,6 +1998,12 @@
     <ClInclude Include="Inc\Objects\StaticMeshComponent.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Math\Transform.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Math\AABB.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

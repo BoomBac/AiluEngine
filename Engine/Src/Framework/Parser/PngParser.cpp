@@ -19,10 +19,21 @@ namespace Ailu
 		else
 		{
 			auto tex = Texture2D::Create(x, y, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			uint8_t* new_data = nullptr;
+			if (n == 3)
+			{
+				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * 3);
+				stbi_image_free(data);
+				tex->FillData(std::move(new_data));
+			}
+			else
+			{
+				tex->FillData(std::move(data));
+				//texture会调用delete[]释放data，使用stbi原始数据使用malloc申请空间，可能会有问题
+				//stbi_image_free(data);
+			}
 			tex->Name(GetFileName(path));
 			TexturePool::Add(tex->Name(), tex);
-			tex->FillData(std::move(data));
-			//stbi_image_free(data);
 			return tex;
 		}
 	}

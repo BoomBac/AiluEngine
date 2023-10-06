@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Framework/Parser/FbxParser.h"
 #include "Framework/Common/ThreadPool.h"
+#include <limits>
 
 using fbxsdk::FbxNodeAttribute;
 using fbxsdk::FbxCast;
@@ -210,6 +211,7 @@ namespace Ailu
 		fbxsdk::FbxVector4* points{ fbx_mesh.GetControlPoints() };
 		uint32_t cur_index_count = 0u;
 		std::vector<Vector3f> positions{};
+		auto tran = fbx_mesh.GetPolygonCount();
 		for (int32_t i = 0; i < fbx_mesh.GetPolygonCount(); ++i)
 		{
 			for (int32_t j = 0; j < 3; ++j)
@@ -422,9 +424,9 @@ namespace Ailu
 	void FbxParser::GenerateIndexdMesh(Ref<Mesh>& mesh)
 	{
 		uint32_t vertex_count = mesh->_vertex_count;
-		std::unordered_map<Vector3f, uint16_t,ALHash::Vector3fHash,ALHash::Vector3Equal> normal_map{};
-		std::unordered_map<Vector2f, uint16_t,ALHash::Vector2fHash,ALHash::Vector2Equal> uv_map{};
-		std::unordered_map<uint64_t, uint16_t> vertex_map{};
+		std::unordered_map<Vector3f, uint32_t,ALHash::Vector3fHash,ALHash::Vector3Equal> normal_map{};
+		std::unordered_map<Vector2f, uint32_t,ALHash::Vector2fHash,ALHash::Vector2Equal> uv_map{};
+		std::unordered_map<uint64_t, uint32_t> vertex_map{};
 		std::vector<Vector3f> normals{};
 		std::vector<Vector3f> positions{};
 		std::vector<Vector2f> uv0s{};
@@ -437,6 +439,12 @@ namespace Ailu
 		ALHash::Vector2fHash v2hash{};
 		TimeMgr mgr;
 		mgr.Mark();
+#undef max(a,b)            (((a) > (b)) ? (a) : (b))
+		constexpr float minf = std::numeric_limits<float>::lowest();
+		constexpr float maxf = std::numeric_limits<float>::max();
+		Vector3f min{maxf,maxf ,maxf };
+		Vector3f max{ minf,minf ,minf };
+#define max(a, b)            (((a) > (b)) ? (a) : (b))
 		for (size_t i = 0; i < vertex_count; i++)
 		{
 			auto p = raw_pos[i], n = raw_normals[i];
@@ -451,11 +459,15 @@ namespace Ailu
 				normals.emplace_back(n);
 				positions.emplace_back(p);
 				uv0s.emplace_back(uv);
+				min = Min(min, p);
+				max = Max(max, p);
 			}
 			else indices.emplace_back(it->second);
 		}
 		LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
 		mesh->Clear();
+		mesh->_bound_box._max = max + Vector3f{10.0f,10.0f,10.0f};
+		mesh->_bound_box._min = min - Vector3f{ 10.0f,10.0f,10.0f };
 		vertex_count = (uint32_t)positions.size();
 		auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;

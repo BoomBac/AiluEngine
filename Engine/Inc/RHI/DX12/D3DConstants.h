@@ -51,8 +51,16 @@ namespace Ailu
 
 	struct ScenePerMaterialData
 	{
-		float padding[64]; // Padding so the constant buffer is 256-byte aligned.
+		Vector4f _BaseColor;
+		float	 _Roughness;
+		Vector3f _Emssive;
+		float	 _Metallic;
+		float    _Specular;
+		// low_bit: metallic|roughness|emssive|normal|albedo
+		uint32_t _SamplerMask;
+		float padding[53]; // Padding so the constant buffer is 256-byte aligned.
 	};
+
 	static_assert((sizeof(ScenePerMaterialData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
 	struct ScenePerObjectData
@@ -68,7 +76,7 @@ namespace Ailu
 		constexpr static uint16_t kMaxMaterialDataCount = 4u;
 		constexpr static uint32_t kMaxRenderObjectCount = 8u;
 		constexpr static uint32_t kMaxTextureCount = 8u;
-		constexpr static uint32_t KMaxDynamicVertexNum = 1024u;
+		constexpr static uint32_t KMaxDynamicVertexNum = 2048;
 		constexpr static uint8_t kMaxVertexAttrNum = 10u;
 
 		constexpr static uint32_t kPerFrameTotalSize = sizeof(ScenePerFrameData) + sizeof(ScenePerMaterialData) * kMaxMaterialDataCount + sizeof(ScenePerObjectData) * kMaxRenderObjectCount;
@@ -89,6 +97,11 @@ namespace Ailu
 		constexpr static char kCBufNameSceneObject[] = "SceneObjectBuffer";
 		constexpr static char kCBufNameSceneMaterial[] = "SceneMaterialBuffer";
 		constexpr static char kCBufNameSceneState[] = "SceneStatetBuffer";
+
+		inline const static std::string kAlbdeoTexName = "TexAlbedo";
+		inline const static std::string kNormalTexName = "TexNormal";
+		inline const static std::string kEmssiveTexName = "TexEmssive";
+		inline const static std::string kRoughnessTexName = "TexRoughness";
 	};
 
 }

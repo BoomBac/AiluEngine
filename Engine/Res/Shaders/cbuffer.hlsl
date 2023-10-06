@@ -1,13 +1,7 @@
 #ifndef __CBUFFER_H__
 #define __CBUFFER_H__
 
-#define MAX_DIRECTIONAL_LIGHT	2
-#define MAX_POINT_LIGHT	4
-#define MAX_SPOT_LIGHT	4
-
-#define PI 3.14159f
-#define ToRadius 0.01745f
-#define ToAngle 57.29582f
+#include "constants.hlsl"
 
 struct ShaderDirectionalAndPointLightData
 {
@@ -34,8 +28,13 @@ cbuffer SceneObjectBuffer : register(b0)
 
 cbuffer SceneMaterialBuffer : register(b1)
 {
-	float4 _Color;
-//	float padding[32];
+	float4 		Color4_BaseColor;
+	float	 	Float_Roughness;
+	float3 		Color_EmssiveColor;
+	float	 	Float_Metallic;
+	float 		Float_Specular;
+	uint 		H_Uint_SamplerMask;
+	float padding0[53];
 };
 
 cbuffer SceneStatetBuffer : register(b2)

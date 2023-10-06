@@ -7,6 +7,7 @@
 #include "Framework/Math/ALMath.hpp"
 #include "Render/Buffer.h"
 #include "Framework/Common/ResourcePool.h"
+#include "Framework/Math/AABB.h"
 
 namespace Ailu
 {
@@ -33,7 +34,8 @@ namespace Ailu
 		DECLARE_PRIVATE_PROPERTY(name,Name, std::string)
 	public:
 		uint32_t _vertex_count;
-		uint16_t _index_count;
+		uint32_t _index_count;
+		AABB _bound_box;
 	private:
 		Ref<VertexBuffer> _p_vbuf;
 		Ref<IndexBuffer> _p_ibuf;

@@ -55,15 +55,16 @@ namespace Ailu
 		p_cmdlist->ResourceBarrier(1, &barrier);
 
 		// Describe and create a SRV for the texture.
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Format = textureDesc.Format;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-		srvDesc.Texture2D.MostDetailedMip = 0;
+		//D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		_srv_desc.Format = textureDesc.Format;
+		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		_srv_desc.Texture2D.MipLevels = 1;
+		_srv_desc.Texture2D.MostDetailedMip = 0;
 		_current_tex_id = s_texture_index;
 		_gpu_handle = D3DContext::GetInstance()->GetSRVGPUDescriptorHandle(s_texture_index);
-		p_device->CreateShaderResourceView(pTextureGPU.Get(), &srvDesc, D3DContext::GetInstance()->GetSRVCPUDescriptorHandle(s_texture_index++));
+		_cpu_handle = D3DContext::GetInstance()->GetSRVCPUDescriptorHandle(s_texture_index++);
+		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _cpu_handle);
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);
 	}

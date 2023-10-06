@@ -27,6 +27,9 @@ namespace Ailu
 		template <typename Type>
 		inline Type* AddComponent();
 
+		template <typename Type,typename... Args>
+		inline Type* AddComponent(Args... args);
+
 		std::list<Scope<Component>>& GetAllComponent() { return _components; }
 
 		std::list<Ref<Actor>>& GetAllChildren();
@@ -92,6 +95,19 @@ namespace Ailu
 				return static_cast<Type*>(component.get());
 		}
 		_components.emplace_back(std::move(MakeScope<Type>()));
+		_components.back()->SetOwner(this);
+		return static_cast<Type*>(_components.back().get());
+	}
+
+	template<typename Type, typename ...Args>
+	inline Type* Actor::AddComponent(Args ...args)
+	{
+		for (auto& component : _components)
+		{
+			if (std::is_same<decltype(*component.get()), Type>::value)
+				return static_cast<Type*>(component.get());
+		}
+		_components.emplace_back(std::move(MakeScope<Type>(args...)));
 		_components.back()->SetOwner(this);
 		return static_cast<Type*>(_components.back().get());
 	}

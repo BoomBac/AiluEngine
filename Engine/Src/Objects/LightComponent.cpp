@@ -22,56 +22,56 @@ namespace Ailu
 	{
 		if (_b_enable)
 		{
-			auto comp = _p_onwer->GetComponent<TransformComponent>();
+			auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
 			Clamp(_intensity, 0.0, 4.0);
 			_light._light_color.a = _intensity;
-			_light._light_pos = comp->Position();
+			_light._light_pos = transf.Position();
 			Clamp(_light._light_param.z,0.0f, 180.0f);
-			Clamp(_light._light_param.y, 0.0f,_light._light_param.z);
+			Clamp(_light._light_param.y, 0.0f,_light._light_param.z - 0.1f);
 			DrawLightGizmo();
 		}
 	}
 	void LightComponent::DrawLightGizmo()
 	{
-		auto comp = _p_onwer->GetComponent<TransformComponent>();
+		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
 		switch (_light_type)
 		{
 			case Ailu::ELightType::kDirectional:
 			{
-				auto rot = comp->Rotation();
+				auto rot = transf.Rotation();
 				Vector4f light_forward = kDefaultDirectionalLightDir;
 				auto rot_mat = MatrixRotationX(ToRadius(rot.x)) * MatrixRotationY(ToRadius(rot.y));
-				Transform(light_forward, rot_mat);
+				TransformVector(light_forward, rot_mat);
 				Normalize(light_forward);
 				_light._light_dir = light_forward;
 				Vector3f light_to = _light._light_dir.xyz;
 				light_to.x *= 100;
 				light_to.y *= 100;
 				light_to.z *= 100;
-				Gizmo::DrawLine(comp->Position(), comp->Position() + light_to, _light._light_color);
-				Gizmo::DrawCircle(comp->Position(), 50.0f, 24, _light._light_color, rot_mat);
+				Gizmo::DrawLine(transf.Position(), transf.Position() + light_to, _light._light_color);
+				Gizmo::DrawCircle(transf.Position(), 50.0f, 24, _light._light_color, rot_mat);
 				return;
 			}
 			case Ailu::ELightType::kPoint:
 			{
-				Gizmo::DrawCircle(comp->Position(), _light._light_param.x, 24, _light._light_color, MatrixRotationX(ToRadius(90.0f)));
-				Gizmo::DrawCircle(comp->Position(), _light._light_param.x, 24, _light._light_color, MatrixRotationZ(ToRadius(90.0f)));
-				Gizmo::DrawCircle(comp->Position(), _light._light_param.x, 24, _light._light_color);
+				Gizmo::DrawCircle(transf.Position(), _light._light_param.x, 24, _light._light_color, MatrixRotationX(ToRadius(90.0f)));
+				Gizmo::DrawCircle(transf.Position(), _light._light_param.x, 24, _light._light_color, MatrixRotationZ(ToRadius(90.0f)));
+				Gizmo::DrawCircle(transf.Position(), _light._light_param.x, 24, _light._light_color);
 				return;
 			}
 			case Ailu::ELightType::kSpot:
 			{
-				auto rot = comp->Rotation();
+				auto rot = transf.Rotation();
 				Vector4f light_forward = kDefaultDirectionalLightDir;
 				auto rot_mat = MatrixRotationX(ToRadius(rot.x)) * MatrixRotationY(ToRadius(rot.y));
-				Transform(light_forward, rot_mat);
+				TransformVector(light_forward, rot_mat);
 				Normalize(light_forward);
 				float angleIncrement = 90.0;
 				_light._light_dir = light_forward;
 				Vector3f light_to = _light._light_dir.xyz;
 				light_to *= _light._light_param.x;
 				{
-					Vector3f inner_center = light_to + comp->Position();
+					Vector3f inner_center = light_to + transf.Position();
 					float inner_radius = tan(ToRadius(_light._light_param.y / 2.0f)) * _light._light_param.x;
 					Gizmo::DrawCircle(inner_center, inner_radius, 24, _light._light_color, rot_mat);
 					for (int i = 0; i < 4; ++i)
@@ -86,12 +86,12 @@ namespace Ailu
 						TransformCoord(point2, rot_mat);
 						point1 += inner_center;
 						point2 += inner_center;
-						Gizmo::DrawLine(comp->Position(), point2, _light._light_color);
+						Gizmo::DrawLine(transf.Position(), point2, _light._light_color);
 					}
 				}
 				light_to *= 0.9f;
 				{
-					Vector3f outer_center = light_to + comp->Position();
+					Vector3f outer_center = light_to + transf.Position();
 					float outer_radius = tan(ToRadius(_light._light_param.z / 2.0f)) * _light._light_param.x;
 					Gizmo::DrawCircle(outer_center, outer_radius, 24, _light._light_color, rot_mat);
 					for (int i = 0; i < 4; ++i)
@@ -106,7 +106,7 @@ namespace Ailu
 						TransformCoord(point2, rot_mat);
 						point1 += outer_center;
 						point2 += outer_center;
-						Gizmo::DrawLine(comp->Position(), point2, _light._light_color);
+						Gizmo::DrawLine(transf.Position(), point2, _light._light_color);
 					}
 				}
 			}

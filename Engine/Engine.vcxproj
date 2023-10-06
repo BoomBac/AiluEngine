@@ -494,7 +494,9 @@
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
     <ClInclude Include="Inc\Framework\Interface\IParser.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
+    <ClInclude Include="Inc\Framework\Math\AABB.h" />
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
+    <ClInclude Include="Inc\Framework\Math\Transform.h" />
     <ClInclude Include="Inc\Framework\Parser\AssetParser.h" />
     <ClInclude Include="Inc\Framework\Parser\FbxParser.h" />
     <ClInclude Include="Inc\Framework\Parser\PngParser.h" />

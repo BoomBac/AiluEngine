@@ -8,8 +8,9 @@
 namespace Ailu
 {
 #define COMPONENT_CLASS_TYPE(type)\
-	static std::string GetType() {return #type;};\
-	inline std::string GetTypeName() override {return GetType();};
+public:\
+	static std::string GetStaticType() {return #type;};\
+	inline std::string GetTypeName() override {return GetStaticType();};
 
 	class Actor;
 	class Component

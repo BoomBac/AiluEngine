@@ -11,6 +11,8 @@ namespace Ailu
 	public:
 		SceneActor();
 		~SceneActor();
+		Transform& GetTransform();
+	private:
 		TransformComponent* _p_transform = nullptr;
 	};
 }

@@ -6,6 +6,7 @@
 #include <string>
 #include <limits>
 #include <format>
+#include <limits>
 #include "GlobalMarco.h"
 
 namespace Ailu
@@ -409,6 +410,28 @@ namespace Ailu
 			first.data[0] * second.data[1] - first.data[1] * second.data[0]);
 	}
 
+	template<template<typename> typename TT, typename T>
+	static TT<T> Max(const TT<T>& first, const TT<T>& second)
+	{
+		TT<T> max{};
+		for (uint8_t i = 0; i < CountOf(first.data); i++)
+		{
+			max.data[i] = first.data[i] > second.data[i] ? first.data[i] : second.data[i];
+		}
+		return max;
+	}
+
+	template<template<typename> typename TT, typename T>
+	static TT<T> Min(const TT<T>& first, const TT<T>& second)
+	{
+		TT<T> min{};
+		for (uint8_t i = 0; i < CountOf(first.data); i++)
+		{
+			min.data[i] = first.data[i] < second.data[i] ? first.data[i] : second.data[i];
+		}
+		return min;
+	}
+
 	template <typename T, int rows, int cols>
 	struct Matrix
 	{
@@ -574,7 +597,7 @@ namespace Ailu
 		return normalizedAngle;
 	}
 
-	static void Transform(Vector4f& vector, const Matrix4x4f& matrix)
+	static void TransformVector(Vector4f& vector, const Matrix4x4f& matrix)
 	{
 		Vector4f temp{};
 		for (uint32_t i = 0; i < 4; i++)
@@ -587,11 +610,19 @@ namespace Ailu
 		vector = temp;
 		return;
 	}
+
+	static Vector3f MultipyVector(const Vector3f& v, const Matrix4x4f& mat)
+	{
+		Vector4f temp{ v,1.f };
+		TransformVector(temp, mat);
+		return temp.xyz;
+	}
+
 	//Transform for point,w is 1.f
 	static void TransformCoord(Vector3f& vector, const Matrix4x4f& matrix)
 	{
 		Vector4f temp{ vector,1.f };
-		Transform(temp, matrix);
+		TransformVector(temp, matrix);
 		vector[0] = temp[0];
 		vector[1] = temp[1];
 		vector[2] = temp[2];
@@ -601,7 +632,7 @@ namespace Ailu
 	static Vector3f TransformCoord(const Vector3f& vector, const Matrix4x4f& matrix)
 	{
 		Vector4f temp{ vector,1.f };
-		Transform(temp, matrix);
+		TransformVector(temp, matrix);
 		return temp.xyz;
 	}
 
@@ -609,7 +640,7 @@ namespace Ailu
 	static void TransformNormal(Vector3f& vector, const Matrix4x4f& matrix)
 	{
 		Vector4f temp{ vector,0.f };
-		Transform(temp, matrix);
+		TransformVector(temp, matrix);
 		vector[0] = temp[0];
 		vector[1] = temp[1];
 		vector[2] = temp[2];

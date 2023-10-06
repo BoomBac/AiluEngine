@@ -4,26 +4,22 @@
 #include "Component.h"
 #include "Framework/Common/Reflect.h"
 #include "Framework/Math/ALMath.hpp"
+#include "Framework/Math/Transform.h"
 
 namespace Ailu
 {
 	class TransformComponent : public Component
 	{
+		COMPONENT_CLASS_TYPE(TransformComponent)
 	public:
 		TransformComponent();
 		~TransformComponent();
-		const Matrix4x4f& GetWorldMatrix();
-		DECLARE_PRIVATE_PROPERTY(position,Position,Vector3f)
-		DECLARE_PRIVATE_PROPERTY(scale,Scale,Vector3f)
-		DECLARE_PRIVATE_PROPERTY(rotation,Rotation,Vector3f)
-		COMPONENT_CLASS_TYPE(TransformComponent);
-
-		//DECLARE_REFLECT_FIELD(TransformComponent)
+		void Tick(const float& delta_time) final;
+		Transform _transform;
 	private:
-		void CalculateMatrix();
-	private:
-		Quaternion _inner_rot;
-		Matrix4x4f _world_mat;
+		Vector3f _pos_data;
+		Vector3f _rotation_data;
+		Vector3f _scale_data;
 	};
 }
 

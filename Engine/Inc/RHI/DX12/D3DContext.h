@@ -149,6 +149,32 @@ namespace Ailu
             }
         }
 
+        static void DrawAABB(const Vector3f& minPoint, const Vector3f& maxPoint, Color color = Gizmo::s_color)
+        {
+            Vector3f vertices[8];
+            vertices[0] = minPoint;
+            vertices[1] = Vector3f(minPoint.x, minPoint.y, maxPoint.z);
+            vertices[2] = Vector3f(minPoint.x, maxPoint.y, minPoint.z);
+            vertices[3] = Vector3f(minPoint.x, maxPoint.y, maxPoint.z);
+            vertices[4] = Vector3f(maxPoint.x, minPoint.y, minPoint.z);
+            vertices[5] = Vector3f(maxPoint.x, minPoint.y, maxPoint.z);
+            vertices[6] = Vector3f(maxPoint.x, maxPoint.y, minPoint.z);
+            vertices[7] = maxPoint;
+
+            DrawLine(vertices[0], vertices[1],color);
+            DrawLine(vertices[0], vertices[2],color);
+            DrawLine(vertices[0], vertices[4],color);
+            DrawLine(vertices[1], vertices[3],color);
+            DrawLine(vertices[1], vertices[5],color);
+            DrawLine(vertices[2], vertices[3],color);
+            DrawLine(vertices[2], vertices[6],color);
+            DrawLine(vertices[3], vertices[7],color);
+            DrawLine(vertices[4], vertices[5],color);
+            DrawLine(vertices[4], vertices[6],color);
+            DrawLine(vertices[5], vertices[7],color);
+            DrawLine(vertices[6], vertices[7],color);
+        }
+
         static void DrawLine(const Vector3f& from, const Vector3f& to, const Color& color_from, const Color& color_to)
         {
             static float vbuf[6];
@@ -263,6 +289,12 @@ namespace Ailu
 
         static void Submit()
         {
+            if (_vertex_num > D3DConstants::KMaxDynamicVertexNum)
+            {
+                LOG_WARNING("[Gizmo] vertex num > KMaxDynamicVertexNum {},draw nothing", D3DConstants::KMaxDynamicVertexNum);
+                _vertex_num = 0;
+                return;
+            }
             if (s_color.a > 0.0f)
             {
                 p_buf->UploadData();

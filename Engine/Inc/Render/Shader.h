@@ -2,6 +2,7 @@
 #ifndef __SHADER_H__
 #define __SHADER_H__
 #include <string>
+#include <set>
 #include <unordered_map>
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Common/ResourcePool.h"
@@ -13,11 +14,6 @@ namespace Ailu
 		kVertex,kPixel
 	};
 
-	struct ShaderSemanic
-	{
-
-	};
-
 	enum class EBindResDescType : uint8_t
 	{
 		kConstBuffer = 0, kTexture2D, kSampler, kCBufferAttribute
@@ -25,6 +21,24 @@ namespace Ailu
 
 	struct ShaderBindResourceInfo
 	{
+		inline const static std::set<std::string> s_reversed_res_name
+		{
+			"SceneObjectBuffer",
+			"_MatrixWorld",
+			"SceneMaterialBuffer",
+			"SceneStatetBuffer",
+			"_MatrixV",
+			"_MatrixP",
+			"_MatrixVP",
+			"_CameraPos",
+			"_DirectionalLights",
+			"_PointLights",
+			"_SpotLights",
+			"padding",
+			"padding0"
+		};
+		inline static uint8_t GetVariableSize(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset & 0XFF;}
+		inline static uint8_t GetVariableOffset(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset >> 8;}
 		EBindResDescType _res_type;
 		union
 		{
@@ -39,6 +53,28 @@ namespace Ailu
 		{
 			if (res_type == EBindResDescType::kCBufferAttribute) _cbuf_member_offset = slot_or_offset;	
 			else _res_slot = slot_or_offset;
+		}
+		bool operator==(const ShaderBindResourceInfo& other) const
+		{
+			return _name == other._name;
+		}
+	};
+
+	// Hash function for ShaderBindResourceInfo
+	struct ShaderBindResourceInfoHash
+	{
+		std::size_t operator()(const ShaderBindResourceInfo& info) const
+		{
+			return std::hash<std::string>{}(info._name);
+		}
+	};
+
+	// Equality function for ShaderBindResourceInfo
+	struct ShaderBindResourceInfoEqual
+	{
+		bool operator()(const ShaderBindResourceInfo& lhs, const ShaderBindResourceInfo& rhs) const
+		{
+			return lhs._name == rhs._name;
 		}
 	};
 

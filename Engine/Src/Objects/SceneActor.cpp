@@ -11,4 +11,8 @@ namespace Ailu
 	{
 
 	}
+	Transform& SceneActor::GetTransform()
+	{
+		return _p_transform->_transform;
+	}
 }

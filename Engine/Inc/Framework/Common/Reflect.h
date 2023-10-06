@@ -15,9 +15,12 @@ namespace Ailu
         void* _value_ptr;
         std::string _name;
         std::string _type_name;
+        SerializableProperty(void* valuePtr, const std::string& name, const std::string& typeName)
+            : _value_ptr(valuePtr), _name(name), _type_name(typeName) {}
         template<typename T>
         static std::string ToString(const T& value);
     };
+
 
     template<typename T>
     std::string SerializableProperty::ToString(const T& value)

@@ -2,13 +2,14 @@
 #define __LIGHTING_H__
 
 #include "cbuffer.hlsl"
+#include "brdf.hlsl"
 
 float3 CaclulateDirectionalLight(uint index, float3 normal, float3 view_dir)
 {
 	float3 light_dir = normalize(-_DirectionalLights[index]._LightPosOrDir.xyz);
 	float diffuse = max(dot(light_dir, normal), 0.0);
 	float3 half_dir = normalize(light_dir + view_dir);
-	float specular = pow(max(0.0, dot(half_dir, normal)), 64);
+	float specular = pow(max(0.0, dot(half_dir, normal)), 256);
 	return saturate(diffuse * _DirectionalLights[index]._LightColor + specular);
 }
 
@@ -28,7 +29,7 @@ float3 CaclulatPointlLight(uint index, float3 normal, float3 pos, float3 view_di
 	atten = (1.0 - saturate(distance / (0.00001 + _PointLights[index]._LightParam0)));
 #endif
 	float diffuse = max(0.0, nl) * atten;
-	float specular = pow(max(0.0, dot(half_dir, normal)), 64) * atten;
+	float specular = pow(max(0.0, dot(half_dir, normal)), 256) * atten;
 	return saturate(diffuse * _PointLights[index]._LightColor + specular);
 }
 
@@ -54,9 +55,56 @@ float3 CaclulatSpotlLight(uint index, float3 normal, float3 pos, float3 view_dir
 	float angle_atten = lerp(1.0, 0.0, angle_lerp);
 	atten *= angle_atten;
 	float diffuse = max(0.0, nl) * atten;
-	float specular = pow(max(0.0, dot(half_dir, normal)), 128) * atten;
+	float specular = pow(max(0.0, dot(half_dir, normal)), 256) * atten;
 	return saturate(diffuse * _SpotLights[index]._LightColor + specular);
 }
+
+float3 CaclulateDirectionalLightPBR(uint index, float3 normal, float3 view_dir)
+{
+	float3 light_dir = normalize(-_DirectionalLights[index]._LightPosOrDir.xyz);
+	float diffuse = max(dot(light_dir, normal), 0.0);
+	float3 half_dir = normalize(light_dir + view_dir);
+	float specular = pow(max(0.0, dot(half_dir, normal)), 256);
+	return saturate(diffuse * _DirectionalLights[index]._LightColor + specular);
+}
+
+float3 GetPointLightIrridance(uint index,float3 world_pos)
+{
+	float dis = distance(_PointLights[index]._LightPosOrDir,world_pos);
+	float atten = 0;
+#if defined(QuadAtten)
+	atten = 10 / (1 + _PointLights[index]._LightParam.x * dis + _PointLights[index]._LightParam.b * dis * _PointLights[index]._LightParam.b * distance)
+#elif defined(InvAtten)
+	atten = 10 / dis * dis;
+#elif defined(LinearAtten)
+	atten = (1.0 - saturate(dis / (0.00001 + _PointLights[index]._LightParam0)));
+#endif
+	return _PointLights[index]._LightColor * atten;
+}
+
+float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
+{
+	float3 light = float3(0.0, 0.0, 0.0);
+	float3 view_dir = normalize(_CameraPos.xyz - world_pos);
+	for (uint i = 0; i < MAX_DIRECTIONAL_LIGHT; i++)
+	{
+		float3 light_dir = -_DirectionalLights[i]._LightPosOrDir;
+		float nl = dot(surface.wnormal,light_dir);
+		light += CookTorranceBRDF(surface,view_dir,light_dir);// * nl * _DirectionalLights[i]._LightColor;
+		//light += nl * _DirectionalLights[i]._LightColor;
+		//light += CaclulateDirectionalLight(i, normal, view_dir);
+	}
+	// for (uint j = 0; j < MAX_POINT_LIGHT; j++)
+	// {
+	// 	light += CaclulatPointlLight(j, normal, pos, view_dir);
+	// }
+	// for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
+	// {
+	// 	light += CaclulatSpotlLight(k, normal, pos, view_dir);
+	// }
+	return light;
+}
+
 float3 CalculateLight
 	(
 	float3 pos, float3 normal)
@@ -67,13 +115,13 @@ float3 CalculateLight
 	{
 		light += CaclulateDirectionalLight(i, normal, view_dir);
 	}
-	for (uint i = 0; i < MAX_POINT_LIGHT; i++)
+	for (uint j = 0; j < MAX_POINT_LIGHT; j++)
 	{
-		light += CaclulatPointlLight(i, normal, pos, view_dir);
+		light += CaclulatPointlLight(j, normal, pos, view_dir);
 	}
-	for (uint i = 0; i < MAX_SPOT_LIGHT; i++)
+	for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
 	{
-		light += CaclulatSpotlLight(i, normal, pos, view_dir);
+		light += CaclulatSpotlLight(k, normal, pos, view_dir);
 	}
 	return light;
 

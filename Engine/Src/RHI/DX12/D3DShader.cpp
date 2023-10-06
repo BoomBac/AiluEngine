@@ -294,8 +294,14 @@ namespace Ailu
 						auto variable = cbuf->GetVariableByIndex(j);
 						D3D12_SHADER_VARIABLE_DESC vdesc{};
 						variable->GetDesc(&vdesc);
-						_bind_res_infos.insert(std::make_pair(vdesc.Name, ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,static_cast<uint16_t>(vdesc.StartOffset),0u,vdesc.Name }));
-						LOG_INFO("{}", vdesc.Name);
+						uint8_t offset = (uint8_t)vdesc.StartOffset;
+						uint8_t size = (uint8_t)vdesc.Size;
+						uint16_t variable_info = 0u;
+						variable_info |= offset;
+						variable_info <<= 8;
+						variable_info |= size;
+						auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
+						_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
 					}
 				}
 			}
