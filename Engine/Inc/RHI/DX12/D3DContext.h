@@ -62,7 +62,7 @@ namespace Ailu
     private:
         inline static D3DContext* s_p_d3dcontext = nullptr;
         WinWindow* _window;
-
+        uint32_t _cbv_desc_num = 0u;
         // Pipeline objects.
         ComPtr<IDXGISwapChain3> m_swapChain;
         ComPtr<ID3D12Device> m_device;

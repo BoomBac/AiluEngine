@@ -10,7 +10,7 @@
 
 namespace Ailu
 {
-	class Actor : public std::enable_shared_from_this<Actor>
+	class Actor
 	{
 	public:
 		virtual ~Actor();
@@ -19,9 +19,9 @@ namespace Ailu
 		virtual void Tick(const float& delta_time);
 		
 		template <typename Type>
-		static Ref<Type> Create();
+		static Type* Create();
 		template <typename Type>
-		static Ref<Type> Create(const std::string& name);
+		static Type* Create(const std::string& name);
 		template <typename Type>
 		Type* GetComponent();
 		template <typename Type>
@@ -32,9 +32,9 @@ namespace Ailu
 
 		std::list<Scope<Component>>& GetAllComponent() { return _components; }
 
-		std::list<Ref<Actor>>& GetAllChildren();
-		void RemoveChild(Ref<Actor> child);
-		void AddChild(Ref<Actor>& child);
+		std::list<Actor*>& GetAllChildren();
+		void RemoveChild(Actor* child);
+		void AddChild(Actor* child);
 		uint16_t GetChildNum() const { return _chilren_num; };
 		void ClearChildren();
 
@@ -42,21 +42,20 @@ namespace Ailu
 		DECLARE_PROTECTED_PROPERTY(Id,Id,uint32_t)
 		DECLARE_PROTECTED_PROPERTY_PTR(Parent,Actor)
 	public:
-		inline static std::vector<Ref<Actor>> s_global_actors{};
+		inline static std::vector<Actor*> s_global_actors{};
 	protected:
-		virtual void Destroy();
 		void RemoveFromRoot() const;	
 	protected:
-		std::list<Ref<Actor>> _children{};
+		std::list<Actor*> _children{};
 		std::list<Scope<Component>> _components{};
 		inline static uint32_t s_actor_count = 0u;
 		uint16_t _chilren_num = 0u;
 	};
 
 	template<typename Type>
-	inline Ref<Type> Actor::Create()
+	inline Type* Actor::Create()
 	{
-		auto actor = MakeRef<Type>();
+		auto actor = new Type();
 		actor->Id(Actor::s_actor_count);
 		actor->Name(std::format("Actor{0}", Actor::s_actor_count++));
 		s_global_actors.emplace_back(actor);
@@ -64,9 +63,9 @@ namespace Ailu
 	}
 
 	template<typename Type>
-	inline Ref<Type> Actor::Create(const std::string& name)
+	inline Type* Actor::Create(const std::string& name)
 	{
-		auto actor = MakeRef<Type>();
+		auto actor = new Type();
 		actor->Id(Actor::s_actor_count);
 		actor->Name(name);
 		++s_actor_count;

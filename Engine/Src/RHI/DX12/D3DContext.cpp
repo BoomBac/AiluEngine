@@ -55,42 +55,6 @@ namespace Ailu
         return begin + D3DConstants::kPerFrameDataSize + D3DConstants::kPerMaterialDataSize * D3DConstants::kMaxMaterialDataCount + object_index * D3DConstants::kPeObjectDataSize;
     }
 
-    static std::vector<UINT8> GenerateTextureData()
-    {
-        UINT TextureWidth = 256, TextureHeight = 256,TexturePixelSize = 4;
-        const UINT rowPitch = TextureWidth * TexturePixelSize;
-        const UINT cellPitch = rowPitch >> 3;        // The width of a cell in the checkboard texture.
-        const UINT cellHeight = TextureWidth >> 3;    // The height of a cell in the checkerboard texture.
-        const UINT textureSize = rowPitch * TextureHeight;
-
-        std::vector<UINT8> data(textureSize);
-        UINT8* pData = &data[0];
-
-        for (UINT n = 0; n < textureSize; n += TexturePixelSize)
-        {
-            UINT x = n % rowPitch;
-            UINT y = n / rowPitch;
-            UINT i = x / cellPitch;
-            UINT j = y / cellHeight;
-
-            if (i % 2 == j % 2)
-            {
-                pData[n] = 0x00;        // R
-                pData[n + 1] = 0x00;    // G
-                pData[n + 2] = 0x00;    // B
-                pData[n + 3] = 0xff;    // A
-            }
-            else
-            {
-                pData[n] = 0xff;        // R
-                pData[n + 1] = 0xff;    // G
-                pData[n + 2] = 0xff;    // B
-                pData[n + 3] = 0xff;    // A
-            }
-        }
-
-        return data;
-    }
 
     D3DContext::D3DContext(WinWindow* window) : _window(window),_width(window->GetWidth()),_height(window->GetHeight())
     {
@@ -106,20 +70,29 @@ namespace Ailu
     {
         s_p_d3dcontext = this;
         LoadPipeline();
-        //init imgui
-        D3D12_DESCRIPTOR_HEAP_DESC SrvHeapDesc;
-        SrvHeapDesc.NumDescriptors = 2;
-        SrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        SrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        SrvHeapDesc.NodeMask = 0;
-        ThrowIfFailed(m_device->CreateDescriptorHeap(
-            &SrvHeapDesc, IID_PPV_ARGS(&g_pd3dSrvDescHeapImGui)));
+        //D3D12_DESCRIPTOR_HEAP_DESC SrvHeapDesc;
+        //SrvHeapDesc.NumDescriptors = 2;
+        //SrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        //SrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        //SrvHeapDesc.NodeMask = 0;
+        //ThrowIfFailed(m_device->CreateDescriptorHeap(
+        //    &SrvHeapDesc, IID_PPV_ARGS(&g_pd3dSrvDescHeapImGui)));
 
-        auto ret = ImGui_ImplDX12_Init(m_device.Get(), D3DConstants::kFrameCount,
-            DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeapImGui,
-            g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart(),
-            g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart());
+        //auto ret = ImGui_ImplDX12_Init(m_device.Get(), D3DConstants::kFrameCount,
+        //    DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeapImGui,
+        //    g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart(),
+        //    g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart());
         LoadAssets();
+        //init imgui
+        {
+            D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle{};
+            gpu_handle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _cbv_desc_size * _cbv_desc_num;
+            D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle{};
+            cpu_handle.ptr = m_cbvHeap->GetCPUDescriptorHandleForHeapStart().ptr + _cbv_desc_size * _cbv_desc_num;
+            auto ret = ImGui_ImplDX12_Init(m_device.Get(), D3DConstants::kFrameCount,
+                DXGI_FORMAT_R8G8B8A8_UNORM, m_cbvHeap.Get(), cpu_handle, gpu_handle);
+        }
+
         Gizmo::Init();
 
 
@@ -177,24 +150,24 @@ namespace Ailu
 
     D3D12_CPU_DESCRIPTOR_HANDLE& D3DContext::GetSRVCPUDescriptorHandle(uint32_t index)
     {
-        //static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount + 
-        //    D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
-        ////CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-        //auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
-        //cpu_handle.ptr += _cbv_desc_size * (base + index);
-        auto cpu_handle = g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart();
-        cpu_handle.ptr += _cbv_desc_size * 1;
+        static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount + 
+            D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
+        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+        auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+        cpu_handle.ptr += _cbv_desc_size * (base + index);
+        //auto cpu_handle = g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart();
+        //cpu_handle.ptr += _cbv_desc_size * 1;
         return cpu_handle;
     }
 
     D3D12_GPU_DESCRIPTOR_HANDLE& D3DContext::GetSRVGPUDescriptorHandle(uint32_t index)
     {
-        //static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount +
-        //    D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
-        //auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
-        //gpu_handle.ptr += _cbv_desc_size * (base + index);
-        auto gpu_handle = g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart();
-        gpu_handle.ptr += _cbv_desc_size * 1;
+        static uint32_t base = D3DConstants::kFrameCount + D3DConstants::kMaxMaterialDataCount * D3DConstants::kFrameCount +
+            D3DConstants::kMaxRenderObjectCount * D3DConstants::kFrameCount;
+        auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
+        gpu_handle.ptr += _cbv_desc_size * (base + index);
+        //auto gpu_handle = g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart();
+        //gpu_handle.ptr += _cbv_desc_size * 1;
         return gpu_handle;
     }
 
@@ -258,7 +231,6 @@ namespace Ailu
 
     void D3DContext::Destroy()
     {
-        g_pd3dSrvDescHeapImGui->Release();
         // Ensure that the GPU is no longer referencing resources that are about to be
 // cleaned up by the destructor.
         WaitForGpu();
@@ -626,7 +598,6 @@ namespace Ailu
 
         //imgui draw
         {
-            m_commandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeapImGui);
             ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
         }
         // Indicate that the back buffer will now be used to present.
@@ -673,8 +644,10 @@ namespace Ailu
     {
         auto device = D3DContext::GetInstance()->GetDevice();
         //constbuffer desc heap
-        D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
-        cbvHeapDesc.NumDescriptors = (1u + D3DConstants::kMaxMaterialDataCount + D3DConstants::kMaxRenderObjectCount) * D3DConstants::kFrameCount + D3DConstants::kMaxTextureCount;
+        D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
+        _cbv_desc_num = (1u + D3DConstants::kMaxMaterialDataCount + D3DConstants::kMaxRenderObjectCount) * D3DConstants::kFrameCount +
+            D3DConstants::kMaxTextureCount;
+        cbvHeapDesc.NumDescriptors = _cbv_desc_num + 1;
         cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         ThrowIfFailed(device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));

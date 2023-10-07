@@ -3,16 +3,22 @@
 
 namespace Ailu
 {
-	Ailu::Actor::~Actor()
+	Actor::~Actor()
 	{
-		Destroy();
+		for (auto& component : _components)
+		{
+			component->Destroy();
+		}
+		ClearChildren();
+		if (_Parent != nullptr)
+			_Parent->RemoveChild(this);
 	}
 
 	void Actor::RemoveFromRoot() const
 	{
 		for (auto it = s_global_actors.begin(); it != s_global_actors.end(); it++)
 		{
-			if (it->get()->Id() == this->_Id)
+			if ((*it)->_Id == this->_Id)
 			{
 				s_global_actors.erase(it);
 				return;
@@ -42,18 +48,18 @@ namespace Ailu
 	}
 
 
-	std::list<Ref<Actor>>& Actor::GetAllChildren()
+	std::list<Actor*>& Actor::GetAllChildren()
 	{
 		return _children;
 	}
 
-	void Actor::RemoveChild(Ref<Actor> child)
+	void Actor::RemoveChild(Actor* child)
 	{
 		--_chilren_num;
 		_children.remove(child);
 	}
 
-	void Actor::AddChild(Ref<Actor>& child)
+	void Actor::AddChild(Actor* child)
 	{
 		++_chilren_num;
 		_children.emplace_back(child);
@@ -63,16 +69,5 @@ namespace Ailu
 	{
 		_chilren_num = 0;
 		_children.clear();
-	}
-
-	void Actor::Destroy()
-	{
-		for (auto& component : _components)
-		{
-			component->Destroy();
-		}
-		ClearChildren();
-		if(_Parent!=nullptr)
-			_Parent->RemoveChild(shared_from_this());
 	}
 }
