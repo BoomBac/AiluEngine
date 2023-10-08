@@ -1,8 +1,9 @@
 #include "pch.h"
+#include "Render/Gizmo.h"
 #include "Objects/LightComponent.h"
 #include "Objects/TransformComponent.h"
+#include "Objects/SceneActor.h"
 #include "Objects/Actor.h"
-#include "RHI/DX12/D3DContext.h"
 
 namespace Ailu
 {

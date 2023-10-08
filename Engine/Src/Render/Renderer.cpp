@@ -1,15 +1,15 @@
 #include "pch.h"
 #include "Render/Renderer.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/SceneMgr.h"
 #include "Render/RenderCommand.h"
 #include "Render/RenderingData.h"
-#include "Framework/Common/SceneMgr.h"
-#include <Objects/StaticMeshComponent.h>
+#include "Render/Gizmo.h"
+#include "Objects/StaticMeshComponent.h"
 #include "Framework/Parser/AssetParser.h"
 
 namespace Ailu
 {
-    Ref<Mesh> tree;
     int Renderer::Initialize()
     {
         _p_context = new D3DContext(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
@@ -22,12 +22,10 @@ namespace Ailu
      
             _p_scene_camera = MakeScope<Camera>(16.0F / 9.0F);
             _p_scene_camera->SetPosition(1356.43f, 604.0f, -613.45f);
-            _p_scene_camera->Rotate(11.80, -59.76);
+            _p_scene_camera->Rotate(11.80f, -59.76f);
             _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
             Camera::sCurrent = _p_scene_camera.get();
         }
-        auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-        tree = parser->Parser(GetResPath("Meshs/plane.fbx"));
         return 0;
     }
     void Renderer::Finalize()
@@ -50,16 +48,6 @@ namespace Ailu
 
     void Renderer::BeginScene()
     {
-        //static SceneActor* actor;
-        //bool first = true;
-        //if (first)
-        //{
-        //    actor = Actor::Create<SceneActor>("stone01");
-        //    actor->AddComponent<StaticMeshComponent>(MeshPool::GetMesh("Sphere"), MaterialPool::GetMaterial("StandardPBR"));
-        //    g_pSceneMgr->_p_current->AddObject(actor);
-        //    first = false;
-        //}
-
         memset(reinterpret_cast<void*>(_p_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
         auto& light_comps = g_pSceneMgr->_p_current->GetAllLight();
         uint16_t updated_light_num = 0u;
@@ -127,12 +115,11 @@ namespace Ailu
         cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
         cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
         cmd->SetPSO(GraphicsPipelineStateMgr::s_standard_shadering_pso);
-        //for (auto& obj : _draw_call)
-        //{
-        //    cmd->DrawRenderer(obj.mesh,obj.transform,obj.mat,obj.instance_count);
-        //}
+        for (auto& obj : _draw_call)
+        {
+            cmd->DrawRenderer(obj.mesh,obj.transform,obj.mat,obj.instance_count);
+        }
       
-        cmd->DrawRenderer(tree, BuildIdentityMatrix(), MaterialPool::GetMaterial("StandardPBR"), 1);
         D3DContext::GetInstance()->ExecuteCommandBuffer(cmd);
         D3DCommandBufferPool::ReleaseCommandBuffer(cmd);
         DrawRendererGizmo();

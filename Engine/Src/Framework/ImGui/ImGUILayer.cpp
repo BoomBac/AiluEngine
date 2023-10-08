@@ -7,6 +7,7 @@
 #include "Framework/Common/Application.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Render/RenderingData.h"
+#include "Render/Gizmo.h"
 
 #include "Objects/Actor.h"
 #include "Objects/TransformComponent.h"
@@ -179,7 +180,7 @@ namespace Ailu
         else if (item_current_idx == 1) RenderingStates::s_shadering_mode = EShaderingMode::kWireFrame;
         else RenderingStates::s_shadering_mode = EShaderingMode::kShaderedWireFrame;
 
-        ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.2f, 1.0f,"%.2f");
+        ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f,"%.2f");
         ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 0.2f,"%.2f");
 
         ImGui::Checkbox("Expand", &show);

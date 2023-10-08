@@ -6,9 +6,6 @@
 
 namespace Ailu
 {
-
-
-
 	struct ShaderDirectionalAndPointLightData
 	{
 		union
@@ -70,7 +67,7 @@ namespace Ailu
 	};
 	static_assert((sizeof(ScenePerObjectData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 
-	struct D3DConstants
+	struct RenderConstants
 	{
 		constexpr static uint8_t  kFrameCount = 2u;
 		constexpr static uint16_t kMaxMaterialDataCount = 4u;

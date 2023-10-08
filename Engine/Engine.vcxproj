@@ -516,6 +516,7 @@
     <ClInclude Include="Inc\Render\AlgFormat.h" />
     <ClInclude Include="Inc\Render\Buffer.h" />
     <ClInclude Include="Inc\Render\Camera.h" />
+    <ClInclude Include="Inc\Render\Gizmo.h" />
     <ClInclude Include="Inc\Render\GraphicsContext.h" />
     <ClInclude Include="Inc\Render\GraphicsPipelineState.h" />
     <ClInclude Include="Inc\Render\Material.h" />
@@ -528,7 +529,7 @@
     <ClInclude Include="Inc\Render\Texture.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DBuffer.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DCommandBuffer.h" />
-    <ClInclude Include="Inc\RHI\DX12\D3DConstants.h" />
+    <ClInclude Include="Inc\Render\RenderConstants.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DContext.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DGraphicsPipelineState.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DRendererAPI.h" />

@@ -10,7 +10,7 @@ namespace Ailu
 {
 	int ResourceMgr::Initialize()
 	{
-        LOG_WARNING("begin init engine internal resource...");
+        LOG_WARNING("Begin init engine internal resource...");
         g_pTimeMgr->Mark();
         MaterialPool::CreateMaterial(ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl")), "StandardPBR");
         MaterialPool::CreateMaterial(ShaderLibrary::Add(GetResPath("Shaders/PureColor.hlsl")), "WireFrame");
@@ -32,7 +32,7 @@ namespace Ailu
         png_parser->Parser(GetResPath("Textures/MyImage01.jpg"));
         //png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_emi.jpg"));
         //png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_nmap_2_Tris.jpg"));
-        LOG_WARNING("finish after {}ms",g_pTimeMgr->GetElapsedSinceLastMark());
+        LOG_WARNING("Finish after {}ms",g_pTimeMgr->GetElapsedSinceLastMark());
 		return 0;
 	}
 	void ResourceMgr::Finalize()
@@ -58,7 +58,6 @@ namespace Ailu
         {
             std::cerr << "无法打开文件" << std::endl;
         }
-
         outputFile << "这是要写入到文件的文本内容." << std::endl;
         outputFile << "可以写入更多内容." << std::endl;
         LOG_WARNING("Save scene to {}",scene_path);

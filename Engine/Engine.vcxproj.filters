@@ -168,7 +168,7 @@
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\RHI\DX12\D3DConstants.h">
+    <ClInclude Include="Inc\Render\RenderConstants.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Render\Material.h">
@@ -2005,6 +2005,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Framework\Common\ResourceMgr.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\Gizmo.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

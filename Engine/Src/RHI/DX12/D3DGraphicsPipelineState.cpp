@@ -341,7 +341,7 @@ namespace Ailu
 			auto d3dshader = std::static_pointer_cast<D3DShader>(_state_desc._p_vertex_shader);
 			_p_sig = d3dshader->GetSignature().Get();
 			_p_bind_res_desc_infos = const_cast<std::unordered_map<std::string, ShaderBindResourceInfo>*>(&d3dshader->GetBindResInfo());
-			auto it = _p_bind_res_desc_infos->find(D3DConstants::kCBufNameSceneState);
+			auto it = _p_bind_res_desc_infos->find(RenderConstants::kCBufNameSceneState);
 			if (it != _p_bind_res_desc_infos->end())
 			{
 				_per_frame_cbuf_bind_slot = it->second._bind_slot;

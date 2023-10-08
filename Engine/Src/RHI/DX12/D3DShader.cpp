@@ -6,10 +6,8 @@
 #include "GlobalMarco.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/dxhelper.h"
-#include "Framework/Common/Utils.h"
 #include "RHI/DX12/D3DContext.h"
 #include "Framework/Common/Utils.h"
-#include "RHI/DX12/D3DConstants.h"
 
 
 namespace Ailu
@@ -21,7 +19,7 @@ namespace Ailu
 		else if (name == "_MatrixVP")
 			return 64;
 		else if (name == "_Color")
-			return D3DConstants::kPerFrameDataSize;
+			return RenderConstants::kPerFrameDataSize;
 		return 0;
 	}
 	//shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
@@ -132,11 +130,16 @@ namespace Ailu
 
 	static DXGI_FORMAT GetFormatBySemanticName(const char* semantic)
 	{
-		if (!std::strcmp(semantic, D3DConstants::kSemanticPosition)) return DXGI_FORMAT_R32G32B32_FLOAT;
-		else if (!std::strcmp(semantic, D3DConstants::kSemanticNormal)) return DXGI_FORMAT_R32G32B32_FLOAT;
-		else if (!std::strcmp(semantic, D3DConstants::kSemanticTangent)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		else if (!std::strcmp(semantic, D3DConstants::kSemanticColor)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		else if (!std::strcmp(semantic, D3DConstants::kSemanticTexcoord)) return DXGI_FORMAT_R32G32_FLOAT;
+		if (!std::strcmp(semantic, RenderConstants::kSemanticPosition)) return DXGI_FORMAT_R32G32B32_FLOAT;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticNormal)) return DXGI_FORMAT_R32G32B32_FLOAT;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticTangent)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticColor)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticTexcoord)) return DXGI_FORMAT_R32G32_FLOAT;
+		else
+		{
+			LOG_ERROR("Unsupported vertex shader semantic!");
+			return DXGI_FORMAT_R32G32B32_FLOAT;
+		}
 	}
 
 	void D3DShader::GenerateRootSignature()
@@ -157,25 +160,25 @@ namespace Ailu
 			if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
 			if (desc._res_type == EBindResDescType::kConstBuffer)
 			{
-				if (desc._name == D3DConstants::kCBufNameSceneObject) cbuf_mask |= 0x01;
-				else if (desc._name == D3DConstants::kCBufNameSceneMaterial) cbuf_mask |= 0x02;
-				else if (desc._name == D3DConstants::kCBufNameSceneState) cbuf_mask |= 0x04;
+				if (desc._name == RenderConstants::kCBufNameSceneObject) cbuf_mask |= 0x01;
+				else if (desc._name == RenderConstants::kCBufNameSceneMaterial) cbuf_mask |= 0x02;
+				else if (desc._name == RenderConstants::kCBufNameSceneState) cbuf_mask |= 0x04;
 			}
 		}
 		uint8_t root_param_index = 0;
 		if (cbuf_mask & 0x01)
 		{
-			_bind_res_infos[D3DConstants::kCBufNameSceneObject]._bind_slot = root_param_index;
+			_bind_res_infos[RenderConstants::kCBufNameSceneObject]._bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(0u);
 		}
 		if (cbuf_mask & 0x02)
 		{
-			_bind_res_infos[D3DConstants::kCBufNameSceneMaterial]._bind_slot = root_param_index;
+			_bind_res_infos[RenderConstants::kCBufNameSceneMaterial]._bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(1u);
 		}
 		if (cbuf_mask & 0x04)
 		{
-			_bind_res_infos[D3DConstants::kCBufNameSceneState]._bind_slot = root_param_index;
+			_bind_res_infos[RenderConstants::kCBufNameSceneState]._bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(2u);
 		}
 		for (auto it = _bind_res_infos.begin(); it != _bind_res_infos.end(); it++)
@@ -352,7 +355,7 @@ namespace Ailu
 		LoadShaderRelfection(_p_p_reflection.Get(),EShaderType::kPixel);
 #endif // SHADER_DXC
 		GenerateRootSignature();
-		auto it = _bind_res_infos.find(D3DConstants::kCBufNameSceneMaterial);
+		auto it = _bind_res_infos.find(RenderConstants::kCBufNameSceneMaterial);
 		if (it != _bind_res_infos.end()) _per_mat_buf_bind_slot = it->second._bind_slot;
 	}
 
@@ -367,12 +370,12 @@ namespace Ailu
 
 	uint8_t* D3DShader::GetCBufferPtr(uint32_t index)
 	{
-		if (index > D3DConstants::kMaxMaterialDataCount)
+		if (index > RenderConstants::kMaxMaterialDataCount)
 		{
 			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
 			return nullptr;
 		}
-		return _p_cbuffer + D3DConstants::kPerFrameDataSize + index * D3DConstants::kPerMaterialDataSize;
+		return _p_cbuffer + RenderConstants::kPerFrameDataSize + index * RenderConstants::kPerMaterialDataSize;
 	}
 
 	void D3DShader::Bind()
@@ -403,7 +406,7 @@ namespace Ailu
 	void D3DShader::Bind(uint32_t index)
 	{
 		if (_per_mat_buf_bind_slot == -1) return;
-		if (index > D3DConstants::kMaxMaterialDataCount)
+		if (index > RenderConstants::kMaxMaterialDataCount)
 		{
 			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
 			return;
@@ -469,5 +472,7 @@ namespace Ailu
 		case Ailu::EShaderType::kPixel:
 			return _p_p_reflection.Get();
 		}
+		LOG_ERROR("Unsupported type shader reflection info!");
+		return nullptr;
 	}
 }

@@ -6,9 +6,8 @@
 #include <map>
 #include <unordered_map>
 
+#include "Render/RenderConstants.h"
 #include "Render/Shader.h"
-#include "D3DConstants.h"
-
 
 
 using Microsoft::WRL::ComPtr;
@@ -48,7 +47,7 @@ namespace Ailu
 		void GenerateRootSignature();
 
 	private:
-		D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[D3DConstants::kMaxVertexAttrNum];
+		D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
 		uint8_t _vertex_input_num = 0u;
 
 		short _per_mat_buf_bind_slot = -1;

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Render/RenderingData.h"
+#include "Render/RenderConstants.h"
 #include "RHI/DX12/D3DBuffer.h"
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DContext.h"
@@ -88,10 +89,11 @@ namespace Ailu
 			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
 			IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
-		d3d_conetxt->GetCmdList()->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
+		auto cmd = d3d_conetxt->GetTaskCmdList();
+		cmd->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
 		auto buf_state = CD3DX12_RESOURCE_BARRIER::Transition(s_vertex_bufs[cur_buffer_index].Get(),
 			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-		d3d_conetxt->GetCmdList()->ResourceBarrier(1, &buf_state);
+		cmd->ResourceBarrier(1, &buf_state);
 		// Initialize the vertex buffer view.
 		s_vertex_buf_views[cur_buffer_index].BufferLocation = s_vertex_bufs[cur_buffer_index]->GetGPUVirtualAddress();
 		s_vertex_buf_views[cur_buffer_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
@@ -108,11 +110,11 @@ namespace Ailu
 	//-----------------------------------------------------------------D3DDynamicVertexBuffer----------------------------------------------------------
 	D3DDynamicVertexBuffer::D3DDynamicVertexBuffer(VertexBufferLayout layout)
 	{
-		_size_pos_buf = D3DConstants::KMaxDynamicVertexNum * sizeof(Vector3f);
-		_size_color_buf = D3DConstants::KMaxDynamicVertexNum * sizeof(Vector4f);
+		_size_pos_buf = RenderConstants::KMaxDynamicVertexNum * sizeof(Vector3f);
+		_size_color_buf = RenderConstants::KMaxDynamicVertexNum * sizeof(Vector4f);
 		_ime_vertex_data_offset = _ime_color_data_offset = 0;
-		_p_ime_vertex_data = new uint8_t[12 * D3DConstants::KMaxDynamicVertexNum];
-		_p_ime_color_data = new uint8_t[16 * D3DConstants::KMaxDynamicVertexNum];
+		_p_ime_vertex_data = new uint8_t[12 * RenderConstants::KMaxDynamicVertexNum];
+		_p_ime_color_data = new uint8_t[16 * RenderConstants::KMaxDynamicVertexNum];
 		auto device = D3DContext::GetInstance()->GetDevice();
 		D3D12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(_size_pos_buf);

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Objects/StaticMeshComponent.h"
+#include "Objects/SceneActor.h"
 #include "Render/Renderer.h"
 
 namespace Ailu
@@ -15,8 +16,8 @@ namespace Ailu
 	}
 	void StaticMeshComponent::Tick(const float& delta_time)
 	{
-		//auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
-		//Renderer::Submit(_p_mesh, _p_mat,Transpose(transf.GetTransformMat()), 1);
+		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
+		Renderer::Submit(_p_mesh, _p_mat,Transpose(transf.GetTransformMat()), 1);
 	}
 	void StaticMeshComponent::SetMesh(Ref<Mesh>& mesh)
 	{

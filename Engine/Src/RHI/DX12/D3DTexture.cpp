@@ -22,7 +22,7 @@ namespace Ailu
 	{
 		Texture2D::FillData(data);
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
-		auto p_cmdlist{ D3DContext::GetInstance()->GetCmdList() };
+		auto p_cmdlist{ D3DContext::GetInstance()->GetTaskCmdList() };
 		ComPtr<ID3D12Resource> pTextureGPU;
 		ComPtr<ID3D12Resource> pTextureUpload;
 		D3D12_RESOURCE_DESC textureDesc{};

@@ -1,3 +1,6 @@
+#pragma warning(push)
+#pragma warning(disable: 4251)
+
 #pragma once
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
@@ -47,5 +50,5 @@ namespace Ailu
         Scope<Camera> _p_scene_camera;
     };
 }
-
+#pragma warning(pop)
 #endif // !RENDERER_H__
