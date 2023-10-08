@@ -24,7 +24,7 @@ namespace Ailu
     class D3DContext : public GraphicsContext
     {
         friend class D3DRendererAPI;
-        friend class D3DComandBuffer;
+        friend class D3DCommandBuffer;
     public:
         D3DContext(WinWindow* window);
         ~D3DContext();
@@ -40,7 +40,11 @@ namespace Ailu
         D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUDescriptorHandle(uint32_t index);
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
         uint8_t* GetCBufferPtr();
-        void ExecuteCommandBuffer(Ref<D3DComandBuffer> cmd);
+        uint8_t* GetPerFrameCbufData() final;
+        uint8_t* GetPerMaterialCbufData(uint32_t mat_index) final;
+        D3D12_CONSTANT_BUFFER_VIEW_DESC* GetPerFrameCbufGPURes();
+        ScenePerFrameData* GetPerFrameCbufDataStruct();
+        void ExecuteCommandBuffer(Ref<D3DCommandBuffer>& cmd);
 
         void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
         void DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform);
@@ -57,7 +61,6 @@ namespace Ailu
         void CreateDepthStencilTarget();
         void CreateDescriptorHeap();
         D3D12_GPU_DESCRIPTOR_HANDLE GetCBVGPUDescHandle(uint32_t index) const;
-
 
     private:
         inline static D3DContext* s_p_d3dcontext = nullptr;
@@ -91,8 +94,8 @@ namespace Ailu
         Ref<Material> _mat_standard;
         Ref<Material> _mat_wireframe;
 
-        Ref<SceneActor> _p_actor;
-        Ref<SceneActor> _p_light;
+        SceneActor* _p_actor;
+        SceneActor* _p_light;
 
 
         uint32_t _render_object_index = 0u;
@@ -112,7 +115,7 @@ namespace Ailu
         uint32_t _height;
         float m_aspectRatio;
 
-        std::unique_ptr<Camera> _p_scene_camera;
+        //std::unique_ptr<Camera> _p_scene_camera;
     };
 
     class Gizmo

@@ -18,16 +18,16 @@ namespace Ailu
         for (auto& logger : _appenders)
             delete logger;
     }
+    void LogMgr::Tick(const float& delta_time)
+    {
+    }
     LogMgr::LogMgr()
     {
         _name = "DefaultLogMgr";
         _output_level = kLogLevel;
         _output_mark = _output_mark;
     }
-    void LogMgr::Tick()
-    {
 
-    }
     void LogMgr::AddAppender(IAppender* appender)
     {
         _appenders.push_back(appender);

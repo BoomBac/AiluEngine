@@ -24,7 +24,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR
 {
 	Ailu::Application* app = new Ailu::Application();
 	app->Initialize();
-	app->Tick();
+	app->Tick(16.6f);
 	app->Finalize();
 	DESTORY_PTR(app)
 }

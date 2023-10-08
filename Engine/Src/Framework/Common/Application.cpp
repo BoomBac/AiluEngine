@@ -5,12 +5,14 @@
 #include "Framework/Events/InputLayer.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Common/SceneMgr.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "CompanyEnv.h"
 
 namespace Ailu
 {
 	TimeMgr* g_pTimeMgr = new TimeMgr();
 	SceneMgr* g_pSceneMgr = new SceneMgr();
+	ResourceMgr* g_pResourceMgr = new ResourceMgr();
 
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
@@ -20,22 +22,27 @@ namespace Ailu
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		g_pTimeMgr->Initialize();
-		g_pSceneMgr->Initialize();
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
 
 		_p_renderer = new Renderer();
 		_p_renderer->Initialize();
+		g_pResourceMgr->Initialize();
+		g_pSceneMgr->Initialize();
 
 		PushLayer(new InputLayer());
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
 		g_pTimeMgr->Mark();
+		auto path = GetResPath("Scene/test.almap");
+		g_pResourceMgr->SaveScene(nullptr, path);
 		return 0;
 	}
 	void Application::Finalize()
 	{
-		DESTORY_PTR(_p_window)
+		DESTORY_PTR(_p_window);
+		g_pResourceMgr->Finalize();
+		DESTORY_PTR(g_pResourceMgr);
 		_p_renderer->Finalize();
 		DESTORY_PTR(_p_renderer)
 		g_pTimeMgr->Finalize();
@@ -43,6 +50,7 @@ namespace Ailu
 		g_pSceneMgr->Finalize();
 		DESTORY_PTR(g_pSceneMgr);
 	}
+
 	double render_lag = 0.0;
 	double update_lag = 0.0;
 #ifdef COMPANY_ENV
@@ -54,11 +62,11 @@ namespace Ailu
 
 	constexpr double kMsPerUpdate = 16.66;
 	constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
-	void Application::Tick()
+	void Application::Tick(const float& delta_time)
 	{
 		while (_b_running)
 		{
-			g_pTimeMgr->Tick();
+			g_pTimeMgr->Tick(0.0f);
 			auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
 			render_lag += last_mark;
 			update_lag += last_mark;
@@ -70,12 +78,12 @@ namespace Ailu
 
 			while (render_lag > kMsPerRender)
 			{	
-				g_pSceneMgr->Tick();
+				g_pSceneMgr->Tick(delta_time);
 				_p_imgui_layer->Begin();
 				for (Layer* layer : _layer_stack)
 					layer->OnImguiRender();
 				_p_imgui_layer->End();
-				_p_renderer->Tick();
+				_p_renderer->Tick(delta_time);
 				render_lag -= kMsPerRender;
 			}
 		}

@@ -10,6 +10,8 @@ namespace Ailu
 		virtual ~GraphicsContext() = default;
 		virtual void Init() = 0;
 		virtual void Present() = 0;
+		virtual uint8_t* GetPerFrameCbufData() = 0;
+		virtual uint8_t* GetPerMaterialCbufData(uint32_t mat_index) = 0;
 	};
 }
 

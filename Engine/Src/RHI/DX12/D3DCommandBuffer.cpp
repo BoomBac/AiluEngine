@@ -4,59 +4,59 @@
 
 namespace Ailu
 {
-	void D3DComandBuffer::SetClearColor(const Vector4f& color)
+	void D3DCommandBuffer::SetClearColor(const Vector4f& color)
 	{
 		_commands.emplace_back([&]() {
 			_clear_color = color;
 			});
 	}
-	void D3DComandBuffer::Clear()
+	void D3DCommandBuffer::Clear()
 	{
 		_commands.clear();
 	}
-	void D3DComandBuffer::ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth)
+	void D3DCommandBuffer::ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth)
 	{
 		_commands.emplace_back([=]() {
 			D3DContext::s_p_d3dcontext->Clear(color, depth, clear_color, clear_depth);
 			});
 	}
-	void D3DComandBuffer::DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, uint32_t instance_count)
+	void D3DCommandBuffer::DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, uint32_t instance_count)
 	{
 		_commands.emplace_back([=]() {
 			D3DContext::s_p_d3dcontext->DrawIndexedInstanced(index_buffer->GetCount(), instance_count, transform);
 			});
 	}
-	void D3DComandBuffer::DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, uint32_t instance_count)
+	void D3DCommandBuffer::DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, uint32_t instance_count)
 	{
 		_commands.emplace_back([=]() {
 			D3DContext::s_p_d3dcontext->DrawInstanced(vertex_buf->GetVertexCount(), instance_count, transform);
 			});
 	}
-	void D3DComandBuffer::SetViewMatrix(const Matrix4x4f& view)
+	void D3DCommandBuffer::SetViewMatrix(const Matrix4x4f& view)
 	{
 		_commands.emplace_back([&]() {
 			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixV = view;
 			});
 	}
-	void D3DComandBuffer::SetProjectionMatrix(const Matrix4x4f& proj)
+	void D3DCommandBuffer::SetProjectionMatrix(const Matrix4x4f& proj)
 	{
 		_commands.emplace_back([&]() {
 			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixP = proj;
 			});
 	}
-	void D3DComandBuffer::SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj)
+	void D3DCommandBuffer::SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj)
 	{
-		_commands.emplace_back([&]() {
+		_commands.emplace_back([=]() {
 			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixV = view;
 			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixP = proj;
 			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixVP = proj * view;
 			memcpy(D3DContext::s_p_d3dcontext->_p_cbuffer, &D3DContext::s_p_d3dcontext->_perframe_scene_data, sizeof(D3DContext::s_p_d3dcontext->_perframe_scene_data));
 			});
 	}
-	void D3DComandBuffer::SetViewports(const std::initializer_list<Viewport>& viewports)
+	void D3DCommandBuffer::SetViewports(const std::initializer_list<Viewport>& viewports)
 	{
 		static CD3DX12_VIEWPORT d3d_viewports[8];
-		_commands.emplace_back([&]() {
+		_commands.emplace_back([=]() {
 			uint8_t nums = 0u;
 			for (auto it = viewports.begin(); it != viewports.end(); it++)
 			{
@@ -65,10 +65,10 @@ namespace Ailu
 			D3DContext::s_p_d3dcontext->GetCmdList()->RSSetViewports(nums, d3d_viewports);
 			});
 	}
-	void D3DComandBuffer::SetScissorRects(const std::initializer_list<Viewport>& rects)
+	void D3DCommandBuffer::SetScissorRects(const std::initializer_list<Viewport>& rects)
 	{
 		static CD3DX12_RECT d3d_rects[8];
-		_commands.emplace_back([&]() {
+		_commands.emplace_back([=]() {
 			uint8_t nums = 0u;
 			for (auto it = rects.begin(); it != rects.end(); it++)
 			{
@@ -77,13 +77,20 @@ namespace Ailu
 			D3DContext::s_p_d3dcontext->GetCmdList()->RSSetScissorRects(nums, d3d_rects);
 			});
 	}
-	void D3DComandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count)
+	void D3DCommandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count)
 	{
 		_commands.emplace_back([=]() {
 			mesh->GetVertexBuffer()->Bind();
 			mesh->GetIndexBuffer()->Bind();
 			material->Bind();
 			D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
+			});
+	}
+	void D3DCommandBuffer::SetPSO(GraphicsPipelineState* pso)
+	{
+		_commands.emplace_back([=]() {
+			pso->Bind();
+			pso->SubmitBindResource(reinterpret_cast<void*>(D3DContext::s_p_d3dcontext->GetPerFrameCbufGPURes()), EBindResDescType::kConstBuffer);
 			});
 	}
 }

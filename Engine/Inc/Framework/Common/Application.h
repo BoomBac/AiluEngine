@@ -16,7 +16,7 @@ namespace Ailu
     public:
         int Initialize() override;
         void Finalize() override;
-        void Tick() override;
+        void Tick(const float& delta_time) override;
 
         void PushLayer(Layer* layer);
         void PushOverLayer(Layer* layer);

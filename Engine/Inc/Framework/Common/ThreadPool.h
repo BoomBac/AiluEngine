@@ -173,7 +173,7 @@ namespace Ailu
 		std::string _pool_name;
 		std::vector<TimeMgr> _timers;
 	};
-	Scope<ThreadPool> g_thread_pool = MakeScope<ThreadPool>(8,"GlobalThreadPool");
+	static Scope<ThreadPool> g_thread_pool = MakeScope<ThreadPool>(8,"GlobalThreadPool");
 }
 
 

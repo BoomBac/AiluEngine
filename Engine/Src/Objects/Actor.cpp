@@ -14,17 +14,6 @@ namespace Ailu
 			_Parent->RemoveChild(this);
 	}
 
-	void Actor::RemoveFromRoot() const
-	{
-		for (auto it = s_global_actors.begin(); it != s_global_actors.end(); it++)
-		{
-			if ((*it)->_Id == this->_Id)
-			{
-				s_global_actors.erase(it);
-				return;
-			}
-		}
-	}
 
 	Actor::Actor()
 	{
@@ -47,6 +36,18 @@ namespace Ailu
 		}
 	}
 
+	void Actor::RemoveFromRoot(Actor* actor)
+	{
+		for (auto it = s_global_actors.begin(); it != s_global_actors.end(); it++)
+		{
+			if (*(*it) == *actor)
+			{
+				s_global_actors.erase(it);
+				return;
+			}
+		}
+	}
+
 
 	std::list<Actor*>& Actor::GetAllChildren()
 	{
@@ -57,6 +58,7 @@ namespace Ailu
 	{
 		--_chilren_num;
 		_children.remove(child);
+		//DESTORY_PTR(child);
 	}
 
 	void Actor::AddChild(Actor* child)
@@ -68,6 +70,10 @@ namespace Ailu
 	void Actor::ClearChildren()
 	{
 		_chilren_num = 0;
+		//for (auto e : _children)
+		//{
+		//	DESTORY_PTR(e);
+		//}
 		_children.clear();
 	}
 }

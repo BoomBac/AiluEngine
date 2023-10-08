@@ -2004,6 +2004,9 @@
     <ClInclude Include="Inc\Framework\Math\AABB.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\ResourceMgr.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2144,6 +2147,9 @@
     <ClCompile Include="Src\Objects\StaticMeshComponent.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Src\Framework\Common\ResourceMgr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat">
@@ -2159,6 +2165,9 @@
     <None Include="Res\Shaders\lighting.hlsl">
       <Filter>头文件</Filter>
     </None>
+    <None Include="Res\Shaders\brdf.hlsl" />
+    <None Include="Res\Shaders\constants.hlsl" />
+    <None Include="Res\Shaders\input.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

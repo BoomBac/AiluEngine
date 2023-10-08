@@ -8,14 +8,16 @@
 #include "Render/RendererAPI.h"
 #include "Render/Material.h"
 #include "Framework/Assets/Mesh.h"
+#include "Render/GraphicsPipelineState.h"
 
 namespace Ailu
 {
-	class D3DComandBuffer
+	class D3DCommandBuffer
 	{
-		friend class D3DComandBufferPool;
+		friend class D3DCommandBufferPool;
 		friend class D3DContext;
 	public:
+        D3DCommandBuffer(uint32_t id) : _id(id) {};
 		void SetClearColor(const Vector4f& color);
 		void Clear();
 		void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth);
@@ -27,55 +29,62 @@ namespace Ailu
 		void SetViewports(const std::initializer_list<Viewport>& viewports);
 		void SetScissorRects(const std::initializer_list<Viewport>& rects);
 		void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform,const Ref<Material>& material,uint32_t instance_count = 1u);
+        void SetPSO(GraphicsPipelineState* pso);
 	private:
 		uint32_t _id = 0u;
 		inline static Vector4f _clear_color = { 0.3f, 0.2f, 0.4f, 1.0f };
 		std::vector<std::function<void()>> _commands{};
 	};
 
-	class D3DComandBufferPool
-	{
-	public:
-		static Ref<D3DComandBuffer>& GetCommandBuffer()
-		{
-			Init();
-			for (auto& cmd : s_cmd_buffers)
-			{
-				auto& [active,cmd_buf] = cmd;
-				if (active)
-				{
-					active = false;
-					return cmd_buf;
-				}
-			}
-			AL_ASSERT(true, "D3dcommandBufferPool is full!");
-		}
-		static void ReleaseCommandBuffer(Ref<D3DComandBuffer>& cmd)
-		{					
-			std::get<0>(s_cmd_buffers[cmd->_id]) = true;
-			std::get<1>(s_cmd_buffers[cmd->_id])->Clear();
-		}
+    class D3DCommandBufferPool 
+    {
+    public:
+        static std::shared_ptr<D3DCommandBuffer> GetCommandBuffer() 
+        {
+            static bool s_b_init = false;
+            if (!s_b_init)
+            {
+                Init();
+                s_b_init = true;
+            }
+            std::unique_lock<std::mutex> lock(_mutex);
+            for (auto& cmd : s_cmd_buffers) 
+            {
+                auto& [avairable, cmd_buf] = cmd;
+                if (avairable) {
+                    avairable = false;
+                    return cmd_buf;
+                }
+            }
+            int newId = (uint32_t)s_cmd_buffers.size();
+            auto cmd = std::make_shared<D3DCommandBuffer>(newId);
+            s_cmd_buffers.emplace_back(std::make_tuple(false, cmd));
+            return cmd;
+        }
 
-		static std::vector<std::tuple<bool,Ref<D3DComandBuffer>>>& GetAllBuffer()
-		{
-			return s_cmd_buffers;
-		}
-	private:
-		static void Init()
-		{
-			if (s_b_init) return;
-			for (uint32_t i = 0; i < 10; i++)
-			{
-				auto cmd = MakeRef<D3DComandBuffer>();
-				cmd->_id = i;
-				s_cmd_buffers.emplace_back(std::make_pair(true,std::move(cmd)));
-			}
-			s_b_init = true;
-		}
-	private:
-		inline static std::vector<std::tuple<bool, Ref<D3DComandBuffer>>> s_cmd_buffers{};
-		inline static bool s_b_init = false;
-	};
+        static void ReleaseCommandBuffer(std::shared_ptr<D3DCommandBuffer> cmd) 
+        {
+            std::unique_lock<std::mutex> lock(_mutex);
+            std::get<0>(s_cmd_buffers[cmd->_id]) = true;
+            cmd->Clear();
+        }
+
+    private:
+        static void Init() 
+        {
+            for (int i = 0; i < kInitialPoolSize; i++)
+            {
+                auto cmd = std::make_shared<D3DCommandBuffer>(i);
+                s_cmd_buffers.emplace_back(std::make_tuple(true, cmd));
+            }
+        }
+
+    private:
+        static inline std::vector<std::tuple<bool, std::shared_ptr<D3DCommandBuffer>>> s_cmd_buffers{};
+        static inline std::mutex _mutex;
+        static const int kInitialPoolSize = 10;
+    };
+
 }
 
 

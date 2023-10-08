@@ -2,7 +2,7 @@
 #ifndef __MESH_H__
 #define __MESH_H__
 #include <string>
-#include <map>
+#include <unordered_map>
 #include "GlobalMarco.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/Buffer.h"
@@ -47,15 +47,44 @@ namespace Ailu
 		uint32_t* _p_indices;
 	};
 
-	//class MeshPool
-	//{
-	//public:
-	//	static Ref<Mesh> FindMesh(const std::string& name);
-	//	static void AddMesh(Ref<Mesh> mesh);
-	//private:
-	//	inline static std::map<std::string, Ref<Mesh>> s_mesh_pool{};
-	//};
-	using MeshPool = ResourcePool<Mesh>;
+	class MeshPool 
+	{
+	public:
+		static Ref<Mesh> CreateMesh(const std::string& name) 
+		{
+			auto mesh = MakeRef<Mesh>(name);
+			s_meshes[name] = mesh;
+			return mesh;
+		}
+
+		static void AddMesh(const std::string& name,Ref<Mesh> mesh)
+		{
+			s_meshes[name] = mesh;
+		}
+
+		static Ref<Mesh> GetMesh(const std::string& name)
+		{
+			auto it = s_meshes.find(name);
+			if (it != s_meshes.end()) 
+			{
+				return it->second;
+			}
+			return nullptr;
+		}
+
+		static void ReleaseMesh(const std::string& name)
+		{
+			auto it = s_meshes.find(name);
+			if (it != s_meshes.end()) 
+			{
+				s_meshes.erase(it);
+			}
+		}
+
+	private:
+		inline static uint32_t s_next_mesh_id = 0u;
+		inline static std::unordered_map<std::string, Ref<Mesh>> s_meshes;
+	};
 }
 
 

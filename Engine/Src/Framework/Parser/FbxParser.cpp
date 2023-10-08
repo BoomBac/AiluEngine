@@ -63,7 +63,7 @@ namespace Ailu
 					if (!GenerateMesh(mesh, fbx_mesh)) continue;
 //					LOG_INFO("Loading mesh: {} takes {}ms", node_name, _time_mgr.GetElapsedSinceLastMark());
 					mesh->Build();
-					MeshPool::Add(node_name, mesh);
+					MeshPool::AddMesh(node_name,mesh);
 					meshs.emplace_back(mesh);
 				}
 			}

@@ -22,6 +22,7 @@ namespace Ailu
 		static Type* Create();
 		template <typename Type>
 		static Type* Create(const std::string& name);
+		static void RemoveFromRoot(Actor* actor);
 		template <typename Type>
 		Type* GetComponent();
 		template <typename Type>
@@ -37,14 +38,16 @@ namespace Ailu
 		void AddChild(Actor* child);
 		uint16_t GetChildNum() const { return _chilren_num; };
 		void ClearChildren();
+		bool operator==(const Actor& other) const
+		{
+			return this->_Id == other._Id;
+		}
 
 		DECLARE_PROTECTED_PROPERTY(name, Name, std::string)
 		DECLARE_PROTECTED_PROPERTY(Id,Id,uint32_t)
 		DECLARE_PROTECTED_PROPERTY_PTR(Parent,Actor)
 	public:
-		inline static std::vector<Actor*> s_global_actors{};
-	protected:
-		void RemoveFromRoot() const;	
+		inline static std::vector<Scope<Actor>> s_global_actors{};
 	protected:
 		std::list<Actor*> _children{};
 		std::list<Scope<Component>> _components{};
@@ -55,22 +58,19 @@ namespace Ailu
 	template<typename Type>
 	inline Type* Actor::Create()
 	{
-		auto actor = new Type();
-		actor->Id(Actor::s_actor_count);
-		actor->Name(std::format("Actor{0}", Actor::s_actor_count++));
-		s_global_actors.emplace_back(actor);
-		return actor;
+		s_global_actors.emplace_back(MakeScope<Type>());
+		s_global_actors.back()->Id(Actor::s_actor_count);
+		s_global_actors.back()->Name(std::format("Actor{0}", Actor::s_actor_count++));
+		return static_cast<Type*>(s_global_actors.back().get());
 	}
 
 	template<typename Type>
 	inline Type* Actor::Create(const std::string& name)
 	{
-		auto actor = new Type();
-		actor->Id(Actor::s_actor_count);
-		actor->Name(name);
-		++s_actor_count;
-		s_global_actors.emplace_back(actor);
-		return actor;
+		s_global_actors.emplace_back(MakeScope<Type>());
+		s_global_actors.back()->Id(Actor::s_actor_count++);
+		s_global_actors.back()->Name(name);
+		return static_cast<Type*>(s_global_actors.back().get());
 	}
 
 	template<typename Type>

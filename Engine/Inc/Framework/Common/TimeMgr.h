@@ -25,7 +25,7 @@ namespace Ailu
 
 		int Initialize() override;
 		void Finalize() override;
-		void Tick() override;
+		void Tick(const float& delta_time) override;
 		void Pause();
 		void Mark();
 		float GetElapsedSinceLastMark();

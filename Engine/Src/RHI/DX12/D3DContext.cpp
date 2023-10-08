@@ -97,11 +97,11 @@ namespace Ailu
 
 
         //scene data
-        _p_scene_camera = std::make_unique<Camera>(16.0F / 9.0F);
-        _p_scene_camera->SetPosition(1356.43f,604.0f,-613.45f);
-        _p_scene_camera->Rotate(11.80,-59.76);
-        _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
-        Camera::sCurrent = _p_scene_camera.get();
+        //_p_scene_camera = std::make_unique<Camera>(16.0F / 9.0F);
+        //_p_scene_camera->SetPosition(1356.43f,604.0f,-613.45f);
+        //_p_scene_camera->Rotate(11.80,-59.76);
+        //_p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
+        //Camera::sCurrent = _p_scene_camera.get();
 
         m_commandList->Close();
         ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
@@ -176,16 +176,32 @@ namespace Ailu
         return _p_cbuffer;
     }
 
-    void D3DContext::ExecuteCommandBuffer(Ref<D3DComandBuffer> cmd)
+    uint8_t* D3DContext::GetPerFrameCbufData()
     {
+        return _p_cbuffer;
+    }
+
+    uint8_t* D3DContext::GetPerMaterialCbufData(uint32_t mat_index)
+    {
+        return _p_cbuffer;
+    }
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC* D3DContext::GetPerFrameCbufGPURes()
+    {
+        return &_cbuf_views[0];
+    }
+
+    ScenePerFrameData* D3DContext::GetPerFrameCbufDataStruct()
+    {
+        return &_perframe_scene_data;
+    }
+
+    void D3DContext::ExecuteCommandBuffer(Ref<D3DCommandBuffer>& cmd)
+    {    
         for (auto& call : cmd->_commands)
         {
-            call();
+            _all_commands.emplace_back(std::move(call));
         }
-        //for (auto& cache_cmd : cmd->_commands)
-        //{
-        //    _all_commands.emplace_back(cache_cmd);
-        //}
     }
 
     void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform)
@@ -332,8 +348,8 @@ namespace Ailu
     {
         GraphicsPipelineStateMgr::BuildPSOCache();
 
-        _mat_standard = MakeRef<Material>(ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl")), "StandardPBR");
-        _mat_wireframe = MakeRef<Material>(ShaderLibrary::Add(GetResPath("Shaders/PureColor.hlsl")), "WireFrame");
+        //_mat_standard = MakeRef<Material>(ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl")), "StandardPBR");
+        //_mat_wireframe = MakeRef<Material>(ShaderLibrary::Add(GetResPath("Shaders/PureColor.hlsl")), "WireFrame");
   
         // Create the vertex buffer.
         {
@@ -395,52 +411,52 @@ namespace Ailu
                 0,3,7,
                 7,4,0//back
             };
-            auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-            
-            //_plane = parser->Parser(GET_RES_PATH(Meshs/plane.fbx));
-            //_plane = parser->Parser(GET_RES_PATH(Meshs/gizmo.fbx));
+            //auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+            //
+            ////_plane = parser->Parser(GET_RES_PATH(Meshs/plane.fbx));
+            ////_plane = parser->Parser(GET_RES_PATH(Meshs/gizmo.fbx));
 
-            //_tree = parser->Parser(GetResPath("Meshs/stone.fbx"));
-            //_tree = parser->Parser(GetResPath("Meshs/plane.fbx"));
-            //_tree = parser->Parser(GetResPath("Meshs/space_ship.fbx"));
-            _tree = parser->Parser(GetResPath("Meshs/sphere.fbx"));
+            ////_tree = parser->Parser(GetResPath("Meshs/stone.fbx"));
+            ////_tree = parser->Parser(GetResPath("Meshs/plane.fbx"));
+            ////_tree = parser->Parser(GetResPath("Meshs/space_ship.fbx"));
+            //_tree = MeshPool::GetMesh("sphere");
 
-            auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-            auto tga_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kTGA);
+            //auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+            //auto tga_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kTGA);
 
-            //_tex_water = tga_parser->Parser(GET_RES_PATH(Textures/PK_stone03_static_0_D.tga));
-            //tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
-            //tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
-            //png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_color_4.png"));
-            png_parser->Parser(GetResPath("Textures/MyImage01.jpg"));
-            //png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_emi.jpg"));
-            //png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_nmap_2_Tris.jpg"));
+            ////_tex_water = tga_parser->Parser(GET_RES_PATH(Textures/PK_stone03_static_0_D.tga));
+            ////tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
+            ////tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
+            ////png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_color_4.png"));
+            //png_parser->Parser(GetResPath("Textures/MyImage01.jpg"));
+            ////png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_emi.jpg"));
+            ////png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_nmap_2_Tris.jpg"));
 
             //_mat_standard->SetTexture("TexAlbedo", TexturePool::Get("Intergalactic Spaceship_color_4"));
             //_mat_standard->SetTexture("TexNormal", TexturePool::Get("Intergalactic Spaceship_nmap_2_Tris"));
             //_mat_standard->SetTexture("TexEmssive", TexturePool::Get("Intergalactic Spaceship_emi"));
 
-            _p_actor = Actor::Create<SceneActor>("stone");
-            _p_actor->AddComponent<StaticMeshComponent>(_tree, _mat_standard);
-            _p_light = Actor::Create<LightActor>("directional_light");
-            Ref<SceneActor> point_light = Actor::Create<LightActor>("point_light");
-            point_light->GetComponent<LightComponent>()->_light_type = ELightType::kPoint;
-            point_light->GetComponent<LightComponent>()->_light._light_param.x = 500.0f;
+            //_p_actor = Actor::Create<SceneActor>("stone");
+            //_p_actor->AddComponent<StaticMeshComponent>(_tree, _mat_standard);
+            //_p_light = Actor::Create<LightActor>("directional_light");
+            //SceneActor* point_light = Actor::Create<LightActor>("point_light");
+            //point_light->GetComponent<LightComponent>()->_light_type = ELightType::kPoint;
+            //point_light->GetComponent<LightComponent>()->_light._light_param.x = 500.0f;
 
-            Ref<SceneActor> spot_light = Actor::Create<LightActor>("spot_light");
-            spot_light->GetTransform().Position({0.0,500.0,0.0});
-            spot_light->GetTransform().Rotation({82.0,0.0,0.0});
-            auto light_comp = spot_light->GetComponent<LightComponent>();
-            light_comp->_light_type = ELightType::kSpot;
-            light_comp->_light._light_param.x = 500.0f;
-            light_comp->_light._light_param.y = 45.0f;
-            light_comp->_light._light_param.z = 60.0f;
+            //SceneActor* spot_light = Actor::Create<LightActor>("spot_light");
+            //spot_light->GetTransform().Position({0.0,500.0,0.0});
+            //spot_light->GetTransform().Rotation({82.0,0.0,0.0});
+            //auto light_comp = spot_light->GetComponent<LightComponent>();
+            //light_comp->_light_type = ELightType::kSpot;
+            //light_comp->_light._light_param.x = 500.0f;
+            //light_comp->_light._light_param.y = 45.0f;
+            //light_comp->_light._light_param.z = 60.0f;
 
-            g_pSceneMgr->_p_current = SceneMgr::Create("default_scene");
-            g_pSceneMgr->_p_current->AddObject(_p_actor);
-            g_pSceneMgr->_p_current->AddObject(_p_light);
-            g_pSceneMgr->_p_current->AddObject(point_light);
-            g_pSceneMgr->_p_current->AddObject(spot_light);
+            //g_pSceneMgr->_p_current = SceneMgr::Create("default_scene");
+            //g_pSceneMgr->_p_current->AddObject(_p_actor);
+            //g_pSceneMgr->_p_current->AddObject(_p_light);
+            //g_pSceneMgr->_p_current->AddObject(point_light);
+            //g_pSceneMgr->_p_current->AddObject(spot_light);
 
 
             //_p_vertex_buf.reset(VertexBuffer::Create({
@@ -488,107 +504,41 @@ namespace Ailu
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
         m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
-        {          
-            Renderer::BeginScene();
-            memset(reinterpret_cast<void*>(&_perframe_scene_data), 0, sizeof(_perframe_scene_data));
-            auto& light_comps = g_pSceneMgr->_p_current->GetAllLight();
-            uint16_t updated_light_num = 0u;
-            uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0;
-            for (auto light : light_comps)
-            {
-                auto& light_data = light->_light;
-                Color color = light_data._light_color;
-                color.r *= color.a;
-                color.g *= color.a;
-                color.b *= color.a;
-                if (light->_light_type == ELightType::kDirectional)
-                {
-                    if (!light->Active())
-                    {
-                        _perframe_scene_data._DirectionalLights[direction_light_index]._LightDir = Vector3f::Zero;
-                        _perframe_scene_data._DirectionalLights[direction_light_index++]._LightColor = Colors::kBlack.xyz;
-                        continue;
-                    }
-                    _perframe_scene_data._DirectionalLights[direction_light_index]._LightColor = color.xyz;
-                    _perframe_scene_data._DirectionalLights[direction_light_index++]._LightDir = light_data._light_dir.xyz;
-                }
-                else if (light->_light_type == ELightType::kPoint)
-                {
-                    if (!light->Active())
-                    {
-                        _perframe_scene_data._PointLights[point_light_index]._LightParam0 = 0.0;
-                        _perframe_scene_data._PointLights[point_light_index++]._LightColor = Colors::kBlack.xyz;
-                        continue;
-                    }
-                    _perframe_scene_data._PointLights[point_light_index]._LightColor = color.xyz;
-                    _perframe_scene_data._PointLights[point_light_index]._LightPos = light_data._light_pos.xyz;
-                    _perframe_scene_data._PointLights[point_light_index]._LightParam0 = light_data._light_param.x;
-                    _perframe_scene_data._PointLights[point_light_index++]._LightParam1 = light_data._light_param.y;
-                }
-                else if (light->_light_type == ELightType::kSpot)
-                {
-                    if (!light->Active())
-                    {
-                        _perframe_scene_data._SpotLights[spot_light_index++]._LightColor = Colors::kBlack.xyz;
-                        continue;
-                    }
-                    _perframe_scene_data._SpotLights[spot_light_index]._LightColor = color.xyz;
-                    _perframe_scene_data._SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;
-                    _perframe_scene_data._SpotLights[spot_light_index]._LightDir = light_data._light_dir.xyz;
-                    _perframe_scene_data._SpotLights[spot_light_index]._Rdius = light_data._light_param.x;
-                    _perframe_scene_data._SpotLights[spot_light_index]._InnerAngle = light_data._light_param.y;
-                    _perframe_scene_data._SpotLights[spot_light_index]._OuterAngle = light_data._light_param.z;
-                }
-                ++updated_light_num;
-            }
-            if(updated_light_num == 0)
-            {
-                _perframe_scene_data._DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
-                _perframe_scene_data._DirectionalLights[0]._LightDir = {0.0f,0.0f,0.0f};
-            }
-            _perframe_scene_data._CameraPos = Camera::sCurrent->GetPosition();
-            memcpy(D3DContext::s_p_d3dcontext->_p_cbuffer, &D3DContext::s_p_d3dcontext->_perframe_scene_data, sizeof(D3DContext::s_p_d3dcontext->_perframe_scene_data));
-            _render_object_index = 0;
-        }
-        auto cmd = D3DComandBufferPool::GetCommandBuffer();
-        cmd->Clear();
-        cmd->SetViewports({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
-        cmd->SetScissorRects({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
-        cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
-        cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
 
-        if (RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShader)
-        {
-            GraphicsPipelineStateMgr::s_standard_shadering_pso->Bind();
-            GraphicsPipelineStateMgr::s_standard_shadering_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_standard);
-        }
-        else
-        {
-            GraphicsPipelineStateMgr::s_wireframe_pso->Bind();
-            GraphicsPipelineStateMgr::s_wireframe_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_wireframe);
-        }   
-        ExecuteCommandBuffer(cmd);
-        cmd->Clear();
-        if (RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
-        {
-            GraphicsPipelineStateMgr::s_wireframe_pso->Bind();
-            GraphicsPipelineStateMgr::s_wireframe_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-            cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_wireframe);
-        }
-        ExecuteCommandBuffer(cmd);
+        _render_object_index = 0;
 
-        auto draw_call = &RenderingStates::s_draw_call;
-        {
-            Renderer::EndScene();
-        }
-        D3DComandBufferPool::ReleaseCommandBuffer(cmd);
-        auto& aabb = _tree->_bound_box;
-        auto [bmin,bmax] = AABB::CaclulateBoundBox(aabb, _p_actor->GetTransform().GetTransformMat());
-        Gizmo::DrawAABB(bmin, bmax,Colors::kRed);
-        //Gizmo::DrawAABB(aabb._min, aabb._max,Colors::kGreen);
-        //Gizmo::DrawLine(bmin, bmax,Colors::kWhite);
+        //auto cmd = D3DCommandBufferPool::GetCommandBuffer();
+        //cmd->Clear();
+        //cmd->SetViewports({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
+        //cmd->SetScissorRects({ Viewport{0,0,(uint16_t)_window->GetWidth(),(uint16_t)_window->GetHeight()} });
+        //cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
+        //cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
+
+        //if (RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShader)
+        //{
+        //    cmd->SetPSO(GraphicsPipelineStateMgr::s_standard_shadering_pso);
+        //    cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_standard);
+        //}
+        //else
+        //{
+        //    cmd->SetPSO(GraphicsPipelineStateMgr::s_wireframe_pso);
+        //    cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_wireframe);
+        //}   
+        ////ExecuteCommandBuffer(cmd);
+        ////cmd->Clear();
+        //if (RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
+        //{
+        //    cmd->SetPSO(GraphicsPipelineStateMgr::s_wireframe_pso);
+        //    cmd->DrawRenderer(_tree, Transpose(_p_actor->GetTransform().GetTransformMat()), _mat_wireframe);
+        //}
+       //ExecuteCommandBuffer(cmd);
+
+        //执行所有命令
+        for (auto& cmd : _all_commands) cmd();
+        _all_commands.clear();
+
+        //D3DCommandBufferPool::ReleaseCommandBuffer(cmd);
+
         //DrawGizmo
         {
             GraphicsPipelineStateMgr::s_gizmo_pso->Bind();

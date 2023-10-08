@@ -26,8 +26,7 @@ public:\
 		DECLARE_PROTECTED_PROPERTY(b_enable,Active,bool)
 		DECLARE_REFLECT_FIELD(Component)
 	protected:
-		Actor* _p_onwer = nullptr;
-		
+		Actor* _p_onwer = nullptr;	
 	};
 }
 

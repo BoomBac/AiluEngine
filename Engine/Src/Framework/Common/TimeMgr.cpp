@@ -17,7 +17,8 @@ namespace Ailu
 	{
 		_b_stop = true;
 	}
-	void TimeMgr::Tick()
+
+	void TimeMgr::Tick(const float& delta_time)
 	{
 		_cur_stamp = std::chrono::high_resolution_clock::now();
 		DeltaTime = ALMSecond(_cur_stamp - _pre_stamp).count();

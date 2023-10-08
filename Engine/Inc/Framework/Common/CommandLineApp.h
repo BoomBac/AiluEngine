@@ -19,7 +19,7 @@ namespace Ailu
 		{
 			std::cout << "Ailu Engine Finalize" << std::endl;
 		};
-		void Tick() override {};
+		void Tick(const float& delta_time) override {};
 	};
 }
 

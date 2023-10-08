@@ -478,6 +478,7 @@
     <ClInclude Include="Inc\Framework\Common\Log.h" />
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Reflect.h" />
+    <ClInclude Include="Inc\Framework\Common\ResourceMgr.h" />
     <ClInclude Include="Inc\Framework\Common\ResourcePool.h" />
     <ClInclude Include="Inc\Framework\Common\SceneMgr.h" />
     <ClInclude Include="Inc\Framework\Common\ThreadPool.h" />
@@ -553,6 +554,7 @@
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\Reflect.cpp" />
+    <ClCompile Include="Src\Framework\Common\ResourceMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\SceneMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\TimeMgr.cpp" />
     <ClCompile Include="Src\Framework\Events\InputLayer.cpp" />
@@ -617,6 +619,17 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Res\Shaders\common.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Res\Shaders\brdf.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Res\Shaders\constants.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Res\Shaders\input.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

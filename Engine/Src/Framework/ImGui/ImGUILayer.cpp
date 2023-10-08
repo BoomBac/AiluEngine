@@ -58,7 +58,7 @@ namespace ImguiTree
 
 namespace Ailu
 {
-    static Ref<SceneActor> s_cur_selected_actor = nullptr;
+    static SceneActor* s_cur_selected_actor = nullptr;
     static int cur_object_index = 0u;
     static uint32_t cur_tree_node_index = 0u;
 
@@ -317,7 +317,7 @@ namespace Ailu
     }
 
 
-    void DrawTreeNode(Ref<SceneActor>& actor)
+    void DrawTreeNode(SceneActor* actor)
     {
         using namespace TreeStats;
         ImGuiTreeNodeFlags node_flags = s_base_flags;
@@ -338,7 +338,7 @@ namespace Ailu
             {
                 if (node->GetChildNum() > 0)
                 {
-                    auto scene_node = std::static_pointer_cast<SceneActor>(node);
+                    auto scene_node = static_cast<SceneActor*>(node);
                     DrawTreeNode(scene_node);
                 }
                 else
@@ -373,7 +373,6 @@ namespace Ailu
     {
         using namespace TreeStats;
         ImGui::Begin("WorldOutline");                          // Create a window called "Hello, world!" and append into it.
-        auto object_list = Actor::s_global_actors;
         uint32_t index = 0;
 
         DrawTreeNode(g_pSceneMgr->_p_current->GetSceneRoot());

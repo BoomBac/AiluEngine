@@ -63,7 +63,7 @@ namespace Ailu
 		LogMgr(std::string name, ELogLevel output_level = kLogLevel, TraceLevle output_mark = kTraceLevel);
 		int Initialize() override;
 		void Finalize() override;
-		void Tick() override;
+		void Tick(const float& delta_time) override;
 		void AddAppender(IAppender* appender);
 		void SetOutputLevel(ELogLevel level);
 		void SetTraceLevel(TraceLevle trace);
