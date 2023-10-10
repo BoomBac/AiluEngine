@@ -7,6 +7,13 @@
 
 namespace Ailu
 {
+	struct EngineResourceType
+	{
+		inline const static std::string Material = "material";
+		inline const static std::string Mesh = "mesh";
+		inline const static std::string Texture2D = "texture2d";
+	};
+
 	class ResourceMgr : public IRuntimeModule
 	{
 	public:
@@ -16,7 +23,7 @@ namespace Ailu
 		void SaveScene(Scene* scene, std::string& scene_path);
 		Scene* LoadScene(std::string& scene_path);
 		void SaveMaterial(Material* mat,std::string path);
-		Ref<Material> LoadMaterial(std::string& path);
+		Ref<Material> LoadMaterial(std::string path);
 	private:
 		void SaveSceneImpl(Scene* scene, std::string& scene_path);
 	};

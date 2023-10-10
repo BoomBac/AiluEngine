@@ -24,7 +24,7 @@ namespace Ailu
 		inline static std::string Vector = "Vector";
 		inline static std::string Float = "Float";
 		inline static std::string Color = "Color";
-		inline static std::string Texture2D = "Texture2D";
+		inline static std::string Texture2D = "Tex2D";
 	};
 
 	struct ShaderBindResourceInfo
@@ -132,14 +132,15 @@ namespace Ailu
 			auto it = s_shader_path.find(name);
 			return it == s_shader_path.end() ? "" : it->second;
 		}
-		static Ref<Shader> Add(const std::string& file_path)
+		static Ref<Shader> Add(const std::string& res_path)
 		{
-			auto name = GetFileName(file_path);
+			auto abs_path = GetResPath(res_path);
+			auto name = GetFileName(abs_path);
 			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
 			else
 			{
-				s_shader_path.insert(std::make_pair(name,file_path));
-				return Shader::Create(file_path);
+				s_shader_path.insert(std::make_pair(name, res_path));
+				return Shader::Create(abs_path);
 			}
 		}
 		inline static uint32_t NameToId(const std::string& name)

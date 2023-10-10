@@ -23,7 +23,7 @@ namespace Ailu
 	{
 		LOG_WARNING("Begin initialize PSO cache...");
 		g_pTimeMgr->Mark();
-		auto p_standard_shader = ShaderLibrary::Add(GetResPath("Shaders/shaders.hlsl"));
+		auto p_standard_shader = ShaderLibrary::Add("Shaders/shaders.hlsl");
 		auto pso_desc0 = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
 		pso_desc0._p_vertex_shader = p_standard_shader;
 		pso_desc0._p_pixel_shader = p_standard_shader;
@@ -32,7 +32,7 @@ namespace Ailu
 		s_standard_shadering_pso = stand_pso.get();
 		s_pso_pool.insert(std::make_pair(EGraphicsPSO::kStandShadering,std::move(stand_pso)));
 
-		auto p_wireframe_shader = ShaderLibrary::Add(GetResPath("Shaders/PureColor.hlsl"));
+		auto p_wireframe_shader = ShaderLibrary::Add("Shaders/PureColor.hlsl");
 		pso_desc0._p_vertex_shader = p_wireframe_shader;
 		pso_desc0._p_pixel_shader = p_wireframe_shader;
 		pso_desc0._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
@@ -42,7 +42,7 @@ namespace Ailu
 		s_wireframe_pso = wireframe_pso.get();
 		s_pso_pool.insert(std::make_pair(EGraphicsPSO::kWireFrame, std::move(wireframe_pso)));
 
-		auto p_gizmo_shader = ShaderLibrary::Add(GetResPath("Shaders/gizmo.hlsl"));
+		auto p_gizmo_shader = ShaderLibrary::Add("Shaders/gizmo.hlsl");
 		auto pso_desc1 = GraphicsPipelineStateInitializer::GetNormalTransparentPSODesc();
 		pso_desc1._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
 		pso_desc1._topology = ETopology::kLine;

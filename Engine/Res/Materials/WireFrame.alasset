@@ -1,0 +1,2 @@
+type: material
+shader_path: Shaders/PureColor.hlsl

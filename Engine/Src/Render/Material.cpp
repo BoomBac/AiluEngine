@@ -56,6 +56,7 @@ namespace Ailu
 			if (bind_info.second._res_type == EBindResDescType::kTexture2D)
 			{
 				_textures.insert(std::make_pair(bind_info.first, std::make_tuple(bind_info.second._bind_slot, nullptr)));
+				_mat_props.insert(bind_info.second);
 			}
 			else if (bind_info.second._res_type == EBindResDescType::kCBufferAttribute && !ShaderBindResourceInfo::s_reversed_res_name.contains(bind_info.first))
 			{
@@ -77,9 +78,18 @@ namespace Ailu
 				if (!b_hide)
 				{
 					std::string	type_name = shader_prop[0], prop_name = shader_prop[1];
-					LOG_INFO("{} with byte offset {}", prop_info._name, (int)ShaderBindResourceInfo::GetVariableOffset(prop_info));
-					SerializableProperty prop{_p_data + ShaderBindResourceInfo::GetVariableOffset(prop_info),prop_name,type_name};
-					properties.insert(std::make_pair(prop_name, prop));
+					//LOG_INFO("{} with byte offset {}", prop_info._name, (int)ShaderBindResourceInfo::GetVariableOffset(prop_info));
+					if (type_name == ShaderPropertyType::Texture2D)
+					{
+						SerializableProperty prop{nullptr,prop_name,type_name };
+						properties.insert(std::make_pair(prop_name, prop));
+					}
+					else
+					{
+						SerializableProperty prop{ _p_data + ShaderBindResourceInfo::GetVariableOffset(prop_info),prop_name,type_name };
+						properties.insert(std::make_pair(prop_name, prop));
+					}
+
 				}
 			}
 			else

@@ -5,10 +5,10 @@
 
 
 
-Texture2D TexAlbedo : register(t0);
-Texture2D TexNormal : register(t1);
-Texture2D TexEmssive : register(t2);
-Texture2D TexRoughness : register(t3);
+Texture2D Tex2D_Albedo : register(t0);
+Texture2D Tex2D_Normal : register(t1);
+Texture2D Tex2D_Emssive : register(t2);
+Texture2D Tex2D_Roughness : register(t3);
 
 SamplerState g_LinearSampler : register(s0);
 
@@ -29,20 +29,20 @@ PSInput VSMain(VSInput v)
 
 void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out float3 emssive,out float specular)
 {
-	if(H_Uint_SamplerMask & 1) albedo = TexAlbedo.Sample(g_LinearSampler,input.uv0);
+	if(H_Uint_SamplerMask & 1) albedo = Tex2D_Albedo.Sample(g_LinearSampler,input.uv0);
 	else albedo = Color_BaseColor;
 	if(H_Uint_SamplerMask & 2) 
 	{
-		wnormal = TexNormal.Sample(g_LinearSampler,input.uv0).xyz;
+		wnormal = Tex2D_Normal.Sample(g_LinearSampler, input.uv0).xyz;
 		wnormal = normalize(mul(wnormal* 2.0 - 1.0,input.btn));
 	}
 	else wnormal = input.normal;
 	if(H_Uint_SamplerMask & 4)
 	{
-		emssive = TexEmssive.Sample(g_LinearSampler,input.uv0).rgb;
+		emssive = Tex2D_Emssive.Sample(g_LinearSampler, input.uv0).rgb;
 	}
 	else emssive = Color_EmssiveColor;
-	float3 roughness_and_metallic = TexRoughness.Sample(g_LinearSampler,input.uv0).xyz;
+	float3 roughness_and_metallic = Tex2D_Roughness.Sample(g_LinearSampler, input.uv0).xyz;
 	if(H_Uint_SamplerMask & 8) roughness = roughness_and_metallic.x;
 	else roughness = Float_Roughness;
 	if(H_Uint_SamplerMask & 16) metallic = roughness_and_metallic.y;

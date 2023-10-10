@@ -70,6 +70,13 @@ namespace Ailu
 				s_materials.erase(it);
 			}
 		}
+
+		static std::list<Material*> GetAllMaterial()
+		{
+			std::list<Material*> mats{};
+			for (auto& mat : s_materials) mats.emplace_back(mat.second.get());
+			return mats;
+		}
 	private:
 		inline static uint32_t s_next_material_id = 0u;
 		inline static std::unordered_map<std::string, Ref<Material>> s_materials{};
