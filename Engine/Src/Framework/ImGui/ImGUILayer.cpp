@@ -288,9 +288,9 @@ namespace Ailu
                     ImGui::Checkbox("Texture", &use_textures[mat_prop_index++]);
                     ImGui::PopID();
                     ImGui::SameLine();
-                    if (prop.second._type_name == "Color")
+                    if (prop.second._type_name == ShaderPropertyType::Color)
                     {
-                        ImGui::ColorEdit3(prop.second._name.c_str(),static_cast<float*>(prop.second._value_ptr));
+                        ImGui::ColorEdit4(prop.second._name.c_str(),static_cast<float*>(prop.second._value_ptr));
                         if (use_textures[mat_prop_index - 1])
                         {
                             auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
@@ -302,10 +302,6 @@ namespace Ailu
                             ImGui::SetCursorPosX(centerX);
                             ImGui::Image((void*)(intptr_t)desc.ptr, ImVec2(256, 256));
                         }
-                    }
-                    else if (prop.second._type_name == "Color4")
-                    {
-                        ImGui::ColorEdit4(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr));
                     }
                     else if (prop.second._type_name == "Float")
                     {

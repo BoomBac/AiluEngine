@@ -3,6 +3,7 @@
 #define __RESOURCE_MGR_H__
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/SceneMgr.h"
+#include "Render/Material.h"
 
 namespace Ailu
 {
@@ -14,6 +15,8 @@ namespace Ailu
 		void Tick(const float& delta_time) final;
 		void SaveScene(Scene* scene, std::string& scene_path);
 		Scene* LoadScene(std::string& scene_path);
+		void SaveMaterial(Material* mat,std::string path);
+		Ref<Material> LoadMaterial(std::string& path);
 	private:
 		void SaveSceneImpl(Scene* scene, std::string& scene_path);
 	};

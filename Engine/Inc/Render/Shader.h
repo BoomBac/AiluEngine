@@ -19,6 +19,14 @@ namespace Ailu
 		kConstBuffer = 0, kTexture2D, kSampler, kCBufferAttribute
 	};
 
+	struct ShaderPropertyType
+	{
+		inline static std::string Vector = "Vector";
+		inline static std::string Float = "Float";
+		inline static std::string Color = "Color";
+		inline static std::string Texture2D = "Texture2D";
+	};
+
 	struct ShaderBindResourceInfo
 	{
 		inline const static std::set<std::string> s_reversed_res_name
@@ -119,11 +127,20 @@ namespace Ailu
 		{
 			return NameToId(name) != s_error_id;
 		}
+		static std::string GetShaderPath(const std::string& name)
+		{
+			auto it = s_shader_path.find(name);
+			return it == s_shader_path.end() ? "" : it->second;
+		}
 		static Ref<Shader> Add(const std::string& file_path)
 		{
 			auto name = GetFileName(file_path);
 			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
-			else return Shader::Create(file_path);
+			else
+			{
+				s_shader_path.insert(std::make_pair(name,file_path));
+				return Shader::Create(file_path);
+			}
 		}
 		inline static uint32_t NameToId(const std::string& name)
 		{
@@ -136,6 +153,7 @@ namespace Ailu
 		inline static uint32_t s_error_id = 9999u;
 		inline static std::unordered_map<uint32_t, Ref<Shader>> s_shader_library;
 		inline static std::unordered_map<std::string, uint32_t> s_shader_name;
+		inline static std::unordered_map<std::string, std::string> s_shader_path;
 	};
 }
 

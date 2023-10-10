@@ -1,0 +1,9 @@
+type : material
+shader path : E:/AiluEngine/Engine/Res/Shaders/shaders.hlsl
+  prop_type : Color
+    BaseColor : 0,0,0,0
+    EmssiveColor : 0,0,0,0
+  prop_type : Float
+    Specular : 0
+    Metallic : 0
+    Roughness : 0

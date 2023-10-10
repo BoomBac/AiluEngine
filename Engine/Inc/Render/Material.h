@@ -17,6 +17,7 @@ namespace Ailu
 
 	class Material
 	{
+		friend class ResourceMgr;
 		DECLARE_REFLECT_FIELD(Material)
 	public:
 		Material(Ref<Shader> shader,std::string name);
@@ -25,6 +26,7 @@ namespace Ailu
 		void SetVector(const std::string& name, const Vector4f& vector);
 		void SetTexture(const std::string& name, Ref<Texture> texture);
 		void Bind();
+		const std::string& Name() const { return _name; };
 		Shader* GetShader() const;
 	private:
 		uint16_t _mat_cbuf_size = 0u;

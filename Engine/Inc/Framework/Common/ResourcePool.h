@@ -36,7 +36,7 @@ namespace Ailu
 		return STR2(RES_PATH) + sub_path;
 	}
 
-	static std::string GetFileName(const std::string_view& filePath, bool include_ext = false)
+	static std::string GetFileName(const std::string_view filePath, bool include_ext = false)
 	{
 		size_t found = filePath.find_last_of("/\\");
 		size_t dot_pos = filePath.find_last_of(".");

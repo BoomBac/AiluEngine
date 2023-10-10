@@ -30,7 +30,7 @@ PSInput VSMain(VSInput v)
 void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out float3 emssive,out float specular)
 {
 	if(H_Uint_SamplerMask & 1) albedo = TexAlbedo.Sample(g_LinearSampler,input.uv0);
-	else albedo = Color4_BaseColor;
+	else albedo = Color_BaseColor;
 	if(H_Uint_SamplerMask & 2) 
 	{
 		wnormal = TexNormal.Sample(g_LinearSampler,input.uv0).xyz;
@@ -61,6 +61,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 	light.g += 0.000001 * surface_data.roughness;
 	light.b += 0.000001 * surface_data.specular;
 	light += surface_data.emssive * 10;
-	return float4(float4(light, 1.0f));
+	
+	return float4(surface_data.albedo);
 	//return float4(float4(surface_data.wnormal, 1.0f));
 }

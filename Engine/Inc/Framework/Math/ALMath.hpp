@@ -250,6 +250,11 @@ namespace Ailu
 
 		operator T* () { return data; };
 		operator const T* () const { return static_cast<const T*>(data); };
+		friend std::ostream& operator<<(std::ostream& os, const Vector4D<T>& vec)
+		{
+			os << vec.x << "," << vec.y << "," << vec.z << "," << vec.w;
+			return os;
+		}
 		Vector4D<T>& operator+=(const Vector4D<T>& other) {
 			for (uint8_t i = 0; i < CountOf(data); i++) {
 				data[i] += other.data[i];

@@ -19,6 +19,8 @@ namespace Ailu
             : _value_ptr(valuePtr), _name(name), _type_name(typeName) {}
         template<typename T>
         static std::string ToString(const T& value);
+        template<typename T>
+        static T GetProppertyValue(const SerializableProperty& prop);
     };
 
 
@@ -26,6 +28,12 @@ namespace Ailu
     std::string SerializableProperty::ToString(const T& value)
     {
         if (std::is_same<T, float>()) return std::format("{}", value);
+    }
+
+    template<typename T>
+    inline T SerializableProperty::GetProppertyValue(const SerializableProperty& prop)
+    {
+        return *reinterpret_cast<T*>(prop._value_ptr);
     }
 
 #define DECLARE_REFLECT_FIELD(class_name) protected: std::unordered_map<std::string,SerializableProperty> properties{};\
