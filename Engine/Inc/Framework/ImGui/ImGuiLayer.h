@@ -21,6 +21,7 @@ namespace Ailu
 	private:
 		void ShowWorldOutline();
 		void ShowObjectDetail();
+		void ShowTextureExplorer();
 	};
 }
 

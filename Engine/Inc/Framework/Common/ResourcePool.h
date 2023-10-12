@@ -9,7 +9,7 @@
 namespace Ailu
 {
 	template<class T>
-	class ResourcePool
+	class TResourcePool
 	{
 	public:
 		static void Add(const std::string& name, Ref<T> res)
@@ -56,7 +56,6 @@ namespace Ailu
 			return std::string(filePath.data(), filePath.length());
 		}
 	}
-
 }
 
 

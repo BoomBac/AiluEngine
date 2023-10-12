@@ -8,6 +8,7 @@
 #include "Texture.h"
 #include "Framework/Common/Reflect.h"
 
+
 namespace Ailu
 {
 	enum class ETextureUsage : uint8_t
@@ -28,13 +29,15 @@ namespace Ailu
 		void Bind();
 		const std::string& Name() const { return _name; };
 		Shader* GetShader() const;
+		vector<string> _texture_paths{};
 	private:
 		uint16_t _mat_cbuf_size = 0u;
 		//std::set<ShaderBindResourceInfo, ShaderBindResourceInfoComparer> _mat_props{};
 		std::unordered_set<ShaderBindResourceInfo,ShaderBindResourceInfoHash,ShaderBindResourceInfoEqual> _mat_props{};
 		uint8_t* _p_data;
 		std::string _name;
-		std::map<std::string, std::tuple<uint8_t, Ref<Texture>>> _textures{};
+		//std::map<string, std::tuple<uint8_t, Ref<Texture>>> _textures{};
+		std::map<string, std::tuple<uint8_t, Ref<Texture>,string*>> _textures{};
 		Ref<Shader> _p_shader;
 		uint8_t* _p_cbuf = nullptr;
 		uint32_t _cbuf_index;

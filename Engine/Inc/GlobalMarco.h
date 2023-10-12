@@ -87,6 +87,11 @@ private: \
 //使用dxc编译高版本着色器(>=6.0)，这样的话无法在PIX中看到cbuffer信息
 //#define SHADER_DXC
 
+using string = std::string;
+
+template<typename T>
+using vector = std::vector<T>;
+
 template<typename T>
 using Scope = std::unique_ptr<T>;
 

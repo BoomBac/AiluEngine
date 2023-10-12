@@ -42,7 +42,7 @@ namespace Ailu
 		EALGFormat _format;
 	};
 
-	using TexturePool = ResourcePool<Texture2D>;
+	using TexturePool = TResourcePool<Texture2D>;
 }
 
 #endif // !TEXTURE_H__

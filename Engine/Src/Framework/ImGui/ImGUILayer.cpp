@@ -4,6 +4,7 @@
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/backends/imgui_impl_win32.h"
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
+#include "Ext/imgui/imgui_internal.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Render/RenderingData.h"
@@ -190,6 +191,7 @@ namespace Ailu
         if (show) ImGui::ShowDemoWindow(&show);
         ShowWorldOutline();
         ShowObjectDetail();
+        ShowTextureExplorer();
     }
 
     void Ailu::ImGUILayer::Begin()
@@ -291,22 +293,38 @@ namespace Ailu
                     if (prop.second._type_name == ShaderPropertyType::Color)
                     {
                         ImGui::ColorEdit4(prop.second._name.c_str(),static_cast<float*>(prop.second._value_ptr));
-                        if (use_textures[mat_prop_index - 1])
-                        {
-                            auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
-                            // 获取当前ImGui窗口的内容区域宽度
-                            float contentWidth = ImGui::GetWindowContentRegionWidth();
-                            // 计算使图像水平居中的X坐标
-                            float centerX = (contentWidth - 256) * 0.5f;
-                            // 设置光标的X坐标，使图像水平居中
-                            ImGui::SetCursorPosX(centerX);
-                            ImGui::Image((void*)(intptr_t)desc.ptr, ImVec2(256, 256));
-                        }
+                        //if (use_textures[mat_prop_index - 1])
+                        //{
+                        //    auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
+                        //    float contentWidth = ImGui::GetWindowContentRegionWidth();
+                        //    float centerX = (contentWidth - 256) * 0.5f;
+                        //    ImGui::SetCursorPosX(centerX);
+                        //    ImGui::Image((void*)(intptr_t)desc.ptr, ImVec2(256, 256));
+                        //}
                     }
                     else if (prop.second._type_name == "Float")
                     {
                         //ImGui::DragFloat(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr));
                         ImGui::SliderFloat(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr), 0.0f, 1.0f, "%.2f");
+                    }
+                    else if (prop.second._type_name == "Tex2D")
+                    {
+                        ImGui::Text("Texture: %s", prop.first.c_str());
+                        auto name_ptr = reinterpret_cast<string*>(prop.second._value_ptr);
+                        auto name = *name_ptr;
+                        if (name == string{ "none" })
+                        {
+                            ImGui::Text("none texture");
+                        }
+                        else
+                        {
+                            auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
+                            float contentWidth = ImGui::GetWindowContentRegionWidth();
+                            float centerX = (contentWidth - 256) * 0.5f;
+                            ImGui::SetCursorPosX(centerX);
+                            ImGui::Image((void*)(intptr_t)desc.ptr, ImVec2(256, 256));
+                        }
+                        
                     }
                 }
             }
@@ -401,6 +419,43 @@ namespace Ailu
                 ImGui::SameLine();
                 DrawComponentProperty(comp.get());
                 ++comp_index;
+            }
+        }
+        ImGui::End();
+    }
+    void ImGUILayer::ShowTextureExplorer()
+    {
+        ImGui::Begin("TextureExplorer");
+        static float preview_tex_size = 128;
+        //// 获取当前ImGui窗口的内容区域宽度
+        uint32_t window_width = (uint32_t)ImGui::GetWindowContentRegionWidth();
+        int numImages = 10,imagesPerRow = window_width / (uint32_t)preview_tex_size;
+        static int s_selected_img_index = -1;
+        //int selected_img_index = 0;
+        auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
+        static ImVec2 uv0{ 0,0 }, uv1{1,1};
+        for (int i = 0; i < numImages; ++i)
+        {
+            ImGui::BeginGroup();
+            ImGuiContext* context = ImGui::GetCurrentContext();
+            auto drawList = context->CurrentWindow->DrawList;
+            if (ImGui::ImageButton((void*)(intptr_t)desc.ptr, ImVec2(preview_tex_size, preview_tex_size)))
+            {
+                s_selected_img_index = i;
+                LOG_INFO("selected img {}", s_selected_img_index);
+
+            }
+            ImVec2 cur_img_pos = ImGui::GetCursorPos();
+            // 获取当前图像的区域坐标
+            ImVec2 imgMin = ImGui::GetItemRectMin(); // 图像区域的最小坐标
+            ImVec2 imgMax = ImGui::GetItemRectMax(); // 图像区域的最大坐标
+            drawList->AddRect(imgMin, imgMax, IM_COL32(255, 0, 0, 255));
+            
+            ImGui::EndGroup();
+            // 根据每行显示的图像数量添加换行
+            if ((i + 1) % imagesPerRow != 0)
+            {
+                ImGui::SameLine();
             }
         }
         ImGui::End();
