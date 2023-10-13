@@ -2,6 +2,8 @@
 #include "Render/Shader.h"
 #include "Render/Renderer.h"
 #include "RHI/DX12/D3DShader.h"
+#include "Framework/Common/ResourceMgr.h"
+#include "Framework/Common/Utils.h"
 
 
 namespace Ailu

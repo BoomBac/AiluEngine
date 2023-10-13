@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <cwchar>
 #include <shellapi.h>
+#include <combaseapi.h>
 
 #include <unordered_map>
 #include <string>

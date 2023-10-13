@@ -6,7 +6,6 @@
 #include "GlobalMarco.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/Buffer.h"
-#include "Framework/Common/ResourcePool.h"
 #include "Framework/Math/AABB.h"
 
 namespace Ailu

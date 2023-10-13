@@ -7,6 +7,7 @@
 #include "GlobalMarco.h"
 #include "Texture.h"
 #include "Framework/Common/Reflect.h"
+#include "Framework/Common/Asset.h"
 
 
 namespace Ailu
@@ -16,7 +17,7 @@ namespace Ailu
 		kAlbedo = 0,kNormal,kEmssive,kRoughness,kSpecular,kMetallic
 	};
 
-	class Material
+	class Material : public Asset
 	{
 		friend class ResourceMgr;
 		DECLARE_REFLECT_FIELD(Material)

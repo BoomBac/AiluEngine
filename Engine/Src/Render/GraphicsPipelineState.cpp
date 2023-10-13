@@ -2,6 +2,7 @@
 #include "Render/Renderer.h"
 #include "Render/GraphicsPipelineState.h"
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/TimeMgr.h"
 
 namespace Ailu

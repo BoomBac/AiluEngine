@@ -3,7 +3,6 @@
 #define __TEXTURE_H__
 
 #include <stdint.h>
-#include "Framework/Common/ResourcePool.h"
 #include "GlobalMarco.h"
 #include "AlgFormat.h"
 
@@ -41,8 +40,6 @@ namespace Ailu
 		uint8_t _channel;
 		EALGFormat _format;
 	};
-
-	using TexturePool = TResourcePool<Texture2D>;
 }
 
 #endif // !TEXTURE_H__

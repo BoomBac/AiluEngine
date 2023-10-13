@@ -470,6 +470,7 @@
     <ClInclude Include="Ailu.h" />
     <ClInclude Include="Inc\CompanyEnv.h" />
     <ClInclude Include="Inc\Framework\Common\Application.h" />
+    <ClInclude Include="Inc\Framework\Common\Asset.h" />
     <ClInclude Include="Inc\Framework\Common\CommandLineApp.h" />
     <ClInclude Include="Inc\Framework\Common\EntryPoint.h" />
     <ClInclude Include="Inc\Framework\Common\GfxConfiguration.h" />
@@ -479,7 +480,6 @@
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Reflect.h" />
     <ClInclude Include="Inc\Framework\Common\ResourceMgr.h" />
-    <ClInclude Include="Inc\Framework\Common\ResourcePool.h" />
     <ClInclude Include="Inc\Framework\Common\SceneMgr.h" />
     <ClInclude Include="Inc\Framework\Common\ThreadPool.h" />
     <ClInclude Include="Inc\Framework\Common\TimeMgr.h" />
@@ -497,6 +497,7 @@
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\Framework\Math\AABB.h" />
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
+    <ClInclude Include="Inc\Framework\Math\Guid.h" />
     <ClInclude Include="Inc\Framework\Math\Transform.h" />
     <ClInclude Include="Inc\Framework\Parser\AssetParser.h" />
     <ClInclude Include="Inc\Framework\Parser\FbxParser.h" />
@@ -553,6 +554,7 @@
     <ClCompile Include="Ext\imgui\imgui_tables.cpp" />
     <ClCompile Include="Ext\imgui\imgui_widgets.cpp" />
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
+    <ClCompile Include="Src\Framework\Common\Asset.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\Reflect.cpp" />
     <ClCompile Include="Src\Framework\Common\ResourceMgr.cpp" />
@@ -562,6 +564,7 @@
     <ClCompile Include="Src\Framework\Events\Layer.cpp" />
     <ClCompile Include="Src\Framework\Events\LayerStack.cpp" />
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
+    <ClCompile Include="Src\Framework\Math\Guid.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\TgaParser.cpp" />

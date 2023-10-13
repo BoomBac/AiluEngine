@@ -2,6 +2,7 @@
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/dxhelper.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "RHI/DX12/D3DContext.h"
 
 namespace Ailu

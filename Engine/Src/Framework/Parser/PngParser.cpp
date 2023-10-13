@@ -32,8 +32,6 @@ namespace Ailu
 				//texture会调用delete[]释放data，使用stbi原始数据使用malloc申请空间，可能会有问题
 				//stbi_image_free(data);
 			}
-			tex->Name(GetFileName(path));
-			TexturePool::Add(tex->Name(), tex);
 			return tex;
 		}
 	}

@@ -14,6 +14,7 @@
 #include "Objects/TransformComponent.h"
 #include "Objects/StaticMeshComponent.h"
 #include "Framework/Common/SceneMgr.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "RHI/DX12/D3DTexture.h"
 
 namespace ImguiTree
@@ -432,7 +433,7 @@ namespace Ailu
         int numImages = 10,imagesPerRow = window_width / (uint32_t)preview_tex_size;
         static int s_selected_img_index = -1;
         //int selected_img_index = 0;
-        auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
+        auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get(EnginePath::kEngineTexturePath + "MyImage01.jpg"))->GetGPUHandle();
         static ImVec2 uv0{ 0,0 }, uv1{1,1};
         for (int i = 0; i < numImages; ++i)
         {

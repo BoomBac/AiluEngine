@@ -32,7 +32,7 @@ namespace Ailu
 		//tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_D.tga"));
 		//tga_parser->Parser(GetResPath("Textures/PK_stone03_static_0_N.tga"));
 		//png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_color_4.png"));
-		png_parser->Parser(GetResPath("Textures/MyImage01.jpg"));
+		LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg");
 		//png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_emi.jpg"));
 		//png_parser->Parser(GetResPath("Textures/Intergalactic Spaceship_nmap_2_Tris.jpg"));
 		LOG_WARNING("Finish after {}ms",g_pTimeMgr->GetElapsedSinceLastMark());
@@ -148,6 +148,13 @@ namespace Ailu
 			}
 		}
 		return mat;
+	}
+
+	Ref<Texture2D> ResourceMgr::LoadTexture(const string& file_path)
+	{
+		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+		string path = kEngineResRootPath + file_path;
+		return TexturePool::Add(file_path, png_parser->Parser(path));
 	}
 
 	void ResourceMgr::SaveSceneImpl(Scene* scene, std::string& scene_path)

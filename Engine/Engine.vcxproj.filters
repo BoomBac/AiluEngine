@@ -1962,9 +1962,6 @@
     <ClInclude Include="Inc\Framework\Parser\TgaParser.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Common\ResourcePool.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\RHI\DX12\D3DCommandBuffer.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2008,6 +2005,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Render\Gizmo.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\Asset.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Math\Guid.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -2151,6 +2154,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\Common\ResourceMgr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Common\Asset.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Math\Guid.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
