@@ -6,19 +6,68 @@
 
 namespace Ailu
 {
+	enum class EAssetType : uint8_t
+	{
+		kUndefined,kMesh,kMaterial,kTexture2D
+	};
+
 	class Asset
 	{
 	public:
 		inline static uint32_t s_instance_num = 0u;
 	public:
-		Asset();
-		Asset(string asset_path,string system_path);
+		Asset(string guid, EAssetType type);
+		Asset(string asset_path, string system_path, string guid, EAssetType type);
 		virtual ~Asset();
+		bool operator<(const Asset& other) const
+		{
+			return _instance_id < other._instance_id;
+		}
+	public:
 		string _asset_path;
 		string _system_path;
 		string _name;
+		string _full_name;
 		uint32_t _instance_id;
 		Guid _guid;
+		EAssetType _asset_type;
+		void* _p_inst_asset;
+	};
+
+	class AssetCompare
+	{
+	public:
+		bool operator() (const Asset& a0, const Asset& a1)
+
+	};
+
+	struct AssetType
+	{
+		inline const static std::string kMaterial = "material";
+		inline const static std::string kMesh = "mesh";
+		inline const static std::string kTexture2D = "texture2d";
+		inline const static std::string kUndefined = "undefined";
+		static string GetTypeString(const EAssetType& type)
+		{
+			switch (type)
+			{
+			case Ailu::EAssetType::kMesh:
+				return kMesh;
+			case Ailu::EAssetType::kMaterial:
+				return kMaterial;
+			case Ailu::EAssetType::kTexture2D:
+				return kTexture2D;
+			case Ailu::EAssetType::kUndefined:
+				return kUndefined;
+			}
+		}
+		static EAssetType GetType(const std::string& type_str)
+		{
+			if (type_str == AssetType::kMaterial) return EAssetType::kMaterial;
+			else if (type_str == AssetType::kMesh) return EAssetType::kMesh;
+			else if (type_str == AssetType::kTexture2D) return EAssetType::kTexture2D;
+			else return EAssetType::kUndefined;
+		}
 	};
 }
 

@@ -2,10 +2,11 @@
 #ifndef __RESOURCE_MGR_H__
 #define __RESOURCE_MGR_H__
 #include <unordered_map>
-
+#include <optional>
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Common/SceneMgr.h"
+#include "Framework/Common/Asset.h"
 #include "Render/Material.h"
 #include "Render/Texture.h"
 
@@ -24,13 +25,6 @@ namespace Ailu
 		static const string kEngineMeshPath =     "Meshs/";
 		static const string kEngineTexturePath =  "Textures/";
 	}
-
-	struct EngineResourceType
-	{
-		inline const static std::string Material = "material";
-		inline const static std::string Mesh = "mesh";
-		inline const static std::string Texture2D = "texture2d";
-	};
 
 	template<class T>
 	class TResourcePool
@@ -67,14 +61,6 @@ namespace Ailu
 		return kEngineResRootPath + sub_path;
 	}
 
-	struct ResourceInfo
-	{
-		string name;
-		string rela_path;
-		string abs_path;
-		uint32_t seq_id;
-	};
-
 	class ResourceMgr : public IRuntimeModule
 	{
 	public:
@@ -84,13 +70,21 @@ namespace Ailu
 		void SaveScene(Scene* scene, std::string& scene_path);
 		Scene* LoadScene(std::string& scene_path);
 		void SaveMaterial(Material* mat,std::string path);
+		void SaveAsset(const std::string asset_path, Material* mat);
+		void SaveAsset(const Asset& asset);
 		
 		Ref<Texture2D> LoadTexture(const string& file_path);
 		template<typename T>
 		static T* LoadAsset(const string& path);
 	private:
+		inline const static string kAssetDatabasePath = kEngineResRootPath + "assetdb.alasset";
+		static bool ExistInAssetDB(const Guid& guid);
+		static void AddToAssetDB(const Asset& asset,bool override = true);
+		static void LoadAssetDB();
+		static void SaveAssetDB();
+		inline static std::map<string, std::tuple<string, string>> s_asset_db{};
+		inline static std::set<Asset> s_all_asset{};
 		static Ref<Material> LoadMaterial(std::string path);
-		static void SaveAssetHeaderInfo();
 		void SaveSceneImpl(Scene* scene, std::string& scene_path);
 	};
 	extern ResourceMgr* g_pResourceMgr;

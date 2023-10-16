@@ -1,0 +1,3 @@
+guid: f88b8422-eeb0-490b-95dd-ba2caca4a64d
+type: material
+shader_path: Shaders/PureColor.hlsl

@@ -47,7 +47,7 @@ namespace Ailu
 		}
 	}
 
-	Material::Material(Ref<Shader> shader, std::string name) : Asset("run_time","run_time"), _p_shader(shader), _name(name)
+	Material::Material(Ref<Shader> shader, std::string name) : _p_shader(shader), _name(name)
 	{
 		_cbuf_index = s_current_cbuf_offset++;
 		_p_cbuf = _p_shader->GetCBufferPtr(_cbuf_index);

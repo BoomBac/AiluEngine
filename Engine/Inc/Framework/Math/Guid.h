@@ -11,6 +11,7 @@ namespace Ailu
     public:
         static Guid Generate();
         Guid();
+        Guid(std::string guid);
         std::string ToString() const;
         bool operator ==(const Guid& other) const;
     private:
