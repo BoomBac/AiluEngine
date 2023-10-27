@@ -34,13 +34,6 @@ namespace Ailu
 		void* _p_inst_asset;
 	};
 
-	class AssetCompare
-	{
-	public:
-		bool operator() (const Asset& a0, const Asset& a1)
-
-	};
-
 	struct AssetType
 	{
 		inline const static std::string kMaterial = "material";

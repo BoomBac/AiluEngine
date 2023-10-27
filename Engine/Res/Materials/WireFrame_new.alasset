@@ -1,3 +1,4 @@
-guid: f88b8422-eeb0-490b-95dd-ba2caca4a64d
+guid: 605ef2e4-c8bc-4eb0-8875-de44c14cd29f
 type: material
+name: WireFrame
 shader_path: Shaders/PureColor.hlsl

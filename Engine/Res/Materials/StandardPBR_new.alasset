@@ -1,8 +1,9 @@
-guid: 7638b055-99ca-4531-9c4c-1691dc996741
+guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
 type: material
+name: StandardPBR
 shader_path: Shaders/shaders.hlsl
   prop_type: Color
-    BaseColor: 0.637255,0.27177,0.27177,0
+    BaseColor: 1,0,0,0
     EmssiveColor: 0.78445,0.456747,0.941176,0
   prop_type: Float
     Specular: 0.49

@@ -26,20 +26,22 @@ namespace Ailu
 		static const string kEngineTexturePath =  "Textures/";
 	}
 
-	template<class T>
-	class TResourcePool
+	class TexturePool
 	{
 	public:
-		static Ref<T> Add(const std::string& name, Ref<T> res)
+		//name with ext
+		static Ref<Texture2D> Add(const std::string& name, Ref<Texture2D> res)
 		{
 			if (s_res_pool.insert(std::make_pair(name, res)).second)
 			{
+				res->Name(GetFileName(name));
 				++s_res_num;
+				s_is_dirty = true;
 				return res;
 			}
-			return TResourcePool<T>::Get(name);
+			return TexturePool::Get(name);
 		}
-		static Ref<T> Get(const std::string& name)
+		static Ref<Texture2D> Get(const std::string& name)
 		{
 			auto it = s_res_pool.find(name);
 			if (it != s_res_pool.end()) return it->second;
@@ -49,12 +51,12 @@ namespace Ailu
 		{
 			return s_res_num;
 		}
+		static std::map<std::string, Ref<Texture2D>>& GetAllResourceMap() { return s_res_pool; };
 	protected:
-		inline static std::map<std::string, Ref<T>> s_res_pool{};
+		inline static std::map<std::string, Ref<Texture2D>> s_res_pool{};
+		inline static bool s_is_dirty = true;
 		inline static uint32_t s_res_num = 0u;
 	};
-
-	using TexturePool = TResourcePool<Texture2D>;
 
 	static inline std::string GetResPath(const std::string& sub_path)
 	{
@@ -69,23 +71,28 @@ namespace Ailu
 		void Tick(const float& delta_time) final;
 		void SaveScene(Scene* scene, std::string& scene_path);
 		Scene* LoadScene(std::string& scene_path);
-		void SaveMaterial(Material* mat,std::string path);
 		void SaveAsset(const std::string asset_path, Material* mat);
 		void SaveAsset(const Asset& asset);
 		
-		Ref<Texture2D> LoadTexture(const string& file_path);
-		template<typename T>
-		static T* LoadAsset(const string& path);
+		Ref<Texture2D> LoadTexture(const string& asset_path);
+		//template<typename T>
+		//static T* LoadAsset(const string& asset_path);
+		static Material* LoadAsset(const string& asset_path);
 	private:
 		inline const static string kAssetDatabasePath = kEngineResRootPath + "assetdb.alasset";
+		static Ref<Material> LoadMaterial(std::string path);
+		static Ref<Material> LoadMaterial(const vector<string>& blob);
 		static bool ExistInAssetDB(const Guid& guid);
 		static void AddToAssetDB(const Asset& asset,bool override = true);
 		static void LoadAssetDB();
 		static void SaveAssetDB();
-		inline static std::map<string, std::tuple<string, string>> s_asset_db{};
-		inline static std::set<Asset> s_all_asset{};
-		static Ref<Material> LoadMaterial(std::string path);
+		static void FormatLine(const string& line, string& key, string& value);
+		void SaveMaterialImpl(const string& asset_path,Material* mat);
 		void SaveSceneImpl(Scene* scene, std::string& scene_path);
+	private:
+		inline static std::map<string, std::tuple<string, string>> s_asset_db{};
+		inline static std::map<string, Scope<Asset>> s_all_asset{};
+
 	};
 	extern ResourceMgr* g_pResourceMgr;
 
@@ -138,15 +145,17 @@ namespace Ailu
 		inline static std::unordered_map<std::string, std::string> s_shader_path;
 	};
 
-	template<typename T>
-	inline T* ResourceMgr::LoadAsset(const string& path)
-	{
-		if (std::is_same<T, Material>::value)
-		{
-			auto mat = LoadMaterial(path);
-		}
-		return nullptr;
-	}
+	//template<typename T>
+	//inline T* ResourceMgr::LoadAsset(const string& asset_path)
+	//{
+	//	//if (std::is_same<T, Material>::value)
+	//	//{
+	//	//	auto mat = LoadMaterial(path);
+	//	//	s_all_asset.insert(Asset{ asset_path,GetResPath(asset_path),guid,AssetType::kMaterial});
+	//	//	return mat.get();
+	//	//}
+	//	return nullptr;
+	//}
 }
 
 #endif // !RESOURCE_MGR_H__
