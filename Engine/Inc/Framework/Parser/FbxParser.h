@@ -13,7 +13,7 @@ namespace Ailu
 	{
 	public:
 		FbxParser();
-		Ref<Mesh> Parser(const std::string_view& path) override;
+		List<Ref<Mesh>> Parser(std::string_view sys_path) final;
 		virtual ~FbxParser();
 	private:
 		bool GenerateMesh(Ref<Mesh>& mesh, fbxsdk::FbxMesh* fbx_mesh);

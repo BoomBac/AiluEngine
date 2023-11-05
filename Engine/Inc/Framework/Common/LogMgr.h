@@ -22,16 +22,21 @@ namespace Ailu
 	};
 	class FileAppender : public IAppender
 	{
-		std::string out_path_ = GET_ENGINE_FULL_PATH(log.txt);
 	public:
+		//static const std::string& GetLogPath() { return s_out_path; }
+		inline static std::string s_out_path = GET_ENGINE_FULL_PATH(log.txt);
 		void Print(std::string str) override
 		{
-			std::ofstream out(out_path_, std::ios_base::app);
+			std::ofstream out(s_out_path, std::ios_base::app);
 			if (out.is_open())
 			{
 				out << str << std::endl;
 				out.close();
 			}
+		}
+		void Print(std::wstring str) override
+		{
+
 		}
 	};
 	class OutputAppender : public IAppender
@@ -84,6 +89,24 @@ namespace Ailu
 				appender->Print(BuildLogMsg(_output_level, msg, args...));
 			}
 		}
+		template <typename... Args>
+		void LogErrorFormat(std::string_view msg, Args&&... args)
+		{
+			for (auto& appender : _appenders)
+			{
+				appender->Print(BuildLogMsg(ELogLevel::kError, msg, args...));
+			}
+		}
+
+		template <typename... Args>
+		void LogWarningFormat(std::string_view msg, Args&&... args)
+		{
+			for (auto& appender : _appenders)
+			{
+				appender->Print(BuildLogMsg(ELogLevel::kWarning, msg, args...));
+			}
+		}
+
 		template <typename... Args>
 		void LogFormat(std::wstring_view msg, Args&&... args)
 		{

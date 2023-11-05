@@ -47,7 +47,7 @@ namespace Ailu
         GraphicsContext* _p_context = nullptr;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;
-        Scope<Camera> _p_scene_camera;
+        Camera* _p_scene_camera;
     };
 }
 #pragma warning(pop)

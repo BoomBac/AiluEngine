@@ -61,7 +61,7 @@ float3 CookTorranceBRDF(SurfaceData surface,float3 view_dir,float3 light_dir)
 	float3 V = normalize(view_dir);
 	float G = GeometrySmith(N, V, L, roughness);
 	float3 H = normalize(L + V);
-	float D = DistributionGGX(N, H, roughness);
+	float D = DistributionGGX(N, H, lerp(0.02, 1, roughness * roughness));
 	//float3 F = SchlickFresnel(H, V, float3(0.4, 0.4, 0.4));
     float3 f0 = lerp(float3(0.04,0.04,0.04),surface.albedo.rgb,float3(surface.metallic,surface.metallic,surface.metallic));
 	float3 F = Fresnel(N, V,f0);
@@ -74,7 +74,8 @@ float3 CookTorranceBRDF(SurfaceData surface,float3 view_dir,float3 light_dir)
 	float3 kD = float3(1.f, 1.f, 1.f) - KS;
 	kD *= 1.f - metallic;
 	// return kD * base_color / PI + KS * specular;
-    return F * float3(1.0,1.0,1.0);
+    // return D * float3(1.0,1.0,1.0);
+    return surface.albedo + D * 0.00001;
 }
 
 #endif

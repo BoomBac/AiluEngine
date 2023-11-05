@@ -7,6 +7,7 @@
 #include "Render/Gizmo.h"
 #include "Objects/StaticMeshComponent.h"
 #include "Framework/Parser/AssetParser.h"
+#include <Framework/Common/LogMgr.h>
 
 namespace Ailu
 {
@@ -18,14 +19,13 @@ namespace Ailu
         _p_timemgr = new TimeMgr();
         _p_timemgr->Initialize();
         _p_per_frame_cbuf_data = static_cast<D3DContext*>(_p_context)->GetPerFrameCbufDataStruct();
-        {
-     
-            _p_scene_camera = MakeScope<Camera>(16.0F / 9.0F);
-            _p_scene_camera->SetPosition(1356.43f, 604.0f, -613.45f);
-            _p_scene_camera->Rotate(11.80f, -59.76f);
-            _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
-            Camera::sCurrent = _p_scene_camera.get();
-        }
+        //{ 
+        //    _p_scene_camera = MakeScope<Camera>(16.0F / 9.0F);
+        //    _p_scene_camera->SetPosition(1356.43f, 604.0f, -613.45f);
+        //    _p_scene_camera->Rotate(11.80f, -59.76f);
+        //    _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
+        //    Camera::sCurrent = _p_scene_camera.get();
+        //}
         return 0;
     }
     void Renderer::Finalize()
@@ -49,6 +49,8 @@ namespace Ailu
     void Renderer::BeginScene()
     {
         memset(reinterpret_cast<void*>(_p_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
+        _p_scene_camera = g_pSceneMgr->_p_current->GetActiveCamera();
+        Camera::sCurrent = _p_scene_camera;
         auto& light_comps = g_pSceneMgr->_p_current->GetAllLight();
         uint16_t updated_light_num = 0u;
         uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0;
@@ -104,7 +106,7 @@ namespace Ailu
             _p_per_frame_cbuf_data->_DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
             _p_per_frame_cbuf_data->_DirectionalLights[0]._LightDir = { 0.0f,0.0f,0.0f };
         }
-        _p_per_frame_cbuf_data->_CameraPos = Camera::sCurrent->GetPosition();
+        _p_per_frame_cbuf_data->_CameraPos = _p_scene_camera->GetPosition();
         memcpy(D3DContext::GetInstance()->GetPerFrameCbufData(), _p_per_frame_cbuf_data, sizeof(ScenePerFrameData));
 
         auto cmd = D3DCommandBufferPool::GetCommandBuffer();
@@ -114,12 +116,23 @@ namespace Ailu
         cmd->SetScissorRects({ Viewport{0,0,(uint16_t)w,(uint16_t)h} });
         cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
         cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
-        cmd->SetPSO(GraphicsPipelineStateMgr::s_standard_shadering_pso);
-        for (auto& obj : _draw_call)
+        if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
         {
-            cmd->DrawRenderer(obj.mesh,obj.transform,obj.mat,obj.instance_count);
+            cmd->SetPSO(GraphicsPipelineStateMgr::s_standard_shadering_pso);
+            for (auto& obj : _draw_call)
+            {
+                cmd->DrawRenderer(obj.mesh, obj.transform, obj.mat, obj.instance_count);
+            }
         }
-      
+        if (RenderingStates::s_shadering_mode == EShaderingMode::kWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
+        {
+            static auto wireframe_mat = MaterialPool::GetMaterial("Materials/WireFrame_new.alasset");
+            cmd->SetPSO(GraphicsPipelineStateMgr::s_wireframe_pso);
+            for (auto& obj : _draw_call)
+            {
+                cmd->DrawRenderer(obj.mesh, obj.transform, wireframe_mat, obj.instance_count);
+            }
+        }
         D3DContext::GetInstance()->ExecuteCommandBuffer(cmd);
         D3DCommandBufferPool::ReleaseCommandBuffer(cmd);
         DrawRendererGizmo();

@@ -28,12 +28,12 @@ cbuffer SceneObjectBuffer : register(b0)
 
 cbuffer SceneMaterialBuffer : register(b1)
 {
-	float4 		Color_BaseColor;
-	float4 		Color_EmssiveColor;
-	float	 	Float_Roughness;
-	float	 	Float_Metallic;
-	float 		Float_Specular;
-	uint 		H_Uint_SamplerMask;
+	float4 		Color_BaseColor; //0
+	float4 		Color_EmssiveColor;//16
+	float4		Color_SpecularColor;//32
+	float	 	Float_RoughnessValue;//36
+	float	 	Float_MetallicValue;//40
+	uint 		H_Uint_SamplerMask;//44
 };
 
 cbuffer SceneStatetBuffer : register(b2)

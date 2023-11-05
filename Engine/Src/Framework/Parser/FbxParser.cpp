@@ -1,7 +1,9 @@
 #include "pch.h"
+#include <limits>
 #include "Framework/Parser/FbxParser.h"
 #include "Framework/Common/ThreadPool.h"
-#include <limits>
+#include "Framework/Common/Utils.h"
+#include "Framework/Common/LogMgr.h"
 
 using fbxsdk::FbxNodeAttribute;
 using fbxsdk::FbxCast;
@@ -18,13 +20,14 @@ namespace Ailu
 		fbx_manager_->SetIOSettings(fbx_ios_);
 		fbx_importer_ = FbxImporter::Create(fbx_manager_, "");
 	}
+
 	static Vector3f scale_factor{};
-	Ref<Mesh> FbxParser::Parser(const std::string_view& path)
+	List<Ref<Mesh>> FbxParser::Parser(std::string_view sys_path)
 	{
-		_time_mgr.Mark();
 		FbxScene* fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
-		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.data(), -1, fbx_manager_->GetIOSettings()))
-			return nullptr;
+		List<Ref<Mesh>> loaded_meshs{};
+		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(sys_path.data(), -1, fbx_manager_->GetIOSettings()))
+			return loaded_meshs;
 		fbx_importer_->Import(fbx_scene);
 		FbxNode* fbx_rt = fbx_scene->GetRootNode();
 		fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(fbx_scene);
@@ -39,8 +42,7 @@ namespace Ailu
 			true  /* mConvertCameraClipPlanes */
 			};
 			fbxsdk::FbxSystemUnit::cm.ConvertScene(fbx_scene, lConversionOptions);
-		}
-		std::vector<Ref<Mesh>> meshs{};
+		}	
 		if (fbx_rt != nullptr)
 		{
 			auto child_num = fbx_rt->GetChildCount();
@@ -59,21 +61,17 @@ namespace Ailu
 					scale_factor.x = scale[0];
 					scale_factor.y = scale[1];
 					scale_factor.z = scale[2];
-					//memcpy(&scale_factor, &scale, sizeof(scale_factor));
 					if (!GenerateMesh(mesh, fbx_mesh)) continue;
-//					LOG_INFO("Loading mesh: {} takes {}ms", node_name, _time_mgr.GetElapsedSinceLastMark());
 					mesh->Build();
-					MeshPool::AddMesh(node_name,mesh);
-					meshs.emplace_back(mesh);
+					loaded_meshs.emplace_back(mesh);
 				}
 			}
 		}
-		if (meshs.empty())
+		if (loaded_meshs.empty())
 		{
-			AL_ASSERT(true, "Load mesh failed!");
-			return nullptr;
+			g_pLogMgr->LogErrorFormat("Load fbx from path {} failed!",sys_path);		
 		}
-		else return *(meshs.end()-1);
+		return loaded_meshs;
 	}
 	Ailu::FbxParser::~FbxParser()
 	{

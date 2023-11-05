@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Objects/Actor.h"
+#include "Framework/Common/LogMgr.h"
 
 namespace Ailu
 {
@@ -36,6 +37,8 @@ namespace Ailu
 		}
 	}
 
+
+
 	void Actor::RemoveFromRoot(Actor* actor)
 	{
 		for (auto it = s_global_actors.begin(); it != s_global_actors.end(); it++)
@@ -48,6 +51,22 @@ namespace Ailu
 		}
 	}
 
+
+	void Actor::AddComponent(Component* comp)
+	{
+		for (auto& component : _components)
+		{
+			if (component->GetTypeName() == comp->GetTypeName()) return;
+		}
+		Scope<Component> ptr(comp);
+		_components.emplace_back(std::move(ptr));
+		_components.back()->SetOwner(this);
+	}
+
+	void Actor::RemoveAllComponent()
+	{
+		_components.clear();
+	}
 
 	std::list<Actor*>& Actor::GetAllChildren()
 	{
@@ -75,5 +94,14 @@ namespace Ailu
 		//	DESTORY_PTR(e);
 		//}
 		_children.clear();
+	}
+
+	void Actor::Serialize(std::ofstream& file, String indent)
+	{
+	}
+
+	void* Actor::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
+	{
+		return nullptr;
 	}
 }

@@ -1,0 +1,5 @@
+Normal: file log test!
+Error: ResourceMgr end
+Normal: init end
+Normal: Exit
+Normal: Save scene: default_scene to F:/ProjectCpp/AiluEngine/Engine/default.almap;

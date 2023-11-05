@@ -2,6 +2,7 @@
 #include "Render/Texture.h"
 #include "Render/Renderer.h"
 #include "RHI/DX12/D3DTexture.h"
+#include "Framework/Parser/AssetParser.h"
 
 namespace Ailu
 {
@@ -41,5 +42,16 @@ namespace Ailu
 	const std::string& Texture2D::Name() const
 	{
 		return _name;
+	}
+	Ref<Texture2D> TexturePool::Get(const std::string& name)
+	{
+		auto it = s_res_pool.find(name);
+		if (it != s_res_pool.end()) return it->second;
+		else
+		{
+			auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+			String sys_path = kEngineResRootPath + name;
+			return TexturePool::Add(name, png_parser->Parser(sys_path));
+		}
 	}
 }

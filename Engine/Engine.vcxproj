@@ -478,6 +478,7 @@
     <ClInclude Include="Inc\Framework\Common\KeyCode.h" />
     <ClInclude Include="Inc\Framework\Common\Log.h" />
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
+    <ClInclude Include="Inc\Framework\Common\Path.h" />
     <ClInclude Include="Inc\Framework\Common\Reflect.h" />
     <ClInclude Include="Inc\Framework\Common\ResourceMgr.h" />
     <ClInclude Include="Inc\Framework\Common\SceneMgr.h" />
@@ -508,6 +509,7 @@
     <ClInclude Include="Inc\Objects\CommonActor.h" />
     <ClInclude Include="Inc\Objects\Component.h" />
     <ClInclude Include="Inc\Objects\LightComponent.h" />
+    <ClInclude Include="Inc\Objects\Object.h" />
     <ClInclude Include="Inc\Objects\SceneActor.h" />
     <ClInclude Include="Inc\Objects\StaticMeshComponent.h" />
     <ClInclude Include="Inc\Objects\TransformComponent.h" />
@@ -571,6 +573,7 @@
     <ClCompile Include="Src\Objects\Actor.cpp" />
     <ClCompile Include="Src\Objects\Component.cpp" />
     <ClCompile Include="Src\Objects\LightComponent.cpp" />
+    <ClCompile Include="Src\Objects\Object.cpp" />
     <ClCompile Include="Src\Objects\SceneActor.cpp" />
     <ClCompile Include="Src\Objects\StaticMeshComponent.cpp" />
     <ClCompile Include="Src\Objects\TransformComponent.cpp" />

@@ -28,4 +28,8 @@ namespace Ailu
 	{
 		return "Component";
 	}
+	void Component::Serialize(std::ofstream& file, String indent)
+	{
+		file << indent << GetTypeName() << ": " << std::endl;
+	}
 }

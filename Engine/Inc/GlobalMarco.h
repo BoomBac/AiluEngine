@@ -47,6 +47,10 @@
 
 #define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
 
+#define TP_ZERO(t) std::get<0>(t)
+#define TP_ONE(t) std::get<1>(t)
+#define TP_TWO(t) std::get<2>(t)
+
 //#define DECLARE_PRIVATE_PROPERTY(Name,type) \
 //public: \
 //    void Name(const type& value) { _##Name = value; } \
@@ -57,16 +61,16 @@
 #define DECLARE_PRIVATE_PROPERTY(member_name,prop_name,type) \
 public: \
     void prop_name(const type& value) { _##member_name = value; } \
-    const type& prop_name() const { return _##member_name; } \
+    const type& prop_name() { return _##member_name; } \
 private: \
     type _##member_name;
 
-//#define DECLARE_PROTECTED_PROPERTY(Name,type) \
-//public: \
-//    void Name(const type& value) { _##Name = value; } \
-//    const type& Name() const { return _##Name; } \
-//protected: \
-//    type _##Name;
+#define DECLARE_PRIVATE_PROPERTY_PTR(member_name,prop_name,type) \
+public: \
+    void prop_name(type* value) { _##member_name = value; } \
+    type* prop_name() { return _##member_name; } \
+private: \
+    type* _##member_name;
 
 #define DECLARE_PROTECTED_PROPERTY(member_name,prop_name,type) \
 public: \
@@ -79,18 +83,32 @@ protected: \
 public: \
     void Name(type* value) { _##Name = value; } \
     const type* Name() const { return _##Name; } \
-private: \
+protected: \
     type* _##Name;
-	
 
 
 //使用dxc编译高版本着色器(>=6.0)，这样的话无法在PIX中看到cbuffer信息
 //#define SHADER_DXC
 
-using string = std::string;
+using u8 = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
+using i8 = int8_t;
+using i16 = int16_t;
+using i32 = int32_t;
+using i64 = int64_t;
+
+using String = std::string;
 
 template<typename T>
-using vector = std::vector<T>;
+using Vector = std::vector<T>;
+
+template<typename T>
+using List = std::list<T>;
+
+template<typename T>
+using Queue = std::queue<T>;
 
 template<typename T>
 using Scope = std::unique_ptr<T>;

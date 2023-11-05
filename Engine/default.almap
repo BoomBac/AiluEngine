@@ -1,0 +1,64 @@
+SceneName: default_scene
+SceneCamera: scene_camera
+  Type: Perspective
+  Position: 1057.75,1261.03,-2167.85
+  Rotation: -24.8378,22.607,0
+  Fov: 60
+  Aspect: 1.77778
+  Near: 1
+  Far: 10000
+SceneGraph: 
+    Name: root
+      Components: 
+        TransformComponent: 
+          Position: 0,0,0
+          Rotation: 0,0,0
+          Scale: 1,1,1
+      Children: 4
+        Name: stone
+          Components: 
+            TransformComponent: 
+              Position: 0,62,0
+              Rotation: 0,0,0
+              Scale: 50,1,50
+            StaticMeshComponent: 
+              MeshPath: plane
+              MaterialPath: Materials/StandardPBR_new.alasset
+          Children: 0
+        Name: directional_light
+          Components: 
+            TransformComponent: 
+              Position: -5,679,564
+              Rotation: 43.78,0,0
+              Scale: 1,1,1
+            LightComponent: 
+              Type: Directional
+              Color: 1,1,1
+              Intensity: 1
+          Children: 0
+        Name: point_light
+          Components: 
+            TransformComponent: 
+              Position: -1177,545,0
+              Rotation: 0,0,0
+              Scale: 1,1,1
+            LightComponent: 
+              Type: Point
+              Color: 0.887255,0.887255,0.117431
+              Intensity: 1
+              Radius: 500
+          Children: 0
+        Name: spot_light
+          Components: 
+            TransformComponent: 
+              Position: 407,692,0
+              Rotation: -29.19,-82.7,34.05
+              Scale: 1,1,1
+            LightComponent: 
+              Type: Spot
+              Color: 0.0395761,0.518758,0.897059
+              Intensity: 1
+              Radius: 936
+              Inner: 45
+              Outer: 60
+          Children: 0

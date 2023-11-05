@@ -9,15 +9,13 @@ namespace Ailu
 {
 	LightComponent::LightComponent()
 	{
+		IMPLEMENT_REFLECT_FIELD(LightComponent)
 		_light._light_color = Colors::kWhite;
 		_light._light_pos = {0.0f,0.0f,0.0f,0.0f};
 		_light._light_dir = kDefaultDirectionalLightDir;
 		_intensity = 1.0f;
 		_b_shadow = false;
 		_light_type = ELightType::kDirectional;
-		DECLARE_REFLECT_PROPERTY(Color, Color, (_light._light_color))
-		DECLARE_REFLECT_PROPERTY(float, Intensity, _intensity)
-		DECLARE_REFLECT_PROPERTY(bool, CastShadow, _b_shadow)
 	}
 	void Ailu::LightComponent::Tick(const float& delta_time)
 	{
@@ -32,6 +30,55 @@ namespace Ailu
 			DrawLightGizmo();
 		}
 	}
+	void LightComponent::Serialize(std::ofstream& file, String indent)
+	{
+		Component::Serialize(file, indent);
+		using namespace std;
+		String prop_indent = indent.append("  ");
+		file << prop_indent << "Type: " << ELightTypeStr(_light_type) << endl;
+		Vector3f color = _light._light_color.xyz;
+		file << prop_indent << "Color: " << color << endl;
+		file << prop_indent << "Intensity: " << _light._light_color.a << endl;
+		if (_light_type != ELightType::kDirectional)
+			file << prop_indent << "Radius: " << _light._light_param.x << endl;
+		if (_light_type == ELightType::kSpot)
+		{
+			file << prop_indent << "Inner: " << _light._light_param.y << endl;
+			file << prop_indent << "Outer: " << _light._light_param.z << endl;
+		}	
+	}
+
+	void* LightComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
+	{
+		formated_str.pop();
+		auto type = TP_ONE(formated_str.front());
+		formated_str.pop();
+		LightComponent* comp = new LightComponent();
+		Vector3f vec{};
+		float f{};
+		LoadVector(TP_ONE(formated_str.front()).c_str(), vec);
+		formated_str.pop();
+		comp->_light._light_color = { vec,LoadFloat(TP_ONE(formated_str.front()).c_str()) };
+		formated_str.pop();
+		if(type == ELightTypeStr(ELightType::kPoint))
+		{
+			comp->_light_type = ELightType::kPoint;
+			comp->_light._light_param.x = LoadFloat(TP_ONE(formated_str.front()).c_str());
+			formated_str.pop();
+		}
+		else if (type == ELightTypeStr(ELightType::kSpot))
+		{
+			comp->_light_type = ELightType::kSpot;
+			comp->_light._light_param.x = LoadFloat(TP_ONE(formated_str.front()).c_str());
+			formated_str.pop();
+			comp->_light._light_param.y = LoadFloat(TP_ONE(formated_str.front()).c_str());
+			formated_str.pop();
+			comp->_light._light_param.z = LoadFloat(TP_ONE(formated_str.front()).c_str());
+			formated_str.pop();
+		}
+		return comp;
+	}
+
 	void LightComponent::DrawLightGizmo()
 	{
 		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();

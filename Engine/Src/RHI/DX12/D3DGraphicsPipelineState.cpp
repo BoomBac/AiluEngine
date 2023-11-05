@@ -188,7 +188,8 @@ namespace Ailu
 			for (auto& [slot, name] : ps_tex_bind_info)
 			{
 				//ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, slot, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-				rootParameters[root_param_index + 3].InitAsShaderResourceView(slot,0,D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC,D3D12_SHADER_VISIBILITY_PIXEL);
+				//rootParameters[root_param_index + 3].InitAsShaderResourceView(slot,0,D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC,D3D12_SHADER_VISIBILITY_PIXEL);
+				rootParameters[root_param_index + 3].InitAsShaderResourceView(slot,0,D3D12_ROOT_DESCRIPTOR_FLAG_NONE,D3D12_SHADER_VISIBILITY_PIXEL);
 			}
 
 			D3D12_STATIC_SAMPLER_DESC sampler = {};

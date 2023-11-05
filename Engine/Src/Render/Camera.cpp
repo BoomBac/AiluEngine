@@ -3,6 +3,15 @@
 
 namespace Ailu
 {
+	Camera* Camera::GetDefaultCamera()
+	{
+		static Camera cam(16.0F / 9.0F);
+		cam.SetPosition(1356.43f, 604.0f, -613.45f);
+		cam.Rotate(11.80f, -59.76f);
+		cam.SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
+		Camera::sCurrent = &cam;
+		return &cam;
+	}
 	void Camera::SetLens(float fovy, float aspect, float nz, float fz)
 	{
 		_hfov = fovy;

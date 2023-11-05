@@ -10,17 +10,28 @@ namespace Ailu
 {
 	class TransformComponent : public Component
 	{
+		template<class T>
+		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
 		COMPONENT_CLASS_TYPE(TransformComponent)
+		DECLARE_REFLECT_FIELD(TransformComponent)
 	public:
 		TransformComponent();
 		~TransformComponent();
 		void Tick(const float& delta_time) final;
 		Transform _transform;
+		void Serialize(std::ofstream& file, String indent) final;
+	private:
+		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) final;
 	private:
 		Vector3f _pos_data;
 		Vector3f _rotation_data;
 		Vector3f _scale_data;
 	};
+	REFLECT_FILED_BEGIN(TransformComponent)
+	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f,Position,_pos_data)
+	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f, Scale, _scale_data)
+	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f, Rotation, _rotation_data)
+	REFLECT_FILED_END
 }
 
 #endif // !TRANSFORM_COMP_H__

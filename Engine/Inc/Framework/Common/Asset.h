@@ -16,18 +16,18 @@ namespace Ailu
 	public:
 		inline static uint32_t s_instance_num = 0u;
 	public:
-		Asset(string guid, EAssetType type);
-		Asset(string asset_path, string system_path, string guid, EAssetType type);
+		Asset(String guid, EAssetType type);
+		Asset(String asset_path, String system_path, String guid, EAssetType type);
 		virtual ~Asset();
 		bool operator<(const Asset& other) const
 		{
 			return _instance_id < other._instance_id;
 		}
 	public:
-		string _asset_path;
-		string _system_path;
-		string _name;
-		string _full_name;
+		String _asset_path;
+		String _system_path;
+		String _name;
+		String _full_name;
 		uint32_t _instance_id;
 		Guid _guid;
 		EAssetType _asset_type;
@@ -40,7 +40,7 @@ namespace Ailu
 		inline const static std::string kMesh = "mesh";
 		inline const static std::string kTexture2D = "texture2d";
 		inline const static std::string kUndefined = "undefined";
-		static string GetTypeString(const EAssetType& type)
+		static String GetTypeString(const EAssetType& type)
 		{
 			switch (type)
 			{

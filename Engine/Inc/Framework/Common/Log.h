@@ -96,6 +96,7 @@ namespace Ailu
 #define LOG_INFO(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
 #define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
 #define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
+#define BOOL_STR(b) b? "true" : "false"
 }
 
 #endif // !LOG_H__

@@ -1,33 +1,52 @@
 #ifndef __CAMERA_H__
 #define __CAMERA_H__
 #include "Framework/Math/ALMath.hpp"
+#include "GlobalMarco.h"
+#include "Objects/Object.h"
 
 namespace Ailu
 {
-    class Camera
+    enum class ECameraType
     {
+        kOrthographic,
+        kPerspective
+    };
+    static String ECameraTypeStr(ECameraType type)
+    {
+        switch (type)
+        {
+        case Ailu::ECameraType::kOrthographic: return String{ "Orthographic" };
+        case Ailu::ECameraType::kPerspective: return String{ "Perspective" };
+        default: return "undefined";
+        }
+    };
+
+    class Camera : public Object
+    {
+        DECLARE_PROTECTED_PROPERTY(camera_type,Type,ECameraType)
+        DECLARE_PROTECTED_PROPERTY(aspect,Aspect,float)
+        DECLARE_PROTECTED_PROPERTY(near_clip,Near,float)
+        DECLARE_PROTECTED_PROPERTY(far_clip,Far,float)
     public:
         inline const static Vector3f kRight{ 1.f,0.f,0.f };
         inline const static Vector3f kUp{ 0.f,1.f,0.f };
         inline const static Vector3f kForward{ 0.f,0.f,1.f };
         inline static Camera* sCurrent = nullptr;
+        static Camera* GetDefaultCamera();
     public:
-        Camera()
+        Camera() : _camera_type(ECameraType::kPerspective)
         {
             UpdateViewMatrix();
         };
-        Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f) : 
-            _aspect(aspect), _near_clip(near_clip), _far_clip(far_clip)
+        Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType camera_type = ECameraType::kPerspective) :
+            _aspect(aspect), _near_clip(near_clip), _far_clip(far_clip), _camera_type(camera_type)
         {
             UpdateViewMatrix();
         };
-
+    public:
         void SetLens(float fovy, float aspect, float nz, float fz);
         void SetFovH(float angle);
         void SetFovV(float angle);
-        float GetNearZ() const { return _near_clip; };
-        float GetFarZ() const { return _far_clip; };
-        float GetAspect() const { return _aspect; };
         float GetFovH() const { return _hfov; };
         float GetFovV() const { return _vfov; };
         float GetNearPlaneWidth() const;
@@ -49,7 +68,7 @@ namespace Ailu
         void RotatePitch(float angle);
         //左右偏航
         void RotateYaw(float angle);
-        void Rotate(float vertical, float horizontal);
+        void Rotate(float vertical, float horizontal);      
     protected:
         void UpdateViewMatrix();
         Vector3f position_{ 0.f, 0.0f, -1000.f };
@@ -59,9 +78,6 @@ namespace Ailu
         Vector3f right_{ 1.f,0.f,0.f };
 
         bool b_dirty_ = true;
-        float _aspect;
-        float _near_clip;
-        float _far_clip;
         float _hfov;
         float _vfov;
         float _near_plane_height;
@@ -73,7 +89,12 @@ namespace Ailu
     class CameraState
     {
     public:
-        CameraState(Camera camera)
+        CameraState(const Camera& camera)
+        {
+            position = camera.GetPosition();
+            rotation = camera.GetRotation();
+        }
+        void UpdateState(const Camera& camera)
         {
             position = camera.GetPosition();
             rotation = camera.GetRotation();

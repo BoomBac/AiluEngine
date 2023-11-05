@@ -12,6 +12,8 @@ namespace Ailu
 {
 	class Mesh
 	{
+		DECLARE_PRIVATE_PROPERTY(origin_path,OriginPath,String)
+		DECLARE_PRIVATE_PROPERTY(name, Name, std::string)
 	public:
 		Mesh();
 		Mesh(const std::string& name);
@@ -30,7 +32,6 @@ namespace Ailu
 		const Ref<VertexBuffer>& GetVertexBuffer() const;
 		const Ref<IndexBuffer>& GetIndexBuffer() const;
 		void Build();
-		DECLARE_PRIVATE_PROPERTY(name,Name, std::string)
 	public:
 		uint32_t _vertex_count;
 		uint32_t _index_count;
@@ -59,6 +60,7 @@ namespace Ailu
 		static void AddMesh(const std::string& name,Ref<Mesh> mesh)
 		{
 			s_meshes[name] = mesh;
+			mesh->OriginPath(name);
 		}
 
 		static Ref<Mesh> GetMesh(const std::string& name)

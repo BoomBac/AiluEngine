@@ -15,7 +15,7 @@ namespace Ailu
         std::string ToString() const;
         bool operator ==(const Guid& other) const;
     private:
-        string _guid;
+        String _guid;
 	};
 }
 

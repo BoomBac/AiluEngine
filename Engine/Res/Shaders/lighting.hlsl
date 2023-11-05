@@ -89,20 +89,21 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	for (uint i = 0; i < MAX_DIRECTIONAL_LIGHT; i++)
 	{
 		float3 light_dir = -_DirectionalLights[i]._LightPosOrDir;
-		float nl = dot(surface.wnormal,light_dir);
-		light += CookTorranceBRDF(surface,view_dir,light_dir);// * nl * _DirectionalLights[i]._LightColor;
+		float nl = dot(surface.wnormal, light_dir);
+		light += CookTorranceBRDF(surface, view_dir, light_dir); // * nl * _DirectionalLights[i]._LightColor;
 		//light += nl * _DirectionalLights[i]._LightColor;
 		//light += CaclulateDirectionalLight(i, normal, view_dir);
 	}
-	// for (uint j = 0; j < MAX_POINT_LIGHT; j++)
-	// {
-	// 	light += CaclulatPointlLight(j, normal, pos, view_dir);
-	// }
-	// for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
-	// {
-	// 	light += CaclulatSpotlLight(k, normal, pos, view_dir);
-	// }
-	return light;
+	for (uint j = 0; j < MAX_POINT_LIGHT; j++)
+	{
+		float3 light_dir = -normalize(world_pos - _PointLights[j]._LightPosOrDir);
+		light += CookTorranceBRDF(surface, view_dir, light_dir);
+	}
+	//for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
+	//{
+	//	light += CaclulatSpotlLight(k, normal, pos, view_dir);
+	//}
+	return light * surface.albedo.rgb;
 }
 
 float3 CalculateLight

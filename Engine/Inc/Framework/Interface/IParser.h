@@ -2,6 +2,7 @@
 #ifndef __IPARSER_H__
 #define __IPARSER_H__
 #include <string>
+#include <list>
 #include "Framework/Assets/Mesh.h"
 #include "Render/Texture.h"
 #include "GlobalMarco.h"
@@ -24,7 +25,7 @@ namespace Ailu
 	{
 	public:
 		virtual ~IMeshParser() = default;
-		virtual Ref<Mesh> Parser(const std::string_view& path) = 0;
+		virtual List<Ref<Mesh>> Parser(std::string_view sys_path) = 0;
 	};
 
 	class ITextureParser

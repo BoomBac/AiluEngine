@@ -25,7 +25,7 @@ struct SurfaceData
 	float roughness;
 	float metallic;
 	float3 emssive;
-	float specular;
+	float3 specular;
 };
 
 struct LightData

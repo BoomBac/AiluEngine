@@ -7,6 +7,15 @@ namespace Ailu
     {
         int ret = 0;
         _appenders.push_back(new OutputAppender());
+        // Open the file in truncate mode (clears the content).
+        std::ofstream file(FileAppender::s_out_path, std::ofstream::out | std::ofstream::trunc);
+
+        if (file.is_open()) 
+        {
+            file.close();
+            std::cout << "File content cleared and closed." << std::endl;
+        }
+        else std::cerr << "Failed to open the file for clearing." << std::endl;
         return ret;
     }
     LogMgr::LogMgr(std::string name, ELogLevel output_level, TraceLevle output_mark) : _name(name), _output_level(output_level), _output_mark(output_mark)

@@ -3,7 +3,7 @@
 #define __COMPONENT_H__
 #include <string>
 #include "GlobalMarco.h"
-#include "Framework/Common/Reflect.h"
+#include "Object.h"
 
 namespace Ailu
 {
@@ -13,8 +13,9 @@ public:\
 	inline std::string GetTypeName() override {return GetStaticType();};
 
 	class Actor;
-	class Component
+	class Component : public Object
 	{
+		DECLARE_PROTECTED_PROPERTY(b_enable, Active, bool)
 	public:
 		Component();
 		virtual ~Component();
@@ -23,10 +24,9 @@ public:\
 		virtual void Destroy();
 		virtual void SetOwner(Actor* onwer);
 		virtual std::string GetTypeName();
-		DECLARE_PROTECTED_PROPERTY(b_enable,Active,bool)
-		DECLARE_REFLECT_FIELD(Component)
+		void Serialize(std::ofstream& file, String indent) override;
 	protected:
-		Actor* _p_onwer = nullptr;	
+		Actor* _p_onwer = nullptr;
 	};
 }
 

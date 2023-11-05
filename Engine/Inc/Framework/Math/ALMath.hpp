@@ -14,10 +14,10 @@ namespace Ailu
 	namespace MathInternal
 	{
 		template<typename T, size_t size_of_arr>
-		constexpr size_t CountOf(T(&)[size_of_arr]) { return size_of_arr; }
+		constexpr u32 CountOf(T(&)[size_of_arr]) { return (u32)size_of_arr; }
 
 		template<typename T, size_t row, size_t col>
-		constexpr size_t CountOf(T(&)[row][col]) { return row * col; }
+		constexpr u32 CountOf(T(&)[row][col]) { return (u32)(row * col); }
 
 		static float NormalizeScaleFactor(int32_t var)
 		{
@@ -209,6 +209,11 @@ namespace Ailu
 			}
 			return *this;
 		}
+		friend std::ostream& operator<<(std::ostream& os, const Vector3D<T>& vec)
+		{
+			os << vec.x << "," << vec.y << "," << vec.z;
+			return os;
+		}
 
 		operator T* () { return data; };
 		operator const T* () const { return static_cast<const T*>(data); };
@@ -293,6 +298,14 @@ namespace Ailu
 	template <typename T>
 	const Vector4D<T> Vector4D<T>::One(1, 1, 1, 1);
 
+	using Vector4f = Vector4D<float>;
+	using Quaternion = Vector4D<float>;
+	using R8G8B8A8Unorm = Vector4D<uint8_t>;
+	using R8G8B8Unorm = Vector3D<uint8_t>;
+	using R32G32B32Float = Vector3D<float>;
+	using R32G32B32A32Float = Vector3D<float>;
+	using Vector4i = Vector4D<uint8_t>;
+
 	template<template<typename> class TT, typename T>
 	static float Distance(const TT<T>& from, const TT<T>& to)
 	{
@@ -304,14 +317,28 @@ namespace Ailu
 		return sqrt(dis);
 	}
 
+	template<template<typename> class TT, typename T>
+	static bool LoadVector(const char* vec_str, const TT<T>& out_v)
+	{
+#pragma warning(push)
+#pragma warning(disable: 4477)
+		int length =  CountOf(out_v.data);
+		if (std::is_same<T, float>::value)
+		{
+			if (length == 3) return sscanf_s(vec_str, "%f,%f,%f", &out_v.x, &out_v.y, &out_v.z) == 3;
+			else if (length == 4) return sscanf_s(vec_str, "%f,%f,%f,%f", &out_v.x, &out_v.y, &out_v.z, &out_v.data[3]) == 4;
+		}
+#pragma warning(pop)
+	}
 
-	using Vector4f = Vector4D<float>;
-	using Quaternion = Vector4D<float>;
-	using R8G8B8A8Unorm = Vector4D<uint8_t>;
-	using R8G8B8Unorm = Vector3D<uint8_t>;
-	using R32G32B32Float = Vector3D<float>;
-	using R32G32B32A32Float = Vector3D<float>;
-	using Vector4i = Vector4D<uint8_t>;
+
+	static float LoadFloat(const char* f_str)
+	{
+		float tmp = 0.0f;
+		return sscanf_s(f_str, "%f", &tmp) == 1? tmp : 0.0f;
+	}
+
+
 
 	inline static float ToRadius(const float& angle) { return angle * kPi / 180.f; }
 	inline static float ToAngle(const float& radius) { return 180.f * radius / kPi; }

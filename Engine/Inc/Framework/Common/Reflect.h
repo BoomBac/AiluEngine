@@ -1,31 +1,76 @@
 #pragma once
 #ifndef __REFLECT_H__
 #define __REFLECT_H__
-
+#include "GlobalMarco.h"
 #include <vector>
 #include <iostream>
 #include <string>
 #include <format>
 #include <cstddef>
+#include <functional>
+#include <unordered_map>
 
 namespace Ailu
 {
+    enum class ESerializablePropertyType : u8
+    {
+        kString = 0,kFloat,kBool,kVector3f,kVector4f,kColor,kTransform,kTexture2D,kStaticMesh
+    };
+    static String GetSerializablePropertyTypeStr(const ESerializablePropertyType& type)
+    {
+        switch (type)
+        {
+        case Ailu::ESerializablePropertyType::kString: return "String";
+        case Ailu::ESerializablePropertyType::kFloat: return "Float";
+        case Ailu::ESerializablePropertyType::kBool: return "Bool";
+        case Ailu::ESerializablePropertyType::kVector3f: return "Vector3f";
+        case Ailu::ESerializablePropertyType::kVector4f: return "Vector4f";
+        case Ailu::ESerializablePropertyType::kColor: return "Color";
+        case Ailu::ESerializablePropertyType::kTransform: return "Transform";
+        case Ailu::ESerializablePropertyType::kTexture2D: return "Texture2D";
+        case Ailu::ESerializablePropertyType::kStaticMesh: return "StaticMesh";
+        default: return "undefined";
+        }
+        return "undefined";
+    }
+
+    template<class T>
+    class Property
+    {
+    public:
+        using ValueChangeEvent = std::function<void(T)>;
+        Property()
+        {
+            event = [](T value) {};
+        }
+        const T&Get() const{ return _value; };
+        void Set(T value) 
+        { 
+            _value = value; 
+            event(value);
+        }
+        ValueChangeEvent event;
+    private:
+        T _value;
+    };
+
     struct SerializableProperty
     {
         void* _value_ptr;
-        std::string _name;
-        std::string _type_name;
-        SerializableProperty(void* valuePtr, const std::string& name, const std::string& typeName)
-            : _value_ptr(valuePtr), _name(name), _type_name(typeName) {}
+        String _name;
+        ESerializablePropertyType _type;
+
+        SerializableProperty(void* valuePtr, const String& name, const ESerializablePropertyType& type)
+            : _value_ptr(valuePtr), _name(name), _type(type) {}
         template<typename T>
-        static std::string ToString(const T& value);
+        static String ToString(const T& value);
         template<typename T>
         static T GetProppertyValue(const SerializableProperty& prop);
     };
 
 
     template<typename T>
-    std::string SerializableProperty::ToString(const T& value)
+    String SerializableProperty::ToString(const T& value)
     {
         if (std::is_same<T, float>()) return std::format("{}", value);
     }
@@ -36,14 +81,25 @@ namespace Ailu
         return *reinterpret_cast<T*>(prop._value_ptr);
     }
 
-#define DECLARE_REFLECT_FIELD(class_name) protected: std::unordered_map<std::string,SerializableProperty> properties{};\
-public:\
-    template<typename T>\
-    T GetProperty(const std::string& name){return *reinterpret_cast<T*>(properties.find(name)->second._value_ptr);}\
-     SerializableProperty& GetProperty(const std::string& name){return properties.find(name)->second;}\
-    std::unordered_map<std::string,SerializableProperty>& GetAllProperties(){return properties;}
+#define DECLARE_REFLECT_FIELD(class_name) friend void class_name##InitReflectProperties(class_name* obj);
+//#define DECLARE_REFLECT_FIELD protected: std::unordered_map<String,SerializableProperty> properties{};\
+//virtual void InitReflectProperties();\
+//public:\
+//    template<typename T>\
+//    T GetProperty(const String& name){return *reinterpret_cast<T*>(properties.find(name)->second._value_ptr);}\
+//     SerializableProperty& GetProperty(const String& name){return properties.find(name)->second;}\
+//    std::unordered_map<String,SerializableProperty>& GetAllProperties(){return properties;}
 
-#define DECLARE_REFLECT_PROPERTY(type_name,name,value) properties.insert(std::make_pair(#name,SerializableProperty{&value,#name,#type_name}));
+#define IMPLEMENT_REFLECT_FIELD(class_name) class_name##InitReflectProperties(this);
+
+#define REFLECT_FILED_BEGIN(class_name) static void class_name##InitReflectProperties(class_name* obj){\
+obj->properties.clear();
+
+#define REFLECT_FILED_END }
+
+//#define DECLARE_REFLECT_PROPERTY(type_name,name,value) properties.insert(std::make_pair(#name,SerializableProperty{&value,#name,#type_name}));
+
+#define DECLARE_REFLECT_PROPERTY(prop_type,name,value) obj->properties.insert(std::make_pair(#name,SerializableProperty{&(obj->value),#name,prop_type}));
 
     namespace reflect {
         //--------------------------------------------------------
@@ -56,7 +112,7 @@ public:\
 
             TypeDescriptor(const char* name, size_t size) : name{ name }, size{ size } {}
             virtual ~TypeDescriptor() {}
-            virtual std::string getFullName() const { return name; }
+            virtual String getFullName() const { return name; }
             virtual void dump(const void* obj, int indentLevel = 0) const = 0;
         };
 
@@ -64,7 +120,7 @@ public:\
         // Finding type descriptors
         //--------------------------------------------------------
 
-        // Declare the function template that handles primitive types such as int, std::string, etc.:
+        // Declare the function template that handles primitive types such as int, String, etc.:
         template <typename T>
         TypeDescriptor* getPrimitiveDescriptor();
 
@@ -119,11 +175,11 @@ public:\
             virtual void dump(const void* obj, int indentLevel) const override {
                 std::cout << name << " {" << std::endl;
                 for (const Member& member : members) {
-                    std::cout << std::string(4 * (indentLevel + 1), ' ') << member.name << " = ";
+                    std::cout << String(4 * (indentLevel + 1), ' ') << member.name << " = ";
                     member.type->dump((char*)obj + member.offset, indentLevel + 1);
                     std::cout << std::endl;
                 }
-                std::cout << std::string(4 * indentLevel, ' ') << "}";
+                std::cout << String(4 * indentLevel, ' ') << "}";
             }
         };
 
@@ -169,8 +225,8 @@ public:\
                     return &vec[index];
                     };
             }
-            virtual std::string getFullName() const override {
-                return std::string("std::vector<") + itemType->getFullName() + ">";
+            virtual String getFullName() const override {
+                return String("std::vector<") + itemType->getFullName() + ">";
             }
             virtual void dump(const void* obj, int indentLevel) const override {
                 size_t numItems = getSize(obj);
@@ -181,11 +237,11 @@ public:\
                 else {
                     std::cout << "{" << std::endl;
                     for (size_t index = 0; index < numItems; index++) {
-                        std::cout << std::string(4 * (indentLevel + 1), ' ') << "[" << index << "] ";
+                        std::cout << String(4 * (indentLevel + 1), ' ') << "[" << index << "] ";
                         itemType->dump(getItem(obj, index), indentLevel + 1);
                         std::cout << std::endl;
                     }
-                    std::cout << std::string(4 * indentLevel, ' ') << "}";
+                    std::cout << String(4 * indentLevel, ' ') << "}";
                 }
             }
         };

@@ -3,11 +3,16 @@ type: material
 name: StandardPBR
 shader_path: Shaders/shaders.hlsl
   prop_type: Color
-    BaseColor: 1,0,0,0
-    EmssiveColor: 0.78445,0.456747,0.941176,0
+    BaseColor: 0.181373,0.181373,0.181373,0
+    SpecularColor: 0.425,0,0,4.2039e-45
+    EmssiveColor: 1,1,1,0
   prop_type: Float
-    Specular: 0.49
-    Metallic: 0.69
-    Roughness: 0.3
-  prop_type: Tex2D
-    Albedo: texture path
+    RoughnessValue: 0.623
+    MetallicValue: 0.293
+  prop_type: Texture2D
+    Metallic: none
+    Specular: none
+    Albedo: none
+    Normal: none
+    Roughness: none
+    Emssive: none

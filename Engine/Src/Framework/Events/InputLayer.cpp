@@ -17,14 +17,18 @@ namespace Ailu
 	}
 	void InputLayer::OnAttach()
 	{
-		AL_ASSERT(Camera::sCurrent == nullptr, "Current Camera is null")
+		if (Camera::sCurrent == nullptr)
+		{
+			LOG_WARNING("Current Camera is null");
+			Camera::GetDefaultCamera();
+		}
 		_origin_cam_state = new CameraState(*Camera::sCurrent);
 		_target_cam_state = new CameraState(*Camera::sCurrent);
 	}
 	void InputLayer::OnDetach()
 	{
 		DESTORY_PTR(_origin_cam_state)
-		DESTORY_PTR(_target_cam_state)
+			DESTORY_PTR(_target_cam_state)
 	}
 	void InputLayer::OnEvent(Event& e)
 	{
@@ -42,7 +46,7 @@ namespace Ailu
 			_camera_move_speed += e.GetOffsetY() > 0 ? 0.01f : -0.01f;
 			_camera_move_speed = max(0.0f, _camera_move_speed);
 			return true;
-		});
+			});
 		EventDispather dispater0(e);
 		dispater0.Dispatch <MouseButtonPressedEvent>([this](MouseButtonPressedEvent& e)->bool {
 			if (e.GetButton() == AL_KEY_RBUTTON)
@@ -51,25 +55,28 @@ namespace Ailu
 				return true;
 			}
 			return true;
-		});
+			});
 	}
 
 	void InputLayer::OnImguiRender()
 	{
-		auto camera_pos = Camera::sCurrent->GetPosition();
-		auto camera_rotation = Camera::sCurrent->GetRotation();
-		ImGui::Begin("CameraDetail");
-		ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 1.0f,"%.2f");
-		ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f,"%.2f");
-		ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.0f, 1.0f,"%.2f");
-		ImGui::SliderFloat("FovH", &_camera_fov_h, 0.0f, 120.0f,"%.2f");
-		ImGui::Text("Position:");
-		ImGui::SameLine();
-		ImGui::Text(camera_pos.ToString().c_str());
-		ImGui::Text("Rotation:");
-		ImGui::SameLine();
-		ImGui::Text(camera_rotation.ToString().c_str());
-		ImGui::End();
+		if (Camera::sCurrent)
+		{
+			auto camera_pos = Camera::sCurrent->GetPosition();
+			auto camera_rotation = Camera::sCurrent->GetRotation();
+			ImGui::Begin("CameraDetail");
+			ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 1.0f, "%.2f");
+			ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f, "%.2f");
+			ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.0f, 1.0f, "%.2f");
+			ImGui::SliderFloat("FovH", &_camera_fov_h, 0.0f, 120.0f, "%.2f");
+			ImGui::Text("Position:");
+			ImGui::SameLine();
+			ImGui::Text(camera_pos.ToString().c_str());
+			ImGui::Text("Rotation:");
+			ImGui::SameLine();
+			ImGui::Text(camera_rotation.ToString().c_str());
+			ImGui::End();
+		}
 	}
 	void InputLayer::OnUpdate(float delta_time)
 	{
@@ -82,12 +89,19 @@ namespace Ailu
 			pre_mouse_pos = Input::GetMousePos();
 			init = true;
 		}
+		static Camera* pre_tick_camera = Camera::sCurrent;
+		if (pre_tick_camera != Camera::sCurrent)
+		{
+			_target_cam_state->UpdateState(*Camera::sCurrent);
+			_target_cam_state->UpdateState(*Camera::sCurrent);
+			LOG_WARNING("Camera changed!");
+		}
 		if (Camera::sCurrent)
 		{
-			Vector3f move_dis{0,0,0};
+			Vector3f move_dis{ 0,0,0 };
 			if (Input::IsKeyPressed(AL_KEY_W))
 			{
-				move_dis += Camera::sCurrent->GetForward()* _camera_move_speed * _camera_move_speed;
+				move_dis += Camera::sCurrent->GetForward() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_S))
 			{
@@ -121,6 +135,6 @@ namespace Ailu
 			_origin_cam_state->UpdateCamrea(*Camera::sCurrent);
 			Camera::sCurrent->SetFovH(_camera_fov_h);
 		}
-
+		pre_tick_camera = Camera::sCurrent;
 	}
 }

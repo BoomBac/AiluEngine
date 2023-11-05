@@ -3,8 +3,11 @@
 #define __TEXTURE_H__
 
 #include <stdint.h>
+#include <map>
 #include "GlobalMarco.h"
 #include "AlgFormat.h"
+#include "Framework/Common/Path.h"
+
 
 namespace Ailu
 {
@@ -39,6 +42,41 @@ namespace Ailu
 		uint16_t _width,_height;
 		uint8_t _channel;
 		EALGFormat _format;
+	};
+
+	class TexturePool
+	{
+	public:
+		//name with ext。图片导入时生成一个可以直接使用的纹理，当导入一个同名纹理时，第二个纹理的gpu资源已经创建并且提交到cmd，
+		// 但是由于存在同名，第二个纹理不会在此处被添加，那么指针就会被释放，执行cmd时便会报错！运行时一般不会有这个错误。
+		// 初始化时，将图片的加载放在最前面
+		static Ref<Texture2D> Add(const std::string& name, Ref<Texture2D> res)
+		{
+			if (s_res_pool.contains(name)) return s_res_pool[name];
+			s_res_pool.insert(std::make_pair(name, res));
+			res->Name(GetFileName(name));
+			++s_res_num;
+			s_is_dirty = true;
+			return res;
+		}
+		static Ref<Texture2D> Get(const std::string& name);
+
+		static Ref<Texture2D> GetDefaultWhite()
+		{
+			auto it = s_res_pool.find(EnginePath::kEngineTexturePath + "MyImage01.jpg");
+			if (it != s_res_pool.end()) return it->second;
+			else return nullptr;
+		}
+
+		static uint32_t GetResNum()
+		{
+			return s_res_num;
+		}
+		static std::map<std::string, Ref<Texture2D>>& GetAllResourceMap() { return s_res_pool; };
+	protected:
+		inline static std::map<std::string, Ref<Texture2D>> s_res_pool{};
+		inline static bool s_is_dirty = true;
+		inline static uint32_t s_res_num = 0u;
 	};
 }
 

@@ -17,6 +17,7 @@ namespace Ailu
 		_vertex_count = 0u;
 		_index_count = 0u;
 	}
+
 	Mesh::Mesh(const std::string& name) : Mesh()
 	{
 		_name = name;

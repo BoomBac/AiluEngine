@@ -2,17 +2,60 @@
 #include "Framework/Common/SceneMgr.h"
 #include "Objects/CommonActor.h"
 #include "Objects/StaticMeshComponent.h"
+#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/ResourceMgr.h"
+#include "Render/Camera.h"
+
 
 namespace Ailu
 {
+	static String GetIndentation(int level)
+	{
+		String ret{""};
+		while (level--)
+		{
+			ret.append("  ");
+		}
+		return ret;
+	}
+
+	static String GetSceneSysPath(const string& scene_path)
+	{
+		return kEngineRootPath + scene_path;
+	}
+
+	inline static void ProcessValueAndPop(Queue<std::tuple<String, String>>& scene_data, std::function<void(String)> func)
+	{
+		func(std::get<1>(scene_data.front()));
+		scene_data.pop();
+	}
+
+	static void LoadCamera(Queue<std::tuple<String, String>>& scene_data, Camera& out_camera)
+	{
+		while (std::get<0>(scene_data.front()) != "Type") scene_data.pop();
+		out_camera.Type(std::get<1>(scene_data.front()) == ECameraTypeStr(ECameraType::kPerspective) ? ECameraType::kPerspective : ECameraType::kOrthographic);
+		scene_data.pop();
+		Vector3f v3{};
+		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.SetPosition(v3); });
+		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.Rotate(v3.y, v3.x); });
+		ProcessValueAndPop(scene_data, [&](String str) {out_camera.SetFovH(LoadFloat(str.c_str())); });
+		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Aspect(LoadFloat(str.c_str())); });
+		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Near(LoadFloat(str.c_str())); });
+		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Far(LoadFloat(str.c_str())); });
+	}
+
 	int SceneMgr::Initialize()
 	{
-		g_pSceneMgr->_p_current = Scene::GetDefaultScene();
+		g_pSceneMgr->_p_current = LoadScene("default.almap");
+		//g_pSceneMgr->_p_current = Scene::GetDefaultScene();
+		Camera::sCurrent = _p_current->GetActiveCamera();
 		return 0;
 	}
 	void SceneMgr::Finalize()
 	{
+		SaveScene(_p_current, "default.almap");
 	}
+
 	void SceneMgr::Tick(const float& delta_time)
 	{
 		if (_p_current)
@@ -30,11 +73,95 @@ namespace Ailu
 		return s_all_scene.back().get();
 	}
 
+	void SceneMgr::SaveScene(Scene* scene, const String& scene_path)
+	{
+		using namespace std;
+		auto sys_path = GetSceneSysPath(scene_path);
+		ofstream file(sys_path,ios_base::out);
+		if (!file.is_open())
+		{
+			g_pLogMgr->LogErrorFormat("Save scene: {} to {} failed with file open failed",scene->Name(),sys_path);
+			return;
+		}
+		String level1 = GetIndentation(1), level2 = GetIndentation(2), level3 = GetIndentation(3), level4 = GetIndentation(4);
+		file << "SceneName: " << scene->Name() << endl;
+		file << "SceneCamera: " << "scene_camera" << endl;
+		file << level1 << "Type: " << ECameraTypeStr(Camera::sCurrent->Type()) << endl;
+		file << level1 << "Position: " << Camera::sCurrent->GetPosition() << endl;
+		file << level1 << "Rotation: " << Camera::sCurrent->GetRotation() << endl;
+		file << level1 << "Fov: " << Camera::sCurrent->GetFovH() << endl;
+		file << level1 << "Aspect: " << Camera::sCurrent->Aspect() << endl;
+		file << level1 << "Near: " << Camera::sCurrent->Near() << endl;
+		file << level1 << "Far: " << Camera::sCurrent->Far() << endl;
+		file << "SceneGraph: "<< endl;
+		SerializeActor(file, scene->GetSceneRoot(), 2);
+		g_pLogMgr->LogFormat("Save scene: {} to {};", scene->Name(), sys_path);
+		file.close();
+	}
+
+	Scene* SceneMgr::LoadScene(const String& scene_path)
+	{
+		using namespace std;
+		auto sys_path = GetSceneSysPath(scene_path);
+		std::ifstream scene_data(sys_path);
+		if (!scene_data.is_open())
+		{
+			g_pLogMgr->LogErrorFormat("Load scene at path {} failed!", sys_path);
+			return nullptr;
+		}
+		String line{};
+		Queue<std::tuple<String, String>> lines{};
+		int line_count = 0;
+		while (std::getline(scene_data,line))
+		{
+			std::istringstream iss(line);
+			std::string key;
+			std::string value;
+			if (std::getline(iss, key, ':') && std::getline(iss, value))
+			{
+				key.erase(key.begin(), std::find_if(key.begin(), key.end(), [](int ch) {return !std::isspace(ch); }));
+				value.erase(value.begin(), std::find_if(value.begin(), value.end(), [](int ch) {return !std::isspace(ch); }));
+				lines.push(std::make_pair(key, value));
+				++line_count;
+			}
+		}
+		scene_data.close();
+		String scene_name = std::get<1>(lines.front());
+		lines.pop();
+		lines.pop();
+		Scene* loaded_scene = SceneMgr::Create(scene_name);
+		LoadCamera(lines, *loaded_scene->GetActiveCamera());
+		lines.pop();
+		SceneActor* scene_root = Deserialize<SceneActor>(lines);
+		loaded_scene->Root(scene_root);
+		loaded_scene->MarkDirty();
+		loaded_scene->GetAllActor();//将根节点的子节点信息填充至Scene的actor容器
+		return loaded_scene;
+	}
+
+	void SceneMgr::SerializeActor(std::ofstream& os, SceneActor* actor, int level)
+	{
+		using namespace std;
+		String base_level = GetIndentation(level);
+		os << base_level << "Name: " << actor->Name() << endl;
+		os << GetIndentation(level + 1) << "Components: " << endl;
+		String comp_ident = GetIndentation(level + 2);
+		for (const auto& comp : actor->GetAllComponent())
+		{
+			comp->Serialize(os, comp_ident);
+		}
+		os << GetIndentation(level + 1) << "Children: " << actor->GetChildNum() << endl;
+		for (const auto& child : actor->GetAllChildren())
+		{
+			SerializeActor(os,static_cast<SceneActor*>(child), level + 2);
+		}
+	}
+
 	//--------------------------------------------------------Scene begin-----------------------------------------------------------------------
 
 	Scene::Scene(const std::string& name)
 	{
-		_p_root = Actor::Create<SceneActor>(name);
+		//_p_root = Actor::Create<SceneActor>(name);
 		_name = name;
 		FillActorList = [this](SceneActor* actor) {
 			_all_objects.emplace_back(actor); 
@@ -94,10 +221,20 @@ namespace Ailu
 		}
 	}
 
+	void Scene::MarkDirty()
+	{
+		_b_dirty = true;
+	}
+
+	Camera* Scene::GetActiveCamera()
+	{
+		return &_scene_cam;
+	}
+
 	Scene* Scene::GetDefaultScene()
 	{
 		auto _p_actor = Actor::Create<SceneActor>("stone");
-		_p_actor->AddComponent<StaticMeshComponent>(MeshPool::GetMesh("Sphere"), MaterialPool::GetMaterial("StandardPBR"));
+		_p_actor->AddComponent<StaticMeshComponent>(MeshPool::GetMesh("sphere"), MaterialPool::GetMaterial("Materials/StandardPBR_new.alasset"));
 		auto _p_light = Actor::Create<LightActor>("directional_light");
 		SceneActor* point_light = Actor::Create<LightActor>("point_light");
 		point_light->GetComponent<LightComponent>()->_light_type = ELightType::kPoint;
@@ -113,10 +250,12 @@ namespace Ailu
 		light_comp->_light._light_param.z = 60.0f;
 
 		auto scene = SceneMgr::Create("default_scene");
+		scene->Root(Actor::Create<SceneActor>("root"));
 		scene->AddObject(_p_actor);
 		scene->AddObject(_p_light);
 		scene->AddObject(point_light);
 		scene->AddObject(spot_light);
+		scene->_scene_cam = *Camera::GetDefaultCamera();
 		return scene;
 	}
 

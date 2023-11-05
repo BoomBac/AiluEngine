@@ -6,6 +6,7 @@
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Framework/Common/LogMgr.h"
 #include "CompanyEnv.h"
 
 namespace Ailu
@@ -13,12 +14,16 @@ namespace Ailu
 	TimeMgr* g_pTimeMgr = new TimeMgr();
 	SceneMgr* g_pSceneMgr = new SceneMgr();
 	ResourceMgr* g_pResourceMgr = new ResourceMgr();
+	LogMgr* g_pLogMgr = new LogMgr();
 
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
 	{
 		AL_ASSERT(sp_instance,"Application already init!")
 		sp_instance = this;
+		g_pLogMgr->Initialize();
+		g_pLogMgr->AddAppender(new FileAppender());
+		g_pLogMgr->Log("file log test!");
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		g_pTimeMgr->Initialize();
@@ -34,21 +39,24 @@ namespace Ailu
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
 		g_pTimeMgr->Mark();
-		auto path = GetResPath("Scene/test.almap");
-		g_pResourceMgr->SaveScene(nullptr, path);
+		//auto path = GetResPath("Scene/test.almap");
+		//g_pResourceMgr->SaveScene(nullptr, path);
+		g_pLogMgr->Log("init end");
 		return 0;
 	}
 	void Application::Finalize()
 	{
 		DESTORY_PTR(_p_window);
 		g_pResourceMgr->Finalize();
+		g_pSceneMgr->Finalize();
+		DESTORY_PTR(g_pSceneMgr);
 		DESTORY_PTR(g_pResourceMgr);
 		_p_renderer->Finalize();
 		DESTORY_PTR(_p_renderer)
 		g_pTimeMgr->Finalize();
 		DESTORY_PTR(g_pTimeMgr);
-		g_pSceneMgr->Finalize();
-		DESTORY_PTR(g_pSceneMgr);
+		g_pLogMgr->Finalize();
+		DESTORY_PTR(g_pLogMgr);
 	}
 
 	double render_lag = 0.0;
@@ -71,13 +79,12 @@ namespace Ailu
 			render_lag += last_mark;
 			update_lag += last_mark;
 			g_pTimeMgr->Mark();
-
 			for (Layer* layer : _layer_stack)
 				layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
 			_p_window->OnUpdate();
 
 			while (render_lag > kMsPerRender)
-			{	
+			{
 				g_pSceneMgr->Tick(delta_time);
 				_p_imgui_layer->Begin();
 				for (Layer* layer : _layer_stack)
@@ -87,6 +94,7 @@ namespace Ailu
 				render_lag -= kMsPerRender;
 			}
 		}
+		g_pLogMgr->Log("Exit");
 	}
 	void Application::PushLayer(Layer* layer)
 	{

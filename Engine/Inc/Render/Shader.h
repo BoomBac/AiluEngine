@@ -5,6 +5,7 @@
 #include <set>
 #include <unordered_map>
 #include "Framework/Math/ALMath.hpp"
+#include "Framework/Common/Path.h"
 
 namespace Ailu
 {
@@ -23,7 +24,7 @@ namespace Ailu
 		inline static std::string Vector = "Vector";
 		inline static std::string Float = "Float";
 		inline static std::string Color = "Color";
-		inline static std::string Texture2D = "Tex2D";
+		inline static std::string Texture2D = "Texture2D";
 	};
 
 	struct ShaderBindResourceInfo
@@ -106,6 +107,55 @@ namespace Ailu
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;
 		virtual uint16_t GetVariableOffset(const std::string& name) const = 0;
 		virtual const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() const = 0;
+	};
+
+	class ShaderLibrary
+	{
+#define VAILD_SHADER_ID(id) id != ShaderLibrary::s_error_id
+		friend class Shader;
+	public:
+		static Ref<Shader> Get(std::string shader_name)
+		{
+			uint32_t shader_id = NameToId(shader_name);
+			if (VAILD_SHADER_ID(shader_id)) return s_shader_library.find(shader_id)->second;
+			else
+			{
+				LOG_ERROR("Shader: {} dont's exist in ShaderLibrary!", shader_name);
+				return nullptr;
+			}
+		}
+		static bool Exist(const std::string& name)
+		{
+			return NameToId(name) != s_error_id;
+		}
+		static std::string GetShaderPath(const std::string& name)
+		{
+			auto it = s_shader_path.find(name);
+			return it == s_shader_path.end() ? "" : it->second;
+		}
+		static Ref<Shader> Add(const std::string& res_path)
+		{
+			auto abs_path = GetResPath(res_path);
+			auto name = GetFileName(abs_path);
+			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
+			else
+			{
+				s_shader_path.insert(std::make_pair(name, res_path));
+				return Shader::Create(abs_path);
+			}
+		}
+		inline static uint32_t NameToId(const std::string& name)
+		{
+			auto it = s_shader_name.find(name);
+			if (it != s_shader_name.end()) return it->second;
+			else return s_error_id;
+		}
+	private:
+		inline static uint32_t s_shader_id = 0u;
+		inline static uint32_t s_error_id = 9999u;
+		inline static std::unordered_map<uint32_t, Ref<Shader>> s_shader_library;
+		inline static std::unordered_map<std::string, uint32_t> s_shader_name;
+		inline static std::unordered_map<std::string, std::string> s_shader_path;
 	};
 }
 

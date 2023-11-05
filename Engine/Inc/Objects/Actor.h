@@ -4,19 +4,24 @@
 
 #include <string>
 #include <list>
+#include "Object.h"
 #include "Component.h"
 #include "GlobalMarco.h"
 
 
 namespace Ailu
 {
-	class Actor
+	class Actor : public Object
 	{
+		DECLARE_PROTECTED_PROPERTY(Id, Id, uint32_t)
+		DECLARE_PROTECTED_PROPERTY_PTR(Parent, Actor)
 	public:
 		virtual ~Actor();
 		Actor();
 		virtual void BeginPlay();
 		virtual void Tick(const float& delta_time);
+		
+		void Serialize(std::ofstream& file, String indent) override;
 		
 		template <typename Type>
 		static Type* Create();
@@ -31,7 +36,11 @@ namespace Ailu
 		template <typename Type,typename... Args>
 		inline Type* AddComponent(Args... args);
 
+		void AddComponent(Component* comp);
+
 		std::list<Scope<Component>>& GetAllComponent() { return _components; }
+
+		void RemoveAllComponent();
 
 		std::list<Actor*>& GetAllChildren();
 		void RemoveChild(Actor* child);
@@ -42,13 +51,10 @@ namespace Ailu
 		{
 			return this->_Id == other._Id;
 		}
-
-		DECLARE_PROTECTED_PROPERTY(name, Name, std::string)
-		DECLARE_PROTECTED_PROPERTY(Id,Id,uint32_t)
-		DECLARE_PROTECTED_PROPERTY_PTR(Parent,Actor)
 	public:
 		inline static std::vector<Scope<Actor>> s_global_actors{};
 	protected:
+		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;
 		std::list<Actor*> _children{};
 		std::list<Scope<Component>> _components{};
 		inline static uint32_t s_actor_count = 0u;
