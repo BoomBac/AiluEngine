@@ -1,3 +1,26 @@
+//info bein
+//name: shaders
+//vert: VSMain
+//pixel: PSMain
+//Cull: Back
+//Queue: Opaque
+//Properties
+//{
+//	Texture2D_Albedo("Albedo",Texture2D) = "white"
+//	Texture2D_Normal("Normal",Texture2D) = "white"
+//	Texture2D_Emssive("Emssive",Texture2D) = "white"
+//	Texture2D_Roughness("Roughness",Texture2D) = "white"
+//	Texture2D_Metallic("Metallic",Texture2D) = "white"
+//	Texture2D_Specular("Specular",Texture2D) = "white"
+//	Texture2D_Specular("Specular",Texture2D) = "white"
+//	Color_BaseColor("BaseColor",Color) = (1,0,0,0)
+//	Color_EmssiveColor("Emssive",Color) = (1,0,0,0)
+//	Color_SpecularColor("Specular",Color) = (1,0,0,0)
+//	Float_RoughnessValue("Roughness",Range(0,1)) = 0
+//	Float_MetallicValue("Metallic",Range(0,1)) = 0
+//}
+//info end
+
 #include "input.hlsl"
 #include "cbuffer.hlsl"
 #include "common.hlsl"

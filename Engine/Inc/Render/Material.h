@@ -44,6 +44,8 @@ namespace Ailu
 		void SetTexture(const std::string& name, const String& texture_path);
 		virtual void Bind();
 		Shader* GetShader() const;
+		List<std::tuple<String, float>> GetAllFloatValue();
+		List<std::tuple<String, Vector4f>> GetAllVectorValue();
 		//Vector<String> _texture_paths{};
 	protected:
 		bool _b_internal = false;

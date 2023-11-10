@@ -1,11 +1,13 @@
 #pragma once
 #ifndef __PATH_H__
 #define __PATH_H__
+#include "GlobalMarco.h"
 
 namespace Ailu
 {
 #ifdef COMPANY_ENV
-    static const string kEngineResRootPath = "E:/AiluEngine/Engine/Res/";
+    static const String kEngineRootPath = "E:/AiluEngine/Engine/";
+    static const String kEngineResRootPath = "E:/AiluEngine/Engine/Res/";
 #else
     static const String kEngineRootPath = "F:/ProjectCpp/AiluEngine/Engine/";
     static const String kEngineResRootPath = "F:/ProjectCpp/AiluEngine/Engine/Res/";

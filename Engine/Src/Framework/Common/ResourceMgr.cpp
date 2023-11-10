@@ -27,6 +27,7 @@ namespace Ailu
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_nmap_2_Tris.jpg");
 		LoadAsset("Materials/StandardPBR_new.alasset")->IsInternal(true);
 		LoadAsset("Materials/WireFrame_new.alasset");
+		
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
 		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());
@@ -200,6 +201,7 @@ namespace Ailu
 		if (!props.empty()) out_mat << endl;
 		std::string cur_prop_type = "type";
 		int prop_count = 0;
+		auto test_props = mat->GetAllFloatValue();
 		for (auto& [prop_name, prop] : props)
 		{
 			if (cur_prop_type != prop_name)

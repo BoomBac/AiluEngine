@@ -14,7 +14,7 @@ namespace Ailu
 {
     enum class ESerializablePropertyType : u8
     {
-        kString = 0,kFloat,kBool,kVector3f,kVector4f,kColor,kTransform,kTexture2D,kStaticMesh
+        kUndefined =0,kString,kFloat,kBool,kVector3f,kVector4f,kColor,kTransform,kTexture2D,kStaticMesh,kRange
     };
     static String GetSerializablePropertyTypeStr(const ESerializablePropertyType& type)
     {
@@ -29,6 +29,8 @@ namespace Ailu
         case Ailu::ESerializablePropertyType::kTransform: return "Transform";
         case Ailu::ESerializablePropertyType::kTexture2D: return "Texture2D";
         case Ailu::ESerializablePropertyType::kStaticMesh: return "StaticMesh";
+        case Ailu::ESerializablePropertyType::kRange: return "Range";
+        case Ailu::ESerializablePropertyType::kUndefined: return "Undefined";
         default: return "undefined";
         }
         return "undefined";

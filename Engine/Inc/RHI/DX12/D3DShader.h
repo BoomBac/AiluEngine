@@ -17,11 +17,12 @@ namespace Ailu
 	class D3DShader : public Shader
 	{
 	public:
-		D3DShader(const std::string_view file_name, const std::string_view shader_name, const uint32_t& id ,EShaderType type);
-		D3DShader(const std::string_view file_name, const std::string_view shader_name,const uint32_t& id);
+		D3DShader(const std::string& file_name, const std::string_view shader_name, const uint32_t& id ,EShaderType type);
+		D3DShader(const std::string& file_name, const std::string_view shader_name,const uint32_t& id);
 		~D3DShader();
 		void Bind() override;
 		void Bind(uint32_t index) override;
+		void Compile() final;
 
 		inline std::string GetName() const override;
 		inline uint32_t GetID() const override;
@@ -31,7 +32,10 @@ namespace Ailu
 		void SetGlobalVector(const std::string& name, const Vector2f& vector) override;
 		void SetGlobalMatrix(const std::string& name, const Matrix4x4f& mat) override;
 		void SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat) override;
+		Vector4f GetVectorValue(const std::string& name);
+		float GetFloatValue(const std::string& name);
 		void* GetByteCode(EShaderType type) override;
+		const String& GetSrcPath() const final;
 		ComPtr<ID3D12RootSignature> GetSignature() const;
 		ID3D12ShaderReflection* GetD3DReflectionInfo() const;
 		ID3D12ShaderReflection* GetD3DReflectionInfo(const EShaderType& type) const;
@@ -39,6 +43,10 @@ namespace Ailu
 
 		std::pair<D3D12_INPUT_ELEMENT_DESC*,uint8_t> GetVertexInputLayout();
 	private:
+		static void ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props);
+		void PreProcessShader() final;
+		void Reset();
+		const List<ShaderPropertyInfo>& GetShaderPropertyInfos() const final;
 		uint8_t* GetCBufferPtr(uint32_t index) override;
 		void LoadShaderRelfection(ID3D12ShaderReflection* reflection,const EShaderType& type);
 
@@ -47,9 +55,10 @@ namespace Ailu
 		void GenerateRootSignature();
 
 	private:
+		String _vert_entry, _pixel_entry;
 		D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
 		uint8_t _vertex_input_num = 0u;
-
+		String _src_file_path;
 		short _per_mat_buf_bind_slot = -1;
 		std::unordered_map<std::string,ShaderBindResourceInfo> _bind_res_infos{};
 
@@ -62,12 +71,12 @@ namespace Ailu
 		ComPtr<ID3DBlob> _p_pblob = nullptr;
 		uint8_t* _p_cbuffer = nullptr;
 		inline static ComPtr<ID3D12DescriptorHeap> m_cbvHeap = nullptr;
-		inline static ComPtr<ID3D12Resource> m_constantBuffer = nullptr;
 		ComPtr<ID3D12RootSignature> _p_sig;
 		ComPtr<ID3D12ShaderReflection> _p_v_reflection;
 		ComPtr<ID3D12ShaderReflection> _p_p_reflection;
 		std::map<std::string, uint16_t> _variable_offset;
 		inline static ComPtr<ID3D12RootSignature> s_active_sig;
+		List<ShaderPropertyInfo> _shader_prop_infos;
 	};
 }
 

@@ -5,7 +5,7 @@
 #include "Framework/Common/LogMgr.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Camera.h"
-
+#include "Framework/Common/Path.h"
 
 namespace Ailu
 {

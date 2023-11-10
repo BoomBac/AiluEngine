@@ -8,6 +8,7 @@
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DContext.h"
 #include "Framework/Common/Utils.h"
+#include "Framework/Common/LogMgr.h"
 
 
 namespace Ailu
@@ -114,7 +115,7 @@ namespace Ailu
 		return true;
 	}
 
-	static void CreateFromFileFXC(const std::wstring& filename, const std::string& entryPoint, const std::string& pTarget, ComPtr<ID3DBlob>& p_blob, 
+	static void CreateFromFileFXC(const std::wstring& filename, const std::string& entryPoint, const std::string& pTarget, ComPtr<ID3DBlob>& p_blob,
 		ComPtr<ID3D12ShaderReflection>& shader_reflection)
 	{
 		ID3DBlob* pErrorBlob = nullptr;
@@ -153,7 +154,7 @@ namespace Ailu
 		}
 		CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
 		CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
-		int cbuf_mask = 0,texture_count = 0;
+		int cbuf_mask = 0, texture_count = 0;
 		for (auto it = _bind_res_infos.begin(); it != _bind_res_infos.end(); it++)
 		{
 			auto& desc = it->second;
@@ -234,129 +235,119 @@ namespace Ailu
 		reflection->GetDesc(&desc);
 		switch (type)
 		{
-			case Ailu::EShaderType::kVertex:
+		case Ailu::EShaderType::kVertex:
+		{
+			if (desc.InputParameters > 10)
 			{
-				if (desc.InputParameters > 10)
+				AL_ASSERT(true, "LayoutDesc count must less than 10");
+				return;
+			}
+			for (uint32_t i = 0u; i < desc.InputParameters; i++)
+			{
+				D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
+				reflection->GetInputParameterDesc(i, &input_desc);
+				_vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+				++_vertex_input_num;
+			}
+			for (uint32_t i = 0u; i < desc.BoundResources; i++)
+			{
+				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
+				reflection->GetResourceBindingDesc(i, &bind_desc);
+				auto res_type = bind_desc.Type;
+				if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
 				{
-					AL_ASSERT(true, "LayoutDesc count must less than 10");
-					return;
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
 				}
-				for (uint32_t i = 0u; i < desc.InputParameters; i++)
+				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
 				{
-					D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
-					reflection->GetInputParameterDesc(i, &input_desc);
-					_vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-					++_vertex_input_num;
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
 				}
-				for (uint32_t i = 0u; i < desc.BoundResources; i++)
+				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
 				{
-					D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
-					reflection->GetResourceBindingDesc(i, &bind_desc);
-					auto res_type = bind_desc.Type;
-					if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
-					{
-						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name}));
-					}
-					else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
-					{
-						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-					}
-					else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
-					{
-						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-					}
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
 				}
 			}
-			case Ailu::EShaderType::kPixel:
-			{			
-				for (uint32_t i = 0u; i < desc.BoundResources; i++)
+		}
+		break;
+		case Ailu::EShaderType::kPixel:
+		{
+			for (uint32_t i = 0u; i < desc.BoundResources; i++)
+			{
+				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
+				reflection->GetResourceBindingDesc(i, &bind_desc);
+				auto res_type = bind_desc.Type;
+				if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
 				{
-					D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
-					reflection->GetResourceBindingDesc(i, &bind_desc);
-					auto res_type = bind_desc.Type;
-					if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
-					{
-						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-					}
-					else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
-					{
-						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-					}
-					else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
-					{
-						_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-					}
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
 				}
-				for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
+				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
 				{
-					auto cbuf = reflection->GetConstantBufferByIndex(i);
-					D3D12_SHADER_BUFFER_DESC desc{};
-					cbuf->GetDesc(&desc);
-					for (uint32_t j = 0u; j < desc.Variables; j++)
-					{
-						auto variable = cbuf->GetVariableByIndex(j);
-						D3D12_SHADER_VARIABLE_DESC vdesc{};
-						variable->GetDesc(&vdesc);
-						uint8_t offset = (uint8_t)vdesc.StartOffset;
-						uint8_t size = (uint8_t)vdesc.Size;
-						uint16_t variable_info = 0u;
-						variable_info |= offset;
-						variable_info <<= 8;
-						variable_info |= size;
-						auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
-						_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
-					}
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+				}
+				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
+				{
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
 				}
 			}
+			for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
+			{
+				auto cbuf = reflection->GetConstantBufferByIndex(i);
+				D3D12_SHADER_BUFFER_DESC desc{};
+				cbuf->GetDesc(&desc);
+				for (uint32_t j = 0u; j < desc.Variables; j++)
+				{
+					auto variable = cbuf->GetVariableByIndex(j);
+					D3D12_SHADER_VARIABLE_DESC vdesc{};
+					variable->GetDesc(&vdesc);
+					uint8_t offset = (uint8_t)vdesc.StartOffset;
+					uint8_t size = (uint8_t)vdesc.Size;
+					uint16_t variable_info = 0u;
+					variable_info |= offset;
+					variable_info <<= 8;
+					variable_info |= size;
+					auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
+					_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
+				}
+			}
+		}
+		break;
 		}
 	}
 
 	uint16_t D3DShader::GetVariableOffset(const std::string& name) const
 	{
-		auto it = _variable_offset.find(name);
-		if (it == _variable_offset.end())
-		{
-			//LOG_WARNING("variable: {} don't exist in shader: {}", name, _name);
-			return 0;
-		}
-		return it->second;
+		//auto it = _variable_offset.find(name);
+		//if (it == _variable_offset.end())
+		//{
+		//	//LOG_WARNING("variable: {} don't exist in shader: {}", name, _name);
+		//	return 0;
+		//}
+		//return it->second;
+		return 0;
 	}
 
-	D3DShader::D3DShader(const std::string_view file_name, const std::string_view shader_name, const uint32_t& id, EShaderType type)
+	D3DShader::D3DShader(const std::string& file_name, const std::string_view shader_name, const uint32_t& id, EShaderType type)
 	{
 
 	}
 
-	D3DShader::D3DShader(const std::string_view file_name, const std::string_view shader_name, const uint32_t& id) : _name(shader_name) , _id(id)
+	D3DShader::D3DShader(const std::string& file_name, const std::string_view shader_name, const uint32_t& id) : _name(shader_name), _id(id)
 	{
 		if (!_b_init_buffer)
 		{
 			m_cbvHeap = D3DContext::GetInstance()->GetDescriptorHeap();
+			_desc_size = D3DContext::GetInstance()->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			_p_cbuffer = D3DContext::GetInstance()->GetCBufferPtr();
 			_b_init_buffer = true;
 		}
-		_desc_size = D3DContext::GetInstance()->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		_p_cbuffer = D3DContext::GetInstance()->GetCBufferPtr();
-#if defined(_DEBUG)
-		// Enable better shader debugging with the graphics debugging tools.
-		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-		UINT compileFlags = 0;
-#endif
-
-#ifdef SHADER_DXC
-		CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
-		LoadShaderRelfection(_p_reflection.Get());
-		CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
-		LoadShaderRelfection(_p_reflection.Get());
-#else
-		CreateFromFileFXC(ToWChar(file_name.data()), "VSMain", "vs_5_0", _p_vblob, _p_v_reflection);
-		LoadShaderRelfection(_p_v_reflection.Get(),EShaderType::kVertex);
-		CreateFromFileFXC(ToWChar(file_name.data()), "PSMain", "ps_5_0", _p_pblob, _p_p_reflection);
-		LoadShaderRelfection(_p_p_reflection.Get(),EShaderType::kPixel);
-#endif // SHADER_DXC
-		GenerateRootSignature();
-		auto it = _bind_res_infos.find(RenderConstants::kCBufNameSceneMaterial);
-		if (it != _bind_res_infos.end()) _per_mat_buf_bind_slot = it->second._bind_slot;
+		_src_file_path = file_name;
+		//#if defined(_DEBUG)
+		//		// Enable better shader debugging with the graphics debugging tools.
+		//		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+		//#else
+		//		UINT compileFlags = 0;
+		//#endif
+		Compile();
 	}
 
 	D3DShader::~D3DShader()
@@ -366,6 +357,110 @@ namespace Ailu
 	std::pair<D3D12_INPUT_ELEMENT_DESC*, uint8_t> D3DShader::GetVertexInputLayout()
 	{
 		return std::make_pair(_vertex_input_layout, _vertex_input_num);
+	}
+
+	void D3DShader::ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props)
+	{
+		line = su::Trim(line);
+		auto cur_edge = line.find_first_of("(");
+		String value_name = line.substr(0, cur_edge);
+		line = line.substr(cur_edge);
+		cur_edge = line.find_first_of("=");
+		String defalut_value = line.substr(cur_edge + 1);
+		line = line.substr(0,cur_edge - 1);
+		su::RemoveSpaces(defalut_value);
+		line = line.substr(1, line.find_last_of(")") - 1);
+		cur_edge = line.find_first_of(",");
+		String prop_name = line.substr(1,cur_edge - 2);
+		String prop_type = line.substr(cur_edge + 1);
+		ESerializablePropertyType seri_type;
+		if (prop_type == "Texture2D") seri_type = ESerializablePropertyType::kTexture2D;
+		else if (prop_type == "Color") seri_type = ESerializablePropertyType::kColor;
+		else if (*(prop_type.begin()) == *"R") seri_type = ESerializablePropertyType::kRange;
+		else if (prop_type == GetSerializablePropertyTypeStr(ESerializablePropertyType::kFloat)) seri_type = ESerializablePropertyType::kFloat;
+		else if (prop_type == "Vector") seri_type = ESerializablePropertyType::kVector4f;
+		else seri_type = ESerializablePropertyType::kUndefined;
+		props.emplace_back(ShaderPropertyInfo{ value_name ,prop_name,seri_type ,Vector4f::Zero});
+	}
+
+	struct ShaderCommand
+	{
+		inline static String kName = "name";
+		inline static String kVSEntry = "Vert";
+		inline static String kPSEntry = "Pixel";
+		inline static String kCull = "Cull";
+		inline static String kQueue = "Queue";
+		struct Cull
+		{
+			inline static String kNone = "none";
+			inline static String kFront = "Front";
+			inline static String kBack = "Back";
+		} kCullValue;
+	};
+
+	void D3DShader::PreProcessShader()
+	{
+		List<String> lines{};
+		u32 line_count = 0;
+		lines = ReadFileToLines(_src_file_path, line_count, "//info bein", "//info end");
+		if (line_count > 0)
+		{
+			u16 prop_num = 0;
+			for (auto it = lines.rbegin(); it != lines.rend(); it++)
+			{
+				if (*it == "//Properties") break;
+				else
+				{
+					if (*it != "//{" && *it != "//}")
+					{
+						*it = (*it).substr(2);
+						ParserShaderProperty(*it, _shader_prop_infos);
+						++prop_num;
+					}
+				}
+			}
+			prop_num += 3;
+			while (prop_num--) lines.pop_back();
+			String k, v;
+			for (auto& line : lines)
+			{
+				line = line.substr(2);
+				k = line.substr(0, line.find_first_of(":"));
+				StringUtils::RemoveSpaces(k);
+				v = line.substr(line.find_first_of(":") + 1);
+				StringUtils::RemoveSpaces(v);
+				if (StringUtils::Equal(k, ShaderCommand::kName, false)) _name = v;
+				if (StringUtils::Equal(k, ShaderCommand::kVSEntry, false)) _vert_entry = v;
+				if (StringUtils::Equal(k, ShaderCommand::kPSEntry, false)) _pixel_entry = v;
+				if (StringUtils::Equal(k, ShaderCommand::kCull, false))
+				{
+
+				}
+			}
+		}
+		else
+		{
+			g_pLogMgr->LogErrorFormat("PreProcess shader: {} with line count 0", _src_file_path);
+		}
+
+	}
+
+	void D3DShader::Reset()
+	{
+		if (_p_vblob != nullptr) _p_vblob->Release();
+		if (_p_pblob != nullptr) _p_pblob->Release();
+		if (_p_v_reflection != nullptr) _p_v_reflection->Release();
+		if (_p_p_reflection != nullptr) _p_p_reflection->Release();
+		if (_p_sig != nullptr) _p_sig->Release();
+		_vertex_input_num = 0u;
+		memset(_vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
+		_shader_prop_infos.clear();
+		_variable_offset.clear();
+	}
+
+	const List<ShaderPropertyInfo>& D3DShader::GetShaderPropertyInfos() const
+	{
+		return _shader_prop_infos;
 	}
 
 	uint8_t* D3DShader::GetCBufferPtr(uint32_t index)
@@ -384,7 +479,7 @@ namespace Ailu
 		cmdlist->SetGraphicsRootSignature(_p_sig.Get());
 		if (_per_mat_buf_bind_slot == -1) return;
 		D3D12_GPU_DESCRIPTOR_HANDLE matHandle;
-		matHandle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _desc_size;	
+		matHandle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _desc_size;
 		cmdlist->SetGraphicsRootDescriptorTable(_per_mat_buf_bind_slot, matHandle);
 	}
 
@@ -415,6 +510,26 @@ namespace Ailu
 		context->GetCmdList()->SetGraphicsRootConstantBufferView(_per_mat_buf_bind_slot, context->GetCBufferViewDesc(1 + index).BufferLocation);
 	}
 
+	void D3DShader::Compile()
+	{
+		Reset();
+		PreProcessShader();
+#ifdef SHADER_DXC
+		CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
+		LoadShaderRelfection(_p_reflection.Get());
+		CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
+		LoadShaderRelfection(_p_reflection.Get());
+#else
+		CreateFromFileFXC(ToWChar(_src_file_path.data()), "VSMain", "vs_5_0", _p_vblob, _p_v_reflection);
+		LoadShaderRelfection(_p_v_reflection.Get(), EShaderType::kVertex);
+		CreateFromFileFXC(ToWChar(_src_file_path.data()), "PSMain", "ps_5_0", _p_pblob, _p_p_reflection);
+		LoadShaderRelfection(_p_p_reflection.Get(), EShaderType::kPixel);
+#endif // SHADER_DXC
+		GenerateRootSignature();
+		auto it = _bind_res_infos.find(RenderConstants::kCBufNameSceneMaterial);
+		if (it != _bind_res_infos.end()) _per_mat_buf_bind_slot = it->second._bind_slot;
+	}
+
 	void D3DShader::SetGlobalVector(const std::string& name, const Vector4f& vector)
 	{
 		auto it = _variable_offset.find(name);
@@ -443,6 +558,34 @@ namespace Ailu
 	{
 	}
 
+	Vector4f D3DShader::GetVectorValue(const std::string& name)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (it != _bind_res_infos.end())
+		{
+			return *reinterpret_cast<Vector4f*>(_p_cbuffer + ShaderBindResourceInfo::GetVariableOffset(it->second));
+		}
+		else
+		{
+			g_pLogMgr->LogWarningFormat("Get vector: {} on shader: {} failed!",name,_name);
+			return Vector4f::Zero;
+		}
+	}
+
+	float D3DShader::GetFloatValue(const std::string& name)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (it != _bind_res_infos.end())
+		{
+			return *reinterpret_cast<float*>(_p_cbuffer + ShaderBindResourceInfo::GetVariableOffset(it->second));
+		}
+		else
+		{
+			g_pLogMgr->LogWarningFormat("Get float: {} on shader: {} failed!", name, _name);
+			return 0.0f;
+		}
+	}
+
 	void* D3DShader::GetByteCode(EShaderType type)
 	{
 		switch (type)
@@ -453,6 +596,11 @@ namespace Ailu
 			return reinterpret_cast<void*>(_p_pblob.Get());
 		}
 		return nullptr;
+	}
+
+	const String& D3DShader::GetSrcPath() const
+	{
+		return _src_file_path;
 	}
 
 	ComPtr<ID3D12RootSignature> D3DShader::GetSignature() const

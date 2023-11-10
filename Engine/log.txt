@@ -1,5 +1,7 @@
 Normal: file log test!
+Error: PreProcess shader: E:/AiluEngine/Engine/Res/Shaders/PureColor.hlsl with line count 0
+Error: PreProcess shader: E:/AiluEngine/Engine/Res/Shaders/gizmo.hlsl with line count 0
 Error: ResourceMgr end
 Normal: init end
 Normal: Exit
-Normal: Save scene: default_scene to F:/ProjectCpp/AiluEngine/Engine/default.almap;
+Normal: Save scene: default_scene to E:/AiluEngine/Engine/default.almap;

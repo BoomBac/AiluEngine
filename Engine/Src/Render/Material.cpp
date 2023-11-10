@@ -216,4 +216,21 @@ namespace Ailu
 	{
 		return _p_shader.get();
 	}
+	List<std::tuple<String, float>> Material::GetAllFloatValue()
+	{
+		List<std::tuple<String, float>> ret{};
+		for (auto& [name,bind_info] : _p_shader->GetBindResInfo())
+		{
+			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type == EBindResDescType::kCBufferAttribute
+				&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 4)
+			{
+				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<float*>(_p_data + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+			}
+		}
+		return ret;
+	}
+	List<std::tuple<String, Vector4f>> Material::GetAllVectorValue()
+	{
+		return List<std::tuple<String, Vector4f>>();
+	}
 }

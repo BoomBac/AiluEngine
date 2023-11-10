@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Common/Path.h"
+#include "Framework/Common/Reflect.h"
 
 namespace Ailu
 {
@@ -86,6 +87,14 @@ namespace Ailu
 		}
 	};
 
+	struct ShaderPropertyInfo
+	{
+		String _value_name;
+		String _prop_name;
+		ESerializablePropertyType _prop_type;
+		Vector4f _prop_param;
+	};
+
 	class Shader
 	{
 		friend class Material;
@@ -94,19 +103,24 @@ namespace Ailu
 		virtual void Bind() = 0;
 		virtual std::string GetName() const = 0;
 		virtual uint32_t GetID() const = 0;
+		virtual void Compile() = 0;
 		virtual void SetGlobalVector(const std::string& name, const Vector4f& vector) = 0;
 		virtual void SetGlobalVector(const std::string& name, const Vector3f& vector) = 0;
 		virtual void SetGlobalVector(const std::string& name, const Vector2f& vector) = 0;
 		virtual void SetGlobalMatrix(const std::string& name, const Matrix4x4f& mat) = 0;
 		virtual void SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat) = 0;
+		virtual Vector4f GetVectorValue(const std::string& name) = 0;
+		virtual float GetFloatValue(const std::string& name) = 0;
 		virtual void* GetByteCode(EShaderType type) = 0;
-		[[deprecated("combine vertex and pixel shader")]] static Shader* Create(const std::string_view file_name,const std::string& shader_name,EShaderType type);
-		static Ref<Shader> Create(const std::string_view file_name);
+		virtual const String& GetSrcPath() const = 0;
+		static Ref<Shader> Create(const std::string& file_name);
 	protected:
+		virtual void PreProcessShader() =0;
 		virtual void Bind(uint32_t index) = 0;
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;
 		virtual uint16_t GetVariableOffset(const std::string& name) const = 0;
 		virtual const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() const = 0;
+		virtual const List<ShaderPropertyInfo>& GetShaderPropertyInfos() const = 0;
 	};
 
 	class ShaderLibrary
