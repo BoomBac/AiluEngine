@@ -6,18 +6,17 @@
 //Queue: Opaque
 //Properties
 //{
-//	Texture2D_Albedo("Albedo",Texture2D) = "white"
-//	Texture2D_Normal("Normal",Texture2D) = "white"
-//	Texture2D_Emssive("Emssive",Texture2D) = "white"
-//	Texture2D_Roughness("Roughness",Texture2D) = "white"
-//	Texture2D_Metallic("Metallic",Texture2D) = "white"
-//	Texture2D_Specular("Specular",Texture2D) = "white"
-//	Texture2D_Specular("Specular",Texture2D) = "white"
-//	Color_BaseColor("BaseColor",Color) = (1,0,0,0)
-//	Color_EmssiveColor("Emssive",Color) = (1,0,0,0)
-//	Color_SpecularColor("Specular",Color) = (1,0,0,0)
-//	Float_RoughnessValue("Roughness",Range(0,1)) = 0
-//	Float_MetallicValue("Metallic",Range(0,1)) = 0
+//	Albedo("Albedo",Texture2D) = "white"
+//	Normal("Normal",Texture2D) = "white"
+//	Emssive("Emssive",Texture2D) = "white"
+//	Roughness("Roughness",Texture2D) = "white"
+//	Metallic("Metallic",Texture2D) = "white"
+//	Specular("Specular",Texture2D) = "white"
+//	BaseColor("BaseColor",Color) = (1,0,0,0)
+//	EmssiveColor("Emssive",Color) = (1,0,0,0)
+//	SpecularColor("Specular",Color) = (1,0,0,0)
+//	RoughnessValue("Roughness",Range(0,1)) = 0
+//	MetallicValue("Metallic",Range(0,1)) = 0
 //}
 //info end
 
@@ -28,12 +27,12 @@
 
 
 
-Texture2D Texture2D_Albedo : register(t0);
-Texture2D Texture2D_Normal : register(t1);
-Texture2D Texture2D_Emssive : register(t2);
-Texture2D Texture2D_Roughness : register(t3);
-Texture2D Texture2D_Metallic : register(t4);
-Texture2D Texture2D_Specular : register(t5);
+Texture2D Albedo : register(t0);
+Texture2D Normal : register(t1);
+Texture2D Emssive : register(t2);
+Texture2D Roughness : register(t3);
+Texture2D Metallic : register(t4);
+Texture2D Specular : register(t5);
 
 SamplerState g_LinearSampler : register(s0);
 
@@ -56,26 +55,26 @@ PSInput VSMain(VSInput v)
 
 void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out float3 emssive,out float3 specular)
 {
-	if(H_Uint_SamplerMask & 1) albedo = Texture2D_Albedo.Sample(g_LinearSampler,input.uv0);
-	else albedo = Color_BaseColor;
-	if(H_Uint_SamplerMask & 2) 
+	if(SamplerMask & 1) albedo = Albedo.Sample(g_LinearSampler,input.uv0);
+	else albedo = BaseColor;
+	if(SamplerMask & 2) 
 	{
-		wnormal = Texture2D_Normal.Sample(g_LinearSampler, input.uv0).xyz;
+		wnormal = Normal.Sample(g_LinearSampler, input.uv0).xyz;
 		wnormal = normalize(mul(wnormal* 2.0 - 1.0,input.btn));
 	}
 	else wnormal = input.normal;
-	if(H_Uint_SamplerMask & 4)
+	if(SamplerMask & 4)
 	{
-		emssive = Texture2D_Emssive.Sample(g_LinearSampler, input.uv0).rgb;
+		emssive = Emssive.Sample(g_LinearSampler, input.uv0).rgb;
 	}
-	else emssive = Color_EmssiveColor;
+	else emssive = EmssiveColor;
 	//float3 roughness_and_metallic = Texture2D_Roughness.Sample(g_LinearSampler, input.uv0).xyz;
-	if(H_Uint_SamplerMask & 8) roughness = Texture2D_Roughness.Sample(g_LinearSampler, input.uv0).r;
-	else roughness = Float_RoughnessValue;
-	if(H_Uint_SamplerMask & 16) metallic = Texture2D_Metallic.Sample(g_LinearSampler, input.uv0).r;
-	else metallic = Float_MetallicValue;
-	if (H_Uint_SamplerMask & 32) specular = Texture2D_Specular.Sample(g_LinearSampler, input.uv0).rgb;
-	else specular = Color_SpecularColor;
+	if(SamplerMask & 8) roughness = Roughness.Sample(g_LinearSampler, input.uv0).r;
+	else roughness = RoughnessValue;
+	if(SamplerMask & 16) metallic = Metallic.Sample(g_LinearSampler, input.uv0).r;
+	else metallic = MetallicValue;
+	if (SamplerMask & 32) specular = Specular.Sample(g_LinearSampler, input.uv0).rgb;
+	else specular = SpecularColor;
 }
 
 float4 PSMain(PSInput input) : SV_TARGET

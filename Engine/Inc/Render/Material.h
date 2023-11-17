@@ -38,7 +38,10 @@ namespace Ailu
 		~Material();
 		void MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos,bool b_use);
 		bool IsTextureUsed(ETextureUsage use_info);
+		void SetFloat(const std::string& name, const float& f);
 		void SetVector(const std::string& name, const Vector4f& vector);
+		float GetFloat(const std::string& name);
+		Vector4f GetVector(const std::string& name);
 		void SetTexture(const std::string& name, Ref<Texture> texture);
 		void RemoveTexture(const std::string& name);
 		void SetTexture(const std::string& name, const String& texture_path);
@@ -53,7 +56,7 @@ namespace Ailu
 		uint16_t _mat_cbuf_size = 0u;
 		//std::set<ShaderBindResourceInfo, ShaderBindResourceInfoComparer> _mat_props{};
 		std::unordered_set<ShaderBindResourceInfo,ShaderBindResourceInfoHash,ShaderBindResourceInfoEqual> _mat_props{};
-		uint8_t* _p_data;
+		uint8_t* _p_cbuf_cpu;
 		//std::map<string, std::tuple<uint8_t, Ref<Texture>>> _textures{};
 		std::map<String, std::tuple<uint8_t, Ref<Texture>,String>> _textures{};
 		Ref<Shader> _p_shader;

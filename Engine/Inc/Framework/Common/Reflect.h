@@ -61,6 +61,7 @@ namespace Ailu
         void* _value_ptr;
         String _name;
         ESerializablePropertyType _type;
+        float _param[4];
 
         SerializableProperty(void* valuePtr, const String& name, const ESerializablePropertyType& type)
             : _value_ptr(valuePtr), _name(name), _type(type) {}

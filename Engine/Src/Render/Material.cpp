@@ -69,60 +69,74 @@ namespace Ailu
 			}
 		}
 		_mat_cbuf_size = ALIGN_TO_256(_mat_cbuf_size);
-		_p_data = new uint8_t[_mat_cbuf_size];
-		memset(_p_data, 0, _mat_cbuf_size);
-		//_texture_paths.reserve(10);	//提前分配内存，否则vector扩容时，prop记录的string地址就不对了
-		for (auto& prop_info : _mat_props)
+		_p_cbuf_cpu = new uint8_t[_mat_cbuf_size];
+		memset(_p_cbuf_cpu, 0, _mat_cbuf_size);
+		auto& bind_info = _p_shader->GetBindResInfo();
+		for (auto& prop_info : _p_shader->GetShaderPropertyInfos())
 		{
-			std::vector<std::string> shader_prop{};
-			if (ParseShaderProperty(prop_info._name, shader_prop))
+			if (prop_info._prop_type == ESerializablePropertyType::kTexture2D)
 			{
-				bool b_hide = shader_prop[0] == "H";
-				if (!b_hide)
-				{
-					std::string	type_name = shader_prop[0], prop_name = shader_prop[1];
-					//LOG_INFO("{} with byte offset {}", prop_info._name, (int)ShaderBindResourceInfo::GetVariableOffset(prop_info));
-					if (type_name == ShaderPropertyType::Texture2D)
-					{
-						//_texture_paths.emplace_back("none");
-						auto tex_info = std::make_tuple(prop_info._bind_slot, nullptr, "none");
-						auto& [slot, tex_ptr, tex_path] = tex_info;
-						SerializableProperty prop{nullptr,prop_name,ESerializablePropertyType::kTexture2D};
-						_textures.insert(std::make_pair(prop_name, tex_info));
-						properties.insert(std::make_pair(prop_name, prop));
-					}
-					else if(type_name == ShaderPropertyType::Float)
-					{
-						SerializableProperty prop{ _p_data + ShaderBindResourceInfo::GetVariableOffset(prop_info),prop_name,ESerializablePropertyType::kFloat };
-						properties.insert(std::make_pair(prop_name, prop));
-					}
-					else if (type_name == ShaderPropertyType::Color)
-					{
-						SerializableProperty prop{ _p_data + ShaderBindResourceInfo::GetVariableOffset(prop_info),prop_name,ESerializablePropertyType::kColor };
-						properties.insert(std::make_pair(prop_name, prop));
-					}
-				}
+				auto tex_info = std::make_tuple(bind_info.find(prop_info._value_name)->second._bind_slot, nullptr, "none");
+				auto& [slot, tex_ptr, tex_path] = tex_info;
+				SerializableProperty prop{ nullptr,prop_info._prop_name,ESerializablePropertyType::kTexture2D };
+				_textures.insert(std::make_pair(prop_info._prop_name, tex_info));
+				properties.insert(std::make_pair(prop_info._value_name, prop));
 			}
 			else
 			{
-				LOG_ERROR("Material: {} with shader {},parser property {} failed!", _p_shader->GetName(), _name, prop_info._name);
-			}		
+				SerializableProperty prop{ _p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(bind_info.find(prop_info._value_name)->second),
+	prop_info._prop_name,prop_info._prop_type };
+				properties.insert(std::make_pair(prop_info._value_name, prop));
+			}
 		}
-		for (auto& prop : properties)
-		{
-
-		}
+		//_texture_paths.reserve(10);	//提前分配内存，否则vector扩容时，prop记录的string地址就不对了
+		//for (auto& prop_info : _mat_props)
+		//{
+		//	std::vector<std::string> shader_prop{};
+		//	if (ParseShaderProperty(prop_info._name, shader_prop))
+		//	{
+		//		bool b_hide = shader_prop[0] == "H";
+		//		if (!b_hide)
+		//		{
+		//			std::string	type_name = shader_prop[0], prop_name = shader_prop[1];
+		//			//LOG_INFO("{} with byte offset {}", prop_info._name, (int)ShaderBindResourceInfo::GetVariableOffset(prop_info));
+		//			if (type_name == ShaderPropertyType::Texture2D)
+		//			{
+		//				//_texture_paths.emplace_back("none");
+		//				auto tex_info = std::make_tuple(prop_info._bind_slot, nullptr, "none");
+		//				auto& [slot, tex_ptr, tex_path] = tex_info;
+		//				SerializableProperty prop{ nullptr,prop_name,ESerializablePropertyType::kTexture2D };
+		//				_textures.insert(std::make_pair(prop_name, tex_info));
+		//				properties.insert(std::make_pair(prop_name, prop));
+		//			}
+		//			else if (type_name == ShaderPropertyType::Float)
+		//			{
+		//				SerializableProperty prop{ _p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(prop_info),prop_name,ESerializablePropertyType::kFloat };
+		//				properties.insert(std::make_pair(prop_name, prop));
+		//			}
+		//			else if (type_name == ShaderPropertyType::Color)
+		//			{
+		//				SerializableProperty prop{ _p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(prop_info),prop_name,ESerializablePropertyType::kColor };
+		//				properties.insert(std::make_pair(prop_name, prop));
+		//			}
+		//		}
+		//	}
+		//	else
+		//	{
+		//		LOG_ERROR("Material: {} with shader {},parser property {} failed!", _p_shader->GetName(), _name, prop_info._name);
+		//	}
+		//}
 	}
 
 	Material::~Material()
 	{
-		DESTORY_PTRARR(_p_data)
+		DESTORY_PTRARR(_p_cbuf_cpu)
 	}
 
 	void Material::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)
 	{
 		//40 根据shader中MaterialBuf计算，可能会有变动
-		uint32_t* sampler_mask = reinterpret_cast<uint32_t*>(_p_data + 56);
+		uint32_t* sampler_mask = reinterpret_cast<uint32_t*>(_p_cbuf_cpu + 56);
 		//*sampler_mask = 0;
 		for (auto& usage : use_infos)
 		{
@@ -132,7 +146,7 @@ namespace Ailu
 
 	bool Material::IsTextureUsed(ETextureUsage use_info)
 	{
-		uint32_t sampler_mask = *reinterpret_cast<uint32_t*>(_p_data + 56);
+		uint32_t sampler_mask = *reinterpret_cast<uint32_t*>(_p_cbuf_cpu + 56);
 		switch (use_info)
 		{
 		case Ailu::ETextureUsage::kAlbedo: return sampler_mask & 1;
@@ -145,9 +159,52 @@ namespace Ailu
 		return false;
 	}
 
+	void Material::SetFloat(const std::string& name, const float& f)
+	{
+		auto& res_info = _p_shader->GetBindResInfo();
+		auto it = res_info.find(name);
+		if (it != res_info.end())
+		{
+			memcpy(_p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(it->second), &f, sizeof(f));
+			LOG_WARNING("float value{}", *reinterpret_cast<float*>(_p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(it->second)));
+		}
+		else
+		{
+			LOG_WARNING("Material: {} set float with name {} failed!", _name, name);
+		}
+	}
+
 	void Material::SetVector(const std::string& name, const Vector4f& vector)
 	{
-		memcpy(_p_cbuf + _p_shader->GetVariableOffset(name), &vector, sizeof(vector));
+		auto& res_info = _p_shader->GetBindResInfo();
+		auto it = res_info.find(name);
+		if (it != res_info.end())
+		{
+			memcpy(_p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector, sizeof(vector));
+		}
+		else
+		{
+			LOG_WARNING("Material: {} set vector with name {} failed!", _name, name);
+		}
+	}
+
+	float Material::GetFloat(const std::string& name)
+	{
+		auto& res_info = _p_shader->GetBindResInfo();
+		auto it = res_info.find(name);
+		if (it != res_info.end())
+			return *reinterpret_cast<float*>(_p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(it->second));
+		return 0.0f;
+	}
+
+	Vector4f Material::GetVector(const std::string& name)
+	{
+		auto& res_info = _p_shader->GetBindResInfo();
+		auto it = res_info.find(name);
+		if (it != res_info.end())
+			return *reinterpret_cast<Vector4f*>(_p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(it->second));
+		return 0.0f;
+		return Vector4f::Zero;
 	}
 
 	void Material::SetTexture(const std::string& name, Ref<Texture> texture)
@@ -157,7 +214,7 @@ namespace Ailu
 		{
 			return;
 		}
-		std::get<1>(_textures[name])= texture;
+		std::get<1>(_textures[name]) = texture;
 	}
 
 	void Material::RemoveTexture(const std::string& name)
@@ -182,9 +239,9 @@ namespace Ailu
 		else if (name == InternalStandardMaterialTexture::kNormal) MarkTextureUsed({ ETextureUsage::kNormal }, true);
 		else {};
 		auto texture = TexturePool::Get(texture_path);
-		if (texture == nullptr) 
+		if (texture == nullptr)
 		{
-			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!",texture_path,_name,name);
+			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", texture_path, _name, name);
 			return;
 		}
 		auto it = _textures.find(name);
@@ -194,22 +251,30 @@ namespace Ailu
 		}
 		std::get<1>(_textures[name]) = texture;
 		std::get<2>(_textures[name]) = texture_path;
-		properties.find(name)->second._value_ptr = &std::get<2>(_textures[name]);
+		if (properties.contains(name))
+		{
+			properties.find(name)->second._value_ptr = &std::get<2>(_textures[name]);
+		}
+		else
+		{
+			g_pLogMgr->LogErrorFormat("Cann't find texture prop: {} when set material {} texture!", name, _name);
+		}
+		
 	}
 
 	void Material::Bind()
 	{
 		for (auto it = _textures.begin(); it != _textures.end(); it++)
 		{
-			auto& [slot, texture,tex_path] = it->second;
-			if(texture != nullptr)
+			auto& [slot, texture, tex_path] = it->second;
+			if (texture != nullptr)
 				texture->Bind(slot);
 			//else
 			//{
 			//	LOG_WARNING("Material: {} haven't set texture on bind slot {}",_name,(short)slot);
 			//}
 		}
-		memcpy(_p_cbuf,_p_data,_mat_cbuf_size);
+		memcpy(_p_cbuf, _p_cbuf_cpu, _mat_cbuf_size);
 		_p_shader->Bind(_cbuf_index);
 	}
 	Shader* Material::GetShader() const
@@ -219,18 +284,27 @@ namespace Ailu
 	List<std::tuple<String, float>> Material::GetAllFloatValue()
 	{
 		List<std::tuple<String, float>> ret{};
-		for (auto& [name,bind_info] : _p_shader->GetBindResInfo())
+		for (auto& [name, bind_info] : _p_shader->GetBindResInfo())
 		{
 			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type == EBindResDescType::kCBufferAttribute
 				&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 4)
 			{
-				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<float*>(_p_data + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<float*>(_p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
 			}
 		}
 		return ret;
 	}
 	List<std::tuple<String, Vector4f>> Material::GetAllVectorValue()
 	{
-		return List<std::tuple<String, Vector4f>>();
+		List<std::tuple<String, Vector4f>> ret{};
+		for (auto& [name, bind_info] : _p_shader->GetBindResInfo())
+		{
+			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type == EBindResDescType::kCBufferAttribute
+				&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 16)
+			{
+				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<Vector4f*>(_p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+			}
+		}
+		return ret;
 	}
 }

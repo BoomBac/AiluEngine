@@ -8,6 +8,7 @@
 
 #include "Render/RenderConstants.h"
 #include "Render/Shader.h"
+#include "RHI/DX12/D3DGraphicsPipelineState.h"
 
 
 using Microsoft::WRL::ComPtr;
@@ -52,7 +53,7 @@ namespace Ailu
 
 		uint16_t GetVariableOffset(const std::string& name) const override;
 
-		void GenerateRootSignature();
+		void GenerateInternalPSO();
 
 	private:
 		String _vert_entry, _pixel_entry;
@@ -77,6 +78,8 @@ namespace Ailu
 		std::map<std::string, uint16_t> _variable_offset;
 		inline static ComPtr<ID3D12RootSignature> s_active_sig;
 		List<ShaderPropertyInfo> _shader_prop_infos;
+		ComPtr<ID3D12PipelineState> _p_pso;
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC _pso_desc;
 	};
 }
 

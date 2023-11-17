@@ -192,6 +192,7 @@ namespace Ailu
 		using std::endl;
 		auto sys_path = GetResPath(asset_path);
 		std::multimap<std::string, SerializableProperty*> props{};
+		//为了写入通用资产头信息，暂时使用追加方式打开
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
 		out_mat << "shader_path: " << ShaderLibrary::GetShaderPath(mat->_p_shader->GetName());
 		for (auto& prop : mat->properties)
@@ -199,9 +200,9 @@ namespace Ailu
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
 		}
 		if (!props.empty()) out_mat << endl;
+#ifdef OLD
 		std::string cur_prop_type = "type";
 		int prop_count = 0;
-		auto test_props = mat->GetAllFloatValue();
 		for (auto& [prop_name, prop] : props)
 		{
 			if (cur_prop_type != prop_name)
@@ -221,6 +222,29 @@ namespace Ailu
 			if (prop_count++ != props.size() - 1)
 				out_mat << endl;
 		}
+#else
+		auto float_props = mat->GetAllFloatValue();
+		auto vector_props = mat->GetAllVectorValue();
+		out_mat << "  prop_type: " << "Float" << endl;
+		for (auto& [name,value] : float_props)
+		{
+			out_mat << "    " << name << ": " << value << endl;
+		}
+		out_mat << "  prop_type: " << "Vector" << endl;
+		for (auto& [name, value] : vector_props)
+		{
+			out_mat << "    " << name << ": " << value << endl;
+		}
+		out_mat << "  prop_type: " << "Texture2D" << endl;
+		for (auto& [prop_name, prop] : props)
+		{
+			if (prop->_type == ESerializablePropertyType::kTexture2D)
+			{
+				String tex_path = prop->_value_ptr == nullptr ? "none" : SerializableProperty::GetProppertyValue<String>(*prop);
+				out_mat << "    " << prop->_name << ": " << tex_path << endl;
+			}
+		}
+#endif // OLD
 		out_mat.close();
 		LOG_WARNING("Save material to {}", sys_path);
 	}
@@ -315,6 +339,7 @@ namespace Ailu
 				cur_type = v;
 				continue;
 			}
+#ifdef OLD
 			auto prop = mat->properties.find(k);
 			if (prop != mat->properties.end())
 			{
@@ -340,6 +365,27 @@ namespace Ailu
 			{
 				g_pLogMgr->LogWarningFormat("Load material: {},property {} failed!", mat->_name, k);
 			}
+#else
+			if (cur_type == ShaderPropertyType::Float)
+			{
+				float f;
+				if (sscanf_s(v.c_str(), "%f", &f) == 1)
+					mat->SetFloat(k,f);
+				else LOG_WARNING("Load material: {},property {} failed!", mat->_name, k);
+			}
+			else if (cur_type == ShaderPropertyType::Vector)
+			{
+				Vector4f vec{};
+				if (sscanf_s(v.c_str(), "%f,%f,%f,%f", &vec.r, &vec.g, &vec.b, &vec.a) == 4) 
+					mat->SetVector(k, vec);
+				else LOG_WARNING("Load material: {},property {} failed!", mat->_name, k);
+			}
+			else if (cur_type == ShaderPropertyType::Texture2D)
+			{
+				if (v == "none") continue;
+				mat->SetTexture(k, v);
+			}
+#endif
 		}
 		return mat;
 	}
