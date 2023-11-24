@@ -3,17 +3,17 @@ type: material
 name: StandardPBR
 shader_path: Shaders/shaders.hlsl
   prop_type: Float
-    RoughnessValue: 0.623
-    MetallicValue: 0.293
+    RoughnessValue: 0
+    MetallicValue: 0
     SamplerMask: 1.4013e-45
   prop_type: Vector
-    BaseColor: 0,0.0588236,1,0
+    BaseColor: 0.485294,0.223616,0.223616,0
     EmssiveColor: 1,1,1,0
-    SpecularColor: 0,1,0.0294116,4.2039e-45
+    SpecularColor: 0.0600731,0.245098,0.0655149,4.2039e-45
   prop_type: Texture2D
-    Metallic: none
     Specular: none
-    Roughness: none
-    Emssive: none
-    Normal: none
+    Metallic: none
     Albedo: Textures/Intergalactic Spaceship_color_4.png
+    Normal: none
+    Emssive: none
+    Roughness: none

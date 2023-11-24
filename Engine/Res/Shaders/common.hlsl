@@ -13,5 +13,10 @@ float4 TransformToWorldSpace(float3 object_pos)
 	return mul(float4(object_pos, 1.0f), _MatrixWorld);
 }
 
+inline void GammaCorrect(inout float3 color,float gamma)
+{
+	color = pow(color, F3_WHITE / gamma);
+}
+
 #endif // !__COMMON_H__
 

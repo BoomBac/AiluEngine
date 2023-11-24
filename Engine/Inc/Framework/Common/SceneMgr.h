@@ -45,8 +45,6 @@ namespace Ailu
 		//inline Scene* GetCurrentScene() { return _p_current.get(); };
 		Scene* _p_current = nullptr;
 	private:
-		void SerializeActor(std::ofstream& os,SceneActor* actor, int level);
-	private:
 
 		inline static std::list<Scope<Scene>> s_all_scene{};
 		inline static uint16_t s_scene_index = 0u;

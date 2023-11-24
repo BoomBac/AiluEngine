@@ -32,4 +32,8 @@ namespace Ailu
 	{
 		file << indent << GetTypeName() << ": " << std::endl;
 	}
+	void Component::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
+	{
+		os << indent << GetTypeName() << ": " << std::endl;
+	}
 }

@@ -17,7 +17,7 @@ namespace Ailu
 
 	enum class EBindResDescType : uint8_t
 	{
-		kConstBuffer = 0, kTexture2D, kSampler, kCBufferAttribute
+		kConstBuffer = 0, kTexture2D, kCubeMap,kTexture2DArray,kSampler, kCBufferAttribute
 	};
 
 	struct ShaderPropertyType
@@ -26,6 +26,7 @@ namespace Ailu
 		inline static std::string Float = "Float";
 		inline static std::string Color = "Color";
 		inline static std::string Texture2D = "Texture2D";
+		inline static std::string CubeMap = "CubeMap";
 	};
 
 	struct ShaderBindResourceInfo
@@ -113,8 +114,11 @@ namespace Ailu
 		virtual float GetFloatValue(const std::string& name) = 0;
 		virtual void* GetByteCode(EShaderType type) = 0;
 		virtual const String& GetSrcPath() const = 0;
+		virtual const Vector<String>& GetVSInputSemanticSeqences() const= 0;
 		static Ref<Shader> Create(const std::string& file_name);
 	protected:
+		virtual void AddMaterialRef(class Material* mat) = 0;
+		virtual void RemoveMaterialRef(class Material* mat) = 0;
 		virtual void PreProcessShader() =0;
 		virtual void Bind(uint32_t index) = 0;
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;

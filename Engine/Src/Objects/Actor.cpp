@@ -100,6 +100,24 @@ namespace Ailu
 	{
 	}
 
+	void Actor::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
+	{
+		using namespace std;
+		os << indent << "Name: " << _name << endl;
+		auto second_indent = std::format("{}{}", indent,"  ");
+		auto third_indent = std::format("{}{}", second_indent, "  ");
+		os << second_indent << "Components: " << endl;
+		for (const auto& comp : _components)
+		{
+			comp->Serialize(os, third_indent);
+		}
+		os << second_indent << "Children: " << _chilren_num << endl;
+		for (const auto& child : _children)
+		{
+			child->Serialize(os, third_indent);
+		}
+	}
+
 	void* Actor::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
 		return nullptr;

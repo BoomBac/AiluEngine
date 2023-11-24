@@ -25,8 +25,22 @@ namespace Ailu
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_color_4.png");
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_emi.jpg");
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_nmap_2_Tris.jpg");
+		Vector<String> default_cubemaps {
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/top.jpg",
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/back.jpg",
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/bottom.jpg",
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/front.jpg",
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/left.jpg",
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/right.jpg",
+		};
+		LoadTexture(default_cubemaps, "cubemap_sea");
 		LoadAsset("Materials/StandardPBR_new.alasset")->IsInternal(true);
 		LoadAsset("Materials/WireFrame_new.alasset");
+		auto skybox = MaterialPool::CreateMaterial(ShaderLibrary::Add("Shaders/skybox.hlsl"),"Skybox");
+		skybox->IsInternal(false);
+		skybox->OriginPath("Skybox");
+		skybox->SetTexture("SkyBox", "cubemap_sea");
+		MaterialPool::CreateMaterial(ShaderLibrary::Add("Shaders/error_fallback.hlsl"),"Error")->OriginPath("Error");
 		
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
@@ -402,11 +416,22 @@ namespace Ailu
 		return mesh_list.front();
 	}
 
-	Ref<Texture2D> ResourceMgr::LoadTexture(const String& asset_path)
+	Ref<Texture2D> ResourceMgr::LoadTexture(const String& asset_path, String name)
 	{
 		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
 		String sys_path = kEngineResRootPath + asset_path;
-		return TexturePool::Add(asset_path, png_parser->Parser(sys_path));
+		return TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path));
+	}
+
+	Ref<TextureCubeMap> ResourceMgr::LoadTexture(const Vector<String>& asset_paths, String name)
+	{
+		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+		Vector<String> sys_paths{};
+		for (auto& asset_path : asset_paths)
+		{
+			sys_paths.emplace_back(kEngineResRootPath + asset_path);
+		}
+		return TexturePool::Add(name.empty()? asset_paths[0] : name, png_parser->Parser(sys_paths));
 	}
 
 	Material* ResourceMgr::LoadAsset(const String& asset_path)
@@ -470,8 +495,9 @@ namespace Ailu
 			{
 				if (files.find(file) == files.end() || files[file] != last_write_time)
 				{
-					LOG_INFO("File: {0} been modified!", file.string());
-					files[file] = last_write_time;
+					//auto shader = ShaderLibrary::Get(GetFileName(file.string()));
+					//LOG_INFO("File: {0} been modified! {1}", file.string(), shader? shader->GetName() : "null");
+					//files[file] = last_write_time;
 				}
 			}
 			std::this_thread::sleep_for(sleep_duration);

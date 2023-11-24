@@ -86,24 +86,40 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 {
 	float3 light = float3(0.0, 0.0, 0.0);
 	float3 view_dir = normalize(_CameraPos.xyz - world_pos);
+	ShadingData shading_data;
+	LightData light_data;
+	shading_data.nv = max(saturate(dot(view_dir,surface.wnormal)),0.000001);
 	for (uint i = 0; i < MAX_DIRECTIONAL_LIGHT; i++)
 	{
 		float3 light_dir = -_DirectionalLights[i]._LightPosOrDir;
-		float nl = dot(surface.wnormal, light_dir);
-		light += CookTorranceBRDF(surface, view_dir, light_dir); // * nl * _DirectionalLights[i]._LightColor;
-		//light += nl * _DirectionalLights[i]._LightColor;
-		//light += CaclulateDirectionalLight(i, normal, view_dir);
+		float3 hv = normalize(view_dir +  light_dir);
+		shading_data.nl = max(saturate(dot(light_dir,surface.wnormal)),0.000001);
+		shading_data.vh = max(saturate(dot(view_dir,hv)),0.000001);
+		shading_data.lh = max(saturate(dot(light_dir,hv)),0.000001);
+		shading_data.nh = max(saturate(dot(surface.wnormal,hv)),0.000001);
+		light_data.light_dir = light_dir;
+		light_data.light_color = _DirectionalLights[i]._LightColor;
+		light_data.light_pos = _DirectionalLights[i]._LightPosOrDir;
+		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
 	}
 	for (uint j = 0; j < MAX_POINT_LIGHT; j++)
 	{
 		float3 light_dir = -normalize(world_pos - _PointLights[j]._LightPosOrDir);
-		light += CookTorranceBRDF(surface, view_dir, light_dir);
+		float3 hv = normalize(view_dir +  light_dir);
+		shading_data.nl = max(saturate(dot(light_dir,surface.wnormal)),0.000001);
+		shading_data.vh = max(saturate(dot(view_dir,hv)),0.000001);
+		shading_data.lh = max(saturate(dot(light_dir,hv)),0.000001);
+		shading_data.nh = max(saturate(dot(surface.wnormal,hv)),0.000001);
+		light_data.light_dir = light_dir;
+		light_data.light_color = _PointLights[j]._LightColor;
+		light_data.light_pos = _PointLights[j]._LightPosOrDir;
+		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _PointLights[j]._LightColor;
 	}
 	//for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
 	//{
 	//	light += CaclulatSpotlLight(k, normal, pos, view_dir);
 	//}
-	return light * surface.albedo.rgb;
+	return light;
 }
 
 float3 CalculateLight

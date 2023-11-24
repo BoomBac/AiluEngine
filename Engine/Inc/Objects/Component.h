@@ -25,6 +25,7 @@ public:\
 		virtual void SetOwner(Actor* onwer);
 		virtual std::string GetTypeName();
 		void Serialize(std::ofstream& file, String indent) override;
+		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) override;
 	protected:
 		Actor* _p_onwer = nullptr;
 	};

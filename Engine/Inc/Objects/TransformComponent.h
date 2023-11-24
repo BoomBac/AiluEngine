@@ -20,6 +20,7 @@ namespace Ailu
 		void Tick(const float& delta_time) final;
 		Transform _transform;
 		void Serialize(std::ofstream& file, String indent) final;
+		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
 	private:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) final;
 	private:

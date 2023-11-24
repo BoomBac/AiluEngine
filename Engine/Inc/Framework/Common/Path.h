@@ -6,8 +6,8 @@
 namespace Ailu
 {
 #ifdef COMPANY_ENV
-    static const String kEngineRootPath = "E:/AiluEngine/Engine/";
-    static const String kEngineResRootPath = "E:/AiluEngine/Engine/Res/";
+    static const String kEngineRootPath = "C:/AiluEngine/Engine/";
+    static const String kEngineResRootPath = "C:/AiluEngine/Engine/Res/";
 #else
     static const String kEngineRootPath = "F:/ProjectCpp/AiluEngine/Engine/";
     static const String kEngineResRootPath = "F:/ProjectCpp/AiluEngine/Engine/Res/";

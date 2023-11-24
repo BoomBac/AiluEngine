@@ -47,7 +47,23 @@ namespace Ailu
 			file << prop_indent << "Outer: " << _light._light_param.z << endl;
 		}	
 	}
-
+	void LightComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
+	{
+		Component::Serialize(os, indent);
+		using namespace std;
+		String prop_indent = indent.append("  ");
+		os << prop_indent << "Type: " << ELightTypeStr(_light_type) << endl;
+		Vector3f color = _light._light_color.xyz;
+		os << prop_indent << "Color: " << color << endl;
+		os << prop_indent << "Intensity: " << _light._light_color.a << endl;
+		if (_light_type != ELightType::kDirectional)
+			os << prop_indent << "Radius: " << _light._light_param.x << endl;
+		if (_light_type == ELightType::kSpot)
+		{
+			os << prop_indent << "Inner: " << _light._light_param.y << endl;
+			os << prop_indent << "Outer: " << _light._light_param.z << endl;
+		}
+	}
 	void* LightComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
 		formated_str.pop();

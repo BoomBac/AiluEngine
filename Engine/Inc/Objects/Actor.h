@@ -22,6 +22,7 @@ namespace Ailu
 		virtual void Tick(const float& delta_time);
 		
 		void Serialize(std::ofstream& file, String indent) override;
+		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) override;
 		
 		template <typename Type>
 		static Type* Create();

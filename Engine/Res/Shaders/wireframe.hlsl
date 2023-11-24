@@ -1,3 +1,11 @@
+//info bein
+//name: wireframe
+//vert: VSMain
+//pixel: PSMain
+//Cull: Back
+//Queue: Opaque
+//Fill: Wireframe
+//info end
 #include "common.hlsl"
 
 struct VSInput

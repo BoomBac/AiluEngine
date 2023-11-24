@@ -3,6 +3,8 @@
 #include "Objects/SceneActor.h"
 #include "Render/Renderer.h"
 
+#include "Framework/Common/LogMgr.h"
+
 namespace Ailu
 {
 	StaticMeshComponent::StaticMeshComponent() : _p_mesh(nullptr), _p_mat(nullptr)
@@ -41,16 +43,38 @@ namespace Ailu
 		using namespace std;
 		String prop_indent = indent.append("  ");
 		file << prop_indent <<"MeshPath: " << _p_mesh->OriginPath() << endl;
-		file << prop_indent <<"MaterialPath: " << _p_mat->OriginPath() << endl;
+		if(_p_mat)
+			file << prop_indent <<"MaterialPath: " << _p_mat->OriginPath() << endl;
+		else
+			file << prop_indent << "MaterialPath: " << "missing" << endl;
+	}
+	void StaticMeshComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
+	{
+		Component::Serialize(os, indent);
+		using namespace std;
+		String prop_indent = indent.append("  ");
+		os << prop_indent << "MeshPath: " << _p_mesh->OriginPath() << endl;
+		if (_p_mat)
+			os << prop_indent << "MaterialPath: " << _p_mat->OriginPath() << endl;
+		else
+			os << prop_indent << "MaterialPath: " << "missing" << endl;
 	}
 	void* StaticMeshComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
-		formated_str.pop();
-		auto mesh_path = TP_ONE(formated_str.front());
-		formated_str.pop();
-		auto mat_path = TP_ONE(formated_str.front());
-		StaticMeshComponent* comp = new StaticMeshComponent(MeshPool::GetMesh(mesh_path), MaterialPool::GetMaterial(mat_path));
-		formated_str.pop();
-		return comp;
+		if (formated_str.size() < 3)
+		{
+			g_pLogMgr->LogError("StaticMeshComponent deserialize failed!");
+			return nullptr;
+		}
+		else
+		{
+			formated_str.pop();
+			auto mesh_path = TP_ONE(formated_str.front());
+			formated_str.pop();
+			auto mat_path = TP_ONE(formated_str.front());
+			StaticMeshComponent* comp = new StaticMeshComponent(MeshPool::GetMesh(mesh_path), MaterialPool::GetMaterial(mat_path));
+			formated_str.pop();
+			return comp;
+		}
 	}
 }

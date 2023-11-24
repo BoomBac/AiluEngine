@@ -210,7 +210,7 @@ namespace Ailu
 				auto prop = mat->GetProperty(name);
 				ImGui::Text(" :%s", prop._name.c_str());
 				String cur_tex_nameid = prop._value_ptr == nullptr ? "none" : *static_cast<String*>(prop._value_ptr);
-				auto& desc = std::static_pointer_cast<D3DTexture2D>(prop._value_ptr == nullptr ? TexturePool::GetDefaultWhite() : TexturePool::Get(cur_tex_nameid))->GetGPUHandle();
+				auto& desc = std::static_pointer_cast<D3DTexture2D>(prop._value_ptr == nullptr ? TexturePool::GetDefaultWhite() : TexturePool::GetTexture2D(cur_tex_nameid))->GetGPUHandle();
 				float contentWidth = ImGui::GetWindowContentRegionWidth();
 				float centerX = (contentWidth - min_tex_size) * 0.5f;
 				ImGui::SetCursorPosX(centerX);
@@ -340,75 +340,17 @@ namespace Ailu
 				}
 				int mat_prop_index = 0;
 				auto mat = static_mesh_comp->GetMaterial();
-				ImGui::Text("Material: %s",mat->Name().c_str());
-				if (mat->IsInternal())
+				if (mat)
 				{
-					DrawInternalStandardMaterial(mat.get());
-					//for (auto& prop : mat->GetAllProperties())
-					//{
-					//	ImGui::PushID(mat_prop_index);
-					//	ImGui::Checkbox("Texture", &use_textures[mat_prop_index++]);
-					//	ImGui::PopID();
-					//	ImGui::SameLine();
-					//	if (mat->IsTextureUsed(ETextureUsage::kAlbedo))
-					//	{
-					//		ImGui::Text("Texture: %s", prop.first.c_str());
-					//		auto name_ptr = reinterpret_cast<String*>(prop.second._value_ptr);
-					//		auto name = *name_ptr;
-					//		if (name == string{ "none" })
-					//		{
-					//			ImGui::Text("none texture");
-					//		}
-					//		else
-					//		{
-					//			auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
-					//			float contentWidth = ImGui::GetWindowContentRegionWidth();
-					//			float centerX = (contentWidth - 256) * 0.5f;
-					//			ImGui::SetCursorPosX(centerX);
-					//			ImGui::Image((void*)(intptr_t)desc.ptr, ImVec2(256, 256));
-					//		}
-					//	}
-					//	else
-					//	{
-
-					//	}
-					//	if (prop.second._type == ESerializablePropertyType::kColor)
-					//	{
-					//		ImGui::ColorEdit4(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr));
-					//		//if (use_textures[mat_prop_index - 1])
-					//		//{
-					//		//    auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
-					//		//    float contentWidth = ImGui::GetWindowContentRegionWidth();
-					//		//    float centerX = (contentWidth - 256) * 0.5f;
-					//		//    ImGui::SetCursorPosX(centerX);
-					//		//    ImGui::Image((void*)(intptr_t)desc.ptr, ImVec2(256, 256));
-					//		//}
-					//	}
-					//	else if (prop.second._type == ESerializablePropertyType::kFloat)
-					//	{
-					//		//ImGui::DragFloat(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr));
-					//		ImGui::SliderFloat(prop.second._name.c_str(), static_cast<float*>(prop.second._value_ptr), 0.0f, 1.0f, "%.2f");
-					//	}
-					//	else if (prop.second._type == ESerializablePropertyType::kTexture2D)
-					//	{
-					//		ImGui::Text("Texture: %s", prop.first.c_str());
-					//		auto name_ptr = reinterpret_cast<String*>(prop.second._value_ptr);
-					//		auto name = *name_ptr;
-					//		if (name == string{ "none" })
-					//		{
-					//			ImGui::Text("none texture");
-					//		}
-					//		else
-					//		{
-					//			auto& desc = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("MyImage01"))->GetGPUHandle();
-					//			float contentWidth = ImGui::GetWindowContentRegionWidth();
-					//			float centerX = (contentWidth - 256) * 0.5f;
-					//			ImGui::SetCursorPosX(centerX);
-					//			ImGui::Image((void*)(intptr_t)desc.ptr, ImVec2(256, 256));
-					//		}
-
-					//	}
-					//}
+					ImGui::Text("Material: %s", mat->Name().c_str());
+					if (mat->IsInternal())
+					{
+						DrawInternalStandardMaterial(mat.get());
+					}
+				}
+				else
+				{
+					ImGui::Text("Material: %s","Missing");
 				}
 			}
 		}
@@ -607,6 +549,7 @@ namespace Ailu
 			u32 comp_index = 0;
 			for (auto& comp : s_cur_selected_actor->GetAllComponent())
 			{
+				//if (comp->GetTypeName() == StaticMeshComponent::GetStaticType()) continue;
 				ImGui::PushID(comp_index);
 				bool b_active = comp->Active();
 				ImGui::Checkbox("", &b_active);

@@ -28,6 +28,15 @@ struct SurfaceData
 	float3 specular;
 };
 
+struct ShadingData
+{
+	float nl;
+	float nv;
+	float vh;
+	float lh;
+	float nh;
+};
+
 struct LightData
 {
     float3 light_pos;

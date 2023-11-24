@@ -28,6 +28,7 @@ namespace Ailu
 	public:
 		Object();
 		virtual void Serialize(std::ofstream& file, String indent);
+		virtual void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent);
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String,String>>& formated_str);
 	protected:

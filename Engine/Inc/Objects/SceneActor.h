@@ -14,6 +14,7 @@ namespace Ailu
 		~SceneActor();
 		Transform& GetTransform();
 		void Serialize(std::ofstream& file, String indent) override;
+		void Serialize(std::ostream& os, String indent) override;
 	protected:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;
 	private:

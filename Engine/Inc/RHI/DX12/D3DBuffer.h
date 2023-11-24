@@ -3,6 +3,7 @@
 #define __D3DBUFFER_H__
 #include "Render/Buffer.h"
 
+#include <map>
 #include <d3dx12.h>
 using Microsoft::WRL::ComPtr;
 
@@ -15,6 +16,7 @@ namespace Ailu
 		D3DVectexBuffer(float* vertices, uint32_t size);
 		~D3DVectexBuffer();
 		void Bind() const override;
+		void Bind(const Vector<String>& input_layout) final;
 		void SetLayout(VertexBufferLayout layout) override;
 		const VertexBufferLayout& GetLayout() const override;
 		void SetStream(float* vertices, uint32_t size,uint8_t stream_index) override;
@@ -27,6 +29,7 @@ namespace Ailu
 		inline static std::vector<ComPtr<ID3D12Resource>> s_vertex_bufs{};
 		inline static std::vector<ComPtr<ID3D12Resource>> s_vertex_upload_bufs{};
 		inline static std::vector<D3D12_VERTEX_BUFFER_VIEW> s_vertex_buf_views{};
+		std::map<String, u8> _buffer_layout_indexer;
 		inline static uint32_t s_cur_offset = 0u;
 	};
 

@@ -87,8 +87,6 @@ float4 PSMain(PSInput input) : SV_TARGET
 	light.g += 0.000001 * surface_data.roughness;
 	light.b += 0.000001 * surface_data.specular;
 	light += surface_data.emssive * 0.00001;
-	
-	//return float4(surface_data.albedo);
-	//return float4(surface_data.albedo);
-	return float4(float4(light, 1.0f));
+	GammaCorrect(light,2.2f);
+	return float4(light, 1.0f);
 }

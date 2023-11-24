@@ -42,6 +42,16 @@ namespace Ailu
 		D3DContext::GetInstance()->GetCmdList()->IASetVertexBuffers(0, _buf_num, &s_vertex_buf_views[_buf_start]);
 	}
 
+	void D3DVectexBuffer::Bind(const Vector<String>& input_layout)
+	{
+		static auto cmdlist = D3DContext::GetInstance()->GetCmdList();
+		RenderingStates::s_vertex_num += _vertices_count;
+		for (auto& layout_slot_name : input_layout)
+		{
+			cmdlist->IASetVertexBuffers(_buffer_layout_indexer[layout_slot_name], 1, &s_vertex_buf_views[_buf_start + _buffer_layout_indexer[layout_slot_name]]);
+		}
+	}
+
 	void D3DVectexBuffer::SetLayout(VertexBufferLayout layout)
 	{
 		_buffer_layout = std::move(layout);
@@ -98,7 +108,7 @@ namespace Ailu
 		s_vertex_buf_views[cur_buffer_index].BufferLocation = s_vertex_bufs[cur_buffer_index]->GetGPUVirtualAddress();
 		s_vertex_buf_views[cur_buffer_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
 		s_vertex_buf_views[cur_buffer_index].SizeInBytes = size;
-
+		_buffer_layout_indexer.emplace(std::make_pair(_buffer_layout[stream_index].Name, stream_index));
 		s_vertex_upload_bufs.emplace_back(upload_heap);
 	}
 

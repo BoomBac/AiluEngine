@@ -36,6 +36,7 @@ namespace Ailu
 	public:
 		Material(Ref<Shader> shader,std::string name);
 		~Material();
+		void ChangeShader(Ref<Shader> shader);
 		void MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos,bool b_use);
 		bool IsTextureUsed(ETextureUsage use_info);
 		void SetFloat(const std::string& name, const float& f);
@@ -53,17 +54,17 @@ namespace Ailu
 	protected:
 		bool _b_internal = false;
 	private:
+		void Construct(bool first_time);
+	private:
 		uint16_t _mat_cbuf_size = 0u;
-		//std::set<ShaderBindResourceInfo, ShaderBindResourceInfoComparer> _mat_props{};
-		std::unordered_set<ShaderBindResourceInfo,ShaderBindResourceInfoHash,ShaderBindResourceInfoEqual> _mat_props{};
 		uint8_t* _p_cbuf_cpu;
-		//std::map<string, std::tuple<uint8_t, Ref<Texture>>> _textures{};
-		std::map<String, std::tuple<uint8_t, Ref<Texture>,String>> _textures{};
 		Ref<Shader> _p_shader;
 		uint8_t* _p_cbuf = nullptr;
 		//每个材质的cbuf大小一致，存储在一个大的buf，index记录其偏移量
 		uint32_t _cbuf_index;
 		inline static uint32_t s_current_cbuf_offset = 0u;
+		std::unordered_set<ShaderBindResourceInfo, ShaderBindResourceInfoHash, ShaderBindResourceInfoEqual> _mat_props{};
+		std::map<String, std::tuple<uint8_t, Ref<Texture>, String>> _textures{};
 	};
 
 	class MaterialPool 

@@ -29,6 +29,17 @@ namespace Ailu
 		file << prop_indent << "Rotation: " << _transform.Rotation() << endl;
 		file << prop_indent << "Scale: " << _transform.Scale() << endl;
 	}
+
+	void TransformComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
+	{
+		Component::Serialize(os, indent);
+		using namespace std;
+		String prop_indent = indent.append("  ");
+		os << prop_indent << "Position: " << _transform.Position() << endl;
+		os << prop_indent << "Rotation: " << _transform.Rotation() << endl;
+		os << prop_indent << "Scale: " << _transform.Scale() << endl;
+	}
+
 	void* TransformComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
 		formated_str.pop();

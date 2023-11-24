@@ -116,9 +116,10 @@ namespace Ailu
         cmd->SetScissorRects({ Viewport{0,0,(uint16_t)w,(uint16_t)h} });
         cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
         cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
+
         if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
         {
-            cmd->SetPSO(GraphicsPipelineStateMgr::s_standard_shadering_pso);
+            //cmd->SetPSO(GraphicsPipelineStateMgr::s_standard_shadering_pso);
             for (auto& obj : _draw_call)
             {
                 cmd->DrawRenderer(obj.mesh, obj.transform, obj.mat, obj.instance_count);
@@ -127,7 +128,7 @@ namespace Ailu
         if (RenderingStates::s_shadering_mode == EShaderingMode::kWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
         {
             static auto wireframe_mat = MaterialPool::GetMaterial("Materials/WireFrame_new.alasset");
-            cmd->SetPSO(GraphicsPipelineStateMgr::s_wireframe_pso);
+            //cmd->SetPSO(GraphicsPipelineStateMgr::s_wireframe_pso);
             for (auto& obj : _draw_call)
             {
                 cmd->DrawRenderer(obj.mesh, obj.transform, wireframe_mat, obj.instance_count);

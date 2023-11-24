@@ -76,25 +76,42 @@ namespace Ailu
 	void SceneMgr::SaveScene(Scene* scene, const String& scene_path)
 	{
 		using namespace std;
-		auto sys_path = GetSceneSysPath(scene_path);
-		ofstream file(sys_path,ios_base::out);
-		if (!file.is_open())
+		std::ostringstream ss;
+		try
 		{
-			g_pLogMgr->LogErrorFormat("Save scene: {} to {} failed with file open failed",scene->Name(),sys_path);
+			String level1 = GetIndentation(1), level2 = GetIndentation(2), level3 = GetIndentation(3), level4 = GetIndentation(4);
+			ss << "SceneName: " << scene->Name() << endl;
+			ss << "SceneCamera: " << "scene_camera" << endl;
+			ss << level1 << "Type: " << ECameraTypeStr(Camera::sCurrent->Type()) << endl;
+			ss << level1 << "Position: " << Camera::sCurrent->GetPosition() << endl;
+			ss << level1 << "Rotation: " << Camera::sCurrent->GetRotation() << endl;
+			ss << level1 << "Fov: " << Camera::sCurrent->GetFovH() << endl;
+			ss << level1 << "Aspect: " << Camera::sCurrent->Aspect() << endl;
+			ss << level1 << "Near: " << Camera::sCurrent->Near() << endl;
+			ss << level1 << "Far: " << Camera::sCurrent->Far() << endl;
+			ss << "SceneGraph: " << endl;
+			//SerializeActor(ss, scene->GetSceneRoot(), 2);
+			scene->Root()->Serialize(ss, level1);
+		}
+		catch (const std::exception&)
+		{
+			g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {}!",scene->Name());
 			return;
 		}
-		String level1 = GetIndentation(1), level2 = GetIndentation(2), level3 = GetIndentation(3), level4 = GetIndentation(4);
-		file << "SceneName: " << scene->Name() << endl;
-		file << "SceneCamera: " << "scene_camera" << endl;
-		file << level1 << "Type: " << ECameraTypeStr(Camera::sCurrent->Type()) << endl;
-		file << level1 << "Position: " << Camera::sCurrent->GetPosition() << endl;
-		file << level1 << "Rotation: " << Camera::sCurrent->GetRotation() << endl;
-		file << level1 << "Fov: " << Camera::sCurrent->GetFovH() << endl;
-		file << level1 << "Aspect: " << Camera::sCurrent->Aspect() << endl;
-		file << level1 << "Near: " << Camera::sCurrent->Near() << endl;
-		file << level1 << "Far: " << Camera::sCurrent->Far() << endl;
-		file << "SceneGraph: "<< endl;
-		SerializeActor(file, scene->GetSceneRoot(), 2);
+		auto sys_path = GetSceneSysPath(scene_path);
+		ofstream file(sys_path, ios_base::out);
+		if (!file.is_open())
+		{
+			g_pLogMgr->LogErrorFormat("Save scene: {} to {} failed with file open failed", scene->Name(), sys_path);
+			return;
+		}
+		String serialized_str = ss.str();
+		std::istringstream iss(serialized_str);
+		std::string line;
+		while (std::getline(iss, line)) 
+		{
+			file << line << endl;
+		}
 		g_pLogMgr->LogFormat("Save scene: {} to {};", scene->Name(), sys_path);
 		file.close();
 	}
@@ -137,24 +154,6 @@ namespace Ailu
 		loaded_scene->MarkDirty();
 		loaded_scene->GetAllActor();//将根节点的子节点信息填充至Scene的actor容器
 		return loaded_scene;
-	}
-
-	void SceneMgr::SerializeActor(std::ofstream& os, SceneActor* actor, int level)
-	{
-		using namespace std;
-		String base_level = GetIndentation(level);
-		os << base_level << "Name: " << actor->Name() << endl;
-		os << GetIndentation(level + 1) << "Components: " << endl;
-		String comp_ident = GetIndentation(level + 2);
-		for (const auto& comp : actor->GetAllComponent())
-		{
-			comp->Serialize(os, comp_ident);
-		}
-		os << GetIndentation(level + 1) << "Children: " << actor->GetChildNum() << endl;
-		for (const auto& child : actor->GetAllChildren())
-		{
-			SerializeActor(os,static_cast<SceneActor*>(child), level + 2);
-		}
 	}
 
 	//--------------------------------------------------------Scene begin-----------------------------------------------------------------------

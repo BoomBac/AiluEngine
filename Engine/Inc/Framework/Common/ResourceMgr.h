@@ -25,7 +25,8 @@ namespace Ailu
 		void SaveAsset(const std::string asset_path, Material* mat);
 		void SaveAsset(const Asset& asset);
 		
-		Ref<Texture2D> LoadTexture(const String& asset_path);
+		Ref<Texture2D> LoadTexture(const String& asset_path, String name = "");
+		Ref<TextureCubeMap> LoadTexture(const Vector<String>& asset_paths,String name = "");
 		//template<typename T>
 		//static T* LoadAsset(const string& asset_path);
 		static Material* LoadAsset(const String& asset_path);

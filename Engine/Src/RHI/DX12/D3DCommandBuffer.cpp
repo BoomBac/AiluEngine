@@ -80,10 +80,21 @@ namespace Ailu
 	void D3DCommandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count)
 	{
 		_commands.emplace_back([=]() {
-			mesh->GetVertexBuffer()->Bind();
-			mesh->GetIndexBuffer()->Bind();
-			material->Bind();
-			D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
+			if (material != nullptr)
+			{
+				mesh->GetVertexBuffer()->Bind(material->GetShader()->GetVSInputSemanticSeqences());
+				mesh->GetIndexBuffer()->Bind();
+				material->Bind();
+				D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
+			}
+			else
+			{
+				static Material* error = MaterialPool::GetMaterial("Error").get();
+				mesh->GetVertexBuffer()->Bind(error->GetShader()->GetVSInputSemanticSeqences());
+				mesh->GetIndexBuffer()->Bind();
+				error->Bind();
+				D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
+			}
 			});
 	}
 	void D3DCommandBuffer::SetPSO(GraphicsPipelineState* pso)

@@ -21,6 +21,10 @@ namespace Ailu
 	void SceneActor::Serialize(std::ofstream& file, String indent)
 	{
 	}
+	void SceneActor::Serialize(std::ostream& os, String indent)
+	{
+		Actor::Serialize(os,indent);
+	}
 	void* SceneActor::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
 		auto [k, v] = formated_str.front();

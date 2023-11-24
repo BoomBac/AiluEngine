@@ -62,6 +62,10 @@ namespace Ailu
 		std::vector<VertexBufferLayoutDesc>::iterator end() { return _buffer_descs.end(); }
 		const std::vector<VertexBufferLayoutDesc>::const_iterator begin() const{ return _buffer_descs.begin(); }
 		const std::vector<VertexBufferLayoutDesc>::const_iterator end() const{ return _buffer_descs.end(); }
+		const VertexBufferLayoutDesc& operator[](const int& index)
+		{
+			return _buffer_descs[index];
+		}
 	private:
 		void CalculateSizeAndStride()
 		{
@@ -97,6 +101,7 @@ namespace Ailu
 	public:
 		virtual ~VertexBuffer() = default;
 		virtual void Bind() const = 0;
+		virtual void Bind(const Vector<String>& input_layout) = 0;
 		//static VertexBuffer* Create(float* vertices,uint32_t size);
 		static VertexBuffer* Create(VertexBufferLayout layout);
 		virtual void SetLayout(VertexBufferLayout layout) = 0;

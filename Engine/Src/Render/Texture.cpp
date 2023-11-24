@@ -14,7 +14,7 @@ namespace Ailu
 			AL_ASSERT(false, "None render api used!")
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-	{
+		{
 			return MakeRef<D3DTexture2D>(width, height, format);
 		}
 		}
@@ -35,6 +35,10 @@ namespace Ailu
 	{
 		return _p_data;
 	}
+	const ETextureType& Texture2D::GetTextureType() const
+	{
+		return ETextureType::kTexture2D;
+	}
 	void Texture2D::Name(const std::string& name)
 	{
 		_name = name;
@@ -43,7 +47,7 @@ namespace Ailu
 	{
 		return _name;
 	}
-	Ref<Texture2D> TexturePool::Get(const std::string& name)
+	Ref<Texture> TexturePool::Get(const std::string& name)
 	{
 		auto it = s_res_pool.find(name);
 		if (it != s_res_pool.end()) return it->second;
@@ -54,4 +58,57 @@ namespace Ailu
 			return TexturePool::Add(name, png_parser->Parser(sys_path));
 		}
 	}
+	Ref<Texture2D> TexturePool::GetTexture2D(const std::string& name)
+	{
+		auto it = s_res_pool.find(name);
+		if (it != s_res_pool.end()) return std::dynamic_pointer_cast<Texture2D>(it->second);
+		else
+		{
+			auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+			String sys_path = kEngineResRootPath + name;
+			return TexturePool::Add(name, png_parser->Parser(sys_path));
+		}
+	}
+	Ref<TextureCubeMap> TexturePool::GetCubemap(const std::string& name)
+	{
+		auto it = s_res_pool.find(name);
+		if (it != s_res_pool.end())
+			return std::dynamic_pointer_cast<TextureCubeMap>(it->second);
+		else
+			return nullptr;
+	}
+	//----------------------------------------------------------TextureCubeMap---------------------------------------------------------------------
+	Ref<TextureCubeMap> TextureCubeMap::Create(const uint16_t& width, const uint16_t& height, EALGFormat format)
+	{
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::ERenderAPI::kNone:
+			AL_ASSERT(false, "None render api used!")
+				return nullptr;
+		case RendererAPI::ERenderAPI::kDirectX12:
+		{
+			return MakeRef<D3DTextureCubeMap>(width, height, format);
+		}
+		}
+		AL_ASSERT(false, "Unsupport render api!");
+		return nullptr;
+	}
+	void TextureCubeMap::FillData(Vector<u8*>& data)
+	{
+		_p_datas = std::move(data);
+	}
+
+	void TextureCubeMap::Bind(u8 slot) const
+	{
+	}
+
+	uint8_t* TextureCubeMap::GetNativePtr()
+	{
+		return _p_datas[0];
+	}
+	const ETextureType& TextureCubeMap::GetTextureType() const
+	{
+		return ETextureType::kTextureCubeMap;
+	}
+	//----------------------------------------------------------TextureCubeMap---------------------------------------------------------------------
 }

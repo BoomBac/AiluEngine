@@ -3,6 +3,7 @@
 #define __UTILS_H__
 //#include "pch.h"
 #include <algorithm>
+#include <numeric>
 #include "GlobalMarco.h"
 
 namespace Ailu
@@ -51,13 +52,20 @@ namespace Ailu
             }
         }
 
-        // 移除字符串中的所有空格
+        /// <summary>
+        /// 移除字符串中的所有空格
+        /// </summary>
+        /// <param name="str"></param>
         static void RemoveSpaces(String& str)
         {
             str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
         }
 
-        // 移除字符串前后的空格和换行符
+        /// <summary>
+        /// 移除字符串前后的空格和换行符
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
         static String Trim(const String& str)
         {
             size_t first = str.find_first_not_of(" \t\n\r");
@@ -67,6 +75,46 @@ namespace Ailu
             }
             size_t last = str.find_last_not_of(" \t\n\r");
             return str.substr(first, (last - first + 1));
+        }
+
+        /// <summary>
+        /// 按分隔符提取字符串
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="delimiter"></param>
+        /// <returns></returns>
+        static Vector<String> Split(const String& input, const char* delimiter) 
+        {
+            Vector<String> tokens;
+            size_t start = 0, end = 0;
+            while ((end = input.find(delimiter, start)) != std::string::npos) 
+            {
+                tokens.push_back(input.substr(start, end - start));
+                start = end + 1;
+            }
+            tokens.push_back(input.substr(start));
+            return tokens;
+        }
+
+        static String Join(const Vector<String>& strings, const String& delimiter)
+        {
+            return std::accumulate(strings.begin() + 1, strings.end(), strings[0],
+                [&delimiter](const std::string& a, const std::string& b) {
+                    return a + delimiter + b;
+                });
+        }
+
+        static bool BeginWith(const String& s, const String& prefix)
+        {
+            if (s.length() < prefix.length()) return false;
+            return s.substr(0, prefix.length()) == prefix;
+        }
+
+        //[begin,end]
+        static inline String SubStrRange(const String& s, const size_t& begin, const size_t& end)
+        {
+            if (end < begin) return s;
+            return s.substr(begin, end - begin + 1);
         }
     }
     namespace su = StringUtils;

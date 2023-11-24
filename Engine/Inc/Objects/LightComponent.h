@@ -40,6 +40,7 @@ namespace Ailu
 		LightComponent();
 		void Tick(const float& delta_time) final;
 		void Serialize(std::ofstream& file, String indent) final;
+		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
 	public:
 		const inline static Vector3f kDefaultDirectionalLightDir = { 0.0f,-1.0f,0.0f };
 		ELightType _light_type;

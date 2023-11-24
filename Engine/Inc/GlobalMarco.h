@@ -15,8 +15,8 @@
 #define STR2(x) STR(x)
 
 #ifdef COMPANY_ENV
-	#define SOLUTION_DIR E:/AiluEngine/
-	#define PROJECT_DIR E:/AiluEngine/Engine/
+	#define SOLUTION_DIR C:/AiluEngine/
+	#define PROJECT_DIR C:/AiluEngine/Engine/
 #else
 	#define SOLUTION_DIR F:/ProjectCpp/AiluEngine/
 	#define PROJECT_DIR F:/ProjectCpp/AiluEngine/Engine/
@@ -112,6 +112,12 @@ using Queue = std::queue<T>;
 
 template<typename T>
 using Scope = std::unique_ptr<T>;
+
+namespace Modules
+{
+    static String Parser = "[Parser]";
+    static String Render = "[Render]";
+}
 
 template<typename T>
 Scope<T> MakeScope()

@@ -21,6 +21,7 @@ namespace Ailu
 		void SetMesh(Ref<Mesh>& mesh);
 		void SetMaterial(Ref<Material>& mat);
 		void Serialize(std::ofstream& file, String indent) final;
+		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent);
 		inline Ref<Material>& GetMaterial() { return _p_mat; };
 		inline Ref<Mesh>& GetMesh() { return _p_mesh; };
 	private:

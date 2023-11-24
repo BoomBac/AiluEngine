@@ -33,6 +33,7 @@ namespace Ailu
 	public:
 		virtual ~ITextureParser() = default;
 		virtual Ref<Texture2D> Parser(const std::string_view& path) = 0;
+		virtual Ref<TextureCubeMap> Parser(Vector<String>& paths) = 0;
 	};
 
 	namespace TextureUtils
