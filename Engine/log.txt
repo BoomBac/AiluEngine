@@ -2,5 +2,3 @@ Normal: file log test!
 Error: Cann't find texture prop: SkyBox when set material Skybox texture!
 Error: ResourceMgr end
 Normal: init end
-Normal: Exit
-Normal: Save scene: default_scene to C:/AiluEngine/Engine/default.almap;

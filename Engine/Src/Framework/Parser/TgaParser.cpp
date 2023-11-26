@@ -33,6 +33,10 @@ namespace Ailu
 			return tex;
 		}
 	}
+	Ref<Texture2D> TagParser::Parser(const std::string_view& path, u8 mip_level)
+	{
+		return Ref<Texture2D>();
+	}
 	Ref<TextureCubeMap> TagParser::Parser(Vector<String>& paths)
 	{
 		if (paths.size() != 6)

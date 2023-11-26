@@ -24,6 +24,8 @@ namespace Ailu
 		}
 		_origin_cam_state = new CameraState(*Camera::sCurrent);
 		_target_cam_state = new CameraState(*Camera::sCurrent);
+		_camera_near = Camera::sCurrent->Near();
+		_camera_far = Camera::sCurrent->Far();
 	}
 	void InputLayer::OnDetach()
 	{
@@ -64,11 +66,15 @@ namespace Ailu
 		{
 			auto camera_pos = Camera::sCurrent->GetPosition();
 			auto camera_rotation = Camera::sCurrent->GetRotation();
+			_camera_near = Camera::sCurrent->Near();
+			_camera_far = Camera::sCurrent->Far();
 			ImGui::Begin("CameraDetail");
 			ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 1.0f, "%.2f");
 			ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f, "%.2f");
 			ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.0f, 1.0f, "%.2f");
 			ImGui::SliderFloat("FovH", &_camera_fov_h, 0.0f, 120.0f, "%.2f");
+			ImGui::SliderFloat("NearClip", &_camera_near, 0.00001f, 1000.0f, "%.2f");
+			ImGui::SliderFloat("FarClip", &_camera_far, 5000.0f, 200000.0f, "%.2f");
 			ImGui::Text("Position:");
 			ImGui::SameLine();
 			ImGui::Text(camera_pos.ToString().c_str());
@@ -134,6 +140,8 @@ namespace Ailu
 			_origin_cam_state->LerpTo(*_target_cam_state, lerp_speed * _lerp_speed_multifactor);
 			_origin_cam_state->UpdateCamrea(*Camera::sCurrent);
 			Camera::sCurrent->SetFovH(_camera_fov_h);
+			Camera::sCurrent->Near(_camera_near);
+			Camera::sCurrent->Far(_camera_far);
 		}
 		pre_tick_camera = Camera::sCurrent;
 	}

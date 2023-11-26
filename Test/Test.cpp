@@ -1,129 +1,123 @@
+#define STB_IMAGE_IMPLEMENTATION
+
+#include "../Engine/Ext/stb/stb_image.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "../Engine/Ext/stb/stb_image_write.h"
+#include <cstdint>
+#define __STDC_LIB_EXT1__
 #include <iostream>
-#include <vector>
-#include <fstream>
-#include <filesystem>
-#include <string>
 #include <list>
-#include <set>
+#include <format>
+#include <string>
 
 using namespace std;
-namespace fs = std::filesystem;
 
-using String = std::string;
-
-enum class EBindResDescType : uint8_t
+uint8_t* DownSample(unsigned char* image, int& width, int& height, int channels)
 {
-	kConstBuffer = 0, kTexture2D, kCubeMap, kTexture2DArray, kSampler, kCBufferAttribute
-};
-
-struct ShaderPropertyType
-{
-	inline static std::string Vector = "Vector";
-	inline static std::string Float = "Float";
-	inline static std::string Color = "Color";
-	inline static std::string Texture2D = "Texture2D";
-	inline static std::string CubeMap = "CubeMap";
-};
-
-struct ShaderBindResourceInfo
-{
-	inline const static std::set<std::string> s_reversed_res_name
-	{
-		"SceneObjectBuffer",
-		"_MatrixWorld",
-		"SceneMaterialBuffer",
-		"SceneStatetBuffer",
-		"_MatrixV",
-		"_MatrixP",
-		"_MatrixVP",
-		"_CameraPos",
-		"_DirectionalLights",
-		"_PointLights",
-		"_SpotLights",
-		"padding",
-		"padding0"
-	};
-	inline static uint8_t GetVariableSize(const ShaderBindResourceInfo& info) { return info._cbuf_member_offset & 0XFF; }
-	inline static uint8_t GetVariableOffset(const ShaderBindResourceInfo& info) { return info._cbuf_member_offset >> 8; }
-	EBindResDescType _res_type;
-	union
-	{
-		uint16_t _res_slot;
-		uint16_t _cbuf_member_offset;
-	};
-	uint8_t _bind_slot;
-	std::string _name;
-	ShaderBindResourceInfo() = default;
-	ShaderBindResourceInfo(EBindResDescType res_type, uint16_t slot_or_offset, uint8_t bind_slot, const std::string& name)
-		: _res_type(res_type), _bind_slot(bind_slot), _name(name)
-	{
-		if (res_type == EBindResDescType::kCBufferAttribute) _cbuf_member_offset = slot_or_offset;
-		else _res_slot = slot_or_offset;
-	}
-	bool operator==(const ShaderBindResourceInfo& other) const
-	{
-		return _name == other._name;
-	}
-};
-
-static bool BeginWith(const String& s,const String& prefix)
-{
-    if (s.length() < prefix.length()) return false;
-    return s.substr(0, prefix.length()) == prefix;
-}
-
-//[begin,end]
-static inline String SubStrRange(const String& s,const size_t& begin, const size_t& end)
-{
-	if (end < begin) return s;
-	return s.substr(begin, end - begin + 1);
-}
-
-
-void LoadAdditionalShaderRelfection(const std::string& sys_path)
-{
-    ifstream src(sys_path,ios::in);
-    string line;
-    vector<string> lines;
-    list<string> header_files;
-    while (getline(src,line))
+    size_t row_size = channels * width;
+    size_t new_width = width >> 1;
+    size_t new_height = height >> 1;
+    size_t new_img_size = new_width * new_height * channels;
+    uint8_t* new_image = new uint8_t[new_img_size];
+    auto downsample_sub_task = [&](int xbegin,int xend,int ybegin,int yend,int new_width) {
+        uint8_t blend_color[4]{};
+        for (size_t i = ybegin; i < yend; ++i)
+        {
+            for (size_t j = xbegin; j < xend; ++j)
+            {
+                // 计算混合颜色的坐标
+                size_t a_i = i * 2;
+                size_t a_j = j * 2;
+                // 获取当前像素及其右侧像素
+                uint8_t* a = &image[a_i * row_size + a_j * channels];
+                uint8_t* b = &image[a_i * row_size + (a_j + 1) * channels];
+                // 计算齐次加权平均值
+                for (int k = 0; k < channels; ++k) {
+                    blend_color[k] = static_cast<uint8_t>((a[k] + b[k]) / 2);
+                }
+                size_t new_index = i * new_width * channels + j * channels;
+                memcpy(new_image + new_index, blend_color, sizeof(blend_color));
+            }
+        }
+    };
+    int sub_task_block_size = 32;
+    int task_num = new_width / sub_task_block_size;
+    task_num = task_num == 0 ? 1 : task_num;
+    if(task_num == 1)
+        downsample_sub_task(0, new_width, 0, new_height, new_width);
+    else
     {
-		if (BeginWith(line, "#include"))
-		{
-			int path_start = line.find_first_of("\"");
-			int path_end = line.find_last_of("\"");
-            header_files.emplace_back(SubStrRange(line, path_start + 1, path_end - 1));
-			cout << header_files.back() << endl;
-		}
-		else if (BeginWith(line, "Texture2D"))
-		{
-			int name_begin = line.find_first_of("D") + 1;
-			int name_end = line.find_first_of(":") -1;
-			String tex_name = line.substr(name_begin,name_end - name_begin);
-			cout << tex_name << endl;
-		}
-		else if (BeginWith(line, "TextureCube"))
-		{
-			int name_begin = line.find_last_of("e") + 1;
-			int name_end = line.find_first_of(":") - 1;
-			String tex_name = line.substr(name_begin, name_end - name_begin);
-			cout << tex_name << endl;
-		}
-        lines.emplace_back(line);
+        for (size_t i = 0; i < task_num; i++)
+        {
+            for (size_t j = 0; j < task_num; j++)
+            {
+                downsample_sub_task(j * sub_task_block_size, (j + 1) * sub_task_block_size, i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width);
+            }
+        }
     }
-	src.close();
-	fs::path src_path(sys_path);
-	fs::path pwd = src_path.parent_path();
-	for (auto& head_file : header_files)
-	{
-		fs::path temp = pwd;
-		temp.append(head_file);
-		cout << temp.string() << endl;
-		LoadAdditionalShaderRelfection(temp.string());
-	}
+    width = new_width;
+    height = new_height;
+    return new_image;
 }
 
-int main()
-{
-	LoadAdditionalShaderRelfection("C:/AiluEngine/Engine/Res/Shaders/shaders.hlsl");
+int main() {
+    int width, height, channels;
+    //unsigned char* image_data = stbi_load("C:\\Users\\BoomBac\\Desktop\\MyImage01.jpg", &width, &height, &channels, 3);
+    unsigned char* image_data = stbi_load("F:\\ProjectCpp\\AiluEngine\\Engine\\Res\\Textures\\Intergalactic Spaceship_color_4.png", &width, &height, &channels, 3);
+
+    // 检查图像是否成功加载
+    if (image_data == NULL) {
+        printf("Error loading image\n");
+        return -1;
+    }
+    unsigned char* new_image_data = nullptr;
+    // 分配内存给新的四通道数组
+    int new_channels = 4;
+    if (channels != 4)
+    {
+        size_t new_size = width * height * new_channels;
+        new_image_data = (unsigned char*)malloc(new_size);
+        // 将三通道数据复制到四通道数组中
+        for (int i = 0; i < width * height; ++i) {
+            // 复制RGB值
+            memcpy(new_image_data + i * new_channels, image_data + i * channels, 3);
+
+            // 将Alpha通道设置为适当的值（例如，通过检查RGB值是否为白色来决定透明度）
+            if (image_data[i * channels] == 255 && image_data[i * channels + 1] == 255 && image_data[i * channels + 2] == 255) {
+                new_image_data[i * new_channels + 3] = 0;  // 白色为完全透明
+            }
+            else {
+                new_image_data[i * new_channels + 3] = 255;  // 其他颜色为不透明
+            }
+        }
+    }
+    else
+        new_image_data = image_data;
+
+    std::list<uint8_t*> mipmaps{};
+    while (width > 1)
+    {
+        try
+        {
+            auto new_image = DownSample(mipmaps.empty() ? new_image_data : mipmaps.back(), width, height, 4);
+            mipmaps.emplace_back(new_image);
+            //stbi_write_jpg(std::format("C:\\Users\\BoomBac\\Desktop\\MyImage01_{}.jpg", width).c_str(), width, height, new_channels, new_image, width * new_channels);
+            stbi_write_png(std::format("C:\\Users\\BoomBac\\Desktop\\MyImage01_{}.jpg", width).c_str(), width, height, new_channels, new_image, width * new_channels);
+        }
+        catch (const std::exception& e)
+        {
+            cout << e.what() << endl;
+        }
+
+    }
+    for (auto it : mipmaps)
+    {
+        if(it != nullptr)
+            delete[] it;
+    }
+    // 释放内存
+    stbi_image_free(image_data);
+    free(new_image_data);
+    return 0;
 }

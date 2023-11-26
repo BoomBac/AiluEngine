@@ -33,23 +33,9 @@ namespace Ailu
 	public:
 		virtual ~ITextureParser() = default;
 		virtual Ref<Texture2D> Parser(const std::string_view& path) = 0;
+		virtual Ref<Texture2D> Parser(const std::string_view& path,u8 mip_level) = 0;
 		virtual Ref<TextureCubeMap> Parser(Vector<String>& paths) = 0;
 	};
-
-	namespace TextureUtils
-	{
-		static uint8_t* ExpandImageDataToFourChannel(uint8_t* p_data,size_t size,uint8_t alpha = 255u)
-		{
-			uint8_t* new_data = new uint8_t[size / 3 * 4];
-			auto pixel_num = size / 3;
-			for (size_t i = 0; i < pixel_num; i++)
-			{
-				memcpy(new_data + i * 4, p_data + i * 3, 3);
-				new_data[i * 4 + 3] = alpha;
-			}
-			return new_data;
-		}
-	}
 }
 
 

@@ -1,14 +1,14 @@
 #include "pch.h"
+#include <atlcomcli.h>
 #include <d3dcompiler.h>
 #include <dxcapi.h>
-#include <atlcomcli.h>
 
+#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Utils.h"
 #include "GlobalMarco.h"
+#include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/dxhelper.h"
-#include "RHI/DX12/D3DContext.h"
-#include "Framework/Common/Utils.h"
-#include "Framework/Common/LogMgr.h"
 
 
 
@@ -130,6 +130,20 @@ namespace Ailu
 		D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void**)&shader_reflection);
 	}
 
+	static D3D12_PRIMITIVE_TOPOLOGY ConvertTopologyToType(D3D12_PRIMITIVE_TOPOLOGY_TYPE type)
+	{
+		switch (type)
+		{
+		case D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE:
+			return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		case D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE:
+			return D3D12_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_LINELIST;
+		default:
+			return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		}
+		return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	}
+
 	static DXGI_FORMAT GetFormatBySemanticName(const char* semantic)
 	{
 		if (!std::strcmp(semantic, RenderConstants::kSemanticPosition)) return DXGI_FORMAT_R32G32B32_FLOAT;
@@ -204,7 +218,7 @@ namespace Ailu
 			sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 			sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 			sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-			sampler.MipLODBias = 0;
+			sampler.MipLODBias = 1.0;
 			sampler.MaxAnisotropy = 0;
 			sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
 			sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
@@ -244,7 +258,7 @@ namespace Ailu
 		ThrowIfFailed(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&_p_pso)));
 	}
 
-	void D3DShader::LoadShaderRelfection(ID3D12ShaderReflection* reflection, const EShaderType& type)
+	void D3DShader::LoadShaderReflection(ID3D12ShaderReflection* reflection, const EShaderType& type)
 	{
 		D3D12_SHADER_DESC desc{};
 		reflection->GetDesc(&desc);
@@ -330,7 +344,7 @@ namespace Ailu
 		}
 	}
 
-	void D3DShader::LoadAdditionalShaderRelfection(const String& sys_path)
+	void D3DShader::LoadAdditionalShaderReflection(const String& sys_path)
 	{
 		using namespace std;
 		namespace su = StringUtils;
@@ -374,7 +388,7 @@ namespace Ailu
 			fs::path temp = pwd;
 			temp.append(head_file);
 			cout << temp.string() << endl;
-			LoadAdditionalShaderRelfection(temp.string());
+			LoadAdditionalShaderReflection(temp.string());
 		}
 	}
 
@@ -585,6 +599,7 @@ namespace Ailu
 		_pso_desc.RasterizerState = r_desc;
 		_pso_desc.BlendState = bl_desc;
 		_pso_desc.DepthStencilState = ds_desc;
+		_topology = ConvertTopologyToType(_pso_desc.PrimitiveTopologyType);
 	}
 
 	void D3DShader::Reset()
@@ -639,6 +654,7 @@ namespace Ailu
 		static auto context = D3DContext::GetInstance();
 		cmdlist->SetPipelineState(_p_pso.Get());
 		cmdlist->SetGraphicsRootSignature(_p_sig.Get());
+		cmdlist->IASetPrimitiveTopology(_topology);
 		if (_per_mat_buf_bind_slot != -1)
 			cmdlist->SetGraphicsRootConstantBufferView(_per_mat_buf_bind_slot, context->GetCBufferViewDesc(1 + index).BufferLocation);
 		if (_per_frame_buf_bind_slot != -1)
@@ -671,9 +687,9 @@ namespace Ailu
 		{
 #ifdef SHADER_DXC
 			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
-			LoadShaderRelfection(_p_reflection.Get());
+			LoadShaderReflection(_p_reflection.Get());
 			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
-			LoadShaderRelfection(_p_reflection.Get());
+			LoadShaderReflection(_p_reflection.Get());
 #else
 			CreateFromFileFXC(ToWChar(_src_file_path.data()), "VSMain", "vs_5_0", _tmp_p_vblob, _tmp_p_v_reflection);
 			CreateFromFileFXC(ToWChar(_src_file_path.data()), "PSMain", "ps_5_0", _tmp_p_pblob, _tmp_p_p_reflection);
@@ -688,9 +704,9 @@ namespace Ailu
 		{
 			Reset();
 			PreProcessShader();
-			LoadShaderRelfection(_tmp_p_v_reflection.Get(), EShaderType::kVertex);
-			LoadShaderRelfection(_tmp_p_p_reflection.Get(), EShaderType::kPixel);
-			LoadAdditionalShaderRelfection(_src_file_path);
+			LoadShaderReflection(_tmp_p_v_reflection.Get(), EShaderType::kVertex);
+			LoadShaderReflection(_tmp_p_p_reflection.Get(), EShaderType::kPixel);
+			LoadAdditionalShaderReflection(_src_file_path);
 			_p_vblob = _tmp_p_vblob;
 			_p_pblob = _tmp_p_pblob;
 			_p_v_reflection = _tmp_p_v_reflection;

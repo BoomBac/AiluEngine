@@ -153,6 +153,7 @@ LICENSE
 
 #include <stdlib.h>
 
+#define __STDC_LIB_EXT1__
 // if STB_IMAGE_WRITE_STATIC causes problems, try defining STBIWDEF to 'inline' or 'static inline'
 #ifndef STBIWDEF
 #ifdef STB_IMAGE_WRITE_STATIC

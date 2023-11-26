@@ -26,12 +26,12 @@ namespace Ailu
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_emi.jpg");
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_nmap_2_Tris.jpg");
 		Vector<String> default_cubemaps {
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/right.jpg",
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/left.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/top.jpg",
-			EnginePath::kEngineTexturePath + "Cubemaps/sea/back.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/bottom.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/front.jpg",
-			EnginePath::kEngineTexturePath + "Cubemaps/sea/left.jpg",
-			EnginePath::kEngineTexturePath + "Cubemaps/sea/right.jpg",
+			EnginePath::kEngineTexturePath + "Cubemaps/sea/back.jpg",
 		};
 		LoadTexture(default_cubemaps, "cubemap_sea");
 		LoadAsset("Materials/StandardPBR_new.alasset")->IsInternal(true);
@@ -420,7 +420,8 @@ namespace Ailu
 	{
 		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
 		String sys_path = kEngineResRootPath + asset_path;
-		return TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path));
+		return TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path,10));
+		//return TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path));
 	}
 
 	Ref<TextureCubeMap> ResourceMgr::LoadTexture(const Vector<String>& asset_paths, String name)
@@ -493,12 +494,17 @@ namespace Ailu
 
 			for (const auto& [file, last_write_time] : current_files)
 			{
-				if (files.find(file) == files.end() || files[file] != last_write_time)
+				if (files.contains(file) && files[file] != last_write_time)
 				{
-					//auto shader = ShaderLibrary::Get(GetFileName(file.string()));
-					//LOG_INFO("File: {0} been modified! {1}", file.string(), shader? shader->GetName() : "null");
-					//files[file] = last_write_time;
+					auto shader = ShaderLibrary::Get(GetFileName(file.string()));
+					if (shader)
+					{
+						LOG_INFO("File: {0} been modified! {1}", file.string(), shader ? shader->GetName() : "null");
+						shader->Compile();
+					}
+
 				}
+				files[file] = last_write_time;
 			}
 			std::this_thread::sleep_for(sleep_duration);
 		}

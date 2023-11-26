@@ -21,12 +21,34 @@ namespace Ailu
 	void D3DTexture2D::FillData(uint8_t* data)
 	{
 		Texture2D::FillData(data);
+		Construct();
+	}
+	void D3DTexture2D::FillData(Vector<u8*> datas)
+	{
+		Texture2D::FillData(datas);
+		Construct();
+	}
+	void D3DTexture2D::Bind(uint8_t slot) const
+	{
+		static auto cmd = D3DContext::GetInstance()->GetCmdList();
+		cmd->SetGraphicsRootDescriptorTable(slot, _gpu_handle);
+	}
+	void D3DTexture2D::Release()
+	{
+		for (auto p : _p_datas)
+		{
+			DESTORY_PTRARR(p);
+		}
+	}
+
+	void D3DTexture2D::Construct()
+	{
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
 		auto p_cmdlist{ D3DContext::GetInstance()->GetTaskCmdList() };
 		ComPtr<ID3D12Resource> pTextureGPU;
 		ComPtr<ID3D12Resource> pTextureUpload;
 		D3D12_RESOURCE_DESC textureDesc{};
-		textureDesc.MipLevels = 1;
+		textureDesc.MipLevels = _mipmap_count;
 		textureDesc.Format = ConvertToDXGIFormat(_format);
 		textureDesc.Width = _width;
 		textureDesc.Height = _height;
@@ -45,37 +67,36 @@ namespace Ailu
 		auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
-		D3D12_SUBRESOURCE_DATA textureData = {};
-		textureData.pData = data;
-		textureData.RowPitch = 4 * _width;  // pixel size/byte  * width
-		textureData.SlicePitch = textureData.RowPitch * _height;
-		UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, &textureData);
+
+		Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
+		for (size_t i = 0; i < _mipmap_count; i++)
+		{
+			u16 cur_mip_width = _width >> i;
+			u16 cur_mip_height = _height >> i;
+			D3D12_SUBRESOURCE_DATA subdata;
+			subdata.pData = _p_datas[i];
+			subdata.RowPitch = 4 * cur_mip_width;  // pixel size/byte  * width
+			subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
+			subres_datas.emplace_back(subdata);
+		}
+		UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
+
 
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		p_cmdlist->ResourceBarrier(1, &barrier);
-
 		// Describe and create a SRV for the texture.
 		//D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		_srv_desc.Format = textureDesc.Format;
 		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		_srv_desc.Texture2D.MipLevels = 1;
+		_srv_desc.Texture2D.MipLevels = _mipmap_count;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
-		_current_tex_id = s_texture_index;
-		_gpu_handle = D3DContext::GetInstance()->GetSRVGPUDescriptorHandle(s_texture_index);
-		_cpu_handle = D3DContext::GetInstance()->GetSRVCPUDescriptorHandle(s_texture_index++);
+		auto [cpu_handle,gpu_handle] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
+		_cpu_handle = cpu_handle;
+		_gpu_handle = gpu_handle;
 		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _cpu_handle);
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);
-	}
-	void D3DTexture2D::Bind(uint8_t slot) const
-	{
-		static auto cmd = D3DContext::GetInstance()->GetCmdList();
-		cmd->SetGraphicsRootDescriptorTable(slot, _gpu_handle);
-	}
-	void D3DTexture2D::Release()
-	{
-		DESTORY_PTR(_p_data);
 	}
 
 	//----------------------------------------------------------D3DTextureCubeMap---------------------------------------------------------------------
@@ -141,9 +162,9 @@ namespace Ailu
 		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 		_srv_desc.Texture2D.MipLevels = 1;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
-		_current_tex_id = s_texture_index;
-		_gpu_handle = D3DContext::GetInstance()->GetSRVGPUDescriptorHandle(s_texture_index);
-		_cpu_handle = D3DContext::GetInstance()->GetSRVCPUDescriptorHandle(s_texture_index++);
+		auto [cpu_handle, gpu_handle] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
+		_cpu_handle = cpu_handle;
+		_gpu_handle = gpu_handle;
 		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _cpu_handle);
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);

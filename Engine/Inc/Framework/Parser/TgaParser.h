@@ -9,6 +9,7 @@ namespace Ailu
 	{
 	public:
 		Ref<Texture2D> Parser(const std::string_view& path) final;
+		virtual Ref<Texture2D> Parser(const std::string_view& path, u8 mip_level) final;
 		Ref<TextureCubeMap> Parser(Vector<String>& paths) final;
 	private:
 

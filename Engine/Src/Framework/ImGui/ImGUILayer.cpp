@@ -124,30 +124,33 @@ namespace Ailu
 
 			for (auto& [tex_name, tex] : TexturePool::GetAllResourceMap())
 			{
-				auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetGPUHandle();
-				ImGui::BeginGroup();
-				ImGuiContext* context = ImGui::GetCurrentContext();
-				auto drawList = context->CurrentWindow->DrawList;
-				if (ImGui::ImageButton((void*)(intptr_t)desc.ptr, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
+				if (tex->GetTextureType() == ETextureType::kTexture2D)
 				{
-					s_selected_img_index = tex_count;
-					LOG_INFO("selected img {}", s_selected_img_index);
+					auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetGPUHandle();
+					ImGui::BeginGroup();
+					ImGuiContext* context = ImGui::GetCurrentContext();
+					auto drawList = context->CurrentWindow->DrawList;
+					if (ImGui::ImageButton((void*)(intptr_t)desc.ptr, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
+					{
+						s_selected_img_index = tex_count;
+						LOG_INFO("selected img {}", s_selected_img_index);
+					}
+					if (s_selected_img_index == tex_count)
+					{
+						ImVec2 cur_img_pos = ImGui::GetCursorPos();
+						ImVec2 imgMin = ImGui::GetItemRectMin();
+						ImVec2 imgMax = ImGui::GetItemRectMax();
+						drawList->AddRect(imgMin, imgMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 2.0f);
+						selected_tex_name = tex_name;
+					}
+					ImGui::Text("%s", tex->Name().c_str());
+					ImGui::EndGroup();
+					if ((tex_count + 1) % imagesPerRow != 0)
+					{
+						ImGui::SameLine();
+					}
+					++tex_count;
 				}
-				if (s_selected_img_index == tex_count)
-				{
-					ImVec2 cur_img_pos = ImGui::GetCursorPos();
-					ImVec2 imgMin = ImGui::GetItemRectMin();
-					ImVec2 imgMax = ImGui::GetItemRectMax();
-					drawList->AddRect(imgMin, imgMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 2.0f);
-					selected_tex_name = tex_name;
-				}
-				ImGui::Text("TexName");
-				ImGui::EndGroup();
-				if ((tex_count + 1) % imagesPerRow != 0)
-				{
-					ImGui::SameLine();
-				}
-				++tex_count;
 			}
 			ImGui::End();
 			s_pre_tex_selector_id = id;
@@ -576,32 +579,35 @@ namespace Ailu
 		int tex_count = 0;
 		for (auto& [tex_name, tex] : TexturePool::GetAllResourceMap())
 		{
-			auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetGPUHandle();
-			ImGui::BeginGroup();
-			ImGuiContext* context = ImGui::GetCurrentContext();
-			auto drawList = context->CurrentWindow->DrawList;
-			if (ImGui::ImageButton((void*)(intptr_t)desc.ptr, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
+			if (tex->GetTextureType() != ETextureType::kTextureCubeMap)
 			{
-				s_selected_img_index = tex_count;
-				LOG_INFO("selected img {}", s_selected_img_index);
+				auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetGPUHandle();
+				ImGui::BeginGroup();
+				ImGuiContext* context = ImGui::GetCurrentContext();
+				auto drawList = context->CurrentWindow->DrawList;
+				if (ImGui::ImageButton((void*)(intptr_t)desc.ptr, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
+				{
+					s_selected_img_index = tex_count;
+					LOG_INFO("selected img {}", s_selected_img_index);
+				}
+				if (s_selected_img_index == tex_count)
+				{
+					ImVec2 cur_img_pos = ImGui::GetCursorPos();
+					// 获取当前图像的区域坐标
+					ImVec2 imgMin = ImGui::GetItemRectMin(); // 图像区域的最小坐标
+					ImVec2 imgMax = ImGui::GetItemRectMax(); // 图像区域的最大坐标
+					drawList->AddRect(imgMin, imgMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 2.0f);
+				}
+				ImGui::Text("TexName");
+				//LOG_WARNING("s_selected_img_index: {}", s_selected_img_index);
+				ImGui::EndGroup();
+				// 根据每行显示的图像数量添加换行
+				if ((tex_count + 1) % imagesPerRow != 0)
+				{
+					ImGui::SameLine();
+				}
+				++tex_count;
 			}
-			if (s_selected_img_index == tex_count)
-			{
-				ImVec2 cur_img_pos = ImGui::GetCursorPos();
-				// 获取当前图像的区域坐标
-				ImVec2 imgMin = ImGui::GetItemRectMin(); // 图像区域的最小坐标
-				ImVec2 imgMax = ImGui::GetItemRectMax(); // 图像区域的最大坐标
-				drawList->AddRect(imgMin, imgMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 2.0f);
-			}
-			ImGui::Text("TexName");
-			//LOG_WARNING("s_selected_img_index: {}", s_selected_img_index);
-			ImGui::EndGroup();
-			// 根据每行显示的图像数量添加换行
-			if ((tex_count + 1) % imagesPerRow != 0)
-			{
-				ImGui::SameLine();
-			}
-			++tex_count;
 		}
 		ImGui::End();
 	}

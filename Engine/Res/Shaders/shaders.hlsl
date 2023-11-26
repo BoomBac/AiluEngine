@@ -55,8 +55,6 @@ PSInput VSMain(VSInput v)
 
 void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out float3 emssive,out float3 specular)
 {
-	if(SamplerMask & 1) albedo = Albedo.Sample(g_LinearSampler,input.uv0);
-	else albedo = BaseColor;
 	if(SamplerMask & 2) 
 	{
 		wnormal = Normal.Sample(g_LinearSampler, input.uv0).xyz;
@@ -68,18 +66,21 @@ void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out floa
 		emssive = Emssive.Sample(g_LinearSampler, input.uv0).rgb;
 	}
 	else emssive = EmssiveColor;
-	//float3 roughness_and_metallic = Texture2D_Roughness.Sample(g_LinearSampler, input.uv0).xyz;
 	if(SamplerMask & 8) roughness = Roughness.Sample(g_LinearSampler, input.uv0).r;
 	else roughness = RoughnessValue;
 	if(SamplerMask & 16) metallic = Metallic.Sample(g_LinearSampler, input.uv0).r;
 	else metallic = MetallicValue;
 	if (SamplerMask & 32) specular = Specular.Sample(g_LinearSampler, input.uv0).rgb;
 	else specular = SpecularColor;
+	if (SamplerMask & 1)
+		albedo = Albedo.SampleLevel(g_LinearSampler, input.uv0, lerp(0.0, 7.0, roughness));
+	else
+		albedo = BaseColor;
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	SurfaceData surface_data;
+	SurfaceData surface_data; 
 	InitSurfaceData(input,surface_data.wnormal,surface_data.albedo,surface_data.roughness,surface_data.metallic,surface_data.emssive,surface_data.specular);
 	//float3 light = CalculateLight(input.world_pos, surface_data.wnormal);
 	float3 light = max(0.0,CalculateLightPBR(surface_data,input.world_pos));
@@ -87,6 +88,6 @@ float4 PSMain(PSInput input) : SV_TARGET
 	light.g += 0.000001 * surface_data.roughness;
 	light.b += 0.000001 * surface_data.specular;
 	light += surface_data.emssive * 0.00001;
-	GammaCorrect(light,2.2f);
+	GammaCorrect(light,2.2f); 
 	return float4(light, 1.0f);
 }

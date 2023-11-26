@@ -101,25 +101,37 @@ namespace Ailu
 
     D3D12_CPU_DESCRIPTOR_HANDLE& D3DContext::GetSRVCPUDescriptorHandle(uint32_t index)
     {
+        static u32 global_texture_offset = 0u;
+        index += global_texture_offset++;
         static uint32_t base = RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * RenderConstants::kFrameCount + 
             RenderConstants::kMaxRenderObjectCount * RenderConstants::kFrameCount;
-        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
         auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
         cpu_handle.ptr += _cbv_desc_size * (base + index);
-        //auto cpu_handle = g_pd3dSrvDescHeapImGui->GetCPUDescriptorHandleForHeapStart();
-        //cpu_handle.ptr += _cbv_desc_size * 1;
         return cpu_handle;
     }
 
     D3D12_GPU_DESCRIPTOR_HANDLE& D3DContext::GetSRVGPUDescriptorHandle(uint32_t index)
     {
+        static u32 global_texture_offset = 0u;
+        index += global_texture_offset++;
         static uint32_t base = RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * RenderConstants::kFrameCount +
             RenderConstants::kMaxRenderObjectCount * RenderConstants::kFrameCount;
         auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
         gpu_handle.ptr += _cbv_desc_size * (base + index);
-        //auto gpu_handle = g_pd3dSrvDescHeapImGui->GetGPUDescriptorHandleForHeapStart();
-        //gpu_handle.ptr += _cbv_desc_size * 1;
         return gpu_handle;
+    }
+
+    std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3DContext::GetSRVDescriptorHandle()
+    {
+        static u32 global_texture_offset = 0u;
+        static uint32_t base = RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * RenderConstants::kFrameCount +
+            RenderConstants::kMaxRenderObjectCount * RenderConstants::kFrameCount;
+        auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
+        gpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
+        auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+        cpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
+        ++global_texture_offset;
+        return std::make_tuple(cpu_handle, gpu_handle);
     }
 
     uint8_t* D3DContext::GetCBufferPtr()

@@ -82,6 +82,28 @@ float3 GetPointLightIrridance(uint index,float3 world_pos)
 	return _PointLights[index]._LightColor * atten;
 }
 
+float3 GetSpotLightIrridance(uint index,float3 world_pos)
+{
+	float dis = distance(_SpotLights[index]._LightPos,world_pos);
+	float3 pixel_to_light = normalize(_SpotLights[index]._LightPos - world_pos);
+	float atten = 0;
+#if defined(QuadAtten)
+	atten = 10 / (1 + _SpotLights[index]._LightParam.x * dis + _SpotLights[index]._LightParam.b * dis * _SpotLights[index]._LightParam.b * distance)
+#elif defined(InvAtten)
+	atten = 10 / dis * dis;
+#elif defined(LinearAtten)
+	atten = (1.0 - saturate(dis / (0.00001 + _SpotLights[index]._Rdius)));
+#endif
+	float angle_cos = dot(-pixel_to_light, _SpotLights[index]._LightDir);
+	float inner_cos = cos(_SpotLights[index]._InnerAngle / 2 * ToRadius);
+	float outer_cos = cos(_SpotLights[index]._OuterAngle / 2 * ToRadius);
+	atten *= step(outer_cos, angle_cos);
+	float angle_lerp = (inner_cos - angle_cos) / (inner_cos - outer_cos + 0.00001);
+	float angle_atten = lerp(1.0, 0.0, angle_lerp);
+	atten *= angle_atten;
+	return _SpotLights[index]._LightColor * atten;
+}
+
 float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 {
 	float3 light = float3(0.0, 0.0, 0.0);
@@ -113,12 +135,21 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_dir = light_dir;
 		light_data.light_color = _PointLights[j]._LightColor;
 		light_data.light_pos = _PointLights[j]._LightPosOrDir;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _PointLights[j]._LightColor;
+		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j,world_pos);
+	} 
+	for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
+	{
+		float3 light_dir = -normalize(_SpotLights[k]._LightDir);
+		float3 hv = normalize(view_dir +  light_dir);
+		shading_data.nl = max(saturate(dot(light_dir,surface.wnormal)),0.000001);
+		shading_data.vh = max(saturate(dot(view_dir,hv)),0.000001);
+		shading_data.lh = max(saturate(dot(light_dir,hv)),0.000001);
+		shading_data.nh = max(saturate(dot(surface.wnormal,hv)),0.000001);
+		light_data.light_dir = light_dir;
+		light_data.light_color = _SpotLights[k]._LightColor;
+		light_data.light_pos = _SpotLights[k]._LightPos;
+		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k,world_pos);
 	}
-	//for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
-	//{
-	//	light += CaclulatSpotlLight(k, normal, pos, view_dir);
-	//}
 	return light;
 }
 

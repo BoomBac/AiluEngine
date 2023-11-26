@@ -51,8 +51,8 @@ namespace Ailu
 		void Reset();
 		const List<ShaderPropertyInfo>& GetShaderPropertyInfos() const final;
 		uint8_t* GetCBufferPtr(uint32_t index) override;
-		void LoadShaderRelfection(ID3D12ShaderReflection* reflection,const EShaderType& type);
-		void LoadAdditionalShaderRelfection(const String& sys_path);
+		void LoadShaderReflection(ID3D12ShaderReflection* reflection,const EShaderType& type);
+		void LoadAdditionalShaderReflection(const String& sys_path);
 		uint16_t GetVariableOffset(const std::string& name) const override;
 		void GenerateInternalPSO();
 
@@ -77,6 +77,7 @@ namespace Ailu
 		ComPtr<ID3D12RootSignature> _p_sig;
 		ComPtr<ID3D12ShaderReflection> _p_v_reflection;
 		ComPtr<ID3D12ShaderReflection> _p_p_reflection;
+		D3D12_PRIMITIVE_TOPOLOGY _topology;
 		std::map<std::string, uint16_t> _variable_offset;
 		inline static ComPtr<ID3D12RootSignature> s_active_sig;
 		List<ShaderPropertyInfo> _shader_prop_infos;

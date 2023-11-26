@@ -23,9 +23,14 @@ namespace Ailu
 	}
 	void Texture2D::FillData(uint8_t* data)
 	{
-		//_p_data = new uint8_t[_width * _height * _channel];
-		//memcpy(_p_data,data, _width * _height * _channel);
-		_p_data = data;
+		_mipmap_count = 1;
+		_p_datas.push_back(data);
+	}
+	void Texture2D::FillData(Vector<u8*> datas)
+	{
+		_mipmap_count = datas.size();
+		for (auto p : datas)
+			_p_datas.emplace_back(p);
 	}
 	void Texture2D::Bind(uint8_t slot) const
 	{
@@ -33,7 +38,7 @@ namespace Ailu
 	}
 	uint8_t* Texture2D::GetNativePtr()
 	{
-		return _p_data;
+		return _p_datas.front();
 	}
 	const ETextureType& Texture2D::GetTextureType() const
 	{

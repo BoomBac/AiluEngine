@@ -32,6 +32,7 @@ namespace Ailu
         ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
         D3D12_CPU_DESCRIPTOR_HANDLE& GetSRVCPUDescriptorHandle(uint32_t index);
         D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUDescriptorHandle(uint32_t index);
+        std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetSRVDescriptorHandle();
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
         uint8_t* GetCBufferPtr();
         uint8_t* GetPerFrameCbufData() final;
