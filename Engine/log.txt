@@ -1,4 +1,2 @@
-Normal: file log test!
-Error: Cann't find texture prop: SkyBox when set material Skybox texture!
 Error: ResourceMgr end
-Normal: init end
+Normal: Init end

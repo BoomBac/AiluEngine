@@ -36,6 +36,17 @@ Texture2D Specular : register(t5);
 
 SamplerState g_LinearSampler : register(s0);
 
+cbuffer SceneMaterialBuffer : register(b1)
+{
+	float4 		BaseColor; //0
+	float4 		EmssiveColor;//16
+	float4		SpecularColor;//32
+	float	 	RoughnessValue;//36
+	float	 	MetallicValue;//40
+	uint 		SamplerMask;//44
+};
+
+
 //Property Begin
 
 PSInput VSMain(VSInput v)
@@ -55,7 +66,7 @@ PSInput VSMain(VSInput v)
 
 void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out float3 emssive,out float3 specular)
 {
-	if(SamplerMask & 2) 
+	if(SamplerMask & 2)
 	{
 		wnormal = Normal.Sample(g_LinearSampler, input.uv0).xyz;
 		wnormal = normalize(mul(wnormal* 2.0 - 1.0,input.btn));
@@ -87,7 +98,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 	light.r += 0.000001 * surface_data.metallic;
 	light.g += 0.000001 * surface_data.roughness;
 	light.b += 0.000001 * surface_data.specular;
-	light += surface_data.emssive * 0.00001;
+	light += surface_data.emssive; 
 	GammaCorrect(light,2.2f); 
 	return float4(light, 1.0f);
 }

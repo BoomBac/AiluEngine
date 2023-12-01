@@ -1998,9 +1998,6 @@
     <ClInclude Include="Inc\Framework\Math\Transform.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Math\AABB.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Framework\Common\ResourceMgr.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2017,6 +2014,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Framework\Common\Path.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Math\AABB.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

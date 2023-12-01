@@ -104,4 +104,12 @@ namespace Ailu
 			pso->SubmitBindResource(reinterpret_cast<void*>(D3DContext::s_p_d3dcontext->GetPerFrameCbufGPURes()), EBindResDescType::kConstBuffer);
 			});
 	}
+	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth)
+	{
+		_commands.emplace_back([=]() {
+			if(color) color->Transition(ETextureResState::kRenderTagret);
+			if(depth) depth->Transition(ETextureResState::kRenderTagret);
+			//D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1,color.);
+			});
+	}
 }

@@ -328,6 +328,7 @@ namespace Ailu
 			if (length == 3) return sscanf_s(vec_str, "%f,%f,%f", &out_v.x, &out_v.y, &out_v.z) == 3;
 			else if (length == 4) return sscanf_s(vec_str, "%f,%f,%f,%f", &out_v.x, &out_v.y, &out_v.z, &out_v.data[3]) == 4;
 		}
+		return false;
 #pragma warning(pop)
 	}
 

@@ -3,6 +3,9 @@
 
 #include "constants.hlsl"
 
+#define CBufBegin cbuffer SceneMaterialBuffer : register(b1) {
+#define CBufEnd }
+
 struct ShaderDirectionalAndPointLightData
 {
 	float3 _LightPosOrDir;
@@ -26,15 +29,6 @@ cbuffer SceneObjectBuffer : register(b0)
 	float4x4 _MatrixWorld;
 }
 
-cbuffer SceneMaterialBuffer : register(b1)
-{
-	float4 		BaseColor; //0
-	float4 		EmssiveColor;//16
-	float4		SpecularColor;//32
-	float	 	RoughnessValue;//36
-	float	 	MetallicValue;//40
-	uint 		SamplerMask;//44
-};
 
 cbuffer SceneStatetBuffer : register(b2)
 {

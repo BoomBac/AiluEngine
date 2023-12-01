@@ -24,5 +24,17 @@ static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat& format)
     return DXGI_FORMAT_UNKNOWN;
 }
 
+static bool IsShadowMapFormat(const EALGFormat& format)
+{
+    switch (format)
+    {
+    case EALGFormat::kALGFormatR8G8B8A8_UNORM: return false;
+    case EALGFormat::kALGFormatR24G8_TYPELESS: return true;
+    case EALGFormat::kALGFormatR32_FLOAT: return true;
+    case EALGFormat::kALGFormatD32_FLOAT: return true;
+    }
+    return false;
+}
+
 #endif // !ALG_FORMAT_H__
 

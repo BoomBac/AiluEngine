@@ -50,7 +50,6 @@ namespace Ailu
 		Shader* GetShader() const;
 		List<std::tuple<String, float>> GetAllFloatValue();
 		List<std::tuple<String, Vector4f>> GetAllVectorValue();
-		//Vector<String> _texture_paths{};
 	protected:
 		bool _b_internal = false;
 	private:
@@ -64,7 +63,8 @@ namespace Ailu
 		uint32_t _cbuf_index;
 		inline static uint32_t s_current_cbuf_offset = 0u;
 		std::unordered_set<ShaderBindResourceInfo, ShaderBindResourceInfoHash, ShaderBindResourceInfoEqual> _mat_props{};
-		std::map<String, std::tuple<uint8_t, Ref<Texture>, String>> _textures{};
+		//value_name : <bind_slot,texture>
+		std::map<String, std::tuple<uint8_t, Ref<Texture>>> _textures{};
 	};
 
 	class MaterialPool 

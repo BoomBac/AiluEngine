@@ -437,12 +437,12 @@ namespace Ailu
 		ALHash::Vector2fHash v2hash{};
 		TimeMgr mgr;
 		mgr.Mark();
-#undef max(a,b)            (((a) > (b)) ? (a) : (b))
+#undef max(a,b) (((a) > (b)) ? (a) : (b))
 		constexpr float minf = std::numeric_limits<float>::lowest();
 		constexpr float maxf = std::numeric_limits<float>::max();
 		Vector3f min{maxf,maxf ,maxf };
 		Vector3f max{ minf,minf ,minf };
-#define max(a, b)            (((a) > (b)) ? (a) : (b))
+#define max(a, b) (((a) > (b)) ? (a) : (b))
 		for (size_t i = 0; i < vertex_count; i++)
 		{
 			auto p = raw_pos[i], n = raw_normals[i];

@@ -60,7 +60,7 @@ namespace Ailu
 		k = TP_ZERO(formated_str.front());
 		if (k == "Children")
 		{
-			i32 child_num = LoadFloat(TP_ONE(formated_str.front()).c_str());
+			int child_num = static_cast<int>(LoadFloat(TP_ONE(formated_str.front()).c_str()));
 			formated_str.pop();
 			for (size_t i = 0; i < child_num; i++)
 			{

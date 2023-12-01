@@ -14,8 +14,11 @@ namespace Ailu
 	}
 	void LayerStack::PushLayer(Layer* layer)
 	{
-		_layers_insert = _layers.emplace(_layers_insert, layer);
+		_layers_insert = _layers.emplace(_layers.begin(), layer);
+		if (_layers_insert == _layers.end())
+			_layers_insert = _layers.begin();
 	}
+
 	void LayerStack::PushOverLayer(Layer* overlayer)
 	{
 		_layers.emplace_back(overlayer);
@@ -25,9 +28,10 @@ namespace Ailu
 		auto it = std::find(_layers.begin(), _layers.end(), layer);
 		if (it != _layers.end())
 		{
+			//if (_layers_insert != _layers.begin() && _layers_insert == it)
+			//	_layers_insert--;
 			_layers.erase(it);
-			_layers_insert--;
-		}		
+		}
 	}
 	void LayerStack::PopOverLayer(Layer* overlayer)
 	{

@@ -16,6 +16,8 @@ namespace Ailu
 {
 	class ResourceMgr : public IRuntimeModule
 	{
+		using ResourceTask = std::function<void()>;
+		using OnResourceTaskCompleted = std::function<void()>;
 	public:
 		int Initialize() final;
 		void Finalize() final;
@@ -30,6 +32,8 @@ namespace Ailu
 		//template<typename T>
 		//static T* LoadAsset(const string& asset_path);
 		static Material* LoadAsset(const String& asset_path);
+		void AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback);
+		void AddResourceTask(ResourceTask task);
 	private:
 		inline const static String kAssetDatabasePath = kEngineResRootPath + "assetdb.alasset";
 		static Ref<Material> LoadMaterial(std::string path);
@@ -41,9 +45,10 @@ namespace Ailu
 		static void SaveAssetDB();
 		static void FormatLine(const String& line, String& key, String& value);
 		void SaveMaterialImpl(const String& asset_path,Material* mat);
-		void SaveSceneImpl(Scene* scene, std::string& scene_path);
 		void WatchDirectory();
+		void SubmitResourceTask();
 	private:
+		List<ResourceTask> _task_queue;
 		inline static std::map<String, std::tuple<String, String>> s_asset_db{};
 		inline static std::map<String, Scope<Asset>> s_all_asset{};
 

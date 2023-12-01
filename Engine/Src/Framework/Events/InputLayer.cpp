@@ -7,16 +7,9 @@
 
 namespace Ailu
 {
-	InputLayer::InputLayer()
+	InputLayer::InputLayer() : Layer("InputLayer")
 	{
-
-	}
-	InputLayer::~InputLayer()
-	{
-
-	}
-	void InputLayer::OnAttach()
-	{
+		_b_handle_input = true;
 		if (Camera::sCurrent == nullptr)
 		{
 			LOG_WARNING("Current Camera is null");
@@ -27,10 +20,22 @@ namespace Ailu
 		_camera_near = Camera::sCurrent->Near();
 		_camera_far = Camera::sCurrent->Far();
 	}
-	void InputLayer::OnDetach()
+	InputLayer::InputLayer(const String& name) : InputLayer()
+	{
+		_debug_name = name;
+	}
+	InputLayer::~InputLayer()
 	{
 		DESTORY_PTR(_origin_cam_state)
-			DESTORY_PTR(_target_cam_state)
+		DESTORY_PTR(_target_cam_state)
+	}
+	void InputLayer::OnAttach()
+	{
+		_b_handle_input = true;
+	}
+	void InputLayer::OnDetach()
+	{
+		_b_handle_input = false;
 	}
 	void InputLayer::OnEvent(Event& e)
 	{
@@ -86,6 +91,7 @@ namespace Ailu
 	}
 	void InputLayer::OnUpdate(float delta_time)
 	{
+		if (!_b_handle_input) return;
 		float lerp_speed = delta_time / 1000.0f;
 		static bool init = false;
 		static Vector2f pre_mouse_pos;
@@ -133,8 +139,11 @@ namespace Ailu
 			auto cur_mouse_pos = Input::GetMousePos();
 			if (Input::IsKeyPressed(AL_KEY_RBUTTON))
 			{
-				_target_cam_state->rotation.x += (cur_mouse_pos.x - pre_mouse_pos.x) * _camera_wander_speed * _camera_wander_speed;
-				_target_cam_state->rotation.y += (cur_mouse_pos.y - pre_mouse_pos.y) * _camera_wander_speed * _camera_wander_speed;
+				if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f && abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
+				{
+					_target_cam_state->rotation.x += (cur_mouse_pos.x - pre_mouse_pos.x) * _camera_wander_speed * _camera_wander_speed;
+					_target_cam_state->rotation.y += (cur_mouse_pos.y - pre_mouse_pos.y) * _camera_wander_speed * _camera_wander_speed;
+				}
 			}
 			pre_mouse_pos = cur_mouse_pos;
 			_origin_cam_state->LerpTo(*_target_cam_state, lerp_speed * _lerp_speed_multifactor);

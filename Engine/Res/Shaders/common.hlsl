@@ -18,5 +18,5 @@ inline void GammaCorrect(inout float3 color,float gamma)
 	color = pow(color, F3_WHITE / gamma);
 }
 
-#endif // !__COMMON_H__
+#endif // !__COMMON_H__ 
 

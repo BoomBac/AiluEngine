@@ -10,6 +10,8 @@
 #include <functional>
 #include <unordered_map>
 
+#include <optional>
+
 namespace Ailu
 {
     enum class ESerializablePropertyType : u8
@@ -61,15 +63,34 @@ namespace Ailu
     {
         void* _value_ptr;
         String _name;
+        String _value_name;
         ESerializablePropertyType _type;
         float _param[4];
 
-        SerializableProperty(void* valuePtr, const String& name, const ESerializablePropertyType& type)
-            : _value_ptr(valuePtr), _name(name), _type(type) {}
+        SerializableProperty(void* value_ptr, const String& name, const ESerializablePropertyType& type)
+            : _value_ptr(value_ptr), _name(name), _type(type)
+        {
+            memset(_param, 0, sizeof(float) * 4);
+        }
+
+        SerializableProperty(void* value_ptr, const String& name,const String& value_name,const ESerializablePropertyType& type) : SerializableProperty(value_ptr,name,type)
+        {
+            memset(_param, 0, sizeof(float) * 4);
+            _value_name = value_name;
+        }
+
+        SerializableProperty() : _value_ptr(nullptr), _name("null"), _type(ESerializablePropertyType::kUndefined)
+        {
+            
+        }
         template<typename T>
         static String ToString(const T& value);
         template<typename T>
-        static T GetProppertyValue(const SerializableProperty& prop);
+        static std::optional<T> GetProppertyValue(const SerializableProperty& prop);
+        inline static bool SameType(const SerializableProperty& a, const SerializableProperty& b)
+        {
+            return a._name == b._name && a._type == b._type;
+        }
     };
 
 
@@ -80,30 +101,33 @@ namespace Ailu
     }
 
     template<typename T>
-    inline T SerializableProperty::GetProppertyValue(const SerializableProperty& prop)
+    inline std::optional<T> SerializableProperty::GetProppertyValue(const SerializableProperty& prop)
     {
-        return *reinterpret_cast<T*>(prop._value_ptr);
+        if (prop._value_ptr != nullptr)
+            return *reinterpret_cast<T*>(prop._value_ptr);
+        else
+            return {};
     }
 
 #define DECLARE_REFLECT_FIELD(class_name) friend void class_name##InitReflectProperties(class_name* obj);
-//#define DECLARE_REFLECT_FIELD protected: std::unordered_map<String,SerializableProperty> properties{};\
+//#define DECLARE_REFLECT_FIELD protected: std::unordered_map<String,SerializableProperty> _properties{};\
 //virtual void InitReflectProperties();\
 //public:\
 //    template<typename T>\
-//    T GetProperty(const String& name){return *reinterpret_cast<T*>(properties.find(name)->second._value_ptr);}\
-//     SerializableProperty& GetProperty(const String& name){return properties.find(name)->second;}\
-//    std::unordered_map<String,SerializableProperty>& GetAllProperties(){return properties;}
+//    T GetProperty(const String& name){return *reinterpret_cast<T*>(_properties.find(name)->second._value_ptr);}\
+//     SerializableProperty& GetProperty(const String& name){return _properties.find(name)->second;}\
+//    std::unordered_map<String,SerializableProperty>& GetAllProperties(){return _properties;}
 
 #define IMPLEMENT_REFLECT_FIELD(class_name) class_name##InitReflectProperties(this);
 
 #define REFLECT_FILED_BEGIN(class_name) static void class_name##InitReflectProperties(class_name* obj){\
-obj->properties.clear();
+obj->_properties.clear();
 
 #define REFLECT_FILED_END }
 
-//#define DECLARE_REFLECT_PROPERTY(type_name,name,value) properties.insert(std::make_pair(#name,SerializableProperty{&value,#name,#type_name}));
+//#define DECLARE_REFLECT_PROPERTY(type_name,name,value) _properties.insert(std::make_pair(#name,SerializableProperty{&value,#name,#type_name}));
 
-#define DECLARE_REFLECT_PROPERTY(prop_type,name,value) obj->properties.insert(std::make_pair(#name,SerializableProperty{&(obj->value),#name,prop_type}));
+#define DECLARE_REFLECT_PROPERTY(prop_type,name,value) obj->_properties.insert(std::make_pair(#name,SerializableProperty{&(obj->value),#name,prop_type}));
 
     namespace reflect {
         //--------------------------------------------------------

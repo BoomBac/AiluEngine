@@ -6,6 +6,7 @@
 #include <map>
 
 #include "Render/Texture.h"
+#include "Framework/Math/ALMath.hpp"
 using Microsoft::WRL::ComPtr;
 
 namespace Ailu
@@ -20,6 +21,7 @@ namespace Ailu
 		void Bind(uint8_t slot) const final;
 		void Release() final;
 		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
+		void* GetGPUNativePtr() final;
 		D3D12_CPU_DESCRIPTOR_HANDLE& GetCPUHandle() { return _cpu_handle; }
 		D3D12_GPU_DESCRIPTOR_HANDLE& GetGPUHandle() { return _gpu_handle; }
 	private:
@@ -49,6 +51,25 @@ namespace Ailu
 		D3D12_CPU_DESCRIPTOR_HANDLE _cpu_handle;
 		std::vector<ComPtr<ID3D12Resource>> _textures;
 		std::vector<ComPtr<ID3D12Resource>> _upload_textures;
+	};
+
+	class D3DRenderTexture : public RenderTexture
+	{
+		inline const static Vector4f kClearColor = Colors::kBlack;
+	public:
+		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
+		void Bind(uint8_t slot) const final;
+		uint8_t* GetCPUNativePtr() final;
+		void Transition(ETextureResState state) final;
+		D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle();
+	private:
+		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
+		D3D12_RENDER_TARGET_VIEW_DESC _rtv_desc{};
+		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;
+		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
+		D3D12_GPU_DESCRIPTOR_HANDLE _rtv_gpu_handle;
+		D3D12_CPU_DESCRIPTOR_HANDLE _rtv_cpu_handle;
+		ComPtr<ID3D12Resource> _p_buffer;
 	};
 }
 

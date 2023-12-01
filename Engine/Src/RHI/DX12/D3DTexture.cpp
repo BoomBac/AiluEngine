@@ -41,6 +41,11 @@ namespace Ailu
 		}
 	}
 
+	void* D3DTexture2D::GetGPUNativePtr()
+	{
+		return reinterpret_cast<void*>(_gpu_handle.ptr);
+	}
+
 	void D3DTexture2D::Construct()
 	{
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
@@ -181,4 +186,84 @@ namespace Ailu
 			DESTORY_PTR(p);
 	}
 	//----------------------------------------------------------D3DTextureCubeMap---------------------------------------------------------------------
+
+	//----------------------------------------------------------D3DRenderTexture----------------------------------------------------------------------
+	static D3D12_RESOURCE_STATES ConvertToD3DResourceState(ETextureResState state)
+	{
+		switch (state)
+		{
+		case ETextureResState::kRenderTagret: return D3D12_RESOURCE_STATE_RENDER_TARGET;
+		case ETextureResState::kShaderResource: return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		}
+		return D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON;
+	}
+	D3DRenderTexture::D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, EALGFormat format)
+	{
+		_width = width;
+		_height = height;
+		_format = format;
+		_channel = 4;
+		_state = ETextureResState::kDefault;
+		bool is_shadowmap = IsShadowMapFormat(_format);
+		auto p_device{ D3DContext::GetInstance()->GetDevice() };
+		auto p_cmdlist{ D3DContext::GetInstance()->GetTaskCmdList() };
+		D3D12_RESOURCE_DESC tex_desc{};
+		tex_desc.MipLevels = 1;
+		tex_desc.Format = ConvertToDXGIFormat(_format);
+		tex_desc.Flags = is_shadowmap? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+		tex_desc.Width = _width;
+		tex_desc.Height = _height;
+		tex_desc.DepthOrArraySize = 1;
+		tex_desc.SampleDesc.Count = 1;
+		tex_desc.SampleDesc.Quality = 0;
+		tex_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		D3D12_CLEAR_VALUE clear_value{};
+		clear_value.Format = tex_desc.Format;
+		if (is_shadowmap)
+			clear_value.DepthStencil = { 0.0f,0 };
+		else
+			memcpy(clear_value.Color, kClearColor, sizeof(kClearColor));
+		CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
+		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &tex_desc, D3D12_RESOURCE_STATE_COMMON,
+			&clear_value, IID_PPV_ARGS(_p_buffer.GetAddressOf())));
+		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		_srv_desc.Format = tex_desc.Format;
+		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		_srv_desc.Texture2D.MostDetailedMip = 0;
+		_srv_desc.Texture2D.MipLevels = 1;
+		_rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		_rtv_desc.Format = tex_desc.Format;
+		_rtv_desc.Texture2D.MipSlice = 0;
+		_rtv_desc.Texture2D.PlaneSlice = 0;
+		auto [s_ch,s_gh] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
+		auto [r_ch, r_gh] = D3DContext::GetInstance()->GetRTVDescriptorHandle();
+		_srv_gpu_handle = s_gh;
+		_srv_cpu_handle = s_ch;
+		_rtv_gpu_handle = r_gh;
+		_rtv_cpu_handle = r_ch;
+		p_device->CreateRenderTargetView(_p_buffer.Get(), &_rtv_desc, _rtv_cpu_handle);
+		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handle);
+		//p_device->CreateDepthStencilView();
+	}
+	void D3DRenderTexture::Bind(uint8_t slot) const
+	{
+
+	}
+	uint8_t* D3DRenderTexture::GetCPUNativePtr()
+	{
+		return nullptr;
+	}
+	void D3DRenderTexture::Transition(ETextureResState state)
+	{
+		auto old_state = _state;
+		RenderTexture::Transition(state);
+		auto p_cmdlist{ D3DContext::GetInstance()->GetCmdList() };
+		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_buffer.Get(), ConvertToD3DResourceState(old_state), ConvertToD3DResourceState(_state));
+		p_cmdlist->ResourceBarrier(1, &barrier);
+	}
+	D3D12_CPU_DESCRIPTOR_HANDLE D3DRenderTexture::GetCPUHandle()
+	{
+		return D3D12_CPU_DESCRIPTOR_HANDLE();
+	}
+	//----------------------------------------------------------D3DRenderTexture----------------------------------------------------------------------
 }

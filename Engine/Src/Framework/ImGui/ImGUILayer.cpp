@@ -65,6 +65,7 @@ namespace Ailu
 	static SceneActor* s_cur_selected_actor = nullptr;
 	static int cur_object_index = 0u;
 	static u32 cur_tree_node_index = 0u;
+	static u16 s_mini_tex_size = 64;
 
 	namespace TreeStats
 	{
@@ -76,37 +77,13 @@ namespace Ailu
 		static u32 s_cur_frame_selected_actor_id = 0;
 		static i16 s_cur_opened_texture_selector = -1;
 		static bool s_is_texture_selector_open = true;
-	}
-
-	static void DrawProperty(SerializableProperty& prop)
-	{
-		switch (prop._type)
-		{
-		case Ailu::ESerializablePropertyType::kString:
-			break;
-		case Ailu::ESerializablePropertyType::kFloat: ImGui::DragFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr));
-			break;
-		case Ailu::ESerializablePropertyType::kBool: ImGui::Checkbox(prop._name.c_str(), static_cast<bool*>(prop._value_ptr));
-			break;
-		case Ailu::ESerializablePropertyType::kVector3f: ImGui::DragFloat3(prop._name.c_str(), static_cast<Vector3f*>(prop._value_ptr)->data);
-			break;
-		case Ailu::ESerializablePropertyType::kVector4f:
-			break;
-		case Ailu::ESerializablePropertyType::kColor: ImGui::ColorEdit3(prop._name.c_str(), static_cast<Vector4f*>(prop._value_ptr)->data);
-			break;
-		case Ailu::ESerializablePropertyType::kTransform:
-			break;
-		case Ailu::ESerializablePropertyType::kTexture2D:
-			break;
-		case Ailu::ESerializablePropertyType::kStaticMesh:
-			break;
-		default: LOG_WARNING("prop: {} value type havn't be handle!", prop._name)
-			break;
-		}
+		static u32 s_common_property_handle = 0u;
+		static String s_texture_selector_ret = "none";
 	}
 
 	static String OpenTextureSelector(int id)
 	{
+		TreeStats::s_texture_selector_ret = "none";
 		static i16 s_pre_tex_selector_id = -1;
 		static int s_selected_img_index = -1;
 		static String selected_tex_name{ "none" };
@@ -155,14 +132,78 @@ namespace Ailu
 			ImGui::End();
 			s_pre_tex_selector_id = id;
 		}
-		return s_selected_img_index ==-1? "none" : selected_tex_name;
+		return s_selected_img_index == -1 ? "none" : selected_tex_name;
 	}
 
-	static void DrawInternalStandardMaterial(Material* mat)
+	static void DrawProperty(SerializableProperty& prop, Object* obj, TextureSelector& selector_window)
+	{
+		++TreeStats::s_common_property_handle;
+		switch (prop._type)
+		{
+		case Ailu::ESerializablePropertyType::kString:
+			break;
+		case Ailu::ESerializablePropertyType::kFloat: ImGui::DragFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr));
+			break;
+		case Ailu::ESerializablePropertyType::kBool: ImGui::Checkbox(prop._name.c_str(), static_cast<bool*>(prop._value_ptr));
+			break;
+		case Ailu::ESerializablePropertyType::kVector3f: ImGui::DragFloat3(prop._name.c_str(), static_cast<Vector3f*>(prop._value_ptr)->data);
+			break;
+		case Ailu::ESerializablePropertyType::kVector4f:
+			break;
+		case Ailu::ESerializablePropertyType::kColor: ImGui::ColorEdit3(prop._name.c_str(), static_cast<Vector4f*>(prop._value_ptr)->data);
+			break;
+		case Ailu::ESerializablePropertyType::kTransform:
+			break;
+		case Ailu::ESerializablePropertyType::kTexture2D:
+		{
+			ImGui::Text("Texture2D : %s", prop._name.c_str());
+			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
+			auto tex = tex_prop_value.has_value()? std::get<1>(tex_prop_value.value()) : nullptr;
+			String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
+			//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
+			float contentWidth = ImGui::GetWindowContentRegionWidth();
+			float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
+			ImGui::SetCursorPosX(centerX);
+			if (selector_window.IsCaller(TreeStats::s_common_property_handle))
+			{
+				auto new_tex = selector_window.GetSelectedTexture(TreeStats::s_common_property_handle);
+				if (new_tex != TextureSelector::kNull && new_tex != cur_tex_nameid)
+				{
+					auto mat = dynamic_cast<Material*>(obj);
+					if (mat)
+						mat->SetTexture(prop._value_name, new_tex);
+				}
+			}
+			if (ImGui::ImageButton(tex ? tex->GetGPUNativePtr() : TexturePool::GetDefaultWhite()->GetGPUNativePtr(), ImVec2(s_mini_tex_size, s_mini_tex_size)))
+			{
+				selector_window.Open(TreeStats::s_common_property_handle);
+			}
+			if (selector_window.IsCaller(TreeStats::s_common_property_handle))
+			{
+				ImGuiContext* context = ImGui::GetCurrentContext();
+				auto drawList = context->CurrentWindow->DrawList;
+				ImVec2 cur_img_pos = ImGui::GetCursorPos();
+				ImVec2 imgMin = ImGui::GetItemRectMin();
+				ImVec2 imgMax = ImGui::GetItemRectMax();
+				drawList->AddRect(imgMin, imgMax, IM_COL32(255, 255, 0, 255), 0.0f, 0, 2.0f);
+			}
+		}
+		break;
+		case Ailu::ESerializablePropertyType::kStaticMesh:
+			break;
+		case Ailu::ESerializablePropertyType::kRange:
+		{
+			ImGui::SliderFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr), prop._param[0], prop._param[1]);
+		}
+		break;
+		default: LOG_WARNING("prop: {} value type havn't be handle!", prop._name)
+			break;
+		}
+	}
+
+	static void DrawInternalStandardMaterial(Material* mat, TextureSelector& selector_window)
 	{
 		u16 mat_prop_index = 0;
-		u16 min_tex_size = 64;
-		static String new_tex = "none";
 		static bool use_textures[10]{};
 		static auto func_show_prop = [&](u16& mat_prop_index, Material* mat, String name) {
 			ImGui::PushID(mat_prop_index);
@@ -198,7 +239,7 @@ namespace Ailu
 				tex_usage = ETextureUsage::kNormal;
 				non_tex_prop_name = "None";
 			}
-			else 
+			else
 			{
 				tex_usage = ETextureUsage::kAlbedo;
 				non_tex_prop_name = "BaseColor";
@@ -212,24 +253,24 @@ namespace Ailu
 			{
 				auto prop = mat->GetProperty(name);
 				ImGui::Text(" :%s", prop._name.c_str());
-				String cur_tex_nameid = prop._value_ptr == nullptr ? "none" : *static_cast<String*>(prop._value_ptr);
-				auto& desc = std::static_pointer_cast<D3DTexture2D>(prop._value_ptr == nullptr ? TexturePool::GetDefaultWhite() : TexturePool::GetTexture2D(cur_tex_nameid))->GetGPUHandle();
+				auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
+				auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
+				String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
+				//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
 				float contentWidth = ImGui::GetWindowContentRegionWidth();
-				float centerX = (contentWidth - min_tex_size) * 0.5f;
+				float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
 				ImGui::SetCursorPosX(centerX);
-				if (TreeStats::s_cur_opened_texture_selector == mat_prop_index)
+				if (selector_window.IsCaller(mat_prop_index))
 				{
-					if (new_tex != "none" && new_tex != cur_tex_nameid)
-					{
+					auto new_tex = selector_window.GetSelectedTexture(mat_prop_index);
+					if (new_tex != "null" && new_tex != cur_tex_nameid)
 						mat->SetTexture(name, new_tex);
-					}
 				}
-				if (ImGui::ImageButton((void*)(intptr_t)desc.ptr, ImVec2(min_tex_size, min_tex_size)))
+				if (ImGui::ImageButton(tex? tex->GetGPUNativePtr() : TexturePool::GetDefaultWhite()->GetGPUNativePtr(), ImVec2(s_mini_tex_size, s_mini_tex_size)))
 				{
-					TreeStats::s_is_texture_selector_open = true;
-					TreeStats::s_cur_opened_texture_selector = mat_prop_index;
+					selector_window.Open(mat_prop_index);
 				}
-				if (TreeStats::s_cur_opened_texture_selector == mat_prop_index)
+				if (selector_window.IsCaller(mat_prop_index))
 				{
 					ImGuiContext* context = ImGui::GetCurrentContext();
 					auto drawList = context->CurrentWindow->DrawList;
@@ -246,10 +287,10 @@ namespace Ailu
 					auto prop = mat->GetProperty(non_tex_prop_name);
 					ImGui::ColorEdit4(prop._name.c_str(), static_cast<float*>(prop._value_ptr));
 				}
-				else if(tex_usage == ETextureUsage::kMetallic || tex_usage == ETextureUsage::kRoughness)
+				else if (tex_usage == ETextureUsage::kMetallic || tex_usage == ETextureUsage::kRoughness)
 				{
 					auto prop = mat->GetProperty(non_tex_prop_name);
-					ImGui::SliderFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr), 0.0, 1.0);
+					ImGui::SliderFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr), prop._param[0], prop._param[1]);
 				}
 				else
 				{
@@ -267,11 +308,11 @@ namespace Ailu
 		func_show_prop(mat_prop_index, mat, "Roughness");
 		func_show_prop(mat_prop_index, mat, "Metallic");
 		func_show_prop(mat_prop_index, mat, "Emssive");
-		if (TreeStats::s_cur_opened_texture_selector != -1) 
-			new_tex = OpenTextureSelector(TreeStats::s_cur_opened_texture_selector);
+		if (TreeStats::s_cur_opened_texture_selector != -1)
+			TreeStats::s_texture_selector_ret = OpenTextureSelector(TreeStats::s_cur_opened_texture_selector);
 	}
 
-	static void DrawComponentProperty(Component* comp)
+	static void DrawComponentProperty(Component* comp, TextureSelector& selector_window)
 	{
 		if (ImGui::CollapsingHeader(comp->GetTypeName().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 		{
@@ -348,18 +389,29 @@ namespace Ailu
 					ImGui::Text("Material: %s", mat->Name().c_str());
 					if (mat->IsInternal())
 					{
-						DrawInternalStandardMaterial(mat.get());
+						DrawInternalStandardMaterial(mat.get(), selector_window);
+					}
+					else
+					{
+						for (auto& prop : mat->GetAllProperties())
+						{
+							DrawProperty(prop.second, mat.get(), selector_window);
+						}
 					}
 				}
 				else
 				{
-					ImGui::Text("Material: %s","Missing");
+					ImGui::Text("Material: %s", "Missing");
 				}
 			}
 		}
 	}
 
-	Ailu::ImGUILayer::ImGUILayer()
+	Ailu::ImGUILayer::ImGUILayer() : Layer("ImGUILayer")
+	{
+	}
+
+	ImGUILayer::ImGUILayer(const String& name) : Layer(name)
 	{
 	}
 
@@ -450,8 +502,10 @@ namespace Ailu
 		ImGui::PopFont();
 
 		if (show) ImGui::ShowDemoWindow(&show);
+		TreeStats::s_common_property_handle = 0;
 		ShowWorldOutline();
 		ShowObjectDetail();
+		_texture_selector.Show();
 		//ShowTextureExplorer();
 	}
 
@@ -559,49 +613,51 @@ namespace Ailu
 				ImGui::PopID();
 				comp->Active(b_active);
 				ImGui::SameLine();
-				DrawComponentProperty(comp.get());
+				DrawComponentProperty(comp.get(), _texture_selector);
 				++comp_index;
 			}
 		}
 		ImGui::End();
 	}
-	void ImGUILayer::ShowTextureExplorer()
+
+	void TextureSelector::Show()
 	{
-		ImGui::Begin("TextureExplorer");
+		if (!_b_show)
+		{
+			_handle = -1;
+			return;
+		}
+		ImGui::Begin("TextureSelector", &_b_show);
 		static float preview_tex_size = 128;
 		//// 获取当前ImGui窗口的内容区域宽度
 		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
 		int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
 		imagesPerRow += imagesPerRow == 0 ? 1 : 0;
-		static int s_selected_img_index = -1;
-		//int selected_img_index = 0;
 		static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
 		int tex_count = 0;
 		for (auto& [tex_name, tex] : TexturePool::GetAllResourceMap())
 		{
-			if (tex->GetTextureType() != ETextureType::kTextureCubeMap)
+			if (tex->GetTextureType() == ETextureType::kTexture2D)
 			{
 				auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetGPUHandle();
 				ImGui::BeginGroup();
 				ImGuiContext* context = ImGui::GetCurrentContext();
 				auto drawList = context->CurrentWindow->DrawList;
-				if (ImGui::ImageButton((void*)(intptr_t)desc.ptr, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
+				if (ImGui::ImageButton(tex->GetGPUNativePtr(), ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
 				{
-					s_selected_img_index = tex_count;
-					LOG_INFO("selected img {}", s_selected_img_index);
+					_selected_img_index = tex_count;
+					LOG_INFO("selected img {}", _selected_img_index);
 				}
-				if (s_selected_img_index == tex_count)
+				if (_selected_img_index == tex_count)
 				{
 					ImVec2 cur_img_pos = ImGui::GetCursorPos();
-					// 获取当前图像的区域坐标
-					ImVec2 imgMin = ImGui::GetItemRectMin(); // 图像区域的最小坐标
-					ImVec2 imgMax = ImGui::GetItemRectMax(); // 图像区域的最大坐标
+					ImVec2 imgMin = ImGui::GetItemRectMin();
+					ImVec2 imgMax = ImGui::GetItemRectMax();
 					drawList->AddRect(imgMin, imgMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 2.0f);
+					_cur_selected_texture_path = tex_name;
 				}
-				ImGui::Text("TexName");
-				//LOG_WARNING("s_selected_img_index: {}", s_selected_img_index);
+				ImGui::Text("%s", tex->Name().c_str());
 				ImGui::EndGroup();
-				// 根据每行显示的图像数量添加换行
 				if ((tex_count + 1) % imagesPerRow != 0)
 				{
 					ImGui::SameLine();
@@ -610,6 +666,24 @@ namespace Ailu
 			}
 		}
 		ImGui::End();
+	}
+	void TextureSelector::Open(const int& handle)
+	{
+		if (handle != _handle)
+			_cur_selected_texture_path = kNull;
+		_handle = handle;
+		_b_show = true;
+		_selected_img_index = -1;
+	}
+	const String& TextureSelector::GetSelectedTexture(const int& handle) const
+	{
+		static String null_tex = kNull;
+		if (_handle == handle)
+		{
+			return _cur_selected_texture_path;
+		}
+		else
+			return null_tex;
 	}
 }
 

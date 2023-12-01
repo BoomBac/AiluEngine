@@ -30,9 +30,8 @@ namespace Ailu
         ID3D12GraphicsCommandList* GetCmdList();
         ID3D12GraphicsCommandList* GetTaskCmdList();
         ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
-        D3D12_CPU_DESCRIPTOR_HANDLE& GetSRVCPUDescriptorHandle(uint32_t index);
-        D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUDescriptorHandle(uint32_t index);
         std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetSRVDescriptorHandle();
+        std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetRTVDescriptorHandle();
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
         uint8_t* GetCBufferPtr();
         uint8_t* GetPerFrameCbufData() final;
@@ -76,10 +75,10 @@ namespace Ailu
         ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
         ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
         ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
-        uint8_t m_rtvDescriptorSize;
-        uint8_t _dsv_desc_size;
-        uint8_t _cbv_desc_size;
-        uint8_t* _p_cbuffer = nullptr;
+        u8 _rtv_desc_size;
+        u8 _dsv_desc_size;
+        u8 _cbv_desc_size;
+        u8* _p_cbuffer = nullptr;
 
         ComPtr<ID3D12GraphicsCommandList> _task_cmd;
         ComPtr<ID3D12CommandAllocator> _task_cmd_alloc;

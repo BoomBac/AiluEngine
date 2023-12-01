@@ -11,6 +11,8 @@
 #include <format>
 #include <string>
 
+import core.math.aabb:Test;
+
 using namespace std;
 
 uint8_t* DownSample(unsigned char* image, int& width, int& height, int channels)
@@ -62,62 +64,65 @@ uint8_t* DownSample(unsigned char* image, int& width, int& height, int channels)
 }
 
 int main() {
-    int width, height, channels;
-    //unsigned char* image_data = stbi_load("C:\\Users\\BoomBac\\Desktop\\MyImage01.jpg", &width, &height, &channels, 3);
-    unsigned char* image_data = stbi_load("F:\\ProjectCpp\\AiluEngine\\Engine\\Res\\Textures\\Intergalactic Spaceship_color_4.png", &width, &height, &channels, 3);
+    //cout << Add(2, 3) << endl;
+    Test a(20,"asa");
+    cout << a.name << endl;
+    //int width, height, channels;
+    ////unsigned char* image_data = stbi_load("C:\\Users\\BoomBac\\Desktop\\MyImage01.jpg", &width, &height, &channels, 3);
+    //unsigned char* image_data = stbi_load("F:\\ProjectCpp\\AiluEngine\\Engine\\Res\\Textures\\Intergalactic Spaceship_color_4.png", &width, &height, &channels, 3);
 
-    // 检查图像是否成功加载
-    if (image_data == NULL) {
-        printf("Error loading image\n");
-        return -1;
-    }
-    unsigned char* new_image_data = nullptr;
-    // 分配内存给新的四通道数组
-    int new_channels = 4;
-    if (channels != 4)
-    {
-        size_t new_size = width * height * new_channels;
-        new_image_data = (unsigned char*)malloc(new_size);
-        // 将三通道数据复制到四通道数组中
-        for (int i = 0; i < width * height; ++i) {
-            // 复制RGB值
-            memcpy(new_image_data + i * new_channels, image_data + i * channels, 3);
+    //// 检查图像是否成功加载
+    //if (image_data == NULL) {
+    //    printf("Error loading image\n");
+    //    return -1;
+    //}
+    //unsigned char* new_image_data = nullptr;
+    //// 分配内存给新的四通道数组
+    //int new_channels = 4;
+    //if (channels != 4)
+    //{
+    //    size_t new_size = width * height * new_channels;
+    //    new_image_data = (unsigned char*)malloc(new_size);
+    //    // 将三通道数据复制到四通道数组中
+    //    for (int i = 0; i < width * height; ++i) {
+    //        // 复制RGB值
+    //        memcpy(new_image_data + i * new_channels, image_data + i * channels, 3);
 
-            // 将Alpha通道设置为适当的值（例如，通过检查RGB值是否为白色来决定透明度）
-            if (image_data[i * channels] == 255 && image_data[i * channels + 1] == 255 && image_data[i * channels + 2] == 255) {
-                new_image_data[i * new_channels + 3] = 0;  // 白色为完全透明
-            }
-            else {
-                new_image_data[i * new_channels + 3] = 255;  // 其他颜色为不透明
-            }
-        }
-    }
-    else
-        new_image_data = image_data;
+    //        // 将Alpha通道设置为适当的值（例如，通过检查RGB值是否为白色来决定透明度）
+    //        if (image_data[i * channels] == 255 && image_data[i * channels + 1] == 255 && image_data[i * channels + 2] == 255) {
+    //            new_image_data[i * new_channels + 3] = 0;  // 白色为完全透明
+    //        }
+    //        else {
+    //            new_image_data[i * new_channels + 3] = 255;  // 其他颜色为不透明
+    //        }
+    //    }
+    //}
+    //else
+    //    new_image_data = image_data;
 
-    std::list<uint8_t*> mipmaps{};
-    while (width > 1)
-    {
-        try
-        {
-            auto new_image = DownSample(mipmaps.empty() ? new_image_data : mipmaps.back(), width, height, 4);
-            mipmaps.emplace_back(new_image);
-            //stbi_write_jpg(std::format("C:\\Users\\BoomBac\\Desktop\\MyImage01_{}.jpg", width).c_str(), width, height, new_channels, new_image, width * new_channels);
-            stbi_write_png(std::format("C:\\Users\\BoomBac\\Desktop\\MyImage01_{}.jpg", width).c_str(), width, height, new_channels, new_image, width * new_channels);
-        }
-        catch (const std::exception& e)
-        {
-            cout << e.what() << endl;
-        }
+    //std::list<uint8_t*> mipmaps{};
+    //while (width > 1)
+    //{
+    //    try
+    //    {
+    //        auto new_image = DownSample(mipmaps.empty() ? new_image_data : mipmaps.back(), width, height, 4);
+    //        mipmaps.emplace_back(new_image);
+    //        //stbi_write_jpg(std::format("C:\\Users\\BoomBac\\Desktop\\MyImage01_{}.jpg", width).c_str(), width, height, new_channels, new_image, width * new_channels);
+    //        stbi_write_png(std::format("C:\\Users\\BoomBac\\Desktop\\MyImage01_{}.jpg", width).c_str(), width, height, new_channels, new_image, width * new_channels);
+    //    }
+    //    catch (const std::exception& e)
+    //    {
+    //        cout << e.what() << endl;
+    //    }
 
-    }
-    for (auto it : mipmaps)
-    {
-        if(it != nullptr)
-            delete[] it;
-    }
-    // 释放内存
-    stbi_image_free(image_data);
-    free(new_image_data);
+    //}
+    //for (auto it : mipmaps)
+    //{
+    //    if(it != nullptr)
+    //        delete[] it;
+    //}
+    //// 释放内存
+    //stbi_image_free(image_data);
+    //free(new_image_data);
     return 0;
 }

@@ -9,6 +9,8 @@
 #include "Framework/Common/LogMgr.h"
 #include "CompanyEnv.h"
 
+#include "Framework/Common/Input.h"
+
 namespace Ailu
 {
 	TimeMgr* g_pTimeMgr = new TimeMgr();
@@ -23,25 +25,23 @@ namespace Ailu
 		sp_instance = this;
 		g_pLogMgr->Initialize();
 		g_pLogMgr->AddAppender(new FileAppender());
-		g_pLogMgr->Log("file log test!");
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		g_pTimeMgr->Initialize();
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
 
+
 		_p_renderer = new Renderer();
 		_p_renderer->Initialize();
 		g_pResourceMgr->Initialize();
 		g_pSceneMgr->Initialize();
-
-		PushLayer(new InputLayer());
+		_p_input_layer = new InputLayer();
+		PushLayer(_p_input_layer);
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
 		g_pTimeMgr->Mark();
-		//auto path = GetResPath("Scene/test.almap");
-		//g_pResourceMgr->SaveScene(nullptr, path);
-		g_pLogMgr->Log("init end");
+		g_pLogMgr->Log("Init end");
 		return 0;
 	}
 	void Application::Finalize()
@@ -82,7 +82,7 @@ namespace Ailu
 			for (Layer* layer : _layer_stack)
 				layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
 			_p_window->OnUpdate();
-
+			g_pResourceMgr->Tick(delta_time);
 			while (render_lag > kMsPerRender)
 			{
 				g_pSceneMgr->Tick(delta_time);
@@ -115,10 +115,26 @@ namespace Ailu
 		_b_running = false;
 		return _b_running;
 	}
+	bool Application::OnLostFoucus(WindowLostFocusEvent& e)
+	{
+		_layer_stack.PopLayer(_p_input_layer);
+		return true;
+	}
+	bool Application::OnGetFoucus(WindowFocusEvent& e)
+	{
+		_layer_stack.PushLayer(_p_input_layer);
+		return true;
+	}
 	void Application::OnEvent(Event& e)
 	{
 		EventDispather dispather(e);
 		dispather.Dispatch<WindowCloseEvent>(BIND_EVENT_HANDLER(OnWindowClose));
+		dispather.Dispatch<WindowFocusEvent>(BIND_EVENT_HANDLER(OnGetFoucus));
+		dispather.Dispatch<WindowLostFocusEvent>(BIND_EVENT_HANDLER(OnLostFoucus));
+		//static bool b_handle_input = true;
+		//if (e.GetEventType() == EEventType::kWindowLostFocus) b_handle_input = false;
+		//else if (e.GetEventType() == EEventType::kWindowFocus) b_handle_input = true;
+		//if (!b_handle_input) return;
 
 		for (auto it = _layer_stack.end(); it != _layer_stack.begin();)
 		{

@@ -116,7 +116,7 @@ namespace Ailu
 		return true;
 	}
 
-	static void CreateFromFileFXC(const std::wstring& filename, const std::string& entryPoint, const std::string& pTarget, ComPtr<ID3DBlob>& p_blob,
+	static bool CreateFromFileFXC(const std::wstring& filename, const std::string& entryPoint, const std::string& pTarget, ComPtr<ID3DBlob>& p_blob,
 		ComPtr<ID3D12ShaderReflection>& shader_reflection)
 	{
 		ID3DBlob* pErrorBlob = nullptr;
@@ -126,8 +126,13 @@ namespace Ailu
 			OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
 			pErrorBlob->Release();
 		}
-		ID3D12ShaderReflection* pReflection = NULL;
-		D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void**)&shader_reflection);
+		if (p_blob != nullptr)
+		{
+			ID3D12ShaderReflection* pReflection = NULL;
+			D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void**)&shader_reflection);
+			return true;
+		}
+		return false;
 	}
 
 	static D3D12_PRIMITIVE_TOPOLOGY ConvertTopologyToType(D3D12_PRIMITIVE_TOPOLOGY_TYPE type)
@@ -240,10 +245,14 @@ namespace Ailu
 		//rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 0u, nullptr, rootSignatureFlags);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
+		auto [sig,pso] = _pso_sys.GetBack();
+		//bool succeed = true;
+		//succeed = !FAILED(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
+		//succeed = !FAILED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&sig)));
 		ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
-		ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_p_sig)));
+		ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&sig)));
 		_pso_desc.InputLayout = { _vertex_input_layout, _vertex_input_num };
-		_pso_desc.pRootSignature = _p_sig.Get();
+		_pso_desc.pRootSignature = sig.Get();
 		_pso_desc.VS = CD3DX12_SHADER_BYTECODE(_p_vblob.Get());
 		_pso_desc.PS = CD3DX12_SHADER_BYTECODE(_p_pblob.Get());
 		_pso_desc.SampleMask = UINT_MAX;
@@ -255,7 +264,9 @@ namespace Ailu
 		_pso_desc.NodeMask = 0;
 		_pso_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 		_pso_desc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
-		ThrowIfFailed(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&_p_pso)));
+		ThrowIfFailed(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&pso)));
+		_pso_sys.Swap();
+		//succeed = !FAILED(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&pso)));
 	}
 
 	void D3DShader::LoadShaderReflection(ID3D12ShaderReflection* reflection, const EShaderType& type)
@@ -352,14 +363,17 @@ namespace Ailu
 		ifstream src(sys_path, ios::in);
 		string line;
 		vector<string> lines;
-		list<string> header_files;
+		List<String> cur_file_head_files{};
+		String parent_path = su::SubStrRange(_src_file_path,0, _src_file_path.find_last_of("/"));
 		while (getline(src, line))
 		{
 			if (su::BeginWith(line, "#include"))
 			{
 				size_t path_start = line.find_first_of("\"");
 				size_t path_end = line.find_last_of("\"");
-				header_files.emplace_back(su::SubStrRange(line, path_start + 1, path_end - 1));
+				auto head_file = su::SubStrRange(line, path_start + 1, path_end - 1);
+				_source_files.insert(parent_path + head_file);
+				cur_file_head_files.emplace_back(head_file);
 			}
 			else if (su::BeginWith(line, "Texture2D"))
 			{
@@ -383,7 +397,7 @@ namespace Ailu
 		src.close();
 		fs::path src_path(sys_path);
 		fs::path pwd = src_path.parent_path();
-		for (auto& head_file : header_files)
+		for (auto& head_file : cur_file_head_files)
 		{
 			fs::path temp = pwd;
 			temp.append(head_file);
@@ -404,12 +418,12 @@ namespace Ailu
 		return 0;
 	}
 
-	D3DShader::D3DShader(const std::string& file_name, const std::string_view shader_name, const uint32_t& id, EShaderType type)
+	D3DShader::D3DShader(const std::string& sys_path, const std::string_view shader_name, const uint32_t& id, EShaderType type)
 	{
 
 	}
 
-	D3DShader::D3DShader(const std::string& file_name, const std::string_view shader_name, const uint32_t& id) : _name(shader_name), _id(id)
+	D3DShader::D3DShader(const std::string& sys_path, const std::string_view shader_name, const uint32_t& id) : _name(shader_name), _id(id)
 	{
 		if (!_b_init_buffer)
 		{
@@ -418,7 +432,8 @@ namespace Ailu
 			_p_cbuffer = D3DContext::GetInstance()->GetCBufferPtr();
 			_b_init_buffer = true;
 		}
-		_src_file_path = file_name;
+		_src_file_path = sys_path;
+		_source_files.insert(sys_path);
 		//#if defined(_DEBUG)
 		//		// Enable better shader debugging with the graphics debugging tools.
 		//		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -472,8 +487,15 @@ namespace Ailu
 		if (seri_type == ESerializablePropertyType::kRange)
 		{
 			cur_edge = prop_type.find_first_of(",");
-			prop_param.x = static_cast<float>(std::stod(prop_type.substr(cur_edge-1,1)));
-			prop_param.y = static_cast<float>(std::stod(prop_type.substr(cur_edge+1,1)));
+			size_t left_bracket = prop_type.find_first_of("(");
+			size_t right_bracket = prop_type.find_first_of(")");
+			prop_param.x = static_cast<float>(std::stod(su::SubStrRange(prop_type, left_bracket + 1, cur_edge - 1)));
+			prop_param.y = static_cast<float>(std::stod(su::SubStrRange(prop_type, cur_edge + 1, right_bracket - 1)));
+			prop_param.z = static_cast<float>(std::stod(defalut_value));
+		}
+		else if (seri_type == ESerializablePropertyType::kFloat)
+		{
+			prop_param.z = static_cast<float>(std::stod(defalut_value));
 		}
 		else if (seri_type == ESerializablePropertyType::kColor || seri_type == ESerializablePropertyType::kVector4f)
 		{
@@ -608,12 +630,10 @@ namespace Ailu
 		if (_p_pblob != nullptr) _p_pblob->Release();
 		if (_p_v_reflection != nullptr) _p_v_reflection->Release();
 		if (_p_p_reflection != nullptr) _p_p_reflection->Release();
-		if (_p_sig != nullptr) _p_sig->Release();
 		_vertex_input_num = 0u;
 		memset(_vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
 		_shader_prop_infos.clear();
 		_variable_offset.clear();
-		_p_pso.Reset();
 	}
 
 	const List<ShaderPropertyInfo>& D3DShader::GetShaderPropertyInfos() const
@@ -634,8 +654,7 @@ namespace Ailu
 	void D3DShader::Bind()
 	{
 		auto cmdlist = D3DContext::GetInstance()->GetCmdList();
-		cmdlist->SetGraphicsRootSignature(_p_sig.Get());
-		cmdlist->SetPipelineState(_p_pso.Get());
+		_pso_sys.Bind(cmdlist);
 		cmdlist->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		if (_per_mat_buf_bind_slot == -1) return;
 		D3D12_GPU_DESCRIPTOR_HANDLE matHandle;
@@ -652,8 +671,7 @@ namespace Ailu
 		}
 		static auto cmdlist = D3DContext::GetInstance()->GetCmdList();
 		static auto context = D3DContext::GetInstance();
-		cmdlist->SetPipelineState(_p_pso.Get());
-		cmdlist->SetGraphicsRootSignature(_p_sig.Get());
+		_pso_sys.Bind(cmdlist);
 		cmdlist->IASetPrimitiveTopology(_topology);
 		if (_per_mat_buf_bind_slot != -1)
 			cmdlist->SetGraphicsRootConstantBufferView(_per_mat_buf_bind_slot, context->GetCBufferViewDesc(1 + index).BufferLocation);
@@ -676,7 +694,7 @@ namespace Ailu
 		return _bind_res_infos;
 	}
 
-	void D3DShader::Compile()
+	bool D3DShader::Compile()
 	{
 		ComPtr<ID3D12ShaderReflection> _tmp_p_v_reflection;
 		ComPtr<ID3D12ShaderReflection> _tmp_p_p_reflection;
@@ -691,21 +709,35 @@ namespace Ailu
 			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			CreateFromFileFXC(ToWChar(_src_file_path.data()), "VSMain", "vs_5_0", _tmp_p_vblob, _tmp_p_v_reflection);
-			CreateFromFileFXC(ToWChar(_src_file_path.data()), "PSMain", "ps_5_0", _tmp_p_pblob, _tmp_p_p_reflection);
+			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "VSMain", "vs_5_0", _tmp_p_vblob, _tmp_p_v_reflection);
+			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "PSMain", "ps_5_0", _tmp_p_pblob, _tmp_p_p_reflection);
 #endif // SHADER_DXC
 		}
 		catch (const std::exception&)
 		{
 			succeed = false;
 			g_pLogMgr->LogErrorFormat("Compile shader with src {0} failed!", _src_file_path);
+			return false;
 		}
+		is_error = !succeed;
 		if (succeed)
 		{
 			Reset();
 			PreProcessShader();
 			LoadShaderReflection(_tmp_p_v_reflection.Get(), EShaderType::kVertex);
 			LoadShaderReflection(_tmp_p_p_reflection.Get(), EShaderType::kPixel);
+			{
+				auto it = _shader_prop_infos.begin();
+				while (it != _shader_prop_infos.end())
+				{
+					if (!_bind_res_infos.contains(it->_value_name))
+					{
+						it = _shader_prop_infos.erase(it);
+					}
+					else
+						it++;
+				}
+			}
 			LoadAdditionalShaderReflection(_src_file_path);
 			_p_vblob = _tmp_p_vblob;
 			_p_pblob = _tmp_p_pblob;
@@ -716,7 +748,9 @@ namespace Ailu
 			if (it != _bind_res_infos.end()) _per_mat_buf_bind_slot = it->second._bind_slot;
 			it = _bind_res_infos.find(RenderConstants::kCBufNameSceneState);
 			if (it != _bind_res_infos.end()) _per_frame_buf_bind_slot = it->second._bind_slot;
+			return true;
 		}
+		return false;
 	}
 
 	void D3DShader::SetGlobalVector(const std::string& name, const Vector4f& vector)
@@ -750,6 +784,20 @@ namespace Ailu
 	const Vector<String>& D3DShader::GetVSInputSemanticSeqences() const
 	{
 		return _semantic_seq;
+	}
+
+	Vector<Material*> D3DShader::GetAllReferencedMaterials()
+	{
+		Vector<Material*> ret;
+		ret.reserve(_reference_mats.size());
+		for (auto it = _reference_mats.begin(); it != _reference_mats.end(); it++)
+			ret.emplace_back(*it);
+		return ret;
+	}
+
+	const std::set<String>& D3DShader::GetSourceFiles() const
+	{
+		return _source_files;
 	}
 
 	Vector4f D3DShader::GetVectorValue(const std::string& name)
@@ -797,9 +845,10 @@ namespace Ailu
 		return _src_file_path;
 	}
 
-	ComPtr<ID3D12RootSignature> D3DShader::GetSignature() const
+	ID3D12RootSignature* D3DShader::GetSignature()
 	{
-		return _p_sig;
+		auto [sig, pso] = _pso_sys.GetFront();
+		return sig.Get();
 	}
 	ID3D12ShaderReflection* D3DShader::GetD3DReflectionInfo() const
 	{

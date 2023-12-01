@@ -104,7 +104,7 @@ namespace Ailu
 		virtual void Bind() = 0;
 		virtual std::string GetName() const = 0;
 		virtual uint32_t GetID() const = 0;
-		virtual void Compile() = 0;
+		virtual bool Compile() = 0;
 		virtual void SetGlobalVector(const std::string& name, const Vector4f& vector) = 0;
 		virtual void SetGlobalVector(const std::string& name, const Vector3f& vector) = 0;
 		virtual void SetGlobalVector(const std::string& name, const Vector2f& vector) = 0;
@@ -116,6 +116,8 @@ namespace Ailu
 		virtual const String& GetSrcPath() const = 0;
 		virtual const Vector<String>& GetVSInputSemanticSeqences() const= 0;
 		static Ref<Shader> Create(const std::string& file_name);
+		virtual const std::set<String>& GetSourceFiles() const = 0;
+		virtual Vector<class Material*> GetAllReferencedMaterials() = 0;
 	protected:
 		virtual void AddMaterialRef(class Material* mat) = 0;
 		virtual void RemoveMaterialRef(class Material* mat) = 0;
@@ -167,6 +169,14 @@ namespace Ailu
 			auto it = s_shader_name.find(name);
 			if (it != s_shader_name.end()) return it->second;
 			else return s_error_id;
+		}
+		static auto ShaderBegin()
+		{
+			return s_shader_library.begin();
+		}
+		static auto ShaderEnd()
+		{
+			return s_shader_library.end();
 		}
 	private:
 		inline static uint32_t s_shader_id = 0u;

@@ -9,19 +9,19 @@ namespace Ailu
 	{
 		//--------------------Reflect
 	protected: 
-		std::unordered_map<String, SerializableProperty> properties{}; 
+		std::unordered_map<String, SerializableProperty> _properties{}; 
 	public: 
 		template<typename T> T GetProperty(const String& name) 
 		{
-			return *reinterpret_cast<T*>(properties.find(name)->second._value_ptr);
+			return *reinterpret_cast<T*>(_properties.find(name)->second._value_ptr);
 		} 
 		SerializableProperty& GetProperty(const String& name) 
 		{
-			return properties.find(name)->second;
+			return _properties.find(name)->second;
 		}
 		std::unordered_map<String, SerializableProperty>& GetAllProperties() 
 		{
-			return properties;
+			return _properties;
 		}
 		//--------------------Reflect
 		DECLARE_PROTECTED_PROPERTY(name,Name,String)

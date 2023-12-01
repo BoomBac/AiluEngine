@@ -17,13 +17,44 @@ namespace Ailu
 {
 	class D3DShader : public Shader
 	{
+		struct PSOSystem
+		{
+			inline std::tuple<ComPtr<ID3D12RootSignature>&, ComPtr<ID3D12PipelineState>&> GetFront()
+			{
+				return _b_current_is_a ? std::tie(_p_sig_a, _p_pso_a) : std::tie(_p_sig_b, _p_pso_b);
+			}
+			inline std::tuple<ComPtr<ID3D12RootSignature>&, ComPtr<ID3D12PipelineState>&> GetBack()
+			{
+				auto& sig = !_b_current_is_a ? _p_sig_a : _p_sig_b;
+				auto& pso = !_b_current_is_a ? _p_pso_a : _p_pso_b;
+				sig.Reset();
+				pso.Reset();
+				return std::tie(sig, pso);
+			}
+			void Bind(ID3D12GraphicsCommandList* cmd)
+			{
+				auto [sig, pso] = GetFront();
+				cmd->SetPipelineState(pso.Get());
+				cmd->SetGraphicsRootSignature(sig.Get());
+			}
+			inline void Swap()
+			{
+				_b_current_is_a = !_b_current_is_a;
+			}
+		private:
+			bool _b_current_is_a = true;
+			ComPtr<ID3D12RootSignature> _p_sig_a;
+			ComPtr<ID3D12PipelineState> _p_pso_a;
+			ComPtr<ID3D12RootSignature> _p_sig_b;
+			ComPtr<ID3D12PipelineState> _p_pso_b;
+		};
 	public:
-		D3DShader(const std::string& file_name, const std::string_view shader_name, const uint32_t& id ,EShaderType type);
-		D3DShader(const std::string& file_name, const std::string_view shader_name,const uint32_t& id);
+		D3DShader(const std::string& sys_path, const std::string_view shader_name, const uint32_t& id ,EShaderType type);
+		D3DShader(const std::string& sys_path, const std::string_view shader_name,const uint32_t& id);
 		~D3DShader();
 		void Bind() override;
 		void Bind(uint32_t index) override;
-		void Compile() final;
+		bool Compile() final;
 
 		inline std::string GetName() const override;
 		inline uint32_t GetID() const override;
@@ -34,11 +65,13 @@ namespace Ailu
 		void SetGlobalMatrix(const std::string& name, const Matrix4x4f& mat) override;
 		void SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat) override;
 		const Vector<String>& GetVSInputSemanticSeqences() const final;
+		Vector<Material*> GetAllReferencedMaterials() final;
+		const std::set<String>& GetSourceFiles() const final;
 		Vector4f GetVectorValue(const std::string& name);
 		float GetFloatValue(const std::string& name);
 		void* GetByteCode(EShaderType type) override;
 		const String& GetSrcPath() const final;
-		ComPtr<ID3D12RootSignature> GetSignature() const;
+		ID3D12RootSignature* GetSignature();
 		ID3D12ShaderReflection* GetD3DReflectionInfo() const;
 		ID3D12ShaderReflection* GetD3DReflectionInfo(const EShaderType& type) const;
 		const D3D12_GRAPHICS_PIPELINE_STATE_DESC& GetD3DPSODesc() const { return _pso_desc; }
@@ -57,6 +90,7 @@ namespace Ailu
 		void GenerateInternalPSO();
 
 	private:
+		bool is_error;
 		String _vert_entry, _pixel_entry;
 		D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
 		uint8_t _vertex_input_num = 0u;
@@ -64,7 +98,7 @@ namespace Ailu
 		short _per_mat_buf_bind_slot = -1;
 		i8 _per_frame_buf_bind_slot = -1;
 		std::unordered_map<std::string,ShaderBindResourceInfo> _bind_res_infos{};
-
+		PSOSystem _pso_sys;
 		std::string _name = "DefaultShader";
 		Vector<String> _semantic_seq;
 		uint32_t _id;
@@ -72,18 +106,16 @@ namespace Ailu
 		uint32_t _desc_size = 0;
 		ComPtr<ID3DBlob> _p_vblob = nullptr;
 		ComPtr<ID3DBlob> _p_pblob = nullptr;
-		uint8_t* _p_cbuffer = nullptr;
+		inline static u8* _p_cbuffer = nullptr;
 		inline static ComPtr<ID3D12DescriptorHeap> m_cbvHeap = nullptr;
-		ComPtr<ID3D12RootSignature> _p_sig;
 		ComPtr<ID3D12ShaderReflection> _p_v_reflection;
 		ComPtr<ID3D12ShaderReflection> _p_p_reflection;
 		D3D12_PRIMITIVE_TOPOLOGY _topology;
 		std::map<std::string, uint16_t> _variable_offset;
-		inline static ComPtr<ID3D12RootSignature> s_active_sig;
 		List<ShaderPropertyInfo> _shader_prop_infos;
-		ComPtr<ID3D12PipelineState> _p_pso;
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC _pso_desc;
 		std::set<Material*> _reference_mats;
+		std::set<String> _source_files;
 	};
 }
 

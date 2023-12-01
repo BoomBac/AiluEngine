@@ -1,8 +1,8 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: Perspective
-  Position: -1034.23,2419.15,-4254.71
-  Rotation: 7.54456,24.0488,0
+  Position: -2773.59,3692.32,-2976.05
+  Rotation: 41.5933,46.2471,0
   Fov: 60
   Aspect: 1.77778
   Near: 345.19

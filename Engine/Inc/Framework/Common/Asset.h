@@ -53,6 +53,7 @@ namespace Ailu
 			case Ailu::EAssetType::kUndefined:
 				return kUndefined;
 			}
+			return kUndefined;
 		}
 		static EAssetType GetType(const std::string& type_str)
 		{

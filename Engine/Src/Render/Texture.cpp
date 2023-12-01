@@ -28,7 +28,7 @@ namespace Ailu
 	}
 	void Texture2D::FillData(Vector<u8*> datas)
 	{
-		_mipmap_count = datas.size();
+		_mipmap_count = static_cast<u8>(datas.size());
 		for (auto p : datas)
 			_p_datas.emplace_back(p);
 	}
@@ -36,11 +36,15 @@ namespace Ailu
 	{
 
 	}
-	uint8_t* Texture2D::GetNativePtr()
+	uint8_t* Texture2D::GetCPUNativePtr()
 	{
 		return _p_datas.front();
 	}
-	const ETextureType& Texture2D::GetTextureType() const
+	void* Texture2D::GetGPUNativePtr()
+	{
+		return nullptr;
+	}
+	const ETextureType Texture2D::GetTextureType() const
 	{
 		return ETextureType::kTexture2D;
 	}
@@ -107,13 +111,45 @@ namespace Ailu
 	{
 	}
 
-	uint8_t* TextureCubeMap::GetNativePtr()
+	uint8_t* TextureCubeMap::GetCPUNativePtr()
 	{
 		return _p_datas[0];
 	}
-	const ETextureType& TextureCubeMap::GetTextureType() const
+	void* TextureCubeMap::GetGPUNativePtr()
+	{
+		return nullptr;
+	}
+	const ETextureType TextureCubeMap::GetTextureType() const
 	{
 		return ETextureType::kTextureCubeMap;
 	}
 	//----------------------------------------------------------TextureCubeMap---------------------------------------------------------------------
+
+	Ref<RenderTexture> RenderTexture::Create(const uint16_t& width, const uint16_t& height, String name, EALGFormat format)
+	{
+		return Ref<RenderTexture>();
+	}
+
+	void RenderTexture::Bind(uint8_t slot) const
+	{
+	}
+
+	//----------------------------------------------------------RenderTexture---------------------------------------------------------------------
+	uint8_t* RenderTexture::GetCPUNativePtr()
+	{
+		return nullptr;
+	}
+	void* RenderTexture::GetGPUNativePtr()
+	{
+		return nullptr;
+	}
+	const ETextureType RenderTexture::GetTextureType() const
+	{
+		return ETextureType::kRenderTexture;
+	}
+	void RenderTexture::Transition(ETextureResState state)
+	{
+		_state = state;
+	}
+	//----------------------------------------------------------RenderTexture---------------------------------------------------------------------
 }

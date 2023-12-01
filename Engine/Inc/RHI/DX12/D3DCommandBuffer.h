@@ -30,6 +30,7 @@ namespace Ailu
 		void SetScissorRects(const std::initializer_list<Viewport>& rects);
 		void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform,const Ref<Material>& material,uint32_t instance_count = 1u);
         void SetPSO(GraphicsPipelineState* pso);
+        void SetRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth);
 	private:
 		uint32_t _id = 0u;
 		inline static Vector4f _clear_color = { 0.3f, 0.2f, 0.4f, 1.0f };

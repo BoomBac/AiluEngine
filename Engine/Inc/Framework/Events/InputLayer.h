@@ -11,6 +11,7 @@ namespace Ailu
 	{
 	public:
 		InputLayer();
+		InputLayer(const String& name);
 		~InputLayer();
 
 		void OnAttach() override;
@@ -19,6 +20,7 @@ namespace Ailu
 		void OnImguiRender() override;
 		void OnUpdate(float delta_time) override;
 	private:
+		bool _b_handle_input;
 		CameraState* _origin_cam_state;
 		CameraState* _target_cam_state;
 

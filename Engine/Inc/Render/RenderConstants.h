@@ -70,7 +70,7 @@ namespace Ailu
 	struct RenderConstants
 	{
 		constexpr static uint8_t  kFrameCount = 2u;
-		constexpr static uint16_t kMaxMaterialDataCount = 4u;
+		constexpr static uint16_t kMaxMaterialDataCount = 8u;
 		constexpr static uint32_t kMaxRenderObjectCount = 8u;
 		constexpr static uint32_t kMaxTextureCount = 8u;
 		constexpr static uint32_t KMaxDynamicVertexNum = 2048;

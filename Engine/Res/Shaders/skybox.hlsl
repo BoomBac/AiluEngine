@@ -4,11 +4,18 @@
 //pixel: PSMain
 //Cull: Front
 //Queue: Opaque
+//Properties
+//{
+//	color("Color",Color) = (1,1,1,1)
+//	expo("Exposure",Range(0,4)) = 1
+//  TestTex("TestTex",Texture2D) = "white"
+//}
 //info end
 
 #include "common.hlsl"
 
 TextureCube SkyBox : register(t0);
+Texture2D TestTex : register(t1);
 
 SamplerState g_LinearSampler : register(s0);
 
@@ -24,6 +31,11 @@ struct PSInput
 	float3 wnormal : NORMAL;
 };
 
+CBufBegin
+	float expo;
+	float4 color;
+CBufEnd
+
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
@@ -35,5 +47,6 @@ PSInput VSMain(VSInput v)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	return float4(SkyBox.Sample(g_LinearSampler,input.wnormal).rgb,1.0);
+	return float4(SkyBox.Sample(g_LinearSampler,input.wnormal).rgb * expo * color.rgb + TestTex.Sample(g_LinearSampler,input.wnormal.xy).rgb,1.0);
+	//return float4(SkyBox.Sample(g_LinearSampler,input.wnormal).rgb * 2.0f,1.0) ; 
 }

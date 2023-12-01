@@ -25,7 +25,7 @@ namespace Ailu
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_color_4.png");
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_emi.jpg");
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_nmap_2_Tris.jpg");
-		Vector<String> default_cubemaps {
+		Vector<String> default_cubemaps{
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/right.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/left.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/top.jpg",
@@ -36,12 +36,12 @@ namespace Ailu
 		LoadTexture(default_cubemaps, "cubemap_sea");
 		LoadAsset("Materials/StandardPBR_new.alasset")->IsInternal(true);
 		LoadAsset("Materials/WireFrame_new.alasset");
-		auto skybox = MaterialPool::CreateMaterial(ShaderLibrary::Add("Shaders/skybox.hlsl"),"Skybox");
+		auto skybox = MaterialPool::CreateMaterial(ShaderLibrary::Add("Shaders/skybox.hlsl"), "Skybox");
 		skybox->IsInternal(false);
 		skybox->OriginPath("Skybox");
 		skybox->SetTexture("SkyBox", "cubemap_sea");
-		MaterialPool::CreateMaterial(ShaderLibrary::Add("Shaders/error_fallback.hlsl"),"Error")->OriginPath("Error");
-		
+		MaterialPool::CreateMaterial(ShaderLibrary::Add("Shaders/error_fallback.hlsl"), "Error")->OriginPath("Error");
+
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
 		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());
@@ -77,11 +77,12 @@ namespace Ailu
 	}
 	void ResourceMgr::Tick(const float& delta_time)
 	{
+		SubmitResourceTask();
 	}
 
 	void ResourceMgr::SaveScene(Scene* scene, std::string& scene_path)
 	{
-		g_thread_pool->Enqueue(&ResourceMgr::SaveSceneImpl, this, scene, scene_path);
+
 	}
 
 	Scene* ResourceMgr::LoadScene(std::string& scene_path)
@@ -209,7 +210,7 @@ namespace Ailu
 		//为了写入通用资产头信息，暂时使用追加方式打开
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
 		out_mat << "shader_path: " << ShaderLibrary::GetShaderPath(mat->_p_shader->GetName());
-		for (auto& prop : mat->properties)
+		for (auto& prop : mat->_properties)
 		{
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
 		}
@@ -240,7 +241,7 @@ namespace Ailu
 		auto float_props = mat->GetAllFloatValue();
 		auto vector_props = mat->GetAllVectorValue();
 		out_mat << "  prop_type: " << "Float" << endl;
-		for (auto& [name,value] : float_props)
+		for (auto& [name, value] : float_props)
 		{
 			out_mat << "    " << name << ": " << value << endl;
 		}
@@ -254,7 +255,8 @@ namespace Ailu
 		{
 			if (prop->_type == ESerializablePropertyType::kTexture2D)
 			{
-				String tex_path = prop->_value_ptr == nullptr ? "none" : SerializableProperty::GetProppertyValue<String>(*prop);
+				auto tex = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(*prop);
+				String tex_path = tex.has_value() ? std::reinterpret_pointer_cast<Texture2D>(std::get<1>(tex.value()))->AssetPath() : "none";
 				out_mat << "    " << prop->_name << ": " << tex_path << endl;
 			}
 		}
@@ -304,7 +306,7 @@ namespace Ailu
 				cur_type = v;
 				continue;
 			}
-			auto prop = mat->properties.find(k);
+			auto prop = mat->_properties.find(k);
 			if (cur_type == ShaderPropertyType::Color)
 			{
 				Vector4f vec{};
@@ -354,8 +356,8 @@ namespace Ailu
 				continue;
 			}
 #ifdef OLD
-			auto prop = mat->properties.find(k);
-			if (prop != mat->properties.end())
+			auto prop = mat->_properties.find(k);
+			if (prop != mat->_properties.end())
 			{
 				if (cur_type == ShaderPropertyType::Color)
 				{
@@ -384,13 +386,13 @@ namespace Ailu
 			{
 				float f;
 				if (sscanf_s(v.c_str(), "%f", &f) == 1)
-					mat->SetFloat(k,f);
+					mat->SetFloat(k, f);
 				else LOG_WARNING("Load material: {},property {} failed!", mat->_name, k);
 			}
 			else if (cur_type == ShaderPropertyType::Vector)
 			{
 				Vector4f vec{};
-				if (sscanf_s(v.c_str(), "%f,%f,%f,%f", &vec.r, &vec.g, &vec.b, &vec.a) == 4) 
+				if (sscanf_s(v.c_str(), "%f,%f,%f,%f", &vec.r, &vec.g, &vec.b, &vec.a) == 4)
 					mat->SetVector(k, vec);
 				else LOG_WARNING("Load material: {},property {} failed!", mat->_name, k);
 			}
@@ -420,7 +422,9 @@ namespace Ailu
 	{
 		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
 		String sys_path = kEngineResRootPath + asset_path;
-		return TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path,10));
+		auto tex = TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path, 10));
+		tex->AssetPath(asset_path);
+		return tex;
 		//return TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path));
 	}
 
@@ -432,7 +436,9 @@ namespace Ailu
 		{
 			sys_paths.emplace_back(kEngineResRootPath + asset_path);
 		}
-		return TexturePool::Add(name.empty()? asset_paths[0] : name, png_parser->Parser(sys_paths));
+		auto tex = TexturePool::Add(name.empty() ? asset_paths[0] : name, png_parser->Parser(sys_paths));
+		tex->AssetPath(asset_paths);
+		return tex;
 	}
 
 	Material* ResourceMgr::LoadAsset(const String& asset_path)
@@ -464,18 +470,19 @@ namespace Ailu
 		return mat.get();
 	}
 
-	void ResourceMgr::SaveSceneImpl(Scene* scene, std::string& scene_path)
+	void ResourceMgr::AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback)
 	{
-		std::ofstream outputFile(scene_path);
-		if (!outputFile.is_open())
-		{
-			std::cerr << "无法打开文件" << std::endl;
-		}
-		outputFile << "这是要写入到文件的文本内容." << std::endl;
-		outputFile << "可以写入更多内容." << std::endl;
-		LOG_WARNING("Save scene to {}", scene_path);
-		outputFile.close();
+		_task_queue.emplace_back([=]() {
+			task();
+			callback();
+			});
 	}
+
+	void ResourceMgr::AddResourceTask(ResourceTask task)
+	{
+		_task_queue.emplace_back(task);
+	}
+
 	void ResourceMgr::WatchDirectory()
 	{
 		namespace fs = std::filesystem;
@@ -491,22 +498,43 @@ namespace Ailu
 					current_files[entry.path()] = fs::last_write_time(entry.path());
 				}
 			}
-
 			for (const auto& [file, last_write_time] : current_files)
 			{
 				if (files.contains(file) && files[file] != last_write_time)
 				{
-					auto shader = ShaderLibrary::Get(GetFileName(file.string()));
-					if (shader)
+					for (auto it = ShaderLibrary::ShaderBegin(); it != ShaderLibrary::ShaderEnd(); it++)
 					{
-						LOG_INFO("File: {0} been modified! {1}", file.string(), shader ? shader->GetName() : "null");
-						shader->Compile();
+						for (auto& head_file : it->second->GetSourceFiles())
+						{
+							if (head_file == file.string())
+							{
+								AddResourceTask([=]() {
+									if (it->second->Compile())
+									{
+										auto mats = it->second->GetAllReferencedMaterials();
+										for (auto mat = mats.begin(); mat != mats.end(); mat++)
+											(*mat)->ChangeShader(it->second);
+										LOG_INFO("Compile shader {} succeed!", it->second->GetName());
+									}
+									else
+										LOG_ERROR("Compile shader {} failed!", it->second->GetName());
+									});
+								break;
+							}
+						}
 					}
-
 				}
 				files[file] = last_write_time;
 			}
 			std::this_thread::sleep_for(sleep_duration);
 		}
+	}
+	void ResourceMgr::SubmitResourceTask()
+	{
+		for (auto& task : _task_queue)
+		{
+			g_thread_pool->Enqueue(std::move(task));
+		}
+		_task_queue.clear();
 	}
 }

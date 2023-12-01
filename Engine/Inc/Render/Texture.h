@@ -9,6 +9,8 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ThreadPool.h"
 
+#include "Framework/Common/Reflect.h"
+
 
 namespace Ailu
 {
@@ -82,24 +84,26 @@ namespace Ailu
 
 	enum class ETextureType
 	{
-		kTexture2D = 0,kTextureCubeMap
+		kTexture2D = 0,kTextureCubeMap,kRenderTexture
 	};
 	class Texture
 	{
 	public:
 		virtual ~Texture() = default;
-		virtual uint8_t* GetNativePtr() = 0;
+		virtual uint8_t* GetCPUNativePtr() = 0;
+		virtual void* GetGPUNativePtr() = 0;
 		virtual const uint16_t& GetWidth() const = 0;
 		virtual const uint16_t& GetHeight() const = 0;
 		virtual void Release() = 0;
 		virtual void Bind(uint8_t slot) const = 0;
 		virtual void Name(const std::string& name) = 0;
 		virtual const std::string& Name() const = 0;
-		virtual const ETextureType& GetTextureType() const = 0;
+		virtual const ETextureType GetTextureType() const = 0;
 	};
 
 	class Texture2D : public Texture
 	{
+		DECLARE_PROTECTED_PROPERTY(path,AssetPath,String)
 	public:
 		static Ref<Texture2D> Create(const uint16_t& width, const uint16_t& height,EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
 		virtual void FillData(uint8_t* data);
@@ -107,8 +111,9 @@ namespace Ailu
 		virtual void Bind(uint8_t slot) const override;
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
-		uint8_t* GetNativePtr() override;
-		const ETextureType& GetTextureType() const final;
+		uint8_t* GetCPUNativePtr() override;
+		void* GetGPUNativePtr()override;
+		const ETextureType GetTextureType() const final;
 	public:
 		void Name(const std::string& name) override;
 		const std::string& Name() const override;
@@ -123,14 +128,16 @@ namespace Ailu
 
 	class TextureCubeMap : public Texture
 	{
+		DECLARE_PROTECTED_PROPERTY(path, AssetPath, Vector<String>)
 	public:
 		static Ref<TextureCubeMap> Create(const uint16_t& width, const uint16_t& height, EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
 		virtual void FillData(Vector<u8*>& data);
 		virtual void Bind(u8 slot) const override;
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
-		uint8_t* GetNativePtr() override;
-		const ETextureType& GetTextureType() const final;
+		uint8_t* GetCPUNativePtr() override;
+		void* GetGPUNativePtr()override;
+		const ETextureType GetTextureType() const final;
 		void Name(const std::string& name) override { _name = name; };
 		const std::string& Name() const override { { return _name; } };
 	protected:
@@ -139,6 +146,34 @@ namespace Ailu
 		uint16_t _width, _height;
 		uint8_t _channel;
 		EALGFormat _format;
+	};
+
+	enum class ETextureResState : u8
+	{
+		kDefault, kRenderTagret, kShaderResource
+	};
+
+	class RenderTexture : public Texture
+	{
+	public:
+		static Ref<RenderTexture> Create(const uint16_t& width, const uint16_t& height, String name,EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
+		virtual void Bind(uint8_t slot) const override;
+		const uint16_t& GetWidth() const final { return _width; };
+		const uint16_t& GetHeight() const final { return _height; };
+		uint8_t* GetCPUNativePtr() override;
+		void* GetGPUNativePtr()override;
+		const ETextureType GetTextureType() const final;
+		virtual void Transition(ETextureResState state);
+	public:
+		void Name(const std::string& name) override { _name = name; };
+		const std::string& Name() const override { return _name; };
+	protected:
+		ETextureResState _state;
+		std::string _name;
+		uint16_t _width, _height;
+		uint8_t _channel;
+		EALGFormat _format;
+		u8 _mipmap_count;
 	};
 
 	class TexturePool

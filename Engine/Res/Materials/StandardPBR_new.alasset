@@ -3,13 +3,13 @@ type: material
 name: StandardPBR
 shader_path: Shaders/shaders.hlsl
   prop_type: Float
-    RoughnessValue: 0
+    RoughnessValue: 0.026
     MetallicValue: 0
     SamplerMask: 4.2039e-45
   prop_type: Vector
-    BaseColor: 0.97549,0.97549,0.97549,0
-    EmssiveColor: 1,0,0,1
     SpecularColor: 0.0600731,0.245098,0.0655149,4.2039e-45
+    BaseColor: 0.97549,0.97549,0.97549,0
+    EmssiveColor: 0,0,0,1
   prop_type: Texture2D
     Specular: none
     Metallic: none

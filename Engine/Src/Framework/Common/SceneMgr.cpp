@@ -218,6 +218,7 @@ namespace Ailu
 				else ++cur_index;
 			}
 		}
+		return _all_objects.front();
 	}
 
 	void Scene::MarkDirty()
