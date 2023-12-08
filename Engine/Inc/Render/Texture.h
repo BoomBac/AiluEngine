@@ -92,6 +92,7 @@ namespace Ailu
 		virtual ~Texture() = default;
 		virtual uint8_t* GetCPUNativePtr() = 0;
 		virtual void* GetGPUNativePtr() = 0;
+		virtual void* GetNativeCPUHandle() = 0;
 		virtual const uint16_t& GetWidth() const = 0;
 		virtual const uint16_t& GetHeight() const = 0;
 		virtual void Release() = 0;
@@ -99,6 +100,7 @@ namespace Ailu
 		virtual void Name(const std::string& name) = 0;
 		virtual const std::string& Name() const = 0;
 		virtual const ETextureType GetTextureType() const = 0;
+		virtual const u8& GetMipmap() const = 0;
 	};
 
 	class Texture2D : public Texture
@@ -112,8 +114,10 @@ namespace Ailu
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
 		uint8_t* GetCPUNativePtr() override;
+		void* GetNativeCPUHandle() override;
 		void* GetGPUNativePtr()override;
 		const ETextureType GetTextureType() const final;
+		const u8& GetMipmap() const final { return _mipmap_count; };
 	public:
 		void Name(const std::string& name) override;
 		const std::string& Name() const override;
@@ -136,21 +140,38 @@ namespace Ailu
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
 		uint8_t* GetCPUNativePtr() override;
+		void* GetNativeCPUHandle() override;
 		void* GetGPUNativePtr()override;
 		const ETextureType GetTextureType() const final;
 		void Name(const std::string& name) override { _name = name; };
 		const std::string& Name() const override { { return _name; } };
+		const u8& GetMipmap() const final { return _mipmap_count; };
 	protected:
 		std::string _name;
 		Vector<u8*> _p_datas;
 		uint16_t _width, _height;
 		uint8_t _channel;
 		EALGFormat _format;
+		u8 _mipmap_count;
 	};
 
 	enum class ETextureResState : u8
 	{
 		kDefault, kRenderTagret, kShaderResource
+	};
+
+	struct RTHandle
+	{
+	public:
+		u32 _id;
+		String _name;
+		RTHandle(const String& name) : _name(name)
+		{
+			_id = s_global_rt_id++;
+		};
+		RTHandle() : RTHandle("TempRT_" + s_global_rt_id) {};
+	private:
+		inline static u32 s_global_rt_id = 0u;
 	};
 
 	class RenderTexture : public Texture
@@ -160,14 +181,17 @@ namespace Ailu
 		virtual void Bind(uint8_t slot) const override;
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
-		uint8_t* GetCPUNativePtr() override;
+		void* GetNativeCPUHandle() override;
+
 		void* GetGPUNativePtr()override;
 		const ETextureType GetTextureType() const final;
 		virtual void Transition(ETextureResState state);
-	public:
+		const RTHandle& GetRTHandle() const { return _rt_handle; }
 		void Name(const std::string& name) override { _name = name; };
 		const std::string& Name() const override { return _name; };
+		const u8& GetMipmap() const final { return _mipmap_count; };
 	protected:
+		RTHandle _rt_handle;
 		ETextureResState _state;
 		std::string _name;
 		uint16_t _width, _height;

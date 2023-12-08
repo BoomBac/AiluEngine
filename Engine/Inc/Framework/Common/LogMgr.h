@@ -99,6 +99,15 @@ namespace Ailu
 		}
 
 		template <typename... Args>
+		void LogErrorFormat(std::wstring_view msg, Args&&... args)
+		{
+			for (auto& appender : _appenders)
+			{
+				appender->Print(BuildLogMsg(ELogLevel::kError, msg, args...));
+			}
+		}
+
+		template <typename... Args>
 		void LogWarningFormat(std::string_view msg, Args&&... args)
 		{
 			for (auto& appender : _appenders)

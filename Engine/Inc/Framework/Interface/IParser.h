@@ -26,6 +26,7 @@ namespace Ailu
 	public:
 		virtual ~IMeshParser() = default;
 		virtual List<Ref<Mesh>> Parser(std::string_view sys_path) = 0;
+		virtual List<Ref<Mesh>> Parser(const WString& sys_path) = 0;
 	};
 
 	class ITextureParser

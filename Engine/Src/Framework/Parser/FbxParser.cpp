@@ -4,6 +4,7 @@
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Utils.h"
 
 using fbxsdk::FbxNodeAttribute;
 using fbxsdk::FbxCast;
@@ -24,54 +25,12 @@ namespace Ailu
 	static Vector3f scale_factor{};
 	List<Ref<Mesh>> FbxParser::Parser(std::string_view sys_path)
 	{
-		FbxScene* fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
-		List<Ref<Mesh>> loaded_meshs{};
-		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(sys_path.data(), -1, fbx_manager_->GetIOSettings()))
-			return loaded_meshs;
-		fbx_importer_->Import(fbx_scene);
-		FbxNode* fbx_rt = fbx_scene->GetRootNode();
-		fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(fbx_scene);
-		if (fbx_scene->GetGlobalSettings().GetSystemUnit() != fbxsdk::FbxSystemUnit::cm)
-		{
-			const FbxSystemUnit::ConversionOptions lConversionOptions = {
-			false, /* mConvertRrsNodes */
-			true, /* mConvertAllLimits */
-			true, /* mConvertClusters */
-			true, /* mConvertLightIntensity */
-			true, /* mConvertPhotometricLProperties */
-			true  /* mConvertCameraClipPlanes */
-			};
-			fbxsdk::FbxSystemUnit::cm.ConvertScene(fbx_scene, lConversionOptions);
-		}	
-		if (fbx_rt != nullptr)
-		{
-			auto child_num = fbx_rt->GetChildCount();
-			for (int i = 0; i < child_num; i++)
-			{
-				FbxNode* fbx_node = fbx_rt->GetChild(i);
-				FbxNodeAttribute* attribute = fbx_node->GetNodeAttribute();
-				std::string node_name = fbx_node->GetName();
-				auto type = attribute->GetAttributeType();
-				if (attribute->GetAttributeType() == FbxNodeAttribute::eMesh)
-				{
-					fbxsdk::FbxMesh* fbx_mesh = FbxCast<fbxsdk::FbxMesh>(attribute);
-					Ref<Mesh> mesh = MakeRef<Mesh>(node_name);
-					FbxAMatrix transformMatrix = fbx_node->EvaluateGlobalTransform();
-					FbxVector4 scale = transformMatrix.GetS();
-					scale_factor.x = scale[0];
-					scale_factor.y = scale[1];
-					scale_factor.z = scale[2];
-					if (!GenerateMesh(mesh, fbx_mesh)) continue;
-					mesh->Build();
-					loaded_meshs.emplace_back(mesh);
-				}
-			}
-		}
-		if (loaded_meshs.empty())
-		{
-			g_pLogMgr->LogErrorFormat("Load fbx from path {} failed!",sys_path);		
-		}
-		return loaded_meshs;
+		// Convert string to wstring
+		return ParserImpl(ToWChar(sys_path.data()));
+	}
+	List<Ref<Mesh>> FbxParser::Parser(const WString& sys_path)
+	{
+		return ParserImpl(sys_path);
 	}
 	Ailu::FbxParser::~FbxParser()
 	{
@@ -485,6 +444,57 @@ namespace Ailu
 		mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(normal_buf)));
 		mesh->SetVertices(std::move(reinterpret_cast<Vector3f*>(vertex_buf)));
 		mesh->SetIndices(std::move(reinterpret_cast<uint32_t*>(index_buf)));
+	}
+	List<Ref<Mesh>> FbxParser::ParserImpl(WString sys_path)
+	{
+		FbxScene* fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
+		List<Ref<Mesh>> loaded_meshs{};
+		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(ToChar(sys_path.data()), -1, fbx_manager_->GetIOSettings()))
+			return loaded_meshs;
+		fbx_importer_->Import(fbx_scene);
+		FbxNode* fbx_rt = fbx_scene->GetRootNode();
+		fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(fbx_scene);
+		if (fbx_scene->GetGlobalSettings().GetSystemUnit() != fbxsdk::FbxSystemUnit::cm)
+		{
+			const FbxSystemUnit::ConversionOptions lConversionOptions = {
+			false, /* mConvertRrsNodes */
+			true, /* mConvertAllLimits */
+			true, /* mConvertClusters */
+			true, /* mConvertLightIntensity */
+			true, /* mConvertPhotometricLProperties */
+			true  /* mConvertCameraClipPlanes */
+			};
+			fbxsdk::FbxSystemUnit::cm.ConvertScene(fbx_scene, lConversionOptions);
+		}
+		if (fbx_rt != nullptr)
+		{
+			auto child_num = fbx_rt->GetChildCount();
+			for (int i = 0; i < child_num; i++)
+			{
+				FbxNode* fbx_node = fbx_rt->GetChild(i);
+				FbxNodeAttribute* attribute = fbx_node->GetNodeAttribute();
+				std::string node_name = fbx_node->GetName();
+				auto type = attribute->GetAttributeType();
+				if (attribute->GetAttributeType() == FbxNodeAttribute::eMesh)
+				{
+					fbxsdk::FbxMesh* fbx_mesh = FbxCast<fbxsdk::FbxMesh>(attribute);
+					Ref<Mesh> mesh = MakeRef<Mesh>(node_name);
+					FbxAMatrix transformMatrix = fbx_node->EvaluateGlobalTransform();
+					FbxVector4 scale = transformMatrix.GetS();
+					scale_factor.x = scale[0];
+					scale_factor.y = scale[1];
+					scale_factor.z = scale[2];
+					if (!GenerateMesh(mesh, fbx_mesh)) continue;
+					mesh->Build();
+					loaded_meshs.emplace_back(mesh);
+				}
+			}
+		}
+		if (loaded_meshs.empty())
+		{
+			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);
+		}
+		return loaded_meshs;
 	}
 #pragma warning(pop)
 }

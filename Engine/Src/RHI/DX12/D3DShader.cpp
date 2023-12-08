@@ -499,10 +499,12 @@ namespace Ailu
 		}
 		else if (seri_type == ESerializablePropertyType::kColor || seri_type == ESerializablePropertyType::kVector4f)
 		{
-			prop_param.x = static_cast<float>(std::stod(&defalut_value[1]));
-			prop_param.y = static_cast<float>(std::stod(&defalut_value[3]));
-			prop_param.z = static_cast<float>(std::stod(&defalut_value[5]));
-			prop_param.w = static_cast<float>(std::stod(&defalut_value[7]));
+			defalut_value = su::SubStrRange(defalut_value,1,defalut_value.find_first_of(")") - 1);
+			auto vec_str = su::Split(defalut_value, ",");
+			prop_param.x = static_cast<float>(std::stod(vec_str[0]));
+			prop_param.y = static_cast<float>(std::stod(vec_str[1]));
+			prop_param.z = static_cast<float>(std::stod(vec_str[2]));
+			prop_param.w = static_cast<float>(std::stod(vec_str[3]));
 		}
 		props.emplace_back(ShaderPropertyInfo{ value_name ,prop_name,seri_type ,prop_param});
 		LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);

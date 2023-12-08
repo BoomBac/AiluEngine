@@ -1,3 +1,5 @@
+#pragma warning(push)
+#pragma warning(disable: 4251)
 #pragma once
 #ifndef __SCENE_MGR_H__
 #define __SCENE_MGR_H__
@@ -9,7 +11,7 @@
 
 namespace Ailu
 {
-	class Scene
+	class AILU_API Scene
 	{
 		using ActorEvent = std::function<void(SceneActor*)>;
 		DECLARE_PRIVATE_PROPERTY_PTR(p_root,Root,SceneActor)
@@ -33,7 +35,7 @@ namespace Ailu
 		void TravelAllActor(SceneActor* actor, ActorEvent& e);
 		ActorEvent FillActorList;
 	};
-	class SceneMgr : public IRuntimeModule
+	class AILU_API SceneMgr : public IRuntimeModule
 	{
 	public:
 		int Initialize() final;
@@ -49,9 +51,7 @@ namespace Ailu
 		inline static std::list<Scope<Scene>> s_all_scene{};
 		inline static uint16_t s_scene_index = 0u;
 	};
-	extern SceneMgr* g_pSceneMgr;
+	extern AILU_API SceneMgr* g_pSceneMgr;
 }
-
-
 #endif // !SCENE_MGR_H__
-
+#pragma warning(pop)

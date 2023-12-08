@@ -3,7 +3,8 @@
 #pragma once
 
 
-#include "Inc/Framework/Common/EntryPoint.h"
+//#include "Inc/Framework/Common/EntryPoint.h"
+#include "Inc/Framework/Common/Application.h"
 
 #endif // !__AILU_H__
 

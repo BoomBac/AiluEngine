@@ -470,6 +470,19 @@ namespace Ailu
 		return mat.get();
 	}
 
+	void ResourceMgr::ImportAsset(const WString& sys_path)
+	{
+		ImportAssetImpl(sys_path);
+	}
+
+	void ResourceMgr::ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback)
+	{
+		_task_queue.emplace_back([=]() {
+			ImportAssetImpl(sys_path);
+			callback();
+			});
+	}
+
 	void ResourceMgr::AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback)
 	{
 		_task_queue.emplace_back([=]() {
@@ -536,5 +549,32 @@ namespace Ailu
 			g_thread_pool->Enqueue(std::move(task));
 		}
 		_task_queue.clear();
+	}
+
+	void ResourceMgr::ImportAssetImpl(const WString& sys_path)
+	{
+		namespace fs = std::filesystem;
+		fs::path p(sys_path);
+		auto ext = p.extension().string();
+		if (!ext.empty())
+		{
+			if (ext == ".fbx" || ext == ".FBX")
+			{
+				static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+				for (auto& mesh : parser->Parser(sys_path))
+				{
+					g_pLogMgr->LogFormat("Start import mesh: {}", mesh->Name());
+					MeshPool::AddMesh(mesh->Name(), mesh);
+				}
+			}
+			else
+			{
+				g_pLogMgr->LogFormat("Havn't handled asset type: {}",ext);
+			}
+		}
+		else
+		{
+			g_pLogMgr->LogFormat("Path: {} isn't valid!");
+		}
 	}
 }

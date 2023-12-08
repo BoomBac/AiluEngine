@@ -69,6 +69,24 @@ namespace Ailu
 		EVENT_CLASS_TYPE(kWindowMoved)
 		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
 	};
+
+	class AILU_API DragFileEvent : public Event
+	{
+	public:
+		DragFileEvent(WString sys_path) : _sys_path(sys_path)
+		{
+			
+		};
+		std::string ToString() const override
+		{
+			return "DragFileEvent";
+		}
+		const WString& GetDragedFilePath() const { return _sys_path; }
+		EVENT_CLASS_TYPE(kDragFile)
+		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
+	private:
+		WString _sys_path;
+	};
 }
 
 

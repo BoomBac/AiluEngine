@@ -2,6 +2,7 @@
 #ifndef __LOG_H__
 #define __LOG_H__
 
+#include <Windows.h>
 #include <string>
 #include <sstream>
 #include <format>

@@ -30,8 +30,6 @@ namespace Ailu
 		g_pTimeMgr->Initialize();
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
-
-
 		_p_renderer = new Renderer();
 		_p_renderer->Initialize();
 		g_pResourceMgr->Initialize();
@@ -120,6 +118,11 @@ namespace Ailu
 		_layer_stack.PopLayer(_p_input_layer);
 		return true;
 	}
+	bool Application::OnDragFile(DragFileEvent& e)
+	{
+		g_pResourceMgr->ImportAssetAsync(e.GetDragedFilePath());
+		return false;
+	}
 	bool Application::OnGetFoucus(WindowFocusEvent& e)
 	{
 		_layer_stack.PushLayer(_p_input_layer);
@@ -131,6 +134,7 @@ namespace Ailu
 		dispather.Dispatch<WindowCloseEvent>(BIND_EVENT_HANDLER(OnWindowClose));
 		dispather.Dispatch<WindowFocusEvent>(BIND_EVENT_HANDLER(OnGetFoucus));
 		dispather.Dispatch<WindowLostFocusEvent>(BIND_EVENT_HANDLER(OnLostFoucus));
+		dispather.Dispatch<DragFileEvent>(BIND_EVENT_HANDLER(OnDragFile));
 		//static bool b_handle_input = true;
 		//if (e.GetEventType() == EEventType::kWindowLostFocus) b_handle_input = false;
 		//else if (e.GetEventType() == EEventType::kWindowFocus) b_handle_input = true;

@@ -18,6 +18,8 @@
 #include "RHI/DX12/D3DTexture.h"
 #include "Framework/Common/LogMgr.h"
 
+#include "Framework/Assets/Mesh.h"
+
 namespace ImguiTree
 {
 	struct TreeNode
@@ -685,6 +687,26 @@ namespace Ailu
 		else
 			return null_tex;
 	}
+	//----------------------------------------------------------------------------MeshBrowser----------------------------------------------------------------------
+	void MeshBrowser::Open(const int& handle)
+	{
+		if (handle != _handle)
+			_cur_selected_texture_path = kNull;
+		_handle = handle;
+		_b_show = true;
+	}
+	void MeshBrowser::Show()
+	{
+		if (!_b_show)
+		{
+			_handle = -1;
+			return;
+		}
+		ImGui::Begin("MeshBrowser", &_b_show);
+		
+		ImGui::End();
+	}
+	//----------------------------------------------------------------------------MeshBrowser---------------------------------------------------------------------
 }
 
 

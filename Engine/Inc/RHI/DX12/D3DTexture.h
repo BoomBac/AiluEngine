@@ -53,22 +53,31 @@ namespace Ailu
 		std::vector<ComPtr<ID3D12Resource>> _upload_textures;
 	};
 
+
 	class D3DRenderTexture : public RenderTexture
 	{
 		inline const static Vector4f kClearColor = Colors::kBlack;
+		struct InnerDescHandle
+		{
+			D3D12_GPU_DESCRIPTOR_HANDLE _gpu_handle;
+			D3D12_CPU_DESCRIPTOR_HANDLE _cpu_handle;
+		};
+		union D3DRTHandle
+		{
+			InnerDescHandle _color_handle;
+			InnerDescHandle _depth_handle;
+		};
 	public:
-		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
+		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
 		void Bind(uint8_t slot) const final;
 		uint8_t* GetCPUNativePtr() final;
 		void Transition(ETextureResState state) final;
 		D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle();
 	private:
 		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
-		D3D12_RENDER_TARGET_VIEW_DESC _rtv_desc{};
 		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;
 		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
-		D3D12_GPU_DESCRIPTOR_HANDLE _rtv_gpu_handle;
-		D3D12_CPU_DESCRIPTOR_HANDLE _rtv_cpu_handle;
+		D3DRTHandle _d3d_handle;
 		ComPtr<ID3D12Resource> _p_buffer;
 	};
 }

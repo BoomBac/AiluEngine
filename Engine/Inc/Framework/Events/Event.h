@@ -13,7 +13,8 @@ namespace Ailu
 		kWindowClose,kWindowResize,kWindowFocus,kWindowLostFocus,kWindowMoved,
 		kAppTick,kAppUpdate,kAppRender,
 		kKeyPressed,kKeyReleased,
-		kMouseButtonPressed,kMouseButtonReleased,kMouseMoved,kMouseScrolled
+		kMouseButtonPressed,kMouseButtonReleased,kMouseMoved,kMouseScrolled,
+		kDragFile
 	};
 
 	enum EEventCategory

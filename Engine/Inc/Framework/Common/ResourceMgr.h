@@ -32,6 +32,8 @@ namespace Ailu
 		//template<typename T>
 		//static T* LoadAsset(const string& asset_path);
 		static Material* LoadAsset(const String& asset_path);
+		void ImportAsset(const WString& sys_path);
+		void ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback = []() {});
 		void AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback);
 		void AddResourceTask(ResourceTask task);
 	private:
@@ -47,6 +49,7 @@ namespace Ailu
 		void SaveMaterialImpl(const String& asset_path,Material* mat);
 		void WatchDirectory();
 		void SubmitResourceTask();
+		void ImportAssetImpl(const WString& sys_path);
 	private:
 		List<ResourceTask> _task_queue;
 		inline static std::map<String, std::tuple<String, String>> s_asset_db{};

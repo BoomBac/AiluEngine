@@ -40,6 +40,10 @@ namespace Ailu
 	{
 		return _p_datas.front();
 	}
+	void* Texture2D::GetNativeCPUHandle()
+	{
+		return nullptr;
+	}
 	void* Texture2D::GetGPUNativePtr()
 	{
 		return nullptr;
@@ -115,6 +119,10 @@ namespace Ailu
 	{
 		return _p_datas[0];
 	}
+	void* TextureCubeMap::GetNativeCPUHandle()
+	{
+		return nullptr;
+	}
 	void* TextureCubeMap::GetGPUNativePtr()
 	{
 		return nullptr;
@@ -135,7 +143,7 @@ namespace Ailu
 	}
 
 	//----------------------------------------------------------RenderTexture---------------------------------------------------------------------
-	uint8_t* RenderTexture::GetCPUNativePtr()
+	void* RenderTexture::GetNativeCPUHandle()
 	{
 		return nullptr;
 	}

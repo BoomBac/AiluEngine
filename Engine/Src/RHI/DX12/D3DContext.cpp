@@ -124,6 +124,18 @@ namespace Ailu
         return std::make_tuple(cpu_handle, gpu_handle);
     }
 
+    std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3DContext::GetDSVDescriptorHandle()
+    {
+        static u32 global_texture_offset = 0u;
+        static uint32_t base = RenderConstants::kFrameCount;
+        auto gpu_handle = m_dsvHeap->GetGPUDescriptorHandleForHeapStart();
+        gpu_handle.ptr += _dsv_desc_size * (base + global_texture_offset);
+        auto cpu_handle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+        cpu_handle.ptr += _dsv_desc_size * (base + global_texture_offset);
+        ++global_texture_offset;
+        return std::make_tuple(cpu_handle, gpu_handle);
+    }
+
     uint8_t* D3DContext::GetCBufferPtr()
     {
         return _p_cbuffer;

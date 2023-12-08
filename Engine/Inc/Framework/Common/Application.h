@@ -30,6 +30,7 @@ namespace Ailu
         bool OnWindowClose(WindowCloseEvent& e);
         bool OnGetFoucus(WindowFocusEvent& e);
         bool OnLostFoucus(WindowLostFocusEvent& e);
+        bool OnDragFile(DragFileEvent& e);
     private:
         LayerStack _layer_stack;
         ImGUILayer* _p_imgui_layer;

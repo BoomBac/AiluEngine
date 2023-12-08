@@ -14,6 +14,7 @@ namespace Ailu
 	public:
 		FbxParser();
 		List<Ref<Mesh>> Parser(std::string_view sys_path) final;
+		List<Ref<Mesh>> Parser(const WString& sys_path) final;
 		virtual ~FbxParser();
 	private:
 		bool GenerateMesh(Ref<Mesh>& mesh, fbxsdk::FbxMesh* fbx_mesh);
@@ -23,6 +24,8 @@ namespace Ailu
 		bool ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh);
 		bool CalculateTangant(Ref<Mesh>& mesh);
 		void GenerateIndexdMesh(Ref<Mesh>& mesh);
+
+		List<Ref<Mesh>> ParserImpl(WString sys_path);
 	private:
 		FbxManager* fbx_manager_;
 		FbxIOSettings* fbx_ios_;

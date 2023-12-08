@@ -1,2 +1,5 @@
 Error: ResourceMgr end
 Normal: Init end
+Normal: Havn't handled asset type: .docx
+Normal: Exit
+Normal: Save scene: default_scene to C:/AiluEngine/Engine/default.almap;

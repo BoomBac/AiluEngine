@@ -19,7 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Inc\Widgets\Common.h" />
+    <ClInclude Include="Inc\Widgets\WorldOutline.h">
+      <FileType>Document</FileType>
+    </ClInclude>
     <ClCompile Include="Src\EditorMain.cpp" />
+    <ClCompile Include="Src\Widgets\WorldOutline.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -112,8 +117,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\Inc\;$(SolutionDir)Engine\;$(SolutionDir)Engine\Ext\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\Inc\;$(SolutionDir)Engine\;$(SolutionDir)Engine\Ext\;$(SolutionDir)Editor\Inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <EnableModules>true</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>NotSet</SubSystem>

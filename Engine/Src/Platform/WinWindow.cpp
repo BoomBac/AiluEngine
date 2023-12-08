@@ -100,6 +100,7 @@ namespace Ailu
             LOG_WARNING("TitleIcon or AppIcon load failed,please check out the path!")
         }
         WinInput::Create(_hwnd);
+        DragAcceptFiles(_hwnd, true);
 	}
 	void WinWindow::OnUpdate()
 	{
@@ -172,6 +173,27 @@ namespace Ailu
             // Save the DXSample* passed in to CreateWindow.
             LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
             SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
+            //DragAcceptFiles(_hwnd, true);
+            //DragAcceptFiles(((LPCREATESTRUCT)lParam)->hwndParent, TRUE);
+        }
+        return 0;
+        case WM_DROPFILES:
+        {
+            // Handle dropped files
+            HDROP hDrop = (HDROP)wParam;
+            UINT fileCount = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
+
+            for (UINT i = 0; i < fileCount; ++i) 
+            {
+                UINT pathLength = DragQueryFile(hDrop, i, NULL, 0);
+                wchar_t* filePath = new wchar_t[pathLength + 1];
+                DragQueryFile(hDrop, i, filePath, pathLength + 1);
+                DragFileEvent e(WString{ filePath });
+                _data.Handler(e);
+                delete[] filePath;
+            }
+
+            DragFinish(hDrop);
         }
         return 0;
         case WM_KEYDOWN:

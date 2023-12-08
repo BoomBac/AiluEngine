@@ -3,6 +3,9 @@
 #include "CompanyEnv.h"
 #include "Framework/Common/Log.h"
 #include <memory>
+#include <vector>
+#include <list>
+#include <queue>
 
 #ifdef AILU_BUILD_DLL
 #define AILU_API __declspec(dllexport)
@@ -100,6 +103,7 @@ using i32 = int32_t;
 using i64 = int64_t;
 
 using String = std::string;
+using WString = std::wstring;
 
 template<typename T>
 using Vector = std::vector<T>;

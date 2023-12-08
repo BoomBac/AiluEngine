@@ -107,9 +107,10 @@ namespace Ailu
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth)
 	{
 		_commands.emplace_back([=]() {
-			if(color) color->Transition(ETextureResState::kRenderTagret);
-			if(depth) depth->Transition(ETextureResState::kRenderTagret);
-			//D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1,color.);
+			color->Transition(ETextureResState::kRenderTagret);
+			depth->Transition(ETextureResState::kRenderTagret);
+			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1,reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()),0,
+				reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
 			});
 	}
 }
