@@ -9,7 +9,11 @@
 //	color("Color",Color) = (1,1,1,1)
 //	expo("Exposure",Range(0,4)) = 1
 //  TestTex("TestTex",Texture2D) = "white"
+//  [Toggle] _InvertColor("InvertColor",Float) = 0
+//  [Enum(Red,0,Blue,1,Green,2)] _ColorOverlay("ColorOverlay",Float) = 0
 //}
+//#pragma multi_complie _InvertColor_ON _InvertColor_OFF
+//#pragma multi_complie _ColorOverlay_Red _ColorOverlay_Blue _ColorOverlay_Green
 //info end
 
 #include "common.hlsl"

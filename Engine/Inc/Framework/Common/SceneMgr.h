@@ -3,6 +3,7 @@
 #pragma once
 #ifndef __SCENE_MGR_H__
 #define __SCENE_MGR_H__
+#include <queue>
 #include <vector>
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Objects/SceneActor.h"
@@ -18,6 +19,7 @@ namespace Ailu
 	public:
 		Scene(const std::string& name);
 		void AddObject(SceneActor* actor);
+		void RemoveObject(SceneActor* actor);
 		std::list<SceneActor*>& GetAllActor();
 		SceneActor* GetSceneRoot() { return _p_root; }
 		SceneActor* GetSceneActorByID(const uint32_t& id);
@@ -35,21 +37,24 @@ namespace Ailu
 		void TravelAllActor(SceneActor* actor, ActorEvent& e);
 		ActorEvent FillActorList;
 	};
-	class AILU_API SceneMgr : public IRuntimeModule
+
+	class SceneMgr : public IRuntimeModule
 	{
 	public:
 		int Initialize() final;
 		void Finalize() final;
 		void Tick(const float& delta_time) final;
 		static Scene* Create(const std::string& name);
+		SceneActor* AddSceneActor(std::string_view name,std::string_view mesh);
+		void DeleteSceneActor(SceneActor* actor);
 		void SaveScene(Scene* scene, const String& scene_path);
 		Scene* LoadScene(const String& scene_path);
 		//inline Scene* GetCurrentScene() { return _p_current.get(); };
 		Scene* _p_current = nullptr;
 	private:
-
 		inline static std::list<Scope<Scene>> s_all_scene{};
 		inline static uint16_t s_scene_index = 0u;
+		Queue<SceneActor*> _pending_delete_actors;
 	};
 	extern AILU_API SceneMgr* g_pSceneMgr;
 }

@@ -12,9 +12,9 @@
 //	Roughness("Roughness",Texture2D) = "white"
 //	Metallic("Metallic",Texture2D) = "white"
 //	Specular("Specular",Texture2D) = "white"
-//	BaseColor("BaseColor",Color) = (1,0,0,0)
-//	EmssiveColor("Emssive",Color) = (1,0,0,0)
-//	SpecularColor("Specular",Color) = (1,0,0,0)
+//	BaseColor("BaseColor",Color) = (1,1,1,0)
+//	EmssiveColor("Emssive",Color) = (0,0,0,0)
+//	SpecularColor("Specular",Color) = (0,0,0,0)
 //	RoughnessValue("Roughness",Range(0,1)) = 0
 //	MetallicValue("Metallic",Range(0,1)) = 0
 //}
@@ -99,6 +99,10 @@ float4 PSMain(PSInput input) : SV_TARGET
 	light.g += 0.000001 * surface_data.roughness;
 	light.b += 0.000001 * surface_data.specular;
 	light += surface_data.emssive; 
-	GammaCorrect(light,2.2f); 
+	GammaCorrect(light,2.2f);
+#ifdef TEST
 	return float4(light, 1.0f);
+#else
+	return float4(0.0,1.0,0.0,1.0);
+#endif
 }

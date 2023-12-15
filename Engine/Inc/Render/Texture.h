@@ -5,11 +5,13 @@
 #include <stdint.h>
 #include <map>
 #include "GlobalMarco.h"
+#include "Framework/Common/LogMgr.h"
 #include "AlgFormat.h"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ThreadPool.h"
 
 #include "Framework/Common/Reflect.h"
+
 
 
 namespace Ailu
@@ -208,22 +210,38 @@ namespace Ailu
 		// 初始化时，将图片的加载放在最前面
 		static Ref<Texture2D> Add(const std::string& name, Ref<Texture2D> res)
 		{
-			if (s_res_pool.contains(name)) return std::dynamic_pointer_cast<Texture2D>(s_res_pool[name]);
-			s_res_pool.insert(std::make_pair(name, res));
-			res->Name(GetFileName(name));
-			++s_res_num;
-			s_is_dirty = true;
-			return res;
+			if (res != nullptr)
+			{
+				if (s_res_pool.contains(name)) return std::dynamic_pointer_cast<Texture2D>(s_res_pool[name]);
+				s_res_pool.insert(std::make_pair(name, res));
+				res->Name(GetFileName(name));
+				++s_res_num;
+				s_is_dirty = true;
+				return res;
+			}
+			else
+			{
+				g_pLogMgr->LogWarningFormat("Add texture with name {} to pool failed! texture is null!",name);
+			}
+			return nullptr;
 		}
 
 		static Ref<TextureCubeMap> Add(const std::string& name, Ref<TextureCubeMap> res)
 		{
-			if (s_res_pool.contains(name)) return std::dynamic_pointer_cast<TextureCubeMap>(s_res_pool[name]);
-			s_res_pool.insert(std::make_pair(name, res));
-			res->Name(GetFileName(name));
-			++s_res_num;
-			s_is_dirty = true;
-			return res;
+			if (res)
+			{
+				if (s_res_pool.contains(name)) return std::dynamic_pointer_cast<TextureCubeMap>(s_res_pool[name]);
+				s_res_pool.insert(std::make_pair(name, res));
+				res->Name(GetFileName(name));
+				++s_res_num;
+				s_is_dirty = true;
+				return res;
+			}
+			else
+			{
+				g_pLogMgr->LogWarningFormat("Add texture with name {} to pool failed! texture is null!", name);
+			}
+			return nullptr;
 		}
 
 		static Ref<Texture> Get(const std::string& name);

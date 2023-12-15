@@ -4,6 +4,8 @@
 #include "Render/Renderer.h"
 
 #include "Framework/Common/LogMgr.h"
+#include "Framework/Common/ResourceMgr.h"
+#include "Framework/Parser/AssetParser.h"
 
 namespace Ailu
 {
@@ -72,7 +74,20 @@ namespace Ailu
 			auto mesh_path = TP_ONE(formated_str.front());
 			formated_str.pop();
 			auto mat_path = TP_ONE(formated_str.front());
-			StaticMeshComponent* comp = new StaticMeshComponent(MeshPool::GetMesh(mesh_path), MaterialPool::GetMaterial(mat_path));
+			auto mesh = MeshPool::GetMesh(mesh_path);
+			if (mesh == nullptr)
+			{
+				auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+				mesh = parser->Parser(mesh_path).front();
+				if(mesh != nullptr) MeshPool::AddMesh(mesh);
+			}
+			auto mat = MaterialLibrary::GetMaterial(mat_path);
+			auto loc = std::source_location::current();
+			if (mat == nullptr)
+			{
+				g_pLogMgr->LogErrorFormat(loc,"Load material failed with id {};",mat_path);
+			}
+			StaticMeshComponent* comp = new StaticMeshComponent(mesh, mat);
 			formated_str.pop();
 			return comp;
 		}

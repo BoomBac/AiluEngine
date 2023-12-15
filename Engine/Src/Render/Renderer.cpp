@@ -127,7 +127,7 @@ namespace Ailu
         }
         if (RenderingStates::s_shadering_mode == EShaderingMode::kWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
         {
-            static auto wireframe_mat = MaterialPool::GetMaterial("Materials/WireFrame_new.alasset");
+            static auto wireframe_mat = MaterialLibrary::GetMaterial("Materials/WireFrame_new.alasset");
             //cmd->SetPSO(GraphicsPipelineStateMgr::s_wireframe_pso);
             for (auto& obj : _draw_call)
             {

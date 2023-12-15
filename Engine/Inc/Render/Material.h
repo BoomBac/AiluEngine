@@ -32,7 +32,7 @@ namespace Ailu
 		friend class ResourceMgr;
 		DECLARE_REFLECT_FIELD(Material)
 		DECLARE_PRIVATE_PROPERTY(origin_path,OriginPath,String)
-		DECLARE_PRIVATE_PROPERTY(_b_internal,IsInternal,bool)
+		DECLARE_PRIVATE_PROPERTY(b_internal,IsInternal,bool)
 	public:
 		Material(Ref<Shader> shader,std::string name);
 		~Material();
@@ -46,12 +46,12 @@ namespace Ailu
 		void SetTexture(const std::string& name, Ref<Texture> texture);
 		void RemoveTexture(const std::string& name);
 		void SetTexture(const std::string& name, const String& texture_path);
+		void EnableKeyword(const String& keyword);
+		void DisableKeyword(const String& keyword);
 		virtual void Bind();
 		Shader* GetShader() const;
 		List<std::tuple<String, float>> GetAllFloatValue();
 		List<std::tuple<String, Vector4f>> GetAllVectorValue();
-	protected:
-		bool _b_internal = false;
 	private:
 		void Construct(bool first_time);
 	private:
@@ -62,12 +62,20 @@ namespace Ailu
 		//每个材质的cbuf大小一致，存储在一个大的buf，index记录其偏移量
 		uint32_t _cbuf_index;
 		inline static uint32_t s_current_cbuf_offset = 0u;
-		std::unordered_set<ShaderBindResourceInfo, ShaderBindResourceInfoHash, ShaderBindResourceInfoEqual> _mat_props{};
+		//std::unordered_set<ShaderBindResourceInfo, ShaderBindResourceInfoHash, ShaderBindResourceInfoEqual> _mat_props{};
 		//value_name : <bind_slot,texture>
 		std::map<String, std::tuple<uint8_t, Ref<Texture>>> _textures{};
 	};
 
-	class MaterialPool 
+	class StandardMaterial : public Material
+	{
+	public:
+		StandardMaterial(Ref<Shader> shader, std::string name);
+		~StandardMaterial();
+	private:
+	};
+
+	class MaterialLibrary 
 	{
 	public:
 		static Ref<Material> CreateMaterial(Ref<Shader> shader, const std::string& name,const String& asset_path) 
@@ -81,6 +89,7 @@ namespace Ailu
 		{
 			auto material = MakeRef<Material>(shader, name);
 			s_materials[name] = material;
+			s_it_materials.emplace_back(material);
 			s_next_material_id++;
 			return material;
 		}
@@ -88,9 +97,13 @@ namespace Ailu
 		static void AddMaterial(Ref<Material> mat, const std::string& id)
 		{
 			s_materials[id] = mat;
+			s_it_materials.emplace_back(mat);
 			s_next_material_id++;
 		}
-
+		static bool Contain(const std::string& nameid)
+		{
+			return s_materials.contains(nameid);
+		}
 		static Ref<Material> GetMaterial(const std::string& name)
 		{
 			auto it = s_materials.find(name);
@@ -100,7 +113,6 @@ namespace Ailu
 			}
 			return nullptr;
 		}
-
 		static void ReleaseMaterial(const std::string& name)
 		{
 			auto it = s_materials.find(name);
@@ -109,16 +121,18 @@ namespace Ailu
 				s_materials.erase(it);
 			}
 		}
-
-		static std::list<Material*> GetAllMaterial()
+		static auto Begin() 
 		{
-			std::list<Material*> mats{};
-			for (auto& mat : s_materials) mats.emplace_back(mat.second.get());
-			return mats;
+			return s_it_materials.begin();
+		}
+		static auto End()
+		{
+			return s_it_materials.end();
 		}
 	private:
 		inline static uint32_t s_next_material_id = 0u;
 		inline static std::unordered_map<std::string, Ref<Material>> s_materials{};
+		inline static Vector<Ref<Material>> s_it_materials{};
 	};
 }
 

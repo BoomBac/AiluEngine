@@ -1,8 +1,8 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: Perspective
-  Position: 557.248,1593.75,3056.34
-  Rotation: -158.207,28.6073,0
+  Position: -2895.97,4258.78,6689.68
+  Rotation: 160.397,29.6889,0
   Fov: 60
   Aspect: 1.77778
   Near: 345.19
@@ -14,8 +14,8 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,0,0
         Scale: 1,1,1
-    Children: 5
-      Name: stone
+    Children: 6
+      Name: plane
         Components: 
           TransformComponent: 
             Position: 0,62,0
@@ -71,4 +71,14 @@ SceneGraph:
             Radius: 1865
             Inner: 45
             Outer: 60
+        Children: 0
+      Name: object0
+        Components: 
+          TransformComponent: 
+            Position: 0,1219,0
+            Rotation: 0,0,0
+            Scale: 5,5,5
+          StaticMeshComponent: 
+            MeshPath: sphere
+            MaterialPath: Materials/aa.almat
         Children: 0

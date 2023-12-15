@@ -16,7 +16,7 @@ namespace Ailu
 {
     enum class ESerializablePropertyType : u8
     {
-        kUndefined =0,kString,kFloat,kBool,kVector3f,kVector4f,kColor,kTransform,kTexture2D,kCubeMap,kStaticMesh,kRange
+        kUndefined =0,kString,kFloat,kBool,kVector3f,kVector4f,kColor,kTransform,kTexture2D,kCubeMap,kStaticMesh,kRange,kEnum
     };
     static String GetSerializablePropertyTypeStr(const ESerializablePropertyType& type)
     {
@@ -34,6 +34,7 @@ namespace Ailu
         case Ailu::ESerializablePropertyType::kRange: return "Range";
         case Ailu::ESerializablePropertyType::kUndefined: return "Undefined";
         case Ailu::ESerializablePropertyType::kCubeMap: return "CubeMap";
+        case Ailu::ESerializablePropertyType::kEnum: return "Enum";
         default: return "undefined";
         }
         return "undefined";
@@ -66,7 +67,6 @@ namespace Ailu
         String _value_name;
         ESerializablePropertyType _type;
         float _param[4];
-
         SerializableProperty(void* value_ptr, const String& name, const ESerializablePropertyType& type)
             : _value_ptr(value_ptr), _name(name), _type(type)
         {
@@ -79,17 +79,97 @@ namespace Ailu
             _value_name = value_name;
         }
 
-        SerializableProperty() : _value_ptr(nullptr), _name("null"), _type(ESerializablePropertyType::kUndefined)
+        SerializableProperty() : _value_ptr(nullptr), _name(""), _type(ESerializablePropertyType::kUndefined)
         {
             
+        }
+
+        SerializableProperty(const SerializableProperty& other)
+        {
+            _value_ptr = other._value_ptr;
+            _value_name = other._value_name;
+            _name = other._name;
+            _type = other._type;
+            std::copy(std::begin(other._param), std::end(other._param), std::begin(_param));
+        }
+        SerializableProperty& operator=(const SerializableProperty& other)
+        {
+            _value_ptr = other._value_ptr;
+            _value_name = other._value_name;
+            _name = other._name;
+            _type = other._type;
+            std::copy(std::begin(other._param), std::end(other._param), std::begin(_param));
+            return *this;
+        }
+        SerializableProperty& operator=(SerializableProperty&& other) noexcept
+        {
+            _value_ptr = other._value_ptr;
+            _value_name = other._value_name;
+            _name = other._name;
+            _type = other._type;
+            std::copy(std::begin(other._param), std::end(other._param), std::begin(_param));
+            other._value_ptr = nullptr;
+            other._name = "null";
+            other._value_name = "null";
+            other._type = ESerializablePropertyType::kUndefined;
+            memset(other._param, 0, sizeof(other._param));
+            return *this;
         }
         template<typename T>
         static String ToString(const T& value);
         template<typename T>
         static std::optional<T> GetProppertyValue(const SerializableProperty& prop);
+        template<typename T>
+        void SetProppertyValue(const T& value)
+        {
+            *reinterpret_cast<T*>(_value_ptr) = value;
+        }
+        template<typename T>
+        std::optional<T> GetProppertyValue()
+        {
+            if (_value_ptr != nullptr)
+                return *reinterpret_cast<T*>(_value_ptr);
+            else
+                return {};
+        }
         inline static bool SameType(const SerializableProperty& a, const SerializableProperty& b)
         {
             return a._name == b._name && a._type == b._type;
+        }
+        static u16 GetValueSize(ESerializablePropertyType type)
+        {
+            switch (type)
+            {
+            case Ailu::ESerializablePropertyType::kUndefined:
+                return 0;
+            case Ailu::ESerializablePropertyType::kString:
+                break;
+            case Ailu::ESerializablePropertyType::kFloat:
+                return 4;
+            case Ailu::ESerializablePropertyType::kEnum:
+                return 4;
+            case Ailu::ESerializablePropertyType::kBool:
+                return 1;
+            case Ailu::ESerializablePropertyType::kVector3f:
+                return 12;
+            case Ailu::ESerializablePropertyType::kVector4f:
+                return 16;
+            case Ailu::ESerializablePropertyType::kColor:
+                return 16;
+            case Ailu::ESerializablePropertyType::kTransform:
+                break;
+            case Ailu::ESerializablePropertyType::kTexture2D:
+                break;
+            case Ailu::ESerializablePropertyType::kCubeMap:
+                break;
+            case Ailu::ESerializablePropertyType::kStaticMesh:
+                break;
+            case Ailu::ESerializablePropertyType::kRange:
+                return 4;
+            default:
+                break;
+            }
+            return 0;
         }
     };
 

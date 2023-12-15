@@ -79,6 +79,11 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count)
 	{
+		if (mesh == nullptr)
+		{
+			LOG_WARNING("Mesh is null when draw renderer!");
+			return;
+		}
 		_commands.emplace_back([=]() {
 			if (material != nullptr)
 			{
@@ -89,7 +94,7 @@ namespace Ailu
 			}
 			else
 			{
-				static Material* error = MaterialPool::GetMaterial("Error").get();
+				static Material* error = MaterialLibrary::GetMaterial("Error").get();
 				mesh->GetVertexBuffer()->Bind(error->GetShader()->GetVSInputSemanticSeqences());
 				mesh->GetIndexBuffer()->Bind();
 				error->Bind();

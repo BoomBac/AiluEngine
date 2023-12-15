@@ -437,7 +437,7 @@ namespace Ailu
 	Ref<D3DGraphicsPipelineState> D3DGraphicsPipelineState::GetGizmoPSO()
 	{
 		Ref<Shader> shader;
-		shader = ShaderLibrary::Add(GetResPath("Shaders/gizmo.hlsl"));
+		shader = ShaderLibrary::Load(GetResPath("Shaders/gizmo.hlsl"));
 		GraphicsPipelineStateInitializer pso_initializer{};
 		pso_initializer._blend_state = TStaticBlendState<true,EBlendFactor::kSrcAlpha,EBlendFactor::kOneMinusSrcAlpha>::GetRHI();
 		pso_initializer._b_has_rt = true;

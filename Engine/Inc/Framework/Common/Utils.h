@@ -69,7 +69,7 @@ namespace Ailu
         static String Trim(const String& str)
         {
             size_t first = str.find_first_not_of(" \t\n\r");
-            if (first == std::string::npos)
+            if (first == String::npos)
             {
                 return "";
             }
@@ -87,7 +87,7 @@ namespace Ailu
         {
             Vector<String> tokens;
             size_t start = 0, end = 0;
-            while ((end = input.find(delimiter, start)) != std::string::npos) 
+            while ((end = input.find(delimiter, start)) != String::npos) 
             {
                 tokens.push_back(input.substr(start, end - start));
                 start = end + 1;
@@ -99,7 +99,7 @@ namespace Ailu
         static String Join(const Vector<String>& strings, const String& delimiter)
         {
             return std::accumulate(strings.begin() + 1, strings.end(), strings[0],
-                [&delimiter](const std::string& a, const std::string& b) {
+                [&delimiter](const String& a, const String& b) {
                     return a + delimiter + b;
                 });
         }
@@ -129,7 +129,7 @@ namespace Ailu
             LOG_ERROR("Load asset with path: {} failed!", sys_path);
             return lines;
         }
-        std::string line;
+        String line;
         bool start = begin.empty(), stop = false;
         while (std::getline(file, line))
         {
@@ -151,6 +151,41 @@ namespace Ailu
         file.close();
         line_count = static_cast<u32>(lines.size());
         return lines;
+    }
+
+    namespace Algorithm
+    {
+        namespace 
+        {
+            static void GeneratePermutationsHelper(const Vector<Vector<String>>& input, Vector<String>& current, Vector<Vector<String>>& result, size_t index)
+            {
+                if (index == input.size())
+                {
+                    result.push_back(current);
+                    return;
+                }
+                // Iterate through the elements at the current index
+                for (const String& element : input[index])
+                {
+                    // Include the current element in the permutation
+                    current.push_back(element);
+                    // Recursively generate permutations for the next index
+                    GeneratePermutationsHelper(input, current, result, index + 1);
+                    // Backtrack: remove the last element to explore other possibilities
+                    current.pop_back();
+                }
+            }
+        }
+
+        static Vector<Vector<String>> Permutations(const Vector<Vector<String>>& input) 
+        {
+            Vector<Vector<String>> result;
+            Vector<String> current;
+
+            GeneratePermutationsHelper(input, current, result, 0);
+
+            return result;
+        }
     }
 }
 

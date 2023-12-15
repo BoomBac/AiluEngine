@@ -12,6 +12,9 @@
 #else
 #define AILU_API __declspec(dllimport)
 #endif
+
+#define DEAR_IMGUI
+
 #define CONTACT(x,y) x##y
 #define STR(x) #x
 #define CONTACT2(x,y) CONTACT(x,y)

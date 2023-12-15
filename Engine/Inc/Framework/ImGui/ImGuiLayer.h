@@ -7,32 +7,65 @@
 
 namespace Ailu
 {
-	class AILU_API TextureSelector
+	class ImguiWindow
 	{
 	public:
 		inline static String kNull = "null";
-		void Open(const int& handle);
-		void Show();
-		const String& GetSelectedTexture(const int& handle) const;
+		~ImguiWindow() = default;
 		bool IsCaller(const int& handle) const { return _handle == handle; }
-	private:
+		virtual void Open(const int& handle)
+		{
+			_handle = handle;
+			_b_show = true;
+		};
+		virtual void Close()
+		{
+			_b_show = false;
+		};
+		virtual void Show()
+		{
+			if (!_b_show)
+			{
+				_handle = -1;
+				return;
+			}
+		};
+	protected:
 		int _handle = -1;
 		bool _b_show = false;
+	};
+	class TextureSelector : public ImguiWindow
+	{
+	public:
+		void Open(const int& handle) final;
+		void Show() final;
+		const String& GetSelectedTexture(const int& handle) const;
+	private:
 		int _selected_img_index = -1;
-		String _cur_selected_texture_path;
+		String _cur_selected_texture_path = kNull;
 	};
 
-	class MeshBrowser
+	class MeshBrowser : public ImguiWindow
 	{
 	public:
-		inline static String kNull = "null";
-		void Open(const int& handle);
-		void Show();
-		bool IsCaller(const int& handle) const { return _handle == handle; }
+		void Open(const int& handle) final;
+		void Show() final;
+	};
+
+	class AssetBrowser : public ImguiWindow
+	{
+	public:
+		void Open(const int& handle) final;
+		void Show() final;
 	private:
-		int _handle = -1;
-		bool _b_show = false;
-		String _cur_selected_texture_path;
+		String _cur_dir;
+	};
+
+	class AssetTable : public ImguiWindow
+	{
+	public:
+		void Open(const int& handle) final;
+		void Show() final;
 	};
 
 	class AILU_API ImGUILayer : public Layer
@@ -55,6 +88,9 @@ namespace Ailu
 		void ShowObjectDetail();
 	private:
 		TextureSelector _texture_selector;
+		MeshBrowser _mesh_browser;
+		AssetBrowser _asset_browser;
+		AssetTable _asset_table;
 	};
 }
 #pragma warning(pop)

@@ -19,8 +19,7 @@ namespace Ailu
 		{
 			std::string  shader_name = GetFileName(file_name);
 			auto shader = MakeRef<D3DShader>(file_name, shader_name, ShaderLibrary::s_shader_id++);
-			ShaderLibrary::s_shader_name.insert(std::make_pair(shader_name, shader->GetID()));
-			ShaderLibrary::s_shader_library.insert(std::make_pair(shader->GetID(), shader));
+			ShaderLibrary::Add(shader_name, shader);
 			return shader;
 		}
 		}

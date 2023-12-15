@@ -17,7 +17,11 @@ namespace Ailu
 		} 
 		SerializableProperty& GetProperty(const String& name) 
 		{
-			return _properties.find(name)->second;
+			static SerializableProperty null{};
+			if (_properties.contains(name))
+				return _properties.find(name)->second;
+			else
+				return null;
 		}
 		std::unordered_map<String, SerializableProperty>& GetAllProperties() 
 		{

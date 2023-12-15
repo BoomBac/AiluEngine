@@ -146,7 +146,53 @@ namespace Ailu
 			break;
 		case Ailu::ESerializablePropertyType::kFloat: ImGui::DragFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr));
 			break;
-		case Ailu::ESerializablePropertyType::kBool: ImGui::Checkbox(prop._name.c_str(), static_cast<bool*>(prop._value_ptr));
+		case Ailu::ESerializablePropertyType::kBool:
+		{
+			auto prop_value = SerializableProperty::GetProppertyValue<float>(prop);
+			if (prop_value.has_value())
+			{
+				bool checked = prop_value.value() == 1.0f;
+				ImGui::Checkbox(prop._name.c_str(), &checked);
+				prop.SetProppertyValue(checked? 1.0f : 0.0f);
+			}
+			else
+				ImGui::Text("Toogle %s value missing", prop._name.c_str());
+		}
+			break;
+		case Ailu::ESerializablePropertyType::kEnum:
+		{
+			auto mat = dynamic_cast<Material*>(obj);
+			if (mat != nullptr)
+			{
+				auto keywords = mat->GetShader()->GetKeywordGroups();
+				auto it = keywords.find(prop._value_name);
+				if (it != keywords.end())
+				{
+					auto prop_value = static_cast<int>(prop.GetProppertyValue<float>().value_or(0.0));
+					if (ImGui::BeginCombo(prop._name.c_str(), it->second[prop_value].substr(it->second[prop_value].rfind("_") + 1).c_str()))
+					{
+						static int s_selected_index = -1;
+						for (int i = 0; i < it->second.size(); i++)
+						{
+							auto x = it->second[i].rfind("_");
+							auto enum_str = it->second[i].substr(x + 1);
+							if (ImGui::Selectable(enum_str.c_str(), i == s_selected_index))
+								s_selected_index = i;
+							if (s_selected_index == i)
+							{
+								mat->EnableKeyword(it->second[i]);
+								prop.SetProppertyValue(static_cast<float>(i));
+							}
+						}
+						ImGui::EndCombo();
+					}
+				}
+				else
+					ImGui::Text("Eunm %s value missing", prop._name.c_str());
+			}
+			else
+				ImGui::Text("Non-Material Eunm %s value missing", prop._name.c_str());
+		}
 			break;
 		case Ailu::ESerializablePropertyType::kVector3f: ImGui::DragFloat3(prop._name.c_str(), static_cast<Vector3f*>(prop._value_ptr)->data);
 			break;
@@ -160,7 +206,7 @@ namespace Ailu
 		{
 			ImGui::Text("Texture2D : %s", prop._name.c_str());
 			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
-			auto tex = tex_prop_value.has_value()? std::get<1>(tex_prop_value.value()) : nullptr;
+			auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
 			String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
 			//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
 			float contentWidth = ImGui::GetWindowContentRegionWidth();
@@ -251,55 +297,61 @@ namespace Ailu
 			mat->MarkTextureUsed({ tex_usage }, use_textures[mat_prop_index]);
 			ImGui::PopID();
 			ImGui::SameLine();
-			if (use_textures[mat_prop_index])
+			auto prop = mat->GetProperty(name);
+			if (!prop._name.empty())
 			{
-				auto prop = mat->GetProperty(name);
-				ImGui::Text(" :%s", prop._name.c_str());
-				auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
-				auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
-				String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
-				//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
-				float contentWidth = ImGui::GetWindowContentRegionWidth();
-				float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
-				ImGui::SetCursorPosX(centerX);
-				if (selector_window.IsCaller(mat_prop_index))
+				if (use_textures[mat_prop_index])
 				{
-					auto new_tex = selector_window.GetSelectedTexture(mat_prop_index);
-					if (new_tex != "null" && new_tex != cur_tex_nameid)
-						mat->SetTexture(name, new_tex);
-				}
-				if (ImGui::ImageButton(tex? tex->GetGPUNativePtr() : TexturePool::GetDefaultWhite()->GetGPUNativePtr(), ImVec2(s_mini_tex_size, s_mini_tex_size)))
-				{
-					selector_window.Open(mat_prop_index);
-				}
-				if (selector_window.IsCaller(mat_prop_index))
-				{
-					ImGuiContext* context = ImGui::GetCurrentContext();
-					auto drawList = context->CurrentWindow->DrawList;
-					ImVec2 cur_img_pos = ImGui::GetCursorPos();
-					ImVec2 imgMin = ImGui::GetItemRectMin();
-					ImVec2 imgMax = ImGui::GetItemRectMax();
-					drawList->AddRect(imgMin, imgMax, IM_COL32(255, 255, 0, 255), 0.0f, 0, 2.0f);
-				}
-			}
-			else
-			{
-				if (tex_usage == ETextureUsage::kAlbedo || tex_usage == ETextureUsage::kEmssive || tex_usage == ETextureUsage::kSpecular)
-				{
-					auto prop = mat->GetProperty(non_tex_prop_name);
-					ImGui::ColorEdit4(prop._name.c_str(), static_cast<float*>(prop._value_ptr));
-				}
-				else if (tex_usage == ETextureUsage::kMetallic || tex_usage == ETextureUsage::kRoughness)
-				{
-					auto prop = mat->GetProperty(non_tex_prop_name);
-					ImGui::SliderFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr), prop._param[0], prop._param[1]);
+					auto prop = mat->GetProperty(name);
+					ImGui::Text(" :%s", prop._name.c_str());
+					auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
+					auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
+					String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
+					//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
+					float contentWidth = ImGui::GetWindowContentRegionWidth();
+					float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
+					ImGui::SetCursorPosX(centerX);
+					if (selector_window.IsCaller(mat_prop_index))
+					{
+						auto new_tex = selector_window.GetSelectedTexture(mat_prop_index);
+						if (new_tex != "null" && new_tex != cur_tex_nameid)
+							mat->SetTexture(name, new_tex);
+					}
+					if (ImGui::ImageButton(tex ? tex->GetGPUNativePtr() : TexturePool::GetDefaultWhite()->GetGPUNativePtr(), ImVec2(s_mini_tex_size, s_mini_tex_size)))
+					{
+						selector_window.Open(mat_prop_index);
+					}
+					if (selector_window.IsCaller(mat_prop_index))
+					{
+						ImGuiContext* context = ImGui::GetCurrentContext();
+						auto drawList = context->CurrentWindow->DrawList;
+						ImVec2 cur_img_pos = ImGui::GetCursorPos();
+						ImVec2 imgMin = ImGui::GetItemRectMin();
+						ImVec2 imgMax = ImGui::GetItemRectMax();
+						drawList->AddRect(imgMin, imgMax, IM_COL32(255, 255, 0, 255), 0.0f, 0, 2.0f);
+					}
 				}
 				else
 				{
-					ImGui::NewLine();
+					if (tex_usage == ETextureUsage::kAlbedo || tex_usage == ETextureUsage::kEmssive || tex_usage == ETextureUsage::kSpecular)
+					{
+						auto prop = mat->GetProperty(non_tex_prop_name);
+						ImGui::ColorEdit4(prop._name.c_str(), static_cast<float*>(prop._value_ptr));
+					}
+					else if (tex_usage == ETextureUsage::kMetallic || tex_usage == ETextureUsage::kRoughness)
+					{
+						auto prop = mat->GetProperty(non_tex_prop_name);
+						ImGui::SliderFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr), prop._param[0], prop._param[1]);
+					}
+					else
+					{
+						ImGui::NewLine();
+					}
+					mat->RemoveTexture(name);
 				}
-				mat->RemoveTexture(name);
 			}
+			else
+				LOG_WARNING("Internal shader property {} missing", name);
 			++mat_prop_index;
 			};
 		if (!TreeStats::s_is_texture_selector_open)
@@ -381,14 +433,57 @@ namespace Ailu
 				{
 					if (prop.second._type == ESerializablePropertyType::kStaticMesh)
 					{
-						ImGui::Text("StaticMesh: %s", prop.second._name.c_str());
+						ImGui::Text("StaticMesh");
+						auto& mesh = static_mesh_comp->GetMesh();
+						int mesh_count = 0;
+						static int s_mesh_selected_index = -1;
+						if (ImGui::BeginCombo("Select Mesh: ", mesh? mesh->Name().c_str() : "missing"))
+						{
+							for (auto it = MeshPool::Begin(); it != MeshPool::End(); it++)
+							{
+								if (ImGui::Selectable((*it)->Name().c_str(), s_mesh_selected_index == mesh_count))
+									s_mesh_selected_index = mesh_count;
+								if (s_mesh_selected_index == mesh_count)
+									static_mesh_comp->SetMesh(*it);
+								++mesh_count;
+							}
+							ImGui::EndCombo();
+						}
 					}
 				}
 				int mat_prop_index = 0;
 				auto mat = static_mesh_comp->GetMaterial();
+				ImGui::Text("Material: ");
+				int mat_count = 0;
+				static int s_mat_selected_index = -1;
+				if (ImGui::BeginCombo("Select Material: ", mat? mat->Name().c_str() : "missing"))
+				{
+					for (auto it = MaterialLibrary::Begin(); it != MaterialLibrary::End(); it++)
+					{
+						if (ImGui::Selectable((*it)->Name().c_str(), s_mat_selected_index == mat_count))
+							s_mat_selected_index = mat_count;
+						if (s_mat_selected_index == mat_count)
+							static_mesh_comp->SetMaterial(*it);
+						++mat_count;
+					}
+					ImGui::EndCombo();
+				}
 				if (mat)
 				{
-					ImGui::Text("Material: %s", mat->Name().c_str());
+					int shader_count = 0;
+					static int s_shader_selected_index = -1;
+					if (ImGui::BeginCombo("Select Shader: ", mat->GetShader()->GetName().c_str()))
+					{
+						for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+						{
+							if (ImGui::Selectable((*it)->GetName().c_str(), s_shader_selected_index == shader_count))
+								s_shader_selected_index = shader_count;
+							if (s_shader_selected_index == shader_count)
+								mat->ChangeShader(*it);
+							++shader_count;
+						}
+						ImGui::EndCombo();
+					}
 					if (mat->IsInternal())
 					{
 						DrawInternalStandardMaterial(mat.get(), selector_window);
@@ -400,10 +495,6 @@ namespace Ailu
 							DrawProperty(prop.second, mat.get(), selector_window);
 						}
 					}
-				}
-				else
-				{
-					ImGui::Text("Material: %s", "Missing");
 				}
 			}
 		}
@@ -452,6 +543,7 @@ namespace Ailu
 		}
 
 		ImGui_ImplWin32_Init(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
+		_asset_browser.Open(21);
 	}
 
 	void Ailu::ImGUILayer::OnDetach()
@@ -466,6 +558,7 @@ namespace Ailu
 
 	}
 	static bool show = false;
+	static bool s_show_asset_table = false;
 
 	void Ailu::ImGUILayer::OnImguiRender()
 	{
@@ -500,14 +593,21 @@ namespace Ailu
 		ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 0.2f, "%.2f");
 
 		ImGui::Checkbox("Expand", &show);
+		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
 		ImGui::End();
 		ImGui::PopFont();
 
 		if (show) ImGui::ShowDemoWindow(&show);
+		if (s_show_asset_table) _asset_table.Open(-2);
+		else _asset_table.Close();
 		TreeStats::s_common_property_handle = 0;
 		ShowWorldOutline();
 		ShowObjectDetail();
 		_texture_selector.Show();
+		_mesh_browser.Open(20);
+		_mesh_browser.Show();
+		_asset_browser.Show();
+		_asset_table.Show();
 		//ShowTextureExplorer();
 	}
 
@@ -527,6 +627,78 @@ namespace Ailu
 
 		ImGui::EndFrame();
 		ImGui::Render();
+	}
+
+	bool s_show_outilineobj_rename_dialog = false;
+	static bool s_global_modal_window_info[256]{false};
+	static void MarkModalWindoShow(const int& handle)
+	{
+		s_global_modal_window_info[handle] = true;
+	}
+
+	static String ShowModalDialog(const String& title,int handle = 0)
+	{
+		static char buf[256] = {};
+		String str_id = std::format("{}-{}", title, handle);
+		if (s_global_modal_window_info[handle])
+		{
+			ImGui::OpenPopup(str_id.c_str());
+			memset(buf, 0, 256);
+			s_global_modal_window_info[handle] = false;
+		}
+		if (ImGui::BeginPopupModal(str_id.c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text("Enter Text:");
+			ImGui::InputText("##inputText", buf, IM_ARRAYSIZE(buf));
+			if (ImGui::Button("OK", ImVec2(120, 0)))
+			{
+				ImGui::CloseCurrentPopup();
+				ImGui::EndPopup();
+				return String{ buf };
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel", ImVec2(120, 0)))
+			{
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
+		return String{};
+	}
+
+	static String ShowModalDialog(const String& title, std::function<void()> show_widget, int handle = 0)
+	{
+		static char buf[256] = {};
+		String str_id = std::format("{}-{}", title, handle);
+		if (s_global_modal_window_info[handle])
+		{
+			ImGui::OpenPopup(str_id.c_str());
+			s_global_modal_window_info[handle] = false;
+		}
+		if (ImGui::BeginPopupModal(str_id.c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			ImGui::Text(title.c_str());
+			show_widget();
+			ImGui::EndPopup();
+		}
+		return String{};
+	}
+
+	static std::tuple<ImVec2, ImVec2> GetCurImguiWindowRect()
+	{
+		ImVec2 vMin = ImGui::GetWindowContentRegionMin();
+		ImVec2 vMax = ImGui::GetWindowContentRegionMax();
+		vMin.x += ImGui::GetWindowPos().x;
+		vMin.y += ImGui::GetWindowPos().y;
+		vMax.x += ImGui::GetWindowPos().x;
+		vMax.y += ImGui::GetWindowPos().y;
+		return std::make_tuple(vMin, vMax);
+	}
+
+	static ImVec2 GetCurImguiWindowSize()
+	{
+		auto [vmin, vmax] = GetCurImguiWindowRect();
+		return vmax - vmin;
 	}
 
 	void DrawTreeNode(SceneActor* actor)
@@ -567,9 +739,23 @@ namespace Ailu
 						if (ImGui::IsItemClicked())
 							s_node_clicked = cur_tree_node_index - 1;
 						s_cur_frame_selected_actor_id = node->Id();
-						//ImGui::Text("占位符");
-						//ImGui::SameLine();
-						//if (ImGui::SmallButton("button")) {}
+						if (ImGui::BeginPopupContextItem()) // <-- use last item id as popup id
+						{
+							if (ImGui::MenuItem("Rename"))
+							{
+								//s_global_modal_window_info[cur_tree_node_index] = true;
+								MarkModalWindoShow(cur_tree_node_index);
+							}
+
+							if (ImGui::MenuItem("Delete"))
+							{
+								g_pSceneMgr->DeleteSceneActor(dynamic_cast<SceneActor*>(node));
+							}
+							ImGui::EndPopup();
+						}
+						auto new_name = ShowModalDialog("Rename: " + node->Name(), cur_tree_node_index);
+						if (!new_name.empty())
+							node->Name(new_name);
 						s_selected_mask = (1 << s_node_clicked);
 						ImGui::TreePop(); // TreePop 需要在退出子节点后
 					}
@@ -629,6 +815,7 @@ namespace Ailu
 			_handle = -1;
 			return;
 		}
+
 		ImGui::Begin("TextureSelector", &_b_show);
 		static float preview_tex_size = 128;
 		//// 获取当前ImGui窗口的内容区域宽度
@@ -671,10 +858,9 @@ namespace Ailu
 	}
 	void TextureSelector::Open(const int& handle)
 	{
+		ImguiWindow::Open(handle);
 		if (handle != _handle)
 			_cur_selected_texture_path = kNull;
-		_handle = handle;
-		_b_show = true;
 		_selected_img_index = -1;
 	}
 	const String& TextureSelector::GetSelectedTexture(const int& handle) const
@@ -690,23 +876,191 @@ namespace Ailu
 	//----------------------------------------------------------------------------MeshBrowser----------------------------------------------------------------------
 	void MeshBrowser::Open(const int& handle)
 	{
-		if (handle != _handle)
-			_cur_selected_texture_path = kNull;
-		_handle = handle;
-		_b_show = true;
+		ImguiWindow::Open(handle);
 	}
+
+
 	void MeshBrowser::Show()
+	{
+		ImguiWindow::Show();
+		static int s_cur_mesh_index = 0;
+		static int object_id = 0;
+		ImGui::Begin("MeshBrowser", &_b_show);
+		//LOG_INFO("max:({},{}),min:({},{})", ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y, ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y)
+		auto [meshs, mesh_count] = MeshPool::GetMeshForGUI();
+		if (ImGui::ListBox("Meshs", &s_cur_mesh_index, meshs, mesh_count))
+		{
+			LOG_INFO(meshs[s_cur_mesh_index]);
+		}
+		if (ImGui::Button("Place in Scene"))
+		{
+			g_pSceneMgr->AddSceneActor(std::format("object{}", object_id++), meshs[s_cur_mesh_index]);
+		}
+		ImGui::End();
+	}
+	//----------------------------------------------------------------------------MeshBrowser---------------------------------------------------------------------
+
+	//----------------------------------------------------------------------------AssetBrowser---------------------------------------------------------------------
+	void AssetBrowser::Open(const int& handle)
+	{
+		ImguiWindow::Open(handle);
+		_cur_dir = kEngineResRootPath;
+	}
+	void AssetBrowser::Show()
+	{
+		static auto new_material_widget = [this]() 
+		{
+			static char buf[256];
+			ImGui::InputText("##MaterialName", buf, IM_ARRAYSIZE(buf));
+			static Ref<Shader> selected_shader = nullptr;
+			int count = 0;
+			static int selected_index = -1;
+			if (ImGui::BeginCombo("Select Shader: ", selected_shader? selected_shader->GetName().c_str() : "select shader"))
+			{
+				for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+				{
+					if (ImGui::Selectable((*it)->GetName().c_str(), selected_index == count))
+						selected_index = count;
+					if (selected_index == count)
+						selected_shader = *it;
+					++count;
+				}
+				ImGui::EndCombo();
+			}
+			if (ImGui::Button("OK", ImVec2(120, 0)))
+			{
+				LOG_INFO("{},{}", String{ buf },selected_shader? selected_shader->GetName() : "null shader");
+				String name{ buf };
+
+				if (!name.empty() && selected_shader)
+				{
+					String sys_path = _cur_dir;
+					if (!sys_path.ends_with("\\") && !sys_path.ends_with("/"))
+						sys_path.append("/");
+					sys_path.append(name).append(".almat");
+					auto asset_path = PathUtils::ExtractAssetPath(sys_path);
+					auto new_mat = MaterialLibrary::CreateMaterial(selected_shader,name,asset_path);
+					new_mat->IsInternal(selected_shader->GetName() == "shaders");
+					g_pResourceMgr->SaveAsset(sys_path,new_mat.get());
+				}
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel", ImVec2(120, 0)))
+			{
+				ImGui::CloseCurrentPopup();
+			}
+		};
+		ImguiWindow::Show();
+		namespace fs = std::filesystem;
+		fs::path cur_path{ _cur_dir };
+		ImGui::Begin("AssetBrowser", &_b_show);
+		auto window_size = GetCurImguiWindowSize();
+
+		ImGui::Text(cur_path.string().c_str());
+		if (ImGui::Button("<-"))
+		{
+
+		}
+		ImGui::SameLine();
+		if (ImGui::Button(" ↑ "))
+		{
+			_cur_dir = cur_path.parent_path().string();
+		}
+		auto asset_content_size = window_size;
+		asset_content_size.x *= 0.9f;
+		asset_content_size.y *= 0.8f;
+		if (ImGui::BeginListBox(" ", asset_content_size))
+		{
+			fs::directory_entry cur_entry(cur_path);
+			fs::directory_iterator curdir_it{ cur_path };
+			int count = 0;
+			static int cur_click_id = -1;
+			for (auto& dir_it : curdir_it)
+			{
+				if(dir_it.is_directory())
+					ImGui::Selectable(std::format("[] {}", dir_it.path().filename().string()).c_str(), cur_click_id == count);
+				else
+					ImGui::Selectable(dir_it.path().filename().string().c_str(), cur_click_id == count);
+				if (ImGui::IsItemClicked())
+					cur_click_id = count;
+				if (cur_click_id == count && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && dir_it.is_directory())
+					_cur_dir = dir_it.path().string();
+				if (ImGui::BeginPopupContextItem()) // <-- use last item id as popup id
+				{
+					if (ImGui::MenuItem("New"))
+					{
+						
+					}
+					if (ImGui::MenuItem("Rename"))
+					{
+					}
+					if (ImGui::MenuItem("Delete"))
+					{
+					}
+					ImGui::EndPopup();
+				}
+				++count;
+			}
+			if (ImGui::BeginPopupContextWindow("AssetBrowserContext", ImGuiPopupFlags_NoOpenOverItems |
+				ImGuiPopupFlags_MouseButtonRight |
+				ImGuiPopupFlags_NoOpenOverExistingPopup))
+			{
+				if (ImGui::BeginMenu("New"))
+				{
+					if (ImGui::MenuItem("Material"))
+					{
+						MarkModalWindoShow(49);
+					}
+					if (ImGui::MenuItem("Shader"))
+					{
+						ShaderLibrary::Add(_cur_dir +  "test_new_shader.shader","test_shader");
+					}
+					ImGui::EndMenu();
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::EndListBox();
+		}
+		ShowModalDialog("New Material", new_material_widget, 49);
+		ImGui::End();
+	}
+	//----------------------------------------------------------------------------AssetBrowser---------------------------------------------------------------------
+
+	//----------------------------------------------------------------------------AssetTable-----------------------------------------------------------------------
+	void AssetTable::Open(const int& handle)
+	{
+		ImguiWindow::Open(handle);
+	}
+	void AssetTable::Show()
 	{
 		if (!_b_show)
 		{
 			_handle = -1;
 			return;
 		}
-		ImGui::Begin("MeshBrowser", &_b_show);
-		
+		ImGui::Begin("AssetTable");
+
+		// 表头
+		ImGui::Text("Column 1");
+		ImGui::SameLine(150);
+		ImGui::Text("Column 2");
+		ImGui::SameLine(300);
+		ImGui::Text("Column 3");
+
+		// 分隔线
+		ImGui::Separator();	
+		for (auto it = g_pResourceMgr->Begin(); it != g_pResourceMgr->End(); it++)
+		{
+			ImGui::Text(it->first.c_str());
+			ImGui::SameLine(0.f,-20.0f);
+			ImGui::Text(it->second->_asset_path.c_str());
+			// 分隔线
+			ImGui::Separator();
+		}
 		ImGui::End();
 	}
-	//----------------------------------------------------------------------------MeshBrowser---------------------------------------------------------------------
+	//----------------------------------------------------------------------------AssetTable-----------------------------------------------------------------------
 }
 
 

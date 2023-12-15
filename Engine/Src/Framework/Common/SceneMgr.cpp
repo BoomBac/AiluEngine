@@ -60,6 +60,12 @@ namespace Ailu
 	{
 		if (_p_current)
 		{
+			while (!_pending_delete_actors.empty())
+			{
+				auto actor = _pending_delete_actors.front();
+				_pending_delete_actors.pop();
+				_p_current->RemoveObject(actor);
+			}
 			for (auto& actor : _p_current->GetAllActor())
 			{
 				actor->Tick(delta_time);
@@ -71,6 +77,19 @@ namespace Ailu
 	{
 		s_all_scene.emplace_back(std::move(MakeScope<Scene>(name)));
 		return s_all_scene.back().get();
+	}
+
+	SceneActor* SceneMgr::AddSceneActor(std::string_view name, std::string_view mesh)
+	{
+		auto p_actor = Actor::Create<SceneActor>(name.data());
+		p_actor->AddComponent<StaticMeshComponent>(MeshPool::GetMesh(mesh.data()), MaterialLibrary::GetMaterial("Materials/StandardPBR_new.alasset"));
+		_p_current->AddObject(p_actor);
+		return p_actor;
+	}
+
+	void SceneMgr::DeleteSceneActor(SceneActor* actor)
+	{
+		_pending_delete_actors.push(actor);
 	}
 
 	void SceneMgr::SaveScene(Scene* scene, const String& scene_path)
@@ -179,6 +198,13 @@ namespace Ailu
 		_b_dirty = true;
 	}
 
+	void Scene::RemoveObject(SceneActor* actor)
+	{
+		auto p = static_cast<Actor*>(actor);
+		_p_root->RemoveChild(p);
+		_b_dirty = true;
+	}
+
 
 	std::list<SceneActor*>& Scene::GetAllActor()
 	{
@@ -234,7 +260,7 @@ namespace Ailu
 	Scene* Scene::GetDefaultScene()
 	{
 		auto _p_actor = Actor::Create<SceneActor>("stone");
-		_p_actor->AddComponent<StaticMeshComponent>(MeshPool::GetMesh("sphere"), MaterialPool::GetMaterial("Materials/StandardPBR_new.alasset"));
+		_p_actor->AddComponent<StaticMeshComponent>(MeshPool::GetMesh("sphere"), MaterialLibrary::GetMaterial("Materials/StandardPBR_new.alasset"));
 		auto _p_light = Actor::Create<LightActor>("directional_light");
 		SceneActor* point_light = Actor::Create<LightActor>("point_light");
 		point_light->GetComponent<LightComponent>()->_light_type = ELightType::kPoint;

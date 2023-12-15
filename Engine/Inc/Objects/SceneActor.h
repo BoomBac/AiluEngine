@@ -15,6 +15,10 @@ namespace Ailu
 		Transform& GetTransform();
 		void Serialize(std::ofstream& file, String indent) override;
 		void Serialize(std::ostream& os, String indent) override;
+		SceneActor& operator=(const SceneActor& other)
+		{
+			return *this;
+		}
 	protected:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;
 	private:

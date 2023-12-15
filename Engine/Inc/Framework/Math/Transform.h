@@ -31,6 +31,14 @@ namespace Ailu
 			Clamp(_rotation.z, -180.0f, 180.0f);
 			_world_mat = MatrixScale(_scale) * MatrixRotationYawPitchRoll(_rotation) * MatrixTranslation(_position);
 		}
+		Transform& operator=(const Transform& other)
+		{
+			this->_position = other._position;
+			this->_rotation = other._rotation;
+			this->_scale = other._scale;
+			this->_world_mat = other._world_mat;
+			return *this;
+		}
 	private:
 		Matrix4x4f _world_mat;
 	};

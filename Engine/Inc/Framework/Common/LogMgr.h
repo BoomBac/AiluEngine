@@ -1,6 +1,10 @@
 #pragma once
 #ifndef __LOG_MGR_H__
 #define __LOG_MGR_H__
+#include <string>
+#include <fstream>
+
+#include <source_location>
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/Log.h"
 
@@ -96,6 +100,14 @@ namespace Ailu
 			{
 				appender->Print(BuildLogMsg(ELogLevel::kError, msg, args...));
 			}
+		}
+
+		template <typename... Args>
+		void LogErrorFormat(const std::source_location& loc, std::string_view msg, Args&&... args)
+		{
+			String new_msg = BuildLogMsg(ELogLevel::kError, msg, args...);
+			new_msg.append(std::format("\n  File: {},Line: {};\n    Function: {}", loc.file_name(), loc.line(), loc.function_name()));
+			LogErrorFormat("{}", new_msg);
 		}
 
 		template <typename... Args>

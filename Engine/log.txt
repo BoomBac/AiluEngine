@@ -1,5 +1,9 @@
-Error: ResourceMgr end
+Normal: Load material asset at path Materials/StandardPBR_new.alasset
+Normal: Load material asset at path Materials/WireFrame_new.alasset
+Normal: Load material asset at path Materials/aa.almat
+Warning: Unused shader prop InvertColor been added;
+Warning: Unused shader prop ColorOverlay been added;
+Normal: ResourceMgr end
 Normal: Init end
-Normal: Havn't handled asset type: .docx
 Normal: Exit
 Normal: Save scene: default_scene to C:/AiluEngine/Engine/default.almap;

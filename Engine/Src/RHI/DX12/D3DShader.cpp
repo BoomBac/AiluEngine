@@ -120,7 +120,8 @@ namespace Ailu
 		ComPtr<ID3D12ShaderReflection>& shader_reflection)
 	{
 		ID3DBlob* pErrorBlob = nullptr;
-		D3DCompileFromFile(filename.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), 0, 0, &p_blob, &pErrorBlob);
+		D3D_SHADER_MACRO macros[] = { {"TEST","0"},{NULL,NULL}};
+		D3DCompileFromFile(filename.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), 0, 0, &p_blob, &pErrorBlob);
 		if (pErrorBlob)
 		{
 			OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
@@ -445,6 +446,10 @@ namespace Ailu
 
 	D3DShader::~D3DShader()
 	{
+		for (auto p : _keyword_defines)
+		{
+			DESTORY_PTRARR(p);
+		}
 	}
 
 	std::pair<D3D12_INPUT_ELEMENT_DESC*, uint8_t> D3DShader::GetVertexInputLayout()
@@ -465,6 +470,14 @@ namespace Ailu
 	void D3DShader::ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props)
 	{
 		line = su::Trim(line);
+		String addi_info{};
+		if (line.find("[") != line.npos)
+		{
+			auto begin = line.find("["), end = line.find("]");
+			addi_info = su::SubStrRange(line, begin + 1, end - 1);
+			line = line.substr(end + 1);
+			line = su::Trim(line);
+		}
 		auto cur_edge = line.find_first_of("(");
 		String value_name = line.substr(0, cur_edge);
 		line = line.substr(cur_edge);
@@ -483,6 +496,25 @@ namespace Ailu
 		else if (prop_type == GetSerializablePropertyTypeStr(ESerializablePropertyType::kFloat)) seri_type = ESerializablePropertyType::kFloat;
 		else if (prop_type == "Vector") seri_type = ESerializablePropertyType::kVector4f;
 		else seri_type = ESerializablePropertyType::kUndefined;
+		if (!addi_info.empty())
+		{
+			if (addi_info.starts_with("Toggle"))
+			{
+				seri_type = ESerializablePropertyType::kBool;
+				_keywords[value_name].emplace_back(value_name + "_ON");
+				_keywords[value_name].emplace_back(value_name + "_OFF");
+			}
+			else if (addi_info.starts_with("Enum"))
+			{
+				seri_type = ESerializablePropertyType::kEnum;
+				auto enum_strs = su::Split(su::SubStrRange(addi_info, addi_info.find("(") + 1, addi_info.find(")") - 1), ",");
+				_keywords[value_name].resize(enum_strs.size() / 2);
+				for (size_t i = 0; i < enum_strs.size(); i+=2)
+				{
+					_keywords[value_name][std::stoi(enum_strs[i + 1])] = value_name + "_" + enum_strs[i];
+				}
+			}
+		}
 		Vector4f prop_param;
 		if (seri_type == ESerializablePropertyType::kRange)
 		{
@@ -493,7 +525,7 @@ namespace Ailu
 			prop_param.y = static_cast<float>(std::stod(su::SubStrRange(prop_type, cur_edge + 1, right_bracket - 1)));
 			prop_param.z = static_cast<float>(std::stod(defalut_value));
 		}
-		else if (seri_type == ESerializablePropertyType::kFloat)
+		else if (seri_type == ESerializablePropertyType::kFloat || seri_type == ESerializablePropertyType::kBool)
 		{
 			prop_param.z = static_cast<float>(std::stod(defalut_value));
 		}
@@ -506,8 +538,16 @@ namespace Ailu
 			prop_param.z = static_cast<float>(std::stod(vec_str[2]));
 			prop_param.w = static_cast<float>(std::stod(vec_str[3]));
 		}
-		props.emplace_back(ShaderPropertyInfo{ value_name ,prop_name,seri_type ,prop_param});
-		LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);
+		if (seri_type != ESerializablePropertyType::kUndefined)
+		{
+			props.emplace_back(ShaderPropertyInfo{ value_name ,prop_name,seri_type ,prop_param });
+			LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);
+		}
+		else
+		{
+			g_pLogMgr->LogWarningFormat("Undefined shader property type with name {}", prop_name);
+		}
+
 	}
 
 	struct ShaderCommand
@@ -547,6 +587,43 @@ namespace Ailu
 
 	void D3DShader::PreProcessShader()
 	{
+		Vector<Vector<String>> kw_permutation_in{};
+		int kw_group_count = 0;
+		for (auto& it : _keywords)
+		{
+			Vector<String> v;
+			for (int i = 0; i < it.second.size(); i++)
+			{
+				auto& kw = it.second[i];
+				_keywords_ids[kw] = std::make_tuple(kw_group_count, i);
+				v.emplace_back(kw);
+			}
+			++kw_group_count;
+			kw_permutation_in.emplace_back(v);
+		}
+		if (!kw_permutation_in.empty())
+		{
+			for (auto& kw_seq : Algorithm::Permutations(kw_permutation_in))
+			{
+				u64 kw_hash = 0;
+				u64 temp_hash = 0;
+				D3D_SHADER_MACRO* shader_marcos = new D3D_SHADER_MACRO[kw_seq.size() + 1];
+				for (int i = 0; i < kw_seq.size(); i++)
+				{
+					auto& [group_id, inner_id] = _keywords_ids[kw_seq[i]];
+					temp_hash = inner_id;
+					temp_hash <<= group_id * 3;//每个关键字组占三位，也就是每组内最多8个关键字
+					kw_hash |= temp_hash;
+					shader_marcos[i] = { kw_seq[i].c_str(),"1" };
+				}
+				shader_marcos[kw_seq.size()] = { NULL,NULL };
+				_keyword_defines.emplace_back(shader_marcos);
+			}
+		}
+	}
+
+	void D3DShader::LoadAdditionInfo()
+	{
 		memset(&_pso_desc, 0, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 		D3D12_RASTERIZER_DESC r_desc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 		D3D12_BLEND_DESC bl_desc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
@@ -558,12 +635,12 @@ namespace Ailu
 		lines = ReadFileToLines(_src_file_path, line_count, "//info bein", "//info end");
 		if (line_count > 0)
 		{
-			auto prop_start_it = std::find(lines.begin(),lines.end(),"//Properties");
+			auto prop_start_it = std::find(lines.begin(), lines.end(), "//Properties");
+			auto prop_end_it = std::find(prop_start_it, lines.end(), "//}");
 			if (prop_start_it != lines.end())
 			{
 				prop_start_it++;
 				prop_start_it++;
-				auto prop_end_it = std::find(prop_start_it, lines.end(), "//}");
 				for (auto& it = prop_start_it; it != prop_end_it; it++)
 				{
 					line = it->substr(2);
@@ -615,6 +692,26 @@ namespace Ailu
 				}
 				else {}
 			}
+			for (auto& it = prop_end_it; it != lines.end(); it++)
+			{
+				line = it->substr(2);
+				if (line.find("multi") != line.npos)
+				{
+					//format: groupname_keywordname
+					auto keywords_str = line.substr(line.find_first_of("e") + 1);
+					keywords_str = su::Trim(keywords_str);
+					auto kw_seq = su::Split(keywords_str, " ");
+					if (kw_seq.size() > 0)
+					{
+						String kw_group_name = kw_seq[0].substr(0, kw_seq[0].rfind("_"));
+						for (auto& kw : kw_seq)
+						{
+							if (std::find(_keywords[kw_group_name].begin(), _keywords[kw_group_name].end(), kw) == _keywords[kw_group_name].end())
+								_keywords[kw_group_name].emplace_back(kw);
+						}
+					}
+				}
+			}
 		}
 		else
 		{
@@ -634,7 +731,6 @@ namespace Ailu
 		if (_p_p_reflection != nullptr) _p_p_reflection->Release();
 		_vertex_input_num = 0u;
 		memset(_vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
-		_shader_prop_infos.clear();
 		_variable_offset.clear();
 	}
 
@@ -728,18 +824,19 @@ namespace Ailu
 			PreProcessShader();
 			LoadShaderReflection(_tmp_p_v_reflection.Get(), EShaderType::kVertex);
 			LoadShaderReflection(_tmp_p_p_reflection.Get(), EShaderType::kPixel);
-			{
-				auto it = _shader_prop_infos.begin();
-				while (it != _shader_prop_infos.end())
-				{
-					if (!_bind_res_infos.contains(it->_value_name))
-					{
-						it = _shader_prop_infos.erase(it);
-					}
-					else
-						it++;
-				}
-			}
+			LoadAdditionInfo();
+			//{
+			//	auto it = _shader_prop_infos.begin();
+			//	while (it != _shader_prop_infos.end())
+			//	{
+			//		if (!_bind_res_infos.contains(it->_value_name))
+			//		{
+			//			it = _shader_prop_infos.erase(it);
+			//		}
+			//		else
+			//			it++;
+			//	}
+			//}
 			LoadAdditionalShaderReflection(_src_file_path);
 			_p_vblob = _tmp_p_vblob;
 			_p_pblob = _tmp_p_pblob;

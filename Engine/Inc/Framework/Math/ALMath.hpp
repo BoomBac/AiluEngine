@@ -480,6 +480,10 @@ namespace Ailu
 		{
 			return data[row_index];
 		}
+		T& operator=(const T& other)
+		{
+			return *this;
+		}
 		operator T* () { return &data[0][0]; };
 		operator const T* () const { return static_cast<const T*>(&data[0][0]); };
 	};

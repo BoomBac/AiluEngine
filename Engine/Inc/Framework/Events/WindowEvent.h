@@ -1,4 +1,6 @@
 #pragma once
+#pragma warning(push)
+#pragma warning(disable: 4251)
 #ifndef __WINDOW_EVENT_H__
 #define __WINDOW_EVENT_H__
 #include <format>
@@ -89,6 +91,6 @@ namespace Ailu
 	};
 }
 
-
+#pragma warning(pop)
 #endif // !WINDOW_EVENT_H__
 

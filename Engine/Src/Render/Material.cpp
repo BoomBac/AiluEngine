@@ -52,6 +52,7 @@ namespace Ailu
 	{
 		_name = name;
 		_cbuf_index = s_current_cbuf_offset++;
+		_b_internal = false;
 		_p_cbuf = _p_shader->GetCBufferPtr(_cbuf_index);
 		Construct(true);
 		shader->AddMaterialRef(this);
@@ -189,6 +190,14 @@ namespace Ailu
 			LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
 	}
 
+	void Material::EnableKeyword(const String& keyword)
+	{
+	}
+
+	void Material::DisableKeyword(const String& keyword)
+	{
+	}
+
 	void Material::RemoveTexture(const std::string& name)
 	{
 		auto it = _textures.find(name);
@@ -249,10 +258,11 @@ namespace Ailu
 
 	void Material::Construct(bool first_time)
 	{
+		static u8 s_unused_shader_prop_buf[256]{ 0 };
+		u16 unused_shader_prop_buf_offset = 0u;
 		u16 cur_shader_cbuf_size = 0;
 		if (!first_time)
 		{
-			_mat_props.clear();
 			_properties.clear();
 		}
 		std::map<String, std::tuple<uint8_t, Ref<Texture>>> _tmp_textures{};
@@ -269,7 +279,6 @@ namespace Ailu
 				auto byte_size = ShaderBindResourceInfo::GetVariableSize(bind_info.second);
 				cur_shader_cbuf_size += byte_size;
 			}
-			_mat_props.insert(bind_info.second);
 		}
 		if (!first_time)
 		{
@@ -308,16 +317,28 @@ namespace Ailu
 					auto it = _textures.find(prop_info._value_name);
 					if (it != _textures.end())
 					{
-						_properties[prop_info._value_name]._value_ptr = &(*it);
+						_properties[prop_info._value_name]._value_ptr = &(it->second);
 					}
 				}
 			}
 			else
 			{
-				SerializableProperty prop{ _p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(bind_info.find(prop_info._value_name)->second),
-	prop_info._prop_name,prop_info._prop_type };
+				auto it = bind_info.find(prop_info._value_name);
+				SerializableProperty prop{};
+				if (it != bind_info.end())
+				{
+					SerializableProperty p{ _p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(bind_info.find(prop_info._value_name)->second),
+prop_info._prop_name,prop_info._value_name,prop_info._prop_type };
+					prop = std::move(p);
+				}
+				else
+				{
+					SerializableProperty p{s_unused_shader_prop_buf + unused_shader_prop_buf_offset,prop_info._prop_name,prop_info._value_name,prop_info._prop_type };
+					prop = std::move(p);
+					unused_shader_prop_buf_offset+= SerializableProperty::GetValueSize(prop_info._prop_type);
+					g_pLogMgr->LogWarningFormat("Unused shader prop {} been added;", prop_info._prop_name);
+				}
 				memcpy(prop._param, prop_info._prop_param, sizeof(Vector4f));
-				_properties.insert(std::make_pair(prop_info._value_name, prop));
 				if (prop._type == ESerializablePropertyType::kFloat || prop._type == ESerializablePropertyType::kRange)
 				{
 					memcpy(prop._value_ptr, &prop._param[2],sizeof(float));
@@ -326,7 +347,17 @@ namespace Ailu
 				{
 					memcpy(prop._value_ptr, prop._param, sizeof(Vector4f));
 				}
+				_properties.insert(std::make_pair(prop_info._value_name, prop));
 			}
 		}
 	}
+	//-------------------------------------------StandardMaterial--------------------------------------------------------
+	StandardMaterial::StandardMaterial(Ref<Shader> shader, std::string name) : Material(shader,name)
+	{
+
+	}
+	StandardMaterial::~StandardMaterial()
+	{
+	}
+	//-------------------------------------------StandardMaterial--------------------------------------------------------
 }

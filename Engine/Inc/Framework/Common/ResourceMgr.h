@@ -22,9 +22,11 @@ namespace Ailu
 		int Initialize() final;
 		void Finalize() final;
 		void Tick(const float& delta_time) final;
+		auto Begin() { return s_all_asset.begin(); };
+		auto End() { return s_all_asset.end(); };
 		void SaveScene(Scene* scene, std::string& scene_path);
 		Scene* LoadScene(std::string& scene_path);
-		void SaveAsset(const std::string asset_path, Material* mat);
+		void SaveAsset(const std::string& path, Material* mat);
 		void SaveAsset(const Asset& asset);
 		
 		Ref<Texture2D> LoadTexture(const String& asset_path, String name = "");
@@ -34,8 +36,8 @@ namespace Ailu
 		static Material* LoadAsset(const String& asset_path);
 		void ImportAsset(const WString& sys_path);
 		void ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback = []() {});
-		void AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback);
-		void AddResourceTask(ResourceTask task);
+		static void AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback);
+		static void AddResourceTask(ResourceTask task);
 	private:
 		inline const static String kAssetDatabasePath = kEngineResRootPath + "assetdb.alasset";
 		static Ref<Material> LoadMaterial(std::string path);
@@ -51,10 +53,9 @@ namespace Ailu
 		void SubmitResourceTask();
 		void ImportAssetImpl(const WString& sys_path);
 	private:
-		List<ResourceTask> _task_queue;
+		inline static List<ResourceTask> s_task_queue;
 		inline static std::map<String, std::tuple<String, String>> s_asset_db{};
 		inline static std::map<String, Scope<Asset>> s_all_asset{};
-
 	};
 	extern ResourceMgr* g_pResourceMgr;
 

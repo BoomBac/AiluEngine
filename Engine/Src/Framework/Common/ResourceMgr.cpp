@@ -16,11 +16,11 @@ namespace Ailu
 		LOG_WARNING("Begin init engine internal resource...");
 		g_pTimeMgr->Mark();
 		LoadAssetDB();
-		for (auto& [guid, asset_info] : s_asset_db)
-		{
-			auto& [asset_path, asset_type] = asset_info;
-			//s_all_asset.insert(Asset{asset_path,GetResPath(asset_path),guid,AssetType::GetType(asset_type)});
-		}
+		//for (auto& [guid, asset_info] : s_asset_db)
+		//{
+		//	auto& [asset_path, asset_type] = asset_info;
+		//	//s_all_asset.insert(Asset{asset_path,GetResPath(asset_path),guid,AssetType::GetType(asset_type)});
+		//}
 		LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg");
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_color_4.png");
 		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_emi.jpg");
@@ -36,12 +36,11 @@ namespace Ailu
 		LoadTexture(default_cubemaps, "cubemap_sea");
 		LoadAsset("Materials/StandardPBR_new.alasset")->IsInternal(true);
 		LoadAsset("Materials/WireFrame_new.alasset");
-		auto skybox = MaterialPool::CreateMaterial(ShaderLibrary::Add("Shaders/skybox.hlsl"), "Skybox");
+		auto skybox = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Skybox");
 		skybox->IsInternal(false);
 		skybox->OriginPath("Skybox");
 		skybox->SetTexture("SkyBox", "cubemap_sea");
-		MaterialPool::CreateMaterial(ShaderLibrary::Add("Shaders/error_fallback.hlsl"), "Error")->OriginPath("Error");
-
+		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/error_fallback.hlsl"), "Error");
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
 		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());
@@ -60,10 +59,9 @@ namespace Ailu
 		{
 			LOG_INFO("texture: {}", name);
 		}
-		auto mat = MaterialPool::GetMaterial("Materials/StandardPBR_new.alasset");
 
 		LOG_WARNING("Finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
-		g_pLogMgr->LogError("ResourceMgr end");
+		g_pLogMgr->Log("ResourceMgr end");
 		g_thread_pool->Enqueue(&ResourceMgr::WatchDirectory, this);
 		return 0;
 	}
@@ -90,16 +88,18 @@ namespace Ailu
 		return nullptr;
 	}
 
-	void ResourceMgr::SaveAsset(const std::string asset_path, Material* mat)
+	void ResourceMgr::SaveAsset(const std::string& path, Material* mat)
 	{
 		using std::endl;
-		String sys_path = GetResPath(asset_path);
-		Asset mat_asset(asset_path, sys_path, Guid::Generate().ToString(), EAssetType::kMaterial);
-		AddToAssetDB(mat_asset);
+		String sys_path = PathUtils::IsSystemPath(path)? path : GetResPath(path);
+		String asset_path = PathUtils::ExtractAssetPath(path);
+		auto asset = MakeScope<Asset>(asset_path, sys_path, Guid::Generate().ToString(), EAssetType::kMaterial);
+		asset->_p_inst_asset = mat;
+		AddToAssetDB(*asset.get());
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::trunc);
 		if (out_mat.is_open())
 		{
-			out_mat << "guid: " << mat_asset._guid.ToString() << endl;
+			out_mat << "guid: " << asset->_guid.ToString() << endl;
 			out_mat << "type: " << AssetType::kMaterial << endl;
 			out_mat << "name: " << mat->Name() << endl;
 			out_mat.close();
@@ -109,6 +109,7 @@ namespace Ailu
 		{
 			LOG_WARNING("Save material to {} failed", sys_path);
 		}
+		s_all_asset[mat->Name()] = std::move(asset);
 	}
 
 	void ResourceMgr::SaveAsset(const Asset& asset)
@@ -157,7 +158,10 @@ namespace Ailu
 	{
 		if (ExistInAssetDB(asset._guid))
 		{
-			if (override) s_asset_db.insert(std::make_pair(asset._guid.ToString(), std::make_pair(asset._asset_path, AssetType::GetTypeString(asset._asset_type))));
+			if (override)
+			{
+				s_asset_db.insert(std::make_pair(asset._guid.ToString(), std::make_pair(asset._asset_path, AssetType::GetTypeString(asset._asset_type))));
+			}
 		}
 		else s_asset_db.insert(std::make_pair(asset._guid.ToString(), std::make_pair(asset._asset_path, AssetType::GetTypeString(asset._asset_type))));
 	}
@@ -180,6 +184,23 @@ namespace Ailu
 			for (const std::string& value : tokens) s_asset_db.insert(std::make_pair(tokens[0], std::make_pair(tokens[1], tokens[2])));
 		}
 		file.close();
+		for (auto& it : s_asset_db)
+		{
+			String type = std::get<1>(it.second);
+			String path = std::get<0>(it.second);
+			auto mat = LoadAsset(path);
+			if (mat)
+			{
+				g_pLogMgr->LogFormat("Load {} asset at path {}",type,path);
+				if (mat->GetShader()->GetName() == "shaders")
+					mat->IsInternal(true);
+			}
+			else
+			{
+				static std::source_location sl;
+				g_pLogMgr->LogErrorFormat(sl, "Load {} asset at path {} failed!", type, path);
+			}
+		}
 	}
 
 	void ResourceMgr::SaveAssetDB()
@@ -215,29 +236,6 @@ namespace Ailu
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
 		}
 		if (!props.empty()) out_mat << endl;
-#ifdef OLD
-		std::string cur_prop_type = "type";
-		int prop_count = 0;
-		for (auto& [prop_name, prop] : props)
-		{
-			if (cur_prop_type != prop_name)
-			{
-				out_mat << "  prop_type: " << prop_name << endl;
-				cur_prop_type = prop_name;
-			}
-			if (prop->_type == ESerializablePropertyType::kColor || prop->_type == ESerializablePropertyType::kVector4f)
-				out_mat << "    " << prop->_name << ": " << SerializableProperty::GetProppertyValue<Vector4f>(*prop);
-			else if (prop->_type == ESerializablePropertyType::kFloat)
-				out_mat << "    " << prop->_name << ": " << SerializableProperty::GetProppertyValue<float>(*prop);
-			else if (prop->_type == ESerializablePropertyType::kTexture2D)
-			{
-				String tex_path = prop->_value_ptr == nullptr ? "none" : SerializableProperty::GetProppertyValue<String>(*prop);
-				out_mat << "    " << prop->_name << ": " << tex_path;
-			}
-			if (prop_count++ != props.size() - 1)
-				out_mat << endl;
-		}
-#else
 		auto float_props = mat->GetAllFloatValue();
 		auto vector_props = mat->GetAllVectorValue();
 		out_mat << "  prop_type: " << "Float" << endl;
@@ -256,11 +254,14 @@ namespace Ailu
 			if (prop->_type == ESerializablePropertyType::kTexture2D)
 			{
 				auto tex = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(*prop);
-				String tex_path = tex.has_value() ? std::reinterpret_pointer_cast<Texture2D>(std::get<1>(tex.value()))->AssetPath() : "none";
+				String tex_path;
+				if (tex.has_value() && std::get<1>(tex.value()))
+					tex_path = std::reinterpret_pointer_cast<Texture2D>(std::get<1>(tex.value()))->AssetPath();
+				else
+					tex_path = "none";
 				out_mat << "    " << prop->_name << ": " << tex_path << endl;
 			}
 		}
-#endif // OLD
 		out_mat.close();
 		LOG_WARNING("Save material to {}", sys_path);
 	}
@@ -295,7 +296,7 @@ namespace Ailu
 			}
 		}
 		file.close();
-		auto mat = MaterialPool::CreateMaterial(ShaderLibrary::Add(std::get<1>(lines[1])), GetFileName(path));
+		auto mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Load(std::get<1>(lines[1])), GetFileName(path));
 		std::string cur_type{ " " };
 		std::string prop_type{ "prop_type" };
 		for (int i = 2; i < lines.size(); ++i)
@@ -343,7 +344,7 @@ namespace Ailu
 		String key{}, name{}, shader_path{};
 		FormatLine(blob[2], key, name);
 		FormatLine(blob[3], key, shader_path);
-		auto mat = MakeRef<Material>(ShaderLibrary::Add(shader_path), name);
+		auto mat = MakeRef<Material>(ShaderLibrary::Load(shader_path), name);
 		std::string cur_type{ " " };
 		std::string prop_type{ "prop_type" };
 		for (int i = 4; i < blob.size(); ++i)
@@ -355,33 +356,6 @@ namespace Ailu
 				cur_type = v;
 				continue;
 			}
-#ifdef OLD
-			auto prop = mat->_properties.find(k);
-			if (prop != mat->_properties.end())
-			{
-				if (cur_type == ShaderPropertyType::Color)
-				{
-					Vector4f vec{};
-					if (sscanf_s(v.c_str(), "%f,%f,%f,%f", &vec.r, &vec.g, &vec.b, &vec.a) == 4) memcpy(prop->second._value_ptr, &vec, sizeof(Vector4f));
-					else LOG_WARNING("Load material: {},property {} failed!", mat->_name, prop->first);
-				}
-				else if (cur_type == ShaderPropertyType::Float)
-				{
-					float roughness;
-					if (sscanf_s(v.c_str(), "%f", &roughness) == 1) memcpy(prop->second._value_ptr, &roughness, sizeof(float));
-					else LOG_WARNING("Load material: {},property {} failed!", mat->_name, prop->first);
-				}
-				else if (cur_type == ShaderPropertyType::Texture2D)
-				{
-					if (v == "none") continue;
-					mat->SetTexture(k, v);
-				}
-			}
-			else
-			{
-				g_pLogMgr->LogWarningFormat("Load material: {},property {} failed!", mat->_name, k);
-			}
-#else
 			if (cur_type == ShaderPropertyType::Float)
 			{
 				float f;
@@ -401,7 +375,6 @@ namespace Ailu
 				if (v == "none") continue;
 				mat->SetTexture(k, v);
 			}
-#endif
 		}
 		return mat;
 	}
@@ -443,6 +416,8 @@ namespace Ailu
 
 	Material* ResourceMgr::LoadAsset(const String& asset_path)
 	{
+		if (MaterialLibrary::Contain(asset_path))
+			return MaterialLibrary::GetMaterial(asset_path).get();
 		String sys_path = GetResPath(asset_path);
 		std::ifstream file(sys_path);
 		if (!file.is_open())
@@ -465,7 +440,7 @@ namespace Ailu
 		s_all_asset.insert(std::make_pair(asset_path, std::move(MakeScope<Asset>(asset_path, sys_path, guid_str, AssetType::GetType(type_str)))));
 		auto mat = LoadMaterial(lines);
 		mat->OriginPath(asset_path);
-		MaterialPool::AddMaterial(mat, asset_path);
+		MaterialLibrary::AddMaterial(mat, asset_path);
 		s_all_asset.find(asset_path)->second->_p_inst_asset = reinterpret_cast<void*>(mat.get());
 		return mat.get();
 	}
@@ -477,7 +452,7 @@ namespace Ailu
 
 	void ResourceMgr::ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback)
 	{
-		_task_queue.emplace_back([=]() {
+		s_task_queue.emplace_back([=]() {
 			ImportAssetImpl(sys_path);
 			callback();
 			});
@@ -485,7 +460,7 @@ namespace Ailu
 
 	void ResourceMgr::AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback)
 	{
-		_task_queue.emplace_back([=]() {
+		s_task_queue.emplace_back([=]() {
 			task();
 			callback();
 			});
@@ -493,7 +468,7 @@ namespace Ailu
 
 	void ResourceMgr::AddResourceTask(ResourceTask task)
 	{
-		_task_queue.emplace_back(task);
+		s_task_queue.emplace_back(task);
 	}
 
 	void ResourceMgr::WatchDirectory()
@@ -502,9 +477,33 @@ namespace Ailu
 		fs::path dir(kEngineResRootPath + EnginePath::kEngineShaderPath);
 		std::chrono::duration<int, std::milli> sleep_duration(1000); // 1秒
 		std::unordered_map<fs::path, fs::file_time_type> files;
+		auto reload_shader = [&](const fs::path& file) {
+			for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+			{
+				for (auto& head_file : (*it)->GetSourceFiles())
+				{
+					if (head_file == file.string())
+					{
+						AddResourceTask([=]() {
+							if ((*it)->Compile())
+							{
+								auto mats = (*it)->GetAllReferencedMaterials();
+								for (auto mat = mats.begin(); mat != mats.end(); mat++)
+									(*mat)->ChangeShader((*it));
+								LOG_INFO("Compile shader {} succeed!", (*it)->GetName());
+							}
+							else
+								LOG_ERROR("Compile shader {} failed!", (*it)->GetName());
+							});
+						break;
+					}
+				}
+			}
+		};
+		bool is_first_execute = true;
 		while (true)
 		{
-			std::unordered_map<fs::path, fs::file_time_type> current_files;
+			static std::unordered_map<fs::path, fs::file_time_type> current_files;
 			for (const auto& entry : fs::directory_iterator(dir))
 			{
 				if (fs::is_regular_file(entry.status())) {
@@ -513,42 +512,26 @@ namespace Ailu
 			}
 			for (const auto& [file, last_write_time] : current_files)
 			{
-				if (files.contains(file) && files[file] != last_write_time)
+				if (files.contains(file))
 				{
-					for (auto it = ShaderLibrary::ShaderBegin(); it != ShaderLibrary::ShaderEnd(); it++)
-					{
-						for (auto& head_file : it->second->GetSourceFiles())
-						{
-							if (head_file == file.string())
-							{
-								AddResourceTask([=]() {
-									if (it->second->Compile())
-									{
-										auto mats = it->second->GetAllReferencedMaterials();
-										for (auto mat = mats.begin(); mat != mats.end(); mat++)
-											(*mat)->ChangeShader(it->second);
-										LOG_INFO("Compile shader {} succeed!", it->second->GetName());
-									}
-									else
-										LOG_ERROR("Compile shader {} failed!", it->second->GetName());
-									});
-								break;
-							}
-						}
-					}
+					if (files[file] != last_write_time)
+						reload_shader(file);
 				}
+				else if(!is_first_execute)
+					reload_shader(file);
 				files[file] = last_write_time;
 			}
 			std::this_thread::sleep_for(sleep_duration);
+			is_first_execute = false;
 		}
 	}
 	void ResourceMgr::SubmitResourceTask()
 	{
-		for (auto& task : _task_queue)
+		for (auto& task : s_task_queue)
 		{
 			g_thread_pool->Enqueue(std::move(task));
 		}
-		_task_queue.clear();
+		s_task_queue.clear();
 	}
 
 	void ResourceMgr::ImportAssetImpl(const WString& sys_path)
@@ -564,7 +547,7 @@ namespace Ailu
 				for (auto& mesh : parser->Parser(sys_path))
 				{
 					g_pLogMgr->LogFormat("Start import mesh: {}", mesh->Name());
-					MeshPool::AddMesh(mesh->Name(), mesh);
+					MeshPool::AddMesh(mesh);
 				}
 			}
 			else

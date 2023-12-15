@@ -28,8 +28,10 @@ namespace Ailu
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		g_pTimeMgr->Initialize();
+#ifdef DEAR_IMGUI
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
+#endif // DEAR_IMGUI
 		_p_renderer = new Renderer();
 		_p_renderer->Initialize();
 		g_pResourceMgr->Initialize();
@@ -84,10 +86,12 @@ namespace Ailu
 			while (render_lag > kMsPerRender)
 			{
 				g_pSceneMgr->Tick(delta_time);
+#ifdef DEAR_IMGUI
 				_p_imgui_layer->Begin();
 				for (Layer* layer : _layer_stack)
 					layer->OnImguiRender();
 				_p_imgui_layer->End();
+#endif // DEAR_IMGUI
 				_p_renderer->Tick(delta_time);
 				render_lag -= kMsPerRender;
 			}

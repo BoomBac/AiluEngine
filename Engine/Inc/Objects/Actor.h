@@ -52,6 +52,15 @@ namespace Ailu
 		{
 			return this->_Id == other._Id;
 		}
+		Actor& operator=(const Actor& other) 
+		{
+			if (this != &other) 
+			{
+				_children = other._children;
+				_chilren_num = other._chilren_num;
+			}
+			return *this;
+		}
 	public:
 		inline static std::vector<Scope<Actor>> s_global_actors{};
 	protected:

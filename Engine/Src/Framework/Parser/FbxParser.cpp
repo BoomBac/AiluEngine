@@ -35,6 +35,34 @@ namespace Ailu
 	Ailu::FbxParser::~FbxParser()
 	{
 	}
+	void FbxParser::ParserFbxNode(FbxNode* node, List<Ref<Mesh>>& loaded_meshes)
+	{
+		if (node != nullptr)
+		{
+			auto child_num = node->GetChildCount();
+			for (int i = 0; i < child_num; i++)
+			{
+				auto child = node->GetChild(i);
+				FbxNodeAttribute* attribute = child->GetNodeAttribute();
+				std::string node_name = node->GetName();
+				auto type = attribute->GetAttributeType();
+				FbxAMatrix transformMatrix = node->EvaluateGlobalTransform();
+				FbxVector4 scale = transformMatrix.GetS();
+				scale_factor.x = scale[0];
+				scale_factor.y = scale[1];
+				scale_factor.z = scale[2];
+				if (type == FbxNodeAttribute::eMesh)
+				{
+					fbxsdk::FbxMesh* fbx_mesh = FbxCast<fbxsdk::FbxMesh>(attribute);
+					Ref<Mesh> mesh = MakeRef<Mesh>(node_name);
+					if (!GenerateMesh(mesh, fbx_mesh)) continue;
+					mesh->Build();
+					loaded_meshes.emplace_back(mesh);
+				}
+				ParserFbxNode(child, loaded_meshes);
+			}
+		}
+	}
 	bool FbxParser::GenerateMesh(Ref<Mesh>& mesh, fbxsdk::FbxMesh* fbx_mesh)
 	{
 		if (!fbx_mesh->IsTriangleMesh()) 
@@ -447,9 +475,10 @@ namespace Ailu
 	}
 	List<Ref<Mesh>> FbxParser::ParserImpl(WString sys_path)
 	{
+		String path = ToChar(sys_path.data());
 		FbxScene* fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
 		List<Ref<Mesh>> loaded_meshs{};
-		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(ToChar(sys_path.data()), -1, fbx_manager_->GetIOSettings()))
+		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.c_str(), -1, fbx_manager_->GetIOSettings()))
 			return loaded_meshs;
 		fbx_importer_->Import(fbx_scene);
 		FbxNode* fbx_rt = fbx_scene->GetRootNode();
@@ -466,34 +495,13 @@ namespace Ailu
 			};
 			fbxsdk::FbxSystemUnit::cm.ConvertScene(fbx_scene, lConversionOptions);
 		}
-		if (fbx_rt != nullptr)
-		{
-			auto child_num = fbx_rt->GetChildCount();
-			for (int i = 0; i < child_num; i++)
-			{
-				FbxNode* fbx_node = fbx_rt->GetChild(i);
-				FbxNodeAttribute* attribute = fbx_node->GetNodeAttribute();
-				std::string node_name = fbx_node->GetName();
-				auto type = attribute->GetAttributeType();
-				if (attribute->GetAttributeType() == FbxNodeAttribute::eMesh)
-				{
-					fbxsdk::FbxMesh* fbx_mesh = FbxCast<fbxsdk::FbxMesh>(attribute);
-					Ref<Mesh> mesh = MakeRef<Mesh>(node_name);
-					FbxAMatrix transformMatrix = fbx_node->EvaluateGlobalTransform();
-					FbxVector4 scale = transformMatrix.GetS();
-					scale_factor.x = scale[0];
-					scale_factor.y = scale[1];
-					scale_factor.z = scale[2];
-					if (!GenerateMesh(mesh, fbx_mesh)) continue;
-					mesh->Build();
-					loaded_meshs.emplace_back(mesh);
-				}
-			}
-		}
+		ParserFbxNode(fbx_rt,loaded_meshs);
 		if (loaded_meshs.empty())
 		{
 			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);
 		}
+		for (auto& mesh : loaded_meshs)
+			mesh->OriginPath(path);
 		return loaded_meshs;
 	}
 #pragma warning(pop)

@@ -60,6 +60,7 @@ namespace Ailu
         s_p_d3dcontext = this;
         LoadPipeline();
         LoadAssets();
+#ifdef DEAR_IMGUI
         //init imgui
         {
             D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle{};
@@ -69,6 +70,7 @@ namespace Ailu
             auto ret = ImGui_ImplDX12_Init(m_device.Get(), RenderConstants::kFrameCount,
                 DXGI_FORMAT_R8G8B8A8_UNORM, m_cbvHeap.Get(), cpu_handle, gpu_handle);
         }
+#endif // DEAR_IMGUI
         Gizmo::Init();
         m_commandList->Close();
         ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
@@ -401,6 +403,7 @@ namespace Ailu
             ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
             m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
         }
+#ifdef DEAR_IMGUI
         ImGuiIO& io = ImGui::GetIO();
         // Update and Render additional Platform Windows
         if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -408,6 +411,7 @@ namespace Ailu
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
         }
+#endif // DEAR_IMGUI
         // Present the frame.
         ThrowIfFailed(m_swapChain->Present(1, 0));
         WaitForGpu();
@@ -447,10 +451,10 @@ namespace Ailu
         GraphicsPipelineStateMgr::s_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
         Gizmo::Submit();
 
-        //imgui draw
-        {
-            ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
-        }
+#ifdef DEAR_IMGUI
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+#endif // DEAR_IMGUI
+
         // Indicate that the back buffer will now be used to present.
         auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
         m_commandList->ResourceBarrier(1, &bar_after);

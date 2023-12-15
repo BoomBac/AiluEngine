@@ -17,6 +17,7 @@ namespace Ailu
 		List<Ref<Mesh>> Parser(const WString& sys_path) final;
 		virtual ~FbxParser();
 	private:
+		void ParserFbxNode(FbxNode* node, List<Ref<Mesh>>& loaded_meshes);
 		bool GenerateMesh(Ref<Mesh>& mesh, fbxsdk::FbxMesh* fbx_mesh);
 		bool ReadNormal(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh);
 		bool ReadVertex(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh);

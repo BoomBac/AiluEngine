@@ -3,6 +3,8 @@
 #define __SHADER_H__
 #include <string>
 #include <set>
+#include <fstream>
+#include <map>
 #include <unordered_map>
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Common/Path.h"
@@ -118,6 +120,7 @@ namespace Ailu
 		static Ref<Shader> Create(const std::string& file_name);
 		virtual const std::set<String>& GetSourceFiles() const = 0;
 		virtual Vector<class Material*> GetAllReferencedMaterials() = 0;
+		virtual const std::map<String, Vector<String>> GetKeywordGroups() const = 0;
 	protected:
 		virtual void AddMaterialRef(class Material* mat) = 0;
 		virtual void RemoveMaterialRef(class Material* mat) = 0;
@@ -153,15 +156,70 @@ namespace Ailu
 			auto it = s_shader_path.find(name);
 			return it == s_shader_path.end() ? "" : it->second;
 		}
-		static Ref<Shader> Add(const std::string& res_path)
+		static Ref<Shader> Add(const String& sys_path, const String& name)
 		{
-			auto abs_path = GetResPath(res_path);
-			auto name = GetFileName(abs_path);
+			std::ofstream out(sys_path);
+			static String shader_template{ R"(//info bein
+//name: )" + name + R"(
+//vert: VSMain
+//pixel: PSMain
+//Cull: Front
+//Queue: Opaque
+//Properties
+//{
+//	color("Color",Color) = (1,1,1,1)
+//}
+//info end
+
+#include "common.hlsl"
+
+struct VSInput
+{
+	float3 position : POSITION;
+	float3 normal : NORMAL;
+};
+
+struct PSInput
+{
+	float4 position : SV_POSITION;
+	float3 wnormal : NORMAL;
+};
+
+CBufBegin
+	float4 color;
+CBufEnd
+
+PSInput VSMain(VSInput v)
+{
+	PSInput result;
+	result.position = TransformToClipSpace(v.position);
+	result.wnormal = normalize(v.position);
+	return result;
+}
+
+float4 PSMain(PSInput input) : SV_TARGET
+{
+	return float4(color) ; 
+})"};
+			out << shader_template;
+			out.close();
+			return Load(sys_path);
+		}
+		static void Add(const String& name, Ref<Shader> shader)
+		{
+			s_shader_name.insert(std::make_pair(name, shader->GetID()));
+			s_shader_library.insert(std::make_pair(shader->GetID(), shader));
+			s_shaders.emplace_back(shader);
+		}
+		static Ref<Shader> Load(const std::string& path)
+		{
+			auto sys_path = PathUtils::IsSystemPath(path)? path : GetResPath(path);
+			auto name = GetFileName(sys_path);
 			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
 			else
 			{
-				s_shader_path.insert(std::make_pair(name, res_path));
-				return Shader::Create(abs_path);
+				s_shader_path.insert(std::make_pair(name, path));
+				return Shader::Create(sys_path);
 			}
 		}
 		inline static uint32_t NameToId(const std::string& name)
@@ -170,18 +228,19 @@ namespace Ailu
 			if (it != s_shader_name.end()) return it->second;
 			else return s_error_id;
 		}
-		static auto ShaderBegin()
+		static auto Begin()
 		{
-			return s_shader_library.begin();
+			return s_shaders.begin();
 		}
-		static auto ShaderEnd()
+		static auto End()
 		{
-			return s_shader_library.end();
+			return s_shaders.end();
 		}
 	private:
 		inline static uint32_t s_shader_id = 0u;
 		inline static uint32_t s_error_id = 9999u;
 		inline static std::unordered_map<uint32_t, Ref<Shader>> s_shader_library;
+		inline static Vector<Ref<Shader>> s_shaders;
 		inline static std::unordered_map<std::string, uint32_t> s_shader_name;
 		inline static std::unordered_map<std::string, std::string> s_shader_path;
 	};

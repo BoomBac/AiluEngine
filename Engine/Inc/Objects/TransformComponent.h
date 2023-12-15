@@ -21,6 +21,12 @@ namespace Ailu
 		Transform _transform;
 		void Serialize(std::ofstream& file, String indent) final;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
+		TransformComponent& operator=(const TransformComponent& other)
+		{
+			this->_pos_data = other._pos_data;
+			this->_rotation_data = other._rotation_data;
+			this->_scale_data = other._scale_data;
+		}
 	private:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) final;
 	private:
