@@ -3,6 +3,7 @@
 #include "Framework/Common/LogMgr.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "Ext/stb/stb_image.h"
+#include "Framework/Common/Path.h"
 
 
 
@@ -11,15 +12,20 @@ namespace Ailu
 	Ref<Texture2D> PngParser::Parser(const std::string_view& path)
 	{
 		int x, y, n;
+		auto asset_path = PathUtils::ExtractAssetPath(path.data());
 		uint8_t* data = stbi_load(path.data(), &x, &y, &n, 0);
 		if (data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
-			return Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			auto tex = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			tex->Name("Placeholder");
+			return tex;
 		}
 		else
 		{
 			auto tex = Texture2D::Create(x, y, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			tex->AssetPath(asset_path);
+			tex->Name(PathUtils::GetFileName(path,true));
 			uint8_t* new_data = nullptr;
 			if (n == 3)
 			{
@@ -48,6 +54,8 @@ namespace Ailu
 		else
 		{
 			auto tex = Texture2D::Create(x, y, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			tex->AssetPath(PathUtils::ExtractAssetPath(path.data()));
+			tex->Name(PathUtils::GetFileName(path, true));
 			uint8_t* new_data = data;
 			if (n == 3)
 			{

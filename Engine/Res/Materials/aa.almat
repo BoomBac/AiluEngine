@@ -8,7 +8,7 @@ shader_path: Shaders/shaders.hlsl
     SamplerMask: 0
   prop_type: Vector
     SpecularColor: 0,0,0,0
-    BaseColor: 0.735294,0,1,0
+    BaseColor: 1,1,1,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
     Specular: none

@@ -4,6 +4,7 @@
 //pixel: PSMain
 //Cull: Back
 //Queue: Opaque
+//Blend: Src,OneMinusSrc
 //Properties
 //{
 //	Albedo("Albedo",Texture2D) = "white"
@@ -47,22 +48,10 @@ cbuffer SceneMaterialBuffer : register(b1)
 };
 
 
-//Property Begin
 
-PSInput VSMain(VSInput v)
-{
-	PSInput result;
-	result.position = TransformToClipSpace(v.position);
-	result.normal = v.normal;
-	result.uv0 = v.uv0;
-	float3 B = normalize(mul(float4(cross(v.tangent.xyz, v.normal), 0.0f), _MatrixWorld).xyz);
-	float3 T = normalize(mul(float4(v.tangent.xyz,0.0f),_MatrixWorld).xyz);
-	float3 N = normalize(mul(float4(v.normal,0.0f),_MatrixWorld).xyz);
-	result.btn = float3x3(T,B,N);
-	result.normal = N;
-	result.world_pos = TransformToWorldSpace(v.position);
-	return result;
-}
+#pragma vs
+PSInput VSMain(VSInput v);
+
 
 void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out float3 emssive,out float3 specular)
 {
@@ -101,8 +90,23 @@ float4 PSMain(PSInput input) : SV_TARGET
 	light += surface_data.emssive; 
 	GammaCorrect(light,2.2f);
 #ifdef TEST
-	return float4(light, 1.0f);
+	return float4(light, surface_data.albedo.a);
 #else
 	return float4(0.0,1.0,0.0,1.0);
 #endif
+}
+
+PSInput VSMain(VSInput v)
+{
+	PSInput result;
+	result.position = TransformToClipSpace(v.position);
+	result.normal = v.normal;
+	result.uv0 = v.uv0;
+	float3 B = normalize(mul(float4(cross(v.tangent.xyz, v.normal), 0.0f), _MatrixWorld).xyz);
+	float3 T = normalize(mul(float4(v.tangent.xyz,0.0f),_MatrixWorld).xyz);
+	float3 N = normalize(mul(float4(v.normal,0.0f),_MatrixWorld).xyz);
+	result.btn = float3x3(T,B,N);
+	result.normal = N;
+	result.world_pos = TransformToWorldSpace(v.position);
+	return result;
 }

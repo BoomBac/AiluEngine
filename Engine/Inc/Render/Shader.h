@@ -10,6 +10,7 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/Reflect.h"
 
+
 namespace Ailu
 {
 	enum class EShaderType : uint8_t
@@ -214,7 +215,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 		static Ref<Shader> Load(const std::string& path)
 		{
 			auto sys_path = PathUtils::IsSystemPath(path)? path : GetResPath(path);
-			auto name = GetFileName(sys_path);
+			auto name = PathUtils::GetFileName(sys_path);
 			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
 			else
 			{

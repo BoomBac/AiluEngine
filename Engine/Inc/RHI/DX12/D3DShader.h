@@ -136,6 +136,14 @@ namespace Ailu
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC _pso_desc;
 		std::set<Material*> _reference_mats;
 		std::set<String> _source_files;
+
+		u32 _hash_vertex_shader; //4~13 10
+		u32 _hash_pixel_shader; // 14~35 22
+		u8 _hash_input_layout; //0~3 4
+		u8 _hash_topology; //36~37 2
+		u8 _hash_blend_state; // 38~40 3
+		u8 _hash_raster_state;// 41 ~ 43 3
+		u8 _hash_depth_stencil_state;// 44~46 3
 	};
 }
 

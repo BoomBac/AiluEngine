@@ -67,7 +67,13 @@
 #define DECLARE_PRIVATE_PROPERTY(member_name,prop_name,type) \
 public: \
     void prop_name(const type& value) { _##member_name = value; } \
-    const type& prop_name() { return _##member_name; } \
+    const type& prop_name() const{ return _##member_name; } \
+private: \
+    type _##member_name;
+
+#define DECLARE_PRIVATE_PROPERTY_RO(member_name,prop_name,type) \
+public: \
+    const type& prop_name() const { return _##member_name; } \
 private: \
     type _##member_name;
 
@@ -81,6 +87,12 @@ private: \
 #define DECLARE_PROTECTED_PROPERTY(member_name,prop_name,type) \
 public: \
     void prop_name(const type& value) { _##member_name = value; } \
+    const type& prop_name() const { return _##member_name; } \
+protected: \
+    type _##member_name;
+
+#define DECLARE_PROTECTED_PROPERTY_RO(member_name,prop_name,type) \
+public: \
     const type& prop_name() const { return _##member_name; } \
 protected: \
     type _##member_name;

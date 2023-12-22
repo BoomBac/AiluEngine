@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Render/Renderer.h"
+#include "Render/Shader.h"
 #include "Render/GraphicsPipelineState.h"
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -65,6 +66,30 @@ namespace Ailu
 			LOG_WARNING("Pso id: {} can't find!", id);
 			return nullptr;
 		}
+	}
+	void GraphicsPipelineStateMgr::ConfigureShader(const u32& vs_hash, const u32& ps_hash)
+	{
+	}
+	void GraphicsPipelineStateMgr::ConfigureVertexInputLayout(const u8& hash)
+	{
+	}
+	void GraphicsPipelineStateMgr::ConfigureTopology(const u8& hash)
+	{
+	}
+	void GraphicsPipelineStateMgr::ConfigureBlendState(const u8& hash)
+	{
+	}
+	void GraphicsPipelineStateMgr::ConfigureRasterizerState(const u8& hash)
+	{
+	}
+	void GraphicsPipelineStateMgr::ConfigureDepthStencilState(const u8& hash)
+	{
+	}
+	void GraphicsPipelineStateMgr::ConfigureRenderTarget(const u8& color_hash, const u8& depth_hash)
+	{
+	}
+	void GraphicsPipelineStateMgr::ConfigureRenderTarget(const u8& color_hash)
+	{
 	}
 }
 

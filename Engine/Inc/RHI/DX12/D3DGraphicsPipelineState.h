@@ -48,6 +48,23 @@ namespace Ailu
 		return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t>(&cache_desc[0], std::move(desc_count));
 	}
 
+	namespace ALHash
+	{
+		template<>
+		static u32 Hasher(const D3D12_PRIMITIVE_TOPOLOGY_TYPE& obj)
+		{
+			switch (obj)
+			{
+			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED: return 0;
+			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT:  return 0;
+			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE:  return 1;
+			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE:  return 2;
+			case D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH:  return 3;
+			}
+			return 0;
+		}
+	}
+
 
 	class D3DGraphicsPipelineState : public GraphicsPipelineState
 	{
@@ -57,6 +74,7 @@ namespace Ailu
 		void Bind() final;
 		void SubmitBindResource(void* res, const EBindResDescType& res_type, short slot = -1) final;
 		void SubmitBindResource(void* res, const EBindResDescType& res_type, const std::string& name) final;
+		const ALHash::Hash<64>& Hash() final { return _hash; };
 	public:
 		static Ref<D3DGraphicsPipelineState> GetGizmoPSO();
 	private:
@@ -67,6 +85,7 @@ namespace Ailu
 		ComPtr<ID3D12PipelineState> _p_plstate;
 		ComPtr<ID3D12RootSignature>_p_sig;
 		std::unordered_map<std::string, ShaderBindResourceInfo>* _p_bind_res_desc_infos = nullptr;
+		ALHash::Hash<64> _hash;
 	};
 }
 

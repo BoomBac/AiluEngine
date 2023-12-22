@@ -208,20 +208,20 @@ namespace Ailu
 		//name with ext。图片导入时生成一个可以直接使用的纹理，当导入一个同名纹理时，第二个纹理的gpu资源已经创建并且提交到cmd，
 		// 但是由于存在同名，第二个纹理不会在此处被添加，那么指针就会被释放，执行cmd时便会报错！运行时一般不会有这个错误。
 		// 初始化时，将图片的加载放在最前面
-		static Ref<Texture2D> Add(const std::string& name, Ref<Texture2D> res)
+		static Ref<Texture2D> Add(const String& asset_path, Ref<Texture2D> res)
 		{
 			if (res != nullptr)
 			{
-				if (s_res_pool.contains(name)) return std::dynamic_pointer_cast<Texture2D>(s_res_pool[name]);
-				s_res_pool.insert(std::make_pair(name, res));
-				res->Name(GetFileName(name));
+				if (s_res_pool.contains(asset_path)) 
+					return std::dynamic_pointer_cast<Texture2D>(s_res_pool[asset_path]);
+				s_res_pool.insert(std::make_pair(asset_path, res));
 				++s_res_num;
 				s_is_dirty = true;
 				return res;
 			}
 			else
 			{
-				g_pLogMgr->LogWarningFormat("Add texture with name {} to pool failed! texture is null!",name);
+				g_pLogMgr->LogWarningFormat("Add texture with name {} to pool failed! texture is null!", asset_path);
 			}
 			return nullptr;
 		}
@@ -232,7 +232,7 @@ namespace Ailu
 			{
 				if (s_res_pool.contains(name)) return std::dynamic_pointer_cast<TextureCubeMap>(s_res_pool[name]);
 				s_res_pool.insert(std::make_pair(name, res));
-				res->Name(GetFileName(name));
+				res->Name(PathUtils::GetFileName(name));
 				++s_res_num;
 				s_is_dirty = true;
 				return res;
@@ -248,9 +248,14 @@ namespace Ailu
 		static Ref<Texture2D> GetTexture2D(const std::string& name);
 		static Ref<TextureCubeMap> GetCubemap(const std::string& name);
 
+		static bool Contain(const String& asset_path)
+		{
+			return s_res_pool.contains(asset_path);
+		}
+
 		static Ref<Texture2D> GetDefaultWhite()
 		{
-			auto it = s_res_pool.find(EnginePath::kEngineTexturePath + "MyImage01.jpg");
+			auto it = s_res_pool.find("Runtime/default_white");
 			if (it != s_res_pool.end()) return std::dynamic_pointer_cast<Texture2D>(it->second);
 			else return nullptr;
 		}

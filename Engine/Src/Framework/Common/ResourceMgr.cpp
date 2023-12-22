@@ -15,16 +15,39 @@ namespace Ailu
 	{
 		LOG_WARNING("Begin init engine internal resource...");
 		g_pTimeMgr->Mark();
+
+		u8* default_data = new u8[4 * 4 * 4];
+		memset(default_data, 255, 64);
+		auto default_white = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		default_white->FillData({ default_data });
+		default_white->Name("default_white");
+		default_white->AssetPath("Runtime/default_white");
+		TexturePool::Add("Runtime/default_white", default_white);
+
+		default_data = new u8[4 * 4 * 4];
+		memset(default_data, 0, 64);
+		for (int i = 0; i < 64; i += 3)
+			default_data[i] = 255;
+		auto default_black = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		default_black->FillData({ default_data });
+		default_black->Name("default_black");
+		default_black->AssetPath("Runtime/default_black");
+		TexturePool::Add("Runtime/default_black", default_black);
+
+		default_data = new u8[4 * 4 * 4];
+		memset(default_data, 128, 64);
+		for (int i = 0; i < 64; i += 3)
+			default_data[i] = 255;
+		auto default_gray = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		default_gray->FillData({ default_data });
+		default_gray->Name("default_gray");
+		default_gray->AssetPath("Runtime/default_gray");
+		TexturePool::Add("Runtime/default_gray", default_gray);
+
 		LoadAssetDB();
-		//for (auto& [guid, asset_info] : s_asset_db)
-		//{
-		//	auto& [asset_path, asset_type] = asset_info;
-		//	//s_all_asset.insert(Asset{asset_path,GetResPath(asset_path),guid,AssetType::GetType(asset_type)});
-		//}
-		LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg");
-		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_color_4.png");
-		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_emi.jpg");
-		LoadTexture(EnginePath::kEngineTexturePath + "Intergalactic Spaceship_nmap_2_Tris.jpg");
+		auto tex0 = LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg","default");
+		TexturePool::Add(tex0->AssetPath(), tex0);
+
 		Vector<String> default_cubemaps{
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/right.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/left.jpg",
@@ -296,7 +319,7 @@ namespace Ailu
 			}
 		}
 		file.close();
-		auto mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Load(std::get<1>(lines[1])), GetFileName(path));
+		auto mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Load(std::get<1>(lines[1])), PathUtils::GetFileName(path));
 		std::string cur_type{ " " };
 		std::string prop_type{ "prop_type" };
 		for (int i = 2; i < lines.size(); ++i)
@@ -372,7 +395,12 @@ namespace Ailu
 			}
 			else if (cur_type == ShaderPropertyType::Texture2D)
 			{
-				if (v == "none") continue;
+				if (v.empty() || v == "none") continue;
+				if (!TexturePool::Contain(v))
+				{
+					auto tex = g_pResourceMgr->LoadTexture(v);
+					TexturePool::Add(tex->AssetPath(),tex);
+				}
 				mat->SetTexture(k, v);
 			}
 		}
@@ -393,12 +421,15 @@ namespace Ailu
 
 	Ref<Texture2D> ResourceMgr::LoadTexture(const String& asset_path, String name)
 	{
-		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-		String sys_path = kEngineResRootPath + asset_path;
-		auto tex = TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path, 10));
-		tex->AssetPath(asset_path);
-		return tex;
-		//return TexturePool::Add(name.empty() ? asset_path : name, png_parser->Parser(sys_path));
+		if (!TexturePool::Contain(asset_path))
+		{
+			auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+			auto tex = png_parser->Parser(kEngineResRootPath + asset_path, 10);
+			if(!name.empty()) 
+				tex->Name(name);
+			return tex;
+		}
+		return TexturePool::GetTexture2D(asset_path);
 	}
 
 	Ref<TextureCubeMap> ResourceMgr::LoadTexture(const Vector<String>& asset_paths, String name)

@@ -43,6 +43,27 @@ namespace Ailu
             }
             return path;
         }
+
+        static std::string GetFileName(const std::string_view filePath, bool include_ext = false)
+        {
+            size_t found = filePath.find_last_of("/\\");
+            size_t dot_pos = filePath.find_last_of(".");
+
+            if (found != std::string::npos && dot_pos != std::string::npos)
+            {
+                if (include_ext)
+                    return std::string(filePath.substr(found + 1).data());
+                else
+                {
+                    size_t name_length = dot_pos - (found + 1);
+                    return std::string(filePath.substr(found + 1, name_length).data(), name_length);
+                }
+            }
+            else
+            {
+                return std::string(filePath.data(), filePath.length());
+            }
+        }
     };
 
     static inline std::string GetResPath(const std::string& sub_path)
@@ -53,29 +74,6 @@ namespace Ailu
         else if (sub_path.starts_with("\\"))
             path = path.substr(2);
         return kEngineResRootPath + path;
-    }
-
-
-
-    static std::string GetFileName(const std::string_view filePath, bool include_ext = false)
-    {
-        size_t found = filePath.find_last_of("/\\");
-        size_t dot_pos = filePath.find_last_of(".");
-
-        if (found != std::string::npos && dot_pos != std::string::npos)
-        {
-            if (include_ext)
-                return std::string(filePath.substr(found + 1).data());
-            else
-            {
-                size_t name_length = dot_pos - (found + 1);
-                return std::string(filePath.substr(found + 1, name_length).data(), name_length);
-            }
-        }
-        else
-        {
-            return std::string(filePath.data(), filePath.length());
-        }
     }
 }
 

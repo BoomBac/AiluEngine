@@ -18,6 +18,7 @@ namespace Ailu
     {
         friend class D3DRendererAPI;
         friend class D3DCommandBuffer;
+        using ResourceCmd = std::function<void()>;
     public:
         D3DContext(WinWindow* window);
         ~D3DContext();
@@ -25,7 +26,8 @@ namespace Ailu
         void Present() override;
         void Clear(Vector4f color, float depth, bool clear_color, bool clear_depth);
         inline static D3DContext* GetInstance() { return s_p_d3dcontext; };
-
+        u32 SubmitResourceTask(ResourceCmd cmd);
+        void CancelResourceTask(const u32& cmd_id);
         ID3D12Device* GetDevice();
         ID3D12GraphicsCommandList* GetCmdList();
         ID3D12GraphicsCommandList* GetTaskCmdList();
@@ -80,6 +82,7 @@ namespace Ailu
         u8 _dsv_desc_size;
         u8 _cbv_desc_size;
         u8* _p_cbuffer = nullptr;
+        List<std::pair<u32, ResourceCmd>> _res_cmd_list;
 
         ComPtr<ID3D12GraphicsCommandList> _task_cmd;
         ComPtr<ID3D12CommandAllocator> _task_cmd_alloc;

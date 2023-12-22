@@ -7,6 +7,7 @@
 #include <limits>
 #include <format>
 #include <limits>
+#include <bitset>
 #include "GlobalMarco.h"
 
 namespace Ailu
@@ -1209,6 +1210,58 @@ namespace Ailu
 		static inline std::size_t CombineHashes(const std::size_t& hash1, const std::size_t& hash2)
 		{
 			return hash1 ^ (hash2 + 0x9e3779b9 + (hash1 << 6) + (hash1 >> 2));
+		}
+
+		template<uint8_t Size>
+		class Hash
+		{
+		public:
+			Hash()
+			{
+				_hash.reset();
+			}
+			void Set(uint8_t pos, uint8_t size, uint32_t value)
+			{
+				while (size--)
+				{
+					_hash.set(pos++, value & 1);
+					value >>= 1;
+				}
+				if (value > 0)
+				{
+					throw std::runtime_error("Hash set overflow");
+				}
+			}
+			bool operator==(const Hash<Size>& other) const
+			{
+				return _hash == other._hash;
+			}
+			bool operator<(const Hash<Size>& other) const
+			{
+				return _hash < other._hash;
+			}
+		private:
+			std::bitset<Size> _hash;
+		};
+
+		template<typename T>
+		static u32 Hasher(const T& obj)
+		{
+			throw std::runtime_error("Unhandled type whth hasher");
+			return 0;
+		}
+
+		template<typename T>
+		static u32 CommonRuntimeHasher(const T& obj)
+		{
+			static Vector<T> hashes;
+			for (u32 i = 0; i < hashes.size(); i++)
+			{
+				if (hashes[i] == obj)
+					return i;
+			}
+			hashes.emplace_back(obj);
+			return static_cast<u32>(hashes.size() - 1);
 		}
 	}
 }

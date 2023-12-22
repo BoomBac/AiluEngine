@@ -63,24 +63,16 @@ namespace Ailu
 	Ref<Texture> TexturePool::Get(const std::string& name)
 	{
 		auto it = s_res_pool.find(name);
-		if (it != s_res_pool.end()) return it->second;
-		else
-		{
-			auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-			String sys_path = kEngineResRootPath + name;
-			return TexturePool::Add(name, png_parser->Parser(sys_path));
-		}
+		if (it != s_res_pool.end()) 
+			return it->second;
+		return nullptr;
 	}
 	Ref<Texture2D> TexturePool::GetTexture2D(const std::string& name)
 	{
 		auto it = s_res_pool.find(name);
-		if (it != s_res_pool.end()) return std::dynamic_pointer_cast<Texture2D>(it->second);
-		else
-		{
-			auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-			String sys_path = kEngineResRootPath + name;
-			return TexturePool::Add(name, png_parser->Parser(sys_path));
-		}
+		if (it != s_res_pool.end()) 
+			return std::dynamic_pointer_cast<Texture2D>(it->second);
+		return nullptr;
 	}
 	Ref<TextureCubeMap> TexturePool::GetCubemap(const std::string& name)
 	{

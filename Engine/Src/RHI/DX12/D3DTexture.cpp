@@ -13,6 +13,12 @@ namespace Ailu
 		_channel = 4;
 	}
 
+	D3DTexture2D::D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format, const String& asset_path) : 
+		D3DTexture2D(width, height, format)
+	{
+		_path = asset_path;
+	}
+
 	D3DTexture2D::~D3DTexture2D()
 	{
 		Release();
@@ -35,6 +41,8 @@ namespace Ailu
 	}
 	void D3DTexture2D::Release()
 	{
+		for (auto& id : _submited_tasks)
+			D3DContext::GetInstance()->CancelResourceTask(id);
 		for (auto p : _p_datas)
 		{
 			DESTORY_PTRARR(p);
@@ -73,6 +81,24 @@ namespace Ailu
 		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
 
+
+		//auto task_id = D3DContext::GetInstance()->SubmitResourceTask([=]() {
+		//	Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
+		//	for (size_t i = 0; i < _mipmap_count; i++)
+		//	{
+		//		u16 cur_mip_width = _width >> i;
+		//		u16 cur_mip_height = _height >> i;
+		//		D3D12_SUBRESOURCE_DATA subdata;
+		//		subdata.pData = _p_datas[i];
+		//		subdata.RowPitch = 4 * cur_mip_width;  // pixel size/byte  * width
+		//		subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
+		//		subres_datas.emplace_back(subdata);
+		//	}
+		//	UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
+		//	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+		//	p_cmdlist->ResourceBarrier(1, &barrier);
+		//	});
+		//_submited_tasks.emplace_back(task_id);
 		Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
 		for (size_t i = 0; i < _mipmap_count; i++)
 		{
@@ -85,8 +111,6 @@ namespace Ailu
 			subres_datas.emplace_back(subdata);
 		}
 		UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
-
-
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		p_cmdlist->ResourceBarrier(1, &barrier);
 		// Describe and create a SRV for the texture.

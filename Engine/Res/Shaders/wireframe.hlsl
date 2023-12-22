@@ -4,6 +4,7 @@
 //pixel: PSMain
 //Cull: Back
 //Queue: Opaque
+//Blend: Src,OneMinusSrc
 //Fill: Wireframe
 //info end
 #include "common.hlsl"

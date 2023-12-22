@@ -816,7 +816,7 @@ namespace Ailu
 			return;
 		}
 
-		ImGui::Begin("TextureSelector", &_b_show);
+		ImGui::Begin(std::format("TextureSelector ,handle {}", _handle).c_str(), &_b_show);
 		static float preview_tex_size = 128;
 		//// 获取当前ImGui窗口的内容区域宽度
 		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
@@ -858,9 +858,9 @@ namespace Ailu
 	}
 	void TextureSelector::Open(const int& handle)
 	{
-		ImguiWindow::Open(handle);
 		if (handle != _handle)
 			_cur_selected_texture_path = kNull;
+		ImguiWindow::Open(handle);
 		_selected_img_index = -1;
 	}
 	const String& TextureSelector::GetSelectedTexture(const int& handle) const

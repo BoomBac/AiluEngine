@@ -78,6 +78,20 @@ namespace Ailu
         WaitForGpu();
     }
 
+    u32 D3DContext::SubmitResourceTask(ResourceCmd cmd)
+    {
+        static u32 cmd_id = 0u;
+        _res_cmd_list.emplace_back(std::make_pair(cmd_id, cmd));
+        return cmd_id++;
+    }
+
+    void D3DContext::CancelResourceTask(const u32& cmd_id)
+    {
+        _res_cmd_list.erase(std::find_if(_res_cmd_list.begin(), _res_cmd_list.end(), [&](std::pair<u32, ResourceCmd>& cmd) {
+            return cmd.first == cmd_id;
+            }));
+    }
+
     ID3D12Device* D3DContext::GetDevice()
     {
         AL_ASSERT(m_device == nullptr,"Global D3D device hasn't been init!")
@@ -395,6 +409,9 @@ namespace Ailu
         _task_cmd->Close();
         if (_b_has_task)
         {
+            for (auto& [id, task] : _res_cmd_list)
+                task();
+            _res_cmd_list.clear();
             ID3D12CommandList* ppCommandLists[] = { _task_cmd.Get(),m_commandList.Get() };
             m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
         }

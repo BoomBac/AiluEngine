@@ -164,6 +164,58 @@ namespace Ailu
 		}
 	}
 
+	namespace ALHash
+	{
+		template<>
+		static u32 CommonRuntimeHasher(const D3D12_RASTERIZER_DESC& obj)
+		{
+			static Vector<D3D12_RASTERIZER_DESC> hashes;
+			for (u32 i = 0; i < hashes.size(); i++)
+			{
+				if (std::memcmp(&hashes[i], &obj, sizeof(D3D12_RASTERIZER_DESC)) == 0)
+					return i;
+			}
+			hashes.emplace_back(obj);
+			return static_cast<u32>(hashes.size() - 1);
+		}
+		template<>
+		static u32 CommonRuntimeHasher(const D3D12_BLEND_DESC& obj)
+		{
+			static Vector<D3D12_BLEND_DESC> hashes;
+			for (u32 i = 0; i < hashes.size(); i++)
+			{
+				if (std::memcmp(&hashes[i], &obj, sizeof(D3D12_BLEND_DESC)) == 0)
+					return i;
+			}
+			hashes.emplace_back(obj);
+			return static_cast<u32>(hashes.size() - 1);
+		}
+		template<>
+		static u32 CommonRuntimeHasher(const D3D12_DEPTH_STENCIL_DESC& obj)
+		{
+			static Vector<D3D12_DEPTH_STENCIL_DESC> hashes;
+			for (u32 i = 0; i < hashes.size(); i++)
+			{
+				if (std::memcmp(&hashes[i], &obj, sizeof(D3D12_DEPTH_STENCIL_DESC)) == 0)
+					return i;
+			}
+			hashes.emplace_back(obj);
+			return static_cast<u32>(hashes.size() - 1);
+		}
+		template<>
+		static u32 CommonRuntimeHasher(const D3D12_INPUT_LAYOUT_DESC& obj)
+		{
+			static Vector<D3D12_INPUT_LAYOUT_DESC> hashes;
+			for (u32 i = 0; i < hashes.size(); i++)
+			{
+				if (std::memcmp(&hashes[i], &obj, sizeof(D3D12_INPUT_LAYOUT_DESC)) == 0)
+					return i;
+			}
+			hashes.emplace_back(obj);
+			return static_cast<u32>(hashes.size() - 1);
+		}
+	}
+
 	void D3DShader::GenerateInternalPSO()
 	{
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
@@ -266,6 +318,11 @@ namespace Ailu
 		_pso_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 		_pso_desc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
 		ThrowIfFailed(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&pso)));
+		_hash_blend_state = ALHash::CommonRuntimeHasher(_pso_desc.BlendState);
+		_hash_input_layout = ALHash::CommonRuntimeHasher(_pso_desc.InputLayout); //0~3 4
+		_hash_topology = ALHash::CommonRuntimeHasher(_pso_desc.PrimitiveTopologyType); //36~37 2
+		_hash_raster_state = ALHash::CommonRuntimeHasher(_pso_desc.RasterizerState);// 41 ~ 43 3
+		_hash_depth_stencil_state = ALHash::CommonRuntimeHasher(_pso_desc.DepthStencilState);// 44~46 3
 		_pso_sys.Swap();
 		//succeed = !FAILED(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&pso)));
 	}
@@ -552,36 +609,41 @@ namespace Ailu
 
 	struct ShaderCommand
 	{
-		inline static String kName = "name";
-		inline static String kVSEntry = "Vert";
-		inline static String kPSEntry = "Pixel";
-		inline static String kCull = "Cull";
-		inline static String kQueue = "Queue";
-		inline static String kTopology = "Topology";
-		inline static String kBlend = "Blend";
-		inline static String KFill = "Fill";
+		inline static const String kName = "name";
+		inline static const String kVSEntry = "Vert";
+		inline static const String kPSEntry = "Pixel";
+		inline static const String kCull = "Cull";
+		inline static const String kQueue = "Queue";
+		inline static const String kTopology = "Topology";
+		inline static const String kBlend = "Blend";
+		inline static const String KFill = "Fill";
+		static struct Queue
+		{
+			inline static const String kGeometry = "Geometry";
+			inline static const String kTransplant = "Transparent";
+		} kQueueValue;
 		static struct Cull
 		{
-			inline static String kNone = "none";
-			inline static String kFront = "Front";
-			inline static String kBack = "Back";
+			inline static const String kNone = "none";
+			inline static const String kFront = "Front";
+			inline static const String kBack = "Back";
 		} kCullValue;
 		static struct Topology
 		{
-			inline static String kTriangle = "Triangle";
-			inline static String kLine = "Line";
+			inline static const String kTriangle = "Triangle";
+			inline static const String kLine = "Line";
 		} kTopologyValue;
 		static struct BlendFactor
 		{
-			inline static String kSrc = "Src";
-			inline static String kOneMinusSrc = "OneMinusSrc";
-			inline static String kOne = "One";
-			inline static String kZero = "Zero";
+			inline static const String kSrc = "Src";
+			inline static const String kOneMinusSrc = "OneMinusSrc";
+			inline static const String kOne = "One";
+			inline static const String kZero = "Zero";
 		} kBlendFactorValue;
 		static struct Fill
 		{
-			inline static String kSolid = "Solid";
-			inline static String kWireframe = "Wireframe";
+			inline static const String kSolid = "Solid";
+			inline static const String kWireframe = "Wireframe";
 		} kFillValue;
 	};
 
@@ -649,7 +711,8 @@ namespace Ailu
 				prop_start_it--;
 				prop_start_it--;
 			}
-			String k, v;
+			String k, v,blend_info;
+			bool is_transparent = false;
 			for (auto it = lines.begin(); it != prop_start_it; it++)
 			{
 				line = it->substr(2);
@@ -672,18 +735,12 @@ namespace Ailu
 				}
 				else if (su::Equal(k, ShaderCommand::kBlend, false))
 				{
-					auto blend_factors = su::Split(v, ",");
-					static auto get_d3d_blend_factor = [](const String& s) -> D3D12_BLEND {
-						if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOne)) return D3D12_BLEND::D3D12_BLEND_ONE;
-						else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kZero)) return D3D12_BLEND::D3D12_BLEND_ZERO;
-						else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kSrc)) return D3D12_BLEND::D3D12_BLEND_SRC_ALPHA;
-						else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOneMinusSrc)) return D3D12_BLEND::D3D12_BLEND_INV_SRC_ALPHA;
-						else return D3D12_BLEND::D3D12_BLEND_ONE;
-						};
-					bl_desc.RenderTarget[0].BlendEnable = true;
-					bl_desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-					bl_desc.RenderTarget[0].SrcBlend = get_d3d_blend_factor(blend_factors[0]);
-					bl_desc.RenderTarget[0].DestBlend = get_d3d_blend_factor(blend_factors[1]);
+					blend_info = v;
+				}
+				else if (su::Equal(k, ShaderCommand::kQueue, false))
+				{
+					if (su::Equal(v, ShaderCommand::kQueueValue.kTransplant, false))
+						is_transparent = true;
 				}
 				else if (su::Equal(k, ShaderCommand::KFill, false))
 				{
@@ -691,6 +748,21 @@ namespace Ailu
 						r_desc.FillMode = D3D12_FILL_MODE_WIREFRAME;
 				}
 				else {}
+			}
+			if (is_transparent && !blend_info.empty())
+			{
+				auto blend_factors = su::Split(blend_info, ",");
+				static auto get_d3d_blend_factor = [](const String& s) -> D3D12_BLEND {
+					if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOne)) return D3D12_BLEND::D3D12_BLEND_ONE;
+					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kZero)) return D3D12_BLEND::D3D12_BLEND_ZERO;
+					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kSrc)) return D3D12_BLEND::D3D12_BLEND_SRC_ALPHA;
+					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOneMinusSrc)) return D3D12_BLEND::D3D12_BLEND_INV_SRC_ALPHA;
+					else return D3D12_BLEND::D3D12_BLEND_ONE;
+					};
+				bl_desc.RenderTarget[0].BlendEnable = true;
+				bl_desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				bl_desc.RenderTarget[0].SrcBlend = get_d3d_blend_factor(blend_factors[0]);
+				bl_desc.RenderTarget[0].DestBlend = get_d3d_blend_factor(blend_factors[1]);
 			}
 			for (auto& it = prop_end_it; it != lines.end(); it++)
 			{

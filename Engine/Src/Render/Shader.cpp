@@ -17,7 +17,7 @@ namespace Ailu
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			std::string  shader_name = GetFileName(file_name);
+			std::string  shader_name = PathUtils::GetFileName(file_name);
 			auto shader = MakeRef<D3DShader>(file_name, shader_name, ShaderLibrary::s_shader_id++);
 			ShaderLibrary::Add(shader_name, shader);
 			return shader;

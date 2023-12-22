@@ -15,6 +15,7 @@ namespace Ailu
 	{
 	public:
 		D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format);
+		D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format,const String& asset_path);
 		~D3DTexture2D();
 		void FillData(uint8_t* data) final;
 		void FillData(Vector<u8*> datas) final;
@@ -30,8 +31,9 @@ namespace Ailu
 		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
 		D3D12_GPU_DESCRIPTOR_HANDLE _gpu_handle;
 		D3D12_CPU_DESCRIPTOR_HANDLE _cpu_handle;
-		std::vector<ComPtr<ID3D12Resource>> _textures;
-		std::vector<ComPtr<ID3D12Resource>> _upload_textures;
+		Vector<ComPtr<ID3D12Resource>> _textures;
+		Vector<ComPtr<ID3D12Resource>> _upload_textures;
+		Vector<u32> _submited_tasks;
 	};
 
 	class D3DTextureCubeMap : public TextureCubeMap
