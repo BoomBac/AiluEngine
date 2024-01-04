@@ -5,3 +5,5 @@ Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
 Normal: ResourceMgr end
 Normal: Init end
+Normal: Exit
+Normal: Save scene: default_scene to C:/AiluEngine/Engine/default.almap;

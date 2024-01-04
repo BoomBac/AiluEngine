@@ -46,6 +46,7 @@ namespace Ailu
 		void Tick(const float& delta_time) final;
 		static Scene* Create(const std::string& name);
 		SceneActor* AddSceneActor(std::string_view name,std::string_view mesh);
+		SceneActor* AddSceneActor(std::string_view name,const Camera& camera);
 		void DeleteSceneActor(SceneActor* actor);
 		void SaveScene(Scene* scene, const String& scene_path);
 		Scene* LoadScene(const String& scene_path);

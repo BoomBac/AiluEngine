@@ -121,7 +121,7 @@ namespace Ailu
 	{
 		ID3DBlob* pErrorBlob = nullptr;
 		D3D_SHADER_MACRO macros[] = { {"TEST","0"},{NULL,NULL}};
-		D3DCompileFromFile(filename.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), 0, 0, &p_blob, &pErrorBlob);
+		D3DCompileFromFile(filename.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), D3DCOMPILE_DEBUG, 0, &p_blob, &pErrorBlob);
 		if (pErrorBlob)
 		{
 			OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));

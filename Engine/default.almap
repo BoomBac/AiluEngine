@@ -1,12 +1,12 @@
 SceneName: default_scene
 SceneCamera: scene_camera
-  Type: Perspective
-  Position: -401.186,3333.23,3684.61
-  Rotation: 172.998,36.1693,0
+  Type: kPerspective
+  Position: -832.334,3607.48,-7664.97
+  Rotation: 31.8778,9.52857,0
   Fov: 60
   Aspect: 1.77778
-  Near: 345.19
-  Far: 109235
+  Near: 89.87
+  Far: 107340
 SceneGraph: 
   Name: root
     Components: 
@@ -14,7 +14,7 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,0,0
         Scale: 1,1,1
-    Children: 6
+    Children: 7
       Name: plane
         Components: 
           TransformComponent: 
@@ -75,10 +75,26 @@ SceneGraph:
       Name: object0
         Components: 
           TransformComponent: 
-            Position: 0,1219,0
+            Position: 0,1188,0
             Rotation: 0,0,0
             Scale: 5,5,5
           StaticMeshComponent: 
             MeshPath: sphere
             MaterialPath: Materials/aa.almat
+        Children: 0
+      Name: camera0
+        Components: 
+          TransformComponent: 
+            Position: 1686,617,0
+            Rotation: 49.5,-27,0
+            Scale: 1,1,1
+          CameraComponent: 8
+            Type: kPerspective
+            Position: 1686,617,0
+            Rotation: 49.5,-27,0
+            Near: 198
+            Aspect: 1.458
+            Far: 2121
+            Size: 787.234
+            FovH: 31.755
         Children: 0

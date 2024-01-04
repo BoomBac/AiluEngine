@@ -26,7 +26,7 @@ namespace Ailu
 
 		default_data = new u8[4 * 4 * 4];
 		memset(default_data, 0, 64);
-		for (int i = 0; i < 64; i += 3)
+		for (int i = 3; i < 64; i += 4)
 			default_data[i] = 255;
 		auto default_black = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		default_black->FillData({ default_data });
@@ -36,7 +36,7 @@ namespace Ailu
 
 		default_data = new u8[4 * 4 * 4];
 		memset(default_data, 128, 64);
-		for (int i = 0; i < 64; i += 3)
+		for (int i = 3; i < 64; i += 4)
 			default_data[i] = 255;
 		auto default_gray = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		default_gray->FillData({ default_data });

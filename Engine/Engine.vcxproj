@@ -511,6 +511,7 @@
     <ClInclude Include="Inc\Framework\Parser\TgaParser.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\Objects\Actor.h" />
+    <ClInclude Include="Inc\Objects\CameraComponent.h" />
     <ClInclude Include="Inc\Objects\CommonActor.h" />
     <ClInclude Include="Inc\Objects\Component.h" />
     <ClInclude Include="Inc\Objects\LightComponent.h" />
@@ -577,6 +578,7 @@
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\TgaParser.cpp" />
     <ClCompile Include="Src\Objects\Actor.cpp" />
+    <ClCompile Include="Src\Objects\CameraComponent.cpp" />
     <ClCompile Include="Src\Objects\Component.cpp" />
     <ClCompile Include="Src\Objects\LightComponent.cpp" />
     <ClCompile Include="Src\Objects\Object.cpp" />

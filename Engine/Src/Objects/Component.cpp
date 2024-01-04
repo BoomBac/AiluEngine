@@ -16,7 +16,10 @@ namespace Ailu
 	void Component::Tick(const float& delta_time)
 	{
 	}
-
+	void Component::OnGizmo()
+	{
+		
+	}
 	void Component::Destroy()
 	{
 	}
@@ -24,16 +27,16 @@ namespace Ailu
 	{
 		_p_onwer = onwer;
 	}
-	std::string Component::GetTypeName()
+	EComponentType Component::GetType()
 	{
-		return "Component";
+		return EComponentType::kDefault;
 	}
 	void Component::Serialize(std::ofstream& file, String indent)
 	{
-		file << indent << GetTypeName() << ": " << std::endl;
+		file << indent << GetComponentTypeStr(GetType()) << ": " << std::endl;
 	}
 	void Component::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
 	{
-		os << indent << GetTypeName() << ": " << std::endl;
+		os << indent << GetComponentTypeStr(GetType()) << ": " << std::endl;
 	}
 }

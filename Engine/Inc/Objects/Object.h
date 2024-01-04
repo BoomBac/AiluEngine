@@ -2,6 +2,7 @@
 #ifndef __OBJECT_H__
 #define __OBJECT_H__
 #include "Framework/Common/Reflect.h"
+#include <ranges>
 
 namespace Ailu
 {
@@ -9,7 +10,7 @@ namespace Ailu
 	{
 		//--------------------Reflect
 	protected: 
-		std::unordered_map<String, SerializableProperty> _properties{}; 
+		std::unordered_map<String, SerializableProperty> _properties{};
 	public: 
 		template<typename T> T GetProperty(const String& name) 
 		{
@@ -23,19 +24,39 @@ namespace Ailu
 			else
 				return null;
 		}
-		std::unordered_map<String, SerializableProperty>& GetAllProperties() 
+		std::unordered_map<String, SerializableProperty>& GetAllProperties()
 		{
 			return _properties;
+		}
+		auto PropertyBegin()
+		{	
+			return _properties.begin();
+		}
+		auto PropertyEnd()
+		{
+			return _properties.end();
 		}
 		//--------------------Reflect
 		DECLARE_PROTECTED_PROPERTY(name,Name,String)
 	public:
 		Object();
+		Object(const Object& other);
 		virtual void Serialize(std::ofstream& file, String indent);
 		virtual void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent);
+		/// <summary>
+		/// Deserialize
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="formated_str">prop name,prop value</param>
+		/// <returns></returns>
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String,String>>& formated_str);
 	protected:
+		/// <summary>
+		/// DeserializeImpl
+		/// </summary>
+		/// <param name="formated_str">prop name,prop value</param>
+		/// <returns></returns>
 		virtual void* DeserializeImpl(Queue<std::tuple<String,String>>& formated_str);
 	};
 

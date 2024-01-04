@@ -6,27 +6,23 @@
 
 namespace Ailu
 {
-    enum class ECameraType
-    {
-        kOrthographic,
-        kPerspective
-    };
-    static String ECameraTypeStr(ECameraType type)
-    {
-        switch (type)
-        {
-        case Ailu::ECameraType::kOrthographic: return String{ "Orthographic" };
-        case Ailu::ECameraType::kPerspective: return String{ "Perspective" };
-        default: return "undefined";
-        }
-    };
+    DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
 
     class Camera : public Object
     {
-        DECLARE_PROTECTED_PROPERTY(camera_type,Type,ECameraType)
+        DECLARE_PROTECTED_PROPERTY(camera_type,Type, ECameraType::ECameraType)
         DECLARE_PROTECTED_PROPERTY(aspect,Aspect,float)
         DECLARE_PROTECTED_PROPERTY(near_clip,Near,float)
         DECLARE_PROTECTED_PROPERTY(far_clip,Far,float)
+        //DECLARE_PROTECTED_PROPERTY(position,Position,Vector3f)
+        DECLARE_PROTECTED_PROPERTY(rotation,Rotation,Vector3f)
+        DECLARE_PROTECTED_PROPERTY(forward,Forward,Vector3f)
+        DECLARE_PROTECTED_PROPERTY(right,Right,Vector3f)
+        DECLARE_PROTECTED_PROPERTY(up,Up,Vector3f)
+        DECLARE_PROTECTED_PROPERTY(fov_h,FovH,float)
+        //Orthographic only
+        DECLARE_PROTECTED_PROPERTY(size,Size,float)
+        DECLARE_REFLECT_FIELD(Camera)
     public:
         inline const static Vector3f kRight{ 1.f,0.f,0.f };
         inline const static Vector3f kUp{ 0.f,1.f,0.f };
@@ -36,68 +32,65 @@ namespace Ailu
     public:
         Camera() : _camera_type(ECameraType::kPerspective)
         {
+            IMPLEMENT_REFLECT_FIELD(Camera);
             UpdateViewMatrix();
         };
-        Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType camera_type = ECameraType::kPerspective) :
+        Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType::ECameraType camera_type = ECameraType::kPerspective) :
             _aspect(aspect), _near_clip(near_clip), _far_clip(far_clip), _camera_type(camera_type)
         {
+            IMPLEMENT_REFLECT_FIELD(Camera);
             UpdateViewMatrix();
         };
+        //Camera(const Camera& other);
     public:
+        void Update();
         void SetLens(float fovy, float aspect, float nz, float fz);
-        void SetFovH(float angle);
-        void SetFovV(float angle);
-        float GetFovH() const { return _hfov; };
-        float GetFovV() const { return _vfov; };
-        float GetNearPlaneWidth() const;
-        float GetFarPlaneWidth() const;
-        float GetNearPlaneHeight() const;
-        float GetFarPlaneHeight() const;
+        void FovV(float angle);
+        float FovV() const { return _fov_v; };
+        //float GetNearPlaneWidth() const;
+        //float GetFarPlaneWidth() const;
+        //float GetNearPlaneHeight() const;
+        //float GetFarPlaneHeight() const;
+        void Position(const Vector3f& new_pos);
+        void Position(const float& x, const float& y, const float& z);
+        const Vector3f& Position() const { return _position; };
         const Matrix4x4f& GetProjection() const { return _proj_matrix; }
         const Matrix4x4f& GetView() const { return _view_matrix; }
-        void SetPosition(const float& x, const float& y, const float& z);
-        void SetPosition(const Vector3f& new_pos);
-        const Vector3f& GetPosition() const { return position_; };
-        const Vector3f& GetRotation() const { return _rotation; };
-        const Vector3f& GetForward() const { return forawrd_; };
-        const Vector3f& GetRight() const { return right_; };
-        const Vector3f& GetUp() const { return up_; };
         void MoveForward(float dis);
         void MoveRight(float dis);
-        //上下俯仰
+    private:
         void RotatePitch(float angle);
-        //左右偏航
         void RotateYaw(float angle);
-        void Rotate(float vertical, float horizontal);      
-    protected:
+        void Rotate(float vertical, float horizontal);
         void UpdateViewMatrix();
-        Vector3f position_{ 0.f, 0.0f, -1000.f };
-        Vector3f _rotation{ 0.f,0.f,0.f };
-        Vector3f forawrd_{ 0.0f, 0.0f, 1.f };
-        Vector3f up_{ 0.0f, 1.0f, 0.0f };
-        Vector3f right_{ 1.f,0.f,0.f };
-
         bool b_dirty_ = true;
-        float _hfov;
-        float _vfov;
-        float _near_plane_height;
-        float _far_plane_height;
+        Vector3f _position;
+        float _fov_v;
         Matrix4x4f _view_matrix{};
         Matrix4x4f _proj_matrix{};
     };
+    REFLECT_FILED_BEGIN(Camera)
+    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f,Position,_position)
+    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f,Rotation,_rotation)
+    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Aspect,_aspect)
+    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Near,_near_clip)
+    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Far,_far_clip)
+    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Size,_size)
+    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, FovH,_fov_h)
+    REFLECT_FILED_END
 
     class CameraState
     {
     public:
         CameraState(const Camera& camera)
         {
-            position = camera.GetPosition();
-            rotation = camera.GetRotation();
+            position = camera.Position();
+            rotation = camera.Rotation();
         }
         void UpdateState(const Camera& camera)
         {
-            position = camera.GetPosition();
-            rotation = camera.GetRotation();
+            position = camera.Position();
+            rotation = camera.Rotation();
         }
         void LerpTo(const CameraState& target,float speed)
         {
@@ -106,8 +99,8 @@ namespace Ailu
         }
         void UpdateCamrea(Camera& camera) const
         {
-            camera.SetPosition(position);
-            camera.Rotate(rotation.y, rotation.x);
+            camera.Position(position);
+            camera.Rotation(rotation);
         }
         Vector3f position;
         Vector3f rotation;

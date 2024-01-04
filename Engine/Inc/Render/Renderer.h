@@ -14,6 +14,8 @@
 #include "Material.h"
 #include "Framework/Assets/Mesh.h"
 
+#include "Framework/Common/SceneMgr.h"
+
 namespace Ailu
 {
     struct DrawInfo
@@ -40,10 +42,13 @@ namespace Ailu
         float GetDeltaTime() const;
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
     private:
-        inline static std::list<DrawInfo> _draw_call{};
-        ScenePerFrameData* _p_per_frame_cbuf_data;
         void Render();
         void DrawRendererGizmo();
+        void PrepareLight(Scene* p_scene);
+        void PrepareCamera(Camera* p_camera);
+    private:
+        inline static std::list<DrawInfo> _draw_call{};
+        ScenePerFrameData* _p_per_frame_cbuf_data;
         GraphicsContext* _p_context = nullptr;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;

@@ -69,8 +69,8 @@ namespace Ailu
 	{
 		if (Camera::sCurrent)
 		{
-			auto camera_pos = Camera::sCurrent->GetPosition();
-			auto camera_rotation = Camera::sCurrent->GetRotation();
+			auto camera_pos = Camera::sCurrent->Position();
+			auto camera_rotation = Camera::sCurrent->Rotation();
 			_camera_near = Camera::sCurrent->Near();
 			_camera_far = Camera::sCurrent->Far();
 			ImGui::Begin("CameraDetail");
@@ -113,27 +113,27 @@ namespace Ailu
 			Vector3f move_dis{ 0,0,0 };
 			if (Input::IsKeyPressed(AL_KEY_W))
 			{
-				move_dis += Camera::sCurrent->GetForward() * _camera_move_speed * _camera_move_speed;
+				move_dis += Camera::sCurrent->Forward() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_S))
 			{
-				move_dis -= Camera::sCurrent->GetForward() * _camera_move_speed * _camera_move_speed;
+				move_dis -= Camera::sCurrent->Forward() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_D))
 			{
-				move_dis += Camera::sCurrent->GetRight() * _camera_move_speed * _camera_move_speed;
+				move_dis += Camera::sCurrent->Right() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_A))
 			{
-				move_dis -= Camera::sCurrent->GetRight() * _camera_move_speed * _camera_move_speed;
+				move_dis -= Camera::sCurrent->Right() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_E))
 			{
-				move_dis += Camera::sCurrent->GetUp() * _camera_move_speed * _camera_move_speed;
+				move_dis += Camera::sCurrent->Up() * _camera_move_speed * _camera_move_speed;
 			}
 			if (Input::IsKeyPressed(AL_KEY_Q))
 			{
-				move_dis -= Camera::sCurrent->GetUp() * _camera_move_speed * _camera_move_speed;
+				move_dis -= Camera::sCurrent->Up() * _camera_move_speed * _camera_move_speed;
 			}
 			_target_cam_state->position += move_dis;
 			auto cur_mouse_pos = Input::GetMousePos();
@@ -148,7 +148,7 @@ namespace Ailu
 			pre_mouse_pos = cur_mouse_pos;
 			_origin_cam_state->LerpTo(*_target_cam_state, lerp_speed * _lerp_speed_multifactor);
 			_origin_cam_state->UpdateCamrea(*Camera::sCurrent);
-			Camera::sCurrent->SetFovH(_camera_fov_h);
+			Camera::sCurrent->FovH(_camera_fov_h);
 			Camera::sCurrent->Near(_camera_near);
 			Camera::sCurrent->Far(_camera_far);
 		}

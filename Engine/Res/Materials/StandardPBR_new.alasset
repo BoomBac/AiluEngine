@@ -13,7 +13,7 @@ shader_path: Shaders/shaders.hlsl
   prop_type: Texture2D
     Specular: none
     Metallic: none
-    Albedo: Runtime/default_black
+    Albedo: Runtime/default_white
     Normal: Textures/Intergalactic Spaceship_nmap_2_Tris.jpg
     Emssive: Textures/Intergalactic Spaceship_emi.jpg
     Roughness: none

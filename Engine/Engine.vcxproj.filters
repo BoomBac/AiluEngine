@@ -2022,6 +2022,9 @@
     <ClInclude Include="Inc\Framework\ImGui\ImGUIDLL.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Objects\CameraComponent.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2175,6 +2178,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\ImGui\ImGUIDLL.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Objects\CameraComponent.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

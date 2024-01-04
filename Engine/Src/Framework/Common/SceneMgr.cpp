@@ -2,6 +2,7 @@
 #include "Framework/Common/SceneMgr.h"
 #include "Objects/CommonActor.h"
 #include "Objects/StaticMeshComponent.h"
+#include "Objects/CameraComponent.h"
 #include "Framework/Common/LogMgr.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Camera.h"
@@ -33,12 +34,12 @@ namespace Ailu
 	static void LoadCamera(Queue<std::tuple<String, String>>& scene_data, Camera& out_camera)
 	{
 		while (std::get<0>(scene_data.front()) != "Type") scene_data.pop();
-		out_camera.Type(std::get<1>(scene_data.front()) == ECameraTypeStr(ECameraType::kPerspective) ? ECameraType::kPerspective : ECameraType::kOrthographic);
+		out_camera.Type(std::get<1>(scene_data.front()) == ECameraType::ToString(ECameraType::kPerspective) ? ECameraType::kPerspective : ECameraType::kOrthographic);
 		scene_data.pop();
 		Vector3f v3{};
-		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.SetPosition(v3); });
-		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.Rotate(v3.y, v3.x); });
-		ProcessValueAndPop(scene_data, [&](String str) {out_camera.SetFovH(LoadFloat(str.c_str())); });
+		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.Position(v3); });
+		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.Rotation(v3); });
+		ProcessValueAndPop(scene_data, [&](String str) {out_camera.FovH(LoadFloat(str.c_str())); });
 		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Aspect(LoadFloat(str.c_str())); });
 		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Near(LoadFloat(str.c_str())); });
 		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Far(LoadFloat(str.c_str())); });
@@ -87,6 +88,14 @@ namespace Ailu
 		return p_actor;
 	}
 
+	SceneActor* SceneMgr::AddSceneActor(std::string_view name, const Camera& camera)
+	{
+		auto p_actor = Actor::Create<SceneActor>(name.data());
+		p_actor->AddComponent<CameraComponent>(camera);
+		_p_current->AddObject(p_actor);
+		return p_actor;
+	}
+
 	void SceneMgr::DeleteSceneActor(SceneActor* actor)
 	{
 		_pending_delete_actors.push(actor);
@@ -101,10 +110,10 @@ namespace Ailu
 			String level1 = GetIndentation(1), level2 = GetIndentation(2), level3 = GetIndentation(3), level4 = GetIndentation(4);
 			ss << "SceneName: " << scene->Name() << endl;
 			ss << "SceneCamera: " << "scene_camera" << endl;
-			ss << level1 << "Type: " << ECameraTypeStr(Camera::sCurrent->Type()) << endl;
-			ss << level1 << "Position: " << Camera::sCurrent->GetPosition() << endl;
-			ss << level1 << "Rotation: " << Camera::sCurrent->GetRotation() << endl;
-			ss << level1 << "Fov: " << Camera::sCurrent->GetFovH() << endl;
+			ss << level1 << "Type: " << ECameraType::ToString(Camera::sCurrent->Type()) << endl;
+			ss << level1 << "Position: " << Camera::sCurrent->Position() << endl;
+			ss << level1 << "Rotation: " << Camera::sCurrent->Rotation() << endl;
+			ss << level1 << "Fov: " << Camera::sCurrent->FovH() << endl;
 			ss << level1 << "Aspect: " << Camera::sCurrent->Aspect() << endl;
 			ss << level1 << "Near: " << Camera::sCurrent->Near() << endl;
 			ss << level1 << "Far: " << Camera::sCurrent->Far() << endl;

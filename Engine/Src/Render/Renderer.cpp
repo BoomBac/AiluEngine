@@ -51,62 +51,8 @@ namespace Ailu
         memset(reinterpret_cast<void*>(_p_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
         _p_scene_camera = g_pSceneMgr->_p_current->GetActiveCamera();
         Camera::sCurrent = _p_scene_camera;
-        auto& light_comps = g_pSceneMgr->_p_current->GetAllLight();
-        uint16_t updated_light_num = 0u;
-        uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0;
-        for (auto light : light_comps)
-        {
-            auto& light_data = light->_light;
-            Color color = light_data._light_color;
-            color.r *= color.a;
-            color.g *= color.a;
-            color.b *= color.a;
-            if (light->_light_type == ELightType::kDirectional)
-            {
-                if (!light->Active())
-                {
-                    _p_per_frame_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = Vector3f::Zero;
-                    _p_per_frame_cbuf_data->_DirectionalLights[direction_light_index++]._LightColor = Colors::kBlack.xyz;
-                    continue;
-                }
-                _p_per_frame_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = color.xyz;
-                _p_per_frame_cbuf_data->_DirectionalLights[direction_light_index++]._LightDir = light_data._light_dir.xyz;
-            }
-            else if (light->_light_type == ELightType::kPoint)
-            {
-                if (!light->Active())
-                {
-                    _p_per_frame_cbuf_data->_PointLights[point_light_index]._LightParam0 = 0.0;
-                    _p_per_frame_cbuf_data->_PointLights[point_light_index++]._LightColor = Colors::kBlack.xyz;
-                    continue;
-                }
-                _p_per_frame_cbuf_data->_PointLights[point_light_index]._LightColor = color.xyz;
-                _p_per_frame_cbuf_data->_PointLights[point_light_index]._LightPos = light_data._light_pos.xyz;
-                _p_per_frame_cbuf_data->_PointLights[point_light_index]._LightParam0 = light_data._light_param.x;
-                _p_per_frame_cbuf_data->_PointLights[point_light_index++]._LightParam1 = light_data._light_param.y;
-            }
-            else if (light->_light_type == ELightType::kSpot)
-            {
-                if (!light->Active())
-                {
-                    _p_per_frame_cbuf_data->_SpotLights[spot_light_index++]._LightColor = Colors::kBlack.xyz;
-                    continue;
-                }
-                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._LightColor = color.xyz;
-                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;
-                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._LightDir = light_data._light_dir.xyz;
-                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._Rdius = light_data._light_param.x;
-                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._InnerAngle = light_data._light_param.y;
-                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._OuterAngle = light_data._light_param.z;
-            }
-            ++updated_light_num;
-        }
-        if (updated_light_num == 0)
-        {
-            _p_per_frame_cbuf_data->_DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
-            _p_per_frame_cbuf_data->_DirectionalLights[0]._LightDir = { 0.0f,0.0f,0.0f };
-        }
-        _p_per_frame_cbuf_data->_CameraPos = _p_scene_camera->GetPosition();
+        PrepareCamera(_p_scene_camera);
+        PrepareLight(g_pSceneMgr->_p_current);
         memcpy(D3DContext::GetInstance()->GetPerFrameCbufData(), _p_per_frame_cbuf_data, sizeof(ScenePerFrameData));
 
         auto cmd = D3DCommandBufferPool::GetCommandBuffer();
@@ -192,7 +138,7 @@ namespace Ailu
         {
             int gridSize = 100;
             int gridSpacing = 100;
-            Vector3f cameraPosition = Camera::sCurrent->GetPosition();
+            Vector3f cameraPosition = Camera::sCurrent->Position();
             float grid_alpha = lerpf(0.0f, 1.0f, abs(cameraPosition.y) / 2000.0f);
             Color grid_color = Colors::kWhite;
             grid_color.a = 1.0f - grid_alpha;
@@ -219,5 +165,68 @@ namespace Ailu
             Gizmo::DrawLine(Vector3f::Zero, Vector3f{ 0.f,500.0f,0.0f }, Colors::kGreen);
             Gizmo::DrawLine(Vector3f::Zero, Vector3f{ 0.f,0.0f,500.0f }, Colors::kBlue);
         }
+    }
+    void Renderer::PrepareLight(Scene* p_scene)
+    {
+        auto& light_comps = p_scene->GetAllLight();
+        uint16_t updated_light_num = 0u;
+        uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0;
+        for (auto light : light_comps)
+        {
+            auto& light_data = light->_light;
+            Color color = light_data._light_color;
+            color.r *= color.a;
+            color.g *= color.a;
+            color.b *= color.a;
+            if (light->_light_type == ELightType::kDirectional)
+            {
+                if (!light->Active())
+                {
+                    _p_per_frame_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = Vector3f::Zero;
+                    _p_per_frame_cbuf_data->_DirectionalLights[direction_light_index++]._LightColor = Colors::kBlack.xyz;
+                    continue;
+                }
+                _p_per_frame_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = color.xyz;
+                _p_per_frame_cbuf_data->_DirectionalLights[direction_light_index++]._LightDir = light_data._light_dir.xyz;
+            }
+            else if (light->_light_type == ELightType::kPoint)
+            {
+                if (!light->Active())
+                {
+                    _p_per_frame_cbuf_data->_PointLights[point_light_index]._LightParam0 = 0.0;
+                    _p_per_frame_cbuf_data->_PointLights[point_light_index++]._LightColor = Colors::kBlack.xyz;
+                    continue;
+                }
+                _p_per_frame_cbuf_data->_PointLights[point_light_index]._LightColor = color.xyz;
+                _p_per_frame_cbuf_data->_PointLights[point_light_index]._LightPos = light_data._light_pos.xyz;
+                _p_per_frame_cbuf_data->_PointLights[point_light_index]._LightParam0 = light_data._light_param.x;
+                _p_per_frame_cbuf_data->_PointLights[point_light_index++]._LightParam1 = light_data._light_param.y;
+            }
+            else if (light->_light_type == ELightType::kSpot)
+            {
+                if (!light->Active())
+                {
+                    _p_per_frame_cbuf_data->_SpotLights[spot_light_index++]._LightColor = Colors::kBlack.xyz;
+                    continue;
+                }
+                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._LightColor = color.xyz;
+                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;
+                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._LightDir = light_data._light_dir.xyz;
+                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._Rdius = light_data._light_param.x;
+                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._InnerAngle = light_data._light_param.y;
+                _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._OuterAngle = light_data._light_param.z;
+            }
+            ++updated_light_num;
+        }
+        if (updated_light_num == 0)
+        {
+            _p_per_frame_cbuf_data->_DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
+            _p_per_frame_cbuf_data->_DirectionalLights[0]._LightDir = { 0.0f,0.0f,0.0f };
+        }
+    }
+    void Renderer::PrepareCamera(Camera* p_camera)
+    {
+        _p_scene_camera->Update();
+        _p_per_frame_cbuf_data->_CameraPos = _p_scene_camera->Position();
     }
 }
