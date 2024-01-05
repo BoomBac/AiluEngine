@@ -120,7 +120,7 @@ namespace Ailu
 		ComPtr<ID3D12ShaderReflection>& shader_reflection)
 	{
 		ID3DBlob* pErrorBlob = nullptr;
-		D3D_SHADER_MACRO macros[] = { {"TEST","0"},{NULL,NULL}};
+		D3D_SHADER_MACRO macros[] = { {"TEST","0"},{NULL,NULL} };
 		D3DCompileFromFile(filename.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), D3DCOMPILE_DEBUG, 0, &p_blob, &pErrorBlob);
 		if (pErrorBlob)
 		{
@@ -150,18 +150,32 @@ namespace Ailu
 		return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 	}
 
-	static DXGI_FORMAT GetFormatBySemanticName(const char* semantic)
+	static EShaderDateType GetShaderDataType(const char* semantic)
 	{
-		if (!std::strcmp(semantic, RenderConstants::kSemanticPosition)) return DXGI_FORMAT_R32G32B32_FLOAT;
-		else if (!std::strcmp(semantic, RenderConstants::kSemanticNormal)) return DXGI_FORMAT_R32G32B32_FLOAT;
-		else if (!std::strcmp(semantic, RenderConstants::kSemanticTangent)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		else if (!std::strcmp(semantic, RenderConstants::kSemanticColor)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		else if (!std::strcmp(semantic, RenderConstants::kSemanticTexcoord)) return DXGI_FORMAT_R32G32_FLOAT;
+		if (!std::strcmp(semantic, RenderConstants::kSemanticPosition)) return EShaderDateType::kFloat3;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticNormal)) return EShaderDateType::kFloat3;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticTangent)) return EShaderDateType::kFloat4;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticColor)) return EShaderDateType::kFloat4;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticTexcoord)) return EShaderDateType::kFloat2;
 		else
 		{
-			LOG_ERROR("Unsupported vertex shader semantic!");
-			return DXGI_FORMAT_R32G32B32_FLOAT;
+			AL_ASSERT(true, "Unsupported DXGI_FORMAT to ShaderDataType!")
+				//LOG_ERROR("Unsupported DXGI_FORMAT to ShaderDataType!");
+				return EShaderDateType::kBool;
 		}
+	}
+
+	static EShaderDateType GetShaderDataType(DXGI_FORMAT dx_format)
+	{
+		switch (dx_format)
+		{
+		case DXGI_FORMAT_R32G32B32_FLOAT: return EShaderDateType::kFloat3;
+		case DXGI_FORMAT_R32G32B32A32_FLOAT: return EShaderDateType::kFloat4;
+		case DXGI_FORMAT_R32G32_FLOAT: return EShaderDateType::kFloat2;
+		}
+		AL_ASSERT(true, "Unsupported DXGI_FORMAT to ShaderDataType!")
+			//LOG_ERROR("Unsupported DXGI_FORMAT to ShaderDataType!");
+			return EShaderDateType::kBool;
 	}
 
 	namespace ALHash
@@ -298,7 +312,7 @@ namespace Ailu
 		//rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 0u, nullptr, rootSignatureFlags);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
-		auto [sig,pso] = _pso_sys.GetBack();
+		auto [sig, pso] = _pso_sys.GetBack();
 		//bool succeed = true;
 		//succeed = !FAILED(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
 		//succeed = !FAILED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&sig)));
@@ -318,11 +332,6 @@ namespace Ailu
 		_pso_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 		_pso_desc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
 		ThrowIfFailed(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&pso)));
-		_hash_blend_state = ALHash::CommonRuntimeHasher(_pso_desc.BlendState);
-		_hash_input_layout = ALHash::CommonRuntimeHasher(_pso_desc.InputLayout); //0~3 4
-		_hash_topology = ALHash::CommonRuntimeHasher(_pso_desc.PrimitiveTopologyType); //36~37 2
-		_hash_raster_state = ALHash::CommonRuntimeHasher(_pso_desc.RasterizerState);// 41 ~ 43 3
-		_hash_depth_stencil_state = ALHash::CommonRuntimeHasher(_pso_desc.DepthStencilState);// 44~46 3
 		_pso_sys.Swap();
 		//succeed = !FAILED(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&pso)));
 	}
@@ -340,14 +349,17 @@ namespace Ailu
 				AL_ASSERT(true, "LayoutDesc count must less than 10");
 				return;
 			}
+			Vector<VertexBufferLayoutDesc> vb_input_desc{};
 			for (uint32_t i = 0u; i < desc.InputParameters; i++)
 			{
 				D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
 				reflection->GetInputParameterDesc(i, &input_desc);
 				_vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 				++_vertex_input_num;
+				vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, GetShaderDataType(input_desc.SemanticName), input_desc.Register));
 				_semantic_seq.emplace_back(input_desc.SemanticName);
 			}
+			_pipeline_input_layout = VertexBufferLayout(vb_input_desc);
 			for (uint32_t i = 0u; i < desc.BoundResources; i++)
 			{
 				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
@@ -422,7 +434,7 @@ namespace Ailu
 		string line;
 		vector<string> lines;
 		List<String> cur_file_head_files{};
-		String parent_path = su::SubStrRange(_src_file_path,0, _src_file_path.find_last_of("/"));
+		String parent_path = su::SubStrRange(_src_file_path, 0, _src_file_path.find_last_of("/"));
 		while (getline(src, line))
 		{
 			if (su::BeginWith(line, "#include"))
@@ -540,11 +552,11 @@ namespace Ailu
 		line = line.substr(cur_edge);
 		cur_edge = line.find_first_of("=");
 		String defalut_value = line.substr(cur_edge + 1);
-		line = line.substr(0,cur_edge - 1);
+		line = line.substr(0, cur_edge - 1);
 		su::RemoveSpaces(defalut_value);
 		line = line.substr(1, line.find_last_of(")") - 1);
 		cur_edge = line.find_first_of(",");
-		String prop_name = line.substr(1,cur_edge - 2);
+		String prop_name = line.substr(1, cur_edge - 2);
 		String prop_type = line.substr(cur_edge + 1);
 		ESerializablePropertyType seri_type;
 		if (prop_type == "Texture2D") seri_type = ESerializablePropertyType::kTexture2D;
@@ -566,7 +578,7 @@ namespace Ailu
 				seri_type = ESerializablePropertyType::kEnum;
 				auto enum_strs = su::Split(su::SubStrRange(addi_info, addi_info.find("(") + 1, addi_info.find(")") - 1), ",");
 				_keywords[value_name].resize(enum_strs.size() / 2);
-				for (size_t i = 0; i < enum_strs.size(); i+=2)
+				for (size_t i = 0; i < enum_strs.size(); i += 2)
 				{
 					_keywords[value_name][std::stoi(enum_strs[i + 1])] = value_name + "_" + enum_strs[i];
 				}
@@ -588,7 +600,7 @@ namespace Ailu
 		}
 		else if (seri_type == ESerializablePropertyType::kColor || seri_type == ESerializablePropertyType::kVector4f)
 		{
-			defalut_value = su::SubStrRange(defalut_value,1,defalut_value.find_first_of(")") - 1);
+			defalut_value = su::SubStrRange(defalut_value, 1, defalut_value.find_first_of(")") - 1);
 			auto vec_str = su::Split(defalut_value, ",");
 			prop_param.x = static_cast<float>(std::stod(vec_str[0]));
 			prop_param.y = static_cast<float>(std::stod(vec_str[1]));
@@ -711,7 +723,7 @@ namespace Ailu
 				prop_start_it--;
 				prop_start_it--;
 			}
-			String k, v,blend_info;
+			String k, v, blend_info;
 			bool is_transparent = false;
 			for (auto it = lines.begin(); it != prop_start_it; it++)
 			{
@@ -725,13 +737,24 @@ namespace Ailu
 				else if (su::Equal(k, ShaderCommand::kPSEntry, false)) _pixel_entry = v;
 				else if (su::Equal(k, ShaderCommand::kCull, false))
 				{
-					if (su::Equal(v, ShaderCommand::kCullValue.kBack, false)) r_desc.CullMode = D3D12_CULL_MODE_BACK;
-					else r_desc.CullMode = D3D12_CULL_MODE_FRONT;
+					if (su::Equal(v, ShaderCommand::kCullValue.kBack, false))
+					{
+						_pipeline_raster_state._cull_mode = ECullMode::kBack;
+						r_desc.CullMode = D3D12_CULL_MODE_BACK;
+					}
+					else
+					{
+						_pipeline_raster_state._cull_mode = ECullMode::kFront;
+						r_desc.CullMode = D3D12_CULL_MODE_FRONT;
+					}
 				}
 				else if (su::Equal(k, ShaderCommand::kTopology, false))
 				{
 					if (su::Equal(v, ShaderCommand::kTopologyValue.kLine))
+					{
 						_pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+						_pipeline_topology = ETopology::kLine;
+					}
 				}
 				else if (su::Equal(k, ShaderCommand::kBlend, false))
 				{
@@ -745,7 +768,10 @@ namespace Ailu
 				else if (su::Equal(k, ShaderCommand::KFill, false))
 				{
 					if (su::Equal(v, ShaderCommand::kFillValue.kWireframe))
+					{
 						r_desc.FillMode = D3D12_FILL_MODE_WIREFRAME;
+						_pipeline_raster_state._fill_mode = EFillMode::kWireframe;
+					}
 				}
 				else {}
 			}
@@ -759,10 +785,22 @@ namespace Ailu
 					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOneMinusSrc)) return D3D12_BLEND::D3D12_BLEND_INV_SRC_ALPHA;
 					else return D3D12_BLEND::D3D12_BLEND_ONE;
 					};
-				bl_desc.RenderTarget[0].BlendEnable = true;
-				bl_desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-				bl_desc.RenderTarget[0].SrcBlend = get_d3d_blend_factor(blend_factors[0]);
-				bl_desc.RenderTarget[0].DestBlend = get_d3d_blend_factor(blend_factors[1]);
+				static auto get_ailu_blend_factor = [](const String& s) -> EBlendFactor {
+					if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOne)) return EBlendFactor::kOne;
+					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kZero)) return EBlendFactor::kZero;
+					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kSrc)) return EBlendFactor::kSrcAlpha;
+					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOneMinusSrc)) return EBlendFactor::kOneMinusSrcAlpha;
+					else return EBlendFactor::kOne;
+					};
+				_pipeline_blend_state._b_enable = true;
+				_pipeline_blend_state._src_color = get_ailu_blend_factor(blend_factors[0]);
+				_pipeline_blend_state._dst_color = get_ailu_blend_factor(blend_factors[1]);
+				bl_desc = D3DConvertUtils::ConvertToD3D12BlendDesc(_pipeline_blend_state,1);
+				//bl_desc.RenderTarget[0] = D3DConvertUtils::ConvertToD3D12BlendDesc(_pipeline_blend_state);
+				//bl_desc.RenderTarget[0].BlendEnable = true;
+				//bl_desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				//bl_desc.RenderTarget[0].SrcBlend = get_d3d_blend_factor(blend_factors[0]);
+				//bl_desc.RenderTarget[0].DestBlend = get_d3d_blend_factor(blend_factors[1]);
 			}
 			for (auto& it = prop_end_it; it != lines.end(); it++)
 			{
@@ -789,9 +827,12 @@ namespace Ailu
 		{
 			g_pLogMgr->LogErrorFormat("PreProcess shader: {} with line count 0", _src_file_path);
 		}
-		_pso_desc.RasterizerState = r_desc;
-		_pso_desc.BlendState = bl_desc;
-		_pso_desc.DepthStencilState = ds_desc;
+		//_pso_desc.RasterizerState = r_desc;
+		//_pso_desc.BlendState = bl_desc;
+		//_pso_desc.DepthStencilState = ds_desc;
+		_pso_desc.RasterizerState = D3DConvertUtils::ConvertToD3D12RasterizerDesc(_pipeline_raster_state);
+		_pso_desc.BlendState = D3DConvertUtils::ConvertToD3D12BlendDesc(_pipeline_blend_state);
+		_pso_desc.DepthStencilState = D3DConvertUtils::ConvertToD3D12DepthStencilDesc(_pipeline_ds_state);
 		_topology = ConvertTopologyToType(_pso_desc.PrimitiveTopologyType);
 	}
 
@@ -804,6 +845,10 @@ namespace Ailu
 		_vertex_input_num = 0u;
 		memset(_vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
 		_variable_offset.clear();
+		//_pipeline_raster_state = RasterizerState();
+		//_pipeline_ds_state;
+		//_pipeline_blend_state;
+		_pipeline_topology = ETopology::kTriangle;
 	}
 
 	const List<ShaderPropertyInfo>& D3DShader::GetShaderPropertyInfos() const
@@ -980,7 +1025,7 @@ namespace Ailu
 		}
 		else
 		{
-			g_pLogMgr->LogWarningFormat("Get vector: {} on shader: {} failed!",name,_name);
+			g_pLogMgr->LogWarningFormat("Get vector: {} on shader: {} failed!", name, _name);
 			return Vector4f::Zero;
 		}
 	}

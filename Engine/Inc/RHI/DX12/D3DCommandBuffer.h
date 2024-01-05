@@ -8,7 +8,7 @@
 #include "Render/RendererAPI.h"
 #include "Render/Material.h"
 #include "Framework/Assets/Mesh.h"
-#include "Render/GraphicsPipelineState.h"
+#include "Render/GraphicsPipelineStateObject.h"
 
 namespace Ailu
 {
@@ -29,7 +29,7 @@ namespace Ailu
 		void SetViewports(const std::initializer_list<Viewport>& viewports);
 		void SetScissorRects(const std::initializer_list<Viewport>& rects);
 		void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform,const Ref<Material>& material,uint32_t instance_count = 1u);
-        void SetPSO(GraphicsPipelineState* pso);
+        void SetPSO(GraphicsPipelineStateObject* pso);
         void SetRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth);
 	private:
 		uint32_t _id = 0u;

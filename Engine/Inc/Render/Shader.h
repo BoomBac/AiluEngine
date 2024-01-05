@@ -10,6 +10,8 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/Reflect.h"
 
+#include "PipelineState.h"
+
 
 namespace Ailu
 {
@@ -122,6 +124,12 @@ namespace Ailu
 		virtual const std::set<String>& GetSourceFiles() const = 0;
 		virtual Vector<class Material*> GetAllReferencedMaterials() = 0;
 		virtual const std::map<String, Vector<String>> GetKeywordGroups() const = 0;
+
+		virtual const VertexInputLayout& PipelineInputLayout() const = 0;
+		virtual const RasterizerState& PipelineRasterizerState() const = 0;
+		virtual const DepthStencilState& PipelineDepthStencilState() const = 0;
+		virtual const BlendState& PipelineBlendState() const = 0;
+		virtual const ETopology& PipelineTopology() const = 0;
 	protected:
 		virtual void AddMaterialRef(class Material* mat) = 0;
 		virtual void RemoveMaterialRef(class Material* mat) = 0;

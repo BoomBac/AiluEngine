@@ -2,7 +2,7 @@
 //name: shaders
 //vert: VSMain
 //pixel: PSMain
-//Cull: Back
+//Cull: Front
 //Queue: Opaque
 //Blend: Src,OneMinusSrc
 //Properties

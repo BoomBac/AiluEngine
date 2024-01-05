@@ -6,6 +6,7 @@
 #include <vector>
 #include <list>
 #include <queue>
+#include <array>
 
 #ifdef AILU_BUILD_DLL
 #define AILU_API __declspec(dllexport)
@@ -159,6 +160,9 @@ using WString = std::wstring;
 
 template<typename T>
 using Vector = std::vector<T>;
+
+template<typename T,size_t Size>
+using Array = std::array<T,Size>;
 
 template<typename T>
 using List = std::list<T>;

@@ -527,9 +527,10 @@
     <ClInclude Include="Inc\Render\Camera.h" />
     <ClInclude Include="Inc\Render\Gizmo.h" />
     <ClInclude Include="Inc\Render\GraphicsContext.h" />
-    <ClInclude Include="Inc\Render\GraphicsPipelineState.h" />
+    <ClInclude Include="Inc\Render\GraphicsPipelineStateObject.h" />
     <ClInclude Include="Inc\Render\Material.h" />
     <ClInclude Include="Inc\Framework\Assets\Mesh.h" />
+    <ClInclude Include="Inc\Render\PipelineState.h" />
     <ClInclude Include="Inc\Render\RenderCommand.h" />
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\Render\RendererAPI.h" />
@@ -596,7 +597,7 @@
     <ClCompile Include="Src\Platform\WinWindow.cpp" />
     <ClCompile Include="Src\Render\Buffer.cpp" />
     <ClCompile Include="Src\Render\Camera.cpp" />
-    <ClCompile Include="Src\Render\GraphicsPipelineState.cpp" />
+    <ClCompile Include="Src\Render\GraphicsPipelineStateObject.cpp" />
     <ClCompile Include="Src\Render\Material.cpp" />
     <ClCompile Include="Src\Framework\Assets\Mesh.cpp" />
     <ClCompile Include="Src\Render\RenderCommand.cpp" />

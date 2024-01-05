@@ -102,7 +102,7 @@ namespace Ailu
 			}
 			});
 	}
-	void D3DCommandBuffer::SetPSO(GraphicsPipelineState* pso)
+	void D3DCommandBuffer::SetPSO(GraphicsPipelineStateObject* pso)
 	{
 		_commands.emplace_back([=]() {
 			pso->Bind();

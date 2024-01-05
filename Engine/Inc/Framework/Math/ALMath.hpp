@@ -1269,7 +1269,7 @@ namespace Ailu
 			}
 			bool operator<(const Hash<Size>& other) const
 			{
-				return _hash < other._hash;
+				return _hash.to_ulong() < other._hash.to_ulong();
 			}
 		private:
 			std::bitset<Size> _hash;

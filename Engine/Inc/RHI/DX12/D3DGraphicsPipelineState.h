@@ -3,7 +3,7 @@
 #define __D3DGFX_PIPELINE_STATE_H__
 #include <d3dx12.h>
 
-#include "Render/GraphicsPipelineState.h"
+#include "Render/GraphicsPipelineStateObject.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -66,7 +66,7 @@ namespace Ailu
 	}
 
 
-	class D3DGraphicsPipelineState : public GraphicsPipelineState
+	class D3DGraphicsPipelineState : public GraphicsPipelineStateObject
 	{
 	public:
 		D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer);

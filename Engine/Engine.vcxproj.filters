@@ -174,7 +174,7 @@
     <ClInclude Include="Inc\Render\Material.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Render\GraphicsPipelineState.h">
+    <ClInclude Include="Inc\Render\GraphicsPipelineStateObject.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Render\AlgFormat.h">
@@ -2025,6 +2025,9 @@
     <ClInclude Include="Inc\Objects\CameraComponent.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Render\PipelineState.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2117,7 +2120,7 @@
     <ClCompile Include="Src\Render\RenderCommand.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Render\GraphicsPipelineState.cpp">
+    <ClCompile Include="Src\Render\GraphicsPipelineStateObject.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\RHI\DX12\D3DGraphicsPipelineState.cpp">
