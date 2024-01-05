@@ -128,28 +128,28 @@ namespace Ailu
         return std::make_tuple(cpu_handle, gpu_handle);
     }
 
-    std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3DContext::GetRTVDescriptorHandle()
+    D3D12_CPU_DESCRIPTOR_HANDLE D3DContext::GetRTVDescriptorHandle()
     {
         static u32 global_texture_offset = 0u;
         static uint32_t base = RenderConstants::kFrameCount;
-        auto gpu_handle = m_rtvHeap->GetGPUDescriptorHandleForHeapStart();
-        gpu_handle.ptr += _rtv_desc_size * (base + global_texture_offset);
+        //auto gpu_handle = m_rtvHeap->GetGPUDescriptorHandleForHeapStart();
+        //gpu_handle.ptr += _rtv_desc_size * (base + global_texture_offset);
         auto cpu_handle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
         cpu_handle.ptr += _rtv_desc_size * (base + global_texture_offset);
         ++global_texture_offset;
-        return std::make_tuple(cpu_handle, gpu_handle);
+        return cpu_handle;
     }
 
-    std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3DContext::GetDSVDescriptorHandle()
+    D3D12_CPU_DESCRIPTOR_HANDLE D3DContext::GetDSVDescriptorHandle()
     {
         static u32 global_texture_offset = 0u;
         static uint32_t base = RenderConstants::kFrameCount;
-        auto gpu_handle = m_dsvHeap->GetGPUDescriptorHandleForHeapStart();
-        gpu_handle.ptr += _dsv_desc_size * (base + global_texture_offset);
-        auto cpu_handle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+        //auto gpu_handle = m_dsvHeap->GetGPUDescriptorHandleForHeapStart();
+        //gpu_handle.ptr += _dsv_desc_size * (base + global_texture_offset);
+        auto cpu_handle = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
         cpu_handle.ptr += _dsv_desc_size * (base + global_texture_offset);
         ++global_texture_offset;
-        return std::make_tuple(cpu_handle, gpu_handle);
+        return cpu_handle;
     }
 
     uint8_t* D3DContext::GetCBufferPtr()
@@ -185,24 +185,57 @@ namespace Ailu
         }
     }
 
+    void D3DContext::SubmitPerObjectBuffer(const Matrix4x4f& transform)
+    {
+        m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + RenderConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
+        memcpy(_p_cbuffer + RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * (_render_object_index++),
+            &transform, sizeof(transform));
+    }
+
+    void D3DContext::BeginBackBuffer()
+    {
+        auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        m_commandList->ResourceBarrier(1, &bar_before);
+        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _rtv_desc_size);
+        m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+        m_commandList->ClearRenderTargetView(rtvHandle, Colors::kBlack, 0, nullptr);
+    }
+
+    void D3DContext::EndBackBuffer()
+    {
+        auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+        m_commandList->ResourceBarrier(1, &bar_after);
+    }
+
+    void D3DContext::DrawOverlay()
+    {
+        GraphicsPipelineStateMgr::s_gizmo_pso->Bind();
+        GraphicsPipelineStateMgr::s_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
+        Gizmo::Submit();
+#ifdef DEAR_IMGUI
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+#endif // DEAR_IMGUI
+    }
+
+
     void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform)
     {
         //TODO:默认将每个物体的cbuf视作绑定在 0 槽位上，当着色器没有PerObjectBuf时，PerFrameBuf会在0槽位上，此时这里会把PSO绑定的结果覆盖
         ++RenderingStates::s_draw_call;
-        m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + RenderConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
+        //m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + RenderConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
         //m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
-        memcpy(_p_cbuffer + RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * (_render_object_index++),
-            &transform, sizeof(transform));
+        //memcpy(_p_cbuffer + RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * (_render_object_index++),
+        //    &transform, sizeof(transform));
         m_commandList->DrawIndexedInstanced(index_count, instance_count, 0, 0, 0);
     }
 
     void D3DContext::DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform)
     {
         ++RenderingStates::s_draw_call;
-        m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + RenderConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
+        //m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + RenderConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
         //m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
-        memcpy(_p_cbuffer + RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * (_render_object_index++),
-            &transform, sizeof(transform));
+        //memcpy(_p_cbuffer + RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * (_render_object_index++),
+        //    &transform, sizeof(transform));
         m_commandList->DrawInstanced(vertex_count, instance_count, 0, 0);
     }
 
@@ -451,12 +484,14 @@ namespace Ailu
         ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
         ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
         m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-        auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        m_commandList->ResourceBarrier(1, &bar_before);
+        //auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        //m_commandList->ResourceBarrier(1, &bar_before);
+        //auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+        //m_commandList->ResourceBarrier(1, &bar_after);
 
-        CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _rtv_desc_size);
-        CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
-        m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _rtv_desc_size);
+        //CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
+        //m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         _render_object_index = 0;
 
         //执行所有命令
@@ -464,17 +499,17 @@ namespace Ailu
         _all_commands.clear();
 
         //DrawGizmo
-        GraphicsPipelineStateMgr::s_gizmo_pso->Bind();
-        GraphicsPipelineStateMgr::s_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-        Gizmo::Submit();
+        //GraphicsPipelineStateMgr::s_gizmo_pso->Bind();
+        //GraphicsPipelineStateMgr::s_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
+        //Gizmo::Submit();
 
-#ifdef DEAR_IMGUI
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
-#endif // DEAR_IMGUI
+//#ifdef DEAR_IMGUI
+//        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+//#endif // DEAR_IMGUI
 
         // Indicate that the back buffer will now be used to present.
-        auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-        m_commandList->ResourceBarrier(1, &bar_after);
+        //auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+        //m_commandList->ResourceBarrier(1, &bar_after);
 
         ThrowIfFailed(m_commandList->Close());
     }
@@ -577,7 +612,8 @@ namespace Ailu
         depthDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         depthDesc.Width = _width;
         depthDesc.Height = _height;
-        depthDesc.Format = DXGI_FORMAT_D32_FLOAT; // 选择深度缓冲格式
+        //depthDesc.Format = DXGI_FORMAT_D32_FLOAT; // 选择深度缓冲格式
+        depthDesc.Format = DXGI_FORMAT_R24G8_TYPELESS; // 选择深度缓冲格式
         depthDesc.MipLevels = 1;
         depthDesc.DepthOrArraySize = 1;
         depthDesc.SampleDesc.Count = 1; // 非多重采样
@@ -585,12 +621,13 @@ namespace Ailu
         depthDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
         depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
         D3D12_CLEAR_VALUE depthClearValue = {};
-        depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+        depthClearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
         depthClearValue.DepthStencil.Depth = 1.0f;
         depthClearValue.DepthStencil.Stencil = 0;
 
         D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-        dsvDesc.Format = DXGI_FORMAT_D32_FLOAT; // 与深度缓冲资源的格式匹配
+        //dsvDesc.Format = DXGI_FORMAT_R24G8_TYPELESS; // 与深度缓冲资源的格式匹配
+        dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT; // 与深度缓冲资源的格式匹配
         dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
         dsvDesc.Texture2D.MipSlice = 0;
         CD3DX12_CPU_DESCRIPTOR_HANDLE dsv_handle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
@@ -613,14 +650,14 @@ namespace Ailu
     {
         // Describe and create a render target view (RTV) descriptor heap.
         D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
-        rtvHeapDesc.NumDescriptors = RenderConstants::kFrameCount;
+        rtvHeapDesc.NumDescriptors = RenderConstants::kFrameCount + RenderConstants::kMaxRenderTextureCount;
         rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         ThrowIfFailed(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
         _rtv_desc_size = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
         D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-        dsvHeapDesc.NumDescriptors = RenderConstants::kFrameCount;
+        dsvHeapDesc.NumDescriptors = RenderConstants::kFrameCount + RenderConstants::kMaxRenderTextureCount / 2u;
         dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
         dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(m_dsvHeap.GetAddressOf())));

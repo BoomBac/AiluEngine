@@ -78,16 +78,44 @@ namespace Ailu
 	}
 	void Mesh::Build()
 	{
-		_p_vbuf.reset(VertexBuffer::Create({
-				{"POSITION",EShaderDateType::kFloat3,0},
-				{"NORMAL",EShaderDateType::kFloat3,1},
-				{"TEXCOORD",EShaderDateType::kFloat2,2},
-				{"TANGENT",EShaderDateType::kFloat4,3}
-			}));
-		_p_vbuf->SetStream(reinterpret_cast<float*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), 0);
-		_p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), 1);
-		_p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), 2);
-		_p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4),3);
+		u8 count = 0;
+		Vector<VertexBufferLayoutDesc> desc_list;
+		u8 vert_index, normal_index, uv_index, tangent_index;
+		if (_vertices)
+		{
+			desc_list.push_back({ "POSITION",EShaderDateType::kFloat3,count });
+			vert_index = count++;
+		}
+		if (_normals)
+		{
+			desc_list.push_back({ "NORMAL",EShaderDateType::kFloat3,count });
+			normal_index = count++;
+		}
+		if (_uv[0])
+		{
+			desc_list.push_back({ "TEXCOORD",EShaderDateType::kFloat2,count });
+			uv_index = count++;
+		}
+		if (_tangents)
+		{
+			desc_list.push_back({ "TANGENT",EShaderDateType::kFloat4,count });
+			tangent_index = count++;
+		}
+		_p_vbuf.reset(VertexBuffer::Create(desc_list));
+		if(_vertices) _p_vbuf->SetStream(reinterpret_cast<float*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index);
+		if(_normals) _p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index);
+		if(_uv[0]) _p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
+		if(_tangents) _p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
+		//_p_vbuf.reset(VertexBuffer::Create({
+		//		{"POSITION",EShaderDateType::kFloat3,0},
+		//		{"NORMAL",EShaderDateType::kFloat3,1},
+		//		{"TEXCOORD",EShaderDateType::kFloat2,2},
+		//		{"TANGENT",EShaderDateType::kFloat4,3}
+		//	}));
+		//_p_vbuf->SetStream(reinterpret_cast<float*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), 0);
+		//_p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), 1);
+		//_p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), 2);
+		//_p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4),3);
 		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
 	}
 	//Ref<Mesh> MeshPool::FindMesh(const std::string& name)

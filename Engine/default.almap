@@ -1,11 +1,11 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: Perspective
-  Position: -401.186,3333.23,3684.61
-  Rotation: 172.998,36.1693,0
+  Position: 2030.87,2740.47,2291.6
+  Rotation: -125.143,32.208,0
   Fov: 60
   Aspect: 1.77778
-  Near: 345.19
+  Near: 54.41
   Far: 109235
 SceneGraph: 
   Name: root
@@ -14,13 +14,13 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,0,0
         Scale: 1,1,1
-    Children: 6
+    Children: 7
       Name: plane
         Components: 
           TransformComponent: 
             Position: 0,62,0
             Rotation: 0,0,0
-            Scale: 50,1,50
+            Scale: 16,1,25
           StaticMeshComponent: 
             MeshPath: plane
             MaterialPath: Materials/StandardPBR_new.alasset
@@ -49,30 +49,30 @@ SceneGraph:
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: -1467,618,-4
+            Position: -268,2940,149
             Rotation: 0,0,0
             Scale: 1,1,1
           LightComponent: 
             Type: Point
-            Color: 0.887255,0.887255,0.117431
+            Color: 1,0,0
             Intensity: 1
-            Radius: 994
+            Radius: 839
         Children: 0
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: 1150,1328,20
+            Position: 2365,1923,77
             Rotation: -29.19,-82.7,34.05
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
             Color: 0.0395761,0.518758,0.897059
             Intensity: 1
-            Radius: 1865
+            Radius: 2249
             Inner: 45
             Outer: 60
         Children: 0
-      Name: object0
+      Name: sphere
         Components: 
           TransformComponent: 
             Position: 0,1219,0
@@ -81,4 +81,14 @@ SceneGraph:
           StaticMeshComponent: 
             MeshPath: sphere
             MaterialPath: Materials/aa.almat
+        Children: 0
+      Name: space ship
+        Components: 
+          TransformComponent: 
+            Position: 0,2376,0
+            Rotation: 0,0,0
+            Scale: 1,1,1
+          StaticMeshComponent: 
+            MeshPath: D:\ProjectCpp\AiluEngine\Engine\Res\Meshs\space_ship.fbx
+            MaterialPath: Materials/StandardPBR_new.alasset
         Children: 0

@@ -8,14 +8,16 @@
 
 #include "Ext/imgui/backends/imgui_impl_win32.h"
 #include "Ext/imgui/imgui.h"
+#include "Framework/Common/Path.h"
+#include "Framework/Common/Utils.h"
 
 #ifdef DEAR_IMGUI
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif // DEAR_IMGUI
 namespace Ailu
 {
-	static const wchar_t* kAppTitleIconPath = GET_ENGINE_FULL_PATHW(Res / Ico / app_title_icon.ico);
-	static const wchar_t* kAppIconPath = GET_ENGINE_FULL_PATHW(Res / Ico / app_icon.ico);
+	static const wchar_t* kAppTitleIconPath = ToWChar(kEngineResRootPath + "Ico/app_title_icon.ico");
+	static const wchar_t* kAppIconPath = ToWChar(kEngineResRootPath + "Ico/app_icon.ico");
 
 	static void HideCursor()
 	{

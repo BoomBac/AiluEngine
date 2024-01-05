@@ -13,6 +13,7 @@
 #include "Render/Camera.h"
 #include "Material.h"
 #include "Framework/Assets/Mesh.h"
+#include "Render/Texture.h"
 
 namespace Ailu
 {
@@ -40,6 +41,8 @@ namespace Ailu
         float GetDeltaTime() const;
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
     private:
+        Ref<RenderTexture> _p_camera_color_attachment;
+        Ref<RenderTexture> _p_camera_depth_attachment;
         inline static std::list<DrawInfo> _draw_call{};
         ScenePerFrameData* _p_per_frame_cbuf_data;
         void Render();

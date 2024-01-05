@@ -159,7 +159,7 @@ namespace Ailu
 
 	enum class ETextureResState : u8
 	{
-		kDefault, kRenderTagret, kShaderResource
+		kDefault, kColorTagret, kShaderResource,kDepthTarget
 	};
 
 	struct RTHandle
@@ -185,7 +185,7 @@ namespace Ailu
 		const uint16_t& GetHeight() const final { return _height; };
 		void* GetNativeCPUHandle() override;
 
-		void* GetGPUNativePtr()override;
+		void* GetGPUNativePtr() override;
 		const ETextureType GetTextureType() const final;
 		virtual void Transition(ETextureResState state);
 		const RTHandle& GetRTHandle() const { return _rt_handle; }

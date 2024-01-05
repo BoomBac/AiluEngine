@@ -288,7 +288,7 @@ namespace Ailu
 			uint16_t root_param_index = 0u;
 			for (auto& [slot, name] : ps_tex_bind_info)
 			{
-				ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, slot, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+				ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, slot);
 				rootParameters[root_param_index + 3].InitAsDescriptorTable(1,&ranges[root_param_index]);
 				root_param_index++;
 				//rootParameters[root_param_index + 3].InitAsShaderResourceView(slot, 0, D3D12_ROOT_DESCRIPTOR_FLAG_DATA_STATIC, D3D12_SHADER_VISIBILITY_PIXEL);
@@ -442,7 +442,8 @@ namespace Ailu
 		pso_initializer._blend_state = TStaticBlendState<true,EBlendFactor::kSrcAlpha,EBlendFactor::kOneMinusSrcAlpha>::GetRHI();
 		pso_initializer._b_has_rt = true;
 		pso_initializer._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
-		pso_initializer._ds_format = EALGFormat::kALGFormatD32_FLOAT;
+		//pso_initializer._ds_format = EALGFormat::kALGFormatD32_FLOAT;
+		pso_initializer._ds_format = EALGFormat::kALGFormatD24S8_UINT;
 		pso_initializer._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
 		pso_initializer._rt_nums = 1;
 		pso_initializer._topology = ETopology::kLine;

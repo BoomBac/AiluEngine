@@ -261,7 +261,7 @@ namespace Ailu
 			if (desc._res_type == EBindResDescType::kTexture2D)
 			{
 				++texture_count;
-				ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+				ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot);
 				rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
 				desc._bind_slot = root_param_index;
 				++root_param_index;
@@ -311,7 +311,7 @@ namespace Ailu
 		_pso_desc.SampleMask = UINT_MAX;
 		_pso_desc.NumRenderTargets = 1;
 		_pso_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		_pso_desc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+		_pso_desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 		_pso_desc.SampleDesc.Count = 1;
 		_pso_desc.SampleDesc.Quality = 0;
 		_pso_desc.NodeMask = 0;
@@ -617,6 +617,8 @@ namespace Ailu
 		inline static const String kTopology = "Topology";
 		inline static const String kBlend = "Blend";
 		inline static const String KFill = "Fill";
+		inline static const String kZTest = "ZTest";
+		inline static const String kZWrite = "ZWrite";
 		static struct Queue
 		{
 			inline static const String kGeometry = "Geometry";
@@ -645,6 +647,17 @@ namespace Ailu
 			inline static const String kSolid = "Solid";
 			inline static const String kWireframe = "Wireframe";
 		} kFillValue;
+		static struct ZTest
+		{
+			inline static const String kOff = "Off";
+			inline static const String kLEqual = "LEqual";
+			inline static const String kEqual = "Equal";
+		} kZTestValue;
+		static struct ZWrite
+		{
+			inline static const String kOff = "Off";
+			inline static const String kOn = "On";
+		} kZWriteValue;
 	};
 
 	void D3DShader::PreProcessShader()
@@ -695,6 +708,7 @@ namespace Ailu
 		String line{};
 		u32 line_count = 0;
 		lines = ReadFileToLines(_src_file_path, line_count, "//info bein", "//info end");
+		u8 need_zbuf_count = 2;
 		if (line_count > 0)
 		{
 			auto prop_start_it = std::find(lines.begin(), lines.end(), "//Properties");
@@ -713,6 +727,7 @@ namespace Ailu
 			}
 			String k, v,blend_info;
 			bool is_transparent = false;
+
 			for (auto it = lines.begin(); it != prop_start_it; it++)
 			{
 				line = it->substr(2);
@@ -747,7 +762,23 @@ namespace Ailu
 					if (su::Equal(v, ShaderCommand::kFillValue.kWireframe))
 						r_desc.FillMode = D3D12_FILL_MODE_WIREFRAME;
 				}
-				else {}
+				else if (su::Equal(k, ShaderCommand::kZTest, false))
+				{
+					if (su::Equal(v, ShaderCommand::kZTestValue.kOff))
+					{
+						need_zbuf_count--;
+						ds_desc.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+					}
+					else if (su::Equal(v, ShaderCommand::kZTestValue.kEqual))
+						ds_desc.DepthFunc = D3D12_COMPARISON_FUNC_EQUAL;
+				}
+				else if (su::Equal(k, ShaderCommand::kZWrite, false))
+				{
+					if (su::Equal(v, ShaderCommand::kZWriteValue.kOff))
+					{
+						need_zbuf_count--;
+					}
+				}
 			}
 			if (is_transparent && !blend_info.empty())
 			{
@@ -791,6 +822,8 @@ namespace Ailu
 		}
 		_pso_desc.RasterizerState = r_desc;
 		_pso_desc.BlendState = bl_desc;
+		if (need_zbuf_count == 0)
+			ds_desc.DepthEnable = false;
 		_pso_desc.DepthStencilState = ds_desc;
 		_topology = ConvertTopologyToType(_pso_desc.PrimitiveTopologyType);
 	}

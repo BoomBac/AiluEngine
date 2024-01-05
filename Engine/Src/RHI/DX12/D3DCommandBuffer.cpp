@@ -20,6 +20,23 @@ namespace Ailu
 			D3DContext::s_p_d3dcontext->Clear(color, depth, clear_color, clear_depth);
 			});
 	}
+	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth)
+	{
+		_commands.emplace_back([=]() {
+			D3DContext::GetInstance()->GetCmdList()->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), clear_color, 0, nullptr);
+			D3DContext::GetInstance()->GetCmdList()->ClearDepthStencilView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
+			});
+
+	}
+	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color)
+	{
+		_commands.emplace_back([=]() {
+			D3DContext::GetInstance()->GetCmdList()->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), clear_color, 1, nullptr);
+			});
+	}
+	//void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth)
+	//{
+	//}
 	void D3DCommandBuffer::DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, uint32_t instance_count)
 	{
 		_commands.emplace_back([=]() {
@@ -90,7 +107,6 @@ namespace Ailu
 				mesh->GetVertexBuffer()->Bind(material->GetShader()->GetVSInputSemanticSeqences());
 				mesh->GetIndexBuffer()->Bind();
 				material->Bind();
-				D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
 			}
 			else
 			{
@@ -98,8 +114,9 @@ namespace Ailu
 				mesh->GetVertexBuffer()->Bind(error->GetShader()->GetVSInputSemanticSeqences());
 				mesh->GetIndexBuffer()->Bind();
 				error->Bind();
-				D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
 			}
+			D3DContext::s_p_d3dcontext->SubmitPerObjectBuffer(transform);
+			D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
 			});
 	}
 	void D3DCommandBuffer::SetPSO(GraphicsPipelineState* pso)
@@ -109,13 +126,38 @@ namespace Ailu
 			pso->SubmitBindResource(reinterpret_cast<void*>(D3DContext::s_p_d3dcontext->GetPerFrameCbufGPURes()), EBindResDescType::kConstBuffer);
 			});
 	}
-	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth)
+	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth)
 	{
 		_commands.emplace_back([=]() {
-			color->Transition(ETextureResState::kRenderTagret);
-			depth->Transition(ETextureResState::kRenderTagret);
-			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1,reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()),0,
+			color->Transition(ETextureResState::kColorTagret);
+			depth->Transition(ETextureResState::kDepthTarget);
+			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
 				reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
+			});
+	}
+	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color)
+	{
+		_commands.emplace_back([=]() {
+			color->Transition(ETextureResState::kColorTagret);
+			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
+				NULL);
+			});
+	}
+	void Ailu::D3DCommandBuffer::ResolveToBackBuffer(Ref<RenderTexture>& color)
+	{
+		static const auto mat = BuildIdentityMatrix();
+		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
+		static const auto material = MaterialLibrary::GetMaterial("Blit");
+		_commands.emplace_back([=]() {
+			D3DContext::s_p_d3dcontext->BeginBackBuffer();
+			mesh->GetVertexBuffer()->Bind(material->GetShader()->GetVSInputSemanticSeqences());
+			mesh->GetIndexBuffer()->Bind();
+			color->Transition(ETextureResState::kShaderResource);
+			material->SetTexture("_SourceTex", color);
+			material->Bind();
+			D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1, mat);
+			D3DContext::s_p_d3dcontext->DrawOverlay();
+			D3DContext::s_p_d3dcontext->EndBackBuffer();
 			});
 	}
 }

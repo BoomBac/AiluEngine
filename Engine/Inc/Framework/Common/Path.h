@@ -9,8 +9,8 @@ namespace Ailu
     static const String kEngineRootPath = "C:/AiluEngine/Engine/";
     static const String kEngineResRootPath = "C:/AiluEngine/Engine/Res/";
 #else
-    static const String kEngineRootPath = "F:/ProjectCpp/AiluEngine/Engine/";
-    static const String kEngineResRootPath = "F:/ProjectCpp/AiluEngine/Engine/Res/";
+    static const String kEngineRootPath = "D:/ProjectCpp/AiluEngine/Engine/";
+    static const String kEngineResRootPath = "D:/ProjectCpp/AiluEngine/Engine/Res/";
 #endif
 
     namespace EnginePath

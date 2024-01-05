@@ -26,6 +26,8 @@ namespace Ailu
         //    _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
         //    Camera::sCurrent = _p_scene_camera.get();
         //}
+        _p_camera_color_attachment = RenderTexture::Create(1600,900,"CameraColorAttachment",EALGFormat::kALGFormatR8G8B8A8_UNORM);
+        _p_camera_depth_attachment = RenderTexture::Create(1600,900,"CameraDepthAttachment",EALGFormat::kALGFormatD24S8_UINT);
         return 0;
     }
     void Renderer::Finalize()
@@ -112,11 +114,12 @@ namespace Ailu
         auto cmd = D3DCommandBufferPool::GetCommandBuffer();
         static uint32_t w = 1600, h = 900;
         cmd->Clear();
+        cmd->SetRenderTarget(_p_camera_color_attachment,_p_camera_depth_attachment);
+        cmd->ClearRenderTarget(_p_camera_color_attachment, _p_camera_depth_attachment, Colors::kBlack, 1.0f);
         cmd->SetViewports({ Viewport{0,0,(uint16_t)w,(uint16_t)h} });
         cmd->SetScissorRects({ Viewport{0,0,(uint16_t)w,(uint16_t)h} });
-        cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
+       // cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
         cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
-
         if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
         {
             //cmd->SetPSO(GraphicsPipelineStateMgr::s_standard_shadering_pso);
@@ -134,6 +137,8 @@ namespace Ailu
                 cmd->DrawRenderer(obj.mesh, obj.transform, wireframe_mat, obj.instance_count);
             }
         }
+        //cmd->DrawRenderer(MeshPool::GetMesh("FullScreenQuad"), BuildIdentityMatrix(), MaterialLibrary::GetMaterial("Blit"));
+        cmd->ResolveToBackBuffer(_p_camera_color_attachment);
         D3DContext::GetInstance()->ExecuteCommandBuffer(cmd);
         D3DCommandBufferPool::ReleaseCommandBuffer(cmd);
         DrawRendererGizmo();
@@ -211,7 +216,7 @@ namespace Ailu
                 Vector3f grid_center_large(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
                     0.0f,
                     static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
-                grid_color = Colors::kGreen;
+                //grid_color = Colors::kGreen;
                 Gizmo::DrawGrid(10, 1000, grid_center_large, grid_color);
             }
 

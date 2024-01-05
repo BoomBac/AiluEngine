@@ -73,8 +73,9 @@ namespace Ailu
 		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
 		void Bind(uint8_t slot) const final;
 		uint8_t* GetCPUNativePtr() final;
+		void* GetNativeCPUHandle() final;
+		void Release() final;
 		void Transition(ETextureResState state) final;
-		D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle();
 	private:
 		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
 		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;

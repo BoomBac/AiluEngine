@@ -33,8 +33,8 @@ namespace Ailu
         ID3D12GraphicsCommandList* GetTaskCmdList();
         ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
         std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetSRVDescriptorHandle();
-        std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetRTVDescriptorHandle();
-        std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetDSVDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle();
+        D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle();
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
         uint8_t* GetCBufferPtr();
         uint8_t* GetPerFrameCbufData() final;
@@ -42,6 +42,13 @@ namespace Ailu
         D3D12_CONSTANT_BUFFER_VIEW_DESC* GetPerFrameCbufGPURes();
         ScenePerFrameData* GetPerFrameCbufDataStruct();
         void ExecuteCommandBuffer(Ref<D3DCommandBuffer>& cmd);
+
+        void SubmitPerObjectBuffer(const Matrix4x4f& transform);
+        void BeginBackBuffer();
+        void EndBackBuffer();
+
+        void DrawOverlay();
+
 
         void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
         void DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform);

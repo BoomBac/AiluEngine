@@ -125,16 +125,27 @@ namespace Ailu
 	}
 	//----------------------------------------------------------TextureCubeMap---------------------------------------------------------------------
 
+	//----------------------------------------------------------RenderTexture---------------------------------------------------------------------
 	Ref<RenderTexture> RenderTexture::Create(const uint16_t& width, const uint16_t& height, String name, EALGFormat format)
 	{
-		return Ref<RenderTexture>();
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::ERenderAPI::kNone:
+			AL_ASSERT(false, "None render api used!")
+				return nullptr;
+		case RendererAPI::ERenderAPI::kDirectX12:
+		{
+			return MakeRef<D3DRenderTexture>(width, height, name,1,format);
+		}
+		}
+		AL_ASSERT(false, "Unsupport render api!");
+		return nullptr;
 	}
 
 	void RenderTexture::Bind(uint8_t slot) const
 	{
 	}
 
-	//----------------------------------------------------------RenderTexture---------------------------------------------------------------------
 	void* RenderTexture::GetNativeCPUHandle()
 	{
 		return nullptr;

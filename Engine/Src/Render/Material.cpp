@@ -56,6 +56,11 @@ namespace Ailu
 		_p_cbuf = _p_shader->GetCBufferPtr(_cbuf_index);
 		Construct(true);
 		shader->AddMaterialRef(this);
+		auto it = _p_shader->GetBindResInfo().find("SamplerMask");
+		if (it != _p_shader->GetBindResInfo().end())
+		{
+			_sampler_mask_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+		}
 	}
 
 	Material::~Material()
@@ -74,7 +79,7 @@ namespace Ailu
 	void Material::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)
 	{
 		//40 根据shader中MaterialBuf计算，可能会有变动
-		uint32_t* sampler_mask = reinterpret_cast<uint32_t*>(_p_cbuf_cpu + 56);
+		uint32_t* sampler_mask = reinterpret_cast<uint32_t*>(_p_cbuf_cpu + _sampler_mask_offset);
 		//*sampler_mask = 0;
 		for (auto& usage : use_infos)
 		{
@@ -84,7 +89,7 @@ namespace Ailu
 
 	bool Material::IsTextureUsed(ETextureUsage use_info)
 	{
-		uint32_t sampler_mask = *reinterpret_cast<uint32_t*>(_p_cbuf_cpu + 56);
+		uint32_t sampler_mask = *reinterpret_cast<uint32_t*>(_p_cbuf_cpu + _sampler_mask_offset);
 		switch (use_info)
 		{
 		case Ailu::ETextureUsage::kAlbedo: return sampler_mask & 1;
@@ -157,8 +162,8 @@ namespace Ailu
 		{
 			_properties[name]._value_ptr = reinterpret_cast<void*>(&_textures[name]);
 		}
-		else
-			LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
+		//else
+		//	LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
 	}
 
 	void Material::SetTexture(const std::string& name, const String& texture_path)
@@ -333,15 +338,15 @@ prop_info._prop_name,prop_info._value_name,prop_info._prop_type };
 				}
 				else
 				{
-					SerializableProperty p{s_unused_shader_prop_buf + unused_shader_prop_buf_offset,prop_info._prop_name,prop_info._value_name,prop_info._prop_type };
+					SerializableProperty p{ s_unused_shader_prop_buf + unused_shader_prop_buf_offset,prop_info._prop_name,prop_info._value_name,prop_info._prop_type };
 					prop = std::move(p);
-					unused_shader_prop_buf_offset+= SerializableProperty::GetValueSize(prop_info._prop_type);
+					unused_shader_prop_buf_offset += SerializableProperty::GetValueSize(prop_info._prop_type);
 					g_pLogMgr->LogWarningFormat("Unused shader prop {} been added;", prop_info._prop_name);
 				}
 				memcpy(prop._param, prop_info._prop_param, sizeof(Vector4f));
 				if (prop._type == ESerializablePropertyType::kFloat || prop._type == ESerializablePropertyType::kRange)
 				{
-					memcpy(prop._value_ptr, &prop._param[2],sizeof(float));
+					memcpy(prop._value_ptr, &prop._param[2], sizeof(float));
 				}
 				else if (prop._type == ESerializablePropertyType::kColor || prop._type == ESerializablePropertyType::kVector4f)
 				{
@@ -352,7 +357,7 @@ prop_info._prop_name,prop_info._value_name,prop_info._prop_type };
 		}
 	}
 	//-------------------------------------------StandardMaterial--------------------------------------------------------
-	StandardMaterial::StandardMaterial(Ref<Shader> shader, std::string name) : Material(shader,name)
+	StandardMaterial::StandardMaterial(Ref<Shader> shader, std::string name) : Material(shader, name)
 	{
 
 	}

@@ -5,7 +5,7 @@ shader_path: Shaders/shaders.hlsl
   prop_type: Float
     RoughnessValue: 0
     MetallicValue: 0
-    SamplerMask: 9.80909e-45
+    SamplerMask: 0
   prop_type: Vector
     SpecularColor: 0,0,0,0
     BaseColor: 1,1,1,0
@@ -13,7 +13,7 @@ shader_path: Shaders/shaders.hlsl
   prop_type: Texture2D
     Specular: none
     Metallic: none
-    Albedo: Runtime/default_black
-    Normal: Textures/Intergalactic Spaceship_nmap_2_Tris.jpg
-    Emssive: Textures/Intergalactic Spaceship_emi.jpg
+    Albedo: none
+    Normal: none
+    Emssive: none
     Roughness: none

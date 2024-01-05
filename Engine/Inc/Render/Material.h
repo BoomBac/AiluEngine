@@ -50,11 +50,13 @@ namespace Ailu
 		void DisableKeyword(const String& keyword);
 		virtual void Bind();
 		Shader* GetShader() const;
+		//int type is as float,may cause some question
 		List<std::tuple<String, float>> GetAllFloatValue();
 		List<std::tuple<String, Vector4f>> GetAllVectorValue();
 	private:
 		void Construct(bool first_time);
 	private:
+		u16 _sampler_mask_offset = 0u;
 		uint16_t _mat_cbuf_size = 0u;
 		uint8_t* _p_cbuf_cpu;
 		Ref<Shader> _p_shader;

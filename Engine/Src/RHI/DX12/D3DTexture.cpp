@@ -216,8 +216,9 @@ namespace Ailu
 	{
 		switch (state)
 		{
-		case ETextureResState::kRenderTagret: return D3D12_RESOURCE_STATE_RENDER_TARGET;
-		case ETextureResState::kShaderResource: return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		case ETextureResState::kColorTagret: return D3D12_RESOURCE_STATE_RENDER_TARGET;
+		case ETextureResState::kShaderResource: return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+		case ETextureResState::kDepthTarget: return D3D12_RESOURCE_STATE_DEPTH_WRITE;
 		}
 		return D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON;
 	}
@@ -244,16 +245,18 @@ namespace Ailu
 		tex_desc.SampleDesc.Quality = 0;
 		tex_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		D3D12_CLEAR_VALUE clear_value{};
+		//clear_value.Format = is_shadowmap? DXGI_FORMAT_D24_UNORM_S8_UINT : tex_desc.Format;
 		clear_value.Format = tex_desc.Format;
 		if (is_shadowmap)
-			clear_value.DepthStencil = { 0.0f,0 };
+			clear_value.DepthStencil = { 1.0f,0 };
 		else
 			memcpy(clear_value.Color, kClearColor, sizeof(kClearColor));
 		CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
 		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &tex_desc, is_shadowmap ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET,
 			&clear_value, IID_PPV_ARGS(_p_buffer.GetAddressOf())));
 		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		_srv_desc.Format = tex_desc.Format;
+		_srv_desc.Format = is_shadowmap? DXGI_FORMAT_R24_UNORM_X8_TYPELESS : tex_desc.Format;
+		//_srv_desc.Format = tex_desc.Format;
 		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
 		_srv_desc.Texture2D.MipLevels = 1;
@@ -263,9 +266,8 @@ namespace Ailu
 		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handle);
 		if (!is_shadowmap)
 		{
-			auto [r_ch, r_gh] = D3DContext::GetInstance()->GetRTVDescriptorHandle();
-			_d3d_handle._color_handle._gpu_handle = r_gh;
-			_d3d_handle._color_handle._cpu_handle = r_ch;
+			auto handle = D3DContext::GetInstance()->GetRTVDescriptorHandle();
+			_d3d_handle._color_handle._cpu_handle = handle;
 			D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
 			rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 			rtv_desc.Format = tex_desc.Format;
@@ -275,23 +277,32 @@ namespace Ailu
 		}
 		else
 		{
-			auto [d_ch, d_gh] = D3DContext::GetInstance()->GetDSVDescriptorHandle();
-			_d3d_handle._depth_handle._gpu_handle = d_gh;
-			_d3d_handle._depth_handle._cpu_handle = d_ch;
+			auto handle = D3DContext::GetInstance()->GetDSVDescriptorHandle();
+			//_d3d_handle._depth_handle._gpu_handle = d_gh;
+			_d3d_handle._depth_handle._cpu_handle = handle;
 			D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
+			//dsv_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 			dsv_desc.Format = tex_desc.Format;
 			dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 			dsv_desc.Texture2D.MipSlice = 0;
 			p_device->CreateDepthStencilView(_p_buffer.Get(), &dsv_desc, _d3d_handle._depth_handle._cpu_handle);
 		}
+		_state = is_shadowmap ? ETextureResState::kDepthTarget : ETextureResState::kColorTagret;
 	}
 	void D3DRenderTexture::Bind(uint8_t slot) const
 	{
-
+		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
 	uint8_t* D3DRenderTexture::GetCPUNativePtr()
 	{
 		return nullptr;
+	}
+	void* D3DRenderTexture::GetNativeCPUHandle()
+	{
+		return reinterpret_cast<void*>(&_d3d_handle._color_handle._cpu_handle);
+	}
+	void D3DRenderTexture::Release()
+	{
 	}
 	void D3DRenderTexture::Transition(ETextureResState state)
 	{
@@ -299,12 +310,10 @@ namespace Ailu
 		auto old_state = _state;
 		RenderTexture::Transition(state);
 		auto p_cmdlist{ D3DContext::GetInstance()->GetCmdList() };
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_buffer.Get(), ConvertToD3DResourceState(old_state), ConvertToD3DResourceState(_state));
+		auto state_before = ConvertToD3DResourceState(old_state);
+		auto state_after = ConvertToD3DResourceState(_state);
+		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_buffer.Get(), state_before, state_after);
 		p_cmdlist->ResourceBarrier(1, &barrier);
-	}
-	D3D12_CPU_DESCRIPTOR_HANDLE D3DRenderTexture::GetCPUHandle()
-	{
-		return _d3d_handle._color_handle._cpu_handle;
 	}
 	//----------------------------------------------------------D3DRenderTexture----------------------------------------------------------------------
 }

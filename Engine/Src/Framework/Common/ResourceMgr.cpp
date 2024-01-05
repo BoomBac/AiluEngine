@@ -26,7 +26,7 @@ namespace Ailu
 
 		default_data = new u8[4 * 4 * 4];
 		memset(default_data, 0, 64);
-		for (int i = 0; i < 64; i += 3)
+		for (int i = 3; i < 64; i += 4)
 			default_data[i] = 255;
 		auto default_black = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		default_black->FillData({ default_data });
@@ -36,7 +36,7 @@ namespace Ailu
 
 		default_data = new u8[4 * 4 * 4];
 		memset(default_data, 128, 64);
-		for (int i = 0; i < 64; i += 3)
+		for (int i = 3; i < 64; i += 4)
 			default_data[i] = 255;
 		auto default_gray = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		default_gray->FillData({ default_data });
@@ -64,6 +64,7 @@ namespace Ailu
 		skybox->OriginPath("Skybox");
 		skybox->SetTexture("SkyBox", "cubemap_sea");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/error_fallback.hlsl"), "Error");
+		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.shader"), "Blit");
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
 		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());
@@ -73,6 +74,22 @@ namespace Ailu
 		MeshPool::AddMesh("monkey", parser->Parser(GetResPath("Meshs/monkey.fbx")).front());
 		MeshPool::AddMesh("plane", parser->Parser(GetResPath("Meshs/plane.fbx")).front());
 		MeshPool::AddMesh("torus", parser->Parser(GetResPath("Meshs/torus.fbx")).front());
+		auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
+		Vector<Vector3f> vertices = {
+		{ -1.0f, 1.0f, 0.0f },
+		{  1.0f, 1.0f, 0.0f },
+		{ -1.0f,  -1.0f, 0.0f },
+		{  1.0f,  -1.0f, 0.0f }
+		};
+		Vector<u32> indices = {0, 1, 2, 1, 3, 2};
+		Vector<Vector2f> uv0 = { {0.f,0.f}, {1.f,0.f},{0.f,1.f} ,{1.f,1.f} };
+		FullScreenQuad->_vertex_count = 4;
+		FullScreenQuad->_index_count = 6;
+		FullScreenQuad->SetVertices(vertices.data());
+		FullScreenQuad->SetIndices(indices.data());
+		FullScreenQuad->SetUVs(uv0.data(),0);
+		FullScreenQuad->Build();
+		MeshPool::AddMesh("FullScreenQuad", FullScreenQuad);
 
 		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
 		auto tga_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kTGA);

@@ -279,7 +279,7 @@ namespace Ailu
 			pso_desc._blend_state = BlendState{};
 			pso_desc._b_has_rt = true;
 			pso_desc._depth_stencil_state = TStaticDepthStencilState<true, ECompareFunc::kLess>::GetRHI();
-			pso_desc._ds_format = EALGFormat::kALGFormatD32_FLOAT;
+			pso_desc._ds_format = EALGFormat::kALGFormatD24S8_UINT;
 			pso_desc._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
 			pso_desc._rt_nums = 1;
 			pso_desc._topology = ETopology::kTriangle;
@@ -293,7 +293,7 @@ namespace Ailu
 			pso_desc._blend_state = TStaticBlendState<true, EBlendFactor::kSrcAlpha, EBlendFactor::kOneMinusSrcAlpha>::GetRHI();
 			pso_desc._b_has_rt = true;
 			pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
-			pso_desc._ds_format = EALGFormat::kALGFormatD32_FLOAT;
+			pso_desc._ds_format = EALGFormat::kALGFormatD24S8_UINT;
 			pso_desc._rt_formats[0] = EALGFormat::kALGFormatR8G8B8A8_UNORM;
 			pso_desc._rt_nums = 1;
 			pso_desc._topology = ETopology::kTriangle;

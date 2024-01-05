@@ -62,6 +62,12 @@ namespace Ailu
 			CalculateSizeAndStride();
 			_hash = static_cast<u8>(ALHash::CommonRuntimeHasher(*this));
 		}
+		VertexBufferLayout(const Vector<VertexBufferLayoutDesc>& desc_list) : _buffer_descs(desc_list)
+		{
+			CalculateSizeAndStride();
+			_hash = static_cast<u8>(ALHash::CommonRuntimeHasher(*this));
+		}
+
 		inline const u8 GetStreamCount() const {return _stream_count;}
 		inline const std::vector<VertexBufferLayoutDesc>& GetBufferDesc() const { return _buffer_descs; }
 		inline const u8 GetDescCount() const { return static_cast<u8>(_buffer_descs.size()); };

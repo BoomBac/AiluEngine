@@ -479,7 +479,10 @@ namespace Ailu
 		FbxScene* fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
 		List<Ref<Mesh>> loaded_meshs{};
 		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.c_str(), -1, fbx_manager_->GetIOSettings()))
+		{
+			g_pLogMgr->LogErrorFormat(std::source_location::current(),"Load mesh failed at path {}", path);
 			return loaded_meshs;
+		}
 		fbx_importer_->Import(fbx_scene);
 		FbxNode* fbx_rt = fbx_scene->GetRootNode();
 		fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(fbx_scene);

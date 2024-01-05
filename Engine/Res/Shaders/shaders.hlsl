@@ -90,7 +90,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 	light += surface_data.emssive; 
 	GammaCorrect(light,2.2f);
 #ifdef TEST
-	return float4(light, surface_data.albedo.a);
+	return float4(light,1.0);
 #else
 	return float4(0.0,1.0,0.0,1.0);
 #endif
