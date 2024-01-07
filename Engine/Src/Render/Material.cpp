@@ -2,6 +2,7 @@
 #include <iosfwd>
 #include "Render/Material.h"
 #include "Framework/Common/LogMgr.h"
+#include "Render/GraphicsPipelineStateObject.h"
 
 namespace Ailu
 {
@@ -221,7 +222,10 @@ namespace Ailu
 		{
 			auto& [slot, texture] = it->second;
 			if (texture != nullptr)
-				texture->Bind(slot);
+			{
+				//texture->Bind(slot);
+				GraphicsPipelineStateMgr::SubmitBindResource(texture.get(), slot);
+			}
 			//else
 			//{
 			//	LOG_WARNING("Material: {} haven't set texture on bind slot {}",_name,(short)slot);

@@ -125,7 +125,7 @@ namespace Ailu
             *reinterpret_cast<T*>(_value_ptr) = value;
         }
         template<typename T>
-        std::optional<T> GetProppertyValue()
+        std::optional<T> GetProppertyValue() const
         {
             if (_value_ptr != nullptr)
                 return *reinterpret_cast<T*>(_value_ptr);

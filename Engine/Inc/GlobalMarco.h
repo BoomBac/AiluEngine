@@ -6,6 +6,7 @@
 #include <vector>
 #include <list>
 #include <queue>
+#include <array>
 
 #ifdef AILU_BUILD_DLL
 #define AILU_API __declspec(dllexport)
@@ -104,6 +105,43 @@ public: \
 protected: \
     type* _##Name;
 
+// Search and remove whitespace from both ends of the string
+static std::string TrimEnumString(const std::string& s)
+{
+    std::string::const_iterator it = s.begin();
+    while (it != s.end() && isspace(*it)) { it++; }
+    std::string::const_reverse_iterator rit = s.rbegin();
+    while (rit.base() != it && isspace(*rit)) { rit++; }
+    return std::string(it, rit.base());
+}
+
+static void SplitEnumArgs(const char* szArgs, std::string Array[], int nMax)
+{
+    std::stringstream ss(szArgs);
+    std::string strSub;
+    int nIdx = 0;
+    while (ss.good() && (nIdx < nMax)) {
+        getline(ss, strSub, ',');
+        Array[nIdx] = TrimEnumString(strSub);
+        nIdx++;
+    }
+};
+// This will to define an enum that is wrapped in a namespace of the same name along with ToString(), FromString(), and COUNT
+#define DECLARE_ENUM(ename, ...) \
+    namespace ename { \
+        enum ename { __VA_ARGS__, COUNT }; \
+        static std::string _Strings[COUNT]; \
+        static const char* ToString(ename e) { \
+            if (_Strings[0].empty()) { SplitEnumArgs(#__VA_ARGS__, _Strings, COUNT); } \
+            return _Strings[e].c_str(); \
+        } \
+        static ename FromString(const std::string& strEnum) { \
+            if (_Strings[0].empty()) { SplitEnumArgs(#__VA_ARGS__, _Strings, COUNT); } \
+            for (int i = 0; i < COUNT; i++) { if (_Strings[i] == strEnum) { return (ename)i; } } \
+            return COUNT; \
+        } \
+    }
+
 
 //使用dxc编译高版本着色器(>=6.0)，这样的话无法在PIX中看到cbuffer信息
 //#define SHADER_DXC
@@ -122,6 +160,9 @@ using WString = std::wstring;
 
 template<typename T>
 using Vector = std::vector<T>;
+
+template<typename T,size_t Size>
+using Array = std::array<T,Size>;
 
 template<typename T>
 using List = std::list<T>;

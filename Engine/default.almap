@@ -1,8 +1,8 @@
 SceneName: default_scene
 SceneCamera: scene_camera
-  Type: Perspective
-  Position: 2030.87,2740.47,2291.6
-  Rotation: -125.143,32.208,0
+  Type: kPerspective
+  Position: 1631.25,2228.14,777.237
+  Rotation: 1325.86,27.9668,0
   Fov: 60
   Aspect: 1.77778
   Near: 54.41
@@ -14,13 +14,13 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,0,0
         Scale: 1,1,1
-    Children: 7
+    Children: 8
       Name: plane
         Components: 
           TransformComponent: 
             Position: 0,62,0
             Rotation: 0,0,0
-            Scale: 16,1,25
+            Scale: 38,1,40
           StaticMeshComponent: 
             MeshPath: plane
             MaterialPath: Materials/StandardPBR_new.alasset
@@ -67,15 +67,15 @@ SceneGraph:
           LightComponent: 
             Type: Spot
             Color: 0.0395761,0.518758,0.897059
-            Intensity: 1
-            Radius: 2249
+            Intensity: 2.478
+            Radius: 2868
             Inner: 45
             Outer: 60
         Children: 0
       Name: sphere
         Components: 
           TransformComponent: 
-            Position: 0,1219,0
+            Position: 0,1188,0
             Rotation: 0,0,0
             Scale: 5,5,5
           StaticMeshComponent: 
@@ -91,4 +91,20 @@ SceneGraph:
           StaticMeshComponent: 
             MeshPath: D:\ProjectCpp\AiluEngine\Engine\Res\Meshs\space_ship.fbx
             MaterialPath: Materials/StandardPBR_new.alasset
+        Children: 0
+      Name: camera0
+        Components: 
+          TransformComponent: 
+            Position: 0,0,0
+            Rotation: -10.43,-20.87,0
+            Scale: 1,1,1
+          CameraComponent: 8
+            Type: kPerspective
+            Position: 0,0,0
+            Rotation: -10.43,-20.87,0
+            Near: 704
+            Aspect: 1.78
+            Far: 5000
+            Size: 0
+            FovH: 21.687
         Children: 0

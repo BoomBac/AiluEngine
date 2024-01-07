@@ -105,7 +105,7 @@ namespace Ailu
                 lineColor.a *= lerpf(1.0f, 0.0f, abs(xPos - center.x) / halfWidth);
                 auto color_start = lineColor;
                 auto color_end = lineColor;
-                if (DotProduct(Camera::sCurrent->GetForward(), { 0,0,1 }) > 0)
+                if (DotProduct(Camera::sCurrent->Forward(), { 0,0,1 }) > 0)
                 {
                     color_start.a *= 0.8f;
                     color_end.a *= 0.2f;
@@ -123,8 +123,8 @@ namespace Ailu
                 lineColor.a *= lerpf(1.0f, 0.0f, abs(zPos - center.z) / halfWidth);
                 color_start = lineColor;
                 color_end = lineColor;
-                auto right = Camera::sCurrent->GetRight();
-                if (DotProduct(Camera::sCurrent->GetForward(), { 1,0,0 }) > 0)
+                auto right = Camera::sCurrent->Right();
+                if (DotProduct(Camera::sCurrent->Forward(), { 1,0,0 }) > 0)
                 {
                     color_start.a *= 0.8f;
                     color_end.a *= 0.2f;

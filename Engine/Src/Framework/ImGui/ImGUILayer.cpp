@@ -13,6 +13,7 @@
 #include "Objects/Actor.h"
 #include "Objects/TransformComponent.h"
 #include "Objects/StaticMeshComponent.h"
+#include "Objects/CameraComponent.h"
 #include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "RHI/DX12/D3DTexture.h"
@@ -153,12 +154,12 @@ namespace Ailu
 			{
 				bool checked = prop_value.value() == 1.0f;
 				ImGui::Checkbox(prop._name.c_str(), &checked);
-				prop.SetProppertyValue(checked? 1.0f : 0.0f);
+				prop.SetProppertyValue(checked ? 1.0f : 0.0f);
 			}
 			else
 				ImGui::Text("Toogle %s value missing", prop._name.c_str());
 		}
-			break;
+		break;
 		case Ailu::ESerializablePropertyType::kEnum:
 		{
 			auto mat = dynamic_cast<Material*>(obj);
@@ -193,7 +194,7 @@ namespace Ailu
 			else
 				ImGui::Text("Non-Material Eunm %s value missing", prop._name.c_str());
 		}
-			break;
+		break;
 		case Ailu::ESerializablePropertyType::kVector3f: ImGui::DragFloat3(prop._name.c_str(), static_cast<Vector3f*>(prop._value_ptr)->data);
 			break;
 		case Ailu::ESerializablePropertyType::kVector4f:
@@ -368,9 +369,9 @@ namespace Ailu
 
 	static void DrawComponentProperty(Component* comp, TextureSelector& selector_window)
 	{
-		if (ImGui::CollapsingHeader(comp->GetTypeName().c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader(GetComponentTypeStr(comp->GetType()).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 		{
-			if (comp->GetTypeName() == LightComponent::GetStaticType())
+			if (comp->GetType() == LightComponent::GetStaticType())
 			{
 				auto light = static_cast<LightComponent*>(comp);
 				static const char* items[] = { "Directional", "Point", "Spot" };
@@ -416,7 +417,7 @@ namespace Ailu
 					ImGui::SliderFloat("OuterAngle", &light_data._light_param.z, 1.0f, 180.0f);
 				}
 			}
-			else if (comp->GetTypeName() == TransformComponent::GetStaticType())
+			else if (comp->GetType() == TransformComponent::GetStaticType())
 			{
 				auto transf = static_cast<TransformComponent*>(comp);
 				auto& pos = transf->GetProperty("Position");
@@ -426,7 +427,7 @@ namespace Ailu
 				auto& scale = transf->GetProperty("Scale");
 				ImGui::DragFloat3(scale._name.c_str(), static_cast<Vector3f*>(scale._value_ptr)->data);
 			}
-			else if (comp->GetTypeName() == StaticMeshComponent::GetStaticType())
+			else if (comp->GetType() == StaticMeshComponent::GetStaticType())
 			{
 				auto static_mesh_comp = static_cast<StaticMeshComponent*>(comp);
 				for (auto& prop : static_mesh_comp->GetAllProperties())
@@ -437,7 +438,7 @@ namespace Ailu
 						auto& mesh = static_mesh_comp->GetMesh();
 						int mesh_count = 0;
 						static int s_mesh_selected_index = -1;
-						if (ImGui::BeginCombo("Select Mesh: ", mesh? mesh->Name().c_str() : "missing"))
+						if (ImGui::BeginCombo("Select Mesh: ", mesh ? mesh->Name().c_str() : "missing"))
 						{
 							for (auto it = MeshPool::Begin(); it != MeshPool::End(); it++)
 							{
@@ -456,7 +457,7 @@ namespace Ailu
 				ImGui::Text("Material: ");
 				int mat_count = 0;
 				static int s_mat_selected_index = -1;
-				if (ImGui::BeginCombo("Select Material: ", mat? mat->Name().c_str() : "missing"))
+				if (ImGui::BeginCombo("Select Material: ", mat ? mat->Name().c_str() : "missing"))
 				{
 					for (auto it = MaterialLibrary::Begin(); it != MaterialLibrary::End(); it++)
 					{
@@ -496,6 +497,47 @@ namespace Ailu
 						}
 					}
 				}
+			}
+			else if (comp->GetType() == CameraComponent::GetStaticType())
+			{
+				auto& cam = static_cast<CameraComponent*>(comp)->_camera;
+				const char* items[]{ "Orthographic","Perspective" };
+				int item_current_idx = 0;
+				if (cam.Type() == ECameraType::kPerspective) item_current_idx = 1;
+				const char* combo_preview_value = items[item_current_idx];
+				if (ImGui::BeginCombo("CameraType", combo_preview_value, 0))
+				{
+					for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+					{
+						const bool is_selected = (item_current_idx == n);
+						if (ImGui::Selectable(items[n], is_selected))
+							item_current_idx = n;
+						if (is_selected)
+							ImGui::SetItemDefaultFocus();
+					}
+					ImGui::EndCombo();
+				}
+				float cam_near = cam.Near(), cam_far = cam.Far(), aspect = cam.Aspect();
+				if (item_current_idx == 0) cam.Type(ECameraType::kOrthographic);
+				else cam.Type(ECameraType::kPerspective);
+				ImGui::DragFloat("Near", &cam_near, 1.0f, 0, 1000.0f);
+				ImGui::DragFloat("Far", &cam_far, 1.0f, cam_near, 500000.f);
+				ImGui::SliderFloat("Aspect", &aspect, 0.01f, 5.f);
+				if (cam.Type() == ECameraType::kPerspective)
+				{
+					float fov_h = cam.FovH();
+					ImGui::SliderFloat("Horizontal Fov", &fov_h, 0.0f, 135.0f);
+					cam.FovH(fov_h);
+				}
+				else
+				{
+					float size = cam.Size();
+					ImGui::SliderFloat("Size", &size, 0.0f, 1000.0f);
+					cam.Size(size);
+				}
+				cam.Near(cam_near);
+				cam.Far(cam_far);
+				cam.Aspect(aspect);
 			}
 		}
 	}
@@ -630,13 +672,13 @@ namespace Ailu
 	}
 
 	bool s_show_outilineobj_rename_dialog = false;
-	static bool s_global_modal_window_info[256]{false};
+	static bool s_global_modal_window_info[256]{ false };
 	static void MarkModalWindoShow(const int& handle)
 	{
 		s_global_modal_window_info[handle] = true;
 	}
 
-	static String ShowModalDialog(const String& title,int handle = 0)
+	static String ShowModalDialog(const String& title, int handle = 0)
 	{
 		static char buf[256] = {};
 		String str_id = std::format("{}-{}", title, handle);
@@ -896,6 +938,11 @@ namespace Ailu
 		{
 			g_pSceneMgr->AddSceneActor(std::format("object{}", object_id++), meshs[s_cur_mesh_index]);
 		}
+		if (ImGui::Button("Add Camera Test"))
+		{
+			Camera cam(1.78f);
+			g_pSceneMgr->AddSceneActor(std::format("camera{}", object_id++), cam);
+		}
 		ImGui::End();
 	}
 	//----------------------------------------------------------------------------MeshBrowser---------------------------------------------------------------------
@@ -908,49 +955,49 @@ namespace Ailu
 	}
 	void AssetBrowser::Show()
 	{
-		static auto new_material_widget = [this]() 
-		{
-			static char buf[256];
-			ImGui::InputText("##MaterialName", buf, IM_ARRAYSIZE(buf));
-			static Ref<Shader> selected_shader = nullptr;
-			int count = 0;
-			static int selected_index = -1;
-			if (ImGui::BeginCombo("Select Shader: ", selected_shader? selected_shader->GetName().c_str() : "select shader"))
+		static auto new_material_widget = [this]()
 			{
-				for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+				static char buf[256];
+				ImGui::InputText("##MaterialName", buf, IM_ARRAYSIZE(buf));
+				static Ref<Shader> selected_shader = nullptr;
+				int count = 0;
+				static int selected_index = -1;
+				if (ImGui::BeginCombo("Select Shader: ", selected_shader ? selected_shader->GetName().c_str() : "select shader"))
 				{
-					if (ImGui::Selectable((*it)->GetName().c_str(), selected_index == count))
-						selected_index = count;
-					if (selected_index == count)
-						selected_shader = *it;
-					++count;
+					for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+					{
+						if (ImGui::Selectable((*it)->GetName().c_str(), selected_index == count))
+							selected_index = count;
+						if (selected_index == count)
+							selected_shader = *it;
+						++count;
+					}
+					ImGui::EndCombo();
 				}
-				ImGui::EndCombo();
-			}
-			if (ImGui::Button("OK", ImVec2(120, 0)))
-			{
-				LOG_INFO("{},{}", String{ buf },selected_shader? selected_shader->GetName() : "null shader");
-				String name{ buf };
+				if (ImGui::Button("OK", ImVec2(120, 0)))
+				{
+					LOG_INFO("{},{}", String{ buf }, selected_shader ? selected_shader->GetName() : "null shader");
+					String name{ buf };
 
-				if (!name.empty() && selected_shader)
-				{
-					String sys_path = _cur_dir;
-					if (!sys_path.ends_with("\\") && !sys_path.ends_with("/"))
-						sys_path.append("/");
-					sys_path.append(name).append(".almat");
-					auto asset_path = PathUtils::ExtractAssetPath(sys_path);
-					auto new_mat = MaterialLibrary::CreateMaterial(selected_shader,name,asset_path);
-					new_mat->IsInternal(selected_shader->GetName() == "shaders");
-					g_pResourceMgr->SaveAsset(sys_path,new_mat.get());
+					if (!name.empty() && selected_shader)
+					{
+						String sys_path = _cur_dir;
+						if (!sys_path.ends_with("\\") && !sys_path.ends_with("/"))
+							sys_path.append("/");
+						sys_path.append(name).append(".almat");
+						auto asset_path = PathUtils::ExtractAssetPath(sys_path);
+						auto new_mat = MaterialLibrary::CreateMaterial(selected_shader, name, asset_path);
+						new_mat->IsInternal(selected_shader->GetName() == "shaders");
+						g_pResourceMgr->SaveAsset(sys_path, new_mat.get());
+					}
+					ImGui::CloseCurrentPopup();
 				}
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Cancel", ImVec2(120, 0)))
-			{
-				ImGui::CloseCurrentPopup();
-			}
-		};
+				ImGui::SameLine();
+				if (ImGui::Button("Cancel", ImVec2(120, 0)))
+				{
+					ImGui::CloseCurrentPopup();
+				}
+			};
 		ImguiWindow::Show();
 		namespace fs = std::filesystem;
 		fs::path cur_path{ _cur_dir };
@@ -978,7 +1025,7 @@ namespace Ailu
 			static int cur_click_id = -1;
 			for (auto& dir_it : curdir_it)
 			{
-				if(dir_it.is_directory())
+				if (dir_it.is_directory())
 					ImGui::Selectable(std::format("[] {}", dir_it.path().filename().string()).c_str(), cur_click_id == count);
 				else
 					ImGui::Selectable(dir_it.path().filename().string().c_str(), cur_click_id == count);
@@ -990,7 +1037,7 @@ namespace Ailu
 				{
 					if (ImGui::MenuItem("New"))
 					{
-						
+
 					}
 					if (ImGui::MenuItem("Rename"))
 					{
@@ -1014,7 +1061,7 @@ namespace Ailu
 					}
 					if (ImGui::MenuItem("Shader"))
 					{
-						ShaderLibrary::Add(_cur_dir +  "test_new_shader.shader","test_shader");
+						ShaderLibrary::Add(_cur_dir + "test_new_shader.shader", "test_shader");
 					}
 					ImGui::EndMenu();
 				}
@@ -1049,11 +1096,11 @@ namespace Ailu
 		ImGui::Text("Column 3");
 
 		// 分隔线
-		ImGui::Separator();	
+		ImGui::Separator();
 		for (auto it = g_pResourceMgr->Begin(); it != g_pResourceMgr->End(); it++)
 		{
 			ImGui::Text(it->first.c_str());
-			ImGui::SameLine(0.f,-20.0f);
+			ImGui::SameLine(0.f, -20.0f);
 			ImGui::Text(it->second->_asset_path.c_str());
 			// 分隔线
 			ImGui::Separator();

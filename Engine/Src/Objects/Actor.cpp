@@ -56,7 +56,7 @@ namespace Ailu
 	{
 		for (auto& component : _components)
 		{
-			if (component->GetTypeName() == comp->GetTypeName()) return;
+			if (component->GetType() == comp->GetType()) return;
 		}
 		Scope<Component> ptr(comp);
 		_components.emplace_back(std::move(ptr));

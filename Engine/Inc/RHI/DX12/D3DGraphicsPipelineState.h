@@ -3,7 +3,7 @@
 #define __D3DGFX_PIPELINE_STATE_H__
 #include <d3dx12.h>
 
-#include "Render/GraphicsPipelineState.h"
+#include "Render/GraphicsPipelineStateObject.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -66,18 +66,20 @@ namespace Ailu
 	}
 
 
-	class D3DGraphicsPipelineState : public GraphicsPipelineState
+	class D3DGraphicsPipelineState : public GraphicsPipelineStateObject
 	{
 	public:
 		D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer);
 		void Build() final;
 		void Bind() final;
-		void SubmitBindResource(void* res, const EBindResDescType& res_type, short slot = -1) final;
-		void SubmitBindResource(void* res, const EBindResDescType& res_type, const std::string& name) final;
+		void SetPipelineResource(void* res, const EBindResDescType& res_type, u8 slot = 255) final;
+		void SetPipelineResource(void* res, const EBindResDescType& res_type, const String& name) final;
 		const ALHash::Hash<64>& Hash() final { return _hash; };
-	public:
-		static Ref<D3DGraphicsPipelineState> GetGizmoPSO();
+		const String& Name() const final { return _name; };
 	private:
+		void BindResource(void* res, const EBindResDescType& res_type, u8 slot = 255) final;
+	private:
+		String _name;
 		uint8_t _per_frame_cbuf_bind_slot = 255u;
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC _d3d_pso_desc;
 		GraphicsPipelineStateInitializer _state_desc;

@@ -33,6 +33,7 @@ namespace Ailu
 		static u8* DownSample(u8* image, int width, int height, int channels)
 		{
 			constexpr static int sub_task_block_size = 128;
+			constexpr static bool use_multithread = false;
 			int row_size = channels * width;
 			int new_width = width >> 1;
 			int new_height = height >> 1;
@@ -59,27 +60,32 @@ namespace Ailu
 				}
 				return true;
 				};
-			int task_num = new_width / sub_task_block_size;
-			task_num = task_num == 0 ? 1 : task_num;
-			if (task_num == 1)
-				downsample_sub_task(0, new_width, 0, new_height, new_width);
-			else
+			if (use_multithread)
 			{
-				Vector<std::future<bool>> task_status{};
-				for (int i = 0; i < task_num; i++)
+				int task_num = new_width / sub_task_block_size;
+				task_num = task_num == 0 ? 1 : task_num;
+				if (task_num == 1)
+					downsample_sub_task(0, new_width, 0, new_height, new_width);
+				else
 				{
-					for (int j = 0; j < task_num; j++)
+					Vector<std::future<bool>> task_status{};
+					for (int i = 0; i < task_num; i++)
 					{
-						task_status.emplace_back(g_thread_pool->Enqueue(downsample_sub_task, j * sub_task_block_size, (j + 1) * sub_task_block_size, 
-							i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width));
-						//downsample_sub_task(j * sub_task_block_size, (j + 1) * sub_task_block_size, i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width);
+						for (int j = 0; j < task_num; j++)
+						{
+							task_status.emplace_back(g_thread_pool->Enqueue(downsample_sub_task, j * sub_task_block_size, (j + 1) * sub_task_block_size,
+								i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width));
+							//downsample_sub_task(j * sub_task_block_size, (j + 1) * sub_task_block_size, i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width);
+						}
+					}
+					for (auto& complete : task_status)
+					{
+						complete.get();
 					}
 				}
-				for (auto& complete : task_status)
-				{
-					complete.get();
-				}
 			}
+			else
+				downsample_sub_task(0, new_width, 0, new_height, new_width);
 			return new_image;
 		}
 	}

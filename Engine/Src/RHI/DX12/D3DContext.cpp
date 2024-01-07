@@ -210,7 +210,7 @@ namespace Ailu
     void D3DContext::DrawOverlay()
     {
         GraphicsPipelineStateMgr::s_gizmo_pso->Bind();
-        GraphicsPipelineStateMgr::s_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
+        GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
         Gizmo::Submit();
 #ifdef DEAR_IMGUI
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
@@ -676,6 +676,11 @@ namespace Ailu
     const D3D12_CONSTANT_BUFFER_VIEW_DESC& D3DContext::GetCBufferViewDesc(uint32_t index) const
     {
         return _cbuf_views[index];
+    }
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC* D3DContext::GetCBufferViewDescPtr(uint32_t index)
+    {
+        return &_cbuf_views[index];
     }
 
 }

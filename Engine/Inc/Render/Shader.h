@@ -10,6 +10,8 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/Reflect.h"
 
+#include "PipelineState.h"
+
 
 namespace Ailu
 {
@@ -20,7 +22,7 @@ namespace Ailu
 
 	enum class EBindResDescType : uint8_t
 	{
-		kConstBuffer = 0, kTexture2D, kCubeMap,kTexture2DArray,kSampler, kCBufferAttribute
+		kConstBuffer = 0, kTexture2D, kCubeMap,kTexture2DArray,kSampler, kCBufferAttribute,kUnknown
 	};
 
 	struct ShaderPropertyType
@@ -122,13 +124,18 @@ namespace Ailu
 		virtual const std::set<String>& GetSourceFiles() const = 0;
 		virtual Vector<class Material*> GetAllReferencedMaterials() = 0;
 		virtual const std::map<String, Vector<String>> GetKeywordGroups() const = 0;
+
+		virtual const VertexInputLayout& PipelineInputLayout() const = 0;
+		virtual const RasterizerState& PipelineRasterizerState() const = 0;
+		virtual const DepthStencilState& PipelineDepthStencilState() const = 0;
+		virtual const BlendState& PipelineBlendState() const = 0;
+		virtual const ETopology& PipelineTopology() const = 0;
 	protected:
 		virtual void AddMaterialRef(class Material* mat) = 0;
 		virtual void RemoveMaterialRef(class Material* mat) = 0;
 		virtual void PreProcessShader() =0;
 		virtual void Bind(uint32_t index) = 0;
 		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;
-		virtual uint16_t GetVariableOffset(const std::string& name) const = 0;
 		virtual const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() const = 0;
 		virtual const List<ShaderPropertyInfo>& GetShaderPropertyInfos() const = 0;
 	};

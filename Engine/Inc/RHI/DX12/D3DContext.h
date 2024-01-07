@@ -36,6 +36,7 @@ namespace Ailu
         D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle();
         const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
+        D3D12_CONSTANT_BUFFER_VIEW_DESC* GetCBufferViewDescPtr(uint32_t index);
         uint8_t* GetCBufferPtr();
         uint8_t* GetPerFrameCbufData() final;
         uint8_t* GetPerMaterialCbufData(uint32_t mat_index) final;

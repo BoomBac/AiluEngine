@@ -15,6 +15,8 @@
 #include "Framework/Assets/Mesh.h"
 #include "Render/Texture.h"
 
+#include "Framework/Common/SceneMgr.h"
+
 namespace Ailu
 {
     struct DrawInfo
@@ -43,10 +45,13 @@ namespace Ailu
     private:
         Ref<RenderTexture> _p_camera_color_attachment;
         Ref<RenderTexture> _p_camera_depth_attachment;
-        inline static std::list<DrawInfo> _draw_call{};
-        ScenePerFrameData* _p_per_frame_cbuf_data;
         void Render();
         void DrawRendererGizmo();
+        void PrepareLight(Scene* p_scene);
+        void PrepareCamera(Camera* p_camera);
+    private:
+        inline static std::list<DrawInfo> _draw_call{};
+        ScenePerFrameData* _p_per_frame_cbuf_data;
         GraphicsContext* _p_context = nullptr;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;

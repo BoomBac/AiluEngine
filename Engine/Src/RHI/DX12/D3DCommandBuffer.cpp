@@ -115,15 +115,23 @@ namespace Ailu
 				mesh->GetIndexBuffer()->Bind();
 				error->Bind();
 			}
-			D3DContext::s_p_d3dcontext->SubmitPerObjectBuffer(transform);
-			D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
+			GraphicsPipelineStateMgr::EndConfigurePSO();
+			if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+			{
+				D3DContext::s_p_d3dcontext->SubmitPerObjectBuffer(transform);
+				D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, transform);
+			}
+			else
+			{
+				LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
+			}
 			});
 	}
-	void D3DCommandBuffer::SetPSO(GraphicsPipelineState* pso)
+	void D3DCommandBuffer::SetPSO(GraphicsPipelineStateObject* pso)
 	{
 		_commands.emplace_back([=]() {
 			pso->Bind();
-			pso->SubmitBindResource(reinterpret_cast<void*>(D3DContext::s_p_d3dcontext->GetPerFrameCbufGPURes()), EBindResDescType::kConstBuffer);
+			pso->SetPipelineResource(reinterpret_cast<void*>(D3DContext::s_p_d3dcontext->GetPerFrameCbufGPURes()), EBindResDescType::kConstBuffer);
 			});
 	}
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth)
@@ -155,6 +163,7 @@ namespace Ailu
 			color->Transition(ETextureResState::kShaderResource);
 			material->SetTexture("_SourceTex", color);
 			material->Bind();
+			GraphicsPipelineStateMgr::EndConfigurePSO();
 			D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1, mat);
 			D3DContext::s_p_d3dcontext->DrawOverlay();
 			D3DContext::s_p_d3dcontext->EndBackBuffer();

@@ -2,6 +2,7 @@
 #include "Objects/SceneActor.h"
 #include "Framework/Common/LogMgr.h"
 #include "Objects/LightComponent.h"
+#include "Objects/CameraComponent.h"
 #include "Objects/StaticMeshComponent.h"
 
 namespace Ailu
@@ -44,12 +45,14 @@ namespace Ailu
 			auto comp_type = TP_ZERO(formated_str.front());
 			while (comp_type != "Children")
 			{
-				if (comp_type == TransformComponent::GetStaticType())
+				if (comp_type == GetComponentTypeStr(TransformComponent::GetStaticType()))
 					actor->AddComponent(Deserialize<TransformComponent>(formated_str));
-				else if (comp_type == StaticMeshComponent::GetStaticType())
+				else if (comp_type == GetComponentTypeStr(StaticMeshComponent::GetStaticType()))
 					actor->AddComponent(Deserialize<StaticMeshComponent>(formated_str));
-				else if (comp_type == LightComponent::GetStaticType())
+				else if (comp_type == GetComponentTypeStr(LightComponent::GetStaticType()))
 					actor->AddComponent(Deserialize<LightComponent>(formated_str));
+				else if (comp_type == GetComponentTypeStr(CameraComponent::GetStaticType()))
+					actor->AddComponent(Deserialize<CameraComponent>(formated_str));
 				else
 				{
 					g_pLogMgr->LogWarningFormat("Unhandled component type {}",comp_type);

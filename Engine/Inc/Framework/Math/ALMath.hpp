@@ -333,6 +333,22 @@ namespace Ailu
 #pragma warning(pop)
 	}
 
+	template<template<typename> class TT, typename T>
+	static TT<T> LoadVector(const char* vec_str)
+	{
+#pragma warning(push)
+#pragma warning(disable: 4477)
+		const TT<T> out_v{};
+		int length = CountOf(out_v.data);
+		if (std::is_same<T, float>::value)
+		{
+			if (length == 3) return sscanf_s(vec_str, "%f,%f,%f", &out_v.x, &out_v.y, &out_v.z) == 3;
+			else if (length == 4) return sscanf_s(vec_str, "%f,%f,%f,%f", &out_v.x, &out_v.y, &out_v.z, &out_v.data[3]) == 4;
+		}
+		return out_v;
+#pragma warning(pop)
+	}
+
 
 	static float LoadFloat(const char* f_str)
 	{
@@ -638,13 +654,27 @@ namespace Ailu
 	static void TransformVector(Vector4f& vector, const Matrix4x4f& matrix)
 	{
 		Vector4f temp{};
-		for (uint32_t i = 0; i < 4; i++)
-		{
-			for (uint32_t j = 0; j < 4; j++)
-			{
-				temp[j] += vector[i] * matrix[i][j];
-			}
-		}
+		//for (uint32_t i = 0; i < 4; i++)
+		//{
+		//	for (uint32_t j = 0; j < 4; j++)
+		//	{
+		//		temp[j] += vector[i] * matrix[i][j];
+		//	}
+		//}
+		temp.x = vector.x * matrix[0][0] + vector.y * matrix[1][0] + vector.z* matrix[2][0] +  vector.w* matrix[3][0];
+		temp.y = vector.x * matrix[0][1] + vector.y * matrix[1][1] + vector.z* matrix[2][1] +  vector.w* matrix[3][1];
+		temp.z = vector.x * matrix[0][2] + vector.y * matrix[1][2] + vector.z* matrix[2][2] +  vector.w* matrix[3][2];
+		temp.w = vector.x * matrix[0][3] + vector.y * matrix[1][3] + vector.z* matrix[2][3] +  vector.w* matrix[3][3];
+
+		//temp.x = vector.x * matrix[0][0] + vector.y * matrix[0][1] + vector.z * matrix[0][2] + vector.w * matrix[0][3];
+		//temp.y = vector.x * matrix[1][0] + vector.y * matrix[1][1] + vector.z * matrix[1][2] + vector.w * matrix[1][3];
+		//temp.z = vector.x * matrix[2][0] + vector.y * matrix[2][1] + vector.z * matrix[2][2] + vector.w * matrix[2][3];
+		//temp.w = vector.x * matrix[3][0] + vector.y * matrix[3][1] + vector.z * matrix[3][2] + vector.w * matrix[3][3];
+		//for (uint32_t i = 0; i < 4; i++) {
+		//	for (uint32_t j = 0; j < 4; j++) {
+		//		temp[i] += matrix[i][j] * vector[j];
+		//	}
+		//}
 		vector = temp;
 		return;
 	}
@@ -667,7 +697,7 @@ namespace Ailu
 		return;
 	}
 
-	static Vector3f TransformCoord(const Vector3f& vector, const Matrix4x4f& matrix)
+	static Vector3f TransformCoord(const Matrix4x4f& matrix, const Vector3f& vector)
 	{
 		Vector4f temp{ vector,1.f };
 		TransformVector(temp, matrix);
@@ -675,14 +705,14 @@ namespace Ailu
 	}
 
 	//	//Transform for normal,w is 0.f
-	static void TransformNormal(Vector3f& vector, const Matrix4x4f& matrix)
+	static Vector3f& TransformNormal(Vector3f& vector, const Matrix4x4f& matrix)
 	{
 		Vector4f temp{ vector,0.f };
 		TransformVector(temp, matrix);
 		vector[0] = temp[0];
 		vector[1] = temp[1];
 		vector[2] = temp[2];
-		return;
+		return vector;
 	}
 
 	static Matrix4x4f BuildViewMatrixLookToLH(Matrix4x4f& result, Vector3f position, Vector3f lookTo, Vector3f up)
@@ -1146,6 +1176,7 @@ namespace Ailu
 		static const Color kWhite = { 1.f,1.f,1.f ,1.0f };
 		static const Color kBlack = { 0.f,0.f,0.f ,1.0f };
 		static const Color kGray = { 0.3f,0.3f,0.3f ,1.0f};
+		static const Color kYellow = { 1.0f,1.0f,0.0f ,1.0f};
 	}
 
 	namespace ALHash
@@ -1222,23 +1253,42 @@ namespace Ailu
 			}
 			void Set(uint8_t pos, uint8_t size, uint32_t value)
 			{
+				if (pos + size > Size)
+				{
+					throw std::out_of_range("Invalid position and size for Set operation");
+				}
 				while (size--)
 				{
 					_hash.set(pos++, value & 1);
 					value >>= 1;
 				}
-				if (value > 0)
-				{
-					throw std::runtime_error("Hash set overflow");
-				}
 			}
+
+			uint32_t Get(uint8_t pos, uint8_t size) const
+			{
+				if (pos + size > Size)
+				{
+					throw std::out_of_range("Invalid position and size for Get operation");
+				}
+				std::bitset<32> result;
+				for (uint8_t i = 0; i < size; ++i)
+				{
+					result.set(i, _hash.test(pos + i));
+				}
+				return static_cast<uint32_t>(result.to_ulong());
+			}
+
 			bool operator==(const Hash<Size>& other) const
 			{
 				return _hash == other._hash;
 			}
 			bool operator<(const Hash<Size>& other) const
 			{
-				return _hash < other._hash;
+				return _hash.to_ullong() < other._hash.to_ullong();
+			}
+			String ToString() const
+			{
+				return std::format("{}",_hash.to_ullong());
 			}
 		private:
 			std::bitset<Size> _hash;
