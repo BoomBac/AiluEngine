@@ -4,6 +4,7 @@
 #ifndef __TIMEMGR_H__
 #define __TIMEMGR_H__
 #include <stack>
+#include <chrono>
 #include "Framework/Interface/IRuntimeModule.h"
 
 namespace Ailu

@@ -6,6 +6,7 @@
 #include "Framework/Common/LogMgr.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Parser/AssetParser.h"
+#include "Render/Gizmo.h"
 
 namespace Ailu
 {
@@ -17,9 +18,7 @@ namespace Ailu
 	{
 		IMPLEMENT_REFLECT_FIELD(StaticMeshComponent)
 	}
-	//StaticMeshComponent::StaticMeshComponent(Ref<Mesh> mesh, Ref<Material> mat) : _p_mesh(mesh), _p_mat(mat)
-	//{
-	//}
+
 	void StaticMeshComponent::BeginPlay()
 	{
 
@@ -27,7 +26,11 @@ namespace Ailu
 	void StaticMeshComponent::Tick(const float& delta_time)
 	{
 		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
-		Renderer::Submit(_p_mesh, _p_mat,Transpose(transf.GetTransformMat()), 1);
+		_aabb = AABB::CaclulateBoundBox(_p_mesh->_bound_box, transf.GetTransformMat());
+	}
+	void StaticMeshComponent::OnGizmo()
+	{
+		Gizmo::DrawAABB(_aabb,Colors::kGreen);
 	}
 	void StaticMeshComponent::SetMesh(Ref<Mesh>& mesh)
 	{

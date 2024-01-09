@@ -6,6 +6,7 @@
 #include "Framework/Common/LogMgr.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Camera.h"
+#include "Render/RenderQueue.h"
 #include "Framework/Common/Path.h"
 
 namespace Ailu
@@ -47,9 +48,11 @@ namespace Ailu
 
 	int SceneMgr::Initialize()
 	{
+		g_pLogMgr->LogFormat("Begin load scene from {}...", GetSceneSysPath("Scenes/default.almap").c_str());
 		g_pSceneMgr->_p_current = LoadScene("default.almap");
 		//g_pSceneMgr->_p_current = Scene::GetDefaultScene();
 		Camera::sCurrent = _p_current->GetActiveCamera();
+		g_pLogMgr->Log("SceneMgr end");
 		return 0;
 	}
 	void SceneMgr::Finalize()
@@ -71,6 +74,7 @@ namespace Ailu
 			{
 				actor->Tick(delta_time);
 			}
+			Cull(_p_current);
 		}
 	}
 
@@ -184,12 +188,24 @@ namespace Ailu
 		return loaded_scene;
 	}
 
+	void SceneMgr::Cull(Scene* p_scene)
+	{
+		RenderQueue::ClearQueue();
+		for (auto static_mesh : p_scene->GetAllStaticRenderable())
+		{	
+			auto& aabb = static_mesh->GetAABB();
+			RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(),static_mesh->GetMaterial().get(), 
+			static_mesh->GetOwner()->GetComponent<TransformComponent>()->_transform.GetTransformMat(), 1);
+		}
+	}
+
 	//--------------------------------------------------------Scene begin-----------------------------------------------------------------------
 
 	Scene::Scene(const std::string& name)
 	{
 		//_p_root = Actor::Create<SceneActor>(name);
 		_name = name;
+		_all_static_renderalbes.resize(kMaxStaticRenderableNum);
 		FillActorList = [this](SceneActor* actor) {
 			_all_objects.emplace_back(actor); 
 			auto light = actor->GetComponent<LightComponent>();
@@ -197,7 +213,12 @@ namespace Ailu
 			{
 				_all_lights.emplace_back(light);
 			}
-			};
+			auto static_mesh = actor->GetComponent<StaticMeshComponent>();
+			if (static_mesh != nullptr)
+			{
+				_all_static_renderalbes.emplace_back(static_mesh);
+			}
+		};
 	}
 
 	void Scene::AddObject(SceneActor* actor)
@@ -221,6 +242,7 @@ namespace Ailu
 		{
 			_all_objects.clear();
 			_all_lights.clear();
+			_all_static_renderalbes.clear();
 			TravelAllActor(_p_root,FillActorList);
 			_b_dirty = false;
 		}

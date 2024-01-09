@@ -45,6 +45,11 @@ namespace Ailu
             }
         }
 
+        static void DrawAABB(const std::tuple<Vector3f, Vector3f>& aabb, Color color = Gizmo::s_color)
+        {
+            DrawAABB(std::get<0>(aabb), std::get<1>(aabb), color);
+        }
+
         static void DrawAABB(const Vector3f& minPoint, const Vector3f& maxPoint, Color color = Gizmo::s_color)
         {
             if (Gizmo::s_color.a < 0.1f) return;

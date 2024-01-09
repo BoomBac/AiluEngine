@@ -451,8 +451,9 @@ namespace Ailu
 		}
 		LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
 		mesh->Clear();
-		mesh->_bound_box._max = max + Vector3f{10.0f,10.0f,10.0f};
-		mesh->_bound_box._min = min - Vector3f{ 10.0f,10.0f,10.0f };
+		float aabb_space = 1.0f;
+		mesh->_bound_box._max = max + Vector3f::One * aabb_space;
+		mesh->_bound_box._min = min - Vector3f::One * aabb_space;
 		vertex_count = (uint32_t)positions.size();
 		auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;
@@ -504,7 +505,7 @@ namespace Ailu
 			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);
 		}
 		for (auto& mesh : loaded_meshs)
-			mesh->OriginPath(path);
+			mesh->OriginPath(PathUtils::ExtractAssetPath(path));
 		return loaded_meshs;
 	}
 #pragma warning(pop)

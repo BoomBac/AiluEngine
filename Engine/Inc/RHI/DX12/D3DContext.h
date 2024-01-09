@@ -9,7 +9,6 @@
 #include "Render/GraphicsContext.h"
 #include "Platform/WinWindow.h"
 #include "Framework/Math/ALMath.hpp"
-#include "RHI/DX12/D3DCommandBuffer.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -42,7 +41,7 @@ namespace Ailu
         uint8_t* GetPerMaterialCbufData(uint32_t mat_index) final;
         D3D12_CONSTANT_BUFFER_VIEW_DESC* GetPerFrameCbufGPURes();
         ScenePerFrameData* GetPerFrameCbufDataStruct();
-        void ExecuteCommandBuffer(Ref<D3DCommandBuffer>& cmd);
+        void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
 
         void SubmitPerObjectBuffer(const Matrix4x4f& transform);
         void BeginBackBuffer();

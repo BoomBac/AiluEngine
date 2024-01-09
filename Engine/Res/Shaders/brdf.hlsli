@@ -1,8 +1,8 @@
 #ifndef __BRDF_H__
 #define __BRDF_H__
-#include "constants.hlsl"
+#include "constants.hlsli"
 //#include "cbuffer.hlsl"
-#include "input.hlsl"
+#include "input.hlsli"
 
 #define F0_AIELECTRICS float3(0.04,0.04,0.04)
 

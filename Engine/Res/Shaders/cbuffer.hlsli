@@ -1,7 +1,7 @@
 #ifndef __CBUFFER_H__
 #define __CBUFFER_H__
 
-#include "constants.hlsl"
+#include "constants.hlsli"
 
 #define CBufBegin cbuffer SceneMaterialBuffer : register(b1) {
 #define CBufEnd }

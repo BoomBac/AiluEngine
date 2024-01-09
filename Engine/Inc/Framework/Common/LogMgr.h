@@ -3,6 +3,7 @@
 #define __LOG_MGR_H__
 #include <string>
 #include <fstream>
+#include <iostream>
 
 #include <source_location>
 #include "Framework/Interface/IRuntimeModule.h"

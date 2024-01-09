@@ -34,18 +34,18 @@ namespace Ailu
 		DECLARE_PRIVATE_PROPERTY(origin_path,OriginPath,String)
 		DECLARE_PRIVATE_PROPERTY(b_internal,IsInternal,bool)
 	public:
-		Material(Ref<Shader> shader,std::string name);
+		Material(Ref<Shader> shader,String name);
 		~Material();
 		void ChangeShader(Ref<Shader> shader);
 		void MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos,bool b_use);
 		bool IsTextureUsed(ETextureUsage use_info);
-		void SetFloat(const std::string& name, const float& f);
-		void SetVector(const std::string& name, const Vector4f& vector);
-		float GetFloat(const std::string& name);
-		Vector4f GetVector(const std::string& name);
-		void SetTexture(const std::string& name, Ref<Texture> texture);
-		void RemoveTexture(const std::string& name);
-		void SetTexture(const std::string& name, const String& texture_path);
+		void SetFloat(const String& name, const float& f);
+		void SetVector(const String& name, const Vector4f& vector);
+		float GetFloat(const String& name);
+		Vector4f GetVector(const String& name);
+		void SetTexture(const String& name, Ref<Texture> texture);
+		void RemoveTexture(const String& name);
+		void SetTexture(const String& name, const String& texture_path);
 		void EnableKeyword(const String& keyword);
 		void DisableKeyword(const String& keyword);
 		virtual void Bind();
@@ -72,7 +72,7 @@ namespace Ailu
 	class StandardMaterial : public Material
 	{
 	public:
-		StandardMaterial(Ref<Shader> shader, std::string name);
+		StandardMaterial(Ref<Shader> shader, String name);
 		~StandardMaterial();
 	private:
 	};
@@ -80,14 +80,14 @@ namespace Ailu
 	class MaterialLibrary 
 	{
 	public:
-		static Ref<Material> CreateMaterial(Ref<Shader> shader, const std::string& name,const String& asset_path) 
+		static Ref<Material> CreateMaterial(Ref<Shader> shader, const String& name,const String& asset_path) 
 		{
 			auto material = CreateMaterial(shader, name);
 			material->OriginPath(asset_path);
 			return material;
 		}
 
-		static Ref<Material> CreateMaterial(Ref<Shader> shader, const std::string& name)
+		static Ref<Material> CreateMaterial(Ref<Shader> shader, const String& name)
 		{
 			auto material = MakeRef<Material>(shader, name);
 			s_materials[name] = material;
@@ -96,17 +96,17 @@ namespace Ailu
 			return material;
 		}
 
-		static void AddMaterial(Ref<Material> mat, const std::string& id)
+		static void AddMaterial(Ref<Material> mat, const String& id)
 		{
 			s_materials[id] = mat;
 			s_it_materials.emplace_back(mat);
 			s_next_material_id++;
 		}
-		static bool Contain(const std::string& nameid)
+		static bool Contain(const String& nameid)
 		{
 			return s_materials.contains(nameid);
 		}
-		static Ref<Material> GetMaterial(const std::string& name)
+		static Ref<Material> GetMaterial(const String& name)
 		{
 			auto it = s_materials.find(name);
 			if (it != s_materials.end()) 
@@ -115,7 +115,7 @@ namespace Ailu
 			}
 			return nullptr;
 		}
-		static void ReleaseMaterial(const std::string& name)
+		static void ReleaseMaterial(const String& name)
 		{
 			auto it = s_materials.find(name);
 			if (it != s_materials.end()) 
@@ -133,7 +133,7 @@ namespace Ailu
 		}
 	private:
 		inline static uint32_t s_next_material_id = 0u;
-		inline static std::unordered_map<std::string, Ref<Material>> s_materials{};
+		inline static std::unordered_map<String, Ref<Material>> s_materials{};
 		inline static Vector<Ref<Material>> s_it_materials{};
 	};
 }

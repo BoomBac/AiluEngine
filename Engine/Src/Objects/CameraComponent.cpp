@@ -19,7 +19,6 @@ namespace Ailu
 		_camera.Position(parent_pos);
 		_camera.Rotation(parent_rot);
 		_camera.Update();
-		OnGizmo();
 	}
 	void CameraComponent::Serialize(std::ofstream& file, String indent)
 	{
@@ -70,73 +69,7 @@ namespace Ailu
 	}
 	void CameraComponent::OnGizmo()
 	{
-		float half_width{ 0.f }, half_height{0.f};
-		if (_camera.Type() == ECameraType::kPerspective)
-		{
-			float tanHalfFov = tan(ToRadius(_camera.FovH()) * 0.5f);
-			half_height = _camera.Near() * tanHalfFov;
-			half_width = half_height * _camera.Aspect();
-		}
-		else
-		{
-			half_width = _camera.Size() * 0.5f;
-			half_height = half_width / _camera.Aspect();
-		}
-		Vector3f near_top_left(-half_width, half_height, _camera.Near());
-		Vector3f near_top_right(half_width, half_height, _camera.Near());
-		Vector3f near_bottom_left(-half_width, -half_height, _camera.Near());
-		Vector3f near_bottom_right(half_width, -half_height, _camera.Near());
-		Vector3f far_top_left, far_top_right, far_bottom_left, far_bottom_right;
-		if (_camera.Type() == ECameraType::kPerspective)
-		{
-			far_top_left = near_top_left * (_camera.Far() / _camera.Near());
-			far_top_right = near_top_right * (_camera.Far() / _camera.Near());
-			far_bottom_left = near_bottom_left * (_camera.Far() / _camera.Near());
-			far_bottom_right = near_bottom_right * (_camera.Far() / _camera.Near());
-		}
-		else
-		{
-			far_top_left = near_top_left;
-			far_top_right = near_top_right;
-			far_bottom_left = near_bottom_left;
-			far_bottom_right = near_bottom_right;
-			float distance = _camera.Far() - _camera.Near();
-			far_top_left.z += distance;
-			far_top_right.z += distance;
-			far_bottom_left.z += distance;
-			far_bottom_right.z += distance;
-		}
-		
-		Matrix4x4f camera_to_world = _camera.GetView();
-		MatrixInverse(camera_to_world);
-
-		TransformCoord(near_top_left,camera_to_world);
-		TransformCoord(near_top_right,camera_to_world);
-		TransformCoord(near_bottom_left,camera_to_world);
-		TransformCoord(near_bottom_right,camera_to_world);
-		TransformCoord(far_top_left,camera_to_world);
-		TransformCoord(far_top_right,camera_to_world);
-		TransformCoord(far_bottom_left,camera_to_world);
-		TransformCoord(far_bottom_right,camera_to_world);
-
-		// 绘制立方体的边框
-		Gizmo::DrawLine(near_top_left, near_top_right, Colors::kWhite);
-		Gizmo::DrawLine(near_top_right, near_bottom_right, Colors::kWhite);
-		Gizmo::DrawLine(near_bottom_right, near_bottom_left, Colors::kWhite);
-		Gizmo::DrawLine(near_bottom_left, near_top_left, Colors::kWhite);
-
-		Gizmo::DrawLine(far_top_left, far_top_right, Colors::kWhite);
-		Gizmo::DrawLine(far_top_right, far_bottom_right, Colors::kWhite);
-		Gizmo::DrawLine(far_bottom_right, far_bottom_left, Colors::kWhite);
-		Gizmo::DrawLine(far_bottom_left, far_top_left, Colors::kWhite);
-
-		// 绘制连接立方体的线
-		Gizmo::DrawLine(near_top_left, far_top_left, Colors::kWhite);
-		Gizmo::DrawLine(near_top_right, far_top_right, Colors::kWhite);
-		Gizmo::DrawLine(near_bottom_right, far_bottom_right, Colors::kWhite);
-		Gizmo::DrawLine(near_bottom_left, far_bottom_left, Colors::kWhite);
-
-		Gizmo::DrawLine(_camera.Position(), _camera.Position() + _camera.Forward() * _camera.Far(), Colors::kRed);
+		Camera::DrawGizmo(&_camera);
 	}
 
 	void* CameraComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)

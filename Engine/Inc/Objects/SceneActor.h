@@ -12,6 +12,8 @@ namespace Ailu
 	public:
 		SceneActor();
 		~SceneActor();
+		void Tick(const float& delta_time) override;
+		virtual void OnGizmo();
 		Transform& GetTransform();
 		void Serialize(std::ofstream& file, String indent) override;
 		void Serialize(std::ostream& os, String indent) override;

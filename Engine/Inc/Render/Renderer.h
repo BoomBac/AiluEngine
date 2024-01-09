@@ -4,28 +4,21 @@
 #pragma once
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
-#include <list>
+
+#include "GlobalMarco.h"
 #include "Framework/Interface/IRuntimeModule.h"
-#include "RHI/DX12/D3DContext.h"
 #include "Framework/Common/TimeMgr.h"
 #include "RendererAPI.h"
-#include "GlobalMarco.h"
-#include "Render/Camera.h"
+#include "Camera.h"
 #include "Material.h"
-#include "Framework/Assets/Mesh.h"
-#include "Render/Texture.h"
-
+#include "Mesh.h"
+#include "Texture.h"
 #include "Framework/Common/SceneMgr.h"
+#include "./Pass/RenderPass.h"
+#include "RenderingData.h"
 
 namespace Ailu
 {
-    struct DrawInfo
-    {
-        Ref<Mesh> mesh;
-        Ref<Material> mat;
-        Matrix4x4f transform;
-        uint32_t instance_count;
-    };
     class AILU_API Renderer : public IRuntimeModule
     {
     public:
@@ -50,9 +43,12 @@ namespace Ailu
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
     private:
-        inline static std::list<DrawInfo> _draw_call{};
+        RenderingData _rendering_data;
         ScenePerFrameData* _p_per_frame_cbuf_data;
         GraphicsContext* _p_context = nullptr;
+        Scope<OpaquePass> _p_opaque_pass;
+        Scope<ReslovePass> _p_reslove_pass;
+        List<RenderPass*> _p_render_passes;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;
         Camera* _p_scene_camera;

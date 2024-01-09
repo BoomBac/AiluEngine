@@ -3,7 +3,7 @@
 #define __IPARSER_H__
 #include <string>
 #include <list>
-#include "Framework/Assets/Mesh.h"
+#include "Render/Mesh.h"
 #include "Render/Texture.h"
 #include "GlobalMarco.h"
 

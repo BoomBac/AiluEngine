@@ -16,7 +16,7 @@
 //#pragma multi_complie _ColorOverlay_Red _ColorOverlay_Blue _ColorOverlay_Green
 //info end
 
-#include "common.hlsl"
+#include "common.hlsli"
 
 TextureCube SkyBox : register(t0);
 Texture2D TestTex : register(t1);

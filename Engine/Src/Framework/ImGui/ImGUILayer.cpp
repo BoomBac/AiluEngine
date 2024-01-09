@@ -19,7 +19,7 @@
 #include "RHI/DX12/D3DTexture.h"
 #include "Framework/Common/LogMgr.h"
 
-#include "Framework/Assets/Mesh.h"
+#include "Render/Mesh.h"
 
 namespace ImguiTree
 {
@@ -403,18 +403,27 @@ namespace Ailu
 				if (item_current_idx == 0) light->_light_type = ELightType::kDirectional;
 				else if (item_current_idx == 1) light->_light_type = ELightType::kPoint;
 				else light->_light_type = ELightType::kSpot;
-				if (light->_light_type == ELightType::kDirectional) return;
-				else if (light->_light_type == ELightType::kPoint)
+
+				if (light->_light_type == ELightType::kPoint)
 				{
 					auto& light_data = light->_light;
 					ImGui::DragFloat("Radius", &light_data._light_param.x, 1.0, 0.0, 5000.0f);
 				}
-				else
+				else if(light->_light_type == ELightType::kSpot)
 				{
 					auto& light_data = light->_light;
 					ImGui::DragFloat("Radius", &light_data._light_param.x);
 					ImGui::SliderFloat("InnerAngle", &light_data._light_param.y, 0.0f, light_data._light_param.z);
 					ImGui::SliderFloat("OuterAngle", &light_data._light_param.z, 1.0f, 180.0f);
+				}
+				bool b_cast_shadow = light->CastShadow();
+				ImGui::Checkbox("CastShadow", &b_cast_shadow);
+				light->CastShadow(b_cast_shadow);
+				if (b_cast_shadow)
+				{
+					auto& shadow_data = light->_shadow;
+					ImGui::SliderFloat("ShadowArea", &shadow_data._size, 100, 10000);
+					ImGui::SliderFloat("ShadowDistance", &shadow_data._distance, 100, 50000);
 				}
 			}
 			else if (comp->GetType() == TransformComponent::GetStaticType())

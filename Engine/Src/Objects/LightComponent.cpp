@@ -1,9 +1,7 @@
 #include "pch.h"
 #include "Render/Gizmo.h"
 #include "Objects/LightComponent.h"
-#include "Objects/TransformComponent.h"
 #include "Objects/SceneActor.h"
-#include "Objects/Actor.h"
 
 namespace Ailu
 {
@@ -14,8 +12,10 @@ namespace Ailu
 		_light._light_pos = {0.0f,0.0f,0.0f,0.0f};
 		_light._light_dir = kDefaultDirectionalLightDir;
 		_intensity = 1.0f;
-		_b_shadow = false;
+		_b_cast_shadow = false;
 		_light_type = ELightType::kDirectional;
+		_p_shadow_camera = MakeScope<Camera>(1.0f, 10.0f, 10000.0f,ECameraType::kOrthographic);
+		_p_shadow_camera->Size(10000);
 	}
 	void Ailu::LightComponent::Tick(const float& delta_time)
 	{
@@ -27,7 +27,16 @@ namespace Ailu
 			_light._light_pos = transf.Position();
 			Clamp(_light._light_param.z,0.0f, 180.0f);
 			Clamp(_light._light_param.y, 0.0f,_light._light_param.z - 0.1f);
-			DrawLightGizmo();
+			_p_shadow_camera->Position(transf.Position());
+			auto rot = transf.Rotation();
+			rot.xy = transf.Rotation().yx;
+			rot.y += 90.0f;
+			_p_shadow_camera->Rotation(rot);
+			_p_shadow_camera->Size(_shadow._size);
+			_p_shadow_camera->Far(_shadow._distance);
+			_p_shadow_camera->Update();
+			if(_b_cast_shadow)
+				Camera::DrawGizmo(_p_shadow_camera.get());
 		}
 	}
 	void LightComponent::Serialize(std::ofstream& file, String indent)
@@ -45,7 +54,10 @@ namespace Ailu
 		{
 			file << prop_indent << "Inner: " << _light._light_param.y << endl;
 			file << prop_indent << "Outer: " << _light._light_param.z << endl;
-		}	
+		}
+		file << prop_indent << "CastShadow: " << (_b_cast_shadow ? "true" : "false") << endl;
+		file << prop_indent << "ShadowArea: " << _shadow._size << endl;
+		file << prop_indent << "ShadowDistance: " << _shadow._distance << endl;
 	}
 	void LightComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
 	{
@@ -63,6 +75,13 @@ namespace Ailu
 			os << prop_indent << "Inner: " << _light._light_param.y << endl;
 			os << prop_indent << "Outer: " << _light._light_param.z << endl;
 		}
+		os << prop_indent << "CastShadow: " << (_b_cast_shadow ? "true" : "false") << endl;
+		os << prop_indent << "ShadowArea: " << _shadow._size << endl;
+		os << prop_indent << "ShadowDistance: " << _shadow._distance << endl;
+	}
+	void LightComponent::OnGizmo()
+	{
+		DrawLightGizmo();
 	}
 	void* LightComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
@@ -92,6 +111,15 @@ namespace Ailu
 			comp->_light._light_param.z = LoadFloat(TP_ONE(formated_str.front()).c_str());
 			formated_str.pop();
 		}
+		if (String{ TP_ONE(formated_str.front()).c_str() } == "true")
+			comp->_b_cast_shadow = true;
+		else
+			comp->_b_cast_shadow = false;
+		formated_str.pop();
+		comp->_shadow._size = LoadFloat(TP_ONE(formated_str.front()).c_str());
+		formated_str.pop();
+		comp->_shadow._distance = LoadFloat(TP_ONE(formated_str.front()).c_str());
+		formated_str.pop();
 		return comp;
 	}
 

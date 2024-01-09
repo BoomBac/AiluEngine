@@ -66,15 +66,16 @@ namespace Ailu
 		_commands.emplace_back([=]() {
 			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixV = view;
 			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixP = proj;
-			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixVP = proj * view;
+			//D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixVP = proj * view;
+			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixVP = view * proj;
 			memcpy(D3DContext::s_p_d3dcontext->_p_cbuffer, &D3DContext::s_p_d3dcontext->_perframe_scene_data, sizeof(D3DContext::s_p_d3dcontext->_perframe_scene_data));
 			});
 	}
-	void D3DCommandBuffer::SetViewports(const std::initializer_list<Viewport>& viewports)
+	void D3DCommandBuffer::SetViewports(const std::initializer_list<Rect>& viewports)
 	{
 		static CD3DX12_VIEWPORT d3d_viewports[8];
 		_commands.emplace_back([=]() {
-			uint8_t nums = 0u;
+			u8 nums = 0u;
 			for (auto it = viewports.begin(); it != viewports.end(); it++)
 			{
 				d3d_viewports[nums++] = CD3DX12_VIEWPORT(it->left, it->top, it->width, it->height);
@@ -82,11 +83,18 @@ namespace Ailu
 			D3DContext::s_p_d3dcontext->GetCmdList()->RSSetViewports(nums, d3d_viewports);
 			});
 	}
-	void D3DCommandBuffer::SetScissorRects(const std::initializer_list<Viewport>& rects)
+	void D3DCommandBuffer::SetViewport(const Rect& viewport)
+	{
+		_commands.emplace_back([=]() {
+			auto rect = CD3DX12_VIEWPORT(viewport.left, viewport.top, viewport.width, viewport.height);
+			D3DContext::s_p_d3dcontext->GetCmdList()->RSSetViewports(1, &rect);
+			});
+	}
+	void D3DCommandBuffer::SetScissorRects(const std::initializer_list<Rect>& rects)
 	{
 		static CD3DX12_RECT d3d_rects[8];
 		_commands.emplace_back([=]() {
-			uint8_t nums = 0u;
+			u8 nums = 0u;
 			for (auto it = rects.begin(); it != rects.end(); it++)
 			{
 				d3d_rects[nums++] = CD3DX12_RECT(it->left, it->top, it->width, it->height);
@@ -94,7 +102,18 @@ namespace Ailu
 			D3DContext::s_p_d3dcontext->GetCmdList()->RSSetScissorRects(nums, d3d_rects);
 			});
 	}
+	void D3DCommandBuffer::SetScissorRect(const Rect& rect)
+	{
+		_commands.emplace_back([=]() {
+			auto d3d_rect = CD3DX12_RECT(rect.left, rect.top, rect.width, rect.height);
+			D3DContext::s_p_d3dcontext->GetCmdList()->RSSetScissorRects(1, &d3d_rect);
+			});
+	}
 	void D3DCommandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count)
+	{
+		DrawRenderer(mesh.get(),material.get(),transform,instance_count);
+	}
+	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, uint32_t instance_count)
 	{
 		if (mesh == nullptr)
 		{
@@ -136,6 +155,7 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth)
 	{
+		GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), depth->GetFormat(),0);
 		_commands.emplace_back([=]() {
 			color->Transition(ETextureResState::kColorTagret);
 			depth->Transition(ETextureResState::kDepthTarget);
@@ -145,6 +165,7 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color)
 	{
+		GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(),0);
 		_commands.emplace_back([=]() {
 			color->Transition(ETextureResState::kColorTagret);
 			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
@@ -153,7 +174,7 @@ namespace Ailu
 	}
 	void Ailu::D3DCommandBuffer::ResolveToBackBuffer(Ref<RenderTexture>& color)
 	{
-		static const auto mat = BuildIdentityMatrix();
+		static const auto& mat = BuildIdentityMatrix();
 		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
 		static const auto material = MaterialLibrary::GetMaterial("Blit");
 		_commands.emplace_back([=]() {
@@ -168,5 +189,9 @@ namespace Ailu
 			D3DContext::s_p_d3dcontext->DrawOverlay();
 			D3DContext::s_p_d3dcontext->EndBackBuffer();
 			});
+	}
+	void D3DCommandBuffer::ResolveToBackBuffer(RenderTexture* color)
+	{
+		throw std::runtime_error("The method or operation is not implemented.");
 	}
 }

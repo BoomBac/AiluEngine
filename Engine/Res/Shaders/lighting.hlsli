@@ -1,8 +1,8 @@
 #ifndef __LIGHTING_H__
 #define __LIGHTING_H__
 
-#include "cbuffer.hlsl"
-#include "brdf.hlsl"
+#include "cbuffer.hlsli"
+#include "brdf.hlsli"
 
 float3 CaclulateDirectionalLight(uint index, float3 normal, float3 view_dir)
 {

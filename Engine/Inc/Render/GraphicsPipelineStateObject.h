@@ -104,6 +104,8 @@ namespace Ailu
 		static void ConfigureRasterizerState(const u8& hash);// 41 ~ 43 3
 		static void ConfigureDepthStencilState(const u8& hash);// 44~46 3
 		static void ConfigureRenderTarget(const u8& hash);// 44~46 3
+		static void SetRenderTargetState(EALGFormat color_format,EALGFormat depth_format, u8 color_rt_id = 0);
+		static void SetRenderTargetState(EALGFormat color_format,u8 color_rt_id = 0);
 
 		static bool IsReadyForCurrentDrawCall() { return s_is_ready; }
 
@@ -158,6 +160,7 @@ namespace Ailu
 		inline static uint32_t s_reserved_pso_id = 32u;
 		inline static List<PipelineResourceInfo> s_bind_resource_list{};
 		inline static bool s_is_ready = false;
+		inline static  RenderTargetState _s_render_target_state{};
 
 		inline static ALHash::Hash<64> s_cur_pos_hash{};
 		inline static u32 s_hash_shader; // 4~35 32

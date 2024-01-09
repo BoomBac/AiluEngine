@@ -1,9 +1,8 @@
 #pragma once
 #ifndef __FPX_PARSER_H__
 #define __FPX_PARSER_H__
-#include "Framework/Interface/IParser.h"
 #include "Ext/fbxsdk/include/fbxsdk.h"
-#include "Framework/Assets/Mesh.h"
+#include "Framework/Interface/IParser.h"
 #include "Framework/Common/TimeMgr.h"
 
 

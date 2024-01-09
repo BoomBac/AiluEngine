@@ -44,6 +44,7 @@ public:\
 		virtual void Destroy();
 		virtual void OnGizmo();
 		virtual void SetOwner(Actor* onwer);
+		virtual Actor* GetOwner() {return _p_onwer; };
 		virtual EComponentType GetType();
 		void Serialize(std::ofstream& file, String indent) override;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) override;

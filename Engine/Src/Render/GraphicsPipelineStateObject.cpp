@@ -113,6 +113,7 @@ namespace Ailu
 	void GraphicsPipelineStateMgr::EndConfigurePSO()
 	{
 		s_is_ready = false;
+		ConfigureRenderTarget(ALHash::CommonRuntimeHasher(_s_render_target_state));
 		GraphicsPipelineStateObject::ConstructPSOHash(s_cur_pos_hash, s_hash_input_layout, s_hash_shader, s_hash_topology, s_hash_blend_state, s_hash_raster_state, s_hash_depth_stencil_state, s_hash_rt_state);
 		auto it = s_pso_library.find(s_cur_pos_hash);
 		u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
@@ -173,6 +174,17 @@ namespace Ailu
 	void GraphicsPipelineStateMgr::ConfigureRenderTarget(const u8& hash)
 	{
 		s_hash_rt_state = hash;
+	}
+	void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat color_format, EALGFormat depth_format, u8 color_rt_id)
+	{
+		_s_render_target_state._color_rt[color_rt_id] = color_format;
+		_s_render_target_state._color_rt_num = std::max(_s_render_target_state._color_rt_num, color_rt_id);
+		_s_render_target_state._depth_rt = depth_format;
+	}
+	void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat color_format, u8 color_rt_id)
+	{
+		_s_render_target_state._color_rt[color_rt_id] = color_format;
+		_s_render_target_state._color_rt_num = std::max(_s_render_target_state._color_rt_num, color_rt_id);
 	}
 	void GraphicsPipelineStateMgr::SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot)
 	{

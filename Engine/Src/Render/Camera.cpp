@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Render/Camera.h"
+#include "Render/Gizmo.h"
 
 namespace Ailu
 {
@@ -29,6 +30,94 @@ namespace Ailu
 	//	_proj_matrix = other._proj_matrix;
 	//}
 
+	void Camera::DrawGizmo(const Camera* p_camera)
+	{
+		//float half_width{ 0.f }, half_height{ 0.f };
+		//if (p_camera->Type() == ECameraType::kPerspective)
+		//{
+		//	float tanHalfFov = tan(ToRadius(p_camera->FovH()) * 0.5f);
+		//	half_height = p_camera->Near() * tanHalfFov;
+		//	half_width = half_height * p_camera->Aspect();
+		//}
+		//else
+		//{
+		//	half_width = p_camera->Size() * 0.5f;
+		//	half_height = half_width / p_camera->Aspect();
+		//}
+		//Vector3f near_top_left(-half_width, half_height, p_camera->Near());
+		//Vector3f near_top_right(half_width, half_height, p_camera->Near());
+		//Vector3f near_bottom_left(-half_width, -half_height, p_camera->Near());
+		//Vector3f near_bottom_right(half_width, -half_height, p_camera->Near());
+		//Vector3f far_top_left, far_top_right, far_bottom_left, far_bottom_right;
+		//if (p_camera->Type() == ECameraType::kPerspective)
+		//{
+		//	far_top_left = near_top_left * (p_camera->Far() / p_camera->Near());
+		//	far_top_right = near_top_right * (p_camera->Far() / p_camera->Near());
+		//	far_bottom_left = near_bottom_left * (p_camera->Far() / p_camera->Near());
+		//	far_bottom_right = near_bottom_right * (p_camera->Far() / p_camera->Near());
+		//}
+		//else
+		//{
+		//	far_top_left = near_top_left;
+		//	far_top_right = near_top_right;
+		//	far_bottom_left = near_bottom_left;
+		//	far_bottom_right = near_bottom_right;
+		//	float distance = p_camera->Far() - p_camera->Near();
+		//	far_top_left.z += distance;
+		//	far_top_right.z += distance;
+		//	far_bottom_left.z += distance;
+		//	far_bottom_right.z += distance;
+		//}
+
+		//Matrix4x4f camera_to_world = p_camera->GetView();
+		//MatrixInverse(camera_to_world);
+
+		//TransformCoord(near_top_left, camera_to_world);
+		//TransformCoord(near_top_right, camera_to_world);
+		//TransformCoord(near_bottom_left, camera_to_world);
+		//TransformCoord(near_bottom_right, camera_to_world);
+		//TransformCoord(far_top_left, camera_to_world);
+		//TransformCoord(far_top_right, camera_to_world);
+		//TransformCoord(far_bottom_left, camera_to_world);
+		//TransformCoord(far_bottom_right, camera_to_world);
+
+		//// 绘制立方体的边框
+		//Gizmo::DrawLine(near_top_left, near_top_right, Colors::kWhite);
+		//Gizmo::DrawLine(near_top_right, near_bottom_right, Colors::kWhite);
+		//Gizmo::DrawLine(near_bottom_right, near_bottom_left, Colors::kWhite);
+		//Gizmo::DrawLine(near_bottom_left, near_top_left, Colors::kWhite);
+
+		//Gizmo::DrawLine(far_top_left, far_top_right, Colors::kWhite);
+		//Gizmo::DrawLine(far_top_right, far_bottom_right, Colors::kWhite);
+		//Gizmo::DrawLine(far_bottom_right, far_bottom_left, Colors::kWhite);
+		//Gizmo::DrawLine(far_bottom_left, far_top_left, Colors::kWhite);
+
+		//// 绘制连接立方体的线
+		//Gizmo::DrawLine(near_top_left, far_top_left, Colors::kWhite);
+		//Gizmo::DrawLine(near_top_right, far_top_right, Colors::kWhite);
+		//Gizmo::DrawLine(near_bottom_right, far_bottom_right, Colors::kWhite);
+		//Gizmo::DrawLine(near_bottom_left, far_bottom_left, Colors::kWhite);
+
+		// 绘制立方体的边框
+		Gizmo::DrawLine(p_camera->_near_top_left, p_camera->_near_top_right, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_near_top_right, p_camera->_near_bottom_right, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_near_bottom_right, p_camera->_near_bottom_left, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_near_top_left, Colors::kWhite);
+
+		Gizmo::DrawLine(p_camera->_far_top_left, p_camera->_far_top_right, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_far_top_right, p_camera->_far_bottom_right, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_far_bottom_right, p_camera->_far_bottom_left, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_far_bottom_left, p_camera->_far_top_left, Colors::kWhite);
+
+		// 绘制连接立方体的线
+		Gizmo::DrawLine(p_camera->_near_top_left, p_camera->_far_top_left, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_near_top_right, p_camera->_far_top_right, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_near_bottom_right, p_camera->_far_bottom_right, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, Colors::kWhite);
+
+		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Forward() * p_camera->Far(), Colors::kRed);
+	}
+
 	void Camera::Update()
 	{
 		b_dirty_ = true;
@@ -43,6 +132,7 @@ namespace Ailu
 			float bottom = -top;
 			BuildOrthographicMatrix(_proj_matrix,left,right,top,bottom,_near_clip,_far_clip);
 		}
+		CalculateFrustum();
 	}
 	void Camera::SetLens(float fovy, float aspect, float nz, float fz)
 	{
@@ -117,6 +207,75 @@ namespace Ailu
 		b_dirty_ = true;
 		UpdateViewMatrix();
 	}
+	void Camera::LookTo(const Vector3f& target, const Vector3f& up)
+	{
+		BuildViewMatrixLookToLH(_view_matrix, _position, target, up);
+		b_dirty_ = false;
+	}
+
+	bool Camera::IsInFrustum(const Vector3f& pos)
+	{
+		return true;
+	}
+
+	void Camera::CalculateFrustum()
+	{
+		float half_width{ 0.f }, half_height{ 0.f };
+		if (_camera_type == ECameraType::kPerspective)
+		{
+			float tanHalfFov = tan(ToRadius(_fov_h) * 0.5f);
+			half_height = _near_clip * tanHalfFov;
+			half_width = half_height * _aspect;
+		}
+		else
+		{
+			half_width = _size * 0.5f;
+			half_height = half_width / _aspect;
+		}
+		Vector3f near_top_left(-half_width, half_height,_near_clip);
+		Vector3f near_top_right(half_width, half_height, _near_clip);
+		Vector3f near_bottom_left(-half_width, -half_height, _near_clip);
+		Vector3f near_bottom_right(half_width, -half_height, _near_clip);
+		Vector3f far_top_left, far_top_right, far_bottom_left, far_bottom_right;
+		if (_camera_type == ECameraType::kPerspective)
+		{
+			far_top_left = near_top_left * (_far_clip / _near_clip);
+			far_top_right = near_top_right * (_far_clip / _near_clip);
+			far_bottom_left = near_bottom_left * (_far_clip / _near_clip);
+			far_bottom_right = near_bottom_right * (_far_clip / _near_clip);
+		}
+		else
+		{
+			far_top_left = near_top_left;
+			far_top_right = near_top_right;
+			far_bottom_left = near_bottom_left;
+			far_bottom_right = near_bottom_right;
+			float distance = _far_clip - _near_clip;
+			far_top_left.z += distance;
+			far_top_right.z += distance;
+			far_bottom_left.z += distance;
+			far_bottom_right.z += distance;
+		}
+		Matrix4x4f camera_to_world = _view_matrix;
+		MatrixInverse(camera_to_world);
+		TransformCoord(near_top_left, camera_to_world);
+		TransformCoord(near_top_right, camera_to_world);
+		TransformCoord(near_bottom_left, camera_to_world);
+		TransformCoord(near_bottom_right, camera_to_world);
+		TransformCoord(far_top_left, camera_to_world);
+		TransformCoord(far_top_right, camera_to_world);
+		TransformCoord(far_bottom_left, camera_to_world);
+		TransformCoord(far_bottom_right, camera_to_world);
+		_near_bottom_left = near_bottom_left;
+		_near_bottom_right = near_bottom_right;
+		_near_top_left = near_top_left;
+		_near_top_right = near_top_right;
+		_far_bottom_left = far_bottom_left;
+		_far_bottom_right = far_bottom_right;
+		_far_top_left = far_top_left;
+		_far_top_right = far_top_right;
+	}
+
 	void Camera::RotatePitch(float angle)
 	{
 		Matrix4x4f m{};

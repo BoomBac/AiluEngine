@@ -15,6 +15,16 @@ namespace Ailu
 	{
 
 	}
+	void SceneActor::Tick(const float& delta_time)
+	{
+		Actor::Tick(delta_time);
+		OnGizmo();
+	}
+	void SceneActor::OnGizmo()
+	{
+		for (auto& comp : _components)
+			comp->OnGizmo();
+	}
 	Transform& SceneActor::GetTransform()
 	{
 		return _p_transform->_transform;

@@ -922,7 +922,7 @@ namespace Ailu
 		GraphicsPipelineStateMgr::ConfigureShader(_id);
 		if (_per_mat_buf_bind_slot != -1)
 		{
-			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufferViewDescPtr(1 + index)), EBindResDescType::kConstBuffer, _per_mat_buf_bind_slot);
+			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufferViewDescPtr(1 + index)), EBindResDescType::kConstBuffer, static_cast<u8>(_per_mat_buf_bind_slot));
 			//cmdlist->SetGraphicsRootConstantBufferView(_per_mat_buf_bind_slot, context->GetCBufferViewDesc(1 + index).BufferLocation);
 		}
 		if (_per_frame_buf_bind_slot != -1)

@@ -2,6 +2,7 @@
 #ifndef __GFX_CONTEXT_H__
 #define __GFX_CONTEXT_H__
 #include "GlobalMarco.h"
+#include "CommandBuffer.h"
 namespace Ailu
 {
 	class GraphicsContext
@@ -12,6 +13,8 @@ namespace Ailu
 		virtual void Present() = 0;
 		virtual uint8_t* GetPerFrameCbufData() = 0;
 		virtual uint8_t* GetPerMaterialCbufData(uint32_t mat_index) = 0;
+		//It will move the cmd in cmd buffer
+		virtual void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) = 0;
 	};
 }
 

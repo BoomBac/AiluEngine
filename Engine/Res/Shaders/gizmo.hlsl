@@ -7,7 +7,8 @@
 //Fill: Solid
 //info end
 
-#include "cbuffer.hlsl"
+#include "cbuffer.hlsli"
+#include "common.hlsli"
 
 struct VSInput
 {
@@ -24,7 +25,8 @@ struct PSInput
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	result.position = mul(float4(v.position, 1.0f), _MatrixVP);
+	//result.position = mul(float4(v.position, 1.0f), _MatrixVP);
+	result.position = TransformFromWorldToClipSpace(v.position);
 	result.color = v.color;
 	return result;
 }

@@ -1,12 +1,12 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 1631.25,2228.14,777.237
-  Rotation: 1325.86,27.9668,0
+  Position: 1447.78,3028,-1453.8
+  Rotation: -35.323,22.1512,0
   Fov: 60
   Aspect: 1.77778
-  Near: 54.41
-  Far: 109235
+  Near: 62.29
+  Far: 158369
 SceneGraph: 
   Name: root
     Components: 
@@ -14,13 +14,13 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,0,0
         Scale: 1,1,1
-    Children: 8
+    Children: 7
       Name: plane
         Components: 
           TransformComponent: 
             Position: 0,62,0
             Rotation: 0,0,0
-            Scale: 38,1,40
+            Scale: 40,1,40
           StaticMeshComponent: 
             MeshPath: plane
             MaterialPath: Materials/StandardPBR_new.alasset
@@ -38,13 +38,16 @@ SceneGraph:
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: -5,679,564
+            Position: -5,5000,564
             Rotation: 43.78,0,0
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
             Intensity: 1
+            CastShadow: true
+            ShadowArea: 10000
+            ShadowDistance: 17003.5
         Children: 0
       Name: point_light
         Components: 
@@ -57,6 +60,9 @@ SceneGraph:
             Color: 1,0,0
             Intensity: 1
             Radius: 839
+            CastShadow: false
+            ShadowArea: 0
+            ShadowDistance: 0
         Children: 0
       Name: spot_light
         Components: 
@@ -67,10 +73,13 @@ SceneGraph:
           LightComponent: 
             Type: Spot
             Color: 0.0395761,0.518758,0.897059
-            Intensity: 2.478
+            Intensity: 1
             Radius: 2868
             Inner: 45
             Outer: 60
+            CastShadow: false
+            ShadowArea: 0
+            ShadowDistance: 0
         Children: 0
       Name: sphere
         Components: 
@@ -82,29 +91,19 @@ SceneGraph:
             MeshPath: sphere
             MaterialPath: Materials/aa.almat
         Children: 0
-      Name: space ship
-        Components: 
-          TransformComponent: 
-            Position: 0,2376,0
-            Rotation: 0,0,0
-            Scale: 1,1,1
-          StaticMeshComponent: 
-            MeshPath: D:\ProjectCpp\AiluEngine\Engine\Res\Meshs\space_ship.fbx
-            MaterialPath: Materials/StandardPBR_new.alasset
-        Children: 0
       Name: camera0
         Components: 
           TransformComponent: 
             Position: 0,0,0
-            Rotation: -10.43,-20.87,0
+            Rotation: 0,-10.43,0
             Scale: 1,1,1
           CameraComponent: 8
             Type: kPerspective
             Position: 0,0,0
-            Rotation: -10.43,-20.87,0
+            Rotation: 0,-10.43,0
             Near: 704
-            Aspect: 1.78
+            Aspect: 1.474
             Far: 5000
             Size: 0
-            FovH: 21.687
+            FovH: 28.792
         Children: 0

@@ -52,17 +52,19 @@ namespace Ailu
 	//}
 
 	template<typename T>
-	T Normalize(T var)
+	T Normalize(const T& var)
 	{
 		size_t len = CountOf(var.data);
 		double sum = 0.f;
 		T temp{};
 		for (uint32_t i = 0; i < len; i++)
+		{
 			sum += pow(var[i], 2.f);
+			temp[i] = var[i];
+		}
 		sum = sqrt(sum);
 		for (uint32_t i = 0; i < len; i++) {
-			var[i] /= sum;
-			temp[i] = var[i];
+			temp[i] /= sum;
 		}
 		return temp;
 	}
@@ -85,6 +87,24 @@ namespace Ailu
 		{
 			return TT<T>(v[Indexes]...);
 		}
+		TT<T>& operator*=(T scale)
+		{
+			int indexes[] = { Indexes... };
+			for (int i = 0; i < sizeof...(Indexes); i++)
+			{
+				v[indexes[i]] *= scale;
+			}
+			return *(TT<T>*)this;
+		}
+		TT<T>& operator+=(T scale)
+		{
+			int indexes[] = { Indexes... };
+			for (int i = 0; i < sizeof...(Indexes); i++)
+			{
+				v[indexes[i]] += scale;
+			}
+			return *(TT<T>*)this;
+		}
 	};
 	template<typename T>
 	struct Vector2D
@@ -105,6 +125,9 @@ namespace Ailu
 		Vector2D<T>(const T& v, const T& w) : x(v), y(w) {};
 		operator T* () { return data; };
 		operator const T* () { return static_cast<const T*>(data); };
+		T& operator[](uint32_t index) { return data[index];}
+		const T& operator[](uint32_t index) const{ return data[index];}
+
 		Vector2D<T>& operator+=(const Vector2D<T>& other) {
 			for (uint8_t i = 0; i < CountOf(data); i++) {
 				data[i] += other.data[i];
@@ -145,6 +168,7 @@ namespace Ailu
 	{
 		static const Vector3D<T> Zero;
 		static const Vector3D<T> One;
+		static const Vector3D<T> kForward;
 		union {
 			T data[3];
 			struct { T x, y, z; };
@@ -166,6 +190,14 @@ namespace Ailu
 		Vector3D<T>() {};
 		Vector3D<T>(const T& _v) : x(_v), y(_v), z(_v) {};
 		Vector3D<T>(const T& _x, const T& _y, const T& _z) : x(_x), y(_y), z(_z) {};
+
+		Vector3D<T>& operator=(const Vector3D<T>& other)
+		{
+			for (uint8_t i = 0; i < CountOf(data); i++) {
+				data[i] = other.data[i];
+			}
+			return *this;
+		}
 
 		Vector3D<T>& operator+=(const Vector3D<T>& other) {
 			for (uint8_t i = 0; i < CountOf(data); i++) {
@@ -218,6 +250,9 @@ namespace Ailu
 
 		operator T* () { return data; };
 		operator const T* () const { return static_cast<const T*>(data); };
+		T& operator[](uint32_t index) { return data[index]; }
+		const T& operator[](uint32_t index) const { return data[index]; }
+
 		std::string ToString(int precision = 2) 
 		{
 			return std::format("({:.{}f},{:.{}f},{:.{}f})", data[0], precision, data[1], precision, data[2], precision);
@@ -227,6 +262,8 @@ namespace Ailu
 	const Vector3D<T> Vector3D<T>::Zero(0, 0, 0);
 	template <typename T>
 	const Vector3D<T> Vector3D<T>::One (1, 1, 1);
+	template <typename T>
+	const Vector3D<T> Vector3D<T>::kForward(0, 0, -1);
 
 	using Vector3f = Vector3D<float>;
 
@@ -256,6 +293,9 @@ namespace Ailu
 
 		operator T* () { return data; };
 		operator const T* () const { return static_cast<const T*>(data); };
+		T& operator[](uint32_t index) { return data[index]; }
+		const T& operator[](uint32_t index) const { return data[index]; }
+
 		friend std::ostream& operator<<(std::ostream& os, const Vector4D<T>& vec)
 		{
 			os << vec.x << "," << vec.y << "," << vec.z << "," << vec.w;
@@ -803,14 +843,15 @@ namespace Ailu
 		return ret;
 	}
 
-	static Matrix4x4f BuildIdentityMatrix()
+	static const Matrix4x4f& BuildIdentityMatrix()
 	{
-		return { {{
+		static Matrix4x4f identity = { {{
 			{ 1.0f, 0.0f, 0.0f, 0.0f},
 			{ 0.0f, 1.0f, 0.0f, 0.0f},
 			{ 0.0f, 0.0f, 1.0f, 0.0f},
 			{ 0.0f, 0.0f, 0.0f, 1.0f}
 		}} };
+		return identity;
 	}
 
 	static void BuildIdentityMatrix(Matrix4x4f& matrix)

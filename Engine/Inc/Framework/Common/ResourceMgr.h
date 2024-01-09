@@ -9,7 +9,7 @@
 #include "Framework/Common/Asset.h"
 #include "Render/Material.h"
 #include "Render/Texture.h"
-#include "Framework/Assets/Mesh.h"
+#include "Render/Mesh.h"
 #include "Path.h"
 
 namespace Ailu

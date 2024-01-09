@@ -109,6 +109,7 @@ namespace Ailu
 		virtual const std::string& Name() const = 0;
 		virtual const ETextureType GetTextureType() const = 0;
 		virtual const u8& GetMipmap() const = 0;
+		virtual EALGFormat GetFormat() const = 0;
 	};
 
 	class Texture2D : public Texture
@@ -126,6 +127,7 @@ namespace Ailu
 		void* GetGPUNativePtr()override;
 		const ETextureType GetTextureType() const final;
 		const u8& GetMipmap() const final { return _mipmap_count; };
+		EALGFormat GetFormat() const { return _format; };
 	public:
 		void Name(const std::string& name) override;
 		const std::string& Name() const override;
@@ -154,6 +156,7 @@ namespace Ailu
 		void Name(const std::string& name) override { _name = name; };
 		const std::string& Name() const override { { return _name; } };
 		const u8& GetMipmap() const final { return _mipmap_count; };
+		EALGFormat GetFormat() const { return _format; };
 	protected:
 		std::string _name;
 		Vector<u8*> _p_datas;
@@ -198,6 +201,7 @@ namespace Ailu
 		void Name(const std::string& name) override { _name = name; };
 		const std::string& Name() const override { return _name; };
 		const u8& GetMipmap() const final { return _mipmap_count; };
+		EALGFormat GetFormat() const { return _format; };
 	protected:
 		RTHandle _rt_handle;
 		ETextureResState _state;

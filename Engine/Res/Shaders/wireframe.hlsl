@@ -7,7 +7,7 @@
 //Blend: Src,OneMinusSrc
 //Fill: Wireframe
 //info end
-#include "common.hlsl"
+#include "common.hlsli"
 
 struct VSInput
 {

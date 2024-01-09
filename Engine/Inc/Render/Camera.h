@@ -8,6 +8,51 @@ namespace Ailu
 {
     DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
 
+    class Frustum 
+    {
+    public:
+        Frustum(float fov, float aspectRatio, float nearDist, float farDist, Vector3f position, Vector3f forward, Vector3f up) 
+        {
+            BuildPerspectiveFovLHMatrix(_proj, fov, aspectRatio, nearDist, farDist);
+            BuildViewMatrixLookToLH(_view,position,forward,up);
+            _view_proj = _proj * _view;
+            ExtractPlanes();
+        }
+
+        // Check if a point is inside the frustum
+        bool pointInside(const Vector3f&  point) const 
+        {
+            for (const auto& plane : _planes) 
+            {
+                if (DotProduct(plane, point) < 0.0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    private:
+        void ExtractPlanes()
+        {
+            //// Extract planes using the rows of the combined frustum matrix
+            //planes[0] = glm::row(frustumMatrix, 3) + glm::row(frustumMatrix, 0); // Left
+            //planes[1] = glm::row(frustumMatrix, 3) - glm::row(frustumMatrix, 0); // Right
+            //planes[2] = glm::row(frustumMatrix, 3) - glm::row(frustumMatrix, 1); // Top
+            //planes[3] = glm::row(frustumMatrix, 3) + glm::row(frustumMatrix, 1); // Bottom
+            //planes[4] = glm::row(frustumMatrix, 2); // Near
+            //planes[5] = glm::row(frustumMatrix, 3) - glm::row(frustumMatrix, 2); // Far
+            for (auto& plane : _planes)
+            {
+                plane = Normalize(plane);
+            }
+        }
+    private:
+        Matrix4x4f _proj;
+        Matrix4x4f _view;
+        Matrix4x4f _view_proj;
+        std::array<Vector3f, 6> _planes;
+    };
+
     class Camera : public Object
     {
         DECLARE_PROTECTED_PROPERTY(camera_type,Type, ECameraType::ECameraType)
@@ -41,7 +86,7 @@ namespace Ailu
             IMPLEMENT_REFLECT_FIELD(Camera);
             UpdateViewMatrix();
         };
-        //Camera(const Camera& other);
+        static void DrawGizmo(const Camera* p_camera);
     public:
         void Update();
         void SetLens(float fovy, float aspect, float nz, float fz);
@@ -58,7 +103,10 @@ namespace Ailu
         const Matrix4x4f& GetView() const { return _view_matrix; }
         void MoveForward(float dis);
         void MoveRight(float dis);
+        void LookTo(const Vector3f& target, const Vector3f& up);
+        bool IsInFrustum(const Vector3f& pos);
     private:
+        void CalculateFrustum();
         void RotatePitch(float angle);
         void RotateYaw(float angle);
         void Rotate(float vertical, float horizontal);
@@ -68,6 +116,15 @@ namespace Ailu
         float _fov_v;
         Matrix4x4f _view_matrix{};
         Matrix4x4f _proj_matrix{};
+
+        Vector3f _near_top_left;
+        Vector3f _near_top_right;
+        Vector3f _near_bottom_left;
+        Vector3f _near_bottom_right;
+        Vector3f _far_top_left;
+        Vector3f _far_top_right;
+        Vector3f _far_bottom_left;
+        Vector3f _far_bottom_right;
     };
     REFLECT_FILED_BEGIN(Camera)
     DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f,Position,_position)

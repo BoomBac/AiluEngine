@@ -141,7 +141,7 @@
     <ClInclude Include="Inc\Framework\Common\KeyCode.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Assets\Mesh.h">
+    <ClInclude Include="Inc\Render\Mesh.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Render\GraphicsContext.h">
@@ -2028,6 +2028,15 @@
     <ClInclude Include="Inc\Render\PipelineState.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Render\Pass\RenderPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\CommandBuffer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\RenderQueue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2096,7 +2105,7 @@
     <ClCompile Include="Src\Framework\Events\InputLayer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\Assets\Mesh.cpp">
+    <ClCompile Include="Src\Render\Mesh.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\Buffer.cpp">
@@ -2186,24 +2195,33 @@
     <ClCompile Include="Src\Objects\CameraComponent.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Src\Render\Pass\RenderPass.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\CommandBuffer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\RenderQueue.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat">
       <Filter>源文件</Filter>
     </None>
     <None Include="Res\Shaders\shaders.hlsl" />
-    <None Include="Res\Shaders\cbuffer.hlsl">
+    <None Include="Res\Shaders\cbuffer.hlsli">
       <Filter>头文件</Filter>
     </None>
     <None Include="Res\Shaders\gizmo.hlsl" />
     <None Include="Res\Shaders\PureColor.hlsl" />
-    <None Include="Res\Shaders\common.hlsl" />
-    <None Include="Res\Shaders\lighting.hlsl">
+    <None Include="Res\Shaders\common.hlsli" />
+    <None Include="Res\Shaders\lighting.hlsli">
       <Filter>头文件</Filter>
     </None>
-    <None Include="Res\Shaders\brdf.hlsl" />
-    <None Include="Res\Shaders\constants.hlsl" />
-    <None Include="Res\Shaders\input.hlsl" />
+    <None Include="Res\Shaders\brdf.hlsli" />
+    <None Include="Res\Shaders\constants.hlsli" />
+    <None Include="Res\Shaders\input.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

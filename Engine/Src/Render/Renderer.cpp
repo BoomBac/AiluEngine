@@ -8,6 +8,7 @@
 #include "Objects/StaticMeshComponent.h"
 #include "Framework/Parser/AssetParser.h"
 #include <Framework/Common/LogMgr.h>
+#include "Render/RenderQueue.h"
 
 namespace Ailu
 {
@@ -19,15 +20,10 @@ namespace Ailu
         _p_timemgr = new TimeMgr();
         _p_timemgr->Initialize();
         _p_per_frame_cbuf_data = static_cast<D3DContext*>(_p_context)->GetPerFrameCbufDataStruct();
-        //{ 
-        //    _p_scene_camera = MakeScope<Camera>(16.0F / 9.0F);
-        //    _p_scene_camera->SetPosition(1356.43f, 604.0f, -613.45f);
-        //    _p_scene_camera->Rotate(11.80f, -59.76f);
-        //    _p_scene_camera->SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
-        //    Camera::sCurrent = _p_scene_camera.get();
-        //}
         _p_camera_color_attachment = RenderTexture::Create(1600,900,"CameraColorAttachment",EALGFormat::kALGFormatR8G8B8A8_UNORM);
         _p_camera_depth_attachment = RenderTexture::Create(1600,900,"CameraDepthAttachment",EALGFormat::kALGFormatD24S8_UINT);
+        _p_opaque_pass = MakeScope<OpaquePass>();
+        _p_reslove_pass = MakeScope<ReslovePass>(_p_camera_color_attachment);
         return 0;
     }
     void Renderer::Finalize()
@@ -43,6 +39,7 @@ namespace Ailu
         RenderingStates::Reset();
         ModuleTimeStatics::RenderDeltatime = _p_timemgr->GetElapsedSinceLastMark();
         _p_timemgr->Mark();
+        _p_render_passes.clear();
         BeginScene();
         Render();
         EndScene();
@@ -55,44 +52,36 @@ namespace Ailu
         Camera::sCurrent = _p_scene_camera;
         PrepareCamera(_p_scene_camera);
         PrepareLight(g_pSceneMgr->_p_current);
-        memcpy(D3DContext::GetInstance()->GetPerFrameCbufData(), _p_per_frame_cbuf_data, sizeof(ScenePerFrameData));
+        memcpy(_p_context->GetPerFrameCbufData(), _p_per_frame_cbuf_data, sizeof(ScenePerFrameData));
 
-        auto cmd = D3DCommandBufferPool::GetCommandBuffer();
+        _p_render_passes.emplace_back(_p_opaque_pass.get());
+        _p_render_passes.emplace_back(_p_reslove_pass.get());
+
+        auto cmd = CommandBufferPool::GetCommandBuffer();
         static uint32_t w = 1600, h = 900;
         cmd->Clear();
         cmd->SetRenderTarget(_p_camera_color_attachment,_p_camera_depth_attachment);
         cmd->ClearRenderTarget(_p_camera_color_attachment, _p_camera_depth_attachment, Colors::kBlack, 1.0f);
-        cmd->SetViewports({ Viewport{0,0,(uint16_t)w,(uint16_t)h} });
-        cmd->SetScissorRects({ Viewport{0,0,(uint16_t)w,(uint16_t)h} });
-       // cmd->ClearRenderTarget({ 0.3f, 0.2f, 0.4f, 1.0f }, 1.0, true, true);
-        cmd->SetViewProjectionMatrices(Transpose(_p_scene_camera->GetView()), Transpose(_p_scene_camera->GetProjection()));
-        if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
-        {
-            //cmd->SetPSO(GraphicsPipelineStateMgr::s_standard_shadering_pso);
-            GraphicsPipelineStateMgr::ConfigureRenderTarget(RenderTargetState{}.Hash());
-            for (auto& obj : _draw_call)
-            {
-                cmd->DrawRenderer(obj.mesh, obj.transform, obj.mat, obj.instance_count);
-            }
-        }
-        if (RenderingStates::s_shadering_mode == EShaderingMode::kWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
-        {
-            static auto wireframe_mat = MaterialLibrary::GetMaterial("Materials/WireFrame_new.alasset");
-            //cmd->SetPSO(GraphicsPipelineStateMgr::s_wireframe_pso);
-            for (auto& obj : _draw_call)
-            {
-                cmd->DrawRenderer(obj.mesh, obj.transform, wireframe_mat, obj.instance_count);
-            }
-        }
+        cmd->SetViewports({ Rect{0,0,(uint16_t)w,(uint16_t)h} });
+        cmd->SetScissorRects({ Rect{0,0,(uint16_t)w,(uint16_t)h} });
+        cmd->SetViewProjectionMatrices(_p_scene_camera->GetView(), _p_scene_camera->GetProjection());
+        _p_context->ExecuteCommandBuffer(cmd);
+        cmd->Clear();
+        _p_context->ExecuteCommandBuffer(cmd);
+        CommandBufferPool::ReleaseCommandBuffer(cmd);
+
+        for (auto pass : _p_render_passes)
+            pass->BeginPass(_p_context);
+
+        //TODO:下一行存在绘制会崩溃，需要排查
         //cmd->DrawRenderer(MeshPool::GetMesh("FullScreenQuad"), BuildIdentityMatrix(), MaterialLibrary::GetMaterial("Blit"));
-        cmd->ResolveToBackBuffer(_p_camera_color_attachment);
-        D3DContext::GetInstance()->ExecuteCommandBuffer(cmd);
-        D3DCommandBufferPool::ReleaseCommandBuffer(cmd);
-        DrawRendererGizmo();
+        //cmd->ResolveToBackBuffer(_p_camera_color_attachment);
     }
     void Renderer::EndScene()
     {
-        _draw_call.clear();
+        _rendering_data.Reset();
+        for (auto pass : _p_render_passes)
+            pass->EndPass(_p_context);
     }
     void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, uint32_t instance_count)
     {
@@ -127,7 +116,7 @@ namespace Ailu
     }
     void Renderer::Submit(const Ref<Mesh>& mesh, Ref<Material>& mat, Matrix4x4f transform, uint32_t instance_count)
     {
-        _draw_call.emplace_back(DrawInfo{ mesh,mat,transform,instance_count });
+
     }
 
     float Renderer::GetDeltaTime() const
@@ -136,6 +125,9 @@ namespace Ailu
     }
     void Renderer::Render()
     {
+        for (auto pass : _p_render_passes)
+            pass->Execute(_p_context);
+        DrawRendererGizmo();
         _p_context->Present();
     }
     void Renderer::DrawRendererGizmo()
@@ -223,6 +215,12 @@ namespace Ailu
                 _p_per_frame_cbuf_data->_SpotLights[spot_light_index]._OuterAngle = light_data._light_param.z;
             }
             ++updated_light_num;
+            if (light->CastShadow())
+            {
+                _rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_view = light->ShadowCamera()->GetView();
+                _rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_proj = light->ShadowCamera()->GetProjection();
+                _rendering_data._shadow_data[_rendering_data._actived_shadow_count++]._shadow_bias = light->_shadow._depth_bias;
+            }
         }
         if (updated_light_num == 0)
         {

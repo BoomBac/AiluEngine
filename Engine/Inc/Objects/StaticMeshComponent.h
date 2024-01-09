@@ -2,7 +2,7 @@
 #ifndef __STATICMESH_COMP__
 #define __STATICMESH_COMP__
 #include "Component.h"
-#include "Framework/Assets/Mesh.h"
+#include "Render/Mesh.h"
 #include "Render/Material.h"
 
 namespace Ailu
@@ -18,15 +18,21 @@ namespace Ailu
 		StaticMeshComponent(Ref<Mesh> mesh, Ref<Material> mat);
 		void BeginPlay() final;
 		void Tick(const float& delta_time) final;
+		void OnGizmo() final;
 		void SetMesh(Ref<Mesh>& mesh);
 		void SetMaterial(Ref<Material>& mat);
 		void Serialize(std::ofstream& file, String indent) final;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent);
 		inline Ref<Material>& GetMaterial() { return _p_mat; };
 		inline Ref<Mesh>& GetMesh() { return _p_mesh; };
+		const std::tuple<Vector3f, Vector3f>& GetAABB() const
+		{
+			return _aabb;
+		}
 	private:
 		Ref<Mesh> _p_mesh;
 		Ref<Material> _p_mat;
+		std::tuple<Vector3f, Vector3f> _aabb;
 	private:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) final;
 	};

@@ -4,6 +4,8 @@ Normal: Load material asset at path Materials/aa.almat
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
 Normal: ResourceMgr end
+Normal: Begin load scene from C:/AiluEngine/Engine/Scenes/default.almap...
+Normal: SceneMgr end
 Normal: Init end
 Normal: Exit
-Normal: Save scene: default_scene to F:/ProjectCpp/AiluEngine/Engine/default.almap;
+Normal: Save scene: default_scene to C:/AiluEngine/Engine/default.almap;

@@ -177,9 +177,9 @@ namespace Ailu
         return &_perframe_scene_data;
     }
 
-    void D3DContext::ExecuteCommandBuffer(Ref<D3DCommandBuffer>& cmd)
+    void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer>& cmd)
     {    
-        for (auto& call : cmd->_commands)
+        for (auto& call : cmd->GetAllCommands())
         {
             _all_commands.emplace_back(std::move(call));
         }

@@ -16,8 +16,8 @@ namespace Ailu
 		void SetViewMatrix(const Matrix4x4f& view) override;
 		void SetProjectionMatrix(const Matrix4x4f& proj) override;
 		void SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj) override;
-		void SetViewports(const std::initializer_list<Viewport>& viewports) override;
-		void SetScissorRects(const std::initializer_list<Viewport>& rects) override;
+		void SetViewports(const std::initializer_list<Rect>& viewports) override;
+		void SetScissorRects(const std::initializer_list<Rect>& rects) override;
 	private:
 		inline static Vector4f _clear_color = { 0.3f, 0.2f, 0.4f, 1.0f };
 		D3DContext* _p_d3dcontext = nullptr;

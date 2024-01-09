@@ -21,10 +21,10 @@
 //}
 //info end
 
-#include "input.hlsl"
-#include "cbuffer.hlsl"
-#include "common.hlsl"
-#include "lighting.hlsl"
+#include "input.hlsli"
+#include "cbuffer.hlsli"
+#include "common.hlsli"
+#include "lighting.hlsli"
 
 
 
@@ -60,7 +60,8 @@ void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out floa
 		wnormal = Normal.Sample(g_LinearSampler, input.uv0).xyz;
 		wnormal = normalize(mul(wnormal* 2.0 - 1.0,input.btn));
 	}
-	else wnormal = input.normal;
+	else
+		wnormal = normalize(input.normal);
 	if(SamplerMask & 4)
 	{
 		emssive = Emssive.Sample(g_LinearSampler, input.uv0).rgb;
@@ -102,9 +103,9 @@ PSInput VSMain(VSInput v)
 	result.position = TransformToClipSpace(v.position);
 	result.normal = v.normal;
 	result.uv0 = v.uv0;
-	float3 B = normalize(mul(float4(cross(v.tangent.xyz, v.normal), 0.0f), _MatrixWorld).xyz);
-	float3 T = normalize(mul(float4(v.tangent.xyz,0.0f),_MatrixWorld).xyz);
-	float3 N = normalize(mul(float4(v.normal,0.0f),_MatrixWorld).xyz);
+	float3 B = TransformNormal(cross(v.tangent.xyz, v.normal));
+	float3 T = TransformNormal(v.tangent.xyz);
+	float3 N = TransformNormal(v.normal);
 	result.btn = float3x3(T,B,N);
 	result.normal = N;
 	result.world_pos = TransformToWorldSpace(v.position);

@@ -27,14 +27,14 @@ namespace Ailu
 		}
 	}
 
-	static bool ParseShaderProperty(const std::string& input, std::vector<std::string>& result)
+	static bool ParseShaderProperty(const String& input, std::vector<String>& result)
 	{
 		if (input.empty())
 		{
 			return false;
 		}
 		std::istringstream ss(input);
-		std::string token;
+		String token;
 		while (std::getline(ss, token, '_'))
 		{
 			if (!token.empty())
@@ -49,7 +49,7 @@ namespace Ailu
 		return true;
 	}
 
-	Material::Material(Ref<Shader> shader, std::string name) : _p_shader(shader)
+	Material::Material(Ref<Shader> shader, String name) : _p_shader(shader)
 	{
 		_name = name;
 		_cbuf_index = s_current_cbuf_offset++;
@@ -103,7 +103,7 @@ namespace Ailu
 		return false;
 	}
 
-	void Material::SetFloat(const std::string& name, const float& f)
+	void Material::SetFloat(const String& name, const float& f)
 	{
 		auto& res_info = _p_shader->GetBindResInfo();
 		auto it = res_info.find(name);
@@ -118,7 +118,7 @@ namespace Ailu
 		}
 	}
 
-	void Material::SetVector(const std::string& name, const Vector4f& vector)
+	void Material::SetVector(const String& name, const Vector4f& vector)
 	{
 		auto& res_info = _p_shader->GetBindResInfo();
 		auto it = res_info.find(name);
@@ -132,7 +132,7 @@ namespace Ailu
 		}
 	}
 
-	float Material::GetFloat(const std::string& name)
+	float Material::GetFloat(const String& name)
 	{
 		auto& res_info = _p_shader->GetBindResInfo();
 		auto it = res_info.find(name);
@@ -141,7 +141,7 @@ namespace Ailu
 		return 0.0f;
 	}
 
-	Vector4f Material::GetVector(const std::string& name)
+	Vector4f Material::GetVector(const String& name)
 	{
 		auto& res_info = _p_shader->GetBindResInfo();
 		auto it = res_info.find(name);
@@ -151,7 +151,7 @@ namespace Ailu
 		return Vector4f::Zero;
 	}
 
-	void Material::SetTexture(const std::string& name, Ref<Texture> texture)
+	void Material::SetTexture(const String& name, Ref<Texture> texture)
 	{
 		auto it = _textures.find(name);
 		if (it == _textures.end())
@@ -167,7 +167,7 @@ namespace Ailu
 		//	LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
 	}
 
-	void Material::SetTexture(const std::string& name, const String& texture_path)
+	void Material::SetTexture(const String& name, const String& texture_path)
 	{
 		if (name == InternalStandardMaterialTexture::kAlbedo) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
 		else if (name == InternalStandardMaterialTexture::kEmssive) MarkTextureUsed({ ETextureUsage::kEmssive }, true);
@@ -204,7 +204,7 @@ namespace Ailu
 	{
 	}
 
-	void Material::RemoveTexture(const std::string& name)
+	void Material::RemoveTexture(const String& name)
 	{
 		auto it = _textures.find(name);
 		if (it == _textures.end())
@@ -361,7 +361,7 @@ prop_info._prop_name,prop_info._value_name,prop_info._prop_type };
 		}
 	}
 	//-------------------------------------------StandardMaterial--------------------------------------------------------
-	StandardMaterial::StandardMaterial(Ref<Shader> shader, std::string name) : Material(shader, name)
+	StandardMaterial::StandardMaterial(Ref<Shader> shader, String name) : Material(shader, name)
 	{
 
 	}

@@ -3,7 +3,7 @@ type: material
 name: aa
 shader_path: Shaders/shaders.hlsl
   prop_type: Float
-    RoughnessValue: 0
+    RoughnessValue: 0.018
     MetallicValue: 0
     SamplerMask: 0
   prop_type: Vector

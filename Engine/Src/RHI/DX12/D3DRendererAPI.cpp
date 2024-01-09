@@ -43,7 +43,7 @@ namespace Ailu
 		memcpy(device->_p_cbuffer, &device->_perframe_scene_data, sizeof(device->_perframe_scene_data));
 
 	}
-	void D3DRendererAPI::SetViewports(const std::initializer_list<Viewport>& viewports)
+	void D3DRendererAPI::SetViewports(const std::initializer_list<Rect>& viewports)
 	{
 		static CD3DX12_VIEWPORT d3d_viewports[8];
 		uint8_t nums = 0u;
@@ -53,7 +53,7 @@ namespace Ailu
 		}
 		D3DContext::s_p_d3dcontext->GetCmdList()->RSSetViewports(nums, d3d_viewports);
 	}
-	void D3DRendererAPI::SetScissorRects(const std::initializer_list<Viewport>& rects)
+	void D3DRendererAPI::SetScissorRects(const std::initializer_list<Rect>& rects)
 	{
 		static CD3DX12_RECT d3d_rects[8];
 		uint8_t nums = 0u;

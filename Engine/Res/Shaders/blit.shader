@@ -8,7 +8,7 @@
 //ZTest: Off
 //ZWrite: Off
 //info end
-#include "common.hlsl"
+#include "common.hlsli"
 
 Texture2D _SourceTex : register(t0);
 SamplerState g_LinearSampler : register(s0);
