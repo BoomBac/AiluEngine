@@ -13,6 +13,14 @@ namespace Ailu
 		_channel = 4;
 	}
 
+	D3DTexture2D::D3DTexture2D(const uint16_t& width, const uint16_t& height, u8 channel, EALGFormat format)
+	{
+		_width = width;
+		_height = height;
+		_format = format;
+		_channel = channel;
+	}
+
 	D3DTexture2D::D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format, const String& asset_path) : 
 		D3DTexture2D(width, height, format)
 	{
@@ -34,7 +42,7 @@ namespace Ailu
 		Texture2D::FillData(datas);
 		Construct();
 	}
-	void D3DTexture2D::Bind(uint8_t slot) const
+	void D3DTexture2D::Bind(uint8_t slot)
 	{
 		static auto cmd = D3DContext::GetInstance()->GetCmdList();
 		cmd->SetGraphicsRootDescriptorTable(slot, _gpu_handle);
@@ -99,6 +107,7 @@ namespace Ailu
 		//	p_cmdlist->ResourceBarrier(1, &barrier);
 		//	});
 		//_submited_tasks.emplace_back(task_id);
+		u16 pixel_size = IsHDRFormat(_format)? 4 * _channel : _channel;
 		Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
 		for (size_t i = 0; i < _mipmap_count; i++)
 		{
@@ -106,7 +115,7 @@ namespace Ailu
 			u16 cur_mip_height = _height >> i;
 			D3D12_SUBRESOURCE_DATA subdata;
 			subdata.pData = _p_datas[i];
-			subdata.RowPitch = 4 * cur_mip_width;  // pixel size/byte  * width
+			subdata.RowPitch = pixel_size * cur_mip_width;  // pixel size/byte  * width
 			subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
 			subres_datas.emplace_back(subdata);
 		}
@@ -199,7 +208,7 @@ namespace Ailu
 		_upload_textures.emplace_back(pTextureUpload);
 	}
 
-	void D3DTextureCubeMap::Bind(uint8_t slot) const
+	void D3DTextureCubeMap::Bind(uint8_t slot)
 	{
 		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _gpu_handle);
 	}
@@ -289,8 +298,9 @@ namespace Ailu
 		}
 		_state = is_shadowmap ? ETextureResState::kDepthTarget : ETextureResState::kColorTagret;
 	}
-	void D3DRenderTexture::Bind(uint8_t slot) const
+	void D3DRenderTexture::Bind(uint8_t slot)
 	{
+		RenderTexture::Bind(slot);
 		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
 	uint8_t* D3DRenderTexture::GetCPUNativePtr()

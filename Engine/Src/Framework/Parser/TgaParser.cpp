@@ -12,11 +12,11 @@ namespace Ailu
 		if (data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
-			return Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			return Texture2D::Create(4, 4);
 		}
 		else
 		{
-			auto tex = Texture2D::Create(x, y, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			auto tex = Texture2D::Create(x, y);
 			uint8_t* new_data = nullptr;
 			if (n == 3)
 			{

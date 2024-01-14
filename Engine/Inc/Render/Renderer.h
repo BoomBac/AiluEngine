@@ -48,6 +48,7 @@ namespace Ailu
         GraphicsContext* _p_context = nullptr;
         Scope<OpaquePass> _p_opaque_pass;
         Scope<ReslovePass> _p_reslove_pass;
+        Scope<ShadowCastPass> _p_shadowcast_pass;
         List<RenderPass*> _p_render_passes;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;

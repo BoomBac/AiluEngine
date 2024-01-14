@@ -60,7 +60,7 @@ namespace Ailu
         DECLARE_PROTECTED_PROPERTY(near_clip,Near,float)
         DECLARE_PROTECTED_PROPERTY(far_clip,Far,float)
         //DECLARE_PROTECTED_PROPERTY(position,Position,Vector3f)
-        DECLARE_PROTECTED_PROPERTY(rotation,Rotation,Vector3f)
+        //DECLARE_PROTECTED_PROPERTY(rotation,Rotation,Vector3f)
         DECLARE_PROTECTED_PROPERTY(forward,Forward,Vector3f)
         DECLARE_PROTECTED_PROPERTY(right,Right,Vector3f)
         DECLARE_PROTECTED_PROPERTY(up,Up,Vector3f)
@@ -92,13 +92,11 @@ namespace Ailu
         void SetLens(float fovy, float aspect, float nz, float fz);
         void FovV(float angle);
         float FovV() const { return _fov_v; };
-        //float GetNearPlaneWidth() const;
-        //float GetFarPlaneWidth() const;
-        //float GetNearPlaneHeight() const;
-        //float GetFarPlaneHeight() const;
         void Position(const Vector3f& new_pos);
+        void Rotation(const Vector3f& new_rot);
         void Position(const float& x, const float& y, const float& z);
         const Vector3f& Position() const { return _position; };
+        const Vector3f& Rotation() const { return _rotation; };
         const Matrix4x4f& GetProjection() const { return _proj_matrix; }
         const Matrix4x4f& GetView() const { return _view_matrix; }
         void MoveForward(float dis);
@@ -113,6 +111,7 @@ namespace Ailu
         void UpdateViewMatrix();
         bool b_dirty_ = true;
         Vector3f _position;
+        Vector3f _rotation;
         float _fov_v;
         Matrix4x4f _view_matrix{};
         Matrix4x4f _proj_matrix{};

@@ -482,11 +482,11 @@ namespace Ailu
 				{
 					int shader_count = 0;
 					static int s_shader_selected_index = -1;
-					if (ImGui::BeginCombo("Select Shader: ", mat->GetShader()->GetName().c_str()))
+					if (ImGui::BeginCombo("Select Shader: ", mat->GetShader()->Name().c_str()))
 					{
 						for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
 						{
-							if (ImGui::Selectable((*it)->GetName().c_str(), s_shader_selected_index == shader_count))
+							if (ImGui::Selectable((*it)->Name().c_str(), s_shader_selected_index == shader_count))
 								s_shader_selected_index = shader_count;
 							if (s_shader_selected_index == shader_count)
 								mat->ChangeShader(*it);
@@ -971,11 +971,11 @@ namespace Ailu
 				static Ref<Shader> selected_shader = nullptr;
 				int count = 0;
 				static int selected_index = -1;
-				if (ImGui::BeginCombo("Select Shader: ", selected_shader ? selected_shader->GetName().c_str() : "select shader"))
+				if (ImGui::BeginCombo("Select Shader: ", selected_shader ? selected_shader->Name().c_str() : "select shader"))
 				{
 					for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
 					{
-						if (ImGui::Selectable((*it)->GetName().c_str(), selected_index == count))
+						if (ImGui::Selectable((*it)->Name().c_str(), selected_index == count))
 							selected_index = count;
 						if (selected_index == count)
 							selected_shader = *it;
@@ -985,7 +985,7 @@ namespace Ailu
 				}
 				if (ImGui::Button("OK", ImVec2(120, 0)))
 				{
-					LOG_INFO("{},{}", String{ buf }, selected_shader ? selected_shader->GetName() : "null shader");
+					LOG_INFO("{},{}", String{ buf }, selected_shader ? selected_shader->Name() : "null shader");
 					String name{ buf };
 
 					if (!name.empty() && selected_shader)
@@ -996,7 +996,7 @@ namespace Ailu
 						sys_path.append(name).append(".almat");
 						auto asset_path = PathUtils::ExtractAssetPath(sys_path);
 						auto new_mat = MaterialLibrary::CreateMaterial(selected_shader, name, asset_path);
-						new_mat->IsInternal(selected_shader->GetName() == "shaders");
+						new_mat->IsInternal(selected_shader->Name() == "shaders");
 						g_pResourceMgr->SaveAsset(sys_path, new_mat.get());
 					}
 					ImGui::CloseCurrentPopup();

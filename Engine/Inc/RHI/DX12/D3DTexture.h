@@ -15,11 +15,12 @@ namespace Ailu
 	{
 	public:
 		D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format);
+		D3DTexture2D(const uint16_t& width, const uint16_t& height, u8 channel,EALGFormat format);
 		D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format,const String& asset_path);
 		~D3DTexture2D();
 		void FillData(uint8_t* data) final;
 		void FillData(Vector<u8*> datas) final;
-		void Bind(uint8_t slot) const final;
+		void Bind(uint8_t slot) final;
 		void Release() final;
 		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
 		void* GetGPUNativePtr() final;
@@ -42,7 +43,7 @@ namespace Ailu
 		D3DTextureCubeMap(const uint16_t& width, const uint16_t& height, EALGFormat format);
 		~D3DTextureCubeMap();
 		void FillData(Vector<u8*>& data) final;
-		void Bind(uint8_t slot) const final;
+		void Bind(uint8_t slot) final;
 		void Release() final;
 		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
 		D3D12_CPU_DESCRIPTOR_HANDLE& GetCPUHandle() { return _cpu_handle; }
@@ -70,8 +71,8 @@ namespace Ailu
 			InnerDescHandle _depth_handle;
 		};
 	public:
-		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
-		void Bind(uint8_t slot) const final;
+		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		void Bind(uint8_t slot) final;
 		uint8_t* GetCPUNativePtr() final;
 		void* GetNativeCPUHandle() final;
 		void Release() final;

@@ -13,91 +13,9 @@ namespace Ailu
 		Camera::sCurrent = &cam;
 		return &cam;
 	}
-	//Camera::Camera(const Camera& other)
-	//{
-	//	_camera_type = other._camera_type;
-	//	_aspect = other._aspect;
-	//	_near_clip = other._near_clip;
-	//	_far_clip = other._far_clip;
-	//	_rotation = other._rotation;
-	//	_forward = other._forward;
-	//	_right = other._right;
-	//	_up = other._up;
-	//	_size = other._size;
-	//	b_dirty_ = other.b_dirty_;
-	//	_position = other._position;
-	//	_view_matrix = other._view_matrix;
-	//	_proj_matrix = other._proj_matrix;
-	//}
 
 	void Camera::DrawGizmo(const Camera* p_camera)
 	{
-		//float half_width{ 0.f }, half_height{ 0.f };
-		//if (p_camera->Type() == ECameraType::kPerspective)
-		//{
-		//	float tanHalfFov = tan(ToRadius(p_camera->FovH()) * 0.5f);
-		//	half_height = p_camera->Near() * tanHalfFov;
-		//	half_width = half_height * p_camera->Aspect();
-		//}
-		//else
-		//{
-		//	half_width = p_camera->Size() * 0.5f;
-		//	half_height = half_width / p_camera->Aspect();
-		//}
-		//Vector3f near_top_left(-half_width, half_height, p_camera->Near());
-		//Vector3f near_top_right(half_width, half_height, p_camera->Near());
-		//Vector3f near_bottom_left(-half_width, -half_height, p_camera->Near());
-		//Vector3f near_bottom_right(half_width, -half_height, p_camera->Near());
-		//Vector3f far_top_left, far_top_right, far_bottom_left, far_bottom_right;
-		//if (p_camera->Type() == ECameraType::kPerspective)
-		//{
-		//	far_top_left = near_top_left * (p_camera->Far() / p_camera->Near());
-		//	far_top_right = near_top_right * (p_camera->Far() / p_camera->Near());
-		//	far_bottom_left = near_bottom_left * (p_camera->Far() / p_camera->Near());
-		//	far_bottom_right = near_bottom_right * (p_camera->Far() / p_camera->Near());
-		//}
-		//else
-		//{
-		//	far_top_left = near_top_left;
-		//	far_top_right = near_top_right;
-		//	far_bottom_left = near_bottom_left;
-		//	far_bottom_right = near_bottom_right;
-		//	float distance = p_camera->Far() - p_camera->Near();
-		//	far_top_left.z += distance;
-		//	far_top_right.z += distance;
-		//	far_bottom_left.z += distance;
-		//	far_bottom_right.z += distance;
-		//}
-
-		//Matrix4x4f camera_to_world = p_camera->GetView();
-		//MatrixInverse(camera_to_world);
-
-		//TransformCoord(near_top_left, camera_to_world);
-		//TransformCoord(near_top_right, camera_to_world);
-		//TransformCoord(near_bottom_left, camera_to_world);
-		//TransformCoord(near_bottom_right, camera_to_world);
-		//TransformCoord(far_top_left, camera_to_world);
-		//TransformCoord(far_top_right, camera_to_world);
-		//TransformCoord(far_bottom_left, camera_to_world);
-		//TransformCoord(far_bottom_right, camera_to_world);
-
-		//// 绘制立方体的边框
-		//Gizmo::DrawLine(near_top_left, near_top_right, Colors::kWhite);
-		//Gizmo::DrawLine(near_top_right, near_bottom_right, Colors::kWhite);
-		//Gizmo::DrawLine(near_bottom_right, near_bottom_left, Colors::kWhite);
-		//Gizmo::DrawLine(near_bottom_left, near_top_left, Colors::kWhite);
-
-		//Gizmo::DrawLine(far_top_left, far_top_right, Colors::kWhite);
-		//Gizmo::DrawLine(far_top_right, far_bottom_right, Colors::kWhite);
-		//Gizmo::DrawLine(far_bottom_right, far_bottom_left, Colors::kWhite);
-		//Gizmo::DrawLine(far_bottom_left, far_top_left, Colors::kWhite);
-
-		//// 绘制连接立方体的线
-		//Gizmo::DrawLine(near_top_left, far_top_left, Colors::kWhite);
-		//Gizmo::DrawLine(near_top_right, far_top_right, Colors::kWhite);
-		//Gizmo::DrawLine(near_bottom_right, far_bottom_right, Colors::kWhite);
-		//Gizmo::DrawLine(near_bottom_left, far_bottom_left, Colors::kWhite);
-
 		// 绘制立方体的边框
 		Gizmo::DrawLine(p_camera->_near_top_left, p_camera->_near_top_right, Colors::kWhite);
 		Gizmo::DrawLine(p_camera->_near_top_right, p_camera->_near_bottom_right, Colors::kWhite);
@@ -116,6 +34,7 @@ namespace Ailu
 		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, Colors::kWhite);
 
 		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Forward() * p_camera->Far(), Colors::kRed);
+		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Up() * p_camera->Far(), Colors::kBlue);
 	}
 
 	void Camera::Update()
@@ -150,29 +69,7 @@ namespace Ailu
 		_fov_h = ToAngle(2.0f * atanf(tanf(ToRadius(_fov_v) / 2.0f) * _aspect));
 		BuildPerspectiveFovLHMatrix(_proj_matrix, ToRadius(_fov_v), _aspect, _near_clip, _far_clip);
 	}
-	//void Camera::FovH(float angle)
-	//{
-	//	_fov_h = angle;
-	//	_fov_v = ToAngle(2.0f * atanf(tanf(ToRadius(_fov_h) / 2.0f) / _aspect));
-	//	BuildPerspectiveFovLHMatrix(_proj_matrix, ToRadius(_fov_h), _aspect, _near_clip, _far_clip);
-	//}
 
-	//float Camera::GetNearPlaneWidth() const
-	//{
-	//	return _aspect * _near_plane_height;
-	//}
-	//float Camera::GetFarPlaneWidth() const
-	//{
-	//	return _aspect * _far_plane_height;
-	//}
-	//float Camera::GetNearPlaneHeight() const
-	//{
-	//	return _near_plane_height;
-	//}
-	//float Camera::GetFarPlaneHeight() const
-	//{
-	//	return _far_plane_height;
-	//}
 	void Camera::Position(const float& x, const float& y, const float& z)
 	{
 		_position.x = x;
@@ -186,6 +83,11 @@ namespace Ailu
 		_position = new_pos;
 		b_dirty_ = true;
 		UpdateViewMatrix();
+	}
+	void Camera::Rotation(const Vector3f& new_rot)
+	{
+		_rotation.x = NormalizeAngle(new_rot.x);
+		_rotation.y = NormalizeAngle(new_rot.y);
 	}
 	void Camera::MoveForward(float dis)
 	{

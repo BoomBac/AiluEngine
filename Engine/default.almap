@@ -1,12 +1,12 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 1447.78,3028,-1453.8
-  Rotation: -35.323,22.1512,0
+  Position: 606.31,433.149,-113.724
+  Rotation: -95.1919,18.0142,0
   Fov: 60
   Aspect: 1.77778
   Near: 62.29
-  Far: 158369
+  Far: 96951.7
 SceneGraph: 
   Name: root
     Components: 
@@ -33,26 +33,26 @@ SceneGraph:
             Scale: 500,500,500
           StaticMeshComponent: 
             MeshPath: cube
-            MaterialPath: Skybox
+            MaterialPath: Materials/CustomSkyBox.almat
         Children: 0
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: -5,5000,564
-            Rotation: 43.78,0,0
+            Position: 2,5815,5331
+            Rotation: 43.63,0,0
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
             Intensity: 1
             CastShadow: true
-            ShadowArea: 10000
-            ShadowDistance: 17003.5
+            ShadowArea: 8650.23
+            ShadowDistance: 15875.1
         Children: 0
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: -268,2940,149
+            Position: -219,471,0
             Rotation: 0,0,0
             Scale: 1,1,1
           LightComponent: 
@@ -67,8 +67,8 @@ SceneGraph:
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: 2365,1923,77
-            Rotation: -29.19,-82.7,34.05
+            Position: 846,845,-374
+            Rotation: -52.42,-94.31,34.05
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
@@ -84,26 +84,20 @@ SceneGraph:
       Name: sphere
         Components: 
           TransformComponent: 
-            Position: 0,1188,0
+            Position: -433,295,-31
             Rotation: 0,0,0
-            Scale: 5,5,5
+            Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: sphere
             MaterialPath: Materials/aa.almat
         Children: 0
-      Name: camera0
+      Name: monkey
         Components: 
           TransformComponent: 
-            Position: 0,0,0
-            Rotation: 0,-10.43,0
+            Position: 0,231,-167
+            Rotation: -12.34,5.62,-28.12
             Scale: 1,1,1
-          CameraComponent: 8
-            Type: kPerspective
-            Position: 0,0,0
-            Rotation: 0,-10.43,0
-            Near: 704
-            Aspect: 1.474
-            Far: 5000
-            Size: 0
-            FovH: 28.792
+          StaticMeshComponent: 
+            MeshPath: monkey
+            MaterialPath: Materials/StandardPBR_new.alasset
         Children: 0

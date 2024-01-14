@@ -6,7 +6,7 @@
 
 namespace Ailu
 {
-	Ref<Texture2D> Texture2D::Create(const uint16_t& width, const uint16_t& height, EALGFormat format)
+	Ref<Texture2D> Texture2D::Create(const uint16_t& width, const uint16_t& height, u8 channel, EALGFormat format)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -15,7 +15,7 @@ namespace Ailu
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			return MakeRef<D3DTexture2D>(width, height, format);
+			return MakeRef<D3DTexture2D>(width, height, channel,format);
 		}
 		}
 		AL_ASSERT(false, "Unsupport render api!");
@@ -32,7 +32,7 @@ namespace Ailu
 		for (auto p : datas)
 			_p_datas.emplace_back(p);
 	}
-	void Texture2D::Bind(uint8_t slot) const
+	void Texture2D::Bind(uint8_t slot)
 	{
 
 	}
@@ -103,7 +103,7 @@ namespace Ailu
 		_p_datas = std::move(data);
 	}
 
-	void TextureCubeMap::Bind(u8 slot) const
+	void TextureCubeMap::Bind(u8 slot)
 	{
 	}
 
@@ -142,8 +142,9 @@ namespace Ailu
 		return nullptr;
 	}
 
-	void RenderTexture::Bind(uint8_t slot) const
+	void RenderTexture::Bind(uint8_t slot)
 	{
+		Transition(ETextureResState::kShaderResource);
 	}
 
 	void* RenderTexture::GetNativeCPUHandle()

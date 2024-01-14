@@ -9,14 +9,14 @@ using Microsoft::WRL::ComPtr;
 
 namespace Ailu
 {
-	class D3DVectexBuffer : public VertexBuffer
+	class D3DVertexBuffer : public VertexBuffer
 	{
 	public:
-		D3DVectexBuffer(VertexBufferLayout layout);
-		D3DVectexBuffer(float* vertices, uint32_t size);
-		~D3DVectexBuffer();
+		D3DVertexBuffer(VertexBufferLayout layout);
+		D3DVertexBuffer(float* vertices, uint32_t size);
+		~D3DVertexBuffer();
 		void Bind() const override;
-		void Bind(const Vector<String>& input_layout) final;
+		void Bind(const VertexBufferLayout& pipeline_input_layout) const final;
 		void SetLayout(VertexBufferLayout layout) override;
 		const VertexBufferLayout& GetLayout() const override;
 		void SetStream(float* vertices, uint32_t size,uint8_t stream_index) override;

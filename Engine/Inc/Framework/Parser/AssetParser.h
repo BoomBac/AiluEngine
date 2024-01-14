@@ -4,6 +4,7 @@
 #include "FbxParser.h"
 #include "PngParser.h"
 #include "TgaParser.h"
+#include "HDRParser.h"
 
 namespace Ailu
 {
@@ -48,6 +49,7 @@ namespace Ailu
         {
             if (loader == EImageLoader::kPNG) return MakeScope<PngParser>();
             else if (loader == EImageLoader::kTGA) return MakeScope<TagParser>();
+            else if (loader == EImageLoader::kHDR) return MakeScope<HDRParser>();
             else return nullptr;
         }
     };

@@ -17,13 +17,13 @@ namespace Ailu
 		if (data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
-			auto tex = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			auto tex = Texture2D::Create(4, 4);
 			tex->Name("Placeholder");
 			return tex;
 		}
 		else
 		{
-			auto tex = Texture2D::Create(x, y, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			auto tex = Texture2D::Create(x, y);
 			tex->AssetPath(asset_path);
 			tex->Name(PathUtils::GetFileName(path,true));
 			uint8_t* new_data = nullptr;
@@ -49,11 +49,11 @@ namespace Ailu
 		if (data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
-			return Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			return Texture2D::Create(4, 4);
 		}
 		else
 		{
-			auto tex = Texture2D::Create(x, y, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+			auto tex = Texture2D::Create(x, y);
 			tex->AssetPath(PathUtils::ExtractAssetPath(path.data()));
 			tex->Name(PathUtils::GetFileName(path, true));
 			uint8_t* new_data = data;
@@ -63,6 +63,13 @@ namespace Ailu
 				stbi_image_free(data);
 			}
 			Vector<u8*> mipmaps{ new_data };
+			mip_level = 1;
+			int size = x;
+			while (size)
+			{
+				size >>= 1;
+				mip_level++;
+			}
 			mip_level = mip_level > 9 ? 9 : mip_level;
 			for (int i = 0; i < mip_level - 1; i++)
 			{

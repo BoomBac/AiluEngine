@@ -21,8 +21,8 @@ namespace Ailu
 	struct GraphicsPipelineStateInitializer
 	{
 		VertexInputLayout _input_layout; //0~3 4
-		Ref<Shader> _p_vertex_shader; //4~13 10
-		Ref<Shader> _p_pixel_shader; // 14~35 22
+		Shader* _p_vertex_shader; //4~13 10
+		Shader* _p_pixel_shader; // 14~35 22
 		ETopology _topology; //36~37 2
 		BlendState _blend_state; // 38~40 3
 		RasterizerState _raster_state;// 41 ~ 43 3
@@ -97,6 +97,7 @@ namespace Ailu
 		inline static GraphicsPipelineStateObject* s_gizmo_pso = nullptr;
 		inline static GraphicsPipelineStateObject* s_wireframe_pso = nullptr;
 		static void EndConfigurePSO();
+		static void OnShaderRecompiled(Shader* shader);
 		static void ConfigureShader(const u32& shader_hash);
 		static void ConfigureVertexInputLayout(const u8& hash); //0~3 4
 		static void ConfigureTopology(const u8& hash); //36~37 2
@@ -111,56 +112,14 @@ namespace Ailu
 
 		static void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot = 255);
 		static void SubmitBindResource(Texture* texture, u8 slot = -1);
-
-		template<typename T>
-		static void Register(const T& pso_state)
-		{
-			static Array<T, 8> states;
-			if (std::is_same<T, VertexInputLayout>::value)
-				s_p_input_layout_set = reinterpret_cast<void*>(&states);
-			else if (std::is_same<T, BlendState>::value)
-				s_p_blend_state_set = reinterpret_cast<void*>(&states);
-			else if (std::is_same<T, RasterizerState>::value)
-				s_p_rasterizer_state_set = reinterpret_cast<void*>(&states);
-			else if (std::is_same<T, DepthStencilState>::value)
-				s_p_depth_stencil_state_set = reinterpret_cast<void*>(&states);
-			else if (std::is_same<T, RenderTargetState>::value)
-				s_p_render_target_state_set = reinterpret_cast<void*>(&states);
-			states[pso_state.Hash()] = pso_state;
-		}
-
-		template<>
-		static void Register(const ETopology& topology)
-		{
-			static Array<ETopology, 8> states;
-			s_p_topology_set = reinterpret_cast<void*>(&states);
-			states[ALHash::Hasher(topology)] = topology;
-		}
-
-		template<typename T>
-		static const T& GetStateComponent(const u32& hash)
-		{
-			if (std::is_same<T, VertexInputLayout>::value)
-				return (*reinterpret_cast<Array<T, 8>*>(s_p_input_layout_set))[hash];
-			else if (std::is_same<T, BlendState>::value)
-				return (*reinterpret_cast<Array<T, 8>*>(s_p_blend_state_set))[hash];
-			else if (std::is_same<T, RasterizerState>::value)
-				return (*reinterpret_cast<Array<T, 8>*>(s_p_rasterizer_state_set))[hash];
-			else if (std::is_same<T, DepthStencilState>::value)
-				return (*reinterpret_cast<Array<T, 8>*>(s_p_depth_stencil_state_set))[hash];
-			else if (std::is_same<T, RenderTargetState>::value)
-				return (*reinterpret_cast<Array<T, 8>*>(s_p_render_target_state_set))[hash];
-			else if (std::is_same<T, ETopology>::value)
-				return (*reinterpret_cast<Array<T, 8>*>(s_p_topology_set))[hash];
-		}
-
 	private:
+		inline static Queue<Scope<GraphicsPipelineStateObject>> s_update_pso{};
 		inline static std::map<ALHash::Hash<64>, Scope<GraphicsPipelineStateObject>> s_pso_library{};
 		inline static std::unordered_map<uint32_t, Scope<GraphicsPipelineStateObject>> s_pso_pool{};
 		inline static uint32_t s_reserved_pso_id = 32u;
 		inline static List<PipelineResourceInfo> s_bind_resource_list{};
 		inline static bool s_is_ready = false;
-		inline static  RenderTargetState _s_render_target_state{};
+		static RenderTargetState _s_render_target_state;
 
 		inline static ALHash::Hash<64> s_cur_pos_hash{};
 		inline static u32 s_hash_shader; // 4~35 32
@@ -170,13 +129,6 @@ namespace Ailu
 		inline static u8 s_hash_raster_state;// 41 ~ 43 3
 		inline static u8 s_hash_depth_stencil_state;// 44~46 3
 		inline static u8 s_hash_rt_state;// 44~46 3
-
-		inline static void* s_p_input_layout_set = nullptr;
-		inline static void* s_p_topology_set = nullptr;
-		inline static void* s_p_blend_state_set = nullptr;
-		inline static void* s_p_rasterizer_state_set = nullptr;
-		inline static void* s_p_depth_stencil_state_set = nullptr;
-		inline static void* s_p_render_target_state_set = nullptr;
 	};
 }
 

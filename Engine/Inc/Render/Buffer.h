@@ -3,9 +3,6 @@
 #define __BUFFER_H__
 
 #include "GlobalMarco.h"
-
-#include "Framework/Math/ALMath.hpp"
-
 #include "PipelineState.h"
 
 namespace Ailu
@@ -15,8 +12,7 @@ namespace Ailu
 	public:
 		virtual ~VertexBuffer() = default;
 		virtual void Bind() const = 0;
-		virtual void Bind(const Vector<String>& input_layout) = 0;
-		//static VertexBuffer* Create(float* vertices,uint32_t size);
+		virtual void Bind(const VertexBufferLayout& pipeline_input_layout) const = 0;
 		static VertexBuffer* Create(VertexBufferLayout layout);
 		virtual void SetLayout(VertexBufferLayout layout) = 0;
 		virtual void SetStream(float* vertices, uint32_t size, u8 stream_index) = 0;

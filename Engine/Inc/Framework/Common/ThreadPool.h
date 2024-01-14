@@ -125,11 +125,12 @@ namespace Ailu
 	private:
 		void Start(size_t num_threads)
 		{
+			LOG_INFO("Thread pool {} is starting...", _pool_name);
 			_timers.resize(num_threads, TimeMgr());
 			_thread_status.resize(num_threads, EThreadStatus::kNotStarted);
 			for (auto i = 0u; i < num_threads; ++i)
 			{
-				std::wstring thread_name = std::format(L"ALEngineWorkThread{0}", i);
+				std::wstring thread_name = std::format(L"ALEngineWorkThread{0}", _s_global_thread_id++);
 				_threads.emplace_back([=]() {
 					SetThreadDescription(GetCurrentThread(), thread_name.c_str());
 					while (true)
@@ -164,6 +165,7 @@ namespace Ailu
 		}
 	private:
 		uint8_t _initial_thread_count = 0;
+		inline static u8 _s_global_thread_id = 0u;
 		std::list<std::thread> _threads;
 		std::condition_variable _task_cv;
 		std::mutex _task_mutex;
@@ -173,7 +175,7 @@ namespace Ailu
 		std::string _pool_name;
 		std::vector<TimeMgr> _timers;
 	};
-	static Scope<ThreadPool> g_thread_pool = MakeScope<ThreadPool>(8,"GlobalThreadPool");
+	extern Scope<ThreadPool> g_thread_pool;
 }
 
 

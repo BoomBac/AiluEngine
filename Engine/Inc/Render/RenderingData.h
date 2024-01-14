@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include "Framework/Math/ALMath.hpp"
+#include "GlobalMarco.h"
 
 namespace Ailu
 {
@@ -11,6 +12,8 @@ namespace Ailu
     {
         kShader,kWireFrame,kShaderedWireFrame
     };
+	DECLARE_ENUM(EColorRange,kLDR,kHDR)
+
     struct RenderingStates
     {      
         inline static uint32_t s_vertex_num = 0u;
@@ -59,7 +62,8 @@ namespace Ailu
 		ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLightNum];
 		ShaderDirectionalAndPointLightData _PointLights[kMaxPointLightNum];
 		ShaderSpotlLightData _SpotLights[kMaxSpotLightNum];
-		float padding[44];
+		Matrix4x4f _MainLightShadowMatrix;
+		float padding[28];
 	};
 
 	static_assert((sizeof(ScenePerFrameData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");

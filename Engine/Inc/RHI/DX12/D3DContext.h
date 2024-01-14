@@ -34,11 +34,10 @@ namespace Ailu
         std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetSRVDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle();
-        const D3D12_CONSTANT_BUFFER_VIEW_DESC& GetCBufferViewDesc(uint32_t index) const;
-        D3D12_CONSTANT_BUFFER_VIEW_DESC* GetCBufferViewDescPtr(uint32_t index);
         uint8_t* GetCBufferPtr();
         uint8_t* GetPerFrameCbufData() final;
         uint8_t* GetPerMaterialCbufData(uint32_t mat_index) final;
+        void* GetCBufGPURes(u32 index) final;
         D3D12_CONSTANT_BUFFER_VIEW_DESC* GetPerFrameCbufGPURes();
         ScenePerFrameData* GetPerFrameCbufDataStruct();
         void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;

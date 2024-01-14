@@ -2037,6 +2037,9 @@
     <ClInclude Include="Inc\Render\RenderQueue.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Parser\HDRParser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2202,6 +2205,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\RenderQueue.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\PipelineState.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Parser\HDRParser.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

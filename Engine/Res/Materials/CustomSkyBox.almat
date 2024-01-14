@@ -1,0 +1,10 @@
+guid: 107bfe23-2d50-48b3-a27d-a684c7d136aa
+type: material
+name: CustomSkyBox
+shader_path: Shaders/skybox.hlsl
+  prop_type: Float
+    expo: 1
+  prop_type: Vector
+    color: 1,1,1,1
+  prop_type: Texture2D
+    env: Textures\kloofendal_43d_clear_puresky_1k.hdr

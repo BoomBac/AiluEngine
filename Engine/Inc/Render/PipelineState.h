@@ -4,6 +4,7 @@
 #include "GlobalMarco.h"
 #include "AlgFormat.h"
 #include "Framework/Math/ALMath.hpp"
+#include "RenderConstants.h"
 
 namespace Ailu
 {
@@ -121,27 +122,43 @@ namespace Ailu
 			return *this;
 		}
 	};
+
+	template<class T>
+	class PipelineStateHash
+	{
+	public:
+		PipelineStateHash() = default;
+		u8 GenHash(const T& obj)
+		{
+			for (u32 i = 0; i < _s_data.size(); i++)
+			{
+				if (_s_data[i] == obj)
+					return i;
+			}
+			_s_data.emplace_back(obj);
+			return static_cast<u8>(_s_data.size() - 1);
+		}
+		const T& Get(const u8& hash) const
+		{
+			if (hash < _s_data.size())
+			{
+				return _s_data[hash];
+			}
+			throw std::out_of_range("Invalid hash");
+		}
+	private:
+		Vector<T> _s_data;
+	};
 	
 	class VertexBufferLayout
 	{
 		DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
 	public:
+		inline static PipelineStateHash<VertexBufferLayout> _s_hash_obj{};
+	public:
 		VertexBufferLayout() = default;
-		VertexBufferLayout(const std::initializer_list<VertexBufferLayoutDesc>& desc_list) : _buffer_descs(desc_list)
-		{
-			CalculateSizeAndStride();
-			_hash = static_cast<u8>(ALHash::CommonRuntimeHasher(*this));
-		}
-		VertexBufferLayout(const Vector<VertexBufferLayoutDesc>& desc_list) : _buffer_descs(desc_list)
-		{
-			CalculateSizeAndStride();
-			_hash = static_cast<u8>(ALHash::CommonRuntimeHasher(*this));
-		}
-		static const VertexBufferLayout& Get(const u8& hash)
-		{
-			AL_ASSERT(hash >= 8, "VertexBufferLayout hash is overflow 8");
-			return s_vb_layouts[hash];
-		}
+		VertexBufferLayout(const std::initializer_list<VertexBufferLayoutDesc>& desc_list);
+		VertexBufferLayout(const Vector<VertexBufferLayoutDesc>& desc_list);
 		inline const u8 GetStreamCount() const { return _stream_count; }
 		inline const std::vector<VertexBufferLayoutDesc>& GetBufferDesc() const { return _buffer_descs; }
 		inline const u8 GetDescCount() const { return static_cast<u8>(_buffer_descs.size()); };
@@ -199,13 +216,9 @@ namespace Ailu
 			}
 		}
 	private:
-		//inline static Array<VertexBufferLayout, 8> s_vb_layouts{};
-		static std::array<VertexBufferLayout, 8> s_vb_layouts;
-		//static VertexBufferLayout s_vb_layouts[8];
 		static constexpr u8 kMaxStreamCount = 6;
 		u8 _stream_count = 0;
 		std::vector<VertexBufferLayoutDesc> _buffer_descs;
-		//uint32_t _size[kMaxStreamCount] ;
 		u8 _stride[kMaxStreamCount]{};
 	};
 
@@ -215,20 +228,13 @@ namespace Ailu
 	{
 		DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
 	public:
-		static const RasterizerState& Get(const u8& hash)
-		{
-			AL_ASSERT(hash >= 8, "RasterizerState hash is overflow 8");
-			return s_raster_states[hash];
-		}
 		ECullMode _cull_mode;
 		EFillMode _fill_mode;
 		bool _b_cw;
-		RasterizerState() : RasterizerState(ECullMode::kBack, EFillMode::kSolid) {}
-		RasterizerState(ECullMode cullMode, EFillMode fillMode, bool cw = true)
-			: _cull_mode(cullMode), _fill_mode(fillMode), _b_cw(cw)
-		{
-			_hash = ALHash::CommonRuntimeHasher(*this);
-		}
+		inline static PipelineStateHash<RasterizerState> _s_hash_obj{};
+	public:
+		RasterizerState();
+		RasterizerState(ECullMode cullMode, EFillMode fillMode, bool cw = true);
 		bool operator==(const RasterizerState& other) const
 		{
 			return (_cull_mode == other._cull_mode &&
@@ -243,8 +249,6 @@ namespace Ailu
 			_b_cw = other._b_cw;
 			return *this;
 		}
-	private:
-		static Array<RasterizerState, 8> s_raster_states;
 	};
 
 	struct DepthStencilState
@@ -258,27 +262,13 @@ namespace Ailu
 		EStencilOp _stencil_test_fail_op;
 		EStencilOp _stencil_depth_test_fail_op;
 		EStencilOp _stencil_test_pass_op;
+		inline static PipelineStateHash<DepthStencilState> _s_hash_obj{};
 	public:
-		static const DepthStencilState& Get(const u8& hash)
-		{
-			AL_ASSERT(hash >= 8, "DepthStencilState hash is overflow 8");
-			return s_ds_state[hash];
-		}
+		DepthStencilState();
 		DepthStencilState(bool depthWrite, ECompareFunc depthTest, bool frontStencil = false,
 			ECompareFunc stencilTest = ECompareFunc::kAlways, EStencilOp stencilFailOp = EStencilOp::kKeep,
-			EStencilOp stencilDepthFailOp = EStencilOp::kKeep, EStencilOp stencilPassOp = EStencilOp::kKeep)
-			: _b_depth_write(depthWrite),
-			_depth_test_func(depthTest),
-			_b_front_stencil(frontStencil),
-			_stencil_test_func(stencilTest),
-			_stencil_test_fail_op(stencilFailOp),
-			_stencil_depth_test_fail_op(stencilDepthFailOp),
-			_stencil_test_pass_op(stencilPassOp)
-		{
-			_hash = ALHash::CommonRuntimeHasher(*this);
-		}
+			EStencilOp stencilDepthFailOp = EStencilOp::kKeep, EStencilOp stencilPassOp = EStencilOp::kKeep);
 
-		DepthStencilState() : DepthStencilState(true, ECompareFunc::kLessEqual) {}
 
 		bool operator==(const DepthStencilState& other) const
 		{
@@ -308,9 +298,6 @@ namespace Ailu
 			//}
 			//return *this;
 		}
-
-	private:
-		static Array<DepthStencilState, 8> s_ds_state;
 	};
 
 	struct BlendState
@@ -325,12 +312,8 @@ namespace Ailu
 		EBlendOp _color_op;
 		EBlendOp _alpha_op;
 		EColorMask _color_mask;
+		inline static PipelineStateHash<BlendState> _s_hash_obj{};
 	public:
-		static const BlendState& Get(const u8& hash)
-		{
-			AL_ASSERT(hash >= 8, "BlendState hash is overflow 8");
-			return s_state[hash];
-		}
 		//default is disable blend
 		BlendState(bool enable = false,
 			EBlendFactor srcColor = EBlendFactor::kSrcAlpha,
@@ -339,18 +322,8 @@ namespace Ailu
 			EBlendFactor dstAlpha = EBlendFactor::kZero,
 			EBlendOp colorOp = EBlendOp::kAdd,
 			EBlendOp alphaOp = EBlendOp::kAdd,
-			EColorMask colorMask = EColorMask::k_RGBA)
-			: _b_enable(enable),
-			_dst_alpha(dstAlpha),
-			_dst_color(dstColor),
-			_src_alpha(srcAlpha),
-			_src_color(srcColor),
-			_color_op(colorOp),
-			_alpha_op(alphaOp),
-			_color_mask(colorMask)
-		{
-			_hash = ALHash::CommonRuntimeHasher(*this);
-		}
+			EColorMask colorMask = EColorMask::k_RGBA);
+			
 
 		bool operator==(const BlendState& other) const
 		{
@@ -382,8 +355,6 @@ namespace Ailu
 			//}
 			//return *this;
 		}
-	private:
-		static Array<BlendState, 8> s_state;
 	};
 
 
@@ -391,7 +362,7 @@ namespace Ailu
 	{
 		DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
 	public:
-		static constexpr EALGFormat kDefaultColorRTFormat = EALGFormat::kALGFormatR8G8B8A8_UNORM;
+		static constexpr EALGFormat kDefaultColorRTFormat = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
 		static constexpr EALGFormat kDefaultDepthRTFormat = EALGFormat::kALGFormatD24S8_UINT;
 		EALGFormat _color_rt[8];
 		u8 _color_rt_num = 0;
@@ -403,16 +374,9 @@ namespace Ailu
 		//	return PipelineStateAA::ps[hash];
 		//}
 
-		RenderTargetState(const std::initializer_list<EALGFormat>& color_rt,EALGFormat depth_rt)
-		{
-			for (auto& f : color_rt)
-				_color_rt[_color_rt_num++] = f;
-			_depth_rt = depth_rt;
-			_hash = ALHash::CommonRuntimeHasher(*this);
-			//PipelineStateAA::ps[_hash] = *this;
-		}
+		RenderTargetState();
 
-		RenderTargetState() : RenderTargetState({ kDefaultColorRTFormat }, kDefaultDepthRTFormat){}
+		RenderTargetState(const std::initializer_list<EALGFormat>& color_rt, EALGFormat depth_rt);
 
 		bool operator==(const RenderTargetState& other) const
 		{
@@ -430,12 +394,10 @@ namespace Ailu
 		RenderTargetState& operator=(const RenderTargetState& other)
 		{
 			return PODCopy(&other, this);
-			//_color_rt_num = other._color_rt_num;
-			//_depth_rt = other._depth_rt;
-			//for (size_t i = 0; i < 8; i++)
-			//	_color_rt[i] = other._color_rt[i];
-			//return *this;
 		}
+		inline static PipelineStateHash<RenderTargetState> _s_hash_obj{};
+	private:
+		inline static Vector<RenderTargetState> _s_rt_caches{};
 	};
 
 	template<bool enable, EBlendFactor src_color, EBlendFactor src_alpha, typename... Rest>
@@ -513,8 +475,8 @@ namespace Ailu
 			case EALGFormat::kALGFormatR24G8_TYPELESS:return 0;
 			case EALGFormat::kALGFormatD32_FLOAT:return 1;
 			case EALGFormat::kALGFormatR8G8B8A8_UNORM: return 0;
-			case EALGFormat::kALGFormatRGB32_FLOAT:return 1;
-			case EALGFormat::kALGFormatRGBA32_FLOAT:return 2;
+			case EALGFormat::kALGFormatR32G32B32A32_FLOAT: return 1;
+			case EALGFormat::kALGFormatR32G32B32_FLOAT:return 2;
 			case EALGFormat::kALGFormatR32_FLOAT:return 3;
 			}
 		}

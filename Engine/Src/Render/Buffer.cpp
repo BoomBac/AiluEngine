@@ -26,7 +26,7 @@ namespace Ailu
 			AL_ASSERT(false, "None render api used!")
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-			return new D3DVectexBuffer(layout);
+			return new D3DVertexBuffer(layout);
 		}
 		AL_ASSERT(false, "Unsupport render api!")
 			return nullptr;

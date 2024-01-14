@@ -39,7 +39,8 @@ cbuffer SceneStatetBuffer : register(b2)
 	ShaderDirectionalAndPointLightData _DirectionalLights[MAX_DIRECTIONAL_LIGHT];
 	ShaderDirectionalAndPointLightData _PointLights[MAX_POINT_LIGHT];
 	ShaderSpotlLightData _SpotLights[MAX_SPOT_LIGHT];
-	float padding[44];
+	float4x4 _MainLightShadowMatrix;
+	float padding[28];
 };
 
 #endif // !CBUFFER_H__

@@ -9,6 +9,7 @@
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/Reflect.h"
+#include "Texture.h"
 
 #include "PipelineState.h"
 
@@ -101,43 +102,122 @@ namespace Ailu
 		Vector4f _prop_param;
 	};
 
+	struct ShaderCommand
+	{
+		inline static const String kName = "name";
+		inline static const String kVSEntry = "Vert";
+		inline static const String kPSEntry = "Pixel";
+		inline static const String kCull = "Cull";
+		inline static const String kQueue = "Queue";
+		inline static const String kTopology = "Topology";
+		inline static const String kBlend = "Blend";
+		inline static const String KFill = "Fill";
+		inline static const String kZTest = "ZTest";
+		inline static const String kZWrite = "ZWrite";
+		static struct Queue
+		{
+			inline static const String kGeometry = "Geometry";
+			inline static const String kTransplant = "Transparent";
+		} kQueueValue;
+		static struct Cull
+		{
+			inline static const String kNone = "none";
+			inline static const String kFront = "Front";
+			inline static const String kBack = "Back";
+		} kCullValue;
+		static struct Topology
+		{
+			inline static const String kTriangle = "Triangle";
+			inline static const String kLine = "Line";
+		} kTopologyValue;
+		static struct BlendFactor
+		{
+			inline static const String kSrc = "Src";
+			inline static const String kOneMinusSrc = "OneMinusSrc";
+			inline static const String kOne = "One";
+			inline static const String kZero = "Zero";
+		} kBlendFactorValue;
+		static struct Fill
+		{
+			inline static const String kSolid = "Solid";
+			inline static const String kWireframe = "Wireframe";
+		} kFillValue;
+		static struct ZTest
+		{
+			inline static const String kOff = "Off";
+			inline static const String kLEqual = "LEqual";
+			inline static const String kEqual = "Equal";
+		} kZTestValue;
+		static struct ZWrite
+		{
+			inline static const String kOff = "Off";
+			inline static const String kOn = "On";
+		} kZWriteValue;
+	};
+
 	class Shader
 	{
+		DECLARE_PRIVATE_PROPERTY(name, Name, String)
+		DECLARE_PRIVATE_PROPERTY(id, ID, u16)
 		friend class Material;
 	public:
-		virtual ~Shader() = default;
-		virtual void Bind() = 0;
-		virtual std::string GetName() const = 0;
-		virtual uint32_t GetID() const = 0;
-		virtual bool Compile() = 0;
-		virtual void SetGlobalVector(const std::string& name, const Vector4f& vector) = 0;
-		virtual void SetGlobalVector(const std::string& name, const Vector3f& vector) = 0;
-		virtual void SetGlobalVector(const std::string& name, const Vector2f& vector) = 0;
-		virtual void SetGlobalMatrix(const std::string& name, const Matrix4x4f& mat) = 0;
-		virtual void SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat) = 0;
-		virtual Vector4f GetVectorValue(const std::string& name) = 0;
-		virtual float GetFloatValue(const std::string& name) = 0;
-		virtual void* GetByteCode(EShaderType type) = 0;
-		virtual const String& GetSrcPath() const = 0;
-		virtual const Vector<String>& GetVSInputSemanticSeqences() const= 0;
 		static Ref<Shader> Create(const std::string& file_name);
-		virtual const std::set<String>& GetSourceFiles() const = 0;
-		virtual Vector<class Material*> GetAllReferencedMaterials() = 0;
-		virtual const std::map<String, Vector<String>> GetKeywordGroups() const = 0;
 
-		virtual const VertexInputLayout& PipelineInputLayout() const = 0;
-		virtual const RasterizerState& PipelineRasterizerState() const = 0;
-		virtual const DepthStencilState& PipelineDepthStencilState() const = 0;
-		virtual const BlendState& PipelineBlendState() const = 0;
-		virtual const ETopology& PipelineTopology() const = 0;
+		Shader(const String& sys_path);
+		virtual ~Shader() = default;
+		virtual void Bind(uint32_t index);
+		virtual bool Compile();
+		virtual void PreProcessShader();
+		virtual void* GetByteCode(EShaderType type);
+
+		const VertexInputLayout& PipelineInputLayout() const { return _pipeline_input_layout; };
+		const RasterizerState& PipelineRasterizerState() const { return _pipeline_raster_state; };
+		const DepthStencilState& PipelineDepthStencilState() const { return _pipeline_ds_state; };
+		const ETopology& PipelineTopology() const { return _pipeline_topology; };
+		const BlendState& PipelineBlendState() const { return _pipeline_blend_state; };
+
+		Vector4f GetVectorValue(const String& name);
+		float GetFloatValue(const String& name);
+
+		static void SetGlobalTexture(const String& name, Texture* texture);
+		const String& GetSrcPath() {return _src_file_path;}
+		const std::set<String>& GetSourceFiles() {return _source_files;}
+		const std::map<String, Vector<String>> GetKeywordGroups() {return _keywords;};
+		Vector<class Material*> GetAllReferencedMaterials();
+		void AddMaterialRef(class Material* mat);
+		void RemoveMaterialRef(class Material* mat);
+		const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() {return	_bind_res_infos;}
+		const List<ShaderPropertyInfo>& GetShaderPropertyInfos() {return _shader_prop_infos;}
 	protected:
-		virtual void AddMaterialRef(class Material* mat) = 0;
-		virtual void RemoveMaterialRef(class Material* mat) = 0;
-		virtual void PreProcessShader() =0;
-		virtual void Bind(uint32_t index) = 0;
-		virtual uint8_t* GetCBufferPtr(uint32_t index) = 0;
-		virtual const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() const = 0;
-		virtual const List<ShaderPropertyInfo>& GetShaderPropertyInfos() const = 0;
+		virtual uint8_t* GetCBufferPtr(uint32_t index) {return nullptr;};
+		virtual void RHICompileImpl();
+	protected:
+		inline static bool _b_init_buffer = false;
+		inline static u8* _p_cbuffer = nullptr;
+		inline static u16 _s_global_shader_id = 0u;
+		String _vert_entry, _pixel_entry;
+		uint8_t _vertex_input_num = 0u;
+		String _src_file_path;
+		i16 _per_mat_buf_bind_slot = -1;
+		i8 _per_frame_buf_bind_slot = -1;
+		VertexInputLayout _pipeline_input_layout;
+		RasterizerState _pipeline_raster_state;
+		DepthStencilState _pipeline_ds_state;
+		ETopology _pipeline_topology;
+		BlendState _pipeline_blend_state;
+		std::unordered_map<std::string, ShaderBindResourceInfo> _bind_res_infos{};
+		std::map<String, Vector<String>> _keywords;
+		bool _is_error;
+		std::map<String, std::tuple<u8, u8>> _keywords_ids;
+		std::set<uint64_t> _shader_variant;
+		List<ShaderPropertyInfo> _shader_prop_infos;
+		std::set<Material*> _reference_mats;
+		std::set<String> _source_files;
+	private:
+		void ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props);
+		void ExtractValidShaderProperty();
+	private:
+		inline static std::map<String, Texture*> s_global_textures_bind_info{};
 	};
 
 	class ShaderLibrary
@@ -215,8 +295,8 @@ float4 PSMain(PSInput input) : SV_TARGET
 		}
 		static void Add(const String& name, Ref<Shader> shader)
 		{
-			s_shader_name.insert(std::make_pair(name, shader->GetID()));
-			s_shader_library.insert(std::make_pair(shader->GetID(), shader));
+			s_shader_name.insert(std::make_pair(name, shader->ID()));
+			s_shader_library.insert(std::make_pair(shader->ID(), shader));
 			s_shaders.emplace_back(shader);
 		}
 		static Ref<Shader> Load(const std::string& path)

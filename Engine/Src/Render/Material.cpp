@@ -27,28 +27,6 @@ namespace Ailu
 		}
 	}
 
-	static bool ParseShaderProperty(const String& input, std::vector<String>& result)
-	{
-		if (input.empty())
-		{
-			return false;
-		}
-		std::istringstream ss(input);
-		String token;
-		while (std::getline(ss, token, '_'))
-		{
-			if (!token.empty())
-			{
-				result.push_back(token);
-			}
-		}
-		if (result.empty())
-		{
-			return false;
-		}
-		return true;
-	}
-
 	Material::Material(Ref<Shader> shader, String name) : _p_shader(shader)
 	{
 		_name = name;

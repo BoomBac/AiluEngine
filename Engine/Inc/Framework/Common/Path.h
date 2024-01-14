@@ -39,7 +39,7 @@ namespace Ailu
             }
             if (p2 != path.npos)
             {
-                return path.substr(p2 + 5);
+                return path.substr(p2 + 4);
             }
             return path;
         }

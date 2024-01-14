@@ -68,7 +68,8 @@ namespace Ailu
             D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle{};
             cpu_handle.ptr = m_cbvHeap->GetCPUDescriptorHandleForHeapStart().ptr + _cbv_desc_size * _cbv_desc_num;
             auto ret = ImGui_ImplDX12_Init(m_device.Get(), RenderConstants::kFrameCount,
-                DXGI_FORMAT_R8G8B8A8_UNORM, m_cbvHeap.Get(), cpu_handle, gpu_handle);
+                RenderConstants::kColorRange == EColorRange::kLDR ? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat),
+                m_cbvHeap.Get(), cpu_handle, gpu_handle);
         }
 #endif // DEAR_IMGUI
         Gizmo::Init();
@@ -143,6 +144,7 @@ namespace Ailu
     D3D12_CPU_DESCRIPTOR_HANDLE D3DContext::GetDSVDescriptorHandle()
     {
         static u32 global_texture_offset = 0u;
+        AL_ASSERT(global_texture_offset > (RenderConstants::kMaxTextureCount - 1), "Can't alloc more texture");
         static uint32_t base = RenderConstants::kFrameCount;
         //auto gpu_handle = m_dsvHeap->GetGPUDescriptorHandleForHeapStart();
         //gpu_handle.ptr += _dsv_desc_size * (base + global_texture_offset);
@@ -167,6 +169,11 @@ namespace Ailu
         return _p_cbuffer;
     }
 
+    void* D3DContext::GetCBufGPURes(u32 index)
+    {
+        return &_cbuf_views[index];
+    }
+
     D3D12_CONSTANT_BUFFER_VIEW_DESC* D3DContext::GetPerFrameCbufGPURes()
     {
         return &_cbuf_views[0];
@@ -186,8 +193,8 @@ namespace Ailu
     }
 
     void D3DContext::SubmitPerObjectBuffer(const Matrix4x4f& transform)
-    {
-        m_commandList->SetGraphicsRootConstantBufferView(0, GetCBufferViewDesc(1 + RenderConstants::kMaxMaterialDataCount + _render_object_index).BufferLocation);
+    {    
+        m_commandList->SetGraphicsRootConstantBufferView(0, _cbuf_views[1 + RenderConstants::kMaxMaterialDataCount + _render_object_index].BufferLocation);
         memcpy(_p_cbuffer + RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * (_render_object_index++),
             &transform, sizeof(transform));
     }
@@ -301,7 +308,7 @@ namespace Ailu
         swapChainDesc.BufferCount = RenderConstants::kFrameCount;
         swapChainDesc.Width = _width;
         swapChainDesc.Height = _height;
-        swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        swapChainDesc.Format = RenderConstants::kColorRange == EColorRange::kLDR? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat);
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         swapChainDesc.SampleDesc.Count = 1;
@@ -672,15 +679,4 @@ namespace Ailu
         handle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _cbv_desc_size * index;
         return handle;
     }
-
-    const D3D12_CONSTANT_BUFFER_VIEW_DESC& D3DContext::GetCBufferViewDesc(uint32_t index) const
-    {
-        return _cbuf_views[index];
-    }
-
-    D3D12_CONSTANT_BUFFER_VIEW_DESC* D3DContext::GetCBufferViewDescPtr(uint32_t index)
-    {
-        return &_cbuf_views[index];
-    }
-
 }

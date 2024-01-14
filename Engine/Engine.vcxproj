@@ -24,6 +24,7 @@
     <ProjectGuid>{36bc17a9-b4bd-4434-9c80-25370791488e}</ProjectGuid>
     <RootNamespace>Engine</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -119,7 +120,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)\Engine\;$(SolutionDir)\Engine\Inc\;$(SolutionDir)\Engine\Ext\;$(SolutionDir)\Engine\Ext\imgui;$(SolutionDir)\Engine\Ext\fbxsdk\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/FS /utf-8 /Zm1000 /MP16 %(AdditionalOptions)</AdditionalOptions>
       <EnableModules>true</EnableModules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -507,6 +508,7 @@
     <ClInclude Include="Inc\Framework\Math\Transform.h" />
     <ClInclude Include="Inc\Framework\Parser\AssetParser.h" />
     <ClInclude Include="Inc\Framework\Parser\FbxParser.h" />
+    <ClInclude Include="Inc\Framework\Parser\HDRParser.h" />
     <ClInclude Include="Inc\Framework\Parser\PngParser.h" />
     <ClInclude Include="Inc\Framework\Parser\TgaParser.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
@@ -579,6 +581,7 @@
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
     <ClCompile Include="Src\Framework\Math\Guid.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
+    <ClCompile Include="Src\Framework\Parser\HDRParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\TgaParser.cpp" />
     <ClCompile Include="Src\Objects\Actor.cpp" />
@@ -604,6 +607,7 @@
     <ClCompile Include="Src\Render\GraphicsPipelineStateObject.cpp" />
     <ClCompile Include="Src\Render\Material.cpp" />
     <ClCompile Include="Src\Render\Mesh.cpp" />
+    <ClCompile Include="Src\Render\PipelineState.cpp" />
     <ClCompile Include="Src\Render\RenderCommand.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\Render\Pass\RenderPass.cpp" />

@@ -18,7 +18,7 @@ namespace Ailu
 
 		u8* default_data = new u8[4 * 4 * 4];
 		memset(default_data, 255, 64);
-		auto default_white = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		auto default_white = Texture2D::Create(4, 4);
 		default_white->FillData({ default_data });
 		default_white->Name("default_white");
 		default_white->AssetPath("Runtime/default_white");
@@ -28,7 +28,7 @@ namespace Ailu
 		memset(default_data, 0, 64);
 		for (int i = 3; i < 64; i += 4)
 			default_data[i] = 255;
-		auto default_black = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		auto default_black = Texture2D::Create(4, 4);
 		default_black->FillData({ default_data });
 		default_black->Name("default_black");
 		default_black->AssetPath("Runtime/default_black");
@@ -38,7 +38,7 @@ namespace Ailu
 		memset(default_data, 128, 64);
 		for (int i = 3; i < 64; i += 4)
 			default_data[i] = 255;
-		auto default_gray = Texture2D::Create(4, 4, EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		auto default_gray = Texture2D::Create(4, 4);
 		default_gray->FillData({ default_data });
 		default_gray->Name("default_gray");
 		default_gray->AssetPath("Runtime/default_gray");
@@ -232,7 +232,7 @@ namespace Ailu
 			if (mat)
 			{
 				g_pLogMgr->LogFormat("Load {} asset at path {}",type,path);
-				if (mat->GetShader()->GetName() == "shaders")
+				if (mat->GetShader()->Name() == "shaders")
 					mat->IsInternal(true);
 			}
 			else
@@ -270,7 +270,7 @@ namespace Ailu
 		std::multimap<std::string, SerializableProperty*> props{};
 		//为了写入通用资产头信息，暂时使用追加方式打开
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
-		out_mat << "shader_path: " << ShaderLibrary::GetShaderPath(mat->_p_shader->GetName());
+		out_mat << "shader_path: " << ShaderLibrary::GetShaderPath(mat->_p_shader->Name());
 		for (auto& prop : mat->_properties)
 		{
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
@@ -299,7 +299,7 @@ namespace Ailu
 					tex_path = std::reinterpret_pointer_cast<Texture2D>(std::get<1>(tex.value()))->AssetPath();
 				else
 					tex_path = "none";
-				out_mat << "    " << prop->_name << ": " << tex_path << endl;
+				out_mat << "    " << prop->_value_name << ": " << tex_path << endl;
 			}
 		}
 		out_mat.close();
@@ -440,8 +440,12 @@ namespace Ailu
 	{
 		if (!TexturePool::Contain(asset_path))
 		{
-			auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-			auto tex = png_parser->Parser(kEngineResRootPath + asset_path, 10);
+			Scope<ITextureParser> parser;
+			if (HDRParser::IsHDRFormat(asset_path))
+				parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kHDR));
+			else
+				parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+			auto tex = parser->Parser(kEngineResRootPath + asset_path, 10);
 			if(!name.empty()) 
 				tex->Name(name);
 			return tex;
@@ -495,7 +499,9 @@ namespace Ailu
 
 	void ResourceMgr::ImportAsset(const WString& sys_path)
 	{
+		g_pTimeMgr->Mark();
 		ImportAssetImpl(sys_path);
+		LOG_WARNING(L"Import asset: {} succeed,cost {}ms", sys_path,g_pTimeMgr->GetElapsedSinceLastMark());
 	}
 
 	void ResourceMgr::ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback)
@@ -538,10 +544,10 @@ namespace Ailu
 								auto mats = (*it)->GetAllReferencedMaterials();
 								for (auto mat = mats.begin(); mat != mats.end(); mat++)
 									(*mat)->ChangeShader((*it));
-								LOG_INFO("Compile shader {} succeed!", (*it)->GetName());
+								LOG_INFO("Compile shader {} succeed!", (*it)->Name());
 							}
 							else
-								LOG_ERROR("Compile shader {} failed!", (*it)->GetName());
+								LOG_ERROR("Compile shader {} failed!", (*it)->Name());
 							});
 						break;
 					}
@@ -596,6 +602,32 @@ namespace Ailu
 				{
 					g_pLogMgr->LogFormat("Start import mesh: {}", mesh->Name());
 					MeshPool::AddMesh(mesh);
+				}
+			}
+			else if (ext == ".png" || ext == ".PNG")
+			{
+				String asset_path = PathUtils::ExtractAssetPath(ToChar(sys_path.data()));
+				if (!TexturePool::Contain(asset_path))
+				{
+					auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
+					auto tex = png_parser->Parser(kEngineResRootPath + asset_path, 1);
+					String name = PathUtils::GetFileName(asset_path);
+					if (!name.empty())
+						tex->Name(name);
+					TexturePool::Add(asset_path, tex);
+				}
+			}
+			else if (ext == ".exr" || ext == ".EXR" || ext == ".hdr" || ext == ".HDR")
+			{
+				String asset_path = PathUtils::ExtractAssetPath(ToChar(sys_path.data()));
+				if (!TexturePool::Contain(asset_path))
+				{
+					auto hdr_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kHDR);
+					auto tex = hdr_parser->Parser(kEngineResRootPath + asset_path, 1);
+					String name = PathUtils::GetFileName(asset_path);
+					if (!name.empty())
+						tex->Name(name);
+					TexturePool::Add(asset_path, tex);
 				}
 			}
 			else

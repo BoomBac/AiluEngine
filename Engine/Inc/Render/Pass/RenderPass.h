@@ -3,6 +3,7 @@
 #define __RENDER_PASS__
 #include "Render/GraphicsContext.h"
 #include "Render/RenderingData.h"
+#include "Render/Material.h"
 
 namespace Ailu
 {
@@ -47,6 +48,7 @@ namespace Ailu
 
 	class ShadowCastPass : public RenderPass
 	{
+		inline static u16 kShadowMapSize = 1024;
 	public:
 		ShadowCastPass();
 		void Execute(GraphicsContext* context) final;
@@ -58,6 +60,7 @@ namespace Ailu
 	private:
 		Rect _rect;
 		Ref<RenderTexture> _p_shadow_map;
+		Ref<Material> _p_shadowcast_material;
 		String _name;
 	};
 }

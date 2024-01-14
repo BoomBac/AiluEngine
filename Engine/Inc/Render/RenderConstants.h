@@ -3,6 +3,7 @@
 #define __D3DCONSTANTS__
 #include <cstdint>
 #include "RenderingData.h"
+#include "AlgFormat.h"
 
 namespace Ailu
 {
@@ -11,7 +12,7 @@ namespace Ailu
 		constexpr static uint8_t  kFrameCount = 2u;
 		constexpr static uint16_t kMaxMaterialDataCount = 8u;
 		constexpr static uint32_t kMaxRenderObjectCount = 8u;
-		constexpr static uint32_t kMaxTextureCount = 8u;
+		constexpr static uint32_t kMaxTextureCount = 16u;
 		constexpr static uint32_t kMaxRenderTextureCount = 8u;
 		constexpr static uint32_t KMaxDynamicVertexNum = 2048;
 		constexpr static uint8_t kMaxVertexAttrNum = 10u;
@@ -39,6 +40,10 @@ namespace Ailu
 		inline const static std::string kNormalTexName = "TexNormal";
 		inline const static std::string kEmssiveTexName = "TexEmssive";
 		inline const static std::string kRoughnessTexName = "TexRoughness";
+
+		inline const static EColorRange::EColorRange kColorRange = EColorRange::kHDR;
+		inline const static EALGFormat kLDRFormat = EALGFormat::kALGFormatR8G8B8A8_UNORM;
+		inline const static EALGFormat kHDRFormat = EALGFormat::kALGFormatR16G16B16A16_FLOAT;
 	};
 
 }

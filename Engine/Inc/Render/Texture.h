@@ -104,7 +104,7 @@ namespace Ailu
 		virtual const uint16_t& GetWidth() const = 0;
 		virtual const uint16_t& GetHeight() const = 0;
 		virtual void Release() = 0;
-		virtual void Bind(uint8_t slot) const = 0;
+		virtual void Bind(uint8_t slot) = 0;
 		virtual void Name(const std::string& name) = 0;
 		virtual const std::string& Name() const = 0;
 		virtual const ETextureType GetTextureType() const = 0;
@@ -115,11 +115,12 @@ namespace Ailu
 	class Texture2D : public Texture
 	{
 		DECLARE_PROTECTED_PROPERTY(path,AssetPath,String)
+		DECLARE_PROTECTED_PROPERTY(channel,Channel,u8)
 	public:
-		static Ref<Texture2D> Create(const uint16_t& width, const uint16_t& height,EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
+		static Ref<Texture2D> Create(const uint16_t& width, const uint16_t& height,u8 channel = 4,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		virtual void FillData(uint8_t* data);
 		virtual void FillData(Vector<u8*> datas);
-		virtual void Bind(uint8_t slot) const override;
+		virtual void Bind(uint8_t slot) override;
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
 		uint8_t* GetCPUNativePtr() override;
@@ -135,7 +136,6 @@ namespace Ailu
 		std::string _name;
 		Vector<u8*> _p_datas;
 		uint16_t _width,_height;
-		uint8_t _channel;
 		EALGFormat _format;
 		u8 _mipmap_count;
 	};
@@ -144,9 +144,9 @@ namespace Ailu
 	{
 		DECLARE_PROTECTED_PROPERTY(path, AssetPath, Vector<String>)
 	public:
-		static Ref<TextureCubeMap> Create(const uint16_t& width, const uint16_t& height, EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
+		static Ref<TextureCubeMap> Create(const uint16_t& width, const uint16_t& height, EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		virtual void FillData(Vector<u8*>& data);
-		virtual void Bind(u8 slot) const override;
+		virtual void Bind(uint8_t slot) override;
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
 		uint8_t* GetCPUNativePtr() override;
@@ -188,12 +188,11 @@ namespace Ailu
 	class RenderTexture : public Texture
 	{
 	public:
-		static Ref<RenderTexture> Create(const uint16_t& width, const uint16_t& height, String name,EALGFormat format = EALGFormat::kALGFormatRGB32_FLOAT);
-		virtual void Bind(uint8_t slot) const override;
+		static Ref<RenderTexture> Create(const uint16_t& width, const uint16_t& height, String name,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		virtual void Bind(uint8_t slot) override;
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
 		void* GetNativeCPUHandle() override;
-
 		void* GetGPUNativePtr() override;
 		const ETextureType GetTextureType() const final;
 		virtual void Transition(ETextureResState state);
@@ -202,6 +201,8 @@ namespace Ailu
 		const std::string& Name() const override { return _name; };
 		const u8& GetMipmap() const final { return _mipmap_count; };
 		EALGFormat GetFormat() const { return _format; };
+		ETextureResState GetState() const { return _state; }
+		bool operator==(const RenderTexture& other) const { return _rt_handle._id == other._rt_handle._id; }
 	protected:
 		RTHandle _rt_handle;
 		ETextureResState _state;

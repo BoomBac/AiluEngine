@@ -14,16 +14,6 @@
 
 namespace Ailu
 {
-	static uint32_t GetPerFramePropertyOffset(std::string_view name)
-	{
-		if (name == "_MatrixV")
-			return 0;
-		else if (name == "_MatrixVP")
-			return 64;
-		else if (name == "_Color")
-			return RenderConstants::kPerFrameDataSize;
-		return 0;
-	}
 	//shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
 	static bool CreateFromFileDXC(const std::wstring& filename, const std::wstring& entryPoint, const std::wstring& pTarget, ComPtr<ID3DBlob>& p_blob,
 		ComPtr<ID3D12ShaderReflection>& shader_reflection)
@@ -121,7 +111,14 @@ namespace Ailu
 	{
 		ID3DBlob* pErrorBlob = nullptr;
 		D3D_SHADER_MACRO macros[] = { {"TEST","0"},{NULL,NULL} };
-		D3DCompileFromFile(filename.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), D3DCOMPILE_DEBUG, 0, &p_blob, &pErrorBlob);
+		UINT compileFlags = 0;
+#if defined(_DEBUG)
+		// Enable better shader debugging with the graphics debugging tools.
+		compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+		compileFlags = 0;
+#endif
+		D3DCompileFromFile(filename.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), compileFlags, 0, &p_blob, &pErrorBlob);
 		if (pErrorBlob)
 		{
 			OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
@@ -178,56 +175,15 @@ namespace Ailu
 			return EShaderDateType::kBool;
 	}
 
-	namespace ALHash
+	static const Vector<CD3DX12_STATIC_SAMPLER_DESC>& CreateStaticSampler()
 	{
-		template<>
-		static u32 CommonRuntimeHasher(const D3D12_RASTERIZER_DESC& obj)
-		{
-			static Vector<D3D12_RASTERIZER_DESC> hashes;
-			for (u32 i = 0; i < hashes.size(); i++)
-			{
-				if (std::memcmp(&hashes[i], &obj, sizeof(D3D12_RASTERIZER_DESC)) == 0)
-					return i;
-			}
-			hashes.emplace_back(obj);
-			return static_cast<u32>(hashes.size() - 1);
-		}
-		template<>
-		static u32 CommonRuntimeHasher(const D3D12_BLEND_DESC& obj)
-		{
-			static Vector<D3D12_BLEND_DESC> hashes;
-			for (u32 i = 0; i < hashes.size(); i++)
-			{
-				if (std::memcmp(&hashes[i], &obj, sizeof(D3D12_BLEND_DESC)) == 0)
-					return i;
-			}
-			hashes.emplace_back(obj);
-			return static_cast<u32>(hashes.size() - 1);
-		}
-		template<>
-		static u32 CommonRuntimeHasher(const D3D12_DEPTH_STENCIL_DESC& obj)
-		{
-			static Vector<D3D12_DEPTH_STENCIL_DESC> hashes;
-			for (u32 i = 0; i < hashes.size(); i++)
-			{
-				if (std::memcmp(&hashes[i], &obj, sizeof(D3D12_DEPTH_STENCIL_DESC)) == 0)
-					return i;
-			}
-			hashes.emplace_back(obj);
-			return static_cast<u32>(hashes.size() - 1);
-		}
-		template<>
-		static u32 CommonRuntimeHasher(const D3D12_INPUT_LAYOUT_DESC& obj)
-		{
-			static Vector<D3D12_INPUT_LAYOUT_DESC> hashes;
-			for (u32 i = 0; i < hashes.size(); i++)
-			{
-				if (std::memcmp(&hashes[i], &obj, sizeof(D3D12_INPUT_LAYOUT_DESC)) == 0)
-					return i;
-			}
-			hashes.emplace_back(obj);
-			return static_cast<u32>(hashes.size() - 1);
-		}
+		static Vector<CD3DX12_STATIC_SAMPLER_DESC> samplers{
+		CD3DX12_STATIC_SAMPLER_DESC(0,D3D12_FILTER_MIN_MAG_MIP_LINEAR,D3D12_TEXTURE_ADDRESS_MODE_WRAP,D3D12_TEXTURE_ADDRESS_MODE_WRAP,D3D12_TEXTURE_ADDRESS_MODE_WRAP),
+		CD3DX12_STATIC_SAMPLER_DESC(1,D3D12_FILTER_MIN_MAG_MIP_LINEAR,D3D12_TEXTURE_ADDRESS_MODE_CLAMP,D3D12_TEXTURE_ADDRESS_MODE_CLAMP,D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
+		CD3DX12_STATIC_SAMPLER_DESC(2,D3D12_FILTER_MIN_MAG_MIP_LINEAR,D3D12_TEXTURE_ADDRESS_MODE_BORDER,D3D12_TEXTURE_ADDRESS_MODE_BORDER,D3D12_TEXTURE_ADDRESS_MODE_BORDER),
+		CD3DX12_STATIC_SAMPLER_DESC(3,D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT,D3D12_TEXTURE_ADDRESS_MODE_BORDER,D3D12_TEXTURE_ADDRESS_MODE_BORDER,D3D12_TEXTURE_ADDRESS_MODE_BORDER,0.0f,16,D3D12_COMPARISON_FUNC_LESS,D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK),
+		};
+		return samplers;
 	}
 
 	void D3DShader::GenerateInternalPSO()
@@ -281,147 +237,54 @@ namespace Ailu
 				++root_param_index;
 			}
 		}
-		D3D12_STATIC_SAMPLER_DESC* p_sampler = nullptr;
-		uint8_t sampler_num = 0;
-		if (texture_count > 0)
-		{
-			D3D12_STATIC_SAMPLER_DESC sampler = {};
-			sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-			sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-			sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-			sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-			sampler.MipLODBias = 1.0;
-			sampler.MaxAnisotropy = 0;
-			sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-			sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-			sampler.MinLOD = 0.0f;
-			sampler.MaxLOD = D3D12_FLOAT32_MAX;
-			sampler.ShaderRegister = 0;
-			sampler.RegisterSpace = 0;
-			sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-			p_sampler = &sampler;
-			++sampler_num;
-		}
 		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, sampler_num, p_sampler, rootSignatureFlags);
-		//rootSignatureDesc.Init_1_1(root_param_count, rootParameters, 0u, nullptr, rootSignatureFlags);
+		auto samplers = CreateStaticSampler();
+		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, samplers.size(), samplers.data(), rootSignatureFlags);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
-		auto [sig, pso] = _pso_sys.GetBack();
-		//bool succeed = true;
-		//succeed = !FAILED(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
-		//succeed = !FAILED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&sig)));
 		ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
-		ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&sig)));
-		_pso_desc.InputLayout = { _vertex_input_layout, _vertex_input_num };
-		_pso_desc.pRootSignature = sig.Get();
-		_pso_desc.VS = CD3DX12_SHADER_BYTECODE(_p_vblob.Get());
-		_pso_desc.PS = CD3DX12_SHADER_BYTECODE(_p_pblob.Get());
-		_pso_desc.SampleMask = UINT_MAX;
-		_pso_desc.NumRenderTargets = 1;
-		_pso_desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		//_pso_desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		_pso_desc.SampleDesc.Count = 1;
-		_pso_desc.SampleDesc.Quality = 0;
-		_pso_desc.NodeMask = 0;
-		_pso_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-		_pso_desc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
-		ThrowIfFailed(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&pso)));
-		_pso_sys.Swap();
-		//succeed = !FAILED(device->CreateGraphicsPipelineState(&_pso_desc, IID_PPV_ARGS(&pso)));
+		ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_p_sig)));
 	}
 
-	void D3DShader::LoadShaderReflection(ID3D12ShaderReflection* reflection, const EShaderType& type)
+	void D3DShader::RHICompileImpl()
 	{
-		D3D12_SHADER_DESC desc{};
-		reflection->GetDesc(&desc);
-		switch (type)
+		bool succeed = true;
+		ComPtr<ID3DBlob> _tmp_p_vblob = nullptr;
+		ComPtr<ID3DBlob> _tmp_p_pblob = nullptr;
+		try
 		{
-		case Ailu::EShaderType::kVertex:
-		{
-			if (desc.InputParameters > 10)
-			{
-				AL_ASSERT(true, "LayoutDesc count must less than 10");
-				return;
-			}
-			Vector<VertexBufferLayoutDesc> vb_input_desc{};
-			for (uint32_t i = 0u; i < desc.InputParameters; i++)
-			{
-				D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
-				reflection->GetInputParameterDesc(i, &input_desc);
-				_vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-				++_vertex_input_num;
-				vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, GetShaderDataType(input_desc.SemanticName), input_desc.Register));
-				_semantic_seq.emplace_back(input_desc.SemanticName);
-			}
-			_pipeline_input_layout = VertexBufferLayout(vb_input_desc);
-			for (uint32_t i = 0u; i < desc.BoundResources; i++)
-			{
-				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
-				reflection->GetResourceBindingDesc(i, &bind_desc);
-				auto res_type = bind_desc.Type;
-				if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
-				{
-					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-				}
-				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
-				{
-					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-				}
-				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
-				{
-					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-				}
-			}
+			Reset();
+#ifdef SHADER_DXC
+			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
+			LoadShaderReflection(_p_reflection.Get());
+			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
+			LoadShaderReflection(_p_reflection.Get());
+#else
+			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "VSMain", "vs_5_0", _tmp_p_vblob, _p_v_reflection);
+			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "PSMain", "ps_5_0", _tmp_p_pblob, _p_p_reflection);
+#endif // SHADER_DXC
 		}
-		break;
-		case Ailu::EShaderType::kPixel:
+		catch (const std::exception&)
 		{
-			for (uint32_t i = 0u; i < desc.BoundResources; i++)
-			{
-				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
-				reflection->GetResourceBindingDesc(i, &bind_desc);
-				auto res_type = bind_desc.Type;
-				if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
-				{
-					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-				}
-				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
-				{
-					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-				}
-				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
-				{
-					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
-				}
-			}
-			for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
-			{
-				auto cbuf = reflection->GetConstantBufferByIndex(i);
-				D3D12_SHADER_BUFFER_DESC desc{};
-				cbuf->GetDesc(&desc);
-				for (uint32_t j = 0u; j < desc.Variables; j++)
-				{
-					auto variable = cbuf->GetVariableByIndex(j);
-					D3D12_SHADER_VARIABLE_DESC vdesc{};
-					variable->GetDesc(&vdesc);
-					uint8_t offset = (uint8_t)vdesc.StartOffset;
-					uint8_t size = (uint8_t)vdesc.Size;
-					uint16_t variable_info = 0u;
-					variable_info |= offset;
-					variable_info <<= 8;
-					variable_info |= size;
-					auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
-					_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
-				}
-			}
+			succeed = false;
+			g_pLogMgr->LogErrorFormat("Compile shader with src {0} failed!", _src_file_path);
 		}
-		break;
+		_is_error = !succeed;
+		if (succeed)
+		{
+			LoadShaderReflection(_p_v_reflection.Get(), _p_p_reflection.Get());
+			_p_vblob = _tmp_p_vblob;
+			_p_pblob = _tmp_p_pblob;
+			GenerateInternalPSO();
+			auto it = _bind_res_infos.find(RenderConstants::kCBufNameSceneMaterial);
+			if (it != _bind_res_infos.end()) _per_mat_buf_bind_slot = it->second._bind_slot;
+			it = _bind_res_infos.find(RenderConstants::kCBufNameSceneState);
+			if (it != _bind_res_infos.end()) _per_frame_buf_bind_slot = it->second._bind_slot;
 		}
 	}
 
@@ -476,12 +339,7 @@ namespace Ailu
 		}
 	}
 
-	D3DShader::D3DShader(const std::string& sys_path, const std::string_view shader_name, const uint32_t& id, EShaderType type)
-	{
-
-	}
-
-	D3DShader::D3DShader(const std::string& sys_path, const std::string_view shader_name, const uint32_t& id) : _name(shader_name), _id(id)
+	D3DShader::D3DShader(const String& sys_path) : Shader(sys_path)
 	{
 		if (!_b_init_buffer)
 		{
@@ -492,12 +350,6 @@ namespace Ailu
 		}
 		_src_file_path = sys_path;
 		_source_files.insert(sys_path);
-		//#if defined(_DEBUG)
-		//		// Enable better shader debugging with the graphics debugging tools.
-		//		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-		//#else
-		//		UINT compileFlags = 0;
-		//#endif
 		Compile();
 	}
 
@@ -514,372 +366,15 @@ namespace Ailu
 		return std::make_pair(_vertex_input_layout, _vertex_input_num);
 	}
 
-	void D3DShader::AddMaterialRef(Material* mat)
-	{
-		_reference_mats.insert(mat);
-	}
-
-	void D3DShader::RemoveMaterialRef(Material* mat)
-	{
-		_reference_mats.erase(mat);
-	}
-
-	void D3DShader::ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props)
-	{
-		line = su::Trim(line);
-		String addi_info{};
-		if (line.find("[") != line.npos)
-		{
-			auto begin = line.find("["), end = line.find("]");
-			addi_info = su::SubStrRange(line, begin + 1, end - 1);
-			line = line.substr(end + 1);
-			line = su::Trim(line);
-		}
-		auto cur_edge = line.find_first_of("(");
-		String value_name = line.substr(0, cur_edge);
-		line = line.substr(cur_edge);
-		cur_edge = line.find_first_of("=");
-		String defalut_value = line.substr(cur_edge + 1);
-		line = line.substr(0, cur_edge - 1);
-		su::RemoveSpaces(defalut_value);
-		line = line.substr(1, line.find_last_of(")") - 1);
-		cur_edge = line.find_first_of(",");
-		String prop_name = line.substr(1, cur_edge - 2);
-		String prop_type = line.substr(cur_edge + 1);
-		ESerializablePropertyType seri_type;
-		if (prop_type == "Texture2D") seri_type = ESerializablePropertyType::kTexture2D;
-		else if (prop_type == "Color") seri_type = ESerializablePropertyType::kColor;
-		else if (*(prop_type.begin()) == *"R") seri_type = ESerializablePropertyType::kRange;
-		else if (prop_type == GetSerializablePropertyTypeStr(ESerializablePropertyType::kFloat)) seri_type = ESerializablePropertyType::kFloat;
-		else if (prop_type == "Vector") seri_type = ESerializablePropertyType::kVector4f;
-		else seri_type = ESerializablePropertyType::kUndefined;
-		if (!addi_info.empty())
-		{
-			if (addi_info.starts_with("Toggle"))
-			{
-				seri_type = ESerializablePropertyType::kBool;
-				_keywords[value_name].emplace_back(value_name + "_ON");
-				_keywords[value_name].emplace_back(value_name + "_OFF");
-			}
-			else if (addi_info.starts_with("Enum"))
-			{
-				seri_type = ESerializablePropertyType::kEnum;
-				auto enum_strs = su::Split(su::SubStrRange(addi_info, addi_info.find("(") + 1, addi_info.find(")") - 1), ",");
-				_keywords[value_name].resize(enum_strs.size() / 2);
-				for (size_t i = 0; i < enum_strs.size(); i += 2)
-				{
-					_keywords[value_name][std::stoi(enum_strs[i + 1])] = value_name + "_" + enum_strs[i];
-				}
-			}
-		}
-		Vector4f prop_param;
-		if (seri_type == ESerializablePropertyType::kRange)
-		{
-			cur_edge = prop_type.find_first_of(",");
-			size_t left_bracket = prop_type.find_first_of("(");
-			size_t right_bracket = prop_type.find_first_of(")");
-			prop_param.x = static_cast<float>(std::stod(su::SubStrRange(prop_type, left_bracket + 1, cur_edge - 1)));
-			prop_param.y = static_cast<float>(std::stod(su::SubStrRange(prop_type, cur_edge + 1, right_bracket - 1)));
-			prop_param.z = static_cast<float>(std::stod(defalut_value));
-		}
-		else if (seri_type == ESerializablePropertyType::kFloat || seri_type == ESerializablePropertyType::kBool)
-		{
-			prop_param.z = static_cast<float>(std::stod(defalut_value));
-		}
-		else if (seri_type == ESerializablePropertyType::kColor || seri_type == ESerializablePropertyType::kVector4f)
-		{
-			defalut_value = su::SubStrRange(defalut_value, 1, defalut_value.find_first_of(")") - 1);
-			auto vec_str = su::Split(defalut_value, ",");
-			prop_param.x = static_cast<float>(std::stod(vec_str[0]));
-			prop_param.y = static_cast<float>(std::stod(vec_str[1]));
-			prop_param.z = static_cast<float>(std::stod(vec_str[2]));
-			prop_param.w = static_cast<float>(std::stod(vec_str[3]));
-		}
-		if (seri_type != ESerializablePropertyType::kUndefined)
-		{
-			props.emplace_back(ShaderPropertyInfo{ value_name ,prop_name,seri_type ,prop_param });
-			LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);
-		}
-		else
-		{
-			g_pLogMgr->LogWarningFormat("Undefined shader property type with name {}", prop_name);
-		}
-
-	}
-
-	struct ShaderCommand
-	{
-		inline static const String kName = "name";
-		inline static const String kVSEntry = "Vert";
-		inline static const String kPSEntry = "Pixel";
-		inline static const String kCull = "Cull";
-		inline static const String kQueue = "Queue";
-		inline static const String kTopology = "Topology";
-		inline static const String kBlend = "Blend";
-		inline static const String KFill = "Fill";
-		inline static const String kZTest = "ZTest";
-		inline static const String kZWrite = "ZWrite";
-		static struct Queue
-		{
-			inline static const String kGeometry = "Geometry";
-			inline static const String kTransplant = "Transparent";
-		} kQueueValue;
-		static struct Cull
-		{
-			inline static const String kNone = "none";
-			inline static const String kFront = "Front";
-			inline static const String kBack = "Back";
-		} kCullValue;
-		static struct Topology
-		{
-			inline static const String kTriangle = "Triangle";
-			inline static const String kLine = "Line";
-		} kTopologyValue;
-		static struct BlendFactor
-		{
-			inline static const String kSrc = "Src";
-			inline static const String kOneMinusSrc = "OneMinusSrc";
-			inline static const String kOne = "One";
-			inline static const String kZero = "Zero";
-		} kBlendFactorValue;
-		static struct Fill
-		{
-			inline static const String kSolid = "Solid";
-			inline static const String kWireframe = "Wireframe";
-		} kFillValue;
-		static struct ZTest
-		{
-			inline static const String kOff = "Off";
-			inline static const String kLEqual = "LEqual";
-			inline static const String kEqual = "Equal";
-		} kZTestValue;
-		static struct ZWrite
-		{
-			inline static const String kOff = "Off";
-			inline static const String kOn = "On";
-		} kZWriteValue;
-	};
-
-	void D3DShader::PreProcessShader()
-	{
-		Vector<Vector<String>> kw_permutation_in{};
-		int kw_group_count = 0;
-		for (auto& it : _keywords)
-		{
-			Vector<String> v;
-			for (int i = 0; i < it.second.size(); i++)
-			{
-				auto& kw = it.second[i];
-				_keywords_ids[kw] = std::make_tuple(kw_group_count, i);
-				v.emplace_back(kw);
-			}
-			++kw_group_count;
-			kw_permutation_in.emplace_back(v);
-		}
-		if (!kw_permutation_in.empty())
-		{
-			for (auto& kw_seq : Algorithm::Permutations(kw_permutation_in))
-			{
-				u64 kw_hash = 0;
-				u64 temp_hash = 0;
-				D3D_SHADER_MACRO* shader_marcos = new D3D_SHADER_MACRO[kw_seq.size() + 1];
-				for (int i = 0; i < kw_seq.size(); i++)
-				{
-					auto& [group_id, inner_id] = _keywords_ids[kw_seq[i]];
-					temp_hash = inner_id;
-					temp_hash <<= group_id * 3;//每个关键字组占三位，也就是每组内最多8个关键字
-					kw_hash |= temp_hash;
-					shader_marcos[i] = { kw_seq[i].c_str(),"1" };
-				}
-				shader_marcos[kw_seq.size()] = { NULL,NULL };
-				_keyword_defines.emplace_back(shader_marcos);
-			}
-		}
-	}
-
-	void D3DShader::LoadAdditionInfo()
-	{
-		memset(&_pso_desc, 0, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-		D3D12_RASTERIZER_DESC r_desc = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-		D3D12_BLEND_DESC bl_desc = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-		D3D12_DEPTH_STENCIL_DESC ds_desc = CD3DX12_DEPTH_STENCIL_DESC(CD3DX12_DEFAULT{});
-		_pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		_pso_desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-		List<String> lines{};
-		String line{};
-		u32 line_count = 0;
-		lines = ReadFileToLines(_src_file_path, line_count, "//info bein", "//info end");
-		u8 need_zbuf_count = 2;
-		if (line_count > 0)
-		{
-			auto prop_start_it = std::find(lines.begin(), lines.end(), "//Properties");
-			auto prop_end_it = std::find(prop_start_it, lines.end(), "//}");
-			if (prop_start_it != lines.end())
-			{
-				prop_start_it++;
-				prop_start_it++;
-				for (auto& it = prop_start_it; it != prop_end_it; it++)
-				{
-					line = it->substr(2);
-					ParserShaderProperty(line, _shader_prop_infos);
-				}
-				prop_start_it--;
-				prop_start_it--;
-			}
-			String k, v, blend_info;
-			bool is_transparent = false;
-
-			for (auto it = lines.begin(); it != prop_start_it; it++)
-			{
-				line = it->substr(2);
-				k = line.substr(0, line.find_first_of(":"));
-				su::RemoveSpaces(k);
-				v = line.substr(line.find_first_of(":") + 1);
-				su::RemoveSpaces(v);
-				if (su::Equal(k, ShaderCommand::kName, false)) _name = v;
-				else if (su::Equal(k, ShaderCommand::kVSEntry, false)) _vert_entry = v;
-				else if (su::Equal(k, ShaderCommand::kPSEntry, false)) _pixel_entry = v;
-				else if (su::Equal(k, ShaderCommand::kCull, false))
-				{
-					if (su::Equal(v, ShaderCommand::kCullValue.kBack, false))
-					{
-						_pipeline_raster_state._cull_mode = ECullMode::kBack;
-						r_desc.CullMode = D3D12_CULL_MODE_BACK;
-					}
-					else
-					{
-						_pipeline_raster_state._cull_mode = ECullMode::kFront;
-						r_desc.CullMode = D3D12_CULL_MODE_FRONT;
-					}
-				}
-				else if (su::Equal(k, ShaderCommand::kTopology, false))
-				{
-					if (su::Equal(v, ShaderCommand::kTopologyValue.kLine))
-					{
-						_pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
-						_pipeline_topology = ETopology::kLine;
-					}
-				}
-				else if (su::Equal(k, ShaderCommand::kBlend, false))
-				{
-					blend_info = v;
-				}
-				else if (su::Equal(k, ShaderCommand::kQueue, false))
-				{
-					if (su::Equal(v, ShaderCommand::kQueueValue.kTransplant, false))
-						is_transparent = true;
-				}
-				else if (su::Equal(k, ShaderCommand::KFill, false))
-				{
-					if (su::Equal(v, ShaderCommand::kFillValue.kWireframe))
-					{
-						r_desc.FillMode = D3D12_FILL_MODE_WIREFRAME;
-						_pipeline_raster_state._fill_mode = EFillMode::kWireframe;
-					}
-				}
-				else if (su::Equal(k, ShaderCommand::kZTest, false))
-				{
-					if (su::Equal(v, ShaderCommand::kZTestValue.kOff))
-					{
-						need_zbuf_count--;
-						_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
-					}
-					else if (su::Equal(v, ShaderCommand::kZTestValue.kEqual))
-						_pipeline_ds_state._depth_test_func = ECompareFunc::kEqual;
-				}
-				else if (su::Equal(k, ShaderCommand::kZWrite, false))
-				{
-					if (su::Equal(v, ShaderCommand::kZWriteValue.kOff))
-					{
-						need_zbuf_count--;
-						_pipeline_ds_state._b_depth_write = false;
-					}
-				}
-			}
-			if (is_transparent && !blend_info.empty())
-			{
-				auto blend_factors = su::Split(blend_info, ",");
-				static auto get_d3d_blend_factor = [](const String& s) -> D3D12_BLEND {
-					if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOne)) return D3D12_BLEND::D3D12_BLEND_ONE;
-					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kZero)) return D3D12_BLEND::D3D12_BLEND_ZERO;
-					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kSrc)) return D3D12_BLEND::D3D12_BLEND_SRC_ALPHA;
-					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOneMinusSrc)) return D3D12_BLEND::D3D12_BLEND_INV_SRC_ALPHA;
-					else return D3D12_BLEND::D3D12_BLEND_ONE;
-					};
-				static auto get_ailu_blend_factor = [](const String& s) -> EBlendFactor {
-					if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOne)) return EBlendFactor::kOne;
-					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kZero)) return EBlendFactor::kZero;
-					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kSrc)) return EBlendFactor::kSrcAlpha;
-					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOneMinusSrc)) return EBlendFactor::kOneMinusSrcAlpha;
-					else return EBlendFactor::kOne;
-					};
-				_pipeline_blend_state._b_enable = true;
-				_pipeline_blend_state._src_color = get_ailu_blend_factor(blend_factors[0]);
-				_pipeline_blend_state._dst_color = get_ailu_blend_factor(blend_factors[1]);
-				bl_desc = D3DConvertUtils::ConvertToD3D12BlendDesc(_pipeline_blend_state,1);
-			}
-			for (auto& it = prop_end_it; it != lines.end(); it++)
-			{
-				line = it->substr(2);
-				if (line.find("multi") != line.npos)
-				{
-					//format: groupname_keywordname
-					auto keywords_str = line.substr(line.find_first_of("e") + 1);
-					keywords_str = su::Trim(keywords_str);
-					auto kw_seq = su::Split(keywords_str, " ");
-					if (kw_seq.size() > 0)
-					{
-						String kw_group_name = kw_seq[0].substr(0, kw_seq[0].rfind("_"));
-						for (auto& kw : kw_seq)
-						{
-							if (std::find(_keywords[kw_group_name].begin(), _keywords[kw_group_name].end(), kw) == _keywords[kw_group_name].end())
-								_keywords[kw_group_name].emplace_back(kw);
-						}
-					}
-				}
-			}
-		}
-		else
-		{
-			g_pLogMgr->LogErrorFormat("PreProcess shader: {} with line count 0", _src_file_path);
-		}
-		_pso_desc.RasterizerState = r_desc;
-		_pso_desc.BlendState = bl_desc;
-		if (need_zbuf_count == 0)
-		{
-			_pipeline_ds_state._b_depth_write = false;
-			_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
-			_pso_desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
-		}
-		_pipeline_raster_state.Hash(static_cast<u8>(ALHash::CommonRuntimeHasher(_pipeline_raster_state)));
-		_pipeline_blend_state.Hash(static_cast<u8>(ALHash::CommonRuntimeHasher(_pipeline_blend_state)));
-		_pipeline_ds_state.Hash(static_cast<u8>(ALHash::CommonRuntimeHasher(_pipeline_ds_state)));
-		_pipeline_input_layout.Hash(static_cast<u8>(ALHash::CommonRuntimeHasher(_pipeline_input_layout)));
-
-		_pso_desc.RasterizerState = D3DConvertUtils::ConvertToD3D12RasterizerDesc(_pipeline_raster_state);
-		_pso_desc.BlendState = D3DConvertUtils::ConvertToD3D12BlendDesc(_pipeline_blend_state);
-		_pso_desc.DepthStencilState = D3DConvertUtils::ConvertToD3D12DepthStencilDesc(_pipeline_ds_state);
-		_topology = ConvertTopologyToType(_pso_desc.PrimitiveTopologyType);
-	}
-
 	void D3DShader::Reset()
 	{
-		if (_p_vblob != nullptr) _p_vblob->Release();
-		if (_p_pblob != nullptr) _p_pblob->Release();
-		if (_p_v_reflection != nullptr) _p_v_reflection->Release();
-		if (_p_p_reflection != nullptr) _p_p_reflection->Release();
+		if (_p_vblob != nullptr) _p_vblob.Reset();
+		if (_p_pblob != nullptr) _p_pblob.Reset();
+		if (_p_v_reflection != nullptr) _p_v_reflection.Reset();
+		if (_p_p_reflection != nullptr) _p_p_reflection.Reset();
 		_vertex_input_num = 0u;
 		memset(_vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
-		_variable_offset.clear();
-		//_pipeline_raster_state = RasterizerState();
-		//_pipeline_ds_state;
-		//_pipeline_blend_state;
 		_pipeline_topology = ETopology::kTriangle;
-	}
-
-	const List<ShaderPropertyInfo>& D3DShader::GetShaderPropertyInfos() const
-	{
-		return _shader_prop_infos;
 	}
 
 	uint8_t* D3DShader::GetCBufferPtr(uint32_t index)
@@ -892,193 +387,104 @@ namespace Ailu
 		return _p_cbuffer + RenderConstants::kPerFrameDataSize + index * RenderConstants::kPerMaterialDataSize;
 	}
 
-	void D3DShader::Bind()
+	void D3DShader::LoadShaderReflection(ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps)
 	{
-		auto cmdlist = D3DContext::GetInstance()->GetCmdList();
-		_pso_sys.Bind(cmdlist);
-		cmdlist->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		if (_per_mat_buf_bind_slot == -1) return;
-		D3D12_GPU_DESCRIPTOR_HANDLE matHandle;
-		matHandle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _desc_size;
-		cmdlist->SetGraphicsRootDescriptorTable(_per_mat_buf_bind_slot, matHandle);
+		D3D12_SHADER_DESC desc{};
+		//parser vs reflecton	
+		ref_vs->GetDesc(&desc);
+		{
+			if (desc.InputParameters > 10)
+			{
+				AL_ASSERT(true, "LayoutDesc count must less than 10");
+				return;
+			}
+			Vector<VertexBufferLayoutDesc> vb_input_desc{};
+			for (uint32_t i = 0u; i < desc.InputParameters; i++)
+			{
+				D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
+				ref_vs->GetInputParameterDesc(i, &input_desc);
+				_vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+				++_vertex_input_num;
+				vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, GetShaderDataType(input_desc.SemanticName), input_desc.Register));
+			}
+			_pipeline_input_layout = VertexBufferLayout(vb_input_desc);
+			for (uint32_t i = 0u; i < desc.BoundResources; i++)
+			{
+				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
+				ref_vs->GetResourceBindingDesc(i, &bind_desc);
+				auto res_type = bind_desc.Type;
+				if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+				{
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+				}
+				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
+				{
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+				}
+				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
+				{
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+				}
+			}
+		}
+		//parser ps reflecton	
+		{
+			ref_ps->GetDesc(&desc);
+			for (uint32_t i = 0u; i < desc.BoundResources; i++)
+			{
+				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
+				ref_ps->GetResourceBindingDesc(i, &bind_desc);
+				auto res_type = bind_desc.Type;
+				if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+				{
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+				}
+				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
+				{
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+				}
+				else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
+				{
+					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+				}
+			}
+			for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
+			{
+				auto cbuf = ref_ps->GetConstantBufferByIndex(i);
+				D3D12_SHADER_BUFFER_DESC desc{};
+				cbuf->GetDesc(&desc);
+				for (uint32_t j = 0u; j < desc.Variables; j++)
+				{
+					auto variable = cbuf->GetVariableByIndex(j);
+					D3D12_SHADER_VARIABLE_DESC vdesc{};
+					variable->GetDesc(&vdesc);
+					uint8_t offset = (uint8_t)vdesc.StartOffset;
+					uint8_t size = (uint8_t)vdesc.Size;
+					uint16_t variable_info = 0u;
+					variable_info |= offset;
+					variable_info <<= 8;
+					variable_info |= size;
+					auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
+					_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
+				}
+			}
+		}
+		//parser additon info
+		LoadAdditionalShaderReflection(_src_file_path);
 	}
 
 	void D3DShader::Bind(uint32_t index)
 	{
-		if (index > RenderConstants::kMaxMaterialDataCount)
-		{
-			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
-			return;
-		}
-		static auto cmdlist = D3DContext::GetInstance()->GetCmdList();
+		Shader::Bind(index);
 		static auto context = D3DContext::GetInstance();
-		//_pso_sys.Bind(cmdlist);
-		//cmdlist->IASetPrimitiveTopology(_topology);
-		GraphicsPipelineStateMgr::ConfigureVertexInputLayout(_pipeline_input_layout.Hash());
-		GraphicsPipelineStateMgr::ConfigureRasterizerState(_pipeline_raster_state.Hash());
-		GraphicsPipelineStateMgr::ConfigureDepthStencilState(_pipeline_ds_state.Hash());
-		GraphicsPipelineStateMgr::ConfigureTopology(static_cast<u8>(ALHash::Hasher(_pipeline_topology)));
-		GraphicsPipelineStateMgr::ConfigureBlendState(_pipeline_blend_state.Hash());
-		GraphicsPipelineStateMgr::ConfigureShader(_id);
+
 		if (_per_mat_buf_bind_slot != -1)
 		{
-			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufferViewDescPtr(1 + index)), EBindResDescType::kConstBuffer, static_cast<u8>(_per_mat_buf_bind_slot));
-			//cmdlist->SetGraphicsRootConstantBufferView(_per_mat_buf_bind_slot, context->GetCBufferViewDesc(1 + index).BufferLocation);
+			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(1 + index)), EBindResDescType::kConstBuffer, static_cast<u8>(_per_mat_buf_bind_slot));
 		}
 		if (_per_frame_buf_bind_slot != -1)
 		{
-			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufferViewDescPtr(0)), EBindResDescType::kConstBuffer, _per_frame_buf_bind_slot);
-			//cmdlist->SetGraphicsRootConstantBufferView(_per_frame_buf_bind_slot, context->GetCBufferViewDesc(0).BufferLocation);
-		}
-	}
-
-	inline std::string D3DShader::GetName() const
-	{
-		return _name;
-	}
-
-	inline uint32_t D3DShader::GetID() const
-	{
-		return _id;
-	}
-
-	inline const std::unordered_map<std::string, ShaderBindResourceInfo>& D3DShader::GetBindResInfo() const
-	{
-		return _bind_res_infos;
-	}
-
-	bool D3DShader::Compile()
-	{
-		ComPtr<ID3D12ShaderReflection> _tmp_p_v_reflection;
-		ComPtr<ID3D12ShaderReflection> _tmp_p_p_reflection;
-		ComPtr<ID3DBlob> _tmp_p_vblob = nullptr;
-		ComPtr<ID3DBlob> _tmp_p_pblob = nullptr;
-		bool succeed = true;
-		try
-		{
-#ifdef SHADER_DXC
-			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
-			LoadShaderReflection(_p_reflection.Get());
-			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
-			LoadShaderReflection(_p_reflection.Get());
-#else
-			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "VSMain", "vs_5_0", _tmp_p_vblob, _tmp_p_v_reflection);
-			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "PSMain", "ps_5_0", _tmp_p_pblob, _tmp_p_p_reflection);
-#endif // SHADER_DXC
-		}
-		catch (const std::exception&)
-		{
-			succeed = false;
-			g_pLogMgr->LogErrorFormat("Compile shader with src {0} failed!", _src_file_path);
-			return false;
-		}
-		is_error = !succeed;
-		if (succeed)
-		{
-			Reset();
-			PreProcessShader();
-			LoadShaderReflection(_tmp_p_v_reflection.Get(), EShaderType::kVertex);
-			LoadShaderReflection(_tmp_p_p_reflection.Get(), EShaderType::kPixel);
-			LoadAdditionInfo();
-			//{
-			//	auto it = _shader_prop_infos.begin();
-			//	while (it != _shader_prop_infos.end())
-			//	{
-			//		if (!_bind_res_infos.contains(it->_value_name))
-			//		{
-			//			it = _shader_prop_infos.erase(it);
-			//		}
-			//		else
-			//			it++;
-			//	}
-			//}
-			LoadAdditionalShaderReflection(_src_file_path);
-			_p_vblob = _tmp_p_vblob;
-			_p_pblob = _tmp_p_pblob;
-			_p_v_reflection = _tmp_p_v_reflection;
-			_p_p_reflection = _tmp_p_p_reflection;
-			GenerateInternalPSO();
-			auto it = _bind_res_infos.find(RenderConstants::kCBufNameSceneMaterial);
-			if (it != _bind_res_infos.end()) _per_mat_buf_bind_slot = it->second._bind_slot;
-			it = _bind_res_infos.find(RenderConstants::kCBufNameSceneState);
-			if (it != _bind_res_infos.end()) _per_frame_buf_bind_slot = it->second._bind_slot;
-			return true;
-		}
-		return false;
-	}
-
-	void D3DShader::SetGlobalVector(const std::string& name, const Vector4f& vector)
-	{
-		auto it = _variable_offset.find(name);
-		if (it == _variable_offset.end())
-		{
-			//LOG_WARNING("variable: {} don't exist in shader: {}",name,_name);
-			return;
-		}
-		memcpy(_p_cbuffer + GetPerFramePropertyOffset(name), &vector, sizeof(vector));
-	}
-
-	void D3DShader::SetGlobalVector(const std::string& name, const Vector3f& vector)
-	{
-	}
-
-	void D3DShader::SetGlobalVector(const std::string& name, const Vector2f& vector)
-	{
-	}
-
-	void D3DShader::SetGlobalMatrix(const std::string& name, const Matrix4x4f& mat)
-	{
-		memcpy(_p_cbuffer + GetPerFramePropertyOffset(name), &mat, sizeof(mat));
-	}
-
-	void D3DShader::SetGlobalMatrix(const std::string& name, const Matrix3x3f& mat)
-	{
-	}
-
-	const Vector<String>& D3DShader::GetVSInputSemanticSeqences() const
-	{
-		return _semantic_seq;
-	}
-
-	Vector<Material*> D3DShader::GetAllReferencedMaterials()
-	{
-		Vector<Material*> ret;
-		ret.reserve(_reference_mats.size());
-		for (auto it = _reference_mats.begin(); it != _reference_mats.end(); it++)
-			ret.emplace_back(*it);
-		return ret;
-	}
-
-	const std::set<String>& D3DShader::GetSourceFiles() const
-	{
-		return _source_files;
-	}
-
-	Vector4f D3DShader::GetVectorValue(const std::string& name)
-	{
-		auto it = _bind_res_infos.find(name);
-		if (it != _bind_res_infos.end())
-		{
-			return *reinterpret_cast<Vector4f*>(_p_cbuffer + ShaderBindResourceInfo::GetVariableOffset(it->second));
-		}
-		else
-		{
-			g_pLogMgr->LogWarningFormat("Get vector: {} on shader: {} failed!", name, _name);
-			return Vector4f::Zero;
-		}
-	}
-
-	float D3DShader::GetFloatValue(const std::string& name)
-	{
-		auto it = _bind_res_infos.find(name);
-		if (it != _bind_res_infos.end())
-		{
-			return *reinterpret_cast<float*>(_p_cbuffer + ShaderBindResourceInfo::GetVariableOffset(it->second));
-		}
-		else
-		{
-			g_pLogMgr->LogWarningFormat("Get float: {} on shader: {} failed!", name, _name);
-			return 0.0f;
+			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(0)), EBindResDescType::kConstBuffer, _per_frame_buf_bind_slot);
 		}
 	}
 
@@ -1094,30 +500,8 @@ namespace Ailu
 		return nullptr;
 	}
 
-	const String& D3DShader::GetSrcPath() const
-	{
-		return _src_file_path;
-	}
-
 	ID3D12RootSignature* D3DShader::GetSignature()
 	{
-		auto [sig, pso] = _pso_sys.GetFront();
-		return sig.Get();
-	}
-	ID3D12ShaderReflection* D3DShader::GetD3DReflectionInfo() const
-	{
-		return _p_p_reflection.Get();
-	}
-	ID3D12ShaderReflection* D3DShader::GetD3DReflectionInfo(const EShaderType& type) const
-	{
-		switch (type)
-		{
-		case Ailu::EShaderType::kVertex:
-			return _p_v_reflection.Get();
-		case Ailu::EShaderType::kPixel:
-			return _p_p_reflection.Get();
-		}
-		LOG_ERROR("Unsupported type shader reflection info!");
-		return nullptr;
+		return _p_sig.Get();
 	}
 }

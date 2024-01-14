@@ -25,6 +25,17 @@ float3 TransformNormal(float3 object_normal)
 	return normalize(mul(_MatrixWorld, float4(object_normal, 0.0f)).xyz);
 }
 
+float4 TransformToLightSpace(uint shadow_index, float3 object_pos)
+{
+	float4x4 mvp = mul(_MainLightShadowMatrix, _MatrixWorld);
+	return mul(mvp, float4(object_pos, 1.0f));
+}
+
+float4 TransformFromWorldToLightSpace(uint shadow_index, float3 world_pos)
+{
+	return mul(_MainLightShadowMatrix, float4(world_pos, 1.0f));
+}
+
 	inline void GammaCorrect
 
 	(inout

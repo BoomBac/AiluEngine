@@ -121,6 +121,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\Inc\;$(SolutionDir)Engine\;$(SolutionDir)Engine\Ext\;$(SolutionDir)Editor\Inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableModules>true</EnableModules>
+      <AdditionalOptions>/FS /Zm1000 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>NotSet</SubSystem>

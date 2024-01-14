@@ -17,11 +17,13 @@ namespace Ailu
         void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) final;
         void ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color) final;
+        void ClearRenderTarget(RenderTexture* depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
         void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, uint32_t instance_count) final;
         void DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, uint32_t instance_count) final;
         void SetViewMatrix(const Matrix4x4f& view) final;
         void SetProjectionMatrix(const Matrix4x4f& proj) final;
         void SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj) final;
+        void SetShadowMatrix(const Matrix4x4f& shadow_matrix, u16 index) final;
         void SetViewports(const std::initializer_list<Rect>& viewports) final;
         void SetScissorRects(const std::initializer_list<Rect>& rects) final;
         void SetViewport(const Rect& viewport) final;
@@ -31,6 +33,7 @@ namespace Ailu
         void SetPSO(GraphicsPipelineStateObject* pso) final;
         void SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth) final;
         void SetRenderTarget(Ref<RenderTexture>& color) final;
+        void SetRenderTarget(RenderTexture* color, RenderTexture* depth) final;
         void ResolveToBackBuffer(Ref<RenderTexture>& color) final;
         void ResolveToBackBuffer(RenderTexture* color) final;
 

@@ -34,6 +34,12 @@ namespace Ailu
 			D3DContext::GetInstance()->GetCmdList()->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), clear_color, 1, nullptr);
 			});
 	}
+	void D3DCommandBuffer::ClearRenderTarget(RenderTexture* depth, float depth_value, u8 stencil_value)
+	{
+		_commands.emplace_back([=]() {
+			D3DContext::GetInstance()->GetCmdList()->ClearDepthStencilView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()), D3D12_CLEAR_FLAG_DEPTH, depth_value, stencil_value, 0, nullptr);
+			});
+	}
 	//void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth)
 	//{
 	//}
@@ -70,6 +76,11 @@ namespace Ailu
 			D3DContext::s_p_d3dcontext->_perframe_scene_data._MatrixVP = view * proj;
 			memcpy(D3DContext::s_p_d3dcontext->_p_cbuffer, &D3DContext::s_p_d3dcontext->_perframe_scene_data, sizeof(D3DContext::s_p_d3dcontext->_perframe_scene_data));
 			});
+	}
+	void D3DCommandBuffer::SetShadowMatrix(const Matrix4x4f& shadow_matrix, u16 index)
+	{
+		D3DContext::s_p_d3dcontext->_perframe_scene_data._MainLightShadowMatrix = shadow_matrix;
+		memcpy(D3DContext::s_p_d3dcontext->_p_cbuffer, &D3DContext::s_p_d3dcontext->_perframe_scene_data, sizeof(D3DContext::s_p_d3dcontext->_perframe_scene_data));
 	}
 	void D3DCommandBuffer::SetViewports(const std::initializer_list<Rect>& viewports)
 	{
@@ -111,7 +122,7 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count)
 	{
-		DrawRenderer(mesh.get(),material.get(),transform,instance_count);
+		DrawRenderer(mesh.get(), material.get(), transform, instance_count);
 	}
 	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, uint32_t instance_count)
 	{
@@ -123,14 +134,14 @@ namespace Ailu
 		_commands.emplace_back([=]() {
 			if (material != nullptr)
 			{
-				mesh->GetVertexBuffer()->Bind(material->GetShader()->GetVSInputSemanticSeqences());
+				mesh->GetVertexBuffer()->Bind(material->GetShader()->PipelineInputLayout());
 				mesh->GetIndexBuffer()->Bind();
 				material->Bind();
 			}
 			else
 			{
 				static Material* error = MaterialLibrary::GetMaterial("Error").get();
-				mesh->GetVertexBuffer()->Bind(error->GetShader()->GetVSInputSemanticSeqences());
+				mesh->GetVertexBuffer()->Bind(error->GetShader()->PipelineInputLayout());
 				mesh->GetIndexBuffer()->Bind();
 				error->Bind();
 			}
@@ -155,22 +166,47 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth)
 	{
-		GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), depth->GetFormat(),0);
-		_commands.emplace_back([=]() {
-			color->Transition(ETextureResState::kColorTagret);
-			depth->Transition(ETextureResState::kDepthTarget);
-			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
-				reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
-			});
+		SetRenderTarget(color.get(), depth.get());
 	}
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color)
 	{
-		GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(),0);
+		if (color->GetState() == ETextureResState::kColorTagret) return;
+		GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), 0);
 		_commands.emplace_back([=]() {
 			color->Transition(ETextureResState::kColorTagret);
 			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
 				NULL);
 			});
+	}
+	void D3DCommandBuffer::SetRenderTarget(RenderTexture* color, RenderTexture* depth)
+	{
+		static RenderTexture* pre_color = nullptr;
+		static RenderTexture* pre_depth = nullptr;
+		if (color && depth)
+		{
+			//if (pre_color  && *color == *pre_color)
+			//	return;
+			_commands.emplace_back([=]() {
+				GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), depth->GetFormat(), 0);
+				color->Transition(ETextureResState::kColorTagret);
+				depth->Transition(ETextureResState::kDepthTarget);
+				D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
+					reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
+				});
+			pre_color = color;
+			pre_depth = depth;
+		}
+		else
+		{
+			if (color == nullptr)
+			{
+				_commands.emplace_back([=]() {
+					GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::kALGFormatUnknown, depth->GetFormat(), 0);
+					depth->Transition(ETextureResState::kDepthTarget);
+					D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(0, nullptr, 0, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
+					});
+			}
+		}
 	}
 	void Ailu::D3DCommandBuffer::ResolveToBackBuffer(Ref<RenderTexture>& color)
 	{
@@ -179,9 +215,9 @@ namespace Ailu
 		static const auto material = MaterialLibrary::GetMaterial("Blit");
 		_commands.emplace_back([=]() {
 			D3DContext::s_p_d3dcontext->BeginBackBuffer();
-			mesh->GetVertexBuffer()->Bind(material->GetShader()->GetVSInputSemanticSeqences());
+			mesh->GetVertexBuffer()->Bind(material->GetShader()->PipelineInputLayout());
 			mesh->GetIndexBuffer()->Bind();
-			color->Transition(ETextureResState::kShaderResource);
+			//color->Transition(ETextureResState::kShaderResource);
 			material->SetTexture("_SourceTex", color);
 			material->Bind();
 			GraphicsPipelineStateMgr::EndConfigurePSO();
