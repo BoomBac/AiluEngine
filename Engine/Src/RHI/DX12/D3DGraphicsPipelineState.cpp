@@ -37,7 +37,7 @@ namespace Ailu
 
 			_d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::kALGFormatUnknown? 0 : _state_desc._rt_state._color_rt_num;
 			if (_state_desc._depth_stencil_state._b_depth_write) _d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._rt_state._depth_rt);
-			for (int i = 0; i < _d3d_pso_desc.NumRenderTargets; i++)
+			for (u16 i = 0; i < _d3d_pso_desc.NumRenderTargets; i++)
 			{
 				_d3d_pso_desc.RTVFormats[i] = ConvertToDXGIFormat(_state_desc._rt_state._color_rt[i]);
 			}

@@ -7,6 +7,7 @@
 
 namespace Ailu
 {
+	static Vector3f target_pos;
 	InputLayer::InputLayer() : Layer("InputLayer")
 	{
 		_b_handle_input = true;
@@ -15,10 +16,10 @@ namespace Ailu
 			LOG_WARNING("Current Camera is null");
 			Camera::GetDefaultCamera();
 		}
-		_origin_cam_state = new CameraState(*Camera::sCurrent);
-		_target_cam_state = new CameraState(*Camera::sCurrent);
 		_camera_near = Camera::sCurrent->Near();
 		_camera_far = Camera::sCurrent->Far();
+		FirstPersonCameraController::s_instance.Attach(Camera::sCurrent);
+		target_pos = Camera::sCurrent->Position();
 	}
 	InputLayer::InputLayer(const String& name) : InputLayer()
 	{
@@ -26,8 +27,7 @@ namespace Ailu
 	}
 	InputLayer::~InputLayer()
 	{
-		DESTORY_PTR(_origin_cam_state)
-		DESTORY_PTR(_target_cam_state)
+
 	}
 	void InputLayer::OnAttach()
 	{
@@ -70,11 +70,11 @@ namespace Ailu
 		if (Camera::sCurrent)
 		{
 			auto camera_pos = Camera::sCurrent->Position();
-			auto camera_rotation = Camera::sCurrent->Rotation();
+			auto camera_rotation = FirstPersonCameraController::s_instance._rotation;
 			_camera_near = Camera::sCurrent->Near();
 			_camera_far = Camera::sCurrent->Far();
 			ImGui::Begin("CameraDetail");
-			ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 1.0f, "%.2f");
+			ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 10.0f, "%.2f");
 			ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f, "%.2f");
 			ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.0f, 1.0f, "%.2f");
 			ImGui::SliderFloat("FovH", &_camera_fov_h, 0.0f, 120.0f, "%.2f");
@@ -102,12 +102,6 @@ namespace Ailu
 			init = true;
 		}
 		static Camera* pre_tick_camera = Camera::sCurrent;
-		if (pre_tick_camera != Camera::sCurrent)
-		{
-			_target_cam_state->UpdateState(*Camera::sCurrent);
-			_target_cam_state->UpdateState(*Camera::sCurrent);
-			LOG_WARNING("Camera changed!");
-		}
 		if (Camera::sCurrent)
 		{
 			Vector3f move_dis{ 0,0,0 };
@@ -135,19 +129,20 @@ namespace Ailu
 			{
 				move_dis -= Camera::sCurrent->Up() * _camera_move_speed * _camera_move_speed;
 			}
-			_target_cam_state->position += move_dis;
+			target_pos += move_dis;
+			static Vector2f target_rotation = { 0.f,0.f };
+			target_rotation = FirstPersonCameraController::s_instance._rotation;
 			auto cur_mouse_pos = Input::GetMousePos();
 			if (Input::IsKeyPressed(AL_KEY_RBUTTON))
 			{
 				if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f && abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
 				{
-					_target_cam_state->rotation.x += (cur_mouse_pos.x - pre_mouse_pos.x) * _camera_wander_speed * _camera_wander_speed;
-					_target_cam_state->rotation.y += (cur_mouse_pos.y - pre_mouse_pos.y) * _camera_wander_speed * _camera_wander_speed;
+					target_rotation.y += (cur_mouse_pos.x - pre_mouse_pos.x) * _camera_wander_speed * _camera_wander_speed;
+					target_rotation.x += (cur_mouse_pos.y - pre_mouse_pos.y) * _camera_wander_speed * _camera_wander_speed;
 				}
 			}
 			pre_mouse_pos = cur_mouse_pos;
-			_origin_cam_state->LerpTo(*_target_cam_state, lerp_speed * _lerp_speed_multifactor);
-			_origin_cam_state->UpdateCamrea(*Camera::sCurrent);
+			FirstPersonCameraController::s_instance.InterpolateTo(target_pos,target_rotation.x, target_rotation.y, lerp_speed * _lerp_speed_multifactor);
 			Camera::sCurrent->FovH(_camera_fov_h);
 			Camera::sCurrent->Near(_camera_near);
 			Camera::sCurrent->Far(_camera_far);

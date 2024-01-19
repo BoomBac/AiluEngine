@@ -25,9 +25,11 @@ namespace Ailu
 			return (var == 0) ? 1.0f / sqrt(2.0f) : 1.0f;
 		}
 		constexpr float kPi = 3.1415926f;
+		constexpr float kHalfPi = kPi / 2.0f;
 		constexpr float kDPi = kPi * 2.f;
 		constexpr float one_over_four = 1.f / 4.f;
 		constexpr float Pi_over_sixteen = kPi / 16.f;
+		constexpr float kFloatEpsilon = 1e-6f;
 
 	}
 	using namespace MathInternal;
@@ -109,8 +111,8 @@ namespace Ailu
 	template<typename T>
 	struct Vector2D
 	{
-		static const Vector2D<T> Zero;
-		static const Vector2D<T> One;
+		static const Vector2D<T> kZero;
+		static const Vector2D<T> kOne;
 		union
 		{
 			T data[2];
@@ -125,8 +127,19 @@ namespace Ailu
 		Vector2D<T>(const T& v, const T& w) : x(v), y(w) {};
 		operator T* () { return data; };
 		operator const T* () { return static_cast<const T*>(data); };
-		T& operator[](uint32_t index) { return data[index];}
-		const T& operator[](uint32_t index) const{ return data[index];}
+		T& operator[](uint32_t index) { return data[index]; }
+		const T& operator[](uint32_t index) const { return data[index]; }
+
+		std::string ToString(int precision = 2)
+		{
+			return std::format("({:.{}f},{:.{}f})", data[0], precision, data[1], precision);
+		}
+
+		friend std::ostream& operator<<(std::ostream& os, const Vector2D<T>& vec)
+		{
+			os << vec.x << "," << vec.y;
+			return os;
+		}
 
 		Vector2D<T>& operator+=(const Vector2D<T>& other) {
 			for (uint8_t i = 0; i < CountOf(data); i++) {
@@ -152,23 +165,26 @@ namespace Ailu
 		Vector2D<T>& operator/=(const Vector2D<T>& other) {
 			for (uint8_t i = 0; i < CountOf(data); i++) {
 				//AL_ASSERT(other.data[i] == 0.f, "vector divide by zero commpoent!")
-					data[i] /= other.data[i];
+				data[i] /= other.data[i];
 			}
 			return *this;
 		}
 	};
 	template <typename T>
-	const Vector2D<T> Vector2D<T>::Zero(0, 0);
+	const Vector2D<T> Vector2D<T>::kZero(0, 0);
 	template <typename T>
-	const Vector2D<T> Vector2D<T>::One(1, 1);
+	const Vector2D<T> Vector2D<T>::kOne(1, 1);
 	using Vector2f = Vector2D<float>;
 
 	template <typename T>
 	struct Vector3D
 	{
-		static const Vector3D<T> Zero;
-		static const Vector3D<T> One;
+		static const Vector3D<T> kZero;
+		static const Vector3D<T> kOne;
 		static const Vector3D<T> kForward;
+		static const Vector3D<T> kUp;
+		static const Vector3D<T> kRight;
+		static const Vector3D<T> kVector3Epsilon;
 		union {
 			T data[3];
 			struct { T x, y, z; };
@@ -190,6 +206,11 @@ namespace Ailu
 		Vector3D<T>() {};
 		Vector3D<T>(const T& _v) : x(_v), y(_v), z(_v) {};
 		Vector3D<T>(const T& _x, const T& _y, const T& _z) : x(_x), y(_y), z(_z) {};
+
+		bool operator==(const Vector3D<T>& other) const
+		{
+			return memcmp(this, &other, sizeof(Vector3D<T>));
+		}
 
 		Vector3D<T>& operator=(const Vector3D<T>& other)
 		{
@@ -232,8 +253,8 @@ namespace Ailu
 			{
 				for (uint8_t i = 0; i < CountOf(data); i++) {
 					AL_ASSERT(other.data[i] == 0.f, "vector divide by zero commpoent!")
-					//if (other.data[i] == 0.f) throw(std::runtime_error("vector divide by zero commpoent!"));
-					data[i] /= other.data[i];
+						//if (other.data[i] == 0.f) throw(std::runtime_error("vector divide by zero commpoent!"));
+						data[i] /= other.data[i];
 				}
 			}
 			catch (const std::exception& e)
@@ -242,6 +263,14 @@ namespace Ailu
 			}
 			return *this;
 		}
+
+		Vector3D<T> operator*(float scale) const
+		{
+			Vector3D<T> v{ *this };
+			v *= scale;
+			return v;
+		}
+
 		friend std::ostream& operator<<(std::ostream& os, const Vector3D<T>& vec)
 		{
 			os << vec.x << "," << vec.y << "," << vec.z;
@@ -253,25 +282,31 @@ namespace Ailu
 		T& operator[](uint32_t index) { return data[index]; }
 		const T& operator[](uint32_t index) const { return data[index]; }
 
-		std::string ToString(int precision = 2) 
+		std::string ToString(int precision = 2)
 		{
 			return std::format("({:.{}f},{:.{}f},{:.{}f})", data[0], precision, data[1], precision, data[2], precision);
 		}
 	};
 	template <typename T>
-	const Vector3D<T> Vector3D<T>::Zero(0, 0, 0);
+	const Vector3D<T> Vector3D<T>::kZero(0, 0, 0);
 	template <typename T>
-	const Vector3D<T> Vector3D<T>::One (1, 1, 1);
+	const Vector3D<T> Vector3D<T>::kOne(1, 1, 1);
 	template <typename T>
-	const Vector3D<T> Vector3D<T>::kForward(0, 0, -1);
+	const Vector3D<T> Vector3D<T>::kForward(0, 0, 1);
+	template <typename T>
+	const Vector3D<T> Vector3D<T>::kUp(0, 1, 0);
+	template <typename T>
+	const Vector3D<T> Vector3D<T>::kRight(1, 0, 0);
+	template <typename T>
+	const Vector3D<T> Vector3D<T>::kVector3Epsilon(kFloatEpsilon, kFloatEpsilon, kFloatEpsilon);
 
 	using Vector3f = Vector3D<float>;
 
 	template <typename T>
 	struct Vector4D
 	{
-		static const Vector4D<T> Zero;
-		static const Vector4D<T> One;
+		static const Vector4D<T> kZero;
+		static const Vector4D<T> kOne;
 		union {
 			T data[4];
 			struct { T x, y, z, w; };
@@ -301,6 +336,12 @@ namespace Ailu
 			os << vec.x << "," << vec.y << "," << vec.z << "," << vec.w;
 			return os;
 		}
+
+		bool operator==(const Vector4D<T>& other) const
+		{
+			return memcmp(this, &other, sizeof(Vector4D<T>));
+		}
+
 		Vector4D<T>& operator+=(const Vector4D<T>& other) {
 			for (uint8_t i = 0; i < CountOf(data); i++) {
 				data[i] += other.data[i];
@@ -323,7 +364,7 @@ namespace Ailu
 		}
 
 		Vector4D<T>& operator/=(const Vector4D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) 
+			for (uint8_t i = 0; i < CountOf(data); i++)
 			{
 				if (other.data[i] == 0.f)
 				{
@@ -333,14 +374,31 @@ namespace Ailu
 			}
 			return *this;
 		}
+		Vector4D<T> operator+(const Vector4D<T>& other) const
+		{
+			Vector4D<T> v{ *this };
+			v += other;
+			return v;
+		}
+		Vector4D<T> operator-(const Vector4D<T>& other) const
+		{
+			Vector4D<T> v{ *this };
+			v -= other;
+			return v;
+		}
+		Vector4D<T> operator*(float scale) const
+		{
+			Vector4D<T> v{ *this };
+			v *= scale;
+			return v;
+		}
 	};
 	template <typename T>
-	const Vector4D<T> Vector4D<T>::Zero(0, 0, 0, 0);
+	const Vector4D<T> Vector4D<T>::kZero(0, 0, 0, 0);
 	template <typename T>
-	const Vector4D<T> Vector4D<T>::One(1, 1, 1, 1);
+	const Vector4D<T> Vector4D<T>::kOne(1, 1, 1, 1);
 
 	using Vector4f = Vector4D<float>;
-	using Quaternion = Vector4D<float>;
 	using R8G8B8A8Unorm = Vector4D<uint8_t>;
 	using R8G8B8Unorm = Vector3D<uint8_t>;
 	using R32G32B32Float = Vector3D<float>;
@@ -363,11 +421,12 @@ namespace Ailu
 	{
 #pragma warning(push)
 #pragma warning(disable: 4477)
-		int length =  CountOf(out_v.data);
+		int length = CountOf(out_v.data);
 		if (std::is_same<T, float>::value)
 		{
-			if (length == 3) return sscanf_s(vec_str, "%f,%f,%f", &out_v.x, &out_v.y, &out_v.z) == 3;
-			else if (length == 4) return sscanf_s(vec_str, "%f,%f,%f,%f", &out_v.x, &out_v.y, &out_v.z, &out_v.data[3]) == 4;
+			if (length == 2) return sscanf_s(vec_str, "%f,%f", &out_v.data[0], &out_v.data[1]) == 2;
+			else if (length == 3) return sscanf_s(vec_str, "%f,%f,%f", &out_v.data[0], &out_v.data[1], &out_v.data[2]) == 3;
+			else if (length == 4) return sscanf_s(vec_str, "%f,%f,%f,%f", &out_v.data[0], &out_v.data[1], &out_v.data[2],&out_v.data[3]) == 4;
 		}
 		return false;
 #pragma warning(pop)
@@ -393,13 +452,16 @@ namespace Ailu
 	static float LoadFloat(const char* f_str)
 	{
 		float tmp = 0.0f;
-		return sscanf_s(f_str, "%f", &tmp) == 1? tmp : 0.0f;
+		return sscanf_s(f_str, "%f", &tmp) == 1 ? tmp : 0.0f;
 	}
 
 
 
 	inline static float ToRadius(const float& angle) { return angle * kPi / 180.f; }
 	inline static float ToAngle(const float& radius) { return 180.f * radius / kPi; }
+
+	inline static float k2Angle = 180.f / kPi;
+	inline static float k2Radius = kPi / 180.f;
 
 	//inline static float Clamp(const float& value, const float& max, const float& min)
 	//{
@@ -432,6 +494,18 @@ namespace Ailu
 		}
 		return res;
 	}
+
+	template<template<typename> typename TT, typename T>
+	TT<T> operator*(const TT<T>& a, const TT<T>& b)
+	{
+		TT<T> res;
+		for (uint32_t i = 0; i < CountOf(a.data); i++)
+		{
+			res.data[i] = a.data[i] * b.data[i];
+		}
+		return res;
+	}
+
 	template<template<typename> typename TT, typename T>
 	TT<T> operator*(const TT<T>& v, const T& scalar)
 	{
@@ -529,6 +603,7 @@ namespace Ailu
 		{
 			T data[rows][cols];
 		};
+
 		T* operator[](int row_index)
 		{
 			return data[row_index];
@@ -683,7 +758,7 @@ namespace Ailu
 		return ret;
 	}
 
-	static float NormalizeAngle(float angle) 
+	static float NormalizeAngle(float angle)
 	{
 		float normalizedAngle = std::fmod(angle, 360.0f);
 		if (normalizedAngle > 180.0f)  normalizedAngle -= 360.0f;
@@ -701,10 +776,10 @@ namespace Ailu
 		//		temp[j] += vector[i] * matrix[i][j];
 		//	}
 		//}
-		temp.x = vector.x * matrix[0][0] + vector.y * matrix[1][0] + vector.z* matrix[2][0] +  vector.w* matrix[3][0];
-		temp.y = vector.x * matrix[0][1] + vector.y * matrix[1][1] + vector.z* matrix[2][1] +  vector.w* matrix[3][1];
-		temp.z = vector.x * matrix[0][2] + vector.y * matrix[1][2] + vector.z* matrix[2][2] +  vector.w* matrix[3][2];
-		temp.w = vector.x * matrix[0][3] + vector.y * matrix[1][3] + vector.z* matrix[2][3] +  vector.w* matrix[3][3];
+		temp.x = vector.x * matrix[0][0] + vector.y * matrix[1][0] + vector.z * matrix[2][0] + vector.w * matrix[3][0];
+		temp.y = vector.x * matrix[0][1] + vector.y * matrix[1][1] + vector.z * matrix[2][1] + vector.w * matrix[3][1];
+		temp.z = vector.x * matrix[0][2] + vector.y * matrix[1][2] + vector.z * matrix[2][2] + vector.w * matrix[3][2];
+		temp.w = vector.x * matrix[0][3] + vector.y * matrix[1][3] + vector.z * matrix[2][3] + vector.w * matrix[3][3];
 
 		//temp.x = vector.x * matrix[0][0] + vector.y * matrix[0][1] + vector.z * matrix[0][2] + vector.w * matrix[0][3];
 		//temp.y = vector.x * matrix[1][0] + vector.y * matrix[1][1] + vector.z * matrix[1][2] + vector.w * matrix[1][3];
@@ -1130,6 +1205,337 @@ namespace Ailu
 		return mat;
 	}
 
+	//https://github.com/apachecn/apachecn-c-cpp-zh/blob/master/docs/handson-cpp-game-ani-prog/04.md
+	struct Quaternion
+	{
+	public:
+		inline static float kQuatEpsilon = kFloatEpsilon;
+		union
+		{
+			Vector4f _quat;
+			struct { float x, y, z, w; };
+			struct { Vector3f v; float s; };
+		};
+	public:
+		Quaternion() : _quat(0.0f, 0.0f, 0.0f, 1.0f) {};
+		Quaternion(const Vector4f& quat) : _quat(quat) {};
+		Quaternion(float x, float y, float z, float w) : _quat(Vector4f(x, y, z, w)) {};
+		Quaternion(Vector3f v, float s) : _quat(Vector4f(v, w)) {};
+		friend std::ostream& operator<<(std::ostream& os, const Quaternion& q)
+		{
+			os << q.x << "," << q.y << "," << q.z << "," << q.w;
+			return os;
+		}
+		Quaternion& operator=(const Quaternion& other)
+		{
+			memcpy(this,&other,sizeof(Quaternion));
+			return *this;
+		}
+		Quaternion operator+(const Quaternion& other) const { return Quaternion(_quat + other._quat); };
+		Quaternion operator-(const Quaternion& other) const { return Quaternion(_quat - other._quat); };
+		Quaternion operator*(float scale) const { return Quaternion(_quat * scale); };
+		// left mulipty: other * current
+		Quaternion operator*(const Quaternion& other) const
+		{
+			return Quaternion(
+				other.x * w + other.y * z - other.z * y + other.w * x,
+				-other.x * z + other.y * w + other.z * x + other.w * y,
+				other.x * y - other.y * x + other.z * w + other.w * z,
+				-other.x * x - other.y * y - other.z * z + other.w * w
+			);
+		}
+
+		Vector3f operator*(const Vector3f& v) const
+		{
+			return this->v * 2.0f * DotProduct(this->v, v) +
+				v * (this->s * this->s - DotProduct(this->v, this->v)) +
+				CrossProduct(this->v, v) * 2.0f * this->s;
+		}
+
+		// right mulipty: current * other
+		Quaternion operator^(const Quaternion& other) const
+		{
+			return Quaternion(
+				w * other.w - x * other.x - y * other.y - z * other.z,
+				w * other.x + x * other.w - y * other.z + z * other.y,
+				w * other.y + x * other.z + y * other.w - z * other.x,
+				w * other.z - x * other.y + y * other.x + z * other.w
+			);
+		}
+
+		// right mulipty: current * other
+		Quaternion operator^(float f) const
+		{
+			float angle = 2.0f * acosf(s);
+			Vector3f axis = Normalize(v);
+			float halfCos = cosf(f * angle * 0.5f);
+			float halfSin = sinf(f * angle * 0.5f);
+			return Quaternion(axis.x * halfSin, axis.y * halfSin, axis.z * halfSin, halfCos);
+		}
+
+		bool operator==(const Quaternion& other) const
+		{
+			return (fabsf(this->x - other.x) <= kQuatEpsilon &&
+				fabsf(this->y - other.y) <= kQuatEpsilon &&
+				fabsf(this->z - other.z) <= kQuatEpsilon &&
+				fabsf(this->w - other.w) <= kQuatEpsilon);
+		}
+		bool operator!=(const Quaternion& other) const
+		{
+			return !(*this == other);
+		}
+
+		Quaternion operator-() const
+		{
+			return Conjugate(*this);
+		}
+
+		void NormalizeQ()
+		{
+			float lenSq = x * x + y * y + z * z + w * w;
+			if (lenSq < kQuatEpsilon) return;
+			float i_len = 1.0f / sqrtf(lenSq);
+			x *= i_len;
+			y *= i_len;
+			z *= i_len;
+			w *= i_len;
+		}
+
+
+		static Quaternion AngleAxis(float angle, const Vector3f& axis)
+		{
+			angle = ToRadius(angle);
+			Vector3f norm = Normalize(axis);
+			float s = sinf(angle * 0.5f);
+			return Quaternion(norm.x * s, norm.y * s, norm.z * s, cosf(angle * 0.5f));
+		}
+
+		static Quaternion RadiusAxis(float radius, const Vector3f& axis)
+		{
+			Vector3f norm = Normalize(axis);
+			float s = sinf(radius * 0.5f);
+			return Quaternion(norm.x * s, norm.y * s, norm.z * s, cosf(radius * 0.5f));
+		}
+
+		static Quaternion EulerAngles(float x, float y, float z)
+		{
+			//return Quaternion::AngleAxis(x, Vector3f::kRight) * Quaternion::AngleAxis(y, Vector3f::kUp) * Quaternion::AngleAxis(z, Vector3f::kForward);
+			return Quaternion::AngleAxis(x, Vector3f::kRight) * Quaternion::AngleAxis(z, Vector3f::kForward) * Quaternion::AngleAxis(y, Vector3f::kUp);
+		}
+
+		static Quaternion EulerAngles(Vector3f euler)
+		{
+			euler *= k2Radius;
+			double cr = cos(euler.x * 0.5);
+			double sr = sin(euler.x * 0.5);
+			double cp = cos(euler.y * 0.5);
+			double sp = sin(euler.y * 0.5);
+			double cy = cos(euler.z * 0.5);
+			double sy = sin(euler.z * 0.5);
+			Quaternion q;
+			q.w = cr * cp * cy + sr * sp * sy;
+			q.x = sr * cp * cy - cr * sp * sy;
+			q.y = cr * sp * cy + sr * cp * sy;
+			q.z = cr * cp * sy - sr * sp * cy;
+			return q;
+		}
+
+		static Vector3f EulerAngles(const Quaternion& q)
+		{
+			Vector3f e;
+			// pitch (y-axis rotation)
+			double sinp = std::sqrt(1 + 2 * (q.w * q.y - q.x * q.z));
+			double cosp = std::sqrt(1 - 2 * (q.w * q.y - q.x * q.z));
+			e.y = 2 * std::atan2(sinp, cosp) - kHalfPi;
+
+			double sinr_cosp = 2.0 * (q.w * q.x + q.y * q.z);
+			double cosr_cosp = 1.0 - 2.0 * (q.x * q.x + q.y * q.y);
+			e.x = std::atan2(sinr_cosp, cosr_cosp);
+			double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
+			double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
+			e.z = std::atan2(siny_cosp, cosy_cosp);
+			e *= k2Angle;
+			return e;
+		}
+
+		static Quaternion FromTo(const Vector3f& from, const Vector3f& to)
+		{
+			Vector3f f = Normalize(from);
+			Vector3f t = Normalize(to);
+			if (f == t)
+				return Quaternion();
+			else if (f == t * -1.0f)
+			{
+				Vector3f ortho = Vector3f(1, 0, 0);
+				if (fabsf(f.y) < fabsf(f.x)) {
+					ortho = Vector3f(0, 1, 0);
+				}
+				if (fabsf(f.z) < fabs(f.y) && fabs(f.z) < fabsf(f.x)) {
+					ortho = Vector3f(0, 0, 1);
+				}
+				Vector3f axis = Normalize(CrossProduct(f, ortho));
+				return Quaternion(axis.x, axis.y, axis.z, 0);
+			}
+			Vector3f half = Normalize(f + t);
+			Vector3f axis = CrossProduct(f, half);
+			return Quaternion(axis.x, axis.y, axis.z, DotProduct(f, half));
+		}
+
+		static Vector3f GetAxis(const Quaternion& quat)
+		{
+			return Normalize(Vector3f(quat.x, quat.y, quat.z));
+		}
+		static float GetAngle(const Quaternion& quat)
+		{
+			return 2.0f * acosf(quat.w);
+		}
+
+		static float GetAngle(const Quaternion& quat,const Vector3f& axis)
+		{
+			auto nq = NormalizedQ(quat);
+			auto naxis = Normalize(axis);
+
+		}
+
+		static bool IsSameOrientation(const Quaternion& l, const Quaternion& r)
+		{
+			return (fabsf(l.x - r.x) <= kQuatEpsilon &&
+				fabsf(l.y - r.y) <= kQuatEpsilon &&
+				fabsf(l.z - r.z) <= kQuatEpsilon &&
+				fabsf(l.w - r.w) <= kQuatEpsilon) ||
+				(fabsf(l.x + r.x) <= kQuatEpsilon &&
+					fabsf(l.y + r.y) <= kQuatEpsilon &&
+					fabsf(l.z + r.z) <= kQuatEpsilon &&
+					fabsf(l.w + r.w) <= kQuatEpsilon);
+		}
+
+		static float Dot(const Quaternion& a, const Quaternion& b)
+		{
+			return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+		}
+
+		static float LenSq(const Quaternion& q)
+		{
+			return q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+		}
+
+		static float Len(const Quaternion& q)
+		{
+			float lenSq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+			if (lenSq < kQuatEpsilon)
+				return 0.0f;
+			return sqrtf(lenSq);
+		}
+		static Quaternion NormalizedQ(const Quaternion& q)
+		{
+			float lenSq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+			if (lenSq < kQuatEpsilon)
+				return Quaternion();
+			float il = 1.0f / sqrtf(lenSq); // il: inverse length
+			return Quaternion(q.x * il, q.y * il, q.z * il, q.w * il);
+		}
+		//flip axis,replace inverse if quat's len sq is 1
+		static Quaternion Conjugate(const Quaternion& q)
+		{
+			return Quaternion(-q.x, -q.y, -q.z, q.w);
+		}
+
+		static Quaternion Inverse(const Quaternion& q)
+		{
+			float lenSq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+			if (lenSq < kQuatEpsilon)
+				return Quaternion();
+			float recip = 1.0f / lenSq;
+			return Quaternion(-q.x * recip, -q.y * recip, -q.z * recip, q.w * recip);
+		}
+
+		static Quaternion Identity()
+		{
+			return Quaternion(0.f, 0.f, 0.f, 1.f);
+		}
+
+		static Quaternion Pure(const Quaternion& q)
+		{
+			return Quaternion(q.v, 0.f);
+		}
+
+		//linear blend
+		static Quaternion Mix(const Quaternion& from, const Quaternion& to, float t)
+		{
+			return from * (1.0f - t) + to * t;
+		}
+
+		static Quaternion NLerp(const Quaternion& from, const Quaternion& to, float t)
+		{
+			return NormalizedQ(from + (to - from) * t);
+		}
+
+		static Quaternion Slerp(const Quaternion& start, const Quaternion& end, float t)
+		{
+			if (fabsf(Dot(start, end)) > 1.0f - kQuatEpsilon) {
+				return NLerp(start, end, t);
+			}
+			Quaternion delta = Inverse(start) * end;
+			return NormalizedQ((delta ^ t) * start);
+		}
+
+		static Quaternion LookRotation(const Vector3f& direction, const Vector3f& up)
+		{
+			// Find orthonormal basis vectors
+			Vector3f f = Normalize(direction); // Object Forward
+			Vector3f u = Normalize(up); // Desired Up
+			Vector3f r = CrossProduct(u, f); // Object Right
+			u = CrossProduct(f, r); // Object Up
+			// From world forward to object forward
+			Quaternion worldToObject = FromTo(Vector3f(0, 0, 1), f);
+			// what direction is the new object up?
+			Vector3f objectUp = worldToObject * Vector3f(0, 1, 0);
+			// From object up to desired up
+			Quaternion u2u = FromTo(objectUp, u);
+			// Rotate to forward direction first
+			// then twist to correct up
+			Quaternion result = worldToObject * u2u;
+			// Don't forget to normalize the result
+			return NormalizedQ(result);
+		}
+
+		Matrix4x4f ToMat4f() const
+		{
+			Vector3f r = *this * Vector3f(1, 0, 0);
+			Vector3f u = *this * Vector3f(0, 1, 0);
+			Vector3f f = *this * Vector3f(0, 0, 1);
+			return { {{
+			{    r.x, r.y, r.z, 0.f},
+			{ u.x, u.y, u.z, 0.f},
+			{ f.x, f.y, f.z, 0.f},
+			{ 0.0f, 0.0f, 0.0f, 1.0f},
+			}} };
+		}
+
+		static Matrix4x4f ToMat4f(const Quaternion& q)
+		{
+			Vector3f r = q * Vector3f(1, 0, 0);
+			Vector3f u = q * Vector3f(0, 1, 0);
+			Vector3f f = q * Vector3f(0, 0, 1);
+			return { {{
+			{    r.x, r.y, r.z, 0.f},
+			{ u.x, u.y, u.z, 0.f},
+			{ f.x, f.y, f.z, 0.f},
+			{ 0.0f, 0.0f, 0.0f, 1.0f},
+			}} };
+		}
+
+		static Quaternion FromMat4f(const Matrix4x4f& m)
+		{
+			Vector3f up = Normalize(Vector3f(m[1][0], m[1][1], m[1][2]));
+			Vector3f forward = Normalize(
+				Vector3f(m[2][0], m[2][1], m[2][2]));
+			Vector3f right = CrossProduct(up, forward);
+			up = CrossProduct(forward, right);
+			return LookRotation(forward, up);
+		}
+	};
+
 	static void MatrixRotationQuaternion(Matrix4x4f& matrix, Quaternion q)
 	{
 		Matrix4x4f rotation = { {{
@@ -1211,13 +1617,13 @@ namespace Ailu
 	using Color32 = Vector4D<uint8_t>;
 	namespace Colors
 	{
-		static const Color kBlue = { 0.f,0.f,1.f ,1.0f};
+		static const Color kBlue = { 0.f,0.f,1.f ,1.0f };
 		static const Color kRed = { 1.f,0.f,0.f ,1.0f };
 		static const Color kGreen = { 0.f,1.f,0.f ,1.0f };
 		static const Color kWhite = { 1.f,1.f,1.f ,1.0f };
 		static const Color kBlack = { 0.f,0.f,0.f ,1.0f };
-		static const Color kGray = { 0.3f,0.3f,0.3f ,1.0f};
-		static const Color kYellow = { 1.0f,1.0f,0.0f ,1.0f};
+		static const Color kGray = { 0.3f,0.3f,0.3f ,1.0f };
+		static const Color kYellow = { 1.0f,1.0f,0.0f ,1.0f };
 	}
 
 	namespace ALHash
@@ -1329,7 +1735,7 @@ namespace Ailu
 			}
 			String ToString() const
 			{
-				return std::format("{}",_hash.to_ullong());
+				return std::format("{}", _hash.to_ullong());
 			}
 		private:
 			std::bitset<Size> _hash;

@@ -126,7 +126,7 @@ namespace Ailu
 		if (it != res_info.end())
 			return *reinterpret_cast<Vector4f*>(_p_cbuf_cpu + ShaderBindResourceInfo::GetVariableOffset(it->second));
 		return 0.0f;
-		return Vector4f::Zero;
+		return Vector4f::kZero;
 	}
 
 	void Material::SetTexture(const String& name, Ref<Texture> texture)

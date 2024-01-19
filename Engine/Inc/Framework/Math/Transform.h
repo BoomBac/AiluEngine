@@ -6,42 +6,209 @@
 
 namespace Ailu
 {
-	class Transform
+	//https://www.andre-gaschler.com/rotationconverter/
+	struct Transform
 	{
-		DECLARE_PRIVATE_PROPERTY(position, Position, Vector3f)
-		DECLARE_PRIVATE_PROPERTY(scale, Scale, Vector3f)
-		DECLARE_PRIVATE_PROPERTY(rotation, Rotation, Vector3f)
 	public:
-		Transform() 
+		Transform* _p_parent;
+		Vector3f _position;
+		Quaternion _rotation;
+		Vector3f _scale;
+		Vector3f _forward = Vector3f::kForward;
+		Vector3f _right = Vector3f::kRight;
+		Vector3f _up = Vector3f::kUp;
+		static Matrix4x4f ToMatrix(const Transform& transform)
 		{
-			_position = { 0.f,0.f,0.f };
-			_scale = { 1.f,1.f,1.f };
-			_rotation = { 0.f,0.f,0.f };
-			_world_mat = BuildIdentityMatrix();
+			Vector3f x = transform._rotation * Vector3f(1, 0, 0);
+			Vector3f y = transform._rotation * Vector3f(0, 1, 0);
+			Vector3f z = transform._rotation * Vector3f(0, 0, 1);
+			x = x * transform._scale.x; // Vector * float
+			y = y * transform._scale.y; // Vector * float
+			z = z * transform._scale.z; // Vector * float
+			Vector3f t = transform._position;
+			return { {{
+				{x.x, x.y, x.z, 0}, // X basis (& Scale)
+				{y.x, y.y, y.z, 0}, // Y basis (& scale)
+				{z.x, z.y, z.z, 0}, // Z basis (& scale)
+				{ t.x, t.y, t.z, 1 }  // Position
+			}} };
 		}
-		const Matrix4x4f& GetTransformMat()
+
+		//expensive! don't use realtime!
+		static Transform FromMatrix(const Matrix4x4f& m)
 		{
-			UpdateMatrix();
-			return _world_mat;
+			Transform out;
+			out._position = Vector3f(m[3][0], m[3][1], m[3][2]);
+			out._rotation = Quaternion::FromMat4f(m);
+			Matrix4x4f rotScaleMat{ {{
+				{ m[0][0], m[0][1], m[0][2], 0 },
+				{ m[1][0], m[1][1], m[1][2], 0 },
+				{ m[2][0], m[2][1], m[2][2], 0 },
+				{ 0, 0, 0, 1 }
+			}} };
+			Matrix4x4f invRotMat = Quaternion::ToMat4f(Quaternion::Inverse(out._rotation));
+			Matrix4x4f scaleSkewMat = rotScaleMat * invRotMat;
+			out._scale = Vector3f(scaleSkewMat[0][0],scaleSkewMat[1][1],scaleSkewMat[2][2]);
+			return out;
 		}
-		void UpdateMatrix()
+
+		static Transform Combine(const Transform& a, const Transform& b) 
 		{
-			Clamp(_rotation.x, -180.0f, 180.0f);
-			Clamp(_rotation.y, -180.0f, 180.0f);
-			Clamp(_rotation.z, -180.0f, 180.0f);
-			_world_mat = MatrixScale(_scale) * MatrixRotationYawPitchRoll(_rotation) * MatrixTranslation(_position);
+			Transform out;
+			out._scale = a._scale * b._scale;
+			out._rotation = b._rotation * a._rotation;
+			out._position = a._rotation * (a._scale * b._position);
+			out._position = a._position + out._position;
+			return out;
 		}
-		Transform& operator=(const Transform& other)
+
+		static Transform Inverse(const Transform& t)
 		{
-			this->_position = other._position;
-			this->_rotation = other._rotation;
-			this->_scale = other._scale;
-			this->_world_mat = other._world_mat;
-			return *this;
+			Transform inv;
+			inv._rotation = Quaternion::Inverse(t._rotation);
+			inv._scale.x = fabs(t._scale.x) < kFloatEpsilon ?
+				0.0f : 1.0f / t._scale.x;
+			inv._scale.y = fabs(t._scale.y) < kFloatEpsilon ?
+				0.0f : 1.0f / t._scale.y;
+			inv._scale.z = fabs(t._scale.z) < kFloatEpsilon ?
+				0.0f : 1.0f / t._scale.z;
+			Vector3f invTrans = t._position * -1.0f;
+			inv._position = inv._rotation * (inv._scale * invTrans);
+			return inv;
 		}
-	private:
-		Matrix4x4f _world_mat;
-	};
+
+		static Transform Mix(const Transform& a, const Transform& b, float t)
+		{
+			Quaternion bRot = b._rotation;
+			if (Quaternion::Dot(a._rotation, bRot) < 0.0f) {
+				bRot = -bRot;
+			}
+			return Transform(
+				lerp(a._position, b._position, t),
+				Quaternion::NLerp(a._rotation, bRot, t),
+				lerp(a._scale, b._scale, t));
+		}
+
+		static Vector3f TransformPoint(const Transform& a, const Vector3f& b)
+		{
+			Vector3f out;
+			out = a._rotation * (a._scale * b);
+			out = a._position + out;
+			return out;
+		}
+
+		static Vector3f TransformVector(const Transform& a, const Vector3f& b)
+		{
+			Vector3f out;
+			out = a._rotation * (a._scale * b);
+			return out;
+		}
+
+		static Transform GetWorldTransform(const Transform& transform)
+		{
+			Transform worldTransform = transform; // This is acopy, not a reference
+			if (transform._p_parent) 
+			{
+				Transform worldParent = GetWorldTransform(*transform._p_parent);
+				// Accumulate scale, Vector * Vector
+				worldTransform._scale = worldParent._scale * worldTransform._scale;
+				// Accumulate rotation, Quaternion * Quaternion
+				// Remember, quaternions multiply in reverse order! So:
+				// parent times child is written as: child * parent
+				worldTransform._rotation = worldTransform._rotation * worldParent._rotation;
+				// Accumulate position: scale first, Vector * vector
+				worldTransform._position = worldParent._scale * worldTransform._position;
+				// Accumulate position: rotate next, vector * Quaternion (quats rotate right to left)
+				worldTransform._position = worldParent._rotation * worldTransform._position;
+				// Accumulate position: transform last, Vector + Vector
+				worldTransform._position = worldParent._position + worldTransform._position;
+			}
+			return worldTransform;
+		}
+
+		static Matrix4x4f GetWorldMatrix(Transform transform)
+		{
+			Transform worldSpaceTransform = GetWorldTransform(transform);
+			return ToMatrix(worldSpaceTransform);
+		}
+
+		static Quaternion GetWorldRotation(const Transform& t)
+		{
+			return GetWorldTransform(t)._rotation;
+		}
+
+		static Vector3f GetWorldPosition(const Transform& t)
+		{
+			return GetWorldTransform(t)._position;
+		}
+
+		static Vector3f GetWorldScale(const Transform& t)
+		{
+			return GetWorldTransform(t)._scale;
+		}
+
+		static Transform LocalInverse(const Transform& t)
+		{
+			Quaternion invRotation = Quaternion::Inverse(t._rotation);
+			Vector3f invScale = Vector3f(0, 0, 0);
+			if (t._scale.x != 0.0f)
+				invScale.x = 1.0f / t._scale.x;
+			if (t._scale.y != 0)
+				invScale.y = 1.0f / t._scale.y;
+			if (t._scale.z != 0)
+				invScale.z = 1.0f / t._scale.z;
+			Vector3f invTranslation = invRotation * (invScale * (-1.0f * t._position));
+			Transform result;
+			result._position = invTranslation;
+			result._rotation = invRotation;
+			result._scale = invScale;
+			return result;
+		}
+
+		static void SetGlobalSRT(Transform& t, Vector3f s, Quaternion r, Vector3f p)
+		{
+			if (t._p_parent == nullptr) 
+			{
+				t._rotation = r;
+				t._position = p;
+				t._scale = s;
+				return;
+			}
+			auto worldParent = GetWorldTransform(*t._p_parent);
+			auto invParent = LocalInverse(worldParent);
+			Transform worldXForm;
+			worldXForm._position = p;
+			worldXForm._rotation = r;
+			worldXForm._scale = s;
+			worldXForm = Combine(invParent, worldXForm);
+			t._position = worldXForm._position;
+			t._rotation = worldXForm._rotation;
+			t._scale = worldXForm._scale;
+		}
+
+		void SetGlobalRotation(Transform& t, Quaternion rotation)
+		{
+			Transform worldXForm = GetWorldTransform(t);
+			SetGlobalSRT(t, worldXForm._scale, rotation, worldXForm._position);
+		}
+
+		void SetGlobalPosition(Transform& t, Vector3f position)
+		{
+			Transform worldXForm = GetWorldTransform(t);
+			SetGlobalSRT(t, worldXForm._scale, worldXForm._rotation, position);
+		}
+
+		void SetGlobalScale(Transform& t, Vector3f scale)
+		{
+			Transform worldXForm = GetWorldTransform(t);
+			SetGlobalSRT(t, scale, worldXForm._rotation, worldXForm._position);
+		}
+
+	public:
+		Transform() : _position(Vector3f::kZero), _rotation(Quaternion()), _scale(Vector3f::kOne) ,_p_parent(nullptr){}
+		Transform(const Vector3f& p, const Quaternion& r, const Vector3f& s) :
+			_position(p), _rotation(r), _scale(s) , _p_parent(nullptr) {}
+	}; 
 }
 
 

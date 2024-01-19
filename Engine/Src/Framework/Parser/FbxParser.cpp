@@ -424,12 +424,10 @@ namespace Ailu
 		ALHash::Vector2fHash v2hash{};
 		TimeMgr mgr;
 		mgr.Mark();
-#undef max(a,b) (((a) > (b)) ? (a) : (b))
 		constexpr float minf = std::numeric_limits<float>::lowest();
 		constexpr float maxf = std::numeric_limits<float>::max();
-		Vector3f min{maxf,maxf ,maxf };
-		Vector3f max{ minf,minf ,minf };
-#define max(a, b) (((a) > (b)) ? (a) : (b))
+		Vector3f vmin{maxf,maxf ,maxf };
+		Vector3f vmax{ minf,minf ,minf };
 		for (size_t i = 0; i < vertex_count; i++)
 		{
 			auto p = raw_pos[i], n = raw_normals[i];
@@ -444,16 +442,16 @@ namespace Ailu
 				normals.emplace_back(n);
 				positions.emplace_back(p);
 				uv0s.emplace_back(uv);
-				min = Min(min, p);
-				max = Max(max, p);
+				vmin = Min(vmin, p);
+				vmax = Max(vmax, p);
 			}
 			else indices.emplace_back(it->second);
 		}
 		LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
 		mesh->Clear();
 		float aabb_space = 1.0f;
-		mesh->_bound_box._max = max + Vector3f::One * aabb_space;
-		mesh->_bound_box._min = min - Vector3f::One * aabb_space;
+		mesh->_bound_box._max = vmax + Vector3f::kOne * aabb_space;
+		mesh->_bound_box._min = vmin - Vector3f::kOne * aabb_space;
 		vertex_count = (uint32_t)positions.size();
 		auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;

@@ -38,12 +38,16 @@ namespace Ailu
 		out_camera.Type(std::get<1>(scene_data.front()) == ECameraType::ToString(ECameraType::kPerspective) ? ECameraType::kPerspective : ECameraType::kOrthographic);
 		scene_data.pop();
 		Vector3f v3{};
+		Vector4f v4{};
 		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.Position(v3); });
-		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.Rotation(v3); });
+		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v4); out_camera.Rotation(v4); });
 		ProcessValueAndPop(scene_data, [&](String str) {out_camera.FovH(LoadFloat(str.c_str())); });
 		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Aspect(LoadFloat(str.c_str())); });
 		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Near(LoadFloat(str.c_str())); });
 		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Far(LoadFloat(str.c_str())); });
+		Vector2f v2{};
+		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v2); FirstPersonCameraController::s_instance._rotation = v2; });
+		out_camera.RecalculateMarix(true);
 	}
 
 	int SceneMgr::Initialize()
@@ -121,6 +125,7 @@ namespace Ailu
 			ss << level1 << "Aspect: " << Camera::sCurrent->Aspect() << endl;
 			ss << level1 << "Near: " << Camera::sCurrent->Near() << endl;
 			ss << level1 << "Far: " << Camera::sCurrent->Far() << endl;
+			ss << level1 << "ControllerRotation: " << FirstPersonCameraController::s_instance._rotation << endl;
 			ss << "SceneGraph: " << endl;
 			//SerializeActor(ss, scene->GetSceneRoot(), 2);
 			scene->Root()->Serialize(ss, level1);
@@ -195,7 +200,7 @@ namespace Ailu
 		{	
 			auto& aabb = static_mesh->GetAABB();
 			RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(),static_mesh->GetMaterial().get(), 
-			static_mesh->GetOwner()->GetComponent<TransformComponent>()->_transform.GetTransformMat(), 1);
+			Transform::GetWorldMatrix(static_mesh->GetOwner()->GetComponent<TransformComponent>()->_transform), 1);
 		}
 	}
 
@@ -298,8 +303,8 @@ namespace Ailu
 		point_light->GetComponent<LightComponent>()->_light._light_param.x = 500.0f;
 
 		SceneActor* spot_light = Actor::Create<LightActor>("spot_light");
-		spot_light->GetTransform().Position({ 0.0,500.0,0.0 });
-		spot_light->GetTransform().Rotation({ 82.0,0.0,0.0 });
+		spot_light->GetTransform()._position = { 0.0,500.0,0.0 };
+		spot_light->GetTransform()._rotation = Quaternion();
 		auto light_comp = spot_light->GetComponent<LightComponent>();
 		light_comp->_light_type = ELightType::kSpot;
 		light_comp->_light._light_param.x = 500.0f;

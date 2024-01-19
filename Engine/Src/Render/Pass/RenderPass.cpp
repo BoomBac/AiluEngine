@@ -22,6 +22,7 @@ namespace Ailu
 			for (auto& obj : RenderQueue::GetOpaqueRenderables())
 			{
 				//obj._mat->SetTexture("MainLightShadowMap", s_p_shadow_map);
+				//Quaternion q = Quaternion::AngleAxis(g_pTimeMgr->GetElapsedSinceLastMark(),Vector3f::kUp);
 				cmd->DrawRenderer(obj._mesh, obj._mat, obj._transform, obj._instance_count);
 			}
 		}
@@ -33,6 +34,9 @@ namespace Ailu
 				cmd->DrawRenderer(obj._mesh, wireframe_mat.get(), obj._transform, obj._instance_count);
 			}
 		}
+		static Vector3f axis = Vector3f::kUp;
+		Quaternion q = Quaternion::AngleAxis(g_pTimeMgr->GetScaledWorldTime(), axis);
+		cmd->DrawRenderer(MeshPool::GetMesh("cube").get(), MaterialLibrary::GetMaterial("Materials/StandardPBR_new.alasset").get(), q.ToMat4f(), 1);
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::ReleaseCommandBuffer(cmd);
 	}

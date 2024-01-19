@@ -7,8 +7,8 @@ namespace Ailu
 	Camera* Camera::GetDefaultCamera()
 	{
 		static Camera cam(16.0F / 9.0F);
-		cam.Position(1356.43f, 604.0f, -613.45f);
-		cam.Rotate(11.80f, -59.76f);
+		cam.Position(Vector3f::kZero);
+		cam.Rotation(Quaternion());
 		cam.SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
 		Camera::sCurrent = &cam;
 		return &cam;
@@ -37,82 +37,49 @@ namespace Ailu
 		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Up() * p_camera->Far(), Colors::kBlue);
 	}
 
-	void Camera::Update()
+	Camera::Camera() : Camera(16.0F / 9.0F)
 	{
-		b_dirty_ = true;
-		UpdateViewMatrix();
+	}
+
+	Camera::Camera(float aspect, float near_clip, float far_clip, ECameraType::ECameraType camera_type) :
+		_aspect(aspect), _near_clip(near_clip), _far_clip(far_clip), _camera_type(camera_type),_fov_h(60.0f),
+		_forward(Vector3f::kForward), _right(Vector3f::kRight), _up(Vector3f::kUp)
+	{
+		IMPLEMENT_REFLECT_FIELD(Camera);
+		MarkDirty();
+		RecalculateMarix();
+	}
+
+	void Camera::RecalculateMarix(bool force)
+	{
+		if (!force && !_is_dirty) return;
 		if (_camera_type == ECameraType::kPerspective)
-			BuildPerspectiveFovLHMatrix(_proj_matrix, ToRadius(_fov_h), _aspect, _near_clip, _far_clip);
+			BuildPerspectiveFovLHMatrix(_proj_matrix, _fov_h * k2Radius, _aspect, _near_clip, _far_clip);
 		else
 		{
 			float left = -_size * 0.5f;
 			float right = -left;
 			float top = right / _aspect;
 			float bottom = -top;
-			BuildOrthographicMatrix(_proj_matrix,left,right,top,bottom,_near_clip,_far_clip);
+			BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom, _near_clip, _far_clip);
 		}
-		CalculateFrustum();
+		_forward = _rotation * Vector3f::kForward;
+		_up = _rotation * Vector3f::kUp;
+		_right = CrossProduct(_up, _forward);
+		BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
 	}
+
 	void Camera::SetLens(float fovy, float aspect, float nz, float fz)
 	{
 		_fov_h = fovy;
 		_aspect = aspect;
 		_near_clip = nz;
 		_far_clip = fz;
-		//_near_plane_height = 2.f * nz * tanf(0.5f * _hfov);
-		//_far_plane_height = 2.f * fz * tanf(0.5f * _hfov);
-		BuildPerspectiveFovLHMatrix(_proj_matrix, _fov_h, _aspect, nz, fz);
-	}
-	void Camera::FovV(float angle)
-	{
-		_fov_v = angle;
-		_fov_h = ToAngle(2.0f * atanf(tanf(ToRadius(_fov_v) / 2.0f) * _aspect));
-		BuildPerspectiveFovLHMatrix(_proj_matrix, ToRadius(_fov_v), _aspect, _near_clip, _far_clip);
 	}
 
-	void Camera::Position(const float& x, const float& y, const float& z)
+	void Camera::LookTo(const Vector3f& direction, const Vector3f& up)
 	{
-		_position.x = x;
-		_position.y = y;
-		_position.z = z;
-		b_dirty_ = true;
-		UpdateViewMatrix();
-	}
-	void Camera::Position(const Vector3f& new_pos)
-	{
-		_position = new_pos;
-		b_dirty_ = true;
-		UpdateViewMatrix();
-	}
-	void Camera::Rotation(const Vector3f& new_rot)
-	{
-		_rotation.x = NormalizeAngle(new_rot.x);
-		_rotation.y = NormalizeAngle(new_rot.y);
-	}
-	void Camera::MoveForward(float dis)
-	{
-		Vector3f dx = DotProduct(_forward, Vector3f{ dis,0.f,0.f });
-		Vector3f dy = DotProduct(_forward, Vector3f{ 0.f,dis,0.f });
-		Vector3f dz = DotProduct(_forward, Vector3f{ 0.f,0.f,dis });
-		Vector3f len = { dx[0],dy[0],dz[0] };
-		_position = len + _position;
-		b_dirty_ = true;
-		UpdateViewMatrix();
-	}
-	void Camera::MoveRight(float dis)
-	{
-		Vector3f dx = DotProduct(_right, Vector3f{ dis,0.f,0.f });
-		Vector3f dy = DotProduct(_right, Vector3f{ 0.f,dis,0.f });
-		Vector3f dz = DotProduct(_right, Vector3f{ 0.f,0.f,dis });
-		Vector3f len = { dx[0],dy[0],dz[0] };
-		_position = len + _position;
-		b_dirty_ = true;
-		UpdateViewMatrix();
-	}
-	void Camera::LookTo(const Vector3f& target, const Vector3f& up)
-	{
-		BuildViewMatrixLookToLH(_view_matrix, _position, target, up);
-		b_dirty_ = false;
+		BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
 	}
 
 	bool Camera::IsInFrustum(const Vector3f& pos)
@@ -178,61 +145,75 @@ namespace Ailu
 		_far_top_right = far_top_right;
 	}
 
-	void Camera::RotatePitch(float angle)
-	{
-		Matrix4x4f m{};
-		MatrixRotationAxis(m, _right, ToRadius(angle));
-		TransformCoord(_up, m);
-		TransformCoord(_forward, m);
-		b_dirty_ = true;
-		UpdateViewMatrix();
-	}
-	void Camera::RotateYaw(float angle)
-	{
-		Matrix4x4f m{};
-		MatrixRotationY(m, ToRadius(angle));
-		TransformCoord(_right, m);
-		TransformCoord(_up, m);
-		TransformCoord(_forward, m);
-		b_dirty_ = true;
-		UpdateViewMatrix();
-	}
-	void Camera::Rotate(float vertical, float horizontal)
-	{
-		_rotation.x = NormalizeAngle(horizontal);
-		_rotation.y = NormalizeAngle(vertical);
-		Matrix4x4f m{};
-		MatrixRotationY(m, ToRadius(_rotation.x));
-		_right = TransformCoord(m, kRight);
-		_up = TransformCoord(m, kUp);
-		_forward = TransformCoord(m, kForward);
+	//---------------------------------------------------------FirstPersonCameraController--------------------------------------------------------
+	FirstPersonCameraController FirstPersonCameraController::s_instance;
 
-		Matrix4x4f m0{};
-		MatrixRotationAxis(m0, _right, ToRadius(_rotation.y));
-		TransformCoord(_up, m0);
-		TransformCoord(_forward, m0);
-		b_dirty_ = true;
-		UpdateViewMatrix();
-	}
-	void Camera::UpdateViewMatrix()
+	FirstPersonCameraController::FirstPersonCameraController() : FirstPersonCameraController(nullptr)
 	{
-		if (b_dirty_)
-		{
-			_rotation.x = NormalizeAngle(_rotation.x);
-			_rotation.y = NormalizeAngle(_rotation.y);
-			Matrix4x4f m{};
-			MatrixRotationY(m, ToRadius(_rotation.x));
-			_right = TransformCoord(m, kRight);
-			_up = TransformCoord(m, kUp);
-			_forward = TransformCoord(m, kForward);
 
-			Matrix4x4f m0{};
-			MatrixRotationAxis(m0, _right, ToRadius(_rotation.y));
-			TransformCoord(_up, m0);
-			TransformCoord(_forward, m0);
-
-			BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
-			b_dirty_ = false;
-		}
 	}
+
+	FirstPersonCameraController::FirstPersonCameraController(Camera* camera) : _p_camera(camera)
+	{
+		
+	}
+	void FirstPersonCameraController::Attach(Camera* camera)
+	{
+		_p_camera = camera;
+		_rot_world_y = Quaternion::AngleAxis(_rotation.y, Vector3f::kUp);
+		Vector3f new_camera_right = _rot_world_y * Vector3f::kRight;
+		_rot_object_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
+	}
+	void FirstPersonCameraController::SetPosition(const Vector3f& position)
+	{
+		_p_camera->Position(position);
+	}
+	void FirstPersonCameraController::SetRotation(float x, float y)
+	{
+		_rotation.x = x;
+		_rotation.y = y;
+	}
+	void FirstPersonCameraController::MoveForward(float distance)
+	{
+		_p_camera->Position(_p_camera->Position() + _p_camera->Forward() * distance);
+	}
+	void FirstPersonCameraController::MoveRight(float distance)
+	{
+		_p_camera->Position(_p_camera->Position() + _p_camera->Right() * distance);
+	}
+	void FirstPersonCameraController::MoveUp(float distance)
+	{
+		_p_camera->Position(_p_camera->Position() + _p_camera->Up() * distance);
+	}
+	void FirstPersonCameraController::TurnHorizontal(float angle)
+	{
+		_rotation.y = angle;
+		_rot_world_y = Quaternion::AngleAxis(angle,Vector3f::kUp);
+	}
+	void FirstPersonCameraController::TurnVertical(float angle)
+	{
+		_rotation.x = angle;
+		Vector3f camera_right = _rot_world_y * Vector3f::kRight;
+		_rot_object_x = Quaternion::AngleAxis(angle, camera_right);
+	}
+	void FirstPersonCameraController::InterpolateTo(const Vector3f target_pos, float rot_x, float rot_y, float speed)
+	{
+		_rotation.x = rot_x;
+		_rotation.y = rot_y;
+		Quaternion new_quat_y = Quaternion::AngleAxis(rot_y, Vector3f::kUp);
+		Vector3f new_camera_right = new_quat_y * Vector3f::kRight;
+		auto new_quat_x = Quaternion::AngleAxis(rot_x, new_camera_right);
+		_rot_object_x = Quaternion::NLerp(_rot_object_x, new_quat_x, speed);
+		_rot_world_y = Quaternion::NLerp(_rot_world_y, new_quat_y, speed);
+		_p_camera->Position(lerp(_p_camera->Position(), target_pos, speed));
+		auto r = _rot_world_y * _rot_object_x;
+		_p_camera->Rotation(r);
+		_p_camera->RecalculateMarix(true);
+	}
+
+	void FirstPersonCameraController::Move(const Vector3f& d)
+	{
+		_p_camera->Position(d);
+	}
+	//---------------------------------------------------------FirstPersonCameraController--------------------------------------------------------
 }

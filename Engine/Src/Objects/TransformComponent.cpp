@@ -1,33 +1,43 @@
 #include "pch.h"
 #include "Objects/TransformComponent.h"
+#include "Render/Gizmo.h"
+#include "Objects/Actor.h"
 
 namespace Ailu
 {
 	TransformComponent::TransformComponent()
 	{
 		IMPLEMENT_REFLECT_FIELD(TransformComponent)
-		_pos_data = _transform.Position();
-		_scale_data = _transform.Scale();
-		_rotation_data = _transform.Rotation();
+		_pos_data = _transform._position;
+		_scale_data = _transform._scale;
+		_rotation_data = Quaternion::EulerAngles(_transform._rotation);
+		_pre_rotation_data = _rotation_data;
 	}
 	TransformComponent::~TransformComponent()
 	{
 	}
 	void TransformComponent::Tick(const float& delta_time)
 	{
-		_transform.Position(_pos_data);
-		_transform.Scale(_scale_data);
-		_transform.Rotation(_rotation_data);
-		_transform.UpdateMatrix();
+		_transform._position = _pos_data;
+		_transform._scale = _scale_data;
+		auto r_d = _rotation_data - _pre_rotation_data;
+		_transform._rotation = _transform._rotation * Quaternion::EulerAngles(r_d);
+		_pre_rotation_data = _rotation_data;
+	}
+	void TransformComponent::OnGizmo()
+	{
+		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._forward * 100, Colors::kBlue);
+		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._up * 100, Colors::kGreen);
+		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._right * 100, Colors::kRed);
 	}
 	void TransformComponent::Serialize(std::ofstream& file, String indent)
 	{
 		Component::Serialize(file, indent);
 		using namespace std;
 		String prop_indent = indent.append("  ");
-		file << prop_indent << "Position: " << _transform.Position() << endl;
-		file << prop_indent << "Rotation: " << _transform.Rotation() << endl;
-		file << prop_indent << "Scale: " << _transform.Scale() << endl;
+		file << prop_indent << "Position: " << _transform._position << endl;
+		file << prop_indent << "Rotation: " << _transform._rotation << endl;
+		file << prop_indent << "Scale: " << _transform._scale << endl;
 	}
 
 	void TransformComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
@@ -35,9 +45,9 @@ namespace Ailu
 		Component::Serialize(os, indent);
 		using namespace std;
 		String prop_indent = indent.append("  ");
-		os << prop_indent << "Position: " << _transform.Position() << endl;
-		os << prop_indent << "Rotation: " << _transform.Rotation() << endl;
-		os << prop_indent << "Scale: " << _transform.Scale() << endl;
+		os << prop_indent << "Position: " << _transform._position << endl;
+		os << prop_indent << "Rotation: " << _transform._rotation << endl;
+		os << prop_indent << "Scale: " << _transform._scale << endl;
 	}
 
 	void* TransformComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
@@ -45,14 +55,16 @@ namespace Ailu
 		formated_str.pop();
 		TransformComponent* trans = new TransformComponent();
 		Vector3f vec;
+		Vector4f vec4;
 		LoadVector(std::get<1>(formated_str.front()).c_str(), trans->_pos_data);
-		trans->_transform.Position(_pos_data);
+		trans->_transform._position = _pos_data;
 		formated_str.pop();
-		LoadVector(std::get<1>(formated_str.front()).c_str(), trans->_rotation_data);
-		trans->_transform.Rotation(_rotation_data);
+		LoadVector(std::get<1>(formated_str.front()).c_str(), vec4);
+		trans->_transform._rotation = Quaternion(vec4);
+		trans->_rotation_data =  Quaternion::EulerAngles(trans->_transform._rotation);
 		formated_str.pop();
 		LoadVector(std::get<1>(formated_str.front()).c_str(), trans->_scale_data);
-		trans->_transform.Scale(_scale_data);
+		trans->_transform._scale = _scale_data;
 		formated_str.pop();
 		return trans;
 	}

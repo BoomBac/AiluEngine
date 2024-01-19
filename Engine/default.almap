@@ -1,25 +1,26 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 606.31,433.149,-113.724
-  Rotation: -95.1919,18.0142,0
+  Position: 520.989,516.387,393.175
+  Rotation: 0.0441806,-0.94835,0.152574,0.274592
   Fov: 60
   Aspect: 1.77778
   Near: 62.29
-  Far: 96951.7
+  Far: 137099
+  ControllerRotation: 18.2799,1292.3
 SceneGraph: 
   Name: root
     Components: 
       TransformComponent: 
         Position: 0,0,0
-        Rotation: 0,0,0
+        Rotation: 1.19729e-06,0.414027,-1.26294e-06,-0.910265
         Scale: 1,1,1
     Children: 7
       Name: plane
         Components: 
           TransformComponent: 
             Position: 0,62,0
-            Rotation: 0,0,0
+            Rotation: 0,0,0,1
             Scale: 40,1,40
           StaticMeshComponent: 
             MeshPath: plane
@@ -29,7 +30,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 0,0,0
-            Rotation: 0,0,0
+            Rotation: 1.19729e-06,0.414027,-1.26294e-06,-0.910265
             Scale: 500,500,500
           StaticMeshComponent: 
             MeshPath: cube
@@ -38,8 +39,8 @@ SceneGraph:
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: 2,5815,5331
-            Rotation: 43.63,0,0
+            Position: 2,759,0
+            Rotation: -0.0483269,0.0585779,0.0372593,-0.996416
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
@@ -53,7 +54,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: -219,471,0
-            Rotation: 0,0,0
+            Rotation: 0.739037,0.00326984,-0.0226596,0.673275
             Scale: 1,1,1
           LightComponent: 
             Type: Point
@@ -68,7 +69,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 846,845,-374
-            Rotation: -52.42,-94.31,34.05
+            Rotation: -0.0126613,-0.578059,0.629823,-0.518664
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
@@ -85,7 +86,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: -433,295,-31
-            Rotation: 0,0,0
+            Rotation: 0.378132,0.376614,-0.171991,-0.828009
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: sphere
@@ -94,8 +95,8 @@ SceneGraph:
       Name: monkey
         Components: 
           TransformComponent: 
-            Position: 0,231,-167
-            Rotation: -12.34,5.62,-28.12
+            Position: 240,243,-211
+            Rotation: 0.117483,-0.564837,-0.57794,-0.577184
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey

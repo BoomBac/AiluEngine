@@ -172,9 +172,9 @@ namespace Ailu
 				Gizmo::DrawGrid(10, 1000, grid_center_large, grid_color);
 			}
 
-			Gizmo::DrawLine(Vector3f::Zero, Vector3f{ 500.f,0.0f,0.0f }, Colors::kRed);
-			Gizmo::DrawLine(Vector3f::Zero, Vector3f{ 0.f,500.0f,0.0f }, Colors::kGreen);
-			Gizmo::DrawLine(Vector3f::Zero, Vector3f{ 0.f,0.0f,500.0f }, Colors::kBlue);
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 500.f,0.0f,0.0f }, Colors::kRed);
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,500.0f,0.0f }, Colors::kGreen);
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,500.0f }, Colors::kBlue);
 		}
 	}
 	void Renderer::PrepareLight(Scene* p_scene)
@@ -193,7 +193,7 @@ namespace Ailu
 			{
 				if (!light->Active())
 				{
-					_p_per_frame_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = Vector3f::Zero;
+					_p_per_frame_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = Vector3f::kZero;
 					_p_per_frame_cbuf_data->_DirectionalLights[direction_light_index++]._LightColor = Colors::kBlack.xyz;
 					continue;
 				}
@@ -243,7 +243,7 @@ namespace Ailu
 	}
 	void Renderer::PrepareCamera(Camera* p_camera)
 	{
-		_p_scene_camera->Update();
+		//_p_scene_camera->RecalculateMarix();
 		_p_per_frame_cbuf_data->_CameraPos = _p_scene_camera->Position();
 	}
 }

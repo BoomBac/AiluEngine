@@ -26,7 +26,7 @@ namespace Ailu
 	void StaticMeshComponent::Tick(const float& delta_time)
 	{
 		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
-		_aabb = AABB::CaclulateBoundBox(_p_mesh->_bound_box, transf.GetTransformMat());
+		_aabb = AABB::CaclulateBoundBox(_p_mesh->_bound_box, Transform::GetWorldMatrix(transf));
 	}
 	void StaticMeshComponent::OnGizmo()
 	{

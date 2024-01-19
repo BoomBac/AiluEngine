@@ -18,7 +18,9 @@ namespace Ailu
 		TransformComponent();
 		~TransformComponent();
 		void Tick(const float& delta_time) final;
+		void OnGizmo() final;
 		Transform _transform;
+		Vector3f GetEuler() const { return _rotation_data; };
 		void Serialize(std::ofstream& file, String indent) final;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
 		TransformComponent& operator=(const TransformComponent& other)
@@ -33,6 +35,7 @@ namespace Ailu
 		Vector3f _pos_data;
 		Vector3f _rotation_data;
 		Vector3f _scale_data;
+		Vector3f _pre_rotation_data;
 	};
 	REFLECT_FILED_BEGIN(TransformComponent)
 	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f,Position,_pos_data)

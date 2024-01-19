@@ -24,17 +24,23 @@ namespace Ailu
 			auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
 			Clamp(_intensity, 0.0, 4.0);
 			_light._light_color.a = _intensity;
-			_light._light_pos = transf.Position();
+			_light._light_pos = transf._position;
 			Clamp(_light._light_param.z,0.0f, 180.0f);
 			Clamp(_light._light_param.y, 0.0f,_light._light_param.z - 0.1f);
-			_p_shadow_camera->Position(transf.Position());
-			auto rot = transf.Rotation();
-			rot.xy = transf.Rotation().yx;
-			rot.y += 90.0f;
-			_p_shadow_camera->Rotation(rot);
+			_p_shadow_camera->Position(transf._position);
+			auto euler = _p_onwer->GetComponent<TransformComponent>()->GetEuler();
+			//_p_shadow_camera->_world_y = Quaternion::AngleAxis(euler.x, Camera::kUp);
+			//Vector3f rotated_right = TransformCoord(_p_shadow_camera->_world_y.ToMat4f(), Camera::kRight);
+			//_p_shadow_camera->_object_x = Quaternion::AngleAxis(euler.y, rotated_right);
+			//_p_shadow_camera->LookTo(_light._light_pos.xyz,Vector3f::kUp);
+			
+			//auto rot = transf.Rotation();
+			//rot.xy = transf.Rotation().yx;
+			//rot.y += 90.0f;
+			//_p_shadow_camera->Rotation(rot);
 			_p_shadow_camera->Size(_shadow._size);
 			_p_shadow_camera->Far(_shadow._distance);
-			_p_shadow_camera->Update();
+			_p_shadow_camera->RecalculateMarix();
 			if(_b_cast_shadow)
 				Camera::DrawGizmo(_p_shadow_camera.get());
 		}
@@ -130,41 +136,43 @@ namespace Ailu
 		{
 			case Ailu::ELightType::kDirectional:
 			{
-				auto rot = transf.Rotation();
-				Vector4f light_forward = kDefaultDirectionalLightDir;
-				auto rot_mat = MatrixRotationX(ToRadius(rot.x)) * MatrixRotationY(ToRadius(rot.y));
-				TransformVector(light_forward, rot_mat);
+				Vector4f light_forward = transf._rotation * kDefaultDirectionalLightDir;
+				//auto rot_mat = Quaternion::ToMat4f(transf._rotation);
+				//TransformVector(light_forward, rot_mat);
 				Normalize(light_forward);
 				_light._light_dir = light_forward;
 				Vector3f light_to = _light._light_dir.xyz;
-				light_to.x *= 100;
-				light_to.y *= 100;
-				light_to.z *= 100;
-				Gizmo::DrawLine(transf.Position(), transf.Position() + light_to, _light._light_color);
-				Gizmo::DrawCircle(transf.Position(), 50.0f, 24, _light._light_color, rot_mat);
+				light_to.x *= 500;
+				light_to.y *= 500;
+				light_to.z *= 500;
+				Gizmo::DrawLine(transf._position, transf._position + light_to, _light._light_color);
+				Gizmo::DrawCircle(transf._position, 50.0f, 24, _light._light_color, Quaternion::ToMat4f(transf._rotation));
 				return;
 			}
 			case Ailu::ELightType::kPoint:
 			{
-				Gizmo::DrawCircle(transf.Position(), _light._light_param.x, 24, _light._light_color, MatrixRotationX(ToRadius(90.0f)));
-				Gizmo::DrawCircle(transf.Position(), _light._light_param.x, 24, _light._light_color, MatrixRotationZ(ToRadius(90.0f)));
-				Gizmo::DrawCircle(transf.Position(), _light._light_param.x, 24, _light._light_color);
+				Gizmo::DrawCircle(transf._position, _light._light_param.x, 24, _light._light_color, MatrixRotationX(ToRadius(90.0f)));
+				Gizmo::DrawCircle(transf._position, _light._light_param.x, 24, _light._light_color, MatrixRotationZ(ToRadius(90.0f)));
+				Gizmo::DrawCircle(transf._position, _light._light_param.x, 24, _light._light_color);
 				return;
 			}
 			case Ailu::ELightType::kSpot:
 			{
-				auto rot = transf.Rotation();
 				Vector4f light_forward = kDefaultDirectionalLightDir;
-				auto rot_mat = MatrixRotationX(ToRadius(rot.x)) * MatrixRotationY(ToRadius(rot.y));
-				TransformVector(light_forward, rot_mat);
-				Normalize(light_forward);
+				//auto rot = transf.Rotation();
+				//auto rot_mat = MatrixRotationX(ToRadius(rot.x)) * MatrixRotationY(ToRadius(rot.y));
+				auto rot_mat = Quaternion::ToMat4f(transf._rotation);
+				//TransformVector(light_forward, rot_mat);
+				//Normalize(light_forward);
+				light_forward.xyz = transf._rotation * light_forward.xyz;
 				float angleIncrement = 90.0;
 				_light._light_dir = light_forward;
 				Vector3f light_to = _light._light_dir.xyz;
 				light_to *= _light._light_param.x;
 				{
-					Vector3f inner_center = light_to + transf.Position();
+					Vector3f inner_center = light_to + transf._position;
 					float inner_radius = tan(ToRadius(_light._light_param.y / 2.0f)) * _light._light_param.x;
+					Gizmo::DrawLine(transf._position, transf._position + light_to * 10.f, Colors::kYellow);
 					Gizmo::DrawCircle(inner_center, inner_radius, 24, _light._light_color, rot_mat);
 					for (int i = 0; i < 4; ++i)
 					{
@@ -174,16 +182,18 @@ namespace Ailu
 						Vector3f point2(inner_center.x + inner_radius * cos(angle2), inner_center.y, inner_center.z + inner_radius * sin(angle2));
 						point1 -= inner_center;
 						point2 -= inner_center;
-						TransformCoord(point1, rot_mat);
-						TransformCoord(point2, rot_mat);
+						point1 = transf._rotation * point1;
+						point2 = transf._rotation * point2;
+						//TransformCoord(point1, rot_mat);
+						//TransformCoord(point2, rot_mat);
 						point1 += inner_center;
 						point2 += inner_center;
-						Gizmo::DrawLine(transf.Position(), point2, _light._light_color);
+						Gizmo::DrawLine(transf._position, point2, _light._light_color);
 					}
 				}
 				light_to *= 0.9f;
 				{
-					Vector3f outer_center = light_to + transf.Position();
+					Vector3f outer_center = light_to + transf._position;
 					float outer_radius = tan(ToRadius(_light._light_param.z / 2.0f)) * _light._light_param.x;
 					Gizmo::DrawCircle(outer_center, outer_radius, 24, _light._light_color, rot_mat);
 					for (int i = 0; i < 4; ++i)
@@ -198,7 +208,7 @@ namespace Ailu
 						TransformCoord(point2, rot_mat);
 						point1 += outer_center;
 						point2 += outer_center;
-						Gizmo::DrawLine(transf.Position(), point2, _light._light_color);
+						Gizmo::DrawLine(transf._position, point2, _light._light_color);
 					}
 				}
 			}

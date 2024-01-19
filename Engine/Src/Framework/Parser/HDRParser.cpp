@@ -55,6 +55,7 @@ namespace Ailu
 				LOG_WARNING("Unsupported HDR format: {} with 4 channel", path);
 			}
 		}
+		return nullptr;
 	}
 	Ref<TextureCubeMap> HDRParser::Parser(Vector<String>& paths)
 	{

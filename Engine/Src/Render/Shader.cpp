@@ -89,7 +89,7 @@ namespace Ailu
 		else
 		{
 			g_pLogMgr->LogWarningFormat("Get vector: {} on shader: {} failed!", name, _name);
-			return Vector4f::Zero;
+			return Vector4f::kZero;
 		}
 	}
 	float Shader::GetFloatValue(const String& name)

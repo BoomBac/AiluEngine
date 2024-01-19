@@ -14,11 +14,12 @@ namespace Ailu
 	}
 	void CameraComponent::Tick(const float& delta_time)
 	{
-		auto& parent_pos = static_cast<SceneActor*>(_p_onwer)->GetTransform().Position();
-		auto& parent_rot = static_cast<SceneActor*>(_p_onwer)->GetTransform().Rotation();
+		auto& parent_pos = static_cast<SceneActor*>(_p_onwer)->GetTransform()._position;
+		auto& parent_rot = static_cast<SceneActor*>(_p_onwer)->GetTransform()._rotation;
+		//auto parent_rot = Vector3f(0.f,0.f,0.f);
 		_camera.Position(parent_pos);
 		_camera.Rotation(parent_rot);
-		_camera.Update();
+		_camera.RecalculateMarix();
 	}
 	void CameraComponent::Serialize(std::ofstream& file, String indent)
 	{
@@ -43,7 +44,7 @@ namespace Ailu
 		}
 		else if (prop._type == ESerializablePropertyType::kVector3f)
 		{
-			auto v = prop.GetProppertyValue<Vector3f>().value_or(Vector3f::Zero);
+			auto v = prop.GetProppertyValue<Vector3f>().value_or(Vector3f::kZero);
 			return std::format("{}: {},{},{}", prop._name, v.x,v.y,v.z);
 		}
 		return "";
@@ -99,8 +100,8 @@ namespace Ailu
 			formated_str.pop();
 		}
 		camera.Position(camera.GetProperty<Vector3f>("Position"));
-		camera.Rotation(camera.GetProperty<Vector3f>("Rotation"));
-		camera.Update();
+		camera.Rotation(camera.GetProperty<Quaternion>("Rotation"));
+		camera.RecalculateMarix();
 		CameraComponent* cam = new CameraComponent(camera);
 		return cam;
 	}

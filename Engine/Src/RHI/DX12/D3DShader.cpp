@@ -244,7 +244,7 @@ namespace Ailu
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
 		auto samplers = CreateStaticSampler();
-		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, samplers.size(), samplers.data(), rootSignatureFlags);
+		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, static_cast<UINT>(samplers.size()), samplers.data(), rootSignatureFlags);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 		ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));

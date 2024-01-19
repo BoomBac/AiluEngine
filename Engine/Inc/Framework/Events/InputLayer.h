@@ -21,9 +21,6 @@ namespace Ailu
 		void OnUpdate(float delta_time) override;
 	private:
 		bool _b_handle_input;
-		CameraState* _origin_cam_state;
-		CameraState* _target_cam_state;
-
 		float _camera_move_speed = 0.4f;
 		float _camera_wander_speed = 0.6f;
 		float _lerp_speed_multifactor = 0.1f;

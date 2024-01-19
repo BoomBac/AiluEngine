@@ -3,7 +3,7 @@ type: material
 name: CustomSkyBox
 shader_path: Shaders/skybox.hlsl
   prop_type: Float
-    expo: 1
+    expo: 1.151
   prop_type: Vector
     color: 1,1,1,1
   prop_type: Texture2D
