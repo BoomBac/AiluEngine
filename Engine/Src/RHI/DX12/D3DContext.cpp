@@ -119,8 +119,9 @@ namespace Ailu
     std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3DContext::GetSRVDescriptorHandle()
     {
         static u32 global_texture_offset = 0u;
+        AL_ASSERT(global_texture_offset > (RenderConstants::kMaxTextureCount - 1), "Can't alloc more texture");
         static uint32_t base = RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * RenderConstants::kFrameCount +
-            RenderConstants::kMaxRenderObjectCount * RenderConstants::kFrameCount;
+            RenderConstants::kMaxRenderObjectCount * RenderConstants::kFrameCount + RenderConstants::kMaxPassDataCount * RenderConstants::kFrameCount;
         auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
         gpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
         auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -132,6 +133,7 @@ namespace Ailu
     D3D12_CPU_DESCRIPTOR_HANDLE D3DContext::GetRTVDescriptorHandle()
     {
         static u32 global_texture_offset = 0u;
+        AL_ASSERT(global_texture_offset > (RenderConstants::kMaxRenderTextureCount - 1), "Can't alloc more texture");
         static uint32_t base = RenderConstants::kFrameCount;
         //auto gpu_handle = m_rtvHeap->GetGPUDescriptorHandleForHeapStart();
         //gpu_handle.ptr += _rtv_desc_size * (base + global_texture_offset);
@@ -174,6 +176,18 @@ namespace Ailu
         return &_cbuf_views[index];
     }
 
+    void* D3DContext::GetCBufferPerPassGPUPtr(u16 index)
+    {
+        static u16 base = 1 + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount;
+        return &_cbuf_views[base + index];
+    }
+
+    u8* D3DContext::GetCBufferPerPassCPUPtr(u16 index)
+    {
+        static u32 base_offset = RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * RenderConstants::kMaxRenderObjectCount;
+        return _p_cbuffer + base_offset + index * RenderConstants::kPePassDataSize;
+    }
+
     D3D12_CONSTANT_BUFFER_VIEW_DESC* D3DContext::GetPerFrameCbufGPURes()
     {
         return &_cbuf_views[0];
@@ -194,7 +208,8 @@ namespace Ailu
 
     void D3DContext::SubmitPerObjectBuffer(const Matrix4x4f& transform)
     {    
-        m_commandList->SetGraphicsRootConstantBufferView(0, _cbuf_views[1 + RenderConstants::kMaxMaterialDataCount + _render_object_index].BufferLocation);
+        AL_ASSERT(_render_object_index > RenderConstants::kMaxRenderObjectCount, "Rendering object count to large!")
+            m_commandList->SetGraphicsRootConstantBufferView(0, _cbuf_views[1 + RenderConstants::kMaxMaterialDataCount + _render_object_index].BufferLocation);
         memcpy(_p_cbuffer + RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * (_render_object_index++),
             &transform, sizeof(transform));
     }
@@ -563,7 +578,7 @@ namespace Ailu
         auto device = D3DContext::GetInstance()->GetDevice();
         //constbuffer desc heap
         D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
-        _cbv_desc_num = (1u + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount) * RenderConstants::kFrameCount +
+        _cbv_desc_num = (1u + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + RenderConstants::kMaxPassDataCount) * RenderConstants::kFrameCount +
             RenderConstants::kMaxTextureCount;
         cbvHeapDesc.NumDescriptors = _cbv_desc_num + 1;
         cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
@@ -579,7 +594,8 @@ namespace Ailu
         for (uint32_t i = 0; i < RenderConstants::kFrameCount; i++)
         {
             D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
-            cbvHandle.ptr = m_cbvHeap->GetCPUDescriptorHandleForHeapStart().ptr + i * (1 + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount) * _cbv_desc_size;
+            cbvHandle.ptr = m_cbvHeap->GetCPUDescriptorHandleForHeapStart().ptr + i * (1 + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + 
+                RenderConstants::kMaxPassDataCount) * _cbv_desc_size;
             D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
             cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * RenderConstants::kPerFrameTotalSize;
             cbv_desc.SizeInBytes = RenderConstants::kPerFrameDataSize;
@@ -601,6 +617,16 @@ namespace Ailu
                 cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + RenderConstants::kPerFrameTotalSize * i + RenderConstants::kPerFrameDataSize +
                     RenderConstants::kMaxMaterialDataCount * RenderConstants::kPerMaterialDataSize + k * RenderConstants::kPeObjectDataSize;
                 cbv_desc.SizeInBytes = RenderConstants::kPeObjectDataSize;
+                device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
+                _cbuf_views.emplace_back(cbv_desc);
+            }
+            for (uint32_t l = 0; l < RenderConstants::kMaxPassDataCount; l++)
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
+                cbvHandle2.ptr = cbvHandle.ptr + (1 + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + l) * _cbv_desc_size;
+                cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + RenderConstants::kPerFrameTotalSize * i + RenderConstants::kPerFrameDataSize +
+                    RenderConstants::kMaxMaterialDataCount * RenderConstants::kPerMaterialDataSize + RenderConstants::kMaxRenderObjectCount * RenderConstants::kPeObjectDataSize + l * RenderConstants::kPePassDataSize;
+                cbv_desc.SizeInBytes = RenderConstants::kPePassDataSize;
                 device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
                 _cbuf_views.emplace_back(cbv_desc);
             }

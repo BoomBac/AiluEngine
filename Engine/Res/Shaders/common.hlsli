@@ -2,6 +2,11 @@
 #define __COMMON_H__
 #include "cbuffer.hlsli"
 
+SamplerState g_LinearWrapSampler : register(s0);
+SamplerState g_LinearClampSampler : register(s1);
+SamplerState g_LinearBorderSampler : register(s2);
+SamplerComparisonState g_ShadowSampler : register(s3);
+
 
 float4 TransformToClipSpace(float3 object_pos)
 {

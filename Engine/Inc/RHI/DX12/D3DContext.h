@@ -38,8 +38,11 @@ namespace Ailu
         uint8_t* GetPerFrameCbufData() final;
         uint8_t* GetPerMaterialCbufData(uint32_t mat_index) final;
         void* GetCBufGPURes(u32 index) final;
+        void* GetCBufferPerPassGPUPtr(u16 index) final;
+        u8* GetCBufferPerPassCPUPtr(u16 index) final;
+
         D3D12_CONSTANT_BUFFER_VIEW_DESC* GetPerFrameCbufGPURes();
-        ScenePerFrameData* GetPerFrameCbufDataStruct();
+        ScenePerFrameData* GetPerFrameCbufDataStruct() final;
         void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
 
         void SubmitPerObjectBuffer(const Matrix4x4f& transform);

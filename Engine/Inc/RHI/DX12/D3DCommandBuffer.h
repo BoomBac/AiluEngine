@@ -12,12 +12,18 @@ namespace Ailu
         D3DCommandBuffer() = default;
         D3DCommandBuffer(uint32_t id) : _id(id) {};
 
+        void SetPerPassCbufferData(u16 index, ScenePerPassData* data) final;
+        void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot = 255) final;
+
         void SetClearColor(const Vector4f& color) final;
         void Clear() final;
         void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) final;
         void ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth) final;
-        void ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color) final;
+        void ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color, u16 index = 0u) final;
         void ClearRenderTarget(RenderTexture* depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
+        void SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth) final;
+        void SetRenderTarget(Ref<RenderTexture>& color, u16 index = 0u) final;
+        void SetRenderTarget(RenderTexture* color, RenderTexture* depth) final;
         void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, uint32_t instance_count) final;
         void DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, uint32_t instance_count) final;
         void SetViewMatrix(const Matrix4x4f& view) final;
@@ -31,9 +37,7 @@ namespace Ailu
         void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count = 1u) final;
         void DrawRenderer(Mesh* mesh, Material* material,const Matrix4x4f& transform, uint32_t instance_count = 1u) final;
         void SetPSO(GraphicsPipelineStateObject* pso) final;
-        void SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth) final;
-        void SetRenderTarget(Ref<RenderTexture>& color) final;
-        void SetRenderTarget(RenderTexture* color, RenderTexture* depth) final;
+
         void ResolveToBackBuffer(Ref<RenderTexture>& color) final;
         void ResolveToBackBuffer(RenderTexture* color) final;
 

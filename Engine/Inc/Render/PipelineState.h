@@ -482,6 +482,24 @@ namespace Ailu
 		}
 	}
 
+	ETopology static GetTopologyByHash(u8 hash)
+	{
+		static ETopology v[4]{ ETopology::kPoint ,ETopology::kLine, ETopology::kTriangle, ETopology::kPatch };
+		return v[hash];
+	}
+
+	enum class EBindResDescType : uint8_t
+	{
+		kConstBuffer = 0, kTexture2D, kCubeMap, kTexture2DArray, kSampler, kCBufferAttribute, kUnknown
+	};
+
+	struct PipelineResourceInfo
+	{
+		void* _p_resource = nullptr;
+		EBindResDescType _res_type = EBindResDescType::kUnknown;
+		u8 _slot = 0;
+	};
+
 	class PipelineState
 	{
 	public:

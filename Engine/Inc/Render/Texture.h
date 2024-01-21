@@ -188,11 +188,14 @@ namespace Ailu
 	class RenderTexture : public Texture
 	{
 	public:
-		static Ref<RenderTexture> Create(const uint16_t& width, const uint16_t& height, String name,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		static Ref<RenderTexture> Create(const uint16_t& width, const uint16_t& height, String name,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool is_cubemap = false);
 		virtual void Bind(uint8_t slot) override;
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
+		//return rtv handle
 		void* GetNativeCPUHandle() override;
+		//return rtv handle
+		virtual void* GetNativeCPUHandle(u16 index);
 		void* GetGPUNativePtr() override;
 		const ETextureType GetTextureType() const final;
 		virtual void Transition(ETextureResState state);
@@ -204,10 +207,11 @@ namespace Ailu
 		ETextureResState GetState() const { return _state; }
 		bool operator==(const RenderTexture& other) const { return _rt_handle._id == other._rt_handle._id; }
 	protected:
+		std::string _name;
 		RTHandle _rt_handle;
 		ETextureResState _state;
-		std::string _name;
 		uint16_t _width, _height;
+		bool _is_cubemap;
 		uint8_t _channel;
 		EALGFormat _format;
 		u8 _mipmap_count;

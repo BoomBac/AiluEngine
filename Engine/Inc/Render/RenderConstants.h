@@ -7,20 +7,23 @@
 
 namespace Ailu
 {
-	struct RenderConstants
+	namespace RenderConstants
 	{
 		constexpr static uint8_t  kFrameCount = 2u;
-		constexpr static uint16_t kMaxMaterialDataCount = 8u;
-		constexpr static uint32_t kMaxRenderObjectCount = 8u;
+		constexpr static uint16_t kMaxMaterialDataCount = 16u;
+		constexpr static uint32_t kMaxRenderObjectCount = 20u;
+		constexpr static uint32_t kMaxPassDataCount = 10u;
 		constexpr static uint32_t kMaxTextureCount = 16u;
-		constexpr static uint32_t kMaxRenderTextureCount = 8u;
+		constexpr static uint32_t kMaxRenderTextureCount = 16u;
 		constexpr static uint32_t KMaxDynamicVertexNum = 2048;
-		constexpr static uint8_t kMaxVertexAttrNum = 10u;
+		constexpr static uint8_t  kMaxVertexAttrNum = 10u;
 
-		constexpr static uint32_t kPerFrameTotalSize = sizeof(ScenePerFrameData) + sizeof(ScenePerMaterialData) * kMaxMaterialDataCount + sizeof(ScenePerObjectData) * kMaxRenderObjectCount;
+		constexpr static uint32_t kPerFrameTotalSize = sizeof(ScenePerFrameData) + sizeof(ScenePerMaterialData) * kMaxMaterialDataCount + + sizeof(ScenePerPassData) * kMaxPassDataCount+
+			sizeof(ScenePerObjectData) * kMaxRenderObjectCount;
 		constexpr static uint32_t kPerFrameDataSize = sizeof(ScenePerFrameData);
 		constexpr static uint32_t kPerMaterialDataSize = sizeof(ScenePerMaterialData);
 		constexpr static uint32_t kPeObjectDataSize = sizeof(ScenePerObjectData);
+		constexpr static uint32_t kPePassDataSize = sizeof(ScenePerPassData);
 		constexpr static wchar_t kVSModel_5_0[] = L"vs_5_0";
 		constexpr static wchar_t kPSModel_5_0[] = L"ps_5_0";
 		constexpr static wchar_t kVSModel_6_1[] = L"vs_6_1";
@@ -32,9 +35,10 @@ namespace Ailu
 		inline const static char* kSemanticNormal = "NORMAL";
 		inline const static char* kSemanticTexcoord = "TEXCOORD";
 
-		constexpr static char kCBufNameSceneObject[] = "SceneObjectBuffer";
-		constexpr static char kCBufNameSceneMaterial[] = "SceneMaterialBuffer";
-		constexpr static char kCBufNameSceneState[] = "SceneStatetBuffer";
+		constexpr static char kCBufNameSceneObject[] = "ScenePerObjectData";
+		constexpr static char kCBufNameSceneMaterial[] = "ScenePerMaterialData";
+		constexpr static char kCBufNameSceneState[] = "ScenePerFrameData";
+		constexpr static char kCBufNameScenePass[] = "ScenePerPassData";
 
 		inline const static std::string kAlbdeoTexName = "TexAlbedo";
 		inline const static std::string kNormalTexName = "TexNormal";

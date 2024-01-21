@@ -18,6 +18,10 @@ struct PSInput
 	float4 position : SV_POSITION;
 };
 
+CBufBegin
+	float4 color;
+CBufEnd
+
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
@@ -27,5 +31,5 @@ PSInput VSMain(VSInput v)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	return float4(1.0,0.0,1.0,1.0);
+	return float4(color);
 }

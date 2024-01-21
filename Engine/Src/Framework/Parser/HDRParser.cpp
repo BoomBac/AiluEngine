@@ -30,7 +30,7 @@ namespace Ailu
 			if (n == 3)
 			{
 				auto tex = Texture2D::Create(w, h, n,EALGFormat::kALGFormatR32G32B32_FLOAT);
-				tex->AssetPath(PathUtils::ExtractAssetPath(path.data()));
+				tex->AssetPath(PathUtils::FormatFilePath(PathUtils::ExtractAssetPath(path.data())));
 				tex->Name(PathUtils::GetFileName(path, true));
 				//Vector<float*> mipmaps{ data };
 				//mip_level = 1;

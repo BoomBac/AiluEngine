@@ -114,6 +114,34 @@ namespace Ailu
 		pso->Build();
 		GraphicsPipelineStateMgr::AddPSO(std::move(pso));
 
+		auto p_cubemap_gen_shader = ShaderLibrary::Load("Shaders/cubemap_gen.hlsl");
+		GraphicsPipelineStateInitializer cgen_desc;
+		cgen_desc._input_layout = p_cubemap_gen_shader->PipelineInputLayout();
+		cgen_desc._blend_state = p_cubemap_gen_shader->PipelineBlendState();
+		cgen_desc._raster_state = p_cubemap_gen_shader->PipelineRasterizerState();
+		cgen_desc._depth_stencil_state = p_cubemap_gen_shader->PipelineDepthStencilState();
+		cgen_desc._topology = p_cubemap_gen_shader->PipelineTopology();
+		cgen_desc._p_pixel_shader = p_cubemap_gen_shader.get();
+		cgen_desc._p_vertex_shader = p_cubemap_gen_shader.get();
+		cgen_desc._rt_state = RenderTargetState{ {EALGFormat::kALGFormatR16G16B16A16_FLOAT},EALGFormat::kALGFormatUnknown };
+		pso = std::move(GraphicsPipelineStateObject::Create(cgen_desc));
+		pso->Build();
+		GraphicsPipelineStateMgr::AddPSO(std::move(pso));
+
+		memset(&cgen_desc, 0, sizeof(GraphicsPipelineStateInitializer));
+		auto shader = ShaderLibrary::Load("Shaders/filter_irradiance.hlsl");
+		cgen_desc._input_layout = shader->PipelineInputLayout();
+		cgen_desc._blend_state = shader->PipelineBlendState();
+		cgen_desc._raster_state = shader->PipelineRasterizerState();
+		cgen_desc._depth_stencil_state = shader->PipelineDepthStencilState();
+		cgen_desc._topology = shader->PipelineTopology();
+		cgen_desc._p_pixel_shader = shader.get();
+		cgen_desc._p_vertex_shader = shader.get();
+		cgen_desc._rt_state = RenderTargetState{ {EALGFormat::kALGFormatR16G16B16A16_FLOAT},EALGFormat::kALGFormatUnknown };
+		pso = std::move(GraphicsPipelineStateObject::Create(cgen_desc));
+		pso->Build();
+		GraphicsPipelineStateMgr::AddPSO(std::move(pso));
+
 		LOG_WARNING("Initialize PSO cache done after {}ms!", g_pTimeMgr->GetElapsedSinceLastMark());
 	}
 
@@ -176,7 +204,25 @@ namespace Ailu
 			GraphicsPipelineStateObject::ExtractPSOHash(s_cur_pos_hash, input_layout, shader, topology, blend_state, raster_state, ds_state, rt_state);
 			LOG_INFO("s_cur_pos_hash////  Input Layout: {}, Shader: {}, Topology: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}, Hash: {}",
 				(u32)input_layout, shader, (u32)topology, (u32)blend_state, (u32)raster_state, (u32)ds_state, (u32)rt_state, s_cur_pos_hash.ToString());
-			LOG_ERROR("Pso in need be create")
+			LOG_ERROR("Pso in need be create");
+			{
+				g_thread_pool->Enqueue([=]() {
+					auto new_shader = ShaderLibrary::Get(shader);
+					GraphicsPipelineStateInitializer new_desc;
+					new_desc._input_layout = VertexInputLayout::_s_hash_obj.Get(input_layout);
+					new_desc._blend_state = BlendState::_s_hash_obj.Get(blend_state);
+					new_desc._raster_state = RasterizerState::_s_hash_obj.Get(raster_state);
+					new_desc._depth_stencil_state = DepthStencilState::_s_hash_obj.Get(ds_state);
+					new_desc._topology = GetTopologyByHash(topology);
+					new_desc._p_pixel_shader = new_shader.get();
+					new_desc._p_vertex_shader = new_shader.get();
+					new_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
+					auto pso = std::move(GraphicsPipelineStateObject::Create(new_desc));
+					pso->Build();
+					GraphicsPipelineStateMgr::AddPSO(std::move(pso));
+				});
+
+			}
 		}
 		s_bind_resource_list.clear();
 	}

@@ -4,6 +4,17 @@
 
 namespace Ailu
 {
+	void D3DCommandBuffer::SetPerPassCbufferData(u16 index, ScenePerPassData* data)
+	{
+		memcpy(g_pGfxContext->GetCBufferPerPassCPUPtr(index), data, sizeof(ScenePerPassData));
+	}
+	void D3DCommandBuffer::SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot)
+	{
+		_commands.emplace_back([=]() {
+			GraphicsPipelineStateMgr::SubmitBindResource(res, res_type, slot);
+			});
+	}
+
 	void D3DCommandBuffer::SetClearColor(const Vector4f& color)
 	{
 		_commands.emplace_back([&]() {
@@ -28,10 +39,10 @@ namespace Ailu
 			});
 
 	}
-	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color)
+	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color, u16 index)
 	{
 		_commands.emplace_back([=]() {
-			D3DContext::GetInstance()->GetCmdList()->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), clear_color, 1, nullptr);
+			D3DContext::GetInstance()->GetCmdList()->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle(index)), clear_color, 0, nullptr);
 			});
 	}
 	void D3DCommandBuffer::ClearRenderTarget(RenderTexture* depth, float depth_value, u8 stencil_value)
@@ -168,13 +179,12 @@ namespace Ailu
 	{
 		SetRenderTarget(color.get(), depth.get());
 	}
-	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color)
+	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color, u16 index)
 	{
-		if (color->GetState() == ETextureResState::kColorTagret) return;
-		GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), 0);
 		_commands.emplace_back([=]() {
+			GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), EALGFormat::kALGFormatUnknown, 0);
 			color->Transition(ETextureResState::kColorTagret);
-			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
+			D3DContext::GetInstance()->GetCmdList()->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle(index)), 0,
 				NULL);
 			});
 	}

@@ -120,7 +120,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)\Engine\;$(SolutionDir)\Engine\Inc\;$(SolutionDir)\Engine\Ext\;$(SolutionDir)\Engine\Ext\imgui;$(SolutionDir)\Engine\Ext\fbxsdk\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>/FS /utf-8 /Zm1000 /MP16 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/FS /utf-8 /MP16 %(AdditionalOptions)</AdditionalOptions>
       <EnableModules>true</EnableModules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -527,6 +527,7 @@
     <ClInclude Include="Inc\Render\AlgFormat.h" />
     <ClInclude Include="Inc\Render\Buffer.h" />
     <ClInclude Include="Inc\Render\Camera.h" />
+    <ClInclude Include="Inc\Render\CBuffer.h" />
     <ClInclude Include="Inc\Render\CommandBuffer.h" />
     <ClInclude Include="Inc\Render\Gizmo.h" />
     <ClInclude Include="Inc\Render\GraphicsContext.h" />
@@ -604,6 +605,7 @@
     <ClCompile Include="Src\Render\Buffer.cpp" />
     <ClCompile Include="Src\Render\Camera.cpp" />
     <ClCompile Include="Src\Render\CommandBuffer.cpp" />
+    <ClCompile Include="Src\Render\GraphicsContext.cpp" />
     <ClCompile Include="Src\Render\GraphicsPipelineStateObject.cpp" />
     <ClCompile Include="Src\Render\Material.cpp" />
     <ClCompile Include="Src\Render\Mesh.cpp" />
@@ -656,6 +658,15 @@
       <FileType>Document</FileType>
     </None>
     <None Include="Res\Shaders\input.hlsli">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Res\Shaders\filter_irradiance.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

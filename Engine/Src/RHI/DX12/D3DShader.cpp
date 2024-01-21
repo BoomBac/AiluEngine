@@ -207,6 +207,7 @@ namespace Ailu
 				if (desc._name == RenderConstants::kCBufNameSceneObject) cbuf_mask |= 0x01;
 				else if (desc._name == RenderConstants::kCBufNameSceneMaterial) cbuf_mask |= 0x02;
 				else if (desc._name == RenderConstants::kCBufNameSceneState) cbuf_mask |= 0x04;
+				else if (desc._name == RenderConstants::kCBufNameScenePass) cbuf_mask |= 0x08;
 			}
 		}
 		uint8_t root_param_index = 0;
@@ -218,12 +219,20 @@ namespace Ailu
 		if (cbuf_mask & 0x02)
 		{
 			_bind_res_infos[RenderConstants::kCBufNameSceneMaterial]._bind_slot = root_param_index;
+			_per_mat_buf_bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(1u);
 		}
 		if (cbuf_mask & 0x04)
 		{
 			_bind_res_infos[RenderConstants::kCBufNameSceneState]._bind_slot = root_param_index;
+			_per_frame_buf_bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(2u);
+		}
+		if (cbuf_mask & 0x08)
+		{
+			_bind_res_infos[RenderConstants::kCBufNameScenePass]._bind_slot = root_param_index;
+			_per_pass_buf_bind_slot = root_param_index;
+			rootParameters[root_param_index++].InitAsConstantBufferView(3u);
 		}
 		for (auto it = _bind_res_infos.begin(); it != _bind_res_infos.end(); it++)
 		{
@@ -265,8 +274,8 @@ namespace Ailu
 			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "VSMain", "vs_5_0", _tmp_p_vblob, _p_v_reflection);
-			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "PSMain", "ps_5_0", _tmp_p_pblob, _p_p_reflection);
+			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), _vert_entry, "vs_5_0", _tmp_p_vblob, _p_v_reflection);
+			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), _pixel_entry, "ps_5_0", _tmp_p_pblob, _p_p_reflection);
 #endif // SHADER_DXC
 		}
 		catch (const std::exception&)
@@ -281,10 +290,6 @@ namespace Ailu
 			_p_vblob = _tmp_p_vblob;
 			_p_pblob = _tmp_p_pblob;
 			GenerateInternalPSO();
-			auto it = _bind_res_infos.find(RenderConstants::kCBufNameSceneMaterial);
-			if (it != _bind_res_infos.end()) _per_mat_buf_bind_slot = it->second._bind_slot;
-			it = _bind_res_infos.find(RenderConstants::kCBufNameSceneState);
-			if (it != _bind_res_infos.end()) _per_frame_buf_bind_slot = it->second._bind_slot;
 		}
 	}
 
@@ -426,6 +431,26 @@ namespace Ailu
 					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
 				}
 			}
+			for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
+			{
+				auto cbuf = ref_ps->GetConstantBufferByIndex(i);
+				D3D12_SHADER_BUFFER_DESC desc{};
+				cbuf->GetDesc(&desc);
+				for (uint32_t j = 0u; j < desc.Variables; j++)
+				{
+					auto variable = cbuf->GetVariableByIndex(j);
+					D3D12_SHADER_VARIABLE_DESC vdesc{};
+					variable->GetDesc(&vdesc);
+					u16 offset = (u16)vdesc.StartOffset;
+					u16 size = (u16)vdesc.Size;
+					u32 variable_info = 0u;
+					variable_info |= offset;
+					variable_info <<= 16;
+					variable_info |= size;
+					auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
+					_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
+				}
+			}
 		}
 		//parser ps reflecton	
 		{
@@ -458,11 +483,11 @@ namespace Ailu
 					auto variable = cbuf->GetVariableByIndex(j);
 					D3D12_SHADER_VARIABLE_DESC vdesc{};
 					variable->GetDesc(&vdesc);
-					uint8_t offset = (uint8_t)vdesc.StartOffset;
-					uint8_t size = (uint8_t)vdesc.Size;
-					uint16_t variable_info = 0u;
+					u16 offset = (u16)vdesc.StartOffset;
+					u16 size = (u16)vdesc.Size;
+					u32 variable_info = 0u;
 					variable_info |= offset;
-					variable_info <<= 8;
+					variable_info <<= 16;
 					variable_info |= size;
 					auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
 					_bind_res_infos.insert(std::make_pair(vdesc.Name, info));

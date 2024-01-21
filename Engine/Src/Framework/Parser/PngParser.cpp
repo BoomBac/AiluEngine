@@ -12,7 +12,7 @@ namespace Ailu
 	Ref<Texture2D> PngParser::Parser(const std::string_view& path)
 	{
 		int x, y, n;
-		auto asset_path = PathUtils::ExtractAssetPath(path.data());
+		auto asset_path = PathUtils::FormatFilePath(PathUtils::ExtractAssetPath(path.data()));
 		uint8_t* data = stbi_load(path.data(), &x, &y, &n, 0);
 		if (data == nullptr)
 		{

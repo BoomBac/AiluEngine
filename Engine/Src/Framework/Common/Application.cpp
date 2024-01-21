@@ -11,6 +11,7 @@
 
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ThreadPool.h"
+#include "Render/GraphicsContext.h"
 
 namespace Ailu
 {
@@ -34,10 +35,11 @@ namespace Ailu
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
 #endif // DEAR_IMGUI
-		_p_renderer = new Renderer();
-		_p_renderer->Initialize();
+		GraphicsContext::InitGlobalContext();
 		g_pResourceMgr->Initialize();
 		g_pSceneMgr->Initialize();
+		_p_renderer = new Renderer();
+		_p_renderer->Initialize();
 		_p_input_layer = new InputLayer();
 		PushLayer(_p_input_layer);
 		_b_running = true;

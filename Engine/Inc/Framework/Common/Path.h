@@ -44,6 +44,23 @@ namespace Ailu
             return path;
         }
 
+        static String FormatFilePath(const String& file_path) 
+        {
+            std::string formattedPath = file_path;
+            size_t pos = 0;
+            while ((pos = formattedPath.find("\\\\", pos)) != std::string::npos) 
+            {
+                formattedPath.replace(pos, 2, "/");
+            }
+            pos = 0;
+            while ((pos = formattedPath.find("\\", pos)) != std::string::npos) 
+            {
+                formattedPath.replace(pos, 1, "/");
+            }
+            return formattedPath;
+        }
+
+
         static std::string GetFileName(const std::string_view filePath, bool include_ext = false)
         {
             size_t found = filePath.find_last_of("/\\");

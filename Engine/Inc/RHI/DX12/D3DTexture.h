@@ -72,16 +72,18 @@ namespace Ailu
 		};
 	public:
 		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool is_cubemap = false);
 		void Bind(uint8_t slot) final;
 		uint8_t* GetCPUNativePtr() final;
 		void* GetNativeCPUHandle() final;
+		void* GetNativeCPUHandle(u16 index) final;
 		void Release() final;
 		void Transition(ETextureResState state) final;
 	private:
 		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
 		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;
 		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
-		D3DRTHandle _d3d_handle;
+		D3DRTHandle _d3drt_handles[6];
 		ComPtr<ID3D12Resource> _p_buffer;
 	};
 }

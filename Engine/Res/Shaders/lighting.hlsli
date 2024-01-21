@@ -1,8 +1,18 @@
 #ifndef __LIGHTING_H__
 #define __LIGHTING_H__
 
+#include "common.hlsli"
 #include "cbuffer.hlsli"
 #include "brdf.hlsli"
+#include "constants.hlsli"
+
+Texture2D Albedo : register(t0);
+Texture2D Normal : register(t1);
+Texture2D Emssive : register(t2);
+Texture2D Roughness : register(t3);
+Texture2D Metallic : register(t4);
+Texture2D Specular : register(t5);
+TextureCube DiffuseIBL : register(t6);
 
 float3 CaclulateDirectionalLight(uint index, float3 normal, float3 view_dir)
 {
@@ -150,6 +160,13 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_pos = _SpotLights[k]._LightPos;
 		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k,world_pos);
 	}
+	//indirect light
+	float3 irradiance = DiffuseIBL.Sample(g_LinearWrapSampler, surface.wnormal);
+	float3 F0 = lerp(F0_AIELECTRICS, surface.albedo.rgb, surface.metallic);
+	float3 ks = FresnelSchlickRoughness(saturate(shading_data.nv), F0,surface.roughness);
+	float3 kd = F3_WHITE - ks;
+	float3 diffuse = irradiance * surface.albedo.rgb;
+	light += diffuse * kd;
 	return light;
 }
 

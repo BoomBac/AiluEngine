@@ -31,10 +31,10 @@ namespace Ailu
 		String _name;
 	};
 
-	class ReslovePass : public RenderPass
+	class ResolvePass : public RenderPass
 	{
 	public:
-		ReslovePass(Ref<RenderTexture>& source);
+		ResolvePass(Ref<RenderTexture>& source);
 		void Execute(GraphicsContext* context) final;
 		void Execute(GraphicsContext* context, CommandBuffer* cmd) final;
 		void BeginPass(GraphicsContext* context) final;
@@ -61,6 +61,28 @@ namespace Ailu
 		Rect _rect;
 		Ref<RenderTexture> _p_shadow_map;
 		Ref<Material> _p_shadowcast_material;
+		String _name;
+	};
+
+	class CubeMapGenPass : public RenderPass
+	{
+	public:
+		CubeMapGenPass(u16 size,String texture_name,String src_texture_name);
+		void Execute(GraphicsContext* context) final;
+		void Execute(GraphicsContext* context, CommandBuffer* cmd) final;
+		void Execute(GraphicsContext* context, CommandBuffer* cmd, const RenderingData& rendering_data);
+		void BeginPass(GraphicsContext* context) final;
+		void EndPass(GraphicsContext* context) final;
+		const String& GetName() const final { return _name; };
+		Ref<RenderTexture> _p_cube_map;
+		Ref<RenderTexture> _p_env_map;
+	private:
+		ScenePerPassData _pass_data[6];
+		Matrix4x4f _world_mat;
+		Rect _rect;
+		Ref<Material> _p_gen_material;
+		Ref<Material> _p_filter_material;
+		Ref<Mesh> _p_cube_mesh;
 		String _name;
 	};
 }

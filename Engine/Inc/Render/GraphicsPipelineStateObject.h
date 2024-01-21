@@ -83,12 +83,6 @@ namespace Ailu
 
 	class GraphicsPipelineStateMgr
 	{
-		struct PipelineResourceInfo
-		{
-			void* _p_resource = nullptr;
-			EBindResDescType _res_type = EBindResDescType::kUnknown;
-			u8 _slot = 0;
-		};
 	public:
 		static void BuildPSOCache();
 		static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);

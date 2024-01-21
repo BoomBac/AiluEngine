@@ -5,6 +5,7 @@
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
+#include "Render/GraphicsContext.h"
 
 
 
@@ -69,6 +70,16 @@ namespace Ailu
 				GraphicsPipelineStateMgr::SubmitBindResource(it.second,tex_it->second._bind_slot);
 			}
 		}
+		for (auto& it : s_global_matrix_bind_info)
+		{
+			auto mat_it = _bind_res_infos.find(it.first);
+			if (mat_it != _bind_res_infos.end() && mat_it->second._res_type == EBindResDescType::kCBufferAttribute)
+			{
+				auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
+				memcpy(reinterpret_cast<u8*>(g_pGfxContext->GetPerFrameCbufDataStruct()) + offset, it.second,sizeof(Matrix4x4f));
+				memcpy(g_pGfxContext->GetPerFrameCbufData(), g_pGfxContext->GetPerFrameCbufDataStruct(), sizeof(ScenePerFrameData));
+			}
+		}
 	}
 
 	bool Shader::Compile()
@@ -112,6 +123,14 @@ namespace Ailu
 		else
 			s_global_textures_bind_info[name] = texture;
 	}
+	void Shader::SetGlobalMatrix(const String& name, const Matrix4x4f& matrix)
+	{
+		if (!s_global_matrix_bind_info.contains(name))
+			s_global_matrix_bind_info.insert(std::make_pair(name, matrix));
+		else
+			s_global_matrix_bind_info[name] = matrix;
+	}
+
 	void* Shader::GetByteCode(EShaderType type)
 	{
 		return nullptr;

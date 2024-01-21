@@ -56,22 +56,13 @@ float DistributionGGX(float nh, float roughness)
 }
 
 
-// float3 SchlickFresnel(float3 H, float3 V, float3 f)
-// {
-// 	return f + (float3(1.f, 1.f, 1.f) - f) * pow(1.f - dot(H, V), 5.f);
-// }
 
-// float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
-// {
-// 	float3 f = max(float3(1.0 - roughness, 1.0 - roughness, 1.0 - roughness),F0);
-// 	return F0 + (f, - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-// }
+float3 FresnelSchlickRoughness(float cosTheta, float3 F0, float roughness)
+{
+	float3 f = max(float3(1.0 - roughness, 1.0 - roughness, 1.0 - roughness), F0);
+	return F0 + (f, -F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
 
-// float3 Fresnel(float3 n,float3 v,float3 f0)
-// {
-//     float v1 = (1.0 - pow(dot(n,v),5));
-//     return lerp(float3(v1,v1,v1),float3(1.0,1.0,1.0),f0);
-// }
 float3 Fresnel(float3 base_color,float metallic,float vh)
 {
 	float3 F0 = lerp(F0_AIELECTRICS,base_color,metallic);

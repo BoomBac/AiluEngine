@@ -233,13 +233,23 @@ namespace Ailu
 	}
 	D3DRenderTexture::D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap, EALGFormat format)
 	{
+
+	}
+	D3DRenderTexture::D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap, EALGFormat format, bool is_cubemap)
+	{
 		_width = width;
 		_height = height;
 		_format = format;
 		_channel = 4;
 		_name = name;
 		_rt_handle._name = _name;
+		_is_cubemap = is_cubemap;
 		_state = ETextureResState::kDefault;
+		u16 texture_num = 1u;
+		if (is_cubemap)
+		{
+			texture_num = 6u;
+		}
 		bool is_shadowmap = IsShadowMapFormat(_format);
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
 		auto p_cmdlist{ D3DContext::GetInstance()->GetTaskCmdList() };
@@ -249,7 +259,7 @@ namespace Ailu
 		tex_desc.Flags = is_shadowmap ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 		tex_desc.Width = _width;
 		tex_desc.Height = _height;
-		tex_desc.DepthOrArraySize = 1;
+		tex_desc.DepthOrArraySize = texture_num;
 		tex_desc.SampleDesc.Count = 1;
 		tex_desc.SampleDesc.Quality = 0;
 		tex_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -264,38 +274,45 @@ namespace Ailu
 		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &tex_desc, is_shadowmap ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET,
 			&clear_value, IID_PPV_ARGS(_p_buffer.GetAddressOf())));
 		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		_srv_desc.Format = is_shadowmap? DXGI_FORMAT_R24_UNORM_X8_TYPELESS : tex_desc.Format;
+		_srv_desc.Format = is_shadowmap ? DXGI_FORMAT_R24_UNORM_X8_TYPELESS : tex_desc.Format;
 		//_srv_desc.Format = tex_desc.Format;
-		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		_srv_desc.ViewDimension = _is_cubemap? D3D12_SRV_DIMENSION_TEXTURECUBE : D3D12_SRV_DIMENSION_TEXTURE2D;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
 		_srv_desc.Texture2D.MipLevels = 1;
 		auto [s_ch, s_gh] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
 		_srv_gpu_handle = s_gh;
 		_srv_cpu_handle = s_ch;
 		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handle);
-		if (!is_shadowmap)
+		for (u16 i = 0; i < texture_num; ++i)
 		{
-			auto handle = D3DContext::GetInstance()->GetRTVDescriptorHandle();
-			_d3d_handle._color_handle._cpu_handle = handle;
-			D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
-			rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			rtv_desc.Format = tex_desc.Format;
-			rtv_desc.Texture2D.MipSlice = 0;
-			rtv_desc.Texture2D.PlaneSlice = 0;
-			p_device->CreateRenderTargetView(_p_buffer.Get(), &rtv_desc, _d3d_handle._color_handle._cpu_handle);
+			if (!is_shadowmap)
+			{
+				auto handle = D3DContext::GetInstance()->GetRTVDescriptorHandle();
+				_d3drt_handles[i]._color_handle._cpu_handle = handle;
+				D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
+				rtv_desc.ViewDimension = _is_cubemap ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY :  D3D12_RTV_DIMENSION_TEXTURE2D;
+				rtv_desc.Format = tex_desc.Format;
+				rtv_desc.Texture2D.MipSlice = 0;
+				rtv_desc.Texture2D.PlaneSlice = 0;
+				if (_is_cubemap)
+				{
+					rtv_desc.Texture2DArray.FirstArraySlice = i;
+					rtv_desc.Texture2DArray.ArraySize = 1;
+				}
+				p_device->CreateRenderTargetView(_p_buffer.Get(), &rtv_desc, _d3drt_handles[i]._color_handle._cpu_handle);
+			}
+			else
+			{
+				auto handle = D3DContext::GetInstance()->GetDSVDescriptorHandle();
+				_d3drt_handles[i]._depth_handle._cpu_handle = handle;
+				D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
+				dsv_desc.Format = tex_desc.Format;
+				dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+				dsv_desc.Texture2D.MipSlice = 0;
+				p_device->CreateDepthStencilView(_p_buffer.Get(), &dsv_desc, _d3drt_handles[i]._depth_handle._cpu_handle);
+			}
 		}
-		else
-		{
-			auto handle = D3DContext::GetInstance()->GetDSVDescriptorHandle();
-			//_d3d_handle._depth_handle._gpu_handle = d_gh;
-			_d3d_handle._depth_handle._cpu_handle = handle;
-			D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
-			//dsv_desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-			dsv_desc.Format = tex_desc.Format;
-			dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-			dsv_desc.Texture2D.MipSlice = 0;
-			p_device->CreateDepthStencilView(_p_buffer.Get(), &dsv_desc, _d3d_handle._depth_handle._cpu_handle);
-		}
+
 		_state = is_shadowmap ? ETextureResState::kDepthTarget : ETextureResState::kColorTagret;
 	}
 	void D3DRenderTexture::Bind(uint8_t slot)
@@ -309,7 +326,12 @@ namespace Ailu
 	}
 	void* D3DRenderTexture::GetNativeCPUHandle()
 	{
-		return reinterpret_cast<void*>(&_d3d_handle._color_handle._cpu_handle);
+		return reinterpret_cast<void*>(&_d3drt_handles[0]._color_handle._cpu_handle);
+	}
+	void* D3DRenderTexture::GetNativeCPUHandle(u16 index)
+	{
+		index = _is_cubemap? index : 0;
+		return reinterpret_cast<void*>(&_d3drt_handles[index]._color_handle._cpu_handle);
 	}
 	void D3DRenderTexture::Release()
 	{

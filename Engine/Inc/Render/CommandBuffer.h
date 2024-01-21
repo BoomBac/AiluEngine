@@ -21,12 +21,18 @@ namespace Ailu
 	public:
         virtual ~CommandBuffer() = default;
 
+        virtual void SetPerPassCbufferData(u16 index,ScenePerPassData* data) = 0;
+        virtual void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot = 255) = 0;
+
         virtual void SetClearColor(const Vector4f& color) = 0;
         virtual void Clear() = 0;
         virtual void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) = 0;
         virtual void ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color) = 0;
+        virtual void ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color,u16 index = 0u) = 0;
         virtual void ClearRenderTarget(RenderTexture* depth, float depth_value = 1.0f,u8 stencil_value = 0u) = 0;
+        virtual void SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth) = 0;
+        virtual void SetRenderTarget(RenderTexture* color, RenderTexture* depth) = 0;
+        virtual void SetRenderTarget(Ref<RenderTexture>& color,u16 index = 0u) = 0;
         virtual void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, uint32_t instance_count) = 0;
         virtual void DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, uint32_t instance_count) = 0;
         virtual void SetViewMatrix(const Matrix4x4f& view) = 0;
@@ -40,12 +46,8 @@ namespace Ailu
         virtual void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count = 1u) = 0;
         virtual void DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, uint32_t instance_count = 1u) = 0;
         virtual void SetPSO(GraphicsPipelineStateObject* pso) = 0;
-        virtual void SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth) = 0;
-        virtual void SetRenderTarget(RenderTexture* color, RenderTexture* depth) = 0;
-        virtual void SetRenderTarget(Ref<RenderTexture>& color) = 0;
         virtual void ResolveToBackBuffer(Ref<RenderTexture>& color) = 0;
         virtual void ResolveToBackBuffer(RenderTexture* color) = 0;
-
         virtual Vector<std::function<void()>>& GetAllCommands() = 0;
         virtual u32 GetID() = 0;
 	};

@@ -3,8 +3,8 @@ type: material
 name: StandardPBR
 shader_path: Shaders/shaders.hlsl
   prop_type: Float
-    RoughnessValue: 0
     MetallicValue: 0
+    RoughnessValue: 0
     SamplerMask: 0
   prop_type: Vector
     SpecularColor: 0,0,0,0

@@ -21,11 +21,6 @@ namespace Ailu
 		kVertex,kPixel
 	};
 
-	enum class EBindResDescType : uint8_t
-	{
-		kConstBuffer = 0, kTexture2D, kCubeMap,kTexture2DArray,kSampler, kCBufferAttribute,kUnknown
-	};
-
 	struct ShaderPropertyType
 	{
 		inline static std::string Vector = "Vector";
@@ -53,18 +48,18 @@ namespace Ailu
 			"padding",
 			"padding0"
 		};
-		inline static uint8_t GetVariableSize(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset & 0XFF;}
-		inline static uint8_t GetVariableOffset(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset >> 8;}
+		inline static u16 GetVariableSize(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset & 0XFFFF;}
+		inline static u16 GetVariableOffset(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset >> 16;}
 		EBindResDescType _res_type;
 		union
 		{
-			uint16_t _res_slot;
-			uint16_t _cbuf_member_offset;
+			u32 _res_slot;
+			u32 _cbuf_member_offset;
 		};
 		uint8_t _bind_slot;
 		std::string _name;
 		ShaderBindResourceInfo() = default;
-		ShaderBindResourceInfo(EBindResDescType res_type, uint16_t slot_or_offset, uint8_t bind_slot, const std::string& name)
+		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, uint8_t bind_slot, const std::string& name)
 			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
 		{
 			if (res_type == EBindResDescType::kCBufferAttribute) _cbuf_member_offset = slot_or_offset;	
@@ -170,6 +165,10 @@ namespace Ailu
 		virtual void PreProcessShader();
 		virtual void* GetByteCode(EShaderType type);
 
+		const i8& GetPerMatBufferBindSlot() const {return _per_mat_buf_bind_slot;}
+		const i8& GetPerFrameBufferBindSlot() const {return _per_frame_buf_bind_slot;}
+		const i8& GetPrePassBufferBindSlot() const  {return _per_pass_buf_bind_slot;}
+
 		const VertexInputLayout& PipelineInputLayout() const { return _pipeline_input_layout; };
 		const RasterizerState& PipelineRasterizerState() const { return _pipeline_raster_state; };
 		const DepthStencilState& PipelineDepthStencilState() const { return _pipeline_ds_state; };
@@ -180,6 +179,7 @@ namespace Ailu
 		float GetFloatValue(const String& name);
 
 		static void SetGlobalTexture(const String& name, Texture* texture);
+		static void SetGlobalMatrix(const String& name, const Matrix4x4f& matrix);
 		const String& GetSrcPath() {return _src_file_path;}
 		const std::set<String>& GetSourceFiles() {return _source_files;}
 		const std::map<String, Vector<String>> GetKeywordGroups() {return _keywords;};
@@ -198,8 +198,9 @@ namespace Ailu
 		String _vert_entry, _pixel_entry;
 		uint8_t _vertex_input_num = 0u;
 		String _src_file_path;
-		i16 _per_mat_buf_bind_slot = -1;
+		i8 _per_mat_buf_bind_slot = -1;
 		i8 _per_frame_buf_bind_slot = -1;
+		i8 _per_pass_buf_bind_slot = -1;
 		VertexInputLayout _pipeline_input_layout;
 		RasterizerState _pipeline_raster_state;
 		DepthStencilState _pipeline_ds_state;
@@ -218,6 +219,7 @@ namespace Ailu
 		void ExtractValidShaderProperty();
 	private:
 		inline static std::map<String, Texture*> s_global_textures_bind_info{};
+		inline static std::map<String, Matrix4x4f> s_global_matrix_bind_info{};
 	};
 
 	class ShaderLibrary
@@ -235,6 +237,17 @@ namespace Ailu
 				return nullptr;
 			}
 		}
+		static Ref<Shader> Get(u32 id)
+		{
+			if (VAILD_SHADER_ID(id)) 
+				return s_shader_library.find(id)->second;
+			else
+			{
+				LOG_ERROR("Shader: {} dont's exist in ShaderLibrary!", id);
+				return nullptr;
+			}
+		}
+
 		static bool Exist(const std::string& name)
 		{
 			return NameToId(name) != s_error_id;

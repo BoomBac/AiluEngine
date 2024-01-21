@@ -43,12 +43,14 @@ namespace Ailu
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
     private:
+        static inline List<RenderPass*> _p_task_render_passes{};
         RenderingData _rendering_data;
         ScenePerFrameData* _p_per_frame_cbuf_data;
         GraphicsContext* _p_context = nullptr;
         Scope<OpaquePass> _p_opaque_pass;
-        Scope<ReslovePass> _p_reslove_pass;
+        Scope<ResolvePass> _p_reslove_pass;
         Scope<ShadowCastPass> _p_shadowcast_pass;
+        Scope<CubeMapGenPass> _p_cubemap_gen_pass;
         List<RenderPass*> _p_render_passes;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;

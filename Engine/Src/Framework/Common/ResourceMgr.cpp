@@ -65,6 +65,8 @@ namespace Ailu
 		skybox->SetTexture("SkyBox", "cubemap_sea");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/error_fallback.hlsl"), "Error");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.shader"), "Blit");
+		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "CubemapGen");
+		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/filter_irradiance.hlsl"), "EnvmapFilter");
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
 		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());

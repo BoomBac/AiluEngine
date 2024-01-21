@@ -5,6 +5,7 @@
 #include "Render/RenderCommand.h"
 #include "Render/RenderingData.h"
 #include "Render/Gizmo.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Objects/StaticMeshComponent.h"
 #include "Framework/Parser/AssetParser.h"
 #include <Framework/Common/LogMgr.h>
@@ -14,9 +15,9 @@ namespace Ailu
 {
 	int Renderer::Initialize()
 	{
-		_p_context = new D3DContext(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
+		_p_context = g_pGfxContext.get();
 		_b_init = true;
-		_p_context->Init();
+
 		_p_timemgr = new TimeMgr();
 		_p_timemgr->Initialize();
 		_p_per_frame_cbuf_data = static_cast<D3DContext*>(_p_context)->GetPerFrameCbufDataStruct();
@@ -24,14 +25,18 @@ namespace Ailu
 			RenderConstants::kLDRFormat : RenderConstants::kHDRFormat);
 		_p_camera_depth_attachment = RenderTexture::Create(1600, 900, "CameraDepthAttachment", EALGFormat::kALGFormatD24S8_UINT);
 		_p_opaque_pass = MakeScope<OpaquePass>();
-		_p_reslove_pass = MakeScope<ReslovePass>(_p_camera_color_attachment);
+		_p_reslove_pass = MakeScope<ResolvePass>(_p_camera_color_attachment);
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
+		auto tex0 =g_pResourceMgr->LoadTexture(EnginePath::kEngineTexturePath + "small_cave_1k.hdr", "SmallCave");
+		TexturePool::Add(tex0->AssetPath(), tex0);
+
+		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512,"pure_sky","Textures/small_cave_1k.hdr");
+		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
 		return 0;
 	}
 	void Renderer::Finalize()
 	{
 		INIT_CHECK(this, Renderer);
-		DESTORY_PTR(_p_context);
 		_p_timemgr->Finalize();
 		DESTORY_PTR(_p_timemgr);
 	}
@@ -69,6 +74,9 @@ namespace Ailu
 		_rendering_data.Reset();
 		for (auto pass : _p_render_passes)
 			pass->EndPass(_p_context);
+		for (auto pass : _p_task_render_passes)
+			pass->EndPass(_p_context);
+		_p_task_render_passes.clear();
 	}
 	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, uint32_t instance_count)
 	{
@@ -117,6 +125,15 @@ namespace Ailu
 		_p_shadowcast_pass->BeginPass(_p_context);
 		_p_shadowcast_pass->Execute(_p_context, cmd.get(), _rendering_data);
 
+		
+		//cmd->SetViewProjectionMatrices(_p_scene_camera->GetView(), _p_scene_camera->GetProjection());
+		for (auto task_pass : _p_task_render_passes)
+		{
+			task_pass->BeginPass(_p_context);
+			task_pass->Execute(_p_context, cmd.get());
+		}
+
+
 		static uint32_t w = 1600, h = 900;
 		cmd->SetRenderTarget(_p_camera_color_attachment, _p_camera_depth_attachment);
 		cmd->ClearRenderTarget(_p_camera_color_attachment, _p_camera_depth_attachment, Colors::kBlack, 1.0f);
@@ -125,6 +142,8 @@ namespace Ailu
 		cmd->SetViewProjectionMatrices(_p_scene_camera->GetView(), _p_scene_camera->GetProjection());
 		_p_context->ExecuteCommandBuffer(cmd);
 
+		Shader::SetGlobalTexture("SkyBox", _p_cubemap_gen_pass->_p_cube_map.get());
+		Shader::SetGlobalTexture("DiffuseIBL", _p_cubemap_gen_pass->_p_env_map.get());
 		_p_opaque_pass->BeginPass(_p_context);
 		_p_opaque_pass->Execute(_p_context);
 

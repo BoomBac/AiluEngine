@@ -21,36 +21,22 @@
 //}
 //info end
 
+#include "common.hlsli"
 #include "input.hlsli"
 #include "cbuffer.hlsli"
-#include "common.hlsli"
 #include "lighting.hlsli"
 
 
+Texture2D MainLightShadowMap : register(t7);
 
-Texture2D Albedo : register(t0);
-Texture2D Normal : register(t1);
-Texture2D Emssive : register(t2);
-Texture2D Roughness : register(t3);
-Texture2D Metallic : register(t4);
-Texture2D Specular : register(t5);
-Texture2D MainLightShadowMap : register(t6);
-
-SamplerState g_LinearWrapSampler : register(s0);
-SamplerState g_LinearClampSampler : register(s1);
-SamplerState g_LinearBorderSampler : register(s2);
-SamplerComparisonState g_ShadowSampler : register(s3);
-
-cbuffer SceneMaterialBuffer : register(b1)
-{
-	float4 		BaseColor; //0
-	float4 		EmssiveColor;//16
-	float4		SpecularColor;//32
-	float	 	RoughnessValue;//36
-	float	 	MetallicValue;//40
-	uint 		SamplerMask;//44
-};
-
+CBufBegin
+	float4 BaseColor; //0
+	float4 EmssiveColor; //16
+	float4 SpecularColor; //32
+	float RoughnessValue; //36
+	float MetallicValue; //40
+	uint SamplerMask; //44
+CBufEnd
 
 
 #pragma vs
