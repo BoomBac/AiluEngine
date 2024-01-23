@@ -67,6 +67,7 @@ namespace Ailu
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.shader"), "Blit");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "CubemapGen");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/filter_irradiance.hlsl"), "EnvmapFilter");
+		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/bone_test.hlsl"), "BoneWeight");
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
 		auto anim = parser->Parser(GetResPath("Meshs/anim.fbx"));
@@ -279,7 +280,7 @@ namespace Ailu
 		{
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
 		}
-		if (!props.empty()) out_mat << endl;
+		out_mat << endl;
 		auto float_props = mat->GetAllFloatValue();
 		auto vector_props = mat->GetAllVectorValue();
 		out_mat << "  prop_type: " << "Float" << endl;

@@ -10,7 +10,7 @@ namespace Ailu
 	namespace RenderConstants
 	{
 		constexpr static uint8_t  kFrameCount = 2u;
-		constexpr static uint16_t kMaxMaterialDataCount = 16u;
+		constexpr static uint16_t kMaxMaterialDataCount = 24u;
 		constexpr static uint32_t kMaxRenderObjectCount = 50u;
 		constexpr static uint32_t kMaxPassDataCount = 10u;
 		constexpr static uint32_t kMaxTextureCount = 16u;
@@ -34,6 +34,8 @@ namespace Ailu
 		inline const static char* kSemanticTangent = "TANGENT";
 		inline const static char* kSemanticNormal = "NORMAL";
 		inline const static char* kSemanticTexcoord = "TEXCOORD";
+		inline const static char* kSemanticBoneWeight = "BONEWEIGHT";
+		inline const static char* kSemanticBoneIndex = "BONEINDEX";
 
 		constexpr static char kCBufNameSceneObject[] = "ScenePerObjectData";
 		constexpr static char kCBufNameSceneMaterial[] = "ScenePerMaterialData";

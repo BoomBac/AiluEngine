@@ -1,0 +1,7 @@
+guid: 6801ca63-ca10-4fda-aad0-3408be9950f5
+type: material
+name: BoneWeight
+shader_path: Shaders/bone_test.hlsl
+  prop_type: Float
+  prop_type: Vector
+  prop_type: Texture2D

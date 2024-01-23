@@ -154,6 +154,8 @@ namespace Ailu
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticTangent)) return EShaderDateType::kFloat4;
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticColor)) return EShaderDateType::kFloat4;
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticTexcoord)) return EShaderDateType::kFloat2;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneWeight)) return EShaderDateType::kFloat4;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneIndex)) return EShaderDateType::kuInt4;
 		else
 		{
 			AL_ASSERT(true, "Unsupported DXGI_FORMAT to ShaderDataType!")

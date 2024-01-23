@@ -1,21 +1,21 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 563.614,933.024,-1532.44
-  Rotation: 0.260249,-0.143791,0.0392294,0.953968
+  Position: 2607.87,3292.35,-3114.89
+  Rotation: -0.214139,0.233247,-0.052733,-0.94708
   Fov: 60
   Aspect: 1.77778
   Near: 62.29
   Far: 137099
-  ControllerRotation: 30.5196,7902.86
+  ControllerRotation: 25.4797,8252.33
 SceneGraph: 
   Name: root
     Components: 
       TransformComponent: 
         Position: 0,0,0
-        Rotation: 2.69195e-05,0.988248,-1.5448e-05,0.152852
+        Rotation: 2.17333e-05,0.974165,-1.48822e-05,0.22584
         Scale: 1,1,1
-    Children: 7
+    Children: 8
       Name: plane
         Components: 
           TransformComponent: 
@@ -40,7 +40,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 2,759,0
-            Rotation: -0.648328,0.106546,0.648368,-0.384628
+            Rotation: 0.679702,-0.111682,-0.679507,0.252593
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
@@ -54,7 +54,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: -219,471,0
-            Rotation: 0.337255,0.0014919,-0.0103402,-0.941356
+            Rotation: 0.756484,0.00334723,-0.0231934,0.653593
             Scale: 1,1,1
           LightComponent: 
             Type: Point
@@ -69,7 +69,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 846,845,-374
-            Rotation: -0.00387709,-0.175531,0.191185,-0.965727
+            Rotation: -0.0149338,-0.676265,0.736506,0.00251076
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
@@ -86,7 +86,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 0,1020,0
-            Rotation: -1.81271e-06,0.909994,9.3011e-08,0.414621
+            Rotation: 3.94315e-07,-0.281617,-3.10941e-07,0.959527
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey
@@ -101,4 +101,14 @@ SceneGraph:
           StaticMeshComponent: 
             MeshPath: sphere
             MaterialPath: Materials/StandardPBR_new.alasset
+        Children: 0
+      Name: object0
+        Components: 
+          TransformComponent: 
+            Position: 960,50,-48
+            Rotation: 0,0,0,1
+            Scale: 1,1,1
+          StaticMeshComponent: 
+            MeshPath: anim
+            MaterialPath: Materials/BoneWeight.almat
         Children: 0

@@ -21,6 +21,8 @@ namespace Ailu
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticTangent)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticColor)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticTexcoord)) return DXGI_FORMAT_R32G32_FLOAT;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneWeight)) return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneIndex)) return DXGI_FORMAT_R32G32B32A32_UINT;
 		else
 		{
 			LOG_ERROR("Unsupported vertex shader semantic!");

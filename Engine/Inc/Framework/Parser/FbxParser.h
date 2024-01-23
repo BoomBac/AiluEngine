@@ -20,12 +20,12 @@ namespace Ailu
 		virtual ~FbxParser();
 	private:
 		void ParserFbxNode(FbxNode* node, List<Ref<Mesh>>& loaded_meshes);
+		void ParserFbxNode(FbxNode* node, Queue<FbxNode*>& mesh_node, Queue<FbxNode*>& skeleton_node);
 		void ParserSkeleton(FbxNode* node);
 		bool ParserMesh(FbxNode* node, List<Ref<Mesh>>& loaded_meshes);
 		bool ReadNormal(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
 		bool ReadVertex(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
 		bool ReadUVs(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
-		bool ReadSkin(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
 		bool ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
 		bool CalculateTangant(Mesh* mesh);
 		void GenerateIndexdMesh(Mesh* mesh);

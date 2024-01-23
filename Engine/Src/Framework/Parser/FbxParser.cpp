@@ -206,11 +206,9 @@ namespace Ailu
 		space_str += "--";
 		if (node != nullptr)
 		{
-			auto child_num = node->GetChildCount();
-			for (int i = 0; i < child_num; i++)
+			FbxNodeAttribute* attribute = node->GetNodeAttribute();
+			if (attribute)
 			{
-				auto child = node->GetChild(i);
-				FbxNodeAttribute* attribute = child->GetNodeAttribute();
 				auto type = attribute->GetAttributeType();
 				FbxAMatrix transformMatrix = node->EvaluateGlobalTransform();
 				FbxVector4 scale = transformMatrix.GetS();
@@ -219,18 +217,53 @@ namespace Ailu
 				scale_factor.z = scale[2];
 				if (type == FbxNodeAttribute::eMesh)
 				{
-					//fbxsdk::FbxMesh* fbx_mesh = FbxCast<fbxsdk::FbxMesh>(attribute);
-					//Ref<Mesh> mesh = MakeRef<Mesh>(node_name);
-					if (!ParserMesh(child, loaded_meshes)) 
-						continue;
-					//mesh->Build();
-					//loaded_meshes.emplace_back(mesh);
+					ParserMesh(node, loaded_meshes);
 				}
 				else if (type == FbxNodeAttribute::eSkeleton)
 				{
-					ParserSkeleton(child);
+					ParserSkeleton(node);
 				}
-				ParserFbxNode(child, loaded_meshes);
+			}
+		}
+		auto child_num = node->GetChildCount();
+		for (int i = 0; i < child_num; i++)
+		{
+			auto child = node->GetChild(i);
+			ParserFbxNode(child, loaded_meshes);
+		}
+		space_str = space_str.substr(space_str.size() - 2, 2);
+	}
+
+	void FbxParser::ParserFbxNode(FbxNode* node, Queue<FbxNode*>& mesh_node, Queue<FbxNode*>& skeleton_node)
+	{
+		std::string node_name = node->GetNameOnly().Buffer();
+		LOG_INFO("FBXNode: {}{}", space_str, node_name);
+		space_str += "--";
+		if (node != nullptr)
+		{
+			FbxNodeAttribute* attribute = node->GetNodeAttribute();
+			if (attribute)
+			{
+				auto type = attribute->GetAttributeType();
+				FbxAMatrix transformMatrix = node->EvaluateGlobalTransform();
+				FbxVector4 scale = transformMatrix.GetS();
+				scale_factor.x = scale[0];
+				scale_factor.y = scale[1];
+				scale_factor.z = scale[2];
+				if (type == FbxNodeAttribute::eMesh)
+				{
+					mesh_node.emplace(node);
+				}
+				else if (type == FbxNodeAttribute::eSkeleton)
+				{
+					skeleton_node.emplace(node);
+				}
+			}
+			auto child_num = node->GetChildCount();
+			for (int i = 0; i < child_num; i++)
+			{
+				auto child = node->GetChild(i);
+				ParserFbxNode(child, mesh_node, skeleton_node);
 			}
 		}
 		space_str = space_str.substr(space_str.size() - 2, 2);
@@ -279,28 +312,18 @@ namespace Ailu
 			auto ret1 = g_thread_pool->Enqueue(&FbxParser::ReadVertex, this, std::ref(*fbx_mesh), mesh.get());
 			auto ret2 = g_thread_pool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), mesh.get());
 			auto ret3 = g_thread_pool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), mesh.get());
-			if (is_skined)
+			if (ret1.get() && ret2.get() && ret3.get())
 			{
-				auto ret4 = g_thread_pool->Enqueue(&FbxParser::ReadSkin, this, std::ref(*fbx_mesh), mesh.get());
-				if (ret1.get() && ret2.get() && ret3.get() && ret4.get())
-				{
-					LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-				}
+				LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				_time_mgr.Mark();
+				GenerateIndexdMesh(mesh.get());
+				CalculateTangant(mesh.get());
+				LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				mesh->Build();
+				loaded_meshes.emplace_back(mesh);
+				return true;
 			}
-			else
-			{
-				if (ret1.get() && ret2.get() && ret3.get())
-				{
-					LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-				}
-			}
-			_time_mgr.Mark();
-			GenerateIndexdMesh(mesh.get());
-			CalculateTangant(mesh.get());
-			LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-			mesh->Build();
-			loaded_meshes.emplace_back(mesh);
-			return true;
+			return false;
 		}
 		else
 		{
@@ -359,25 +382,99 @@ namespace Ailu
 
 	bool FbxParser::ReadVertex(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh)
 	{
+		auto mesh_name = fbx_mesh.GetName();
+		u32 deformers_num = fbx_mesh.GetDeformerCount(FbxDeformer::eSkin);
+		//FbxAMatrix transf = fbx_mesh.EvaluateGlobalTransform();
+		//control point : <joint_index, weight>,<joint_index, weight>...
+		std::map<u32, Vector<std::pair<u16, float>>> control_point_weight_infos{};
+		for (u32 i = 0; i < deformers_num; i++)
+		{
+			FbxSkin* skin = FbxCast<FbxSkin>(fbx_mesh.GetDeformer(i, FbxDeformer::eSkin));
+			if (!skin)
+				continue;
+			u32 cluster_num = skin->GetClusterCount();
+			for (u32 j = 0; j < cluster_num; j++)
+			{
+				FbxCluster* cluster = skin->GetCluster(j);
+				FbxString joint_name = cluster->GetLink()->GetName();
+				auto it = s_global_joint.find(joint_name.Buffer());
+				if (it == s_global_joint.end())
+				{
+					//LOG_WARNING("Can't find joint {} when load mesh {}", joint_name.Buffer(), mesh_name);
+					continue;
+				}
+				FbxAMatrix local_matrix = cluster->GetLink()->EvaluateLocalTransform();
+				u32 indices_count = cluster->GetControlPointIndicesCount();
+
+				for (int k = 0; k < indices_count; k++)
+				{
+					u32 control_point_index = cluster->GetControlPointIndices()[k];
+					if (control_point_weight_infos.find(control_point_index) == control_point_weight_infos.end())
+						control_point_weight_infos.insert(std::make_pair(control_point_index, Vector<std::pair<u16, float>>()));
+					control_point_weight_infos[control_point_index].emplace_back(std::make_pair(it->second._self, cluster->GetControlPointWeights()[k]));
+				}
+			}
+		}
+
 		fbxsdk::FbxVector4* points{ fbx_mesh.GetControlPoints() };
 		uint32_t cur_index_count = 0u;
 		std::vector<Vector3f> positions{};
-		auto tran = fbx_mesh.GetPolygonCount();
-		for (int32_t i = 0; i < fbx_mesh.GetPolygonCount(); ++i)
+		Vector<Vector4f> bone_weights_vec{};
+		Vector<Vector4D<u32>> bone_indices_vec{};
+		if (control_point_weight_infos.size() > 0)
 		{
-			for (int32_t j = 0; j < 3; ++j)
+			for (int32_t i = 0; i < fbx_mesh.GetPolygonCount(); ++i)
 			{
-				auto p = points[fbx_mesh.GetPolygonVertex(i, j)];
-				Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
-				position *= scale_factor;
-				positions.emplace_back(position);
+				for (int32_t j = 0; j < 3; ++j)
+				{
+					auto cur_control_point_index = fbx_mesh.GetPolygonVertex(i, j);
+					auto p = points[cur_control_point_index];
+					Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
+					//position *= scale_factor;
+					positions.emplace_back(position);
+					auto& cur_weight_info = control_point_weight_infos[cur_control_point_index];
+					u16 bone_effect_num = cur_weight_info.size() > 4 ? 4 : cur_weight_info.size();
+					Vector4f cur_weight{0,0,0,0};
+					Vector4D<u32> cur_indices{0,0,0,0};
+					for (int weight_index = 0; weight_index < bone_effect_num; ++weight_index)
+					{
+						cur_weight[weight_index] = cur_weight_info[weight_index].second;
+						cur_weight[weight_index] = cur_weight_info[weight_index].second;
+					}
+					bone_weights_vec.emplace_back(cur_weight);
+					bone_indices_vec.emplace_back(cur_indices);
+				}
 			}
 		}
+		else
+		{
+			for (int32_t i = 0; i < fbx_mesh.GetPolygonCount(); ++i)
+			{
+				for (int32_t j = 0; j < 3; ++j)
+				{
+					auto p = points[fbx_mesh.GetPolygonVertex(i, j)];
+					Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
+					position *= scale_factor;
+					positions.emplace_back(position);
+				}
+			}
+		}
+
 		uint32_t vertex_count = (uint32_t)positions.size();
 		float* vertex_buf = new float[vertex_count * 3];
 		memcpy(vertex_buf, positions.data(), sizeof(Vector3f) * vertex_count);
 		mesh->_vertex_count = vertex_count;
 		mesh->SetVertices(std::move(reinterpret_cast<Vector3f*>(vertex_buf)));
+		if (control_point_weight_infos.size() > 0)
+		{
+			float* bone_weights = new float[vertex_count * 4];
+			u32* bone_indices = new u32[vertex_count * 4];
+			memcpy(bone_weights, bone_weights_vec.data(), sizeof(Vector4f) * vertex_count);
+			memcpy(bone_indices, bone_indices_vec.data(), sizeof(Vector4D<u32>) * vertex_count);
+			auto sk_mesh = dynamic_cast<SkinedMesh*>(mesh);
+			sk_mesh->SetBoneIndices(reinterpret_cast<Vector4D<u32>*>(bone_indices));
+			sk_mesh->SetBoneWeights(reinterpret_cast<Vector4D<float>*>(bone_weights));
+		}
 		return true;
 	}
 
@@ -437,74 +534,6 @@ namespace Ailu
 			mesh->SetUVs(std::move(reinterpret_cast<Vector2f*>(data)),i);
 		}
 		return true;
-	}
-
-	bool FbxParser::ReadSkin(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh)
-	{
-		SkinedMesh* sk_mesh = dynamic_cast<SkinedMesh*>(mesh);
-		if (!sk_mesh)
-		{
-			LOG_ERROR("Mesh is not skined mesh");
-			return false;
-		}
-		//控制点索引和实际读入顶点对应关系,根据控制点索引快速找到对应的顶点
-		std::vector<u32> control_point_indices(fbx_mesh.GetControlPointsCount());
-		u32 vertex_index = 0;
-		for (int32_t i = 0; i < fbx_mesh.GetPolygonCount(); ++i)
-		{
-			for (int32_t j = 0; j < 3; ++j)
-				control_point_indices[fbx_mesh.GetPolygonVertex(i, j)] = vertex_index++;
-		}
-		auto mesh_name = fbx_mesh.GetName();
-		u32 deformers_num = fbx_mesh.GetDeformerCount();
-		//FbxAMatrix transf = fbx_mesh.EvaluateGlobalTransform();
-		//control point : <joint_index, weight>,<joint_index, weight>...
-		std::map<u32, Vector<std::pair<u16, float>>> control_point_weight_infos{};
-		for (u32 i = 0; i < deformers_num; i++)
-		{
-			FbxSkin* skin = FbxCast<FbxSkin>(fbx_mesh.GetDeformer(i, FbxDeformer::eSkin));
-			if (!skin)
-				continue;
-			u32 cluster_num = skin->GetClusterCount();
-			for (u32 j = 0; j < cluster_num; j++)
-			{
-				FbxCluster* cluster = skin->GetCluster(j);
-				FbxString joint_name = cluster->GetLink()->GetName();
-				auto it = s_global_joint.find(joint_name.Buffer());
-				if (it == s_global_joint.end())
-				{
-					LOG_WARNING("Can't find joint {} when load mesh {}", joint_name.Buffer(), mesh_name);
-					continue;
-				}
-				FbxAMatrix local_matrix = cluster->GetLink()->EvaluateLocalTransform();
-				u32 indices_count = cluster->GetControlPointIndicesCount();
-				
-				for (int k = 0; k < indices_count; k++)
-				{
-					u32 control_point_index = cluster->GetControlPointIndices()[k];
-					if (control_point_weight_infos.find(control_point_index) == control_point_weight_infos.end())
-						control_point_weight_infos.insert(std::make_pair(control_point_index, Vector<std::pair<u16, float>>()));
-					control_point_weight_infos[control_point_index].emplace_back(std::make_pair(it->second._self, cluster->GetControlPointWeights()[k]));
-				}
-			}
-		}
-		float* bone_weights = new float[vertex_index * 4];
-		u32* bone_indices = new u32[vertex_index * 4];
-		for (auto& it : control_point_weight_infos)
-		{
-			u32 cur_vertex_index = control_point_indices[it.first] * 4;
-			u16 offset = 0;
-			for (auto& weight_info : it.second)
-			{
-				if (offset < 4)
-				{
-					bone_weights[cur_vertex_index + offset] = weight_info.second;
-					bone_indices[cur_vertex_index + offset++] = weight_info.first;
-				}
-			}
-		}
-		sk_mesh->SetBoneIndices(reinterpret_cast<Vector4D<u32>*>(bone_indices));
-		sk_mesh->SetBoneWeights(reinterpret_cast<Vector4D<float>*>(bone_weights));
 	}
 
 	bool FbxParser::ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh)
@@ -714,7 +743,7 @@ namespace Ailu
 		constexpr float maxf = std::numeric_limits<float>::max();
 		Vector3f vmin{ maxf,maxf ,maxf };
 		Vector3f vmax{ minf,minf ,minf };
-		if (skined_mesh)
+		if (raw_bonei)
 		{
 			for (size_t i = 0; i < vertex_count; i++)
 			{
@@ -787,7 +816,7 @@ namespace Ailu
 		mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(normal_buf)));
 		mesh->SetVertices(std::move(reinterpret_cast<Vector3f*>(vertex_buf)));
 		mesh->SetIndices(std::move(reinterpret_cast<uint32_t*>(index_buf)));
-		if (skined_mesh)
+		if (raw_bonei)
 		{
 			u32* bone_indices_buf = new u32[vertex_count * 4];
 			float* bone_weights_buf = new float[vertex_count * 4];
@@ -800,6 +829,7 @@ namespace Ailu
 
 	List<Ref<Mesh>> FbxParser::ParserImpl(WString sys_path)
 	{
+		scale_factor = Vector3f::kOne;
 		String path = ToChar(sys_path.data());
 		space_str = "--";
 		FbxScene* fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
@@ -824,7 +854,19 @@ namespace Ailu
 			};
 			fbxsdk::FbxSystemUnit::cm.ConvertScene(fbx_scene, lConversionOptions);
 		}
-		ParserFbxNode(fbx_rt,loaded_meshs);
+		//ParserFbxNode(fbx_rt, loaded_meshs);
+		Queue<FbxNode*> mesh_node, skeleton_node;
+		ParserFbxNode(fbx_rt, mesh_node,skeleton_node);
+		while (!skeleton_node.empty())
+		{
+			ParserSkeleton(skeleton_node.front());
+			skeleton_node.pop();
+		}
+		while (!mesh_node.empty())
+		{
+			ParserMesh(mesh_node.front(), loaded_meshs);
+			mesh_node.pop();
+		}
 		if (loaded_meshs.empty())
 		{
 			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);

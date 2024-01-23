@@ -129,8 +129,8 @@ namespace Ailu
 	{
 		auto cmd = CommandBufferPool::GetCommandBuffer();
 		cmd->Clear();
-		_p_shadowcast_pass->BeginPass(_p_context);
-		_p_shadowcast_pass->Execute(_p_context, cmd.get(), _rendering_data);
+		//_p_shadowcast_pass->BeginPass(_p_context);
+		//_p_shadowcast_pass->Execute(_p_context, cmd.get(), _rendering_data);
 
 		
 		//cmd->SetViewProjectionMatrices(_p_scene_camera->GetView(), _p_scene_camera->GetProjection());

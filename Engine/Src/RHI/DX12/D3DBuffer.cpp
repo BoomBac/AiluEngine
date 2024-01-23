@@ -56,8 +56,16 @@ namespace Ailu
 		RenderingStates::s_vertex_num += _vertices_count;
 		for (auto& layout_ele : pipeline_input_layout)
 		{
-			const u8 stream_index = _buffer_layout_indexer.find(layout_ele.Name)->second;
-			cmdlist->IASetVertexBuffers(stream_index, 1, &s_vertex_buf_views[_buf_start + stream_index]);
+			auto it = _buffer_layout_indexer.find(layout_ele.Name);
+			if (it != _buffer_layout_indexer.end())
+			{
+				const u8 stream_index = it->second;
+				cmdlist->IASetVertexBuffers(layout_ele.Stream, 1, &s_vertex_buf_views[_buf_start + stream_index]);
+			}
+			else
+			{
+				LOG_WARNING("Try to bind a vertex buffer with an invalid layout element name {}",layout_ele.Name);
+			}
 		}
 	}
 
@@ -160,8 +168,12 @@ namespace Ailu
 			uint32_t cur_buffer_index = _buf_start + stream_index;
 			s_vertex_bufs[cur_buffer_index].Reset();
 			ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
+			auto f = reinterpret_cast<Vector3f*>(_mapped_data[0]);
+			LOG_WARNING("{}", f->ToString())
 			s_vertex_bufs[cur_buffer_index]->Map(0, nullptr, reinterpret_cast<void**>(&_mapped_data[stream_index]));
+			memcpy(_mapped_data[stream_index], data, size);
 		}
+
 		// Initialize the vertex buffer view.
 		s_vertex_buf_views[cur_buffer_index].BufferLocation = s_vertex_bufs[cur_buffer_index]->GetGPUVirtualAddress();
 		s_vertex_buf_views[cur_buffer_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
@@ -213,15 +225,15 @@ namespace Ailu
 	void D3DDynamicVertexBuffer::UploadData()
 	{
 		_vertex_num = _ime_vertex_data_offset / 12;
-		memcpy(_p_vertex_data, _p_ime_vertex_data, _size_pos_buf);
-		memcpy(_p_color_data, _p_ime_color_data, _size_color_buf);
+		//memcpy(_p_vertex_data, _p_ime_vertex_data, _size_pos_buf);
+		//memcpy(_p_color_data, _p_ime_color_data, _size_color_buf);
 		_ime_vertex_data_offset = 0;
 		_ime_color_data_offset = 0;
 	}
 	void D3DDynamicVertexBuffer::AppendData(float* data0, uint32_t num0, float* data1, uint32_t num1)
 	{
-		memcpy(_p_ime_vertex_data + _ime_vertex_data_offset, data0, num0 * 4);
-		memcpy(_p_ime_color_data + _ime_color_data_offset, data1, num1 * 4);
+		memcpy(_p_vertex_data + _ime_vertex_data_offset, data0, num0 * 4);
+		memcpy(_p_color_data + _ime_color_data_offset, data1, num1 * 4);
 		_ime_vertex_data_offset += num0 * 4;
 		_ime_color_data_offset += num1 * 4;
 	}
