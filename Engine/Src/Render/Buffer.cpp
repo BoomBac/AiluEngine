@@ -5,20 +5,7 @@
 
 namespace Ailu
 {
-	//VertexBuffer* VertexBuffer::Create(float* vertices, uint32_t size)
-	//{
-	//	switch (Renderer::GetAPI())
-	//	{
-	//	case ERenderAPI::kNone:
-	//		AL_ASSERT(false, "None render api used!")
-	//		return nullptr;
-	//	case ERenderAPI::kDirectX12:
-	//		return new D3DVectexBuffer(vertices,size);
-	//	}
-	//	AL_ASSERT(false, "Unsupport render api!")
-	//	return nullptr;
-	//}
-	VertexBuffer* VertexBuffer::Create(VertexBufferLayout layout)
+	VertexBuffer* VertexBuffer::Create(VertexBufferLayout layout, bool is_static)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -26,11 +13,12 @@ namespace Ailu
 			AL_ASSERT(false, "None render api used!")
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-			return new D3DVertexBuffer(layout);
+			return new D3DVertexBuffer(layout, is_static);
 		}
 		AL_ASSERT(false, "Unsupport render api!")
 			return nullptr;
 	}
+
 	IndexBuffer* IndexBuffer::Create(uint32_t* indices, uint32_t count)
 	{
 		switch (Renderer::GetAPI())

@@ -4,6 +4,7 @@
 #include "Objects/LightComponent.h"
 #include "Objects/CameraComponent.h"
 #include "Objects/StaticMeshComponent.h"
+#include "Framework/Common/SceneMgr.h"
 
 namespace Ailu
 {
@@ -18,12 +19,15 @@ namespace Ailu
 	void SceneActor::Tick(const float& delta_time)
 	{
 		Actor::Tick(delta_time);
-		OnGizmo();
+		//OnGizmo();
 	}
 	void SceneActor::OnGizmo()
 	{
-		for (auto& comp : _components)
-			comp->OnGizmo();
+		if (_Id == g_pSceneMgr->_selected_id)
+		{
+			for (auto& comp : _components)
+				comp->OnGizmo();
+		}
 	}
 	Transform& SceneActor::GetTransform()
 	{

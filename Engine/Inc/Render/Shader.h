@@ -162,12 +162,13 @@ namespace Ailu
 		virtual ~Shader() = default;
 		virtual void Bind(uint32_t index);
 		virtual bool Compile();
-		virtual void PreProcessShader();
+		virtual bool PreProcessShader();
 		virtual void* GetByteCode(EShaderType type);
 
 		const i8& GetPerMatBufferBindSlot() const {return _per_mat_buf_bind_slot;}
 		const i8& GetPerFrameBufferBindSlot() const {return _per_frame_buf_bind_slot;}
 		const i8& GetPrePassBufferBindSlot() const  {return _per_pass_buf_bind_slot;}
+		const u32& ActualID() const {return _actual_id;}
 
 		const VertexInputLayout& PipelineInputLayout() const { return _pipeline_input_layout; };
 		const RasterizerState& PipelineRasterizerState() const { return _pipeline_raster_state; };
@@ -190,7 +191,7 @@ namespace Ailu
 		const List<ShaderPropertyInfo>& GetShaderPropertyInfos() {return _shader_prop_infos;}
 	protected:
 		virtual uint8_t* GetCBufferPtr(uint32_t index) {return nullptr;};
-		virtual void RHICompileImpl();
+		virtual bool RHICompileImpl();
 	protected:
 		inline static bool _b_init_buffer = false;
 		inline static u8* _p_cbuffer = nullptr;
@@ -198,6 +199,7 @@ namespace Ailu
 		String _vert_entry, _pixel_entry;
 		uint8_t _vertex_input_num = 0u;
 		String _src_file_path;
+		u32 _actual_id;
 		i8 _per_mat_buf_bind_slot = -1;
 		i8 _per_frame_buf_bind_slot = -1;
 		i8 _per_pass_buf_bind_slot = -1;
@@ -208,7 +210,6 @@ namespace Ailu
 		BlendState _pipeline_blend_state;
 		std::unordered_map<std::string, ShaderBindResourceInfo> _bind_res_infos{};
 		std::map<String, Vector<String>> _keywords;
-		bool _is_error;
 		std::map<String, std::tuple<u8, u8>> _keywords_ids;
 		std::set<uint64_t> _shader_variant;
 		List<ShaderPropertyInfo> _shader_prop_infos;

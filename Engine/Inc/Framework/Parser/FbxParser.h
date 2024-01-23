@@ -6,6 +6,7 @@
 #include "Framework/Common/TimeMgr.h"
 
 
+
 namespace Ailu
 {
 	class FbxParser : public IMeshParser
@@ -14,16 +15,20 @@ namespace Ailu
 		FbxParser();
 		List<Ref<Mesh>> Parser(std::string_view sys_path) final;
 		List<Ref<Mesh>> Parser(const WString& sys_path) final;
+		//temp test
+		void Parser(std::string_view sys_path, struct Skeleton& sk, Vector<Vector<Matrix4x4f>>& anim);
 		virtual ~FbxParser();
 	private:
 		void ParserFbxNode(FbxNode* node, List<Ref<Mesh>>& loaded_meshes);
-		bool GenerateMesh(Ref<Mesh>& mesh, fbxsdk::FbxMesh* fbx_mesh);
-		bool ReadNormal(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh);
-		bool ReadVertex(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh);
-		bool ReadUVs(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh);
-		bool ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Ref<Mesh>& mesh);
-		bool CalculateTangant(Ref<Mesh>& mesh);
-		void GenerateIndexdMesh(Ref<Mesh>& mesh);
+		void ParserSkeleton(FbxNode* node);
+		bool ParserMesh(FbxNode* node, List<Ref<Mesh>>& loaded_meshes);
+		bool ReadNormal(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
+		bool ReadVertex(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
+		bool ReadUVs(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
+		bool ReadSkin(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
+		bool ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
+		bool CalculateTangant(Mesh* mesh);
+		void GenerateIndexdMesh(Mesh* mesh);
 
 		List<Ref<Mesh>> ParserImpl(WString sys_path);
 	private:

@@ -135,7 +135,7 @@ namespace Ailu
 				if (_s_data[i] == obj)
 					return i;
 			}
-			_s_data.emplace_back(obj);
+			_s_data.push_back(obj);
 			return static_cast<u8>(_s_data.size() - 1);
 		}
 		const T& Get(const u8& hash) const

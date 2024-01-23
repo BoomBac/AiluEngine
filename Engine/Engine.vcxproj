@@ -471,6 +471,8 @@
     <ClInclude Include="Ext\stb\stb_voxel_render.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Ailu.h" />
+    <ClInclude Include="Inc\Animation\Pose.h" />
+    <ClInclude Include="Inc\Animation\Skeleton.h" />
     <ClInclude Include="Inc\CompanyEnv.h" />
     <ClInclude Include="Inc\Framework\Common\Application.h" />
     <ClInclude Include="Inc\Framework\Common\Asset.h" />
@@ -568,6 +570,8 @@
     <ClCompile Include="Ext\imgui\imgui_draw.cpp" />
     <ClCompile Include="Ext\imgui\imgui_tables.cpp" />
     <ClCompile Include="Ext\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Src\Animation\Pose.cpp" />
+    <ClCompile Include="Src\Animation\Skeleton.cpp" />
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\Asset.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />

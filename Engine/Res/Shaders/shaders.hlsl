@@ -109,7 +109,6 @@ float Random(float4 seed4)
 {
 		SurfaceData surface_data;
 		InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
-	//float3 light = CalculateLight(input.world_pos, surface_data.wnormal);
 		float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface_data.wnormal));
 		float shadow_factor = ApplyShadow(input.shadow_pos, nl, input.world_pos);
 		//if (shadow_factor == 0)

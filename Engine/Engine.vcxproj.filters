@@ -2043,6 +2043,12 @@
     <ClInclude Include="Inc\Render\CBuffer.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Animation\Pose.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Animation\Skeleton.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2217,6 +2223,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\GraphicsContext.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Animation\Skeleton.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Animation\Pose.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

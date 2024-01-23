@@ -1,19 +1,19 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 1479.51,1261.93,1188.38
-  Rotation: 0.0778013,-0.890352,0.166297,0.416612
+  Position: 563.614,933.024,-1532.44
+  Rotation: 0.260249,-0.143791,0.0392294,0.953968
   Fov: 60
   Aspect: 1.77778
   Near: 62.29
   Far: 137099
-  ControllerRotation: 21.16,7070.15
+  ControllerRotation: 30.5196,7902.86
 SceneGraph: 
   Name: root
     Components: 
       TransformComponent: 
         Position: 0,0,0
-        Rotation: 2.0219e-05,0.687107,-1.08564e-05,0.726554
+        Rotation: 2.69195e-05,0.988248,-1.5448e-05,0.152852
         Scale: 1,1,1
     Children: 7
       Name: plane
@@ -40,7 +40,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 2,759,0
-            Rotation: -0.305636,0.0502296,0.305665,-0.900353
+            Rotation: -0.648328,0.106546,0.648368,-0.384628
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
@@ -54,12 +54,12 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: -219,471,0
-            Rotation: 0.454267,0.00200957,-0.0139278,0.890755
+            Rotation: 0.337255,0.0014919,-0.0103402,-0.941356
             Scale: 1,1,1
           LightComponent: 
             Type: Point
             Color: 1,0,0
-            Intensity: 0
+            Intensity: 1
             Radius: 839
             CastShadow: false
             ShadowArea: 0
@@ -69,7 +69,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 846,845,-374
-            Rotation: -0.00903813,-0.409731,0.446294,-0.795531
+            Rotation: -0.00387709,-0.175531,0.191185,-0.965727
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
@@ -86,7 +86,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 0,1020,0
-            Rotation: -1.05998e-06,0.526489,1.94102e-08,0.850183
+            Rotation: -1.81271e-06,0.909994,9.3011e-08,0.414621
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey

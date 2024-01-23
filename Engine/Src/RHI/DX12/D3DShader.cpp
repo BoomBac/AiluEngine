@@ -260,7 +260,7 @@ namespace Ailu
 		ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_p_sig)));
 	}
 
-	void D3DShader::RHICompileImpl()
+	bool D3DShader::RHICompileImpl()
 	{
 		bool succeed = true;
 		ComPtr<ID3DBlob> _tmp_p_vblob = nullptr;
@@ -283,7 +283,6 @@ namespace Ailu
 			succeed = false;
 			g_pLogMgr->LogErrorFormat("Compile shader with src {0} failed!", _src_file_path);
 		}
-		_is_error = !succeed;
 		if (succeed)
 		{
 			LoadShaderReflection(_p_v_reflection.Get(), _p_p_reflection.Get());
@@ -291,6 +290,7 @@ namespace Ailu
 			_p_pblob = _tmp_p_pblob;
 			GenerateInternalPSO();
 		}
+		return succeed;
 	}
 
 	void D3DShader::LoadAdditionalShaderReflection(const String& sys_path)

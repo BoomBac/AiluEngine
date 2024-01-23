@@ -17,6 +17,8 @@ namespace Ailu
 	{
 		using ActorEvent = std::function<void(SceneActor*)>;
 		DECLARE_PRIVATE_PROPERTY_PTR(p_root,Root,SceneActor)
+		DECLARE_PRIVATE_PROPERTY(b_dirty, Dirty, bool)
+		DECLARE_PRIVATE_PROPERTY(name, Name, std::string)
 	public:
 		inline static u32 kMaxStaticRenderableNum = 500;
 		Scene(const std::string& name);
@@ -31,8 +33,6 @@ namespace Ailu
 		static Scene* GetDefaultScene();
 		std::list<LightComponent*>& GetAllLight();
 		Vector<StaticMeshComponent*>& GetAllStaticRenderable() {return _all_static_renderalbes;};
-		DECLARE_PRIVATE_PROPERTY(b_dirty, Dirty, bool)
-		DECLARE_PRIVATE_PROPERTY(name, Name, std::string)
 	private:
 		Camera _scene_cam;
 		std::list<SceneActor*> _all_objects{};
@@ -55,6 +55,7 @@ namespace Ailu
 		void SaveScene(Scene* scene, const String& scene_path);
 		Scene* LoadScene(const String& scene_path);
 		Scene* _p_current = nullptr;
+		u32 _selected_id = 0u;
 	private:
 		void Cull(Scene* p_scene);
 		inline static std::list<Scope<Scene>> s_all_scene{};

@@ -69,6 +69,8 @@ namespace Ailu
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/filter_irradiance.hlsl"), "EnvmapFilter");
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+		auto anim = parser->Parser(GetResPath("Meshs/anim.fbx"));
+		MeshPool::AddMesh("anim", anim.front());
 		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());
 		MeshPool::AddMesh("cube", parser->Parser(GetResPath("Meshs/cube.fbx")).front());
 		MeshPool::AddMesh("cone", parser->Parser(GetResPath("Meshs/cone.fbx")).front());

@@ -7,18 +7,21 @@
 #include "Framework/Math/ALMath.hpp"
 #include "Render/Buffer.h"
 #include "Framework/Math/AABB.h"
+#include "Animation/Skeleton.h"
 
 
 namespace Ailu
 {
 	class Mesh
 	{
-		DECLARE_PRIVATE_PROPERTY(origin_path, OriginPath, String)
-		DECLARE_PRIVATE_PROPERTY(name, Name, std::string)
+		DECLARE_PROTECTED_PROPERTY(origin_path, OriginPath, String)
+		DECLARE_PROTECTED_PROPERTY(name, Name, std::string)
 	public:
 		Mesh();
 		Mesh(const std::string& name);
 		~Mesh();
+		virtual void Clear();
+		virtual void Build();
 		void SetVertices(Vector3f* vertices);
 		void SetNormals(Vector3f* normals);
 		void SetTangents(Vector4f* tangents);
@@ -28,16 +31,14 @@ namespace Ailu
 		inline Vector4f* GetTangents() { return _tangents; };
 		inline Vector2f* GetUVs(uint8_t index) { return _uv[index]; };
 		inline uint32_t* GetIndices() { return _p_indices; };
-		void Clear();
 		void SetIndices(uint32_t* indices);
 		const Ref<VertexBuffer>& GetVertexBuffer() const;
 		const Ref<IndexBuffer>& GetIndexBuffer() const;
-		void Build();
 	public:
 		uint32_t _vertex_count;
 		uint32_t _index_count;
 		AABB _bound_box;
-	private:
+	protected:
 		Ref<VertexBuffer> _p_vbuf;
 		Ref<IndexBuffer> _p_ibuf;
 		Vector3f* _vertices;
@@ -46,6 +47,25 @@ namespace Ailu
 		Vector4f* _tangents;
 		Vector2f** _uv;
 		uint32_t* _p_indices;
+	};
+
+	class SkinedMesh : public Mesh
+	{
+	public:
+		SkinedMesh();
+		SkinedMesh(const String& name);
+		~SkinedMesh();
+		void Build() final;
+		void Clear() final;
+		void SetBoneWeights(Vector4f* bone_weights);
+		void SetBoneIndices(Vector4D<u32>* bone_indices);
+		inline Vector4D<u32>* GetBoneIndices() { return _bone_indices; };
+		inline Vector4f* GetBoneWeights() { return _bone_weights; };
+		Skeleton& GetSkeleton() { return _skeleton; };
+	private:
+		Vector4f* _bone_weights;
+		Vector4D<u32>* _bone_indices;
+		Skeleton _skeleton;
 	};
 
 	class MeshPool

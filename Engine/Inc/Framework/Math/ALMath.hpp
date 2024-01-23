@@ -766,30 +766,14 @@ namespace Ailu
 		return normalizedAngle;
 	}
 
+	//row-major matrix * vector
 	static void TransformVector(Vector4f& vector, const Matrix4x4f& matrix)
 	{
 		Vector4f temp{};
-		//for (uint32_t i = 0; i < 4; i++)
-		//{
-		//	for (uint32_t j = 0; j < 4; j++)
-		//	{
-		//		temp[j] += vector[i] * matrix[i][j];
-		//	}
-		//}
 		temp.x = vector.x * matrix[0][0] + vector.y * matrix[1][0] + vector.z * matrix[2][0] + vector.w * matrix[3][0];
 		temp.y = vector.x * matrix[0][1] + vector.y * matrix[1][1] + vector.z * matrix[2][1] + vector.w * matrix[3][1];
 		temp.z = vector.x * matrix[0][2] + vector.y * matrix[1][2] + vector.z * matrix[2][2] + vector.w * matrix[3][2];
 		temp.w = vector.x * matrix[0][3] + vector.y * matrix[1][3] + vector.z * matrix[2][3] + vector.w * matrix[3][3];
-
-		//temp.x = vector.x * matrix[0][0] + vector.y * matrix[0][1] + vector.z * matrix[0][2] + vector.w * matrix[0][3];
-		//temp.y = vector.x * matrix[1][0] + vector.y * matrix[1][1] + vector.z * matrix[1][2] + vector.w * matrix[1][3];
-		//temp.z = vector.x * matrix[2][0] + vector.y * matrix[2][1] + vector.z * matrix[2][2] + vector.w * matrix[2][3];
-		//temp.w = vector.x * matrix[3][0] + vector.y * matrix[3][1] + vector.z * matrix[3][2] + vector.w * matrix[3][3];
-		//for (uint32_t i = 0; i < 4; i++) {
-		//	for (uint32_t j = 0; j < 4; j++) {
-		//		temp[i] += matrix[i][j] * vector[j];
-		//	}
-		//}
 		vector = temp;
 		return;
 	}
@@ -1682,6 +1666,35 @@ namespace Ailu
 			inline bool operator()(const Vector4f& v1, const Vector4f& v2) const
 			{
 				return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z && v1.w == v2.w;
+			}
+		};
+
+		template<template<typename> typename TT, typename T>
+		struct VectorHash
+		{
+			inline std::size_t operator()(const TT<T>& v) const
+			{
+				std::size_t out_hash = std::hash<T>{}(v[0]);
+				for (u32 i = 1; i < CountOf(v.data); i++)
+				{
+					auto cur_hash = std::hash<T>{}(v[i]);
+					out_hash ^= cur_hash << i;
+				}
+				return out_hash;
+			}
+		};
+
+		template<template<typename> typename TT, typename T>
+		struct VectorEqual
+		{
+			inline bool operator()(const TT<T>& v1, const TT<T>& v2) const
+			{
+				bool is_equal = true;
+				for (u32 i = 1; i < CountOf(v1.data); i++)
+				{
+					is_equal &= v1[i] == v2[i];
+				}
+				return is_equal;
 			}
 		};
 

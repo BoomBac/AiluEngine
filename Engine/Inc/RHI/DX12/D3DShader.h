@@ -186,7 +186,7 @@ namespace Ailu
 		ID3D12RootSignature* GetSignature();
 		std::pair<D3D12_INPUT_ELEMENT_DESC*,uint8_t> GetVertexInputLayout();
 	private:
-		void RHICompileImpl() final;
+		bool RHICompileImpl() final;
 		uint8_t* GetCBufferPtr(uint32_t index) final;
 		void Reset();
 		void LoadShaderReflection(ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps);

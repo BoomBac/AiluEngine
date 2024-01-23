@@ -10,9 +10,12 @@
 #include "Framework/Parser/AssetParser.h"
 #include <Framework/Common/LogMgr.h>
 #include "Render/RenderQueue.h"
+#include "Animation/Skeleton.h"
 
 namespace Ailu
 {
+	static Skeleton s_test_sk;
+	static Vector<Vector<Matrix4x4f>> s_anim_mat;
 	int Renderer::Initialize()
 	{
 		_p_context = g_pGfxContext.get();
@@ -29,6 +32,10 @@ namespace Ailu
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
 		auto tex0 =g_pResourceMgr->LoadTexture(EnginePath::kEngineTexturePath + "small_cave_1k.hdr", "SmallCave");
 		TexturePool::Add(tex0->AssetPath(), tex0);
+		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+
+		//MeshPool::AddMesh("anim", parser->Parser(GetResPath("Meshs/anim.fbx")).front());
+		//static_cast<FbxParser*>(parser.get())->Parser(GetResPath("Meshs/anim.fbx"), s_test_sk,s_anim_mat);
 
 		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512,"pure_sky","Textures/small_cave_1k.hdr");
 		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
@@ -194,6 +201,17 @@ namespace Ailu
 			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 500.f,0.0f,0.0f }, Colors::kRed);
 			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,500.0f,0.0f }, Colors::kGreen);
 			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,500.0f }, Colors::kBlue);
+			//Vector3f joint_pos[4];
+			//memset(joint_pos, 0, sizeof(Vector3f) * 4);
+			//u64 time = (u32)g_pTimeMgr->GetScaledWorldTime() % 75;
+			//LOG_INFO("Time: {}", time);
+			//Matrix4x4f transf = s_anim_mat[0][time];
+			//for (int i = 1; i < s_test_sk.joint_num; i++)
+			//{
+			//	transf = s_anim_mat[i][time] * transf;
+			//	joint_pos[i] = TransformCoord(transf, joint_pos[i]);
+			//	Gizmo::DrawLine(joint_pos[i - 1], joint_pos[i],Colors::kYellow);
+			//}
 		}
 	}
 	void Renderer::PrepareLight(Scene* p_scene)

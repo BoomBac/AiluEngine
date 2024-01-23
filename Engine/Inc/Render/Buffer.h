@@ -10,13 +10,15 @@ namespace Ailu
 	class VertexBuffer
 	{
 	public:
+		static VertexBuffer* Create(VertexBufferLayout layout,bool is_static = true);
 		virtual ~VertexBuffer() = default;
 		virtual void Bind() const = 0;
 		virtual void Bind(const VertexBufferLayout& pipeline_input_layout) const = 0;
-		static VertexBuffer* Create(VertexBufferLayout layout);
 		virtual void SetLayout(VertexBufferLayout layout) = 0;
 		virtual void SetStream(float* vertices, uint32_t size, u8 stream_index) = 0;
+		virtual void SetStream(u8* data, uint32_t size, u8 stream_index) = 0;
 		virtual const VertexBufferLayout& GetLayout() const = 0;
+		virtual bool IsStatic() const = 0;
 		virtual uint32_t GetVertexCount() const = 0;
 	};
 	

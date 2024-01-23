@@ -22,20 +22,6 @@ namespace Ailu
 		{
 			auto shader = MakeRef<D3DShader>(file_name);
 			ShaderLibrary::Add(shader->Name(), shader);
-			//GraphicsPipelineStateInitializer gpso_desc;
-			//gpso_desc._input_layout = shader->PipelineInputLayout();
-			//gpso_desc._blend_state = shader->PipelineBlendState();
-			//gpso_desc._raster_state = shader->PipelineRasterizerState();
-			//gpso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
-			//gpso_desc._topology = shader->PipelineTopology();
-			//gpso_desc._p_pixel_shader = shader.get();
-			//gpso_desc._p_vertex_shader = shader.get();
-			//gpso_desc._rt_state = RenderTargetState{};
-			//auto pso = GraphicsPipelineStateObject::Create(gpso_desc);
-			//pso->Build();
-
-			//LOG_WARNING("shader: {},hash code is {}", file_name, pso->Hash().ToString());
-			//GraphicsPipelineStateMgr::AddPSO(std::move(pso));
 			return shader;
 		}
 		}
@@ -43,9 +29,9 @@ namespace Ailu
 			return nullptr;
 	}
 
-	Shader::Shader(const String& sys_path) : _src_file_path(sys_path), _id(_s_global_shader_id), _is_error(false), _name(std::format("AnonymityShader_{}", _s_global_shader_id++))
+	Shader::Shader(const String& sys_path) : _src_file_path(sys_path), _id(_s_global_shader_id), _name(std::format("AnonymityShader_{}", _s_global_shader_id++))
 	{
-
+		_actual_id = _id;
 	}
 
 	void Shader::Bind(uint32_t index)
@@ -55,19 +41,24 @@ namespace Ailu
 			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
 			return;
 		}
+		if (_actual_id != _id)
+		{
+			ShaderLibrary::Get("error")->Bind(index);
+			return;
+		}
 		GraphicsPipelineStateMgr::ConfigureVertexInputLayout(_pipeline_input_layout.Hash());
 		GraphicsPipelineStateMgr::ConfigureRasterizerState(_pipeline_raster_state.Hash());
 		GraphicsPipelineStateMgr::ConfigureDepthStencilState(_pipeline_ds_state.Hash());
 		GraphicsPipelineStateMgr::ConfigureTopology(static_cast<u8>(ALHash::Hasher(_pipeline_topology)));
 		GraphicsPipelineStateMgr::ConfigureBlendState(_pipeline_blend_state.Hash());
-		GraphicsPipelineStateMgr::ConfigureShader(_id);
+		GraphicsPipelineStateMgr::ConfigureShader(_actual_id);
 		for (auto& it : s_global_textures_bind_info)
 		{
 			auto tex_it = _bind_res_infos.find(it.first);
 			if (tex_it != _bind_res_infos.end() && (tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray ||
 				tex_it->second._res_type == EBindResDescType::kTexture2D))
 			{
-				GraphicsPipelineStateMgr::SubmitBindResource(it.second,tex_it->second._bind_slot);
+				GraphicsPipelineStateMgr::SubmitBindResource(it.second, tex_it->second._bind_slot);
 			}
 		}
 		for (auto& it : s_global_matrix_bind_info)
@@ -76,7 +67,7 @@ namespace Ailu
 			if (mat_it != _bind_res_infos.end() && mat_it->second._res_type == EBindResDescType::kCBufferAttribute)
 			{
 				auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
-				memcpy(reinterpret_cast<u8*>(g_pGfxContext->GetPerFrameCbufDataStruct()) + offset, it.second,sizeof(Matrix4x4f));
+				memcpy(reinterpret_cast<u8*>(g_pGfxContext->GetPerFrameCbufDataStruct()) + offset, it.second, sizeof(Matrix4x4f));
 				memcpy(g_pGfxContext->GetPerFrameCbufData(), g_pGfxContext->GetPerFrameCbufDataStruct(), sizeof(ScenePerFrameData));
 			}
 		}
@@ -84,10 +75,17 @@ namespace Ailu
 
 	bool Shader::Compile()
 	{
-		PreProcessShader();
-		RHICompileImpl();
-		GraphicsPipelineStateMgr::OnShaderRecompiled(this);
-		return true;
+		if (PreProcessShader() && RHICompileImpl())
+		{
+			GraphicsPipelineStateMgr::OnShaderRecompiled(this);
+			_actual_id = _id;
+			return true;
+		}
+		else
+		{
+			_actual_id = ShaderLibrary::Get("error")->ID();
+			return false;
+		}
 	}
 
 	Vector4f Shader::GetVectorValue(const String& name)
@@ -152,8 +150,9 @@ namespace Ailu
 	{
 		_reference_mats.erase(mat);
 	}
-	void Shader::RHICompileImpl()
+	bool Shader::RHICompileImpl()
 	{
+		return true;
 	}
 	void Shader::ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props)
 	{
@@ -249,7 +248,7 @@ namespace Ailu
 				it++;
 		}
 	}
-	void Shader::PreProcessShader()
+	bool Shader::PreProcessShader()
 	{
 		//parser property and pipeline state
 		_shader_prop_infos.clear();
@@ -419,5 +418,6 @@ namespace Ailu
 				//_keyword_defines.emplace_back(shader_marcos);
 			}
 		}
+		return true;
 	}
 }

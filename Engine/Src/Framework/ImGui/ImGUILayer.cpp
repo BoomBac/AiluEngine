@@ -816,6 +816,7 @@ namespace Ailu
 			ImGui::TreePop(); // TreePop 需要在退出当前节点后
 		}
 		ImGui::PopID(); // PopID 需要与对应的 PushID 配对
+		g_pSceneMgr->_selected_id = s_cur_frame_selected_actor_id;
 	}
 
 	void ImGUILayer::ShowWorldOutline()
