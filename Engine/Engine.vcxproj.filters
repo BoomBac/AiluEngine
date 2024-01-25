@@ -2049,6 +2049,12 @@
     <ClInclude Include="Inc\Animation\Skeleton.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Animation\Clip.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Math\Random.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2250,6 +2256,7 @@
     <None Include="Res\Shaders\constants.hlsli" />
     <None Include="Res\Shaders\input.hlsli" />
     <None Include="Res\Shaders\filter_irradiance.hlsl" />
+    <None Include="Src\Animation\Clip.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

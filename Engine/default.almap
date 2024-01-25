@@ -1,19 +1,19 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 2607.87,3292.35,-3114.89
-  Rotation: -0.214139,0.233247,-0.052733,-0.94708
+  Position: -1857.79,1134.51,-842.941
+  Rotation: 0.0739773,0.570874,-0.0517554,0.816059
   Fov: 60
   Aspect: 1.77778
   Near: 62.29
   Far: 137099
-  ControllerRotation: 25.4797,8252.33
+  ControllerRotation: 10.3597,8709.95
 SceneGraph: 
   Name: root
     Components: 
       TransformComponent: 
         Position: 0,0,0
-        Rotation: 2.17333e-05,0.974165,-1.48822e-05,0.22584
+        Rotation: 0,0,0,1
         Scale: 1,1,1
     Children: 8
       Name: plane
@@ -40,7 +40,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 2,759,0
-            Rotation: 0.679702,-0.111682,-0.679507,0.252593
+            Rotation: 0.285129,-0.0468715,-0.285202,0.913875
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
@@ -54,7 +54,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: -219,471,0
-            Rotation: 0.756484,0.00334723,-0.0231934,0.653593
+            Rotation: 0.710722,0.00314484,-0.0217905,-0.703129
             Scale: 1,1,1
           LightComponent: 
             Type: Point
@@ -69,7 +69,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 846,845,-374
-            Rotation: -0.0149338,-0.676265,0.736506,0.00251076
+            Rotation: -0.0154111,-0.676268,0.736443,0.00904614
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
@@ -86,7 +86,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 0,1020,0
-            Rotation: 3.94315e-07,-0.281617,-3.10941e-07,0.959527
+            Rotation: -6.16682e-07,0.693637,1.04441e-06,-0.720324
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey
@@ -105,8 +105,8 @@ SceneGraph:
       Name: object0
         Components: 
           TransformComponent: 
-            Position: 960,50,-48
-            Rotation: 0,0,0,1
+            Position: 960,916,-48
+            Rotation: 0.576422,1.44029e-07,-1.54398e-08,-0.817152
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: anim

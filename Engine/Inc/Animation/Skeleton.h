@@ -10,12 +10,22 @@ namespace Ailu
 		Matrix4x4f _inv_bind_pos;
 		String _name;
 		u16 _parent;
-		u16 _self;
+		Vector<Matrix4x4f> _pose;
+		u16 _frame_count = 0u;
 	};
 
 	struct Skeleton
 	{
-		u32 joint_num;
+        static i32 GetJointIndexByName(const Skeleton& sk, const String& name)
+        {
+            auto it = std::find_if(sk._joints.begin(), sk._joints.end(),[&](const auto& joint) { return joint._name == name; });
+            if (it != sk._joints.end())
+				return static_cast<i32>(std::distance(sk._joints.begin(), it));
+            else
+				return -1;
+        }
+
+		u32 joint_num = 0u;
 		Vector<Joint> _joints;
 	};
 }

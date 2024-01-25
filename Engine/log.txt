@@ -3,6 +3,13 @@ Warning: Unused shader prop ColorOverlay been added;
 Normal: Load material asset at path Materials/CustomSkyBox.almat
 Normal: Load material asset at path Materials/StandardPBR_new.alasset
 Normal: Load material asset at path Materials/WireFrame_new.alasset
+Normal: Load material asset at path Materials/BoneWeight.almat
 Normal: Load material asset at path Materials/aa.almat
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
+Normal: ResourceMgr end
+Normal: Begin load scene from C:/AiluEngine/Engine/Scenes/default.almap...
+Normal: SceneMgr end
+Normal: Init end
+Normal: Exit
+Normal: Save scene: default_scene to C:/AiluEngine/Engine/default.almap;

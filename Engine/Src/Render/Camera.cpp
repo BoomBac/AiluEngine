@@ -33,8 +33,8 @@ namespace Ailu
 		Gizmo::DrawLine(p_camera->_near_bottom_right, p_camera->_far_bottom_right, Colors::kWhite);
 		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, Colors::kWhite);
 
-		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Forward() * p_camera->Far(), Colors::kRed);
-		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Up() * p_camera->Far(), Colors::kBlue);
+		//Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Forward() * p_camera->Far(), Colors::kRed);
+		//Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Up() * p_camera->Far(), Colors::kBlue);
 	}
 
 	Camera::Camera() : Camera(16.0F / 9.0F)

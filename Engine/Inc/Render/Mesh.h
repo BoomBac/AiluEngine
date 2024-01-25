@@ -51,6 +51,7 @@ namespace Ailu
 
 	class SkinedMesh : public Mesh
 	{
+		DECLARE_PRIVATE_PROPERTY(skeleton, CurSkeleton, Skeleton)
 	public:
 		SkinedMesh();
 		SkinedMesh(const String& name);
@@ -61,11 +62,11 @@ namespace Ailu
 		void SetBoneIndices(Vector4D<u32>* bone_indices);
 		inline Vector4D<u32>* GetBoneIndices() { return _bone_indices; };
 		inline Vector4f* GetBoneWeights() { return _bone_weights; };
-		Skeleton& GetSkeleton() { return _skeleton; };
+		//Skeleton& GetSkeleton() { return _skeleton; };
 	private:
 		Vector4f* _bone_weights;
 		Vector4D<u32>* _bone_indices;
-		Skeleton _skeleton;
+//		Skeleton _skeleton;
 	};
 
 	class MeshPool

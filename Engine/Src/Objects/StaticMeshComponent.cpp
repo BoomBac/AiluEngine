@@ -7,6 +7,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Parser/AssetParser.h"
 #include "Render/Gizmo.h"
+#include "Framework/Math/Random.h"
 
 namespace Ailu
 {
@@ -26,7 +27,26 @@ namespace Ailu
 	void StaticMeshComponent::Tick(const float& delta_time)
 	{
 		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
-		_aabb = AABB::CaclulateBoundBox(_p_mesh->_bound_box, Transform::GetWorldMatrix(transf));
+		auto world_mat = Transform::GetWorldMatrix(transf);
+		_aabb = AABB::CaclulateBoundBox(_p_mesh->_bound_box, world_mat);
+		SkinedMesh* skined_mesh = dynamic_cast<SkinedMesh*>(_p_mesh.get());
+		if (skined_mesh)
+		{
+			//LOG_INFO("SkinedMesh: ", skined_mesh->CurSkeleton()._joints[0]._name);
+			Vector3f origin = {0,1,0};
+			//Vector3f parent = TransformCoord(world_mat, Vector3f::kZero);
+			Vector3f parent = Vector3f::kZero;
+			auto joints = skined_mesh->CurSkeleton()._joints;
+			u64 time = (u32)g_pTimeMgr->GetScaledWorldTime(1.0f) % joints[0]._frame_count;
+			for (int i = 0; i < joints.size() - 1; i++)
+			{
+				auto mat = joints[i]._pose[time];
+				//mat = mat * world_mat;
+				Vector3f cur = TransformCoord(mat, origin);
+				Gizmo::DrawLine(parent, cur,Random::RandomColor(i));
+				parent = cur;
+			}
+		}
 	}
 	void StaticMeshComponent::OnGizmo()
 	{

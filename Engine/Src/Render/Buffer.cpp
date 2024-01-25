@@ -5,7 +5,7 @@
 
 namespace Ailu
 {
-	VertexBuffer* VertexBuffer::Create(VertexBufferLayout layout, bool is_static)
+	VertexBuffer* VertexBuffer::Create(VertexBufferLayout layout)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -13,7 +13,7 @@ namespace Ailu
 			AL_ASSERT(false, "None render api used!")
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-			return new D3DVertexBuffer(layout, is_static);
+			return new D3DVertexBuffer(layout);
 		}
 		AL_ASSERT(false, "Unsupport render api!")
 			return nullptr;

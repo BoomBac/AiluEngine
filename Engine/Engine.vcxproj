@@ -471,6 +471,7 @@
     <ClInclude Include="Ext\stb\stb_voxel_render.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Ailu.h" />
+    <ClInclude Include="Inc\Animation\Clip.h" />
     <ClInclude Include="Inc\Animation\Pose.h" />
     <ClInclude Include="Inc\Animation\Skeleton.h" />
     <ClInclude Include="Inc\CompanyEnv.h" />
@@ -507,6 +508,7 @@
     </ClInclude>
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
     <ClInclude Include="Inc\Framework\Math\Guid.h" />
+    <ClInclude Include="Inc\Framework\Math\Random.h" />
     <ClInclude Include="Inc\Framework\Math\Transform.h" />
     <ClInclude Include="Inc\Framework\Parser\AssetParser.h" />
     <ClInclude Include="Inc\Framework\Parser\FbxParser.h" />
@@ -560,6 +562,7 @@
     <None Include="Res\Shaders\cbuffer.hlsli">
       <FileType>Document</FileType>
     </None>
+    <None Include="Src\Animation\Clip.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />

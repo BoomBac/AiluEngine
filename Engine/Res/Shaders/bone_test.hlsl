@@ -28,7 +28,7 @@ PSInput VSMain(VSInput v)
 	PSInput result;
 	result.position = TransformToClipSpace(v.position);
 	result.wnormal = normalize(v.position);
-	result.color = v.bone_weight[0];
+	result.color = v.bone_weight[2];
 	return result;
 }
 
