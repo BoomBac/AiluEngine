@@ -70,6 +70,7 @@ namespace Ailu
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/bone_test.hlsl"), "BoneWeight");
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+		//auto anim = parser->Parser(GetResPath("Meshs/Walking.fbx"));
 		auto anim = parser->Parser(GetResPath("Meshs/anim.fbx"));
 		MeshPool::AddMesh("anim", anim.front());
 		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());

@@ -22,7 +22,7 @@ namespace Ailu
 		using ALTimeStamp = std::chrono::high_resolution_clock::time_point;
 		inline static float DeltaTime = 0.0f;
 		inline static float TimeSinceLoad = 0.0f;
-		inline static float TimeScale = 0.01f;
+		inline static float TimeScale = 1.0f;
 
 		int Initialize() override;
 		void Finalize() override;

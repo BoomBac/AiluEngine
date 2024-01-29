@@ -641,10 +641,11 @@ namespace Ailu
 		else RenderingStates::s_shadering_mode = EShaderingMode::kShaderedWireFrame;
 
 		ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
-		ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 0.2f, "%.2f");
+		ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 2.0f, "%.2f");
 
 		ImGui::Checkbox("Expand", &show);
 		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
+		ImGui::Checkbox("Skin", &StaticMeshComponent::s_skin);
 		ImGui::End();
 		ImGui::PopFont();
 

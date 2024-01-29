@@ -85,19 +85,52 @@ namespace Ailu
 			{
 				unique_lock<mutex> lock(_task_mutex);
 				_tasks.emplace([=]() {
-					try
-					{
-						(*wrapper)();
-					}
-					catch (const std::exception& e)
-					{
-						LOG_ERROR("Thread pool {0}: Exception in Task: {1}",_pool_name,e.what())
-					}
+					//try
+					//{
+					//	(*wrapper)();
+					//}
+					//catch (const std::exception& e)
+					//{
+					//	LOG_ERROR("Thread pool {0}: Exception in Task: {1}",_pool_name,e.what())
+					//}
+					(*wrapper)();
 					});
 			}
 			_task_cv.notify_one();
 			return ret;
 		}
+
+		//// Parallel 函数
+		//template <typename T, typename F>
+		//void Parallel(const std::vector<T>& v, F f, ThreadPool& threadPool) {
+		//	size_t size = v.size();
+		//	if (size == 0) {
+		//		return;
+		//	}
+
+		//	size_t numThreads = std::thread::hardware_concurrency();
+		//	size_t chunkSize = (size + numThreads - 1) / numThreads;
+
+		//	std::vector<std::future<void>> futures;
+
+		//	for (size_t i = 0; i < numThreads; ++i) 
+		//	{
+		//		size_t startIdx = i * chunkSize;
+		//		size_t endIdx = std::min((i + 1) * chunkSize, size);
+
+		//		futures.push_back(threadPool.Enqueue([&, startIdx, endIdx]() 
+		//		{
+		//			for (size_t j = startIdx; j < endIdx; ++j) {
+		//				f(v[j]);
+		//			}
+		//		}));
+		//	}
+
+		//	for (auto& future : futures) 
+		//	{
+		//		future.wait();
+		//	}
+		//}
 		//template<typename Callable, typename...Args>
 		//auto Enqueue(Callable&& task, Args&&... args) -> std::future<std::invoke_result_t<Callable, Args...>>
 		//{
@@ -145,9 +178,9 @@ namespace Ailu
 							task = std::move(_tasks.front());
 							_tasks.pop();
 						}
-						_timers[i].Mark();
+						//_timers[i].Mark();
 						task();
-						LOG_INFO(L"{} has finish task after {}ms!", thread_name.c_str(),_timers[i].GetElapsedSinceLastMark());
+						//LOG_INFO(L"{} has finish task after {}ms!", thread_name.c_str(),_timers[i].GetElapsedSinceLastMark());
 						_thread_status[i] = EThreadStatus::kCompleted;
 					}
 					});

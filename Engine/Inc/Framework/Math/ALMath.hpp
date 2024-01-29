@@ -736,10 +736,10 @@ namespace Ailu
 			for (uint32_t j = 0; j < Dc; j++)
 			{
 				for (uint32_t k = 0; k < Dc; k++)
-					ret[i][j] += m1[j][k] * m2[k][i];
+					ret[j][i] += m1[j][k] * m2[k][i];
 			}
 		}
-		Transpose(ret);
+		//Transpose(ret);
 	}
 
 	template <template <typename, int, int> class M, template <typename> class V, typename T, int ROWS, int COLS>

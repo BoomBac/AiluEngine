@@ -21,6 +21,10 @@ namespace Ailu
 		const VertexBufferLayout& GetLayout() const override;
 		void SetStream(float* vertices, uint32_t size,uint8_t stream_index) final;
 		void SetStream(u8* data, uint32_t size, u8 stream_index, bool dynamic = false) final;
+		u8* GetStream(u8 index) final
+		{
+			return _mapped_data[index];
+		};
 		uint32_t GetVertexCount() const override;
 	private:
 		VertexBufferLayout _buffer_layout;

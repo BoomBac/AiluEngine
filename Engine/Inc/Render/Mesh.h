@@ -62,6 +62,7 @@ namespace Ailu
 		void SetBoneIndices(Vector4D<u32>* bone_indices);
 		inline Vector4D<u32>* GetBoneIndices() { return _bone_indices; };
 		inline Vector4f* GetBoneWeights() { return _bone_weights; };
+		void Skin();
 		//Skeleton& GetSkeleton() { return _skeleton; };
 	private:
 		Vector4f* _bone_weights;

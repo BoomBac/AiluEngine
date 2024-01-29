@@ -11,6 +11,7 @@ namespace Ailu
 		String _name;
 		u16 _parent;
 		Vector<Matrix4x4f> _pose;
+		Matrix4x4f _global_pose;
 		u16 _frame_count = 0u;
 	};
 

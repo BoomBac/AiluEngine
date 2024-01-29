@@ -1,5 +1,8 @@
 #include "pch.h"
 #include "Render/Mesh.h"
+#include "Framework/Common/TimeMgr.h"
+#include "Framework/Common/ThreadPool.h"
+#include "Render/Gizmo.h"
 
 namespace Ailu
 {
@@ -9,7 +12,7 @@ namespace Ailu
 		_normals = nullptr;
 		_colors = nullptr;
 		_tangents = nullptr;
-		_uv = new Vector2f*[8];
+		_uv = new Vector2f * [8];
 		for (size_t i = 0; i < 8; i++)
 		{
 			_uv[i] = nullptr;
@@ -102,14 +105,41 @@ namespace Ailu
 			tangent_index = count++;
 		}
 		_p_vbuf.reset(VertexBuffer::Create(desc_list));
-		if(_vertices) _p_vbuf->SetStream(reinterpret_cast<float*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index);
-		if(_normals) _p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index);
-		if(_uv[0]) _p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
-		if(_tangents) _p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
+		if (_vertices) _p_vbuf->SetStream(reinterpret_cast<float*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index);
+		if (_normals) _p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index);
+		if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
+		if (_tangents) _p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
 		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
 	}
 
 	//----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------
+	// Parallel 函数
+	//template <typename T, typename F>
+	//void Parallel(T* v, size_t size, F f, ThreadPool& threadPool)
+	//{
+	//	size_t numThreads = std::thread::hardware_concurrency();
+	//	size_t chunkSize = (size + numThreads - 1) / numThreads;
+
+	//	std::vector<std::future<void>> futures;
+
+	//	for (size_t i = 0; i < numThreads; ++i)
+	//	{
+	//		size_t startIdx = i * chunkSize;
+	//		size_t endIdx = std::min((i + 1) * chunkSize, size);
+
+	//		futures.push_back(threadPool.Enqueue([&, startIdx, endIdx]()
+	//			{
+	//				for (size_t j = startIdx; j < endIdx; ++j) {
+	//					f(v[j]);
+	//				}
+	//			}));
+	//	}
+	//	for (auto& future : futures)
+	//	{
+	//		future.wait();
+	//	}
+	//}
+	
 	SkinedMesh::SkinedMesh() : Mesh()
 	{
 		_bone_indices = nullptr;
@@ -133,6 +163,50 @@ namespace Ailu
 	void SkinedMesh::SetBoneIndices(Vector4D<u32>* bone_indices)
 	{
 		_bone_indices = bone_indices;
+	}
+
+	void SkinedMesh::Skin()
+	{
+		float world_time = g_pTimeMgr->GetScaledWorldTime(1.0f);
+		auto joints = _skeleton._joints;
+		u64 time = (u32)world_time % joints[0]._frame_count;
+		Vector3f* pos = reinterpret_cast<Vector3f*>(_p_vbuf->GetStream(0));
+		static auto skin = [&](u32 begin,u32 end) {
+			for (u32 i = begin; i < end; i++)
+			{
+				auto& cur_weight = _bone_weights[i];
+				auto& cur_indices = _bone_indices[i];
+				Vector3f tmp = _vertices[i];
+				Vector3f new_pos = Vector3f::kZero;
+				for (u16 j = 0; j < 4; j++)
+				{
+					auto& joint = _skeleton._joints[cur_indices[j]];
+					new_pos += cur_weight[j] * TransformCoord(joint._inv_bind_pos * joint._pose[time], tmp);
+				}
+				pos[i] = new_pos;
+			}
+		};
+		if (_vertex_count < 1000)
+		{
+			skin(0, _vertex_count);
+		}
+		else
+		{
+			size_t numThreads = 6;
+			size_t chunkSize = (_vertex_count + numThreads - 1) / numThreads;
+			std::vector<std::future<void>> futures;
+			for (size_t i = 0; i < numThreads; ++i)
+			{
+				size_t startIdx = i * chunkSize;
+				size_t endIdx = min((i + 1) * chunkSize, _vertex_count);
+				futures.push_back(g_thread_pool->Enqueue(skin, startIdx, endIdx));
+			}
+			for (auto& future : futures)
+			{
+				future.wait();
+			}
+		}
+
 	}
 	void SkinedMesh::Clear()
 	{
@@ -177,7 +251,7 @@ namespace Ailu
 			bone_weight_index = count++;
 		}
 		_p_vbuf.reset(VertexBuffer::Create(desc_list));
-		if (_vertices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index);
+		if (_vertices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, true);
 		if (_normals) _p_vbuf->SetStream(reinterpret_cast<u8*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index);
 		if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<u8*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
 		if (_tangents) _p_vbuf->SetStream(reinterpret_cast<u8*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);

@@ -14,6 +14,8 @@ namespace Ailu
 		COMPONENT_CLASS_TYPE(StaticMeshComponent)
 		DECLARE_REFLECT_FIELD(StaticMeshComponent)
 	public:
+		//test only
+		inline static bool s_skin = true;
 		StaticMeshComponent();
 		StaticMeshComponent(Ref<Mesh> mesh, Ref<Material> mat);
 		void BeginPlay() final;

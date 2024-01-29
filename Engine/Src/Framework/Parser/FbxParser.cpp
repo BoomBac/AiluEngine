@@ -421,6 +421,7 @@ namespace Ailu
 				global_bindpose_inv_matrix = transform_link_matrix.Inverse() * transform_matrix * geometry_transform;
 				u16 joint_index = (u16)joint_i;
 				_cur_skeleton._joints[joint_index]._inv_bind_pos = FbxMatToMat4x4f(global_bindpose_inv_matrix);
+				//_cur_skeleton._joints[joint_index]._inv_bind_pos = FbxMatToMat4x4f(transform_link_matrix.Inverse());
 				FbxAMatrix local_matrix = cluster->GetLink()->EvaluateLocalTransform();
 				u32 indices_count = cluster->GetControlPointIndicesCount();
 				for (int k = 0; k < indices_count; k++)
@@ -429,10 +430,10 @@ namespace Ailu
 					if (control_point_weight_infos.find(control_point_index) == control_point_weight_infos.end())
 						control_point_weight_infos.insert(std::make_pair(control_point_index, Vector<std::pair<u16, float>>()));
 					control_point_weight_infos[control_point_index].push_back(std::make_pair(joint_index, cluster->GetControlPointWeights()[k]));
-					//control_point_weight_infos[control_point_index][j] = std::make_pair(it->second._self, cluster->GetControlPointWeights()[k]);
 				}
 				//only support one stack
 				FbxAnimStack* cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
+				//LOG_INFO("Scene {} has {} animation stack", _p_cur_fbx_scene->GetName(), _p_cur_fbx_scene->GetSrcObjectCount<FbxAnimStack>());
 				FbxString anim_fname = cur_anim_stack->GetName();
 				String anim_name = anim_fname.Buffer();
 				FbxTakeInfo* take_info = _p_cur_fbx_scene->GetTakeInfo(anim_fname);
@@ -449,6 +450,7 @@ namespace Ailu
 					cur_time.SetFrame(i, TimeMode);
 					FbxAMatrix cur_transform_offset = node->EvaluateGlobalTransform(cur_time) * geometry_transform;
 					_cur_skeleton._joints[joint_index]._pose.emplace_back(FbxMatToMat4x4f(cur_transform_offset.Inverse() * cluster->GetLink()->EvaluateGlobalTransform(cur_time)));
+					//_cur_skeleton._joints[joint_index]._pose.emplace_back(FbxMatToMat4x4f(cluster->GetLink()->EvaluateLocalTransform(cur_time)));
 					//_cur_skeleton._joints[joint_index]._pose.emplace_back(FbxMatToMat4x4fcur_transform_offset);
 				}
 			}
@@ -476,6 +478,7 @@ namespace Ailu
 					for (int weight_index = 0; weight_index < bone_effect_num; ++weight_index)
 					{
 						cur_weight[weight_index] = cur_weight_info[weight_index].second;
+						cur_indices[weight_index] = cur_weight_info[weight_index].first;
 					}
 					bone_weights_vec.emplace_back(cur_weight);
 					bone_indices_vec.emplace_back(cur_indices);
@@ -897,6 +900,7 @@ namespace Ailu
 		ParserFbxNode(fbx_rt, mesh_node, skeleton_node);
 		_cur_skeleton.joint_num = 0;
 		_cur_skeleton._joints.clear();//当前仅支持一个骨骼，所以清空之前的数据
+		auto skeleton_node_c = skeleton_node;
 		while (!skeleton_node.empty())
 		{
 			ParserSkeleton(skeleton_node.front(), _cur_skeleton);
@@ -907,6 +911,59 @@ namespace Ailu
 			ParserMesh(mesh_node.front(), loaded_meshs);
 			mesh_node.pop();
 		}
+		//while (!skeleton_node_c.empty())
+		//{
+		//	auto Node = skeleton_node_c.front();
+		//	//only support one stack
+		//	FbxAnimStack* cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
+		//	//LOG_INFO("Scene {} has {} animation stack", _p_cur_fbx_scene->GetName(), _p_cur_fbx_scene->GetSrcObjectCount<FbxAnimStack>());
+		//	FbxString anim_fname = cur_anim_stack->GetName();
+		//	String anim_name = anim_fname.Buffer();
+		//	FbxTakeInfo* take_info = _p_cur_fbx_scene->GetTakeInfo(anim_fname);
+		//	FbxTime start_time = take_info->mLocalTimeSpan.GetStart();
+		//	FbxTime end_time = take_info->mLocalTimeSpan.GetStop();
+		//	FbxTime Duration = take_info->mLocalTimeSpan.GetDuration();
+		//	FbxTime::EMode TimeMode = FbxTime::GetGlobalTimeMode();
+		//	FbxLongLong FrameCount = Duration.GetFrameCount(TimeMode);
+		//	double FrameRate = FbxTime::GetFrameRate(TimeMode);
+		//	u32 joint_index = Skeleton::GetJointIndexByName(_cur_skeleton, Node->GetName());
+		//	_cur_skeleton._joints[joint_index]._frame_count = static_cast<u16>(FrameCount);
+		//	_cur_skeleton._joints[joint_index]._pose.clear();
+		//	for (FbxLongLong i = 0; i < FrameCount; i++)
+		//	{
+		//		FbxTime cur_time;
+		//		cur_time.SetFrame(i, TimeMode);
+		//		// Get name without 'namespace'
+		//		FbxString Name = Node->GetNameOnly();
+
+		//		// The global node transform is equal to your local skeleton root if there is no parent bone 
+		//		FbxAMatrix LocalTransform = Node->EvaluateGlobalTransform(cur_time);
+
+		//		// Do we have a parent bone, if yes then evaluate its global transform and apply the inverse to this nodes global transform
+		//		if (FbxNode* Parent = Node->GetParent())
+		//		{
+		//			FbxNodeAttribute* ParentAttribute = Parent->GetNodeAttribute();
+		//			if (ParentAttribute && ParentAttribute->GetAttributeType() == FbxNodeAttribute::eSkeleton)
+		//			{
+		//				FbxAMatrix GlobalParentTransform = Parent->EvaluateGlobalTransform(cur_time);
+		//				LocalTransform = GlobalParentTransform.Inverse() * LocalTransform;
+		//			}
+		//		}
+
+		//		// DON'T get the geometric transform here - it does not propagate! Bake it into the mesh instead! This makes it also easier to read the skinning from the clusters!
+		//		_cur_skeleton._joints[joint_index]._pose.emplace_back(FbxMatToMat4x4f(LocalTransform));
+		//		// Now you can decompose
+		//		//FbxVector4 LocalTranslation = LocalTransform.GetT();
+		//		//FbxQuaternion LocalTranslation = LocalTransform.GetQ();
+		//		//FbxVector4 LocalScale = LocalTransform.GetS();
+		//	}
+		//	skeleton_node_c.pop();
+		//}
+		//auto it = dynamic_cast<SkinedMesh*>(loaded_meshs.front().get());
+		//if (it)
+		//{
+		//	it->CurSkeleton(_cur_skeleton);
+		//}
 		if (loaded_meshs.empty())
 		{
 			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);

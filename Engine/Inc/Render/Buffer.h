@@ -17,6 +17,7 @@ namespace Ailu
 		virtual void SetLayout(VertexBufferLayout layout) = 0;
 		virtual void SetStream(float* vertices, uint32_t size, u8 stream_index) = 0;
 		virtual void SetStream(u8* data, uint32_t size, u8 stream_index,bool dynamic = false) = 0;
+		virtual u8* GetStream(u8 index) = 0;
 		virtual const VertexBufferLayout& GetLayout() const = 0;
 		virtual uint32_t GetVertexCount() const = 0;
 	};
