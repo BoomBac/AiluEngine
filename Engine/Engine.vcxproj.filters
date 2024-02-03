@@ -2049,6 +2049,9 @@
     <ClInclude Include="Inc\Animation\Skeleton.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Events\SceneLayer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2229,6 +2232,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Animation\Pose.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Events\SceneLayer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

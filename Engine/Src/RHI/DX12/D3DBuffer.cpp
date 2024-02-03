@@ -10,12 +10,12 @@ namespace Ailu
 	D3DVertexBuffer::D3DVertexBuffer(VertexBufferLayout layout, bool is_static) : _is_static(is_static)
 	{
 		_buffer_layout = std::move(layout);
-		_buf_start = s_cur_offset;
+		_buf_start = s_global_offset;
 		for (size_t i = 0; i < _buffer_layout.GetStreamCount(); i++)
 		{
 			s_vertex_bufs.emplace_back(ComPtr<ID3D12Resource>());
 			s_vertex_buf_views.emplace_back(D3D12_VERTEX_BUFFER_VIEW{});
-			++s_cur_offset;
+			++s_global_offset;
 		}
 		_buf_num = _buffer_layout.GetStreamCount();
 		if (!is_static)
@@ -27,8 +27,8 @@ namespace Ailu
 	{
 		s_vertex_bufs.emplace_back(ComPtr<ID3D12Resource>());
 		s_vertex_buf_views.emplace_back(D3D12_VERTEX_BUFFER_VIEW{});
-		_buf_start = s_cur_offset;
-		++s_cur_offset;
+		_buf_start = s_global_offset;
+		++s_global_offset;
 		SetStream(vertices, size, 0);
 		if (!is_static)
 		{
@@ -237,8 +237,9 @@ namespace Ailu
 		_ime_vertex_data_offset += num0 * 4;
 		_ime_color_data_offset += num1 * 4;
 	}
+	//-----------------------------------------------------------------D3DDynamicVertexBuffer----------------------------------------------------------
 
-	//-----------------------------------------------------------------IndexBuffer----------------------------------------------------------
+	//-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
 	D3DIndexBuffer::D3DIndexBuffer(uint32_t* indices, uint32_t count) : _index_count(count)
 	{
 		auto d3d_conetxt = D3DContext::GetInstance();
@@ -285,4 +286,61 @@ namespace Ailu
 	{
 		return _index_count;
 	}
+	//-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
+
+
+	//-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
+	static u32 CalcConstantBufferByteSize(u32 byte_size)
+	{
+		return (byte_size + 255) & ~255;
+	}
+
+	D3DConstantBuffer::D3DConstantBuffer(u32 size)
+	{
+		static bool b_init = false;	
+		if (!b_init)
+		{
+			s_global_index = 0u;
+			s_global_offset = 0u;
+			auto device = D3DContext::GetInstance()->GetDevice();
+			s_p_d3d_heap = D3DContext::GetInstance()->GetDescriptorHeap();
+			//constbuffer
+			auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+			s_total_size = RenderConstants::kPerFrameTotalSize * RenderConstants::kFrameCount;
+			s_desc_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(s_total_size);
+			ThrowIfFailed(device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&s_p_d3d_res)));
+			// Map and initialize the constant buffer. We don't unmap this until the
+			// app closes. Keeping things mapped for the lifetime of the resource is okay.
+			CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
+			ThrowIfFailed(s_p_d3d_res->Map(0, &readRange, reinterpret_cast<void**>(&_p_data)));
+			b_init = true;
+		}
+		size = CalculateConstantBufferByteSize(size);
+		AL_ASSERT(s_global_offset + size <= s_total_size, "Constant buffer overflow");
+		_offset = s_global_offset;
+		_index = s_global_index;
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
+			cbvHandle.ptr = s_p_d3d_heap->GetCPUDescriptorHandleForHeapStart().ptr + _index * s_desc_size;
+			D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
+			cbv_desc.BufferLocation = s_p_d3d_res->GetGPUVirtualAddress() + _offset;
+			cbv_desc.SizeInBytes = size;
+			D3DContext::GetInstance()->GetDevice()->CreateConstantBufferView(&cbv_desc, cbvHandle);
+			s_cbuf_views.emplace_back(cbv_desc);
+		}
+		s_global_offset += size;
+		s_global_index++;
+	}
+	D3DConstantBuffer::~D3DConstantBuffer()
+	{
+	}
+	void D3DConstantBuffer::Bind(u8 bind_slot) const
+	{
+		static auto cmd = D3DContext::GetInstance()->GetCmdList();
+		cmd->SetGraphicsRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
+		return;
+	}
+	//-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
+
 }

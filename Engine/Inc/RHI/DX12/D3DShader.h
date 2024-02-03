@@ -208,6 +208,54 @@ namespace Ailu
 		ComPtr<ID3D12ShaderReflection> _p_p_reflection;
 		D3D12_PRIMITIVE_TOPOLOGY _topology;
 	};
+
+	class D3DComputeShader : public ComputeShader
+	{
+		struct PSOSystem
+		{
+			FORCEINLINE std::tuple<ComPtr<ID3D12RootSignature>&, ComPtr<ID3D12PipelineState>&> Front()
+			{
+				return _b_current_is_a ? std::tie(_p_sig_a, _p_pso_a) : std::tie(_p_sig_b, _p_pso_b);
+			}
+
+			inline std::tuple<ComPtr<ID3D12RootSignature>&, ComPtr<ID3D12PipelineState>&> Back()
+			{
+				auto& sig = !_b_current_is_a ? _p_sig_a : _p_sig_b;
+				auto& pso = !_b_current_is_a ? _p_pso_a : _p_pso_b;
+				sig.Reset();
+				pso.Reset();
+				return std::tie(sig, pso);
+			}
+			void Bind(ID3D12GraphicsCommandList* cmd)
+			{
+				auto [sig, pso] = Front();
+				cmd->SetPipelineState(pso.Get());
+				cmd->SetComputeRootSignature(sig.Get());
+			}
+			inline void Swap()
+			{
+				_b_current_is_a = !_b_current_is_a;
+			}
+		private:
+			bool _b_current_is_a = true;
+			ComPtr<ID3D12RootSignature> _p_sig_a;
+			ComPtr<ID3D12PipelineState> _p_pso_a;
+			ComPtr<ID3D12RootSignature> _p_sig_b;
+			ComPtr<ID3D12PipelineState> _p_pso_b;
+		};
+	public:
+		D3DComputeShader(const String& sys_path);
+		//void Dispatch(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
+		void Bind(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
+	private:
+		void LoadReflectionInfo(ID3D12ShaderReflection* p_reflect);
+		bool RHICompileImpl() final;
+		void GenerateInternalPSO();
+	private:
+		ComPtr<ID3DBlob> _p_blob;
+		ComPtr<ID3D12ShaderReflection> _p_reflection;
+		PSOSystem _pso_sys;
+	};
 }
 
 

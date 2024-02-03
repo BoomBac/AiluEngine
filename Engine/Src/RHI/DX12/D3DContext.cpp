@@ -156,6 +156,20 @@ namespace Ailu
         return cpu_handle;
     }
 
+    std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3DContext::GetUAVDescriptorHandle()
+    {
+        static u32 global_texture_offset = 0u;
+        AL_ASSERT(global_texture_offset > (RenderConstants::kMaxUAVTextureCount - 1), "Can't alloc more uav texture");
+        static uint32_t base = RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * RenderConstants::kFrameCount +
+            RenderConstants::kMaxRenderObjectCount * RenderConstants::kFrameCount + RenderConstants::kMaxPassDataCount * RenderConstants::kFrameCount + RenderConstants::kMaxTextureCount;
+        auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
+        gpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
+        auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
+        cpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
+        ++global_texture_offset;
+        return std::make_tuple(cpu_handle, gpu_handle);
+    }
+
     uint8_t* D3DContext::GetCBufferPtr()
     {
         return _p_cbuffer;
@@ -515,7 +529,6 @@ namespace Ailu
         //CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
         //m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         _render_object_index = 0;
-
         //执行所有命令
         for (auto& cmd : _all_commands) cmd();
         _all_commands.clear();
@@ -579,7 +592,7 @@ namespace Ailu
         //constbuffer desc heap
         D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
         _cbv_desc_num = (1u + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + RenderConstants::kMaxPassDataCount) * RenderConstants::kFrameCount +
-            RenderConstants::kMaxTextureCount;
+            RenderConstants::kMaxTextureCount + RenderConstants::kMaxUAVTextureCount;
         cbvHeapDesc.NumDescriptors = _cbv_desc_num + 1;
         cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;

@@ -240,4 +240,12 @@ namespace Ailu
 	{
 		throw std::runtime_error("The method or operation is not implemented.");
 	}
+
+	void D3DCommandBuffer::Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+	{
+		static auto cmd = D3DContext::GetInstance()->GetCmdList();
+		_commands.emplace_back([=]() {
+			cs->Bind(thread_group_x, thread_group_y, thread_group_z);
+			});
+	}
 }

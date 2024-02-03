@@ -97,7 +97,7 @@ float Random(float4 seed4)
 		for (int i = 0; i < 4; i++)
 		{
 			uint random_index = uint(4.0 * Random(float4(world_pos.xyy, i))) % 4;
-			shadow_factor += lerp(0.0, 0.25, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadow_uv.xy + poissonDisk[random_index] / 3000, depth + z_bias).r);
+			shadow_factor += lerp(0.0, 0.25, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadow_uv.xy + poissonDisk[random_index] / 1200, depth + z_bias).r);
 		}
 		//shadow_factor = MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadow_uv.xy, depth).r;
 		return shadow_factor;
@@ -111,8 +111,8 @@ float Random(float4 seed4)
 		InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
 		float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface_data.wnormal));
 		float shadow_factor = ApplyShadow(input.shadow_pos, nl, input.world_pos);
-		//if (shadow_factor == 0)
-		//	return float4(0.0, 0.0, 0.0, 1.0);
+	if (shadow_factor == 0)
+		return float4(0.0, 0.0, 0.0, 1.0);
 		float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos));
 		light.r += 0.000001 * surface_data.metallic;
 		light.g += 0.000001 * surface_data.roughness;
@@ -121,8 +121,8 @@ float Random(float4 seed4)
 
 	//float shadow_factor = MainLightShadowMap.Sample(g_LinearBorderSampler, shadow_uv.xy).r; 
 	//if (shadow_factor <= depth)
-	//	return float4(0.0,0.0,0.0,1.0);
-		//light *= shadow_factor;
+	//	return float4(0.0,0.0,0.0,1.0); 
+		light *= shadow_factor;
 //		GammaCorrect(light, 2.2f);
 #ifdef TEST
 	return float4(light,1.0);

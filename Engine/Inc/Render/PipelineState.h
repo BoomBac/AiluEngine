@@ -490,7 +490,7 @@ namespace Ailu
 
 	enum class EBindResDescType : uint8_t
 	{
-		kConstBuffer = 0, kTexture2D, kCubeMap, kTexture2DArray, kSampler, kCBufferAttribute, kUnknown
+		kConstBuffer = 0, kTexture2D, kCubeMap, kTexture2DArray, kSampler, kCBufferAttribute, kUAVTexture2D,kUnknown
 	};
 
 	struct PipelineResourceInfo

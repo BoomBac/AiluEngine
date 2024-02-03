@@ -40,6 +40,16 @@ namespace Ailu
 		virtual uint32_t GetCount() const = 0;
 		static IndexBuffer* Create(uint32_t* indices, uint32_t count);
 	};
+
+	class ConstantBuffer
+	{
+	public:
+		static ConstantBuffer* Create(u32 size);
+		static void Release(u8* ptr);
+		virtual ~ConstantBuffer() = default;
+		virtual void Bind(u8 bind_slot) const = 0;
+		virtual u8* GetData() = 0;
+	};
 }
 
 #endif // !BUFFER_H__

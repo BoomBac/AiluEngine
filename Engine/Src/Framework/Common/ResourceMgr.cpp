@@ -11,6 +11,27 @@
 
 namespace Ailu
 {
+	namespace fs = std::filesystem;
+	static void TraverseDirectory(const fs::path& directoryPath,std::set<fs::path>& path_set)
+	{
+		try {
+			for (const auto& entry : fs::directory_iterator(directoryPath)) 
+			{
+				if (fs::is_directory(entry.status())) 
+				{
+					TraverseDirectory(entry.path(), path_set);
+				}
+				else if (fs::is_regular_file(entry.status())) 
+				{
+					path_set.insert(entry.path());
+				}
+			}
+		}
+		catch (const std::exception& e) {
+			std::cerr << "Exception: " << e.what() << std::endl;
+		}
+	}
+
 	int ResourceMgr::Initialize()
 	{
 		LOG_WARNING("Begin init engine internal resource...");
@@ -68,6 +89,7 @@ namespace Ailu
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "CubemapGen");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/filter_irradiance.hlsl"), "EnvmapFilter");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/bone_test.hlsl"), "BoneWeight");
+
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
 		auto anim = parser->Parser(GetResPath("Meshs/anim.fbx"));
@@ -536,12 +558,13 @@ namespace Ailu
 		fs::path dir(kEngineResRootPath + EnginePath::kEngineShaderPath);
 		std::chrono::duration<int, std::milli> sleep_duration(1000); // 1秒
 		std::unordered_map<fs::path, fs::file_time_type> files;
-		auto reload_shader = [&](const fs::path& file) {
+		static auto reload_shader = [&](const fs::path& file) {
+			const String& cur_path = file.string();
 			for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
 			{
 				for (auto& head_file : (*it)->GetSourceFiles())
 				{
-					if (head_file == file.string())
+					if (head_file == cur_path)
 					{
 						AddResourceTask([=]() {
 							if ((*it)->Compile())
@@ -558,16 +581,23 @@ namespace Ailu
 					}
 				}
 			}
+			auto cs = ComputeShader::Get(PathUtils::ExtractAssetPath(cur_path));
+			if (cs)
+			{
+				AddResourceTask([=]() {
+					cs->Compile();
+				});
+			}
 		};
 		bool is_first_execute = true;
+		static std::set<fs::path> path_set{};
+		static std::unordered_map<fs::path, fs::file_time_type> current_files;
 		while (true)
 		{
-			static std::unordered_map<fs::path, fs::file_time_type> current_files;
-			for (const auto& entry : fs::directory_iterator(dir))
+			TraverseDirectory(dir, path_set);
+			for (auto& cur_path : path_set)
 			{
-				if (fs::is_regular_file(entry.status())) {
-					current_files[entry.path()] = fs::last_write_time(entry.path());
-				}
+				current_files[cur_path] = fs::last_write_time(cur_path);
 			}
 			for (const auto& [file, last_write_time] : current_files)
 			{

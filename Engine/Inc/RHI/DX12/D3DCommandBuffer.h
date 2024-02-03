@@ -41,6 +41,8 @@ namespace Ailu
         void ResolveToBackBuffer(Ref<RenderTexture>& color) final;
         void ResolveToBackBuffer(RenderTexture* color) final;
 
+        void Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
+
         Vector<std::function<void()>>& GetAllCommands() final{ return _commands; }
         virtual u32 GetID() final { return _id; };
 	private:

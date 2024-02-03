@@ -39,6 +39,11 @@ namespace Ailu
 
 		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512,"pure_sky","Textures/small_cave_1k.hdr");
 		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
+		_p_test_cs = ComputeShader::Create(GetResPath("Shaders/Compute/cs_test.hlsl"));
+		TextureDesc desc(64,64,1,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR32_UINT,false);
+		_p_test_texture = Texture2D::Create(desc);
+		_p_test_texture->Name("cs_out");
+		TexturePool::Add("cs_out", std::dynamic_pointer_cast<Texture2D>(_p_test_texture));
 		return 0;
 	}
 	void Renderer::Finalize()
@@ -85,41 +90,6 @@ namespace Ailu
 			pass->EndPass(_p_context);
 		_p_task_render_passes.clear();
 	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		index_buffer->Bind();
-		RenderCommand::DrawIndexedInstanced(index_buffer, instance_count);
-	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		RenderCommand::DrawInstanced(vertex_buf, instance_count);
-	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		index_buffer->Bind();
-		mat->Bind();
-		RenderCommand::DrawIndexedInstanced(index_buffer, instance_count);
-	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, Ref<Material> mat, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		mat->Bind();
-		RenderCommand::DrawInstanced(vertex_buf, instance_count);
-	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, Matrix4x4f transform, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		index_buffer->Bind();
-		mat->Bind();
-		RenderCommand::DrawIndexedInstanced(index_buffer, instance_count, transform);
-	}
-	void Renderer::Submit(const Ref<Mesh>& mesh, Ref<Material>& mat, Matrix4x4f transform, uint32_t instance_count)
-	{
-
-	}
 
 	float Renderer::GetDeltaTime() const
 	{
@@ -127,10 +97,14 @@ namespace Ailu
 	}
 	void Renderer::Render()
 	{
+		_p_test_cs->SetTexture("gInputA",TexturePool::Get("Textures/MyImage01.jpg").get());
+		//_p_test_cs->SetTexture("gInputB",TexturePool::Get("Runtime/default_black").get());
+		_p_test_cs->SetTexture("gOut", _p_test_texture.get());
 		auto cmd = CommandBufferPool::GetCommandBuffer();
 		cmd->Clear();
-		//_p_shadowcast_pass->BeginPass(_p_context);
-		//_p_shadowcast_pass->Execute(_p_context, cmd.get(), _rendering_data);
+		cmd->Dispatch(_p_test_cs.get(), 4, 4, 1);
+		_p_shadowcast_pass->BeginPass(_p_context);
+		_p_shadowcast_pass->Execute(_p_context, cmd.get(), _rendering_data);
 
 		
 		//cmd->SetViewProjectionMatrices(_p_scene_camera->GetView(), _p_scene_camera->GetProjection());
@@ -151,6 +125,7 @@ namespace Ailu
 
 		Shader::SetGlobalTexture("SkyBox", _p_cubemap_gen_pass->_p_cube_map.get());
 		Shader::SetGlobalTexture("DiffuseIBL", _p_cubemap_gen_pass->_p_env_map.get());
+		//Shader::SetGlobalTexture("Albedo", _p_test_texture.get());
 		_p_opaque_pass->BeginPass(_p_context);
 		_p_opaque_pass->Execute(_p_context);
 

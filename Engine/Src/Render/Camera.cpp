@@ -33,8 +33,9 @@ namespace Ailu
 		Gizmo::DrawLine(p_camera->_near_bottom_right, p_camera->_far_bottom_right, Colors::kWhite);
 		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, Colors::kWhite);
 
-		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Forward() * p_camera->Far(), Colors::kRed);
-		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Up() * p_camera->Far(), Colors::kBlue);
+		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Forward() * p_camera->Far(), Colors::kBlue);
+		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Up() * p_camera->Far(), Colors::kGreen);
+		Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Right() * p_camera->Far(), Colors::kRed);
 	}
 
 	Camera::Camera() : Camera(16.0F / 9.0F)
@@ -66,6 +67,7 @@ namespace Ailu
 		_forward = _rotation * Vector3f::kForward;
 		_up = _rotation * Vector3f::kUp;
 		_right = CrossProduct(_up, _forward);
+		CalculateFrustum();
 		BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
 	}
 
@@ -79,7 +81,24 @@ namespace Ailu
 
 	void Camera::LookTo(const Vector3f& direction, const Vector3f& up)
 	{
+		_forward = direction;
+		_right = CrossProduct(up, _forward);
+		_up = CrossProduct(_forward,_right);
+		_forward = Normalize(_forward);
+		_right = Normalize(_right);
+		_up = Normalize(_up);
+		if (_camera_type == ECameraType::kPerspective)
+			BuildPerspectiveFovLHMatrix(_proj_matrix, _fov_h * k2Radius, _aspect, _near_clip, _far_clip);
+		else
+		{
+			float left = -_size * 0.5f;
+			float right = -left;
+			float top = right / _aspect;
+			float bottom = -top;
+			BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom, _near_clip, _far_clip);
+		}
 		BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
+		CalculateFrustum();
 	}
 
 	bool Camera::IsInFrustum(const Vector3f& pos)

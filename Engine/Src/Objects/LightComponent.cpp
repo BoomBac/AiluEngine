@@ -27,8 +27,7 @@ namespace Ailu
 			_light._light_pos = transf._position;
 			Clamp(_light._light_param.z,0.0f, 180.0f);
 			Clamp(_light._light_param.y, 0.0f,_light._light_param.z - 0.1f);
-			_p_shadow_camera->Position(transf._position);
-			auto euler = _p_onwer->GetComponent<TransformComponent>()->GetEuler();
+			//auto euler = _p_onwer->GetComponent<TransformComponent>()->GetEuler();
 			//_p_shadow_camera->_world_y = Quaternion::AngleAxis(euler.x, Camera::kUp);
 			//Vector3f rotated_right = TransformCoord(_p_shadow_camera->_world_y.ToMat4f(), Camera::kRight);
 			//_p_shadow_camera->_object_x = Quaternion::AngleAxis(euler.y, rotated_right);
@@ -37,12 +36,15 @@ namespace Ailu
 			//auto rot = transf.Rotation();
 			//rot.xy = transf.Rotation().yx;
 			//rot.y += 90.0f;
-			//_p_shadow_camera->Rotation(rot);
-			_p_shadow_camera->Size(_shadow._size);
-			_p_shadow_camera->Far(_shadow._distance);
-			_p_shadow_camera->RecalculateMarix();
-			if(_b_cast_shadow)
-				Camera::DrawGizmo(_p_shadow_camera.get());
+
+			if (_b_cast_shadow)
+			{
+				Vector4f light_forward = transf._rotation * kDefaultDirectionalLightDir;
+				_p_shadow_camera->Position(transf._position);
+				_p_shadow_camera->Size(_shadow._size);
+				_p_shadow_camera->Far(_shadow._distance);
+				_p_shadow_camera->LookTo(light_forward.xyz, Vector3f::kUp);
+			}
 		}
 	}
 	void LightComponent::Serialize(std::ofstream& file, String indent)
@@ -147,6 +149,10 @@ namespace Ailu
 				light_to.z *= 500;
 				Gizmo::DrawLine(transf._position, transf._position + light_to, _light._light_color);
 				Gizmo::DrawCircle(transf._position, 50.0f, 24, _light._light_color, Quaternion::ToMat4f(transf._rotation));
+				if (_b_cast_shadow)
+				{
+					Camera::DrawGizmo(_p_shadow_camera.get());
+				}
 				return;
 			}
 			case Ailu::ELightType::kPoint:

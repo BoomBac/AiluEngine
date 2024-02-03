@@ -112,12 +112,28 @@ namespace Ailu
 		virtual EALGFormat GetFormat() const = 0;
 	};
 
+	struct TextureDesc
+	{
+		u16 _width, _height;
+		u16 _mipmap;
+		EALGFormat _res_format;
+		EALGFormat _srv_format;
+		EALGFormat _uav_format;
+		bool _read_only;
+		TextureDesc() : _width(0),_height(0),_mipmap(1),_res_format(EALGFormat::kALGFormatUnknown),_srv_format(EALGFormat::kALGFormatUnknown),_uav_format(EALGFormat::kALGFormatUnknown), _read_only(false){}
+		TextureDesc(u16 w,u16 h,u16 mipmap,EALGFormat res_format,EALGFormat srv_format,EALGFormat uav_format,bool read_only) : _width(w), _height(h), _mipmap(mipmap), 
+		_res_format(res_format), _srv_format(srv_format), _uav_format(uav_format), _read_only(read_only) 
+		{
+		}
+	};
+
 	class Texture2D : public Texture
 	{
 		DECLARE_PROTECTED_PROPERTY(path,AssetPath,String)
 		DECLARE_PROTECTED_PROPERTY(channel,Channel,u8)
 	public:
-		static Ref<Texture2D> Create(const uint16_t& width, const uint16_t& height,u8 channel = 4,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		static Ref<Texture2D> Create(const uint16_t& width, const uint16_t& height, EALGFormat res_format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool read_only = true);
+		static Ref<Texture2D> Create(const TextureDesc& desc);
 		virtual void FillData(uint8_t* data);
 		virtual void FillData(Vector<u8*> datas);
 		virtual void Bind(uint8_t slot) override;
@@ -137,7 +153,8 @@ namespace Ailu
 		Vector<u8*> _p_datas;
 		uint16_t _width,_height;
 		EALGFormat _format;
-		u8 _mipmap_count;
+		u8 _mipmap_count = 1u;
+		bool _read_only;
 	};
 
 	class TextureCubeMap : public Texture

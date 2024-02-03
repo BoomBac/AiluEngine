@@ -19,11 +19,11 @@ namespace Ailu
 	void SceneActor::Tick(const float& delta_time)
 	{
 		Actor::Tick(delta_time);
-		//OnGizmo();
+		OnGizmo();
 	}
 	void SceneActor::OnGizmo()
 	{
-		if (_Id == g_pSceneMgr->_selected_id)
+		if (this == g_pSceneMgr->_p_selected_actor)
 		{
 			for (auto& comp : _components)
 				comp->OnGizmo();

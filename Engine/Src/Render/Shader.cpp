@@ -329,6 +329,8 @@ namespace Ailu
 					}
 					else if (su::Equal(v, ShaderCommand::kZTestValue.kEqual))
 						_pipeline_ds_state._depth_test_func = ECompareFunc::kEqual;
+					else if (su::Equal(v, ShaderCommand::kZTestValue.kLEqual))
+						_pipeline_ds_state._depth_test_func = ECompareFunc::kLessEqual;
 				}
 				else if (su::Equal(k, ShaderCommand::kZWrite, false))
 				{
@@ -420,4 +422,80 @@ namespace Ailu
 		}
 		return true;
 	}
+
+	//---------------------------------------------------------------------ComputeShader-------------------------------------------------------------------
+	Ref<ComputeShader> ComputeShader::Create(const String& file_name)
+	{
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::ERenderAPI::kNone:
+			AL_ASSERT(false, "None render api used!");
+			return nullptr;
+		case RendererAPI::ERenderAPI::kDirectX12:
+		{
+			auto shader = MakeRef<D3DComputeShader>(file_name);
+			auto asset_path = PathUtils::ExtractAssetPath(file_name);
+			s_cs_library.insert(std::make_pair(asset_path, shader));
+			return shader;
+		}
+		}
+		AL_ASSERT(false, "Unsupported render api!")
+			return nullptr;
+	}
+
+	Ref<ComputeShader> ComputeShader::Get(const String& name)
+	{
+		if (s_cs_library.contains(name))
+			return s_cs_library[name];
+		else
+			return nullptr;
+	}
+
+	ComputeShader::ComputeShader(const String& sys_path) : _src_file_path(sys_path)
+	{
+		_name = PathUtils::GetFileName(sys_path);
+		_id = s_global_cs_id++;
+	}
+
+	void ComputeShader::Bind(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+	{
+
+	}
+
+	void ComputeShader::SetTexture(const String& name, Texture* texture)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (texture != nullptr && it != _bind_res_infos.end())
+		{
+			it->second._p_res = texture;
+		}
+		//else
+		//{
+		//	LOG_WARNING("Set compute shader {} texture {} failed", _name, name);
+		//}
+	}
+
+	void ComputeShader::SetTexture(u8 bind_slot, Texture* texture)
+	{
+		if (texture != nullptr)
+		{
+			auto rit = std::find_if(_bind_res_infos.begin(), _bind_res_infos.end(), [=](const auto& it) {
+				return it.second._bind_slot == bind_slot;
+				});
+			if(rit != _bind_res_infos.end())
+				rit->second._p_res = texture;
+		}
+	}
+
+	bool ComputeShader::Compile()
+	{
+		return RHICompileImpl();
+	}
+
+	bool ComputeShader::RHICompileImpl()
+	{
+		return false;
+	}
+
+	//---------------------------------------------------------------------ComputeShader-------------------------------------------------------------------
 }

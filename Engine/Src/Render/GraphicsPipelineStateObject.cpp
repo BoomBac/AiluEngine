@@ -19,7 +19,7 @@ namespace Ailu
 		case RendererAPI::ERenderAPI::kDirectX12:
 			return std::move(MakeScope<D3DGraphicsPipelineState>(initializer));
 		}
-		AL_ASSERT(false, "Unsupport render api!");
+		AL_ASSERT(false, "Unsupported render api!");
 		return nullptr;
 	}
 

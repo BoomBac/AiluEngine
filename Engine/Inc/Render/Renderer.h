@@ -17,6 +17,7 @@
 #include "./Pass/RenderPass.h"
 #include "RenderingData.h"
 
+
 namespace Ailu
 {
     class AILU_API Renderer : public IRuntimeModule
@@ -24,12 +25,6 @@ namespace Ailu
     public:
         void BeginScene();
         void EndScene();
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer,uint32_t instance_count = 1);
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, uint32_t instance_count = 1);
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, uint32_t instance_count = 1);
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, Ref<Material> mat ,uint32_t instance_count = 1);
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat,Matrix4x4f transform ,uint32_t instance_count = 1);
-        static void Submit(const Ref<Mesh>& mesh, Ref<Material>& mat,Matrix4x4f transform ,uint32_t instance_count = 1);
         int Initialize() override;
         void Finalize() override;
         void Tick(const float& delta_time) override;
@@ -43,7 +38,10 @@ namespace Ailu
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
     private:
+        Ref<ComputeShader> _p_test_cs;
+        Ref<Texture> _p_test_texture;
         static inline List<RenderPass*> _p_task_render_passes{};
+        //ConstantBuffer* 
         RenderingData _rendering_data;
         ScenePerFrameData* _p_per_frame_cbuf_data;
         GraphicsContext* _p_context = nullptr;

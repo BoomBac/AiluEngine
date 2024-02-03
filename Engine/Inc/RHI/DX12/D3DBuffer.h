@@ -35,7 +35,7 @@ namespace Ailu
 		inline static std::vector<ComPtr<ID3D12Resource>> s_vertex_upload_bufs{};
 		inline static std::vector<D3D12_VERTEX_BUFFER_VIEW> s_vertex_buf_views{};
 		std::map<String, u8> _buffer_layout_indexer;
-		inline static uint32_t s_cur_offset = 0u;
+		inline static uint32_t s_global_offset = 0u;
 	};
 
 	class D3DDynamicVertexBuffer : public DynamicVertexBuffer
@@ -75,6 +75,22 @@ namespace Ailu
 		ComPtr<ID3D12Resource> _index_buf;
 		inline static std::vector<D3D12_INDEX_BUFFER_VIEW> s_index_buf_views{};
 		inline static uint32_t s_cur_view_offset = 0u;
+	};
+
+	class D3DConstantBuffer : public ConstantBuffer
+	{
+	public:
+		D3DConstantBuffer(u32 size);
+		~D3DConstantBuffer();
+		void Bind(u8 bind_slot) const final;
+		u8* GetData() final {return _p_data + _offset;};
+	private:
+		inline static ComPtr<ID3D12Resource> s_p_d3d_res;
+		inline static ComPtr<ID3D12DescriptorHeap> s_p_d3d_heap;
+		inline static std::vector<D3D12_CONSTANT_BUFFER_VIEW_DESC> s_cbuf_views;
+		inline static u32 s_desc_size, s_total_size,s_global_offset,s_global_index;
+		u32 _offset,_index;
+		u8* _p_data;
 	};
 }
 #endif // !D3DBUFFER_H__

@@ -14,6 +14,7 @@ namespace Ailu
 		constexpr static uint32_t kMaxRenderObjectCount = 50u;
 		constexpr static uint32_t kMaxPassDataCount = 10u;
 		constexpr static uint32_t kMaxTextureCount = 16u;
+		constexpr static uint8_t  kMaxUAVTextureCount = 10U;
 		constexpr static uint32_t kMaxRenderTextureCount = 16u;
 		constexpr static uint32_t KMaxDynamicVertexNum = 2048;
 		constexpr static uint8_t  kMaxVertexAttrNum = 10u;

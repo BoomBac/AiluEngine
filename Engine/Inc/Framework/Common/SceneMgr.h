@@ -3,8 +3,6 @@
 #pragma once
 #ifndef __SCENE_MGR_H__
 #define __SCENE_MGR_H__
-#include <queue>
-#include <vector>
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Objects/SceneActor.h"
 #include "Objects/LightComponent.h"
@@ -55,7 +53,7 @@ namespace Ailu
 		void SaveScene(Scene* scene, const String& scene_path);
 		Scene* LoadScene(const String& scene_path);
 		Scene* _p_current = nullptr;
-		u32 _selected_id = 0u;
+		SceneActor* _p_selected_actor = nullptr;
 	private:
 		void Cull(Scene* p_scene);
 		inline static std::list<Scope<Scene>> s_all_scene{};

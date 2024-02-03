@@ -28,21 +28,7 @@ namespace Ailu
             return path.find_first_of(":") == 1;
         }
 
-        //begin from Res/  eg: Engien/Res/aa/b -> aa/b
-        static inline String ExtractAssetPath(const String& path)
-        {
-            auto p1 = path.find("Res/");
-            auto p2 = path.find("Res\\");
-            if (p1 != path.npos)
-            {
-                return path.substr(p1 + 4);
-            }
-            if (p2 != path.npos)
-            {
-                return path.substr(p2 + 4);
-            }
-            return path;
-        }
+
 
         static String FormatFilePath(const String& file_path) 
         {
@@ -60,6 +46,21 @@ namespace Ailu
             return formattedPath;
         }
 
+        //begin from Res/  eg: Engien/Res/aa/b -> aa/b
+        static inline String ExtractAssetPath(const String& path)
+        {
+            auto p1 = path.find("Res/");
+            auto p2 = path.find("Res\\");
+            if (p1 != path.npos)
+            {
+                return FormatFilePath(path.substr(p1 + 4));
+            }
+            if (p2 != path.npos)
+            {
+                return FormatFilePath(path.substr(p2 + 4));
+            }
+            return FormatFilePath(path);
+        }
 
         static std::string GetFileName(const std::string_view filePath, bool include_ext = false)
         {

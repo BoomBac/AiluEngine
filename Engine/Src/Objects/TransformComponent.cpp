@@ -11,7 +11,7 @@ namespace Ailu
 		_pos_data = _transform._position;
 		_scale_data = _transform._scale;
 		_rotation_data = Quaternion::EulerAngles(_transform._rotation);
-		_pre_rotation_data = _rotation_data;
+		//_pre_rotation_data = _rotation_data;
 	}
 	TransformComponent::~TransformComponent()
 	{
@@ -20,9 +20,9 @@ namespace Ailu
 	{
 		_transform._position = _pos_data;
 		_transform._scale = _scale_data;
-		auto r_d = _rotation_data - _pre_rotation_data;
-		_transform._rotation = _transform._rotation * Quaternion::EulerAngles(r_d);
-		_pre_rotation_data = _rotation_data;
+		//auto r_d = _rotation_data - _pre_rotation_data;
+		_transform._rotation = Quaternion::EulerAngles(_rotation_data);
+		//_pre_rotation_data = _rotation_data;
 	}
 	void TransformComponent::OnGizmo()
 	{

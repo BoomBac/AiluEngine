@@ -48,6 +48,7 @@ namespace Ailu
         virtual void SetPSO(GraphicsPipelineStateObject* pso) = 0;
         virtual void ResolveToBackBuffer(Ref<RenderTexture>& color) = 0;
         virtual void ResolveToBackBuffer(RenderTexture* color) = 0;
+        virtual void Dispatch(ComputeShader* cs,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
         virtual Vector<std::function<void()>>& GetAllCommands() = 0;
         virtual u32 GetID() = 0;
 	};

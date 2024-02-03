@@ -42,6 +42,8 @@ namespace Ailu
 		_p_renderer->Initialize();
 		_p_input_layer = new InputLayer();
 		PushLayer(_p_input_layer);
+		_p_scene_layer = new SceneLayer();
+		PushLayer(_p_scene_layer);
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
 		g_pTimeMgr->Mark();
@@ -131,6 +133,7 @@ namespace Ailu
 		g_pResourceMgr->ImportAsset(e.GetDragedFilePath());
 		return false;
 	}
+
 	bool Application::OnGetFoucus(WindowFocusEvent& e)
 	{
 		_layer_stack.PushLayer(_p_input_layer);
@@ -143,6 +146,7 @@ namespace Ailu
 		dispather.Dispatch<WindowFocusEvent>(BIND_EVENT_HANDLER(OnGetFoucus));
 		dispather.Dispatch<WindowLostFocusEvent>(BIND_EVENT_HANDLER(OnLostFoucus));
 		dispather.Dispatch<DragFileEvent>(BIND_EVENT_HANDLER(OnDragFile));
+//		dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseBtnClicked));
 		//static bool b_handle_input = true;
 		//if (e.GetEventType() == EEventType::kWindowLostFocus) b_handle_input = false;
 		//else if (e.GetEventType() == EEventType::kWindowFocus) b_handle_input = true;
