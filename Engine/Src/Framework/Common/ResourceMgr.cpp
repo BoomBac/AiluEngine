@@ -56,13 +56,13 @@ namespace Ailu
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/front.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/back.jpg",
 		};
-		LoadTexture(default_cubemaps, "cubemap_sea");
+		//LoadTexture(default_cubemaps, "cubemap_sea");
 		LoadAsset("Materials/StandardPBR_new.alasset")->IsInternal(true);
 		LoadAsset("Materials/WireFrame_new.alasset");
 		auto skybox = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Skybox");
 		skybox->IsInternal(false);
 		skybox->OriginPath("Skybox");
-		skybox->SetTexture("SkyBox", "cubemap_sea");
+		//skybox->SetTexture("SkyBox", "cubemap_sea");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/error_fallback.hlsl"), "Error");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.shader"), "Blit");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "CubemapGen");
@@ -70,16 +70,20 @@ namespace Ailu
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/bone_test.hlsl"), "BoneWeight");
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+		auto anim = parser->Parser(GetResPath("Meshs/soldier.fbx"));
 		//auto anim = parser->Parser(GetResPath("Meshs/Walking.fbx"));
-		auto anim = parser->Parser(GetResPath("Meshs/anim.fbx"));
+		//auto anim = parser->Parser(GetResPath("Meshs/mutant.fbx"));
+		//auto anim = parser->Parser(GetResPath("Meshs/anim.fbx"));
+		//auto anim = parser->Parser(GetResPath("Meshs/one_bone.fbx"));
+		//auto anim = parser->Parser(GetResPath("Meshs/two_bone.fbx"));
 		MeshPool::AddMesh("anim", anim.front());
 		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());
-		MeshPool::AddMesh("cube", parser->Parser(GetResPath("Meshs/cube.fbx")).front());
-		MeshPool::AddMesh("cone", parser->Parser(GetResPath("Meshs/cone.fbx")).front());
-		MeshPool::AddMesh("cylinder", parser->Parser(GetResPath("Meshs/cylinder.fbx")).front());
-		MeshPool::AddMesh("monkey", parser->Parser(GetResPath("Meshs/monkey.fbx")).front());
 		MeshPool::AddMesh("plane", parser->Parser(GetResPath("Meshs/plane.fbx")).front());
-		MeshPool::AddMesh("torus", parser->Parser(GetResPath("Meshs/torus.fbx")).front());
+		MeshPool::AddMesh("cube", parser->Parser(GetResPath("Meshs/cube.fbx")).front());
+		//MeshPool::AddMesh("cone", parser->Parser(GetResPath("Meshs/cone.fbx")).front());
+		//MeshPool::AddMesh("cylinder", parser->Parser(GetResPath("Meshs/cylinder.fbx")).front());
+		MeshPool::AddMesh("monkey", parser->Parser(GetResPath("Meshs/monkey.fbx")).front());
+		//MeshPool::AddMesh("torus", parser->Parser(GetResPath("Meshs/torus.fbx")).front());
 		auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
 		Vector<Vector3f> vertices = {
 		{ -1.0f, 1.0f, 0.0f },

@@ -53,6 +53,7 @@ namespace Ailu
 	{
 		DECLARE_PRIVATE_PROPERTY(skeleton, CurSkeleton, Skeleton)
 	public:
+		inline static bool s_use_local_transf = false;
 		SkinedMesh();
 		SkinedMesh(const String& name);
 		~SkinedMesh();
@@ -62,7 +63,7 @@ namespace Ailu
 		void SetBoneIndices(Vector4D<u32>* bone_indices);
 		inline Vector4D<u32>* GetBoneIndices() { return _bone_indices; };
 		inline Vector4f* GetBoneWeights() { return _bone_weights; };
-		void Skin();
+		void Skin(float time,bool use_local);
 		//Skeleton& GetSkeleton() { return _skeleton; };
 	private:
 		Vector4f* _bone_weights;

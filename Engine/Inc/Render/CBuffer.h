@@ -68,6 +68,7 @@ namespace Ailu
 		ShaderSpotlLightData _SpotLights[kMaxSpotLightNum];
 		float4x4 _MainLightShadowMatrix;
 		float4x4 _CubeMapGenCameraMatrix;
+		float4x4 _JointMatrix[80];
 		float padding1[12];
 	};
 

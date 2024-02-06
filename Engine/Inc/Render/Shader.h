@@ -180,7 +180,8 @@ namespace Ailu
 		float GetFloatValue(const String& name);
 
 		static void SetGlobalTexture(const String& name, Texture* texture);
-		static void SetGlobalMatrix(const String& name, const Matrix4x4f& matrix);
+		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
+		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix,u32 num);
 		const String& GetSrcPath() {return _src_file_path;}
 		const std::set<String>& GetSourceFiles() {return _source_files;}
 		const std::map<String, Vector<String>> GetKeywordGroups() {return _keywords;};
@@ -220,7 +221,7 @@ namespace Ailu
 		void ExtractValidShaderProperty();
 	private:
 		inline static std::map<String, Texture*> s_global_textures_bind_info{};
-		inline static std::map<String, Matrix4x4f> s_global_matrix_bind_info{};
+		inline static std::map<String, std::tuple<Matrix4x4f*,u32>> s_global_matrix_bind_info{};
 	};
 
 	class ShaderLibrary

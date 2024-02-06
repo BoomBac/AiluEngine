@@ -3,6 +3,7 @@
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Render/Gizmo.h"
+#include "Framework/Math/Random.h"
 
 namespace Ailu
 {
@@ -165,47 +166,137 @@ namespace Ailu
 		_bone_indices = bone_indices;
 	}
 
-	void SkinedMesh::Skin()
+	void SkinedMesh::Skin(float time, bool use_local)
 	{
-		float world_time = g_pTimeMgr->GetScaledWorldTime(1.0f);
-		auto joints = _skeleton._joints;
-		u64 time = (u32)world_time % joints[0]._frame_count;
-		Vector3f* pos = reinterpret_cast<Vector3f*>(_p_vbuf->GetStream(0));
-		static auto skin = [&](u32 begin,u32 end) {
-			for (u32 i = begin; i < end; i++)
-			{
-				auto& cur_weight = _bone_weights[i];
-				auto& cur_indices = _bone_indices[i];
-				Vector3f tmp = _vertices[i];
-				Vector3f new_pos = Vector3f::kZero;
-				for (u16 j = 0; j < 4; j++)
-				{
-					auto& joint = _skeleton._joints[cur_indices[j]];
-					new_pos += cur_weight[j] * TransformCoord(joint._inv_bind_pos * joint._pose[time], tmp);
-				}
-				pos[i] = new_pos;
-			}
-		};
-		if (_vertex_count < 1000)
+		static Matrix4x4f mats[96];
+		u32 utime = u32(time);
+		auto& joints = _skeleton._joints;
+		u32 jc = 0;
+		if (use_local)
 		{
-			skin(0, _vertex_count);
+			for (auto& j : joints)
+			{
+				if (j._local_mat.empty())
+					continue;
+				if (j._parent == 65535)
+					j._cur_pose = j._local_mat[utime];
+				else
+				{
+					j._cur_pose = j._local_mat[utime] * joints[j._parent]._cur_pose;
+				}
+			}
+			Vector3f origin = { 0,0,0 };
+			Vector3f parent = Vector3f::kZero;
+			for (auto& j : joints)
+			{
+				auto cur = TransformCoord(j._cur_pose * j._node_inv_world_mat, origin);
+				Gizmo::DrawLine(parent, cur, Random::RandomColor(j._parent));
+				parent = cur;
+			}
+			for (auto& j : joints)
+			{
+				j._cur_pose = j._inv_bind_pos * j._cur_pose * j._node_inv_world_mat;
+				mats[jc++] = j._cur_pose;
+			}
 		}
 		else
 		{
-			size_t numThreads = 6;
-			size_t chunkSize = (_vertex_count + numThreads - 1) / numThreads;
-			std::vector<std::future<void>> futures;
-			for (size_t i = 0; i < numThreads; ++i)
+			for (auto& j : joints)
 			{
-				size_t startIdx = i * chunkSize;
-				size_t endIdx = min((i + 1) * chunkSize, _vertex_count);
-				futures.push_back(g_thread_pool->Enqueue(skin, startIdx, endIdx));
+				if (j._local_mat.empty())
+					continue;
+				if (j._parent == 65535)
+					j._cur_pose = Transform::ToMatrix(j._local_transf[utime]);
+				else
+				{
+					j._cur_pose = Transform::ToMatrix(j._local_transf[utime]) * joints[j._parent]._cur_pose;
+				}
 			}
-			for (auto& future : futures)
+			Vector3f origin = { 0,0,0 };
+			Vector3f parent = Vector3f::kZero;
+			for (auto& j : joints)
 			{
-				future.wait();
+				auto cur = TransformCoord(j._cur_pose * j._node_inv_world_mat, origin);
+				Gizmo::DrawLine(parent, cur, Random::RandomColor(j._parent));
+				parent = cur;
 			}
+			for (auto& j : joints)
+			{
+				j._cur_pose = j._inv_bind_pos * j._cur_pose * j._node_inv_world_mat;
+				mats[jc++] = j._cur_pose;
+			}
+
+			//Vector3f origin = { 0,0,0 };
+			//Vector3f parent = Vector3f::kZero;
+			//for (auto& j : joints)
+			//{
+			//	if (j._pose.empty())
+			//		continue;
+			//	auto cur = TransformCoord(j._pose[utime], origin);
+			//	Gizmo::DrawLine(parent, cur, Random::RandomColor(j._parent));
+			//	parent = cur;
+			//}
+
+			//for (auto& j : joints)
+			//{
+			//	if (j._pose.empty())
+			//		continue;
+			//	j._cur_pose = j._inv_bind_pos * j._pose[utime];
+			//	//j._cur_pose = j._pose[utime];
+			//	mats[jc++] = j._cur_pose;
+			//}
 		}
+		Shader::SetGlobalMatrixArray("_JointMatrix", mats, jc);
+		
+		//auto vert = reinterpret_cast<Vector3f*>(_p_vbuf->GetStream(0));
+		//for (u32 i = 0; i < _vertex_count; i++)
+		//{
+		//	auto& cur_weight = _bone_weights[i];
+		//	auto& cur_indices = _bone_indices[i];
+		//	Vector3f tmp = _vertices[i];
+		//	Vector3f new_pos = Vector3f::kZero;
+		//	for (u16 j = 0; j < 4; j++)
+		//	{
+		//		auto& joint = _skeleton._joints[cur_indices[j]];
+		//		new_pos += cur_weight[j] * TransformCoord(joint._inv_bind_pos * joint._cur_pose, tmp);
+		//	}
+		//	vert[i] = new_pos;
+		//}
+
+		//static auto skin = [&](u32 begin,u32 end) {
+		//	for (u32 i = begin; i < end; i++)
+		//	{
+		//		auto& cur_weight = _bone_weights[i];
+		//		auto& cur_indices = _bone_indices[i];
+		//		Vector3f tmp = _vertices[i];
+		//		Vector3f new_pos = Vector3f::kZero;
+		//		for (u16 j = 0; j < 4; j++)
+		//		{
+		//			auto& joint = _skeleton._joints[cur_indices[j]];
+		//			new_pos += cur_weight[j] * TransformCoord(joint._inv_bind_pos * joint._cur_pose, tmp);
+		//		}
+		//	}
+		//};
+		//if (_vertex_count < 1000)
+		//{
+		//	skin(0, _vertex_count);
+		//}
+		//else
+		//{
+		//	size_t numThreads = 6;
+		//	size_t chunkSize = (_vertex_count + numThreads - 1) / numThreads;
+		//	std::vector<std::future<void>> futures;
+		//	for (size_t i = 0; i < numThreads; ++i)
+		//	{
+		//		size_t startIdx = i * chunkSize;
+		//		size_t endIdx = min((i + 1) * chunkSize, _vertex_count);
+		//		futures.push_back(g_thread_pool->Enqueue(skin, startIdx, endIdx));
+		//	}
+		//	for (auto& future : futures)
+		//	{
+		//		future.wait();
+		//	}
+		//}
 
 	}
 	void SkinedMesh::Clear()

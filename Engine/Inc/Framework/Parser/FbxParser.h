@@ -33,14 +33,29 @@ namespace Ailu
 		void GenerateIndexdMesh(Mesh* mesh);
 
 		List<Ref<Mesh>> ParserImpl(WString sys_path);
+		List<Ref<Mesh>> ParserImpl(WString sys_path,bool ph);
 
-		FbxAMatrix GetGeometryTransformation(FbxNode* node);
+		void FillCameraArray(FbxScene* pScene, FbxArray<FbxNode*>& pCameraArray);
+		void FillCameraArrayRecursive(FbxNode* pNode, FbxArray<FbxNode*>& pCameraArray);
+		void FillPoseArray(FbxScene* pScene, FbxArray<FbxPose*>& pPoseArray);
+		bool SetCurrentAnimStack(u16 index);
+
+		void ParserSceneNodeRecursive(FbxNode* pNode, FbxAnimLayer* pAnimLayer);
 	private:
 		FbxScene* _p_cur_fbx_scene;
 		Skeleton _cur_skeleton;
 		FbxManager* fbx_manager_;
 		FbxIOSettings* fbx_ios_;
 		FbxImporter* fbx_importer_;
+
+		FbxArray<FbxPose*> _fbx_poses;
+		FbxArray<FbxNode*> _fbx_cameras;
+
+		FbxArray<FbxString*> _fbx_anim_stack_names;
+		FbxAnimLayer* _p_fbx_anim_layer; 
+		FbxTime _start_time;
+		FbxTime _end_time;
+
 		inline static TimeMgr _time_mgr{};
 	};
 }

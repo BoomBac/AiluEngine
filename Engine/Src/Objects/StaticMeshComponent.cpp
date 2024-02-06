@@ -33,30 +33,7 @@ namespace Ailu
 		if (skined_mesh)
 		{
 			if(s_skin)
-				skined_mesh->Skin();
-			//LOG_INFO("SkinedMesh: ", skined_mesh->CurSkeleton()._joints[0]._name);
-			//Vector3f origin = { 0,0,0 };
-			////Vector3f parent = TransformCoord(world_mat, Vector3f::kZero);
-			//Vector3f parent = Vector3f::kZero;
-			//auto joints = skined_mesh->CurSkeleton()._joints;
-			//u64 time = (u32)g_pTimeMgr->GetScaledWorldTime(1.0f) % joints[0]._frame_count;
-			//Vector3f joint_pos[4];
-			//memset(joint_pos, 0, sizeof(Vector3f) * 4);
-			//Matrix4x4f transf = joints[0]._pose[time];
-			//for (int i = 1; i < joints.size() - 1; i++)
-			//{
-			//	transf = joints[i]._pose[time] * transf;
-			//	joint_pos[i] = TransformCoord(transf, joint_pos[i]);
-			//	Gizmo::DrawLine(joint_pos[i - 1], joint_pos[i], Random::RandomColor(i));
-			//}
-			//for (int i = 0; i < joints.size() - 1; i++)
-			//{
-			//	auto mat = joints[i]._pose[time];
-			//	mat = mat * world_mat;
-			//	Vector3f cur = TransformCoord(mat, origin);
-			//	Gizmo::DrawLine(parent, cur, Random::RandomColor(i));
-			//	parent = cur;
-			//}
+				skined_mesh->Skin((float)_animation_frame,_use_local);
 		}
 	}
 	void StaticMeshComponent::OnGizmo()

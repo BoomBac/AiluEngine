@@ -409,7 +409,7 @@ namespace Ailu
 					auto& light_data = light->_light;
 					ImGui::DragFloat("Radius", &light_data._light_param.x, 1.0, 0.0, 5000.0f);
 				}
-				else if(light->_light_type == ELightType::kSpot)
+				else if (light->_light_type == ELightType::kSpot)
 				{
 					auto& light_data = light->_light;
 					ImGui::DragFloat("Radius", &light_data._light_param.x);
@@ -505,6 +505,27 @@ namespace Ailu
 							DrawProperty(prop.second, mat.get(), selector_window);
 						}
 					}
+				}
+				ImGui::Text("Animation: ");
+				auto sk_mesh = dynamic_cast<SkinedMesh*>(static_mesh_comp->GetMesh().get());
+				if (sk_mesh)
+				{
+					i32 frame = static_cast<i32>(static_mesh_comp->_animation_frame);
+					auto& joints = sk_mesh->CurSkeleton()._joints;
+					ImGui::SliderInt("Frame", &frame, 0u, joints[0]._frame_count - 1);
+					ImGui::Checkbox("Local", &static_mesh_comp->_use_local);
+					u32 frame_time = u32(frame);
+					for (int i = 0; i < joints.size() - 1; i++)
+					{
+						ImGui::Text("Joint: %s",joints[i]._name.c_str());
+						if (joints[i]._local_transf.size() > frame_time)
+						{
+							ImGui::Text("	Local Position:  %s", joints[i]._local_transf[frame_time]._position.ToString().c_str());
+							ImGui::Text("	Local Rotation:  %s", joints[i]._local_transf[frame_time]._rotation.ToString().c_str());
+							ImGui::Text("	Local Scale:  %s", joints[i]._local_transf[frame_time]._scale.ToString().c_str());
+						}
+					}
+					static_mesh_comp->_animation_frame = frame_time;
 				}
 			}
 			else if (comp->GetType() == CameraComponent::GetStaticType())

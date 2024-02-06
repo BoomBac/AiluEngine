@@ -31,6 +31,8 @@ namespace Ailu
 		{
 			return _aabb;
 		}
+		u32 _animation_frame = 0u;
+		bool _use_local = false;
 	private:
 		Ref<Mesh> _p_mesh;
 		Ref<Material> _p_mat;

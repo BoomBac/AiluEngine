@@ -282,7 +282,7 @@ namespace Ailu
 		T& operator[](uint32_t index) { return data[index]; }
 		const T& operator[](uint32_t index) const { return data[index]; }
 
-		std::string ToString(int precision = 2)
+		std::string ToString(int precision = 2) const
 		{
 			return std::format("({:.{}f},{:.{}f},{:.{}f})", data[0], precision, data[1], precision, data[2], precision);
 		}
@@ -1272,6 +1272,11 @@ namespace Ailu
 		Quaternion operator-() const
 		{
 			return Conjugate(*this);
+		}
+
+		std::string ToString(int precision = 2) const
+		{
+			return std::format("({:.{}f},{:.{}f},{:.{}f},{:.{}f})", x, precision, y, precision, z, precision, w, precision);
 		}
 
 		void NormalizeQ()
