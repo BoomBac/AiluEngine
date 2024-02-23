@@ -3,7 +3,6 @@
 #define __INPUT_LAYER_H__
 
 #include "Layer.h"
-#include "Render/Camera.h"
 
 namespace Ailu
 {

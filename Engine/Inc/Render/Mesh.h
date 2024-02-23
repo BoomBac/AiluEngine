@@ -63,12 +63,11 @@ namespace Ailu
 		void SetBoneIndices(Vector4D<u32>* bone_indices);
 		inline Vector4D<u32>* GetBoneIndices() { return _bone_indices; };
 		inline Vector4f* GetBoneWeights() { return _bone_weights; };
-		void Skin(float time,bool use_local);
-		//Skeleton& GetSkeleton() { return _skeleton; };
+	private:
+
 	private:
 		Vector4f* _bone_weights;
 		Vector4D<u32>* _bone_indices;
-//		Skeleton _skeleton;
 	};
 
 	class MeshPool

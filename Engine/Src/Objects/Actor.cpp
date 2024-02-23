@@ -63,6 +63,11 @@ namespace Ailu
 		_components.back()->SetOwner(this);
 	}
 
+	void Actor::RemoveComponent(Component* comp)
+	{
+		_components.remove_if([&](const Scope<Component>& comp_ptr)->bool {return comp_ptr->GetType() == comp->GetType(); });
+	}
+
 	void Actor::RemoveAllComponent()
 	{
 		_components.clear();
@@ -96,11 +101,7 @@ namespace Ailu
 		_children.clear();
 	}
 
-	void Actor::Serialize(std::ofstream& file, String indent)
-	{
-	}
-
-	void Actor::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
+	void Actor::Serialize(std::ostream& os, String indent)
 	{
 		using namespace std;
 		os << indent << "Name: " << _name << endl;

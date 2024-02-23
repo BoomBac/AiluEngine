@@ -104,6 +104,13 @@ namespace Ailu
 		return p_actor;
 	}
 
+	SceneActor* SceneMgr::AddSceneActor()
+	{
+		auto p_actor = Actor::Create<SceneActor>();
+		_p_current->AddObject(p_actor);
+		return p_actor;
+	}
+
 	void SceneMgr::DeleteSceneActor(SceneActor* actor)
 	{
 		_pending_delete_actors.push(actor);
@@ -200,7 +207,7 @@ namespace Ailu
 		{	
 			auto& aabb = static_mesh->GetAABB();
 			RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(),static_mesh->GetMaterial().get(), 
-			Transform::GetWorldMatrix(static_mesh->GetOwner()->GetComponent<TransformComponent>()->_transform), 1);
+			static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), 1);
 		}
 	}
 
@@ -219,7 +226,7 @@ namespace Ailu
 				_all_lights.emplace_back(light);
 			}
 			auto static_mesh = actor->GetComponent<StaticMeshComponent>();
-			if (static_mesh != nullptr)
+			if (static_mesh != nullptr && static_mesh->Active())
 			{
 				_all_static_renderalbes.emplace_back(static_mesh);
 			}
@@ -303,8 +310,9 @@ namespace Ailu
 		point_light->GetComponent<LightComponent>()->_light._light_param.x = 500.0f;
 
 		SceneActor* spot_light = Actor::Create<LightActor>("spot_light");
-		spot_light->GetTransform()._position = { 0.0,500.0,0.0 };
-		spot_light->GetTransform()._rotation = Quaternion();
+		auto transf_comp = spot_light->GetTransformComponent();
+		transf_comp->SetPosition({ 0.0,500.0,0.0 });
+		transf_comp->SetRotation(Quaternion());
 		auto light_comp = spot_light->GetComponent<LightComponent>();
 		light_comp->_light_type = ELightType::kSpot;
 		light_comp->_light._light_param.x = 500.0f;

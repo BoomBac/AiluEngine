@@ -19,7 +19,7 @@ namespace Ailu
 	void SceneActor::Tick(const float& delta_time)
 	{
 		Actor::Tick(delta_time);
-		//OnGizmo();
+		OnGizmo();
 	}
 	void SceneActor::OnGizmo()
 	{
@@ -28,13 +28,6 @@ namespace Ailu
 			for (auto& comp : _components)
 				comp->OnGizmo();
 		}
-	}
-	Transform& SceneActor::GetTransform()
-	{
-		return _p_transform->_transform;
-	}
-	void SceneActor::Serialize(std::ofstream& file, String indent)
-	{
 	}
 	void SceneActor::Serialize(std::ostream& os, String indent)
 	{
@@ -59,16 +52,19 @@ namespace Ailu
 			auto comp_type = TP_ZERO(formated_str.front());
 			while (comp_type != "Children")
 			{
-				if (comp_type == GetComponentTypeStr(TransformComponent::GetStaticType()))
+				if (comp_type == Component::GetTypeName(TransformComponent::GetStaticType()))
 					actor->AddComponent(Deserialize<TransformComponent>(formated_str));
-				else if (comp_type == GetComponentTypeStr(StaticMeshComponent::GetStaticType()))
+				else if (comp_type == Component::GetTypeName(StaticMeshComponent::GetStaticType()))
 					actor->AddComponent(Deserialize<StaticMeshComponent>(formated_str));
-				else if (comp_type == GetComponentTypeStr(LightComponent::GetStaticType()))
+				else if (comp_type == Component::GetTypeName(LightComponent::GetStaticType()))
 					actor->AddComponent(Deserialize<LightComponent>(formated_str));
-				else if (comp_type == GetComponentTypeStr(CameraComponent::GetStaticType()))
+				else if (comp_type == Component::GetTypeName(CameraComponent::GetStaticType()))
 					actor->AddComponent(Deserialize<CameraComponent>(formated_str));
+				else if (comp_type == Component::GetTypeName(SkinedMeshComponent::GetStaticType()))
+					actor->AddComponent(Deserialize<SkinedMeshComponent>(formated_str));
 				else
 				{
+					AL_ASSERT(true, "Unhandled component type");
 					g_pLogMgr->LogWarningFormat("Unhandled component type {}",comp_type);
 				}
 				comp_type = TP_ZERO(formated_str.front());

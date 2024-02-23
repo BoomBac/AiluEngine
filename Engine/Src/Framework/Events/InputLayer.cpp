@@ -2,6 +2,7 @@
 #include "Framework/Events/InputLayer.h"
 #include "Framework/Events/MouseEvent.h"
 #include "Framework/Common/Input.h"
+#include "Render/Camera.h"
 
 #include "imgui.h"
 

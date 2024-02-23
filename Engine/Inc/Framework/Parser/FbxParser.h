@@ -4,7 +4,7 @@
 #include "Ext/fbxsdk/include/fbxsdk.h"
 #include "Framework/Interface/IParser.h"
 #include "Framework/Common/TimeMgr.h"
-
+#include "Animation/Clip.h"
 
 
 namespace Ailu
@@ -16,15 +16,13 @@ namespace Ailu
 		FbxParser();
 		List<Ref<Mesh>> Parser(std::string_view sys_path) final;
 		List<Ref<Mesh>> Parser(const WString& sys_path) final;
-		//temp test
-		void Parser(std::string_view sys_path, struct Skeleton& sk, Vector<Vector<Matrix4x4f>>& anim);
 		virtual ~FbxParser();
 	private:
 		//void ParserFbxNode(FbxNode* node, List<Ref<Mesh>>& loaded_meshes);
 		void ParserFbxNode(FbxNode* node, Queue<FbxNode*>& mesh_node, Queue<FbxNode*>& skeleton_node);
 		void ParserSkeleton(FbxNode* node,Skeleton& sk);
 		bool ParserMesh(FbxNode* node, List<Ref<Mesh>>& loaded_meshes);
-		void ParserAnimation(Queue<FbxNode*>& skeleton_node, Skeleton& sk);
+		bool ParserAnimation(FbxNode* node, Skeleton& sk);
 		bool ReadNormal(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
 		bool ReadVertex(fbxsdk::FbxNode* node, Mesh* mesh);
 		bool ReadUVs(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh);
@@ -51,6 +49,7 @@ namespace Ailu
 		FbxArray<FbxPose*> _fbx_poses;
 		FbxArray<FbxNode*> _fbx_cameras;
 
+		List<AnimationClip*> _loaded_anims;
 		FbxArray<FbxString*> _fbx_anim_stack_names;
 		FbxAnimLayer* _p_fbx_anim_layer; 
 		FbxTime _start_time;

@@ -556,13 +556,13 @@
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DTexture.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
+    <None Include="Res\Shaders\blit.shader" />
     <None Include="Res\Shaders\lighting.hlsli">
       <FileType>Document</FileType>
     </None>
     <None Include="Res\Shaders\cbuffer.hlsli">
       <FileType>Document</FileType>
     </None>
-    <None Include="Src\Animation\Clip.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -573,6 +573,7 @@
     <ClCompile Include="Ext\imgui\imgui_draw.cpp" />
     <ClCompile Include="Ext\imgui\imgui_tables.cpp" />
     <ClCompile Include="Ext\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Src\Animation\Clip.cpp" />
     <ClCompile Include="Src\Animation\Pose.cpp" />
     <ClCompile Include="Src\Animation\Skeleton.cpp" />
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
@@ -674,6 +675,26 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Res\Shaders\bone_test.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Res\Shaders\cubemap_gen.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Res\Shaders\depth_only.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Res\Shaders\error_fallback.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Res\Shaders\skybox.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Res\Shaders\wireframe.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

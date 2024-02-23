@@ -616,6 +616,11 @@ namespace Ailu
 		{
 			return *this;
 		}
+		template<template<typename> typename TT, typename T>
+		void SetRow(u16 row,const TT<T>& v)
+		{
+			memcpy(data[row],&v,sizeof(v));
+		}
 		operator T* () { return &data[0][0]; };
 		operator const T* () const { return static_cast<const T*>(&data[0][0]); };
 	};

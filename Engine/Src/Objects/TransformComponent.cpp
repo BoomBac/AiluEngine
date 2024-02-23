@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "Objects/TransformComponent.h"
 #include "Render/Gizmo.h"
-#include "Objects/Actor.h"
 
 namespace Ailu
 {
@@ -18,11 +17,16 @@ namespace Ailu
 	}
 	void TransformComponent::Tick(const float& delta_time)
 	{
+		if (!_b_enable)
+		{
+			LOG_WARNING("TransformComponent can't been disable!");
+		}
 		_transform._position = _pos_data;
 		_transform._scale = _scale_data;
 		auto r_d = _rotation_data - _pre_rotation_data;
 		_transform._rotation = _transform._rotation * Quaternion::EulerAngles(r_d);
 		_pre_rotation_data = _rotation_data;
+		Transform::ToMatrix(_transform, _matrix);
 	}
 	void TransformComponent::OnGizmo()
 	{
@@ -30,14 +34,17 @@ namespace Ailu
 		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._up * 100, Colors::kGreen);
 		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._right * 100, Colors::kRed);
 	}
-	void TransformComponent::Serialize(std::ofstream& file, String indent)
+	void TransformComponent::SetPosition(const Vector3f& pos)
 	{
-		Component::Serialize(file, indent);
-		using namespace std;
-		String prop_indent = indent.append("  ");
-		file << prop_indent << "Position: " << _transform._position << endl;
-		file << prop_indent << "Rotation: " << _transform._rotation << endl;
-		file << prop_indent << "Scale: " << _transform._scale << endl;
+		_transform._position = pos;
+	}
+	void TransformComponent::SetRotation(const Quaternion& quat)
+	{
+		_transform._rotation = quat;
+	}
+	void TransformComponent::SetScale(const Vector3f& scale)
+	{
+		_transform._scale = scale;
 	}
 
 	void TransformComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)

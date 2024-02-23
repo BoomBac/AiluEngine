@@ -17,7 +17,6 @@ namespace Ailu
 		CameraComponent(const Camera& camera);
 		~CameraComponent();
 		void Tick(const float& delta_time) final;
-		void Serialize(std::ofstream& file, String indent) final;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
 		void OnGizmo() final;
 		CameraComponent& operator=(const CameraComponent& other)

@@ -34,6 +34,21 @@ namespace Ailu
 			}} };
 		}
 
+		static void ToMatrix(const Transform& transform, Matrix4x4f& out_matrix)
+		{
+			Vector3f x = transform._rotation * Vector3f(1, 0, 0);
+			Vector3f y = transform._rotation * Vector3f(0, 1, 0);
+			Vector3f z = transform._rotation * Vector3f(0, 0, 1);
+			x = x * transform._scale.x; // Vector * float
+			y = y * transform._scale.y; // Vector * float
+			z = z * transform._scale.z; // Vector * float
+			Vector3f t = transform._position;
+			out_matrix.SetRow(0, Vector4f{x,0.f});
+			out_matrix.SetRow(1, Vector4f{y,0.f});
+			out_matrix.SetRow(2, Vector4f{z,0.f});
+			out_matrix.SetRow(3, Vector4f{t,1.f});
+		}
+
 		//expensive! don't use realtime!
 		static Transform FromMatrix(const Matrix4x4f& m)
 		{
