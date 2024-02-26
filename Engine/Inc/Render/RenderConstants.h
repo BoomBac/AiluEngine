@@ -2,11 +2,13 @@
 #ifndef __D3DCONSTANTS__
 #define __D3DCONSTANTS__
 #include <cstdint>
-#include "RenderingData.h"
 #include "AlgFormat.h"
+#include "CBuffer.h"
 
 namespace Ailu
 {
+	DECLARE_ENUM(EColorRange, kLDR, kHDR)
+
 	namespace RenderConstants
 	{
 		constexpr static uint8_t  kFrameCount = 2u;

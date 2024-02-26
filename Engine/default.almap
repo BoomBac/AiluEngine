@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: -2125.69,2124.1,-1961.46
-  Rotation: 0.106748,0.429471,-0.0512019,0.895287
+  Position: -2662.52,1380.38,1262.89
+  Rotation: 0.107246,0.845823,-0.185653,0.488483
   Fov: 60
   Aspect: 1.77778
   Near: 62.29
   Far: 137099
-  ControllerRotation: 13.5996,1491.25
+  ControllerRotation: 24.7595,3719.98
 SceneGraph: 
   Name: root
     Components: 
@@ -15,11 +15,11 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 4.55395e-05,0.792576,1.36094e-05,0.609773
         Scale: 1,1,1
-    Children: 8
+    Children: 9
       Name: plane
         Components: 
           TransformComponent: 
-            Position: 0,62,0
+            Position: 0,0,0
             Rotation: 4.55341e-07,6.75513e-08,-3.07588e-14,1
             Scale: 40,1,40
           StaticMeshComponent: 
@@ -40,21 +40,21 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: -16,4078,-1550
-            Rotation: -0.208168,5.83044e-08,5.05562e-08,0.978093
+            Rotation: -0.249984,-0.0208685,-0.00538899,0.96801
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
-            Intensity: 0
+            Intensity: 1
             CastShadow: true
-            ShadowArea: 8331.03
+            ShadowArea: 8634.48
             ShadowDistance: 6218.01
         Children: 0
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: -219,471,0
-            Rotation: 0.512285,0.00226527,-0.0157067,0.858669
+            Position: -219,384,0
+            Rotation: -0.17522,-0.388443,-0.14761,0.892536
             Scale: 1,1,1
           LightComponent: 
             Type: Point
@@ -95,14 +95,14 @@ SceneGraph:
       Name: sphere
         Components: 
           TransformComponent: 
-            Position: 0,466,0
+            Position: 7,524,-495
             Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: sphere
             MaterialPath: Materials/StandardPBR_new.alasset
         Children: 0
-      Name: object0
+      Name: bone
         Components: 
           TransformComponent: 
             Position: 960,50,-48
@@ -111,4 +111,14 @@ SceneGraph:
           StaticMeshComponent: 
             MeshPath: anim
             MaterialPath: Materials/BoneWeight.almat
+        Children: 0
+      Name: grass
+        Components: 
+          TransformComponent: 
+            Position: -743,61,-7
+            Rotation: 0.707107,4.77659e-08,-4.7766e-08,0.707107
+            Scale: 10,10,10
+          StaticMeshComponent: 
+            MeshPath: I:/Downloads/c30lumexfif4-eb_house_plant_01/eb_house_plant_01/eb_house_plant_01.fbx
+            MaterialPath: Materials/grass.almat
         Children: 0

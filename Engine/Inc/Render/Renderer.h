@@ -15,6 +15,7 @@
 #include "Texture.h"
 #include "Framework/Common/SceneMgr.h"
 #include "./Pass/RenderPass.h"
+#include "./Pass/PostprocessPass.h"
 #include "RenderingData.h"
 
 
@@ -41,14 +42,16 @@ namespace Ailu
         Ref<ComputeShader> _p_test_cs;
         Ref<Texture> _p_test_texture;
         static inline List<RenderPass*> _p_task_render_passes{};
-        //ConstantBuffer* 
-        RenderingData _rendering_data;
+        Scope<ConstantBuffer> _p_per_frame_cbuf;
         ScenePerFrameData* _p_per_frame_cbuf_data;
+        RenderingData _rendering_data;
+        ConstantBuffer* _p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
         GraphicsContext* _p_context = nullptr;
         Scope<OpaquePass> _p_opaque_pass;
         Scope<ResolvePass> _p_reslove_pass;
         Scope<ShadowCastPass> _p_shadowcast_pass;
         Scope<CubeMapGenPass> _p_cubemap_gen_pass;
+        Scope<PostProcessPass> _p_postprocess_pass;
         List<RenderPass*> _p_render_passes;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;

@@ -245,8 +245,6 @@ namespace Ailu
 
     void D3DContext::DrawOverlay()
     {
-        GraphicsPipelineStateMgr::s_gizmo_pso->Bind();
-        GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
         Gizmo::Submit();
 #ifdef DEAR_IMGUI
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
@@ -262,6 +260,13 @@ namespace Ailu
         //m_commandList->SetGraphicsRootDescriptorTable(0, GetCBVGPUDescHandle(1 + D3DConstants::kMaxMaterialDataCount + _render_object_index));
         //memcpy(_p_cbuffer + RenderConstants::kPerFrameDataSize + RenderConstants::kPerMaterialDataSize * RenderConstants::kMaxMaterialDataCount + RenderConstants::kPeObjectDataSize * (_render_object_index++),
         //    &transform, sizeof(transform));
+        m_commandList->DrawIndexedInstanced(index_count, instance_count, 0, 0, 0);
+    }
+
+    void D3DContext::DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count)
+    {
+        //TODO:默认将每个物体的cbuf视作绑定在 0 槽位上，当着色器没有PerObjectBuf时，PerFrameBuf会在0槽位上，此时这里会把PSO绑定的结果覆盖
+        ++RenderingStates::s_draw_call;
         m_commandList->DrawIndexedInstanced(index_count, instance_count, 0, 0, 0);
     }
 
@@ -520,32 +525,19 @@ namespace Ailu
         ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
         ID3D12DescriptorHeap* ppHeaps[] = { m_cbvHeap.Get() };
         m_commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
-        //auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        //m_commandList->ResourceBarrier(1, &bar_before);
-        //auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-        //m_commandList->ResourceBarrier(1, &bar_after);
-
-        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _rtv_desc_size);
-        //CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _dsv_desc_size);
-        //m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
         _render_object_index = 0;
         //执行所有命令
-        for (auto& cmd : _all_commands) cmd();
+        try
+        {
+            for (auto& cmd : _all_commands)
+                cmd();
+        }
+        catch (const std::exception& e)
+        {
+            LOG_ERROR("PopulateCommandList error:{}", e.what());
+        }
+
         _all_commands.clear();
-
-        //DrawGizmo
-        //GraphicsPipelineStateMgr::s_gizmo_pso->Bind();
-        //GraphicsPipelineStateMgr::s_gizmo_pso->SubmitBindResource(&_cbuf_views[0], EBindResDescType::kConstBuffer);
-        //Gizmo::Submit();
-
-//#ifdef DEAR_IMGUI
-//        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
-//#endif // DEAR_IMGUI
-
-        // Indicate that the back buffer will now be used to present.
-        //auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-        //m_commandList->ResourceBarrier(1, &bar_after);
-
         ThrowIfFailed(m_commandList->Close());
     }
 
@@ -598,56 +590,56 @@ namespace Ailu
         cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         ThrowIfFailed(device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
         _cbv_desc_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        _cbuf_views.reserve(cbvHeapDesc.NumDescriptors);
-        //constbuffer
-        auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-        auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(RenderConstants::kPerFrameTotalSize * RenderConstants::kFrameCount);
-        ThrowIfFailed(device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_constantBuffer)));
-        // Describe and create a constant buffer view.
-        for (uint32_t i = 0; i < RenderConstants::kFrameCount; i++)
-        {
-            D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
-            cbvHandle.ptr = m_cbvHeap->GetCPUDescriptorHandleForHeapStart().ptr + i * (1 + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + 
-                RenderConstants::kMaxPassDataCount) * _cbv_desc_size;
-            D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
-            cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * RenderConstants::kPerFrameTotalSize;
-            cbv_desc.SizeInBytes = RenderConstants::kPerFrameDataSize;
-            device->CreateConstantBufferView(&cbv_desc, cbvHandle);
-            _cbuf_views.emplace_back(cbv_desc);
-            for (uint32_t j = 0; j < RenderConstants::kMaxMaterialDataCount; j++)
-            {
-                D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
-                cbvHandle2.ptr = cbvHandle.ptr + (j + 1) * _cbv_desc_size;
-                cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * RenderConstants::kPerFrameTotalSize + RenderConstants::kPerFrameDataSize + j * RenderConstants::kPerMaterialDataSize;
-                cbv_desc.SizeInBytes = RenderConstants::kPerMaterialDataSize;
-                device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
-                _cbuf_views.emplace_back(cbv_desc);
-            }
-            for (uint32_t k = 0; k < RenderConstants::kMaxRenderObjectCount; k++)
-            {
-                D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
-                cbvHandle2.ptr = cbvHandle.ptr + (1 + RenderConstants::kMaxMaterialDataCount + k) * _cbv_desc_size;
-                cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + RenderConstants::kPerFrameTotalSize * i + RenderConstants::kPerFrameDataSize +
-                    RenderConstants::kMaxMaterialDataCount * RenderConstants::kPerMaterialDataSize + k * RenderConstants::kPeObjectDataSize;
-                cbv_desc.SizeInBytes = RenderConstants::kPeObjectDataSize;
-                device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
-                _cbuf_views.emplace_back(cbv_desc);
-            }
-            for (uint32_t l = 0; l < RenderConstants::kMaxPassDataCount; l++)
-            {
-                D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
-                cbvHandle2.ptr = cbvHandle.ptr + (1 + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + l) * _cbv_desc_size;
-                cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + RenderConstants::kPerFrameTotalSize * i + RenderConstants::kPerFrameDataSize +
-                    RenderConstants::kMaxMaterialDataCount * RenderConstants::kPerMaterialDataSize + RenderConstants::kMaxRenderObjectCount * RenderConstants::kPeObjectDataSize + l * RenderConstants::kPePassDataSize;
-                cbv_desc.SizeInBytes = RenderConstants::kPePassDataSize;
-                device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
-                _cbuf_views.emplace_back(cbv_desc);
-            }
-        }
+        //_cbuf_views.reserve(cbvHeapDesc.NumDescriptors);
+        ////constbuffer
+        //auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+        //auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(RenderConstants::kPerFrameTotalSize * RenderConstants::kFrameCount);
+        //ThrowIfFailed(device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_constantBuffer)));
+        //// Describe and create a constant buffer view.
+        //for (uint32_t i = 0; i < RenderConstants::kFrameCount; i++)
+        //{
+        //    D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
+        //    cbvHandle.ptr = m_cbvHeap->GetCPUDescriptorHandleForHeapStart().ptr + i * (1 + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + 
+        //        RenderConstants::kMaxPassDataCount) * _cbv_desc_size;
+        //    D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
+        //    cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * RenderConstants::kPerFrameTotalSize;
+        //    cbv_desc.SizeInBytes = RenderConstants::kPerFrameDataSize;
+        //    device->CreateConstantBufferView(&cbv_desc, cbvHandle);
+        //    _cbuf_views.emplace_back(cbv_desc);
+        //    for (uint32_t j = 0; j < RenderConstants::kMaxMaterialDataCount; j++)
+        //    {
+        //        D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
+        //        cbvHandle2.ptr = cbvHandle.ptr + (j + 1) * _cbv_desc_size;
+        //        cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + i * RenderConstants::kPerFrameTotalSize + RenderConstants::kPerFrameDataSize + j * RenderConstants::kPerMaterialDataSize;
+        //        cbv_desc.SizeInBytes = RenderConstants::kPerMaterialDataSize;
+        //        device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
+        //        _cbuf_views.emplace_back(cbv_desc);
+        //    }
+        //    for (uint32_t k = 0; k < RenderConstants::kMaxRenderObjectCount; k++)
+        //    {
+        //        D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
+        //        cbvHandle2.ptr = cbvHandle.ptr + (1 + RenderConstants::kMaxMaterialDataCount + k) * _cbv_desc_size;
+        //        cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + RenderConstants::kPerFrameTotalSize * i + RenderConstants::kPerFrameDataSize +
+        //            RenderConstants::kMaxMaterialDataCount * RenderConstants::kPerMaterialDataSize + k * RenderConstants::kPeObjectDataSize;
+        //        cbv_desc.SizeInBytes = RenderConstants::kPeObjectDataSize;
+        //        device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
+        //        _cbuf_views.emplace_back(cbv_desc);
+        //    }
+        //    for (uint32_t l = 0; l < RenderConstants::kMaxPassDataCount; l++)
+        //    {
+        //        D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle2;
+        //        cbvHandle2.ptr = cbvHandle.ptr + (1 + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + l) * _cbv_desc_size;
+        //        cbv_desc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress() + RenderConstants::kPerFrameTotalSize * i + RenderConstants::kPerFrameDataSize +
+        //            RenderConstants::kMaxMaterialDataCount * RenderConstants::kPerMaterialDataSize + RenderConstants::kMaxRenderObjectCount * RenderConstants::kPeObjectDataSize + l * RenderConstants::kPePassDataSize;
+        //        cbv_desc.SizeInBytes = RenderConstants::kPePassDataSize;
+        //        device->CreateConstantBufferView(&cbv_desc, cbvHandle2);
+        //        _cbuf_views.emplace_back(cbv_desc);
+        //    }
+        //}
         // Map and initialize the constant buffer. We don't unmap this until the
         // app closes. Keeping things mapped for the lifetime of the resource is okay.
-        CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-        ThrowIfFailed(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&_p_cbuffer)));
+        //CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
+        //ThrowIfFailed(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&_p_cbuffer)));
     }
 
     void D3DContext::CreateDepthStencilTarget()

@@ -349,13 +349,15 @@ namespace Ailu
 
 	D3DShader::D3DShader(const String& sys_path) : Shader(sys_path)
 	{
-		if (!_b_init_buffer)
-		{
-			m_cbvHeap = D3DContext::GetInstance()->GetDescriptorHeap();
-			_desc_size = D3DContext::GetInstance()->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_p_cbuffer = D3DContext::GetInstance()->GetCBufferPtr();
-			_b_init_buffer = true;
-		}
+		_src_file_path = sys_path;
+		_source_files.insert(sys_path);
+		Compile();
+	}
+
+	D3DShader::D3DShader(const String& sys_path, const String& vs_entry, String ps_entry) : Shader(sys_path)
+	{
+		_vert_entry = vs_entry;
+		_pixel_entry = ps_entry;
 		_src_file_path = sys_path;
 		_source_files.insert(sys_path);
 		Compile();
@@ -383,16 +385,6 @@ namespace Ailu
 		_vertex_input_num = 0u;
 		memset(_vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
 		_pipeline_topology = ETopology::kTriangle;
-	}
-
-	uint8_t* D3DShader::GetCBufferPtr(uint32_t index)
-	{
-		if (index > RenderConstants::kMaxMaterialDataCount)
-		{
-			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
-			return nullptr;
-		}
-		return _p_cbuffer + RenderConstants::kPerFrameDataSize + index * RenderConstants::kPerMaterialDataSize;
 	}
 
 	void D3DShader::LoadShaderReflection(ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps)
@@ -505,14 +497,10 @@ namespace Ailu
 	{
 		Shader::Bind(index);
 		static auto context = D3DContext::GetInstance();
-
-		if (_per_mat_buf_bind_slot != -1)
-		{
-			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(1 + index)), EBindResDescType::kConstBuffer, static_cast<u8>(_per_mat_buf_bind_slot));
-		}
 		if (_per_frame_buf_bind_slot != -1)
 		{
-			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(0)), EBindResDescType::kConstBuffer, _per_frame_buf_bind_slot);
+			//GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(0)), EBindResDescType::kConstBuffer, _per_frame_buf_bind_slot);
+			GraphicsPipelineStateMgr::SubmitBindResource(s_p_per_frame_cbuffer, EBindResDescType::kConstBuffer, static_cast<u8>(_per_frame_buf_bind_slot));
 		}
 	}
 

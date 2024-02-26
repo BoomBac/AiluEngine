@@ -340,7 +340,7 @@ namespace Ailu
 
 		bool operator==(const Vector4D<T>& other) const
 		{
-			return memcmp(this, &other, sizeof(Vector4D<T>));
+			return x == other.x && y == other.y && z == other.z && w == other.w;
 		}
 
 		Vector4D<T>& operator+=(const Vector4D<T>& other) {

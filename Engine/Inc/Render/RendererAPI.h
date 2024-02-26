@@ -17,6 +17,7 @@ namespace Ailu
 			: left(l), top(t), width(w), height(h)
 		{
 		}
+		Rect() : Rect(0, 0, 0, 0) {};
 	};
 
 	using ScissorRect = Rect;

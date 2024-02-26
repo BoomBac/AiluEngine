@@ -11,8 +11,7 @@ namespace Ailu
 	{
 	public:
 		~RenderPass() = default;
-		virtual void Execute(GraphicsContext* context) = 0;
-		virtual void Execute(GraphicsContext* context, CommandBuffer* cmd) = 0;
+		virtual void Execute(GraphicsContext* context,RenderingData& rendering_data) = 0;
 		virtual void BeginPass(GraphicsContext* context) = 0;
 		virtual void EndPass(GraphicsContext* context) = 0;
 		virtual const String& GetName() const = 0;
@@ -22,8 +21,8 @@ namespace Ailu
 	{
 	public:
 		OpaquePass();
-		void Execute(GraphicsContext* context) final;
-		void Execute(GraphicsContext* context,CommandBuffer* cmd) final;
+		~OpaquePass();
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 		const String& GetName() const final { return _name; };
@@ -35,25 +34,23 @@ namespace Ailu
 	{
 	public:
 		ResolvePass(Ref<RenderTexture>& source);
-		void Execute(GraphicsContext* context) final;
-		void Execute(GraphicsContext* context, CommandBuffer* cmd) final;
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void BeginPass(GraphicsContext* context, Ref<RenderTexture>& source);
 		void EndPass(GraphicsContext* context) final;
 		const String& GetName() const final { return _name; };
 	private:
+		Rect _backbuf_rect;
 		String _name;
 		Ref<RenderTexture> _p_src_color;
 	};
 
 	class ShadowCastPass : public RenderPass
 	{
-		inline static u16 kShadowMapSize = 1024;
+		inline static u16 kShadowMapSize = 2048;
 	public:
 		ShadowCastPass();
-		void Execute(GraphicsContext* context) final;
-		void Execute(GraphicsContext* context, CommandBuffer* cmd) final;
-		void Execute(GraphicsContext* context, CommandBuffer* cmd,const RenderingData& rendering_data);
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 		const String& GetName() const final { return _name; };
@@ -68,9 +65,7 @@ namespace Ailu
 	{
 	public:
 		CubeMapGenPass(u16 size,String texture_name,String src_texture_name);
-		void Execute(GraphicsContext* context) final;
-		void Execute(GraphicsContext* context, CommandBuffer* cmd) final;
-		void Execute(GraphicsContext* context, CommandBuffer* cmd, const RenderingData& rendering_data);
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 		const String& GetName() const final { return _name; };
@@ -78,6 +73,8 @@ namespace Ailu
 		Ref<RenderTexture> _p_env_map;
 	private:
 		ScenePerPassData _pass_data[6];
+		Scope<ConstantBuffer> _per_pass_cb[6];
+		Scope<ConstantBuffer> _per_obj_cb;
 		Matrix4x4f _world_mat;
 		Rect _rect;
 		Ref<Material> _p_gen_material;

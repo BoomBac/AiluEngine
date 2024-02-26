@@ -2052,6 +2052,9 @@
     <ClInclude Include="Inc\Framework\Events\SceneLayer.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Render\Pass\PostprocessPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2235,6 +2238,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\Events\SceneLayer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\Pass\PostprocessPass.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

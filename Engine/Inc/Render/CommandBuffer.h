@@ -38,17 +38,20 @@ namespace Ailu
         virtual void SetViewMatrix(const Matrix4x4f& view) = 0;
         virtual void SetProjectionMatrix(const Matrix4x4f& proj) = 0;
         virtual void SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj) = 0;
-        virtual void SetShadowMatrix(const Matrix4x4f& shadow_matrix,u16 index) = 0;
         virtual void SetViewports(const std::initializer_list<Rect>& viewports) = 0;
         virtual void SetScissorRects(const std::initializer_list<Rect>& rects) = 0;
         virtual void SetViewport(const Rect& viewport) = 0;
         virtual void SetScissorRect(const Rect& rect) = 0;
         virtual void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count = 1u) = 0;
         virtual void DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, uint32_t instance_count = 1u) = 0;
+        virtual void DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, uint32_t instance_count = 1u) = 0;
+        virtual void DrawRenderer(Mesh* mesh, Material* material,uint32_t instance_count = 1u) = 0;
         virtual void SetPSO(GraphicsPipelineStateObject* pso) = 0;
         virtual void ResolveToBackBuffer(Ref<RenderTexture>& color) = 0;
         virtual void ResolveToBackBuffer(RenderTexture* color) = 0;
         virtual void Dispatch(ComputeShader* cs,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
+        //virtual void Blit();
+
         virtual Vector<std::function<void()>>& GetAllCommands() = 0;
         virtual u32 GetID() = 0;
 	};

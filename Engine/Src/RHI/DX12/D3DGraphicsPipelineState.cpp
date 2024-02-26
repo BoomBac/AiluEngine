@@ -45,6 +45,7 @@ namespace Ailu
 			_d3d_pso_desc.SampleDesc.Count = 1;
 			ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
 			_b_build = true;
+			LOG_INFO("rt hash {}", (u32)_state_desc._rt_state.Hash());
 			_hash = ConstructPSOHash(_state_desc);
 		}
 		static u16 count = 0;
@@ -90,8 +91,9 @@ namespace Ailu
 		case Ailu::EBindResDescType::kConstBuffer:
 		{
 			short bind_slot = slot == 255 ? _per_frame_cbuf_bind_slot : slot;
-			D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
-			context->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, view.BufferLocation);
+			//D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
+			//context->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, view.BufferLocation);
+			static_cast<ConstantBuffer*>(res)->Bind(bind_slot);
 			return;
 		}
 		break;

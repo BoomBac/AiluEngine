@@ -2,7 +2,7 @@
 //name: DepthOnly
 //vert: VSMain
 //pixel: PSMain
-//Cull: Front
+//Cull: Back
 //Queue: Opaque
 //info end
 
@@ -25,7 +25,7 @@ PSInput VSMain(VSInput v)
 	return result;
 }
 
-float4 PSMain(PSInput input) : SV_TARGET
+void PSMain(PSInput input)
 {
-	return float4(1.0, 0.0, 1.0, 1.0);
+
 }

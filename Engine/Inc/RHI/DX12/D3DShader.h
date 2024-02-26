@@ -182,6 +182,7 @@ namespace Ailu
 	{
 	public:
 		D3DShader(const String& sys_path);
+		D3DShader(const String& sys_path,const String& vs_entry,String ps_entry);
 		~D3DShader();
 		void Bind(uint32_t index) final;
 		void* GetByteCode(EShaderType type) final;
@@ -189,7 +190,6 @@ namespace Ailu
 		std::pair<D3D12_INPUT_ELEMENT_DESC*,uint8_t> GetVertexInputLayout();
 	private:
 		bool RHICompileImpl() final;
-		uint8_t* GetCBufferPtr(uint32_t index) final;
 		void Reset();
 		void LoadShaderReflection(ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps);
 		void LoadAdditionalShaderReflection(const String& sys_path);
@@ -200,10 +200,8 @@ namespace Ailu
 		ComPtr<ID3D12RootSignature> _p_sig;
 		List<D3D_SHADER_MACRO*> _keyword_defines;
 		//keyword,<kwgroup_id,kw_inner_group_id>
-		uint32_t _desc_size = 0;
 		ComPtr<ID3DBlob> _p_vblob = nullptr;
 		ComPtr<ID3DBlob> _p_pblob = nullptr;
-		inline static ComPtr<ID3D12DescriptorHeap> m_cbvHeap = nullptr;
 		ComPtr<ID3D12ShaderReflection> _p_v_reflection;
 		ComPtr<ID3D12ShaderReflection> _p_p_reflection;
 		D3D12_PRIMITIVE_TOPOLOGY _topology;

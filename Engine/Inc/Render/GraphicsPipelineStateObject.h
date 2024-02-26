@@ -61,6 +61,7 @@ namespace Ailu
 		static void ConstructPSOHash(ALHash::Hash<64>& hash,u8 input_layout,u32 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
 		static ALHash::Hash<64> ConstructPSOHash(const GraphicsPipelineStateInitializer& initializer);
 		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u8& input_layout, u32& shader, u8& topology, u8& blend_state, u8& raster_state, u8& ds_state, u8& rt_state);
+		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u32& shader);
 
 		virtual ~GraphicsPipelineStateObject() = default;
 		virtual void Build() = 0;

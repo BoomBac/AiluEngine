@@ -29,13 +29,14 @@ namespace Ailu
         void SetViewMatrix(const Matrix4x4f& view) final;
         void SetProjectionMatrix(const Matrix4x4f& proj) final;
         void SetViewProjectionMatrices(const Matrix4x4f& view, const Matrix4x4f& proj) final;
-        void SetShadowMatrix(const Matrix4x4f& shadow_matrix, u16 index) final;
         void SetViewports(const std::initializer_list<Rect>& viewports) final;
         void SetScissorRects(const std::initializer_list<Rect>& rects) final;
         void SetViewport(const Rect& viewport) final;
         void SetScissorRect(const Rect& rect) final;
         void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, uint32_t instance_count = 1u) final;
         void DrawRenderer(Mesh* mesh, Material* material,const Matrix4x4f& transform, uint32_t instance_count = 1u) final;
+        void DrawRenderer(Mesh* mesh, Material* material,ConstantBuffer* per_obj_cbuf,uint32_t instance_count = 1u) final;
+        void DrawRenderer(Mesh* mesh, Material* material, uint32_t instance_count = 1u) final;
         void SetPSO(GraphicsPipelineStateObject* pso) final;
 
         void ResolveToBackBuffer(Ref<RenderTexture>& color) final;

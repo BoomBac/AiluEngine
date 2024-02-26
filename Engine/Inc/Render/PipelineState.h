@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __PIPELINE_STATE_H__
 #define __PIPELINE_STATE_H__
+#include <mutex>
 #include "GlobalMarco.h"
 #include "AlgFormat.h"
 #include "Framework/Math/ALMath.hpp"
@@ -128,18 +129,21 @@ namespace Ailu
 	{
 	public:
 		PipelineStateHash() = default;
-		u8 GenHash(const T& obj)
+		u8 GenHash(T& obj)
 		{
+			std::lock_guard<std::mutex> lock(_mutex);
 			for (u32 i = 0; i < _s_data.size(); i++)
 			{
 				if (_s_data[i] == obj)
 					return i;
 			}
+			obj.Hash(_s_data.size());
 			_s_data.push_back(obj);
 			return static_cast<u8>(_s_data.size() - 1);
 		}
 		const T& Get(const u8& hash) const
 		{
+			std::lock_guard<std::mutex> lock(_mutex);
 			if (hash < _s_data.size())
 			{
 				return _s_data[hash];
@@ -148,6 +152,7 @@ namespace Ailu
 		}
 	private:
 		Vector<T> _s_data;
+		mutable std::mutex _mutex;
 	};
 	
 	class VertexBufferLayout

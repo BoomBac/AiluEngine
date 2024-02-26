@@ -55,6 +55,7 @@ namespace Ailu
 
 
         void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
+        void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count);
         void DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform);
         void DrawInstanced(uint32_t vertex_count, uint32_t instance_count);
 

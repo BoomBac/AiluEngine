@@ -313,11 +313,11 @@ namespace Ailu
 			// Map and initialize the constant buffer. We don't unmap this until the
 			// app closes. Keeping things mapped for the lifetime of the resource is okay.
 			CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-			ThrowIfFailed(s_p_d3d_res->Map(0, &readRange, reinterpret_cast<void**>(&_p_data)));
+			ThrowIfFailed(s_p_d3d_res->Map(0, &readRange, reinterpret_cast<void**>(&s_p_data)));
 			b_init = true;
 		}
 		size = CalculateConstantBufferByteSize(size);
-		AL_ASSERT(s_global_offset + size <= s_total_size, "Constant buffer overflow");
+		AL_ASSERT(s_global_offset + size > s_total_size, "Constant buffer overflow");
 		_offset = s_global_offset;
 		_index = s_global_index;
 		{

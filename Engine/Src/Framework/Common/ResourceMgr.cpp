@@ -559,7 +559,7 @@ namespace Ailu
 		std::chrono::duration<int, std::milli> sleep_duration(1000); // 1秒
 		std::unordered_map<fs::path, fs::file_time_type> files;
 		static auto reload_shader = [&](const fs::path& file) {
-			const String& cur_path = file.string();
+			const String cur_path = PathUtils::FormatFilePath(file.string());
 			for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
 			{
 				for (auto& head_file : (*it)->GetSourceFiles())

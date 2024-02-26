@@ -11,7 +11,7 @@
 
 namespace Ailu
 {
-	Ref<Shader> Shader::Create(const std::string& file_name)
+	Ref<Shader> Shader::Create(const std::string& file_name, String vert_entry, String pixel_entry)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -20,7 +20,7 @@ namespace Ailu
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			auto shader = MakeRef<D3DShader>(file_name);
+			auto shader = MakeRef<D3DShader>(file_name, vert_entry, pixel_entry);
 			ShaderLibrary::Add(shader->Name(), shader);
 			return shader;
 		}
@@ -114,6 +114,7 @@ namespace Ailu
 			return 0.0f;
 		}
 	}
+
 	void Shader::SetGlobalTexture(const String& name, Texture* texture)
 	{
 		if (!s_global_textures_bind_info.contains(name))
@@ -127,6 +128,11 @@ namespace Ailu
 			s_global_matrix_bind_info.insert(std::make_pair(name, matrix));
 		else
 			s_global_matrix_bind_info[name] = matrix;
+	}
+
+	void Shader::ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf)
+	{
+		s_p_per_frame_cbuffer = cbuf;
 	}
 
 	void* Shader::GetByteCode(EShaderType type)
@@ -284,8 +290,8 @@ namespace Ailu
 				v = line.substr(line.find_first_of(":") + 1);
 				su::RemoveSpaces(v);
 				if (su::Equal(k, ShaderCommand::kName, false)) _name = v;
-				else if (su::Equal(k, ShaderCommand::kVSEntry, false)) _vert_entry = v;
-				else if (su::Equal(k, ShaderCommand::kPSEntry, false)) _pixel_entry = v;
+				else if (su::Equal(k, ShaderCommand::kVSEntry, false) && _vert_entry.empty()) _vert_entry = v;
+				else if (su::Equal(k, ShaderCommand::kPSEntry, false) && _pixel_entry.empty()) _pixel_entry = v;
 				else if (su::Equal(k, ShaderCommand::kCull, false))
 				{
 					if (su::Equal(v, ShaderCommand::kCullValue.kBack, false))
