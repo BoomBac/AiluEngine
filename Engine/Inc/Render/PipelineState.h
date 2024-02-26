@@ -137,7 +137,7 @@ namespace Ailu
 				if (_s_data[i] == obj)
 					return i;
 			}
-			obj.Hash(_s_data.size());
+			obj.Hash(static_cast<u8>(_s_data.size()));
 			_s_data.push_back(obj);
 			return static_cast<u8>(_s_data.size() - 1);
 		}

@@ -20,6 +20,7 @@
 #include "Framework/Common/LogMgr.h"
 
 #include "Render/Mesh.h"
+#include "Animation/Clip.h"
 
 namespace ImguiTree
 {
@@ -369,7 +370,7 @@ namespace Ailu
 
 	static void DrawComponentProperty(Component* comp, TextureSelector& selector_window)
 	{
-		if (ImGui::CollapsingHeader(GetComponentTypeStr(comp->GetType()).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader(Component::GetTypeName(comp->GetType()).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			if (comp->GetType() == LightComponent::GetStaticType())
 			{
@@ -409,7 +410,7 @@ namespace Ailu
 					auto& light_data = light->_light;
 					ImGui::DragFloat("Radius", &light_data._light_param.x, 1.0, 0.0, 5000.0f);
 				}
-				else if(light->_light_type == ELightType::kSpot)
+				else if (light->_light_type == ELightType::kSpot)
 				{
 					auto& light_data = light->_light;
 					ImGui::DragFloat("Radius", &light_data._light_param.x);
@@ -436,14 +437,15 @@ namespace Ailu
 				auto& scale = transf->GetProperty("Scale");
 				ImGui::DragFloat3(scale._name.c_str(), static_cast<Vector3f*>(scale._value_ptr)->data);
 			}
-			else if (comp->GetType() == StaticMeshComponent::GetStaticType())
+			else if (comp->GetType() == StaticMeshComponent::GetStaticType() || comp->GetType() == SkinedMeshComponent::GetStaticType())
 			{
 				auto static_mesh_comp = static_cast<StaticMeshComponent*>(comp);
+				bool is_skined_comp = comp->GetType() == SkinedMeshComponent::GetStaticType();
 				for (auto& prop : static_mesh_comp->GetAllProperties())
 				{
 					if (prop.second._type == ESerializablePropertyType::kStaticMesh)
 					{
-						ImGui::Text("StaticMesh");
+						ImGui::Text(is_skined_comp? "SkinedMesh" :"StaticMesh");
 						auto& mesh = static_mesh_comp->GetMesh();
 						int mesh_count = 0;
 						static int s_mesh_selected_index = -1;
@@ -451,10 +453,15 @@ namespace Ailu
 						{
 							for (auto it = MeshPool::Begin(); it != MeshPool::End(); it++)
 							{
+								if (is_skined_comp && !dynamic_cast<SkinedMesh*>(it->get()))
+									continue;
 								if (ImGui::Selectable((*it)->Name().c_str(), s_mesh_selected_index == mesh_count))
 									s_mesh_selected_index = mesh_count;
 								if (s_mesh_selected_index == mesh_count)
+								{
 									static_mesh_comp->SetMesh(*it);
+									g_pSceneMgr->MarkCurSceneDirty();
+								}
 								++mesh_count;
 							}
 							ImGui::EndCombo();
@@ -473,7 +480,10 @@ namespace Ailu
 						if (ImGui::Selectable((*it)->Name().c_str(), s_mat_selected_index == mat_count))
 							s_mat_selected_index = mat_count;
 						if (s_mat_selected_index == mat_count)
+						{
 							static_mesh_comp->SetMaterial(*it);
+							g_pSceneMgr->MarkCurSceneDirty();
+						}
 						++mat_count;
 					}
 					ImGui::EndCombo();
@@ -503,6 +513,44 @@ namespace Ailu
 						for (auto& prop : mat->GetAllProperties())
 						{
 							DrawProperty(prop.second, mat.get(), selector_window);
+						}
+					}
+				}
+				if (comp->GetType() == SkinedMeshComponent::GetStaticType())
+				{
+					auto sk_mesh_comp = static_cast<SkinedMeshComponent*>(comp);
+					ImGui::Text("Animation: ");
+					auto sk_mesh = dynamic_cast<SkinedMesh*>(sk_mesh_comp->GetMesh().get());
+					if (sk_mesh)
+					{
+						u32 anim_index = 0;
+						static u32 s_anim_selected_index = -1;
+						auto clip = sk_mesh_comp->GetAnimationClip();
+						if (ImGui::BeginCombo("Select Animation: ", clip ? clip->Name().c_str() : "null"))
+						{
+							for (auto it = AnimationClipLibrary::Begin(); it != AnimationClipLibrary::End(); it++)
+							{
+								auto& clip = it->second;
+								if (clip->CurSkeletion() == sk_mesh->CurSkeleton())
+								{
+									if (ImGui::Selectable(it->second->Name().c_str(), anim_index == s_anim_selected_index))
+										s_anim_selected_index = anim_index;
+									if (s_anim_selected_index == anim_index)
+									{
+										sk_mesh_comp->SetAnimationClip(clip);
+									}
+									++anim_index;
+								}
+							}
+							ImGui::EndCombo();
+						}
+						if (clip)
+						{
+							ImGui::Text("Name: %s", clip->Name().c_str());
+							ImGui::Text("FrameCount: %d", clip->FrameCount());
+							ImGui::Text("Duration: %f s", clip->Duration());
+							ImGui::Checkbox("DrawSkeleton", &sk_mesh_comp->_is_draw_debug_skeleton);
+							ImGui::SliderFloat("Time", &sk_mesh_comp->_anim_time, 0.f, (float)sk_mesh_comp->GetAnimationClip()->FrameCount());
 						}
 					}
 				}
@@ -579,7 +627,7 @@ namespace Ailu
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
-		font0 = io.Fonts->AddFontFromFileTTF(GetResPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
+		font0 = io.Fonts->AddFontFromFileTTF(PathUtils::GetResPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
 		io.Fonts->Build();
 		ImGuiStyle& style = ImGui::GetStyle();
 		// Setup Dear ImGui style
@@ -641,10 +689,11 @@ namespace Ailu
 		else RenderingStates::s_shadering_mode = EShaderingMode::kShaderedWireFrame;
 
 		ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
-		ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 0.2f, "%.2f");
+		ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 2.0f, "%.2f");
 
 		ImGui::Checkbox("Expand", &show);
 		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
+		ImGui::ProgressBar(0.5f,ImVec2(0.f,0.f));
 		ImGui::End();
 		ImGui::PopFont();
 
@@ -823,7 +872,15 @@ namespace Ailu
 		using namespace TreeStats;
 		ImGui::Begin("WorldOutline");                          // Create a window called "Hello, world!" and append into it.
 		u32 index = 0;
-
+		if (ImGui::Button("Reflesh Scene"))
+		{
+			g_pSceneMgr->MarkCurSceneDirty();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Add empty"))
+		{
+			g_pSceneMgr->AddSceneActor();
+		}
 		DrawTreeNode(g_pSceneMgr->_p_current->GetSceneRoot());
 		s_cur_frame_selected_actor_id = s_node_clicked;
 		if (s_pre_frame_selected_actor_id != s_cur_frame_selected_actor_id)
@@ -841,8 +898,34 @@ namespace Ailu
 		ImGui::Begin("ObjectDetail");
 		if (s_cur_selected_actor != nullptr)
 		{
-			ImGui::Text(s_cur_selected_actor->Name().c_str());
+			ImGui::BulletText(s_cur_selected_actor->Name().c_str());
+			ImGui::SameLine();
+			i32 new_comp_count = 0;
+			i32 selected_new_comp_index = -1;
+			if (ImGui::BeginCombo(" ", "+ Add Component"))
+			{
+				auto& type_str = Component::GetAllComponentTypeStr();
+				for (auto& comp_type : type_str)
+				{
+					if (ImGui::Selectable(comp_type.c_str(), new_comp_count == selected_new_comp_index))
+						selected_new_comp_index = new_comp_count;
+					if (selected_new_comp_index == new_comp_count)
+					{
+						if (comp_type == Component::GetTypeName(StaticMeshComponent::GetStaticType()))
+							s_cur_selected_actor->AddComponent<StaticMeshComponent>();
+						else if (comp_type == Component::GetTypeName(SkinedMeshComponent::GetStaticType()))
+							s_cur_selected_actor->AddComponent<SkinedMeshComponent>();
+						else if (comp_type == Component::GetTypeName(LightComponent::GetStaticType()))
+						{
+							s_cur_selected_actor->AddComponent<LightComponent>();
+						}
+					}
+					++new_comp_count;
+				}
+				ImGui::EndCombo();
+			}
 			u32 comp_index = 0;
+			Component* comp_will_remove = nullptr;
 			for (auto& comp : s_cur_selected_actor->GetAllComponent())
 			{
 				//if (comp->GetTypeName() == StaticMeshComponent::GetStaticType()) continue;
@@ -852,8 +935,18 @@ namespace Ailu
 				ImGui::PopID();
 				comp->Active(b_active);
 				ImGui::SameLine();
+				ImGui::PushID(comp_index);
+				if (ImGui::Button("x"))
+					comp_will_remove = comp.get();
+				ImGui::PopID();
+				ImGui::SameLine();
 				DrawComponentProperty(comp.get(), _texture_selector);
 				++comp_index;
+			}
+			if (comp_will_remove && comp_will_remove->GetType() != EComponentType::kTransformComponent)
+			{
+				s_cur_selected_actor->RemoveComponent(comp_will_remove);
+				g_pSceneMgr->MarkCurSceneDirty();
 			}
 		}
 		ImGui::End();

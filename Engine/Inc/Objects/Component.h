@@ -14,19 +14,9 @@ namespace Ailu
 		kLightComponent,
 		kStaticMeshComponent,
 		kCameraComponent,
+		kSkinedMeshComponent
 	};
-	const static String& GetComponentTypeStr(EComponentType type)
-	{
-		static const String type_str[]{"TransformComponent","LightComponent","StaticMeshComponent","CameraComponent"};
-		switch (type)
-		{
-		case Ailu::EComponentType::kTransformComponent: return type_str[0];
-		case Ailu::EComponentType::kLightComponent:return type_str[1];
-		case Ailu::EComponentType::kStaticMeshComponent:return type_str[2];
-		case Ailu::EComponentType::kCameraComponent:return type_str[3];
-		}
-		return type_str[0];
-	}
+
 #define COMPONENT_CLASS_TYPE(type)\
 public:\
 	static EComponentType GetStaticType() {return EComponentType::k##type;};\
@@ -46,8 +36,23 @@ public:\
 		virtual void SetOwner(Actor* onwer);
 		virtual Actor* GetOwner() {return _p_onwer; };
 		virtual EComponentType GetType();
-		void Serialize(std::ofstream& file, String indent) override;
-		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) override;
+		void Serialize(std::ostream& os, String indent) override;
+		const static String& GetTypeName(EComponentType type)
+		{
+			switch (type)
+			{
+			case Ailu::EComponentType::kTransformComponent: return s_type_str[0];
+			case Ailu::EComponentType::kLightComponent:return s_type_str[1];
+			case Ailu::EComponentType::kStaticMeshComponent:return s_type_str[2];
+			case Ailu::EComponentType::kCameraComponent:return s_type_str[3];
+			case Ailu::EComponentType::kSkinedMeshComponent:return s_type_str[4];
+			}
+			return s_type_str[0];
+		}
+		const static Vector<String>& GetAllComponentTypeStr() { return s_type_str; }
+		static Component* Create(String& type_name);
+	private:
+		inline static const Vector<String> s_type_str{ "TransformComponent","LightComponent","StaticMeshComponent","CameraComponent","SkinedMeshComponent" };
 	protected:
 		Actor* _p_onwer = nullptr;
 	};

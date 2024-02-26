@@ -7,7 +7,7 @@
 
 namespace Ailu
 {
-	D3DVertexBuffer::D3DVertexBuffer(VertexBufferLayout layout, bool is_static) : _is_static(is_static)
+	D3DVertexBuffer::D3DVertexBuffer(VertexBufferLayout layout)
 	{
 		_buffer_layout = std::move(layout);
 		_buf_start = s_global_offset;
@@ -17,23 +17,16 @@ namespace Ailu
 			s_vertex_buf_views.emplace_back(D3D12_VERTEX_BUFFER_VIEW{});
 			++s_global_offset;
 		}
+		_mapped_data.resize(RenderConstants::kMaxVertexAttrNum);
 		_buf_num = _buffer_layout.GetStreamCount();
-		if (!is_static)
-		{
-			_mapped_data.resize(_buf_num);
-		}
 	}
-	D3DVertexBuffer::D3DVertexBuffer(float* vertices, uint32_t size, bool is_static) : _buf_num(1), _is_static(is_static)
+	D3DVertexBuffer::D3DVertexBuffer(float* vertices, uint32_t size) : _buf_num(1)
 	{
 		s_vertex_bufs.emplace_back(ComPtr<ID3D12Resource>());
 		s_vertex_buf_views.emplace_back(D3D12_VERTEX_BUFFER_VIEW{});
 		_buf_start = s_global_offset;
 		++s_global_offset;
 		SetStream(vertices, size, 0);
-		if (!is_static)
-		{
-			_mapped_data.resize(_buf_num);
-		}
 	}
 	D3DVertexBuffer::~D3DVertexBuffer()
 	{
@@ -129,7 +122,7 @@ namespace Ailu
 		s_vertex_upload_bufs.emplace_back(upload_heap);
 	}
 
-	void D3DVertexBuffer::SetStream(u8* data, uint32_t size, u8 stream_index)
+	void D3DVertexBuffer::SetStream(u8* data, uint32_t size, u8 stream_index,bool dynamic)
 	{
 		auto d3d_conetxt = D3DContext::GetInstance();
 		if (_buffer_layout.GetStride(stream_index) == 0)
@@ -141,7 +134,7 @@ namespace Ailu
 		auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
 		uint32_t cur_buffer_index = _buf_start + stream_index;
-		if (_is_static)
+		if (!dynamic)
 		{
 			ComPtr<ID3D12Resource> upload_heap;
 			ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(upload_heap.GetAddressOf())));
@@ -168,8 +161,6 @@ namespace Ailu
 			uint32_t cur_buffer_index = _buf_start + stream_index;
 			s_vertex_bufs[cur_buffer_index].Reset();
 			ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
-			auto f = reinterpret_cast<Vector3f*>(_mapped_data[0]);
-			LOG_WARNING("{}", f->ToString())
 			s_vertex_bufs[cur_buffer_index]->Map(0, nullptr, reinterpret_cast<void**>(&_mapped_data[stream_index]));
 			memcpy(_mapped_data[stream_index], data, size);
 		}

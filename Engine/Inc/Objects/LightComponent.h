@@ -49,7 +49,6 @@ namespace Ailu
 	public:
 		LightComponent();
 		void Tick(const float& delta_time) final;
-		void Serialize(std::ofstream& file, String indent) final;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
 		void OnGizmo() final;
 		Camera* ShadowCamera() { return _p_shadow_camera.get(); }

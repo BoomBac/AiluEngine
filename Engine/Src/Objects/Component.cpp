@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Objects/Component.h"
+#include "Objects/StaticMeshComponent.h"
 
 namespace Ailu
 {
@@ -31,12 +32,13 @@ namespace Ailu
 	{
 		return EComponentType::kDefault;
 	}
-	void Component::Serialize(std::ofstream& file, String indent)
+	void Component::Serialize(std::ostream& os, String indent)
 	{
-		file << indent << GetComponentTypeStr(GetType()) << ": " << std::endl;
+		os << indent << GetTypeName(GetType()) << ": " << std::endl;
 	}
-	void Component::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
+	Component* Component::Create(String& type_name)
 	{
-		os << indent << GetComponentTypeStr(GetType()) << ": " << std::endl;
+		if(type_name == GetTypeName(StaticMeshComponent::GetStaticType())) return new StaticMeshComponent();
+		else if(type_name == GetTypeName(SkinedMeshComponent::GetStaticType())) return new SkinedMeshComponent();
 	}
 }

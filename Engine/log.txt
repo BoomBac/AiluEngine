@@ -3,6 +3,15 @@ Warning: Unused shader prop ColorOverlay been added;
 Normal: Load material asset at path Materials/CustomSkyBox.almat
 Normal: Load material asset at path Materials/StandardPBR_new.alasset
 Normal: Load material asset at path Materials/WireFrame_new.alasset
+Normal: Load material asset at path Materials/BoneWeight.almat
 Normal: Load material asset at path Materials/aa.almat
+Normal: Load material asset at path Materials/Role.almat
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
+Normal: ResourceMgr end
+Normal: Begin load scene from C:/AiluEngine/Engine/Scenes/default.almap...
+Error: Error: Load material failed with id missing;
+  File: C:\AiluEngine\Engine\Src\Objects\StaticMeshComponent.cpp,Line: 131;
+    Function: void *__cdecl Ailu::SkinedMeshComponent::DeserializeImpl(class std::queue<class std::tuple<class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> >,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > >,class std::deque<class std::tuple<class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> >,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > >,class std::allocator<class std::tuple<class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> >,class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > > > > > &)
+Normal: SceneMgr end
+Normal: Init end

@@ -41,8 +41,7 @@ namespace Ailu
 	public:
 		Object();
 		Object(const Object& other);
-		virtual void Serialize(std::ofstream& file, String indent);
-		virtual void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent);
+		virtual void Serialize(std::ostream& os, String indent);
 		/// <summary>
 		/// Deserialize
 		/// </summary>

@@ -1,0 +1,19 @@
+guid: e4c5b3a1-8e51-4ab4-8b23-3370b7f35785
+type: material
+name: Role
+shader_path: Shaders/shaders.hlsl
+  prop_type: Float
+    MetallicValue: 0
+    RoughnessValue: 0.091
+    SamplerMask: 2.66247e-44
+  prop_type: Vector
+    SpecularColor: 0,0,0,0
+    BaseColor: 1,1,1,0
+    EmssiveColor: 0,0,0,0
+  prop_type: Texture2D
+    Albedo: none
+    Normal: none
+    Emssive: none
+    Roughness: none
+    Metallic: none
+    Specular: none

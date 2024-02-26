@@ -12,23 +12,25 @@ namespace Ailu
 	class D3DVertexBuffer : public VertexBuffer
 	{
 	public:
-		D3DVertexBuffer(VertexBufferLayout layout,bool is_static = true);
-		D3DVertexBuffer(float* vertices, uint32_t size, bool is_static = true);
+		D3DVertexBuffer(VertexBufferLayout layout);
+		D3DVertexBuffer(float* vertices, uint32_t size);
 		~D3DVertexBuffer();
 		void Bind() const override;
 		void Bind(const VertexBufferLayout& pipeline_input_layout) const final;
 		void SetLayout(VertexBufferLayout layout) override;
 		const VertexBufferLayout& GetLayout() const override;
 		void SetStream(float* vertices, uint32_t size,uint8_t stream_index) final;
-		void SetStream(u8* data, uint32_t size, u8 stream_index) final;
+		void SetStream(u8* data, uint32_t size, u8 stream_index, bool dynamic = false) final;
+		u8* GetStream(u8 index) final
+		{
+			return _mapped_data[index];
+		};
 		uint32_t GetVertexCount() const override;
-		bool IsStatic() const final {return _is_static;};
 	private:
 		VertexBufferLayout _buffer_layout;
 		uint32_t _vertices_count;
 		uint32_t _buf_start;
 		uint8_t _buf_num;
-		bool _is_static;
 		//just for dynamic buffer
 		Vector<u8*> _mapped_data;
 		inline static std::vector<ComPtr<ID3D12Resource>> s_vertex_bufs{};

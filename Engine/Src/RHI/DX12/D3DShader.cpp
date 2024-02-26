@@ -658,7 +658,7 @@ namespace Ailu
 
 		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, samplers.size(), samplers.data(), rootSignatureFlags);
+		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, static_cast<u32>(samplers.size()), samplers.data(), rootSignatureFlags);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 

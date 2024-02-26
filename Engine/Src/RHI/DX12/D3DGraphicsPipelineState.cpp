@@ -90,7 +90,7 @@ namespace Ailu
 		{
 		case Ailu::EBindResDescType::kConstBuffer:
 		{
-			short bind_slot = slot == 255 ? _per_frame_cbuf_bind_slot : slot;
+			u8 bind_slot = slot == 255 ? _per_frame_cbuf_bind_slot : slot;
 			//D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
 			//context->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, view.BufferLocation);
 			static_cast<ConstantBuffer*>(res)->Bind(bind_slot);

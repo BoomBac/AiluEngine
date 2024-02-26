@@ -160,7 +160,8 @@ namespace Ailu
 	public:
 		static Ref<Shader> Create(const std::string& file_name,String vert_entry = "", String pixel_entry = "");
 		static void SetGlobalTexture(const String& name, Texture* texture);
-		static void SetGlobalMatrix(const String& name, const Matrix4x4f& matrix);
+		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
+		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
 		static void ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf);
 		static ConstantBuffer* GetPerFrameConstBuffer() { return	s_p_per_frame_cbuffer; };
 
@@ -225,7 +226,7 @@ namespace Ailu
 		void ExtractValidShaderProperty();
 	private:
 		inline static std::map<String, Texture*> s_global_textures_bind_info{};
-		inline static std::map<String, Matrix4x4f> s_global_matrix_bind_info{};
+		inline static std::map<String, std::tuple<Matrix4x4f*,u32>> s_global_matrix_bind_info{};
 	};
 
 	class ShaderLibrary
@@ -320,7 +321,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 		}
 		static Ref<Shader> Load(const std::string& path)
 		{
-			auto sys_path = PathUtils::IsSystemPath(path)? path : GetResPath(path);
+			auto sys_path = PathUtils::IsSystemPath(path)? path : PathUtils::GetResPath(path);
 			auto name = PathUtils::GetFileName(sys_path);
 			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
 			else

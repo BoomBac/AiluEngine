@@ -1,7 +1,19 @@
 guid: 6801ca63-ca10-4fda-aad0-3408be9950f5
 type: material
 name: BoneWeight
-shader_path: Shaders/bone_test.hlsl
+shader_path: Shaders/shaders.hlsl
   prop_type: Float
+    MetallicValue: 0
+    RoughnessValue: 0.066
+    SamplerMask: 4.2039e-45
   prop_type: Vector
+    SpecularColor: 0,0,0,0
+    BaseColor: 1,1,1,0
+    EmssiveColor: 0,0,0,0
   prop_type: Texture2D
+    Albedo: Meshs\Walking.fbm\Ch46_1001_Diffuse.png
+    Normal: Meshs\Walking.fbm\Ch46_1001_Normal.png
+    Emssive: none
+    Roughness: none
+    Metallic: none
+    Specular: none

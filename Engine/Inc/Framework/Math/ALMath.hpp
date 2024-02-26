@@ -283,7 +283,7 @@ namespace Ailu
 		T& operator[](uint32_t index) { return data[index]; }
 		const T& operator[](uint32_t index) const { return data[index]; }
 
-		std::string ToString(int precision = 2)
+		std::string ToString(int precision = 2) const
 		{
 			return std::format("({:.{}f},{:.{}f},{:.{}f})", data[0], precision, data[1], precision, data[2], precision);
 		}
@@ -672,6 +672,11 @@ namespace Ailu
 		{
 			return *this;
 		}
+		template<template<typename> typename TT, typename T>
+		void SetRow(u16 row,const TT<T>& v)
+		{
+			memcpy(data[row],&v,sizeof(v));
+		}
 		operator T* () { return &data[0][0]; };
 		operator const T* () const { return static_cast<const T*>(&data[0][0]); };
 	};
@@ -792,10 +797,10 @@ namespace Ailu
 			for (uint32_t j = 0; j < Dc; j++)
 			{
 				for (uint32_t k = 0; k < Dc; k++)
-					ret[i][j] += m1[j][k] * m2[k][i];
+					ret[j][i] += m1[j][k] * m2[k][i];
 			}
 		}
-		Transpose(ret);
+		//Transpose(ret);
 	}
 
 	template <template <typename, int, int> class M, template <typename> class V, typename T, int ROWS, int COLS>
@@ -1328,6 +1333,11 @@ namespace Ailu
 		Quaternion operator-() const
 		{
 			return Conjugate(*this);
+		}
+
+		std::string ToString(int precision = 2) const
+		{
+			return std::format("({:.{}f},{:.{}f},{:.{}f},{:.{}f})", x, precision, y, precision, z, precision, w, precision);
 		}
 
 		void NormalizeQ()

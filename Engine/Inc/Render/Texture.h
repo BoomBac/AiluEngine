@@ -115,13 +115,13 @@ namespace Ailu
 	struct TextureDesc
 	{
 		u16 _width, _height;
-		u16 _mipmap;
+		u8 _mipmap;
 		EALGFormat _res_format;
 		EALGFormat _srv_format;
 		EALGFormat _uav_format;
 		bool _read_only;
 		TextureDesc() : _width(0),_height(0),_mipmap(1),_res_format(EALGFormat::kALGFormatUnknown),_srv_format(EALGFormat::kALGFormatUnknown),_uav_format(EALGFormat::kALGFormatUnknown), _read_only(false){}
-		TextureDesc(u16 w,u16 h,u16 mipmap,EALGFormat res_format,EALGFormat srv_format,EALGFormat uav_format,bool read_only) : _width(w), _height(h), _mipmap(mipmap), 
+		TextureDesc(u16 w,u16 h,u8 mipmap,EALGFormat res_format,EALGFormat srv_format,EALGFormat uav_format,bool read_only) : _width(w), _height(h), _mipmap(mipmap), 
 		_res_format(res_format), _srv_format(srv_format), _uav_format(uav_format), _read_only(read_only) 
 		{
 		}

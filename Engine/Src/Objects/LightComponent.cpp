@@ -19,53 +19,31 @@ namespace Ailu
 	}
 	void Ailu::LightComponent::Tick(const float& delta_time)
 	{
-		if (_b_enable)
-		{
-			auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
-			Clamp(_intensity, 0.0, 4.0);
-			_light._light_color.a = _intensity;
-			_light._light_pos = transf._position;
-			Clamp(_light._light_param.z,0.0f, 180.0f);
-			Clamp(_light._light_param.y, 0.0f,_light._light_param.z - 0.1f);
-			//auto euler = _p_onwer->GetComponent<TransformComponent>()->GetEuler();
-			//_p_shadow_camera->_world_y = Quaternion::AngleAxis(euler.x, Camera::kUp);
-			//Vector3f rotated_right = TransformCoord(_p_shadow_camera->_world_y.ToMat4f(), Camera::kRight);
-			//_p_shadow_camera->_object_x = Quaternion::AngleAxis(euler.y, rotated_right);
-			//_p_shadow_camera->LookTo(_light._light_pos.xyz,Vector3f::kUp);
-			
-			//auto rot = transf.Rotation();
-			//rot.xy = transf.Rotation().yx;
-			//rot.y += 90.0f;
+		if (!_b_enable) return;
+		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
+		Clamp(_intensity, 0.0, 4.0);
+		_light._light_color.a = _intensity;
+		_light._light_pos = transf._position;
+		Clamp(_light._light_param.z, 0.0f, 180.0f);
+		Clamp(_light._light_param.y, 0.0f, _light._light_param.z - 0.1f);
+		//auto euler = _p_onwer->GetComponent<TransformComponent>()->GetEuler();
+		//_p_shadow_camera->_world_y = Quaternion::AngleAxis(euler.x, Camera::kUp);
+		//Vector3f rotated_right = TransformCoord(_p_shadow_camera->_world_y.ToMat4f(), Camera::kRight);
+		//_p_shadow_camera->_object_x = Quaternion::AngleAxis(euler.y, rotated_right);
+		//_p_shadow_camera->LookTo(_light._light_pos.xyz,Vector3f::kUp);
 
-			if (_b_cast_shadow)
-			{
-				Vector4f light_forward = transf._rotation * kDefaultDirectionalLightDir;
-				_p_shadow_camera->Position(transf._position);
-				_p_shadow_camera->Size(_shadow._size);
-				_p_shadow_camera->Far(_shadow._distance);
-				_p_shadow_camera->LookTo(light_forward.xyz, Vector3f::kUp);
-			}
-		}
-	}
-	void LightComponent::Serialize(std::ofstream& file, String indent)
-	{
-		Component::Serialize(file, indent);
-		using namespace std;
-		String prop_indent = indent.append("  ");
-		file << prop_indent << "Type: " << ELightTypeStr(_light_type) << endl;
-		Vector3f color = _light._light_color.xyz;
-		file << prop_indent << "Color: " << color << endl;
-		file << prop_indent << "Intensity: " << _light._light_color.a << endl;
-		if (_light_type != ELightType::kDirectional)
-			file << prop_indent << "Radius: " << _light._light_param.x << endl;
-		if (_light_type == ELightType::kSpot)
+		//auto rot = transf.Rotation();
+		//rot.xy = transf.Rotation().yx;
+		//rot.y += 90.0f;
+
+		if (_b_cast_shadow)
 		{
-			file << prop_indent << "Inner: " << _light._light_param.y << endl;
-			file << prop_indent << "Outer: " << _light._light_param.z << endl;
+			Vector4f light_forward = transf._rotation * kDefaultDirectionalLightDir;
+			_p_shadow_camera->Position(transf._position);
+			_p_shadow_camera->Size(_shadow._size);
+			_p_shadow_camera->Far(_shadow._distance);
+			_p_shadow_camera->LookTo(light_forward.xyz, Vector3f::kUp);
 		}
-		file << prop_indent << "CastShadow: " << (_b_cast_shadow ? "true" : "false") << endl;
-		file << prop_indent << "ShadowArea: " << _shadow._size << endl;
-		file << prop_indent << "ShadowDistance: " << _shadow._distance << endl;
 	}
 	void LightComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
 	{

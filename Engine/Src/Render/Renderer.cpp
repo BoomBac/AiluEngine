@@ -36,7 +36,7 @@ namespace Ailu
 
 		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512,"pure_sky","Textures/small_cave_1k.hdr");
 		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
-		_p_test_cs = ComputeShader::Create(GetResPath("Shaders/Compute/cs_test.hlsl"));
+		_p_test_cs = ComputeShader::Create(PathUtils::GetResPath("Shaders/Compute/cs_test.hlsl"));
 		TextureDesc desc(64,64,1,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR32_UINT,false);
 		_p_test_texture = Texture2D::Create(desc);
 		_p_test_texture->Name("cs_out");

@@ -7,7 +7,6 @@
 #include "Framework/Common/ThreadPool.h"
 #include "GlobalMarco.h"
 #include "Framework/Common/LogMgr.h"
-#include "Framework/Common/ThreadPool.h"
 
 namespace Ailu
 {
@@ -77,13 +76,13 @@ namespace Ailu
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/front.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/back.jpg",
 		};
-		LoadTexture(default_cubemaps, "cubemap_sea");
+		//LoadTexture(default_cubemaps, "cubemap_sea");
 		LoadAsset("Materials/StandardPBR_new.alasset")->IsInternal(true);
 		LoadAsset("Materials/WireFrame_new.alasset");
 		auto skybox = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Skybox");
 		skybox->IsInternal(false);
 		skybox->OriginPath("Skybox");
-		skybox->SetTexture("SkyBox", "cubemap_sea");
+		//skybox->SetTexture("SkyBox", "cubemap_sea");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/error_fallback.hlsl"), "Error");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.shader"), "Blit");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "CubemapGen");
@@ -92,15 +91,20 @@ namespace Ailu
 
 
 		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-		auto anim = parser->Parser(GetResPath("Meshs/anim.fbx"));
-		MeshPool::AddMesh("anim", anim.front());
-		MeshPool::AddMesh("sphere", parser->Parser(GetResPath("Meshs/sphere.fbx")).front());
-		MeshPool::AddMesh("cube", parser->Parser(GetResPath("Meshs/cube.fbx")).front());
-		MeshPool::AddMesh("cone", parser->Parser(GetResPath("Meshs/cone.fbx")).front());
-		MeshPool::AddMesh("cylinder", parser->Parser(GetResPath("Meshs/cylinder.fbx")).front());
-		MeshPool::AddMesh("monkey", parser->Parser(GetResPath("Meshs/monkey.fbx")).front());
-		MeshPool::AddMesh("plane", parser->Parser(GetResPath("Meshs/plane.fbx")).front());
-		MeshPool::AddMesh("torus", parser->Parser(GetResPath("Meshs/torus.fbx")).front());
+		//auto anim = parser->Parser(PathUtils::GetResPath("Meshs/soldier.fbx"));
+		//auto anim = parser->Parser(PathUtils::GetResPath("Meshs/Walking.fbx"));
+		//auto anim = parser->Parser(PathUtils::GetResPath("Meshs/mutant.fbx"));
+		//auto anim = parser->Parser(PathUtils::GetResPath("Meshs/anim.fbx"));
+		//auto anim = parser->Parser(PathUtils::GetResPath("Meshs/one_bone.fbx"));
+		//auto anim = parser->Parser(PathUtils::GetResPath("Meshs/two_bone.fbx"));
+		//MeshPool::AddMesh("anim", anim.front());
+		MeshPool::AddMesh("sphere", parser->Parser(PathUtils::GetResPath("Meshs/sphere.fbx")).front());
+		MeshPool::AddMesh("plane", parser->Parser(PathUtils::GetResPath("Meshs/plane.fbx")).front());
+		MeshPool::AddMesh("cube", parser->Parser(PathUtils::GetResPath("Meshs/cube.fbx")).front());
+		//MeshPool::AddMesh("cone", parser->Parser(GetResPath("Meshs/cone.fbx")).front());
+		//MeshPool::AddMesh("cylinder", parser->Parser(GetResPath("Meshs/cylinder.fbx")).front());
+		MeshPool::AddMesh("monkey", parser->Parser(PathUtils::GetResPath("Meshs/monkey.fbx")).front());
+		//MeshPool::AddMesh("torus", parser->Parser(GetResPath("Meshs/torus.fbx")).front());
 		auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
 		Vector<Vector3f> vertices = {
 		{ -1.0f, 1.0f, 0.0f },
@@ -158,7 +162,7 @@ namespace Ailu
 	void ResourceMgr::SaveAsset(const std::string& path, Material* mat)
 	{
 		using std::endl;
-		String sys_path = PathUtils::IsSystemPath(path)? path : GetResPath(path);
+		String sys_path = PathUtils::IsSystemPath(path)? path : PathUtils::GetResPath(path);
 		String asset_path = PathUtils::ExtractAssetPath(path);
 		auto asset = MakeScope<Asset>(asset_path, sys_path, Guid::Generate().ToString(), EAssetType::kMaterial);
 		asset->_p_inst_asset = mat;
@@ -193,7 +197,7 @@ namespace Ailu
 		case Ailu::EAssetType::kMaterial:
 		{
 			using std::endl;
-			String sys_path = GetResPath(asset._asset_path);
+			String sys_path = PathUtils::GetResPath(asset._asset_path);
 			AddToAssetDB(asset);
 			std::ofstream out_mat(sys_path, std::ios::out | std::ios::trunc);
 			if (out_mat.is_open())
@@ -293,7 +297,7 @@ namespace Ailu
 	void ResourceMgr::SaveMaterialImpl(const String& asset_path, Material* mat)
 	{
 		using std::endl;
-		auto sys_path = GetResPath(asset_path);
+		auto sys_path = PathUtils::GetResPath(asset_path);
 		std::multimap<std::string, SerializableProperty*> props{};
 		//为了写入通用资产头信息，暂时使用追加方式打开
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
@@ -454,7 +458,7 @@ namespace Ailu
 	Ref<Mesh> ResourceMgr::LoadMeshImpl(const String& asset_path)
 	{
 		static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-		auto sys_path = GetResPath(asset_path);
+		auto sys_path = PathUtils::GetResPath(asset_path);
 		auto mesh_list = parser->Parser(sys_path);
 		for (auto& mesh : mesh_list)
 		{
@@ -497,7 +501,7 @@ namespace Ailu
 	{
 		if (MaterialLibrary::Contain(asset_path))
 			return MaterialLibrary::GetMaterial(asset_path).get();
-		String sys_path = GetResPath(asset_path);
+		String sys_path = PathUtils::GetResPath(asset_path);
 		std::ifstream file(sys_path);
 		if (!file.is_open())
 		{
@@ -526,9 +530,7 @@ namespace Ailu
 
 	void ResourceMgr::ImportAsset(const WString& sys_path)
 	{
-		g_pTimeMgr->Mark();
 		ImportAssetImpl(sys_path);
-		LOG_WARNING(L"Import asset: {} succeed,cost {}ms", sys_path,g_pTimeMgr->GetElapsedSinceLastMark());
 	}
 
 	void ResourceMgr::ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback)
@@ -628,19 +630,22 @@ namespace Ailu
 		namespace fs = std::filesystem;
 		fs::path p(sys_path);
 		auto ext = p.extension().string();
+		TimeMgr time_mgr;
 		if (!ext.empty())
 		{
+			time_mgr.Mark();
 			if (ext == ".fbx" || ext == ".FBX")
 			{
 				static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+				g_pLogMgr->LogFormat(L"Start import mesh file {}",sys_path);
 				for (auto& mesh : parser->Parser(sys_path))
 				{
-					g_pLogMgr->LogFormat("Start import mesh: {}", mesh->Name());
 					MeshPool::AddMesh(mesh);
 				}
 			}
 			else if (ext == ".png" || ext == ".PNG")
 			{
+				g_pLogMgr->LogFormat(L"Start import image file {}", sys_path);
 				String asset_path = PathUtils::ExtractAssetPath(ToChar(sys_path.data()));
 				if (!TexturePool::Contain(asset_path))
 				{
@@ -654,6 +659,7 @@ namespace Ailu
 			}
 			else if (ext == ".exr" || ext == ".EXR" || ext == ".hdr" || ext == ".HDR")
 			{
+				g_pLogMgr->LogFormat(L"Start import image file {}", sys_path);
 				String asset_path = PathUtils::ExtractAssetPath(ToChar(sys_path.data()));
 				if (!TexturePool::Contain(asset_path))
 				{
@@ -668,7 +674,9 @@ namespace Ailu
 			else
 			{
 				g_pLogMgr->LogFormat("Havn't handled asset type: {}",ext);
+				return;
 			}
+			g_pLogMgr->LogFormat(L"Import asset: {} succeed,cost {}ms", sys_path, time_mgr.GetElapsedSinceLastMark());
 		}
 		else
 		{

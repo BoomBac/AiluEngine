@@ -14,26 +14,13 @@ namespace Ailu
 	}
 	void CameraComponent::Tick(const float& delta_time)
 	{
+		if (!_b_enable) return;
 		auto& parent_pos = static_cast<SceneActor*>(_p_onwer)->GetTransform()._position;
 		auto& parent_rot = static_cast<SceneActor*>(_p_onwer)->GetTransform()._rotation;
 		//auto parent_rot = Vector3f(0.f,0.f,0.f);
 		_camera.Position(parent_pos);
 		_camera.Rotation(parent_rot);
 		_camera.RecalculateMarix();
-	}
-	void CameraComponent::Serialize(std::ofstream& file, String indent)
-	{
-		Component::Serialize(file, indent);
-		using namespace std;
-		String prop_indent = indent.append("  ");
-		file << prop_indent << "Type: " << ECameraType::ToString(_camera.Type()) << endl;
-		file << prop_indent << "Position: " << _camera.Position() << endl;
-		file << prop_indent << "Rotation: " << _camera.Rotation() << endl;
-		file << prop_indent << "Aspect: " << _camera.Aspect() << endl;
-		file << prop_indent << "Far: " << _camera.Far() << endl;
-		file << prop_indent << "Near: " << _camera.Near() << endl;
-		file << prop_indent << "FovH: " << _camera.FovH() << endl;
-		file << prop_indent << "Size: " << _camera.Size() << endl;
 	}
 
 	static String SerializeProperty(const SerializableProperty& prop)
@@ -53,7 +40,7 @@ namespace Ailu
 	void CameraComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
 	{
 		using namespace std;
-		os << indent << GetComponentTypeStr(GetType()) << ": " <<_camera.GetAllProperties().size() + 1 << std::endl;
+		os << indent << Component::GetTypeName(GetType()) << ": " <<_camera.GetAllProperties().size() + 1 << std::endl;
 		String prop_indent = indent.append("  ");
 		os << prop_indent << "Type: " << ECameraType::ToString(_camera.Type()) << endl;
 		for (auto it = _camera.PropertyBegin(); it != _camera.PropertyEnd(); it++)

@@ -21,8 +21,7 @@ namespace Ailu
 		virtual void BeginPlay();
 		virtual void Tick(const float& delta_time);
 		
-		void Serialize(std::ofstream& file, String indent) override;
-		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) override;
+		void Serialize(std::ostream& os, String indent) override;
 		
 		template <typename Type>
 		static Type* Create();
@@ -38,6 +37,8 @@ namespace Ailu
 		inline Type* AddComponent(Args... args);
 
 		void AddComponent(Component* comp);
+		//remove comp if they have same comp type
+		void RemoveComponent(Component* comp);
 
 		std::list<Scope<Component>>& GetAllComponent() { return _components; }
 
@@ -104,12 +105,16 @@ namespace Ailu
 	template<typename Type>
 	inline Type* Actor::AddComponent()
 	{
+		auto new_comp = MakeScope<Type>();
 		for (auto& component : _components)
 		{
-			if (std::is_same<decltype(*component.get()), Type>::value)
+			if (component->GetType() == new_comp->GetType())
+			{
+				LOG_WARNING("Same component can't been added!");
 				return static_cast<Type*>(component.get());
+			}
 		}
-		_components.emplace_back(std::move(MakeScope<Type>()));
+		_components.emplace_back(std::move(new_comp));
 		_components.back()->SetOwner(this);
 		return static_cast<Type*>(_components.back().get());
 	}
@@ -117,12 +122,16 @@ namespace Ailu
 	template<typename Type, typename ...Args>
 	inline Type* Actor::AddComponent(Args ...args)
 	{
+		auto new_comp = MakeScope<Type>(args...);
 		for (auto& component : _components)
 		{
-			if (std::is_same<decltype(*component.get()), Type>::value)
+			if (component->GetType() == new_comp->GetType())
+			{
+				LOG_WARNING("Same component can't been added!");
 				return static_cast<Type*>(component.get());
+			}
 		}
-		_components.emplace_back(std::move(MakeScope<Type>(args...)));
+		_components.emplace_back(std::move(new_comp));
 		_components.back()->SetOwner(this);
 		return static_cast<Type*>(_components.back().get());
 	}

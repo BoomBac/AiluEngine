@@ -67,7 +67,9 @@ namespace Ailu
 			if (mat_it != _bind_res_infos.end() && mat_it->second._res_type == EBindResDescType::kCBufferAttribute)
 			{
 				auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
-				memcpy(reinterpret_cast<u8*>(g_pGfxContext->GetPerFrameCbufDataStruct()) + offset, it.second, sizeof(Matrix4x4f));
+				Matrix4x4f* mat_ptr = std::get<0>(it.second);
+				u32 mat_num = std::get<1>(it.second);
+				memcpy(reinterpret_cast<u8*>(g_pGfxContext->GetPerFrameCbufDataStruct()) + offset, mat_ptr, sizeof(Matrix4x4f) * mat_num);
 				memcpy(g_pGfxContext->GetPerFrameCbufData(), g_pGfxContext->GetPerFrameCbufDataStruct(), sizeof(ScenePerFrameData));
 			}
 		}
@@ -122,12 +124,20 @@ namespace Ailu
 		else
 			s_global_textures_bind_info[name] = texture;
 	}
-	void Shader::SetGlobalMatrix(const String& name, const Matrix4x4f& matrix)
+	void Shader::SetGlobalMatrix(const String& name, Matrix4x4f* matrix)
 	{
 		if (!s_global_matrix_bind_info.contains(name))
-			s_global_matrix_bind_info.insert(std::make_pair(name, matrix));
+			s_global_matrix_bind_info.insert(std::make_pair(name, std::make_tuple(matrix,1)));
 		else
-			s_global_matrix_bind_info[name] = matrix;
+			s_global_matrix_bind_info[name] = std::make_tuple(matrix, 1);
+	}
+
+	void Shader::SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num)
+	{
+		if (!s_global_matrix_bind_info.contains(name))
+			s_global_matrix_bind_info.insert(std::make_pair(name, std::make_tuple(matrix, num)));
+		else
+			s_global_matrix_bind_info[name] = std::make_tuple(matrix, num);
 	}
 
 	void Shader::ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf)

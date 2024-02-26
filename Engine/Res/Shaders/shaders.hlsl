@@ -115,10 +115,10 @@ float Random(float4 seed4)
 		shadow_uv.x = shadow_coord.x * 0.5f + 0.5f;
 		shadow_uv.y = shadow_coord.y * -0.5f + 0.5f;
 		float shadow_factor = 0.0;
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < 8; i++)
 		{
 			uint random_index = uint(16.0 * Random(float4(world_pos.xyy, i))) % 16;
-			shadow_factor += lerp(0.0, 0.0625, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadow_uv.xy + poissonDisk[random_index] / 1200, depth - z_bias).r);
+			shadow_factor += lerp(0.0, 0.0625, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadow_uv.xy + poissonDisk[random_index] / 1800, depth - z_bias).r);
 		}
 		//shadow_factor = MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadow_uv.xy, depth).r;
 		return shadow_factor;
