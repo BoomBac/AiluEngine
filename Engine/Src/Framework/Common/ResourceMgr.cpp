@@ -44,7 +44,7 @@ namespace Ailu
 		TexturePool::Add("Runtime/default_gray", default_gray);
 
 		LoadAssetDB();
-		auto tex0 = LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg","default");
+		auto tex0 = LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg", "default");
 		TexturePool::Add(tex0->AssetPath(), tex0);
 
 		Vector<String> default_cubemaps{
@@ -90,13 +90,13 @@ namespace Ailu
 		{ -1.0f,  -1.0f, 0.0f },
 		{  1.0f,  -1.0f, 0.0f }
 		};
-		Vector<u32> indices = {0, 1, 2, 1, 3, 2};
+		Vector<u32> indices = { 0, 1, 2, 1, 3, 2 };
 		Vector<Vector2f> uv0 = { {0.f,0.f}, {1.f,0.f},{0.f,1.f} ,{1.f,1.f} };
 		FullScreenQuad->_vertex_count = 4;
 		FullScreenQuad->_index_count = 6;
 		FullScreenQuad->SetVertices(vertices.data());
 		FullScreenQuad->SetIndices(indices.data());
-		FullScreenQuad->SetUVs(uv0.data(),0);
+		FullScreenQuad->SetUVs(uv0.data(), 0);
 		FullScreenQuad->Build();
 		MeshPool::AddMesh("FullScreenQuad", FullScreenQuad);
 
@@ -140,7 +140,7 @@ namespace Ailu
 	void ResourceMgr::SaveAsset(const std::string& path, Material* mat)
 	{
 		using std::endl;
-		String sys_path = PathUtils::IsSystemPath(path)? path : PathUtils::GetResPath(path);
+		String sys_path = PathUtils::IsSystemPath(path) ? path : PathUtils::GetResPath(path);
 		String asset_path = PathUtils::ExtractAssetPath(path);
 		auto asset = MakeScope<Asset>(asset_path, sys_path, Guid::Generate().ToString(), EAssetType::kMaterial);
 		asset->_p_inst_asset = mat;
@@ -240,7 +240,7 @@ namespace Ailu
 			auto mat = LoadAsset(path);
 			if (mat)
 			{
-				g_pLogMgr->LogFormat("Load {} asset at path {}",type,path);
+				g_pLogMgr->LogFormat("Load {} asset at path {}", type, path);
 				if (mat->GetShader()->Name() == "shaders")
 					mat->IsInternal(true);
 			}
@@ -425,7 +425,7 @@ namespace Ailu
 				if (!TexturePool::Contain(v))
 				{
 					auto tex = g_pResourceMgr->LoadTexture(v);
-					TexturePool::Add(tex->AssetPath(),tex);
+					TexturePool::Add(tex->AssetPath(), tex);
 				}
 				mat->SetTexture(k, v);
 			}
@@ -455,7 +455,7 @@ namespace Ailu
 			else
 				parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
 			auto tex = parser->Parser(kEngineResRootPath + asset_path, 10);
-			if(!name.empty()) 
+			if (!name.empty())
 				tex->Name(name);
 			return tex;
 		}
@@ -560,7 +560,7 @@ namespace Ailu
 					}
 				}
 			}
-		};
+			};
 		bool is_first_execute = true;
 		while (true)
 		{
@@ -578,7 +578,7 @@ namespace Ailu
 					if (files[file] != last_write_time)
 						reload_shader(file);
 				}
-				else if(!is_first_execute)
+				else if (!is_first_execute)
 					reload_shader(file);
 				files[file] = last_write_time;
 			}
@@ -600,6 +600,13 @@ namespace Ailu
 		namespace fs = std::filesystem;
 		fs::path p(sys_path);
 		auto ext = p.extension().string();
+		ImportInfo info;
+		info._is_succeed = false;
+		info._last_write_time = fs::last_write_time(p);
+		info._msg = std::format("Import {}...",p.filename().string());
+		info._progress = 0.0f;
+		info._sys_path = sys_path;
+		_import_infos.push_back(info);
 		TimeMgr time_mgr;
 		if (!ext.empty())
 		{
@@ -607,13 +614,19 @@ namespace Ailu
 			if (ext == ".fbx" || ext == ".FBX")
 			{
 				static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-				g_pLogMgr->LogFormat(L"Start import mesh file {}",sys_path);
+				g_pLogMgr->LogFormat(L"Start import mesh file {}", sys_path);
 				for (auto& mesh : parser->Parser(sys_path))
 				{
 					MeshPool::AddMesh(mesh);
 				}
+				auto& tex_info = static_cast<FbxParser*>(parser.get())->GetTextureInfos();
+				for (auto& info : tex_info)
+				{
+					auto& [path, type] = info;
+					ImportAsset(ToWChar(path));
+				}
 			}
-			else if (ext == ".png" || ext == ".PNG")
+			else if (kCommonImageExt.contains(ext))
 			{
 				g_pLogMgr->LogFormat(L"Start import image file {}", sys_path);
 				String asset_path = PathUtils::ExtractAssetPath(ToChar(sys_path.data()));
@@ -643,8 +656,8 @@ namespace Ailu
 			}
 			else
 			{
-				g_pLogMgr->LogFormat("Havn't handled asset type: {}",ext);
-				return;
+				g_pLogMgr->LogFormat("Havn't handled asset type: {}", ext);
+				//return;
 			}
 			g_pLogMgr->LogFormat(L"Import asset: {} succeed,cost {}ms", sys_path, time_mgr.GetElapsedSinceLastMark());
 		}
@@ -652,5 +665,6 @@ namespace Ailu
 		{
 			g_pLogMgr->LogFormat("Path: {} isn't valid!");
 		}
+		_import_infos.erase(std::remove_if(_import_infos.begin(), _import_infos.end(), [&](auto it) {return it._msg == info._msg; }),_import_infos.end());
 	}
 }

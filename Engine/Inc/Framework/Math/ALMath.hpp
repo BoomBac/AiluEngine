@@ -2,7 +2,7 @@
 #define __AL_MATH_H__
 
 #include <math.h>
-#include <sstream>
+#include <immintrin.h> //simd
 #include <string>
 #include <limits>
 #include <format>
@@ -774,6 +774,28 @@ namespace Ailu
 	//row-major matrix * vector
 	static void TransformVector(Vector4f& vector, const Matrix4x4f& matrix)
 	{
+#ifdef _SIMD
+		__m128 xmm_vector1 = _mm_loadu_ps(&vector.x); // Load vector1 into SSE register
+
+		__m128 xmm_matrix_row1 = _mm_loadu_ps(&matrix[0][0]); // Load matrix row 1 into SSE register
+		__m128 xmm_matrix_row2 = _mm_loadu_ps(&matrix[1][0]); // Load matrix row 2 into SSE register
+		__m128 xmm_matrix_row3 = _mm_loadu_ps(&matrix[2][0]); // Load matrix row 3 into SSE register
+		__m128 xmm_matrix_row4 = _mm_loadu_ps(&matrix[3][0]); // Load matrix row 4 into SSE register
+
+		// Multiply and accumulate operations
+		xmm_vector1 = _mm_add_ps(
+			_mm_add_ps(
+				_mm_mul_ps(_mm_shuffle_ps(xmm_vector1, xmm_vector1, _MM_SHUFFLE(0, 0, 0, 0)), xmm_matrix_row1),
+				_mm_mul_ps(_mm_shuffle_ps(xmm_vector1, xmm_vector1, _MM_SHUFFLE(1, 1, 1, 1)), xmm_matrix_row2)
+			),
+			_mm_add_ps(
+				_mm_mul_ps(_mm_shuffle_ps(xmm_vector1, xmm_vector1, _MM_SHUFFLE(2, 2, 2, 2)), xmm_matrix_row3),
+				_mm_mul_ps(_mm_shuffle_ps(xmm_vector1, xmm_vector1, _MM_SHUFFLE(3, 3, 3, 3)), xmm_matrix_row4)
+			)
+		);
+		// Store the result back into the vector
+		_mm_storeu_ps(&vector.x, xmm_vector1); // Store xmm_vector1 into vector1
+#else
 		Vector4f temp{};
 		temp.x = vector.x * matrix[0][0] + vector.y * matrix[1][0] + vector.z * matrix[2][0] + vector.w * matrix[3][0];
 		temp.y = vector.x * matrix[0][1] + vector.y * matrix[1][1] + vector.z * matrix[2][1] + vector.w * matrix[3][1];
@@ -781,6 +803,7 @@ namespace Ailu
 		temp.w = vector.x * matrix[0][3] + vector.y * matrix[1][3] + vector.z * matrix[2][3] + vector.w * matrix[3][3];
 		vector = temp;
 		return;
+#endif // !_SIMD
 	}
 
 	static Vector3f MultipyVector(const Vector3f& v, const Matrix4x4f& mat)
@@ -795,10 +818,7 @@ namespace Ailu
 	{
 		Vector4f temp{ vector,1.f };
 		TransformVector(temp, matrix);
-		vector[0] = temp[0];
-		vector[1] = temp[1];
-		vector[2] = temp[2];
-		return;
+		memcpy(&vector,temp,12);
 	}
 
 	static Vector3f TransformCoord(const Matrix4x4f& matrix, const Vector3f& vector)

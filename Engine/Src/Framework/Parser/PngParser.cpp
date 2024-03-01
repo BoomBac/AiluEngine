@@ -27,9 +27,9 @@ namespace Ailu
 			tex->AssetPath(asset_path);
 			tex->Name(PathUtils::GetFileName(path,true));
 			uint8_t* new_data = nullptr;
-			if (n == 3)
+			if (n != 4)
 			{
-				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * 3);
+				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);
 				stbi_image_free(data);
 				tex->FillData(std::move(new_data));
 			}
@@ -57,9 +57,9 @@ namespace Ailu
 			tex->AssetPath(PathUtils::ExtractAssetPath(path.data()));
 			tex->Name(PathUtils::GetFileName(path, true));
 			uint8_t* new_data = data;
-			if (n == 3)
+			if (n != 4)
 			{
-				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * 3);
+				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);
 				stbi_image_free(data);
 			}
 			Vector<u8*> mipmaps{ new_data };
@@ -101,9 +101,9 @@ namespace Ailu
 			}
 			else
 			{
-				if (n == 3)
+				if (n != 4)
 				{
-					expand_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * 3);
+					expand_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);
 				}
 				else
 				{

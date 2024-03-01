@@ -4,7 +4,7 @@ name: Role
 shader_path: Shaders/shaders.hlsl
   prop_type: Float
     MetallicValue: 0
-    RoughnessValue: 0.091
+    RoughnessValue: 0
     SamplerMask: 2.66247e-44
   prop_type: Vector
     SpecularColor: 0,0,0,0

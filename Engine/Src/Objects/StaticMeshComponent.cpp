@@ -152,8 +152,9 @@ namespace Ailu
 	{
 		if (!_b_enable) return;
 		StaticMeshComponent::Tick(delta_time);
-		if (_p_clip)
+		if (_p_clip && _pre_anim_time != _anim_time)
 			Skin(_anim_time);
+		_pre_anim_time = _anim_time;
 	}
 
 	static void DrawJoint(const Skeleton& sk, const Joint& j, AnimationClip* clip, u32 time, Vector3f origin, const Matrix4x4f& obj_world_mat)
@@ -191,7 +192,8 @@ namespace Ailu
 		u32 vert_count = skined_mesh->_vertex_count;
 		u32 utime = u32(time) % _p_clip->FrameCount();
 		auto vert = reinterpret_cast<Vector3f*>(skined_mesh->GetVertexBuffer()->GetStream(0));
-		if (vert_count < 2000)
+		g_pTimeMgr->Mark();
+		if (!_is_mt_skin)
 		{
 			SkinTask(_p_clip.get(), utime, vert, 0, vert_count);
 		}
@@ -208,6 +210,7 @@ namespace Ailu
 				future.wait();
 			}
 		}
+		_skin_time = g_pTimeMgr->GetElapsedSinceLastMark();
 	}
 	void SkinedMeshComponent::SkinTask(AnimationClip* clip, u32 time, Vector3f* vert, u32 begin, u32 end)
 	{
@@ -215,24 +218,17 @@ namespace Ailu
 		auto bone_weights = skined_mesh->GetBoneWeights();
 		auto bone_indices = skined_mesh->GetBoneIndices();
 		auto vertices = skined_mesh->GetVertices();
-		try
+		for (u32 i = begin; i < end; i++)
 		{
-			for (u32 i = begin; i < end; i++)
+			auto& cur_weight = bone_weights[i];
+			auto& cur_indices = bone_indices[i];
+			Vector3f tmp = vertices[i];
+			Vector3f new_pos = Vector3f::kZero;
+			for (u16 j = 0; j < 4; j++)
 			{
-				auto& cur_weight = bone_weights[i];
-				auto& cur_indices = bone_indices[i];
-				Vector3f tmp = vertices[i];
-				Vector3f new_pos = Vector3f::kZero;
-				for (u16 j = 0; j < 4; j++)
-				{
-					new_pos += cur_weight[j] * TransformCoord(clip->Sample(cur_indices[j], time), tmp);
-				}
-				vert[i] = new_pos;
+				new_pos += cur_weight[j] * TransformCoord(clip->Sample(cur_indices[j], time), tmp);
 			}
-		}
-		catch (const std::exception& e)
-		{
-			LOG_ERROR("{}", e.what());
+			vert[i] = new_pos;
 		}
 	}
 	void SkinedMeshComponent::SetMesh(Ref<Mesh>& mesh)
@@ -245,6 +241,8 @@ namespace Ailu
 		if (_p_clip && skined_mesh->CurSkeleton() != _p_clip->CurSkeletion())
 		{
 			_p_clip.reset();
+			_anim_time = 0.0f;
+			_pre_anim_time = 0.0f;
 		}
 	}
 	void SkinedMeshComponent::Serialize(std::ostream& os, String indent)

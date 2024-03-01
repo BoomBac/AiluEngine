@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 405.046,489.991,903.399
-  Rotation: -0.0676253,0.925069,-0.19696,-0.317618
+  Position: 209.623,282.462,557.432
+  Rotation: 0.0386047,-0.961184,0.182656,0.203157
   Fov: 60
   Aspect: 1.77778
   Near: 62.29
   Far: 137099
-  ControllerRotation: 24.0392,11737.9
+  ControllerRotation: 21.5192,12083.9
 SceneGraph: 
   Name: root
     Components: 
@@ -15,12 +15,12 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,0,0,1
         Scale: -13.99,0.01,0.01
-    Children: 7
+    Children: 6
       Name: plane
         Components: 
           TransformComponent: 
             Position: 0,0,0
-            Rotation: 0,0,0,1
+            Rotation: 0,-0.000279032,0,1
             Scale: 40,1,40
           StaticMeshComponent: 
             MeshPath: plane
@@ -40,7 +40,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 268,759,0
-            Rotation: 0.400277,-0.167806,0.455319,0.777373
+            Rotation: -0.635415,0.267004,-0.723627,0.0364653
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
@@ -54,7 +54,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: -219,471,0
-            Rotation: 0.122442,0.000537715,-0.00375428,-0.992473
+            Rotation: 0.0295486,0.00012828,-0.00090621,-0.999569
             Scale: 1,1,1
           LightComponent: 
             Type: Point
@@ -69,7 +69,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 846,845,-374
-            Rotation: 0.0134424,0.662039,-0.719927,-0.207953
+            Rotation: 0.00889763,0.4406,-0.47904,-0.759161
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
@@ -82,25 +82,15 @@ SceneGraph:
             ShadowArea: 0
             ShadowDistance: 0
         Children: 0
-      Name: monkey
+      Name: Actor6
         Components: 
           TransformComponent: 
-            Position: 0,296,0
-            Rotation: 5.26497e-07,-0.937249,6.83359e-07,0.348674
-            Scale: 1,1,1
-          StaticMeshComponent: 
-            MeshPath: monkey
-            MaterialPath: Materials/StandardPBR_new.alasset
-        Children: 0
-      Name: Actor8
-        Components: 
-          TransformComponent: 
-            Position: 0,1,0
+            Position: 0,0,0
             Rotation: 0,0,0,1
             Scale: 1,1,1
           SkinedMeshComponent: 
             MeshPath: Meshs/soldier.fbx
-            MaterialPath: missing
+            MaterialPath: Materials/StandardPBR_new.alasset
             AnimationAlip: Meshs/soldier.fbx
-            AnimationTime: 51.2
+            AnimationTime: 20.7
         Children: 0

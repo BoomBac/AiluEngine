@@ -18,6 +18,14 @@ namespace Ailu
 	{
 		using ResourceTask = std::function<void()>;
 		using OnResourceTaskCompleted = std::function<void()>;
+		struct ImportInfo
+		{
+			String _msg;
+			WString _sys_path;
+			float _progress;
+			std::filesystem::file_time_type _last_write_time;
+			bool _is_succeed;
+		};
 	public:
 		int Initialize() final;
 		void Finalize() final;
@@ -38,8 +46,12 @@ namespace Ailu
 		void ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback = []() {});
 		static void AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback);
 		static void AddResourceTask(ResourceTask task);
+	public:
+		Vector<ImportInfo> _import_infos;
 	private:
+		inline const static std::set<String> kCommonImageExt = { ".png",".PNG",".tga",".TGA",".jpg",".JPG",".jpg",".JPEG"};
 		inline const static String kAssetDatabasePath = kEngineResRootPath + "assetdb.alasset";
+		inline static ImportInfo* s_p_current_import_info;
 		static Ref<Material> LoadMaterial(std::string path);
 		static Ref<Material> LoadMaterial(const Vector<String>& blob);
 		Ref<Mesh> LoadMeshImpl(const String& asset_path);

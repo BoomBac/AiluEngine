@@ -19,7 +19,7 @@ namespace Ailu
 	SceneMgr* g_pSceneMgr = new SceneMgr();
 	ResourceMgr* g_pResourceMgr = new ResourceMgr();
 	LogMgr* g_pLogMgr = new LogMgr();
-	Scope<ThreadPool> g_thread_pool = MakeScope<ThreadPool>(8, "GlobalThreadPool");
+	Scope<ThreadPool> g_thread_pool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
 
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
@@ -128,7 +128,7 @@ namespace Ailu
 	}
 	bool Application::OnDragFile(DragFileEvent& e)
 	{
-		g_pResourceMgr->ImportAssetAsync(e.GetDragedFilePath());
+		g_pResourceMgr->ImportAsset(e.GetDragedFilePath());
 		return false;
 	}
 	bool Application::OnGetFoucus(WindowFocusEvent& e)

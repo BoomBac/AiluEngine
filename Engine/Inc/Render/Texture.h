@@ -18,14 +18,14 @@ namespace Ailu
 {
 	namespace TextureUtils
 	{
-		static uint8_t* ExpandImageDataToFourChannel(uint8_t* p_data, size_t size, uint8_t alpha = 255u)
+		static uint8_t* ExpandImageDataToFourChannel(uint8_t* p_data, size_t size, u8 channel,uint8_t alpha = 255u)
 		{
-			uint8_t* new_data = new uint8_t[size / 3 * 4];
-			auto pixel_num = size / 3;
+			uint8_t* new_data = new uint8_t[size / channel * 4];
+			auto pixel_num = size / channel;
 			for (size_t i = 0; i < pixel_num; i++)
 			{
-				memcpy(new_data + i * 4, p_data + i * 3, 3);
-				new_data[i * 4 + 3] = alpha;
+				memcpy(new_data + i * 4, p_data + i * channel, channel);
+				new_data[i * 4 + channel] = alpha;
 			}
 			return new_data;
 		}

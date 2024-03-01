@@ -445,7 +445,7 @@ namespace Ailu
 				{
 					if (prop.second._type == ESerializablePropertyType::kStaticMesh)
 					{
-						ImGui::Text(is_skined_comp? "SkinedMesh" :"StaticMesh");
+						ImGui::Text(is_skined_comp ? "SkinedMesh" : "StaticMesh");
 						auto& mesh = static_mesh_comp->GetMesh();
 						int mesh_count = 0;
 						static int s_mesh_selected_index = -1;
@@ -549,7 +549,9 @@ namespace Ailu
 							ImGui::Text("Name: %s", clip->Name().c_str());
 							ImGui::Text("FrameCount: %d", clip->FrameCount());
 							ImGui::Text("Duration: %f s", clip->Duration());
+							ImGui::Text("SkinTime: %.2f ms", sk_mesh_comp->_skin_time);
 							ImGui::Checkbox("DrawSkeleton", &sk_mesh_comp->_is_draw_debug_skeleton);
+							ImGui::Checkbox("MT Skin", &sk_mesh_comp->_is_mt_skin);
 							ImGui::SliderFloat("Time", &sk_mesh_comp->_anim_time, 0.f, (float)sk_mesh_comp->GetAnimationClip()->FrameCount());
 						}
 					}
@@ -693,7 +695,13 @@ namespace Ailu
 
 		ImGui::Checkbox("Expand", &show);
 		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
-		ImGui::ProgressBar(0.5f,ImVec2(0.f,0.f));
+		for (auto& info : g_pResourceMgr->_import_infos)
+		{
+			float x = g_pTimeMgr->GetScaledWorldTime(0.25f);
+			ImGui::Text("%s", info._msg.c_str());
+			ImGui::SameLine();
+			ImGui::ProgressBar(x - static_cast<int>(x), ImVec2(0.f, 0.f));
+		}
 		ImGui::End();
 		ImGui::PopFont();
 

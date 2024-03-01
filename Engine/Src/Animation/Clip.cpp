@@ -35,17 +35,20 @@ namespace Ailu
 			for (int j = 0; j < _local_pose.size(); j++)
 			{
 				auto& joint = _sk[j];
-				auto& local_pose = _local_pose[j][i];
-				if (joint._parent == 65535)
+				if (!_local_pose[j].empty())
 				{
-					joint._cur_pose = Transform::ToMatrix(local_pose);
+					auto& local_pose = _local_pose[j][i];
+					if (joint._parent == 65535)
+					{
+						joint._cur_pose = Transform::ToMatrix(local_pose);
+					}
+					else
+					{
+						joint._cur_pose = Transform::ToMatrix(local_pose) * _sk[joint._parent]._cur_pose;
+					}
+					_local_pose_mat[j][i] = joint._inv_bind_pos * joint._cur_pose * joint._node_inv_world_mat;
+					_local_pose_mat_debug[j][i] = joint._cur_pose * joint._node_inv_world_mat;
 				}
-				else
-				{
-					joint._cur_pose = Transform::ToMatrix(local_pose) * _sk[joint._parent]._cur_pose;
-				}
-				_local_pose_mat[j][i] = joint._inv_bind_pos * joint._cur_pose * joint._node_inv_world_mat;
-				_local_pose_mat_debug[j][i] = joint._cur_pose * joint._node_inv_world_mat;
 			}
 		}
 	}

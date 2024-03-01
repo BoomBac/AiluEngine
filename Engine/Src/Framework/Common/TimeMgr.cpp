@@ -62,8 +62,7 @@ namespace Ailu
 
 	float TimeMgr::GetScaledWorldTime(float scale, bool smooth_scale)
 	{
-		if (smooth_scale) return TimeSinceLoad * TimeScale * TimeScale;
-		else return TimeSinceLoad * TimeScale;
+		return smooth_scale ? TimeSinceLoad * scale * scale : TimeSinceLoad * scale;
 	}
 
 

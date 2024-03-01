@@ -28,15 +28,6 @@ namespace Ailu
 		Clamp(_light._light_param.y, 0.0f, _light._light_param.z - 0.1f);
 		_p_shadow_camera->Position(transf._position);
 		auto euler = _p_onwer->GetComponent<TransformComponent>()->GetEuler();
-		//_p_shadow_camera->_world_y = Quaternion::AngleAxis(euler.x, Camera::kUp);
-		//Vector3f rotated_right = TransformCoord(_p_shadow_camera->_world_y.ToMat4f(), Camera::kRight);
-		//_p_shadow_camera->_object_x = Quaternion::AngleAxis(euler.y, rotated_right);
-		//_p_shadow_camera->LookTo(_light._light_pos.xyz,Vector3f::kUp);
-
-		//auto rot = transf.Rotation();
-		//rot.xy = transf.Rotation().yx;
-		//rot.y += 90.0f;
-		//_p_shadow_camera->Rotation(rot);
 		_p_shadow_camera->Size(_shadow._size);
 		_p_shadow_camera->Far(_shadow._distance);
 		_p_shadow_camera->RecalculateMarix();

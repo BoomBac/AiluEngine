@@ -15,6 +15,7 @@
 #endif
 
 #define DEAR_IMGUI
+#define _SIMD
 
 #define CONTACT(x,y) x##y
 #define STR(x) #x
