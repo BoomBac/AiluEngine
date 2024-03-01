@@ -107,7 +107,7 @@ namespace Ailu
 			{
 				if (tex->GetTextureType() == ETextureType::kTexture2D)
 				{
-					auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetGPUHandle();
+					auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetSRVGPUHandle();
 					ImGui::BeginGroup();
 					ImGuiContext* context = ImGui::GetCurrentContext();
 					auto drawList = context->CurrentWindow->DrawList;
@@ -873,7 +873,6 @@ namespace Ailu
 			ImGui::TreePop(); // TreePop 需要在退出当前节点后
 		}
 		ImGui::PopID(); // PopID 需要与对应的 PushID 配对
-		g_pSceneMgr->_selected_id = s_cur_frame_selected_actor_id;
 	}
 
 	void ImGUILayer::ShowWorldOutline()
@@ -897,7 +896,7 @@ namespace Ailu
 			s_cur_selected_actor = s_cur_frame_selected_actor_id == 0 ? nullptr : g_pSceneMgr->_p_current->GetSceneActorByIndex(s_cur_frame_selected_actor_id);
 		}
 		s_pre_frame_selected_actor_id = s_cur_frame_selected_actor_id;
-
+		g_pSceneMgr->_p_selected_actor = s_cur_selected_actor;
 		cur_tree_node_index = 0;
 		ImGui::End();
 	}
@@ -981,7 +980,7 @@ namespace Ailu
 		{
 			if (tex->GetTextureType() == ETextureType::kTexture2D)
 			{
-				auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetGPUHandle();
+				auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetSRVGPUHandle();
 				ImGui::BeginGroup();
 				ImGuiContext* context = ImGui::GetCurrentContext();
 				auto drawList = context->CurrentWindow->DrawList;

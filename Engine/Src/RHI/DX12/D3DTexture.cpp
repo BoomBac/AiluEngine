@@ -5,26 +5,33 @@
 
 namespace Ailu
 {
-	D3DTexture2D::D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format)
+	D3DTexture2D::D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format, bool read_only)
 	{
 		_width = width;
 		_height = height;
 		_format = format;
-		_channel = 4;
+		_channel = GetFormatChannel(_format);
+		_res_format = ConvertToDXGIFormat(_format);
+		_srv_format = ConvertToDXGIFormat(_format);
+		_uav_format = ConvertToDXGIFormat(_format);
+		_read_only = read_only;
+		if(!_read_only)
+			Construct();
 	}
 
-	D3DTexture2D::D3DTexture2D(const uint16_t& width, const uint16_t& height, u8 channel, EALGFormat format)
+	D3DTexture2D::D3DTexture2D(const TextureDesc& desc)
 	{
-		_width = width;
-		_height = height;
-		_format = format;
-		_channel = channel;
-	}
-
-	D3DTexture2D::D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format, const String& asset_path) : 
-		D3DTexture2D(width, height, format)
-	{
-		_path = asset_path;
+		_width = desc._width;
+		_height = desc._height;
+		_format = desc._res_format;
+		_channel = GetFormatChannel(_format);
+		_res_format = ConvertToDXGIFormat(desc._res_format);
+		_srv_format = ConvertToDXGIFormat(desc._srv_format);
+		_uav_format = ConvertToDXGIFormat(desc._uav_format);
+		_read_only = desc._read_only;
+		_mipmap_count = desc._mipmap;
+		if (!_read_only)
+			Construct();
 	}
 
 	D3DTexture2D::~D3DTexture2D()
@@ -45,7 +52,7 @@ namespace Ailu
 	void D3DTexture2D::Bind(uint8_t slot)
 	{
 		static auto cmd = D3DContext::GetInstance()->GetCmdList();
-		cmd->SetGraphicsRootDescriptorTable(slot, _gpu_handle);
+		cmd->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
 	void D3DTexture2D::Release()
 	{
@@ -59,7 +66,7 @@ namespace Ailu
 
 	void* D3DTexture2D::GetGPUNativePtr()
 	{
-		return reinterpret_cast<void*>(_gpu_handle.ptr);
+		return reinterpret_cast<void*>(_srv_gpu_handle.ptr);
 	}
 
 	void D3DTexture2D::Construct()
@@ -70,69 +77,65 @@ namespace Ailu
 		ComPtr<ID3D12Resource> pTextureUpload;
 		D3D12_RESOURCE_DESC textureDesc{};
 		textureDesc.MipLevels = _mipmap_count;
-		textureDesc.Format = ConvertToDXGIFormat(_format);
+		textureDesc.Format = _res_format;
 		textureDesc.Width = _width;
 		textureDesc.Height = _height;
-		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		textureDesc.Flags = _read_only ? D3D12_RESOURCE_FLAG_NONE : D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 		textureDesc.DepthOrArraySize = 1;
 		textureDesc.SampleDesc.Count = 1;
 		textureDesc.SampleDesc.Quality = 0;
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, D3D12_RESOURCE_STATE_COPY_DEST,
+
+		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _read_only ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON,
 			nullptr, IID_PPV_ARGS(pTextureGPU.GetAddressOf())));
 
-		const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
-		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(pTextureGPU.Get(), 0, subresourceCount);
-		heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-		auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
-		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
-
-
-		//auto task_id = D3DContext::GetInstance()->SubmitResourceTask([=]() {
-		//	Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
-		//	for (size_t i = 0; i < _mipmap_count; i++)
-		//	{
-		//		u16 cur_mip_width = _width >> i;
-		//		u16 cur_mip_height = _height >> i;
-		//		D3D12_SUBRESOURCE_DATA subdata;
-		//		subdata.pData = _p_datas[i];
-		//		subdata.RowPitch = 4 * cur_mip_width;  // pixel size/byte  * width
-		//		subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
-		//		subres_datas.emplace_back(subdata);
-		//	}
-		//	UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
-		//	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		//	p_cmdlist->ResourceBarrier(1, &barrier);
-		//	});
-		//_submited_tasks.emplace_back(task_id);
-		u16 pixel_size = IsHDRFormat(_format)? 4 * _channel : _channel;
-		Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
-		for (size_t i = 0; i < _mipmap_count; i++)
+		if (_read_only)
 		{
-			u16 cur_mip_width = _width >> i;
-			u16 cur_mip_height = _height >> i;
-			D3D12_SUBRESOURCE_DATA subdata;
-			subdata.pData = _p_datas[i];
-			subdata.RowPitch = pixel_size * cur_mip_width;  // pixel size/byte  * width
-			subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
-			subres_datas.emplace_back(subdata);
+			const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
+			const UINT64 uploadBufferSize = GetRequiredIntermediateSize(pTextureGPU.Get(), 0, subresourceCount);
+			heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
+			auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+			ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
+
+			Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
+			for (size_t i = 0; i < _mipmap_count; i++)
+			{
+				u16 cur_mip_width = _width >> i;
+				u16 cur_mip_height = _height >> i;
+				D3D12_SUBRESOURCE_DATA subdata;
+				subdata.pData = _p_datas[i];
+				subdata.RowPitch = GetPixelByteSize(_format) * cur_mip_width;  // pixel size/byte  * width
+				subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
+				subres_datas.emplace_back(subdata);
+			}
+			UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
+			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			p_cmdlist->ResourceBarrier(1, &barrier);
 		}
-		UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		p_cmdlist->ResourceBarrier(1, &barrier);
+
 		// Describe and create a SRV for the texture.
 		//D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		_srv_desc.Format = textureDesc.Format;
+		_srv_desc.Format = _srv_format;
 		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		_srv_desc.Texture2D.MipLevels = _mipmap_count;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
 		auto [cpu_handle, gpu_handle] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
-		_cpu_handle = cpu_handle;
-		_gpu_handle = gpu_handle;
-		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _cpu_handle);
+		_srv_cpu_handle = cpu_handle;
+		_srv_gpu_handle = gpu_handle;
+		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _srv_cpu_handle);
+		if (!_read_only)
+		{
+			_uav_desc.Format = _uav_format;
+			_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			_uav_desc.Texture2D.MipSlice = 0;
+			auto [uav_cpu_handle, uav_gpu_handle] = D3DContext::GetInstance()->GetUAVDescriptorHandle();
+			_uav_cpu_handle = uav_cpu_handle;
+			_uav_gpu_handle = uav_gpu_handle;
+			p_device->CreateUnorderedAccessView(pTextureGPU.Get(), nullptr, &_uav_desc, _uav_cpu_handle);
+		}
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);
 	}
@@ -201,16 +204,16 @@ namespace Ailu
 		_srv_desc.Texture2D.MipLevels = 1;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
 		auto [cpu_handle, gpu_handle] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
-		_cpu_handle = cpu_handle;
-		_gpu_handle = gpu_handle;
-		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _cpu_handle);
+		_srv_cpu_handle = cpu_handle;
+		_srv_gpu_handle = gpu_handle;
+		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _srv_cpu_handle);
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);
 	}
 
 	void D3DTextureCubeMap::Bind(uint8_t slot)
 	{
-		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _gpu_handle);
+		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
 
 	void D3DTextureCubeMap::Release()
@@ -245,6 +248,8 @@ namespace Ailu
 		_rt_handle._name = _name;
 		_is_cubemap = is_cubemap;
 		_state = ETextureResState::kDefault;
+		_mipmap_count = mipmap;
+		bool need_uav = _mipmap_count > 1;
 		u16 texture_num = 1u;
 		if (is_cubemap)
 		{
@@ -254,9 +259,11 @@ namespace Ailu
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
 		auto p_cmdlist{ D3DContext::GetInstance()->GetTaskCmdList() };
 		D3D12_RESOURCE_DESC tex_desc{};
-		tex_desc.MipLevels = 1;
+		tex_desc.MipLevels = _mipmap_count;
 		tex_desc.Format = ConvertToDXGIFormat(_format);
 		tex_desc.Flags = is_shadowmap ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+		if(need_uav)
+			tex_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 		tex_desc.Width = _width;
 		tex_desc.Height = _height;
 		tex_desc.DepthOrArraySize = texture_num;
@@ -288,7 +295,7 @@ namespace Ailu
 			if (!is_shadowmap)
 			{
 				auto handle = D3DContext::GetInstance()->GetRTVDescriptorHandle();
-				_d3drt_handles[i]._color_handle._cpu_handle = handle;
+				_d3drt_handles[i]._color_handle._srv_cpu_handle = handle;
 				D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
 				rtv_desc.ViewDimension = _is_cubemap ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY :  D3D12_RTV_DIMENSION_TEXTURE2D;
 				rtv_desc.Format = tex_desc.Format;
@@ -299,17 +306,17 @@ namespace Ailu
 					rtv_desc.Texture2DArray.FirstArraySlice = i;
 					rtv_desc.Texture2DArray.ArraySize = 1;
 				}
-				p_device->CreateRenderTargetView(_p_buffer.Get(), &rtv_desc, _d3drt_handles[i]._color_handle._cpu_handle);
+				p_device->CreateRenderTargetView(_p_buffer.Get(), &rtv_desc, _d3drt_handles[i]._color_handle._srv_cpu_handle);
 			}
 			else
 			{
 				auto handle = D3DContext::GetInstance()->GetDSVDescriptorHandle();
-				_d3drt_handles[i]._depth_handle._cpu_handle = handle;
+				_d3drt_handles[i]._depth_handle._srv_cpu_handle = handle;
 				D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
 				dsv_desc.Format = tex_desc.Format;
 				dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 				dsv_desc.Texture2D.MipSlice = 0;
-				p_device->CreateDepthStencilView(_p_buffer.Get(), &dsv_desc, _d3drt_handles[i]._depth_handle._cpu_handle);
+				p_device->CreateDepthStencilView(_p_buffer.Get(), &dsv_desc, _d3drt_handles[i]._depth_handle._srv_cpu_handle);
 			}
 		}
 
@@ -326,12 +333,12 @@ namespace Ailu
 	}
 	void* D3DRenderTexture::GetNativeCPUHandle()
 	{
-		return reinterpret_cast<void*>(&_d3drt_handles[0]._color_handle._cpu_handle);
+		return reinterpret_cast<void*>(&_d3drt_handles[0]._color_handle._srv_cpu_handle);
 	}
 	void* D3DRenderTexture::GetNativeCPUHandle(u16 index)
 	{
 		index = _is_cubemap? index : 0;
-		return reinterpret_cast<void*>(&_d3drt_handles[index]._color_handle._cpu_handle);
+		return reinterpret_cast<void*>(&_d3drt_handles[index]._color_handle._srv_cpu_handle);
 	}
 	void D3DRenderTexture::Release()
 	{

@@ -7,6 +7,12 @@ namespace Ailu
     class AABB
     {
     public:
+        static float DistanceFromRayToAABB(const Vector3f& rayOrigin, const Vector3f& rayDirection,const Vector3f& aabbMin, const Vector3f& aabbMax) 
+        {
+            Vector3f p = 0.5f * (aabbMin + aabbMax);
+            return DistanceToRay(rayOrigin, rayDirection, p);
+        }
+
         static std::pair<Vector3f,Vector3f> CaclulateBoundBox(const AABB& aabb, const Matrix4x4f& mat) 
         {
             Vector3f vertices[8];

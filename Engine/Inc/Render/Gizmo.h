@@ -6,11 +6,15 @@
 #include "RenderCommand.h"
 #include "Buffer.h"
 #include "Camera.h"
+#include <functional>
 
 namespace Ailu
 {
     class Gizmo
     {
+    private: 
+        enum class EGeometryType {kLine, kCircle, kAABB, kOBB, kSphere};
+        inline static List<std::tuple<std::function<void()>, std::chrono::system_clock::time_point,std::chrono::seconds>> s_geometry_draw_list;
     public:
         static void Init()
         {
@@ -22,6 +26,11 @@ namespace Ailu
         {
             if (Gizmo::s_color.a < 0.1f) return;
             DrawLine(from, to, color, color);
+        }
+
+        static void DrawLine(const Vector3f& from, const Vector3f& to, const std::chrono::seconds& duration, Color color = Gizmo::s_color)
+        {
+            s_geometry_draw_list.emplace_back(std::make_tuple([=]() { DrawLine(from, to, color);},std::chrono::system_clock::now(),duration));
         }
 
         static void DrawCircle(const Vector3f& center, float radius, int num_segments, Color color = Gizmo::s_color, Matrix4x4f mat = BuildIdentityMatrix())
@@ -202,6 +211,19 @@ namespace Ailu
             }
             if (_vertex_num > 0)
             {
+                auto cur_time = std::chrono::system_clock::now();
+                s_geometry_draw_list.erase(std::remove_if(s_geometry_draw_list.begin(),s_geometry_draw_list.end(),
+                        [&](const auto& it) -> bool {
+                            return cur_time - std::get<2>(it) > std::get<1>(it);
+                        }
+                    ),
+                    s_geometry_draw_list.end()
+                );
+                for (auto& it : s_geometry_draw_list)
+                {
+                    auto& f = std::get<0>(it);
+                    f();
+                }
                 p_buf->UploadData();
                 p_buf->Bind();
                 D3DContext::GetInstance()->DrawInstanced(_vertex_num, 1);

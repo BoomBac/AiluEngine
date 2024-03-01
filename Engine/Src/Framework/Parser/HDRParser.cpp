@@ -23,13 +23,13 @@ namespace Ailu
 		if (data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
-			return Texture2D::Create(4, 4, n,EALGFormat::kALGFormatR32G32B32_FLOAT);
+			return Texture2D::Create(4, 4,EALGFormat::kALGFormatR32G32B32_FLOAT);
 		}
 		else
 		{
 			if (n == 3)
 			{
-				auto tex = Texture2D::Create(w, h, n,EALGFormat::kALGFormatR32G32B32_FLOAT);
+				auto tex = Texture2D::Create(w, h,EALGFormat::kALGFormatR32G32B32_FLOAT);
 				tex->AssetPath(PathUtils::FormatFilePath(PathUtils::ExtractAssetPath(path.data())));
 				tex->Name(PathUtils::GetFileName(path, true));
 				//Vector<float*> mipmaps{ data };

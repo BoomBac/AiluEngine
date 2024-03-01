@@ -88,11 +88,7 @@ namespace Ailu
 			memcpy(D3DContext::s_p_d3dcontext->_p_cbuffer, &D3DContext::s_p_d3dcontext->_perframe_scene_data, sizeof(D3DContext::s_p_d3dcontext->_perframe_scene_data));
 			});
 	}
-	void D3DCommandBuffer::SetShadowMatrix(const Matrix4x4f& shadow_matrix, u16 index)
-	{
-		D3DContext::s_p_d3dcontext->_perframe_scene_data._MainLightShadowMatrix = shadow_matrix;
-		memcpy(D3DContext::s_p_d3dcontext->_p_cbuffer, &D3DContext::s_p_d3dcontext->_perframe_scene_data, sizeof(D3DContext::s_p_d3dcontext->_perframe_scene_data));
-	}
+
 	void D3DCommandBuffer::SetViewports(const std::initializer_list<Rect>& viewports)
 	{
 		static CD3DX12_VIEWPORT d3d_viewports[8];
@@ -168,6 +164,71 @@ namespace Ailu
 			}
 			});
 	}
+	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material,ConstantBuffer* per_obj_cbuf, uint32_t instance_count)
+	{
+		if (mesh == nullptr)
+		{
+			LOG_WARNING("Mesh is null when draw renderer!");
+			return;
+		}
+		_commands.emplace_back([=]() {
+			if (material != nullptr)
+			{
+				mesh->GetVertexBuffer()->Bind(material->GetShader()->PipelineInputLayout());
+				mesh->GetIndexBuffer()->Bind();
+				material->Bind();
+			}
+			else
+			{
+				static Material* error = MaterialLibrary::GetMaterial("Error").get();
+				mesh->GetVertexBuffer()->Bind(error->GetShader()->PipelineInputLayout());
+				mesh->GetIndexBuffer()->Bind();
+				error->Bind();
+			}
+			GraphicsPipelineStateMgr::EndConfigurePSO();
+			if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+			{
+				per_obj_cbuf->Bind(0);
+				D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count);
+			}
+			else
+			{
+				LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
+			}
+			});
+	}
+	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, uint32_t instance_count)
+	{
+		if (mesh == nullptr)
+		{
+			LOG_WARNING("Mesh is null when draw renderer!");
+			return;
+		}
+		_commands.emplace_back([=]() {
+			if (material != nullptr)
+			{
+				mesh->GetVertexBuffer()->Bind(material->GetShader()->PipelineInputLayout());
+				mesh->GetIndexBuffer()->Bind();
+				material->Bind();
+			}
+			else
+			{
+				static Material* error = MaterialLibrary::GetMaterial("Error").get();
+				mesh->GetVertexBuffer()->Bind(error->GetShader()->PipelineInputLayout());
+				mesh->GetIndexBuffer()->Bind();
+				error->Bind();
+			}
+			GraphicsPipelineStateMgr::EndConfigurePSO();
+			if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+			{
+				D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count);
+			}
+			else
+			{
+				LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
+			}
+			});
+	}
 	void D3DCommandBuffer::SetPSO(GraphicsPipelineStateObject* pso)
 	{
 		_commands.emplace_back([=]() {
@@ -227,11 +288,12 @@ namespace Ailu
 			D3DContext::s_p_d3dcontext->BeginBackBuffer();
 			mesh->GetVertexBuffer()->Bind(material->GetShader()->PipelineInputLayout());
 			mesh->GetIndexBuffer()->Bind();
-			//color->Transition(ETextureResState::kShaderResource);
 			material->SetTexture("_SourceTex", color);
 			material->Bind();
 			GraphicsPipelineStateMgr::EndConfigurePSO();
 			D3DContext::s_p_d3dcontext->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1, mat);
+			GraphicsPipelineStateMgr::s_gizmo_pso->Bind();
+			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
 			D3DContext::s_p_d3dcontext->DrawOverlay();
 			D3DContext::s_p_d3dcontext->EndBackBuffer();
 			});
@@ -239,5 +301,13 @@ namespace Ailu
 	void D3DCommandBuffer::ResolveToBackBuffer(RenderTexture* color)
 	{
 		throw std::runtime_error("The method or operation is not implemented.");
+	}
+
+	void D3DCommandBuffer::Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+	{
+		static auto cmd = D3DContext::GetInstance()->GetCmdList();
+		_commands.emplace_back([=]() {
+			cs->Bind(thread_group_x, thread_group_y, thread_group_z);
+			});
 	}
 }

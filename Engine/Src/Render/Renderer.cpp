@@ -30,15 +30,22 @@ namespace Ailu
 		_p_opaque_pass = MakeScope<OpaquePass>();
 		_p_reslove_pass = MakeScope<ResolvePass>(_p_camera_color_attachment);
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
+		_p_postprocess_pass = MakeScope<PostProcessPass>();
 		auto tex0 =g_pResourceMgr->LoadTexture(EnginePath::kEngineTexturePath + "small_cave_1k.hdr", "SmallCave");
 		TexturePool::Add(tex0->AssetPath(), tex0);
-		auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-
-		//MeshPool::AddMesh("anim", parser->Parser(GetResPath("Meshs/anim.fbx")).front());
-		//static_cast<FbxParser*>(parser.get())->Parser(GetResPath("Meshs/anim.fbx"), s_test_sk,s_anim_mat);
 
 		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512,"pure_sky","Textures/small_cave_1k.hdr");
 		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
+		_p_test_cs = ComputeShader::Create(PathUtils::GetResPath("Shaders/Compute/cs_test.hlsl"));
+		TextureDesc desc(64,64,1,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR32_UINT,false);
+		_p_test_texture = Texture2D::Create(desc);
+		_p_test_texture->Name("cs_out");
+		TexturePool::Add("cs_out", std::dynamic_pointer_cast<Texture2D>(_p_test_texture));
+
+		_p_per_frame_cbuf.reset(ConstantBuffer::Create(RenderConstants::kPerFrameDataSize));
+		Shader::ConfigurePerFrameConstBuffer(_p_per_frame_cbuf.get());
+		for (int i = 0; i < RenderConstants::kMaxRenderObjectCount; i++)
+			_p_per_object_cbufs[i] = ConstantBuffer::Create(RenderConstants::kPeObjectDataSize);
 		return 0;
 	}
 	void Renderer::Finalize()
@@ -46,6 +53,8 @@ namespace Ailu
 		INIT_CHECK(this, Renderer);
 		_p_timemgr->Finalize();
 		DESTORY_PTR(_p_timemgr);
+		for (int i = 0; i < RenderConstants::kMaxRenderObjectCount; i++)
+			DESTORY_PTR(_p_per_object_cbufs[i]);
 	}
 	void Renderer::Tick(const float& delta_time)
 	{
@@ -66,10 +75,14 @@ namespace Ailu
 		Camera::sCurrent = _p_scene_camera;
 		PrepareCamera(_p_scene_camera);
 		PrepareLight(g_pSceneMgr->_p_current);
-		memcpy(_p_context->GetPerFrameCbufData(), _p_per_frame_cbuf_data, sizeof(ScenePerFrameData));
+		_rendering_data._p_per_frame_cbuf = _p_per_frame_cbuf.get();
+		_rendering_data._p_per_object_cbuf = _p_per_object_cbufs;
+		_rendering_data._p_camera_color_target = _p_camera_color_attachment;
 
+		memcpy(_p_per_frame_cbuf->GetData(), _p_per_frame_cbuf_data, sizeof(ScenePerFrameData));
 		_p_render_passes.emplace_back(_p_opaque_pass.get());
 		_p_render_passes.emplace_back(_p_reslove_pass.get());
+
 
 
 		//TODO:下一行存在绘制会崩溃，需要排查
@@ -85,41 +98,6 @@ namespace Ailu
 			pass->EndPass(_p_context);
 		_p_task_render_passes.clear();
 	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		index_buffer->Bind();
-		RenderCommand::DrawIndexedInstanced(index_buffer, instance_count);
-	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		RenderCommand::DrawInstanced(vertex_buf, instance_count);
-	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		index_buffer->Bind();
-		mat->Bind();
-		RenderCommand::DrawIndexedInstanced(index_buffer, instance_count);
-	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, Ref<Material> mat, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		mat->Bind();
-		RenderCommand::DrawInstanced(vertex_buf, instance_count);
-	}
-	void Renderer::Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, Matrix4x4f transform, uint32_t instance_count)
-	{
-		vertex_buf->Bind();
-		index_buffer->Bind();
-		mat->Bind();
-		RenderCommand::DrawIndexedInstanced(index_buffer, instance_count, transform);
-	}
-	void Renderer::Submit(const Ref<Mesh>& mesh, Ref<Material>& mat, Matrix4x4f transform, uint32_t instance_count)
-	{
-
-	}
 
 	float Renderer::GetDeltaTime() const
 	{
@@ -127,17 +105,20 @@ namespace Ailu
 	}
 	void Renderer::Render()
 	{
+		_p_test_cs->SetTexture("gInputA",TexturePool::Get("Textures/MyImage01.jpg").get());
+		_p_test_cs->SetTexture("gOut", _p_test_texture.get());
 		auto cmd = CommandBufferPool::GetCommandBuffer();
 		cmd->Clear();
-		//_p_shadowcast_pass->BeginPass(_p_context);
-		//_p_shadowcast_pass->Execute(_p_context, cmd.get(), _rendering_data);
+		cmd->Dispatch(_p_test_cs.get(), 4, 4, 1);
 
-		
-		//cmd->SetViewProjectionMatrices(_p_scene_camera->GetView(), _p_scene_camera->GetProjection());
+		_p_shadowcast_pass->BeginPass(_p_context);
+		_p_shadowcast_pass->Execute(_p_context,_rendering_data);
+
+
 		for (auto task_pass : _p_task_render_passes)
 		{
 			task_pass->BeginPass(_p_context);
-			task_pass->Execute(_p_context, cmd.get());
+			task_pass->Execute(_p_context, _rendering_data);
 		}
 
 
@@ -146,13 +127,13 @@ namespace Ailu
 		cmd->ClearRenderTarget(_p_camera_color_attachment, _p_camera_depth_attachment, Colors::kBlack, 1.0f);
 		cmd->SetViewports({ Rect{0,0,(uint16_t)w,(uint16_t)h} });
 		cmd->SetScissorRects({ Rect{0,0,(uint16_t)w,(uint16_t)h} });
-		cmd->SetViewProjectionMatrices(_p_scene_camera->GetView(), _p_scene_camera->GetProjection());
 		_p_context->ExecuteCommandBuffer(cmd);
 
 		Shader::SetGlobalTexture("SkyBox", _p_cubemap_gen_pass->_p_cube_map.get());
 		Shader::SetGlobalTexture("DiffuseIBL", _p_cubemap_gen_pass->_p_env_map.get());
+
 		_p_opaque_pass->BeginPass(_p_context);
-		_p_opaque_pass->Execute(_p_context);
+		_p_opaque_pass->Execute(_p_context, _rendering_data);
 
 
 		//cmd->Clear();
@@ -161,8 +142,11 @@ namespace Ailu
 		//	pass->BeginPass(_p_context);
 		//	pass->Execute(_p_context);
 		//}
+		//_p_postprocess_pass->Execute(_p_context, _rendering_data);
+
 		_p_reslove_pass->BeginPass(_p_context);
-		_p_reslove_pass->Execute(_p_context);
+		_p_reslove_pass->Execute(_p_context, _rendering_data);
+
 
 		CommandBufferPool::ReleaseCommandBuffer(cmd);
 
@@ -277,10 +261,15 @@ namespace Ailu
 			_p_per_frame_cbuf_data->_DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
 			_p_per_frame_cbuf_data->_DirectionalLights[0]._LightDir = { 0.0f,0.0f,0.0f };
 		}
+		_p_per_frame_cbuf_data->_MainLightShadowMatrix = _rendering_data._shadow_data[0]._shadow_view * _rendering_data._shadow_data[0]._shadow_proj;
 	}
+
 	void Renderer::PrepareCamera(Camera* p_camera)
 	{
 		//_p_scene_camera->RecalculateMarix();
 		_p_per_frame_cbuf_data->_CameraPos = _p_scene_camera->Position();
+		_p_per_frame_cbuf_data->_MatrixV = _p_scene_camera->GetView();
+		_p_per_frame_cbuf_data->_MatrixP = _p_scene_camera->GetProjection();
+		_p_per_frame_cbuf_data->_MatrixVP = _p_per_frame_cbuf_data->_MatrixV * _p_per_frame_cbuf_data->_MatrixP;
 	}
 }

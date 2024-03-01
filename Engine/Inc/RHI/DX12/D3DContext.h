@@ -30,8 +30,10 @@ namespace Ailu
         ID3D12Device* GetDevice();
         ID3D12GraphicsCommandList* GetCmdList();
         ID3D12GraphicsCommandList* GetTaskCmdList();
+        //return cbv/uav/src desc heap
         ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
         std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetSRVDescriptorHandle();
+        std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetUAVDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle();
         uint8_t* GetCBufferPtr();
@@ -53,6 +55,7 @@ namespace Ailu
 
 
         void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
+        void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count);
         void DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform);
         void DrawInstanced(uint32_t vertex_count, uint32_t instance_count);
 

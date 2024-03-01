@@ -8,6 +8,7 @@
 #include <format>
 #include <limits>
 #include <bitset>
+#include <limits>
 #include "GlobalMarco.h"
 
 namespace Ailu
@@ -339,7 +340,7 @@ namespace Ailu
 
 		bool operator==(const Vector4D<T>& other) const
 		{
-			return memcmp(this, &other, sizeof(Vector4D<T>));
+			return x == other.x && y == other.y && z == other.z && w == other.w;
 		}
 
 		Vector4D<T>& operator+=(const Vector4D<T>& other) {
@@ -412,6 +413,18 @@ namespace Ailu
 		for (uint32_t i = 0; i < CountOf(from.data); i++)
 		{
 			dis += (to.data[i] - from.data[i]) * (to.data[i] - from.data[i]);
+		}
+		return sqrt(dis);
+	}
+
+	// Calculate magnitude (length) of a vector
+	template<template<typename> class TT, typename T>
+	static float Magnitude(const TT<T>& v)
+	{
+		float dis = 0;
+		for (uint32_t i = 0; i < CountOf(v.data); i++)
+		{
+			dis += v.data[i] * v.data[i];
 		}
 		return sqrt(dis);
 	}
@@ -594,6 +607,49 @@ namespace Ailu
 			min.data[i] = first.data[i] < second.data[i] ? first.data[i] : second.data[i];
 		}
 		return min;
+	}
+
+	template<template<typename> typename TT, typename T>
+	static T CompMax(const TT<T>& v)
+	{
+		T max_var = std::numeric_limits<T>::lowest();
+		for (uint8_t i = 0; i < CountOf(v.data); i++)
+		{
+			max_var = max(v.data[i], max_var);
+		}
+		return max_var;
+	}
+
+	template<template<typename> typename TT, typename T>
+	static T CompMin(const TT<T>& v)
+	{
+#undef max
+		T min_var = std::numeric_limits<T>::max();
+		for (uint8_t i = 0; i < CountOf(v.data); i++)
+		{
+			min_var = min(v.data[i], min_var);
+		}
+		return min_var;
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+	}
+
+	template<template<typename> typename TT, typename T>
+	T DistanceToRay(const TT<T>& start, const TT<T>& dir, const TT<T>& p) 
+	{
+		const TT<T> PA = p - start;
+		// Calculate the dot product of PA and the ray's direction vector
+		T dotProductValue = DotProduct(PA, dir);
+		// Calculate the projection vector
+		const TT<T> projection = dir * dotProductValue;
+
+		// Vector from PA to the projection point on the ray
+		const TT<T> distanceVector = PA - projection;
+
+		// Calculate the distance as the magnitude of the distance vector
+		T distance = Magnitude(distanceVector);
+		return distance;
 	}
 
 	template <typename T, int rows, int cols>

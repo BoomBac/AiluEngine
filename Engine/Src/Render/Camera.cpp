@@ -66,6 +66,7 @@ namespace Ailu
 		_forward = _rotation * Vector3f::kForward;
 		_up = _rotation * Vector3f::kUp;
 		_right = CrossProduct(_up, _forward);
+		CalculateFrustum();
 		BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
 	}
 
@@ -79,7 +80,24 @@ namespace Ailu
 
 	void Camera::LookTo(const Vector3f& direction, const Vector3f& up)
 	{
+		_forward = direction;
+		_right = CrossProduct(up, _forward);
+		_up = CrossProduct(_forward,_right);
+		_forward = Normalize(_forward);
+		_right = Normalize(_right);
+		_up = Normalize(_up);
+		if (_camera_type == ECameraType::kPerspective)
+			BuildPerspectiveFovLHMatrix(_proj_matrix, _fov_h * k2Radius, _aspect, _near_clip, _far_clip);
+		else
+		{
+			float left = -_size * 0.5f;
+			float right = -left;
+			float top = right / _aspect;
+			float bottom = -top;
+			BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom, _near_clip, _far_clip);
+		}
 		BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
+		CalculateFrustum();
 	}
 
 	bool Camera::IsInFrustum(const Vector3f& pos)

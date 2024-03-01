@@ -2,11 +2,13 @@
 #ifndef __D3DCONSTANTS__
 #define __D3DCONSTANTS__
 #include <cstdint>
-#include "RenderingData.h"
 #include "AlgFormat.h"
+#include "CBuffer.h"
 
 namespace Ailu
 {
+	DECLARE_ENUM(EColorRange, kLDR, kHDR)
+
 	namespace RenderConstants
 	{
 		constexpr static uint8_t  kFrameCount = 2u;
@@ -14,6 +16,7 @@ namespace Ailu
 		constexpr static uint32_t kMaxRenderObjectCount = 50u;
 		constexpr static uint32_t kMaxPassDataCount = 10u;
 		constexpr static uint32_t kMaxTextureCount = 16u;
+		constexpr static uint8_t  kMaxUAVTextureCount = 10U;
 		constexpr static uint32_t kMaxRenderTextureCount = 16u;
 		constexpr static uint32_t KMaxDynamicVertexNum = 2048;
 		constexpr static uint8_t  kMaxVertexAttrNum = 10u;

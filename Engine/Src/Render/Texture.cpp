@@ -6,7 +6,7 @@
 
 namespace Ailu
 {
-	Ref<Texture2D> Texture2D::Create(const uint16_t& width, const uint16_t& height, u8 channel, EALGFormat format)
+	Ref<Texture2D> Texture2D::Create(const uint16_t& width, const uint16_t& height, EALGFormat res_format, bool read_only)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -15,12 +15,29 @@ namespace Ailu
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			return MakeRef<D3DTexture2D>(width, height, channel,format);
+			return MakeRef<D3DTexture2D>(width, height, res_format, read_only);
 		}
 		}
 		AL_ASSERT(false, "Unsupport render api!");
 		return nullptr;
 	}
+
+	Ref<Texture2D> Texture2D::Create(const TextureDesc& desc)
+	{
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::ERenderAPI::kNone:
+			AL_ASSERT(false, "None render api used!")
+				return nullptr;
+		case RendererAPI::ERenderAPI::kDirectX12:
+		{
+			return MakeRef<D3DTexture2D>(desc);
+		}
+		}
+		AL_ASSERT(false, "Unsupport render api!");
+		return nullptr;
+	}
+
 	void Texture2D::FillData(uint8_t* data)
 	{
 		_mipmap_count = 1;

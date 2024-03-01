@@ -15,7 +15,9 @@
 #include "Texture.h"
 #include "Framework/Common/SceneMgr.h"
 #include "./Pass/RenderPass.h"
+#include "./Pass/PostprocessPass.h"
 #include "RenderingData.h"
+
 
 namespace Ailu
 {
@@ -24,12 +26,6 @@ namespace Ailu
     public:
         void BeginScene();
         void EndScene();
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer,uint32_t instance_count = 1);
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, uint32_t instance_count = 1);
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat, uint32_t instance_count = 1);
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, Ref<Material> mat ,uint32_t instance_count = 1);
-        static void Submit(const Ref<VertexBuffer>& vertex_buf, const Ref<IndexBuffer>& index_buffer, Ref<Material> mat,Matrix4x4f transform ,uint32_t instance_count = 1);
-        static void Submit(const Ref<Mesh>& mesh, Ref<Material>& mat,Matrix4x4f transform ,uint32_t instance_count = 1);
         int Initialize() override;
         void Finalize() override;
         void Tick(const float& delta_time) override;
@@ -43,14 +39,19 @@ namespace Ailu
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
     private:
+        Ref<ComputeShader> _p_test_cs;
+        Ref<Texture> _p_test_texture;
         static inline List<RenderPass*> _p_task_render_passes{};
-        RenderingData _rendering_data;
+        Scope<ConstantBuffer> _p_per_frame_cbuf;
         ScenePerFrameData* _p_per_frame_cbuf_data;
+        RenderingData _rendering_data;
+        ConstantBuffer* _p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
         GraphicsContext* _p_context = nullptr;
         Scope<OpaquePass> _p_opaque_pass;
         Scope<ResolvePass> _p_reslove_pass;
         Scope<ShadowCastPass> _p_shadowcast_pass;
         Scope<CubeMapGenPass> _p_cubemap_gen_pass;
+        Scope<PostProcessPass> _p_postprocess_pass;
         List<RenderPass*> _p_render_passes;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;

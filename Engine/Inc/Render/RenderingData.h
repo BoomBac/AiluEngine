@@ -2,8 +2,9 @@
 #ifndef __RENDERING_DATA_H__
 #define __RENDERING_DATA_H__
 
-#include "CBuffer.h"
 #include "GlobalMarco.h"
+#include "Buffer.h"
+#include "Texture.h"
 
 namespace Ailu
 {
@@ -11,7 +12,6 @@ namespace Ailu
     {
         kShader,kWireFrame,kShaderedWireFrame
     };
-	DECLARE_ENUM(EColorRange,kLDR,kHDR)
 
     struct RenderingStates
     {      
@@ -38,6 +38,9 @@ namespace Ailu
     public:
         RenderingShadowData _shadow_data[8];
         u8 _actived_shadow_count = 0;
+        ConstantBuffer* _p_per_frame_cbuf;
+        ConstantBuffer** _p_per_object_cbuf;
+        Ref<RenderTexture> _p_camera_color_target;
         void Reset()
         {
             _actived_shadow_count = 0;

@@ -8,6 +8,7 @@
 #include "GlobalMarco.h"
 #include "Texture.h"
 #include "Framework/Common/Reflect.h"
+#include "Buffer.h"
 
 
 namespace Ailu
@@ -58,12 +59,13 @@ namespace Ailu
 	private:
 		u16 _sampler_mask_offset = 0u;
 		uint16_t _mat_cbuf_size = 0u;
-		uint8_t* _p_cbuf_cpu;
 		Ref<Shader> _p_shader;
-		uint8_t* _p_cbuf = nullptr;
-		//每个材质的cbuf大小一致，存储在一个大的buf，index记录其偏移量
-		uint32_t _cbuf_index;
+		//uint8_t* _p_cbuf_cpu;
+		//uint8_t* _p_cbuf = nullptr;
+		////每个材质的cbuf大小一致，存储在一个大的buf，index记录其偏移量
+		//uint32_t _cbuf_index;
 		inline static uint32_t s_current_cbuf_offset = 0u;
+		Scope<ConstantBuffer> _p_cbuf;
 		//std::unordered_set<ShaderBindResourceInfo, ShaderBindResourceInfoHash, ShaderBindResourceInfoEqual> _mat_props{};
 		//value_name : <bind_slot,texture>
 		std::map<String, std::tuple<uint8_t, Ref<Texture>>> _textures{};

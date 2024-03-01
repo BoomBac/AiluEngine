@@ -4,16 +4,16 @@ name: BoneWeight
 shader_path: Shaders/shaders.hlsl
   prop_type: Float
     MetallicValue: 0
-    RoughnessValue: 0
-    SamplerMask: 0
+    RoughnessValue: 0.066
+    SamplerMask: 4.2039e-45
   prop_type: Vector
     SpecularColor: 0,0,0,0
     BaseColor: 1,1,1,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
-    Specular: none
-    Metallic: none
-    Albedo: none
-    Normal: none
+    Albedo: Meshs\Walking.fbm\Ch46_1001_Diffuse.png
+    Normal: Meshs\Walking.fbm\Ch46_1001_Normal.png
     Emssive: none
     Roughness: none
+    Metallic: none
+    Specular: none

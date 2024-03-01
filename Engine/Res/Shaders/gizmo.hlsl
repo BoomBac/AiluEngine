@@ -4,6 +4,7 @@
 //pixel: PSMain
 //Cull: Back
 //Queue: Opaque
+//ZTest: LEqual
 //Fill: Solid
 //info end
 

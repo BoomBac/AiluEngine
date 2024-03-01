@@ -4,11 +4,13 @@
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/Window.h"
 #include "Framework/Events/Event.h"
+#include "Framework/Events/MouseEvent.h"
 #include "Render/Renderer.h"
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/LayerStack.h"
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Framework/Events/InputLayer.h"
+#include "Framework/Events/SceneLayer.h"
 
 namespace Ailu
 {
@@ -35,6 +37,7 @@ namespace Ailu
         LayerStack _layer_stack;
         ImGUILayer* _p_imgui_layer;
         InputLayer* _p_input_layer;
+        SceneLayer* _p_scene_layer;
         Window* _p_window = nullptr;
         Renderer* _p_renderer = nullptr;
         void OnEvent(Event& e);

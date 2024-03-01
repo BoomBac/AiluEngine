@@ -10,6 +10,7 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/Reflect.h"
 #include "Texture.h"
+#include "Buffer.h"
 
 #include "PipelineState.h"
 
@@ -58,6 +59,7 @@ namespace Ailu
 		};
 		uint8_t _bind_slot;
 		std::string _name;
+		void* _p_res = nullptr;
 		ShaderBindResourceInfo() = default;
 		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, uint8_t bind_slot, const std::string& name)
 			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
@@ -156,7 +158,12 @@ namespace Ailu
 		DECLARE_PRIVATE_PROPERTY(id, ID, u16)
 		friend class Material;
 	public:
-		static Ref<Shader> Create(const std::string& file_name);
+		static Ref<Shader> Create(const std::string& file_name,String vert_entry = "", String pixel_entry = "");
+		static void SetGlobalTexture(const String& name, Texture* texture);
+		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
+		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
+		static void ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf);
+		static ConstantBuffer* GetPerFrameConstBuffer() { return	s_p_per_frame_cbuffer; };
 
 		Shader(const String& sys_path);
 		virtual ~Shader() = default;
@@ -179,9 +186,7 @@ namespace Ailu
 		Vector4f GetVectorValue(const String& name);
 		float GetFloatValue(const String& name);
 
-		static void SetGlobalTexture(const String& name, Texture* texture);
-		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
-		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix,u32 num);
+
 		const String& GetSrcPath() {return _src_file_path;}
 		const std::set<String>& GetSourceFiles() {return _source_files;}
 		const std::map<String, Vector<String>> GetKeywordGroups() {return _keywords;};
@@ -191,12 +196,12 @@ namespace Ailu
 		const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() {return	_bind_res_infos;}
 		const List<ShaderPropertyInfo>& GetShaderPropertyInfos() {return _shader_prop_infos;}
 	protected:
-		virtual uint8_t* GetCBufferPtr(uint32_t index) {return nullptr;};
 		virtual bool RHICompileImpl();
 	protected:
 		inline static bool _b_init_buffer = false;
 		inline static u8* _p_cbuffer = nullptr;
 		inline static u16 _s_global_shader_id = 0u;
+		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
 		String _vert_entry, _pixel_entry;
 		uint8_t _vertex_input_num = 0u;
 		String _src_file_path;
@@ -346,6 +351,32 @@ float4 PSMain(PSInput input) : SV_TARGET
 		inline static Vector<Ref<Shader>> s_shaders;
 		inline static std::unordered_map<std::string, uint32_t> s_shader_name;
 		inline static std::unordered_map<std::string, std::string> s_shader_path;
+	};
+
+	class ComputeShader
+	{
+		DECLARE_PRIVATE_PROPERTY(name, Name, String)
+		DECLARE_PRIVATE_PROPERTY(id, ID, u16)
+		DECLARE_PROTECTED_PROPERTY(src_file_path,Path,String)
+	public:
+		static Ref<ComputeShader> Create(const String& file_name);
+		static Ref<ComputeShader> Get(const String& name);
+		ComputeShader(const String& sys_path);
+		virtual ~ComputeShader() = default;
+		virtual void Bind(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+		virtual void SetTexture(const String& name, Texture* texture);
+		virtual void SetTexture(u8 bind_slot, Texture* texture);
+
+		bool Compile();
+	protected:
+		virtual bool RHICompileImpl();
+	protected:
+		inline static std::unordered_map<String,Ref<ComputeShader>> s_cs_library{};
+		std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
+		std::unordered_map<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
+		bool _is_valid;
+	private:
+		inline static u32 s_global_cs_id = 0u;
 	};
 }
 

@@ -9,6 +9,7 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/dxhelper.h"
+#include "RHI/DX12/D3DTexture.h"
 
 
 
@@ -348,13 +349,15 @@ namespace Ailu
 
 	D3DShader::D3DShader(const String& sys_path) : Shader(sys_path)
 	{
-		if (!_b_init_buffer)
-		{
-			m_cbvHeap = D3DContext::GetInstance()->GetDescriptorHeap();
-			_desc_size = D3DContext::GetInstance()->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			_p_cbuffer = D3DContext::GetInstance()->GetCBufferPtr();
-			_b_init_buffer = true;
-		}
+		_src_file_path = sys_path;
+		_source_files.insert(sys_path);
+		Compile();
+	}
+
+	D3DShader::D3DShader(const String& sys_path, const String& vs_entry, String ps_entry) : Shader(sys_path)
+	{
+		_vert_entry = vs_entry;
+		_pixel_entry = ps_entry;
 		_src_file_path = sys_path;
 		_source_files.insert(sys_path);
 		Compile();
@@ -382,16 +385,6 @@ namespace Ailu
 		_vertex_input_num = 0u;
 		memset(_vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
 		_pipeline_topology = ETopology::kTriangle;
-	}
-
-	uint8_t* D3DShader::GetCBufferPtr(uint32_t index)
-	{
-		if (index > RenderConstants::kMaxMaterialDataCount)
-		{
-			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
-			return nullptr;
-		}
-		return _p_cbuffer + RenderConstants::kPerFrameDataSize + index * RenderConstants::kPerMaterialDataSize;
 	}
 
 	void D3DShader::LoadShaderReflection(ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps)
@@ -504,14 +497,10 @@ namespace Ailu
 	{
 		Shader::Bind(index);
 		static auto context = D3DContext::GetInstance();
-
-		if (_per_mat_buf_bind_slot != -1)
-		{
-			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(1 + index)), EBindResDescType::kConstBuffer, static_cast<u8>(_per_mat_buf_bind_slot));
-		}
 		if (_per_frame_buf_bind_slot != -1)
 		{
-			GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(0)), EBindResDescType::kConstBuffer, _per_frame_buf_bind_slot);
+			//GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(0)), EBindResDescType::kConstBuffer, _per_frame_buf_bind_slot);
+			GraphicsPipelineStateMgr::SubmitBindResource(s_p_per_frame_cbuffer, EBindResDescType::kConstBuffer, static_cast<u8>(_per_frame_buf_bind_slot));
 		}
 	}
 
@@ -531,4 +520,171 @@ namespace Ailu
 	{
 		return _p_sig.Get();
 	}
+
+
+	//-------------------------------------------------------------------------------D3DComputeShader---------------------------------------------------------------------------
+	D3DComputeShader::D3DComputeShader(const String& sys_path) : ComputeShader(sys_path)
+	{
+		Compile();
+	}
+
+	void D3DComputeShader::Bind(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+	{
+		if (!_is_valid)
+		{
+			LOG_WARNING("ComputeShader is not valid!");
+			return;
+		}
+		static auto cmd = D3DContext::GetInstance()->GetCmdList();
+		_pso_sys.Bind(cmd);
+		for (auto& info : _bind_res_infos)
+		{
+			auto& bind_info = info.second;
+			if (bind_info._p_res != nullptr)
+			{
+				if (bind_info._res_type == EBindResDescType::kTexture2D)
+				{
+					cmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetSRVGPUHandle());
+				}
+				else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
+				{
+					cmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetUAVGPUHandle());
+				}
+			}
+		}
+		cmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
+	}
+
+
+	void D3DComputeShader::LoadReflectionInfo(ID3D12ShaderReflection* p_reflect)
+	{
+		D3D12_SHADER_DESC desc{};
+		_temp_bind_res_infos.clear();
+		//parser vs reflecton	
+		p_reflect->GetDesc(&desc);
+		for (uint32_t i = 0u; i < desc.BoundResources; i++)
+		{
+			D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
+			p_reflect->GetResourceBindingDesc(i, &bind_desc);
+			auto res_type = bind_desc.Type;
+			if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+			{
+				_temp_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kConstBuffer,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+			}
+			else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
+			{
+				_temp_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+			}
+			else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
+			{
+				_temp_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+			}
+			else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED)
+			{
+				_temp_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kUAVTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+			}
+		}
+	}
+
+	bool D3DComputeShader::RHICompileImpl()
+	{
+		bool succeed = true;
+		ComPtr<ID3DBlob> _tmp_blob = nullptr;
+		try
+		{
+#ifdef SHADER_DXC
+			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
+			LoadShaderReflection(_p_reflection.Get());
+#else
+			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "cs_main", "cs_5_0", _tmp_blob, _p_reflection);
+#endif // SHADER_DXC
+		}
+		catch (const std::exception&)
+		{
+			succeed = false;
+			g_pLogMgr->LogErrorFormat("Compile shader with src {0} failed!", _src_file_path);
+			_is_valid = false;
+		}
+		if (succeed)
+		{
+			_p_blob = _tmp_blob;
+			LoadReflectionInfo(_p_reflection.Get());
+			GenerateInternalPSO();
+			succeed = _is_valid;
+			LOG_INFO("Compile shader with src {0} succeed!", _src_file_path);
+		}
+		return succeed;
+	}
+
+	void D3DComputeShader::GenerateInternalPSO()
+	{
+		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+		auto device = D3DContext::GetInstance()->GetDevice();
+		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
+		{
+			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+		}
+		CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
+		CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
+		int texture_count = 0;
+		uint8_t root_param_index = 0;
+		for (auto it = _temp_bind_res_infos.begin(); it != _temp_bind_res_infos.end(); it++)
+		{
+			auto& desc = it->second;
+			if (desc._res_type == EBindResDescType::kTexture2D)
+			{
+				++texture_count;
+				ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot);
+				rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
+				desc._bind_slot = root_param_index;
+				++root_param_index;
+			}
+			else if (desc._res_type == EBindResDescType::kUAVTexture2D)
+			{
+				++texture_count;
+				ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot);
+				rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
+				desc._bind_slot = root_param_index;
+				++root_param_index;
+			}
+		}
+		auto [sig, pso] = _pso_sys.Back();
+		static Vector<CD3DX12_STATIC_SAMPLER_DESC> samplers{
+			CD3DX12_STATIC_SAMPLER_DESC(0,D3D12_FILTER_MIN_MAG_MIP_LINEAR,D3D12_TEXTURE_ADDRESS_MODE_WRAP,D3D12_TEXTURE_ADDRESS_MODE_WRAP,D3D12_TEXTURE_ADDRESS_MODE_WRAP),
+			CD3DX12_STATIC_SAMPLER_DESC(1,D3D12_FILTER_MIN_MAG_MIP_LINEAR,D3D12_TEXTURE_ADDRESS_MODE_CLAMP,D3D12_TEXTURE_ADDRESS_MODE_CLAMP,D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
+			CD3DX12_STATIC_SAMPLER_DESC(2,D3D12_FILTER_MIN_MAG_MIP_LINEAR,D3D12_TEXTURE_ADDRESS_MODE_BORDER,D3D12_TEXTURE_ADDRESS_MODE_BORDER,D3D12_TEXTURE_ADDRESS_MODE_BORDER)
+		};
+
+		D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.Init_1_1(root_param_index, rootParameters, static_cast<u32>(samplers.size()), samplers.data(), rootSignatureFlags);
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+
+		if (SUCCEEDED(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error)) &&
+			SUCCEEDED(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&sig))))
+		{
+			D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc{};
+			pso_desc.pRootSignature = sig.Get();
+			pso_desc.CS = { _p_blob->GetBufferPointer() ,_p_blob->GetBufferSize() };
+			pso_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+			if (SUCCEEDED(device->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&pso))))
+			{
+				_pso_sys.Swap();
+				_bind_res_infos = std::move(_temp_bind_res_infos);
+				_is_valid = true;
+			}
+			else
+				_is_valid = false;
+		}
+		else
+		{
+			_is_valid = false;
+			LOG_ERROR("Create compute shader {} failed when generate internal pso!", _src_file_path);
+		}
+	
+	}
+
+	//-------------------------------------------------------------------------------D3DComputeShader---------------------------------------------------------------------------
 }
