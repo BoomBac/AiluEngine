@@ -42,7 +42,7 @@ namespace Ailu
 		_joints.resize(size);
 	}
 	unsigned int Pose::Size() {
-		return _joints.size();
+		return static_cast<int>(_joints.size());
 	}
 
 	Transform Pose::GetLocalTransform(unsigned int index) {

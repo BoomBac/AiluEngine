@@ -4,6 +4,7 @@
 #include "RHI/DX12/dxhelper.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "RHI/DX12/D3DContext.h"
+#include "RHI/DX12/D3DCommandBuffer.h"
 
 namespace Ailu
 {
@@ -52,24 +53,26 @@ namespace Ailu
 		LOG_WARNING("PipelineState build {}!", count++);
 	}
 
-	void D3DGraphicsPipelineState::Bind()
+	void D3DGraphicsPipelineState::Bind(CommandBuffer* cmd)
 	{
 		if (!_b_build)
 		{
 			LOG_ERROR("PipelineState must be build before it been bind!");
 			return;
 		}
-		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootSignature(_p_sig.Get());
-		D3DContext::GetInstance()->GetCmdList()->SetPipelineState(_p_plstate.Get());
-		D3DContext::GetInstance()->GetCmdList()->IASetPrimitiveTopology(D3DConvertUtils::ConvertToDXTopology(_state_desc._topology));
+		_p_cmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		_p_cmd->SetGraphicsRootSignature(_p_sig.Get());
+		_p_cmd->SetPipelineState(_p_plstate.Get());
+		_p_cmd->IASetPrimitiveTopology(D3DConvertUtils::ConvertToDXTopology(_state_desc._topology));
+		_p_cmd->SetDescriptorHeaps(1, D3DContext::GetInstance()->GetDescriptorHeap().GetAddressOf());
 	}
 
-	void D3DGraphicsPipelineState::SetPipelineResource(void* res, const EBindResDescType& res_type, u8 slot)
+	void D3DGraphicsPipelineState::SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot)
 	{
-		BindResource(res,res_type,slot);
+		BindResource(cmd,res,res_type,slot);
 	}
 
-	void D3DGraphicsPipelineState::SetPipelineResource(void* res, const EBindResDescType& res_type, const String& name)
+	void D3DGraphicsPipelineState::SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, const String& name)
 	{
 		if (_p_bind_res_desc_infos == nullptr)
 		{
@@ -79,11 +82,11 @@ namespace Ailu
 		auto it = _p_bind_res_desc_infos->find(name);
 		if (it != _p_bind_res_desc_infos->end())
 		{
-			BindResource(res, res_type, it->second._bind_slot);
+			BindResource(cmd,res, res_type, it->second._bind_slot);
 		}
 	}
 
-	void D3DGraphicsPipelineState::BindResource(void* res, const EBindResDescType& res_type, u8 slot)
+	void D3DGraphicsPipelineState::BindResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot)
 	{
 		static auto context = D3DContext::GetInstance();
 		switch (res_type)
@@ -93,13 +96,13 @@ namespace Ailu
 			u8 bind_slot = slot == 255 ? _per_frame_cbuf_bind_slot : slot;
 			//D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
 			//context->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, view.BufferLocation);
-			static_cast<ConstantBuffer*>(res)->Bind(bind_slot);
+			static_cast<ConstantBuffer*>(res)->Bind(cmd,bind_slot);
 			return;
 		}
 		break;
 		case Ailu::EBindResDescType::kTexture2D:
 		{
-			reinterpret_cast<Texture*>(res)->Bind(slot);
+			reinterpret_cast<Texture*>(res)->Bind(cmd,slot);
 		}
 		break;
 		case Ailu::EBindResDescType::kSampler:

@@ -17,7 +17,7 @@
 
 namespace Ailu
 {
-	enum class EShaderType : uint8_t
+	enum class EShaderType : u8
 	{
 		kVertex,kPixel
 	};
@@ -57,11 +57,11 @@ namespace Ailu
 			u32 _res_slot;
 			u32 _cbuf_member_offset;
 		};
-		uint8_t _bind_slot;
+		u8 _bind_slot;
 		std::string _name;
 		void* _p_res = nullptr;
 		ShaderBindResourceInfo() = default;
-		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, uint8_t bind_slot, const std::string& name)
+		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, u8 bind_slot, const std::string& name)
 			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
 		{
 			if (res_type == EBindResDescType::kCBufferAttribute) _cbuf_member_offset = slot_or_offset;	
@@ -167,7 +167,7 @@ namespace Ailu
 
 		Shader(const String& sys_path);
 		virtual ~Shader() = default;
-		virtual void Bind(uint32_t index);
+		virtual void Bind(u32 index);
 		virtual bool Compile();
 		virtual bool PreProcessShader();
 		virtual void* GetByteCode(EShaderType type);
@@ -203,7 +203,7 @@ namespace Ailu
 		inline static u16 _s_global_shader_id = 0u;
 		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
 		String _vert_entry, _pixel_entry;
-		uint8_t _vertex_input_num = 0u;
+		u8 _vertex_input_num = 0u;
 		String _src_file_path;
 		u32 _actual_id;
 		i8 _per_mat_buf_bind_slot = -1;
@@ -236,7 +236,7 @@ namespace Ailu
 	public:
 		static Ref<Shader> Get(std::string shader_name)
 		{
-			uint32_t shader_id = NameToId(shader_name);
+			u32 shader_id = NameToId(shader_name);
 			if (VAILD_SHADER_ID(shader_id)) return s_shader_library.find(shader_id)->second;
 			else
 			{
@@ -330,7 +330,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 				return Shader::Create(sys_path);
 			}
 		}
-		inline static uint32_t NameToId(const std::string& name)
+		inline static u32 NameToId(const std::string& name)
 		{
 			auto it = s_shader_name.find(name);
 			if (it != s_shader_name.end()) return it->second;
@@ -345,11 +345,11 @@ float4 PSMain(PSInput input) : SV_TARGET
 			return s_shaders.end();
 		}
 	private:
-		inline static uint32_t s_shader_id = 0u;
-		inline static uint32_t s_error_id = 9999u;
-		inline static std::unordered_map<uint32_t, Ref<Shader>> s_shader_library;
+		inline static u32 s_shader_id = 0u;
+		inline static u32 s_error_id = 9999u;
+		inline static std::unordered_map<u32, Ref<Shader>> s_shader_library;
 		inline static Vector<Ref<Shader>> s_shaders;
-		inline static std::unordered_map<std::string, uint32_t> s_shader_name;
+		inline static std::unordered_map<std::string, u32> s_shader_name;
 		inline static std::unordered_map<std::string, std::string> s_shader_path;
 	};
 
@@ -363,7 +363,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 		static Ref<ComputeShader> Get(const String& name);
 		ComputeShader(const String& sys_path);
 		virtual ~ComputeShader() = default;
-		virtual void Bind(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+		virtual void Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
 		virtual void SetTexture(const String& name, Texture* texture);
 		virtual void SetTexture(u8 bind_slot, Texture* texture);
 

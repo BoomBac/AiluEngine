@@ -13,7 +13,7 @@
 
 namespace Ailu
 {
-	enum class ETextureUsage : uint8_t
+	enum class ETextureUsage : u8
 	{
 		kAlbedo = 0,kNormal,kEmssive,kRoughness,kSpecular,kMetallic
 	};
@@ -60,15 +60,15 @@ namespace Ailu
 		u16 _sampler_mask_offset = 0u;
 		uint16_t _mat_cbuf_size = 0u;
 		Ref<Shader> _p_shader;
-		//uint8_t* _p_cbuf_cpu;
-		//uint8_t* _p_cbuf = nullptr;
+		//u8* _p_cbuf_cpu;
+		//u8* _p_cbuf = nullptr;
 		////每个材质的cbuf大小一致，存储在一个大的buf，index记录其偏移量
-		//uint32_t _cbuf_index;
-		inline static uint32_t s_current_cbuf_offset = 0u;
+		//u32 _cbuf_index;
+		inline static u32 s_current_cbuf_offset = 0u;
 		Scope<ConstantBuffer> _p_cbuf;
 		//std::unordered_set<ShaderBindResourceInfo, ShaderBindResourceInfoHash, ShaderBindResourceInfoEqual> _mat_props{};
 		//value_name : <bind_slot,texture>
-		std::map<String, std::tuple<uint8_t, Ref<Texture>>> _textures{};
+		std::map<String, std::tuple<u8, Ref<Texture>>> _textures{};
 	};
 
 	class StandardMaterial : public Material
@@ -134,7 +134,7 @@ namespace Ailu
 			return s_it_materials.end();
 		}
 	private:
-		inline static uint32_t s_next_material_id = 0u;
+		inline static u32 s_next_material_id = 0u;
 		inline static std::unordered_map<String, Ref<Material>> s_materials{};
 		inline static Vector<Ref<Material>> s_it_materials{};
 	};

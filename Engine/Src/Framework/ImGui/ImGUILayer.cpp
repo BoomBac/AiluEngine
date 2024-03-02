@@ -207,7 +207,7 @@ namespace Ailu
 		case Ailu::ESerializablePropertyType::kTexture2D:
 		{
 			ImGui::Text("Texture2D : %s", prop._name.c_str());
-			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
+			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Ref<Texture>>>(prop);
 			auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
 			String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
 			//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
@@ -306,7 +306,7 @@ namespace Ailu
 				{
 					auto prop = mat->GetProperty(name);
 					ImGui::Text(" :%s", prop._name.c_str());
-					auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
+					auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Ref<Texture>>>(prop);
 					auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
 					String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
 					//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();

@@ -18,9 +18,9 @@ namespace Ailu
 {
 	namespace TextureUtils
 	{
-		static uint8_t* ExpandImageDataToFourChannel(uint8_t* p_data, size_t size, uint8_t alpha = 255u)
+		static u8* ExpandImageDataToFourChannel(u8* p_data, size_t size, u8 alpha = 255u)
 		{
-			uint8_t* new_data = new uint8_t[size / 3 * 4];
+			u8* new_data = new u8[size / 3 * 4];
 			auto pixel_num = size / 3;
 			for (size_t i = 0; i < pixel_num; i++)
 			{
@@ -94,17 +94,18 @@ namespace Ailu
 	{
 		kTexture2D = 0,kTextureCubeMap,kRenderTexture
 	};
+	class CommandBuffer;
 	class Texture
 	{
 	public:
 		virtual ~Texture() = default;
-		virtual uint8_t* GetCPUNativePtr() = 0;
+		virtual u8* GetCPUNativePtr() = 0;
 		virtual void* GetGPUNativePtr() = 0;
 		virtual void* GetNativeCPUHandle() = 0;
 		virtual const uint16_t& GetWidth() const = 0;
 		virtual const uint16_t& GetHeight() const = 0;
 		virtual void Release() = 0;
-		virtual void Bind(uint8_t slot) = 0;
+		virtual void Bind(CommandBuffer* cmd,u8 slot) = 0;
 		virtual void Name(const std::string& name) = 0;
 		virtual const std::string& Name() const = 0;
 		virtual const ETextureType GetTextureType() const = 0;
@@ -134,12 +135,12 @@ namespace Ailu
 	public:
 		static Ref<Texture2D> Create(const uint16_t& width, const uint16_t& height, EALGFormat res_format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool read_only = true);
 		static Ref<Texture2D> Create(const TextureDesc& desc);
-		virtual void FillData(uint8_t* data);
+		virtual void FillData(u8* data);
 		virtual void FillData(Vector<u8*> datas);
-		virtual void Bind(uint8_t slot) override;
+		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
-		uint8_t* GetCPUNativePtr() override;
+		u8* GetCPUNativePtr() override;
 		void* GetNativeCPUHandle() override;
 		void* GetGPUNativePtr()override;
 		const ETextureType GetTextureType() const final;
@@ -163,10 +164,10 @@ namespace Ailu
 	public:
 		static Ref<TextureCubeMap> Create(const uint16_t& width, const uint16_t& height, EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		virtual void FillData(Vector<u8*>& data);
-		virtual void Bind(uint8_t slot) override;
+		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
-		uint8_t* GetCPUNativePtr() override;
+		u8* GetCPUNativePtr() override;
 		void* GetNativeCPUHandle() override;
 		void* GetGPUNativePtr()override;
 		const ETextureType GetTextureType() const final;
@@ -178,7 +179,7 @@ namespace Ailu
 		std::string _name;
 		Vector<u8*> _p_datas;
 		uint16_t _width, _height;
-		uint8_t _channel;
+		u8 _channel;
 		EALGFormat _format;
 		u8 _mipmap_count;
 	};
@@ -206,7 +207,7 @@ namespace Ailu
 	{
 	public:
 		static Ref<RenderTexture> Create(const uint16_t& width, const uint16_t& height, String name,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool is_cubemap = false);
-		virtual void Bind(uint8_t slot) override;
+		virtual void Bind(CommandBuffer* cmd, u8 slot) override;
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
 		//return rtv handle
@@ -215,7 +216,7 @@ namespace Ailu
 		virtual void* GetNativeCPUHandle(u16 index);
 		void* GetGPUNativePtr() override;
 		const ETextureType GetTextureType() const final;
-		virtual void Transition(ETextureResState state);
+		virtual void Transition(CommandBuffer* cmd,ETextureResState state);
 		const RTHandle& GetRTHandle() const { return _rt_handle; }
 		void Name(const std::string& name) override { _name = name; };
 		const std::string& Name() const override { return _name; };
@@ -229,7 +230,7 @@ namespace Ailu
 		ETextureResState _state;
 		uint16_t _width, _height;
 		bool _is_cubemap;
-		uint8_t _channel;
+		u8 _channel;
 		EALGFormat _format;
 		u8 _mipmap_count;
 	};
@@ -292,7 +293,7 @@ namespace Ailu
 			else return nullptr;
 		}
 
-		static uint32_t GetResNum()
+		static u32 GetResNum()
 		{
 			return s_res_num;
 		}
@@ -300,7 +301,7 @@ namespace Ailu
 	protected:
 		inline static std::map<std::string, Ref<Texture>> s_res_pool{};
 		inline static bool s_is_dirty = true;
-		inline static uint32_t s_res_num = 0u;
+		inline static u32 s_res_num = 0u;
 	};
 }
 

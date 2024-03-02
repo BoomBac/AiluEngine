@@ -329,7 +329,7 @@ namespace Ailu
 				GenerateIndexdMesh(mesh.get());
 				CalculateTangant(mesh.get());
 				LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-				mesh->Build();
+				//mesh->BuildRHIResource();
 				if (is_skined)
 				{
 					dynamic_cast<SkinedMesh*>(mesh.get())->CurSkeleton(_cur_skeleton);
@@ -598,7 +598,7 @@ namespace Ailu
 		}
 
 		fbxsdk::FbxVector4* points{ fbx_mesh->GetControlPoints() };
-		uint32_t cur_index_count = 0u;
+		u32 cur_index_count = 0u;
 		std::vector<Vector3f> positions{};
 		Vector<Vector4f> bone_weights_vec{};
 		Vector<Vector4D<u32>> bone_indices_vec{};
@@ -648,7 +648,7 @@ namespace Ailu
 			}
 		}
 
-		uint32_t vertex_count = (uint32_t)positions.size();
+		u32 vertex_count = (u32)positions.size();
 		float* vertex_buf = new float[vertex_count * 3];
 		memcpy(vertex_buf, positions.data(), sizeof(Vector3f) * vertex_count);
 		mesh->_vertex_count = vertex_count;
@@ -726,7 +726,7 @@ namespace Ailu
 
 	bool FbxParser::ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh)
 	{
-		uint32_t tangent_num = fbx_mesh.GetElementTangentCount();
+		u32 tangent_num = fbx_mesh.GetElementTangentCount();
 		AL_ASSERT(tangent_num < 0, "ReadTangent");
 		auto* tangents = fbx_mesh.GetElementTangent();
 		if (tangents == nullptr)
@@ -734,7 +734,7 @@ namespace Ailu
 			LOG_WARNING("FbxMesh: {} don't contain tangent info!", fbx_mesh.GetName());
 			return true;
 		}
-		uint32_t vertex_count = fbx_mesh.GetControlPointsCount(), data_size = 0;
+		u32 vertex_count = fbx_mesh.GetControlPointsCount(), data_size = 0;
 		void* data = nullptr;
 		if (tangents->GetMappingMode() == fbxsdk::FbxGeometryElement::eByPolygonVertex)
 		{
@@ -762,9 +762,9 @@ namespace Ailu
 		else if (tangents->GetMappingMode() == fbxsdk::FbxGeometryElement::eByControlPoint)
 		{
 			data = new float[vertex_count * 3];
-			for (uint32_t vertex_id = 0; vertex_id < vertex_count; ++vertex_id)
+			for (u32 vertex_id = 0; vertex_id < vertex_count; ++vertex_id)
 			{
-				uint32_t tangent_id = 0;
+				u32 tangent_id = 0;
 				if (tangents->GetReferenceMode() == fbxsdk::FbxGeometryElement::eDirect)
 					tangent_id = vertex_id;
 				else if (tangents->GetReferenceMode() == fbxsdk::FbxGeometryElement::eIndexToDirect)
@@ -782,7 +782,7 @@ namespace Ailu
 
 	bool FbxParser::CalculateTangant(Mesh* mesh)
 	{
-		uint32_t* indices = mesh->GetIndices();
+		u32* indices = mesh->GetIndices();
 		Vector3f* pos = mesh->GetVertices();
 		Vector2f* uv0 = mesh->GetUVs(0);
 		Vector4f* tangents = new Vector4f[mesh->_vertex_count];
@@ -793,7 +793,7 @@ namespace Ailu
 		ZeroMemory(tan1, vertexCount * sizeof(Vector3f) * 2);
 		for (size_t i = 0; i < mesh->_index_count; i += 3)
 		{
-			uint32_t i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
+			u32 i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
 			const Vector3f& pos1 = pos[i1];
 			const Vector3f& pos2 = pos[i2];
 			const Vector3f& pos3 = pos[i3];
@@ -842,14 +842,14 @@ namespace Ailu
 		}
 		SkinedMesh* skined_mesh = dynamic_cast<SkinedMesh*>(mesh);
 
-		uint32_t vertex_count = mesh->_vertex_count;
-		std::unordered_map<uint64_t, uint32_t> vertex_map{};
+		u32 vertex_count = mesh->_vertex_count;
+		std::unordered_map<uint64_t, u32> vertex_map{};
 		std::vector<Vector3f> normals{};
 		std::vector<Vector3f> positions{};
 		std::vector<Vector2f> uv0s{};
-		std::vector<uint32_t> indices{};
+		std::vector<u32> indices{};
 
-		uint32_t cur_index_count = 0u;
+		u32 cur_index_count = 0u;
 		auto raw_normals = mesh->GetNormals();
 		auto raw_uv0 = mesh->GetUVs(0u);
 		auto raw_pos = mesh->GetVertices();
@@ -924,22 +924,22 @@ namespace Ailu
 		float aabb_space = 1.0f;
 		mesh->_bound_box._max = vmax + Vector3f::kOne * aabb_space;
 		mesh->_bound_box._min = vmin - Vector3f::kOne * aabb_space;
-		vertex_count = (uint32_t)positions.size();
+		vertex_count = (u32)positions.size();
 		auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;
-		mesh->_index_count = (uint32_t)index_count;
+		mesh->_index_count = (u32)index_count;
 		float* vertex_buf = new float[vertex_count * 3];
 		float* normal_buf = new float[vertex_count * 3];
 		float* uv0_buf = new float[vertex_count * 2];
-		uint32_t* index_buf = new uint32_t[index_count];
+		u32* index_buf = new u32[index_count];
 		memcpy(uv0_buf, uv0s.data(), sizeof(Vector2f) * vertex_count);
 		memcpy(normal_buf, normals.data(), sizeof(Vector3f) * vertex_count);
 		memcpy(vertex_buf, positions.data(), sizeof(Vector3f) * vertex_count);
-		memcpy(index_buf, indices.data(), sizeof(uint32_t) * index_count);
+		memcpy(index_buf, indices.data(), sizeof(u32) * index_count);
 		mesh->SetUVs(std::move(reinterpret_cast<Vector2f*>(uv0_buf)), 0u);
 		mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(normal_buf)));
 		mesh->SetVertices(std::move(reinterpret_cast<Vector3f*>(vertex_buf)));
-		mesh->SetIndices(std::move(reinterpret_cast<uint32_t*>(index_buf)));
+		mesh->SetIndices(std::move(reinterpret_cast<u32*>(index_buf)));
 		if (raw_bonei)
 		{
 			u32* bone_indices_buf = new u32[vertex_count * 4];

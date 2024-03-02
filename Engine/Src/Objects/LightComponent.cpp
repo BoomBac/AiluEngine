@@ -21,21 +21,10 @@ namespace Ailu
 	{
 		if (!_b_enable) return;
 		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
-		Clamp(_intensity, 0.0, 4.0);
 		_light._light_color.a = _intensity;
 		_light._light_pos = transf._position;
 		Clamp(_light._light_param.z, 0.0f, 180.0f);
 		Clamp(_light._light_param.y, 0.0f, _light._light_param.z - 0.1f);
-		//auto euler = _p_onwer->GetComponent<TransformComponent>()->GetEuler();
-		//_p_shadow_camera->_world_y = Quaternion::AngleAxis(euler.x, Camera::kUp);
-		//Vector3f rotated_right = TransformCoord(_p_shadow_camera->_world_y.ToMat4f(), Camera::kRight);
-		//_p_shadow_camera->_object_x = Quaternion::AngleAxis(euler.y, rotated_right);
-		//_p_shadow_camera->LookTo(_light._light_pos.xyz,Vector3f::kUp);
-
-		//auto rot = transf.Rotation();
-		//rot.xy = transf.Rotation().yx;
-		//rot.y += 90.0f;
-
 		if (_b_cast_shadow)
 		{
 			Vector4f light_forward = transf._rotation * kDefaultDirectionalLightDir;
@@ -81,6 +70,7 @@ namespace Ailu
 		formated_str.pop();
 		comp->_light._light_color = { vec,LoadFloat(TP_ONE(formated_str.front()).c_str()) };
 		formated_str.pop();
+		comp->_intensity = comp->_light._light_color.a;
 		if(type == ELightTypeStr(ELightType::kPoint))
 		{
 			comp->_light_type = ELightType::kPoint;

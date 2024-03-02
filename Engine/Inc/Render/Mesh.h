@@ -21,22 +21,23 @@ namespace Ailu
 		Mesh(const std::string& name);
 		~Mesh();
 		virtual void Clear();
-		virtual void Build();
+		virtual void BuildRHIResource();
 		void SetVertices(Vector3f* vertices);
 		void SetNormals(Vector3f* normals);
 		void SetTangents(Vector4f* tangents);
-		void SetUVs(Vector2f* uv, uint8_t index);
+		void SetUVs(Vector2f* uv, u8 index);
 		inline  Vector3f* GetVertices() { return _vertices; };
 		inline Vector3f* GetNormals() { return _normals; };
 		inline Vector4f* GetTangents() { return _tangents; };
-		inline Vector2f* GetUVs(uint8_t index) { return _uv[index]; };
-		inline uint32_t* GetIndices() { return _p_indices; };
-		void SetIndices(uint32_t* indices);
+		inline Vector2f* GetUVs(u8 index) { return _uv[index]; };
+		inline u32* GetIndices() { return _p_indices; };
+		void SetIndices(u32* indices);
 		const Ref<VertexBuffer>& GetVertexBuffer() const;
 		const Ref<IndexBuffer>& GetIndexBuffer() const;
+		bool _is_rhi_res_ready = false;
 	public:
-		uint32_t _vertex_count;
-		uint32_t _index_count;
+		u32 _vertex_count;
+		u32 _index_count;
 		AABB _bound_box;
 	protected:
 		Ref<VertexBuffer> _p_vbuf;
@@ -46,7 +47,7 @@ namespace Ailu
 		Color* _colors;
 		Vector4f* _tangents;
 		Vector2f** _uv;
-		uint32_t* _p_indices;
+		u32* _p_indices;
 	};
 
 	class SkinedMesh : public Mesh
@@ -57,7 +58,7 @@ namespace Ailu
 		SkinedMesh();
 		SkinedMesh(const String& name);
 		~SkinedMesh();
-		void Build() final;
+		void BuildRHIResource() final;
 		void Clear() final;
 		void SetBoneWeights(Vector4f* bone_weights);
 		void SetBoneIndices(Vector4D<u32>* bone_indices);
@@ -133,7 +134,7 @@ namespace Ailu
 			return s_it_meshes.end();
 		}
 	private:
-		inline static uint32_t s_next_mesh_id = 0u;
+		inline static u32 s_next_mesh_id = 0u;
 		inline static std::unordered_map<std::string, Ref<Mesh>> s_meshes;
 		inline static Vector<Ref<Mesh>> s_it_meshes;
 		inline static Vector<const char*> s_meshe_names;

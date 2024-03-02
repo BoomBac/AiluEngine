@@ -18,7 +18,12 @@ namespace Ailu
 	}
 	void OpaquePass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::GetCommandBuffer();
+		auto cmd = CommandBufferPool::Get();
+		cmd->SetRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target);
+		cmd->ClearRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target, Colors::kBlack, 1.0f);
+		cmd->SetViewport(rendering_data._viewport);
+		cmd->SetScissorRect(rendering_data._scissor_rect);
+
 		u32 obj_index = 0u;
 		if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
 		{
@@ -42,7 +47,7 @@ namespace Ailu
 			}
 		}
 		context->ExecuteCommandBuffer(cmd);
-		CommandBufferPool::ReleaseCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 	}
 	void OpaquePass::BeginPass(GraphicsContext* context)
 	{
@@ -60,13 +65,13 @@ namespace Ailu
 	}
 	void ResolvePass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::GetCommandBuffer();
+		auto cmd = CommandBufferPool::Get();
 		cmd->Clear();
 		cmd->SetViewport(_backbuf_rect);
 		cmd->SetScissorRect(_backbuf_rect);
 		cmd->ResolveToBackBuffer(_p_src_color);
 		context->ExecuteCommandBuffer(cmd);
-		CommandBufferPool::ReleaseCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 	}
 
 	void ResolvePass::BeginPass(GraphicsContext* context)
@@ -92,7 +97,7 @@ namespace Ailu
 
 	void ShadowCastPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::GetCommandBuffer();
+		auto cmd = CommandBufferPool::Get();
 		cmd->Clear();
 		cmd->SetRenderTarget(nullptr, _p_shadow_map.get());
 		cmd->ClearRenderTarget(_p_shadow_map.get(), 1.0f);
@@ -105,7 +110,7 @@ namespace Ailu
 		}
 		Shader::SetGlobalTexture("MainLightShadowMap", _p_shadow_map.get());
 		context->ExecuteCommandBuffer(cmd);
-		CommandBufferPool::ReleaseCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 	}
 
 	void ShadowCastPass::BeginPass(GraphicsContext* context)
@@ -166,7 +171,7 @@ namespace Ailu
 
 	void CubeMapGenPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::GetCommandBuffer();
+		auto cmd = CommandBufferPool::Get();
 		cmd->Clear();
 		cmd->SetScissorRect(_rect);
 		cmd->SetViewport(_rect);
@@ -187,7 +192,7 @@ namespace Ailu
 		}
 		Shader::SetGlobalTexture("SkyBox", _p_env_map.get());
 		context->ExecuteCommandBuffer(cmd);
-		CommandBufferPool::ReleaseCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 	}
 
 	void CubeMapGenPass::BeginPass(GraphicsContext* context)

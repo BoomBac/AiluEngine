@@ -30,7 +30,7 @@ namespace Ailu
 	{
 		return GetAsyncKeyState(keycode) & 0x8000;
 	}
-	bool WinInput::IsMouseButtonPressedImpl(uint8_t button)
+	bool WinInput::IsMouseButtonPressedImpl(u8 button)
 	{
 		if(button == 0)
 			return GetAsyncKeyState(VK_MBUTTON) & 0x8000;

@@ -4,6 +4,7 @@
 #include "RHI/DX12/D3DBuffer.h"
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DContext.h"
+#include "RHI/DX12/D3DCommandBuffer.h"
 
 namespace Ailu
 {
@@ -20,7 +21,7 @@ namespace Ailu
 		_mapped_data.resize(RenderConstants::kMaxVertexAttrNum);
 		_buf_num = _buffer_layout.GetStreamCount();
 	}
-	D3DVertexBuffer::D3DVertexBuffer(float* vertices, uint32_t size) : _buf_num(1)
+	D3DVertexBuffer::D3DVertexBuffer(float* vertices, u32 size) : _buf_num(1)
 	{
 		s_vertex_bufs.emplace_back(ComPtr<ID3D12Resource>());
 		s_vertex_buf_views.emplace_back(D3D12_VERTEX_BUFFER_VIEW{});
@@ -32,20 +33,10 @@ namespace Ailu
 	{
 
 	}
-	void D3DVertexBuffer::Bind() const
-	{
-		if (_buf_start < 0 || _buf_start >= s_vertex_buf_views.size())
-		{
-			AL_ASSERT(false, "Try to bind a vertex buffer with an invalid index");
-			return;
-		}
-		RenderingStates::s_vertex_num += _vertices_count;
-		D3DContext::GetInstance()->GetCmdList()->IASetVertexBuffers(0, _buf_num, &s_vertex_buf_views[_buf_start]);
-	}
 
-	void D3DVertexBuffer::Bind(const VertexBufferLayout& pipeline_input_layout) const
+	void D3DVertexBuffer::Bind(CommandBuffer* cmd, const VertexBufferLayout& pipeline_input_layout) const
 	{
-		static auto cmdlist = D3DContext::GetInstance()->GetCmdList();
+		auto cmdlist = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
 		RenderingStates::s_vertex_num += _vertices_count;
 		for (auto& layout_ele : pipeline_input_layout)
 		{
@@ -57,7 +48,7 @@ namespace Ailu
 			}
 			else
 			{
-				LOG_WARNING("Try to bind a vertex buffer with an invalid layout element name {}",layout_ele.Name);
+				LOG_WARNING("Try to bind a vertex buffer with an invalid layout element name {}", layout_ele.Name);
 			}
 		}
 	}
@@ -72,7 +63,7 @@ namespace Ailu
 		return _buffer_layout;
 	}
 
-	void D3DVertexBuffer::SetStream(float* vertices, uint32_t size, uint8_t stream_index)
+	void D3DVertexBuffer::SetStream(float* vertices, u32 size, u8 stream_index)
 	{
 		auto d3d_conetxt = D3DContext::GetInstance();
 		if (_buffer_layout.GetStride(stream_index) == 0)
@@ -84,36 +75,26 @@ namespace Ailu
 		ComPtr<ID3D12Resource> upload_heap;
 		auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(
-			&heap_prop,
-			D3D12_HEAP_FLAG_NONE,
-			&res_desc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(upload_heap.GetAddressOf())));
+		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop,D3D12_HEAP_FLAG_NONE,&res_desc,D3D12_RESOURCE_STATE_GENERIC_READ,nullptr,IID_PPV_ARGS(upload_heap.GetAddressOf())));
 		// Copy the triangle data to update heap
-		uint8_t* pVertexDataBegin;
+		u8* pVertexDataBegin;
 		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
 		ThrowIfFailed(upload_heap->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
 		memcpy(pVertexDataBegin, vertices, size);
 		upload_heap->Unmap(0, nullptr);
 
 		// Create a Default Heap for the vertex buffer
-		uint32_t cur_buffer_index = _buf_start + stream_index;
+		u32 cur_buffer_index = _buf_start + stream_index;
 		s_vertex_bufs[cur_buffer_index].Reset();
 		heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(
-			&heap_prop,
-			D3D12_HEAP_FLAG_NONE,
-			&res_desc,
-			D3D12_RESOURCE_STATE_COMMON,
-			nullptr,
-			IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
-		auto cmd = d3d_conetxt->GetTaskCmdList();
-		cmd->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
+		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop,D3D12_HEAP_FLAG_NONE,&res_desc,D3D12_RESOURCE_STATE_COMMON,nullptr,IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
+		auto cmd = CommandBufferPool::Get();
+		auto cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
+		cmdlist->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
 		auto buf_state = CD3DX12_RESOURCE_BARRIER::Transition(s_vertex_bufs[cur_buffer_index].Get(),
 			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-		cmd->ResourceBarrier(1, &buf_state);
+		cmdlist->ResourceBarrier(1, &buf_state);
+		d3d_conetxt->ExecuteCommandBuffer(cmd);
 		// Initialize the vertex buffer view.
 		s_vertex_buf_views[cur_buffer_index].BufferLocation = s_vertex_bufs[cur_buffer_index]->GetGPUVirtualAddress();
 		s_vertex_buf_views[cur_buffer_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
@@ -122,7 +103,7 @@ namespace Ailu
 		s_vertex_upload_bufs.emplace_back(upload_heap);
 	}
 
-	void D3DVertexBuffer::SetStream(u8* data, uint32_t size, u8 stream_index,bool dynamic)
+	void D3DVertexBuffer::SetStream(u8* data, u32 size, u8 stream_index,bool dynamic)
 	{
 		auto d3d_conetxt = D3DContext::GetInstance();
 		if (_buffer_layout.GetStride(stream_index) == 0)
@@ -133,13 +114,13 @@ namespace Ailu
 		_vertices_count = size / _buffer_layout.GetStride(stream_index);
 		auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-		uint32_t cur_buffer_index = _buf_start + stream_index;
+		u32 cur_buffer_index = _buf_start + stream_index;
 		if (!dynamic)
 		{
 			ComPtr<ID3D12Resource> upload_heap;
 			ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(upload_heap.GetAddressOf())));
 			// Copy the triangle data to update heap
-			uint8_t* pVertexDataBegin;
+			u8* pVertexDataBegin;
 			CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
 			ThrowIfFailed(upload_heap->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
 			memcpy(pVertexDataBegin, data, size);
@@ -148,17 +129,19 @@ namespace Ailu
 			s_vertex_bufs[cur_buffer_index].Reset();
 			heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 			ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
-			auto cmd = d3d_conetxt->GetTaskCmdList();
-			cmd->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
+			auto cmd = CommandBufferPool::Get();
+			auto cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
+			cmdlist->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
 			auto buf_state = CD3DX12_RESOURCE_BARRIER::Transition(s_vertex_bufs[cur_buffer_index].Get(),
 				D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-			cmd->ResourceBarrier(1, &buf_state);
+			cmdlist->ResourceBarrier(1, &buf_state);
+			d3d_conetxt->ExecuteCommandBuffer(cmd);
 			s_vertex_upload_bufs.emplace_back(upload_heap);
 		}
 		else
 		{
 			_mapped_data[stream_index] = data;
-			uint32_t cur_buffer_index = _buf_start + stream_index;
+			u32 cur_buffer_index = _buf_start + stream_index;
 			s_vertex_bufs[cur_buffer_index].Reset();
 			ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
 			s_vertex_bufs[cur_buffer_index]->Map(0, nullptr, reinterpret_cast<void**>(&_mapped_data[stream_index]));
@@ -172,7 +155,7 @@ namespace Ailu
 		_buffer_layout_indexer.emplace(std::make_pair(_buffer_layout[stream_index].Name, stream_index));
 	}
 
-	uint32_t D3DVertexBuffer::GetVertexCount() const
+	u32 D3DVertexBuffer::GetVertexCount() const
 	{
 		return _vertices_count;
 	}
@@ -183,8 +166,8 @@ namespace Ailu
 		_size_pos_buf = RenderConstants::KMaxDynamicVertexNum * sizeof(Vector3f);
 		_size_color_buf = RenderConstants::KMaxDynamicVertexNum * sizeof(Vector4f);
 		_ime_vertex_data_offset = _ime_color_data_offset = 0;
-		_p_ime_vertex_data = new uint8_t[12 * RenderConstants::KMaxDynamicVertexNum];
-		_p_ime_color_data = new uint8_t[16 * RenderConstants::KMaxDynamicVertexNum];
+		_p_ime_vertex_data = new u8[12 * RenderConstants::KMaxDynamicVertexNum];
+		_p_ime_color_data = new u8[16 * RenderConstants::KMaxDynamicVertexNum];
 		auto device = D3DContext::GetInstance()->GetDevice();
 		D3D12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(_size_pos_buf);
@@ -208,10 +191,11 @@ namespace Ailu
 		delete[] _p_ime_vertex_data;
 		delete[] _p_ime_color_data;
 	}
-	void D3DDynamicVertexBuffer::Bind() const
+
+	void D3DDynamicVertexBuffer::Bind(CommandBuffer* cmd) const
 	{
 		RenderingStates::s_vertex_num += _vertex_num;
-		D3DContext::GetInstance()->GetCmdList()->IASetVertexBuffers(0, 2, _buf_views);
+		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->IASetVertexBuffers(0, 2, _buf_views);
 	}
 	void D3DDynamicVertexBuffer::UploadData()
 	{
@@ -221,7 +205,7 @@ namespace Ailu
 		_ime_vertex_data_offset = 0;
 		_ime_color_data_offset = 0;
 	}
-	void D3DDynamicVertexBuffer::AppendData(float* data0, uint32_t num0, float* data1, uint32_t num1)
+	void D3DDynamicVertexBuffer::AppendData(float* data0, u32 num0, float* data1, u32 num1)
 	{
 		memcpy(_p_vertex_data + _ime_vertex_data_offset, data0, num0 * 4);
 		memcpy(_p_color_data + _ime_color_data_offset, data1, num1 * 4);
@@ -231,10 +215,10 @@ namespace Ailu
 	//-----------------------------------------------------------------D3DDynamicVertexBuffer----------------------------------------------------------
 
 	//-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
-	D3DIndexBuffer::D3DIndexBuffer(uint32_t* indices, uint32_t count) : _index_count(count)
+	D3DIndexBuffer::D3DIndexBuffer(u32* indices, u32 count) : _index_count(count)
 	{
 		auto d3d_conetxt = D3DContext::GetInstance();
-		auto size = sizeof(uint32_t) * count;
+		auto size = sizeof(u32) * count;
 		auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
 		ComPtr<ID3D12Resource> temp_buffer = nullptr;
@@ -247,7 +231,7 @@ namespace Ailu
 			IID_PPV_ARGS(&_index_buf)));
 
 		// Copy the triangle data to the vertex buffer.
-		uint8_t* pVertexDataBegin;
+		u8* pVertexDataBegin;
 		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
 		ThrowIfFailed(_index_buf->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
 		memcpy(pVertexDataBegin, indices, size);
@@ -256,14 +240,15 @@ namespace Ailu
 		// Initialize the vertex buffer view.
 		s_index_buf_views[s_cur_view_offset].BufferLocation = _index_buf->GetGPUVirtualAddress();
 		s_index_buf_views[s_cur_view_offset].Format = DXGI_FORMAT_R32_UINT;
-		s_index_buf_views[s_cur_view_offset].SizeInBytes = static_cast<uint32_t>(size);
+		s_index_buf_views[s_cur_view_offset].SizeInBytes = static_cast<u32>(size);
 		_buf_view_index = s_cur_view_offset;
 		++s_cur_view_offset;
 	}
 	D3DIndexBuffer::~D3DIndexBuffer()
 	{
 	}
-	void D3DIndexBuffer::Bind() const
+
+	void D3DIndexBuffer::Bind(CommandBuffer* cmd) const
 	{
 		if (_buf_view_index < 0 || _buf_view_index >= s_index_buf_views.size())
 		{
@@ -271,9 +256,9 @@ namespace Ailu
 			return;
 		}
 		RenderingStates::s_triangle_num += _index_count / 3;
-		D3DContext::GetInstance()->GetCmdList()->IASetIndexBuffer(&s_index_buf_views[_buf_view_index]);
+		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->IASetIndexBuffer(&s_index_buf_views[_buf_view_index]);
 	}
-	uint32_t D3DIndexBuffer::GetCount() const
+	u32 D3DIndexBuffer::GetCount() const
 	{
 		return _index_count;
 	}
@@ -326,11 +311,10 @@ namespace Ailu
 	D3DConstantBuffer::~D3DConstantBuffer()
 	{
 	}
-	void D3DConstantBuffer::Bind(u8 bind_slot) const
+
+	void D3DConstantBuffer::Bind(CommandBuffer* cmd, u8 bind_slot) const
 	{
-		static auto cmd = D3DContext::GetInstance()->GetCmdList();
-		cmd->SetGraphicsRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
-		return;
+		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
 	}
 	//-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
 

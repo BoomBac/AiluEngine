@@ -263,7 +263,7 @@ namespace Ailu
 		return _all_objects;
 	}
 
-	SceneActor* Scene::GetSceneActorByID(const uint32_t& id)
+	SceneActor* Scene::GetSceneActorByID(const u32& id)
 	{
 		for (auto& actor : _all_objects)
 		{
@@ -273,7 +273,7 @@ namespace Ailu
 		return _all_objects.front();
 	}
 
-	SceneActor* Scene::GetSceneActorByIndex(const uint32_t& index)
+	SceneActor* Scene::GetSceneActorByIndex(const u32& index)
 	{
 		if (index >= _all_objects.size())
 		{

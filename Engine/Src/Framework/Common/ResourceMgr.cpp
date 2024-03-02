@@ -7,27 +7,23 @@
 #include "Framework/Common/ThreadPool.h"
 #include "GlobalMarco.h"
 #include "Framework/Common/LogMgr.h"
+#include "Render/GraphicsContext.h"
 
 namespace Ailu
 {
 	namespace fs = std::filesystem;
 	static void TraverseDirectory(const fs::path& directoryPath,std::set<fs::path>& path_set)
 	{
-		try {
-			for (const auto& entry : fs::directory_iterator(directoryPath)) 
+		for (const auto& entry : fs::directory_iterator(directoryPath))
+		{
+			if (fs::is_directory(entry.status()))
 			{
-				if (fs::is_directory(entry.status())) 
-				{
-					TraverseDirectory(entry.path(), path_set);
-				}
-				else if (fs::is_regular_file(entry.status())) 
-				{
-					path_set.insert(entry.path());
-				}
+				TraverseDirectory(entry.path(), path_set);
 			}
-		}
-		catch (const std::exception& e) {
-			std::cerr << "Exception: " << e.what() << std::endl;
+			else if (fs::is_regular_file(entry.status()))
+			{
+				path_set.insert(entry.path());
+			}
 		}
 	}
 
@@ -98,12 +94,20 @@ namespace Ailu
 		//auto anim = parser->Parser(PathUtils::GetResPath("Meshs/one_bone.fbx"));
 		//auto anim = parser->Parser(PathUtils::GetResPath("Meshs/two_bone.fbx"));
 		//MeshPool::AddMesh("anim", anim.front());
-		MeshPool::AddMesh("sphere", parser->Parser(PathUtils::GetResPath("Meshs/sphere.fbx")).front());
-		MeshPool::AddMesh("plane", parser->Parser(PathUtils::GetResPath("Meshs/plane.fbx")).front());
-		MeshPool::AddMesh("cube", parser->Parser(PathUtils::GetResPath("Meshs/cube.fbx")).front());
+		auto new_mesh = parser->Parser(PathUtils::GetResPath("Meshs/sphere.fbx")).front();
+		new_mesh->BuildRHIResource();
+		MeshPool::AddMesh("sphere", new_mesh);
+		new_mesh = parser->Parser(PathUtils::GetResPath("Meshs/plane.fbx")).front();
+		new_mesh->BuildRHIResource();
+		MeshPool::AddMesh("plane", new_mesh);
+		new_mesh = parser->Parser(PathUtils::GetResPath("Meshs/cube.fbx")).front();
+		new_mesh->BuildRHIResource();
+		MeshPool::AddMesh("cube", new_mesh);
+		new_mesh = parser->Parser(PathUtils::GetResPath("Meshs/monkey.fbx")).front();
+		new_mesh->BuildRHIResource();
 		//MeshPool::AddMesh("cone", parser->Parser(GetResPath("Meshs/cone.fbx")).front());
 		//MeshPool::AddMesh("cylinder", parser->Parser(GetResPath("Meshs/cylinder.fbx")).front());
-		MeshPool::AddMesh("monkey", parser->Parser(PathUtils::GetResPath("Meshs/monkey.fbx")).front());
+		MeshPool::AddMesh("monkey", new_mesh);
 		//MeshPool::AddMesh("torus", parser->Parser(GetResPath("Meshs/torus.fbx")).front());
 		auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
 		Vector<Vector3f> vertices = {
@@ -119,7 +123,7 @@ namespace Ailu
 		FullScreenQuad->SetVertices(vertices.data());
 		FullScreenQuad->SetIndices(indices.data());
 		FullScreenQuad->SetUVs(uv0.data(),0);
-		FullScreenQuad->Build();
+		FullScreenQuad->BuildRHIResource();
 		MeshPool::AddMesh("FullScreenQuad", FullScreenQuad);
 
 		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
@@ -324,7 +328,7 @@ namespace Ailu
 		{
 			if (prop->_type == ESerializablePropertyType::kTexture2D)
 			{
-				auto tex = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(*prop);
+				auto tex = SerializableProperty::GetProppertyValue<std::tuple<u8, Ref<Texture>>>(*prop);
 				String tex_path;
 				if (tex.has_value() && std::get<1>(tex.value()))
 					tex_path = std::reinterpret_pointer_cast<Texture2D>(std::get<1>(tex.value()))->AssetPath();
@@ -641,6 +645,7 @@ namespace Ailu
 				for (auto& mesh : parser->Parser(sys_path))
 				{
 					MeshPool::AddMesh(mesh);
+					g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
 				}
 			}
 			else if (ext == ".png" || ext == ".PNG")

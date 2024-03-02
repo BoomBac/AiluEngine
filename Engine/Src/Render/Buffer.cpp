@@ -20,7 +20,7 @@ namespace Ailu
 			return nullptr;
 	}
 
-	IndexBuffer* IndexBuffer::Create(uint32_t* indices, uint32_t count)
+	IndexBuffer* IndexBuffer::Create(u32* indices, u32 count)
 	{
 		switch (Renderer::GetAPI())
 		{

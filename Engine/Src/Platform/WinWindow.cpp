@@ -120,11 +120,11 @@ namespace Ailu
 			DispatchMessage(&msg);
 		}
 	}
-	uint32_t WinWindow::GetWidth() const
+	u32 WinWindow::GetWidth() const
 	{
 		return _data.Width;
 	}
-	uint32_t WinWindow::GetHeight() const
+	u32 WinWindow::GetHeight() const
 	{
 		return _data.Height;
 	}
@@ -205,7 +205,7 @@ namespace Ailu
 		return 0;
 		case WM_KEYDOWN:
 		{
-			KeyPressedEvent e(static_cast<uint8_t>(wParam), lParam & 0xFFFF);
+			KeyPressedEvent e(static_cast<u8>(wParam), lParam & 0xFFFF);
 			_data.Handler(e);
 		}
 		return 0;
@@ -241,7 +241,7 @@ namespace Ailu
 		return 0;
 		case WM_SIZE:
 		{
-			uint32_t w = static_cast<uint32_t>(lParam & 0XFFFF), h = static_cast<uint32_t>(lParam >> 16);
+			u32 w = static_cast<u32>(lParam & 0XFFFF), h = static_cast<u32>(lParam >> 16);
 			_data.Width = w;
 			_data.Height = h;
 			WindowResizeEvent e(w, h);

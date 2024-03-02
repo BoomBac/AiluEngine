@@ -33,11 +33,11 @@ namespace Ailu
 	class ThreadPool
 	{
 	public:
-		inline static uint8_t _s_cur_thread_num = 0;
+		inline static u8 _s_cur_thread_num = 0;
 		using Task = std::function<void()>;
 		ThreadPool(std::string name = "ALThreadPool") : _pool_name(name)
 		{
-			uint8_t hd_cy = std::thread::hardware_concurrency();
+			u8 hd_cy = std::thread::hardware_concurrency();
 			_s_cur_thread_num += 4;
 			if (_s_cur_thread_num > 1.5 * hd_cy)
 			{			
@@ -45,7 +45,7 @@ namespace Ailu
 			}
 			Start(4);
 		}
-		ThreadPool(uint8_t thread_num, std::string name = "ALThreadPool") : _initial_thread_count(thread_num), _pool_name(name)
+		ThreadPool(u8 thread_num, std::string name = "ALThreadPool") : _initial_thread_count(thread_num), _pool_name(name)
 		{
 			_s_cur_thread_num += thread_num;
 			if (_s_cur_thread_num > 1.5 * std::thread::hardware_concurrency())
@@ -58,16 +58,16 @@ namespace Ailu
 		{
 			Release();
 		}
-		EThreadStatus GetThreadStatus(uint8_t thread_index) const
+		EThreadStatus GetThreadStatus(u8 thread_index) const
 		{
 			if (thread_index < _threads.size()) {
 				return _thread_status[thread_index];
 			}
 			return EThreadStatus::kNotStarted;
 		}
-		uint8_t GetIdleThreadNum() const
+		u8 GetIdleThreadNum() const
 		{
-			uint8_t count = 0;
+			u8 count = 0;
 			for (auto status : _thread_status)
 			{
 				if (status == EThreadStatus::kNotStarted) count++;
@@ -197,7 +197,7 @@ namespace Ailu
 				t.join();
 		}
 	private:
-		uint8_t _initial_thread_count = 0;
+		u8 _initial_thread_count = 0;
 		inline static u8 _s_global_thread_id = 0u;
 		std::list<std::thread> _threads;
 		std::condition_variable _task_cv;

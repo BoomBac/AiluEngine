@@ -15,68 +15,47 @@ namespace Ailu
 {
     class D3DContext : public GraphicsContext
     {
-        friend class D3DRendererAPI;
         friend class D3DCommandBuffer;
-        using ResourceCmd = std::function<void()>;
     public:
+        inline static D3DContext* GetInstance() { return s_p_d3dcontext; };
         D3DContext(WinWindow* window);
         ~D3DContext();
-        void Init() override;
-        void Present() override;
-        void Clear(Vector4f color, float depth, bool clear_color, bool clear_depth);
-        inline static D3DContext* GetInstance() { return s_p_d3dcontext; };
-        u32 SubmitResourceTask(ResourceCmd cmd);
-        void CancelResourceTask(const u32& cmd_id);
-        ID3D12Device* GetDevice();
-        ID3D12GraphicsCommandList* GetCmdList();
-        ID3D12GraphicsCommandList* GetTaskCmdList();
+        void Init() final;
+        void Present() final;
+        const u64& GetFenceValue(const u32& cmd_index) const final;
+        u64 GetCurFenceValue() const final;
+        void SubmitRHIResourceBuildTask(RHIResourceTask task) final;
+
+
+
+        ID3D12Device* GetDevice() { return m_device.Get(); };
         //return cbv/uav/src desc heap
         ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
         std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetSRVDescriptorHandle();
         std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetUAVDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle();
-        uint8_t* GetCBufferPtr();
-        uint8_t* GetPerFrameCbufData() final;
-        uint8_t* GetPerMaterialCbufData(uint32_t mat_index) final;
-        void* GetCBufGPURes(u32 index) final;
-        void* GetCBufferPerPassGPUPtr(u16 index) final;
-        u8* GetCBufferPerPassCPUPtr(u16 index) final;
 
-        D3D12_CONSTANT_BUFFER_VIEW_DESC* GetPerFrameCbufGPURes();
-        ScenePerFrameData* GetPerFrameCbufDataStruct() final;
         void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
-
-        void SubmitPerObjectBuffer(const Matrix4x4f& transform);
-        void BeginBackBuffer();
-        void EndBackBuffer();
-
-        void DrawOverlay();
-
-
-        void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count, const Matrix4x4f& transform);
-        void DrawIndexedInstanced(uint32_t index_count, uint32_t instance_count);
-        void DrawInstanced(uint32_t vertex_count, uint32_t instance_count, const Matrix4x4f& transform);
-        void DrawInstanced(uint32_t vertex_count, uint32_t instance_count);
+        void BeginBackBuffer(CommandBuffer* cmd);
+        void EndBackBuffer(CommandBuffer* cmd);
+        void DrawOverlay(CommandBuffer* cmd);
 
     private:
         void Destroy();
         void LoadPipeline();
         void LoadAssets();
-        void PopulateCommandList();
         void WaitForGpu();
-        void WaitForTask();
-        void MoveToNextFrame();
+        void FlushCommandQueue(ID3D12CommandQueue* cmd_queue,ID3D12Fence* fence,u64& fence_value);
         void InitCBVSRVUAVDescHeap();
         void CreateDepthStencilTarget();
         void CreateDescriptorHeap();
-        D3D12_GPU_DESCRIPTOR_HANDLE GetCBVGPUDescHandle(uint32_t index) const;
+        D3D12_GPU_DESCRIPTOR_HANDLE GetCBVGPUDescHandle(u32 index) const;
 
     private:
         inline static D3DContext* s_p_d3dcontext = nullptr;
-        bool _b_has_task = false;
         WinWindow* _window;
-        uint32_t _cbv_desc_num = 0u;
+        u32 _cbv_desc_num = 0u;
         // Pipeline objects.
         ComPtr<IDXGISwapChain3> m_swapChain;
         ComPtr<ID3D12Device> m_device;
@@ -93,29 +72,16 @@ namespace Ailu
         u8 _rtv_desc_size;
         u8 _dsv_desc_size;
         u8 _cbv_desc_size;
-        u8* _p_cbuffer = nullptr;
-        List<std::pair<u32, ResourceCmd>> _res_cmd_list;
-
-        ComPtr<ID3D12GraphicsCommandList> _task_cmd;
-        ComPtr<ID3D12CommandAllocator> _task_cmd_alloc;
-
-        std::list<std::function<void()>> _all_commands{};
-
-        uint32_t _render_object_index = 0u;
-
-        ComPtr<ID3D12Resource> m_constantBuffer;
-        ScenePerFrameData _perframe_scene_data;
-        std::vector<D3D12_CONSTANT_BUFFER_VIEW_DESC> _cbuf_views;
-
         // Synchronization objects.
-        uint8_t m_frameIndex;
+        u8 m_frameIndex;
         HANDLE m_fenceEvent;
-        ComPtr<ID3D12Fence> m_fence;
-        uint64_t m_fenceValues[RenderConstants::kFrameCount];
+        u64 _fence_value = 0u;
+        ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
+        std::unordered_map<u32, u64> _cmd_target_fence_value;
+        Queue<RHIResourceTask> _resource_task;
 
-
-        uint32_t _width;
-        uint32_t _height;
+        u32 _width;
+        u32 _height;
         float m_aspectRatio;
     };
 }

@@ -13,7 +13,7 @@ namespace Ailu
 		static void Create(HWND hwnd);
 	public:
 		bool IsKeyPressedImpl(int keycode) override;
-		bool IsMouseButtonPressedImpl(uint8_t button) override;
+		bool IsMouseButtonPressedImpl(u8 button) override;
 		float GetMouseXImpl() override;
 		float GetMouseYImpl() override;
 		Vector2f GetMousePosImpl() override;

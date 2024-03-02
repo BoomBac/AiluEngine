@@ -17,9 +17,9 @@ namespace Ailu
 		D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format,bool read_only = true);
 		D3DTexture2D(const TextureDesc& desc);
 		~D3DTexture2D();
-		void FillData(uint8_t* data) final;
+		void FillData(u8* data) final;
 		void FillData(Vector<u8*> datas) final;
-		void Bind(uint8_t slot) final;
+		void Bind(CommandBuffer* cmd,u8 slot) final;
 		void Release() final;
 		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
 		void* GetGPUNativePtr() final;
@@ -48,7 +48,7 @@ namespace Ailu
 		D3DTextureCubeMap(const uint16_t& width, const uint16_t& height, EALGFormat format);
 		~D3DTextureCubeMap();
 		void FillData(Vector<u8*>& data) final;
-		void Bind(uint8_t slot) final;
+		void Bind(CommandBuffer* cmd, u8 slot) final;
 		void Release() final;
 		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
 		D3D12_CPU_DESCRIPTOR_HANDLE& GetSRVCPUHandle() { return _srv_cpu_handle; }
@@ -78,12 +78,12 @@ namespace Ailu
 	public:
 		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool is_cubemap = false);
-		void Bind(uint8_t slot) final;
-		uint8_t* GetCPUNativePtr() final;
+		void Bind(CommandBuffer* cmd, u8 slot) final;
+		u8* GetCPUNativePtr() final;
 		void* GetNativeCPUHandle() final;
 		void* GetNativeCPUHandle(u16 index) final;
 		void Release() final;
-		void Transition(ETextureResState state) final;
+		void Transition(CommandBuffer* cmd, ETextureResState state) final;
 	private:
 		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
 		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;

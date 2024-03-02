@@ -95,7 +95,7 @@ namespace Ailu
 			return D3D12_BLEND_OP_ADD;
 		}
 
-		static uint8_t ConvertToD3DBlendColorMask(const EColorMask& mask)
+		static u8 ConvertToD3DBlendColorMask(const EColorMask& mask)
 		{
 			switch (mask)
 			{
@@ -112,7 +112,7 @@ namespace Ailu
 			return D3D12_COLOR_WRITE_ENABLE_ALL;
 		}
 
-		static D3D12_BLEND_DESC ConvertToD3D12BlendDesc(const BlendState& state, const uint8_t& rt_num)
+		static D3D12_BLEND_DESC ConvertToD3D12BlendDesc(const BlendState& state, const u8& rt_num)
 		{
 			auto blend_state = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 			for (size_t i = 0; i < rt_num; i++)
@@ -184,10 +184,10 @@ namespace Ailu
 		D3DShader(const String& sys_path);
 		D3DShader(const String& sys_path,const String& vs_entry,String ps_entry);
 		~D3DShader();
-		void Bind(uint32_t index) final;
+		void Bind(u32 index) final;
 		void* GetByteCode(EShaderType type) final;
 		ID3D12RootSignature* GetSignature();
-		std::pair<D3D12_INPUT_ELEMENT_DESC*,uint8_t> GetVertexInputLayout();
+		std::pair<D3D12_INPUT_ELEMENT_DESC*,u8> GetVertexInputLayout();
 	private:
 		bool RHICompileImpl() final;
 		void Reset();
@@ -244,7 +244,7 @@ namespace Ailu
 	public:
 		D3DComputeShader(const String& sys_path);
 		//void Dispatch(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
-		void Bind(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
+		void Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 	private:
 		void LoadReflectionInfo(ID3D12ShaderReflection* p_reflect);
 		bool RHICompileImpl() final;

@@ -32,20 +32,20 @@ namespace Ailu
 		return DXGI_FORMAT_UNKNOWN;
 	}
 
-	static std::tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t> ConvertToD3DInputLayout(const VertexBufferLayout& layout)
+	static std::tuple<D3D12_INPUT_ELEMENT_DESC*, u32> ConvertToD3DInputLayout(const VertexBufferLayout& layout)
 	{
 		static D3D12_INPUT_ELEMENT_DESC cache_desc[10]{};
 		if (layout.GetDescCount() > 10)
 		{
 			AL_ASSERT(true, "LayoutDesc count must less than 10");
-			return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t>(nullptr, 0);
+			return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, u32>(nullptr, 0);
 		}
-		uint32_t desc_count = 0u;
+		u32 desc_count = 0u;
 		for (const auto& desc : layout)
 		{
 			cache_desc[desc_count++] = { desc.Name.c_str(), 0, ShaderDataTypeToDGXIFormat(desc.Type), desc.Stream, desc.Offset, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 		}
-		return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, uint32_t>(&cache_desc[0], std::move(desc_count));
+		return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, u32>(&cache_desc[0], std::move(desc_count));
 	}
 
 	namespace ALHash
@@ -71,21 +71,22 @@ namespace Ailu
 	public:
 		D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer);
 		void Build() final;
-		void Bind() final;
-		void SetPipelineResource(void* res, const EBindResDescType& res_type, u8 slot = 255) final;
-		void SetPipelineResource(void* res, const EBindResDescType& res_type, const String& name) final;
+		void Bind(CommandBuffer* cmd) final;
+		void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) final;
+		void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, const String& name) final;
 		const ALHash::Hash<64>& Hash() final { return _hash; };
 		const String& Name() const final { return _name; };
 	private:
-		void BindResource(void* res, const EBindResDescType& res_type, u8 slot = 255) final;
+		void BindResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) final;
 	private:
 		String _name;
-		uint8_t _per_frame_cbuf_bind_slot = 255u;
+		u8 _per_frame_cbuf_bind_slot = 255u;
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC _d3d_pso_desc;
 		GraphicsPipelineStateInitializer _state_desc;
 		bool _b_build = false;
 		ComPtr<ID3D12PipelineState> _p_plstate;
 		ComPtr<ID3D12RootSignature>_p_sig;
+		ID3D12GraphicsCommandList* _p_cmd;
 		std::unordered_map<std::string, ShaderBindResourceInfo>* _p_bind_res_desc_infos = nullptr;
 		ALHash::Hash<64> _hash;
 	};

@@ -1,12 +1,12 @@
 #pragma once
 #ifndef __GIZMO_H__
 #define __GIZMO_H__
+#include <functional>
+
 #include "Framework/Math/ALMath.hpp"
-#include "RHI/DX12/D3DContext.h"
-#include "RenderCommand.h"
 #include "Buffer.h"
 #include "Camera.h"
-#include <functional>
+#include "CommandBuffer.h"
 
 namespace Ailu
 {
@@ -201,7 +201,7 @@ namespace Ailu
             _vertex_num += 24;
         }
 
-        static void Submit()
+        static void Submit(CommandBuffer* cmd)
         {
             if (_vertex_num > RenderConstants::KMaxDynamicVertexNum)
             {
@@ -225,8 +225,8 @@ namespace Ailu
                     f();
                 }
                 p_buf->UploadData();
-                p_buf->Bind();
-                D3DContext::GetInstance()->DrawInstanced(_vertex_num, 1);
+                p_buf->Bind(cmd);
+                cmd->DrawInstanced(_vertex_num, 1);
             }
             _vertex_num = 0;
         }
@@ -234,7 +234,7 @@ namespace Ailu
     public:
         inline static Color s_color = Colors::kGray;
     private:
-        inline static uint32_t _vertex_num = 0u;
+        inline static u32 _vertex_num = 0u;
         inline static Ref<DynamicVertexBuffer> p_buf = nullptr;
     };
 }

@@ -11,9 +11,9 @@ shader_path: Shaders/shaders.hlsl
     BaseColor: 0.176097,0.852941,0.133795,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
+    Specular: none
+    Metallic: none
     Albedo: none
     Normal: none
     Emssive: none
     Roughness: none
-    Metallic: none
-    Specular: none

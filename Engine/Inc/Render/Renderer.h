@@ -24,6 +24,9 @@ namespace Ailu
     class AILU_API Renderer : public IRuntimeModule
     {
     public:
+        inline static u32 kRendererWidth = 1600u;
+        inline static u32 kRendererHeight = 900u;
+    public:
         void BeginScene();
         void EndScene();
         int Initialize() override;
@@ -43,7 +46,7 @@ namespace Ailu
         Ref<Texture> _p_test_texture;
         static inline List<RenderPass*> _p_task_render_passes{};
         Scope<ConstantBuffer> _p_per_frame_cbuf;
-        ScenePerFrameData* _p_per_frame_cbuf_data;
+        ScenePerFrameData _per_frame_cbuf_data;
         RenderingData _rendering_data;
         ConstantBuffer* _p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
         GraphicsContext* _p_context = nullptr;

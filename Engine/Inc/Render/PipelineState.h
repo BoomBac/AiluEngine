@@ -493,7 +493,7 @@ namespace Ailu
 		return v[hash];
 	}
 
-	enum class EBindResDescType : uint8_t
+	enum class EBindResDescType : u8
 	{
 		kConstBuffer = 0, kTexture2D, kCubeMap, kTexture2DArray, kSampler, kCBufferAttribute, kUAVTexture2D,kUnknown
 	};

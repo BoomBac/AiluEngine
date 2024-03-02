@@ -4,7 +4,7 @@
 #include <cstdint>
 #include "dxgiformat.h"
 
-enum class EALGFormat : uint8_t
+enum class EALGFormat : u8
 {
     kALGFormatUnknown = 0,
 	kALGFormatR8G8B8A8_UNORM,

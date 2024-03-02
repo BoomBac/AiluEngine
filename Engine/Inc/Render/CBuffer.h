@@ -94,7 +94,7 @@ namespace Ailu
 		float	 _Metallic;
 		float    _Specular;
 		// low_bit: metallic|roughness|emssive|normal|albedo
-		uint32_t _SamplerMask;
+		u32 _SamplerMask;
 		float padding2[53]; // Padding so the constant buffer is 256-byte aligned.
 	};
 	static_assert((sizeof(ScenePerObjectData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");

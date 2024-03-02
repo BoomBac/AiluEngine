@@ -156,12 +156,6 @@
     <ClInclude Include="Inc\Render\RendererAPI.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Render\RenderCommand.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\RHI\DX12\D3DRendererAPI.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Render\Shader.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2055,6 +2049,12 @@
     <ClInclude Include="Inc\Framework\Math\Random.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Framework\Events\SceneLayer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\Pass\PostprocessPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2132,9 +2132,6 @@
     <ClCompile Include="Src\RHI\DX12\D3DBuffer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\RHI\DX12\D3DRendererAPI.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\Render\Shader.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -2142,9 +2139,6 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\Material.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Render\RenderCommand.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\GraphicsPipelineStateObject.cpp">
@@ -2238,6 +2232,12 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Animation\Clip.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Events\SceneLayer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\Pass\PostprocessPass.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

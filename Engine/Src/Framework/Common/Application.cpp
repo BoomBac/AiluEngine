@@ -130,7 +130,7 @@ namespace Ailu
 	}
 	bool Application::OnDragFile(DragFileEvent& e)
 	{
-		g_pResourceMgr->ImportAsset(e.GetDragedFilePath());
+		g_pResourceMgr->ImportAssetAsync(e.GetDragedFilePath());
 		return false;
 	}
 

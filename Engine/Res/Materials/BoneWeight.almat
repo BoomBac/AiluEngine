@@ -11,9 +11,9 @@ shader_path: Shaders/shaders.hlsl
     BaseColor: 1,1,1,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
-    Albedo: Meshs\Walking.fbm\Ch46_1001_Diffuse.png
-    Normal: Meshs\Walking.fbm\Ch46_1001_Normal.png
+    Specular: none
+    Metallic: none
+    Albedo: none
+    Normal: none
     Emssive: none
     Roughness: none
-    Metallic: none
-    Specular: none

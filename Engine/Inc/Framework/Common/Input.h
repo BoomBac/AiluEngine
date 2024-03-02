@@ -17,7 +17,7 @@ namespace Ailu
         /// </summary>
         /// <param name="button">: 0 mid btn;1 left btn;2 right btn</param>
         /// <returns></returns>
-        inline static bool IsMouseButtonPressed(uint8_t button) { return sp_instance->IsMouseButtonPressedImpl(button); }
+        inline static bool IsMouseButtonPressed(u8 button) { return sp_instance->IsMouseButtonPressedImpl(button); }
         inline static float GetMouseX() 
         { 
             return sp_instance->GetMouseYImpl();
@@ -33,7 +33,7 @@ namespace Ailu
     protected:
         virtual bool IsKeyPressedImpl(int keycode) = 0;
 
-        virtual bool IsMouseButtonPressedImpl(uint8_t button) = 0;
+        virtual bool IsMouseButtonPressedImpl(u8 button) = 0;
         virtual float GetMouseXImpl() = 0;
         virtual float GetMouseYImpl() = 0;
         virtual Vector2f GetMousePosImpl() = 0;

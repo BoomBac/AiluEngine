@@ -38,7 +38,7 @@ namespace Ailu
 		return nullptr;
 	}
 
-	void Texture2D::FillData(uint8_t* data)
+	void Texture2D::FillData(u8* data)
 	{
 		_mipmap_count = 1;
 		_p_datas.push_back(data);
@@ -49,11 +49,7 @@ namespace Ailu
 		for (auto p : datas)
 			_p_datas.emplace_back(p);
 	}
-	void Texture2D::Bind(uint8_t slot)
-	{
-
-	}
-	uint8_t* Texture2D::GetCPUNativePtr()
+	u8* Texture2D::GetCPUNativePtr()
 	{
 		return _p_datas.front();
 	}
@@ -120,11 +116,7 @@ namespace Ailu
 		_p_datas = std::move(data);
 	}
 
-	void TextureCubeMap::Bind(u8 slot)
-	{
-	}
-
-	uint8_t* TextureCubeMap::GetCPUNativePtr()
+	u8* TextureCubeMap::GetCPUNativePtr()
 	{
 		return _p_datas[0];
 	}
@@ -159,9 +151,9 @@ namespace Ailu
 		return nullptr;
 	}
 
-	void RenderTexture::Bind(uint8_t slot)
+	void RenderTexture::Bind(CommandBuffer* cmd, u8 slot)
 	{
-		Transition(ETextureResState::kShaderResource);
+		Transition(cmd,ETextureResState::kShaderResource);
 	}
 
 	void* RenderTexture::GetNativeCPUHandle()
@@ -180,7 +172,7 @@ namespace Ailu
 	{
 		return ETextureType::kRenderTexture;
 	}
-	void RenderTexture::Transition(ETextureResState state)
+	void RenderTexture::Transition(CommandBuffer* cmd, ETextureResState state)
 	{
 		_state = state;
 	}

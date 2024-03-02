@@ -21,18 +21,18 @@ namespace Ailu
 
 	void AnimationClip::Bake()
 	{
-		u32 frame_count = _local_pose[0].size();
-		u16 joint_num = _local_pose.size();
+		u32 frame_count = static_cast<u32>(_local_pose[0].size());
+		u16 joint_num = static_cast<u32>(_local_pose.size());
 		_local_pose_mat.resize(joint_num);
 		_local_pose_mat_debug.resize(joint_num);
-		for (int i = 0; i < joint_num; i++)
+		for (u32 i = 0; i < joint_num; i++)
 		{
 			_local_pose_mat[i].resize(frame_count);
 			_local_pose_mat_debug[i].resize(frame_count);
 		}
-		for (int i = 0; i < frame_count; i++)
+		for (u32 i = 0; i < frame_count; i++)
 		{
-			for (int j = 0; j < _local_pose.size(); j++)
+			for (u32 j = 0; j < _local_pose.size(); j++)
 			{
 				auto& joint = _sk[j];
 				auto& local_pose = _local_pose[j][i];

@@ -70,6 +70,7 @@ namespace Ailu
 			auto mesh = MeshPool::GetMesh(mesh_path);
 			if (mesh == nullptr)
 			{
+				mesh_path = PathUtils::GetResPath(mesh_path);
 				auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
 				mesh = parser->Parser(mesh_path).front();
 				if (mesh != nullptr) MeshPool::AddMesh(mesh);

@@ -44,10 +44,10 @@ namespace Ailu
 	//	size_t len = CountOf(var.data);
 	//	double sum = 0.f;
 	//	T temp{};
-	//	for (uint32_t i = 0; i < len; i++)
+	//	for (u32 i = 0; i < len; i++)
 	//		sum += pow(var[i], 2.f);
 	//	sum = sqrt(sum);
-	//	for (uint32_t i = 0; i < len; i++) {
+	//	for (u32 i = 0; i < len; i++) {
 	//		var[i] /= sum;
 	//		temp[i] = var[i];
 	//	}
@@ -60,13 +60,13 @@ namespace Ailu
 		size_t len = CountOf(var.data);
 		double sum = 0.f;
 		T temp{};
-		for (uint32_t i = 0; i < len; i++)
+		for (u32 i = 0; i < len; i++)
 		{
 			sum += pow(var[i], 2.f);
 			temp[i] = var[i];
 		}
 		sum = sqrt(sum);
-		for (uint32_t i = 0; i < len; i++) {
+		for (u32 i = 0; i < len; i++) {
 			temp[i] /= sum;
 		}
 		return temp;
@@ -128,8 +128,8 @@ namespace Ailu
 		Vector2D<T>(const T& v, const T& w) : x(v), y(w) {};
 		operator T* () { return data; };
 		operator const T* () { return static_cast<const T*>(data); };
-		T& operator[](uint32_t index) { return data[index]; }
-		const T& operator[](uint32_t index) const { return data[index]; }
+		T& operator[](u32 index) { return data[index]; }
+		const T& operator[](u32 index) const { return data[index]; }
 
 		std::string ToString(int precision = 2)
 		{
@@ -143,28 +143,28 @@ namespace Ailu
 		}
 
 		Vector2D<T>& operator+=(const Vector2D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] += other.data[i];
 			}
 			return *this;
 		}
 
 		Vector2D<T>& operator-=(const Vector2D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] -= other.data[i];
 			}
 			return *this;
 		}
 
 		Vector2D<T>& operator*=(const Vector2D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] *= other.data[i];
 			}
 			return *this;
 		}
 
 		Vector2D<T>& operator/=(const Vector2D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				//AL_ASSERT(other.data[i] == 0.f, "vector divide by zero commpoent!")
 				data[i] /= other.data[i];
 			}
@@ -215,35 +215,35 @@ namespace Ailu
 
 		Vector3D<T>& operator=(const Vector3D<T>& other)
 		{
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] = other.data[i];
 			}
 			return *this;
 		}
 
 		Vector3D<T>& operator+=(const Vector3D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] += other.data[i];
 			}
 			return *this;
 		}
 
 		Vector3D<T>& operator-=(const Vector3D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] -= other.data[i];
 			}
 			return *this;
 		}
 
 		Vector3D<T>& operator*=(const Vector3D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] *= other.data[i];
 			}
 			return *this;
 		}
 
 		Vector3D<T>& operator*=(const float& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] *= other;
 			}
 			return *this;
@@ -252,7 +252,7 @@ namespace Ailu
 		Vector3D<T>& operator/=(const Vector3D<T>& other) {
 			try
 			{
-				for (uint8_t i = 0; i < CountOf(data); i++) {
+				for (u8 i = 0; i < CountOf(data); i++) {
 					AL_ASSERT(other.data[i] == 0.f, "vector divide by zero commpoent!")
 						//if (other.data[i] == 0.f) throw(std::runtime_error("vector divide by zero commpoent!"));
 						data[i] /= other.data[i];
@@ -280,8 +280,8 @@ namespace Ailu
 
 		operator T* () { return data; };
 		operator const T* () const { return static_cast<const T*>(data); };
-		T& operator[](uint32_t index) { return data[index]; }
-		const T& operator[](uint32_t index) const { return data[index]; }
+		T& operator[](u32 index) { return data[index]; }
+		const T& operator[](u32 index) const { return data[index]; }
 
 		std::string ToString(int precision = 2) const
 		{
@@ -329,8 +329,8 @@ namespace Ailu
 
 		operator T* () { return data; };
 		operator const T* () const { return static_cast<const T*>(data); };
-		T& operator[](uint32_t index) { return data[index]; }
-		const T& operator[](uint32_t index) const { return data[index]; }
+		T& operator[](u32 index) { return data[index]; }
+		const T& operator[](u32 index) const { return data[index]; }
 
 		friend std::ostream& operator<<(std::ostream& os, const Vector4D<T>& vec)
 		{
@@ -344,28 +344,28 @@ namespace Ailu
 		}
 
 		Vector4D<T>& operator+=(const Vector4D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] += other.data[i];
 			}
 			return *this;
 		}
 
 		Vector4D<T>& operator-=(const Vector4D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] -= other.data[i];
 			}
 			return *this;
 		}
 
 		Vector4D<T>& operator*=(const Vector4D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++) {
+			for (u8 i = 0; i < CountOf(data); i++) {
 				data[i] *= other.data[i];
 			}
 			return *this;
 		}
 
 		Vector4D<T>& operator/=(const Vector4D<T>& other) {
-			for (uint8_t i = 0; i < CountOf(data); i++)
+			for (u8 i = 0; i < CountOf(data); i++)
 			{
 				if (other.data[i] == 0.f)
 				{
@@ -400,17 +400,17 @@ namespace Ailu
 	const Vector4D<T> Vector4D<T>::kOne(1, 1, 1, 1);
 
 	using Vector4f = Vector4D<float>;
-	using R8G8B8A8Unorm = Vector4D<uint8_t>;
-	using R8G8B8Unorm = Vector3D<uint8_t>;
+	using R8G8B8A8Unorm = Vector4D<u8>;
+	using R8G8B8Unorm = Vector3D<u8>;
 	using R32G32B32Float = Vector3D<float>;
 	using R32G32B32A32Float = Vector3D<float>;
-	using Vector4i = Vector4D<uint8_t>;
+	using Vector4i = Vector4D<u8>;
 
 	template<template<typename> class TT, typename T>
 	static float Distance(const TT<T>& from, const TT<T>& to)
 	{
 		float dis = 0;
-		for (uint32_t i = 0; i < CountOf(from.data); i++)
+		for (u32 i = 0; i < CountOf(from.data); i++)
 		{
 			dis += (to.data[i] - from.data[i]) * (to.data[i] - from.data[i]);
 		}
@@ -422,7 +422,7 @@ namespace Ailu
 	static float Magnitude(const TT<T>& v)
 	{
 		float dis = 0;
-		for (uint32_t i = 0; i < CountOf(v.data); i++)
+		for (u32 i = 0; i < CountOf(v.data); i++)
 		{
 			dis += v.data[i] * v.data[i];
 		}
@@ -490,7 +490,7 @@ namespace Ailu
 	TT<T> operator+(const TT<T> v1, const TT<T> v2)
 	{
 		TT<T> res;
-		for (uint32_t i = 0; i < CountOf(v1.data); i++)
+		for (u32 i = 0; i < CountOf(v1.data); i++)
 		{
 			res.data[i] = v1.data[i] + v2.data[i];
 		}
@@ -501,7 +501,7 @@ namespace Ailu
 	TT<T> operator*(const T& scalar, const TT<T>& v)
 	{
 		TT<T> res;
-		for (uint32_t i = 0; i < CountOf(v.data); i++)
+		for (u32 i = 0; i < CountOf(v.data); i++)
 		{
 			res.data[i] = scalar * v.data[i];
 		}
@@ -512,7 +512,7 @@ namespace Ailu
 	TT<T> operator*(const TT<T>& a, const TT<T>& b)
 	{
 		TT<T> res;
-		for (uint32_t i = 0; i < CountOf(a.data); i++)
+		for (u32 i = 0; i < CountOf(a.data); i++)
 		{
 			res.data[i] = a.data[i] * b.data[i];
 		}
@@ -528,7 +528,7 @@ namespace Ailu
 	TT<T> operator+(const T& scalar, const TT<T>& v)
 	{
 		TT<T> res{};
-		for (uint32_t i = 0; i < CountOf(v.data); i++)
+		for (u32 i = 0; i < CountOf(v.data); i++)
 		{
 			res.data[i] = v.data[i] + scalar;
 		}
@@ -545,7 +545,7 @@ namespace Ailu
 	template<template<typename> typename TT, typename T>
 	TT<T> operator-(TT<T> v)
 	{
-		for (uint32_t i = 0; i < CountOf(v.data); i++)
+		for (u32 i = 0; i < CountOf(v.data); i++)
 		{
 			v[i] = -v[i];
 		}
@@ -555,7 +555,7 @@ namespace Ailu
 	TT<T> operator-(const TT<T> v1, const TT<T> v2)
 	{
 		TT<T> res;
-		for (uint32_t i = 0; i < CountOf(v1.data); i++)
+		for (u32 i = 0; i < CountOf(v1.data); i++)
 		{
 			res.data[i] = v1.data[i] - v2.data[i];
 		}
@@ -570,7 +570,7 @@ namespace Ailu
 	T DotProduct(const TT<T>& first, const TT<T>& second)
 	{
 		T res{};
-		for (uint32_t i = 0; i < CountOf(first.data); i++)
+		for (u32 i = 0; i < CountOf(first.data); i++)
 		{
 			res += first.data[i] * second.data[i];
 		}
@@ -591,7 +591,7 @@ namespace Ailu
 	static TT<T> Max(const TT<T>& first, const TT<T>& second)
 	{
 		TT<T> max{};
-		for (uint8_t i = 0; i < CountOf(first.data); i++)
+		for (u8 i = 0; i < CountOf(first.data); i++)
 		{
 			max.data[i] = first.data[i] > second.data[i] ? first.data[i] : second.data[i];
 		}
@@ -602,7 +602,7 @@ namespace Ailu
 	static TT<T> Min(const TT<T>& first, const TT<T>& second)
 	{
 		TT<T> min{};
-		for (uint8_t i = 0; i < CountOf(first.data); i++)
+		for (u8 i = 0; i < CountOf(first.data); i++)
 		{
 			min.data[i] = first.data[i] < second.data[i] ? first.data[i] : second.data[i];
 		}
@@ -613,7 +613,7 @@ namespace Ailu
 	static T CompMax(const TT<T>& v)
 	{
 		T max_var = std::numeric_limits<T>::lowest();
-		for (uint8_t i = 0; i < CountOf(v.data); i++)
+		for (u8 i = 0; i < CountOf(v.data); i++)
 		{
 			max_var = max(v.data[i], max_var);
 		}
@@ -625,7 +625,7 @@ namespace Ailu
 	{
 #undef max
 		T min_var = std::numeric_limits<T>::max();
-		for (uint8_t i = 0; i < CountOf(v.data); i++)
+		for (u8 i = 0; i < CountOf(v.data); i++)
 		{
 			min_var = min(v.data[i], min_var);
 		}
@@ -687,10 +687,10 @@ namespace Ailu
 	std::string MatrixToString(Matrix<T, rows, cols> mat)
 	{
 		std::stringstream ss;
-		for (uint32_t i = 0; i < rows; i++)
+		for (u32 i = 0; i < rows; i++)
 		{
 			ss << "[ ";
-			for (uint32_t j = 0; j < cols; j++)
+			for (u32 j = 0; j < cols; j++)
 			{
 				if (j != cols - 1) ss << mat[i][j] << ",";
 				else ss << mat[i][j] << " ]" << "\n";
@@ -710,9 +710,9 @@ namespace Ailu
 	template<typename T, int rows, int cols>
 	void MatrixAdd(Matrix<T, rows, cols>& ret, const Matrix<T, rows, cols>& m1, const Matrix<T, rows, cols>& m2)
 	{
-		for (uint32_t i = 0; i < CountOf(m1.data); i++)
+		for (u32 i = 0; i < CountOf(m1.data); i++)
 		{
-			for (uint32_t j = 0; j < CountOf(m2.data); j++)
+			for (u32 j = 0; j < CountOf(m2.data); j++)
 			{
 				ret[i][j] = m1[i][j] + m2[i][j];
 			}
@@ -723,9 +723,9 @@ namespace Ailu
 	Matrix<T, rows, cols> operator+(const Matrix<T, rows, cols>& m1, const Matrix<T, rows, cols>& m2)
 	{
 		Matrix<T, rows, cols> ret;
-		for (uint32_t i = 0; i < CountOf(m1.data); i++)
+		for (u32 i = 0; i < CountOf(m1.data); i++)
 		{
-			for (uint32_t j = 0; j < CountOf(m2.data); j++)
+			for (u32 j = 0; j < CountOf(m2.data); j++)
 			{
 				ret[i][j] = m1[i][j] + m2[i][j];
 			}
@@ -736,9 +736,9 @@ namespace Ailu
 	template<typename T, int rows, int cols>
 	void MatrixSub(Matrix<T, rows, cols>& ret, const Matrix<T, rows, cols>& m1, const Matrix<T, rows, cols>& m2)
 	{
-		for (uint32_t i = 0; i < CountOf(m1.data); i++)
+		for (u32 i = 0; i < CountOf(m1.data); i++)
 		{
-			for (uint32_t j = 0; j < CountOf(m2.data); j++)
+			for (u32 j = 0; j < CountOf(m2.data); j++)
 			{
 				ret[i][j] = m1[i][j] - m2[i][j];
 			}
@@ -749,9 +749,9 @@ namespace Ailu
 	Matrix<T, rows, cols> operator-(const Matrix<T, rows, cols>& m1, const Matrix<T, rows, cols>& m2)
 	{
 		Matrix<T, rows, cols> ret;
-		for (uint32_t i = 0; i < CountOf(m1.data); i++)
+		for (u32 i = 0; i < CountOf(m1.data); i++)
 		{
-			for (uint32_t j = 0; j < CountOf(m2.data); j++)
+			for (u32 j = 0; j < CountOf(m2.data); j++)
 			{
 				ret[i][j] = m1[i][j] - m2[i][j];
 			}
@@ -763,9 +763,9 @@ namespace Ailu
 	Matrix<T, cols, rows> Transpose(Matrix<T, rows, cols>& mat)
 	{
 		Matrix<T, cols, rows> ret;
-		for (uint32_t i = 0; i < rows; i++)
+		for (u32 i = 0; i < rows; i++)
 		{
-			for (uint32_t j = 0; j < cols; j++)
+			for (u32 j = 0; j < cols; j++)
 			{
 				ret[j][i] = mat[i][j];
 			}
@@ -777,9 +777,9 @@ namespace Ailu
 	Matrix<T, cols, rows> Transpose(const Matrix<T, rows, cols>& mat)
 	{
 		Matrix<T, cols, rows> ret;
-		for (uint32_t i = 0; i < rows; i++)
+		for (u32 i = 0; i < rows; i++)
 		{
-			for (uint32_t j = 0; j < cols; j++)
+			for (u32 j = 0; j < cols; j++)
 			{
 				ret[j][i] = mat[i][j];
 			}
@@ -792,11 +792,11 @@ namespace Ailu
 	{
 		//Matrix<T, Db, Dc> m2_t;
 		//m2_t = Transpose(m2);
-		for (uint32_t i = 0; i < Da; i++)
+		for (u32 i = 0; i < Da; i++)
 		{
-			for (uint32_t j = 0; j < Dc; j++)
+			for (u32 j = 0; j < Dc; j++)
 			{
-				for (uint32_t k = 0; k < Dc; k++)
+				for (u32 k = 0; k < Dc; k++)
 					ret[j][i] += m1[j][k] * m2[k][i];
 			}
 		}
@@ -1601,7 +1601,7 @@ namespace Ailu
 	static V lerp(const V& src, const V& des, const float& weight)
 	{
 		V res{};
-		for (uint32_t i = 0; i < CountOf(src.data); i++)
+		for (u32 i = 0; i < CountOf(src.data); i++)
 		{
 			res[i] = (1.f - weight) * src[i] + weight * des[i];
 		}
@@ -1664,7 +1664,7 @@ namespace Ailu
 	}
 #pragma warning(pop)
 	using Color = Vector4D<float>;
-	using Color32 = Vector4D<uint8_t>;
+	using Color32 = Vector4D<u8>;
 	namespace Colors
 	{
 		static const Color kBlue = { 0.f,0.f,1.f ,1.0f };
@@ -1769,7 +1769,7 @@ namespace Ailu
 			return hash1 ^ (hash2 + 0x9e3779b9 + (hash1 << 6) + (hash1 >> 2));
 		}
 
-		template<uint8_t Size>
+		template<u8 Size>
 		class Hash
 		{
 		public:
@@ -1777,7 +1777,7 @@ namespace Ailu
 			{
 				_hash.reset();
 			}
-			void Set(uint8_t pos, uint8_t size, uint32_t value)
+			void Set(u8 pos, u8 size, u32 value)
 			{
 				if (pos + size > Size)
 				{
@@ -1790,18 +1790,18 @@ namespace Ailu
 				}
 			}
 
-			uint32_t Get(uint8_t pos, uint8_t size) const
+			u32 Get(u8 pos, u8 size) const
 			{
 				if (pos + size > Size)
 				{
 					throw std::out_of_range("Invalid position and size for Get operation");
 				}
 				std::bitset<32> result;
-				for (uint8_t i = 0; i < size; ++i)
+				for (u8 i = 0; i < size; ++i)
 				{
 					result.set(i, _hash.test(pos + i));
 				}
-				return static_cast<uint32_t>(result.to_ulong());
+				return static_cast<u32>(result.to_ulong());
 			}
 
 			bool operator==(const Hash<Size>& other) const

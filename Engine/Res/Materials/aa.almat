@@ -3,17 +3,17 @@ type: material
 name: aa
 shader_path: Shaders/shaders.hlsl
   prop_type: Float
-    MetallicValue: 0
-    RoughnessValue: 0
+    MetallicValue: 0.634
+    RoughnessValue: 0.044
     SamplerMask: 0
   prop_type: Vector
     SpecularColor: 0,0,0,0
-    BaseColor: 1,1,1,0
+    BaseColor: 0.906863,0.115581,0.115581,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
+    Specular: none
+    Metallic: none
     Albedo: none
     Normal: none
     Emssive: none
     Roughness: none
-    Metallic: none
-    Specular: none
