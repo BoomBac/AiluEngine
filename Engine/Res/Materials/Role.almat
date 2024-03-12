@@ -5,7 +5,7 @@ shader_path: Shaders/shaders.hlsl
   prop_type: Float
     MetallicValue: 0
     RoughnessValue: 0.043
-    SamplerMask: 0
+    SamplerMask: 4.2039e-45
   prop_type: Vector
     SpecularColor: 1,0.955882,0.955882,0
     BaseColor: 1,1,1,0
@@ -13,7 +13,7 @@ shader_path: Shaders/shaders.hlsl
   prop_type: Texture2D
     Specular: none
     Metallic: none
-    Albedo: none
-    Normal: none
+    Albedo: Meshs\Walking.fbm\Ch46_1001_Diffuse.png
+    Normal: Meshs\Walking.fbm\Ch46_1001_Normal.png
     Emssive: none
     Roughness: none

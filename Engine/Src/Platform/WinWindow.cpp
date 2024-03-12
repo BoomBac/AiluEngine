@@ -83,7 +83,7 @@ namespace Ailu
 
 		//移除调整窗口大小的样式
 		LONG_PTR style = GetWindowLongPtr(_hwnd, GWL_STYLE);
-		style = style & ~WS_THICKFRAME;
+		//style = style & ~WS_THICKFRAME;
 		SetWindowLongPtr(_hwnd, GWL_STYLE, style);
 		ShowWindow(_hwnd, SW_SHOW);
 		UpdateWindow(_hwnd);

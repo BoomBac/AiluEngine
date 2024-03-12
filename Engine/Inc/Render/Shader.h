@@ -321,7 +321,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 		}
 		static Ref<Shader> Load(const std::string& path)
 		{
-			auto sys_path = PathUtils::IsSystemPath(path)? path : PathUtils::GetResPath(path);
+			auto sys_path = PathUtils::IsSystemPath(path)? path : PathUtils::GetResSysPath(path);
 			auto name = PathUtils::GetFileName(sys_path);
 			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
 			else

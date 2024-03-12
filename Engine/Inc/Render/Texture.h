@@ -18,14 +18,14 @@ namespace Ailu
 {
 	namespace TextureUtils
 	{
-		static u8* ExpandImageDataToFourChannel(u8* p_data, size_t size, u8 alpha = 255u)
+		static u8* ExpandImageDataToFourChannel(u8* p_data, size_t size, u8 channel,u8 alpha = 255u)
 		{
-			u8* new_data = new u8[size / 3 * 4];
-			auto pixel_num = size / 3;
+			u8* new_data = new u8[size / channel * 4];
+			auto pixel_num = size / channel;
 			for (size_t i = 0; i < pixel_num; i++)
 			{
-				memcpy(new_data + i * 4, p_data + i * 3, 3);
-				new_data[i * 4 + 3] = alpha;
+				memcpy(new_data + i * 4, p_data + i * channel, channel);
+				new_data[i * 4 + channel] = alpha;
 			}
 			return new_data;
 		}
@@ -105,6 +105,7 @@ namespace Ailu
 		virtual const uint16_t& GetWidth() const = 0;
 		virtual const uint16_t& GetHeight() const = 0;
 		virtual void Release() = 0;
+		virtual void BuildRHIResource() = 0;
 		virtual void Bind(CommandBuffer* cmd,u8 slot) = 0;
 		virtual void Name(const std::string& name) = 0;
 		virtual const std::string& Name() const = 0;
@@ -137,6 +138,7 @@ namespace Ailu
 		static Ref<Texture2D> Create(const TextureDesc& desc);
 		virtual void FillData(u8* data);
 		virtual void FillData(Vector<u8*> datas);
+		virtual void BuildRHIResource() override {};
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
@@ -164,6 +166,7 @@ namespace Ailu
 	public:
 		static Ref<TextureCubeMap> Create(const uint16_t& width, const uint16_t& height, EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		virtual void FillData(Vector<u8*>& data);
+		virtual void BuildRHIResource() override {};
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
@@ -208,6 +211,7 @@ namespace Ailu
 	public:
 		static Ref<RenderTexture> Create(const uint16_t& width, const uint16_t& height, String name,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool is_cubemap = false);
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override;
+		void BuildRHIResource() final {};
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
 		//return rtv handle

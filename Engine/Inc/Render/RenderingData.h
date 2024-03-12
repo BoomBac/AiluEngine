@@ -19,11 +19,13 @@ namespace Ailu
         inline static u32 s_vertex_num = 0u;
         inline static u32 s_triangle_num = 0u;
         inline static u32 s_draw_call = 0u;
+        inline static f32 s_gpu_latency = 0.0f;
         static void Reset()
         {
             s_vertex_num = 0u;
             s_triangle_num = 0u;
             s_draw_call = 0u;
+            s_gpu_latency = 0.0f;
         }
         inline static EShaderingMode s_shadering_mode = EShaderingMode::kShader;
     };

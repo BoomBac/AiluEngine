@@ -113,10 +113,19 @@ namespace Ailu
 	// Get the geometry offset to a node. It is never inherited by the children.
 	static FbxAMatrix GetGeometry(FbxNode* pNode)
 	{
-		const FbxVector4 lT = pNode->GetGeometricTranslation(FbxNode::eSourcePivot);
-		const FbxVector4 lR = pNode->GetGeometricRotation(FbxNode::eSourcePivot);
-		const FbxVector4 lS = pNode->GetGeometricScaling(FbxNode::eSourcePivot);
-		return FbxAMatrix(lT, lR, lS);
+		if (pNode)
+		{
+			const FbxVector4 lT = pNode->GetGeometricTranslation(FbxNode::eSourcePivot);
+			const FbxVector4 lR = pNode->GetGeometricRotation(FbxNode::eSourcePivot);
+			const FbxVector4 lS = pNode->GetGeometricScaling(FbxNode::eSourcePivot);
+			return FbxAMatrix(lT, lR, lS);
+		}
+		else
+		{
+			FbxAMatrix mat;
+			mat.SetIdentity();
+			return mat;
+		}
 	}
 
 	static void GetGeometry(FbxNode* pNode, FbxVector4& t, FbxVector4& r, FbxVector4& s)
@@ -126,7 +135,8 @@ namespace Ailu
 		s = pNode->GetGeometricScaling(FbxNode::eSourcePivot);
 	}
 
-	static void ComputeClusterDeformation(bool is_local, FbxAMatrix& pGlobalPosition, FbxMesh* pMesh, FbxCluster* pCluster, FbxAMatrix& pVertexTransformMatrix, FbxTime pTime, FbxPose* pPose)
+	static void ComputeClusterDeformation(bool is_local, FbxAMatrix& pGlobalPosition, FbxNode* pMesh, FbxCluster* pCluster, FbxNode* cluster_link,
+	FbxAMatrix& pVertexTransformMatrix, FbxTime pTime, FbxPose* pPose)
 	{
 		FbxCluster::ELinkMode lClusterMode = pCluster->GetLinkMode();
 
@@ -155,7 +165,7 @@ namespace Ailu
 
 			pCluster->GetTransformMatrix(lReferenceGlobalInitPosition);
 			// Multiply lReferenceGlobalInitPosition by Geometric Transformation
-			lReferenceGeometry = GetGeometry(pMesh->GetNode());
+			lReferenceGeometry = GetGeometry(pMesh);
 			lReferenceGlobalInitPosition *= lReferenceGeometry;
 			lReferenceGlobalCurrentPosition = pGlobalPosition;
 
@@ -176,7 +186,7 @@ namespace Ailu
 			pCluster->GetTransformMatrix(lReferenceGlobalInitPosition);
 			lReferenceGlobalCurrentPosition = pGlobalPosition;
 			// Multiply lReferenceGlobalInitPosition by Geometric Transformation
-			lReferenceGeometry = GetGeometry(pMesh->GetNode());
+			lReferenceGeometry = GetGeometry(pMesh);
 			lReferenceGlobalInitPosition *= lReferenceGeometry;
 
 			// Get the link initial global position and the link current global position.
@@ -207,7 +217,8 @@ namespace Ailu
 			}
 			else
 			{
-				lClusterRelativeCurrentPositionInverse = pCluster->GetLink()->EvaluateLocalTransform(pTime) * lReferenceGeometry;
+				//lClusterRelativeCurrentPositionInverse = pCluster->GetLink()->EvaluateLocalTransform(pTime) * lReferenceGeometry;
+				lClusterRelativeCurrentPositionInverse = cluster_link->EvaluateLocalTransform(pTime) * lReferenceGeometry;
 			}
 
 
@@ -316,13 +327,56 @@ namespace Ailu
 		bool use_multi_thread = true;
 		bool is_skined = fbx_mesh->GetDeformerCount(FbxDeformer::eSkin) > 0;
 		auto mesh = is_skined ? MakeRef<SkinedMesh>(node->GetName()) : MakeRef<Mesh>(node->GetName());
+		const int mat_count = node->GetMaterialCount();
+		static auto fill_tex = [](const FbxProperty& prop, List<std::pair<String, u8>>& loaded_textures)
+			{
+				int layeredTextureCount = prop.GetSrcObjectCount<FbxLayeredTexture>();
+				if (layeredTextureCount > 0)
+				{
+					for (int layerIndex = 0; layerIndex != layeredTextureCount; ++layerIndex)
+					{
+						FbxLayeredTexture* layeredTexture = prop.GetSrcObject<FbxLayeredTexture>(layerIndex);
+						int count = layeredTexture->GetSrcObjectCount<FbxTexture>();
+						for (int c = 0; c != count; ++c)
+						{
+							FbxFileTexture* fileTexture = FbxCast<FbxFileTexture>(layeredTexture->GetSrcObject<FbxFileTexture>(c));
+							const char* sys_path = fileTexture->GetFileName();
+							LOG_INFO("texture name: {}", sys_path);
+							loaded_textures.emplace_back(std::make_pair(sys_path, 0));
+						}
+					}
+				}
+				else
+				{
+					int textureCount = prop.GetSrcObjectCount<FbxTexture>();
+					for (int i = 0; i != textureCount; ++i)
+					{
+						FbxFileTexture* fileTexture = FbxCast<FbxFileTexture>(prop.GetSrcObject<FbxFileTexture>(i));
+						const char* sys_path = fileTexture->GetFileName();
+						LOG_INFO("texture name: {}", sys_path);
+						loaded_textures.emplace_back(std::make_pair(sys_path, 0));
+					}
+				}
+			};
+		for (int i = 0; i < mat_count; ++i)
+		{
+			FbxSurfaceMaterial* mat = node->GetMaterial(i);
+			if (mat)
+			{
+				LOG_INFO("Node {} have material {} at slot {}", node->GetName(), mat->GetName(), i);
+				fill_tex(mat->FindProperty(FbxSurfaceMaterial::sDiffuse), _loaded_textures);
+				fill_tex(mat->FindProperty(FbxSurfaceMaterial::sNormalMap), _loaded_textures);
+			}
+		}
+
 		if (use_multi_thread)
 		{
 			_time_mgr.Mark();
+			auto ret4 = g_thread_pool->Enqueue(&FbxParser::ParserAnimation, this, node, _cur_skeleton);
 			auto ret1 = g_thread_pool->Enqueue(&FbxParser::ReadVertex, this, node, mesh.get());
 			auto ret2 = g_thread_pool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), mesh.get());
 			auto ret3 = g_thread_pool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), mesh.get());
-			if (ret1.get() && ret2.get() && ret3.get())
+			if (ret1.get() && ret2.get() && ret3.get() && ret4.get())
 			{
 				LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
 				_time_mgr.Mark();
@@ -341,7 +395,24 @@ namespace Ailu
 		}
 		else
 		{
-			throw std::runtime_error("error");
+			_time_mgr.Mark();
+			ReadVertex(node, mesh.get());
+			ReadNormal(*fbx_mesh, mesh.get());
+			ReadUVs(*fbx_mesh, mesh.get());
+			ParserAnimation(node, _cur_skeleton);
+			LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+			_time_mgr.Mark();
+			GenerateIndexdMesh(mesh.get());
+			CalculateTangant(mesh.get());
+			LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+			//mesh->Build();
+			if (is_skined)
+			{
+				dynamic_cast<SkinedMesh*>(mesh.get())->CurSkeleton(_cur_skeleton);
+			}
+			loaded_meshes.emplace_back(mesh);
+			return true;
+			return false;
 		}
 	}
 
@@ -351,34 +422,27 @@ namespace Ailu
 		auto mesh_name = fbx_mesh->GetName();
 		u32 deformers_num = fbx_mesh->GetDeformerCount(FbxDeformer::eSkin);
 		bool b_use_mt = false;
-		static auto parser_anim = [](Skeleton& sk,FbxNode* node,FbxMesh* mesh,FbxSkin* skin, FbxAMatrix& geometry_transform, AnimationClip* clip,FbxLongLong frame_count, FbxTime::EMode time_mode) {
-			u32 cluster_num = skin->GetClusterCount();
-			for (u32 j = 0; j < cluster_num; j++)
-			{
-				FbxCluster* cluster = skin->GetCluster(j);
+		static auto parser_anim = [](Skeleton& sk, FbxNode* node, FbxMesh* mesh, FbxCluster* cluster, FbxNode* cluster_link,const FbxAMatrix& geometry_transform, AnimationClip* clip,
+			FbxLongLong frame_count, FbxTime::EMode time_mode) {
 				String joint_name = cluster->GetLink()->GetName();
 				i32 joint_i = Skeleton::GetJointIndexByName(sk, joint_name);
 				if (joint_i == -1)
-				{
-					//LOG_WARNING("Can't find joint {} when load mesh {}", joint_name, mesh_name);
-					continue;
-				}
+					return;
 				FbxAMatrix transform_matrix, transform_link_matrix, global_bindpose_inv_matrix;
 				cluster->GetTransformMatrix(transform_matrix);//transform of mesh at binding time
 				cluster->GetTransformLinkMatrix(transform_link_matrix);//transform of joint at binding time from joint space -> world_space
 				global_bindpose_inv_matrix = transform_link_matrix.Inverse() * transform_matrix * geometry_transform;
 				u16 joint_index = (u16)joint_i;
 				sk[joint_index]._inv_bind_pos = FbxMatToMat4x4f(global_bindpose_inv_matrix);
-				FbxAMatrix local_matrix = cluster->GetLink()->EvaluateLocalTransform();
+				auto joint = cluster_link;
 				for (FbxLongLong i = 0; i < frame_count; i++)
 				{
 					FbxTime cur_time;
 					cur_time.SetFrame(i, time_mode);
 					FbxAMatrix global_offpositon = node->EvaluateGlobalTransform(cur_time) * geometry_transform;
 					FbxAMatrix bone_matrix_l;
-					ComputeClusterDeformation(true, global_offpositon, mesh, cluster, bone_matrix_l, cur_time, nullptr);
+					ComputeClusterDeformation(true, global_offpositon, node, cluster, cluster_link,bone_matrix_l, cur_time, nullptr);
 					sk[joint_index]._node_inv_world_mat = FbxMatToMat4x4f(global_offpositon.Inverse());
-					auto joint = cluster->GetLink();
 					if (!joint->GetParent()->GetSkeleton())
 					{
 						FbxNode* parent_node = joint->GetParent();
@@ -391,8 +455,7 @@ namespace Ailu
 					}
 					clip->AddKeyFrame(joint_index, FbxMatToTransform(bone_matrix_l));
 				}
-			}
-		};
+			};
 		g_pTimeMgr->Mark();
 		if (deformers_num > 0)
 		{
@@ -421,8 +484,15 @@ namespace Ailu
 				{
 					FbxSkin* skin = FbxCast<FbxSkin>(fbx_mesh->GetDeformer(i, FbxDeformer::eSkin));
 					if (!skin)
+					{
+						g_pLogMgr->LogWarningFormat("only support Skin deformer!");
 						continue;
-					res.emplace_back(g_thread_pool->Enqueue(parser_anim,std::ref(sk), node,fbx_mesh,skin, std::ref(geometry_transform), clip, FrameCount, TimeMode));
+					}
+					u32 cluster_num = skin->GetClusterCount();
+					for (u32 j = 0; j < cluster_num; j++)
+					{
+						res.emplace_back(g_thread_pool->Enqueue(parser_anim,std::ref(sk), node, fbx_mesh, skin->GetCluster(j),skin->GetCluster(j)->GetLink(),std::ref(geometry_transform), clip, FrameCount, TimeMode));
+					}
 				}
 				for (auto& ret : res)
 					ret.wait();
@@ -437,52 +507,17 @@ namespace Ailu
 					u32 cluster_num = skin->GetClusterCount();
 					for (u32 j = 0; j < cluster_num; j++)
 					{
-						FbxCluster* cluster = skin->GetCluster(j);
-						String joint_name = cluster->GetLink()->GetName();
-						i32 joint_i = Skeleton::GetJointIndexByName(_cur_skeleton, joint_name);
-						if (joint_i == -1)
-						{
-							LOG_WARNING("Can't find joint {} when load mesh {}", joint_name, mesh_name);
-							continue;
-						}
-						FbxAMatrix transform_matrix, transform_link_matrix, global_bindpose_inv_matrix;
-						cluster->GetTransformMatrix(transform_matrix);//transform of mesh at binding time
-						cluster->GetTransformLinkMatrix(transform_link_matrix);//transform of joint at binding time from joint space -> world_space
-						global_bindpose_inv_matrix = transform_link_matrix.Inverse() * transform_matrix * geometry_transform;
-						u16 joint_index = (u16)joint_i;
-						_cur_skeleton[joint_index]._inv_bind_pos = FbxMatToMat4x4f(global_bindpose_inv_matrix);
-						FbxAMatrix local_matrix = cluster->GetLink()->EvaluateLocalTransform();
-						for (FbxLongLong i = 0; i < FrameCount; i++)
-						{
-							FbxTime cur_time;
-							cur_time.SetFrame(i, TimeMode);
-							FbxAMatrix global_offpositon = node->EvaluateGlobalTransform(cur_time) * geometry_transform;
-							FbxAMatrix bone_matrix_l;
-							ComputeClusterDeformation(true, global_offpositon, fbx_mesh, cluster, bone_matrix_l, cur_time, nullptr);
-							_cur_skeleton[joint_index]._node_inv_world_mat = FbxMatToMat4x4f(global_offpositon.Inverse());
-							auto joint = cluster->GetLink();
-							if (!joint->GetParent()->GetSkeleton())
-							{
-								FbxNode* parent_node = joint->GetParent();
-								FbxAMatrix none_joint_matrix = parent_node->EvaluateLocalTransform(cur_time);
-								while ((parent_node = parent_node->GetParent()) != NULL)
-								{
-									none_joint_matrix = parent_node->EvaluateLocalTransform(cur_time) * none_joint_matrix;
-								}
-								bone_matrix_l = none_joint_matrix * bone_matrix_l;
-							}
-							clip->AddKeyFrame(joint_index, FbxMatToTransform(bone_matrix_l));
-						}
+						parser_anim(sk, node, fbx_mesh, skin->GetCluster(j), skin->GetCluster(j)->GetLink(), geometry_transform, clip, FrameCount, TimeMode);
 					}
 				}
 			}
 			LOG_INFO("Fill animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
-			clip->CurSkeletion(_cur_skeleton);
+			clip->CurSkeletion(sk);
 			g_pTimeMgr->Mark();
 			clip->Bake();
 			LOG_INFO("Bake animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
-			LOG_INFO("Import animation {}", clip->Name())
-			_loaded_anims.emplace_back(clip);
+			LOG_INFO("Import animation {} end", clip->Name())
+				_loaded_anims.emplace_back(clip);
 		}
 		return true;
 	}
@@ -495,6 +530,8 @@ namespace Ailu
 		void* data = nullptr;
 		if (normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByControlPoint)
 		{
+			_b_normal_by_controlpoint = true;
+			LOG_WARNING("Normal by control point");
 			data = new float[vertex_count * 3];
 			for (int i = 0; i < vertex_count; ++i)
 			{
@@ -512,6 +549,8 @@ namespace Ailu
 		}
 		else if (normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByPolygonVertex)
 		{
+			_b_normal_by_controlpoint = false;
+			LOG_WARNING("Normal by eByPolygonVertex");
 			int trangle_count = fbx_mesh.GetPolygonCount();
 			vertex_count = trangle_count * 3;
 			data = new float[vertex_count * 3];
@@ -549,24 +588,6 @@ namespace Ailu
 		std::map<u32, Vector<std::pair<u16, float>>> control_point_weight_infos{};
 		if (deformers_num > 0)
 		{
-			FbxVector4 t, r, s;
-			GetGeometry(node, t, r, s);
-			FbxAMatrix geometry_transform;
-			geometry_transform.SetTRS(t, r, s);
-			//only support one stack
-			FbxAnimStack* cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
-			//LOG_INFO("Scene {} has {} animation stack", _p_cur_fbx_scene->GetName(), _p_cur_fbx_scene->GetSrcObjectCount<FbxAnimStack>());
-			FbxString anim_fname = cur_anim_stack->GetName();
-			String anim_name = anim_fname.Buffer();
-			FbxTakeInfo* take_info = _p_cur_fbx_scene->GetTakeInfo(anim_fname);
-			FbxTime start_time = take_info->mLocalTimeSpan.GetStart();
-			FbxTime end_time = take_info->mLocalTimeSpan.GetStop();
-			FbxTime Duration = take_info->mLocalTimeSpan.GetDuration();
-			FbxTime::EMode TimeMode = FbxTime::GetGlobalTimeMode();
-			FbxLongLong FrameCount = Duration.GetFrameCount(TimeMode);
-			double FrameRate = FbxTime::GetFrameRate(TimeMode);
-			//AnimationClip* clip = new AnimationClip(_cur_skeleton, FrameCount,static_cast<float>(Duration.GetSecondDouble()));
-			//clip->Name(mesh->Name() + take_info->mName.Buffer());
 			for (u32 i = 0; i < deformers_num; i++)
 			{
 				FbxSkin* skin = FbxCast<FbxSkin>(fbx_mesh->GetDeformer(i, FbxDeformer::eSkin));
@@ -596,7 +617,8 @@ namespace Ailu
 				}
 			}
 		}
-
+		_positon_conrtol_index_mapper.clear();
+		_positon_conrtol_index_mapper.resize(fbx_mesh->GetPolygonCount() * 3);
 		fbxsdk::FbxVector4* points{ fbx_mesh->GetControlPoints() };
 		u32 cur_index_count = 0u;
 		std::vector<Vector3f> positions{};
@@ -612,6 +634,7 @@ namespace Ailu
 					auto p = points[cur_control_point_index];
 					Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
 					//position *= scale_factor;
+					_positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
 					positions.emplace_back(position);
 					auto& cur_weight_info = control_point_weight_infos[cur_control_point_index];
 					if (cur_weight_info.size() > 4)
@@ -640,8 +663,10 @@ namespace Ailu
 			{
 				for (int32_t j = 0; j < 3; ++j)
 				{
-					auto p = points[fbx_mesh->GetPolygonVertex(i, j)];
+					auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
+					auto p = points[cur_control_point_index];
 					Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
+					_positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
 					position *= scale_factor;
 					positions.emplace_back(position);
 				}
@@ -874,7 +899,7 @@ namespace Ailu
 			for (size_t i = 0; i < vertex_count; i++)
 			{
 				auto p = raw_pos[i];
-				auto n = raw_normals[i];
+				auto n = raw_normals[_b_normal_by_controlpoint ? _positon_conrtol_index_mapper[i] : i];
 				auto uv = raw_uv0[i];
 				auto hash0 = v3hash(n), hash1 = v2hash(uv);
 				auto vertex_hash = ALHash::CombineHashes(hash0, hash1);
@@ -954,6 +979,7 @@ namespace Ailu
 	List<Ref<Mesh>> FbxParser::ParserImpl(WString sys_path)
 	{
 		//return ParserImpl(sys_path, false);
+		_cur_file_sys_path = sys_path;
 		scale_factor = Vector3f::kOne;
 		String path = ToChar(sys_path.data());
 		_p_cur_fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
@@ -984,6 +1010,7 @@ namespace Ailu
 		ParserFbxNode(fbx_rt, mesh_node, skeleton_node);
 		_cur_skeleton.Clear();//当前仅支持一个骨骼，所以清空之前的数据
 		_loaded_anims.clear();
+		_loaded_textures.clear();
 		auto skeleton_node_c = skeleton_node;
 		while (!skeleton_node.empty())
 		{
@@ -992,10 +1019,8 @@ namespace Ailu
 		}
 		while (!mesh_node.empty())
 		{
-			auto ret = g_thread_pool->Enqueue(&FbxParser::ParserAnimation, this, mesh_node.front(), _cur_skeleton);
 			ParserMesh(mesh_node.front(), loaded_meshs);
-			if (ret.get())
-				mesh_node.pop();
+			mesh_node.pop();
 		}
 		if (loaded_meshs.empty())
 		{

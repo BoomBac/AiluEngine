@@ -16,6 +16,7 @@ namespace Ailu
 		FbxParser();
 		List<Ref<Mesh>> Parser(std::string_view sys_path) final;
 		List<Ref<Mesh>> Parser(const WString& sys_path) final;
+		const List<std::pair<String, u8>>& GetTextureInfos() const { return _loaded_textures; }
 		virtual ~FbxParser();
 	private:
 		//void ParserFbxNode(FbxNode* node, List<Ref<Mesh>>& loaded_meshes);
@@ -49,6 +50,12 @@ namespace Ailu
 		FbxArray<FbxPose*> _fbx_poses;
 		FbxArray<FbxNode*> _fbx_cameras;
 
+		List<std::pair<String, u8>> _loaded_textures;
+		WString _cur_file_sys_path;
+		//Record the location and its corresponding control point index, 
+		//when the normal mapping method is control point, we need to get the normal based on this information to generate the index mesh
+		Vector<u32> _positon_conrtol_index_mapper;
+		bool _b_normal_by_controlpoint = false;
 		List<AnimationClip*> _loaded_anims;
 		FbxArray<FbxString*> _fbx_anim_stack_names;
 		FbxAnimLayer* _p_fbx_anim_layer; 

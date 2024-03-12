@@ -18,9 +18,9 @@ namespace Ailu
 		{
 			auto tex = Texture2D::Create(x, y);
 			u8* new_data = nullptr;
-			if (n == 3)
+			if (n != 4)
 			{
-				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * 3);
+				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);
 				stbi_image_free(data);
 				tex->FillData(std::move(new_data));
 			}
@@ -57,9 +57,9 @@ namespace Ailu
 			}
 			else
 			{
-				if (n == 3)
+				if (n != 4)
 				{
-					expand_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * 3);
+					expand_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);
 				}
 				else
 				{

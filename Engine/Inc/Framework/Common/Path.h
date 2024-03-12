@@ -10,7 +10,9 @@ namespace Ailu
 	static const String kEngineResRootPath = "C:/AiluEngine/Engine/Res/";
 #else
 	static const String kEngineRootPath = "D:/ProjectCpp/AiluEngine/Engine/";
+	static const WString kEngineRootPathW = L"D:/ProjectCpp/AiluEngine/Engine/";
 	static const String kEngineResRootPath = "D:/ProjectCpp/AiluEngine/Engine/Res/";
+	static const WString kEngineResRootPathW = L"D:/ProjectCpp/AiluEngine/Engine/Res/";
 #endif
 
 	namespace EnginePath
@@ -28,11 +30,32 @@ namespace Ailu
 			return path.find_first_of(":") == 1;
 		}
 
+		inline static bool IsSystemPath(const WString& path)
+		{
+			return path.find_first_of(L":") == 1;
+		}
+
 		//begin from Res/  eg: Engien/Res/aa/b -> aa/b
 		static inline String ExtractAssetPath(const String& path)
 		{
 			auto p1 = path.find("Res/");
 			auto p2 = path.find("Res\\");
+			if (p1 != path.npos)
+			{
+				return path.substr(p1 + 4);
+			}
+			if (p2 != path.npos)
+			{
+				return path.substr(p2 + 4);
+			}
+			return path;
+		}
+
+		//begin from Res/  eg: Engien/Res/aa/b -> aa/b
+		static inline WString ExtractAssetPathW(const WString& path)
+		{
+			auto p1 = path.find(L"Res/");
+			auto p2 = path.find(L"Res\\");
 			if (p1 != path.npos)
 			{
 				return path.substr(p1 + 4);
@@ -81,7 +104,7 @@ namespace Ailu
 			}
 		}
 
-		static inline std::string GetResPath(const std::string& sub_path)
+		static inline std::string GetResSysPath(const String& sub_path)
 		{
 			String path = sub_path;
 			if (IsSystemPath(path)) 
@@ -91,6 +114,18 @@ namespace Ailu
 			else if (sub_path.starts_with("\\"))
 				path = path.substr(2);
 			return kEngineResRootPath + path;
+		}
+
+		static inline WString GetResSysPath(const WString& sub_path)
+		{
+			WString path = sub_path;
+			if (IsSystemPath(path))
+				return sub_path;
+			if (sub_path.starts_with(L"/"))
+				path = path.substr(1);
+			else if (sub_path.starts_with(L"\\"))
+				path = path.substr(2);
+			return kEngineResRootPathW + path;
 		}
 	};
 

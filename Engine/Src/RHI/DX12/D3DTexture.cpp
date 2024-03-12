@@ -16,8 +16,6 @@ namespace Ailu
 		_srv_format = ConvertToDXGIFormat(_format);
 		_uav_format = ConvertToDXGIFormat(_format);
 		_read_only = read_only;
-		if(!_read_only)
-			Construct();
 	}
 
 	D3DTexture2D::D3DTexture2D(const TextureDesc& desc)
@@ -31,8 +29,6 @@ namespace Ailu
 		_uav_format = ConvertToDXGIFormat(desc._uav_format);
 		_read_only = desc._read_only;
 		_mipmap_count = desc._mipmap;
-		if (!_read_only)
-			Construct();
 	}
 
 	D3DTexture2D::~D3DTexture2D()
@@ -43,12 +39,10 @@ namespace Ailu
 	void D3DTexture2D::FillData(u8* data)
 	{
 		Texture2D::FillData(data);
-		Construct();
 	}
 	void D3DTexture2D::FillData(Vector<u8*> datas)
 	{
 		Texture2D::FillData(datas);
-		Construct();
 	}
 	void D3DTexture2D::Bind(CommandBuffer* cmd, u8 slot)
 	{
@@ -67,7 +61,7 @@ namespace Ailu
 		return reinterpret_cast<void*>(_srv_gpu_handle.ptr);
 	}
 
-	void D3DTexture2D::Construct()
+	void D3DTexture2D::BuildRHIResource()
 	{
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
 		auto cmd = CommandBufferPool::Get();
@@ -158,6 +152,10 @@ namespace Ailu
 	void D3DTextureCubeMap::FillData(Vector<u8*>& data)
 	{
 		TextureCubeMap::FillData(data);
+	}
+
+	void D3DTextureCubeMap::BuildRHIResource()
+	{
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
 		auto cmd = CommandBufferPool::Get();
 		auto p_cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();

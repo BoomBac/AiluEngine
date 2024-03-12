@@ -59,12 +59,15 @@ namespace Ailu
 		AnimationClip* GetAnimationClip() {return _p_clip.get();};
 		float _anim_time = 0.0f;
 		bool _is_draw_debug_skeleton = true;
+		bool _is_mt_skin = true;
+		float _skin_time = 0.0f;
 	private:
-		inline constexpr static u16 s_skin_thread_num = 6u;
+		inline constexpr static u16 s_skin_thread_num = 12u;
 		Ref<AnimationClip> _p_clip;
 		u16 _per_skin_task_vertex_num = 0u;
 		Vector<std::future<void>> _skin_tasks;
 	private:
+		float _pre_anim_time = 0.0f;
 		void Skin(float time);
 		void SkinTask(AnimationClip* clip, u32 time, Vector3f* vert, u32 begin, u32 end);
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;

@@ -1,12 +1,13 @@
 #include "pch.h"
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
+#include <limits>
 #include "Framework/Common/Log.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
-#include <limits>
+#include "Render/RenderingData.h"
 
 
 
@@ -338,12 +339,14 @@ namespace Ailu
 	void D3DContext::FlushCommandQueue(ID3D12CommandQueue* cmd_queue, ID3D12Fence* fence, u64& fence_value)
 	{
 		++fence_value;
+		g_pTimeMgr->Mark();
 		ThrowIfFailed(cmd_queue->Signal(fence,fence_value));
 		if (fence->GetCompletedValue() < fence_value)
 		{
 			ThrowIfFailed(fence->SetEventOnCompletion(fence_value, m_fenceEvent));
 			WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 		}
+		RenderingStates::s_gpu_latency = g_pTimeMgr->GetElapsedSinceLastMark();
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	}
 
