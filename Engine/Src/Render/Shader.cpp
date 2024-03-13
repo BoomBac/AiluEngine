@@ -64,7 +64,7 @@ namespace Ailu
 		for (auto& it : s_global_matrix_bind_info)
 		{
 			auto mat_it = _bind_res_infos.find(it.first);
-			if (mat_it != _bind_res_infos.end() && mat_it->second._res_type == EBindResDescType::kCBufferAttribute)
+			if (mat_it != _bind_res_infos.end() && (mat_it->second._res_type & EBindResDescType::kCBufferAttribute))
 			{
 				auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
 				Matrix4x4f* mat_ptr = std::get<0>(it.second);

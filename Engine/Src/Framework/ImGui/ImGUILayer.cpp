@@ -1127,41 +1127,83 @@ namespace Ailu
 		auto asset_content_size = window_size;
 		asset_content_size.x *= 0.9f;
 		asset_content_size.y *= 0.8f;
-		if (ImGui::BeginListBox(" ", asset_content_size))
-		{
-			fs::directory_entry cur_entry(cur_path);
-			fs::directory_iterator curdir_it{ cur_path };
-			int count = 0;
-			static int cur_click_id = -1;
-			for (auto& dir_it : curdir_it)
-			{
-				if (dir_it.is_directory())
-					ImGui::Selectable(std::format("[] {}", dir_it.path().filename().string()).c_str(), cur_click_id == count);
-				else
-					ImGui::Selectable(dir_it.path().filename().string().c_str(), cur_click_id == count);
-				if (ImGui::IsItemClicked())
-					cur_click_id = count;
-				if (cur_click_id == count && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && dir_it.is_directory())
-					_cur_dir = dir_it.path().string();
-				if (ImGui::BeginPopupContextItem()) // <-- use last item id as popup id
-				{
-					if (ImGui::MenuItem("New"))
-					{
 
-					}
-					if (ImGui::MenuItem("Rename"))
-					{
-					}
-					if (ImGui::MenuItem("Delete"))
-					{
-					}
-					ImGui::EndPopup();
-				}
-				++count;
+		static float preview_tex_size = 64;
+		float paddinged_preview_tex_size_padding = preview_tex_size *1.15f;
+		//// 获取当前ImGui窗口的内容区域宽度
+		ImGui::SliderFloat(" ", &preview_tex_size, 16, 256, "%.0f");
+		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
+		u32 icon_num_per_row = window_width / (u32)paddinged_preview_tex_size_padding;
+		icon_num_per_row += icon_num_per_row == 0 ? 1 : 0;
+		static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
+		static fs::directory_entry s_cur_entry(cur_path);
+		fs::directory_iterator curdir_it{ cur_path };
+		static auto folder_snap = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("Editor/folder"));
+		static auto file_us_snap = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("Editor/file_us"));
+		static auto mesh_snap = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("Editor/3d"));
+		static auto shader_snap = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("Editor/shader"));
+		static int cur_selected_file_index = -1;
+		ImGui::Text("%s", s_cur_entry.path().string().c_str());
+		int file_count = 0;
+		for (auto& dir_it : curdir_it)
+		{
+			bool is_dir = dir_it.is_directory();
+			auto file_name = dir_it.path().filename();
+			auto file_name_str = file_name.string();
+
+			ImGui::BeginGroup();
+			//ImGuiContext* context = ImGui::GetCurrentContext();
+			//auto drawList = context->CurrentWindow->DrawList;
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));
+			ImTextureID tex_id = is_dir? folder_snap->GetGPUNativePtr() : file_us_snap->GetGPUNativePtr();
+			String ext_str = file_name.extension().string();
+			if(ext_str == ".fbx" || ext_str.c_str() == ".FBX")
+			{
+				tex_id = mesh_snap->GetGPUNativePtr();
 			}
-			if (ImGui::BeginPopupContextWindow("AssetBrowserContext", ImGuiPopupFlags_NoOpenOverItems |
-				ImGuiPopupFlags_MouseButtonRight |
-				ImGuiPopupFlags_NoOpenOverExistingPopup))
+			else if (ext_str == ".hlsl")
+			{
+				tex_id = shader_snap->GetGPUNativePtr();
+			}
+			else
+			{
+			}
+			if (ImGui::ImageButton(tex_id, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
+			{
+				cur_selected_file_index = file_count;
+				LOG_INFO("selected file {}", file_name_str.c_str());
+			}
+			ImGui::PopStyleColor();
+			std::string truncatedText = file_name_str.substr(0, static_cast<size_t>(preview_tex_size / ImGui::CalcTextSize("A").x));
+			ImGui::Text("%s", truncatedText.c_str());
+			//ImGui::Text("%s", file_name_str.c_str());
+			ImGui::EndGroup();
+			if (ImGui::IsItemClicked())
+			{
+				s_cur_entry = dir_it;
+				cur_selected_file_index = file_count;
+			}
+			if (cur_selected_file_index == file_count && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && is_dir)
+				_cur_dir = dir_it.path().string();
+			if ((file_count + 1) % icon_num_per_row != 0)
+			{
+				ImGui::SameLine();
+			}
+			if (ImGui::BeginPopupContextItem(file_name_str.c_str())) // <-- use last item id as popup id
+			{
+				if (ImGui::MenuItem("New"))
+				{
+				}
+				if (ImGui::MenuItem("Rename"))
+				{
+				}
+				if (ImGui::MenuItem("Delete"))
+				{
+				}
+				ImGui::EndPopup();
+			}
+			++file_count;
+			if (ImGui::BeginPopupContextWindow("AssetBrowserContext", ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverExistingPopup))
 			{
 				if (ImGui::BeginMenu("New"))
 				{
@@ -1177,7 +1219,6 @@ namespace Ailu
 				}
 				ImGui::EndPopup();
 			}
-			ImGui::EndListBox();
 		}
 		ShowModalDialog("New Material", new_material_widget, 49);
 		ImGui::End();

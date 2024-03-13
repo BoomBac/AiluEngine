@@ -2,18 +2,19 @@ guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
 type: material
 name: StandardPBR
 shader_path: Shaders/shaders.hlsl
+  prop_type: Uint
+    SamplerMask: 1
   prop_type: Float
     MetallicValue: 0
     RoughnessValue: 0.164
-    SamplerMask: 0
   prop_type: Vector
     SpecularColor: 0,0,0,0
     BaseColor: 1,1,1,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
-    Albedo: none
+    Specular: none
+    Metallic: none
+    Albedo: Textures/MyImage01.jpg
     Normal: none
     Emssive: none
     Roughness: none
-    Metallic: none
-    Specular: none

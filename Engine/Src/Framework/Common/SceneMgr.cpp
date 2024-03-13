@@ -4,7 +4,6 @@
 #include "Objects/StaticMeshComponent.h"
 #include "Objects/CameraComponent.h"
 #include "Framework/Common/LogMgr.h"
-#include "Framework/Common/ResourceMgr.h"
 #include "Render/Camera.h"
 #include "Render/RenderQueue.h"
 #include "Framework/Common/Path.h"
@@ -15,7 +14,7 @@ namespace Ailu
 {
 	static String GetIndentation(int level)
 	{
-		String ret{""};
+		String ret{ "" };
 		while (level--)
 		{
 			ret.append("  ");
@@ -23,7 +22,7 @@ namespace Ailu
 		return ret;
 	}
 
-	static String GetSceneSysPath(const string& scene_path)
+	static String GetSceneSysPath(const String& scene_path)
 	{
 		return kEngineRootPath + scene_path;
 	}
@@ -80,13 +79,13 @@ namespace Ailu
 			{
 				actor->Tick(delta_time);
 			}
-			Cull(_p_current);
+			Cull(Camera::sCurrent, _p_current);
 		}
 	}
 
 	Scene* SceneMgr::Create(const std::string& name)
 	{
-		s_all_scene.emplace_back(std::move(MakeScope<Scene>(name)));
+		s_all_scene.push_back(std::move(MakeScope<Scene>(name)));
 		return s_all_scene.back().get();
 	}
 
@@ -141,7 +140,7 @@ namespace Ailu
 		}
 		catch (const std::exception&)
 		{
-			g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {}!",scene->Name());
+			g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {}!", scene->Name());
 			return;
 		}
 		auto sys_path = GetSceneSysPath(scene_path);
@@ -154,7 +153,7 @@ namespace Ailu
 		String serialized_str = ss.str();
 		std::istringstream iss(serialized_str);
 		std::string line;
-		while (std::getline(iss, line)) 
+		while (std::getline(iss, line))
 		{
 			file << line << endl;
 		}
@@ -175,7 +174,7 @@ namespace Ailu
 		String line{};
 		Queue<std::tuple<String, String>> lines{};
 		int line_count = 0;
-		while (std::getline(scene_data,line))
+		while (std::getline(scene_data, line))
 		{
 			std::istringstream iss(line);
 			std::string key;
@@ -202,14 +201,17 @@ namespace Ailu
 		return loaded_scene;
 	}
 
-	void SceneMgr::Cull(Scene* p_scene)
+	void SceneMgr::Cull(Camera* cam, Scene* p_scene)
 	{
 		RenderQueue::ClearQueue();
+		auto& cam_vf = cam->GetViewFrustum();
 		for (auto static_mesh : p_scene->GetAllStaticRenderable())
-		{	
-			auto& aabb = static_mesh->GetAABB();
-			RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(),static_mesh->GetMaterial().get(), 
-			static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), 1);
+		{
+			if (ViewFrustum::Conatin(cam_vf, static_mesh->GetAABB()))
+			{
+				RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(), static_mesh->GetMaterial().get(),
+					static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), 1);
+			}
 		}
 	}
 
@@ -221,7 +223,7 @@ namespace Ailu
 		_name = name;
 		_all_static_renderalbes.resize(kMaxStaticRenderableNum);
 		FillActorList = [this](SceneActor* actor) {
-			_all_objects.emplace_back(actor); 
+			_all_objects.emplace_back(actor);
 			auto light = actor->GetComponent<LightComponent>();
 			if (light != nullptr)
 			{
@@ -232,7 +234,7 @@ namespace Ailu
 			{
 				_all_static_renderalbes.emplace_back(static_mesh);
 			}
-		};
+			};
 	}
 
 	void Scene::AddObject(SceneActor* actor)
@@ -257,7 +259,7 @@ namespace Ailu
 			_all_objects.clear();
 			_all_lights.clear();
 			_all_static_renderalbes.clear();
-			TravelAllActor(_p_root,FillActorList);
+			TravelAllActor(_p_root, FillActorList);
 			_b_dirty = false;
 		}
 		return _all_objects;
@@ -269,7 +271,7 @@ namespace Ailu
 		{
 			if (actor->Id() == id) return actor;
 		}
-		LOG_WARNING("Can't find actor with id: {} in scene {},will return first actor",id,_name);
+		LOG_WARNING("Can't find actor with id: {} in scene {},will return first actor", id, _name);
 		return _all_objects.front();
 	}
 
@@ -278,12 +280,12 @@ namespace Ailu
 		if (index >= _all_objects.size())
 		{
 			return _all_objects.front();
-			LOG_WARNING("Can't find actor with index: {} in scene {},will return first actor",index,_name);
+			LOG_WARNING("Can't find actor with index: {} in scene {},will return first actor", index, _name);
 		}
 		else
 		{
 			int cur_index = 0;
-			for (auto it = _all_objects.begin(); it!= _all_objects.end();it++)
+			for (auto it = _all_objects.begin(); it != _all_objects.end(); it++)
 			{
 				if (cur_index == index) return *it;
 				else ++cur_index;

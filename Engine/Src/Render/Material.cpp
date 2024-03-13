@@ -94,6 +94,21 @@ namespace Ailu
 		}
 	}
 
+	void Material::SetUint(const String& name, const u32& value)
+	{
+		auto& res_info = _p_shader->GetBindResInfo();
+		auto it = res_info.find(name);
+		if (it != res_info.end())
+		{
+			memcpy(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(value));
+			LOG_WARNING("uint value{}", *reinterpret_cast<u32*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second)));
+		}
+		else
+		{
+			LOG_WARNING("Material: {} set uint with name {} failed!", _name, name);
+		}
+	}
+
 	void Material::SetVector(const String& name, const Vector4f& vector)
 	{
 		auto& res_info = _p_shader->GetBindResInfo();
@@ -222,7 +237,7 @@ namespace Ailu
 		List<std::tuple<String, float>> ret{};
 		for (auto& [name, bind_info] : _p_shader->GetBindResInfo())
 		{
-			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type == EBindResDescType::kCBufferAttribute
+			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat
 				&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 4)
 			{
 				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<float*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
@@ -236,10 +251,23 @@ namespace Ailu
 		List<std::tuple<String, Vector4f>> ret{};
 		for (auto& [name, bind_info] : _p_shader->GetBindResInfo())
 		{
-			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type == EBindResDescType::kCBufferAttribute
+			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat4
 				&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 16)
 			{
 				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<Vector4f*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+			}
+		}
+		return ret;
+	}
+
+	List<std::tuple<String, u32>> Material::GetAllUintValue()
+	{
+		List<std::tuple<String, u32>> ret{};
+		for (auto& [name, bind_info] : _p_shader->GetBindResInfo())
+		{
+			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUint)
+			{
+				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<u32*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
 			}
 		}
 		return ret;
@@ -263,7 +291,7 @@ namespace Ailu
 				auto& [slot, tex_ptr] = tex_info;
 				first_time ? _textures.insert(std::make_pair(bind_info.second._name, tex_info)) : _tmp_textures.insert(std::make_pair(bind_info.second._name, tex_info));
 			}
-			else if (bind_info.second._res_type == EBindResDescType::kCBufferAttribute && !ShaderBindResourceInfo::s_reversed_res_name.contains(bind_info.first))
+			else if (bind_info.second._res_type & EBindResDescType::kCBufferAttribute && !ShaderBindResourceInfo::s_reversed_res_name.contains(bind_info.first))
 			{
 				auto byte_size = ShaderBindResourceInfo::GetVariableSize(bind_info.second);
 				cur_shader_cbuf_size += byte_size;

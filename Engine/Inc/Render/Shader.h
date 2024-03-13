@@ -26,6 +26,7 @@ namespace Ailu
 	{
 		inline static std::string Vector = "Vector";
 		inline static std::string Float = "Float";
+		inline static std::string Uint = "Uint";
 		inline static std::string Color = "Color";
 		inline static std::string Texture2D = "Texture2D";
 		inline static std::string CubeMap = "CubeMap";
@@ -64,7 +65,8 @@ namespace Ailu
 		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, uint8_t bind_slot, const std::string& name)
 			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
 		{
-			if (res_type == EBindResDescType::kCBufferAttribute) _cbuf_member_offset = slot_or_offset;	
+			if (res_type & EBindResDescType::kCBufferAttribute) 
+				_cbuf_member_offset = slot_or_offset;
 			else _res_slot = slot_or_offset;
 		}
 		bool operator==(const ShaderBindResourceInfo& other) const

@@ -123,7 +123,7 @@ namespace Ailu
 			Swizzle<Vector2D, T, 0, 1> xy;
 			Swizzle<Vector2D, T, 1, 0> yx;
 		};
-		Vector2D<T>() {};
+		Vector2D<T>() : x(0),y(0) {};
 		Vector2D<T>(const T& v) : x(v), y(v) {};
 		Vector2D<T>(const T& v, const T& w) : x(v), y(w) {};
 		operator T* () { return data; };
@@ -204,7 +204,7 @@ namespace Ailu
 			Swizzle<Vector3D, T, 2, 1, 0> zyx;
 		};
 
-		Vector3D<T>() {};
+		Vector3D<T>() : x(0), y(0),z(0) {};
 		Vector3D<T>(const T& _v) : x(_v), y(_v), z(_v) {};
 		Vector3D<T>(const T& _x, const T& _y, const T& _z) : x(_x), y(_y), z(_z) {};
 
@@ -321,7 +321,7 @@ namespace Ailu
 			Swizzle<Vector4D, T, 2, 1, 0, 3> bgra;
 		};
 
-		Vector4D<T>() { x = 0; y = 0; z = 0; w = 0; };
+		Vector4D<T>() : x(0), y(0),z(0),w(0) { };
 		Vector4D<T>(const T& _v) : x(_v), y(_v), z(_v), w(_v) {};
 		Vector4D<T>(const T& _x, const T& _y, const T& _z, const T& _w) : x(_x), y(_y), z(_z), w(_w) {};
 		Vector4D<T>(const Vector3D<T>& v3) : x(v3.x), y(v3.y), z(v3.z), w(1.0f) {};
@@ -524,6 +524,18 @@ namespace Ailu
 	{
 		return scalar * v;
 	}
+
+	template<template<typename> typename TT, typename T>
+	TT<T> operator/(const TT<T>& v, const T& scalar)
+	{
+		TT<T> res;
+		for (uint32_t i = 0; i < CountOf(v.data); i++)
+		{
+			res.data[i] /= scalar;
+		}
+		return res;
+	}
+
 	template<template<typename> typename TT, typename T>
 	TT<T> operator+(const T& scalar, const TT<T>& v)
 	{
@@ -577,7 +589,7 @@ namespace Ailu
 		return res;
 	}
 	/// <summary>
-	/// Only 3D vectors can be input for now
+	/// right-hand,first vector dir is forefinger,second dir is middlefinger
 	/// </summary>
 	template<template<typename> typename TT, typename T>
 	TT<T> CrossProduct(const TT<T>& first, const TT<T>& second)

@@ -6,7 +6,7 @@
 #include "GlobalMarco.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/Buffer.h"
-#include "Framework/Math/AABB.h"
+#include "Framework/Math/Geometry.h"
 #include "Animation/Skeleton.h"
 
 

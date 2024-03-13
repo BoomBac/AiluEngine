@@ -45,11 +45,11 @@ namespace Ailu
 			_d3d_pso_desc.SampleDesc.Count = 1;
 			ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
 			_b_build = true;
-			LOG_INFO("rt hash {}", (u32)_state_desc._rt_state.Hash());
+			//LOG_INFO("rt hash {}", (u32)_state_desc._rt_state.Hash());
 			_hash = ConstructPSOHash(_state_desc);
 		}
 		static u16 count = 0;
-		LOG_WARNING("PipelineState build {}!", count++);
+		//LOG_WARNING("PipelineState build {}!", count++);
 	}
 
 	void D3DGraphicsPipelineState::Bind()

@@ -457,14 +457,14 @@ namespace Ailu
 				}
 			};
 		g_pTimeMgr->Mark();
-		if (deformers_num > 0)
+		FbxAnimStack* cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
+		if (deformers_num > 0 && cur_anim_stack)
 		{
 			FbxVector4 t, r, s;
 			GetGeometry(node, t, r, s);
 			FbxAMatrix geometry_transform;
 			geometry_transform.SetTRS(t, r, s);
 			//only support one stack
-			FbxAnimStack* cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
 			//LOG_INFO("Scene {} has {} animation stack", _p_cur_fbx_scene->GetName(), _p_cur_fbx_scene->GetSrcObjectCount<FbxAnimStack>());
 			FbxString anim_fname = cur_anim_stack->GetName();
 			String anim_name = anim_fname.Buffer();
@@ -531,7 +531,6 @@ namespace Ailu
 		if (normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByControlPoint)
 		{
 			_b_normal_by_controlpoint = true;
-			LOG_WARNING("Normal by control point");
 			data = new float[vertex_count * 3];
 			for (int i = 0; i < vertex_count; ++i)
 			{
@@ -550,7 +549,6 @@ namespace Ailu
 		else if (normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByPolygonVertex)
 		{
 			_b_normal_by_controlpoint = false;
-			LOG_WARNING("Normal by eByPolygonVertex");
 			int trangle_count = fbx_mesh.GetPolygonCount();
 			vertex_count = trangle_count * 3;
 			data = new float[vertex_count * 3];
@@ -573,9 +571,6 @@ namespace Ailu
 				}
 			}
 		}
-		//float* data = new float[vnormals.size() * 3];
-		//memcpy(data,vnormals.data(), vnormals.size() * 3);
-		//LOG_INFO("Mesh {} has {} normal point", mesh->Name(), vnormals.size());
 		mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(data)));
 		return true;
 	}
@@ -986,7 +981,7 @@ namespace Ailu
 		List<Ref<Mesh>> loaded_meshs{};
 		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.c_str(), -1, fbx_manager_->GetIOSettings()))
 		{
-			g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load mesh failed at path {}", path);
+			g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load mesh failed whit invalid path {}", path);
 			return loaded_meshs;
 		}
 		fbx_importer_->Import(_p_cur_fbx_scene);

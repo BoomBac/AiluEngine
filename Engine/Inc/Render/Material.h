@@ -41,6 +41,7 @@ namespace Ailu
 		void MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos,bool b_use);
 		bool IsTextureUsed(ETextureUsage use_info);
 		void SetFloat(const String& name, const float& f);
+		void SetUint(const String& name, const u32& value);
 		void SetVector(const String& name, const Vector4f& vector);
 		float GetFloat(const String& name);
 		Vector4f GetVector(const String& name);
@@ -54,6 +55,7 @@ namespace Ailu
 		//int type is as float,may cause some question
 		List<std::tuple<String, float>> GetAllFloatValue();
 		List<std::tuple<String, Vector4f>> GetAllVectorValue();
+		List<std::tuple<String, u32>> GetAllUintValue();
 	private:
 		void Construct(bool first_time);
 	private:

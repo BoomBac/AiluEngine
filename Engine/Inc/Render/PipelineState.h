@@ -493,9 +493,12 @@ namespace Ailu
 		return v[hash];
 	}
 
-	enum class EBindResDescType : uint8_t
+	enum EBindResDescType
 	{
-		kConstBuffer = 0, kTexture2D, kCubeMap, kTexture2DArray, kSampler, kCBufferAttribute, kUAVTexture2D,kUnknown
+		kConstBuffer = 0x01, 
+		kCBufferAttribute = 0x02,kCBufferFloat = 0x04, kCBufferFloat4 = 0x08, kCBufferUint = 0x10, kCBufferUint4 = 0x20, kCBufferMatrix4 = 0x40,kCBufferBool = 0x80,
+		kTexture2D, kCubeMap, kTexture2DArray, kSampler, kUAVTexture2D,
+		kUnknown
 	};
 
 	struct PipelineResourceInfo

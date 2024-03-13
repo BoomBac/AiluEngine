@@ -204,7 +204,7 @@ namespace Ailu
 		for (auto it = _bind_res_infos.begin(); it != _bind_res_infos.end(); it++)
 		{
 			auto& desc = it->second;
-			if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
+			//if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
 			if (desc._res_type == EBindResDescType::kConstBuffer)
 			{
 				if (desc._name == RenderConstants::kCBufNameSceneObject) cbuf_mask |= 0x01;
@@ -308,6 +308,7 @@ namespace Ailu
 		String parent_path = su::SubStrRange(_src_file_path, 0, _src_file_path.find_last_of("/"));
 		while (getline(src, line))
 		{
+			line = su::Trim(line);
 			if (su::BeginWith(line, "#include"))
 			{
 				size_t path_start = line.find_first_of("\"");
@@ -331,6 +332,18 @@ namespace Ailu
 				if (it != _bind_res_infos.end())
 				{
 					it->second._res_type = EBindResDescType::kCubeMap;
+				}
+			}
+			else if (su::BeginWith(line, "uint"))
+			{
+				size_t value_name_begin = line.find_first_of("t") + 1;
+				size_t value_name_end = line.find_first_of(";");
+				String value_name = su::Trim(line.substr(value_name_begin, value_name_end - value_name_begin));
+				auto it = _bind_res_infos.find(value_name);
+				if (it != _bind_res_infos.end())
+				{
+					auto& c = it->second;
+					it->second._res_type = (EBindResDescType)(EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferUint);
 				}
 			}
 			lines.emplace_back(line);
@@ -442,7 +455,12 @@ namespace Ailu
 					variable_info |= offset;
 					variable_info <<= 16;
 					variable_info |= size;
-					auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
+					auto value_type = EBindResDescType::kCBufferAttribute;
+					if (size == 4) value_type = (EBindResDescType)(EBindResDescType::kCBufferFloat | value_type);
+					else if (size == 16) value_type = (EBindResDescType)(EBindResDescType::kCBufferFloat4 | value_type);
+					else if (size == 64) value_type = (EBindResDescType)(EBindResDescType::kCBufferMatrix4 | value_type);
+					else {}
+					auto info = ShaderBindResourceInfo{ value_type,variable_info,0u,vdesc.Name };
 					_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
 				}
 			}
@@ -484,7 +502,12 @@ namespace Ailu
 					variable_info |= offset;
 					variable_info <<= 16;
 					variable_info |= size;
-					auto info = ShaderBindResourceInfo{ EBindResDescType::kCBufferAttribute,variable_info,0u,vdesc.Name };
+					auto value_type = EBindResDescType::kCBufferAttribute;
+					if (size == 4) value_type = (EBindResDescType)(EBindResDescType::kCBufferFloat | value_type);
+					else if (size == 16) value_type = (EBindResDescType)(EBindResDescType::kCBufferFloat4 | value_type);
+					else if (size == 64) value_type = (EBindResDescType)(EBindResDescType::kCBufferMatrix4 | value_type);
+					else {}
+					auto info = ShaderBindResourceInfo{ value_type,variable_info,0u,vdesc.Name };
 					_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
 				}
 			}

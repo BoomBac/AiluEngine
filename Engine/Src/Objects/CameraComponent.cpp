@@ -20,7 +20,7 @@ namespace Ailu
 		//auto parent_rot = Vector3f(0.f,0.f,0.f);
 		_camera.Position(parent_pos);
 		_camera.Rotation(parent_rot);
-		_camera.RecalculateMarix();
+		_camera.RecalculateMarix(true);
 	}
 
 	static String SerializeProperty(const SerializableProperty& prop)

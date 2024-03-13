@@ -68,6 +68,15 @@ namespace Ailu
 		auto tex0 = LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg", "default");
 		TexturePool::Add(tex0->AssetPath(), tex0);
 
+		tex0 = LoadTexture(EnginePath::kEngineTexturePath + "Editor/folder.png", "Editor/folder");
+		TexturePool::Add("Editor/folder", tex0);
+		tex0 = LoadTexture(EnginePath::kEngineTexturePath + "Editor/file.png", "Editor/file_us");
+		TexturePool::Add("Editor/file_us", tex0);
+		tex0 = LoadTexture(EnginePath::kEngineTexturePath + "Editor/3d.png", "Editor/3d");
+		TexturePool::Add("Editor/3d", tex0);
+		tex0 = LoadTexture(EnginePath::kEngineTexturePath + "Editor/shader.png", "Editor/shader");
+		TexturePool::Add("Editor/shader", tex0);
+
 		Vector<String> default_cubemaps{
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/right.jpg",
 			EnginePath::kEngineTexturePath + "Cubemaps/sea/left.jpg",
@@ -309,6 +318,12 @@ namespace Ailu
 		out_mat << endl;
 		auto float_props = mat->GetAllFloatValue();
 		auto vector_props = mat->GetAllVectorValue();
+		auto uint_props = mat->GetAllUintValue();
+		out_mat << "  prop_type: " << "Uint" << endl;
+		for (auto& [name, value] : uint_props)
+		{
+			out_mat << "    " << name << ": " << value << endl;
+		}
 		out_mat << "  prop_type: " << "Float" << endl;
 		for (auto& [name, value] : float_props)
 		{
@@ -440,6 +455,13 @@ namespace Ailu
 				if (sscanf_s(v.c_str(), "%f,%f,%f,%f", &vec.r, &vec.g, &vec.b, &vec.a) == 4)
 					mat->SetVector(k, vec);
 				else LOG_WARNING("Load material: {},property {} failed!", mat->_name, k);
+			}
+			else if (cur_type == ShaderPropertyType::Uint)
+			{
+				uint32_t u;
+				if (sscanf_s(v.c_str(), "%u", &u) == 1)
+					mat->SetUint(k, u);
+				else LOG_WARNING("Load material: {}, property {} failed!", mat->_name, k);
 			}
 			else if (cur_type == ShaderPropertyType::Texture2D)
 			{
@@ -629,6 +651,11 @@ namespace Ailu
 	{
 		namespace fs = std::filesystem;
 		fs::path p(sys_path);
+		if (!fs::exists(sys_path))
+		{
+			g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} not exist on the disk!", sys_path);
+			return;
+		}
 		auto ext = p.extension().string();
 		ImportInfo info;
 		info._is_succeed = false;

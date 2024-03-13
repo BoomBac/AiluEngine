@@ -8,6 +8,7 @@
 #include <source_location>
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/Log.h"
+#include "Utils.h"
 
 namespace Ailu
 {
@@ -118,6 +119,14 @@ namespace Ailu
 			{
 				appender->Print(BuildLogMsg(ELogLevel::kError, msg, args...));
 			}
+		}
+
+		template <typename... Args>
+		void LogErrorFormat(const std::source_location& loc, std::wstring_view msg, Args&&... args)
+		{
+			WString new_msg = BuildLogMsg(ELogLevel::kError, msg, args...);
+			new_msg.append(std::format(L"\n  File: {},Line: {};\n    Function: {}", ToWChar(loc.file_name()), loc.line(), ToWChar(loc.function_name())));
+			LogErrorFormat(L"{}", new_msg);
 		}
 
 		template <typename... Args>
