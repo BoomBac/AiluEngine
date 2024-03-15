@@ -21,7 +21,6 @@ namespace Ailu
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
 			auto shader = MakeRef<D3DShader>(file_name, vert_entry, pixel_entry);
-			ShaderLibrary::Add(shader->Name(), shader);
 			return shader;
 		}
 		}
@@ -34,7 +33,7 @@ namespace Ailu
 		_actual_id = _id;
 	}
 
-	void Shader::Bind(uint32_t index)
+	void Shader::Bind(u32 index)
 	{
 		if (index > RenderConstants::kMaxMaterialDataCount)
 		{
@@ -43,7 +42,7 @@ namespace Ailu
 		}
 		if (_actual_id != _id)
 		{
-			ShaderLibrary::Get("error")->Bind(index);
+			ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kErrorFallback)->Bind(index);
 			return;
 		}
 		GraphicsPipelineStateMgr::ConfigureVertexInputLayout(_pipeline_input_layout.Hash());
@@ -63,14 +62,14 @@ namespace Ailu
 		}
 		for (auto& it : s_global_matrix_bind_info)
 		{
+			throw std::runtime_error("s_global_matrix_bind_info");
 			auto mat_it = _bind_res_infos.find(it.first);
 			if (mat_it != _bind_res_infos.end() && (mat_it->second._res_type & EBindResDescType::kCBufferAttribute))
 			{
 				auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
 				Matrix4x4f* mat_ptr = std::get<0>(it.second);
 				u32 mat_num = std::get<1>(it.second);
-				memcpy(reinterpret_cast<u8*>(g_pGfxContext->GetPerFrameCbufDataStruct()) + offset, mat_ptr, sizeof(Matrix4x4f) * mat_num);
-				memcpy(g_pGfxContext->GetPerFrameCbufData(), g_pGfxContext->GetPerFrameCbufDataStruct(), sizeof(ScenePerFrameData));
+				memcpy(s_p_per_frame_cbuffer->GetData() + offset, mat_ptr, sizeof(Matrix4x4f) * mat_num);
 			}
 		}
 	}
@@ -85,7 +84,7 @@ namespace Ailu
 		}
 		else
 		{
-			_actual_id = ShaderLibrary::Get("error")->ID();
+			_actual_id = ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kErrorFallback)->ID();
 			return false;
 		}
 	}
@@ -244,7 +243,7 @@ namespace Ailu
 		if (seri_type != ESerializablePropertyType::kUndefined)
 		{
 			props.emplace_back(ShaderPropertyInfo{ value_name ,prop_name,seri_type ,prop_param });
-			LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);
+			//LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);
 		}
 		else
 		{
@@ -473,9 +472,8 @@ namespace Ailu
 		_id = s_global_cs_id++;
 	}
 
-	void ComputeShader::Bind(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+	void ComputeShader::Bind(CommandBuffer* cmd, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
 	{
-
 	}
 
 	void ComputeShader::SetTexture(const String& name, Texture* texture)

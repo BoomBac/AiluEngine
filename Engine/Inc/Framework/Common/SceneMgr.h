@@ -24,8 +24,8 @@ namespace Ailu
 		void RemoveObject(SceneActor* actor);
 		std::list<SceneActor*>& GetAllActor();
 		SceneActor* GetSceneRoot() { return _p_root; }
-		SceneActor* GetSceneActorByID(const uint32_t& id);
-		SceneActor* GetSceneActorByIndex(const uint32_t& index);
+		SceneActor* GetSceneActorByID(const u32& id);
+		SceneActor* GetSceneActorByIndex(const u32& index);
 		void MarkDirty();
 		Camera* GetActiveCamera();
 		static Scene* GetDefaultScene();

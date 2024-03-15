@@ -62,14 +62,15 @@ namespace Ailu
 		float4x4 _MatrixV;
 		float4x4 _MatrixP;
 		float4x4 _MatrixVP;
+		float4x4 _MatrixIVP;
 		float4   _CameraPos;
 		ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLightNum];
 		ShaderDirectionalAndPointLightData _PointLights[kMaxPointLightNum];
 		ShaderSpotlLightData _SpotLights[kMaxSpotLightNum];
 		float4x4 _MainLightShadowMatrix;
 		float4x4 _CubeMapGenCameraMatrix;
-		float4x4 _JointMatrix[80];
-		float padding1[12];
+		//float4x4 _JointMatrix[80];
+		float padding1[60];
 	};
 
 #ifdef __cplusplus
@@ -94,7 +95,7 @@ namespace Ailu
 		float	 _Metallic;
 		float    _Specular;
 		// low_bit: metallic|roughness|emssive|normal|albedo
-		uint32_t _SamplerMask;
+		u32 _SamplerMask;
 		float padding2[53]; // Padding so the constant buffer is 256-byte aligned.
 	};
 	static_assert((sizeof(ScenePerObjectData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");

@@ -4,12 +4,12 @@
 #include <cstdint>
 #include "dxgiformat.h"
 
-enum class EALGFormat : uint8_t
+enum class EALGFormat : u8
 {
     kALGFormatUnknown = 0,
 	kALGFormatR8G8B8A8_UNORM,
 	kALGFormatR24G8_TYPELESS, kALGFormatR32_FLOAT, kALGFormatD32_FLOAT, kALGFormatD24S8_UINT,
-    kALGFormatR32G32B32A32_FLOAT, kALGFormatR32G32B32_FLOAT, kALGFormatR16G16B16A16_FLOAT, kALGFormatR32_UINT, kALGFormatR32_SINT
+    kALGFormatR32G32B32A32_FLOAT, kALGFormatR32G32B32_FLOAT, kALGFormatR16G16B16A16_FLOAT, kALGFormatR16G16_FLOAT,kALGFormatR32_UINT, kALGFormatR32_SINT
 };
 
 static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat& format)
@@ -25,6 +25,7 @@ static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat& format)
     case EALGFormat::kALGFormatR32G32B32A32_FLOAT: return DXGI_FORMAT_R32G32B32A32_FLOAT;
     case EALGFormat::kALGFormatR32G32B32_FLOAT: return DXGI_FORMAT_R32G32B32_FLOAT;
     case EALGFormat::kALGFormatR16G16B16A16_FLOAT: return DXGI_FORMAT_R16G16B16A16_FLOAT;
+    case EALGFormat::kALGFormatR16G16_FLOAT: return DXGI_FORMAT_R16G16_FLOAT;
     case EALGFormat::kALGFormatR32_UINT: return DXGI_FORMAT_R32_UINT;
     case EALGFormat::kALGFormatR32_SINT: return DXGI_FORMAT_R32_SINT;
     }

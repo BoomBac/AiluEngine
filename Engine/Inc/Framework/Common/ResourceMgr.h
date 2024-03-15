@@ -17,7 +17,7 @@ namespace Ailu
 	class ResourceMgr : public IRuntimeModule
 	{
 		using ResourceTask = std::function<void()>;
-		using OnResourceTaskCompleted = std::function<void()>;
+		using OnResourceTaskCompleted = std::function<void(Ref<void> asset)>;
 		struct ImportInfo
 		{
 			String _msg;
@@ -37,14 +37,17 @@ namespace Ailu
 		void SaveAsset(const std::string& path, Material* mat);
 		void SaveAsset(const Asset& asset);
 		
-		Ref<Texture2D> LoadTexture(const String& asset_path, String name = "");
-		Ref<TextureCubeMap> LoadTexture(const Vector<String>& asset_paths,String name = "");
+		Ref<Texture2D> LoadTexture(const WString& asset_path);
+		Ref<TextureCubeMap> LoadTexture(const Vector<WString>& asset_paths);
+		List<Ref<Mesh>> LoadMesh(const WString& asset_path);
 		//template<typename T>
 		//static T* LoadAsset(const string& asset_path);
 		static Material* LoadAsset(const String& asset_path);
-		void ImportAsset(const WString& sys_path);
-		void ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback = []() {});
-		static void AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback);
+		Ref<void> ImportAsset(const WString& sys_path);
+		//async editon always reutn nullptr
+		Ref<void> ImportAssetAsync(const WString& sys_path, OnResourceTaskCompleted callback = [](Ref<void> asset) {});
+
+		//static void AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback);
 		static void AddResourceTask(ResourceTask task);
 	public:
 		Vector<ImportInfo> _import_infos;
@@ -54,7 +57,6 @@ namespace Ailu
 		inline static ImportInfo* s_p_current_import_info;
 		static Ref<Material> LoadMaterial(std::string path);
 		static Ref<Material> LoadMaterial(const Vector<String>& blob);
-		Ref<Mesh> LoadMeshImpl(const String& asset_path);
 		static bool ExistInAssetDB(const Guid& guid);
 		static void AddToAssetDB(const Asset& asset,bool override = true);
 		static void LoadAssetDB();
@@ -63,7 +65,7 @@ namespace Ailu
 		void SaveMaterialImpl(const String& asset_path,Material* mat);
 		void WatchDirectory();
 		void SubmitResourceTask();
-		void ImportAssetImpl(const WString& sys_path);
+		Ref<void> ImportAssetImpl(const WString& sys_path);
 	private:
 		inline static List<ResourceTask> s_task_queue;
 		inline static std::map<String, std::tuple<String, String>> s_asset_db{};
@@ -77,7 +79,7 @@ namespace Ailu
 	//	//if (std::is_same<T, Material>::value)
 	//	//{
 	//	//	auto mat = LoadMaterial(path);
-	//	//	s_all_asset.insert(Asset{ asset_path,GetResPath(asset_path),guid,AssetType::kMaterial});
+	//	//	s_all_asset.insert(Asset{ asset_path,GetResSysPath(asset_path),guid,AssetType::kMaterial});
 	//	//	return mat.get();
 	//	//}
 	//	return nullptr;

@@ -19,6 +19,7 @@ struct PSInput
 	float3x3 btn : BTN;
 };
 
+
 struct SurfaceData
 {
 	float3 wnormal;

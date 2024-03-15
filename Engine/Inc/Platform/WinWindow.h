@@ -10,8 +10,8 @@ namespace Ailu
 		WinWindow(const WindowProps& prop);
 		virtual ~WinWindow();
 		void OnUpdate() override;
-		uint32_t GetWidth() const override;
-		uint32_t GetHeight() const override;
+		u32 GetWidth() const override;
+		u32 GetHeight() const override;
 		void SetEventHandler(const EventHandler& handler) override;
 		void SetVSync(bool enabled) override;
 		bool IsVSync() const override;
@@ -25,7 +25,7 @@ namespace Ailu
 		struct WindowData
 		{
 			std::wstring Title;
-			uint32_t Width, Height;
+			u32 Width, Height;
 			bool VSync;
 			EventHandler Handler;
 		};

@@ -13,7 +13,7 @@ namespace Ailu
 {
 	class Actor : public Object
 	{
-		DECLARE_PROTECTED_PROPERTY(Id, Id, uint32_t)
+		DECLARE_PROTECTED_PROPERTY(Id, Id, u32)
 		DECLARE_PROTECTED_PROPERTY_PTR(Parent, Actor)
 	public:
 		virtual ~Actor();
@@ -68,7 +68,7 @@ namespace Ailu
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;
 		std::list<Actor*> _children{};
 		std::list<Scope<Component>> _components{};
-		inline static uint32_t s_actor_count = 0u;
+		inline static u32 s_actor_count = 0u;
 		uint16_t _chilren_num = 0u;
 	};
 

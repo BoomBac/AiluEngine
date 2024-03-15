@@ -8,7 +8,7 @@ namespace Ailu
 {
 #define ALIGN_TO_256(x) (((x) + 255) & ~255)
 
-	static void MarkTextureUsedHelper(uint32_t& mask, const ETextureUsage& usage, const bool& b_use)
+	static void MarkTextureUsedHelper(u32& mask, const ETextureUsage& usage, const bool& b_use)
 	{
 		switch (usage)
 		{
@@ -56,7 +56,7 @@ namespace Ailu
 	void Material::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)
 	{
 		//40 根据shader中MaterialBuf计算，可能会有变动
-		uint32_t* sampler_mask = reinterpret_cast<uint32_t*>(_p_cbuf->GetData() + _sampler_mask_offset);
+		u32* sampler_mask = reinterpret_cast<u32*>(_p_cbuf->GetData() + _sampler_mask_offset);
 		//*sampler_mask = 0;
 		for (auto& usage : use_infos)
 		{
@@ -66,7 +66,7 @@ namespace Ailu
 
 	bool Material::IsTextureUsed(ETextureUsage use_info)
 	{
-		uint32_t sampler_mask = *reinterpret_cast<uint32_t*>(_p_cbuf->GetData() + _sampler_mask_offset);
+		u32 sampler_mask = *reinterpret_cast<u32*>(_p_cbuf->GetData() + _sampler_mask_offset);
 		switch (use_info)
 		{
 		case Ailu::ETextureUsage::kAlbedo: return sampler_mask & 1;
@@ -86,7 +86,7 @@ namespace Ailu
 		if (it != res_info.end())
 		{
 			memcpy(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &f, sizeof(f));
-			LOG_WARNING("float value{}", *reinterpret_cast<float*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second)));
+			//LOG_WARNING("float value{}", *reinterpret_cast<float*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second)));
 		}
 		else
 		{
@@ -101,7 +101,7 @@ namespace Ailu
 		if (it != res_info.end())
 		{
 			memcpy(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(value));
-			LOG_WARNING("uint value{}", *reinterpret_cast<u32*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second)));
+			//LOG_WARNING("uint value{}", *reinterpret_cast<u32*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second)));
 		}
 		else
 		{
@@ -208,6 +208,8 @@ namespace Ailu
 	void Material::Bind()
 	{
 		_p_shader->Bind(0);
+		if (_p_shader->ID() != _p_shader->ActualID())
+			return;
 		i8 cbuf_bind_slot = _p_shader->GetPerMatBufferBindSlot();
 		if (cbuf_bind_slot != -1)
 		{
@@ -282,7 +284,7 @@ namespace Ailu
 		{
 			_properties.clear();
 		}
-		std::map<String, std::tuple<uint8_t, Ref<Texture>>> _tmp_textures{};
+		std::map<String, std::tuple<u8, Ref<Texture>>> _tmp_textures{};
 		for (auto& bind_info : _p_shader->GetBindResInfo())
 		{
 			if (bind_info.second._res_type == EBindResDescType::kTexture2D)
@@ -318,7 +320,7 @@ namespace Ailu
 		else if (_mat_cbuf_size != cur_shader_cbuf_size)
 		{
 			throw std::runtime_error("Material: " + _name + " shader cbuf size not equal!");
-			//u8* new_cbuf_data = new uint8_t[cur_shader_cbuf_size];
+			//u8* new_cbuf_data = new u8[cur_shader_cbuf_size];
 			//memcpy(new_cbuf_data, _p_cbuf_cpu, _mat_cbuf_size);
 			//DESTORY_PTRARR(_p_cbuf_cpu);
 			//_p_cbuf_cpu = new_cbuf_data;

@@ -11,22 +11,22 @@ namespace Ailu
 
 	namespace RenderConstants
 	{
-		constexpr static uint8_t  kFrameCount = 2u;
-		constexpr static uint16_t kMaxMaterialDataCount = 24u;
-		constexpr static uint32_t kMaxRenderObjectCount = 50u;
-		constexpr static uint32_t kMaxPassDataCount = 10u;
-		constexpr static uint32_t kMaxTextureCount = 16u;
-		constexpr static uint8_t  kMaxUAVTextureCount = 10U;
-		constexpr static uint32_t kMaxRenderTextureCount = 16u;
-		constexpr static uint32_t KMaxDynamicVertexNum = 2048;
-		constexpr static uint8_t  kMaxVertexAttrNum = 10u;
+		constexpr static u8  kFrameCount = 2u;
+		constexpr static uint16_t kMaxMaterialDataCount = 48u;
+		constexpr static u32 kMaxRenderObjectCount = 50u;
+		constexpr static u32 kMaxPassDataCount = 10u;
+		constexpr static u32 kMaxTextureCount = 32u;
+		constexpr static u8  kMaxUAVTextureCount = 10U;
+		constexpr static u32 kMaxRenderTextureCount = 32u;
+		constexpr static u32 KMaxDynamicVertexNum = 2048;
+		constexpr static u8  kMaxVertexAttrNum = 10u;
 
-		constexpr static uint32_t kPerFrameTotalSize = sizeof(ScenePerFrameData) + sizeof(ScenePerMaterialData) * kMaxMaterialDataCount + + sizeof(ScenePerPassData) * kMaxPassDataCount+
+		constexpr static u32 kPerFrameTotalSize = sizeof(ScenePerFrameData) + sizeof(ScenePerMaterialData) * kMaxMaterialDataCount + + sizeof(ScenePerPassData) * kMaxPassDataCount+
 			sizeof(ScenePerObjectData) * kMaxRenderObjectCount;
-		constexpr static uint32_t kPerFrameDataSize = sizeof(ScenePerFrameData);
-		constexpr static uint32_t kPerMaterialDataSize = sizeof(ScenePerMaterialData);
-		constexpr static uint32_t kPeObjectDataSize = sizeof(ScenePerObjectData);
-		constexpr static uint32_t kPePassDataSize = sizeof(ScenePerPassData);
+		constexpr static u32 kPerFrameDataSize = sizeof(ScenePerFrameData);
+		constexpr static u32 kPerMaterialDataSize = sizeof(ScenePerMaterialData);
+		constexpr static u32 kPeObjectDataSize = sizeof(ScenePerObjectData);
+		constexpr static u32 kPePassDataSize = sizeof(ScenePerPassData);
 		constexpr static wchar_t kVSModel_5_0[] = L"vs_5_0";
 		constexpr static wchar_t kPSModel_5_0[] = L"ps_5_0";
 		constexpr static wchar_t kVSModel_6_1[] = L"vs_6_1";

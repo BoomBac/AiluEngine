@@ -4,8 +4,6 @@
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/Window.h"
 #include "Framework/Events/Event.h"
-#include "Framework/Events/MouseEvent.h"
-#include "Render/Renderer.h"
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/LayerStack.h"
 #include "Framework/ImGui/ImGuiLayer.h"
@@ -39,7 +37,6 @@ namespace Ailu
         InputLayer* _p_input_layer;
         SceneLayer* _p_scene_layer;
         Window* _p_window = nullptr;
-        Renderer* _p_renderer = nullptr;
         void OnEvent(Event& e);
         bool _b_running;
         inline static Application* sp_instance = nullptr;

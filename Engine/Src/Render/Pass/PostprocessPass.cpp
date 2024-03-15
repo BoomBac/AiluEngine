@@ -4,7 +4,7 @@
 
 namespace Ailu
 {
-	PostProcessPass::PostProcessPass() : _name("PostProcessPass")
+	PostProcessPass::PostProcessPass() : RenderPass("PostProcessPass")
 	{
 		_p_tex_bloom_threshold = RenderTexture::Create(800,450,"BloomThreshold",EALGFormat::kALGFormatR16G16B16A16_FLOAT);
 		_p_bloom_thread_mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/PostProcess/bloom.hlsl"),"BloomThread");
@@ -21,7 +21,7 @@ namespace Ailu
 	}
 	void PostProcessPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::GetCommandBuffer();
+		auto cmd = CommandBufferPool::Get();
 		cmd->Clear();
 		cmd->SetViewport(_bloom_thread_rect);
 		cmd->SetScissorRect(_bloom_thread_rect);
@@ -34,7 +34,7 @@ namespace Ailu
 		_p_blit_mat->SetTexture("_SourceTex", _p_tex_bloom_threshold);
 		cmd->DrawRenderer(_p_quad_mesh.get(), _p_blit_mat.get());
 		context->ExecuteCommandBuffer(cmd);
-		CommandBufferPool::ReleaseCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 	}
 	void PostProcessPass::BeginPass(GraphicsContext* context)
 	{

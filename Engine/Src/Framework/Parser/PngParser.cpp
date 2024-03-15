@@ -13,7 +13,7 @@ namespace Ailu
 	{
 		int x, y, n;
 		auto asset_path = PathUtils::FormatFilePath(PathUtils::ExtractAssetPath(path.data()));
-		uint8_t* data = stbi_load(path.data(), &x, &y, &n, 0);
+		u8* data = stbi_load(path.data(), &x, &y, &n, 0);
 		if (data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
@@ -26,7 +26,7 @@ namespace Ailu
 			auto tex = Texture2D::Create(x, y);
 			tex->AssetPath(asset_path);
 			tex->Name(PathUtils::GetFileName(path,true));
-			uint8_t* new_data = nullptr;
+			u8* new_data = nullptr;
 			if (n != 4)
 			{
 				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);
@@ -45,7 +45,7 @@ namespace Ailu
 	Ref<Texture2D> PngParser::Parser(const std::string_view& path, u8 mip_level)
 	{
 		int x, y, n;
-		uint8_t* data = stbi_load(path.data(), &x, &y, &n, 0);
+		u8* data = stbi_load(path.data(), &x, &y, &n, 0);
 		if (data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
@@ -56,7 +56,7 @@ namespace Ailu
 			auto tex = Texture2D::Create(x, y);
 			tex->AssetPath(PathUtils::ExtractAssetPath(path.data()));
 			tex->Name(PathUtils::GetFileName(path, true));
-			uint8_t* new_data = data;
+			u8* new_data = data;
 			if (n != 4)
 			{
 				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);

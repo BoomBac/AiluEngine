@@ -23,7 +23,7 @@ namespace Ailu
 		float _distance;
 	};
 
-	enum class ELightType : uint8_t
+	enum class ELightType : u8
 	{
 		kDirectional,kPoint,kSpot
 	};

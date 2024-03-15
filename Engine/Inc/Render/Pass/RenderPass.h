@@ -7,14 +7,31 @@
 
 namespace Ailu
 {
-	class RenderPass
+	class IRenderPass
 	{
 	public:
-		~RenderPass() = default;
+		~IRenderPass() = default;
 		virtual void Execute(GraphicsContext* context,RenderingData& rendering_data) = 0;
 		virtual void BeginPass(GraphicsContext* context) = 0;
 		virtual void EndPass(GraphicsContext* context) = 0;
 		virtual const String& GetName() const = 0;
+		virtual const bool IsActive() const = 0;
+		virtual const void SetActive(bool is_active) = 0;
+	};
+
+	class RenderPass : public IRenderPass
+	{
+	public:
+		RenderPass(const String& name) : _name(name), _is_active(true) {};
+		virtual void Execute(GraphicsContext* context, RenderingData& rendering_data) override {};
+		virtual void BeginPass(GraphicsContext* context) override {};
+		virtual void EndPass(GraphicsContext* context) override {};
+		virtual const String& GetName() const final { return _name; };
+		virtual const bool IsActive() const final {return _is_active; };
+		virtual const void SetActive(bool is_active) final { _is_active = is_active; };
+	protected:
+		String _name;
+		bool _is_active;
 	};
 
 	class OpaquePass : public RenderPass
@@ -25,9 +42,6 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		const String& GetName() const final { return _name; };
-	private:
-		String _name;
 	};
 
 	class ResolvePass : public RenderPass
@@ -38,10 +52,8 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void BeginPass(GraphicsContext* context, Ref<RenderTexture>& source);
 		void EndPass(GraphicsContext* context) final;
-		const String& GetName() const final { return _name; };
 	private:
 		Rect _backbuf_rect;
-		String _name;
 		Ref<RenderTexture> _p_src_color;
 	};
 
@@ -53,12 +65,10 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		const String& GetName() const final { return _name; };
 	private:
 		Rect _rect;
 		Ref<RenderTexture> _p_shadow_map;
 		Ref<Material> _p_shadowcast_material;
-		String _name;
 	};
 
 	class CubeMapGenPass : public RenderPass
@@ -68,7 +78,6 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		const String& GetName() const final { return _name; };
 		Ref<RenderTexture> _p_cube_map;
 		Ref<RenderTexture> _p_env_map;
 	private:
@@ -80,7 +89,25 @@ namespace Ailu
 		Ref<Material> _p_gen_material;
 		Ref<Material> _p_filter_material;
 		Ref<Mesh> _p_cube_mesh;
-		String _name;
+	};
+	// 32-bit: standard gbuffer layout
+	//ds 24-8
+	//g0 lighting-accumulation24 intensity8
+	//g1 normalx 16 normaly 16
+	//g2 motion vector xy 16 spec-power/intensity 8
+	//g3 diffuse-albedo 24 sun-occlusiton 8
+	class DeferredGeometryPass : public RenderPass
+	{
+	public:
+		DeferredGeometryPass(u16 width,u16 height);
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
+		void BeginPass(GraphicsContext* context) final;
+		void EndPass(GraphicsContext* context) final;
+	private:
+		Vector<Ref<RenderTexture>> _gbuffers;
+		Ref<Material> _p_lighting_material;
+		Ref<Mesh> _p_quad_mesh;
+		Array<Rect, 3> _rects;
 	};
 }
 

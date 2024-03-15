@@ -12,9 +12,7 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		const String& GetName() const final { return _name; };
 	private:
-		String _name;
 	};
 }
 

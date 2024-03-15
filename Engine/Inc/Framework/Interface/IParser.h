@@ -9,15 +9,15 @@
 
 namespace Ailu
 {
-	enum class EResourceType : uint8_t
+	enum class EResourceType : u8
 	{
 		kStaticMesh = 0,kImage
 	};
-	enum class EMeshLoader : uint8_t
+	enum class EMeshLoader : u8
 	{
 		kFbx = 0,kObj
 	};
-	enum class EImageLoader : uint8_t
+	enum class EImageLoader : u8
 	{
 		kPNG = 0,kJPEG,kTGA,kHDR
 	};

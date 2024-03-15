@@ -48,9 +48,9 @@ namespace Ailu
 	{
 		if (!_mark_stamps.empty())
 		{
-			auto pre_mark = _mark_stamps.top();
+			float count = ALMSecond(std::chrono::high_resolution_clock::now() - _mark_stamps.top()).count();
 			_mark_stamps.pop();
-			return ALMSecond(std::chrono::high_resolution_clock::now() - pre_mark).count();
+			return count;
 		}
 		else
 		{

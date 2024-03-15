@@ -10,6 +10,8 @@
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DTexture.h"
+#include "RHI/DX12/D3DCommandBuffer.h"
+#include "Render/GraphicsPipelineStateObject.h"
 
 
 
@@ -122,7 +124,17 @@ namespace Ailu
 		D3DCompileFromFile(filename.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint.c_str(), pTarget.c_str(), compileFlags, 0, &p_blob, &pErrorBlob);
 		if (pErrorBlob)
 		{
-			OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+			//OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+			String text(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+			// 使用 std::stringstream 分割文本并提取每一行
+			std::istringstream iss(text);
+			//std::vector<std::string> lines;
+			std::string line;
+			while (std::getline(iss, line)) 
+			{
+				if(line.find("error") != line.npos)
+					LOG_WARNING("{}", line)
+			}
 			pErrorBlob->Release();
 		}
 		if (p_blob != nullptr)
@@ -213,7 +225,7 @@ namespace Ailu
 				else if (desc._name == RenderConstants::kCBufNameScenePass) cbuf_mask |= 0x08;
 			}
 		}
-		uint8_t root_param_index = 0;
+		u8 root_param_index = 0;
 		if (cbuf_mask & 0x01)
 		{
 			_bind_res_infos[RenderConstants::kCBufNameSceneObject]._bind_slot = root_param_index;
@@ -384,7 +396,7 @@ namespace Ailu
 		}
 	}
 
-	std::pair<D3D12_INPUT_ELEMENT_DESC*, uint8_t> D3DShader::GetVertexInputLayout()
+	std::pair<D3D12_INPUT_ELEMENT_DESC*, u8> D3DShader::GetVertexInputLayout()
 	{
 		return std::make_pair(_vertex_input_layout, _vertex_input_num);
 	}
@@ -412,7 +424,7 @@ namespace Ailu
 				return;
 			}
 			Vector<VertexBufferLayoutDesc> vb_input_desc{};
-			for (uint32_t i = 0u; i < desc.InputParameters; i++)
+			for (u32 i = 0u; i < desc.InputParameters; i++)
 			{
 				D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
 				ref_vs->GetInputParameterDesc(i, &input_desc);
@@ -421,7 +433,7 @@ namespace Ailu
 				vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, GetShaderDataType(input_desc.SemanticName), input_desc.Register));
 			}
 			_pipeline_input_layout = VertexBufferLayout(vb_input_desc);
-			for (uint32_t i = 0u; i < desc.BoundResources; i++)
+			for (u32 i = 0u; i < desc.BoundResources; i++)
 			{
 				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
 				ref_vs->GetResourceBindingDesc(i, &bind_desc);
@@ -439,12 +451,12 @@ namespace Ailu
 					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
 				}
 			}
-			for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
+			for (u32 i = 0u; i < desc.ConstantBuffers; i++)
 			{
 				auto cbuf = ref_ps->GetConstantBufferByIndex(i);
 				D3D12_SHADER_BUFFER_DESC desc{};
 				cbuf->GetDesc(&desc);
-				for (uint32_t j = 0u; j < desc.Variables; j++)
+				for (u32 j = 0u; j < desc.Variables; j++)
 				{
 					auto variable = cbuf->GetVariableByIndex(j);
 					D3D12_SHADER_VARIABLE_DESC vdesc{};
@@ -468,7 +480,7 @@ namespace Ailu
 		//parser ps reflecton	
 		{
 			ref_ps->GetDesc(&desc);
-			for (uint32_t i = 0u; i < desc.BoundResources; i++)
+			for (u32 i = 0u; i < desc.BoundResources; i++)
 			{
 				D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
 				ref_ps->GetResourceBindingDesc(i, &bind_desc);
@@ -486,12 +498,12 @@ namespace Ailu
 					_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kSampler,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
 				}
 			}
-			for (uint32_t i = 0u; i < desc.ConstantBuffers; i++)
+			for (u32 i = 0u; i < desc.ConstantBuffers; i++)
 			{
 				auto cbuf = ref_ps->GetConstantBufferByIndex(i);
 				D3D12_SHADER_BUFFER_DESC desc{};
 				cbuf->GetDesc(&desc);
-				for (uint32_t j = 0u; j < desc.Variables; j++)
+				for (u32 j = 0u; j < desc.Variables; j++)
 				{
 					auto variable = cbuf->GetVariableByIndex(j);
 					D3D12_SHADER_VARIABLE_DESC vdesc{};
@@ -516,7 +528,7 @@ namespace Ailu
 		LoadAdditionalShaderReflection(_src_file_path);
 	}
 
-	void D3DShader::Bind(uint32_t index)
+	void D3DShader::Bind(u32 index)
 	{
 		Shader::Bind(index);
 		static auto context = D3DContext::GetInstance();
@@ -551,15 +563,15 @@ namespace Ailu
 		Compile();
 	}
 
-	void D3DComputeShader::Bind(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+	void D3DComputeShader::Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
 	{
 		if (!_is_valid)
 		{
 			LOG_WARNING("ComputeShader is not valid!");
 			return;
 		}
-		static auto cmd = D3DContext::GetInstance()->GetCmdList();
-		_pso_sys.Bind(cmd);
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		_pso_sys.Bind(d3dcmd);
 		for (auto& info : _bind_res_infos)
 		{
 			auto& bind_info = info.second;
@@ -567,15 +579,15 @@ namespace Ailu
 			{
 				if (bind_info._res_type == EBindResDescType::kTexture2D)
 				{
-					cmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetSRVGPUHandle());
+					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetSRVGPUHandle());
 				}
 				else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
 				{
-					cmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetUAVGPUHandle());
+					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetUAVGPUHandle());
 				}
 			}
 		}
-		cmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
+		d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
 	}
 
 
@@ -585,7 +597,7 @@ namespace Ailu
 		_temp_bind_res_infos.clear();
 		//parser vs reflecton	
 		p_reflect->GetDesc(&desc);
-		for (uint32_t i = 0u; i < desc.BoundResources; i++)
+		for (u32 i = 0u; i < desc.BoundResources; i++)
 		{
 			D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
 			p_reflect->GetResourceBindingDesc(i, &bind_desc);
@@ -651,7 +663,7 @@ namespace Ailu
 		CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
 		CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
 		int texture_count = 0;
-		uint8_t root_param_index = 0;
+		u8 root_param_index = 0;
 		for (auto it = _temp_bind_res_infos.begin(); it != _temp_bind_res_infos.end(); it++)
 		{
 			auto& desc = it->second;

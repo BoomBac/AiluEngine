@@ -3,10 +3,11 @@
 #include "Objects/SceneActor.h"
 
 #include "Framework/Common/LogMgr.h"
-#include "Framework/Parser/AssetParser.h"
 #include "Render/Gizmo.h"
+#include "Render/GraphicsContext.h"
 #include "Framework/Math/Random.h"
 #include "Framework/Common/ThreadPool.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
@@ -70,9 +71,18 @@ namespace Ailu
 			auto mesh = MeshPool::GetMesh(mesh_path);
 			if (mesh == nullptr)
 			{
-				auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-				mesh = parser->Parser(mesh_path).front();
-				if (mesh != nullptr) MeshPool::AddMesh(mesh);
+				mesh_path = PathUtils::GetResSysPath(mesh_path);
+				auto meshes = g_pResourceMgr->LoadMesh(ToWChar(mesh_path));
+				if (!meshes.empty())
+				{
+					mesh = meshes.front();
+					mesh->OriginPath(mesh_path);
+					g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
+				}
+				else
+				{
+					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
+				}
 			}
 			auto mat = MaterialLibrary::GetMaterial(mat_path);
 			auto loc = std::source_location::current();
@@ -114,17 +124,17 @@ namespace Ailu
 			auto mesh = MeshPool::GetMesh(mesh_path);
 			if (mesh == nullptr)
 			{
-				mesh_path = PathUtils::GetResPath(mesh_path);
-				auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-				auto loaded_mesh = parser->Parser(mesh_path);
-				if (loaded_mesh.empty())
+				mesh_path = PathUtils::GetResSysPath(mesh_path);
+				auto meshes = g_pResourceMgr->LoadMesh(ToWChar(mesh_path));
+				if (!meshes.empty())
 				{
-					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
+					mesh = meshes.front();
+					mesh->OriginPath(mesh_path);
+					g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
 				}
 				else
 				{
-					mesh = loaded_mesh.front();
-					if (mesh != nullptr) MeshPool::AddMesh(mesh);
+					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
 				}
 			}
 			auto mat = MaterialLibrary::GetMaterial(mat_path);
@@ -152,7 +162,7 @@ namespace Ailu
 	{
 		if (!_b_enable) return;
 		StaticMeshComponent::Tick(delta_time);
-		if (_p_clip && _pre_anim_time != _anim_time)
+		if (_p_clip && _pre_anim_time != _anim_time && _p_mesh->_is_rhi_res_ready)
 			Skin(_anim_time);
 		_pre_anim_time = _anim_time;
 	}
@@ -203,7 +213,7 @@ namespace Ailu
 			{
 				u32 startIdx = i * _per_skin_task_vertex_num;
 				u32 endIdx = min((i + 1) * _per_skin_task_vertex_num, vert_count);
-				_skin_tasks[i] = g_thread_pool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx);
+				_skin_tasks[i] = g_pThreadTool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx);
 			}
 			for (auto& future : _skin_tasks)
 			{

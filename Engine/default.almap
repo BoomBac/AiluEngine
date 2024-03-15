@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 2779.98,570.623,-243.795
-  Rotation: 0.0650521,-0.662939,0.0579925,0.743584
+  Position: 1299.77,1054.34,-1083.43
+  Rotation: -0.206771,0.33905,-0.0766573,-0.914557
   Fov: 60
   Aspect: 1.77778
   Near: 144.32
   Far: 118818
-  ControllerRotation: 9.9994,20796.6
+  ControllerRotation: 25.4796,24079.3
 SceneGraph: 
   Name: root
     Components: 
@@ -24,7 +24,7 @@ SceneGraph:
             Scale: 50,1,50
           StaticMeshComponent: 
             MeshPath: plane
-            MaterialPath: Materials/StandardPBR_new.alasset
+            MaterialPath: Materials/StandardPBR_new.almat
         Children: 0
       Name: skybox
         Components: 
@@ -53,13 +53,13 @@ SceneGraph:
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: -219,471,0
-            Rotation: -0.0235722,-0.000100865,0.00072292,0.999722
+            Position: 410,522,0
+            Rotation: -0.671074,-0.00054795,0.00048205,0.74139
             Scale: 1,1,1
           LightComponent: 
             Type: Point
             Color: 1,0,0
-            Intensity: 1
+            Intensity: 9.865
             Radius: 722
             CastShadow: false
             ShadowArea: 0
@@ -69,7 +69,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 846,845,-374
-            Rotation: 0.00302747,0.148037,-0.160967,0.97579
+            Rotation: 0.0030282,0.148037,-0.160967,0.97579
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
@@ -86,25 +86,25 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 0,329,0
-            Rotation: 0,6.75513e-08,0,1
+            Rotation: 0,0.328867,0,0.944376
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey
-            MaterialPath: Materials/StandardPBR_new.alasset
+            MaterialPath: Materials/StandardPBR_new.almat
         Children: 0
       Name: camera0
         Components: 
           TransformComponent: 
             Position: 0,778,0
-            Rotation: 0,3.7749e-08,0,1
+            Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           CameraComponent: 8
             Type: kPerspective
             Position: 0,778,0
+            Rotation: 0,6.755128e-08,0
             Near: 10
-            Rotation: 0,3.7748954e-08,0
             Aspect: 2.999
             Far: 500
-            FovH: 56.447
             Size: 0
+            FovH: 56.447
         Children: 0

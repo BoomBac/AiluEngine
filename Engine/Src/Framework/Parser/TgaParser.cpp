@@ -8,7 +8,7 @@ namespace Ailu
 	Ref<Texture2D> TagParser::Parser(const std::string_view& path)
 	{
 		int x, y, n;
-		uint8_t* data = stbi_load(path.data(), &x, &y, &n, 0);
+		u8* data = stbi_load(path.data(), &x, &y, &n, 0);
 		if (data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
@@ -17,7 +17,7 @@ namespace Ailu
 		else
 		{
 			auto tex = Texture2D::Create(x, y);
-			uint8_t* new_data = nullptr;
+			u8* new_data = nullptr;
 			if (n != 4)
 			{
 				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);

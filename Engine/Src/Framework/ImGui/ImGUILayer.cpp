@@ -21,6 +21,7 @@
 
 #include "Render/Mesh.h"
 #include "Animation/Clip.h"
+#include "Render/Renderer.h"
 
 namespace ImguiTree
 {
@@ -207,7 +208,7 @@ namespace Ailu
 		case Ailu::ESerializablePropertyType::kTexture2D:
 		{
 			ImGui::Text("Texture2D : %s", prop._name.c_str());
-			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
+			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Ref<Texture>>>(prop);
 			auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
 			String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
 			//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
@@ -306,7 +307,7 @@ namespace Ailu
 				{
 					auto prop = mat->GetProperty(name);
 					ImGui::Text(" :%s", prop._name.c_str());
-					auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<uint8_t, Ref<Texture>>>(prop);
+					auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Ref<Texture>>>(prop);
 					auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
 					String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
 					//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
@@ -629,7 +630,7 @@ namespace Ailu
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
-		font0 = io.Fonts->AddFontFromFileTTF(PathUtils::GetResPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
+		font0 = io.Fonts->AddFontFromFileTTF(PathUtils::GetResSysPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
 		io.Fonts->Build();
 		ImGuiStyle& style = ImGui::GetStyle();
 		// Setup Dear ImGui style
@@ -660,6 +661,7 @@ namespace Ailu
 	}
 	static bool show = false;
 	static bool s_show_asset_table = false;
+	static bool s_show_rt = false;
 
 	void Ailu::ImGUILayer::OnImguiRender()
 	{
@@ -670,6 +672,7 @@ namespace Ailu
 		ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
 		ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
 		ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
+		ImGui::Text("GPU Latency: %.2f ms", RenderingStates::s_gpu_latency);
 
 		static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame" };
 		static int item_current_idx = 0; // Here we store our selection data as an index.
@@ -695,6 +698,7 @@ namespace Ailu
 
 		ImGui::Checkbox("Expand", &show);
 		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
+		ImGui::Checkbox("ShowRT", &s_show_rt);
 		for (auto& info : g_pResourceMgr->_import_infos)
 		{
 			float x = g_pTimeMgr->GetScaledWorldTime(0.25f);
@@ -708,6 +712,8 @@ namespace Ailu
 		if (show) ImGui::ShowDemoWindow(&show);
 		if (s_show_asset_table) _asset_table.Open(-2);
 		else _asset_table.Close();
+		if (s_show_rt) _rt_view.Open(-3);
+		else _rt_view.Close();
 		TreeStats::s_common_property_handle = 0;
 		ShowWorldOutline();
 		ShowObjectDetail();
@@ -716,6 +722,7 @@ namespace Ailu
 		_mesh_browser.Show();
 		_asset_browser.Show();
 		_asset_table.Show();
+		_rt_view.Show();
 		//ShowTextureExplorer();
 	}
 
@@ -980,7 +987,6 @@ namespace Ailu
 		{
 			if (tex->GetTextureType() == ETextureType::kTexture2D)
 			{
-				auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetSRVGPUHandle();
 				ImGui::BeginGroup();
 				ImGuiContext* context = ImGui::GetCurrentContext();
 				auto drawList = context->CurrentWindow->DrawList;
@@ -1259,6 +1265,63 @@ namespace Ailu
 		ImGui::End();
 	}
 	//----------------------------------------------------------------------------AssetTable-----------------------------------------------------------------------
+	// 
+	//----------------------------------------------------------------------------RTDebugWindow-----------------------------------------------------------------------
+	void RTDebugWindow::Open(const int& handle)
+	{
+		ImguiWindow::Open(handle);
+	}
+	void RTDebugWindow::Show()
+	{
+		if (!_b_show)
+		{
+			_handle = -1;
+			return;
+		}
+		//ImGui::Begin("RTDebugWindow");
+		//static float preview_tex_size = 128;
+		////// 获取当前ImGui窗口的内容区域宽度
+		//u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
+		//int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
+		//imagesPerRow += imagesPerRow == 0 ? 1 : 0;
+		//static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
+		//int tex_count = 0;
+		//auto cmd = CommandBufferPool::Get();
+		//for (auto& rt : RenderTexture::s_all_render_texture)
+		//{
+		//	rt->Transition(cmd.get(), ETextureResState::kShaderResource);
+		//}
+		//g_pGfxContext->ExecuteCommandBuffer(cmd);
+		//for (auto& rt : RenderTexture::s_all_render_texture)
+		//{
+		//	ImGui::BeginGroup();
+		//	//ImGuiContext* context = ImGui::GetCurrentContext();
+		//	//auto drawList = context->CurrentWindow->DrawList;
+		//	ImGui::Image(rt->GetGPUNativePtr(), ImVec2(preview_tex_size, preview_tex_size));
+		//	ImGui::Text("%s", rt->Name().c_str());
+		//	ImGui::EndGroup();
+		//	if ((tex_count + 1) % imagesPerRow != 0)
+		//	{
+		//		ImGui::SameLine();
+		//	}
+		//	++tex_count;
+		//}
+		ImGui::Begin("RenderPassWindow");
+		u16 pass_index = 0;
+		for (auto& pass : g_pRenderer->GetRenderPasses())
+		{
+			bool active = pass->IsActive();
+			ImGui::PushID(pass_index++);
+			ImGui::Checkbox(" ", &active);
+			ImGui::SameLine();
+			ImGui::Text("PassName: %s",pass->GetName().c_str());
+			pass->SetActive(active);
+			ImGui::PopID();
+		}
+		ImGui::End();
+	}
+	//----------------------------------------------------------------------------RTDebugWindow-----------------------------------------------------------------------
+
 }
 
 

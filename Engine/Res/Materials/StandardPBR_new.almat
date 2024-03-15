@@ -1,12 +1,12 @@
-guid: 6801ca63-ca10-4fda-aad0-3408be9950f5
+guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
 type: material
-name: BoneWeight
-shader_path: Shaders/shaders.hlsl
+name: StandardPBR
+shader_path: Shaders/defered_standard_lit.hlsl
   prop_type: Uint
     SamplerMask: 0
   prop_type: Float
     MetallicValue: 0
-    RoughnessValue: 0
+    RoughnessValue: 0.008
   prop_type: Vector
     SpecularColor: 0,0,0,0
     BaseColor: 1,1,1,0

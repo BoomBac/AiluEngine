@@ -10,8 +10,6 @@
 #include "Framework/Common/TimeMgr.h"
 #include "RendererAPI.h"
 #include "Camera.h"
-#include "Material.h"
-#include "Mesh.h"
 #include "Texture.h"
 #include "Framework/Common/SceneMgr.h"
 #include "./Pass/RenderPass.h"
@@ -24,12 +22,16 @@ namespace Ailu
     class AILU_API Renderer : public IRuntimeModule
     {
     public:
+        inline static u32 kRendererWidth = 1600u;
+        inline static u32 kRendererHeight = 900u;
+    public:
         void BeginScene();
         void EndScene();
         int Initialize() override;
         void Finalize() override;
         void Tick(const float& delta_time) override;
         float GetDeltaTime() const;
+        List<RenderPass*>& GetRenderPasses() { return _render_passes; };
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
     private:
         Ref<RenderTexture> _p_camera_color_attachment;
@@ -39,11 +41,11 @@ namespace Ailu
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
     private:
+        static inline List<RenderPass*> _p_task_render_passes{};
         Ref<ComputeShader> _p_test_cs;
         Ref<Texture> _p_test_texture;
-        static inline List<RenderPass*> _p_task_render_passes{};
         Scope<ConstantBuffer> _p_per_frame_cbuf;
-        ScenePerFrameData* _p_per_frame_cbuf_data;
+        ScenePerFrameData _per_frame_cbuf_data;
         RenderingData _rendering_data;
         ConstantBuffer* _p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
         GraphicsContext* _p_context = nullptr;
@@ -52,11 +54,13 @@ namespace Ailu
         Scope<ShadowCastPass> _p_shadowcast_pass;
         Scope<CubeMapGenPass> _p_cubemap_gen_pass;
         Scope<PostProcessPass> _p_postprocess_pass;
-        List<RenderPass*> _p_render_passes;
+        Scope<DeferredGeometryPass> _p_gbuffer_pass;
+        List<RenderPass*> _render_passes;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;
         Camera* _p_scene_camera;
     };
+    extern Renderer* g_pRenderer;
 }
 #pragma warning(pop)
 #endif // !RENDERER_H__

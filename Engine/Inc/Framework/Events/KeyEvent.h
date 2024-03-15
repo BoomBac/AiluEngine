@@ -11,18 +11,18 @@ namespace Ailu
 	class AILU_API KeyEvent : public Event
 	{
 	public:
-		inline uint8_t GetKeyCode() const { return _key_code; }
+		inline u8 GetKeyCode() const { return _key_code; }
 		EVENT_CLASS_CATEGORY(kEventCategoryKeyboard | kEventCategoryInput)
 	protected:
-		KeyEvent(uint8_t keycode) : _key_code(keycode) {}
-		uint8_t _key_code;
+		KeyEvent(u8 keycode) : _key_code(keycode) {}
+		u8 _key_code;
 	};
 
 	class AILU_API KeyPressedEvent : public KeyEvent
 	{
 	public:
-		KeyPressedEvent(uint8_t keycode, int repeat_count) : KeyEvent(keycode), _repeat_count(repeat_count) {}
-		inline uint8_t GetRepeatCount() const { return _repeat_count; }
+		KeyPressedEvent(u8 keycode, int repeat_count) : KeyEvent(keycode), _repeat_count(repeat_count) {}
+		inline u8 GetRepeatCount() const { return _repeat_count; }
 		std::string ToString() const override
 		{
 			return std::format("KeyPressEvent: {} ({} repeats)",_key_code,_repeat_count);
@@ -35,7 +35,7 @@ namespace Ailu
 	class AILU_API KeyReleasedEvent : public KeyEvent
 	{
 	public:
-		KeyReleasedEvent(uint8_t keycode) : KeyEvent(keycode) {}
+		KeyReleasedEvent(u8 keycode) : KeyEvent(keycode) {}
 
 		std::string ToString() const override
 		{

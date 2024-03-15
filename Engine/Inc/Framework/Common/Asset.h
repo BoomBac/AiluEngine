@@ -6,7 +6,7 @@
 
 namespace Ailu
 {
-	enum class EAssetType : uint8_t
+	enum class EAssetType : u8
 	{
 		kUndefined,kMesh,kMaterial,kTexture2D
 	};
@@ -14,7 +14,7 @@ namespace Ailu
 	class Asset
 	{
 	public:
-		inline static uint32_t s_instance_num = 0u;
+		inline static u32 s_instance_num = 0u;
 	public:
 		Asset(String guid, EAssetType type);
 		Asset(String asset_path, String system_path, String guid, EAssetType type);
@@ -28,7 +28,7 @@ namespace Ailu
 		String _system_path;
 		String _name;
 		String _full_name;
-		uint32_t _instance_id;
+		u32 _instance_id;
 		Guid _guid;
 		EAssetType _asset_type;
 		void* _p_inst_asset;

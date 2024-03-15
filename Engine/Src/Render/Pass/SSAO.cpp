@@ -3,7 +3,7 @@
 
 namespace Ailu
 {
-	SSAOPass::SSAOPass() : _name("SSAOPass")
+	SSAOPass::SSAOPass() : RenderPass("SSAOPass")
 	{
 	}
 	SSAOPass::~SSAOPass()

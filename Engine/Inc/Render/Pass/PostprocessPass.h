@@ -14,7 +14,6 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		const String& GetName() const final { return _name; };
 	private:
 		Ref<RenderTexture> _p_tex_bloom_threshold;
 		Ref<Material> _p_bloom_thread_mat;
@@ -22,7 +21,6 @@ namespace Ailu
 		Ref<Mesh> _p_quad_mesh;
 		ConstantBuffer* _p_obj_cb;
 		Rect _bloom_thread_rect,_backbuf_rect;
-		String _name;
 	};
 }
 

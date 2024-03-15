@@ -2,6 +2,7 @@
 #include "RHI/DX12/D3DTexture.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
+#include "RHI/DX12/D3DCommandBuffer.h"
 
 namespace Ailu
 {
@@ -15,8 +16,6 @@ namespace Ailu
 		_srv_format = ConvertToDXGIFormat(_format);
 		_uav_format = ConvertToDXGIFormat(_format);
 		_read_only = read_only;
-		if(!_read_only)
-			Construct();
 	}
 
 	D3DTexture2D::D3DTexture2D(const TextureDesc& desc)
@@ -30,8 +29,6 @@ namespace Ailu
 		_uav_format = ConvertToDXGIFormat(desc._uav_format);
 		_read_only = desc._read_only;
 		_mipmap_count = desc._mipmap;
-		if (!_read_only)
-			Construct();
 	}
 
 	D3DTexture2D::~D3DTexture2D()
@@ -39,25 +36,20 @@ namespace Ailu
 		Release();
 	}
 
-	void D3DTexture2D::FillData(uint8_t* data)
+	void D3DTexture2D::FillData(u8* data)
 	{
 		Texture2D::FillData(data);
-		Construct();
 	}
 	void D3DTexture2D::FillData(Vector<u8*> datas)
 	{
 		Texture2D::FillData(datas);
-		Construct();
 	}
-	void D3DTexture2D::Bind(uint8_t slot)
+	void D3DTexture2D::Bind(CommandBuffer* cmd, u8 slot)
 	{
-		static auto cmd = D3DContext::GetInstance()->GetCmdList();
-		cmd->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
+		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
 	void D3DTexture2D::Release()
 	{
-		for (auto& id : _submited_tasks)
-			D3DContext::GetInstance()->CancelResourceTask(id);
 		for (auto p : _p_datas)
 		{
 			DESTORY_PTRARR(p);
@@ -69,10 +61,11 @@ namespace Ailu
 		return reinterpret_cast<void*>(_srv_gpu_handle.ptr);
 	}
 
-	void D3DTexture2D::Construct()
+	void D3DTexture2D::BuildRHIResource()
 	{
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
-		auto p_cmdlist{ D3DContext::GetInstance()->GetTaskCmdList() };
+		auto cmd = CommandBufferPool::Get();
+		auto p_cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
 		ComPtr<ID3D12Resource> pTextureGPU;
 		ComPtr<ID3D12Resource> pTextureUpload;
 		D3D12_RESOURCE_DESC textureDesc{};
@@ -138,6 +131,8 @@ namespace Ailu
 		}
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);
+		D3DContext::GetInstance()->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 	}
 
 	//----------------------------------------------------------D3DTextureCubeMap---------------------------------------------------------------------
@@ -157,8 +152,13 @@ namespace Ailu
 	void D3DTextureCubeMap::FillData(Vector<u8*>& data)
 	{
 		TextureCubeMap::FillData(data);
+	}
+
+	void D3DTextureCubeMap::BuildRHIResource()
+	{
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
-		auto p_cmdlist{ D3DContext::GetInstance()->GetTaskCmdList() };
+		auto cmd = CommandBufferPool::Get();
+		auto p_cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
 		ComPtr<ID3D12Resource> pTextureGPU;
 		ComPtr<ID3D12Resource> pTextureUpload;
 		D3D12_RESOURCE_DESC textureDesc{};
@@ -209,11 +209,13 @@ namespace Ailu
 		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _srv_cpu_handle);
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);
+		D3DContext::GetInstance()->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 	}
 
-	void D3DTextureCubeMap::Bind(uint8_t slot)
+	void D3DTextureCubeMap::Bind(CommandBuffer* cmd, u8 slot)
 	{
-		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
+		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
 
 	void D3DTextureCubeMap::Release()
@@ -257,7 +259,6 @@ namespace Ailu
 		}
 		bool is_shadowmap = IsShadowMapFormat(_format);
 		auto p_device{ D3DContext::GetInstance()->GetDevice() };
-		auto p_cmdlist{ D3DContext::GetInstance()->GetTaskCmdList() };
 		D3D12_RESOURCE_DESC tex_desc{};
 		tex_desc.MipLevels = _mipmap_count;
 		tex_desc.Format = ConvertToDXGIFormat(_format);
@@ -322,12 +323,12 @@ namespace Ailu
 
 		_state = is_shadowmap ? ETextureResState::kDepthTarget : ETextureResState::kColorTagret;
 	}
-	void D3DRenderTexture::Bind(uint8_t slot)
+	void D3DRenderTexture::Bind(CommandBuffer* cmd, u8 slot)
 	{
-		RenderTexture::Bind(slot);
-		D3DContext::GetInstance()->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
+		RenderTexture::Bind(cmd,slot);
+		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
-	uint8_t* D3DRenderTexture::GetCPUNativePtr()
+	u8* D3DRenderTexture::GetCPUNativePtr()
 	{
 		return nullptr;
 	}
@@ -343,16 +344,15 @@ namespace Ailu
 	void D3DRenderTexture::Release()
 	{
 	}
-	void D3DRenderTexture::Transition(ETextureResState state)
+	void D3DRenderTexture::Transition(CommandBuffer* cmd, ETextureResState state)
 	{
 		if (state == _state) return;
 		auto old_state = _state;
-		RenderTexture::Transition(state);
-		auto p_cmdlist{ D3DContext::GetInstance()->GetCmdList() };
+		RenderTexture::Transition(cmd,state);
 		auto state_before = ConvertToD3DResourceState(old_state);
 		auto state_after = ConvertToD3DResourceState(_state);
 		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_buffer.Get(), state_before, state_after);
-		p_cmdlist->ResourceBarrier(1, &barrier);
+		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->ResourceBarrier(1, &barrier);
 	}
 	//----------------------------------------------------------D3DRenderTexture----------------------------------------------------------------------
 }

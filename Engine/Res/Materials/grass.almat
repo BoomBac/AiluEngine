@@ -1,7 +1,7 @@
 guid: 2307dd4d-805b-4744-88bd-fa4a1d07b9ad
 type: material
 name: grass
-shader_path: Shaders/shaders.hlsl
+shader_path: Shaders/defered_standard_lit.hlsl
   prop_type: Uint
     SamplerMask: 0
   prop_type: Float

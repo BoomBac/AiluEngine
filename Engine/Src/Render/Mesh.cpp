@@ -39,7 +39,7 @@ namespace Ailu
 	{
 		_tangents = tangents;
 	}
-	void Mesh::SetUVs(Vector2f* uv, uint8_t index)
+	void Mesh::SetUVs(Vector2f* uv, u8 index)
 	{
 		if (index >= 8)
 		{
@@ -64,7 +64,7 @@ namespace Ailu
 		_vertex_count = 0;
 		_index_count = 0;
 	}
-	void Mesh::SetIndices(uint32_t* indices)
+	void Mesh::SetIndices(u32* indices)
 	{
 		_p_indices = indices;
 	}
@@ -76,7 +76,7 @@ namespace Ailu
 	{
 		return _p_ibuf;
 	}
-	void Mesh::Build()
+	void Mesh::BuildRHIResource()
 	{
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
@@ -107,36 +107,10 @@ namespace Ailu
 		if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
 		if (_tangents) _p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
 		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
+		_is_rhi_res_ready = true;
 	}
 
 	//----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------
-	// Parallel 函数
-	//template <typename T, typename F>
-	//void Parallel(T* v, size_t size, F f, ThreadPool& threadPool)
-	//{
-	//	size_t numThreads = std::thread::hardware_concurrency();
-	//	size_t chunkSize = (size + numThreads - 1) / numThreads;
-
-	//	std::vector<std::future<void>> futures;
-
-	//	for (size_t i = 0; i < numThreads; ++i)
-	//	{
-	//		size_t startIdx = i * chunkSize;
-	//		size_t endIdx = std::min((i + 1) * chunkSize, size);
-
-	//		futures.push_back(threadPool.Enqueue([&, startIdx, endIdx]()
-	//			{
-	//				for (size_t j = startIdx; j < endIdx; ++j) {
-	//					f(v[j]);
-	//				}
-	//			}));
-	//	}
-	//	for (auto& future : futures)
-	//	{
-	//		future.wait();
-	//	}
-	//}
-	
 	SkinedMesh::SkinedMesh() : Mesh()
 	{
 		_bone_indices = nullptr;
@@ -169,11 +143,11 @@ namespace Ailu
 		DESTORY_PTRARR(_bone_indices);
 	}
 
-	void SkinedMesh::Build()
+	void SkinedMesh::BuildRHIResource()
 	{
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
-		u8 vert_index, normal_index, uv_index, tangent_index, bone_index_index, bone_weight_index;
+		u8 vert_index, normal_index, uv_index, tangent_index;
 		if (_vertices)
 		{
 			desc_list.push_back({ "POSITION",EShaderDateType::kFloat3,count });
@@ -194,24 +168,25 @@ namespace Ailu
 			desc_list.push_back({ "TANGENT",EShaderDateType::kFloat4,count });
 			tangent_index = count++;
 		}
-		if (_bone_indices)
-		{
-			desc_list.push_back({ "BONEINDEX",EShaderDateType::kInt4,count });
-			bone_index_index = count++;
-		}
-		if (_bone_weights)
-		{
-			desc_list.push_back({ "BONEWEIGHT",EShaderDateType::kFloat4,count });
-			bone_weight_index = count++;
-		}
+		//if (_bone_indices)
+		//{
+		//	desc_list.push_back({ "BONEINDEX",EShaderDateType::kInt4,count });
+		//	bone_index_index = count++;
+		//}
+		//if (_bone_weights)
+		//{
+		//	desc_list.push_back({ "BONEWEIGHT",EShaderDateType::kFloat4,count });
+		//	bone_weight_index = count++;
+		//}
 		_p_vbuf.reset(VertexBuffer::Create(desc_list));
 		if (_vertices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, true);
 		if (_normals) _p_vbuf->SetStream(reinterpret_cast<u8*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index);
 		if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<u8*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
 		if (_tangents) _p_vbuf->SetStream(reinterpret_cast<u8*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
-		if (_bone_indices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_indices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kInt4), bone_index_index);
-		if (_bone_weights) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_weights), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), bone_weight_index);
+		//if (_bone_indices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_indices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kInt4), bone_index_index);
+		//if (_bone_weights) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_weights), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), bone_weight_index);
 		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
+		_is_rhi_res_ready = true;
 	}
 	//----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------
 }

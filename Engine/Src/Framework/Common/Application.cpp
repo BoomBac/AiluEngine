@@ -12,6 +12,7 @@
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Render/GraphicsContext.h"
+#include "Render/Renderer.h"
 
 namespace Ailu
 {
@@ -19,7 +20,8 @@ namespace Ailu
 	SceneMgr* g_pSceneMgr = new SceneMgr();
 	ResourceMgr* g_pResourceMgr = new ResourceMgr();
 	LogMgr* g_pLogMgr = new LogMgr();
-	Scope<ThreadPool> g_thread_pool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
+	Renderer* g_pRenderer = new Renderer();
+	Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
 
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
@@ -36,18 +38,25 @@ namespace Ailu
 		PushLayer(_p_imgui_layer);
 #endif // DEAR_IMGUI
 		GraphicsContext::InitGlobalContext();
+		g_pLogMgr->Log("Begin init resource mgr...");
+		g_pTimeMgr->Mark();
 		g_pResourceMgr->Initialize();
+		g_pLogMgr->LogFormat("Resource mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
+		g_pLogMgr->Log("Begin init scene mgr...");
+		g_pTimeMgr->Mark();
 		g_pSceneMgr->Initialize();
-		_p_renderer = new Renderer();
-		_p_renderer->Initialize();
+		g_pLogMgr->LogFormat("Scene mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
+		g_pLogMgr->Log("Begin init renderer...");
+		g_pTimeMgr->Mark();
+		g_pRenderer->Initialize();
+		g_pLogMgr->LogFormat("Renderer init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
 		_p_input_layer = new InputLayer();
 		PushLayer(_p_input_layer);
 		_p_scene_layer = new SceneLayer();
 		PushLayer(_p_scene_layer);
 		_b_running = true;
 		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
-		g_pTimeMgr->Mark();
-		g_pLogMgr->Log("Init end");
+		g_pLogMgr->Log("Application Init end");
 		return 0;
 	}
 	void Application::Finalize()
@@ -57,8 +66,8 @@ namespace Ailu
 		g_pSceneMgr->Finalize();
 		DESTORY_PTR(g_pSceneMgr);
 		DESTORY_PTR(g_pResourceMgr);
-		_p_renderer->Finalize();
-		DESTORY_PTR(_p_renderer)
+		g_pRenderer->Finalize();
+		DESTORY_PTR(g_pRenderer)
 		g_pTimeMgr->Finalize();
 		DESTORY_PTR(g_pTimeMgr);
 		g_pLogMgr->Finalize();
@@ -98,7 +107,7 @@ namespace Ailu
 					layer->OnImguiRender();
 				_p_imgui_layer->End();
 #endif // DEAR_IMGUI
-				_p_renderer->Tick(delta_time);
+				g_pRenderer->Tick(delta_time);
 				render_lag -= kMsPerRender;
 			}
 		}
@@ -130,7 +139,7 @@ namespace Ailu
 	}
 	bool Application::OnDragFile(DragFileEvent& e)
 	{
-		g_pResourceMgr->ImportAsset(e.GetDragedFilePath());
+		g_pResourceMgr->ImportAssetAsync(e.GetDragedFilePath());
 		return false;
 	}
 

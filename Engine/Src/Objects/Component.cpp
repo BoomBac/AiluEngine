@@ -40,5 +40,6 @@ namespace Ailu
 	{
 		if(type_name == GetTypeName(StaticMeshComponent::GetStaticType())) return new StaticMeshComponent();
 		else if(type_name == GetTypeName(SkinedMeshComponent::GetStaticType())) return new SkinedMeshComponent();
+		return nullptr;
 	}
 }
