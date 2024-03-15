@@ -10,10 +10,14 @@ namespace Ailu
 {
 	struct RenderableObjectData
 	{
-		Mesh* _mesh;
-		Material* _mat;
-		Matrix4x4f _transform;
+		u16 _mesh_index;
+		u16 _material_index;
+		u16 _transform_index;
+		u16 _submesh_index;
 		u32 _instance_count;
+		Mesh* GetMesh() const;
+		Material* GetMaterial() const;
+		Matrix4x4f* GetTransform() const;
 	};
 
 	class RenderQueue
@@ -21,10 +25,13 @@ namespace Ailu
 	public:
 		inline static constexpr u32 kQpaque = 2000;
 		inline static constexpr u32 kTransparent = 3000;
-		static void Enqueue(u32 queue_id, Mesh* mesh, Material* material, Matrix4x4f transform, u32 instance_count = 1);
+		static void Enqueue(u32 queue_id, Mesh* mesh, Material* material, Matrix4x4f transform, u16 submesh_index,u32 instance_count);
 		static void ClearQueue();
 		static const Vector<RenderableObjectData>& GetOpaqueRenderables() {return _s_renderables[kQpaque];};
 		static const Vector<RenderableObjectData>& GetTransparentRenderables() {return _s_renderables[kTransparent];}
+		inline static Vector<Mesh*> s_all_meshes{};
+		inline static Vector<Material*> s_all_materials{};
+		inline static Vector<Matrix4x4f> s_all_matrix{};
 	private:
 		inline static std::map<u32, Vector<RenderableObjectData>> _s_renderables{};
 	};

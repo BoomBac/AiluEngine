@@ -208,8 +208,16 @@ namespace Ailu
 		for (auto static_mesh : p_scene->GetAllStaticRenderable())
 		{	
 			auto& aabb = static_mesh->GetAABB();
-			RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(),static_mesh->GetMaterial().get(), 
-			static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), 1);
+			auto submesh_count = static_mesh->GetMesh()->SubmeshCount();
+			auto materials = static_mesh->GetMaterials();
+			auto replace_mat = materials.empty()? nullptr : materials[0].get();
+			for (int i = 0; i < submesh_count; i++)
+			{
+				RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(), i < materials.size()? materials[i].get() : replace_mat,
+					static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(),i,1);
+				//RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(),  materials[0].get(),
+				//	static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), i, 1);
+			}
 		}
 	}
 

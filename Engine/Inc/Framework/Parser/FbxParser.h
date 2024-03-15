@@ -55,6 +55,7 @@ namespace Ailu
 		//Record the location and its corresponding control point index, 
 		//when the normal mapping method is control point, we need to get the normal based on this information to generate the index mesh
 		Vector<u32> _positon_conrtol_index_mapper;
+		Vector<u32> _positon_material_index_mapper;
 		bool _b_normal_by_controlpoint = false;
 		List<AnimationClip*> _loaded_anims;
 		FbxArray<FbxString*> _fbx_anim_stack_names;

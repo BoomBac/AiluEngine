@@ -29,9 +29,8 @@ namespace Ailu
 		{
 			for (auto& obj : RenderQueue::GetOpaqueRenderables())
 			{
-				
-				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), &obj._transform, sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj._mesh, obj._mat, rendering_data._p_per_object_cbuf[obj_index], obj._instance_count);
+				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+				cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index,obj._instance_count);
 				++obj_index;
 			}
 		}
@@ -41,8 +40,8 @@ namespace Ailu
 			static auto wireframe_mat = MaterialLibrary::GetMaterial("Materials/WireFrame_new.alasset");
 			for (auto& obj : RenderQueue::GetOpaqueRenderables())
 			{
-				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), &obj._transform, sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj._mesh, wireframe_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._instance_count);
+				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+				cmd->DrawRenderer(obj.GetMesh(), wireframe_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index,obj._instance_count);
 				++obj_index;
 			}
 		}
@@ -106,7 +105,7 @@ namespace Ailu
 		u32 obj_index = 0u;
 		for (auto& obj : RenderQueue::GetOpaqueRenderables())
 		{
-			cmd->DrawRenderer(obj._mesh, _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._instance_count);
+			cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index,obj._instance_count);
 		}
 		Shader::SetGlobalTexture("MainLightShadowMap", _p_shadow_map.get());
 		context->ExecuteCommandBuffer(cmd);

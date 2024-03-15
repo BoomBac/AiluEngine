@@ -21,10 +21,14 @@ namespace Ailu
 		void BeginPlay() override;
 		void Tick(const float& delta_time) override;
 		void OnGizmo() override;
-		virtual void SetMesh(Ref<Mesh>& mesh);
-		void SetMaterial(Ref<Material>& mat);
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) override;
-		inline Ref<Material>& GetMaterial() { return _p_mat; };
+		virtual void SetMesh(Ref<Mesh>& mesh);
+		void AddMaterial(Ref<Material> mat);
+		void AddMaterial(Ref<Material> mat,u16 slot);
+		void RemoveMaterial(u16 slot);
+		void SetMaterial(Ref<Material>& mat,u16 slot = 0u);
+		inline Ref<Material>& GetMaterial(u16 slot = 0) { return _p_mats[slot]; };
+		inline Vector<Ref<Material>>& GetMaterials() { return _p_mats; };
 		inline Ref<Mesh>& GetMesh() { return _p_mesh; };
 		const std::tuple<Vector3f, Vector3f>& GetAABB() const
 		{
@@ -32,7 +36,7 @@ namespace Ailu
 		}
 	protected:
 		Ref<Mesh> _p_mesh;
-		Ref<Material> _p_mat;
+		Vector<Ref<Material>> _p_mats;
 		std::tuple<Vector3f, Vector3f> _aabb;
 	protected:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;

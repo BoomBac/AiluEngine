@@ -120,30 +120,33 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count)
 	{
+		if (mesh)
+		{
+			for(int i = 0; i < mesh->SubmeshCount(); ++i)
+			{
+				DrawRenderer(mesh, material, per_obj_cbuf,i,instance_count);
+			}
+		}
+	}
+
+	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count)
+	{
 		if (mesh == nullptr || !mesh->_is_rhi_res_ready)
 		{
 			LOG_WARNING("Mesh is null or is not ready when draw renderer!");
 			return;
 		}
-		if (material != nullptr)
-		{
-			mesh->GetVertexBuffer()->Bind(this,material->GetShader()->PipelineInputLayout());
-			mesh->GetIndexBuffer()->Bind(this);
-			material->Bind();
-		}
-		else
-		{
-			static Material* error = MaterialLibrary::GetMaterial("Error").get();
-			mesh->GetVertexBuffer()->Bind(this,error->GetShader()->PipelineInputLayout());
-			mesh->GetIndexBuffer()->Bind(this);
-			error->Bind();
-		}
+		static Material* error = MaterialLibrary::GetMaterial("Error").get();
+		Material* actual_mat = material ? material : error;
+		actual_mat->Bind();
+		mesh->GetVertexBuffer()->Bind(this, actual_mat->GetShader()->PipelineInputLayout());
+		mesh->GetIndexBuffer(submesh_index)->Bind(this);
 		GraphicsPipelineStateMgr::EndConfigurePSO(this);
 		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
 		{
-			per_obj_cbuf->Bind(this,0);
+			per_obj_cbuf->Bind(this, 0);
 			++RenderingStates::s_draw_call;
-			_p_cmd->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, 0, 0, 0);
+			_p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
 		}
 		else
 		{

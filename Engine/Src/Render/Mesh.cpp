@@ -15,7 +15,6 @@ namespace Ailu
 			_uv[i] = nullptr;
 		}
 		_vertex_count = 0u;
-		_index_count = 0u;
 	}
 
 	Mesh::Mesh(const std::string& name) : Mesh()
@@ -61,20 +60,25 @@ namespace Ailu
 				DESTORY_PTRARR(_uv[i]);
 			}
 		}
+		for (auto indices : _p_indices)
+		{
+			DESTORY_PTRARR(std::get<0>(indices));
+		}
+		_p_indices.clear();
 		_vertex_count = 0;
-		_index_count = 0;
 	}
-	void Mesh::SetIndices(u32* indices)
-	{
-		_p_indices = indices;
-	}
+
 	const Ref<VertexBuffer>& Mesh::GetVertexBuffer() const
 	{
 		return _p_vbuf;
 	}
-	const Ref<IndexBuffer>& Mesh::GetIndexBuffer() const
+	const Ref<IndexBuffer>& Mesh::GetIndexBuffer(u16 submesh_index) const
 	{
-		return _p_ibuf;
+		return _p_ibufs[submesh_index];
+	}
+	void Mesh::AddSubmesh(u32* indices, u32 indices_count)
+	{
+		_p_indices.emplace_back(std::make_tuple(indices, indices_count));
 	}
 	void Mesh::BuildRHIResource()
 	{
@@ -106,7 +110,11 @@ namespace Ailu
 		if (_normals) _p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index);
 		if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
 		if (_tangents) _p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
-		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
+		_p_ibufs.resize(_p_indices.size());
+		for(int i = 0; i < _p_indices.size(); i++)
+		{
+			_p_ibufs[i].reset(IndexBuffer::Create(std::get<0>(_p_indices[i]), std::get<1>(_p_indices[i])));
+		}
 		_is_rhi_res_ready = true;
 	}
 
@@ -185,7 +193,11 @@ namespace Ailu
 		if (_tangents) _p_vbuf->SetStream(reinterpret_cast<u8*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
 		//if (_bone_indices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_indices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kInt4), bone_index_index);
 		//if (_bone_weights) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_weights), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), bone_weight_index);
-		_p_ibuf.reset(IndexBuffer::Create(_p_indices, _index_count));
+		_p_ibufs.resize(_p_indices.size());
+		for (int i = 0; i < _p_indices.size(); i++)
+		{
+			_p_ibufs[i].reset(IndexBuffer::Create(std::get<0>(_p_indices[i]), std::get<1>(_p_indices[i])));
+		}
 		_is_rhi_res_ready = true;
 	}
 	//----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------

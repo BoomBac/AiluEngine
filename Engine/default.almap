@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 1338.07,2175.63,3677.37
-  Rotation: -0.011575,0.974689,-0.217136,-0.0519538
+  Position: -580.852,911.76,2372.32
+  Rotation: 0.0360902,0.96278,-0.164207,0.211631
   Fov: 60
   Aspect: 1.77778
   Near: 44.44
-  Far: 67585.1
-  ControllerRotation: 25.1193,16746.1
+  Far: 98279.6
+  ControllerRotation: 19.3592,23195.2
 SceneGraph: 
   Name: root
     Components: 
@@ -24,42 +24,42 @@ SceneGraph:
             Scale: 40,1,40
           StaticMeshComponent: 
             MeshPath: plane
-            MaterialPath: Materials/StandardPBR_new.alasset
+            MaterialPath0: Materials/StandardPBR_new.alasset
         Children: 0
       Name: skybox
         Components: 
           TransformComponent: 
             Position: 0,0,0
-            Rotation: -6.40009e-08,0.852093,-6.40009e-08,0.52339
+            Rotation: 0,6.75513e-08,0,1
             Scale: 500,500,500
           StaticMeshComponent: 
             MeshPath: cube
-            MaterialPath: Materials/CustomSkyBox.almat
+            MaterialPath0: Materials/CustomSkyBox.almat
         Children: 0
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: -5000,5000,0
-            Rotation: -0.29932,0.622492,0.278923,0.667168
+            Position: -5000,3811,0
+            Rotation: -0.291974,0.6215,0.268624,0.675522
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
-            Intensity: 1
+            Intensity: 1.407
             CastShadow: true
-            ShadowArea: 7723.63
+            ShadowArea: 8376.38
             ShadowDistance: 9059.53
         Children: 0
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: 33,569,566
-            Rotation: -0.0235722,-9.97629e-05,0.000722956,0.999722
+            Position: 227,189,-29
+            Rotation: -0.0235722,-9.9048e-05,0.00072298,0.999722
             Scale: 1,1,1
           LightComponent: 
             Type: Point
             Color: 0.754122,0.838235,0.12327
-            Intensity: 3.637
+            Intensity: 2.344
             Radius: 722
             CastShadow: false
             ShadowArea: 0
@@ -69,12 +69,12 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 846,845,-374
-            Rotation: 0.00302828,0.148037,-0.160967,0.97579
+            Rotation: 0.00302879,0.148037,-0.160967,0.97579
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
             Color: 0.0395761,0.518758,0.897059
-            Intensity: 3.755
+            Intensity: 2.403
             Radius: 2868
             Inner: 46.978
             Outer: 60
@@ -90,5 +90,5 @@ SceneGraph:
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey
-            MaterialPath: Materials/StandardPBR_new.alasset
+            MaterialPath0: Materials/StandardPBR_new.alasset
         Children: 0

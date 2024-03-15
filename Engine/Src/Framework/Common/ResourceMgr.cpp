@@ -113,9 +113,8 @@ namespace Ailu
 		Vector<u32> indices = { 0, 1, 2, 1, 3, 2 };
 		Vector<Vector2f> uv0 = { {0.f,0.f}, {1.f,0.f},{0.f,1.f} ,{1.f,1.f} };
 		FullScreenQuad->_vertex_count = 4;
-		FullScreenQuad->_index_count = 6;
 		FullScreenQuad->SetVertices(vertices.data());
-		FullScreenQuad->SetIndices(indices.data());
+		FullScreenQuad->AddSubmesh(indices.data(), 6);
 		FullScreenQuad->SetUVs(uv0.data(), 0);
 		FullScreenQuad->BuildRHIResource();
 		MeshPool::AddMesh("FullScreenQuad", FullScreenQuad);

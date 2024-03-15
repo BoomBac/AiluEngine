@@ -30,24 +30,25 @@ namespace Ailu
 		inline Vector3f* GetNormals() { return _normals; };
 		inline Vector4f* GetTangents() { return _tangents; };
 		inline Vector2f* GetUVs(u8 index) { return _uv[index]; };
-		inline u32* GetIndices() { return _p_indices; };
-		void SetIndices(u32* indices);
+		inline u32* GetIndices(u16 submesh_index = 0) { return std::get<0>(_p_indices[submesh_index]); };
+		inline u32 GetIndicesCount(u16 submesh_index = 0) { return std::get<1>(_p_indices[submesh_index]); };
 		const Ref<VertexBuffer>& GetVertexBuffer() const;
-		const Ref<IndexBuffer>& GetIndexBuffer() const;
+		const Ref<IndexBuffer>& GetIndexBuffer(u16 submesh_index = 0) const;
+		void AddSubmesh(u32* indices, u32 indices_count);
 		bool _is_rhi_res_ready = false;
+		const u16 SubmeshCount() const { return static_cast<u16>(_p_indices.size()); };
 	public:
 		u32 _vertex_count;
-		u32 _index_count;
 		AABB _bound_box;
 	protected:
 		Ref<VertexBuffer> _p_vbuf;
-		Ref<IndexBuffer> _p_ibuf;
+		Vector<Ref<IndexBuffer>> _p_ibufs;
 		Vector3f* _vertices;
 		Vector3f* _normals;
 		Color* _colors;
 		Vector4f* _tangents;
 		Vector2f** _uv;
-		u32* _p_indices;
+		Vector<std::tuple<u32*, u32>> _p_indices;
 	};
 
 	class SkinedMesh : public Mesh

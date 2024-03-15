@@ -143,7 +143,7 @@ float Random(float4 seed4)
 	//float shadow_factor = MainLightShadowMap.Sample(g_LinearBorderSampler, shadow_uv.xy).r; 
 	//if (shadow_factor <= depth)
 	//	return float4(0.0,0.0,0.0,1.0); 
-		light *= lerp(0.2,1.0,shadow_factor);
+		light *= lerp(0.2f,1.0,shadow_factor);
 //		GammaCorrect(light, 2.2f);
 #ifdef TEST
 	return float4(light,1.0);

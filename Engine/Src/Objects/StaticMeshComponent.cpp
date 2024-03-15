@@ -11,13 +11,15 @@
 
 namespace Ailu
 {
-	StaticMeshComponent::StaticMeshComponent() : _p_mesh(nullptr), _p_mat(nullptr)
+	StaticMeshComponent::StaticMeshComponent() : _p_mesh(nullptr)
 	{
 		IMPLEMENT_REFLECT_FIELD(StaticMeshComponent)
 	}
-	StaticMeshComponent::StaticMeshComponent(Ref<Mesh> mesh, Ref<Material> mat) : _p_mesh(mesh), _p_mat(mat)
+	StaticMeshComponent::StaticMeshComponent(Ref<Mesh> mesh, Ref<Material> mat) : _p_mesh(mesh)
 	{
-		IMPLEMENT_REFLECT_FIELD(StaticMeshComponent)
+		IMPLEMENT_REFLECT_FIELD(StaticMeshComponent);
+		if(mat)
+			_p_mats.emplace_back(mat);
 	}
 
 	void StaticMeshComponent::BeginPlay()
@@ -39,9 +41,25 @@ namespace Ailu
 		_p_mesh = mesh;
 	}
 
-	void StaticMeshComponent::SetMaterial(Ref<Material>& mat)
+	void StaticMeshComponent::AddMaterial(Ref<Material> mat)
 	{
-		_p_mat = mat;
+		_p_mats.emplace_back(mat);
+	}
+
+	void StaticMeshComponent::AddMaterial(Ref<Material> mat, u16 slot)
+	{
+		_p_mats.insert(_p_mats.begin() + slot, mat);
+	}
+
+	void StaticMeshComponent::RemoveMaterial(u16 slot)
+	{
+		_p_mats.erase(_p_mats.begin() + slot);
+	}
+
+	void StaticMeshComponent::SetMaterial(Ref<Material>& mat, u16 slot)
+	{
+		if(slot < _p_mats.size())
+			_p_mats[slot] = mat;
 	}
 
 	void StaticMeshComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)
@@ -50,10 +68,13 @@ namespace Ailu
 		using namespace std;
 		String prop_indent = indent.append("  ");
 		os << prop_indent << "MeshPath: " << _p_mesh->OriginPath() << endl;
-		if (_p_mat)
-			os << prop_indent << "MaterialPath: " << _p_mat->OriginPath() << endl;
-		else
-			os << prop_indent << "MaterialPath: " << "missing" << endl;
+		for(int i = 0; i < _p_mats.size(); ++i)
+		{
+			if (_p_mats[i])
+				os << prop_indent << std::format("MaterialPath{}: {}", i,_p_mats[i]->OriginPath()) << endl;
+			else
+				os << prop_indent << std::format("MaterialPath{}: missing", i) << endl;
+		}
 	}
 	void* StaticMeshComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
@@ -67,7 +88,6 @@ namespace Ailu
 			formated_str.pop();
 			auto mesh_path = TP_ONE(formated_str.front());
 			formated_str.pop();
-			auto mat_path = TP_ONE(formated_str.front());
 			auto mesh = MeshPool::GetMesh(mesh_path);
 			if (mesh == nullptr)
 			{
@@ -77,6 +97,7 @@ namespace Ailu
 				{
 					mesh = meshes.front();
 					mesh->OriginPath(mesh_path);
+					MeshPool::AddMesh(mesh);
 					g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
 				}
 				else
@@ -84,14 +105,20 @@ namespace Ailu
 					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
 				}
 			}
-			auto mat = MaterialLibrary::GetMaterial(mat_path);
-			auto loc = std::source_location::current();
-			if (mat == nullptr)
+			//auto mat_path = TP_ONE(formated_str.front());
+			Vector<String> mat_paths;
+			String cur_mat_path;
+			StaticMeshComponent* comp = new StaticMeshComponent(mesh, nullptr);
+			while ((cur_mat_path = TP_ZERO(formated_str.front())).starts_with("MaterialPath"))
 			{
-				g_pLogMgr->LogErrorFormat(loc, "Load material failed with id {};", mat_path);
+				cur_mat_path = cur_mat_path = TP_ONE(formated_str.front());
+				auto mat = MaterialLibrary::GetMaterial(cur_mat_path);
+				if (mat == nullptr)
+					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load material failed with id {};", cur_mat_path);
+				else
+					comp->AddMaterial(mat);
+				formated_str.pop();
 			}
-			StaticMeshComponent* comp = new StaticMeshComponent(mesh, mat);
-			formated_str.pop();
 			return comp;
 		}
 	}

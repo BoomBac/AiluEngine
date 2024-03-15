@@ -136,7 +136,7 @@ namespace Ailu
 	}
 
 	static void ComputeClusterDeformation(bool is_local, FbxAMatrix& pGlobalPosition, FbxNode* pMesh, FbxCluster* pCluster, FbxNode* cluster_link,
-	FbxAMatrix& pVertexTransformMatrix, FbxTime pTime, FbxPose* pPose)
+		FbxAMatrix& pVertexTransformMatrix, FbxTime pTime, FbxPose* pPose)
 	{
 		FbxCluster::ELinkMode lClusterMode = pCluster->GetLinkMode();
 
@@ -368,7 +368,6 @@ namespace Ailu
 				fill_tex(mat->FindProperty(FbxSurfaceMaterial::sNormalMap), _loaded_textures);
 			}
 		}
-
 		if (use_multi_thread)
 		{
 			_time_mgr.Mark();
@@ -422,7 +421,7 @@ namespace Ailu
 		auto mesh_name = fbx_mesh->GetName();
 		u32 deformers_num = fbx_mesh->GetDeformerCount(FbxDeformer::eSkin);
 		bool b_use_mt = false;
-		static auto parser_anim = [](Skeleton& sk, FbxNode* node, FbxMesh* mesh, FbxCluster* cluster, FbxNode* cluster_link,const FbxAMatrix& geometry_transform, AnimationClip* clip,
+		static auto parser_anim = [](Skeleton& sk, FbxNode* node, FbxMesh* mesh, FbxCluster* cluster, FbxNode* cluster_link, const FbxAMatrix& geometry_transform, AnimationClip* clip,
 			FbxLongLong frame_count, FbxTime::EMode time_mode) {
 				String joint_name = cluster->GetLink()->GetName();
 				i32 joint_i = Skeleton::GetJointIndexByName(sk, joint_name);
@@ -441,7 +440,7 @@ namespace Ailu
 					cur_time.SetFrame(i, time_mode);
 					FbxAMatrix global_offpositon = node->EvaluateGlobalTransform(cur_time) * geometry_transform;
 					FbxAMatrix bone_matrix_l;
-					ComputeClusterDeformation(true, global_offpositon, node, cluster, cluster_link,bone_matrix_l, cur_time, nullptr);
+					ComputeClusterDeformation(true, global_offpositon, node, cluster, cluster_link, bone_matrix_l, cur_time, nullptr);
 					sk[joint_index]._node_inv_world_mat = FbxMatToMat4x4f(global_offpositon.Inverse());
 					if (!joint->GetParent()->GetSkeleton())
 					{
@@ -491,7 +490,7 @@ namespace Ailu
 					u32 cluster_num = skin->GetClusterCount();
 					for (u32 j = 0; j < cluster_num; j++)
 					{
-						res.emplace_back(g_thread_pool->Enqueue(parser_anim,std::ref(sk), node, fbx_mesh, skin->GetCluster(j),skin->GetCluster(j)->GetLink(),std::ref(geometry_transform), clip, FrameCount, TimeMode));
+						res.emplace_back(g_thread_pool->Enqueue(parser_anim, std::ref(sk), node, fbx_mesh, skin->GetCluster(j), skin->GetCluster(j)->GetLink(), std::ref(geometry_transform), clip, FrameCount, TimeMode));
 					}
 				}
 				for (auto& ret : res)
@@ -619,60 +618,124 @@ namespace Ailu
 		}
 		_positon_conrtol_index_mapper.clear();
 		_positon_conrtol_index_mapper.resize(fbx_mesh->GetPolygonCount() * 3);
+		_positon_material_index_mapper.clear();
+		_positon_material_index_mapper.resize(fbx_mesh->GetPolygonCount() * 3);
 		fbxsdk::FbxVector4* points{ fbx_mesh->GetControlPoints() };
 		u32 cur_index_count = 0u;
 		std::vector<Vector3f> positions{};
 		Vector<Vector4f> bone_weights_vec{};
 		Vector<Vector4D<u32>> bone_indices_vec{};
-		if (control_point_weight_infos.size() > 0)
+		i32 trangle_count = fbx_mesh->GetPolygonCount();
+		auto mat_element = fbx_mesh->GetElementMaterial();
+		if (mat_element)
 		{
-			for (int32_t i = 0; i < fbx_mesh->GetPolygonCount(); ++i)
+			auto material_indices = mat_element->GetIndexArray();
+			if (control_point_weight_infos.size() > 0)
 			{
-				for (int32_t j = 0; j < 3; ++j)
+				for (int32_t i = 0; i < fbx_mesh->GetPolygonCount(); ++i)
 				{
-					auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
-					auto p = points[cur_control_point_index];
-					Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
-					//position *= scale_factor;
-					_positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
-					positions.emplace_back(position);
-					auto& cur_weight_info = control_point_weight_infos[cur_control_point_index];
-					if (cur_weight_info.size() > 4)
+					auto cur_mat_index = material_indices.GetAt(i);
+					for (int32_t j = 0; j < 3; ++j)
 					{
-						std::sort(cur_weight_info.begin(), cur_weight_info.end(), [](const std::pair<u16, float>& a, const std::pair<u16, float>& b) {
-							return a.second > b.second;
-							});
+						auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
+						auto p = points[cur_control_point_index];
+						Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
+						//position *= scale_factor;
+						_positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
+						_positon_material_index_mapper[positions.size()] = cur_mat_index;
+						positions.emplace_back(position);
+						auto& cur_weight_info = control_point_weight_infos[cur_control_point_index];
+						if (cur_weight_info.size() > 4)
+						{
+							std::sort(cur_weight_info.begin(), cur_weight_info.end(), [](const std::pair<u16, float>& a, const std::pair<u16, float>& b) {
+								return a.second > b.second;
+								});
+						}
+						//AL_ASSERT(cur_weight_info.size() > 4 , "weight must equal one");
+						auto bone_effect_num = cur_weight_info.size() > 4 ? 4 : cur_weight_info.size();
+						Vector4f cur_weight{ 0,0,0,0 };
+						Vector4D<u32> cur_indices{ 0,0,0,0 };
+						for (int weight_index = 0; weight_index < bone_effect_num; ++weight_index)
+						{
+							cur_weight[weight_index] = cur_weight_info[weight_index].second;
+							cur_indices[weight_index] = cur_weight_info[weight_index].first;
+						}
+						bone_weights_vec.emplace_back(cur_weight);
+						bone_indices_vec.emplace_back(cur_indices);
 					}
-					//AL_ASSERT(cur_weight_info.size() > 4 , "weight must equal one");
-					auto bone_effect_num = cur_weight_info.size() > 4 ? 4 : cur_weight_info.size();
-					Vector4f cur_weight{ 0,0,0,0 };
-					Vector4D<u32> cur_indices{ 0,0,0,0 };
-					for (int weight_index = 0; weight_index < bone_effect_num; ++weight_index)
+				}
+			}
+			else
+			{
+				for (int32_t i = 0; i < fbx_mesh->GetPolygonCount(); ++i)
+				{
+					auto cur_mat_index = material_indices.GetAt(i);
+					for (int32_t j = 0; j < 3; ++j)
 					{
-						cur_weight[weight_index] = cur_weight_info[weight_index].second;
-						cur_indices[weight_index] = cur_weight_info[weight_index].first;
+						auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
+						auto p = points[cur_control_point_index];
+						Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
+						_positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
+						_positon_material_index_mapper[positions.size()] = cur_mat_index;
+						position *= scale_factor;
+						positions.emplace_back(position);
 					}
-					bone_weights_vec.emplace_back(cur_weight);
-					bone_indices_vec.emplace_back(cur_indices);
 				}
 			}
 		}
 		else
 		{
-			for (int32_t i = 0; i < fbx_mesh->GetPolygonCount(); ++i)
+			if (control_point_weight_infos.size() > 0)
 			{
-				for (int32_t j = 0; j < 3; ++j)
+				for (int32_t i = 0; i < fbx_mesh->GetPolygonCount(); ++i)
 				{
-					auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
-					auto p = points[cur_control_point_index];
-					Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
-					_positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
-					position *= scale_factor;
-					positions.emplace_back(position);
+					for (int32_t j = 0; j < 3; ++j)
+					{
+						auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
+						auto p = points[cur_control_point_index];
+						Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
+						//position *= scale_factor;
+						_positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
+						_positon_material_index_mapper[positions.size()] = 0;
+						positions.emplace_back(position);
+						auto& cur_weight_info = control_point_weight_infos[cur_control_point_index];
+						if (cur_weight_info.size() > 4)
+						{
+							std::sort(cur_weight_info.begin(), cur_weight_info.end(), [](const std::pair<u16, float>& a, const std::pair<u16, float>& b) {
+								return a.second > b.second;
+								});
+						}
+						//AL_ASSERT(cur_weight_info.size() > 4 , "weight must equal one");
+						auto bone_effect_num = cur_weight_info.size() > 4 ? 4 : cur_weight_info.size();
+						Vector4f cur_weight{ 0,0,0,0 };
+						Vector4D<u32> cur_indices{ 0,0,0,0 };
+						for (int weight_index = 0; weight_index < bone_effect_num; ++weight_index)
+						{
+							cur_weight[weight_index] = cur_weight_info[weight_index].second;
+							cur_indices[weight_index] = cur_weight_info[weight_index].first;
+						}
+						bone_weights_vec.emplace_back(cur_weight);
+						bone_indices_vec.emplace_back(cur_indices);
+					}
+				}
+			}
+			else
+			{
+				for (int32_t i = 0; i < fbx_mesh->GetPolygonCount(); ++i)
+				{
+					for (int32_t j = 0; j < 3; ++j)
+					{
+						auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
+						auto p = points[cur_control_point_index];
+						Vector3f position{ (float)p[0],(float)p[1],(float)p[2] };
+						_positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
+						_positon_material_index_mapper[positions.size()] = 0;
+						position *= scale_factor;
+						positions.emplace_back(position);
+					}
 				}
 			}
 		}
-
 		u32 vertex_count = (u32)positions.size();
 		float* vertex_buf = new float[vertex_count * 3];
 		memcpy(vertex_buf, positions.data(), sizeof(Vector3f) * vertex_count);
@@ -816,7 +879,7 @@ namespace Ailu
 		Vector3f* tan1 = new Vector3f[vertexCount * 2];
 		Vector3f* tan2 = tan1 + vertexCount;
 		ZeroMemory(tan1, vertexCount * sizeof(Vector3f) * 2);
-		for (size_t i = 0; i < mesh->_index_count; i += 3)
+		for (size_t i = 0; i < mesh->GetIndicesCount(); i += 3)
 		{
 			u32 i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
 			const Vector3f& pos1 = pos[i1];
@@ -873,7 +936,7 @@ namespace Ailu
 		std::vector<Vector3f> positions{};
 		std::vector<Vector2f> uv0s{};
 		std::vector<u32> indices{};
-
+		std::map<u16, Vector<u32>> submesh_indices{};
 		u32 cur_index_count = 0u;
 		auto raw_normals = mesh->GetNormals();
 		auto raw_uv0 = mesh->GetUVs(0u);
@@ -925,6 +988,7 @@ namespace Ailu
 		{
 			for (size_t i = 0; i < vertex_count; i++)
 			{
+				int mat_index = _positon_material_index_mapper[i];
 				auto p = raw_pos[i], n = raw_normals[i];
 				auto uv = raw_uv0[i];
 				auto hash0 = v3hash(n), hash1 = v2hash(uv);
@@ -933,38 +997,51 @@ namespace Ailu
 				if (it == vertex_map.end())
 				{
 					vertex_map[vertex_hash] = cur_index_count;
-					indices.emplace_back(cur_index_count++);
+					submesh_indices[mat_index].emplace_back(cur_index_count);
+					indices.emplace_back(cur_index_count);
 					normals.emplace_back(n);
 					positions.emplace_back(p);
 					uv0s.emplace_back(uv);
 					vmin = Min(vmin, p);
 					vmax = Max(vmax, p);
+					++cur_index_count;
 				}
-				else indices.emplace_back(it->second);
+				else
+				{
+					indices.emplace_back(it->second);
+					submesh_indices[mat_index].emplace_back(it->second);
+				}
 			}
 		}
 
 		LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
-		mesh->Clear();
+		//mesh->Clear();
 		float aabb_space = 1.0f;
 		mesh->_bound_box._max = vmax + Vector3f::kOne * aabb_space;
 		mesh->_bound_box._min = vmin - Vector3f::kOne * aabb_space;
 		vertex_count = (u32)positions.size();
-		auto index_count = indices.size();
+		//auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;
-		mesh->_index_count = (u32)index_count;
+		//mesh->_index_count = (u32)index_count;
 		float* vertex_buf = new float[vertex_count * 3];
 		float* normal_buf = new float[vertex_count * 3];
 		float* uv0_buf = new float[vertex_count * 2];
-		u32* index_buf = new u32[index_count];
 		memcpy(uv0_buf, uv0s.data(), sizeof(Vector2f) * vertex_count);
 		memcpy(normal_buf, normals.data(), sizeof(Vector3f) * vertex_count);
 		memcpy(vertex_buf, positions.data(), sizeof(Vector3f) * vertex_count);
-		memcpy(index_buf, indices.data(), sizeof(u32) * index_count);
 		mesh->SetUVs(std::move(reinterpret_cast<Vector2f*>(uv0_buf)), 0u);
 		mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(normal_buf)));
 		mesh->SetVertices(std::move(reinterpret_cast<Vector3f*>(vertex_buf)));
-		mesh->SetIndices(std::move(reinterpret_cast<u32*>(index_buf)));
+
+		for (int i = 0; i < submesh_indices.size(); ++i)
+		{
+			auto& submesh_indices_i = submesh_indices[i];
+			u32 cur_indices_count = static_cast<u32>(submesh_indices_i.size());
+			u32* index_buf = new u32[cur_indices_count];
+			memcpy(index_buf, submesh_indices_i.data(), sizeof(u32) * cur_indices_count);
+			mesh->AddSubmesh(index_buf, cur_indices_count);
+		}
+		//mesh->SetIndices(std::move(reinterpret_cast<u32*>(index_buf)));
 		if (raw_bonei)
 		{
 			u32* bone_indices_buf = new u32[vertex_count * 4];
@@ -1005,7 +1082,6 @@ namespace Ailu
 			fbxsdk::FbxSystemUnit::cm.ConvertScene(_p_cur_fbx_scene, lConversionOptions);
 		}
 		FillPoseArray(_p_cur_fbx_scene, _fbx_poses);
-		//ParserFbxNode(fbx_rt, loaded_meshs);
 		Queue<FbxNode*> mesh_node, skeleton_node;
 		ParserFbxNode(fbx_rt, mesh_node, skeleton_node);
 		_cur_skeleton.Clear();//当前仅支持一个骨骼，所以清空之前的数据

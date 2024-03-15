@@ -5,6 +5,8 @@
 #include <immintrin.h> //simd
 #include <string>
 #include <limits>
+#include <chrono>
+#include <random>
 #include <format>
 #include <limits>
 #include <bitset>
@@ -1702,8 +1704,14 @@ namespace Ailu
 		{
 			inline std::size_t operator()(const Vector2f& v) const
 			{
-				std::size_t h1 = std::hash<float>{}(v.x);
-				std::size_t h2 = std::hash<float>{}(v.y);
+				// Generate random seeds
+				static std::random_device rd;
+				static std::mt19937 gen(rd());
+				std::uniform_int_distribution<std::size_t> dis;
+				std::size_t seed1 = dis(gen);
+				std::size_t seed2 = dis(gen);
+				std::size_t h1 = std::hash<float>{}(v.x) + seed1;
+				std::size_t h2 = std::hash<float>{}(v.y) + seed2;
 				return h1 ^ (h2 << 1);
 			}
 		};
@@ -1720,9 +1728,20 @@ namespace Ailu
 		{
 			inline std::size_t operator()(const Vector3f& v) const
 			{
-				std::size_t h1 = std::hash<float>{}(v.x);
-				std::size_t h2 = std::hash<float>{}(v.y);
-				std::size_t h3 = std::hash<float>{}(v.z);
+				// Generate random seeds
+				static std::random_device rd;
+				static std::mt19937 gen(rd());
+				std::uniform_int_distribution<std::size_t> dis;
+				std::size_t seed1 = dis(gen);
+				std::size_t seed2 = dis(gen);
+				std::size_t seed3 = dis(gen);
+
+				// Use more complex combination
+				std::size_t h1 = std::hash<float>{}(v.x) + seed1;
+				std::size_t h2 = std::hash<float>{}(v.y) + seed2;
+				std::size_t h3 = std::hash<float>{}(v.z) + seed3;
+
+				// Combine hashes
 				return h1 ^ (h2 << 1) ^ (h3 << 2);
 			}
 		};
@@ -1739,10 +1758,19 @@ namespace Ailu
 		{
 			inline std::size_t operator()(const Vector4f& v) const
 			{
-				std::size_t h1 = std::hash<float>{}(v.x);
-				std::size_t h2 = std::hash<float>{}(v.y);
-				std::size_t h3 = std::hash<float>{}(v.z);
-				std::size_t h4 = std::hash<float>{}(v.w);
+				// Generate random seeds
+				static std::random_device rd;
+				static std::mt19937 gen(rd());
+				std::uniform_int_distribution<std::size_t> dis;
+				std::size_t seed1 = dis(gen);
+				std::size_t seed2 = dis(gen);
+				std::size_t seed3 = dis(gen);
+				std::size_t seed4 = dis(gen);
+
+				std::size_t h1 = std::hash<float>{}(v.x) + seed1;
+				std::size_t h2 = std::hash<float>{}(v.y) + seed2;
+				std::size_t h3 = std::hash<float>{}(v.z) + seed3;
+				std::size_t h4 = std::hash<float>{}(v.w) + seed4;
 				return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
 			}
 		};

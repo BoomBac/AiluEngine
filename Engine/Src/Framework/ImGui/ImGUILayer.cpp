@@ -447,6 +447,7 @@ namespace Ailu
 					{
 						ImGui::Text(is_skined_comp ? "SkinedMesh" : "StaticMesh");
 						auto& mesh = static_mesh_comp->GetMesh();
+						ImGui::Text("    submesh: %d",mesh->SubmeshCount());
 						int mesh_count = 0;
 						static int s_mesh_selected_index = -1;
 						if (ImGui::BeginCombo("Select Mesh: ", mesh ? mesh->Name().c_str() : "missing"))
@@ -468,54 +469,75 @@ namespace Ailu
 						}
 					}
 				}
-				int mat_prop_index = 0;
-				auto mat = static_mesh_comp->GetMaterial();
-				ImGui::Text("Material: ");
-				int mat_count = 0;
-				static int s_mat_selected_index = -1;
-				if (ImGui::BeginCombo("Select Material: ", mat ? mat->Name().c_str() : "missing"))
+				//int mat_prop_index = 0;
+				auto& materials = static_mesh_comp->GetMaterials();
+				ImGui::Text("Material: %d", materials.size());
+				if(ImGui::Button("Add Material"))
 				{
-					for (auto it = MaterialLibrary::Begin(); it != MaterialLibrary::End(); it++)
-					{
-						if (ImGui::Selectable((*it)->Name().c_str(), s_mat_selected_index == mat_count))
-							s_mat_selected_index = mat_count;
-						if (s_mat_selected_index == mat_count)
-						{
-							static_mesh_comp->SetMaterial(*it);
-							g_pSceneMgr->MarkCurSceneDirty();
-						}
-						++mat_count;
-					}
-					ImGui::EndCombo();
-				}
-				if (mat)
+					static_mesh_comp->AddMaterial(nullptr);
+					g_pSceneMgr->MarkCurSceneDirty();
+				};
+				ImGui::SameLine();
+				if (ImGui::Button("Remove Material"))
 				{
-					int shader_count = 0;
-					static int s_shader_selected_index = -1;
-					if (ImGui::BeginCombo("Select Shader: ", mat->GetShader()->Name().c_str()))
+					static_mesh_comp->RemoveMaterial(materials.size() - 1);
+					g_pSceneMgr->MarkCurSceneDirty();
+				};
+				for (int i = 0; i < materials.size(); i++)
+				{
+					int mat_count = 0;
+					auto mat = materials[i];
+					static int s_mat_selected_index = -1;
+					ImGui::Text("  Material slot %d", i);
+					ImGui::SameLine();
+					String slot_label = std::format("{}: {}", i, mat ? mat->Name() : "Select Material");
+					if (ImGui::CollapsingHeader(slot_label.c_str()))
 					{
-						for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+						if (ImGui::BeginCombo("Select Material: ", mat ? mat->Name().c_str() : "missing"))
 						{
-							if (ImGui::Selectable((*it)->Name().c_str(), s_shader_selected_index == shader_count))
-								s_shader_selected_index = shader_count;
-							if (s_shader_selected_index == shader_count)
-								mat->ChangeShader(*it);
-							++shader_count;
+							for (auto it = MaterialLibrary::Begin(); it != MaterialLibrary::End(); it++)
+							{
+								if (ImGui::Selectable((*it)->Name().c_str(), s_mat_selected_index == mat_count))
+									s_mat_selected_index = mat_count;
+								if (s_mat_selected_index == mat_count)
+								{
+									static_mesh_comp->SetMaterial(*it,i);
+									g_pSceneMgr->MarkCurSceneDirty();
+								}
+								++mat_count;
+							}
+							ImGui::EndCombo();
 						}
-						ImGui::EndCombo();
-					}
-					if (mat->IsInternal())
-					{
-						DrawInternalStandardMaterial(mat.get(), selector_window);
-					}
-					else
-					{
-						for (auto& prop : mat->GetAllProperties())
+						if (mat)
 						{
-							DrawProperty(prop.second, mat.get(), selector_window);
+							int shader_count = 0;
+							static int s_shader_selected_index = -1;
+							if (ImGui::BeginCombo("Select Shader: ", mat->GetShader()->Name().c_str()))
+							{
+								for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+								{
+									if (ImGui::Selectable((*it)->Name().c_str(), s_shader_selected_index == shader_count))
+										s_shader_selected_index = shader_count;
+									if (s_shader_selected_index == shader_count)
+										mat->ChangeShader(*it);
+									++shader_count;
+								}
+								ImGui::EndCombo();
+							}
+							if (mat->IsInternal())
+							{
+								DrawInternalStandardMaterial(mat.get(), selector_window);
+							}
+							else
+							{
+								for (auto& prop : mat->GetAllProperties())
+								{
+									DrawProperty(prop.second, mat.get(), selector_window);
+								}
+							}
 						}
-					}
-				}
+					}				
+				}				
 				if (comp->GetType() == SkinedMeshComponent::GetStaticType())
 				{
 					auto sk_mesh_comp = static_cast<SkinedMeshComponent*>(comp);
