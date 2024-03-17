@@ -25,7 +25,7 @@ namespace Ailu
         return wideStr;
     }
 
-    static wchar_t* ToWChar(String str)
+    static wchar_t* ToWChar(const String& str)
     {
         auto multiByteStr = str.c_str();
         int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
@@ -48,6 +48,18 @@ namespace Ailu
         static char multiByteStr[256];
         WideCharToMultiByte(CP_UTF8, 0, wideStr, -1, multiByteStr, size, nullptr, nullptr);
         return multiByteStr;
+    }
+
+    static String ToChar(const WString& wideStr)
+    {
+        int size = WideCharToMultiByte(CP_UTF8, 0, wideStr.data(), -1, nullptr, 0, nullptr, nullptr);
+        if (size == 0 || size > 256) {
+            throw std::runtime_error("to nstring error!");
+            return "";
+        }
+        static char multiByteStr[256];
+        WideCharToMultiByte(CP_UTF8, 0, wideStr.data(), -1, multiByteStr, size, nullptr, nullptr);
+        return String{ multiByteStr };
     }
 
     namespace StringUtils

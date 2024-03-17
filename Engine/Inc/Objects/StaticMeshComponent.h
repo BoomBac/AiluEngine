@@ -30,14 +30,14 @@ namespace Ailu
 		inline Ref<Material>& GetMaterial(u16 slot = 0) { return _p_mats[slot]; };
 		inline Vector<Ref<Material>>& GetMaterials() { return _p_mats; };
 		inline Ref<Mesh>& GetMesh() { return _p_mesh; };
-		const std::tuple<Vector3f, Vector3f>& GetAABB() const
+		const AABB& GetAABB() const
 		{
 			return _aabb;
 		}
 	protected:
 		Ref<Mesh> _p_mesh;
 		Vector<Ref<Material>> _p_mats;
-		std::tuple<Vector3f, Vector3f> _aabb;
+		AABB _aabb;
 	protected:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;
 	};

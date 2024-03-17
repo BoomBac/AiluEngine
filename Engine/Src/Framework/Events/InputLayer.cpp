@@ -52,7 +52,7 @@ namespace Ailu
 		EventDispather dispater(e);
 		dispater.Dispatch<MouseScrollEvent>([this](MouseScrollEvent& e)->bool {
 			_camera_move_speed += e.GetOffsetY() > 0 ? 0.01f : -0.01f;
-			_camera_move_speed = max(0.0f, _camera_move_speed);
+			_camera_move_speed = std::ranges::max(0.0f, _camera_move_speed);
 			return true;
 			});
 		EventDispather dispater0(e);

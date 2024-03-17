@@ -68,6 +68,13 @@ namespace Ailu
 		void Show() final;
 	};
 
+	class RTDebugWindow : public ImguiWindow
+	{
+	public:
+		void Open(const int& handle) final;
+		void Show() final;
+	};
+
 	class AILU_API ImGUILayer : public Layer
 	{
 	public:
@@ -91,6 +98,7 @@ namespace Ailu
 		MeshBrowser _mesh_browser;
 		AssetBrowser _asset_browser;
 		AssetTable _asset_table;
+		RTDebugWindow _rt_view;
 	};
 }
 #pragma warning(pop)

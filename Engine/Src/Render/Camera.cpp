@@ -32,9 +32,29 @@ namespace Ailu
 		Gizmo::DrawLine(p_camera->_near_top_right, p_camera->_far_top_right, Colors::kWhite);
 		Gizmo::DrawLine(p_camera->_near_bottom_right, p_camera->_far_bottom_right, Colors::kWhite);
 		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, Colors::kWhite);
+		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, Colors::kWhite);
 
-		//Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Forward() * p_camera->Far(), Colors::kRed);
-		//Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->Up() * p_camera->Far(), Colors::kBlue);
+		//Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->_vf._planes[3]._normal * 200.0f, Colors::kWhite);
+	}
+
+	void Camera::CalcViewFrustumPlane(const Camera* cam, ViewFrustum& vf)
+	{
+		vf._planes[0]._normal = CrossProduct(cam->_near_top_left - cam->_near_bottom_left, cam->_near_bottom_right - cam->_near_bottom_left);
+		vf._planes[1]._normal = -vf._planes[0]._normal;
+		vf._planes[2]._normal = CrossProduct(cam->_far_top_left - cam->_near_top_left, cam->_near_top_right - cam->_near_top_left);
+		vf._planes[3]._normal = -CrossProduct(cam->_far_bottom_left - cam->_near_bottom_left, cam->_near_bottom_right - cam->_near_bottom_left);//bottom
+		vf._planes[4]._normal = CrossProduct(cam->_far_bottom_left - cam->_near_bottom_left, cam->_near_top_left - cam->_near_bottom_left);
+		vf._planes[5]._normal = -CrossProduct(cam->_far_bottom_right - cam->_near_bottom_right, cam->_near_top_right - cam->_near_bottom_right);
+		for (int i = 0; i < 6; ++i)
+		{
+			vf._planes[i]._normal = Normalize(vf._planes[i]._normal);
+		}
+		vf._planes[0]._distance = -DotProduct(vf._planes[0]._normal, cam->_near_top_left);
+		vf._planes[1]._distance = -DotProduct(vf._planes[1]._normal, cam->_far_top_left);
+		vf._planes[2]._distance = -DotProduct(vf._planes[2]._normal, cam->_far_top_left);
+		vf._planes[3]._distance = -DotProduct(vf._planes[3]._normal, cam->_near_bottom_left);
+		vf._planes[4]._distance = -DotProduct(vf._planes[4]._normal, cam->_far_bottom_left);
+		vf._planes[5]._distance = -DotProduct(vf._planes[5]._normal, cam->_far_bottom_right);
 	}
 
 	Camera::Camera() : Camera(16.0F / 9.0F)
@@ -42,7 +62,7 @@ namespace Ailu
 	}
 
 	Camera::Camera(float aspect, float near_clip, float far_clip, ECameraType::ECameraType camera_type) :
-		_aspect(aspect), _near_clip(near_clip), _far_clip(far_clip), _camera_type(camera_type),_fov_h(60.0f),
+		_aspect(aspect), _near_clip(near_clip), _far_clip(far_clip), _camera_type(camera_type), _fov_h(60.0f),
 		_forward(Vector3f::kForward), _right(Vector3f::kRight), _up(Vector3f::kUp)
 	{
 		IMPLEMENT_REFLECT_FIELD(Camera);
@@ -82,7 +102,7 @@ namespace Ailu
 	{
 		_forward = direction;
 		_right = CrossProduct(up, _forward);
-		_up = CrossProduct(_forward,_right);
+		_up = CrossProduct(_forward, _right);
 		_forward = Normalize(_forward);
 		_right = Normalize(_right);
 		_up = Normalize(_up);
@@ -119,7 +139,7 @@ namespace Ailu
 			half_width = _size * 0.5f;
 			half_height = half_width / _aspect;
 		}
-		Vector3f near_top_left(-half_width, half_height,_near_clip);
+		Vector3f near_top_left(-half_width, half_height, _near_clip);
 		Vector3f near_top_right(half_width, half_height, _near_clip);
 		Vector3f near_bottom_left(-half_width, -half_height, _near_clip);
 		Vector3f near_bottom_right(half_width, -half_height, _near_clip);
@@ -161,6 +181,7 @@ namespace Ailu
 		_far_bottom_right = far_bottom_right;
 		_far_top_left = far_top_left;
 		_far_top_right = far_top_right;
+		CalcViewFrustumPlane(this, _vf);
 	}
 
 	//---------------------------------------------------------FirstPersonCameraController--------------------------------------------------------
@@ -173,7 +194,7 @@ namespace Ailu
 
 	FirstPersonCameraController::FirstPersonCameraController(Camera* camera) : _p_camera(camera)
 	{
-		
+
 	}
 	void FirstPersonCameraController::Attach(Camera* camera)
 	{
@@ -206,7 +227,7 @@ namespace Ailu
 	void FirstPersonCameraController::TurnHorizontal(float angle)
 	{
 		_rotation.y = angle;
-		_rot_world_y = Quaternion::AngleAxis(angle,Vector3f::kUp);
+		_rot_world_y = Quaternion::AngleAxis(angle, Vector3f::kUp);
 	}
 	void FirstPersonCameraController::TurnVertical(float angle)
 	{

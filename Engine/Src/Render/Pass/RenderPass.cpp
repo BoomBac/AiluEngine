@@ -9,7 +9,7 @@
 namespace Ailu
 {
 	//-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
-	OpaquePass::OpaquePass() : _name("OpaquePass")
+	OpaquePass::OpaquePass() : RenderPass("OpaquePass")
 	{
 
 	}
@@ -30,7 +30,7 @@ namespace Ailu
 			for (auto& obj : RenderQueue::GetOpaqueRenderables())
 			{
 				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index,obj._instance_count);
+				cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
 				++obj_index;
 			}
 		}
@@ -41,7 +41,7 @@ namespace Ailu
 			for (auto& obj : RenderQueue::GetOpaqueRenderables())
 			{
 				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj.GetMesh(), wireframe_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index,obj._instance_count);
+				cmd->DrawRenderer(obj.GetMesh(), wireframe_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
 				++obj_index;
 			}
 		}
@@ -57,7 +57,7 @@ namespace Ailu
 	//-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
 
 	//-------------------------------------------------------------ReslovePass-------------------------------------------------------------
-	ResolvePass::ResolvePass(Ref<RenderTexture>& source) : _name("ReslovePass")
+	ResolvePass::ResolvePass(Ref<RenderTexture>& source) : RenderPass("ReslovePass")
 	{
 		_p_src_color = source;
 		_backbuf_rect = Rect(0, 0, 1600, 900);
@@ -88,10 +88,10 @@ namespace Ailu
 	//-------------------------------------------------------------ReslovePass-------------------------------------------------------------
 
 	//-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
-	ShadowCastPass::ShadowCastPass() : _name("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize })
+	ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize })
 	{
 		_p_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainShadowMap", EALGFormat::kALGFormatD24S8_UINT);
-		_p_shadowcast_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Get("DepthOnly"), "ShadowCast");
+		_p_shadowcast_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDepthOnly), "ShadowCast");
 	}
 
 	void ShadowCastPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
@@ -105,7 +105,7 @@ namespace Ailu
 		u32 obj_index = 0u;
 		for (auto& obj : RenderQueue::GetOpaqueRenderables())
 		{
-			cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index,obj._instance_count);
+			cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
 		}
 		Shader::SetGlobalTexture("MainLightShadowMap", _p_shadow_map.get());
 		context->ExecuteCommandBuffer(cmd);
@@ -123,7 +123,7 @@ namespace Ailu
 
 	//-------------------------------------------------------------CubeMapGenPass-------------------------------------------------------------
 
-	CubeMapGenPass::CubeMapGenPass(u16 size, String texture_name, String src_texture_name) : _name("CubeMapGenPass"), _rect(Rect{ 0,0,size,size })
+	CubeMapGenPass::CubeMapGenPass(u16 size, String texture_name, String src_texture_name) : RenderPass("CubeMapGenPass"), _rect(Rect{ 0,0,size,size })
 	{
 		float x = 0.f, y = 0.f, z = 0.f;
 		Vector3f center = { x,y,z };
@@ -201,6 +201,83 @@ namespace Ailu
 	void CubeMapGenPass::EndPass(GraphicsContext* context)
 	{
 	}
-
 	//-------------------------------------------------------------CubeMapGenPass-------------------------------------------------------------
+
+	//-------------------------------------------------------------DeferedGeometryPass-------------------------------------------------------------
+	DeferredGeometryPass::DeferredGeometryPass(u16 width, u16 height) : RenderPass("DeferedGeometryPass")
+	{
+		_gbuffers.resize(3);
+		_gbuffers[0] = RenderTexture::Create(width, height, "DeferredNormal", EALGFormat::kALGFormatR16G16_FLOAT);
+		_gbuffers[1] = RenderTexture::Create(width, height, "DeferredAlbedo", EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		_gbuffers[2] = RenderTexture::Create(width, height, "DeferredNormal", EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		_p_lighting_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/deferred_lighting.hlsl", "DeferredLightingVSMain", "DeferredLightingPSMain"), "DeferedGbufferLighting");
+		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
+		for (int i = 0; i < _rects.size(); i++)
+			_rects[i] = Rect(0, 0, width, height);
+	}
+	void DeferredGeometryPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
+	{
+		auto cmd = CommandBufferPool::Get();
+		cmd->SetRenderTargets(_gbuffers, rendering_data._p_camera_depth_target);
+		cmd->ClearRenderTarget(_gbuffers, rendering_data._p_camera_depth_target, Colors::kBlack, 1.0f);
+		cmd->SetViewports({ _rects[0],_rects[1],_rects[2] });
+		cmd->SetScissorRects({ _rects[0],_rects[1],_rects[2] });
+
+		u32 obj_index = 0;
+		for (auto& obj : RenderQueue::GetOpaqueRenderables())
+		{
+			memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+			auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
+			if (ret != 0)
+			{
+				//LOG_WARNING("DeferredGeometryPass mesh {} not draw",obj.GetMesh()->Name());
+			}
+			else
+				++obj_index;
+		}
+		_p_lighting_material->SetTexture("_GBuffer0", _gbuffers[0]);
+		_p_lighting_material->SetTexture("_GBuffer1", _gbuffers[1]);
+		_p_lighting_material->SetTexture("_GBuffer2", _gbuffers[2]);
+		_p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._p_camera_depth_target);
+		cmd->SetRenderTarget(rendering_data._p_camera_color_target);
+		cmd->ClearRenderTarget(rendering_data._p_camera_color_target, Colors::kBlack);
+		cmd->SetViewport(rendering_data._viewport);
+		cmd->SetScissorRect(rendering_data._scissor_rect);
+		cmd->DrawRenderer(_p_quad_mesh.get(), _p_lighting_material.get(), 1);
+		context->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
+	}
+	void DeferredGeometryPass::BeginPass(GraphicsContext* context)
+	{
+	}
+	void DeferredGeometryPass::EndPass(GraphicsContext* context)
+	{
+	}
+	//-------------------------------------------------------------DeferedGeometryPass-------------------------------------------------------------
+
+
+	//-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
+	SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
+	{
+		_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.hlsl"), "SkyboxPP");
+		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
+	}
+	void SkyboxPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
+	{
+		auto cmd = CommandBufferPool::Get();
+		cmd->Clear();
+		cmd->SetViewport(rendering_data._viewport);
+		cmd->SetScissorRect(rendering_data._scissor_rect);
+		cmd->SetRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target);
+		cmd->DrawRenderer(_p_quad_mesh.get(), _p_skybox_material.get(), 1);
+		context->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
+	}
+	void SkyboxPass::BeginPass(GraphicsContext* context)
+	{
+	}
+	void SkyboxPass::EndPass(GraphicsContext* context)
+	{
+	}
+	//-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
 }

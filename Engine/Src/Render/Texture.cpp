@@ -144,7 +144,9 @@ namespace Ailu
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			return MakeRef<D3DRenderTexture>(width, height, name, 1, format, is_cubemap);
+			auto rt = MakeRef<D3DRenderTexture>(width, height, name, 1, format, is_cubemap);
+			s_all_render_texture.emplace_back(rt);
+			return rt;
 		}
 		}
 		AL_ASSERT(false, "Unsupport render api!");

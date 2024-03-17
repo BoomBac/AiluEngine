@@ -24,16 +24,17 @@ namespace Ailu
 
 	struct ShaderPropertyType
 	{
-		inline static std::string Vector = "Vector";
-		inline static std::string Float = "Float";
-		inline static std::string Color = "Color";
-		inline static std::string Texture2D = "Texture2D";
-		inline static std::string CubeMap = "CubeMap";
+		inline static String Vector = "Vector";
+		inline static String Float = "Float";
+		inline static String Uint = "Uint";
+		inline static String Color = "Color";
+		inline static String Texture2D = "Texture2D";
+		inline static String CubeMap = "CubeMap";
 	};
 
 	struct ShaderBindResourceInfo
 	{
-		inline const static std::set<std::string> s_reversed_res_name
+		inline const static std::set<String> s_reversed_res_name
 		{
 			"SceneObjectBuffer",
 			"_MatrixWorld",
@@ -58,13 +59,14 @@ namespace Ailu
 			u32 _cbuf_member_offset;
 		};
 		u8 _bind_slot;
-		std::string _name;
+		String _name;
 		void* _p_res = nullptr;
 		ShaderBindResourceInfo() = default;
-		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, u8 bind_slot, const std::string& name)
+		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, u8 bind_slot, const String& name)
 			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
 		{
-			if (res_type == EBindResDescType::kCBufferAttribute) _cbuf_member_offset = slot_or_offset;	
+			if (res_type & EBindResDescType::kCBufferAttribute) 
+				_cbuf_member_offset = slot_or_offset;
 			else _res_slot = slot_or_offset;
 		}
 		bool operator==(const ShaderBindResourceInfo& other) const
@@ -78,7 +80,7 @@ namespace Ailu
 	{
 		std::size_t operator()(const ShaderBindResourceInfo& info) const
 		{
-			return std::hash<std::string>{}(info._name);
+			return std::hash<String>{}(info._name);
 		}
 	};
 
@@ -158,7 +160,7 @@ namespace Ailu
 		DECLARE_PRIVATE_PROPERTY(id, ID, u16)
 		friend class Material;
 	public:
-		static Ref<Shader> Create(const std::string& file_name,String vert_entry = "", String pixel_entry = "");
+		static Ref<Shader> Create(const String& file_name,String vert_entry = "", String pixel_entry = "");
 		static void SetGlobalTexture(const String& name, Texture* texture);
 		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
 		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
@@ -175,7 +177,7 @@ namespace Ailu
 		const i8& GetPerMatBufferBindSlot() const {return _per_mat_buf_bind_slot;}
 		const i8& GetPerFrameBufferBindSlot() const {return _per_frame_buf_bind_slot;}
 		const i8& GetPrePassBufferBindSlot() const  {return _per_pass_buf_bind_slot;}
-		const u32& ActualID() const {return _actual_id;}
+		const bool IsCompileError() const {return _is_compile_error;}
 
 		const VertexInputLayout& PipelineInputLayout() const { return _pipeline_input_layout; };
 		const RasterizerState& PipelineRasterizerState() const { return _pipeline_raster_state; };
@@ -193,28 +195,27 @@ namespace Ailu
 		Vector<class Material*> GetAllReferencedMaterials();
 		void AddMaterialRef(class Material* mat);
 		void RemoveMaterialRef(class Material* mat);
-		const std::unordered_map<std::string, ShaderBindResourceInfo>& GetBindResInfo() {return	_bind_res_infos;}
+		const std::unordered_map<String, ShaderBindResourceInfo>& GetBindResInfo() {return	_bind_res_infos;}
 		const List<ShaderPropertyInfo>& GetShaderPropertyInfos() {return _shader_prop_infos;}
 	protected:
 		virtual bool RHICompileImpl();
 	protected:
-		inline static bool _b_init_buffer = false;
 		inline static u8* _p_cbuffer = nullptr;
 		inline static u16 _s_global_shader_id = 0u;
 		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
 		String _vert_entry, _pixel_entry;
 		u8 _vertex_input_num = 0u;
 		String _src_file_path;
-		u32 _actual_id;
 		i8 _per_mat_buf_bind_slot = -1;
 		i8 _per_frame_buf_bind_slot = -1;
 		i8 _per_pass_buf_bind_slot = -1;
+		bool _is_compile_error;
 		VertexInputLayout _pipeline_input_layout;
 		RasterizerState _pipeline_raster_state;
 		DepthStencilState _pipeline_ds_state;
 		ETopology _pipeline_topology;
 		BlendState _pipeline_blend_state;
-		std::unordered_map<std::string, ShaderBindResourceInfo> _bind_res_infos{};
+		std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
 		std::map<String, Vector<String>> _keywords;
 		std::map<String, std::tuple<u8, u8>> _keywords_ids;
 		std::set<uint64_t> _shader_variant;
@@ -234,13 +235,18 @@ namespace Ailu
 #define VAILD_SHADER_ID(id) id != ShaderLibrary::s_error_id
 		friend class Shader;
 	public:
-		static Ref<Shader> Get(std::string shader_name)
+		inline static const struct
 		{
-			u32 shader_id = NameToId(shader_name);
+			inline static const String kDepthOnly = "Shaders/depth_only.hlsl__";
+			inline static const String kDeferredStandardLit = "Shaders/defered_standard_lit.hlsl__";
+		} kInternalShaderStringID;
+		static Ref<Shader> Get(String string_id)
+		{
+			u32 shader_id = NameToId(string_id);
 			if (VAILD_SHADER_ID(shader_id)) return s_shader_library.find(shader_id)->second;
 			else
 			{
-				LOG_ERROR("Shader: {} dont's exist in ShaderLibrary!", shader_name);
+				LOG_ERROR("Shader: {} dont's exist in ShaderLibrary!", string_id);
 				return nullptr;
 			}
 		}
@@ -255,13 +261,13 @@ namespace Ailu
 			}
 		}
 
-		static bool Exist(const std::string& name)
+		static bool Exist(const String& name)
 		{
 			return NameToId(name) != s_error_id;
 		}
-		static std::string GetShaderPath(const std::string& name)
+		static String GetShaderPath(u32 shader_id)
 		{
-			auto it = s_shader_path.find(name);
+			auto it = s_shader_path.find(shader_id);
 			return it == s_shader_path.end() ? "" : it->second;
 		}
 		static Ref<Shader> Add(const String& sys_path, const String& name)
@@ -313,24 +319,30 @@ float4 PSMain(PSInput input) : SV_TARGET
 			out.close();
 			return Load(sys_path);
 		}
-		static void Add(const String& name, Ref<Shader> shader)
+		//string_id: path_vs_ps
+		static void Add(const String& string_id, Ref<Shader> shader)
 		{
-			s_shader_name.insert(std::make_pair(name, shader->ID()));
+			s_shader_name.insert(std::make_pair(string_id, shader->ID()));
 			s_shader_library.insert(std::make_pair(shader->ID(), shader));
 			s_shaders.emplace_back(shader);
 		}
-		static Ref<Shader> Load(const std::string& path)
+
+		static Ref<Shader> Load(const String& path,const String vs_entry = "", const String ps_entry = "")
 		{
-			auto sys_path = PathUtils::IsSystemPath(path)? path : PathUtils::GetResSysPath(path);
-			auto name = PathUtils::GetFileName(sys_path);
-			if (Exist(name)) return s_shader_library.find(NameToId(name))->second;
+			auto sys_path = PathUtils::IsSystemPath(path) ? path : PathUtils::GetResSysPath(path);
+			String string_id = path + "_" + vs_entry + "_" + ps_entry;
+			if (Exist(string_id)) 
+				return s_shader_library.find(NameToId(string_id))->second;
 			else
 			{
-				s_shader_path.insert(std::make_pair(name, path));
-				return Shader::Create(sys_path);
+				auto shader = Shader::Create(sys_path, vs_entry, ps_entry);
+				s_shader_path.insert(std::make_pair(shader->ID(), path));
+				Add(string_id, shader);
+				return shader;
 			}
 		}
-		inline static u32 NameToId(const std::string& name)
+
+		inline static u32 NameToId(const String& name)
 		{
 			auto it = s_shader_name.find(name);
 			if (it != s_shader_name.end()) return it->second;
@@ -348,9 +360,9 @@ float4 PSMain(PSInput input) : SV_TARGET
 		inline static u32 s_shader_id = 0u;
 		inline static u32 s_error_id = 9999u;
 		inline static std::unordered_map<u32, Ref<Shader>> s_shader_library;
-		inline static Vector<Ref<Shader>> s_shaders;
-		inline static std::unordered_map<std::string, u32> s_shader_name;
-		inline static std::unordered_map<std::string, std::string> s_shader_path;
+		inline static Vector<Ref<Shader>> s_shaders; //just for imgui iterator
+		inline static std::unordered_map<String, u32> s_shader_name;
+		inline static std::unordered_map<u32, String> s_shader_path;
 	};
 
 	class ComputeShader

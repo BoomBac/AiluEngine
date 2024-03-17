@@ -504,10 +504,8 @@
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
     <ClInclude Include="Inc\Framework\Interface\IParser.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
-    <ClInclude Include="Inc\Framework\Math\AABB.h">
-      <FileType>Document</FileType>
-    </ClInclude>
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
+    <ClInclude Include="Inc\Framework\Math\Geometry.h" />
     <ClInclude Include="Inc\Framework\Math\Guid.h" />
     <ClInclude Include="Inc\Framework\Math\Random.h" />
     <ClInclude Include="Inc\Framework\Math\Transform.h" />
@@ -540,6 +538,7 @@
     <ClInclude Include="Inc\Render\Material.h" />
     <ClInclude Include="Inc\Render\Mesh.h" />
     <ClInclude Include="Inc\Render\Pass\PostprocessPass.h" />
+    <ClInclude Include="Inc\Render\Pass\SSAO.h" />
     <ClInclude Include="Inc\Render\PipelineState.h" />
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\Render\RendererAPI.h" />
@@ -556,7 +555,7 @@
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DTexture.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
-    <None Include="Res\Shaders\blit.shader" />
+    <None Include="Res\Shaders\blit.hlsl" />
     <None Include="Res\Shaders\lighting.hlsli">
       <FileType>Document</FileType>
     </None>
@@ -619,6 +618,7 @@
     <ClCompile Include="Src\Render\Material.cpp" />
     <ClCompile Include="Src\Render\Mesh.cpp" />
     <ClCompile Include="Src\Render\Pass\PostprocessPass.cpp" />
+    <ClCompile Include="Src\Render\Pass\SSAO.cpp" />
     <ClCompile Include="Src\Render\PipelineState.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\Render\Pass\RenderPass.cpp" />
@@ -637,11 +637,6 @@
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Res\Shaders\shaders.hlsl">
-      <FileType>Document</FileType>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <None Include="Res\Shaders\gizmo.hlsl">
@@ -679,9 +674,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Res\Shaders\bone_test.hlsl">
-      <FileType>Document</FileType>
-    </None>
     <None Include="Res\Shaders\cubemap_gen.hlsl">
       <FileType>Document</FileType>
     </None>
@@ -695,6 +687,11 @@
       <FileType>Document</FileType>
     </None>
     <None Include="Res\Shaders\wireframe.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Res\Shaders\deferred_shading.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

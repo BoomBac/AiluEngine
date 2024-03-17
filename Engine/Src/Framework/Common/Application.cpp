@@ -12,6 +12,7 @@
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Render/GraphicsContext.h"
+#include "Render/Renderer.h"
 
 namespace Ailu
 {
@@ -19,46 +20,57 @@ namespace Ailu
 	SceneMgr* g_pSceneMgr = new SceneMgr();
 	ResourceMgr* g_pResourceMgr = new ResourceMgr();
 	LogMgr* g_pLogMgr = new LogMgr();
-	Scope<ThreadPool> g_thread_pool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
+	Renderer* g_pRenderer = new Renderer();
+	Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
 
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
 	int Application::Initialize()
 	{
-		AL_ASSERT(sp_instance,"Application already init!")
-		sp_instance = this;
+		AL_ASSERT(sp_instance, "Application already init!")
+			sp_instance = this;
 		g_pLogMgr->Initialize();
 		g_pLogMgr->AddAppender(new FileAppender());
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		g_pTimeMgr->Initialize();
+		_layer_stack = new LayerStack();
 #ifdef DEAR_IMGUI
 		_p_imgui_layer = new ImGUILayer();
 		PushLayer(_p_imgui_layer);
 #endif // DEAR_IMGUI
 		GraphicsContext::InitGlobalContext();
+		g_pLogMgr->Log("Begin init resource mgr...");
+		g_pTimeMgr->Mark();
 		g_pResourceMgr->Initialize();
+		g_pLogMgr->LogFormat("Resource mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
+		g_pLogMgr->Log("Begin init scene mgr...");
+		g_pTimeMgr->Mark();
 		g_pSceneMgr->Initialize();
-		_p_renderer = new Renderer();
-		_p_renderer->Initialize();
+		g_pLogMgr->LogFormat("Scene mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
+		g_pLogMgr->Log("Begin init renderer...");
+		g_pTimeMgr->Mark();
+		g_pRenderer->Initialize();
+		g_pLogMgr->LogFormat("Renderer init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
 		_p_input_layer = new InputLayer();
 		PushLayer(_p_input_layer);
 		_p_scene_layer = new SceneLayer();
 		PushLayer(_p_scene_layer);
-		_b_running = true;
-		SetThreadDescription(GetCurrentThread(),L"ALEngineMainThread");
-		g_pTimeMgr->Mark();
-		g_pLogMgr->Log("Init end");
+		SetThreadDescription(GetCurrentThread(), L"ALEngineMainThread");
+		g_pLogMgr->Log("Application Init end");
+		_state = EApplicationState::EApplicationState_Running;
 		return 0;
 	}
 	void Application::Finalize()
 	{
+		DESTORY_PTR(_layer_stack);
 		DESTORY_PTR(_p_window);
 		g_pResourceMgr->Finalize();
 		g_pSceneMgr->Finalize();
 		DESTORY_PTR(g_pSceneMgr);
 		DESTORY_PTR(g_pResourceMgr);
-		_p_renderer->Finalize();
-		DESTORY_PTR(_p_renderer)
+		g_pRenderer->Finalize();
+		DESTORY_PTR(g_pRenderer);
+		GraphicsContext::FinalizeGlobalContext();
 		g_pTimeMgr->Finalize();
 		DESTORY_PTR(g_pTimeMgr);
 		g_pLogMgr->Finalize();
@@ -78,40 +90,48 @@ namespace Ailu
 	constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
 	void Application::Tick(const float& delta_time)
 	{
-		while (_b_running)
+		while (_state != EApplicationState::EApplicationState_Exit)
 		{
-			g_pTimeMgr->Tick(0.0f);
-			auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
-			render_lag += last_mark;
-			update_lag += last_mark;
-			g_pTimeMgr->Mark();
-			for (Layer* layer : _layer_stack)
-				layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
-			_p_window->OnUpdate();
-			g_pResourceMgr->Tick(delta_time);
-			while (render_lag > kMsPerRender)
+			if (_state == EApplicationState::EApplicationState_Pause)
 			{
-				g_pSceneMgr->Tick(delta_time);
+				_p_window->OnUpdate();
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			}
+			else
+			{
+				g_pTimeMgr->Tick(0.0f);
+				auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
+				render_lag += last_mark;
+				update_lag += last_mark;
+				g_pTimeMgr->Mark();
+				for (Layer* layer : *_layer_stack)
+					layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
+				_p_window->OnUpdate();
+				g_pResourceMgr->Tick(delta_time);
+				while (render_lag > kMsPerRender)
+				{
+					g_pSceneMgr->Tick(delta_time);
 #ifdef DEAR_IMGUI
-				_p_imgui_layer->Begin();
-				for (Layer* layer : _layer_stack)
-					layer->OnImguiRender();
-				_p_imgui_layer->End();
+					_p_imgui_layer->Begin();
+					for (Layer* layer : *_layer_stack)
+						layer->OnImguiRender();
+					_p_imgui_layer->End();
 #endif // DEAR_IMGUI
-				_p_renderer->Tick(delta_time);
-				render_lag -= kMsPerRender;
+					g_pRenderer->Tick(delta_time);
+					render_lag -= kMsPerRender;
+				}
 			}
 		}
 		g_pLogMgr->Log("Exit");
 	}
 	void Application::PushLayer(Layer* layer)
 	{
-		_layer_stack.PushLayer(layer);
+		_layer_stack->PushLayer(layer);
 		layer->OnAttach();
 	}
 	void Application::PushOverLayer(Layer* layer)
 	{
-		_layer_stack.PushOverLayer(layer);
+		_layer_stack->PushOverLayer(layer);
 		layer->OnAttach();
 	}
 	Application* Application::GetInstance()
@@ -120,13 +140,26 @@ namespace Ailu
 	}
 	bool Application::OnWindowClose(WindowCloseEvent& e)
 	{
-		_b_running = false;
-		return _b_running;
+		_state = EApplicationState::EApplicationState_Exit;
+		return false;
 	}
 	bool Application::OnLostFoucus(WindowLostFocusEvent& e)
 	{
-		_layer_stack.PopLayer(_p_input_layer);
+		_layer_stack->PopLayer(_p_input_layer);
 		return true;
+	}
+	bool Application::OnWindowMinimize(WindowMinimizeEvent& e)
+	{
+		_state = EApplicationState::EApplicationState_Pause;
+		LOG_WARNING("Application state: {}",EApplicationState::ToString(_state))
+		return false;
+	}
+	bool Application::OnWindowResize(WindowResizeEvent& e)
+	{
+		if (_state == EApplicationState::EApplicationState_Pause)
+			_state = EApplicationState::EApplicationState_Running;
+		LOG_WARNING("Application state: {}", EApplicationState::ToString(_state))
+		return false;
 	}
 	bool Application::OnDragFile(DragFileEvent& e)
 	{
@@ -136,7 +169,8 @@ namespace Ailu
 
 	bool Application::OnGetFoucus(WindowFocusEvent& e)
 	{
-		_layer_stack.PushLayer(_p_input_layer);
+		_state = EApplicationState::EApplicationState_Running;
+		_layer_stack->PushLayer(_p_input_layer);
 		return true;
 	}
 	void Application::OnEvent(Event& e)
@@ -146,13 +180,15 @@ namespace Ailu
 		dispather.Dispatch<WindowFocusEvent>(BIND_EVENT_HANDLER(OnGetFoucus));
 		dispather.Dispatch<WindowLostFocusEvent>(BIND_EVENT_HANDLER(OnLostFoucus));
 		dispather.Dispatch<DragFileEvent>(BIND_EVENT_HANDLER(OnDragFile));
-//		dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseBtnClicked));
-		//static bool b_handle_input = true;
-		//if (e.GetEventType() == EEventType::kWindowLostFocus) b_handle_input = false;
-		//else if (e.GetEventType() == EEventType::kWindowFocus) b_handle_input = true;
-		//if (!b_handle_input) return;
+		dispather.Dispatch<WindowMinimizeEvent>(BIND_EVENT_HANDLER(OnWindowMinimize));
+		dispather.Dispatch<WindowResizeEvent>(BIND_EVENT_HANDLER(OnWindowResize));
+		//		dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseBtnClicked));
+				//static bool b_handle_input = true;
+				//if (e.GetEventType() == EEventType::kWindowLostFocus) b_handle_input = false;
+				//else if (e.GetEventType() == EEventType::kWindowFocus) b_handle_input = true;
+				//if (!b_handle_input) return;
 
-		for (auto it = _layer_stack.end(); it != _layer_stack.begin();)
+		for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
 		{
 			(*--it)->OnEvent(e);
 			if (e.Handled()) break;

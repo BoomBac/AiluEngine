@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include <limits>
+#include <dxgidebug.h>
 #include "Framework/Common/Log.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
@@ -56,6 +57,7 @@ namespace Ailu
 	D3DContext::~D3DContext()
 	{
 		Destroy();
+		LOG_INFO("D3DContext Destroy");
 	}
 
 	void D3DContext::Init()
@@ -141,7 +143,7 @@ namespace Ailu
 		return std::make_tuple(cpu_handle, gpu_handle);
 	}
 
-	void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer>& cmd)
+	u64 D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer>& cmd)
 	{    
 		//for (auto& call : cmd->GetAllCommands())
 		//{
@@ -156,6 +158,7 @@ namespace Ailu
 			_cmd_target_fence_value[cmd->GetID()] = _fence_value;
 		else
 			_cmd_target_fence_value.insert(std::make_pair(cmd->GetID(), _fence_value));
+		return _fence_value;
 	}
 
 	void D3DContext::BeginBackBuffer(CommandBuffer* cmd)
@@ -189,8 +192,27 @@ namespace Ailu
 		// Ensure that the GPU is no longer referencing resources that are about to be
 // cleaned up by the destructor.
 		WaitForGpu();
-
 		CloseHandle(m_fenceEvent);
+		//m_swapChain.Reset();
+		//m_device.Reset();
+		//for(int i = 0; i < RenderConstants::kFrameCount; ++i)
+		//{
+		//	_color_buffer[i].Reset();
+		//	_depth_buffer[i].Reset();
+		//	m_commandAllocators[i].Reset();
+		//}
+		//m_commandQueue.Reset();
+		//m_commandList.Reset();
+		//m_rtvHeap.Reset();
+		//m_cbvHeap.Reset();
+		//m_dsvHeap.Reset();
+		// 在程序终止时调用 ReportLiveObjects() 函数
+		IDXGIDebug1* pDebug = nullptr;
+		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
+		{
+			pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_SUMMARY);
+			pDebug->Release();
+		}
 	}
 
 	void D3DContext::LoadPipeline()
@@ -339,14 +361,14 @@ namespace Ailu
 	void D3DContext::FlushCommandQueue(ID3D12CommandQueue* cmd_queue, ID3D12Fence* fence, u64& fence_value)
 	{
 		++fence_value;
-		g_pTimeMgr->Mark();
+		_timer.Mark();
 		ThrowIfFailed(cmd_queue->Signal(fence,fence_value));
 		if (fence->GetCompletedValue() < fence_value)
 		{
 			ThrowIfFailed(fence->SetEventOnCompletion(fence_value, m_fenceEvent));
 			WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 		}
-		RenderingStates::s_gpu_latency = g_pTimeMgr->GetElapsedSinceLastMark();
+		RenderingStates::s_gpu_latency = _timer.GetElapsedSinceLastMark();
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	}
 

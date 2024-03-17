@@ -63,14 +63,15 @@ namespace Ailu
 				stbi_image_free(data);
 			}
 			Vector<u8*> mipmaps{ new_data };
-			mip_level = 1;
+			u8 all_mip_level = 1;
 			int size = x;
 			while (size)
 			{
 				size >>= 1;
-				mip_level++;
+				all_mip_level++;
 			}
-			mip_level = mip_level > 9 ? 9 : mip_level;
+			all_mip_level = min(all_mip_level,9);
+			mip_level = min(mip_level, all_mip_level);
 			for (int i = 0; i < mip_level - 1; i++)
 			{
 				mipmaps.emplace_back(TextureUtils::DownSample(mipmaps.back(), x >> i, y >> i, 4));

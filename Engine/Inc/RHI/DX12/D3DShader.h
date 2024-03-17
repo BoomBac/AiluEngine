@@ -137,7 +137,7 @@ namespace Ailu
 		static D3D12_DEPTH_STENCIL_DESC ConvertToD3D12DepthStencilDesc(const DepthStencilState& state)
 		{
 			auto ds_state = CD3DX12_DEPTH_STENCIL_DESC(CD3DX12_DEFAULT{});
-			ds_state.DepthEnable = state._b_depth_write && state._depth_test_func != ECompareFunc::kAlways;
+			ds_state.DepthEnable = state._depth_test_func != ECompareFunc::kAlways && state._depth_test_func != ECompareFunc::kNever;
 			switch (state._depth_test_func)
 			{
 			case ECompareFunc::kLess: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_LESS; break;
@@ -150,6 +150,7 @@ namespace Ailu
 			case ECompareFunc::kNotEqual: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_NOT_EQUAL; break;
 			}
 			ds_state.StencilEnable = state._b_front_stencil;
+			ds_state.DepthWriteMask = state._b_depth_write ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
 			return ds_state;
 		}
 

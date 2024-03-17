@@ -1,0 +1,20 @@
+guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+type: material
+name: StandardPBR
+shader_path: Shaders/defered_standard_lit.hlsl
+  prop_type: Uint
+    SamplerMask: 0
+  prop_type: Float
+    MetallicValue: 0
+    RoughnessValue: 1
+  prop_type: Vector
+    SpecularColor: 0,0,0,0
+    BaseColor: 1,1,1,0
+    EmssiveColor: 0,0,0,0
+  prop_type: Texture2D
+    Specular: none
+    Metallic: none
+    Albedo: none
+    Normal: none
+    Emssive: none
+    Roughness: none

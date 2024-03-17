@@ -139,13 +139,14 @@ namespace Ailu
 			}
 			obj.Hash(static_cast<u8>(_s_data.size()));
 			_s_data.push_back(obj);
-			return static_cast<u8>(_s_data.size() - 1);
+			return static_cast<u8>(obj.Hash());
 		}
 		const T& Get(const u8& hash) const
 		{
 			std::lock_guard<std::mutex> lock(_mutex);
 			if (hash < _s_data.size())
 			{
+				//_s_data[hash].Hash(hash);
 				return _s_data[hash];
 			}
 			throw std::out_of_range("Invalid hash");
@@ -196,7 +197,7 @@ namespace Ailu
 			_stream_count = other._stream_count;
 			_buffer_descs = other._buffer_descs;
 			memcpy(_stride, other._stride,sizeof(u8) * kMaxStreamCount);
-			_hash = static_cast<u8>(ALHash::CommonRuntimeHasher(*this));
+			//_hash = static_cast<u8>(ALHash::CommonRuntimeHasher(*this));
 			return *this;
 		}
 
@@ -493,9 +494,12 @@ namespace Ailu
 		return v[hash];
 	}
 
-	enum class EBindResDescType : u8
+	enum EBindResDescType
 	{
-		kConstBuffer = 0, kTexture2D, kCubeMap, kTexture2DArray, kSampler, kCBufferAttribute, kUAVTexture2D,kUnknown
+		kConstBuffer = 0x01, 
+		kCBufferAttribute = 0x02,kCBufferFloat = 0x04, kCBufferFloat4 = 0x08, kCBufferUint = 0x10, kCBufferUint4 = 0x20, kCBufferMatrix4 = 0x40,kCBufferBool = 0x80,
+		kTexture2D = 3, kCubeMap = 5, kTexture2DArray = 6, kSampler = 7, kUAVTexture2D = 9,
+		kUnknown
 	};
 
 	struct PipelineResourceInfo

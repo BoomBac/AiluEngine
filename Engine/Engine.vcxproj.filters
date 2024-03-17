@@ -2010,9 +2010,6 @@
     <ClInclude Include="Inc\Framework\Common\Path.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Math\AABB.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Framework\ImGui\ImGUIDLL.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2053,6 +2050,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Render\Pass\PostprocessPass.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Math\Geometry.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\Pass\SSAO.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -2240,12 +2243,14 @@
     <ClCompile Include="Src\Render\Pass\PostprocessPass.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Src\Render\Pass\SSAO.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat">
       <Filter>源文件</Filter>
     </None>
-    <None Include="Res\Shaders\shaders.hlsl" />
     <None Include="Res\Shaders\cbuffer.hlsli">
       <Filter>头文件</Filter>
     </None>
@@ -2259,13 +2264,13 @@
     <None Include="Res\Shaders\constants.hlsli" />
     <None Include="Res\Shaders\input.hlsli" />
     <None Include="Res\Shaders\filter_irradiance.hlsl" />
-    <None Include="Res\Shaders\blit.shader" />
-    <None Include="Res\Shaders\bone_test.hlsl" />
+    <None Include="Res\Shaders\blit.hlsl" />
     <None Include="Res\Shaders\cubemap_gen.hlsl" />
     <None Include="Res\Shaders\depth_only.hlsl" />
     <None Include="Res\Shaders\error_fallback.hlsl" />
     <None Include="Res\Shaders\skybox.hlsl" />
     <None Include="Res\Shaders\wireframe.hlsl" />
+    <None Include="Res\Shaders\deferred_shading.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

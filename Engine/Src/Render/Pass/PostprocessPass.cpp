@@ -1,10 +1,11 @@
 #include "pch.h"
 #include "Render/Pass/PostprocessPass.h"
+#include "Render/CommandBuffer.h"
 
 
 namespace Ailu
 {
-	PostProcessPass::PostProcessPass() : _name("PostProcessPass")
+	PostProcessPass::PostProcessPass() : RenderPass("PostProcessPass")
 	{
 		_p_tex_bloom_threshold = RenderTexture::Create(800,450,"BloomThreshold",EALGFormat::kALGFormatR16G16B16A16_FLOAT);
 		_p_bloom_thread_mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/PostProcess/bloom.hlsl"),"BloomThread");

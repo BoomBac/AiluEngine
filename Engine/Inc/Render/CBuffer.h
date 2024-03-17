@@ -62,14 +62,15 @@ namespace Ailu
 		float4x4 _MatrixV;
 		float4x4 _MatrixP;
 		float4x4 _MatrixVP;
+		float4x4 _MatrixIVP;
 		float4   _CameraPos;
 		ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLightNum];
 		ShaderDirectionalAndPointLightData _PointLights[kMaxPointLightNum];
 		ShaderSpotlLightData _SpotLights[kMaxSpotLightNum];
 		float4x4 _MainLightShadowMatrix;
 		float4x4 _CubeMapGenCameraMatrix;
-		float4x4 _JointMatrix[80];
-		float padding1[12];
+		//float4x4 _JointMatrix[80];
+		float padding1[60];
 	};
 
 #ifdef __cplusplus

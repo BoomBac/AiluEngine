@@ -57,7 +57,7 @@ namespace Ailu
 		Scene* _p_current = nullptr;
 		SceneActor* _p_selected_actor = nullptr;
 	private:
-		void Cull(Scene* p_scene);
+		void Cull(Camera* cam,Scene* p_scene);
 		inline static std::list<Scope<Scene>> s_all_scene{};
 		inline static uint16_t s_scene_index = 0u;
 		Queue<SceneActor*> _pending_delete_actors;

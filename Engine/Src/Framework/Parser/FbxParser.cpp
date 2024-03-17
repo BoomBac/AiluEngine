@@ -328,11 +328,13 @@ namespace Ailu
 		bool is_skined = fbx_mesh->GetDeformerCount(FbxDeformer::eSkin) > 0;
 		auto mesh = is_skined ? MakeRef<SkinedMesh>(node->GetName()) : MakeRef<Mesh>(node->GetName());
 		const int mat_count = node->GetMaterialCount();
-		static auto fill_tex = [](const FbxProperty& prop, List<std::pair<String, u8>>& loaded_textures)
+		static auto fill_tex = [&](const FbxProperty& prop)->String
 			{
 				int layeredTextureCount = prop.GetSrcObjectCount<FbxLayeredTexture>();
+				String sys_path;
 				if (layeredTextureCount > 0)
 				{
+					LOG_WARNING("MultiLayer texture not been supported yet! when load mesh {}", node->GetName());
 					for (int layerIndex = 0; layerIndex != layeredTextureCount; ++layerIndex)
 					{
 						FbxLayeredTexture* layeredTexture = prop.GetSrcObject<FbxLayeredTexture>(layerIndex);
@@ -340,9 +342,7 @@ namespace Ailu
 						for (int c = 0; c != count; ++c)
 						{
 							FbxFileTexture* fileTexture = FbxCast<FbxFileTexture>(layeredTexture->GetSrcObject<FbxFileTexture>(c));
-							const char* sys_path = fileTexture->GetFileName();
-							LOG_INFO("texture name: {}", sys_path);
-							loaded_textures.emplace_back(std::make_pair(sys_path, 0));
+							sys_path = fileTexture->GetFileName();
 						}
 					}
 				}
@@ -352,36 +352,36 @@ namespace Ailu
 					for (int i = 0; i != textureCount; ++i)
 					{
 						FbxFileTexture* fileTexture = FbxCast<FbxFileTexture>(prop.GetSrcObject<FbxFileTexture>(i));
-						const char* sys_path = fileTexture->GetFileName();
-						LOG_INFO("texture name: {}", sys_path);
-						loaded_textures.emplace_back(std::make_pair(sys_path, 0));
+						sys_path = fileTexture->GetFileName();
 					}
 				}
+				return sys_path;
 			};
 		for (int i = 0; i < mat_count; ++i)
 		{
 			FbxSurfaceMaterial* mat = node->GetMaterial(i);
 			if (mat)
 			{
-				LOG_INFO("Node {} have material {} at slot {}", node->GetName(), mat->GetName(), i);
-				fill_tex(mat->FindProperty(FbxSurfaceMaterial::sDiffuse), _loaded_textures);
-				fill_tex(mat->FindProperty(FbxSurfaceMaterial::sNormalMap), _loaded_textures);
+				ImportedMaterialInfo mat_info(i, mat->GetName());
+				mat_info._textures[0] = fill_tex(mat->FindProperty(FbxSurfaceMaterial::sDiffuse));
+				mat_info._textures[1] = fill_tex(mat->FindProperty(FbxSurfaceMaterial::sNormalMap));
+				_imported_fbx_materials.emplace_back(mat_info);
 			}
 		}
 		if (use_multi_thread)
 		{
-			_time_mgr.Mark();
-			auto ret4 = g_thread_pool->Enqueue(&FbxParser::ParserAnimation, this, node, _cur_skeleton);
-			auto ret1 = g_thread_pool->Enqueue(&FbxParser::ReadVertex, this, node, mesh.get());
-			auto ret2 = g_thread_pool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), mesh.get());
-			auto ret3 = g_thread_pool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), mesh.get());
+			//_time_mgr.Mark();
+			auto ret4 = g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, node, _cur_skeleton);
+			auto ret1 = g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, mesh.get());
+			auto ret2 = g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), mesh.get());
+			auto ret3 = g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), mesh.get());
 			if (ret1.get() && ret2.get() && ret3.get() && ret4.get())
 			{
-				LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-				_time_mgr.Mark();
+				//LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				//_time_mgr.Mark();
 				GenerateIndexdMesh(mesh.get());
 				CalculateTangant(mesh.get());
-				LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				//LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
 				//mesh->BuildRHIResource();
 				if (is_skined)
 				{
@@ -394,16 +394,16 @@ namespace Ailu
 		}
 		else
 		{
-			_time_mgr.Mark();
+			//_time_mgr.Mark();
 			ReadVertex(node, mesh.get());
 			ReadNormal(*fbx_mesh, mesh.get());
 			ReadUVs(*fbx_mesh, mesh.get());
 			ParserAnimation(node, _cur_skeleton);
-			LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-			_time_mgr.Mark();
+			//LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+			//_time_mgr.Mark();
 			GenerateIndexdMesh(mesh.get());
 			CalculateTangant(mesh.get());
-			LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+			//LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
 			//mesh->Build();
 			if (is_skined)
 			{
@@ -456,14 +456,14 @@ namespace Ailu
 				}
 			};
 		g_pTimeMgr->Mark();
-		if (deformers_num > 0)
+		FbxAnimStack* cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
+		if (deformers_num > 0 && cur_anim_stack)
 		{
 			FbxVector4 t, r, s;
 			GetGeometry(node, t, r, s);
 			FbxAMatrix geometry_transform;
 			geometry_transform.SetTRS(t, r, s);
 			//only support one stack
-			FbxAnimStack* cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
 			//LOG_INFO("Scene {} has {} animation stack", _p_cur_fbx_scene->GetName(), _p_cur_fbx_scene->GetSrcObjectCount<FbxAnimStack>());
 			FbxString anim_fname = cur_anim_stack->GetName();
 			String anim_name = anim_fname.Buffer();
@@ -490,7 +490,7 @@ namespace Ailu
 					u32 cluster_num = skin->GetClusterCount();
 					for (u32 j = 0; j < cluster_num; j++)
 					{
-						res.emplace_back(g_thread_pool->Enqueue(parser_anim, std::ref(sk), node, fbx_mesh, skin->GetCluster(j), skin->GetCluster(j)->GetLink(), std::ref(geometry_transform), clip, FrameCount, TimeMode));
+						res.emplace_back(g_pThreadTool->Enqueue(parser_anim, std::ref(sk), node, fbx_mesh, skin->GetCluster(j), skin->GetCluster(j)->GetLink(), std::ref(geometry_transform), clip, FrameCount, TimeMode));
 					}
 				}
 				for (auto& ret : res)
@@ -510,7 +510,7 @@ namespace Ailu
 					}
 				}
 			}
-			LOG_INFO("Fill animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
+			//LOG_INFO("Fill animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
 			clip->CurSkeletion(sk);
 			g_pTimeMgr->Mark();
 			clip->Bake();
@@ -530,7 +530,6 @@ namespace Ailu
 		if (normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByControlPoint)
 		{
 			_b_normal_by_controlpoint = true;
-			LOG_WARNING("Normal by control point");
 			data = new float[vertex_count * 3];
 			for (int i = 0; i < vertex_count; ++i)
 			{
@@ -549,7 +548,6 @@ namespace Ailu
 		else if (normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByPolygonVertex)
 		{
 			_b_normal_by_controlpoint = false;
-			LOG_WARNING("Normal by eByPolygonVertex");
 			int trangle_count = fbx_mesh.GetPolygonCount();
 			vertex_count = trangle_count * 3;
 			data = new float[vertex_count * 3];
@@ -572,9 +570,6 @@ namespace Ailu
 				}
 			}
 		}
-		//float* data = new float[vnormals.size() * 3];
-		//memcpy(data,vnormals.data(), vnormals.size() * 3);
-		//LOG_INFO("Mesh {} has {} normal point", mesh->Name(), vnormals.size());
 		mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(data)));
 		return true;
 	}
@@ -773,6 +768,7 @@ namespace Ailu
 			float* data = new float[trangle_count * 6];
 			if (uv->GetMappingMode() == FbxGeometryElement::eByControlPoint)
 			{
+				throw std::runtime_error("Mesh uv by eByControlPoint");
 				int cur_vertex_id = 0;
 				for (int lPolyIndex = 0; lPolyIndex < trangle_count; ++lPolyIndex)
 				{
@@ -870,54 +866,94 @@ namespace Ailu
 
 	bool FbxParser::CalculateTangant(Mesh* mesh)
 	{
-		u32* indices = mesh->GetIndices();
+
 		Vector3f* pos = mesh->GetVertices();
 		Vector2f* uv0 = mesh->GetUVs(0);
 		Vector4f* tangents = new Vector4f[mesh->_vertex_count];
-
-		auto vertexCount = mesh->_vertex_count;
-		Vector3f* tan1 = new Vector3f[vertexCount * 2];
-		Vector3f* tan2 = tan1 + vertexCount;
-		ZeroMemory(tan1, vertexCount * sizeof(Vector3f) * 2);
-		for (size_t i = 0; i < mesh->GetIndicesCount(); i += 3)
+		Vector4f* bitangents = new Vector4f[mesh->_vertex_count];
+		for (u16 i = 0; i < mesh->SubmeshCount(); i++)
 		{
-			u32 i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
-			const Vector3f& pos1 = pos[i1];
-			const Vector3f& pos2 = pos[i2];
-			const Vector3f& pos3 = pos[i3];
-			const Vector2f& uv1 = uv0[i1];
-			const Vector2f& uv2 = uv0[i2];
-			const Vector2f& uv3 = uv0[i3];
-			float x1 = pos2.x - pos1.x;
-			float x2 = pos3.x - pos1.x;
-			float y1 = pos2.y - pos1.y;
-			float y2 = pos3.y - pos1.y;
-			float z2 = pos3.z - pos1.z;
-			float z1 = pos2.z - pos1.z;
-			float s1 = uv2.x - uv1.x;
-			float s2 = uv3.x - uv1.x;
-			float t1 = uv2.y - uv1.y;
-			float t2 = uv3.y - uv1.y;
-			float r = 1.0f / (s1 * t2 - s2 * t1);
-			Vector3f sdir{ (t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r,(t2 * z1 - t1 * z2) * r };
-			Vector3f tdir{ (s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r,(s1 * z2 - s2 * z1) * r };
-			tan1[i1] += sdir;
-			tan1[i2] += sdir;
-			tan1[i3] += sdir;
-			tan2[i1] += tdir;
-			tan2[i2] += tdir;
-			tan2[i3] += tdir;
+			u32* indices = mesh->GetIndices(i);
+			for (size_t j = 0; j < mesh->GetIndicesCount(i); j += 3)
+			{
+				Vector4f tangent, bitangent;
+				u32 index0 = indices[j], index1 = indices[j + 1], index2 = indices[j + 2];
+				Vector3f& v0 = pos[index0], v1 = pos[index1], v2 = pos[index2];
+				Vector2f& t0 = uv0[index0], t1 = uv0[index1], t2 = uv0[index2];
+				Vector3f edge1 = v1 - v0;
+				Vector3f edge2 = v2 - v0;
+				Vector2f deltaUV1 = t1 - t0;
+				Vector2f deltaUV2 = t2 - t0;
+				float f = 1.0f / ((deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y) + 0.0000001f);
+				tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+				tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+				tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+				bitangent.x = f * (deltaUV1.x * edge2.x - deltaUV2.x * edge1.x);
+				bitangent.y = f * (deltaUV1.x * edge2.y - deltaUV2.x * edge1.y);
+				bitangent.z = f * (deltaUV1.x * edge2.z - deltaUV2.x * edge1.z);
+				tangents[index0] = tangent;
+				tangents[index1] = tangent;
+				tangents[index2] = tangent;
+				bitangents[index0] = bitangent;
+				bitangents[index1] = bitangent;
+				bitangents[index2] = bitangent;
+			}
 		}
+
 		Vector3f* normal = mesh->GetNormals();
 		for (size_t i = 0; i < mesh->_vertex_count; i++)
 		{
 			const Vector3f& n = normal[i];
-			const Vector3f& t = tan1[i];
+			const Vector3f& t = tangents[i].xyz;
+			const Vector3f& b = bitangents[i].xyz;
 			tangents[i].xyz = Normalize(t - n * DotProduct(n, t));
-			tangents[i].w = (DotProduct(CrossProduct(n, t), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
+			tangents[i].w = (DotProduct(CrossProduct(n, t), b) < 0.0f) ? -1.0f : 1.0f;
 		}
+		delete[] bitangents;
+		//auto vertexCount = mesh->_vertex_count;
+		//Vector3f* tan1 = new Vector3f[vertexCount * 2];
+		//Vector3f* tan2 = tan1 + vertexCount;
+		//ZeroMemory(tan1, vertexCount * sizeof(Vector3f) * 2);
+		//for (size_t i = 0; i < mesh->GetIndicesCount(); i += 3)
+		//{
+		//	u32 i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
+		//	const Vector3f& pos1 = pos[i1];
+		//	const Vector3f& pos2 = pos[i2];
+		//	const Vector3f& pos3 = pos[i3];
+		//	const Vector2f& uv1 = uv0[i1];
+		//	const Vector2f& uv2 = uv0[i2];
+		//	const Vector2f& uv3 = uv0[i3];
+		//	float x1 = pos2.x - pos1.x;
+		//	float x2 = pos3.x - pos1.x;
+		//	float y1 = pos2.y - pos1.y;
+		//	float y2 = pos3.y - pos1.y;
+		//	float z2 = pos3.z - pos1.z;
+		//	float z1 = pos2.z - pos1.z;
+		//	float s1 = uv2.x - uv1.x;
+		//	float s2 = uv3.x - uv1.x;
+		//	float t1 = uv2.y - uv1.y;
+		//	float t2 = uv3.y - uv1.y;
+		//	float r = 1.0f / (s1 * t2 - s2 * t1);
+		//	Vector3f sdir{ (t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r,(t2 * z1 - t1 * z2) * r };
+		//	Vector3f tdir{ (s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r,(s1 * z2 - s2 * z1) * r };
+		//	tan1[i1] += sdir;
+		//	tan1[i2] += sdir;
+		//	tan1[i3] += sdir;
+		//	tan2[i1] += tdir;
+		//	tan2[i2] += tdir;
+		//	tan2[i3] += tdir;
+		//	LOG_INFO("({},{},{})", tan1[i].x, tan1[i].y, tan1[i].z);
+		//}
+		//Vector3f* normal = mesh->GetNormals();
+		//for (size_t i = 0; i < mesh->_vertex_count; i++)
+		//{
+		//	const Vector3f& n = normal[i];
+		//	const Vector3f& t = tan1[i];
+		//	tangents[i].xyz = Normalize(t - n * DotProduct(n, t));
+		//	tangents[i].w = (DotProduct(CrossProduct(n, t), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
+		//}
+		//delete[] tan1;
 		mesh->SetTangents(std::move(tangents));
-		delete[] tan1;
 		return true;
 	}
 
@@ -1014,8 +1050,8 @@ namespace Ailu
 			}
 		}
 
-		LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
-		//mesh->Clear();
+		//LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
+		mesh->Clear();
 		float aabb_space = 1.0f;
 		mesh->_bound_box._max = vmax + Vector3f::kOne * aabb_space;
 		mesh->_bound_box._min = vmin - Vector3f::kOne * aabb_space;
@@ -1063,7 +1099,7 @@ namespace Ailu
 		List<Ref<Mesh>> loaded_meshs{};
 		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.c_str(), -1, fbx_manager_->GetIOSettings()))
 		{
-			g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load mesh failed at path {}", path);
+			g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load mesh failed whit invalid path {}", path);
 			return loaded_meshs;
 		}
 		fbx_importer_->Import(_p_cur_fbx_scene);
@@ -1086,7 +1122,7 @@ namespace Ailu
 		ParserFbxNode(fbx_rt, mesh_node, skeleton_node);
 		_cur_skeleton.Clear();//当前仅支持一个骨骼，所以清空之前的数据
 		_loaded_anims.clear();
-		_loaded_textures.clear();
+		_imported_fbx_materials.clear();
 		auto skeleton_node_c = skeleton_node;
 		while (!skeleton_node.empty())
 		{
@@ -1201,7 +1237,7 @@ namespace Ailu
 		}
 		while (!mesh_node.empty())
 		{
-			auto ret = g_thread_pool->Enqueue(&FbxParser::ParserAnimation, this, mesh_node.front(), _cur_skeleton);
+			auto ret = g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, mesh_node.front(), _cur_skeleton);
 			ParserMesh(mesh_node.front(), loaded_meshs);
 			if (ret.get())
 				mesh_node.pop();

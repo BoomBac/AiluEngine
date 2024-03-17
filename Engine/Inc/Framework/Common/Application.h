@@ -4,8 +4,6 @@
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/Window.h"
 #include "Framework/Events/Event.h"
-#include "Framework/Events/MouseEvent.h"
-#include "Render/Renderer.h"
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/LayerStack.h"
 #include "Framework/ImGui/ImGuiLayer.h"
@@ -14,6 +12,12 @@
 
 namespace Ailu
 {
+    DECLARE_ENUM(EApplicationState,
+        EApplicationState_None,
+        EApplicationState_Running,
+        EApplicationState_Pause,
+        EApplicationState_Exit
+    )
     class AILU_API Application : public IRuntimeModule
     {
     public:
@@ -32,16 +36,17 @@ namespace Ailu
         bool OnWindowClose(WindowCloseEvent& e);
         bool OnGetFoucus(WindowFocusEvent& e);
         bool OnLostFoucus(WindowLostFocusEvent& e);
+        bool OnWindowMinimize(WindowMinimizeEvent& e);
+        bool OnWindowResize(WindowResizeEvent& e);
         bool OnDragFile(DragFileEvent& e);
     private:
-        LayerStack _layer_stack;
+        LayerStack* _layer_stack;
         ImGUILayer* _p_imgui_layer;
         InputLayer* _p_input_layer;
         SceneLayer* _p_scene_layer;
         Window* _p_window = nullptr;
-        Renderer* _p_renderer = nullptr;
+        EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None; 
         void OnEvent(Event& e);
-        bool _b_running;
         inline static Application* sp_instance = nullptr;
     };
 }

@@ -5,10 +5,14 @@
 
 namespace Ailu
 {
-	Ref<GraphicsContext> g_pGfxContext;
+	GraphicsContext* g_pGfxContext;
 	void GraphicsContext::InitGlobalContext()
 	{
-		g_pGfxContext = MakeRef<D3DContext>(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
+		g_pGfxContext = new D3DContext(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
 		g_pGfxContext->Init();
+	}
+	void GraphicsContext::FinalizeGlobalContext()
+	{
+		delete g_pGfxContext;
 	}
 }

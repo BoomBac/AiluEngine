@@ -31,6 +31,14 @@ namespace Ailu
 		if (!_b_enable) return;
 		if (!_p_mesh) return;
 		_aabb = AABB::CaclulateBoundBox(_p_mesh->_bound_box, static_cast<SceneActor*>(_p_onwer)->GetTransformComponent()->GetMatrix());
+		if (_p_mats.size() != _p_mesh->SubmeshCount())
+		{
+			_p_mats.clear();
+			for (auto it = _p_mesh->GetCacheMaterials().begin(); it != _p_mesh->GetCacheMaterials().end(); it++)
+			{
+				_p_mats.emplace_back(MaterialLibrary::GetMaterial(it->_name));
+			}
+		}
 	}
 	void StaticMeshComponent::OnGizmo()
 	{
@@ -240,7 +248,7 @@ namespace Ailu
 			{
 				u32 startIdx = i * _per_skin_task_vertex_num;
 				u32 endIdx = min((i + 1) * _per_skin_task_vertex_num, vert_count);
-				_skin_tasks[i] = g_thread_pool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx);
+				_skin_tasks[i] = g_pThreadTool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx);
 			}
 			for (auto& future : _skin_tasks)
 			{

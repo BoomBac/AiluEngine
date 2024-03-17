@@ -21,7 +21,6 @@ namespace Ailu
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
 			auto shader = MakeRef<D3DShader>(file_name, vert_entry, pixel_entry);
-			ShaderLibrary::Add(shader->Name(), shader);
 			return shader;
 		}
 		}
@@ -31,7 +30,7 @@ namespace Ailu
 
 	Shader::Shader(const String& sys_path) : _src_file_path(sys_path), _id(_s_global_shader_id), _name(std::format("AnonymityShader_{}", _s_global_shader_id++))
 	{
-		_actual_id = _id;
+
 	}
 
 	void Shader::Bind(u32 index)
@@ -41,31 +40,26 @@ namespace Ailu
 			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
 			return;
 		}
-		if (_actual_id != _id)
-		{
-			ShaderLibrary::Get("error")->Bind(index);
-			return;
-		}
 		GraphicsPipelineStateMgr::ConfigureVertexInputLayout(_pipeline_input_layout.Hash());
 		GraphicsPipelineStateMgr::ConfigureRasterizerState(_pipeline_raster_state.Hash());
 		GraphicsPipelineStateMgr::ConfigureDepthStencilState(_pipeline_ds_state.Hash());
 		GraphicsPipelineStateMgr::ConfigureTopology(static_cast<u8>(ALHash::Hasher(_pipeline_topology)));
 		GraphicsPipelineStateMgr::ConfigureBlendState(_pipeline_blend_state.Hash());
-		GraphicsPipelineStateMgr::ConfigureShader(_actual_id);
+		GraphicsPipelineStateMgr::ConfigureShader(_id);
 		for (auto& it : s_global_textures_bind_info)
 		{
 			auto tex_it = _bind_res_infos.find(it.first);
-			if (tex_it != _bind_res_infos.end() && (tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray ||
-				tex_it->second._res_type == EBindResDescType::kTexture2D))
+			if (tex_it != _bind_res_infos.end())
 			{
-				GraphicsPipelineStateMgr::SubmitBindResource(it.second, tex_it->second._bind_slot);
+				if(tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray ||tex_it->second._res_type == EBindResDescType::kTexture2D)
+					GraphicsPipelineStateMgr::SubmitBindResource(it.second, tex_it->second._bind_slot);
 			}
 		}
 		for (auto& it : s_global_matrix_bind_info)
 		{
 			throw std::runtime_error("s_global_matrix_bind_info");
 			auto mat_it = _bind_res_infos.find(it.first);
-			if (mat_it != _bind_res_infos.end() && mat_it->second._res_type == EBindResDescType::kCBufferAttribute)
+			if (mat_it != _bind_res_infos.end() && (mat_it->second._res_type & EBindResDescType::kCBufferAttribute))
 			{
 				auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
 				Matrix4x4f* mat_ptr = std::get<0>(it.second);
@@ -80,12 +74,12 @@ namespace Ailu
 		if (PreProcessShader() && RHICompileImpl())
 		{
 			GraphicsPipelineStateMgr::OnShaderRecompiled(this);
-			_actual_id = _id;
+			_is_compile_error = false;
 			return true;
 		}
 		else
 		{
-			_actual_id = ShaderLibrary::Get("error")->ID();
+			_is_compile_error = true;
 			return false;
 		}
 	}
@@ -244,7 +238,7 @@ namespace Ailu
 		if (seri_type != ESerializablePropertyType::kUndefined)
 		{
 			props.emplace_back(ShaderPropertyInfo{ value_name ,prop_name,seri_type ,prop_param });
-			LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);
+			//LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);
 		}
 		else
 		{

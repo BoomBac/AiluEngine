@@ -45,9 +45,15 @@ namespace Ailu
 	{
 		throw std::runtime_error("error");
 	}
-	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth)
+	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth)
 	{
 		_p_cmd->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), clear_color, 0, nullptr);
+		_p_cmd->ClearDepthStencilView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
+	}
+	void D3DCommandBuffer::ClearRenderTarget(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth)
+	{
+		for (auto& color : colors)
+			_p_cmd->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), clear_color, 0, nullptr);
 		_p_cmd->ClearDepthStencilView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
 	}
 	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color, u16 index)
@@ -110,40 +116,41 @@ namespace Ailu
 		auto d3d_rect = CD3DX12_RECT(rect.left, rect.top, rect.width, rect.height);
 		_p_cmd->RSSetScissorRects(1, &d3d_rect);
 	}
-	void D3DCommandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, u32 instance_count)
-	{
-		DrawRenderer(mesh.get(), material.get(), transform, instance_count);
-	}
-	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count)
+	u16 D3DCommandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, u32 instance_count)
 	{
 		throw std::runtime_error("error");
+		return 0;
 	}
-	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count)
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count)
+	{
+		throw std::runtime_error("error");
+		return 0;
+	}
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count)
 	{
 		if (mesh)
 		{
-			for(int i = 0; i < mesh->SubmeshCount(); ++i)
+			for (int i = 0; i < mesh->SubmeshCount(); ++i)
 			{
-				DrawRenderer(mesh, material, per_obj_cbuf,i,instance_count);
+				DrawRenderer(mesh, material, per_obj_cbuf, i, instance_count);
 			}
 		}
+		return 0;
 	}
 
-	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count)
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count)
 	{
-		if (mesh == nullptr || !mesh->_is_rhi_res_ready)
+		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || material->GetShader()->IsCompileError())
 		{
-			LOG_WARNING("Mesh is null or is not ready when draw renderer!");
-			return;
+			//LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
+			return 1;
 		}
-		static Material* error = MaterialLibrary::GetMaterial("Error").get();
-		Material* actual_mat = material ? material : error;
-		actual_mat->Bind();
-		mesh->GetVertexBuffer()->Bind(this, actual_mat->GetShader()->PipelineInputLayout());
-		mesh->GetIndexBuffer(submesh_index)->Bind(this);
+		material->Bind();
 		GraphicsPipelineStateMgr::EndConfigurePSO(this);
 		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
 		{
+			mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+			mesh->GetIndexBuffer(submesh_index)->Bind(this);
 			per_obj_cbuf->Bind(this, 0);
 			++RenderingStates::s_draw_call;
 			_p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
@@ -151,38 +158,33 @@ namespace Ailu
 		else
 		{
 			LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
+			return 2;
 		}
+		return 0;
 	}
 
-	void D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, u32 instance_count)
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, u32 instance_count)
 	{
-		if (mesh == nullptr)
+		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || material->GetShader()->IsCompileError())
 		{
-			LOG_WARNING("Mesh is null when draw renderer!");
-			return;
+			LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
+			return 1;
 		}
-		if (material != nullptr)
-		{
-			mesh->GetVertexBuffer()->Bind(this,material->GetShader()->PipelineInputLayout());
-			mesh->GetIndexBuffer()->Bind(this);
-			material->Bind();
-		}
-		else
-		{
-			static Material* error = MaterialLibrary::GetMaterial("Error").get();
-			mesh->GetVertexBuffer()->Bind(this, error->GetShader()->PipelineInputLayout());
-			mesh->GetIndexBuffer()->Bind(this);
-			error->Bind();
-		}
+		material->Bind();
 		GraphicsPipelineStateMgr::EndConfigurePSO(this);
 		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
 		{
+			mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+			mesh->GetIndexBuffer()->Bind(this);
+			++RenderingStates::s_draw_call;
 			_p_cmd->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, 0, 0, 0);
 		}
 		else
 		{
 			LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
+			return 2;
 		}
+		return 0;
 	}
 
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth)
@@ -190,23 +192,40 @@ namespace Ailu
 		SetRenderTarget(color.get(), depth.get());
 	}
 
+	void D3DCommandBuffer::SetRenderTargets(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth)
+	{
+		GraphicsPipelineStateMgr::ResetRenderTargetState();
+		u16 rt_num = static_cast<u16>(colors.size());
+		static D3D12_CPU_DESCRIPTOR_HANDLE handles[8];
+		for (int i = 0; i < rt_num; i++)
+		{
+			GraphicsPipelineStateMgr::SetRenderTargetState(colors[i]->GetFormat(), depth->GetFormat(), i);
+			colors[i]->Transition(this, ETextureResState::kColorTagret);
+			depth->Transition(this, ETextureResState::kDepthTarget);
+			handles[i] = *reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(colors[i]->GetNativeCPUHandle());
+		}
+		_p_cmd->OMSetRenderTargets(rt_num, handles, false, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
+	}
+
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color, u16 index)
 	{
+		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), EALGFormat::kALGFormatUnknown, 0);
-		color->Transition(this,ETextureResState::kColorTagret);
+		color->Transition(this, ETextureResState::kColorTagret);
 		_p_cmd->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle(index)), 0,
 			NULL);
 	}
 
 	void D3DCommandBuffer::SetRenderTarget(RenderTexture* color, RenderTexture* depth)
 	{
+		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		if (color && depth)
 		{
 			//if (pre_color  && *color == *pre_color)
 			//	return;
 			GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), depth->GetFormat(), 0);
-			color->Transition(this,ETextureResState::kColorTagret);
-			depth->Transition(this,ETextureResState::kDepthTarget);
+			color->Transition(this, ETextureResState::kColorTagret);
+			depth->Transition(this, ETextureResState::kDepthTarget);
 			_p_cmd->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
 				reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
 		}
@@ -215,7 +234,7 @@ namespace Ailu
 			if (color == nullptr)
 			{
 				GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::kALGFormatUnknown, depth->GetFormat(), 0);
-				depth->Transition(this,ETextureResState::kDepthTarget);
+				depth->Transition(this, ETextureResState::kDepthTarget);
 				_p_cmd->OMSetRenderTargets(0, nullptr, 0, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
 			}
 		}
@@ -226,20 +245,23 @@ namespace Ailu
 		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
 		static const auto material = MaterialLibrary::GetMaterial("Blit");
 		D3DContext::s_p_d3dcontext->BeginBackBuffer(this);
-		mesh->GetVertexBuffer()->Bind(this,material->GetShader()->PipelineInputLayout());
+		mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
 		mesh->GetIndexBuffer()->Bind(this);
 		material->SetTexture("_SourceTex", color);
 		material->Bind();
 		GraphicsPipelineStateMgr::EndConfigurePSO(this);
-		DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
-		GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
-		GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this,Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
-		D3DContext::s_p_d3dcontext->DrawOverlay(this);
+		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+		{
+			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
+			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
+			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			D3DContext::s_p_d3dcontext->DrawOverlay(this);
+		}
 		D3DContext::s_p_d3dcontext->EndBackBuffer(this);
 	}
 
 	void D3DCommandBuffer::Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
 	{
-		cs->Bind(this,thread_group_x, thread_group_y, thread_group_z);
+		cs->Bind(this, thread_group_x, thread_group_y, thread_group_z);
 	}
 }

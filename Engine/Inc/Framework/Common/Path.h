@@ -7,7 +7,9 @@ namespace Ailu
 {
 #ifdef COMPANY_ENV
 	static const String kEngineRootPath = "C:/AiluEngine/Engine/";
+	static const WString kEngineRootPathW = L"C:/AiluEngine/Engine/";
 	static const String kEngineResRootPath = "C:/AiluEngine/Engine/Res/";
+	static const WString kEngineResRootPathW = L"C:/AiluEngine/Engine/Res/";
 #else
 	static const String kEngineRootPath = "D:/ProjectCpp/AiluEngine/Engine/";
 	static const WString kEngineRootPathW = L"D:/ProjectCpp/AiluEngine/Engine/";
@@ -33,6 +35,16 @@ namespace Ailu
 		inline static bool IsSystemPath(const WString& path)
 		{
 			return path.find_first_of(L":") == 1;
+		}
+
+		static inline bool IsInAssetFolder(const WString& path)
+		{
+			return path.find(L"Res/") != path.npos || path.find(L"Res\\") != path.npos;
+		}
+
+		static inline bool IsInAssetFolder(const String& path)
+		{
+			return path.find("Res/") != path.npos || path.find("Res\\") != path.npos;
 		}
 
 		//begin from Res/  eg: Engien/Res/aa/b -> aa/b

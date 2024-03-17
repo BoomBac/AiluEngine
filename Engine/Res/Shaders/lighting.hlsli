@@ -124,11 +124,11 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	for (uint i = 0; i < MAX_DIRECTIONAL_LIGHT; i++)
 	{
 		float3 light_dir = -_DirectionalLights[i]._LightPosOrDir;
-		float3 hv = normalize(view_dir +  light_dir);
-		shading_data.nl = max(saturate(dot(light_dir,surface.wnormal)),0.000001);
-		shading_data.vh = max(saturate(dot(view_dir,hv)),0.000001);
-		shading_data.lh = max(saturate(dot(light_dir,hv)),0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal,hv)),0.000001);
+		float3 hv = normalize(view_dir + light_dir);
+		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
+		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
+		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
+		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
 		light_data.light_dir = light_dir;
 		light_data.light_color = _DirectionalLights[i]._LightColor;
 		light_data.light_pos = _DirectionalLights[i]._LightPosOrDir;
@@ -137,28 +137,28 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	for (uint j = 0; j < MAX_POINT_LIGHT; j++)
 	{
 		float3 light_dir = -normalize(world_pos - _PointLights[j]._LightPosOrDir);
-		float3 hv = normalize(view_dir +  light_dir);
-		shading_data.nl = max(saturate(dot(light_dir,surface.wnormal)),0.000001);
-		shading_data.vh = max(saturate(dot(view_dir,hv)),0.000001);
-		shading_data.lh = max(saturate(dot(light_dir,hv)),0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal,hv)),0.000001);
+		float3 hv = normalize(view_dir + light_dir);
+		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
+		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
+		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
+		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
 		light_data.light_dir = light_dir;
 		light_data.light_color = _PointLights[j]._LightColor;
 		light_data.light_pos = _PointLights[j]._LightPosOrDir;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j,world_pos);
-	} 
+		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
+	}
 	for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
 	{
 		float3 light_dir = -normalize(_SpotLights[k]._LightDir);
-		float3 hv = normalize(view_dir +  light_dir);
-		shading_data.nl = max(saturate(dot(light_dir,surface.wnormal)),0.000001);
-		shading_data.vh = max(saturate(dot(view_dir,hv)),0.000001);
-		shading_data.lh = max(saturate(dot(light_dir,hv)),0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal,hv)),0.000001);
+		float3 hv = normalize(view_dir + light_dir);
+		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
+		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
+		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
+		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
 		light_data.light_dir = light_dir;
 		light_data.light_color = _SpotLights[k]._LightColor;
 		light_data.light_pos = _SpotLights[k]._LightPos;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k,world_pos);
+		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos);
 	}
 	//indirect light
 	float3 irradiance = DiffuseIBL.Sample(g_LinearWrapSampler, surface.wnormal);
@@ -166,7 +166,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	float3 ks = FresnelSchlickRoughness(saturate(shading_data.nv), F0,surface.roughness);
 	float3 kd = F3_WHITE - ks;
 	float3 diffuse = irradiance * surface.albedo.rgb;
-	light = 1.0f * diffuse * kd;
+	light += 0.01f * diffuse * kd;
 	return light;
 }
 

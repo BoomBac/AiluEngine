@@ -79,7 +79,7 @@ float3 DirectSpecular(SurfaceData surface,ShadingData shading_data,LightData lig
 	float D = DistributionGGX(shading_data.nh,surface.roughness);
 	float G = GeometrySmith(shading_data.nv,shading_data.nl,surface.roughness);
 	F = Fresnel(surface.albedo.rgb,surface.metallic,shading_data.vh);
-	return (D * G * F * 0.25) / (shading_data.nv * shading_data.nl);
+	return (D * G * F * 0.25) / (shading_data.nl);
 }
 
 float3 CookTorranceBRDF(SurfaceData surface,ShadingData shading_data,LightData light_data)

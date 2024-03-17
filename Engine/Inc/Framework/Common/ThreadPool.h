@@ -208,7 +208,7 @@ namespace Ailu
 		std::string _pool_name;
 		std::vector<TimeMgr> _timers;
 	};
-	extern Scope<ThreadPool> g_thread_pool;
+	extern Scope<ThreadPool> g_pThreadTool;
 }
 
 

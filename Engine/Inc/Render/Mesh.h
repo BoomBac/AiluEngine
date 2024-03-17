@@ -6,12 +6,20 @@
 #include "GlobalMarco.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Render/Buffer.h"
-#include "Framework/Math/AABB.h"
+#include "Framework/Math/Geometry.h"
 #include "Animation/Skeleton.h"
 
 
 namespace Ailu
 {
+	struct ImportedMaterialInfo
+	{
+		String _name;
+		u16 _slot;
+		Array<String, 2> _textures;
+		ImportedMaterialInfo(u16 slot = 0, String name = "") : _slot(slot), _name(name) {};
+	};
+
 	class Mesh
 	{
 		DECLARE_PROTECTED_PROPERTY(origin_path, OriginPath, String)
@@ -37,6 +45,8 @@ namespace Ailu
 		void AddSubmesh(u32* indices, u32 indices_count);
 		bool _is_rhi_res_ready = false;
 		const u16 SubmeshCount() const { return static_cast<u16>(_p_indices.size()); };
+		void AddCacheMaterial(ImportedMaterialInfo material) { _imported_materials.emplace_back(material);};
+		const List<ImportedMaterialInfo>& GetCacheMaterials() const { return _imported_materials; };
 	public:
 		u32 _vertex_count;
 		AABB _bound_box;
@@ -49,6 +59,7 @@ namespace Ailu
 		Vector4f* _tangents;
 		Vector2f** _uv;
 		Vector<std::tuple<u32*, u32>> _p_indices;
+		List<ImportedMaterialInfo> _imported_materials;
 	};
 
 	class SkinedMesh : public Mesh

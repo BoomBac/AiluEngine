@@ -2,6 +2,7 @@ guid: 107bfe23-2d50-48b3-a27d-a684c7d136aa
 type: material
 name: CustomSkyBox
 shader_path: Shaders/skybox.hlsl
+  prop_type: Uint
   prop_type: Float
     expo: 0.492
   prop_type: Vector

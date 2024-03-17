@@ -1,14 +1,17 @@
+Normal: Begin init resource mgr...
+Warning: Unused shader prop InvertColor been added;
+Warning: Unused shader prop ColorOverlay been added;
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
 Normal: Load material asset at path Materials/CustomSkyBox.almat
-Normal: Load material asset at path Materials/StandardPBR_new.alasset
-Normal: Load material asset at path Materials/WireFrame_new.alasset
-Normal: Load material asset at path Materials/BoneWeight.almat
-Normal: Load material asset at path Materials/aa.almat
-Normal: Load material asset at path Materials/Role.almat
-Warning: Unused shader prop InvertColor been added;
-Warning: Unused shader prop ColorOverlay been added;
-Normal: ResourceMgr end
+Normal: Load material asset at path Materials/grass.almat
+Normal: Load material asset at path Materials/StandardPBR_new.almat
+Normal: Load material asset at path Materials/WireFrame_new.almat
+Normal: Resource mgr init finish after 10.3697ms
+Normal: Begin init scene mgr...
 Normal: Begin load scene from C:/AiluEngine/Engine/Scenes/default.almap...
 Normal: SceneMgr end
-Normal: Init end
+Normal: Scene mgr init finish after 5.5614ms
+Normal: Begin init renderer...
+Normal: Renderer init finish after 131.729ms
+Normal: Application Init end

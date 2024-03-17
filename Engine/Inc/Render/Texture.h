@@ -73,7 +73,7 @@ namespace Ailu
 					{
 						for (int j = 0; j < task_num; j++)
 						{
-							task_status.emplace_back(g_thread_pool->Enqueue(downsample_sub_task, j * sub_task_block_size, (j + 1) * sub_task_block_size,
+							task_status.emplace_back(g_pThreadTool->Enqueue(downsample_sub_task, j * sub_task_block_size, (j + 1) * sub_task_block_size,
 								i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width));
 							//downsample_sub_task(j * sub_task_block_size, (j + 1) * sub_task_block_size, i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width);
 						}
@@ -228,6 +228,7 @@ namespace Ailu
 		EALGFormat GetFormat() const { return _format; };
 		ETextureResState GetState() const { return _state; }
 		bool operator==(const RenderTexture& other) const { return _rt_handle._id == other._rt_handle._id; }
+		inline static Vector<Ref<RenderTexture>> s_all_render_texture;
 	protected:
 		std::string _name;
 		RTHandle _rt_handle;

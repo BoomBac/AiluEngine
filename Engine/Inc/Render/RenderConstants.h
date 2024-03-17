@@ -12,12 +12,12 @@ namespace Ailu
 	namespace RenderConstants
 	{
 		constexpr static u8  kFrameCount = 2u;
-		constexpr static uint16_t kMaxMaterialDataCount = 24u;
+		constexpr static uint16_t kMaxMaterialDataCount = 128u;
 		constexpr static u32 kMaxRenderObjectCount = 50u;
 		constexpr static u32 kMaxPassDataCount = 10u;
-		constexpr static u32 kMaxTextureCount = 16u;
+		constexpr static u32 kMaxTextureCount = 128u;
 		constexpr static u8  kMaxUAVTextureCount = 10U;
-		constexpr static u32 kMaxRenderTextureCount = 16u;
+		constexpr static u32 kMaxRenderTextureCount = 32u;
 		constexpr static u32 KMaxDynamicVertexNum = 2048;
 		constexpr static u8  kMaxVertexAttrNum = 10u;
 

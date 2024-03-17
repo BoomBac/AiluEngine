@@ -1,9 +1,7 @@
 #pragma once
 #ifndef __GIZMO_H__
 #define __GIZMO_H__
-#include <functional>
-
-#include "Framework/Math/ALMath.hpp"
+#include "Framework/Math/Geometry.h"
 #include "Buffer.h"
 #include "Camera.h"
 #include "CommandBuffer.h"
@@ -54,9 +52,9 @@ namespace Ailu
             }
         }
 
-        static void DrawAABB(const std::tuple<Vector3f, Vector3f>& aabb, Color color = Gizmo::s_color)
+        static void DrawAABB(const AABB& aabb, Color color = Gizmo::s_color)
         {
-            DrawAABB(std::get<0>(aabb), std::get<1>(aabb), color);
+            DrawAABB(aabb._min, aabb._max, color);
         }
 
         static void DrawAABB(const Vector3f& minPoint, const Vector3f& maxPoint, Color color = Gizmo::s_color)

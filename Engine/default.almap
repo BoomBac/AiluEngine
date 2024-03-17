@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: -580.852,911.76,2372.32
-  Rotation: 0.0360902,0.96278,-0.164207,0.211631
+  Position: -846.171,412.891,-593.802
+  Rotation: -0.0186701,-0.480196,0.0102247,-0.876903
   Fov: 60
   Aspect: 1.77778
-  Near: 44.44
-  Far: 98279.6
-  ControllerRotation: 19.3592,23195.2
+  Near: 76.58
+  Far: 118818
+  ControllerRotation: 2.4396,28497.4
 SceneGraph: 
   Name: root
     Components: 
@@ -15,52 +15,42 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,9.72351e-06,0,1
         Scale: -13.99,0.01,0.01
-    Children: 6
+    Children: 5
       Name: plane
         Components: 
           TransformComponent: 
             Position: 0,0,0
             Rotation: 0,9.72351e-06,0,1
-            Scale: 40,1,40
+            Scale: 25,1,25
           StaticMeshComponent: 
             MeshPath: plane
-            MaterialPath0: Materials/StandardPBR_new.alasset
-        Children: 0
-      Name: skybox
-        Components: 
-          TransformComponent: 
-            Position: 0,0,0
-            Rotation: 0,6.75513e-08,0,1
-            Scale: 500,500,500
-          StaticMeshComponent: 
-            MeshPath: cube
-            MaterialPath0: Materials/CustomSkyBox.almat
+            MaterialPath0: Materials/StandardPBR_new.almat
         Children: 0
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: -5000,3811,0
-            Rotation: -0.291974,0.6215,0.268624,0.675522
+            Position: -5000,5000,0
+            Rotation: 0.298668,-0.640935,0.298668,0.640935
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
-            Intensity: 1.407
+            Intensity: 2.586
             CastShadow: true
-            ShadowArea: 8376.38
-            ShadowDistance: 9059.53
+            ShadowArea: 5206.37
+            ShadowDistance: 10521.8
         Children: 0
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: 227,189,-29
-            Rotation: -0.0235722,-9.9048e-05,0.00072298,0.999722
+            Position: 55,366,-39
+            Rotation: 0,0.24869,0,0.968583
             Scale: 1,1,1
           LightComponent: 
             Type: Point
-            Color: 0.754122,0.838235,0.12327
-            Intensity: 2.344
-            Radius: 722
+            Color: 0.688327,0.818627,0.26485
+            Intensity: 3.767
+            Radius: 733
             CastShadow: false
             ShadowArea: 0
             ShadowDistance: 0
@@ -68,27 +58,27 @@ SceneGraph:
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: 846,845,-374
-            Rotation: 0.00302879,0.148037,-0.160967,0.97579
+            Position: 846,845,-1411
+            Rotation: -0.00308869,0.148036,-0.120523,0.981606
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
             Color: 0.0395761,0.518758,0.897059
-            Intensity: 2.403
+            Intensity: 3.97
             Radius: 2868
-            Inner: 46.978
+            Inner: 42.293
             Outer: 60
             CastShadow: false
             ShadowArea: 0
             ShadowDistance: 0
         Children: 0
-      Name: monkey
+      Name: object1
         Components: 
           TransformComponent: 
-            Position: 85,236,968
-            Rotation: 1.10941e-07,0.349635,-2.18065e-07,0.936886
+            Position: 0,152,0
+            Rotation: -4.30756e-08,0.809017,-4.30756e-08,0.587785
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey
-            MaterialPath0: Materials/StandardPBR_new.alasset
+            MaterialPath0: Materials/StandardPBR_new.almat
         Children: 0

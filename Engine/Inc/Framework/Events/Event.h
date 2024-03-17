@@ -10,7 +10,7 @@ namespace Ailu
 	enum class EEventType
 	{
 		kNone = 0,
-		kWindowClose,kWindowResize,kWindowFocus,kWindowLostFocus,kWindowMoved,
+		kWindowClose,kWindowResize,kWindowFocus,kWindowLostFocus,kWindowMoved, kWindowMinimize,kWindowMaximize,
 		kAppTick,kAppUpdate,kAppRender,
 		kKeyPressed,kKeyReleased,
 		kMouseButtonPressed,kMouseButtonReleased,kMouseMoved,kMouseScrolled,

@@ -89,6 +89,30 @@ namespace Ailu
 	private:
 		WString _sys_path;
 	};
+
+	class AILU_API WindowMinimizeEvent : public Event
+	{
+	public:
+		WindowMinimizeEvent() {};
+		std::string ToString() const override
+		{
+			return "WindowMinimizeEvent";
+		}
+		EVENT_CLASS_TYPE(kWindowMinimize)
+		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
+	};
+	
+	class AILU_API WindowMaximizeEvent : public Event
+	{
+	public:
+		WindowMaximizeEvent() {};
+		std::string ToString() const override
+		{
+			return "WindowMaximizeEvent";
+		}
+		EVENT_CLASS_TYPE(kWindowMaximize)
+		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
+	};
 }
 
 #pragma warning(pop)

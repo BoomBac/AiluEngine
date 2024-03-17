@@ -20,10 +20,12 @@ namespace Ailu
 
         void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot = 255) final;
         void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) final;
-        void ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth) final;
+        void ClearRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth) final;
+        void ClearRenderTarget(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color, u16 index = 0u) final;
         void ClearRenderTarget(RenderTexture* depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
         void SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth) final;
+        void SetRenderTargets(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth) final;
         void SetRenderTarget(Ref<RenderTexture>& color, u16 index = 0u) final;
         void SetRenderTarget(RenderTexture* color, RenderTexture* depth) final;
         void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) final;
@@ -34,11 +36,11 @@ namespace Ailu
         void SetScissorRects(const std::initializer_list<Rect>& rects) final;
         void SetViewport(const Rect& viewport) final;
         void SetScissorRect(const Rect& rect) final;
-        void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, u32 instance_count = 1u) final;
-        void DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count = 1u) final;
-        void DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) final;
-        void DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
-        void DrawRenderer(Mesh* mesh, Material* material, u32 instance_count = 1u) final;
+        u16 DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh* mesh, Material* material, u32 instance_count = 1u) final;
         void ResolveToBackBuffer(Ref<RenderTexture>& color) final;
         void Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 

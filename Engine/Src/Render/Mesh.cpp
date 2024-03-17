@@ -65,6 +65,7 @@ namespace Ailu
 			DESTORY_PTRARR(std::get<0>(indices));
 		}
 		_p_indices.clear();
+		_imported_materials.clear();
 		_vertex_count = 0;
 	}
 

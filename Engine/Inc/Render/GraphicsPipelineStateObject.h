@@ -56,7 +56,6 @@ namespace Ailu
 	class GraphicsPipelineStateObject
 	{
 	public:
-		inline static GraphicsPipelineStateObject* sCurrent = 0;
 		static Scope<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer& initializer);
 		static ALHash::Hash<64> ConstructPSOHash(u8 input_layout,u32 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
 		static void ConstructPSOHash(ALHash::Hash<64>& hash,u8 input_layout,u32 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
@@ -69,30 +68,26 @@ namespace Ailu
 		virtual void Bind(CommandBuffer* cmd) = 0;
 		virtual void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) = 0;
 		virtual void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, const String& name) = 0;
+		virtual bool IsValidPipelineResource(const EBindResDescType& res_type, u8 slot) const = 0;
 		virtual const ALHash::Hash<64>& Hash() = 0;
 		virtual const String& Name() const = 0;
 	protected:
 		virtual void BindResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) = 0;
-	};
-
-	enum EGraphicsPSO : u32
-	{
-		kStandShadering = 0u,
-		kWireFrame = 1u,
-		kShadedWireFrame = 3u,
-		kGizmo = 4u,
+		struct BindResDescSlotOffset
+		{
+			u8 kConstBuffer = 32;
+			u8 kTexture2D = 64;
+			u8 kTextureCube = 96;
+			u8 kSampler = 128;
+		};
 	};
 
 	class GraphicsPipelineStateMgr
 	{
 	public:
+		inline static Scope<GraphicsPipelineStateObject> s_gizmo_pso = nullptr;
 		static void BuildPSOCache();
 		static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
-		static GraphicsPipelineStateObject* GetPso(const u32& id);
-		inline static GraphicsPipelineStateObject* s_standard_shadering_pso = nullptr;
-		inline static GraphicsPipelineStateObject* s_gizmo_pso = nullptr;
-		inline static GraphicsPipelineStateObject* s_wireframe_pso = nullptr;
-		static void EndConfigurePSO();
 		static void EndConfigurePSO(CommandBuffer* cmd);
 		static void OnShaderRecompiled(Shader* shader);
 		static void ConfigureShader(const u32& shader_hash);
@@ -104,6 +99,8 @@ namespace Ailu
 		static void ConfigureRenderTarget(const u8& hash);// 44~46 3
 		static void SetRenderTargetState(EALGFormat color_format,EALGFormat depth_format, u8 color_rt_id = 0);
 		static void SetRenderTargetState(EALGFormat color_format,u8 color_rt_id = 0);
+		//call before cmd->SetRenderTarget
+		static void ResetRenderTargetState();
 
 		static bool IsReadyForCurrentDrawCall() { return s_is_ready; }
 
@@ -112,7 +109,6 @@ namespace Ailu
 	private:
 		inline static Queue<Scope<GraphicsPipelineStateObject>> s_update_pso{};
 		inline static std::map<ALHash::Hash<64>, Scope<GraphicsPipelineStateObject>> s_pso_library{};
-		inline static std::unordered_map<u32, Scope<GraphicsPipelineStateObject>> s_pso_pool{};
 		inline static u32 s_reserved_pso_id = 32u;
 		inline static List<PipelineResourceInfo> s_bind_resource_list{};
 		inline static bool s_is_ready = false;

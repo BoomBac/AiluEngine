@@ -241,11 +241,21 @@ namespace Ailu
 		return 0;
 		case WM_SIZE:
 		{
-			u32 w = static_cast<u32>(lParam & 0XFFFF), h = static_cast<u32>(lParam >> 16);
-			_data.Width = w;
-			_data.Height = h;
-			WindowResizeEvent e(w, h);
-			_data.Handler(e);
+			if (wParam == SIZE_MINIMIZED) 
+			{
+				WindowMinimizeEvent e;
+				_data.Handler(e);
+			}
+			else 
+			{
+				u32 w = static_cast<u32>(lParam & 0XFFFF), h = static_cast<u32>(lParam >> 16);
+				_data.Width = w;
+				_data.Height = h;
+				WindowResizeEvent e(w, h);
+				_data.Handler(e);
+			}
+
+
 		}
 		return 0;
 		case WM_MOUSEMOVE:

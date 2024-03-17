@@ -26,10 +26,12 @@ namespace Ailu
         virtual u32 GetID() = 0;
 
         virtual void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) = 0;
-        virtual void ClearRenderTarget(Ref<RenderTexture> color, Ref<RenderTexture> depth, Vector4f clear_color, float clear_depth) = 0;
+        virtual void ClearRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth) = 0;
+        virtual void ClearRenderTarget(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth) = 0;
         virtual void ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color,u16 index = 0u) = 0;
         virtual void ClearRenderTarget(RenderTexture* depth, float depth_value = 1.0f,u8 stencil_value = 0u) = 0;
         virtual void SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth) = 0;
+        virtual void SetRenderTargets(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth) = 0;
         virtual void SetRenderTarget(RenderTexture* color, RenderTexture* depth) = 0;
         virtual void SetRenderTarget(Ref<RenderTexture>& color,u16 index = 0u) = 0;
         virtual void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) = 0;
@@ -40,11 +42,11 @@ namespace Ailu
         virtual void SetScissorRects(const std::initializer_list<Rect>& rects) = 0;
         virtual void SetViewport(const Rect& viewport) = 0;
         virtual void SetScissorRect(const Rect& rect) = 0;
-        virtual void DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, u32 instance_count = 1u) = 0;
-        virtual void DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count = 1u) = 0;
-        virtual void DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) = 0;
-        virtual void DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index,u32 instance_count = 1u) = 0;
-        virtual void DrawRenderer(Mesh* mesh, Material* material,u32 instance_count = 1u) = 0;
+        virtual u16 DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, u32 instance_count = 1u) = 0;
+        virtual u16 DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count = 1u) = 0;
+        virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) = 0;
+        virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index,u32 instance_count = 1u) = 0;
+        virtual u16 DrawRenderer(Mesh* mesh, Material* material,u32 instance_count = 1u) = 0;
         virtual void ResolveToBackBuffer(Ref<RenderTexture>& color) = 0;
         virtual void Dispatch(ComputeShader* cs,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
 	};

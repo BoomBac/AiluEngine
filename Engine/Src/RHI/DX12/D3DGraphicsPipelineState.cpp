@@ -20,6 +20,11 @@ namespace Ailu
 		{
 			auto d3dshader = static_cast<D3DShader*>(_state_desc._p_vertex_shader);
 			_p_bind_res_desc_infos = const_cast<std::unordered_map<std::string, ShaderBindResourceInfo>*>(&d3dshader->GetBindResInfo());
+			_bind_res_desc_type_lut.clear();
+			for(auto& it : *_p_bind_res_desc_infos)
+			{
+				_bind_res_desc_type_lut.insert(std::make_pair(it.second._bind_slot,it.second._res_type));
+			}
 			auto it = _p_bind_res_desc_infos->find(RenderConstants::kCBufNameSceneState);
 			if (it != _p_bind_res_desc_infos->end())
 			{
@@ -37,7 +42,8 @@ namespace Ailu
 			_d3d_pso_desc.PrimitiveTopologyType = D3DConvertUtils::ConvertToDXTopologyType(_state_desc._topology);
 
 			_d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::kALGFormatUnknown? 0 : _state_desc._rt_state._color_rt_num;
-			if (_state_desc._depth_stencil_state._b_depth_write) _d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._rt_state._depth_rt);
+			if (_state_desc._depth_stencil_state._b_depth_write || _state_desc._depth_stencil_state._depth_test_func != ECompareFunc::kAlways)
+				_d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._rt_state._depth_rt);
 			for (u16 i = 0; i < _d3d_pso_desc.NumRenderTargets; i++)
 			{
 				_d3d_pso_desc.RTVFormats[i] = ConvertToDXGIFormat(_state_desc._rt_state._color_rt[i]);
@@ -46,11 +52,11 @@ namespace Ailu
 			_d3d_pso_desc.SampleDesc.Count = 1;
 			ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
 			_b_build = true;
-			LOG_INFO("rt hash {}", (u32)_state_desc._rt_state.Hash());
+			//LOG_INFO("rt hash {}", (u32)_state_desc._rt_state.Hash());
 			_hash = ConstructPSOHash(_state_desc);
 		}
 		static u16 count = 0;
-		LOG_WARNING("PipelineState build {}!", count++);
+		//LOG_WARNING("PipelineState build {}!", count++);
 	}
 
 	void D3DGraphicsPipelineState::Bind(CommandBuffer* cmd)
@@ -86,14 +92,33 @@ namespace Ailu
 		}
 	}
 
+	bool D3DGraphicsPipelineState::IsValidPipelineResource(const EBindResDescType& res_type, u8 slot) const
+	{
+		if (_bind_res_desc_type_lut.contains(slot))
+		{
+			auto range = _bind_res_desc_type_lut.equal_range(slot);
+			for (auto it = range.first; it != range.second; ++it) 
+			{
+				if(it->second == res_type)
+					return true;
+			}
+		}
+		return false;
+	}
+
 	void D3DGraphicsPipelineState::BindResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot)
 	{
+		u8 bind_slot = slot == 255 ? _per_frame_cbuf_bind_slot : slot;
+		if (!IsValidPipelineResource(res_type, bind_slot))
+		{
+			LOG_WARNING("PSO:{} submitBindResource: bind slot {} not found!",_name,(u16)bind_slot);
+			return;
+		}
 		static auto context = D3DContext::GetInstance();
 		switch (res_type)
 		{
 		case Ailu::EBindResDescType::kConstBuffer:
 		{
-			u8 bind_slot = slot == 255 ? _per_frame_cbuf_bind_slot : slot;
 			//D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
 			//context->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, view.BufferLocation);
 			static_cast<ConstantBuffer*>(res)->Bind(cmd,bind_slot);

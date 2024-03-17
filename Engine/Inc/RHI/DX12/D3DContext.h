@@ -9,6 +9,7 @@
 #include "Render/GraphicsContext.h"
 #include "Platform/WinWindow.h"
 #include "Framework/Math/ALMath.hpp"
+#include "Framework/Common/TimeMgr.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -36,7 +37,7 @@ namespace Ailu
         D3D12_CPU_DESCRIPTOR_HANDLE GetRTVDescriptorHandle();
         D3D12_CPU_DESCRIPTOR_HANDLE GetDSVDescriptorHandle();
 
-        void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
+        u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void BeginBackBuffer(CommandBuffer* cmd);
         void EndBackBuffer(CommandBuffer* cmd);
         void DrawOverlay(CommandBuffer* cmd);
@@ -63,8 +64,6 @@ namespace Ailu
         ComPtr<ID3D12Resource> _depth_buffer[RenderConstants::kFrameCount];
         ComPtr<ID3D12CommandAllocator> m_commandAllocators[RenderConstants::kFrameCount];
         ComPtr<ID3D12CommandQueue> m_commandQueue;
-        ComPtr<ID3D12RootSignature> m_rootSignature;
-        ComPtr<ID3D12PipelineState> m_pipelineState;
         ComPtr<ID3D12GraphicsCommandList> m_commandList;
         ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
         ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
@@ -79,7 +78,7 @@ namespace Ailu
         ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
         std::unordered_map<u32, u64> _cmd_target_fence_value;
         Queue<RHIResourceTask> _resource_task;
-
+        TimeMgr _timer;
         u32 _width;
         u32 _height;
         float m_aspectRatio;

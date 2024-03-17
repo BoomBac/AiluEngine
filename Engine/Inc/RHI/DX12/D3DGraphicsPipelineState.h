@@ -74,6 +74,8 @@ namespace Ailu
 		void Bind(CommandBuffer* cmd) final;
 		void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) final;
 		void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, const String& name) final;
+		//just compare res type is same by slot,maybe cause some error
+		bool IsValidPipelineResource(const EBindResDescType& res_type, u8 slot) const final;
 		const ALHash::Hash<64>& Hash() final { return _hash; };
 		const String& Name() const final { return _name; };
 	private:
@@ -88,6 +90,7 @@ namespace Ailu
 		ComPtr<ID3D12RootSignature>_p_sig;
 		ID3D12GraphicsCommandList* _p_cmd;
 		std::unordered_map<std::string, ShaderBindResourceInfo>* _p_bind_res_desc_infos = nullptr;
+		std::unordered_multimap<u8,EBindResDescType> _bind_res_desc_type_lut;
 		ALHash::Hash<64> _hash;
 	};
 }
