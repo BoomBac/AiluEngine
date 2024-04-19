@@ -2058,6 +2058,18 @@
     <ClInclude Include="Inc\Render\Pass\SSAO.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\DescriptorAllocation.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\DescriptorAllocator.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\DescriptorAllocatorPage.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\DynamicDescriptorHeap.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2244,6 +2256,18 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\Pass\SSAO.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\DescriptorAllocator.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\DescriptorAllocatorPage.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\DescriptorAllocation.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\DynamicDescriptorHeap.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -260,7 +260,7 @@ namespace Ailu
 	SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
 	{
 		_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.hlsl"), "SkyboxPP");
-		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
+		_p_quad_mesh = MeshPool::GetMesh("sphere");
 	}
 	void SkyboxPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{

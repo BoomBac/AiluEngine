@@ -32,6 +32,7 @@ namespace Ailu
         Window* GetWindowPtr() { return _p_window; }
 
         static Application* GetInstance();
+        inline static u64 s_frame_count = 0u;
     private:
         bool OnWindowClose(WindowCloseEvent& e);
         bool OnGetFoucus(WindowFocusEvent& e);

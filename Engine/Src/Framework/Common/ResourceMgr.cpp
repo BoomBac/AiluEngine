@@ -117,9 +117,12 @@ namespace Ailu
 		MeshPool::AddMesh("cube", new_mesh);
 		new_mesh = parser->Parser(PathUtils::GetResSysPath("Meshs/monkey.fbx")).front();
 		new_mesh->BuildRHIResource();
+		MeshPool::AddMesh("monkey", new_mesh);
 		//MeshPool::AddMesh("cone", parser->Parser(GetResSysPath("Meshs/cone.fbx")).front());
 		//MeshPool::AddMesh("cylinder", parser->Parser(GetResSysPath("Meshs/cylinder.fbx")).front());
-		MeshPool::AddMesh("monkey", new_mesh);
+		//new_mesh = parser->Parser(PathUtils::GetResSysPath("Meshs/skybox.fbx")).front();
+		//new_mesh->BuildRHIResource();
+		//MeshPool::AddMesh("skybox", new_mesh);
 		//MeshPool::AddMesh("torus", parser->Parser(GetResSysPath("Meshs/torus.fbx")).front());
 		auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
 		Vector<Vector3f> vertices = {

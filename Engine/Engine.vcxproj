@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -554,7 +554,11 @@
     <ClInclude Include="Inc\RHI\DX12\D3DGraphicsPipelineState.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DShader.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DTexture.h" />
+    <ClInclude Include="Inc\RHI\DX12\DescriptorAllocation.h" />
+    <ClInclude Include="Inc\RHI\DX12\DescriptorAllocator.h" />
+    <ClInclude Include="Inc\RHI\DX12\DescriptorAllocatorPage.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
+    <ClInclude Include="Inc\RHI\DX12\DynamicDescriptorHeap.h" />
     <None Include="Res\Shaders\blit.hlsl" />
     <None Include="Res\Shaders\lighting.hlsli">
       <FileType>Document</FileType>
@@ -631,6 +635,10 @@
     <ClCompile Include="Src\RHI\DX12\D3DGraphicsPipelineState.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DShader.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DTexture.cpp" />
+    <ClCompile Include="Src\RHI\DX12\DescriptorAllocation.cpp" />
+    <ClCompile Include="Src\RHI\DX12\DescriptorAllocator.cpp" />
+    <ClCompile Include="Src\RHI\DX12\DescriptorAllocatorPage.cpp" />
+    <ClCompile Include="Src\RHI\DX12\DynamicDescriptorHeap.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat" />

@@ -110,6 +110,7 @@ namespace Ailu
 				g_pResourceMgr->Tick(delta_time);
 				while (render_lag > kMsPerRender)
 				{
+					s_frame_count++;
 					g_pSceneMgr->Tick(delta_time);
 #ifdef DEAR_IMGUI
 					_p_imgui_layer->Begin();
