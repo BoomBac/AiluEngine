@@ -5,6 +5,7 @@
 
 namespace Ailu
 {
+	const Guid Guid::kEmptyGuid = Guid("");
     Guid Guid::Generate()
     {
         GUID guid;
@@ -39,7 +40,7 @@ namespace Ailu
 	{
 	}
 
-	std::string Guid::ToString() const
+	const std::string& Guid::ToString() const
 	{
 		return _guid;
 	}

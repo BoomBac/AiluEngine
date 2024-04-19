@@ -17,6 +17,8 @@ namespace Ailu
         void Clear() final;
         void Close() final;
         virtual u32 GetID() final { return _id; };
+        const String& GetName() const final { return _name; };
+        void SetName(const String& name) final{ _name = name; };
 
         void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot = 255) final;
         void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) final;
@@ -48,6 +50,7 @@ namespace Ailu
     private:
         u32 _id = 0u;
         bool _b_cmd_closed;
+        String _name;
         ComPtr<ID3D12GraphicsCommandList> _p_cmd;
         ComPtr<ID3D12CommandAllocator> _p_alloc;
     };

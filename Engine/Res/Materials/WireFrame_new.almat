@@ -1,8 +1,0 @@
-guid: 605ef2e4-c8bc-4eb0-8875-de44c14cd29f
-type: material
-name: WireFrame
-shader_path: Shaders/wireframe.hlsl
-  prop_type: Uint
-  prop_type: Float
-  prop_type: Vector
-  prop_type: Texture2D

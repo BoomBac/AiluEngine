@@ -31,6 +31,7 @@ namespace Ailu
         void Finalize() override;
         void Tick(const float& delta_time) override;
         float GetDeltaTime() const;
+        void TakeCapture();
         List<RenderPass*>& GetRenderPasses() { return _render_passes; };
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
     private:
@@ -60,6 +61,7 @@ namespace Ailu
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;
         Camera* _p_scene_camera;
+        Queue<int> _captures;
     };
     extern Renderer* g_pRenderer;
 }

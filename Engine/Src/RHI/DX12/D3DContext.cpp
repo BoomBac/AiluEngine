@@ -10,6 +10,12 @@
 #include "RHI/DX12/dxhelper.h"
 #include "Render/RenderingData.h"
 
+#ifdef _PIX_DEBUG
+#include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
+#endif // _PIX_DEBUG
+
+
+
 
 
 
@@ -145,15 +151,18 @@ namespace Ailu
 
 	u64 D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer>& cmd)
 	{    
-		//for (auto& call : cmd->GetAllCommands())
-		//{
-		//	_all_commands.emplace_back(std::move(call));
-		//}
 		cmd->Close();
 		ID3D12CommandList* ppCommandLists[] = { static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList() };
+#ifdef _PIX_DEBUG
+		PIXBeginEvent(m_commandQueue.Get(), cmd->GetID(), ToWChar(cmd->GetName()));
+#endif // _PIX_DEBUG
 		m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 		++_fence_value;
 		ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value));
+#ifdef _PIX_DEBUG
+		PIXEndEvent(m_commandQueue.Get());
+#endif // _PIX_DEBUG
+
 		if (_cmd_target_fence_value.contains(cmd->GetID()))
 			_cmd_target_fence_value[cmd->GetID()] = _fence_value;
 		else
@@ -181,7 +190,6 @@ namespace Ailu
 	void D3DContext::DrawOverlay(CommandBuffer* cmd)
 	{
 		auto dxcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
-		Gizmo::Submit(cmd);
 #ifdef DEAR_IMGUI
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxcmd);
 #endif // DEAR_IMGUI
@@ -233,6 +241,10 @@ namespace Ailu
 			}
 		}
 #endif
+#ifdef _PIX_DEBUG
+		PIXLoadLatestWinPixGpuCapturerLibrary();
+#endif // _PIX_DEBUG
+
 		ComPtr<IDXGIFactory6> factory;
 		ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
 		ComPtr<IDXGIAdapter4> hardwareAdapter;
@@ -260,7 +272,9 @@ namespace Ailu
 		ThrowIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
 		ThrowIfFailed(swapChain->SetFullscreenState(FALSE, nullptr));
 		ThrowIfFailed(swapChain.As(&m_swapChain));
-
+#if defined(_PIX_DEBUG)
+		PIXSetTargetWindow(hwnd);
+#endif
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
 		CreateDescriptorHeap();
@@ -328,6 +342,14 @@ namespace Ailu
 		// Present the frame.
 		ThrowIfFailed(m_swapChain->Present(1, 0));
 		WaitForGpu();
+		if (_is_cur_frame_capture)
+		{
+#ifdef _PIX_DEBUG
+			PIXEndCapture(true);
+			_is_cur_frame_capture = false;
+			ShellExecute(NULL, L"open", _cur_capture_name.data(), NULL, NULL, SW_SHOWNORMAL);
+#endif // _PIX_DEBUG
+		}
 		//CommandBufferPool::ReleaseAll();
 	}
 
@@ -350,6 +372,22 @@ namespace Ailu
 	void D3DContext::SubmitRHIResourceBuildTask(RHIResourceTask task)
 	{
 		_resource_task.push(task);
+	}
+
+	void D3DContext::TakeCapture()
+	{
+#ifdef _PIX_DEBUG
+		LOG_WARNING("Begin take capture...")
+			static PIXCaptureParameters parms{};
+		static u32 s_capture_count = 0u;
+		_cur_capture_name = std::format(L"{}_{}.{}", L"NewCapture", s_capture_count++, L".wpix");
+		parms.GpuCaptureParameters.FileName = _cur_capture_name.data();
+		PIXBeginCapture(PIX_CAPTURE_GPU, &parms);
+		_is_cur_frame_capture = true;
+#else
+		LOG_WARNING("No available gpu debug enabled!");
+#endif // _PIX_DEBUG
+
 	}
 
 

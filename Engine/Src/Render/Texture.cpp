@@ -3,6 +3,7 @@
 #include "Render/Renderer.h"
 #include "RHI/DX12/D3DTexture.h"
 #include "Framework/Parser/AssetParser.h"
+#include "Framework/Common/Asset.h"
 
 namespace Ailu
 {
@@ -57,13 +58,26 @@ namespace Ailu
 	{
 		return nullptr;
 	}
-	void* Texture2D::GetGPUNativePtr()
-	{
-		return nullptr;
-	}
+
 	const ETextureType Texture2D::GetTextureType() const
 	{
 		return ETextureType::kTexture2D;
+	}
+	const Guid& Texture2D::GetGuid() const
+	{
+		if (_p_asset_owned_this)
+		{
+			return _p_asset_owned_this->GetGuid();
+		}
+		return Guid::EmptyGuid();
+	}
+
+	void Texture2D::AttachToAsset(Asset* asset)
+	{
+		AL_ASSERT(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
+		_p_asset_owned_this = asset;
+		asset->_p_inst_asset = this;
+		asset->_name = ToWChar(_name);
 	}
 	void Texture2D::Name(const std::string& name)
 	{
@@ -124,10 +138,7 @@ namespace Ailu
 	{
 		return nullptr;
 	}
-	void* TextureCubeMap::GetGPUNativePtr()
-	{
-		return nullptr;
-	}
+
 	const ETextureType TextureCubeMap::GetTextureType() const
 	{
 		return ETextureType::kTextureCubeMap;
@@ -166,10 +177,7 @@ namespace Ailu
 	{
 		return nullptr;
 	}
-	void* RenderTexture::GetGPUNativePtr()
-	{
-		return nullptr;
-	}
+
 	const ETextureType RenderTexture::GetTextureType() const
 	{
 		return ETextureType::kRenderTexture;

@@ -22,6 +22,8 @@
 #include "Render/Mesh.h"
 #include "Animation/Clip.h"
 #include "Render/Renderer.h"
+#include "Framework/ImGui/Widgets/AssetBrowser.h"
+#include "Framework/ImGui/Widgets/AssetTable.h"
 
 namespace ImguiTree
 {
@@ -84,60 +86,6 @@ namespace Ailu
 		static bool s_is_texture_selector_open = true;
 		static u32 s_common_property_handle = 0u;
 		static String s_texture_selector_ret = "none";
-	}
-
-	static String OpenTextureSelector(int id)
-	{
-		TreeStats::s_texture_selector_ret = "none";
-		static i16 s_pre_tex_selector_id = -1;
-		static int s_selected_img_index = -1;
-		static String selected_tex_name{ "none" };
-		if (TreeStats::s_is_texture_selector_open)
-		{
-			ImGui::Begin("TextureSelector", &TreeStats::s_is_texture_selector_open);
-			static float preview_tex_size = 128;
-			//// 获取当前ImGui窗口的内容区域宽度
-			u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
-			int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
-			imagesPerRow += imagesPerRow == 0 ? 1 : 0;
-			if (s_pre_tex_selector_id != id) s_selected_img_index = -1;
-			static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
-			int tex_count = 0;
-
-			for (auto& [tex_name, tex] : TexturePool::GetAllResourceMap())
-			{
-				if (tex->GetTextureType() == ETextureType::kTexture2D)
-				{
-					auto& desc = std::static_pointer_cast<D3DTexture2D>(tex)->GetSRVGPUHandle();
-					ImGui::BeginGroup();
-					ImGuiContext* context = ImGui::GetCurrentContext();
-					auto drawList = context->CurrentWindow->DrawList;
-					if (ImGui::ImageButton((void*)(intptr_t)desc.ptr, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
-					{
-						s_selected_img_index = tex_count;
-						LOG_INFO("selected img {}", s_selected_img_index);
-					}
-					if (s_selected_img_index == tex_count)
-					{
-						ImVec2 cur_img_pos = ImGui::GetCursorPos();
-						ImVec2 imgMin = ImGui::GetItemRectMin();
-						ImVec2 imgMax = ImGui::GetItemRectMax();
-						drawList->AddRect(imgMin, imgMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 2.0f);
-						selected_tex_name = tex_name;
-					}
-					ImGui::Text("%s", tex->Name().c_str());
-					ImGui::EndGroup();
-					if ((tex_count + 1) % imagesPerRow != 0)
-					{
-						ImGui::SameLine();
-					}
-					++tex_count;
-				}
-			}
-			ImGui::End();
-			s_pre_tex_selector_id = id;
-		}
-		return s_selected_img_index == -1 ? "none" : selected_tex_name;
 	}
 
 	static void DrawProperty(SerializableProperty& prop, Object* obj, TextureSelector& selector_window)
@@ -365,8 +313,6 @@ namespace Ailu
 		func_show_prop(mat_prop_index, mat, "Roughness");
 		func_show_prop(mat_prop_index, mat, "Metallic");
 		func_show_prop(mat_prop_index, mat, "Emssive");
-		if (TreeStats::s_cur_opened_texture_selector != -1)
-			TreeStats::s_texture_selector_ret = OpenTextureSelector(TreeStats::s_cur_opened_texture_selector);
 	}
 
 	static void DrawComponentProperty(Component* comp, TextureSelector& selector_window)
@@ -481,7 +427,7 @@ namespace Ailu
 				ImGui::SameLine();
 				if (ImGui::Button("Remove Material"))
 				{
-					static_mesh_comp->RemoveMaterial(materials.size() - 1);
+					static_mesh_comp->RemoveMaterial(static_cast<u16>(materials.size() - 1));
 					g_pSceneMgr->MarkCurSceneDirty();
 				};
 				for (int i = 0; i < materials.size(); i++)
@@ -624,24 +570,11 @@ namespace Ailu
 		}
 	}
 
-	Ailu::ImGUILayer::ImGUILayer() : Layer("ImGUILayer")
+	Ailu::ImGUILayer::ImGUILayer() : ImGUILayer("ImGUILayer")
 	{
 	}
 
 	ImGUILayer::ImGUILayer(const String& name) : Layer(name)
-	{
-	}
-
-	Ailu::ImGUILayer::~ImGUILayer()
-	{
-		// Cleanup
-		ImGui_ImplDX12_Shutdown();
-		ImGui_ImplWin32_Shutdown();
-		ImGui::DestroyContext();
-	}
-	static ImFont* font0 = nullptr;
-
-	void Ailu::ImGUILayer::OnAttach()
 	{
 		IMGUI_CHECKVERSION();
 		auto context = ImGui::CreateContext();
@@ -652,7 +585,7 @@ namespace Ailu
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
-		font0 = io.Fonts->AddFontFromFileTTF(PathUtils::GetResSysPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
+		_font = io.Fonts->AddFontFromFileTTF(PathUtils::GetResSysPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
 		io.Fonts->Build();
 		ImGuiStyle& style = ImGui::GetStyle();
 		// Setup Dear ImGui style
@@ -667,7 +600,21 @@ namespace Ailu
 		}
 
 		ImGui_ImplWin32_Init(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
-		_asset_browser.Open(21);
+	}
+
+	Ailu::ImGUILayer::~ImGUILayer()
+	{
+		// Cleanup
+		ImGui_ImplDX12_Shutdown();
+		ImGui_ImplWin32_Shutdown();
+		ImGui::DestroyContext();
+	}
+
+	void Ailu::ImGUILayer::OnAttach()
+	{
+		_asset_browser = new AssetBrowser();
+		_asset_browser->Open(21);
+		_asset_table = new AssetTable();
 	}
 
 	void Ailu::ImGUILayer::OnDetach()
@@ -675,6 +622,8 @@ namespace Ailu
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 		ImGui::DestroyContext();
+		DESTORY_PTR(_asset_browser);
+		DESTORY_PTR(_asset_table);
 	}
 
 	void Ailu::ImGUILayer::OnEvent(Event& e)
@@ -687,7 +636,8 @@ namespace Ailu
 
 	void Ailu::ImGUILayer::OnImguiRender()
 	{
-		ImGui::PushFont(font0);
+		//ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+		ImGui::PushFont(_font);
 		ImGui::Begin("Performace Statics");                          // Create a window called "Hello, world!" and append into it.
 		ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
 		ImGui::Text("FrameTime: %.2f ms", ModuleTimeStatics::RenderDeltatime);
@@ -721,6 +671,10 @@ namespace Ailu
 		ImGui::Checkbox("Expand", &show);
 		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
 		ImGui::Checkbox("ShowRT", &s_show_rt);
+		if (ImGui::Button("Capture"))
+		{
+			g_pRenderer->TakeCapture();
+		}
 		for (auto& info : g_pResourceMgr->_import_infos)
 		{
 			float x = g_pTimeMgr->GetScaledWorldTime(0.25f);
@@ -732,8 +686,8 @@ namespace Ailu
 		ImGui::PopFont();
 
 		if (show) ImGui::ShowDemoWindow(&show);
-		if (s_show_asset_table) _asset_table.Open(-2);
-		else _asset_table.Close();
+		if (s_show_asset_table) _asset_table->Open(-2);
+		else _asset_table->Close();
 		if (s_show_rt) _rt_view.Open(-3);
 		else _rt_view.Close();
 		TreeStats::s_common_property_handle = 0;
@@ -742,8 +696,8 @@ namespace Ailu
 		_texture_selector.Show();
 		_mesh_browser.Open(20);
 		_mesh_browser.Show();
-		_asset_browser.Show();
-		_asset_table.Show();
+		_asset_browser->Show();
+		_asset_table->Show();
 		_rt_view.Show();
 		//ShowTextureExplorer();
 	}
@@ -819,23 +773,6 @@ namespace Ailu
 			ImGui::EndPopup();
 		}
 		return String{};
-	}
-
-	static std::tuple<ImVec2, ImVec2> GetCurImguiWindowRect()
-	{
-		ImVec2 vMin = ImGui::GetWindowContentRegionMin();
-		ImVec2 vMax = ImGui::GetWindowContentRegionMax();
-		vMin.x += ImGui::GetWindowPos().x;
-		vMin.y += ImGui::GetWindowPos().y;
-		vMax.x += ImGui::GetWindowPos().x;
-		vMax.y += ImGui::GetWindowPos().y;
-		return std::make_tuple(vMin, vMax);
-	}
-
-	static ImVec2 GetCurImguiWindowSize()
-	{
-		auto [vmin, vmax] = GetCurImguiWindowRect();
-		return vmax - vmin;
 	}
 
 	void DrawTreeNode(SceneActor* actor)
@@ -989,70 +926,7 @@ namespace Ailu
 		ImGui::End();
 	}
 
-	void TextureSelector::Show()
-	{
-		if (!_b_show)
-		{
-			_handle = -1;
-			return;
-		}
 
-		ImGui::Begin(std::format("TextureSelector ,handle {}", _handle).c_str(), &_b_show);
-		static float preview_tex_size = 128;
-		//// 获取当前ImGui窗口的内容区域宽度
-		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
-		int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
-		imagesPerRow += imagesPerRow == 0 ? 1 : 0;
-		static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
-		int tex_count = 0;
-		for (auto& [tex_name, tex] : TexturePool::GetAllResourceMap())
-		{
-			if (tex->GetTextureType() == ETextureType::kTexture2D)
-			{
-				ImGui::BeginGroup();
-				ImGuiContext* context = ImGui::GetCurrentContext();
-				auto drawList = context->CurrentWindow->DrawList;
-				if (ImGui::ImageButton(tex->GetGPUNativePtr(), ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
-				{
-					_selected_img_index = tex_count;
-					LOG_INFO("selected img {}", _selected_img_index);
-				}
-				if (_selected_img_index == tex_count)
-				{
-					ImVec2 cur_img_pos = ImGui::GetCursorPos();
-					ImVec2 imgMin = ImGui::GetItemRectMin();
-					ImVec2 imgMax = ImGui::GetItemRectMax();
-					drawList->AddRect(imgMin, imgMax, IM_COL32(255, 0, 0, 255), 0.0f, 0, 2.0f);
-					_cur_selected_texture_path = tex_name;
-				}
-				ImGui::Text("%s", tex->Name().c_str());
-				ImGui::EndGroup();
-				if ((tex_count + 1) % imagesPerRow != 0)
-				{
-					ImGui::SameLine();
-				}
-				++tex_count;
-			}
-		}
-		ImGui::End();
-	}
-	void TextureSelector::Open(const int& handle)
-	{
-		if (handle != _handle)
-			_cur_selected_texture_path = kNull;
-		ImguiWindow::Open(handle);
-		_selected_img_index = -1;
-	}
-	const String& TextureSelector::GetSelectedTexture(const int& handle) const
-	{
-		static String null_tex = kNull;
-		if (_handle == handle)
-		{
-			return _cur_selected_texture_path;
-		}
-		else
-			return null_tex;
-	}
 	//----------------------------------------------------------------------------MeshBrowser----------------------------------------------------------------------
 	void MeshBrowser::Open(const int& handle)
 	{
@@ -1085,208 +959,6 @@ namespace Ailu
 	}
 	//----------------------------------------------------------------------------MeshBrowser---------------------------------------------------------------------
 
-	//----------------------------------------------------------------------------AssetBrowser---------------------------------------------------------------------
-	void AssetBrowser::Open(const int& handle)
-	{
-		ImguiWindow::Open(handle);
-		_cur_dir = kEngineResRootPath;
-	}
-	void AssetBrowser::Show()
-	{
-		static auto new_material_widget = [this]()
-			{
-				static char buf[256];
-				ImGui::InputText("##MaterialName", buf, IM_ARRAYSIZE(buf));
-				static Ref<Shader> selected_shader = nullptr;
-				int count = 0;
-				static int selected_index = -1;
-				if (ImGui::BeginCombo("Select Shader: ", selected_shader ? selected_shader->Name().c_str() : "select shader"))
-				{
-					for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
-					{
-						if (ImGui::Selectable((*it)->Name().c_str(), selected_index == count))
-							selected_index = count;
-						if (selected_index == count)
-							selected_shader = *it;
-						++count;
-					}
-					ImGui::EndCombo();
-				}
-				if (ImGui::Button("OK", ImVec2(120, 0)))
-				{
-					LOG_INFO("{},{}", String{ buf }, selected_shader ? selected_shader->Name() : "null shader");
-					String name{ buf };
-
-					if (!name.empty() && selected_shader)
-					{
-						String sys_path = _cur_dir;
-						if (!sys_path.ends_with("\\") && !sys_path.ends_with("/"))
-							sys_path.append("/");
-						sys_path.append(name).append(".almat");
-						auto asset_path = PathUtils::ExtractAssetPath(sys_path);
-						auto new_mat = MaterialLibrary::CreateMaterial(selected_shader, name, asset_path);
-						new_mat->IsInternal(selected_shader->Name() == "shaders");
-						g_pResourceMgr->SaveAsset(sys_path, new_mat.get());
-					}
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::SameLine();
-				if (ImGui::Button("Cancel", ImVec2(120, 0)))
-				{
-					ImGui::CloseCurrentPopup();
-				}
-			};
-		ImguiWindow::Show();
-		namespace fs = std::filesystem;
-		fs::path cur_path{ _cur_dir };
-		ImGui::Begin("AssetBrowser", &_b_show);
-		auto window_size = GetCurImguiWindowSize();
-
-		ImGui::Text(cur_path.string().c_str());
-		if (ImGui::Button("<-"))
-		{
-
-		}
-		ImGui::SameLine();
-		if (ImGui::Button(" ↑ "))
-		{
-			_cur_dir = cur_path.parent_path().string();
-		}
-		auto asset_content_size = window_size;
-		asset_content_size.x *= 0.9f;
-		asset_content_size.y *= 0.8f;
-
-		static float preview_tex_size = 64;
-		float paddinged_preview_tex_size_padding = preview_tex_size *1.15f;
-		//// 获取当前ImGui窗口的内容区域宽度
-		ImGui::SliderFloat(" ", &preview_tex_size, 16, 256, "%.0f");
-		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
-		u32 icon_num_per_row = window_width / (u32)paddinged_preview_tex_size_padding;
-		icon_num_per_row += icon_num_per_row == 0 ? 1 : 0;
-		static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
-		static fs::directory_entry s_cur_entry(cur_path);
-		fs::directory_iterator curdir_it{ cur_path };
-		static auto folder_snap = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("Editor/folder"));
-		static auto file_us_snap = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("Editor/file_us"));
-		static auto mesh_snap = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("Editor/3d"));
-		static auto shader_snap = std::static_pointer_cast<D3DTexture2D>(TexturePool::Get("Editor/shader"));
-		static int cur_selected_file_index = -1;
-		ImGui::Text("%s", s_cur_entry.path().string().c_str());
-		int file_count = 0;
-		for (auto& dir_it : curdir_it)
-		{
-			bool is_dir = dir_it.is_directory();
-			auto file_name = dir_it.path().filename();
-			auto file_name_str = file_name.string();
-
-			ImGui::BeginGroup();
-			//ImGuiContext* context = ImGui::GetCurrentContext();
-			//auto drawList = context->CurrentWindow->DrawList;
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));
-			ImTextureID tex_id = is_dir? folder_snap->GetGPUNativePtr() : file_us_snap->GetGPUNativePtr();
-			String ext_str = file_name.extension().string();
-			if(ext_str == ".fbx" || ext_str.c_str() == ".FBX")
-			{
-				tex_id = mesh_snap->GetGPUNativePtr();
-			}
-			else if (ext_str == ".hlsl")
-			{
-				tex_id = shader_snap->GetGPUNativePtr();
-			}
-			else
-			{
-			}
-			if (ImGui::ImageButton(tex_id, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
-			{
-				cur_selected_file_index = file_count;
-				LOG_INFO("selected file {}", file_name_str.c_str());
-			}
-			ImGui::PopStyleColor();
-			std::string truncatedText = file_name_str.substr(0, static_cast<size_t>(preview_tex_size / ImGui::CalcTextSize("A").x));
-			ImGui::Text("%s", truncatedText.c_str());
-			//ImGui::Text("%s", file_name_str.c_str());
-			ImGui::EndGroup();
-			if (ImGui::IsItemClicked())
-			{
-				s_cur_entry = dir_it;
-				cur_selected_file_index = file_count;
-			}
-			if (cur_selected_file_index == file_count && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && is_dir)
-				_cur_dir = dir_it.path().string();
-			if ((file_count + 1) % icon_num_per_row != 0)
-			{
-				ImGui::SameLine();
-			}
-			if (ImGui::BeginPopupContextItem(file_name_str.c_str())) // <-- use last item id as popup id
-			{
-				if (ImGui::MenuItem("New"))
-				{
-				}
-				if (ImGui::MenuItem("Rename"))
-				{
-				}
-				if (ImGui::MenuItem("Delete"))
-				{
-				}
-				ImGui::EndPopup();
-			}
-			++file_count;
-			if (ImGui::BeginPopupContextWindow("AssetBrowserContext", ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverExistingPopup))
-			{
-				if (ImGui::BeginMenu("New"))
-				{
-					if (ImGui::MenuItem("Material"))
-					{
-						MarkModalWindoShow(49);
-					}
-					if (ImGui::MenuItem("Shader"))
-					{
-						ShaderLibrary::Add(_cur_dir + "test_new_shader.shader", "test_shader");
-					}
-					ImGui::EndMenu();
-				}
-				ImGui::EndPopup();
-			}
-		}
-		ShowModalDialog("New Material", new_material_widget, 49);
-		ImGui::End();
-	}
-	//----------------------------------------------------------------------------AssetBrowser---------------------------------------------------------------------
-
-	//----------------------------------------------------------------------------AssetTable-----------------------------------------------------------------------
-	void AssetTable::Open(const int& handle)
-	{
-		ImguiWindow::Open(handle);
-	}
-	void AssetTable::Show()
-	{
-		if (!_b_show)
-		{
-			_handle = -1;
-			return;
-		}
-		ImGui::Begin("AssetTable");
-
-		// 表头
-		ImGui::Text("Column 1");
-		ImGui::SameLine(150);
-		ImGui::Text("Column 2");
-		ImGui::SameLine(300);
-		ImGui::Text("Column 3");
-
-		// 分隔线
-		ImGui::Separator();
-		for (auto it = g_pResourceMgr->Begin(); it != g_pResourceMgr->End(); it++)
-		{
-			ImGui::Text(it->first.c_str());
-			ImGui::SameLine(0.f, -20.0f);
-			ImGui::Text(it->second->_asset_path.c_str());
-			// 分隔线
-			ImGui::Separator();
-		}
-		ImGui::End();
-	}
-	//----------------------------------------------------------------------------AssetTable-----------------------------------------------------------------------
 	// 
 	//----------------------------------------------------------------------------RTDebugWindow-----------------------------------------------------------------------
 	void RTDebugWindow::Open(const int& handle)
@@ -1300,46 +972,91 @@ namespace Ailu
 			_handle = -1;
 			return;
 		}
-		//ImGui::Begin("RTDebugWindow");
-		//static float preview_tex_size = 128;
-		////// 获取当前ImGui窗口的内容区域宽度
-		//u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
-		//int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
-		//imagesPerRow += imagesPerRow == 0 ? 1 : 0;
-		//static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
-		//int tex_count = 0;
-		//auto cmd = CommandBufferPool::Get();
-		//for (auto& rt : RenderTexture::s_all_render_texture)
-		//{
-		//	rt->Transition(cmd.get(), ETextureResState::kShaderResource);
-		//}
-		//g_pGfxContext->ExecuteCommandBuffer(cmd);
-		//for (auto& rt : RenderTexture::s_all_render_texture)
-		//{
-		//	ImGui::BeginGroup();
-		//	//ImGuiContext* context = ImGui::GetCurrentContext();
-		//	//auto drawList = context->CurrentWindow->DrawList;
-		//	ImGui::Image(rt->GetGPUNativePtr(), ImVec2(preview_tex_size, preview_tex_size));
-		//	ImGui::Text("%s", rt->Name().c_str());
-		//	ImGui::EndGroup();
-		//	if ((tex_count + 1) % imagesPerRow != 0)
-		//	{
-		//		ImGui::SameLine();
-		//	}
-		//	++tex_count;
-		//}
-		ImGui::Begin("RenderPassWindow");
-		u16 pass_index = 0;
-		for (auto& pass : g_pRenderer->GetRenderPasses())
+		ImGui::Begin("RTDebugWindow");
+		static float preview_tex_size = 128;
+		//// 获取当前ImGui窗口的内容区域宽度
+		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
+		int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
+		imagesPerRow += imagesPerRow == 0 ? 1 : 0;
+		static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
+		int tex_count = 0;
+		auto cmd = CommandBufferPool::Get();
+		for (auto& rt : RenderTexture::s_all_render_texture)
 		{
-			bool active = pass->IsActive();
-			ImGui::PushID(pass_index++);
-			ImGui::Checkbox(" ", &active);
-			ImGui::SameLine();
-			ImGui::Text("PassName: %s",pass->GetName().c_str());
-			pass->SetActive(active);
-			ImGui::PopID();
+			rt->Transition(cmd.get(), ETextureResState::kShaderResource);
 		}
+		g_pGfxContext->ExecuteCommandBuffer(cmd);
+		static const char* s_cube_dirs[] = { "+Y", "-X", "+Z", "+X","-Z","-Y"};
+		static int s_selected_dir = 0;
+		for (auto& rt : RenderTexture::s_all_render_texture)
+		{
+			ImGui::BeginGroup();
+			//ImGuiContext* context = ImGui::GetCurrentContext();
+			//auto drawList = context->CurrentWindow->DrawList;
+			if (rt->IsCubemap())
+			{
+				if (ImGui::BeginCombo("##combo", s_cube_dirs[s_selected_dir])) // ##combo 可以用来隐藏标签
+				{
+					for (int i = 0; i < 6; i++)
+					{
+						const bool isSelected = (s_selected_dir == i);
+						if (ImGui::Selectable(s_cube_dirs[i], isSelected))
+							s_selected_dir = i;
+						if (isSelected)
+							ImGui::SetItemDefaultFocus(); // Make the selected item the default focus so it appears in the box initially.
+					}
+					ImGui::EndCombo();
+				}
+				ImGui::Image(rt->GetGPUNativePtr(s_selected_dir + 1), ImVec2(preview_tex_size, preview_tex_size));
+				//ImGui::BeginTable(rt->Name().c_str(), 4);
+				//// +Y
+				//ImGui::TableNextRow();
+				//ImGui::TableSetColumnIndex(1);
+				//ImGui::Image(rt->GetGPUNativePtr(3), ImVec2(preview_tex_size, preview_tex_size));
+				//// -X
+				//ImGui::TableNextRow();
+				//ImGui::TableSetColumnIndex(0);
+				//ImGui::Image(rt->GetGPUNativePtr(2), ImVec2(preview_tex_size, preview_tex_size));
+				//// +Z
+				//ImGui::TableSetColumnIndex(1);
+				//ImGui::Image(rt->GetGPUNativePtr(5), ImVec2(preview_tex_size, preview_tex_size));
+				//// +X
+				//ImGui::TableSetColumnIndex(2);
+				//ImGui::Image(rt->GetGPUNativePtr(1), ImVec2(preview_tex_size, preview_tex_size));
+				//// -Z
+				//ImGui::TableSetColumnIndex(3);
+				//ImGui::Image(rt->GetGPUNativePtr(6), ImVec2(preview_tex_size, preview_tex_size));
+				//// -Y
+				//ImGui::TableNextRow();
+				//ImGui::TableSetColumnIndex(1);
+				//ImGui::Image(rt->GetGPUNativePtr(4), ImVec2(preview_tex_size, preview_tex_size));
+				//ImGui::EndTable();
+				ImGui::Text("TextureCube: %s", rt->Name().c_str());
+			}
+			else
+			{
+				ImGui::Image(rt->GetGPUNativePtr(), ImVec2(preview_tex_size, preview_tex_size));
+				ImGui::Text("Texture2D: %s", rt->Name().c_str());
+			}
+			ImGui::EndGroup();
+			if ((tex_count + 1) % imagesPerRow != 0)
+			{
+				ImGui::SameLine();
+			}
+			++tex_count;
+		}
+		//ImGui::Begin("RenderPassWindow");
+		//u16 pass_index = 0;
+		//for (auto& pass : g_pRenderer->GetRenderPasses())
+		//{
+		//	bool active = pass->IsActive();
+		//	ImGui::PushID(pass_index++);
+		//	ImGui::Checkbox(" ", &active);
+		//	ImGui::SameLine();
+		//	ImGui::Text("PassName: %s",pass->GetName().c_str());
+		//	pass->SetActive(active);
+		//	ImGui::PopID();
+		//}
 		ImGui::End();
 	}
 	//----------------------------------------------------------------------------RTDebugWindow-----------------------------------------------------------------------

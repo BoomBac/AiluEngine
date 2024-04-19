@@ -16,6 +16,7 @@
 
 #define DEAR_IMGUI
 #define _SIMD
+#define _PIX_DEBUG
 
 #define CONTACT(x,y) x##y
 #define STR(x) #x

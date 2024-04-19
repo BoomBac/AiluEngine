@@ -36,12 +36,15 @@ namespace Ailu
 		_layer_stack = new LayerStack();
 #ifdef DEAR_IMGUI
 		_p_imgui_layer = new ImGUILayer();
-		PushLayer(_p_imgui_layer);
+
 #endif // DEAR_IMGUI
 		GraphicsContext::InitGlobalContext();
 		g_pLogMgr->Log("Begin init resource mgr...");
 		g_pTimeMgr->Mark();
 		g_pResourceMgr->Initialize();
+#ifdef DEAR_IMGUI
+		PushLayer(_p_imgui_layer);
+#endif // DEAR_IMGUI
 		g_pLogMgr->LogFormat("Resource mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
 		g_pLogMgr->Log("Begin init scene mgr...");
 		g_pTimeMgr->Mark();
@@ -64,8 +67,8 @@ namespace Ailu
 	{
 		DESTORY_PTR(_layer_stack);
 		DESTORY_PTR(_p_window);
-		g_pResourceMgr->Finalize();
 		g_pSceneMgr->Finalize();
+		g_pResourceMgr->Finalize();
 		DESTORY_PTR(g_pSceneMgr);
 		DESTORY_PTR(g_pResourceMgr);
 		g_pRenderer->Finalize();
@@ -163,7 +166,7 @@ namespace Ailu
 	}
 	bool Application::OnDragFile(DragFileEvent& e)
 	{
-		g_pResourceMgr->ImportAssetAsync(e.GetDragedFilePath());
+		g_pResourceMgr->ImportResourceAsync(e.GetDragedFilePath());
 		return false;
 	}
 

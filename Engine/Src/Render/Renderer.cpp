@@ -21,7 +21,7 @@ namespace Ailu
 		_p_opaque_pass = MakeScope<OpaquePass>();
 		_p_reslove_pass = MakeScope<ResolvePass>(_p_camera_color_attachment);
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
-		_p_postprocess_pass = MakeScope<PostProcessPass>();
+		//_p_postprocess_pass = MakeScope<PostProcessPass>();
 		_p_gbuffer_pass = MakeScope<DeferredGeometryPass>(kRendererWidth, kRendererHeight);
 		_p_skybox_pass = MakeScope<SkyboxPass>();
 		auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"small_cave_1k.hdr");
@@ -98,6 +98,10 @@ namespace Ailu
 	{
 		return _p_timemgr->GetElapsedSinceLastMark();
 	}
+	void Renderer::TakeCapture()
+	{
+		_captures.push(0);
+	}
 	void Renderer::Render()
 	{
 		//TODO:第一帧不渲染，否则会有taskpass执行结果异常，原因未知
@@ -108,6 +112,11 @@ namespace Ailu
 			//_p_test_cs->SetTexture("gOut", _p_test_texture.get());
 			//cmd->Dispatch(_p_test_cs.get(), 4, 4, 1);
 
+			if (!_captures.empty())
+			{
+				_p_context->TakeCapture();
+				_captures.pop();
+			}
 
 			if (!_p_task_render_passes.empty())
 			{

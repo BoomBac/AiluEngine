@@ -6,62 +6,36 @@
 
 namespace Ailu
 {
-	enum class EAssetType : u8
-	{
-		kUndefined,kMesh,kMaterial,kTexture2D
-	};
+	DECLARE_ENUM(EAssetType,kUndefined, kMesh, kMaterial, kTexture2D)
 
+	class IAssetable;
 	class Asset
 	{
 	public:
 		inline static u32 s_instance_num = 0u;
 	public:
-		Asset(String guid, EAssetType type);
-		Asset(String asset_path, String system_path, String guid, EAssetType type);
+		Asset() = default;
+		Asset(EAssetType::EAssetType type,const WString& sys_path);
+		Asset(Guid guid, EAssetType::EAssetType type,const WString& sys_path);
+		Asset(const Asset& other) = delete;
+		Asset& operator=(const Asset& other) = delete;
+		//Asset(Asset&& other);
+		//Asset& operator=(Asset&& other);
 		virtual ~Asset();
-		bool operator<(const Asset& other) const
-		{
-			return _instance_id < other._instance_id;
-		}
+		bool operator<(const Asset& other) const{return _instance_id < other._instance_id;}
+		
+		void AssignGuid(const Guid& guid);
+		const Guid& GetGuid() const { return _guid; };
 	public:
-		String _asset_path;
-		String _system_path;
-		String _name;
-		String _full_name;
+		WString _asset_path;
+		WString _system_path;
+		WString _name;
+		WString _full_name;
+		EAssetType::EAssetType _asset_type;
+		IAssetable* _p_inst_asset;
+	private:
 		u32 _instance_id;
 		Guid _guid;
-		EAssetType _asset_type;
-		void* _p_inst_asset;
-	};
-
-	struct AssetType
-	{
-		inline const static std::string kMaterial = "material";
-		inline const static std::string kMesh = "mesh";
-		inline const static std::string kTexture2D = "texture2d";
-		inline const static std::string kUndefined = "undefined";
-		static String GetTypeString(const EAssetType& type)
-		{
-			switch (type)
-			{
-			case Ailu::EAssetType::kMesh:
-				return kMesh;
-			case Ailu::EAssetType::kMaterial:
-				return kMaterial;
-			case Ailu::EAssetType::kTexture2D:
-				return kTexture2D;
-			case Ailu::EAssetType::kUndefined:
-				return kUndefined;
-			}
-			return kUndefined;
-		}
-		static EAssetType GetType(const std::string& type_str)
-		{
-			if (type_str == AssetType::kMaterial) return EAssetType::kMaterial;
-			else if (type_str == AssetType::kMesh) return EAssetType::kMesh;
-			else if (type_str == AssetType::kTexture2D) return EAssetType::kTexture2D;
-			else return EAssetType::kUndefined;
-		}
 	};
 }
 

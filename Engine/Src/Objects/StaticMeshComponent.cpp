@@ -78,10 +78,7 @@ namespace Ailu
 		os << prop_indent << "MeshPath: " << _p_mesh->OriginPath() << endl;
 		for(int i = 0; i < _p_mats.size(); ++i)
 		{
-			if (_p_mats[i])
-				os << prop_indent << std::format("MaterialPath{}: {}", i,_p_mats[i]->OriginPath()) << endl;
-			else
-				os << prop_indent << std::format("MaterialPath{}: missing", i) << endl;
+			os << prop_indent << std::format("MaterialPath{}: {}", i, _p_mats[i]? _p_mats[i]->GetGuid().ToString() : "missing") << endl;
 		}
 	}
 	void* StaticMeshComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
@@ -99,15 +96,20 @@ namespace Ailu
 			auto mesh = MeshPool::GetMesh(mesh_path);
 			if (mesh == nullptr)
 			{
-				mesh_path = PathUtils::GetResSysPath(mesh_path);
-				auto meshes = g_pResourceMgr->LoadMesh(ToWChar(mesh_path));
-				if (!meshes.empty())
+				auto load_mesh = g_pResourceMgr->ImportResource(ToWChar(PathUtils::GetResSysPath(mesh_path)));
+				if (load_mesh)
 				{
-					mesh = meshes.front();
-					mesh->OriginPath(mesh_path);
-					MeshPool::AddMesh(mesh);
-					g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
+					mesh = std::static_pointer_cast<Mesh>(load_mesh);
 				}
+				//mesh_path = PathUtils::GetResSysPath(mesh_path);
+				//auto meshes = g_pResourceMgr->LoadMesh(ToWChar(mesh_path));
+				//if (!meshes.empty())
+				//{
+				//	mesh = meshes.front();
+				//	mesh->OriginPath(mesh_path);
+				//	MeshPool::AddMesh(mesh);
+				//	g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
+				//}
 				else
 				{
 					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
@@ -119,10 +121,13 @@ namespace Ailu
 			StaticMeshComponent* comp = new StaticMeshComponent(mesh, nullptr);
 			while ((cur_mat_path = TP_ZERO(formated_str.front())).starts_with("MaterialPath"))
 			{
-				cur_mat_path = cur_mat_path = TP_ONE(formated_str.front());
-				auto mat = MaterialLibrary::GetMaterial(cur_mat_path);
+				cur_mat_path = TP_ONE(formated_str.front());
+				auto mat = g_pResourceMgr->LoadAsset<Material>(Guid(cur_mat_path));
 				if (mat == nullptr)
+				{
 					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load material failed with id {};", cur_mat_path);
+					mat = MaterialLibrary::GetMaterial("StandardLit");
+				}
 				else
 					comp->AddMaterial(mat);
 				formated_str.pop();

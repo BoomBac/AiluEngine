@@ -6,17 +6,22 @@
 using std::string;
 namespace Ailu
 {
-	class Guid
-	{
+    class Guid
+    {
     public:
         static Guid Generate();
         Guid();
-        Guid(std::string guid);
-        std::string ToString() const;
+        explicit Guid(std::string guid);
+        const std::string& ToString() const;
         bool operator ==(const Guid& other) const;
+        bool operator<(const Guid& other) const { return _guid < other._guid; }
+        static const Guid& EmptyGuid() { return kEmptyGuid; }
+
     private:
-        String _guid;
-	};
+        std::string _guid;
+
+        static const Guid kEmptyGuid;
+    };
 }
 
 

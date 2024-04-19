@@ -26,8 +26,7 @@ namespace Ailu
         const u64& GetFenceValue(const u32& cmd_index) const final;
         u64 GetCurFenceValue() const final;
         void SubmitRHIResourceBuildTask(RHIResourceTask task) final;
-
-
+        void TakeCapture() final;
 
         ID3D12Device* GetDevice() { return m_device.Get(); };
         //return cbv/uav/src desc heap
@@ -82,6 +81,8 @@ namespace Ailu
         u32 _width;
         u32 _height;
         float m_aspectRatio;
+        bool _is_cur_frame_capture = false;
+        WString _cur_capture_name;
     };
 }
 

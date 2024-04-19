@@ -52,17 +52,25 @@ void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out floa
 	{
 		emssive = Emssive.Sample(g_LinearWrapSampler, input.uv0).rgb;
 	}
-	else emssive = EmssiveColor;
-	if(SamplerMask & 8) roughness = Roughness.Sample(g_LinearWrapSampler, input.uv0).r;
-	else roughness = RoughnessValue;
-	if(SamplerMask & 16) metallic = Metallic.Sample(g_LinearWrapSampler, input.uv0).r;
-	else metallic = MetallicValue;
-	if (SamplerMask & 32) specular = Specular.Sample(g_LinearWrapSampler, input.uv0).rgb;
-	else specular = SpecularColor;
+	else 
+		emssive = EmssiveColor;
+	if(SamplerMask & 8) 
+		roughness = Roughness.Sample(g_LinearWrapSampler, input.uv0).r;
+	else 
+		roughness = RoughnessValue;
+	if(SamplerMask & 16) 
+		metallic = Metallic.Sample(g_LinearWrapSampler, input.uv0).r;
+	else 
+		metallic = MetallicValue;
+	if (SamplerMask & 32) 
+		specular = Specular.Sample(g_LinearWrapSampler, input.uv0).rgb;
+	else 
+		specular = SpecularColor;
 	if (SamplerMask & 1)
-		albedo = Albedo.SampleLevel(g_LinearWrapSampler, input.uv0, lerp(0.0, 7.0, roughness));
+		albedo = Albedo.Sample(g_LinearWrapSampler, input.uv0);
 	else
 		albedo = BaseColor;
+	albedo *= emssive;
 }
 
 struct GBuffer

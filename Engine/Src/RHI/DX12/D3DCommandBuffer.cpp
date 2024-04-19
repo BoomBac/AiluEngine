@@ -3,7 +3,9 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Render/RenderingData.h"
+#include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
+#include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
 
 namespace Ailu
 {
@@ -252,10 +254,27 @@ namespace Ailu
 		GraphicsPipelineStateMgr::EndConfigurePSO(this);
 		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
 		{
+#ifdef _PIX_DEBUG
+			PIXBeginEvent(_p_cmd.Get(), 100, "FinalBlitPass");
+			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
+			PIXEndEvent(_p_cmd.Get());
+			PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
+			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
+			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			Gizmo::Submit(this);
+			PIXEndEvent(_p_cmd.Get());
+			PIXBeginEvent(_p_cmd.Get(), 110, "GUIPass");
+			D3DContext::s_p_d3dcontext->DrawOverlay(this);
+			PIXEndEvent(_p_cmd.Get());
+#else
 			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
 			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
 			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			Gizmo::Submit(this);
 			D3DContext::s_p_d3dcontext->DrawOverlay(this);
+#endif // _PIX_DEBUG
+
+
 		}
 		D3DContext::s_p_d3dcontext->EndBackBuffer(this);
 	}

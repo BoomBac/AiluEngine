@@ -128,8 +128,8 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>$(ProjectDir)Ext\dxc\lib;$(ProjectDir)Ext\fbxsdk\lib\vs2019\x64\debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxcompiler.lib;d3dcompiler.lib;dxguid.lib;libfbxsdk.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)Ext\dxc\lib;$(ProjectDir)Ext\fbxsdk\lib\vs2019\x64\debug;$(ProjectDir)Ext\pix\bin\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;dxcompiler.lib;d3dcompiler.lib;dxguid.lib;libfbxsdk.lib;WinPixEventRuntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>
       </DelayLoadDLLs>
     </Link>
@@ -449,6 +449,11 @@
     <ClInclude Include="Ext\imgui\imstb_rectpack.h" />
     <ClInclude Include="Ext\imgui\imstb_textedit.h" />
     <ClInclude Include="Ext\imgui\imstb_truetype.h" />
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\pix3.h" />
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\pix3_win.h" />
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\PIXEvents.h" />
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\PIXEventsCommon.h" />
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\PIXEventsLegacy.h" />
     <ClInclude Include="Ext\stb\stb_connected_components.h" />
     <ClInclude Include="Ext\stb\stb_c_lexer.h" />
     <ClInclude Include="Ext\stb\stb_divide.h" />
@@ -479,6 +484,7 @@
     <ClInclude Include="Inc\Framework\Common\Asset.h" />
     <ClInclude Include="Inc\Framework\Common\CommandLineApp.h" />
     <ClInclude Include="Inc\Framework\Common\EntryPoint.h" />
+    <ClInclude Include="Inc\Framework\Common\FileManager.h" />
     <ClInclude Include="Inc\Framework\Common\GfxConfiguration.h" />
     <ClInclude Include="Inc\Framework\Common\Input.h" />
     <ClInclude Include="Inc\Framework\Common\KeyCode.h" />
@@ -502,6 +508,11 @@
     <ClInclude Include="Inc\Framework\Events\WindowEvent.h" />
     <ClInclude Include="Inc\Framework\ImGui\ImGUIDLL.h" />
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\TextureSelector.h" />
+    <ClInclude Include="Inc\Framework\Interface\IAssetable.h" />
     <ClInclude Include="Inc\Framework\Interface\IParser.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
@@ -577,6 +588,7 @@
     <ClCompile Include="Src\Animation\Skeleton.cpp" />
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
     <ClCompile Include="Src\Framework\Common\Asset.cpp" />
+    <ClCompile Include="Src\Framework\Common\FileManager.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\Reflect.cpp" />
     <ClCompile Include="Src\Framework\Common\ResourceMgr.cpp" />
@@ -588,6 +600,10 @@
     <ClCompile Include="Src\Framework\Events\SceneLayer.cpp" />
     <ClCompile Include="Src\Framework\ImGui\ImGUIDLL.cpp" />
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\TextureSelector.cpp" />
     <ClCompile Include="Src\Framework\Math\Guid.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\HDRParser.cpp" />

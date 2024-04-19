@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: -846.171,412.891,-593.802
-  Rotation: -0.0186701,-0.480196,0.0102247,-0.876903
+  Position: -865.846,800.127,899.436
+  Rotation: -0.0816352,-0.886333,0.171317,-0.422373
   Fov: 60
   Aspect: 1.77778
   Near: 76.58
   Far: 118818
-  ControllerRotation: 2.4396,28497.4
+  ControllerRotation: 21.8796,28569
 SceneGraph: 
   Name: root
     Components: 
@@ -24,13 +24,13 @@ SceneGraph:
             Scale: 25,1,25
           StaticMeshComponent: 
             MeshPath: plane
-            MaterialPath0: Materials/StandardPBR_new.almat
+            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0
       Name: directional_light
         Components: 
           TransformComponent: 
             Position: -5000,5000,0
-            Rotation: 0.298668,-0.640935,0.298668,0.640935
+            Rotation: 0,3.7749e-08,0,1
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
@@ -80,5 +80,5 @@ SceneGraph:
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey
-            MaterialPath0: Materials/StandardPBR_new.almat
+            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0

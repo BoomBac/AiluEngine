@@ -55,6 +55,7 @@ PSInput VSMain(VSInput v)
 {
 	PSInput result;
 	result.position = TransformToClipSpace(v.position);
+    result.position.w = 1.0f;
 	//result.wnormal = normalize(mul(_MatrixWorld, float4(v.normal, 0.0f)).xyz);
 	result.wnormal = v.position;
 	return result;
@@ -62,7 +63,7 @@ PSInput VSMain(VSInput v)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	float2 uv = SampleSphericalMap(normalize(-input.wnormal));
+	//float2 uv = SampleSphericalMap(normalize(-input.wnormal));
 	//float3 sky_color = env.Sample(g_LinearSampler,uv).rgb * expo * color.rgb;
 	//return float4(sky_color,1.0);
 	return float4(SkyBox.Sample(g_LinearSampler, normalize(input.wnormal)).rgb * expo * color.rgb, 1.0);

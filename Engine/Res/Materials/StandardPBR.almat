@@ -1,15 +1,15 @@
-guid: 2307dd4d-805b-4744-88bd-fa4a1d07b9ad
-type: material
-name: grass
+guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+type: kMaterial
+name: StandardPBR
 shader_path: Shaders/defered_standard_lit.hlsl
   prop_type: Uint
     SamplerMask: 0
   prop_type: Float
     MetallicValue: 0
-    RoughnessValue: 0.008
+    RoughnessValue: 0.447
   prop_type: Vector
     SpecularColor: 0,0,0,0
-    BaseColor: 0.373074,0.779412,0.347679,0
+    BaseColor: 1,1,1,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
     Specular: none

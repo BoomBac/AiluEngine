@@ -2058,6 +2058,39 @@
     <ClInclude Include="Inc\Render\Pass\SSAO.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\pix3.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\pix3_win.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\PIXEvents.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\PIXEventsCommon.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\PIXEventsLegacy.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\FileManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\TextureSelector.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Interface\IAssetable.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2244,6 +2277,21 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\Pass\SSAO.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Common\FileManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\TextureSelector.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -56,7 +56,7 @@ namespace Ailu
 		}
 	}
 
-	void* D3DTexture2D::GetGPUNativePtr()
+	void* D3DTexture2D::GetGPUNativePtr(u16 index)
 	{
 		return reinterpret_cast<void*>(_srv_gpu_handle.ptr);
 	}
@@ -287,9 +287,26 @@ namespace Ailu
 		_srv_desc.Texture2D.MostDetailedMip = 0;
 		_srv_desc.Texture2D.MipLevels = 1;
 		auto [s_ch, s_gh] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
-		_srv_gpu_handle = s_gh;
-		_srv_cpu_handle = s_ch;
-		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handle);
+		_srv_cpu_handles[0] = s_ch;
+		_srv_gpu_handles[0] = s_gh;
+		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handles[0]);
+		if (is_cubemap)
+		{
+			for (size_t i = 1; i < 7; i++)
+			{
+				auto [ch, gh] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
+				_srv_cpu_handles[i] = ch;
+				_srv_gpu_handles[i] = gh;
+				D3D12_SHADER_RESOURCE_VIEW_DESC slice_srv_desc{};
+				_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				_srv_desc.Format = is_shadowmap ? DXGI_FORMAT_R24_UNORM_X8_TYPELESS : tex_desc.Format;
+				_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+				_srv_desc.Texture2DArray.ArraySize = 1;
+				_srv_desc.Texture2DArray.FirstArraySlice = i - 1;
+				p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handles[i]);
+			}
+		}
+		_is_cubemap = is_cubemap;
 		for (u16 i = 0; i < texture_num; ++i)
 		{
 			if (!is_shadowmap)
@@ -325,7 +342,7 @@ namespace Ailu
 	void D3DRenderTexture::Bind(CommandBuffer* cmd, u8 slot)
 	{
 		RenderTexture::Bind(cmd,slot);
-		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
+		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handles[0]);
 	}
 	u8* D3DRenderTexture::GetCPUNativePtr()
 	{
@@ -340,6 +357,11 @@ namespace Ailu
 		index = _is_cubemap? index : 0;
 		return reinterpret_cast<void*>(&_d3drt_handles[index]._color_handle._srv_cpu_handle);
 	}
+	void* D3DRenderTexture::GetGPUNativePtr(u16 index)
+	{
+		return reinterpret_cast<void*>(_srv_gpu_handles[index].ptr);
+	}
+
 	void D3DRenderTexture::Release()
 	{
 	}

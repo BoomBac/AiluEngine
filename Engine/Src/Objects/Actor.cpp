@@ -13,6 +13,7 @@ namespace Ailu
 		ClearChildren();
 		if (_Parent != nullptr)
 			_Parent->RemoveChild(this);
+		LOG_WARNING("Destory actor {}", _name);
 	}
 
 
@@ -91,13 +92,18 @@ namespace Ailu
 		_children.emplace_back(child);
 	}
 
+	void Actor::SetParent(Actor* new_parent)
+	{
+		_Parent = new_parent;
+	}
+
 	void Actor::ClearChildren()
 	{
+		for (auto c : _children)
+		{
+			c->SetParent(nullptr);
+		}
 		_chilren_num = 0;
-		//for (auto e : _children)
-		//{
-		//	DESTORY_PTR(e);
-		//}
 		_children.clear();
 	}
 

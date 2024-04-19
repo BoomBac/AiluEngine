@@ -20,6 +20,7 @@ namespace Ailu
 		virtual u64 GetCurFenceValue() const = 0;
 		virtual u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) = 0;
 		virtual void SubmitRHIResourceBuildTask(RHIResourceTask task) = 0;
+		virtual void TakeCapture() = 0;
 	};
 	extern GraphicsContext* g_pGfxContext;
 }

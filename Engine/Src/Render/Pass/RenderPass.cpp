@@ -18,7 +18,7 @@ namespace Ailu
 	}
 	void OpaquePass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get();
+		auto cmd = CommandBufferPool::Get("OpaquePass");
 		cmd->SetRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target);
 		cmd->ClearRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target, Colors::kBlack, 1.0f);
 		cmd->SetViewport(rendering_data._viewport);
@@ -64,7 +64,7 @@ namespace Ailu
 	}
 	void ResolvePass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get();
+		auto cmd = CommandBufferPool::Get("ReslovePass");
 		cmd->Clear();
 		cmd->SetViewport(_backbuf_rect);
 		cmd->SetScissorRect(_backbuf_rect);
@@ -96,7 +96,7 @@ namespace Ailu
 
 	void ShadowCastPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get();
+		auto cmd = CommandBufferPool::Get("ShadowCastPass");
 		cmd->Clear();
 		cmd->SetRenderTarget(nullptr, _p_shadow_map.get());
 		cmd->ClearRenderTarget(_p_shadow_map.get(), 1.0f);
@@ -207,9 +207,9 @@ namespace Ailu
 	DeferredGeometryPass::DeferredGeometryPass(u16 width, u16 height) : RenderPass("DeferedGeometryPass")
 	{
 		_gbuffers.resize(3);
-		_gbuffers[0] = RenderTexture::Create(width, height, "DeferredNormal", EALGFormat::kALGFormatR16G16_FLOAT);
-		_gbuffers[1] = RenderTexture::Create(width, height, "DeferredAlbedo", EALGFormat::kALGFormatR8G8B8A8_UNORM);
-		_gbuffers[2] = RenderTexture::Create(width, height, "DeferredNormal", EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		_gbuffers[0] = RenderTexture::Create(width, height, "GBuffer0", EALGFormat::kALGFormatR16G16_FLOAT);
+		_gbuffers[1] = RenderTexture::Create(width, height, "GBuffer1", EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		_gbuffers[2] = RenderTexture::Create(width, height, "GBuffer2", EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		_p_lighting_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/deferred_lighting.hlsl", "DeferredLightingVSMain", "DeferredLightingPSMain"), "DeferedGbufferLighting");
 		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
 		for (int i = 0; i < _rects.size(); i++)
@@ -217,7 +217,7 @@ namespace Ailu
 	}
 	void DeferredGeometryPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get();
+		auto cmd = CommandBufferPool::Get("DeferredRenderPass");
 		cmd->SetRenderTargets(_gbuffers, rendering_data._p_camera_depth_target);
 		cmd->ClearRenderTarget(_gbuffers, rendering_data._p_camera_depth_target, Colors::kBlack, 1.0f);
 		cmd->SetViewports({ _rects[0],_rects[1],_rects[2] });
@@ -259,17 +259,22 @@ namespace Ailu
 	//-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
 	SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
 	{
-		_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.hlsl"), "SkyboxPP");
-		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
+		//_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.hlsl"), "SkyboxPP");
+		_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Skybox");
+		_p_sky_mesh = MeshPool::GetMesh("monkey");
+		Matrix4x4f world_mat;
+		MatrixScale(world_mat, 10000.f, 10000.f, 10000.f);
+		_p_cbuffer.reset(ConstantBuffer::Create(RenderConstants::kPeObjectDataSize));
+		memcpy(_p_cbuffer->GetData(), &world_mat, RenderConstants::kPeObjectDataSize);
 	}
 	void SkyboxPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get();
+		auto cmd = CommandBufferPool::Get("SkyboxPass");
 		cmd->Clear();
 		cmd->SetViewport(rendering_data._viewport);
 		cmd->SetScissorRect(rendering_data._scissor_rect);
 		cmd->SetRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target);
-		cmd->DrawRenderer(_p_quad_mesh.get(), _p_skybox_material.get(), 1);
+		cmd->DrawRenderer(_p_sky_mesh.get(), _p_skybox_material.get(), _p_cbuffer.get(), 0,1);
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}

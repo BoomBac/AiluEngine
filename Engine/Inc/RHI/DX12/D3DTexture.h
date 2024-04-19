@@ -22,7 +22,7 @@ namespace Ailu
 		void Bind(CommandBuffer* cmd,u8 slot) final;
 		void Release() final;
 		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
-		void* GetGPUNativePtr() final;
+		void* GetGPUNativePtr(u16 index) final;
 		void BuildRHIResource() final;
 		D3D12_CPU_DESCRIPTOR_HANDLE& GetSRVCPUHandle() { return _srv_cpu_handle; }
 		D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUHandle() { return _srv_gpu_handle; }
@@ -83,12 +83,13 @@ namespace Ailu
 		u8* GetCPUNativePtr() final;
 		void* GetNativeCPUHandle() final;
 		void* GetNativeCPUHandle(u16 index) final;
+		void* GetGPUNativePtr(u16 index) final;
 		void Release() final;
 		void Transition(CommandBuffer* cmd, ETextureResState state) final;
 	private:
-		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
-		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;
-		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
+		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};	
+		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handles[7];
+		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handles[7];
 		D3DRTHandle _d3drt_handles[6];
 		ComPtr<ID3D12Resource> _p_buffer;
 	};

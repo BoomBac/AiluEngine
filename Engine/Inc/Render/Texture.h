@@ -11,7 +11,7 @@
 #include "Framework/Common/ThreadPool.h"
 
 #include "Framework/Common/Reflect.h"
-
+#include "Framework/Interface/IAssetable.h"
 
 
 namespace Ailu
@@ -100,7 +100,7 @@ namespace Ailu
 	public:
 		virtual ~Texture() = default;
 		virtual u8* GetCPUNativePtr() = 0;
-		virtual void* GetGPUNativePtr() = 0;
+		virtual void* GetGPUNativePtr(u16 index = 0u) = 0;
 		virtual void* GetNativeCPUHandle() = 0;
 		virtual const uint16_t& GetWidth() const = 0;
 		virtual const uint16_t& GetHeight() const = 0;
@@ -129,7 +129,7 @@ namespace Ailu
 		}
 	};
 
-	class Texture2D : public Texture
+	class Texture2D : public Texture, public IAssetable
 	{
 		DECLARE_PROTECTED_PROPERTY(path,AssetPath,String)
 		DECLARE_PROTECTED_PROPERTY(channel,Channel,u8)
@@ -144,10 +144,13 @@ namespace Ailu
 		const uint16_t& GetHeight() const final { return _height; };
 		u8* GetCPUNativePtr() override;
 		void* GetNativeCPUHandle() override;
-		void* GetGPUNativePtr()override;
+		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
 		const ETextureType GetTextureType() const final;
 		const u8& GetMipmap() const final { return _mipmap_count; };
 		EALGFormat GetFormat() const { return _format; };
+
+		const Guid& GetGuid() const final;
+		void AttachToAsset(Asset* owner) final;
 	public:
 		void Name(const std::string& name) override;
 		const std::string& Name() const override;
@@ -158,6 +161,7 @@ namespace Ailu
 		EALGFormat _format;
 		u8 _mipmap_count = 1u;
 		bool _read_only;
+		Asset* _p_asset_owned_this;
 	};
 
 	class TextureCubeMap : public Texture
@@ -172,7 +176,7 @@ namespace Ailu
 		const uint16_t& GetHeight() const final { return _height; };
 		u8* GetCPUNativePtr() override;
 		void* GetNativeCPUHandle() override;
-		void* GetGPUNativePtr()override;
+		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
 		const ETextureType GetTextureType() const final;
 		void Name(const std::string& name) override { _name = name; };
 		const std::string& Name() const override { { return _name; } };
@@ -218,7 +222,7 @@ namespace Ailu
 		void* GetNativeCPUHandle() override;
 		//return rtv handle
 		virtual void* GetNativeCPUHandle(u16 index);
-		void* GetGPUNativePtr() override;
+		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
 		const ETextureType GetTextureType() const final;
 		virtual void Transition(CommandBuffer* cmd,ETextureResState state);
 		const RTHandle& GetRTHandle() const { return _rt_handle; }
@@ -227,6 +231,7 @@ namespace Ailu
 		const u8& GetMipmap() const final { return _mipmap_count; };
 		EALGFormat GetFormat() const { return _format; };
 		ETextureResState GetState() const { return _state; }
+		bool IsCubemap() const { return _is_cubemap; }
 		bool operator==(const RenderTexture& other) const { return _rt_handle._id == other._rt_handle._id; }
 		inline static Vector<Ref<RenderTexture>> s_all_render_texture;
 	protected:
