@@ -1697,17 +1697,17 @@ namespace Ailu
 		return out_mat;
 	}
 #pragma warning(pop)
-	using Color = Vector4D<float>;
-	using Color32 = Vector4D<u8>;
+	using Color32 = Vector4D<float>;
+	using Color = Vector4D<u8>;
 	namespace Colors
 	{
-		static const Color kBlue = { 0.f,0.f,1.f ,1.0f };
-		static const Color kRed = { 1.f,0.f,0.f ,1.0f };
-		static const Color kGreen = { 0.f,1.f,0.f ,1.0f };
-		static const Color kWhite = { 1.f,1.f,1.f ,1.0f };
-		static const Color kBlack = { 0.f,0.f,0.f ,1.0f };
-		static const Color kGray = { 0.3f,0.3f,0.3f ,1.0f };
-		static const Color kYellow = { 1.0f,1.0f,0.0f ,1.0f };
+		static const Color32 kBlue = { 0.f,0.f,1.f ,1.0f };
+		static const Color32 kRed = { 1.f,0.f,0.f ,1.0f };
+		static const Color32 kGreen = { 0.f,1.f,0.f ,1.0f };
+		static const Color32 kWhite = { 1.f,1.f,1.f ,1.0f };
+		static const Color32 kBlack = { 0.f,0.f,0.f ,1.0f };
+		static const Color32 kGray = { 0.3f,0.3f,0.3f ,1.0f };
+		static const Color32 kYellow = { 1.0f,1.0f,0.0f ,1.0f };
 	}
 
 	namespace ALHash

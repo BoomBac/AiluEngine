@@ -11,7 +11,7 @@ namespace Ailu
 	{
 		Vector4f _light_pos;
 		Vector4f _light_dir;
-		Color _light_color;
+		Color32 _light_color;
 		Vector4f _light_param;
 	};
 
@@ -65,7 +65,7 @@ namespace Ailu
 		Scope<Camera> _p_shadow_camera;
 	};
 	REFLECT_FILED_BEGIN(LightComponent)
-	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kColor, Color, _light._light_color)
+	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kColor, Color32, _light._light_color)
 	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Intensity, _intensity)
 	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kBool, CastShadow, _b_cast_shadow)
 	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, ShadowDistance, _shadow._distance)

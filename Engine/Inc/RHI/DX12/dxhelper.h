@@ -255,6 +255,5 @@ void ResetUniquePtrArray(T* uniquePtrArray)
         i.reset();
     }
 }
-
 #endif // !DXHELPER_H__
 

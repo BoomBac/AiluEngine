@@ -70,7 +70,7 @@ namespace Ailu
 				size >>= 1;
 				all_mip_level++;
 			}
-			all_mip_level = min(all_mip_level,9);
+			all_mip_level = min(all_mip_level,8);
 			mip_level = min(mip_level, all_mip_level);
 			for (int i = 0; i < mip_level - 1; i++)
 			{

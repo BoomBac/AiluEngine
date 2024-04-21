@@ -190,11 +190,6 @@ namespace Ailu
 
 	void GraphicsPipelineStateMgr::EndConfigurePSO(CommandBuffer* cmd)
 	{
-		while (!s_update_pso.empty())
-		{
-			AddPSO(std::move(s_update_pso.front()));
-			s_update_pso.pop();
-		}
 		s_is_ready = false;
 		_s_render_target_state.Hash(RenderTargetState::_s_hash_obj.GenHash(_s_render_target_state));
 		ConfigureRenderTarget(_s_render_target_state.Hash());
@@ -353,6 +348,15 @@ namespace Ailu
 	void GraphicsPipelineStateMgr::SubmitBindResource(Texture* texture, u8 slot)
 	{
 		s_bind_resource_list.emplace_back(PipelineResourceInfo{ texture, EBindResDescType::kTexture2D, slot });
+	}
+
+	void GraphicsPipelineStateMgr::UpdateAllPSOObject()
+	{
+		while (!s_update_pso.empty())
+		{
+			AddPSO(std::move(s_update_pso.front()));
+			s_update_pso.pop();
+		}
 	}
 
 	//------------------------------------------------------------------------------GraphicsPipelineStateMgr---------------------------------------------------------------------------------

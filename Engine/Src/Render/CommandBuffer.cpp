@@ -7,7 +7,7 @@
 
 namespace Ailu
 {
-	std::shared_ptr<CommandBuffer> CommandBufferPool::Get()
+	std::shared_ptr<CommandBuffer> CommandBufferPool::Get(const String& name)
 	{
 		static bool s_b_init = false;
 		if (!s_b_init)
@@ -23,6 +23,7 @@ namespace Ailu
 			{
 				available = false;
 				cmd_buf->Clear();
+				cmd_buf->SetName(name);
 				return cmd_buf;
 			}
 			else
@@ -31,6 +32,7 @@ namespace Ailu
 				{
 					//LOG_WARNING("cmd {} is ready cmd value {},gpu value {}!", cmd_buf->GetID(), g_pGfxContext->GetFenceValue(cmd_buf->GetID()), g_pGfxContext->GetCurFenceValue());
 					cmd_buf->Clear();
+					cmd_buf->SetName(name);
 					return cmd_buf;
 				}
 			}
@@ -43,6 +45,7 @@ namespace Ailu
 			s_cmd_buffers.emplace_back(std::make_tuple(false, cmd));
 			++s_cur_pool_size;
 			LOG_WARNING("Expand commandbuffer pool to {}", s_cur_pool_size);
+			cmd->SetName(name);
 			return cmd;
 		}
 		else

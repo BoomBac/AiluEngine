@@ -75,13 +75,10 @@ namespace Ailu
 		Component::Serialize(os, indent);
 		using namespace std;
 		String prop_indent = indent.append("  ");
-		os << prop_indent << "MeshPath: " << _p_mesh->OriginPath() << endl;
+		os << prop_indent << "MeshPath: " << (_p_mesh ? _p_mesh->OriginPath() : String("")) << endl;
 		for(int i = 0; i < _p_mats.size(); ++i)
 		{
-			if (_p_mats[i])
-				os << prop_indent << std::format("MaterialPath{}: {}", i,_p_mats[i]->OriginPath()) << endl;
-			else
-				os << prop_indent << std::format("MaterialPath{}: missing", i) << endl;
+			os << prop_indent << std::format("MaterialPath{}: {}", i, _p_mats[i]? _p_mats[i]->GetGuid().ToString() : "missing") << endl;
 		}
 	}
 	void* StaticMeshComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
@@ -96,33 +93,39 @@ namespace Ailu
 			formated_str.pop();
 			auto mesh_path = TP_ONE(formated_str.front());
 			formated_str.pop();
-			auto mesh = MeshPool::GetMesh(mesh_path);
-			if (mesh == nullptr)
+			Ref<Mesh> mesh = nullptr;
+			if (!mesh_path.empty())
 			{
-				mesh_path = PathUtils::GetResSysPath(mesh_path);
-				auto meshes = g_pResourceMgr->LoadMesh(ToWChar(mesh_path));
-				if (!meshes.empty())
+				mesh = MeshPool::GetMesh(mesh_path);
+				if (mesh == nullptr)
 				{
-					mesh = meshes.front();
-					mesh->OriginPath(mesh_path);
-					MeshPool::AddMesh(mesh);
-					g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
-				}
-				else
-				{
-					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
+					auto sys_path = PathUtils::GetResSysPath(mesh_path);
+					sys_path = sys_path.substr(0, sys_path.find_first_of(".") + 4);
+					auto load_mesh = g_pResourceMgr->ImportResource(ToWChar(sys_path), MeshImportSetting("", false, false));
+					if (load_mesh)
+					{
+						mesh = std::static_pointer_cast<Mesh>(load_mesh);
+					}
 				}
 			}
+			if(!mesh)
+			{
+				g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
+			}
+
 			//auto mat_path = TP_ONE(formated_str.front());
 			Vector<String> mat_paths;
 			String cur_mat_path;
 			StaticMeshComponent* comp = new StaticMeshComponent(mesh, nullptr);
 			while ((cur_mat_path = TP_ZERO(formated_str.front())).starts_with("MaterialPath"))
 			{
-				cur_mat_path = cur_mat_path = TP_ONE(formated_str.front());
-				auto mat = MaterialLibrary::GetMaterial(cur_mat_path);
+				cur_mat_path = TP_ONE(formated_str.front());
+				auto mat = g_pResourceMgr->LoadAsset<Material>(Guid(cur_mat_path));
 				if (mat == nullptr)
+				{
 					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load material failed with id {};", cur_mat_path);
+					mat = MaterialLibrary::GetMaterial("StandardLit");
+				}
 				else
 					comp->AddMaterial(mat);
 				formated_str.pop();

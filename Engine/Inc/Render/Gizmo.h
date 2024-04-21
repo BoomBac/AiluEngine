@@ -20,18 +20,18 @@ namespace Ailu
             s_color.a = 0.75f;
         }
 
-        static void DrawLine(const Vector3f& from, const Vector3f& to, Color color = Gizmo::s_color)
+        static void DrawLine(const Vector3f& from, const Vector3f& to, Color32 color = Gizmo::s_color)
         {
             if (Gizmo::s_color.a < 0.1f) return;
             DrawLine(from, to, color, color);
         }
 
-        static void DrawLine(const Vector3f& from, const Vector3f& to, const std::chrono::seconds& duration, Color color = Gizmo::s_color)
+        static void DrawLine(const Vector3f& from, const Vector3f& to, const std::chrono::seconds& duration, Color32 color = Gizmo::s_color)
         {
             s_geometry_draw_list.emplace_back(std::make_tuple([=]() { DrawLine(from, to, color);},std::chrono::system_clock::now(),duration));
         }
 
-        static void DrawCircle(const Vector3f& center, float radius, int num_segments, Color color = Gizmo::s_color, Matrix4x4f mat = BuildIdentityMatrix())
+        static void DrawCircle(const Vector3f& center, float radius, int num_segments, Color32 color = Gizmo::s_color, Matrix4x4f mat = BuildIdentityMatrix())
         {
             if (Gizmo::s_color.a < 0.1f) return;
             float angleIncrement = 360.0f / static_cast<float>(num_segments);
@@ -52,12 +52,12 @@ namespace Ailu
             }
         }
 
-        static void DrawAABB(const AABB& aabb, Color color = Gizmo::s_color)
+        static void DrawAABB(const AABB& aabb, Color32 color = Gizmo::s_color)
         {
             DrawAABB(aabb._min, aabb._max, color);
         }
 
-        static void DrawAABB(const Vector3f& minPoint, const Vector3f& maxPoint, Color color = Gizmo::s_color)
+        static void DrawAABB(const Vector3f& minPoint, const Vector3f& maxPoint, Color32 color = Gizmo::s_color)
         {
             if (Gizmo::s_color.a < 0.1f) return;
             Vector3f vertices[8];
@@ -84,7 +84,7 @@ namespace Ailu
             DrawLine(vertices[6], vertices[7], color);
         }
 
-        static void DrawLine(const Vector3f& from, const Vector3f& to, const Color& color_from, const Color& color_to)
+        static void DrawLine(const Vector3f& from, const Vector3f& to, const Color32& color_from, const Color32& color_to)
         {
             if (Gizmo::s_color.a < 0.1f) return;
             static float vbuf[6];
@@ -103,12 +103,12 @@ namespace Ailu
             _vertex_num += 2;
         }
 
-        static void DrawGrid(const int& grid_size, const int& grid_spacing, const Vector3f& center, Color color)
+        static void DrawGrid(const int& grid_size, const int& grid_spacing, const Vector3f& center, Color32 color)
         {
             if (Gizmo::s_color.a < 0.1f) return;
             float halfWidth = static_cast<float>(grid_size * grid_spacing) * 0.5f;
             float halfHeight = static_cast<float>(grid_size * grid_spacing) * 0.5f;
-            static Color lineColor = color;
+            static Color32 lineColor = color;
 
             for (int i = -grid_size / 2; i <= grid_size / 2; ++i)
             {
@@ -230,7 +230,7 @@ namespace Ailu
         }
 
     public:
-        inline static Color s_color = Colors::kGray;
+        inline static Color32 s_color = Colors::kGray;
     private:
         inline static u32 _vertex_num = 0u;
         inline static Ref<DynamicVertexBuffer> p_buf = nullptr;

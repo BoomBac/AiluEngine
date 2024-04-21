@@ -15,8 +15,11 @@ namespace Ailu
         D3DCommandBuffer();
         D3DCommandBuffer(u32 id);
         void Clear() final;
+        //close before execute
         void Close() final;
         virtual u32 GetID() final { return _id; };
+        const String& GetName() const final { return _name; };
+        void SetName(const String& name) final{ _name = name; };
 
         void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot = 255) final;
         void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) final;
@@ -45,9 +48,13 @@ namespace Ailu
         void Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 
         ID3D12GraphicsCommandList* GetCmdList() { return _p_cmd.Get(); }
+        u16 GetDescriptorHeapId() const { return _cur_cbv_heap_id; }
+        void SetDescriptorHeapId(u16 id) { _cur_cbv_heap_id = id; };
     private:
+        String _name;
         u32 _id = 0u;
         bool _b_cmd_closed;
+        u16 _cur_cbv_heap_id = 65535u;
         ComPtr<ID3D12GraphicsCommandList> _p_cmd;
         ComPtr<ID3D12CommandAllocator> _p_alloc;
     };

@@ -65,7 +65,7 @@ namespace Ailu
 
 	void D3DVertexBuffer::SetStream(float* vertices, u32 size, u8 stream_index)
 	{
-		auto d3d_conetxt = D3DContext::GetInstance();
+		auto d3d_conetxt = D3DContext::Get();
 		if (_buffer_layout.GetStride(stream_index) == 0)
 		{
 			AL_ASSERT(true, "Try to set a null stream!");
@@ -105,7 +105,7 @@ namespace Ailu
 
 	void D3DVertexBuffer::SetStream(u8* data, u32 size, u8 stream_index,bool dynamic)
 	{
-		auto d3d_conetxt = D3DContext::GetInstance();
+		auto d3d_conetxt = D3DContext::Get();
 		if (_buffer_layout.GetStride(stream_index) == 0)
 		{
 			AL_ASSERT(true, "Try to set a null stream!");
@@ -168,7 +168,7 @@ namespace Ailu
 		_ime_vertex_data_offset = _ime_color_data_offset = 0;
 		_p_ime_vertex_data = new u8[12 * RenderConstants::KMaxDynamicVertexNum];
 		_p_ime_color_data = new u8[16 * RenderConstants::KMaxDynamicVertexNum];
-		auto device = D3DContext::GetInstance()->GetDevice();
+		auto device = D3DContext::Get()->GetDevice();
 		D3D12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		D3D12_RESOURCE_DESC bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(_size_pos_buf);
 		ThrowIfFailed(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&_p_vertex_buf)));
@@ -217,7 +217,7 @@ namespace Ailu
 	//-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
 	D3DIndexBuffer::D3DIndexBuffer(u32* indices, u32 count) : _index_count(count)
 	{
-		auto d3d_conetxt = D3DContext::GetInstance();
+		auto d3d_conetxt = D3DContext::Get();
 		auto size = sizeof(u32) * count;
 		auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
@@ -278,8 +278,8 @@ namespace Ailu
 		{
 			s_global_index = 0u;
 			s_global_offset = 0u;
-			auto device = D3DContext::GetInstance()->GetDevice();
-			s_p_d3d_heap = D3DContext::GetInstance()->GetDescriptorHeap();
+			auto device = D3DContext::Get()->GetDevice();
+			//s_p_d3d_heap = D3DContext::Get()->GetDescriptorHeap();
 			//constbuffer
 			auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 			s_total_size = RenderConstants::kPerFrameTotalSize * RenderConstants::kFrameCount;
@@ -293,16 +293,28 @@ namespace Ailu
 			b_init = true;
 		}
 		size = CalculateConstantBufferByteSize(size);
-		AL_ASSERT(s_global_offset + size > s_total_size, "Constant buffer overflow");
+		try
+		{
+			AL_ASSERT(s_global_offset + size > s_total_size, "Constant buffer overflow");
+		}
+		catch (const std::runtime_error& e) 
+		{
+			std::cerr << "Exception caught: " << e.what() << std::endl;
+			// 这里可以进行适当的处理，如日志记录、清理资源等
+			// 如果不希望程序继续执行，可以直接退出程序
+			// exit(EXIT_FAILURE);
+		}
+
 		_offset = s_global_offset;
 		_index = s_global_index;
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
-			cbvHandle.ptr = s_p_d3d_heap->GetCPUDescriptorHandleForHeapStart().ptr + _index * s_desc_size;
+			_allocation = g_pGPUDescriptorAllocator->Allocate(1);
+			//D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
+			//cbvHandle.ptr = s_p_d3d_heap->GetCPUDescriptorHandleForHeapStart().ptr + _index * s_desc_size;
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
 			cbv_desc.BufferLocation = s_p_d3d_res->GetGPUVirtualAddress() + _offset;
 			cbv_desc.SizeInBytes = size;
-			D3DContext::GetInstance()->GetDevice()->CreateConstantBufferView(&cbv_desc, cbvHandle);
+			D3DContext::Get()->GetDevice()->CreateConstantBufferView(&cbv_desc, std::get<0>(_allocation.At(0)));
 			s_cbuf_views.emplace_back(cbv_desc);
 		}
 		s_global_offset += size;

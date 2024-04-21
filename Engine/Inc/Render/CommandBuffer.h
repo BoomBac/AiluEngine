@@ -24,6 +24,8 @@ namespace Ailu
         virtual void Clear() = 0;
         virtual void Close() = 0;
         virtual u32 GetID() = 0;
+        virtual const String& GetName() const = 0;
+        virtual void SetName(const String& name) = 0;
 
         virtual void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) = 0;
         virtual void ClearRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth) = 0;
@@ -54,7 +56,7 @@ namespace Ailu
     class CommandBufferPool
     {
     public:
-        static std::shared_ptr<CommandBuffer> Get();
+        static std::shared_ptr<CommandBuffer> Get(const String& name = "");
         static void Release(std::shared_ptr<CommandBuffer> cmd);
         static void ReleaseAll();
     private:

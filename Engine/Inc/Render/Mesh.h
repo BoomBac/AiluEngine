@@ -8,6 +8,7 @@
 #include "Render/Buffer.h"
 #include "Framework/Math/Geometry.h"
 #include "Animation/Skeleton.h"
+#include "Framework/Interface/IAssetable.h"
 
 
 namespace Ailu
@@ -20,7 +21,7 @@ namespace Ailu
 		ImportedMaterialInfo(u16 slot = 0, String name = "") : _slot(slot), _name(name) {};
 	};
 
-	class Mesh
+	class Mesh : public IAssetable
 	{
 		DECLARE_PROTECTED_PROPERTY(origin_path, OriginPath, String)
 		DECLARE_PROTECTED_PROPERTY(name, Name, std::string)
@@ -47,6 +48,8 @@ namespace Ailu
 		const u16 SubmeshCount() const { return static_cast<u16>(_p_indices.size()); };
 		void AddCacheMaterial(ImportedMaterialInfo material) { _imported_materials.emplace_back(material);};
 		const List<ImportedMaterialInfo>& GetCacheMaterials() const { return _imported_materials; };
+		const Guid& GetGuid() const final;
+		void AttachToAsset(Asset* owner) final;
 	public:
 		u32 _vertex_count;
 		AABB _bound_box;
@@ -55,11 +58,12 @@ namespace Ailu
 		Vector<Ref<IndexBuffer>> _p_ibufs;
 		Vector3f* _vertices;
 		Vector3f* _normals;
-		Color* _colors;
+		Color32* _colors;
 		Vector4f* _tangents;
 		Vector2f** _uv;
 		Vector<std::tuple<u32*, u32>> _p_indices;
 		List<ImportedMaterialInfo> _imported_materials;
+		Asset* _p_asset_owned_this;
 	};
 
 	class SkinedMesh : public Mesh

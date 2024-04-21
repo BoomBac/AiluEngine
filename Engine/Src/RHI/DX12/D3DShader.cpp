@@ -205,7 +205,7 @@ namespace Ailu
 	{
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		auto device = D3DContext::GetInstance()->GetDevice();
+		auto device = D3DContext::Get()->GetDevice();
 		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
 		{
 			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
@@ -531,7 +531,7 @@ namespace Ailu
 	void D3DShader::Bind(u32 index)
 	{
 		Shader::Bind(index);
-		static auto context = D3DContext::GetInstance();
+		static auto context = D3DContext::Get();
 		if (_per_frame_buf_bind_slot != -1)
 		{
 			//GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(context->GetCBufGPURes(0)), EBindResDescType::kConstBuffer, _per_frame_buf_bind_slot);
@@ -655,7 +655,7 @@ namespace Ailu
 	{
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		auto device = D3DContext::GetInstance()->GetDevice();
+		auto device = D3DContext::Get()->GetDevice();
 		if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
 		{
 			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;

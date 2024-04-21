@@ -5,6 +5,7 @@
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
 
+#include <functional>
 #include "GlobalMarco.h"
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/TimeMgr.h"
@@ -24,6 +25,8 @@ namespace Ailu
     public:
         inline static u32 kRendererWidth = 1600u;
         inline static u32 kRendererHeight = 900u;
+        using BeforeTickEvent = std::function<void()>;
+        using AfterTickEvent = std::function<void()>;
     public:
         void BeginScene();
         void EndScene();
@@ -31,8 +34,13 @@ namespace Ailu
         void Finalize() override;
         void Tick(const float& delta_time) override;
         float GetDeltaTime() const;
+        void TakeCapture();
         List<RenderPass*>& GetRenderPasses() { return _render_passes; };
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
+        void RegisterEventBeforeTick(BeforeTickEvent e);
+        void RegisterEventAfterTick(AfterTickEvent e);
+        void UnRegisterEventBeforeTick(BeforeTickEvent e);
+        void UnRegisterEventAfterTick(AfterTickEvent e);
     private:
         Ref<RenderTexture> _p_camera_color_attachment;
         Ref<RenderTexture> _p_camera_depth_attachment;
@@ -60,6 +68,10 @@ namespace Ailu
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;
         Camera* _p_scene_camera;
+        Queue<int> _captures;
+        List<BeforeTickEvent> _events_before_tick;
+        List<AfterTickEvent> _events_after_tick;
+
     };
     extern Renderer* g_pRenderer;
 }

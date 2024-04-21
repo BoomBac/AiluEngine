@@ -166,10 +166,10 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	float3 ks = FresnelSchlickRoughness(saturate(shading_data.nv), F0,surface.roughness);
 	float3 kd = F3_WHITE - ks;
 	float3 diffuse = irradiance * surface.albedo.rgb;
-	light += 0.01f * diffuse * kd;
-	return light;
+	light += 1.0f * diffuse * kd;
+	return light; 
 }
-
+ 
 float3 CalculateLight
 	(
 	float3 pos, float3 normal)

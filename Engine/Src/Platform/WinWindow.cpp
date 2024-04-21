@@ -16,8 +16,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #endif // DEAR_IMGUI
 namespace Ailu
 {
-	static const wchar_t* kAppTitleIconPath = ToWChar(kEngineResRootPath + "Ico/app_title_icon.ico");
-	static const wchar_t* kAppIconPath = ToWChar(kEngineResRootPath + "Ico/app_icon.ico");
+	static const wchar_t* kAppTitleIconPath = ToWChar(kEngineResRootPath + "Icons/app_title_icon.ico");
+	static const wchar_t* kAppIconPath = ToWChar(kEngineResRootPath + "Icons/app_icon.ico");
 
 	static void HideCursor()
 	{

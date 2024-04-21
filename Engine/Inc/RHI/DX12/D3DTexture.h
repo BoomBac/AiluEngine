@@ -7,6 +7,8 @@
 
 #include "Render/Texture.h"
 #include "Framework/Math/ALMath.hpp"
+#include "RHI/DX12/CPUDescriptorManager.h"
+#include "RHI/DX12/GPUDescriptorManager.h"
 using Microsoft::WRL::ComPtr;
 
 namespace Ailu
@@ -22,11 +24,9 @@ namespace Ailu
 		void Bind(CommandBuffer* cmd,u8 slot) final;
 		void Release() final;
 		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
-		void* GetGPUNativePtr() final;
+		void* GetGPUNativePtr(u16 index) final;
 		void BuildRHIResource() final;
-		D3D12_CPU_DESCRIPTOR_HANDLE& GetSRVCPUHandle() { return _srv_cpu_handle; }
 		D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUHandle() { return _srv_gpu_handle; }
-		D3D12_CPU_DESCRIPTOR_HANDLE& GetUAVCPUHandle() { return _uav_cpu_handle; }
 		D3D12_GPU_DESCRIPTOR_HANDLE& GetUAVGPUHandle() { return _uav_gpu_handle; }
 	private:
 	private:
@@ -40,6 +40,7 @@ namespace Ailu
 		Vector<ComPtr<ID3D12Resource>> _textures;
 		Vector<ComPtr<ID3D12Resource>> _upload_textures;
 		Vector<u32> _submited_tasks;
+		GPUVisibleDescriptorAllocation _allocation;
 	};
 
 	class D3DTextureCubeMap : public TextureCubeMap
@@ -60,6 +61,7 @@ namespace Ailu
 		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
 		std::vector<ComPtr<ID3D12Resource>> _textures;
 		std::vector<ComPtr<ID3D12Resource>> _upload_textures;
+		GPUVisibleDescriptorAllocation _allocation;
 	};
 
 
@@ -79,18 +81,22 @@ namespace Ailu
 	public:
 		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
 		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool is_cubemap = false);
+		~D3DRenderTexture();
 		void Bind(CommandBuffer* cmd, u8 slot) final;
-		u8* GetCPUNativePtr() final;
+		u8* GetPixelData() final;
 		void* GetNativeCPUHandle() final;
 		void* GetNativeCPUHandle(u16 index) final;
+		void* GetGPUNativePtr(u16 index) final;
 		void Release() final;
 		void Transition(CommandBuffer* cmd, ETextureResState state) final;
 	private:
-		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
-		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;
-		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
+		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};	
+		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handles[7];
+		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handles[7];
 		D3DRTHandle _d3drt_handles[6];
 		ComPtr<ID3D12Resource> _p_buffer;
+		CPUVisibleDescriptorAllocation _cpu_allocation;
+		GPUVisibleDescriptorAllocation _gpu_allocation;
 	};
 }
 

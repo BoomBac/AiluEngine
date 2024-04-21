@@ -4,6 +4,7 @@
 #include "Render/RenderingData.h"
 #include "Render/Gizmo.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/GraphicsPipelineStateObject.h"
 
 
 namespace Ailu
@@ -21,7 +22,7 @@ namespace Ailu
 		_p_opaque_pass = MakeScope<OpaquePass>();
 		_p_reslove_pass = MakeScope<ResolvePass>(_p_camera_color_attachment);
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
-		_p_postprocess_pass = MakeScope<PostProcessPass>();
+		//_p_postprocess_pass = MakeScope<PostProcessPass>();
 		_p_gbuffer_pass = MakeScope<DeferredGeometryPass>(kRendererWidth, kRendererHeight);
 		_p_skybox_pass = MakeScope<SkyboxPass>();
 		auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"small_cave_1k.hdr");
@@ -52,6 +53,7 @@ namespace Ailu
 		_render_passes.emplace_back(_p_gbuffer_pass.get());
 		_render_passes.emplace_back(_p_skybox_pass.get());
 		_render_passes.emplace_back(_p_reslove_pass.get());
+		RegisterEventBeforeTick([]() {GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
 		return 0;
 	}
 	void Renderer::Finalize()
@@ -68,9 +70,17 @@ namespace Ailu
 		RenderingStates::Reset();
 		ModuleTimeStatics::RenderDeltatime = _p_timemgr->GetElapsedSinceLastMark();
 		_p_timemgr->Mark();
+		for (auto& e : _events_before_tick)
+		{
+			e();
+		}
 		BeginScene();
 		Render();
 		EndScene();
+		for (auto& e : _events_after_tick)
+		{
+			e();
+		}
 	}
 
 	void Renderer::BeginScene()
@@ -98,6 +108,26 @@ namespace Ailu
 	{
 		return _p_timemgr->GetElapsedSinceLastMark();
 	}
+	void Renderer::TakeCapture()
+	{
+		_captures.push(0);
+	}
+	void Renderer::RegisterEventBeforeTick(BeforeTickEvent e)
+	{
+		_events_before_tick.emplace_back(e);
+	}
+	//void Renderer::RegisterEventAfterTick(AfterTickEvent e)
+	//{
+	//	events_after_tick.emplace_back(e);
+	//}
+	//void Renderer::UnRegisterEventBeforeTick(BeforeTickEvent e)
+	//{
+	//	_events_before_tick.remove(e);
+	//}
+	//void Renderer::UnRegisterEventAfterTick(AfterTickEvent e)
+	//{
+	//	_events_after_tick.remove(e);
+	//}
 	void Renderer::Render()
 	{
 		//TODO:第一帧不渲染，否则会有taskpass执行结果异常，原因未知
@@ -108,6 +138,11 @@ namespace Ailu
 			//_p_test_cs->SetTexture("gOut", _p_test_texture.get());
 			//cmd->Dispatch(_p_test_cs.get(), 4, 4, 1);
 
+			if (!_captures.empty())
+			{
+				_p_context->TakeCapture();
+				_captures.pop();
+			}
 
 			if (!_p_task_render_passes.empty())
 			{
@@ -156,7 +191,7 @@ namespace Ailu
 			int gridSpacing = 100;
 			Vector3f cameraPosition = Camera::sCurrent->Position();
 			float grid_alpha = lerpf(0.0f, 1.0f, abs(cameraPosition.y) / 2000.0f);
-			Color grid_color = Colors::kWhite;
+			Color32 grid_color = Colors::kWhite;
 			grid_color.a = 1.0f - grid_alpha;
 			if (grid_color.a > 0)
 			{
@@ -191,7 +226,7 @@ namespace Ailu
 		for (auto light : light_comps)
 		{
 			auto& light_data = light->_light;
-			Color color = light_data._light_color;
+			Color32 color = light_data._light_color;
 			color.r *= color.a;
 			color.g *= color.a;
 			color.b *= color.a;

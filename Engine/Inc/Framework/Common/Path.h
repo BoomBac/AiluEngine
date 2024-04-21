@@ -23,6 +23,12 @@ namespace Ailu
 		static const String kEngineMaterialPath = "Materials/";
 		static const String kEngineMeshPath = "Meshs/";
 		static const String kEngineTexturePath = "Textures/";
+		static const WString kEngineShaderPathW = L"Shaders/";
+		static const WString kEngineMaterialPathW = L"Materials/";
+		static const WString kEngineMeshPathW = L"Meshs/";
+		static const WString kEngineTexturePathW = L"Textures/";
+		static const String kEngineIconPath = "Icons/";
+		static const WString kEngineIconPathW = L"Icons/";
 	}
 
 	namespace PathUtils
@@ -64,7 +70,7 @@ namespace Ailu
 		}
 
 		//begin from Res/  eg: Engien/Res/aa/b -> aa/b
-		static inline WString ExtractAssetPathW(const WString& path)
+		static inline WString ExtractAssetPath(const WString& path)
 		{
 			auto p1 = path.find(L"Res/");
 			auto p2 = path.find(L"Res\\");
@@ -93,6 +99,50 @@ namespace Ailu
 				formattedPath.replace(pos, 1, "/");
 			}
 			return formattedPath;
+		}
+
+		static WString FormatFilePath(const WString& file_path)
+		{
+			std::wstring formattedPath = file_path;
+			size_t pos = 0;
+			while ((pos = formattedPath.find(L"\\\\", pos)) != std::string::npos)
+			{
+				formattedPath.replace(pos, 2, L"/");
+			}
+			pos = 0;
+			while ((pos = formattedPath.find(L"\\", pos)) != std::string::npos)
+			{
+				formattedPath.replace(pos, 1, L"/");
+			}
+			return formattedPath;
+		}
+
+		static void FormatFilePathInPlace(WString& file_path)
+		{
+			size_t pos = 0;
+			while ((pos = file_path.find(L"\\\\", pos)) != std::wstring::npos)
+			{
+				file_path.replace(pos, 2, L"/");
+			}
+			pos = 0;
+			while ((pos = file_path.find(L"\\", pos)) != std::wstring::npos)
+			{
+				file_path.replace(pos, 1, L"/");
+			}
+		}
+
+		static void FormatFilePathInPlace(String& file_path)
+		{
+			size_t pos = 0;
+			while ((pos = file_path.find("\\\\", pos)) != std::wstring::npos)
+			{
+				file_path.replace(pos, 2, "/");
+			}
+			pos = 0;
+			while ((pos = file_path.find("\\", pos)) != std::wstring::npos)
+			{
+				file_path.replace(pos, 1, "/");
+			}
 		}
 
 		static std::string GetFileName(const std::string_view filePath, bool include_ext = false)

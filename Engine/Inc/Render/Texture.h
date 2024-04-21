@@ -6,12 +6,13 @@
 #include <map>
 #include "GlobalMarco.h"
 #include "Framework/Common/LogMgr.h"
+#include "Framework/Math/ALMath.hpp"
 #include "AlgFormat.h"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ThreadPool.h"
 
 #include "Framework/Common/Reflect.h"
-
+#include "Framework/Interface/IAssetable.h"
 
 
 namespace Ailu
@@ -94,13 +95,76 @@ namespace Ailu
 	{
 		kTexture2D = 0,kTextureCubeMap,kRenderTexture
 	};
+
+	DECLARE_ENUM(ETextureDimension,kUnknown, kTex2D, kTex3D, kCube, kTex2DArray,kCubeArray)
+	DECLARE_ENUM(EFilterMode,kPoint,kBilinear,kTrilinear)
+	DECLARE_ENUM(EWrapMode, kClamp, kRepeat, kMirror)
+	DECLARE_ENUM(ETextureFormat,kRGBA32,kRGBAFloat)
+	static EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format)
+	{
+		switch (format)
+		{
+		case ETextureFormat::kRGBA32:
+			return EALGFormat::kALGFormatR8G8B8A8_UNORM;
+		case ETextureFormat::kRGBAFloat:
+			return EALGFormat::kALGFormatR32G32B32A32_FLOAT;
+		default:
+			break;
+		}
+		return EALGFormat::kALGFormatUnknown;
+	}
+	//------------
+	class TextureNew
+	{
+		DECLARE_PROTECTED_PROPERTY(mipmap_count,MipmapLevel,u16)
+		DECLARE_PROTECTED_PROPERTY(is_readble,Readble,bool)
+		DECLARE_PROTECTED_PROPERTY(is_srgb,sRGB,bool)
+		DECLARE_PROTECTED_PROPERTY(dimension, Dimension, ETextureDimension::ETextureDimension)
+		DECLARE_PROTECTED_PROPERTY(filter_mode, FilterMode, EFilterMode::EFilterMode)
+		DECLARE_PROTECTED_PROPERTY(wrap_mode, WrapMode, EWrapMode::EWrapMode)
+		DECLARE_PROTECTED_PROPERTY_RO(width, Width, u16)
+		DECLARE_PROTECTED_PROPERTY_RO(height, Height, u16)
+		DECLARE_PROTECTED_PROPERTY_RO(pixel_format, PixelFormat, EALGFormat)
+	public:
+		TextureNew();
+		TextureNew(u16 width, u16 height);
+		virtual ~TextureNew();
+		virtual InPtr GetNativeTexturePtr();
+	};
+
+	class Texture2DNew : public TextureNew
+	{
+	public:
+		Texture2DNew(u16 width, u16 height,ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32,u16 mipmap_count = 1,bool linear = false);
+		Texture2DNew(u16 width, u16 height, bool mipmap_chain = true,ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32,bool linear = false);
+		virtual ~Texture2DNew();
+		virtual void Apply();
+		Color32 GetPixel32(u16 x, u16 y);
+		Color GetPixel(u16 x, u16 y);
+		Color GetPixelBilinear(float u, float v);
+		InPtr GetPixelData(u16 mipmap);
+		void SetPixel(u16 x, u16 y, Color color,u16 mipmap);
+		void SetPixel32(u16 x, u16 y, Color32 color,u16 mipmap);
+		template<typename T>
+		void SetPixelData(T* data, u16 mipmap,u64 offset);
+	protected:
+		ETextureFormat::ETextureFormat _format;
+		Vector<u8*> _pixel_data;
+	};
+	template<typename T>
+	inline void Texture2DNew::SetPixelData(T* data, u16 mipmap, u64 offset)
+	{
+
+	}
+
+
 	class CommandBuffer;
 	class Texture
 	{
 	public:
 		virtual ~Texture() = default;
-		virtual u8* GetCPUNativePtr() = 0;
-		virtual void* GetGPUNativePtr() = 0;
+		virtual u8* GetPixelData() = 0;
+		virtual void* GetGPUNativePtr(u16 index = 0u) = 0;
 		virtual void* GetNativeCPUHandle() = 0;
 		virtual const uint16_t& GetWidth() const = 0;
 		virtual const uint16_t& GetHeight() const = 0;
@@ -129,7 +193,7 @@ namespace Ailu
 		}
 	};
 
-	class Texture2D : public Texture
+	class Texture2D : public Texture, public IAssetable
 	{
 		DECLARE_PROTECTED_PROPERTY(path,AssetPath,String)
 		DECLARE_PROTECTED_PROPERTY(channel,Channel,u8)
@@ -142,12 +206,15 @@ namespace Ailu
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
-		u8* GetCPUNativePtr() override;
+		u8* GetPixelData() override;
 		void* GetNativeCPUHandle() override;
-		void* GetGPUNativePtr()override;
+		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
 		const ETextureType GetTextureType() const final;
 		const u8& GetMipmap() const final { return _mipmap_count; };
 		EALGFormat GetFormat() const { return _format; };
+
+		const Guid& GetGuid() const final;
+		void AttachToAsset(Asset* owner) final;
 	public:
 		void Name(const std::string& name) override;
 		const std::string& Name() const override;
@@ -158,6 +225,7 @@ namespace Ailu
 		EALGFormat _format;
 		u8 _mipmap_count = 1u;
 		bool _read_only;
+		Asset* _p_asset_owned_this;
 	};
 
 	class TextureCubeMap : public Texture
@@ -170,9 +238,9 @@ namespace Ailu
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		const uint16_t& GetWidth() const final { return _width; };
 		const uint16_t& GetHeight() const final { return _height; };
-		u8* GetCPUNativePtr() override;
+		u8* GetPixelData() override;
 		void* GetNativeCPUHandle() override;
-		void* GetGPUNativePtr()override;
+		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
 		const ETextureType GetTextureType() const final;
 		void Name(const std::string& name) override { _name = name; };
 		const std::string& Name() const override { { return _name; } };
@@ -218,7 +286,7 @@ namespace Ailu
 		void* GetNativeCPUHandle() override;
 		//return rtv handle
 		virtual void* GetNativeCPUHandle(u16 index);
-		void* GetGPUNativePtr() override;
+		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
 		const ETextureType GetTextureType() const final;
 		virtual void Transition(CommandBuffer* cmd,ETextureResState state);
 		const RTHandle& GetRTHandle() const { return _rt_handle; }
@@ -227,6 +295,7 @@ namespace Ailu
 		const u8& GetMipmap() const final { return _mipmap_count; };
 		EALGFormat GetFormat() const { return _format; };
 		ETextureResState GetState() const { return _state; }
+		bool IsCubemap() const { return _is_cubemap; }
 		bool operator==(const RenderTexture& other) const { return _rt_handle._id == other._rt_handle._id; }
 		inline static Vector<Ref<RenderTexture>> s_all_render_texture;
 	protected:

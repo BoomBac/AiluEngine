@@ -498,7 +498,7 @@ namespace Ailu
 	{
 		kConstBuffer = 0x01, 
 		kCBufferAttribute = 0x02,kCBufferFloat = 0x04, kCBufferFloat4 = 0x08, kCBufferUint = 0x10, kCBufferUint4 = 0x20, kCBufferMatrix4 = 0x40,kCBufferBool = 0x80,
-		kTexture2D = 3, kCubeMap = 5, kTexture2DArray = 6, kSampler = 7, kUAVTexture2D = 9,
+		kTexture2D = 0x100, kCubeMap = 0x200, kTexture2DArray = 0x400, kSampler = 0x800, kUAVTexture2D = 0x1000,
 		kUnknown
 	};
 

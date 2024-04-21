@@ -9,6 +9,7 @@
 #include "Texture.h"
 #include "Framework/Common/Reflect.h"
 #include "Buffer.h"
+#include "Framework/Interface/IAssetable.h"
 
 
 namespace Ailu
@@ -28,7 +29,7 @@ namespace Ailu
 		inline static String kNormal = "Normal";
 	};
 
-	class Material : public Object
+	class Material : public Object,public IAssetable
 	{
 		friend class ResourceMgr;
 		DECLARE_REFLECT_FIELD(Material)
@@ -56,6 +57,11 @@ namespace Ailu
 		List<std::tuple<String, float>> GetAllFloatValue();
 		List<std::tuple<String, Vector4f>> GetAllVectorValue();
 		List<std::tuple<String, u32>> GetAllUintValue();
+		//为了持久化
+		const Guid& GetGuid() const final;
+		void AttachToAsset(Asset* owner) final;
+	protected:
+		Asset* _p_asset_owned_this;
 	private:
 		void Construct(bool first_time);
 	private:

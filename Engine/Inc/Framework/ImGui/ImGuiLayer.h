@@ -4,9 +4,14 @@
 #ifndef __IMGUI_LAYER_H__
 #define __IMGUI_LAYER_H__
 #include "Framework/Events/Layer.h"
+#include "Widgets/TextureSelector.h"
+
+struct ImFont;
 
 namespace Ailu
 {
+	class AssetBrowser;
+	class AssetTable;
 	class ImguiWindow
 	{
 	public:
@@ -34,34 +39,8 @@ namespace Ailu
 		int _handle = -1;
 		bool _b_show = false;
 	};
-	class TextureSelector : public ImguiWindow
-	{
-	public:
-		void Open(const int& handle) final;
-		void Show() final;
-		const String& GetSelectedTexture(const int& handle) const;
-	private:
-		int _selected_img_index = -1;
-		String _cur_selected_texture_path = kNull;
-	};
 
 	class MeshBrowser : public ImguiWindow
-	{
-	public:
-		void Open(const int& handle) final;
-		void Show() final;
-	};
-
-	class AssetBrowser : public ImguiWindow
-	{
-	public:
-		void Open(const int& handle) final;
-		void Show() final;
-	private:
-		String _cur_dir;
-	};
-
-	class AssetTable : public ImguiWindow
 	{
 	public:
 		void Open(const int& handle) final;
@@ -74,6 +53,7 @@ namespace Ailu
 		void Open(const int& handle) final;
 		void Show() final;
 	};
+
 
 	class AILU_API ImGUILayer : public Layer
 	{
@@ -94,10 +74,11 @@ namespace Ailu
 		void ShowWorldOutline();
 		void ShowObjectDetail();
 	private:
+		ImFont* _font = nullptr;
 		TextureSelector _texture_selector;
 		MeshBrowser _mesh_browser;
-		AssetBrowser _asset_browser;
-		AssetTable _asset_table;
+		AssetBrowser* _asset_browser;
+		AssetTable* _asset_table;
 		RTDebugWindow _rt_view;
 	};
 }

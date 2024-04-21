@@ -106,6 +106,7 @@ namespace Ailu
 
 		static void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot = 255);
 		static void SubmitBindResource(Texture* texture, u8 slot = -1);
+		static void UpdateAllPSOObject();
 	private:
 		inline static Queue<Scope<GraphicsPipelineStateObject>> s_update_pso{};
 		inline static std::map<ALHash::Hash<64>, Scope<GraphicsPipelineStateObject>> s_pso_library{};

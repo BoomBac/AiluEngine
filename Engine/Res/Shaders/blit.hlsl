@@ -5,7 +5,7 @@
 //Cull: Back
 //Queue: Opaque
 //Fill: Solid
-//ZTest: Off
+//ZTest: Always
 //ZWrite: Off
 //info end
 #include "common.hlsli"

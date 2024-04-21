@@ -1,5 +1,7 @@
 #include "pch.h"
 #include "Render/Mesh.h"
+#include "Framework/Common/Asset.h"
+#include "Framework/Common/Utils.h"
 
 namespace Ailu
 {
@@ -80,6 +82,23 @@ namespace Ailu
 	void Mesh::AddSubmesh(u32* indices, u32 indices_count)
 	{
 		_p_indices.emplace_back(std::make_tuple(indices, indices_count));
+	}
+	const Guid& Mesh::GetGuid() const
+	{
+		if (_p_asset_owned_this)
+		{
+			return _p_asset_owned_this->GetGuid();
+		}
+		return Guid::EmptyGuid();
+	}
+
+	void Mesh::AttachToAsset(Asset* asset)
+	{
+		AL_ASSERT(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
+		_p_asset_owned_this = asset;
+		asset->_p_inst_asset = this;
+		asset->_name = ToWChar(_name);
+		asset->_full_name = asset->_name.append(L".almat");
 	}
 	void Mesh::BuildRHIResource()
 	{

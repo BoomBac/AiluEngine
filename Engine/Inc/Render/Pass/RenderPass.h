@@ -119,8 +119,9 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 	private:
-		Ref<Mesh> _p_quad_mesh;
+		Ref<Mesh> _p_sky_mesh;
 		Ref<Material> _p_skybox_material;
+		Scope<ConstantBuffer> _p_cbuffer;
 	};
 }
 

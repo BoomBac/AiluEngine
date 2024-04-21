@@ -3,6 +3,7 @@
 #include "Render/Material.h"
 #include "Framework/Common/LogMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"
+#include "Framework/Common/Asset.h"
 
 namespace Ailu
 {
@@ -203,6 +204,24 @@ namespace Ailu
 	{
 	}
 
+	const Guid& Material::GetGuid() const
+	{
+		if (_p_asset_owned_this)
+		{
+			return _p_asset_owned_this->GetGuid();
+		}
+		return Guid::EmptyGuid();
+	}
+
+	void Material::AttachToAsset(Asset* asset)
+	{
+		AL_ASSERT(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
+		_p_asset_owned_this = asset;
+		asset->_p_inst_asset = this;
+		asset->_name = ToWChar(_name);
+		asset->_full_name = asset->_name.append(L".almat");
+	}
+
 	void Material::RemoveTexture(const String& name)
 	{
 		auto it = _textures.find(name);
@@ -328,6 +347,7 @@ namespace Ailu
 		else if (_mat_cbuf_size != cur_shader_cbuf_size)
 		{
 			throw std::runtime_error("Material: " + _name + " shader cbuf size not equal!");
+			LOG_ERROR("Material: " + _name + " shader cbuf size not equal!");
 			//u8* new_cbuf_data = new u8[cur_shader_cbuf_size];
 			//memcpy(new_cbuf_data, _p_cbuf_cpu, _mat_cbuf_size);
 			//DESTORY_PTRARR(_p_cbuf_cpu);

@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: -1424.58,1192.79,-457.949
-  Rotation: -0.241929,-0.528986,0.160523,-0.797419
+  Position: 942.948,743.662,350.687
+  Rotation: 0.173045,-0.737947,0.206311,0.618809
   Fov: 60
   Aspect: 1.77778
   Near: 76.58
   Far: 118818
-  ControllerRotation: 33.7594,29227.1
+  ControllerRotation: 31.2396,29420
 SceneGraph: 
   Name: root
     Components: 
@@ -15,7 +15,7 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,9.72351e-06,0,1
         Scale: -13.99,0.01,0.01
-    Children: 6
+    Children: 5
       Name: plane
         Components: 
           TransformComponent: 
@@ -24,26 +24,26 @@ SceneGraph:
             Scale: 25,1,25
           StaticMeshComponent: 
             MeshPath: plane
-            MaterialPath0: Materials/StandardPBR_new.almat
+            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0
       Name: directional_light
         Components: 
           TransformComponent: 
             Position: -5000,5000,0
-            Rotation: -2.45491e-08,6.29326e-08,0.363414,0.931628
+            Rotation: -3.01095e-08,6.04698e-08,0.445729,0.895168
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
             Intensity: 1
             CastShadow: true
-            ShadowArea: 5206.37
+            ShadowArea: 8776.86
             ShadowDistance: 10521.8
         Children: 0
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: 55,366,-39
+            Position: 55,838,-39
             Rotation: 0,0.24869,0,0.968583
             Scale: 1,1,1
           LightComponent: 
@@ -80,15 +80,5 @@ SceneGraph:
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey
-            MaterialPath0: Materials/StandardPBR_new.almat
-        Children: 0
-      Name: object0
-        Components: 
-          TransformComponent: 
-            Position: 0,334,390
-            Rotation: 0,-0.925936,0,0.377679
-            Scale: 1,1,1
-          StaticMeshComponent: 
-            MeshPath: D:/ProjectCpp/AiluEngine/Engine/Res/Meshs/DamagedHelmet.fbx
-            MaterialPath0: Materials/StandardPBR_new.almat
+            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0

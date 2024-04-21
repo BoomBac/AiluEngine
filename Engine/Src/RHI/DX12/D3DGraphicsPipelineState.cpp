@@ -50,7 +50,7 @@ namespace Ailu
 			}
 			_p_sig = d3dshader->GetSignature();
 			_d3d_pso_desc.SampleDesc.Count = 1;
-			ThrowIfFailed(D3DContext::GetInstance()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
+			ThrowIfFailed(D3DContext::Get()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
 			_b_build = true;
 			//LOG_INFO("rt hash {}", (u32)_state_desc._rt_state.Hash());
 			_hash = ConstructPSOHash(_state_desc);
@@ -70,7 +70,7 @@ namespace Ailu
 		_p_cmd->SetGraphicsRootSignature(_p_sig.Get());
 		_p_cmd->SetPipelineState(_p_plstate.Get());
 		_p_cmd->IASetPrimitiveTopology(D3DConvertUtils::ConvertToDXTopology(_state_desc._topology));
-		_p_cmd->SetDescriptorHeaps(1, D3DContext::GetInstance()->GetDescriptorHeap().GetAddressOf());
+		//_p_cmd->SetDescriptorHeaps(1, D3DContext::Get()->GetDescriptorHeap().GetAddressOf());
 	}
 
 	void D3DGraphicsPipelineState::SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot)
@@ -114,7 +114,7 @@ namespace Ailu
 			LOG_WARNING("PSO:{} submitBindResource: bind slot {} not found!",_name,(u16)bind_slot);
 			return;
 		}
-		static auto context = D3DContext::GetInstance();
+		static auto context = D3DContext::Get();
 		switch (res_type)
 		{
 		case Ailu::EBindResDescType::kConstBuffer:

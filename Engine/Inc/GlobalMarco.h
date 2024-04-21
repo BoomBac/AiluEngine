@@ -7,6 +7,7 @@
 #include <list>
 #include <queue>
 #include <array>
+#include <map>
 
 #ifdef AILU_BUILD_DLL
 #define AILU_API __declspec(dllexport)
@@ -16,6 +17,7 @@
 
 #define DEAR_IMGUI
 #define _SIMD
+#define _PIX_DEBUG
 
 #define CONTACT(x,y) x##y
 #define STR(x) #x
@@ -53,7 +55,8 @@
 #define HIGH_BIT(x, n) ((x) >> (n))
 #define LOW_BIT(x, n) ((x) & ((1 << (n)) - 1))
 
-#define AL_ASSERT(x,msg) if(x) throw(std::runtime_error(msg));
+#define AL_ASSERT(x,msg) if(x) {throw(std::runtime_error(msg));LOG_ERROR(msg);}\
+
 
 #define TP_ZERO(t) std::get<0>(t)
 #define TP_ONE(t) std::get<1>(t)
@@ -141,7 +144,7 @@ static void SplitEnumArgs(const char* szArgs, std::string Array[], int nMax)
             for (int i = 0; i < COUNT; i++) { if (_Strings[i] == strEnum) { return (ename)i; } } \
             return COUNT; \
         } \
-    }
+    };
 
 
 //使用dxc编译高版本着色器(>=6.0)，这样的话无法在PIX中看到cbuffer信息
@@ -156,6 +159,7 @@ using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
 using f32 = float;
+using InPtr = void*;
 
 using String = std::string;
 using WString = std::wstring;
@@ -172,8 +176,15 @@ using List = std::list<T>;
 template<typename T>
 using Queue = std::queue<T>;
 
+template<typename Key, typename Value>
+using Map = std::map<Key, Value>;
+
+template<typename Key, typename Value>
+using HashMap = std::multimap<Key, Value>;
+
 template<typename T>
 using Scope = std::unique_ptr<T>;
+
 
 namespace Modules
 {

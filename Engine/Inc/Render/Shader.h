@@ -146,6 +146,7 @@ namespace Ailu
 			inline static const String kOff = "Off";
 			inline static const String kLEqual = "LEqual";
 			inline static const String kEqual = "Equal";
+			inline static const String kAlways = "Always";
 		} kZTestValue;
 		static struct ZWrite
 		{

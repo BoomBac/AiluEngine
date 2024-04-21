@@ -266,6 +266,11 @@ namespace Ailu
 		String line{};
 		u32 line_count = 0;
 		lines = ReadFileToLines(_src_file_path, line_count, "//info bein", "//info end");
+		RasterizerState _temp_pipeline_raster_state;
+		DepthStencilState  _temp_pipeline_ds_state;
+		ETopology  _temp_pipeline_topology = ETopology::kTriangle;
+		BlendState  _temp_pipeline_blend_state;
+
 		u8 need_zbuf_count = 2;
 		if (line_count > 0)
 		{
@@ -300,18 +305,18 @@ namespace Ailu
 				{
 					if (su::Equal(v, ShaderCommand::kCullValue.kBack, false))
 					{
-						_pipeline_raster_state._cull_mode = ECullMode::kBack;
+						_temp_pipeline_raster_state._cull_mode = ECullMode::kBack;
 					}
 					else
 					{
-						_pipeline_raster_state._cull_mode = ECullMode::kFront;
+						_temp_pipeline_raster_state._cull_mode = ECullMode::kFront;
 					}
 				}
 				else if (su::Equal(k, ShaderCommand::kTopology, false))
 				{
 					if (su::Equal(v, ShaderCommand::kTopologyValue.kLine))
 					{
-						_pipeline_topology = ETopology::kLine;
+						_temp_pipeline_topology = ETopology::kLine;
 					}
 				}
 				else if (su::Equal(k, ShaderCommand::kBlend, false))
@@ -327,27 +332,27 @@ namespace Ailu
 				{
 					if (su::Equal(v, ShaderCommand::kFillValue.kWireframe))
 					{
-						_pipeline_raster_state._fill_mode = EFillMode::kWireframe;
+						_temp_pipeline_raster_state._fill_mode = EFillMode::kWireframe;
 					}
 				}
 				else if (su::Equal(k, ShaderCommand::kZTest, false))
 				{
-					if (su::Equal(v, ShaderCommand::kZTestValue.kOff))
+					if (su::Equal(v, ShaderCommand::kZTestValue.kAlways,false))
 					{
 						need_zbuf_count--;
-						_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
+						_temp_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
 					}
-					else if (su::Equal(v, ShaderCommand::kZTestValue.kEqual))
-						_pipeline_ds_state._depth_test_func = ECompareFunc::kEqual;
-					else if (su::Equal(v, ShaderCommand::kZTestValue.kLEqual))
-						_pipeline_ds_state._depth_test_func = ECompareFunc::kLessEqual;
+					else if (su::Equal(v, ShaderCommand::kZTestValue.kEqual, false))
+						_temp_pipeline_ds_state._depth_test_func = ECompareFunc::kEqual;
+					else if (su::Equal(v, ShaderCommand::kZTestValue.kLEqual, false))
+						_temp_pipeline_ds_state._depth_test_func = ECompareFunc::kLessEqual;
 				}
 				else if (su::Equal(k, ShaderCommand::kZWrite, false))
 				{
 					if (su::Equal(v, ShaderCommand::kZWriteValue.kOff))
 					{
 						need_zbuf_count--;
-						_pipeline_ds_state._b_depth_write = false;
+						_temp_pipeline_ds_state._b_depth_write = false;
 					}
 				}
 			}
@@ -361,9 +366,9 @@ namespace Ailu
 					else if (su::Equal(s, ShaderCommand::kBlendFactorValue.kOneMinusSrc)) return EBlendFactor::kOneMinusSrcAlpha;
 					else return EBlendFactor::kOne;
 					};
-				_pipeline_blend_state._b_enable = true;
-				_pipeline_blend_state._src_color = get_ailu_blend_factor(blend_factors[0]);
-				_pipeline_blend_state._dst_color = get_ailu_blend_factor(blend_factors[1]);
+				_temp_pipeline_blend_state._b_enable = true;
+				_temp_pipeline_blend_state._src_color = get_ailu_blend_factor(blend_factors[0]);
+				_temp_pipeline_blend_state._dst_color = get_ailu_blend_factor(blend_factors[1]);
 			}
 			for (auto& it = prop_end_it; it != lines.end(); it++)
 			{
@@ -393,9 +398,13 @@ namespace Ailu
 
 		if (need_zbuf_count == 0)
 		{
-			_pipeline_ds_state._b_depth_write = false;
-			_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
+			_temp_pipeline_ds_state._b_depth_write = false;
+			_temp_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
 		}
+		_pipeline_raster_state = _temp_pipeline_raster_state;
+		_pipeline_ds_state = _temp_pipeline_ds_state;
+		_pipeline_topology = _temp_pipeline_topology;
+		_pipeline_blend_state = _temp_pipeline_blend_state;
 		//construct keywords
 		Vector<Vector<String>> kw_permutation_in{};
 		int kw_group_count = 0;

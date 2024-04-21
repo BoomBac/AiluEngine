@@ -3,13 +3,15 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Render/RenderingData.h"
+#include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
+#include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
 
 namespace Ailu
 {
 	D3DCommandBuffer::D3DCommandBuffer()
 	{
-		auto dev = D3DContext::GetInstance()->GetDevice();
+		auto dev = D3DContext::Get()->GetDevice();
 		ThrowIfFailed(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(_p_alloc.GetAddressOf())));
 		ThrowIfFailed(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _p_alloc.Get(), nullptr, IID_PPV_ARGS(_p_cmd.GetAddressOf())));
 		_b_cmd_closed = false;
@@ -32,6 +34,7 @@ namespace Ailu
 			ThrowIfFailed(_p_cmd->Reset(_p_alloc.Get(), nullptr));
 			_b_cmd_closed = false;
 		}
+		_cur_cbv_heap_id = 65535;
 	}
 	void D3DCommandBuffer::Close()
 	{
@@ -244,7 +247,7 @@ namespace Ailu
 		static const auto& mat = BuildIdentityMatrix();
 		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
 		static const auto material = MaterialLibrary::GetMaterial("Blit");
-		D3DContext::s_p_d3dcontext->BeginBackBuffer(this);
+		D3DContext::Get()->BeginBackBuffer(this);
 		mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
 		mesh->GetIndexBuffer()->Bind(this);
 		material->SetTexture("_SourceTex", color);
@@ -252,12 +255,29 @@ namespace Ailu
 		GraphicsPipelineStateMgr::EndConfigurePSO(this);
 		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
 		{
+#ifdef _PIX_DEBUG
+			PIXBeginEvent(_p_cmd.Get(), 100, "FinalBlitPass");
+			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
+			PIXEndEvent(_p_cmd.Get());
+			PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
+			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
+			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			Gizmo::Submit(this);
+			PIXEndEvent(_p_cmd.Get());
+			PIXBeginEvent(_p_cmd.Get(), 110, "GUIPass");
+			D3DContext::Get()->DrawOverlay(this);
+			PIXEndEvent(_p_cmd.Get());
+#else
 			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
 			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
 			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			Gizmo::Submit(this);
 			D3DContext::s_p_d3dcontext->DrawOverlay(this);
+#endif // _PIX_DEBUG
+
+
 		}
-		D3DContext::s_p_d3dcontext->EndBackBuffer(this);
+		D3DContext::Get()->EndBackBuffer(this);
 	}
 
 	void D3DCommandBuffer::Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)

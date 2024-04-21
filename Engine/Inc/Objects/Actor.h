@@ -47,6 +47,7 @@ namespace Ailu
 		std::list<Actor*>& GetAllChildren();
 		void RemoveChild(Actor* child);
 		void AddChild(Actor* child);
+		void SetParent(Actor* new_parent);
 		uint16_t GetChildNum() const { return _chilren_num; };
 		void ClearChildren();
 		bool operator==(const Actor& other) const

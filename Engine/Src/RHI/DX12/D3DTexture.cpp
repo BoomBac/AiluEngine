@@ -46,7 +46,8 @@ namespace Ailu
 	}
 	void D3DTexture2D::Bind(CommandBuffer* cmd, u8 slot)
 	{
-		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
+		_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd),slot);
+		//static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
 	void D3DTexture2D::Release()
 	{
@@ -54,16 +55,19 @@ namespace Ailu
 		{
 			DESTORY_PTRARR(p);
 		}
+		g_pGPUDescriptorAllocator->Free(std::move(_allocation));
 	}
 
-	void* D3DTexture2D::GetGPUNativePtr()
+	void* D3DTexture2D::GetGPUNativePtr(u16 index)
 	{
+		//if(_allocation.PageID() != 0)
+		//_allocation.SetupDescriptorHeap();
 		return reinterpret_cast<void*>(_srv_gpu_handle.ptr);
 	}
 
 	void D3DTexture2D::BuildRHIResource()
 	{
-		auto p_device{ D3DContext::GetInstance()->GetDevice() };
+		auto p_device{ D3DContext::Get()->GetDevice() };
 		auto cmd = CommandBufferPool::Get();
 		auto p_cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
 		ComPtr<ID3D12Resource> pTextureGPU;
@@ -114,23 +118,24 @@ namespace Ailu
 		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		_srv_desc.Texture2D.MipLevels = _mipmap_count;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
-		auto [cpu_handle, gpu_handle] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
+		_allocation = g_pGPUDescriptorAllocator->Allocate(1);
+		auto [cpu_handle, gpu_handle] = _allocation.At(0);
 		_srv_cpu_handle = cpu_handle;
 		_srv_gpu_handle = gpu_handle;
 		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _srv_cpu_handle);
-		if (!_read_only)
-		{
-			_uav_desc.Format = _uav_format;
-			_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-			_uav_desc.Texture2D.MipSlice = 0;
-			auto [uav_cpu_handle, uav_gpu_handle] = D3DContext::GetInstance()->GetUAVDescriptorHandle();
-			_uav_cpu_handle = uav_cpu_handle;
-			_uav_gpu_handle = uav_gpu_handle;
-			p_device->CreateUnorderedAccessView(pTextureGPU.Get(), nullptr, &_uav_desc, _uav_cpu_handle);
-		}
+		//if (!_read_only)
+		//{
+		//	_uav_desc.Format = _uav_format;
+		//	_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		//	_uav_desc.Texture2D.MipSlice = 0;
+		//	auto [uav_cpu_handle, uav_gpu_handle] = D3DContext::Get()->GetUAVDescriptorHandle();
+		//	_uav_cpu_handle = uav_cpu_handle;
+		//	_uav_gpu_handle = uav_gpu_handle;
+		//	p_device->CreateUnorderedAccessView(pTextureGPU.Get(), nullptr, &_uav_desc, _uav_cpu_handle);
+		//}
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);
-		D3DContext::GetInstance()->ExecuteCommandBuffer(cmd);
+		D3DContext::Get()->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}
 
@@ -155,7 +160,7 @@ namespace Ailu
 
 	void D3DTextureCubeMap::BuildRHIResource()
 	{
-		auto p_device{ D3DContext::GetInstance()->GetDevice() };
+		auto p_device{ D3DContext::Get()->GetDevice() };
 		auto cmd = CommandBufferPool::Get();
 		auto p_cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
 		ComPtr<ID3D12Resource> pTextureGPU;
@@ -202,25 +207,28 @@ namespace Ailu
 		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 		_srv_desc.Texture2D.MipLevels = 1;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
-		auto [cpu_handle, gpu_handle] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
+		_allocation = g_pGPUDescriptorAllocator->Allocate(1);
+		auto [cpu_handle, gpu_handle] = _allocation.At(0);
 		_srv_cpu_handle = cpu_handle;
 		_srv_gpu_handle = gpu_handle;
 		p_device->CreateShaderResourceView(pTextureGPU.Get(), &_srv_desc, _srv_cpu_handle);
 		_textures.emplace_back(pTextureGPU);
 		_upload_textures.emplace_back(pTextureUpload);
-		D3DContext::GetInstance()->ExecuteCommandBuffer(cmd);
+		D3DContext::Get()->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}
 
 	void D3DTextureCubeMap::Bind(CommandBuffer* cmd, u8 slot)
 	{
-		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
+		_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+		//static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
 	}
 
 	void D3DTextureCubeMap::Release()
 	{
 		for (u8* p : _p_datas)
 			DESTORY_PTR(p);
+		g_pGPUDescriptorAllocator->Free(std::move(_allocation));
 	}
 	//----------------------------------------------------------D3DTextureCubeMap---------------------------------------------------------------------
 
@@ -257,7 +265,7 @@ namespace Ailu
 			texture_num = 6u;
 		}
 		bool is_shadowmap = IsShadowMapFormat(_format);
-		auto p_device{ D3DContext::GetInstance()->GetDevice() };
+		auto p_device{ D3DContext::Get()->GetDevice() };
 		D3D12_RESOURCE_DESC tex_desc{};
 		tex_desc.MipLevels = _mipmap_count;
 		tex_desc.Format = ConvertToDXGIFormat(_format);
@@ -286,15 +294,36 @@ namespace Ailu
 		_srv_desc.ViewDimension = _is_cubemap? D3D12_SRV_DIMENSION_TEXTURECUBE : D3D12_SRV_DIMENSION_TEXTURE2D;
 		_srv_desc.Texture2D.MostDetailedMip = 0;
 		_srv_desc.Texture2D.MipLevels = 1;
-		auto [s_ch, s_gh] = D3DContext::GetInstance()->GetSRVDescriptorHandle();
-		_srv_gpu_handle = s_gh;
-		_srv_cpu_handle = s_ch;
-		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handle);
+
+		_gpu_allocation = g_pGPUDescriptorAllocator->Allocate(1);
+		auto [s_ch, s_gh] = _gpu_allocation.At(0);
+		_srv_cpu_handles[0] = s_ch;
+		_srv_gpu_handles[0] = s_gh;
+		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handles[0]);
+		//if (is_cubemap)
+		//{
+		//	for (u32 i = 1; i < 7; i++)
+		//	{
+		//		auto [ch, gh] = D3DContext::Get()->GetSRVDescriptorHandle();
+		//		_srv_cpu_handles[i] = ch;
+		//		_srv_gpu_handles[i] = gh;
+		//		D3D12_SHADER_RESOURCE_VIEW_DESC slice_srv_desc{};
+		//		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		//		_srv_desc.Format = is_shadowmap ? DXGI_FORMAT_R24_UNORM_X8_TYPELESS : tex_desc.Format;
+		//		_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+		//		_srv_desc.Texture2DArray.ArraySize = 1;
+		//		_srv_desc.Texture2DArray.FirstArraySlice = i - 1;
+		//		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _srv_cpu_handles[i]);
+		//	}
+		//}
+		_is_cubemap = is_cubemap;
+		_cpu_allocation = is_shadowmap ? std::move(g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, texture_num)) : 
+			std::move(g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, texture_num));
 		for (u16 i = 0; i < texture_num; ++i)
 		{
 			if (!is_shadowmap)
 			{
-				auto handle = D3DContext::GetInstance()->GetRTVDescriptorHandle();
+				auto handle = _cpu_allocation.At(i);
 				_d3drt_handles[i]._color_handle._srv_cpu_handle = handle;
 				D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
 				rtv_desc.ViewDimension = _is_cubemap ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY :  D3D12_RTV_DIMENSION_TEXTURE2D;
@@ -310,7 +339,7 @@ namespace Ailu
 			}
 			else
 			{
-				auto handle = D3DContext::GetInstance()->GetDSVDescriptorHandle();
+				auto handle = _cpu_allocation.At(i);
 				_d3drt_handles[i]._depth_handle._srv_cpu_handle = handle;
 				D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
 				dsv_desc.Format = tex_desc.Format;
@@ -322,12 +351,19 @@ namespace Ailu
 
 		_state = is_shadowmap ? ETextureResState::kDepthTarget : ETextureResState::kColorTagret;
 	}
+
+	D3DRenderTexture::~D3DRenderTexture()
+	{
+		Release();
+	}
+
 	void D3DRenderTexture::Bind(CommandBuffer* cmd, u8 slot)
 	{
 		RenderTexture::Bind(cmd,slot);
-		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handle);
+		_gpu_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+		//static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(slot, _srv_gpu_handles[0]);
 	}
-	u8* D3DRenderTexture::GetCPUNativePtr()
+	u8* D3DRenderTexture::GetPixelData()
 	{
 		return nullptr;
 	}
@@ -340,8 +376,15 @@ namespace Ailu
 		index = _is_cubemap? index : 0;
 		return reinterpret_cast<void*>(&_d3drt_handles[index]._color_handle._srv_cpu_handle);
 	}
+	void* D3DRenderTexture::GetGPUNativePtr(u16 index)
+	{
+		return reinterpret_cast<void*>(_srv_gpu_handles[index].ptr);
+	}
+
 	void D3DRenderTexture::Release()
 	{
+		g_pCPUDescriptorAllocator->Free(std::move(_cpu_allocation));
+		g_pGPUDescriptorAllocator->Free(std::move(_gpu_allocation));
 	}
 	void D3DRenderTexture::Transition(CommandBuffer* cmd, ETextureResState state)
 	{
