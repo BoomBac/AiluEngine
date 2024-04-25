@@ -25,7 +25,9 @@ namespace Ailu
     void LogMgr::Finalize()
     {
         for (auto& logger : _appenders)
-            delete logger;
+        {
+            DESTORY_PTR(logger);
+        }
     }
     void LogMgr::Tick(const float& delta_time)
     {

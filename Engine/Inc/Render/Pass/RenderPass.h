@@ -53,6 +53,7 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void BeginPass(GraphicsContext* context, Ref<RenderTexture>& source);
 		void EndPass(GraphicsContext* context) final;
+		bool _is_offscreen = false;
 	private:
 		Rect _backbuf_rect;
 		Ref<RenderTexture> _p_src_color;

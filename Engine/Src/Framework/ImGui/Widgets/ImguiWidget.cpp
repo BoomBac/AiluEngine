@@ -1,6 +1,10 @@
 #include "pch.h"
 #include "Framework/ImGui/Widgets/ImGuiWidget.h"
 #include "Ext/imgui/imgui.h"
+#include "Framework/Common/Input.h"
+
+#include "Render/CommandBuffer.h"
+#include "Render/Renderer.h"
 
 namespace Ailu
 {
@@ -80,13 +84,17 @@ namespace Ailu
 
 		ImGui::Begin(std::format("{} ,handle {}",_title,_handle).c_str(), &_b_show);
 		_is_focus = ImGui::IsWindowFocused();
+		Input::s_block_input |= _is_focus;
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 windowSize = ImGui::GetWindowSize();
 		_left_top.x = windowPos.x;
 		_left_top.y = windowPos.y;
 		_right_bottom.x = windowSize.x;
 		_right_bottom.y = windowSize.y;
-		ImGui::Text("State: pos: (%.2f,%.2f),size: (%.2f,%.2f)", _left_top.x, _left_top.y, _right_bottom.x, _right_bottom.y);
+		if (!_is_hide_common_widget_info)
+		{
+			ImGui::Text("State: pos: (%.2f,%.2f),size: (%.2f,%.2f)", _left_top.x, _left_top.y, _right_bottom.x, _right_bottom.y);
+		}
 		ShowImpl();
 		ImGui::End();
 	}

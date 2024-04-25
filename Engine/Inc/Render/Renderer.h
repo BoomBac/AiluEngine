@@ -41,8 +41,11 @@ namespace Ailu
         void RegisterEventAfterTick(AfterTickEvent e);
         void UnRegisterEventBeforeTick(BeforeTickEvent e);
         void UnRegisterEventAfterTick(AfterTickEvent e);
+        RenderTexture* GetTargetTexture() const { return _p_gameview_rt.get(); }
+        bool _is_offscreen = true;
     private:
         Ref<RenderTexture> _p_camera_color_attachment;
+        Ref<RenderTexture> _p_gameview_rt;
         Ref<RenderTexture> _p_camera_depth_attachment;
         void Render();
         void DrawRendererGizmo();

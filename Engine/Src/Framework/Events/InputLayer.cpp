@@ -2,6 +2,7 @@
 #include "Framework/Events/InputLayer.h"
 #include "Framework/Events/MouseEvent.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Events/KeyEvent.h"
 #include "Render/Camera.h"
 
 #include "imgui.h"
@@ -64,12 +65,27 @@ namespace Ailu
 			}
 			return true;
 			});
+		//dispater0.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e)->bool {
+		//	if (!e.Handled())
+		//	{
+		//		Input::s_key_pressed_map[e.GetKeyCode()] = true;
+		//		return true;
+		//	}
+		//	});
+		//dispater0.Dispatch<KeyReleasedEvent>([this](KeyReleasedEvent& e)->bool {
+		//	if (!e.Handled())
+		//	{
+		//		Input::s_key_pressed_map[e.GetKeyCode()] = false;
+		//		return true;
+		//	}
+		//	});
 	}
 
 	void InputLayer::OnImguiRender()
 	{
 		if (Camera::sCurrent)
 		{
+			ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 			auto camera_pos = Camera::sCurrent->Position();
 			auto camera_rotation = FirstPersonCameraController::s_instance._rotation;
 			_camera_near = Camera::sCurrent->Near();
@@ -92,6 +108,7 @@ namespace Ailu
 	}
 	void InputLayer::OnUpdate(float delta_time)
 	{
+		if (Input::s_block_input) return;
 		if (!_b_handle_input) return;
 		float lerp_speed = delta_time / 1000.0f;
 		static bool init = false;

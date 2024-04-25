@@ -68,7 +68,12 @@ namespace Ailu
 		cmd->Clear();
 		cmd->SetViewport(_backbuf_rect);
 		cmd->SetScissorRect(_backbuf_rect);
-		cmd->ResolveToBackBuffer(_p_src_color);
+		if (!rendering_data._p_final_rt)
+			cmd->ResolveToBackBuffer(_p_src_color);
+		else
+		{
+			cmd->ResolveToBackBuffer(_p_src_color, rendering_data._p_final_rt);
+		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}
@@ -274,7 +279,7 @@ namespace Ailu
 		cmd->SetViewport(rendering_data._viewport);
 		cmd->SetScissorRect(rendering_data._scissor_rect);
 		cmd->SetRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target);
-		cmd->DrawRenderer(_p_sky_mesh.get(), _p_skybox_material.get(), _p_cbuffer.get(), 0,1);
+		cmd->DrawRenderer(_p_sky_mesh.get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}

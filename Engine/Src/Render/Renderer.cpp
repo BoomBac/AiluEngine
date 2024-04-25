@@ -18,6 +18,13 @@ namespace Ailu
 		_p_timemgr->Initialize();
 		_p_camera_color_attachment = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraColorAttachment", RenderConstants::kColorRange == EColorRange::kLDR ?
 			RenderConstants::kLDRFormat : RenderConstants::kHDRFormat);
+		if (_is_offscreen)
+		{
+			_p_gameview_rt = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraColorAttachment", RenderConstants::kColorRange == EColorRange::kLDR ?
+				RenderConstants::kLDRFormat : RenderConstants::kHDRFormat);
+		}
+		else
+			_p_gameview_rt = nullptr;
 		_p_camera_depth_attachment = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraDepthAttachment", EALGFormat::kALGFormatD24S8_UINT);
 		_p_opaque_pass = MakeScope<OpaquePass>();
 		_p_reslove_pass = MakeScope<ResolvePass>(_p_camera_color_attachment);
@@ -46,6 +53,7 @@ namespace Ailu
 		_rendering_data._p_camera_depth_target = _p_camera_depth_attachment;
 		_rendering_data._viewport = Rect{ 0,0,(uint16_t)kRendererWidth,(uint16_t)kRendererHeight };
 		_rendering_data._scissor_rect = _rendering_data._viewport;
+		_rendering_data._p_final_rt = _p_gameview_rt;
 
 		_render_passes.emplace_back(_p_shadowcast_pass.get());
 		_p_opaque_pass->SetActive(false);

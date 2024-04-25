@@ -511,6 +511,9 @@
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\ObjectDetail.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\TextureSelector.h" />
     <ClInclude Include="Inc\Framework\Interface\IAssetable.h" />
     <ClInclude Include="Inc\Framework\Interface\IParser.h" />
@@ -605,6 +608,9 @@
     <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\ObjectDetail.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\TextureSelector.cpp" />
     <ClCompile Include="Src\Framework\Math\Guid.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />

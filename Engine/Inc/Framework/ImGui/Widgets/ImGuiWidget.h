@@ -27,6 +27,7 @@ namespace Ailu
 	protected:
 		i32 _handle = -1;
 		bool _b_show = false;
+		bool _is_hide_common_widget_info = false;
 		virtual void ShowImpl();
 	};
 }

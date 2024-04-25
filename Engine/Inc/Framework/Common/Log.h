@@ -98,6 +98,7 @@ namespace Ailu
 #define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
 #define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
 #define BOOL_STR(b) b? "true" : "false"
+	extern class LogMgr* g_pLogMgr;
 }
 
 #endif // !LOG_H__

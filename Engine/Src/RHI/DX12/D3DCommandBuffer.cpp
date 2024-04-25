@@ -280,6 +280,47 @@ namespace Ailu
 		D3DContext::Get()->EndBackBuffer(this);
 	}
 
+	void D3DCommandBuffer::ResolveToBackBuffer(Ref<RenderTexture>& color, Ref<RenderTexture>& destination)
+	{
+		static const auto& mat = BuildIdentityMatrix();
+		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
+		static const auto material = MaterialLibrary::GetMaterial("Blit");
+		//D3DContext::Get()->BeginBackBuffer(this);
+		SetRenderTarget(destination);
+		ClearRenderTarget(destination, Colors::kBlack);
+		mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+		mesh->GetIndexBuffer()->Bind(this);
+		material->SetTexture("_SourceTex", color);
+		material->Bind();
+		GraphicsPipelineStateMgr::EndConfigurePSO(this);
+		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+		{
+#ifdef _PIX_DEBUG
+			PIXBeginEvent(_p_cmd.Get(), 100, "FinalBlitPass");
+			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
+			PIXEndEvent(_p_cmd.Get());
+			PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
+			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
+			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			Gizmo::Submit(this);
+			PIXEndEvent(_p_cmd.Get());
+			PIXBeginEvent(_p_cmd.Get(), 110, "GUIPass");
+			D3DContext::Get()->BeginBackBuffer(this);
+			D3DContext::Get()->DrawOverlay(this);
+			PIXEndEvent(_p_cmd.Get());
+#else
+			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
+			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
+			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			Gizmo::Submit(this);
+			D3DContext::s_p_d3dcontext->DrawOverlay(this);
+#endif // _PIX_DEBUG
+
+
+		}
+		D3DContext::Get()->EndBackBuffer(this);
+	}
+
 	void D3DCommandBuffer::Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
 	{
 		cs->Bind(this, thread_group_x, thread_group_y, thread_group_z);

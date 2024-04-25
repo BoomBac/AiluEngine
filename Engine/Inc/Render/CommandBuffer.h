@@ -50,6 +50,7 @@ namespace Ailu
         virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index,u32 instance_count = 1u) = 0;
         virtual u16 DrawRenderer(Mesh* mesh, Material* material,u32 instance_count = 1u) = 0;
         virtual void ResolveToBackBuffer(Ref<RenderTexture>& color) = 0;
+        virtual void ResolveToBackBuffer(Ref<RenderTexture>& color, Ref<RenderTexture>& destination) = 0;
         virtual void Dispatch(ComputeShader* cs,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
 	};
 

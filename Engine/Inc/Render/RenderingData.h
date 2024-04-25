@@ -46,6 +46,7 @@ namespace Ailu
         ConstantBuffer** _p_per_object_cbuf;
         Ref<RenderTexture> _p_camera_color_target;
         Ref<RenderTexture> _p_camera_depth_target;
+        Ref<RenderTexture> _p_final_rt;
         Rect _viewport,_scissor_rect;
         u32 width, height;
         CommandBuffer* cmd;

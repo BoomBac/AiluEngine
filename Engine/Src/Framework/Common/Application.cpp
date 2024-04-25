@@ -149,7 +149,13 @@ namespace Ailu
 	}
 	bool Application::OnLostFoucus(WindowLostFocusEvent& e)
 	{
-		_layer_stack->PopLayer(_p_input_layer);
+		//_layer_stack->PopLayer(_p_input_layer);
+		return true;
+	}
+	bool Application::OnGetFoucus(WindowFocusEvent& e)
+	{
+		_state = EApplicationState::EApplicationState_Running;
+		//_layer_stack->PushLayer(_p_input_layer);
 		return true;
 	}
 	bool Application::OnWindowMinimize(WindowMinimizeEvent& e)
@@ -162,7 +168,7 @@ namespace Ailu
 	{
 		if (_state == EApplicationState::EApplicationState_Pause)
 			_state = EApplicationState::EApplicationState_Running;
-		LOG_WARNING("Application state: {}", EApplicationState::ToString(_state))
+		g_pLogMgr->LogWarningFormat("Application state: {}", EApplicationState::ToString(_state));
 		return false;
 	}
 	bool Application::OnDragFile(DragFileEvent& e)
@@ -171,12 +177,6 @@ namespace Ailu
 		return false;
 	}
 
-	bool Application::OnGetFoucus(WindowFocusEvent& e)
-	{
-		_state = EApplicationState::EApplicationState_Running;
-		_layer_stack->PushLayer(_p_input_layer);
-		return true;
-	}
 	void Application::OnEvent(Event& e)
 	{
 		EventDispather dispather(e);

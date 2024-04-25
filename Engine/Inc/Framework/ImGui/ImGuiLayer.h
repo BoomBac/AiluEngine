@@ -5,6 +5,7 @@
 #define __IMGUI_LAYER_H__
 #include "Framework/Events/Layer.h"
 #include "Widgets/TextureSelector.h"
+#include "Widgets/RenderView.h"
 
 struct ImFont;
 
@@ -12,6 +13,7 @@ namespace Ailu
 {
 	class AssetBrowser;
 	class AssetTable;
+	class ObjectDetail;
 	class ImguiWindow
 	{
 	public:
@@ -77,9 +79,12 @@ namespace Ailu
 		ImFont* _font = nullptr;
 		TextureSelector _texture_selector;
 		MeshBrowser _mesh_browser;
+		RenderView* _render_view;
 		AssetBrowser* _asset_browser;
 		AssetTable* _asset_table;
+		ObjectDetail* _object_detail;
 		RTDebugWindow _rt_view;
+		ImGuiWidget* _p_outputlog;
 	};
 }
 #pragma warning(pop)

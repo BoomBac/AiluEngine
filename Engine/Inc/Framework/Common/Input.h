@@ -30,6 +30,7 @@ namespace Ailu
         {
             return sp_instance->GetMousePosImpl();
         }
+        inline static bool s_block_input = false;
     protected:
         virtual bool IsKeyPressedImpl(int keycode) = 0;
 

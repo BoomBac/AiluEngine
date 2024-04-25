@@ -45,6 +45,7 @@ namespace Ailu
         u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, u32 instance_count = 1u) final;
         void ResolveToBackBuffer(Ref<RenderTexture>& color) final;
+        void ResolveToBackBuffer(Ref<RenderTexture>& color, Ref<RenderTexture>& destination) final;
         void Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 
         ID3D12GraphicsCommandList* GetCmdList() { return _p_cmd.Get(); }
