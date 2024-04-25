@@ -2,6 +2,7 @@
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
+#include "RHI/DX12/D3DTexture.h"
 #include "Render/RenderingData.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
@@ -50,22 +51,30 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth)
 	{
-		_p_cmd->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), clear_color, 0, nullptr);
-		_p_cmd->ClearDepthStencilView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
+		auto crt = static_cast<D3DRenderTexture*>(color.get());
+		auto drt = static_cast<D3DRenderTexture*>(color.get());
+		_p_cmd->ClearRenderTargetView(*crt->TargetCPUHandle(), clear_color, 0, nullptr);
+		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
 	}
 	void D3DCommandBuffer::ClearRenderTarget(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth)
 	{
 		for (auto& color : colors)
-			_p_cmd->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), clear_color, 0, nullptr);
-		_p_cmd->ClearDepthStencilView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
+		{
+			auto crt = static_cast<D3DRenderTexture*>(color.get());
+			_p_cmd->ClearRenderTargetView(*crt->TargetCPUHandle(), clear_color, 0, nullptr);
+		}
+		auto drt = static_cast<D3DRenderTexture*>(depth.get());
+		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
 	}
 	void D3DCommandBuffer::ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color, u16 index)
 	{
-		_p_cmd->ClearRenderTargetView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle(index)), clear_color, 0, nullptr);
+		auto crt = static_cast<D3DRenderTexture*>(color.get());
+		_p_cmd->ClearRenderTargetView(*crt->TargetCPUHandle(), clear_color, 0, nullptr);
 	}
 	void D3DCommandBuffer::ClearRenderTarget(RenderTexture* depth, float depth_value, u8 stencil_value)
 	{
-		_p_cmd->ClearDepthStencilView(*reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()), D3D12_CLEAR_FLAG_DEPTH, depth_value, stencil_value, 0, nullptr);
+		auto drt = static_cast<D3DRenderTexture*>(depth);
+		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(), D3D12_CLEAR_FLAG_DEPTH, depth_value, stencil_value, 0, nullptr);
 	}
 
 	void D3DCommandBuffer::DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count)
@@ -200,22 +209,25 @@ namespace Ailu
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		u16 rt_num = static_cast<u16>(colors.size());
 		static D3D12_CPU_DESCRIPTOR_HANDLE handles[8];
+		auto drt = static_cast<D3DRenderTexture*>(depth.get());
 		for (int i = 0; i < rt_num; i++)
 		{
-			GraphicsPipelineStateMgr::SetRenderTargetState(colors[i]->GetFormat(), depth->GetFormat(), i);
-			colors[i]->Transition(this, ETextureResState::kColorTagret);
-			depth->Transition(this, ETextureResState::kDepthTarget);
-			handles[i] = *reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(colors[i]->GetNativeCPUHandle());
+			auto crt = static_cast<D3DRenderTexture*>(colors[i].get());
+			GraphicsPipelineStateMgr::SetRenderTargetState(colors[i]->PixelFormat(), depth->PixelFormat(), i);
+			crt->Transition(this, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			drt->Transition(this, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			handles[i] = *crt->TargetCPUHandle();
 		}
-		_p_cmd->OMSetRenderTargets(rt_num, handles, false, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
+		_p_cmd->OMSetRenderTargets(rt_num, handles, false, drt->TargetCPUHandle());
 	}
 
 	void D3DCommandBuffer::SetRenderTarget(Ref<RenderTexture>& color, u16 index)
 	{
+		auto crt = static_cast<D3DRenderTexture*>(color.get());
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
-		GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), EALGFormat::kALGFormatUnknown, 0);
-		color->Transition(this, ETextureResState::kColorTagret);
-		_p_cmd->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle(index)), 0,
+		GraphicsPipelineStateMgr::SetRenderTargetState(color->PixelFormat(), EALGFormat::kALGFormatUnknown, 0);
+		crt->Transition(this, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		_p_cmd->OMSetRenderTargets(1, crt->TargetCPUHandle(), 0,
 			NULL);
 	}
 
@@ -224,21 +236,21 @@ namespace Ailu
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		if (color && depth)
 		{
-			//if (pre_color  && *color == *pre_color)
-			//	return;
-			GraphicsPipelineStateMgr::SetRenderTargetState(color->GetFormat(), depth->GetFormat(), 0);
-			color->Transition(this, ETextureResState::kColorTagret);
-			depth->Transition(this, ETextureResState::kDepthTarget);
-			_p_cmd->OMSetRenderTargets(1, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(color->GetNativeCPUHandle()), 0,
-				reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
+			auto crt = static_cast<D3DRenderTexture*>(color);
+			auto drt = static_cast<D3DRenderTexture*>(depth);
+			GraphicsPipelineStateMgr::SetRenderTargetState(color->PixelFormat(), depth->PixelFormat(), 0);
+			crt->Transition(this, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			drt->Transition(this, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			_p_cmd->OMSetRenderTargets(1, crt->TargetCPUHandle(), 0,drt->TargetCPUHandle());
 		}
 		else
 		{
 			if (color == nullptr)
 			{
-				GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::kALGFormatUnknown, depth->GetFormat(), 0);
-				depth->Transition(this, ETextureResState::kDepthTarget);
-				_p_cmd->OMSetRenderTargets(0, nullptr, 0, reinterpret_cast<D3D12_CPU_DESCRIPTOR_HANDLE*>(depth->GetNativeCPUHandle()));
+				GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::kALGFormatUnknown, depth->PixelFormat(), 0);
+				auto drt = static_cast<D3DRenderTexture*>(depth);
+				drt->Transition(this, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				_p_cmd->OMSetRenderTargets(0, nullptr, 0, drt->TargetCPUHandle());
 			}
 		}
 	}

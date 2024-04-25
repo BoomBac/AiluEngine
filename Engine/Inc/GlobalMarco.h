@@ -159,7 +159,8 @@ using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
 using f32 = float;
-using InPtr = void*;
+using f64 = double;
+using Ptr = void*;
 
 using String = std::string;
 using WString = std::wstring;

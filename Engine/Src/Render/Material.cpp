@@ -167,7 +167,7 @@ namespace Ailu
 		//	LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
 	}
 
-	void Material::SetTexture(const String& name, const String& texture_path)
+	void Material::SetTexture(const String& name, const WString& texture_path)
 	{
 		if (name == InternalStandardMaterialTexture::kAlbedo) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
 		else if (name == InternalStandardMaterialTexture::kEmssive) MarkTextureUsed({ ETextureUsage::kEmssive }, true);
@@ -176,10 +176,10 @@ namespace Ailu
 		else if (name == InternalStandardMaterialTexture::kSpecular) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
 		else if (name == InternalStandardMaterialTexture::kNormal) MarkTextureUsed({ ETextureUsage::kNormal }, true);
 		else {};
-		auto texture = TexturePool::Get(texture_path);
+		auto texture = g_pTexturePool->Get(texture_path);
 		if (texture == nullptr)
 		{
-			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", texture_path, _name, name);
+			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
 			return;
 		}
 		auto it = _textures.find(name);
@@ -301,6 +301,19 @@ namespace Ailu
 		}
 		return ret;
 	}
+
+	//List<std::tuple<String, Texture*>> Material::GetAllTexture()
+	//{
+	//	List<std::tuple<String, Texture*>> ret{};
+	//	for (auto& [name, bind_info] : _p_shader->GetBindResInfo())
+	//	{
+	//		if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kTexture2D)
+	//		{
+	//			ret.emplace_back(std::make_tuple(name, bind_info._p_res));
+	//		}
+	//	}
+	//	return ret;
+	//}
 
 	void Material::Construct(bool first_time)
 	{

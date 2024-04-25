@@ -57,6 +57,8 @@ namespace Ailu
 		/// <param name="formated_str">prop name,prop value</param>
 		/// <returns></returns>
 		virtual void* DeserializeImpl(Queue<std::tuple<String,String>>& formated_str);
+	private:
+		inline static u64 s_global_object_id = 0u;
 	};
 
 	template<class T>

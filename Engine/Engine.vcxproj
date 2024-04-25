@@ -524,7 +524,6 @@
     <ClInclude Include="Inc\Framework\Parser\FbxParser.h" />
     <ClInclude Include="Inc\Framework\Parser\HDRParser.h" />
     <ClInclude Include="Inc\Framework\Parser\PngParser.h" />
-    <ClInclude Include="Inc\Framework\Parser\TgaParser.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\Objects\Actor.h" />
     <ClInclude Include="Inc\Objects\CameraComponent.h" />
@@ -610,7 +609,6 @@
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\HDRParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp" />
-    <ClCompile Include="Src\Framework\Parser\TgaParser.cpp" />
     <ClCompile Include="Src\Objects\Actor.cpp" />
     <ClCompile Include="Src\Objects\CameraComponent.cpp" />
     <ClCompile Include="Src\Objects\Component.cpp" />

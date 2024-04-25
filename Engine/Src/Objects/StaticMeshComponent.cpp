@@ -208,7 +208,7 @@ namespace Ailu
 	static void DrawJoint(const Skeleton& sk, const Joint& j, AnimationClip* clip, u32 time, Vector3f origin, const Matrix4x4f& obj_world_mat)
 	{
 		auto cur = TransformCoord(clip->SampleDebug(j._self, time) * obj_world_mat, Vector3f::kZero);
-		Gizmo::DrawLine(origin, cur, Random::RandomColor(j._parent));
+		Gizmo::DrawLine(origin, cur, Random::RandomColor32(j._parent));
 		for (auto& cj : j._children)
 		{
 			DrawJoint(sk, sk[cj], clip, time, cur, obj_world_mat);

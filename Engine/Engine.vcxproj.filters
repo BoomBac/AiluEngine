@@ -1953,9 +1953,6 @@
     <ClInclude Include="Inc\Framework\Parser\PngParser.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Parser\TgaParser.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\RHI\DX12\D3DCommandBuffer.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2091,7 +2088,10 @@
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\RHI\DX12\DescriptorManager.h">
+    <ClInclude Include="Inc\RHI\DX12\CPUDescriptorManager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\GPUDescriptorManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -2198,9 +2198,6 @@
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\Parser\TgaParser.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\RHI\DX12\D3DCommandBuffer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -2297,7 +2294,10 @@
     <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\RHI\DX12\DescriptorManager.cpp">
+    <ClCompile Include="Src\RHI\DX12\CPUDescriptorManager.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\GPUDescriptorManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

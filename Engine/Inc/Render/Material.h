@@ -46,9 +46,9 @@ namespace Ailu
 		void SetVector(const String& name, const Vector4f& vector);
 		float GetFloat(const String& name);
 		Vector4f GetVector(const String& name);
-		void SetTexture(const String& name, Ref<Texture> texture);
 		void RemoveTexture(const String& name);
-		void SetTexture(const String& name, const String& texture_path);
+		void SetTexture(const String& name, Ref<Texture> texture);
+		void SetTexture(const String& name, const WString& texture_path);
 		void EnableKeyword(const String& keyword);
 		void DisableKeyword(const String& keyword);
 		virtual void Bind();
@@ -57,6 +57,7 @@ namespace Ailu
 		List<std::tuple<String, float>> GetAllFloatValue();
 		List<std::tuple<String, Vector4f>> GetAllVectorValue();
 		List<std::tuple<String, u32>> GetAllUintValue();
+		//List<std::tuple<String, Texture*>> GetAllTexture();
 		//为了持久化
 		const Guid& GetGuid() const final;
 		void AttachToAsset(Asset* owner) final;

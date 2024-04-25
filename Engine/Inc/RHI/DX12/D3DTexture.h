@@ -16,84 +16,64 @@ namespace Ailu
 	class D3DTexture2D : public Texture2D
 	{
 	public:
-		D3DTexture2D(const uint16_t& width, const uint16_t& height, EALGFormat format,bool read_only = true);
-		D3DTexture2D(const TextureDesc& desc);
+		D3DTexture2D(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
 		~D3DTexture2D();
-		void FillData(u8* data) final;
-		void FillData(Vector<u8*> datas) final;
-		void Bind(CommandBuffer* cmd,u8 slot) final;
-		void Release() final;
-		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
-		void* GetGPUNativePtr(u16 index) final;
-		void BuildRHIResource() final;
-		D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUHandle() { return _srv_gpu_handle; }
-		D3D12_GPU_DESCRIPTOR_HANDLE& GetUAVGPUHandle() { return _uav_gpu_handle; }
+		void Apply() final;
+		TextureHandle GetNativeTextureHandle() const final { return _main_srv_handle.ptr; };
+		void Bind(CommandBuffer* cmd, u8 slot) final;
+		TextureHandle GetView(u16 mimmap) final;
+		void CreateView() final;
+		D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _main_srv_handle; };
 	private:
-	private:
-		DXGI_FORMAT _res_format,_srv_format,_uav_format;
-		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
-		D3D12_UNORDERED_ACCESS_VIEW_DESC _uav_desc{};
-		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;
-		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
-		D3D12_CPU_DESCRIPTOR_HANDLE _uav_cpu_handle;
-		D3D12_GPU_DESCRIPTOR_HANDLE _uav_gpu_handle;
+		D3D12_GPU_DESCRIPTOR_HANDLE _main_srv_handle;
 		Vector<ComPtr<ID3D12Resource>> _textures;
 		Vector<ComPtr<ID3D12Resource>> _upload_textures;
-		Vector<u32> _submited_tasks;
 		GPUVisibleDescriptorAllocation _allocation;
+		GPUVisibleDescriptorAllocation _mimmap_allocation;
+		Vector<D3D12_GPU_DESCRIPTOR_HANDLE> _mipmap_srv_handles;
 	};
 
-	class D3DTextureCubeMap : public TextureCubeMap
+	class D3DCubeMap : public CubeMap
 	{
 	public:
-		D3DTextureCubeMap(const uint16_t& width, const uint16_t& height, EALGFormat format);
-		~D3DTextureCubeMap();
-		void FillData(Vector<u8*>& data) final;
-		void BuildRHIResource() final;
+		D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+		~D3DCubeMap();
+		void Apply() final;
+		TextureHandle GetNativeTextureHandle() const final { return _main_srv_handle.ptr; };
 		void Bind(CommandBuffer* cmd, u8 slot) final;
-		void Release() final;
-		D3D12_SHADER_RESOURCE_VIEW_DESC& GetSRVDesc() { return _srv_desc; }
-		D3D12_CPU_DESCRIPTOR_HANDLE& GetSRVCPUHandle() { return _srv_cpu_handle; }
-		D3D12_GPU_DESCRIPTOR_HANDLE& GetSRVGPUHandle() { return _srv_gpu_handle; }
-	private:
-		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
-		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;
-		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
-		std::vector<ComPtr<ID3D12Resource>> _textures;
-		std::vector<ComPtr<ID3D12Resource>> _upload_textures;
-		GPUVisibleDescriptorAllocation _allocation;
-	};
 
+		TextureHandle GetView(ECubemapFace::ECubemapFace face, u16 mimmap) final;
+		void CreateView() final;
+	private:
+		D3D12_GPU_DESCRIPTOR_HANDLE _main_srv_handle;
+		Vector<ComPtr<ID3D12Resource>> _textures;
+		Vector<ComPtr<ID3D12Resource>> _upload_textures;
+		GPUVisibleDescriptorAllocation _allocation;
+		GPUVisibleDescriptorAllocation _mimmap_allocation;
+		Map<ECubemapFace::ECubemapFace, Vector<D3D12_GPU_DESCRIPTOR_HANDLE>> _mipmap_srv_handles;
+	};
 
 	class D3DRenderTexture : public RenderTexture
 	{
 		inline const static Vector4f kClearColor = Colors::kBlack;
-		struct InnerDescHandle
-		{
-			D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handle;
-			D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handle;
-		};
-		union D3DRTHandle
-		{
-			InnerDescHandle _color_handle;
-			InnerDescHandle _depth_handle;
-		};
 	public:
-		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
-		D3DRenderTexture(const uint16_t& width, const uint16_t& height, String name, int mipmap = 1,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool is_cubemap = false);
+		D3DRenderTexture(const RenderTextureDesc& desc);
 		~D3DRenderTexture();
 		void Bind(CommandBuffer* cmd, u8 slot) final;
-		u8* GetPixelData() final;
-		void* GetNativeCPUHandle() final;
-		void* GetNativeCPUHandle(u16 index) final;
-		void* GetGPUNativePtr(u16 index) final;
-		void Release() final;
-		void Transition(CommandBuffer* cmd, ETextureResState state) final;
+		void CreateView() final;
+		TextureHandle ColorRenderTargetHandle(u16 index = 0) final;
+		TextureHandle DepthRenderTargetHandle(u16 index = 0) final;
+		TextureHandle ColorTexture(u16 index = 0) final;
+		TextureHandle DepthTexture(u16 index = 0) final;
+		D3D12_CPU_DESCRIPTOR_HANDLE* TargetCPUHandle(u16 index = 0);
+		void Transition(CommandBuffer* cmd, D3D12_RESOURCE_STATES state);
 	private:
-		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};	
-		D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handles[7];
-		D3D12_CPU_DESCRIPTOR_HANDLE _srv_cpu_handles[7];
-		D3DRTHandle _d3drt_handles[6];
+		D3D12_RESOURCE_STATES _cur_res_state;
+		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
+		D3D12_CPU_DESCRIPTOR_HANDLE _main_srv_cpu_handle;
+		D3D12_GPU_DESCRIPTOR_HANDLE _main_srv_gpu_handle;
+		//D3D12_GPU_DESCRIPTOR_HANDLE _srv_gpu_handles[7];
+		Vector<D3D12_CPU_DESCRIPTOR_HANDLE> _rtv_or_dsv_cpu_handles;
 		ComPtr<ID3D12Resource> _p_buffer;
 		CPUVisibleDescriptorAllocation _cpu_allocation;
 		GPUVisibleDescriptorAllocation _gpu_allocation;

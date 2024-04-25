@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 942.948,743.662,350.687
-  Rotation: 0.173045,-0.737947,0.206311,0.618809
+  Position: 942.97,743.657,350.683
+  Rotation: 0.182092,-0.696543,0.190029,0.667503
   Fov: 60
   Aspect: 1.77778
   Near: 76.58
   Far: 118818
-  ControllerRotation: 31.2396,29420
+  ControllerRotation: 30.5196,29427.6
 SceneGraph: 
   Name: root
     Components: 
@@ -76,7 +76,7 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 0,144,0
-            Rotation: 1.31829e-07,-0.809017,-7.90827e-08,-0.587785
+            Rotation: -1.83214e-07,0.809017,1.49809e-07,0.587785
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey

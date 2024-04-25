@@ -9,29 +9,26 @@
 
 namespace Ailu
 {
-	Ref<Texture2D> HDRParser::Parser(const std::string_view& path)
+	Ref<CubeMap> HDRParser::Parser(Vector<String>& paths)
 	{
-		return Ref<Texture2D>();
+		return Ref<CubeMap>();
 	}
-	Ref<Texture2D> HDRParser::Parser(const std::string_view& path, u8 mip_level)
+	Ref<Texture2D> HDRParser::Parser(const WString& sys_path)
 	{
-		if (!IsHDRFormat(path))
-			return nullptr;
-			//stbi_set_flip_vertically_on_load(true);
+		//stbi_set_flip_vertically_on_load(true);
 		int w, h, n;
-		float* data = stbi_loadf(path.data(), &w, &h, &n, 0);
+		auto sys_path_n = ToChar(sys_path);
+		float* data = stbi_loadf(sys_path_n.data(), &w, &h, &n, 0);
 		if (data == nullptr)
 		{
-			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
-			return Texture2D::Create(4, 4,EALGFormat::kALGFormatR32G32B32_FLOAT);
+			LOG_ERROR("Load {} failed: {}", sys_path_n, stbi_failure_reason());
+			return Texture2D::Create(4, 4,false,ETextureFormat::kRGBAFloat);
 		}
 		else
 		{
 			if (n == 3)
 			{
-				auto tex = Texture2D::Create(w, h,EALGFormat::kALGFormatR32G32B32_FLOAT);
-				tex->AssetPath(PathUtils::FormatFilePath(PathUtils::ExtractAssetPath(path.data())));
-				tex->Name(PathUtils::GetFileName(path, true));
+				auto tex = Texture2D::Create(w, h, false, ETextureFormat::kRGBAFloat);
 				//Vector<float*> mipmaps{ data };
 				//mip_level = 1;
 				//int size = x;
@@ -47,22 +44,14 @@ namespace Ailu
 				//	if (x >> i == 1)
 				//		break;
 				//}
-				tex->FillData(reinterpret_cast<u8*>(data));
+				tex->SetPixelData(reinterpret_cast<u8*>(data),0);
 				return tex;
 			}
 			else
 			{
-				LOG_WARNING("Unsupported HDR format: {} with 4 channel", path);
+				LOG_WARNING("Unsupported HDR format: {} with 4 channel", sys_path_n);
 			}
 		}
 		return nullptr;
-	}
-	Ref<TextureCubeMap> HDRParser::Parser(Vector<String>& paths)
-	{
-		return Ref<TextureCubeMap>();
-	}
-	bool HDRParser::IsHDRFormat(const std::string_view& path)
-	{
-		return path.find(".hdr") != std::string::npos || path.find(".HDR") != std::string::npos || path.find(".exr") != std::string::npos || path.find(".EXR") != std::string::npos;
 	}
 }

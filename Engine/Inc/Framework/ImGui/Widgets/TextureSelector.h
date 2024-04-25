@@ -11,11 +11,11 @@ namespace Ailu
 		~TextureSelector();
 		void Open(const i32& handle) final;
 		void Close() final;
-		const String& GetSelectedTexture(i32 handle) const;
+		const WString& GetSelectedTexture(i32 handle) const;
 	private:
 		void ShowImpl() final;
 		i32 _selected_img_index = -1;
-		String _cur_selected_texture_path = kNull;
+		WString _cur_selected_texture_path = kNull;
 	};
 }
 

@@ -90,7 +90,7 @@ namespace Ailu
 	//-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
 	ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize })
 	{
-		_p_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainShadowMap", EALGFormat::kALGFormatD24S8_UINT);
+		_p_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainShadowMap", ERenderTargetFormat::kShadowMap);
 		_p_shadowcast_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDepthOnly), "ShadowCast");
 	}
 
@@ -128,10 +128,10 @@ namespace Ailu
 		float x = 0.f, y = 0.f, z = 0.f;
 		Vector3f center = { x,y,z };
 		Vector3f world_up = Vector3f::kUp;
-		_p_cube_map = RenderTexture::Create(size, size, texture_name, EALGFormat::kALGFormatR16G16B16A16_FLOAT, true);
-		_p_env_map = RenderTexture::Create(size, size, texture_name, EALGFormat::kALGFormatR16G16B16A16_FLOAT, true);
+		_p_cube_map = RenderTexture::Create(size, size, texture_name, ERenderTargetFormat::kDefaultHDR, true);
+		_p_env_map = RenderTexture::Create(size, size, texture_name, ERenderTargetFormat::kDefaultHDR, true);
 		_p_gen_material = MaterialLibrary::GetMaterial("CubemapGen");
-		_p_gen_material->SetTexture("env", src_texture_name);
+		_p_gen_material->SetTexture("env", ToWChar(src_texture_name));
 		_p_cube_mesh = MeshPool::GetMesh("cube");
 		_p_filter_material = MaterialLibrary::GetMaterial("EnvmapFilter");
 		Matrix4x4f view, proj;
@@ -207,9 +207,9 @@ namespace Ailu
 	DeferredGeometryPass::DeferredGeometryPass(u16 width, u16 height) : RenderPass("DeferedGeometryPass")
 	{
 		_gbuffers.resize(3);
-		_gbuffers[0] = RenderTexture::Create(width, height, "GBuffer0", EALGFormat::kALGFormatR16G16_FLOAT);
-		_gbuffers[1] = RenderTexture::Create(width, height, "GBuffer1", EALGFormat::kALGFormatR8G8B8A8_UNORM);
-		_gbuffers[2] = RenderTexture::Create(width, height, "GBuffer2", EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		_gbuffers[0] = RenderTexture::Create(width, height, "GBuffer0", ERenderTargetFormat::kRGHalf);
+		_gbuffers[1] = RenderTexture::Create(width, height, "GBuffer1", ERenderTargetFormat::kDefault);
+		_gbuffers[2] = RenderTexture::Create(width, height, "GBuffer2", ERenderTargetFormat::kDefault);
 		_p_lighting_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/deferred_lighting.hlsl", "DeferredLightingVSMain", "DeferredLightingPSMain"), "DeferedGbufferLighting");
 		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
 		for (int i = 0; i < _rects.size(); i++)

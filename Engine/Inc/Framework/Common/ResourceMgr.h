@@ -93,7 +93,7 @@ namespace Ailu
 		void SaveAsset(const Asset* asset);
 		//Load系函数负责加载生成资源，不会放置到对应的对象池，不会生成对应的asset
 		Ref<Texture2D> LoadTexture(const WString& asset_path, const ImportSetting* setting = &ImportSetting::Default());
-		Ref<TextureCubeMap> LoadTexture(const Vector<WString>& asset_paths);
+		Ref<CubeMap> LoadTexture(const Vector<WString>& asset_paths);
 		List<Ref<Mesh>> LoadMesh(const WString& asset_path);
 		template<typename T>
 		Ref<T> LoadAsset(const WString& asset_path);
@@ -110,6 +110,8 @@ namespace Ailu
 		static WString GetAssetPath(const Guid& guid);
 		Asset* GetAsset(const WString& asset_path) const;
 	public:
+		Texture* _test_new_tex;
+		Scope<CubeMap> _test_cubemap;
 		Vector<ImportInfo> _import_infos;
 	private:
 		inline const static String kAssetDatabasePath = kEngineResRootPath + "assetdb.alasset";

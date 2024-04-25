@@ -5,11 +5,12 @@
 #include "Framework/Math/ALMath.hpp"
 namespace Ailu
 {
+#define TEXTURE_HANDLE_TO_IMGUI_TEXID(handle) reinterpret_cast<void*>(handle)
 	class ImGuiWidget
 	{
 		DECLARE_PROTECTED_PROPERTY(is_focus,Focus,bool)
 	public:
-		inline static String kNull = "null";
+		inline static WString kNull = L"null";
 		inline static bool s_global_modal_window_info[256]{ false };
 		static void MarkModalWindoShow(const int& handle);
 		static String ShowModalDialog(const String& title, int handle = 0);

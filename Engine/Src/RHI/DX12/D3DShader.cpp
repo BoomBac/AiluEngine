@@ -579,11 +579,11 @@ namespace Ailu
 			{
 				if (bind_info._res_type == EBindResDescType::kTexture2D)
 				{
-					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetSRVGPUHandle());
+					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetMainGPUSRVHandle());
 				}
 				else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
 				{
-					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetUAVGPUHandle());
+					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetMainGPUSRVHandle());
 				}
 			}
 		}

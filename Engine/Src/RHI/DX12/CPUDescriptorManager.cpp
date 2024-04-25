@@ -180,7 +180,7 @@ namespace Ailu
 			_page_free_space_lut[type].emplace(std::make_pair(page.AvailableDescriptorNum(), page.PageID()));
 			return std::move(CPUVisibleDescriptorAllocation(page.PageID(), offset, num, page.DescriptorSize(), page.BaseHandle()));
 		}
-		return CPUVisibleDescriptorAllocation();
+		return std::move(CPUVisibleDescriptorAllocation());
 	}
 	void CPUVisibleDescriptorAllocator::Free(CPUVisibleDescriptorAllocation&& handle)
 	{

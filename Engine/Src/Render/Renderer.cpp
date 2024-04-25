@@ -16,20 +16,19 @@ namespace Ailu
 
 		_p_timemgr = new TimeMgr();
 		_p_timemgr->Initialize();
-		_p_camera_color_attachment = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraColorAttachment", RenderConstants::kColorRange == EColorRange::kLDR ?
-			RenderConstants::kLDRFormat : RenderConstants::kHDRFormat);
-		_p_camera_depth_attachment = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraDepthAttachment", EALGFormat::kALGFormatD24S8_UINT);
+		_p_camera_color_attachment = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraColorAttachment",ERenderTargetFormat::kDefaultHDR);
+		_p_camera_depth_attachment = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
 		_p_opaque_pass = MakeScope<OpaquePass>();
 		_p_reslove_pass = MakeScope<ResolvePass>(_p_camera_color_attachment);
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
 		//_p_postprocess_pass = MakeScope<PostProcessPass>();
 		_p_gbuffer_pass = MakeScope<DeferredGeometryPass>(kRendererWidth, kRendererHeight);
 		_p_skybox_pass = MakeScope<SkyboxPass>();
-		auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"small_cave_1k.hdr");
-		TexturePool::Add("Textures/small_cave_1k.hdr", std::dynamic_pointer_cast<Texture2D>(tex));
+		//auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"small_cave_1k.hdr");
+		//TexturePool::Add("Textures/small_cave_1k.hdr", std::dynamic_pointer_cast<Texture2D>(tex));
 
-		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512, "pure_sky", "Textures/small_cave_1k.hdr");
-		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
+		//_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512, "pure_sky", "Textures/small_cave_1k.hdr");
+		//_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
 		//_p_test_cs = ComputeShader::Create(PathUtils::GetResSysPath("Shaders/Compute/cs_test.hlsl"));
 		//TextureDesc desc(64,64,1,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR32_UINT,false);
 		//_p_test_texture = Texture2D::Create(desc);
@@ -47,7 +46,7 @@ namespace Ailu
 		_rendering_data._viewport = Rect{ 0,0,(uint16_t)kRendererWidth,(uint16_t)kRendererHeight };
 		_rendering_data._scissor_rect = _rendering_data._viewport;
 
-		_render_passes.emplace_back(_p_shadowcast_pass.get());
+		//_render_passes.emplace_back(_p_shadowcast_pass.get());
 		_p_opaque_pass->SetActive(false);
 		_render_passes.emplace_back(_p_opaque_pass.get());
 		_render_passes.emplace_back(_p_gbuffer_pass.get());
@@ -154,8 +153,8 @@ namespace Ailu
 				_p_task_render_passes.clear();
 			}
 
-			Shader::SetGlobalTexture("SkyBox", _p_cubemap_gen_pass->_p_cube_map.get());
-			Shader::SetGlobalTexture("DiffuseIBL", _p_cubemap_gen_pass->_p_env_map.get());
+			//Shader::SetGlobalTexture("SkyBox", _p_cubemap_gen_pass->_p_cube_map.get());
+			//Shader::SetGlobalTexture("DiffuseIBL", _p_cubemap_gen_pass->_p_env_map.get());
 
 			for (auto pass : _render_passes)
 			{

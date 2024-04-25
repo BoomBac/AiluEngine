@@ -5,6 +5,7 @@ namespace Ailu
 {
 	Object::Object()
 	{
+		_name = std::format("object_{}", s_global_object_id++);
 	}
 	Object::Object(const Object& other)
 	{

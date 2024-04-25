@@ -37,12 +37,12 @@ namespace Ailu
 	void AssetBrowser::Open(const i32& handle)
 	{
 		ImGuiWidget::Open(handle);
-		_folder_icon = TexturePool::Get("Editor/folder");
-		_file_icon = TexturePool::Get("Editor/file_us");
-		_mesh_icon = TexturePool::Get("Editor/3d");
-		_shader_icon = TexturePool::Get("Editor/shader");
-		_image_icon = TexturePool::Get("Editor/image");
-		_scene_icon = TexturePool::Get("Editor/scene");
+		_folder_icon = g_pTexturePool->Get(L"Editor/folder");
+		_file_icon =   g_pTexturePool->Get(L"Editor/file_us");
+		_mesh_icon =   g_pTexturePool->Get(L"Editor/3d");
+		_shader_icon = g_pTexturePool->Get(L"Editor/shader");
+		_image_icon =  g_pTexturePool->Get(L"Editor/image");
+		_scene_icon =  g_pTexturePool->Get(L"Editor/scene");
 	}
 	void AssetBrowser::Close()
 	{
@@ -82,26 +82,26 @@ namespace Ailu
 			//ImGuiContext* context = ImGui::GetCurrentContext();
 			//auto drawList = context->CurrentWindow->DrawList;
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(1.0f, 1.0f, 1.0f, 0.0f));
-			ImTextureID tex_id = is_dir ? _folder_icon->GetGPUNativePtr() : _file_icon->GetGPUNativePtr();
+			ImTextureID tex_id = is_dir ? TEXTURE_HANDLE_TO_IMGUI_TEXID(_folder_icon->GetNativeTextureHandle()) : TEXTURE_HANDLE_TO_IMGUI_TEXID(_file_icon->GetNativeTextureHandle());
 			static ImVec4 color_unimported = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
 			static ImVec4 color_bg = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 			static ImVec4 color_tint = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 			String ext_str = file_name.extension().string();
 			if (ext_str == ".fbx" || ext_str.c_str() == ".FBX")
 			{
-				tex_id = _mesh_icon->GetGPUNativePtr();
+				tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_mesh_icon->GetNativeTextureHandle());
 			}
 			else if (ext_str == ".hlsl")
 			{
-				tex_id = _shader_icon->GetGPUNativePtr();
+				tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_shader_icon->GetNativeTextureHandle());
 			}
 			else if (ResourceMgr::kLDRImageExt.contains(ext_str) || ResourceMgr::kHDRImageExt.contains(ext_str))
 			{
-				tex_id = _image_icon->GetGPUNativePtr();
+				tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_image_icon->GetNativeTextureHandle());
 			}
 			else if (ext_str == ".almap")
 			{
-				tex_id = _scene_icon->GetGPUNativePtr();
+				tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_scene_icon->GetNativeTextureHandle());
 			}
 			if (ImGui::ImageButton(tex_id, ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0, color_bg, is_dir || is_cur_asset_imported? 
 				color_tint : color_unimported))
