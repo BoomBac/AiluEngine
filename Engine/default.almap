@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: -900.933,210.069,-107.415
-  Rotation: -0.0185181,0.696935,0.0180082,0.716669
+  Position: -493.649,608.066,116.55
+  Rotation: 0.0464721,0.842829,-0.0737353,0.531078
   Fov: 60
-  Aspect: 1.77778
-  Near: 76.58
-  Far: 118818
-  ControllerRotation: -2.96029,30328.4
+  Aspect: 1.7223
+  Near: 86.8
+  Far: 29398.2
+  ControllerRotation: 9.99959,36835.6
 SceneGraph: 
   Name: root
     Components: 
@@ -15,7 +15,7 @@ SceneGraph:
         Position: 0,45,0
         Rotation: 0,9.72351e-06,0,1
         Scale: -13.99,0.01,0.01
-    Children: 5
+    Children: 7
       Name: plane
         Components: 
           TransformComponent: 
@@ -30,11 +30,11 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: -5000,5000,0
-            Rotation: -3.01095e-08,6.04698e-08,0.445729,0.895168
+            Rotation: -2.18419e-08,6.39227e-08,0.323339,0.946283
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
-            Color: 1,1,1
+            Color: 0.916667,0.801026,0.13031
             Intensity: 1
             CastShadow: true
             ShadowArea: 8776.86
@@ -43,13 +43,13 @@ SceneGraph:
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: 55,838,-39
-            Rotation: 0,0.24869,0,0.968583
+            Position: 170,407,-479
+            Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           LightComponent: 
             Type: Point
-            Color: 0.688327,0.818627,0.26485
-            Intensity: 3.767
+            Color: 1,1,1
+            Intensity: 2.26
             Radius: 733
             CastShadow: false
             ShadowArea: 0
@@ -75,10 +75,36 @@ SceneGraph:
       Name: monkey
         Components: 
           TransformComponent: 
-            Position: 0,196,0
-            Rotation: -2.75236e-07,0.727826,-2.75236e-07,-0.685762
+            Position: 116,413,-284
+            Rotation: -0.254171,0.628777,-0.698327,-0.228856
             Scale: 1,1,1
           StaticMeshComponent: 
             MeshPath: monkey
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+        Children: 0
+      Name: object0
+        Components: 
+          TransformComponent: 
+            Position: 0,544,0
+            Rotation: -0.260224,0.66696,-0.644076,-0.269469
+            Scale: 1,1,1
+          StaticMeshComponent: 
+            MeshPath: NewScene/DamagedHelmet.fbx_node_damagedHelmet_-6514
+            MaterialPath0: 96a597e6-6bb8-4905-8091-ebd23b072b18
+        Children: 0
+      Name: camera0
+        Components: 
+          TransformComponent: 
+            Position: -646,555,0
+            Rotation: -2.73605e-08,0.786072,-2.73605e-08,0.618135
+            Scale: 1,1,1
+          CameraComponent: 8
+            Type: kPerspective
+            Position: -646,555,0
+            Rotation: -2.7360466e-08,0.78607213,-2.7360466e-08
+            Near: 233
+            Aspect: 1.78
+            Far: 1000
+            Size: 0
+            FovH: 60
         Children: 0

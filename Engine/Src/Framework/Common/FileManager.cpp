@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Framework/Common/FileManager.h"
+#include "Framework/Common/LogMgr.h"
 
 namespace Ailu
 {
@@ -22,6 +23,11 @@ namespace Ailu
 			return;
 		try 
 		{
+			if (!FileManager::Exist(src_file))
+			{
+				g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} not exist on the disk!", src_file);
+				return;
+			}
 			fs::copy_file(src_file, dest_file, fs::copy_options::overwrite_existing);
 			LOG_INFO("File copied successfully.");
 		}

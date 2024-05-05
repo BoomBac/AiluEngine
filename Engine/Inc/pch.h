@@ -11,14 +11,17 @@
 #include "../framework.h"
 #include <cstdint>
 #include <cstdlib>
+#include <cassert>
 #include <stdexcept>
 #include <cwchar>
 #include <shellapi.h>
 #include <combaseapi.h>
+#include <time.h>
 
 #include <unordered_map>
 #include <string>
 #include <sstream>
+#include <format>
 #include <thread>
 #include <queue>
 #include <mutex>

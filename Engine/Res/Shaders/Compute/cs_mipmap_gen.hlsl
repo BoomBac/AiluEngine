@@ -15,7 +15,7 @@ cbuffer GenerateMipsCB : register(b0)
     uint NumMipLevels;	// Number of OutMips to write: [1-4]
     uint SrcDimension;  // Width and height of the source texture are even or odd.
     bool IsSRGB;        // Must apply gamma correction to sRGB textures.
-    float2 TexelSize;	// 1.0 / OutMip1.Dimensions
+    float4 TexelSize;	// 1.0 / OutMip1.Dimensions
 }
 
 // Source mip map.
@@ -35,7 +35,7 @@ groupshared float gs_G[64];
 groupshared float gs_B[64];
 groupshared float gs_A[64];
 
-void StoreColor( uint Index, float4 Color )
+void StoreColor( uint Index, float4 Color ) 
 {
     gs_R[Index] = Color.r;
     gs_G[Index] = Color.g;
@@ -69,10 +69,9 @@ float4 PackColor(float4 x)
         return x;
     }
 }
+
 [numthreads( BLOCK_SIZE, BLOCK_SIZE, 1 )]
-
-
-void main(CSInput IN )
+void cs_main(CSInput IN )
 {
     float4 Src1 = (float4)0;
     // One bilinear sample is insufficient when scaling down by more than 2x.
@@ -93,7 +92,7 @@ void main(CSInput IN )
         //宽高均为偶数，普通双线性采样。
                 case WIDTH_HEIGHT_EVEN:
         {
-            float2 UV = TexelSize * ( IN.DispatchThreadID.xy + 0.5 );
+            float2 UV = TexelSize.xy * ( IN.DispatchThreadID.xy + 0.5 );
 
             Src1 = SrcMip.SampleLevel( g_LinearClampSampler, UV, SrcMipLevel );
         }
@@ -103,8 +102,8 @@ void main(CSInput IN )
             // > 2:1 in X dimension 宽度奇数，高度偶数
             // Use 2 bilinear samples to guarantee we don't undersample when downsizing by more than 2x
             // horizontally.
-            float2 UV1 = TexelSize * ( IN.DispatchThreadID.xy + float2( 0.25, 0.5 ) );
-            float2 Off = TexelSize * float2( 0.5, 0.0 );
+            float2 UV1 = TexelSize.xy * ( IN.DispatchThreadID.xy + float2( 0.25, 0.5 ) );
+            float2 Off = TexelSize.xy * float2( 0.5, 0.0 );
 
             Src1 = 0.5 * ( SrcMip.SampleLevel( g_LinearClampSampler, UV1, SrcMipLevel ) +
                            SrcMip.SampleLevel( g_LinearClampSampler, UV1 + Off, SrcMipLevel ) );
@@ -115,8 +114,8 @@ void main(CSInput IN )
             // > 2:1 in Y dimension
             // Use 2 bilinear samples to guarantee we don't undersample when downsizing by more than 2x
             // vertically.
-            float2 UV1 = TexelSize * ( IN.DispatchThreadID.xy + float2( 0.5, 0.25 ) );
-            float2 Off = TexelSize * float2( 0.0, 0.5 );
+            float2 UV1 = TexelSize.xy * ( IN.DispatchThreadID.xy + float2( 0.5, 0.25 ) );
+            float2 Off = TexelSize.xy * float2( 0.0, 0.5 );
 
             Src1 = 0.5 * ( SrcMip.SampleLevel( g_LinearClampSampler, UV1, SrcMipLevel ) +
                            SrcMip.SampleLevel( g_LinearClampSampler, UV1 + Off, SrcMipLevel ) );
@@ -127,8 +126,8 @@ void main(CSInput IN )
             // > 2:1 in in both dimensions
             // Use 4 bilinear samples to guarantee we don't undersample when downsizing by more than 2x
             // in both directions.
-            float2 UV1 = TexelSize * ( IN.DispatchThreadID.xy + float2( 0.25, 0.25 ) );
-            float2 Off = TexelSize * 0.5;
+            float2 UV1 = TexelSize.xy * ( IN.DispatchThreadID.xy + float2( 0.25, 0.25 ) );
+            float2 Off = TexelSize.xy * 0.5;
 
             Src1 =  SrcMip.SampleLevel( g_LinearClampSampler, UV1, SrcMipLevel );
             Src1 += SrcMip.SampleLevel( g_LinearClampSampler, UV1 + float2( Off.x, 0.0   ), SrcMipLevel );

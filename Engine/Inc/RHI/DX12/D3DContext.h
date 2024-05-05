@@ -30,21 +30,31 @@ namespace Ailu
         void Present() final;
         const u64& GetFenceValue(const u32& cmd_index) const final;
         u64 GetCurFenceValue() const final;
+        bool IsCommandBufferReady(const u32 cmd_index) final;
         void SubmitRHIResourceBuildTask(RHIResourceTask task) final;
         void TakeCapture() final;
+        void TrackResource(FrameResource* resource) final;
+        bool IsResourceReferencedByGPU(FrameResource* resource) final;
+        void ResizeSwapChain(const u32 width, const u32 height) final;
+        std::tuple<u32, u32> GetSwapChainSize() const final { return std::make_pair(_width, _height);};
+        IGPUTimer* GetTimer() final { return _p_gpu_timer.get(); }
+        const u32 CurBackbufIndex() const final {return m_frameIndex ;};
+        void TryReleaseUnusedResources() final;
+        f32 TotalGPUMemeryUsage() final;
 
         ID3D12Device* GetDevice() { return m_device.Get(); };
-        //return cbv/uav/src desc heap
-        //ComPtr<ID3D12DescriptorHeap> GetDescriptorHeap();
-        //std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetSRVDescriptorHandle();
-        //std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> GetUAVDescriptorHandle();
-
+        void TrackResource(ComPtr<ID3D12Resource> resource);
 
 
         u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void BeginBackBuffer(CommandBuffer* cmd);
         void EndBackBuffer(CommandBuffer* cmd);
         void DrawOverlay(CommandBuffer* cmd);
+        //ID3D12QueryHeap* GetQueryHeap() { return m_queryHeap.Get(); }
+        //ComPtr<ID3D12Resource> _p_query_buffer;
+        //unsigned int  Offset = 0;
+        //const unsigned int FRAME_COUNT = 4;
+        //const unsigned int QUERY_COUNT = 2;
 
     private:
         void Destroy();
@@ -52,37 +62,38 @@ namespace Ailu
         void LoadAssets();
         void WaitForGpu();
         void FlushCommandQueue(ID3D12CommandQueue* cmd_queue,ID3D12Fence* fence,u64& fence_value);
-        void InitCBVSRVUAVDescHeap();
-        //void CreateDepthStencilTarget();
-        //void CreateDescriptorHeap();
-        D3D12_GPU_DESCRIPTOR_HANDLE GetCBVGPUDescHandle(u32 index) const;
 
     private:
+        inline static const u32 kResourceCleanupIntervalTick = 2000u;
+        //1600 * 900 * 4 * 20
+        inline static constexpr u64 kMaxRenderTextureMemorySize = 115200000u;
         WinWindow* _window;
-        u32 _cbv_desc_num = 0u;
+        //u32 _cbv_desc_num = 0u;
         // Pipeline objects.
+        DXGI_FORMAT _backbuffer_format;
         ComPtr<IDXGISwapChain3> m_swapChain;
         ComPtr<ID3D12Device> m_device;
         ComPtr<ID3D12Resource> _color_buffer[RenderConstants::kFrameCount];
-        ComPtr<ID3D12Resource> _depth_buffer[RenderConstants::kFrameCount];
         ComPtr<ID3D12CommandAllocator> m_commandAllocators[RenderConstants::kFrameCount];
         ComPtr<ID3D12CommandQueue> m_commandQueue;
         ComPtr<ID3D12GraphicsCommandList> m_commandList;
+        ComPtr<IDXGIAdapter4> _p_adapter;
+        DXGI_QUERY_VIDEO_MEMORY_INFO _local_video_memory_info;
+        DXGI_QUERY_VIDEO_MEMORY_INFO _non_local_video_memory_info;
+        Scope<IGPUTimer> _p_gpu_timer;
+        //ComPtr<ID3D12QueryHeap> m_queryHeap;
         //ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
-
+        u64 _frame_count = 0u;
         CPUVisibleDescriptorAllocation _rtv_allocation;
         GPUVisibleDescriptorAllocation _imgui_allocation;
-        u8 _rtv_desc_size;
-        u8 _dsv_desc_size;
-        u8 _cbv_desc_size;
         // Synchronization objects.
         u8 m_frameIndex;
         HANDLE m_fenceEvent;
         u64 _fence_value = 0u;
         ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
         std::unordered_map<u32, u64> _cmd_target_fence_value;
+        std::multimap<u64, ComPtr<ID3D12Resource>> _global_tracked_resource;
         Queue<RHIResourceTask> _resource_task;
-        TimeMgr _timer;
         u32 _width;
         u32 _height;
         float m_aspectRatio;

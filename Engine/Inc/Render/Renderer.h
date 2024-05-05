@@ -23,43 +23,44 @@ namespace Ailu
     class AILU_API Renderer : public IRuntimeModule
     {
     public:
-        inline static u32 kRendererWidth = 1600u;
-        inline static u32 kRendererHeight = 900u;
         using BeforeTickEvent = std::function<void()>;
         using AfterTickEvent = std::function<void()>;
     public:
         void BeginScene();
         void EndScene();
         int Initialize() override;
+        int Initialize(u32 width,u32 height);
         void Finalize() override;
         void Tick(const float& delta_time) override;
         float GetDeltaTime() const;
         void TakeCapture();
         List<RenderPass*>& GetRenderPasses() { return _render_passes; };
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
+        void ResizeBuffer(u32 width, u32 height);
         void RegisterEventBeforeTick(BeforeTickEvent e);
         void RegisterEventAfterTick(AfterTickEvent e);
         void UnRegisterEventBeforeTick(BeforeTickEvent e);
         void UnRegisterEventAfterTick(AfterTickEvent e);
-        RenderTexture* GetTargetTexture() const { return _p_gameview_rt.get(); }
+        RenderTexture* GetTargetTexture() const { return g_pRenderTexturePool->Get(_gameview_rt_handle); }
         bool _is_offscreen = true;
     private:
-        Ref<RenderTexture> _p_camera_color_attachment;
-        Ref<RenderTexture> _p_gameview_rt;
-        Ref<RenderTexture> _p_camera_depth_attachment;
+        RTHandle _camera_color_handle;
+        RTHandle _gameview_rt_handle;
+        RTHandle _camera_depth_handle;
+
         void Render();
         void DrawRendererGizmo();
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
+        void DoResize();
     private:
         static inline List<RenderPass*> _p_task_render_passes{};
-        Ref<ComputeShader> _p_test_cs;
-        Ref<Texture> _p_test_texture;
+        GraphicsContext* _p_context = nullptr;
+        u32 _width, _height;
         Scope<ConstantBuffer> _p_per_frame_cbuf;
         ScenePerFrameData _per_frame_cbuf_data;
         RenderingData _rendering_data;
         ConstantBuffer* _p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
-        GraphicsContext* _p_context = nullptr;
         Scope<OpaquePass> _p_opaque_pass;
         Scope<ResolvePass> _p_reslove_pass;
         Scope<ShadowCastPass> _p_shadowcast_pass;
@@ -72,6 +73,7 @@ namespace Ailu
         TimeMgr* _p_timemgr = nullptr;
         Camera* _p_scene_camera;
         Queue<int> _captures;
+        Queue<Vector2f> _resize_events;
         List<BeforeTickEvent> _events_before_tick;
         List<AfterTickEvent> _events_after_tick;
 

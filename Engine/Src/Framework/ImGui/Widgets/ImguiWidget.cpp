@@ -70,9 +70,10 @@ namespace Ailu
 		_handle = handle;
 		_b_show = true;
 	}
-	void ImGuiWidget::Close()
+	void ImGuiWidget::Close(i32 handle)
 	{
-		_b_show = false;
+		if(handle == _handle)
+			_b_show = false;
 	}
 	void ImGuiWidget::Show()
 	{
@@ -81,8 +82,10 @@ namespace Ailu
 			_handle = -1;
 			return;
 		}
-
-		ImGui::Begin(std::format("{} ,handle {}",_title,_handle).c_str(), &_b_show);
+		if(_allow_close)
+			ImGui::Begin(std::format("{} ,handle {}",_title,_handle).c_str(), &_b_show);
+		else
+			ImGui::Begin(std::format("{} ,handle {}", _title, _handle).c_str(), nullptr, ImGuiWindowFlags_NoCollapse);
 		_is_focus = ImGui::IsWindowFocused();
 		Input::s_block_input |= _is_focus;
 		ImVec2 windowPos = ImGui::GetWindowPos();

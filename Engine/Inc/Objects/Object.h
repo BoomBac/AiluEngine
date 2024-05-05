@@ -37,7 +37,7 @@ namespace Ailu
 			return _properties.end();
 		}
 		//--------------------Reflect
-		DECLARE_PROTECTED_PROPERTY(name,Name,String)
+		DECLARE_PRIVATE_PROPERTY(id,ID,u64)
 	public:
 		Object();
 		Object(const Object& other);
@@ -50,6 +50,14 @@ namespace Ailu
 		/// <returns></returns>
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String,String>>& formated_str);
+		virtual void Name(const String& value)
+		{
+			_name = value;
+		} 
+		const String& Name() const 
+		{
+			return _name;
+		}
 	protected:
 		/// <summary>
 		/// DeserializeImpl
@@ -57,6 +65,10 @@ namespace Ailu
 		/// <param name="formated_str">prop name,prop value</param>
 		/// <returns></returns>
 		virtual void* DeserializeImpl(Queue<std::tuple<String,String>>& formated_str);
+	protected: 
+		String _name;
+	private:
+		inline static u64 s_global_object_id = 0u;
 	};
 
 	template<class T>

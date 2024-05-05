@@ -156,8 +156,8 @@ namespace Ailu
 
 		if (lClusterMode == FbxCluster::eAdditive && pCluster->GetAssociateModel())
 		{
-			AL_ASSERT(true, "")
-				pCluster->GetTransformAssociateModelMatrix(lAssociateGlobalInitPosition);
+			AL_ASSERT(true);
+			pCluster->GetTransformAssociateModelMatrix(lAssociateGlobalInitPosition);
 			// Geometric transform of the model
 			lAssociateGeometry = GetGeometry(pCluster->GetAssociateModel());
 			lAssociateGlobalInitPosition *= lAssociateGeometry;
@@ -811,7 +811,7 @@ namespace Ailu
 	bool FbxParser::ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh)
 	{
 		u32 tangent_num = fbx_mesh.GetElementTangentCount();
-		AL_ASSERT(tangent_num < 0, "ReadTangent");
+		AL_ASSERT_MSG(tangent_num < 0, "ReadTangent");
 		auto* tangents = fbx_mesh.GetElementTangent();
 		if (tangents == nullptr)
 		{

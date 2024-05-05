@@ -3,6 +3,7 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/Assert.h"
 
 namespace Ailu
 {
@@ -162,7 +163,7 @@ namespace Ailu
 
 	CPUVisibleDescriptorAllocation&& CPUVisibleDescriptorAllocator::Allocate(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num)
 	{
-		AL_ASSERT(num >= kMaxDescriptorNumPerPage, "CPUVisibleDescriptorAllocator bad alloc: num to large!");
+		AL_ASSERT(num >= kMaxDescriptorNumPerPage);
 		if (!_page_free_space_lut.contains(type))
 		{
 			_page_free_space_lut[type] = HashMap<u16, u16>{};
@@ -178,7 +179,7 @@ namespace Ailu
 		{
 			_page_free_space_lut[type].erase(page_it);
 			_page_free_space_lut[type].emplace(std::make_pair(page.AvailableDescriptorNum(), page.PageID()));
-			return std::move(CPUVisibleDescriptorAllocation(page.PageID(), offset, num, page.DescriptorSize(), page.BaseHandle()));
+			return CPUVisibleDescriptorAllocation(page.PageID(), offset, num, page.DescriptorSize(), page.BaseHandle());
 		}
 		return CPUVisibleDescriptorAllocation();
 	}

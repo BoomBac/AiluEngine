@@ -23,6 +23,8 @@ namespace Ailu
 		inline static float DeltaTime = 0.0f;
 		inline static float TimeSinceLoad = 0.0f;
 		inline static float TimeScale = 1.0f;
+		static float GetScaledWorldTime(float scale = TimeMgr::TimeScale,bool smooth_scale = true);
+		static String CurrentTime(String format = "%Y-%m-%d_%H:%M:%S");
 
 		int Initialize() override;
 		void Finalize() override;
@@ -30,7 +32,6 @@ namespace Ailu
 		void Pause();
 		void Mark();
 		float GetElapsedSinceLastMark();
-		static float GetScaledWorldTime(float scale = TimeMgr::TimeScale,bool smooth_scale = true);
 		void Resume();
 		void Reset();
 	private:
@@ -44,6 +45,36 @@ namespace Ailu
 		bool _b_stop = false;
 	};
 	extern TimeMgr* g_pTimeMgr;
+
+    class CommandBuffer;
+	//GPUTimer create by GfxContext
+    class IGPUTimer
+    {
+    public:
+        static const u64 kMaxGpuTimerNum = 32u;
+        IGPUTimer() = default;
+        ~IGPUTimer() = default;
+
+        IGPUTimer(const IGPUTimer&) = delete;
+        IGPUTimer& operator=(const IGPUTimer&) = delete;
+        IGPUTimer(IGPUTimer&&) = default;
+        IGPUTimer& operator=(IGPUTimer&&) = default;
+
+        // Indicate beginning & end of frame
+        virtual void BeginFrame(CommandBuffer* cmd) = 0;
+        virtual void EndFrame() = 0;
+        // Start/stop a particular performance timer (don't start same index more than once in a single frame)
+        virtual void Start(CommandBuffer* commandList, u32 timerid = 0) = 0;
+        virtual void Stop(CommandBuffer* commandList, u32 timerid = 0) = 0;
+        // Reset running average
+        virtual void Reset() = 0;
+        // Returns delta time in milliseconds
+        virtual f64 GetElapsedMS(u32 timerid = 0) const = 0;
+        // Returns running average in milliseconds
+		virtual f32 GetAverageMS(u32 timerid = 0) const = 0;
+        // Device management
+		virtual void ReleaseDevice() = 0;
+    };
 }
 #pragma warning(pop)
 

@@ -3,16 +3,11 @@
 2ff30e48-6661-479b-a90c-863e606734f6,Meshs/sphere.fbx,kMesh
 352bbe93-08cc-4780-bacf-2eb126bfba98,Icons/shader.png,kTexture2D
 3a47674b-7028-4f49-a308-92c9fd4e9917,Icons/file.png,kTexture2D
-422d995a-e96a-40c9-92bb-d64dce02848d,NewScene/Material_MR.almat,kMaterial
+40572189-df8e-4f99-a7d3-e81a8417a3ae,NewScene/DamagedHelmet.fbx,kMesh
 4f6e2fa4-c9af-4800-9ff9-70874abfbd50,Materials/StandardPBR.almat,kMaterial
-5f225b5f-0615-44ad-95b8-70ba96f213e1,Meshs/Intergalactic Spaceship_nmap_2_Tris.jpg,kTexture2D
 7baa598b-7eb4-478d-91ae-bf758da25d3b,Meshs/monkey.fbx,kMesh
 8353ebb5-ab8e-4a52-bc3f-86260e54720e,Icons/3d.png,kTexture2D
 881f94ee-2dbb-48e9-b084-72c9bfb729ea,Icons/folder.png,kTexture2D
-a2478586-da1c-4f03-8539-ddee87402961,NewScene/DamagedHelmet.fbx,kMesh
-b9adc50d-14e4-49a3-8938-70398d781956,NewScene/8773302468495022225.jpg,kTexture2D
+96a597e6-6bb8-4905-8091-ebd23b072b18,NewScene/Material_MR.almat,kMaterial
 c3315e03-1052-4825-98f7-a676beae0615,Meshs/plane.fbx,kMesh
 d137d2a7-0d2b-40bc-9c76-6d2708923869,Meshs/cube.fbx,kMesh
-d2b6a3b7-0fd5-4bce-9950-f6bc5ab39beb,NewScene/palace.fbx,kMesh
-d84909f5-601d-47a0-914c-5362645ff932,Meshs/Intergalactic Spaceship_color_4.jpg,kTexture2D
-d9ac9989-061d-4e7c-974f-bab16804aaed,Meshs/space_ship.fbx,kMesh

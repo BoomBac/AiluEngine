@@ -3,16 +3,16 @@
 #define __ALG_FORMAT_H__
 #include <cstdint>
 #include "dxgiformat.h"
+#include "GlobalMarco.h"
+#include "Framework/Common/Assert.h"
 
-enum class EALGFormat : u8
-{
-    kALGFormatUnknown = 0,
-	kALGFormatR8G8B8A8_UNORM, kALGFormatR8G8B8A8_UNORM_SRGB,
-	kALGFormatR24G8_TYPELESS, kALGFormatR32_FLOAT, kALGFormatD32_FLOAT, kALGFormatD24S8_UINT,
-    kALGFormatR32G32B32A32_FLOAT, kALGFormatR32G32B32_FLOAT, kALGFormatR16G16B16A16_FLOAT, kALGFormatR16G16_FLOAT,kALGFormatR32_UINT, kALGFormatR32_SINT
-};
+DECLARE_ENUM(EALGFormat, kALGFormatUnknown,
+    kALGFormatR8G8B8A8_UNORM, kALGFormatR8G8B8A8_UNORM_SRGB,
+    kALGFormatR24G8_TYPELESS, kALGFormatR32_FLOAT, kALGFormatD32_FLOAT, kALGFormatD24S8_UINT,
+    kALGFormatR32G32B32A32_FLOAT, kALGFormatR32G32B32_FLOAT, kALGFormatR16G16B16A16_FLOAT, kALGFormatR16G16_FLOAT, kALGFormatR32G32_FLOAT, kALGFormatR32_UINT, kALGFormatR32_SINT)
 
-static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat& format)
+
+static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat::EALGFormat& format)
 {
     switch (format)
     {
@@ -25,6 +25,7 @@ static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat& format)
     case EALGFormat::kALGFormatD32_FLOAT: return DXGI_FORMAT_D32_FLOAT;
     case EALGFormat::kALGFormatR32G32B32A32_FLOAT: return DXGI_FORMAT_R32G32B32A32_FLOAT;
     case EALGFormat::kALGFormatR32G32B32_FLOAT: return DXGI_FORMAT_R32G32B32_FLOAT;
+    case EALGFormat::kALGFormatR32G32_FLOAT: return DXGI_FORMAT_R32G32_FLOAT;
     case EALGFormat::kALGFormatR16G16B16A16_FLOAT: return DXGI_FORMAT_R16G16B16A16_FLOAT;
     case EALGFormat::kALGFormatR16G16_FLOAT: return DXGI_FORMAT_R16G16_FLOAT;
     case EALGFormat::kALGFormatR32_UINT: return DXGI_FORMAT_R32_UINT;
@@ -33,7 +34,7 @@ static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat& format)
     return DXGI_FORMAT_UNKNOWN;
 }
 
-static i8 GetFormatChannel(const EALGFormat& format)
+static i8 GetFormatChannel(const EALGFormat::EALGFormat& format)
 {
     switch (format)
     {
@@ -51,7 +52,7 @@ static i8 GetFormatChannel(const EALGFormat& format)
 }
 
 
-static bool IsShadowMapFormat(const EALGFormat& format)
+static bool IsShadowMapFormat(const EALGFormat::EALGFormat& format)
 {
     switch (format)
     {
@@ -64,12 +65,12 @@ static bool IsShadowMapFormat(const EALGFormat& format)
     return false;
 }
 
-static bool IsHDRFormat(const EALGFormat& format)
+static bool IsHDRFormat(const EALGFormat::EALGFormat& format)
 {
-    return format == EALGFormat::kALGFormatR32G32B32A32_FLOAT || format == EALGFormat::kALGFormatR32G32B32_FLOAT;
+    return format == EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT || format == EALGFormat::EALGFormat::kALGFormatR32G32B32_FLOAT;
 }
 
-static u16 GetPixelByteSize(const EALGFormat& format)
+static u16 GetPixelByteSize(const EALGFormat::EALGFormat& format)
 {
     switch (format)
     {
@@ -95,9 +96,11 @@ static u16 GetPixelByteSize(const EALGFormat& format)
         break;
     case EALGFormat::kALGFormatR32_SINT: return 4;
         break;
+    case EALGFormat::kALGFormatR16G16_FLOAT: return 4;
     default:
         break;
     }
+    AL_ASSERT_MSG(true, "Unknown format %d", (u32)format);
     return 65535;
 }
 

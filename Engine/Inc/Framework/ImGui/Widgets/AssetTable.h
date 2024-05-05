@@ -11,7 +11,7 @@ namespace Ailu
 		AssetTable();
 		~AssetTable();
 		void Open(const i32& handle) final;
-		void Close() final;
+		void Close(i32 handle) final;
 	private:
 		void ShowImpl() final;
 	};

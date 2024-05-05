@@ -25,7 +25,7 @@ namespace Ailu
         else
         {
             LOG_ERROR("Generate guid failed!");
-            AL_ASSERT(true, "Generate guid failed!");
+            AL_ASSERT_MSG(true, "Generate guid failed!");
             al_guid._guid = "error_guid";
         }
         return al_guid;

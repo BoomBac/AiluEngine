@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef __MATERIAL_H__
 #define __MATERIAL_H__
 #include <map>
@@ -46,9 +46,10 @@ namespace Ailu
 		void SetVector(const String& name, const Vector4f& vector);
 		float GetFloat(const String& name);
 		Vector4f GetVector(const String& name);
-		void SetTexture(const String& name, Ref<Texture> texture);
 		void RemoveTexture(const String& name);
-		void SetTexture(const String& name, const String& texture_path);
+		void SetTexture(const String& name, Texture* texture);
+		void SetTexture(const String& name, const WString& texture_path);
+		void SetTexture(const String& name, RTHandle texture);
 		void EnableKeyword(const String& keyword);
 		void DisableKeyword(const String& keyword);
 		virtual void Bind();
@@ -57,6 +58,7 @@ namespace Ailu
 		List<std::tuple<String, float>> GetAllFloatValue();
 		List<std::tuple<String, Vector4f>> GetAllVectorValue();
 		List<std::tuple<String, u32>> GetAllUintValue();
+		//List<std::tuple<String, Texture*>> GetAllTexture();
 		//为了持久化
 		const Guid& GetGuid() const final;
 		void AttachToAsset(Asset* owner) final;
@@ -76,7 +78,7 @@ namespace Ailu
 		Scope<ConstantBuffer> _p_cbuf;
 		//std::unordered_set<ShaderBindResourceInfo, ShaderBindResourceInfoHash, ShaderBindResourceInfoEqual> _mat_props{};
 		//value_name : <bind_slot,texture>
-		std::map<String, std::tuple<u8, Ref<Texture>>> _textures{};
+		std::map<String, std::tuple<u8, Texture*>> _textures{};
 	};
 
 	class StandardMaterial : public Material

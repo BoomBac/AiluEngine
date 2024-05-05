@@ -20,6 +20,7 @@ namespace Ailu
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		ThrowIfFailed(p_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&_heap)));
 		AddNewBlock(0, num);
+		_heap->SetName(std::format(L"GPUDescriptorHead_{}",id).c_str());
 	}
 	GPUVisibleDescriptorPage::GPUVisibleDescriptorPage(GPUVisibleDescriptorPage&& other) noexcept
 	{
@@ -179,7 +180,14 @@ namespace Ailu
 
 	GPUVisibleDescriptorAllocation&& GPUVisibleDescriptorAllocator::Allocate(u16 num, D3D12_DESCRIPTOR_HEAP_TYPE type)
 	{
-		AL_ASSERT(num >= kMaxDescriptorNumPerPage, "GPUVisibleDescriptorAllocator bad alloc: num to large!");
+		static bool s_first_alloc = true;
+		if (s_first_alloc)
+		{
+			//防止vec扩容后，原有的allocation中存储的page指针失效
+			_pages.reserve(10);
+			s_first_alloc = false;
+		}
+		AL_ASSERT_MSG(num >= kMaxDescriptorNumPerPage, "GPUVisibleDescriptorAllocator bad alloc: num to large!");
 		if (!_page_free_space_lut.contains(type))
 		{
 			_page_free_space_lut[type] = HashMap<u16, u16>{};
@@ -195,13 +203,14 @@ namespace Ailu
 		{
 			_page_free_space_lut[type].erase(page_it);
 			_page_free_space_lut[type].emplace(std::make_pair(page.AvailableDescriptorNum(), page.PageID()));
-			return std::move(GPUVisibleDescriptorAllocation(offset,num,&page));
+			return GPUVisibleDescriptorAllocation(offset,num,&page);
 		}
 		return GPUVisibleDescriptorAllocation();
 	}
 	void GPUVisibleDescriptorAllocator::Free(GPUVisibleDescriptorAllocation&& handle)
 	{
-		_pages[handle.PageID()].Free(handle.PageOffset(), handle.DescriptorNum(), Application::s_frame_count);
+		if(handle.Page())
+			_pages[handle.PageID()].Free(handle.PageOffset(), handle.DescriptorNum(), Application::s_frame_count);
 	}
 
 	void GPUVisibleDescriptorAllocator::ReleaseSpace()
@@ -211,8 +220,17 @@ namespace Ailu
 		{
 			u16 release_num = page.ReleaseAllStaleBlock(Application::s_frame_count);
 			_page_free_space_lut[page.PageType()].emplace(std::make_pair(page.AvailableDescriptorNum(), page.PageID()));
-			LOG_WARNING("Release GPUVisibleDescripto at page{} with num {}.", page.PageID(), release_num);
+			g_pLogMgr->LogFormat("Release GPUVisibleDescripto at page{} with num {}.", page.PageID(), release_num);
 		}
+	}
+
+	void GPUVisibleDescriptorAllocator::AllocationInfo(u32& total_num, u32& available_num) const
+	{
+		for (auto& page : _pages)
+		{
+			available_num += page.AvailableDescriptorNum();
+		}
+		total_num = static_cast<u32>(_pages.size()) * kMaxDescriptorNumPerPage;
 	}
 
 	HashMap<u16, u16>::iterator GPUVisibleDescriptorAllocator::AddNewPage(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num)

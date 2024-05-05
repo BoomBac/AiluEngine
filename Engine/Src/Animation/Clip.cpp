@@ -13,7 +13,7 @@ namespace Ailu
 
 	void AnimationClip::AddKeyFrame(u16 joint_index, const Transform& local_pose)
 	{
-		AL_ASSERT(_sk.JointNum() < joint_index, "joint index out of range");
+		AL_ASSERT_MSG(_sk.JointNum() < joint_index, "joint index out of range");
 		if (_local_pose.empty())
 			_local_pose.resize(_sk.JointNum());
 		_local_pose[joint_index].emplace_back(local_pose);
@@ -55,15 +55,15 @@ namespace Ailu
 
 	const Matrix4x4f& AnimationClip::Sample(u16 joint_index, u32 time) const
 	{
-		AL_ASSERT(_local_pose_mat.size() < joint_index, "joint index out of range");
-		AL_ASSERT(_local_pose_mat[joint_index].size() < time, "time out of range");
+		AL_ASSERT_MSG(_local_pose_mat.size() < joint_index, "joint index out of range");
+		AL_ASSERT_MSG(_local_pose_mat[joint_index].size() < time, "time out of range");
 		return _local_pose_mat[joint_index][time];
 	}
 
 	const Matrix4x4f& AnimationClip::SampleDebug(u16 joint_index, u32 time) const
 	{
-		AL_ASSERT(_local_pose_mat_debug.size() < joint_index, "joint index out of range");
-		AL_ASSERT(_local_pose_mat_debug[joint_index].size() < time, "time out of range");
+		AL_ASSERT_MSG(_local_pose_mat_debug.size() < joint_index, "joint index out of range");
+		AL_ASSERT_MSG(_local_pose_mat_debug[joint_index].size() < time, "time out of range");
 		return _local_pose_mat_debug[joint_index][time];
 	}
 

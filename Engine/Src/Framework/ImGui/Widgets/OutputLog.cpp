@@ -4,9 +4,9 @@
 
 namespace Ailu
 {
-	OutputLog::OutputLog() : ImGuiWidget("OutputLog")
+	OutputLog::OutputLog(IAppender* imgui_logger) : ImGuiWidget("OutputLog")
 	{
-        g_pLogMgr->AddAppender(this);
+		_p_logger = static_cast<ImGuiLogAppender*>(imgui_logger);
 	}
 	OutputLog::~OutputLog()
 	{
@@ -15,21 +15,14 @@ namespace Ailu
 	{
 		ImGuiWidget::Open(handle);
 	}
-	void OutputLog::Close()
+	void OutputLog::Close(i32 handle)
 	{
-		ImGuiWidget::Close();
+		ImGuiWidget::Close(handle);
 	}
-    void OutputLog::Print(std::string str)
-    {
-        _logger.AddLog("%s\r\n",str.c_str());
-    }
-    void OutputLog::Print(std::wstring str)
-    {
-        _logger.AddLog("%s\r\n",ToChar(str).c_str());
-    }
+
 
 	void OutputLog::ShowImpl()
 	{
-        _logger.Draw("OutputLog");
+		_p_logger->Draw("OutputLog");
 	}
 }

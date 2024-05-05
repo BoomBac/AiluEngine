@@ -9,80 +9,7 @@
 
 namespace Ailu
 {
-	Ref<Texture2D> PngParser::Parser(const std::string_view& path)
-	{
-		int x, y, n;
-		auto asset_path = PathUtils::FormatFilePath(PathUtils::ExtractAssetPath(path.data()));
-		u8* data = stbi_load(path.data(), &x, &y, &n, 0);
-		if (data == nullptr)
-		{
-			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
-			auto tex = Texture2D::Create(4, 4);
-			tex->Name("Placeholder");
-			return tex;
-		}
-		else
-		{
-			auto tex = Texture2D::Create(x, y);
-			tex->AssetPath(asset_path);
-			tex->Name(PathUtils::GetFileName(path,true));
-			u8* new_data = nullptr;
-			if (n != 4)
-			{
-				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);
-				stbi_image_free(data);
-				tex->FillData(std::move(new_data));
-			}
-			else
-			{
-				tex->FillData(std::move(data));
-				//texture会调用delete[]释放data，使用stbi原始数据使用malloc申请空间，可能会有问题
-				//stbi_image_free(data);
-			}
-			return tex;
-		}
-	}
-	Ref<Texture2D> PngParser::Parser(const std::string_view& path, u8 mip_level)
-	{
-		int x, y, n;
-		u8* data = stbi_load(path.data(), &x, &y, &n, 0);
-		if (data == nullptr)
-		{
-			LOG_ERROR("Load {} failed: {}", path, stbi_failure_reason());
-			return Texture2D::Create(4, 4);
-		}
-		else
-		{
-			auto tex = Texture2D::Create(x, y);
-			tex->AssetPath(PathUtils::ExtractAssetPath(path.data()));
-			tex->Name(PathUtils::GetFileName(path, true));
-			u8* new_data = data;
-			if (n != 4)
-			{
-				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n,n);
-				stbi_image_free(data);
-			}
-			Vector<u8*> mipmaps{ new_data };
-			u8 all_mip_level = 1;
-			int size = x;
-			while (size)
-			{
-				size >>= 1;
-				all_mip_level++;
-			}
-			all_mip_level = min(all_mip_level,8);
-			mip_level = min(mip_level, all_mip_level);
-			for (int i = 0; i < mip_level - 1; i++)
-			{
-				mipmaps.emplace_back(TextureUtils::DownSample(mipmaps.back(), x >> i, y >> i, 4));
-				if (x >> i == 1)
-					break;
-			}
-			tex->FillData(mipmaps);
-			return tex;
-		}
-	}
-	Ref<TextureCubeMap> PngParser::Parser(Vector<String>& paths)
+	Ref<CubeMap> PngParser::Parser(Vector<String>& paths)
 	{
 		if (paths.size() != 6)
 		{
@@ -116,8 +43,47 @@ namespace Ailu
 				datas.emplace_back(expand_data);
 			}
 		}
-		auto tex = TextureCubeMap::Create(x, y, EALGFormat::kALGFormatR8G8B8A8_UNORM);
-		tex->FillData(datas);
+		auto tex = CubeMap::Create(x,false,ETextureFormat::kRGBA32);
 		return tex;
+	}
+	Ref<Texture2D> PngParser::Parser(const WString& sys_path)
+	{
+		int x, y, n;
+		String sys_path_n = ToChar(sys_path);
+		u8* data = stbi_load(sys_path_n.data(), &x, &y, &n, 0);
+		if (data == nullptr)
+		{
+			LOG_ERROR("Load {} failed: {}", sys_path_n, stbi_failure_reason());
+			return MakeRef<Texture2D>(4, 4);
+		}
+		else
+		{
+			auto tex = Texture2D::Create(x, y, true);
+			//tex->AssetPath(PathUtils::ExtractAssetPath(sys_path_n));
+			//tex->Name(PathUtils::GetFileName(sys_path_n, true));
+			u8* new_data = data;
+			if (n != 4)
+			{
+				new_data = TextureUtils::ExpandImageDataToFourChannel(data, x * y * n, n);
+				stbi_image_free(data);
+			}
+			Vector<u8*> mipmaps{ new_data };
+			//all_mip_level = min(all_mip_level, 8);
+			auto mip_level = tex->MipmapLevel();
+			tex->SetPixelData(new_data,0);
+			for (int i = 0; i < mip_level - 1; i++)
+			{
+				mipmaps.emplace_back(TextureUtils::DownSample(mipmaps.back(), x >> i, y >> i, 4));
+				if (x >> i == 1)
+					break;
+			}
+			for (int i = 0; i < mip_level; i++)
+			{
+				tex->SetPixelData(mipmaps[i], i);
+				DESTORY_PTRARR(mipmaps[i]);
+			}
+			tex->Name(PathUtils::GetFileName(sys_path_n));
+			return tex;
+		}
 	}
 }

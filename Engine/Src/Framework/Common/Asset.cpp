@@ -14,6 +14,8 @@ namespace Ailu
     {
         _asset_path = asset_path;
         _sys_path = PathUtils::GetResSysPath(_asset_path);
+        _full_name = PathUtils::GetFileName(_asset_path,true);
+        _name = _full_name.substr(0, _full_name.find_last_of('.'));
     }
 
     void Asset::AssignGuid(const Guid& guid)

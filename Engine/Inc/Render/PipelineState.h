@@ -10,7 +10,7 @@
 namespace Ailu
 {
 	template<typename T>
-	T& PODCopy(const T* src,T* dst)
+	T& PODCopy(const T* src, T* dst)
 	{
 		if (src != dst)
 			memcpy(dst, src, sizeof(*dst));
@@ -95,7 +95,7 @@ namespace Ailu
 		case Ailu::EShaderDateType::kuInt4:	 return 16;
 		case Ailu::EShaderDateType::kBool:	 return 1;
 		}
-		AL_ASSERT(true, "Unknown ShaderDateType!");
+		AL_ASSERT_MSG(true, "Unknown ShaderDateType!");
 		return 0;
 	}
 
@@ -155,7 +155,7 @@ namespace Ailu
 		Vector<T> _s_data;
 		mutable std::mutex _mutex;
 	};
-	
+
 	class VertexBufferLayout
 	{
 		DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
@@ -196,7 +196,7 @@ namespace Ailu
 			_hash = other._hash;
 			_stream_count = other._stream_count;
 			_buffer_descs = other._buffer_descs;
-			memcpy(_stride, other._stride,sizeof(u8) * kMaxStreamCount);
+			memcpy(_stride, other._stride, sizeof(u8) * kMaxStreamCount);
 			//_hash = static_cast<u8>(ALHash::CommonRuntimeHasher(*this));
 			return *this;
 		}
@@ -209,7 +209,7 @@ namespace Ailu
 			{
 				if (desc.Stream >= kMaxStreamCount)
 				{
-					AL_ASSERT(true, "Stream count must less than kMaxStreamCount");
+					AL_ASSERT_MSG(true, "Stream count must less than kMaxStreamCount");
 					return;
 				}
 				desc.Offset += offset[min(desc.Stream, kMaxStreamCount)];
@@ -329,7 +329,7 @@ namespace Ailu
 			EBlendOp colorOp = EBlendOp::kAdd,
 			EBlendOp alphaOp = EBlendOp::kAdd,
 			EColorMask colorMask = EColorMask::k_RGBA);
-			
+
 
 		bool operator==(const BlendState& other) const
 		{
@@ -368,11 +368,11 @@ namespace Ailu
 	{
 		DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
 	public:
-		static constexpr EALGFormat kDefaultColorRTFormat = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
-		static constexpr EALGFormat kDefaultDepthRTFormat = EALGFormat::kALGFormatD24S8_UINT;
-		EALGFormat _color_rt[8];
+		static constexpr EALGFormat::EALGFormat kDefaultColorRTFormat = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
+		static constexpr EALGFormat::EALGFormat kDefaultDepthRTFormat = EALGFormat::EALGFormat::kALGFormatD24S8_UINT;
+		EALGFormat::EALGFormat _color_rt[8];
 		u8 _color_rt_num = 0;
-		EALGFormat _depth_rt;
+		EALGFormat::EALGFormat _depth_rt;
 	public:
 		//static const RenderTargetState& Get(const u8& hash)
 		//{
@@ -382,16 +382,16 @@ namespace Ailu
 
 		RenderTargetState();
 
-		RenderTargetState(const std::initializer_list<EALGFormat>& color_rt, EALGFormat depth_rt);
+		RenderTargetState(const std::initializer_list<EALGFormat::EALGFormat>& color_rt, EALGFormat::EALGFormat depth_rt);
 
 		bool operator==(const RenderTargetState& other) const
 		{
 			bool is_equal = this->_color_rt_num == other._color_rt_num && this->_depth_rt == other._depth_rt;
-			if(!is_equal) 
+			if (!is_equal)
 				return false;
-			else 
+			else
 			{
-				for(int i = 0; i < _color_rt_num; i++)
+				for (int i = 0; i < _color_rt_num; i++)
 					is_equal &= this->_color_rt[i] == other._color_rt[i];
 			}
 			return is_equal;
@@ -473,17 +473,17 @@ namespace Ailu
 		}
 
 		template<>
-		static u32 Hasher(const EALGFormat& obj)
+		static u32 Hasher(const EALGFormat::EALGFormat& obj)
 		{
 			//separate color and depth hash
 			switch (obj)
 			{
-			case EALGFormat::kALGFormatR24G8_TYPELESS:return 0;
-			case EALGFormat::kALGFormatD32_FLOAT:return 1;
-			case EALGFormat::kALGFormatR8G8B8A8_UNORM: return 0;
-			case EALGFormat::kALGFormatR32G32B32A32_FLOAT: return 1;
-			case EALGFormat::kALGFormatR32G32B32_FLOAT:return 2;
-			case EALGFormat::kALGFormatR32_FLOAT:return 3;
+			case EALGFormat::EALGFormat::kALGFormatR24G8_TYPELESS:return 0;
+			case EALGFormat::EALGFormat::kALGFormatD32_FLOAT:return 1;
+			case EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM: return 0;
+			case EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT: return 1;
+			case EALGFormat::EALGFormat::kALGFormatR32G32B32_FLOAT:return 2;
+			case EALGFormat::EALGFormat::kALGFormatR32_FLOAT:return 3;
 			}
 		}
 	}
@@ -496,8 +496,8 @@ namespace Ailu
 
 	enum EBindResDescType
 	{
-		kConstBuffer = 0x01, 
-		kCBufferAttribute = 0x02,kCBufferFloat = 0x04, kCBufferFloat4 = 0x08, kCBufferUint = 0x10, kCBufferUint4 = 0x20, kCBufferMatrix4 = 0x40,kCBufferBool = 0x80,
+		kConstBuffer = 0x01,
+		kCBufferAttribute = 0x02, kCBufferFloat = 0x04, kCBufferFloat4 = 0x08, kCBufferUint = 0x10, kCBufferUint4 = 0x20, kCBufferMatrix4 = 0x40, kCBufferBool = 0x80,
 		kTexture2D = 0x100, kCubeMap = 0x200, kTexture2DArray = 0x400, kSampler = 0x800, kUAVTexture2D = 0x1000,
 		kUnknown
 	};

@@ -1953,9 +1953,6 @@
     <ClInclude Include="Inc\Framework\Parser\PngParser.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Parser\TgaParser.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\RHI\DX12\D3DCommandBuffer.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2079,7 +2076,7 @@
     <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\TextureSelector.h">
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h">
@@ -2104,6 +2101,18 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\FrameResource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\RHI\DX12\D3DGPUTimer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\Profiler.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Common\Assert.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -2210,9 +2219,6 @@
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\Parser\TgaParser.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\RHI\DX12\D3DCommandBuffer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -2300,7 +2306,7 @@
     <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\TextureSelector.cpp">
+    <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp">
@@ -2322,6 +2328,18 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\FrameResource.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\RHI\DX12\D3DGPUTimer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Common\Profiler.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Common\Assert.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -15,12 +15,12 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 	private:
-		Ref<RenderTexture> _p_tex_bloom_threshold;
+		//Scope<RenderTexture> _p_tex_bloom_threshold;
 		Ref<Material> _p_bloom_thread_mat;
 		Ref<Material> _p_blit_mat;
 		Ref<Mesh> _p_quad_mesh;
 		ConstantBuffer* _p_obj_cb;
-		Rect _bloom_thread_rect,_backbuf_rect;
+		Rect _bloom_thread_rect;
 	};
 }
 

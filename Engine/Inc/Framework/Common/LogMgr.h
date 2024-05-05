@@ -81,6 +81,9 @@ namespace Ailu
 		const std::string& GetOutputPath() const;
 		const ELogLevel& GetOutputLevel() const;
 		const TraceLevle& GetTraceLevel() const;
+		const std::vector<IAppender*>& GetAppenders() const {
+			return _appenders;
+		};
 		void Log(std::string msg);
 		void Log(std::wstring msg);
 		void LogWarning(std::string msg);

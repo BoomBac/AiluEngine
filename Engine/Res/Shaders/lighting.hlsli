@@ -13,6 +13,7 @@ Texture2D Roughness : register(t3);
 Texture2D Metallic : register(t4);
 Texture2D Specular : register(t5);
 TextureCube DiffuseIBL : register(t6);
+TextureCube SkyBox : register(t7);
 
 float3 CaclulateDirectionalLight(uint index, float3 normal, float3 view_dir)
 {
@@ -166,7 +167,8 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	float3 ks = FresnelSchlickRoughness(saturate(shading_data.nv), F0,surface.roughness);
 	float3 kd = F3_WHITE - ks;
 	float3 diffuse = irradiance * surface.albedo.rgb;
-	light += 1.0f * diffuse * kd;
+	float3 specular = SkyBox.SampleLevel(g_LinearWrapSampler, surface.wnormal,lerp(0,9,surface.roughness));
+	light += 0.5f * diffuse * kd + ks * specular * 0.25;
 	return light; 
 }
  

@@ -1,19 +1,18 @@
 #include "pch.h"
 #include "Render/Pass/PostprocessPass.h"
 #include "Render/CommandBuffer.h"
-
+#include "Framework/Common/Profiler.h"
 
 namespace Ailu
 {
 	PostProcessPass::PostProcessPass() : RenderPass("PostProcessPass")
 	{
-		_p_tex_bloom_threshold = RenderTexture::Create(800,450,"BloomThreshold",EALGFormat::kALGFormatR16G16B16A16_FLOAT);
+		//_p_tex_bloom_threshold = RenderTexture::Create(800,450,"BloomThreshold",ERenderTargetFormat::kDefaultHDR);
 		_p_bloom_thread_mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/PostProcess/bloom.hlsl"),"BloomThread");
 		_p_blit_mat = MaterialLibrary::GetMaterial("Blit");
 		_p_obj_cb = ConstantBuffer::Create(256);
 		memcpy(_p_obj_cb->GetData(),&BuildIdentityMatrix(),sizeof(Matrix4x4f));
 		_bloom_thread_rect = Rect(0, 0, 800, 450);
-		_backbuf_rect = Rect(0, 0, 1600, 900);
 		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
 		//static const auto material = MaterialLibrary::GetMaterial("Blit");
 	}
@@ -22,19 +21,30 @@ namespace Ailu
 	}
 	void PostProcessPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get();
+		_bloom_thread_rect.width = rendering_data._width >> 1;
+		_bloom_thread_rect.height = rendering_data._height >> 1;
+		auto cmd = CommandBufferPool::Get("PostProcessPass");
+		RTHandle rt;
 		cmd->Clear();
-		cmd->SetViewport(_bloom_thread_rect);
-		cmd->SetScissorRect(_bloom_thread_rect);
-		cmd->SetRenderTarget(_p_tex_bloom_threshold);
-		_p_bloom_thread_mat->SetTexture("_SourceTex", rendering_data._p_camera_color_target);
-		cmd->DrawRenderer(_p_quad_mesh.get(), _p_bloom_thread_mat.get());
-		cmd->SetViewport(_backbuf_rect);
-		cmd->SetScissorRect(_backbuf_rect);
-		cmd->SetRenderTarget(rendering_data._p_camera_color_target);
-		_p_blit_mat->SetTexture("_SourceTex", _p_tex_bloom_threshold);
-		cmd->DrawRenderer(_p_quad_mesh.get(), _p_blit_mat.get());
+		{
+			ProfileBlock p(cmd.get(), _name);
+			cmd->SetViewport(_bloom_thread_rect);
+			cmd->SetScissorRect(_bloom_thread_rect);
+			rt = RenderTexture::GetTempRT(_bloom_thread_rect.width, _bloom_thread_rect.height, "BloomThreshold", ERenderTargetFormat::kDefaultHDR);
+			cmd->SetRenderTarget(rt);
+			_p_bloom_thread_mat->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
+			cmd->DrawRenderer(_p_quad_mesh.get(), _p_bloom_thread_mat.get());
+			cmd->SetViewport(rendering_data._scissor_rect);
+			cmd->SetScissorRect(rendering_data._scissor_rect);
+			cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
+			//_p_blit_mat->SetTexture("_SourceTex", _p_tex_bloom_threshold.get());
+			//将原至空，防止其他地方设置的值干扰这里，当前所有blit使用同一个材质
+			_p_blit_mat->SetTexture("_SourceTex", nullptr);
+			Shader::SetGlobalTexture("_SourceTex", g_pRenderTexturePool->Get(rt));
+			cmd->DrawRenderer(_p_quad_mesh.get(), _p_blit_mat.get());
+		}
 		context->ExecuteCommandBuffer(cmd);
+		RenderTexture::ReleaseTempRT(rt);
 		CommandBufferPool::Release(cmd);
 	}
 	void PostProcessPass::BeginPass(GraphicsContext* context)
@@ -42,5 +52,6 @@ namespace Ailu
 	}
 	void PostProcessPass::EndPass(GraphicsContext* context)
 	{
+		Shader::SetGlobalTexture("_SourceTex", nullptr);
 	}
 }

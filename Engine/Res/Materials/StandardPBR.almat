@@ -6,15 +6,15 @@ shader_path: Shaders/defered_standard_lit.hlsl
     SamplerMask: 0
   prop_type: Float
     MetallicValue: 0
-    RoughnessValue: 0.447
+    RoughnessValue: 0.012
   prop_type: Vector
     SpecularColor: 0,0,0,0
     BaseColor: 1,1,1,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
-    Specular: none
-    Metallic: none
-    Albedo: none
-    Normal: none
-    Emssive: none
-    Roughness: none
+    Specular: null guid
+    Metallic: null guid
+    Albedo: null guid
+    Normal: null guid
+    Emssive: null guid
+    Roughness: null guid

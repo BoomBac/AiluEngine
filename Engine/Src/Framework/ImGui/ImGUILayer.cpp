@@ -26,6 +26,8 @@
 #include "Framework/ImGui/Widgets/AssetTable.h"
 #include "Framework/ImGui/Widgets/ObjectDetail.h"
 #include "Framework/ImGui/Widgets/Outputlog.h"
+#include "Framework/ImGui/Widgets/CommonTextureWidget.h"
+#include "Framework/Common/Profiler.h"
 
 namespace ImguiTree
 {
@@ -111,6 +113,7 @@ namespace Ailu
 		ImGuiStyle& style = ImGui::GetStyle();
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark(&style);
+		style.WindowPadding = ImVec2(3.0f, 3.0f);
 		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
@@ -134,6 +137,7 @@ namespace Ailu
 		DESTORY_PTR(_render_view);
 		DESTORY_PTR(_object_detail);
 		DESTORY_PTR(_p_outputlog);
+		DESTORY_PTR(_p_rt_view);
 	}
 
 	void Ailu::ImGUILayer::OnAttach()
@@ -145,8 +149,16 @@ namespace Ailu
 		_render_view->Open(22);
 		_object_detail = new ObjectDetail(&s_cur_selected_actor);
 		_object_detail->Open(23);
-		_p_outputlog = new OutputLog();
-		_p_outputlog->Open(24);
+		for (auto appender : g_pLogMgr->GetAppenders())
+		{
+			auto imgui_appender = dynamic_cast<ImGuiLogAppender*>(appender);
+			if (imgui_appender)
+			{
+				_p_outputlog = new OutputLog(imgui_appender);
+				_p_outputlog->Open(24);
+			}
+		}
+		_p_rt_view = new RenderTextureView();
 	}
 
 	void Ailu::ImGUILayer::OnDetach()
@@ -172,7 +184,43 @@ namespace Ailu
 		ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
 		ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
 		ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
-		ImGui::Text("GPU Latency: %.2f ms", RenderingStates::s_gpu_latency);
+
+		String space = "";
+		ImGui::Text("CPU Time:");
+		while (!Profiler::g_Profiler._cpu_profiler_queue.empty())
+		{
+			auto [is_start, profiler_id] = Profiler::g_Profiler._cpu_profiler_queue.front();
+			Profiler::g_Profiler._cpu_profiler_queue.pop();
+			if (is_start)
+			{
+				space.append("-");
+				const auto& profiler = Profiler::g_Profiler.GetCPUProfileData(profiler_id);
+				ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
+			}
+			else
+				space = space.substr(0, space.size() - 1);
+		}
+		space = "";
+		ImGui::Text("GPU Time:");
+		while (!Profiler::g_Profiler._gpu_profiler_queue.empty())
+		{
+			auto [is_start, profiler_id] = Profiler::g_Profiler._gpu_profiler_queue.front();
+			Profiler::g_Profiler._gpu_profiler_queue.pop();
+			if (is_start)
+			{
+				space.append("-");
+				const auto& profiler = Profiler::g_Profiler.GetProfileData(profiler_id);
+				ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
+			}
+			else
+				space = space.substr(0, space.size() - 1);
+		}
+		for (auto pass : g_pRenderer->GetRenderPasses())
+		{
+			bool active = pass->IsActive();
+			ImGui::Checkbox(pass->GetName().c_str(), &active);
+			pass->SetActive(active);
+		}
 
 		static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame" };
 		static int item_current_idx = 0; // Here we store our selection data as an index.
@@ -199,7 +247,6 @@ namespace Ailu
 		ImGui::Checkbox("Expand", &show);
 		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
 		ImGui::Checkbox("ShowRT", &s_show_rt);
-		ImGui::Checkbox("ShowGameView", &s_show_renderview);
 		if (ImGui::Button("Capture"))
 		{
 			g_pRenderer->TakeCapture();
@@ -216,9 +263,9 @@ namespace Ailu
 
 		if (show) ImGui::ShowDemoWindow(&show);
 		if (s_show_asset_table) _asset_table->Open(-2);
-		else _asset_table->Close();
-		if (s_show_rt) _rt_view.Open(-3);
-		else _rt_view.Close();
+		else _asset_table->Close(-2);
+		if (s_show_rt) _p_rt_view->Open(-3);
+		else _p_rt_view->Close(-3);
 		TreeStats::s_common_property_handle = 0;
 
 		ShowWorldOutline();
@@ -228,7 +275,7 @@ namespace Ailu
 		_mesh_browser.Show();
 		_asset_browser->Show();
 		_asset_table->Show();
-		_rt_view.Show();
+		_p_rt_view->Show();
 		_object_detail->Show();
 		_p_outputlog->Show();
 		//render view焦点时才不会阻塞输入，所以它必须放在最后渲染
@@ -403,61 +450,6 @@ namespace Ailu
 
 	void ImGUILayer::ShowObjectDetail()
 	{
-		//ImGui::Begin("ObjectDetail");
-		//if (s_cur_selected_actor != nullptr)
-		//{
-		//	ImGui::BulletText(s_cur_selected_actor->Name().c_str());
-		//	ImGui::SameLine();
-		//	i32 new_comp_count = 0;
-		//	i32 selected_new_comp_index = -1;
-		//	if (ImGui::BeginCombo(" ", "+ Add Component"))
-		//	{
-		//		auto& type_str = Component::GetAllComponentTypeStr();
-		//		for (auto& comp_type : type_str)
-		//		{
-		//			if (ImGui::Selectable(comp_type.c_str(), new_comp_count == selected_new_comp_index))
-		//				selected_new_comp_index = new_comp_count;
-		//			if (selected_new_comp_index == new_comp_count)
-		//			{
-		//				if (comp_type == Component::GetTypeName(StaticMeshComponent::GetStaticType()))
-		//					s_cur_selected_actor->AddComponent<StaticMeshComponent>();
-		//				else if (comp_type == Component::GetTypeName(SkinedMeshComponent::GetStaticType()))
-		//					s_cur_selected_actor->AddComponent<SkinedMeshComponent>();
-		//				else if (comp_type == Component::GetTypeName(LightComponent::GetStaticType()))
-		//				{
-		//					s_cur_selected_actor->AddComponent<LightComponent>();
-		//				}
-		//			}
-		//			++new_comp_count;
-		//		}
-		//		ImGui::EndCombo();
-		//	}
-		//	u32 comp_index = 0;
-		//	Component* comp_will_remove = nullptr;
-		//	for (auto& comp : s_cur_selected_actor->GetAllComponent())
-		//	{
-		//		//if (comp->GetTypeName() == StaticMeshComponent::GetStaticType()) continue;
-		//		ImGui::PushID(comp_index);
-		//		bool b_active = comp->Active();
-		//		ImGui::Checkbox("", &b_active);
-		//		ImGui::PopID();
-		//		comp->Active(b_active);
-		//		ImGui::SameLine();
-		//		ImGui::PushID(comp_index);
-		//		if (ImGui::Button("x"))
-		//			comp_will_remove = comp.get();
-		//		ImGui::PopID();
-		//		ImGui::SameLine();
-		//		DrawComponentProperty(comp.get(), _texture_selector);
-		//		++comp_index;
-		//	}
-		//	if (comp_will_remove && comp_will_remove->GetType() != EComponentType::kTransformComponent)
-		//	{
-		//		s_cur_selected_actor->RemoveComponent(comp_will_remove);
-		//		g_pSceneMgr->MarkCurSceneDirty();
-		//	}
-		//}
-		//ImGui::End();
 	}
 
 
@@ -492,111 +484,6 @@ namespace Ailu
 		ImGui::End();
 	}
 	//----------------------------------------------------------------------------MeshBrowser---------------------------------------------------------------------
-
-	// 
-	//----------------------------------------------------------------------------RTDebugWindow-----------------------------------------------------------------------
-	void RTDebugWindow::Open(const int& handle)
-	{
-		ImguiWindow::Open(handle);
-	}
-	void RTDebugWindow::Show()
-	{
-		if (!_b_show)
-		{
-			_handle = -1;
-			return;
-		}
-		ImGui::Begin("RTDebugWindow");
-		static float preview_tex_size = 128;
-		//// 获取当前ImGui窗口的内容区域宽度
-		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
-		int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
-		imagesPerRow += imagesPerRow == 0 ? 1 : 0;
-		static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
-		int tex_count = 0;
-		auto cmd = CommandBufferPool::Get();
-		for (auto& rt : RenderTexture::s_all_render_texture)
-		{
-			rt->Transition(cmd.get(), ETextureResState::kShaderResource);
-		}
-		g_pGfxContext->ExecuteCommandBuffer(cmd);
-		static const char* s_cube_dirs[] = { "+Y", "-X", "+Z", "+X","-Z","-Y"};
-		static int s_selected_dir = 0;
-		for (auto& rt : RenderTexture::s_all_render_texture)
-		{
-			ImGui::BeginGroup();
-			//ImGuiContext* context = ImGui::GetCurrentContext();
-			//auto drawList = context->CurrentWindow->DrawList;
-			//if (rt->IsCubemap())
-			//{
-			//	if (ImGui::BeginCombo("##combo", s_cube_dirs[s_selected_dir])) // ##combo 可以用来隐藏标签
-			//	{
-			//		for (int i = 0; i < 6; i++)
-			//		{
-			//			const bool isSelected = (s_selected_dir == i);
-			//			if (ImGui::Selectable(s_cube_dirs[i], isSelected))
-			//				s_selected_dir = i;
-			//			if (isSelected)
-			//				ImGui::SetItemDefaultFocus(); // Make the selected item the default focus so it appears in the box initially.
-			//		}
-			//		ImGui::EndCombo();
-			//	}
-			//	ImGui::Image(rt->GetGPUNativePtr(s_selected_dir + 1), ImVec2(preview_tex_size, preview_tex_size));
-			//	//ImGui::BeginTable(rt->Name().c_str(), 4);
-			//	//// +Y
-			//	//ImGui::TableNextRow();
-			//	//ImGui::TableSetColumnIndex(1);
-			//	//ImGui::Image(rt->GetGPUNativePtr(3), ImVec2(preview_tex_size, preview_tex_size));
-			//	//// -X
-			//	//ImGui::TableNextRow();
-			//	//ImGui::TableSetColumnIndex(0);
-			//	//ImGui::Image(rt->GetGPUNativePtr(2), ImVec2(preview_tex_size, preview_tex_size));
-			//	//// +Z
-			//	//ImGui::TableSetColumnIndex(1);
-			//	//ImGui::Image(rt->GetGPUNativePtr(5), ImVec2(preview_tex_size, preview_tex_size));
-			//	//// +X
-			//	//ImGui::TableSetColumnIndex(2);
-			//	//ImGui::Image(rt->GetGPUNativePtr(1), ImVec2(preview_tex_size, preview_tex_size));
-			//	//// -Z
-			//	//ImGui::TableSetColumnIndex(3);
-			//	//ImGui::Image(rt->GetGPUNativePtr(6), ImVec2(preview_tex_size, preview_tex_size));
-			//	//// -Y
-			//	//ImGui::TableNextRow();
-			//	//ImGui::TableSetColumnIndex(1);
-			//	//ImGui::Image(rt->GetGPUNativePtr(4), ImVec2(preview_tex_size, preview_tex_size));
-			//	//ImGui::EndTable();
-			//	ImGui::Text("TextureCube: %s", rt->Name().c_str());
-			//}
-			//else
-			//{
-			//	ImGui::Image(rt->GetGPUNativePtr(), ImVec2(preview_tex_size, preview_tex_size));
-			//	ImGui::Text("Texture2D: %s", rt->Name().c_str());
-			//}
-			ImGui::Image(rt->GetGPUNativePtr(), ImVec2(preview_tex_size, preview_tex_size));
-			ImGui::Text("Texture2D: %s", rt->Name().c_str());
-			ImGui::EndGroup();
-			if ((tex_count + 1) % imagesPerRow != 0)
-			{
-				ImGui::SameLine();
-			}
-			++tex_count;
-		}
-		//ImGui::Begin("RenderPassWindow");
-		//u16 pass_index = 0;
-		//for (auto& pass : g_pRenderer->GetRenderPasses())
-		//{
-		//	bool active = pass->IsActive();
-		//	ImGui::PushID(pass_index++);
-		//	ImGui::Checkbox(" ", &active);
-		//	ImGui::SameLine();
-		//	ImGui::Text("PassName: %s",pass->GetName().c_str());
-		//	pass->SetActive(active);
-		//	ImGui::PopID();
-		//}
-		ImGui::End();
-	}
-	//----------------------------------------------------------------------------RTDebugWindow-----------------------------------------------------------------------
-
 }
 
 

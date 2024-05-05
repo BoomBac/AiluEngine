@@ -27,15 +27,27 @@ namespace Ailu
         virtual const String& GetName() const = 0;
         virtual void SetName(const String& name) = 0;
 
-        virtual void ClearRenderTarget(Vector4f color, float depth, bool clear_color, bool clear_depth) = 0;
-        virtual void ClearRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(Ref<RenderTexture>& color, Vector4f clear_color,u16 index = 0u) = 0;
+        virtual void ClearRenderTarget(RenderTexture* color, RenderTexture* depth, Vector4f clear_color, float clear_depth) = 0;
+        virtual void ClearRenderTarget(Vector<RenderTexture*>& colors, RenderTexture* depth, Vector4f clear_color, float clear_depth) = 0;
+        virtual void ClearRenderTarget(RenderTexture* color, Vector4f clear_color,u16 index = 0u) = 0;
         virtual void ClearRenderTarget(RenderTexture* depth, float depth_value = 1.0f,u8 stencil_value = 0u) = 0;
-        virtual void SetRenderTarget(Ref<RenderTexture>& color, Ref<RenderTexture>& depth) = 0;
-        virtual void SetRenderTargets(Vector<Ref<RenderTexture>>& colors, Ref<RenderTexture>& depth) = 0;
+        virtual void SetRenderTargets(Vector<RenderTexture*>& colors, RenderTexture* depth) = 0;
         virtual void SetRenderTarget(RenderTexture* color, RenderTexture* depth) = 0;
-        virtual void SetRenderTarget(Ref<RenderTexture>& color,u16 index = 0u) = 0;
+        /// <summary>
+        /// 设置rendertarget，index用于cubemap或者texture array
+        /// </summary>
+        /// <param name="color"></param>
+        /// <param name="index"></param>
+        virtual void SetRenderTarget(RenderTexture*color,u16 index = 0u) = 0;
+
+        virtual void ClearRenderTarget(RTHandle color, RTHandle depth, Vector4f clear_color, float clear_depth) = 0;
+        virtual void ClearRenderTarget(Vector<RTHandle>& colors, RTHandle depth, Vector4f clear_color, float clear_depth) = 0;
+        virtual void ClearRenderTarget(RTHandle color, Vector4f clear_color, u16 index = 0u) = 0;
+        virtual void ClearRenderTarget(RTHandle depth, float depth_value = 1.0f, u8 stencil_value = 0u) = 0;
+        virtual void SetRenderTargets(Vector<RTHandle>& colors, RTHandle depth) = 0;
+        virtual void SetRenderTarget(RTHandle color, RTHandle depth) = 0;
+        virtual void SetRenderTarget(RTHandle color, u16 index = 0u) = 0;
+
         virtual void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) = 0;
         virtual void DrawIndexedInstanced(u32 index_count, u32 instance_count) = 0;
         virtual void DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count) = 0;
@@ -49,8 +61,10 @@ namespace Ailu
         virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) = 0;
         virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index,u32 instance_count = 1u) = 0;
         virtual u16 DrawRenderer(Mesh* mesh, Material* material,u32 instance_count = 1u) = 0;
-        virtual void ResolveToBackBuffer(Ref<RenderTexture>& color) = 0;
-        virtual void ResolveToBackBuffer(Ref<RenderTexture>& color, Ref<RenderTexture>& destination) = 0;
+        virtual void ResolveToBackBuffer(RenderTexture* color) = 0;
+        virtual void ResolveToBackBuffer(RenderTexture* color, RenderTexture* destination) = 0;
+        virtual void ResolveToBackBuffer(RTHandle color) = 0;
+        virtual void ResolveToBackBuffer(RTHandle color, RTHandle destination) = 0;
         virtual void Dispatch(ComputeShader* cs,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
 	};
 
@@ -58,7 +72,7 @@ namespace Ailu
     {
     public:
         static std::shared_ptr<CommandBuffer> Get(const String& name = "");
-        static void Release(std::shared_ptr<CommandBuffer> cmd);
+        static void Release(std::shared_ptr<CommandBuffer>& cmd);
         static void ReleaseAll();
     private:
         static void Init();

@@ -48,15 +48,13 @@ namespace Ailu
 	class ResolvePass : public RenderPass
 	{
 	public:
-		ResolvePass(Ref<RenderTexture>& source);
+		ResolvePass();
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
-		void BeginPass(GraphicsContext* context, Ref<RenderTexture>& source);
 		void EndPass(GraphicsContext* context) final;
 		bool _is_offscreen = false;
 	private:
-		Rect _backbuf_rect;
-		Ref<RenderTexture> _p_src_color;
+
 	};
 
 	class ShadowCastPass : public RenderPass
@@ -69,7 +67,7 @@ namespace Ailu
 		void EndPass(GraphicsContext* context) final;
 	private:
 		Rect _rect;
-		Ref<RenderTexture> _p_shadow_map;
+		Scope<RenderTexture> _p_shadow_map;
 		Ref<Material> _p_shadowcast_material;
 	};
 
@@ -80,14 +78,15 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		Ref<RenderTexture> _p_cube_map;
-		Ref<RenderTexture> _p_env_map;
+		Scope<RenderTexture> _p_cube_map;
+		Scope<RenderTexture> _p_env_map;
 	private:
 		ScenePerPassData _pass_data[6];
 		Scope<ConstantBuffer> _per_pass_cb[6];
 		Scope<ConstantBuffer> _per_obj_cb;
 		Matrix4x4f _world_mat;
-		Rect _rect;
+		Rect _cubemap_rect;
+		Rect _ibl_rect;
 		Ref<Material> _p_gen_material;
 		Ref<Material> _p_filter_material;
 		Ref<Mesh> _p_cube_mesh;
@@ -106,7 +105,9 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 	private:
-		Vector<Ref<RenderTexture>> _gbuffers;
+		//Vector<Ref<RenderTexture>> _gbuffers;
+		//Vector<RenderTexture*> _gbuffers_cache;
+		Vector<RTHandle> _gbuffers;
 		Ref<Material> _p_lighting_material;
 		Ref<Mesh> _p_quad_mesh;
 		Array<Rect, 3> _rects;

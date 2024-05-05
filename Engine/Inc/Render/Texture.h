@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <map>
 #include "GlobalMarco.h"
+#include "FrameResource.h"
 #include "Framework/Common/LogMgr.h"
 #include "Framework/Math/ALMath.hpp"
 #include "AlgFormat.h"
@@ -91,30 +92,49 @@ namespace Ailu
 		}
 	}
 
-	enum class ETextureType
+	struct TextureDesc
 	{
-		kTexture2D = 0,kTextureCubeMap,kRenderTexture
+		u16 _width, _height;
+		u8 _mipmap;
+		EALGFormat::EALGFormat _res_format;
+		EALGFormat::EALGFormat _srv_format;
+		EALGFormat::EALGFormat _uav_format;
+		bool _read_only;
+		TextureDesc() : _width(0), _height(0), _mipmap(1), _res_format(EALGFormat::EALGFormat::kALGFormatUnknown), _srv_format(EALGFormat::EALGFormat::kALGFormatUnknown), _uav_format(EALGFormat::EALGFormat::kALGFormatUnknown), _read_only(false) {}
+		TextureDesc(u16 w, u16 h, u8 mipmap, EALGFormat::EALGFormat res_format, EALGFormat::EALGFormat srv_format, EALGFormat::EALGFormat uav_format, bool read_only) : _width(w), _height(h), _mipmap(mipmap),
+			_res_format(res_format), _srv_format(srv_format), _uav_format(uav_format), _read_only(read_only)
+		{
+		}
 	};
+
 
 	DECLARE_ENUM(ETextureDimension,kUnknown, kTex2D, kTex3D, kCube, kTex2DArray,kCubeArray)
 	DECLARE_ENUM(EFilterMode,kPoint,kBilinear,kTrilinear)
 	DECLARE_ENUM(EWrapMode, kClamp, kRepeat, kMirror)
-	DECLARE_ENUM(ETextureFormat,kRGBA32,kRGBAFloat)
-	static EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format)
+	DECLARE_ENUM(ETextureFormat,kRGBA32,kRGBAFloat,kRGBFloat,kRGBAHalf)
+	DECLARE_ENUM(ECubemapFace, kUnknown, kPositiveX, kNegativeX, kPositiveY, kNegativeY, kPositiveZ, kNegativeZ)
+	static EALGFormat::EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format)
 	{
 		switch (format)
 		{
 		case ETextureFormat::kRGBA32:
-			return EALGFormat::kALGFormatR8G8B8A8_UNORM;
+			return EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
 		case ETextureFormat::kRGBAFloat:
-			return EALGFormat::kALGFormatR32G32B32A32_FLOAT;
+			return EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT;
+		case ETextureFormat::kRGBFloat:
+			return EALGFormat::EALGFormat::kALGFormatR32G32B32_FLOAT;
+		case ETextureFormat::kRGBAHalf:
+			return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
 		default:
 			break;
 		}
-		return EALGFormat::kALGFormatUnknown;
+		return EALGFormat::EALGFormat::kALGFormatUnknown;
 	}
+
 	//------------
-	class TextureNew
+	class CommandBuffer;
+	using TextureHandle = size_t;
+	class Texture : public FrameResource,public IAssetable
 	{
 		DECLARE_PROTECTED_PROPERTY(mipmap_count,MipmapLevel,u16)
 		DECLARE_PROTECTED_PROPERTY(is_readble,Readble,bool)
@@ -124,135 +144,83 @@ namespace Ailu
 		DECLARE_PROTECTED_PROPERTY(wrap_mode, WrapMode, EWrapMode::EWrapMode)
 		DECLARE_PROTECTED_PROPERTY_RO(width, Width, u16)
 		DECLARE_PROTECTED_PROPERTY_RO(height, Height, u16)
-		DECLARE_PROTECTED_PROPERTY_RO(pixel_format, PixelFormat, EALGFormat)
+		DECLARE_PROTECTED_PROPERTY_RO(pixel_format, PixelFormat, EALGFormat::EALGFormat)
 	public:
-		TextureNew();
-		TextureNew(u16 width, u16 height);
-		virtual ~TextureNew();
-		virtual InPtr GetNativeTexturePtr();
+		static u16 MaxMipmapCount(u16 w, u16 h);
+		Texture();
+		Texture(u16 width, u16 height);
+		virtual ~Texture();
+		virtual Ptr GetNativeTexturePtr();
+		virtual TextureHandle GetNativeTextureHandle() { return 0; }
+		virtual TextureHandle GetView(u16 mimmap,bool random_access = false,ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) { return 0; };
+		virtual void Bind(CommandBuffer* cmd, u8 slot) {};
+		const Guid& GetGuid() const final;
+		void AttachToAsset(Asset* owner) final;
+		Asset* GetAsset() { return _p_asset; };
+	protected:
+		// mipmap = 0 means the raw texture
+		virtual bool IsValidMipmap(u16 mipmap) const { return false; };
+		bool IsValidSize(u16 width,u16 height,u16 mipmap) const;
+		std::tuple<u16,u16> CurMipmapSize(u16 mipmap) const;
+		Asset* _p_asset;
+	protected:
+		u16 _pixel_size;
+		bool _is_random_access;
 	};
 
-	class Texture2DNew : public TextureNew
+	class Texture2D : public Texture
 	{
 	public:
-		Texture2DNew(u16 width, u16 height,ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32,u16 mipmap_count = 1,bool linear = false);
-		Texture2DNew(u16 width, u16 height, bool mipmap_chain = true,ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32,bool linear = false);
-		virtual ~Texture2DNew();
-		virtual void Apply();
+		static u64 TotalGPUMemerySize() { return s_gpu_memory_size; }
+		static Ref<Texture2D> Create(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+		Texture2D(u16 width, u16 height, bool mipmap_chain = true,ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32,bool linear = false, bool random_access = false);
+		virtual ~Texture2D();
+		virtual void Apply() {};
+		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
+		virtual void CreateView() {};
+		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		Color32 GetPixel32(u16 x, u16 y);
 		Color GetPixel(u16 x, u16 y);
 		Color GetPixelBilinear(float u, float v);
-		InPtr GetPixelData(u16 mipmap);
+		Ptr GetPixelData(u16 mipmap);
 		void SetPixel(u16 x, u16 y, Color color,u16 mipmap);
 		void SetPixel32(u16 x, u16 y, Color32 color,u16 mipmap);
-		template<typename T>
-		void SetPixelData(T* data, u16 mipmap,u64 offset);
+		void SetPixelData(u8* data, u16 mipmap, u64 offset = 0u);
 	protected:
+		bool IsValidMipmap(u16 mipmap) const final { return mipmap < _pixel_data.size(); };
+	protected:
+		inline static u64 s_gpu_memory_size = 0u;
 		ETextureFormat::ETextureFormat _format;
 		Vector<u8*> _pixel_data;
 	};
-	template<typename T>
-	inline void Texture2DNew::SetPixelData(T* data, u16 mipmap, u64 offset)
+
+	class Texture2DArray
 	{
 
-	}
-
-
-	class CommandBuffer;
-	class Texture
-	{
-	public:
-		virtual ~Texture() = default;
-		virtual u8* GetPixelData() = 0;
-		virtual void* GetGPUNativePtr(u16 index = 0u) = 0;
-		virtual void* GetNativeCPUHandle() = 0;
-		virtual const uint16_t& GetWidth() const = 0;
-		virtual const uint16_t& GetHeight() const = 0;
-		virtual void Release() = 0;
-		virtual void BuildRHIResource() = 0;
-		virtual void Bind(CommandBuffer* cmd,u8 slot) = 0;
-		virtual void Name(const std::string& name) = 0;
-		virtual const std::string& Name() const = 0;
-		virtual const ETextureType GetTextureType() const = 0;
-		virtual const u8& GetMipmap() const = 0;
-		virtual EALGFormat GetFormat() const = 0;
 	};
 
-	struct TextureDesc
+	class CubeMap : public Texture
 	{
-		u16 _width, _height;
-		u8 _mipmap;
-		EALGFormat _res_format;
-		EALGFormat _srv_format;
-		EALGFormat _uav_format;
-		bool _read_only;
-		TextureDesc() : _width(0),_height(0),_mipmap(1),_res_format(EALGFormat::kALGFormatUnknown),_srv_format(EALGFormat::kALGFormatUnknown),_uav_format(EALGFormat::kALGFormatUnknown), _read_only(false){}
-		TextureDesc(u16 w,u16 h,u8 mipmap,EALGFormat res_format,EALGFormat srv_format,EALGFormat uav_format,bool read_only) : _width(w), _height(h), _mipmap(mipmap), 
-		_res_format(res_format), _srv_format(srv_format), _uav_format(uav_format), _read_only(read_only) 
-		{
-		}
-	};
-
-	class Texture2D : public Texture, public IAssetable
-	{
-		DECLARE_PROTECTED_PROPERTY(path,AssetPath,String)
-		DECLARE_PROTECTED_PROPERTY(channel,Channel,u8)
 	public:
-		static Ref<Texture2D> Create(const uint16_t& width, const uint16_t& height, EALGFormat res_format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool read_only = true);
-		static Ref<Texture2D> Create(const TextureDesc& desc);
-		virtual void FillData(u8* data);
-		virtual void FillData(Vector<u8*> datas);
-		virtual void BuildRHIResource() override {};
+		static Ref<CubeMap> Create(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+		CubeMap(u16 width,bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+		virtual ~CubeMap();
+		virtual void Apply() {};
+		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
+		virtual void CreateView() {};
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
-		const uint16_t& GetWidth() const final { return _width; };
-		const uint16_t& GetHeight() const final { return _height; };
-		u8* GetPixelData() override;
-		void* GetNativeCPUHandle() override;
-		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
-		const ETextureType GetTextureType() const final;
-		const u8& GetMipmap() const final { return _mipmap_count; };
-		EALGFormat GetFormat() const { return _format; };
-
-		const Guid& GetGuid() const final;
-		void AttachToAsset(Asset* owner) final;
-	public:
-		void Name(const std::string& name) override;
-		const std::string& Name() const override;
+		Color32 GetPixel32(ECubemapFace::ECubemapFace face,u16 x, u16 y);
+		Color GetPixel(ECubemapFace::ECubemapFace face,u16 x, u16 y);
+		Ptr GetPixelData(ECubemapFace::ECubemapFace face,u16 mipmap);
+		void SetPixel(ECubemapFace::ECubemapFace face,u16 x, u16 y, Color color, u16 mipmap);
+		void SetPixel32(ECubemapFace::ECubemapFace face,u16 x, u16 y, Color32 color, u16 mipmap);
+		void SetPixelData(ECubemapFace::ECubemapFace face,u8* data, u16 mipmap, u64 offset = 0u);
 	protected:
-		std::string _name;
-		Vector<u8*> _p_datas;
-		uint16_t _width,_height;
-		EALGFormat _format;
-		u8 _mipmap_count = 1u;
-		bool _read_only;
-		Asset* _p_asset_owned_this;
-	};
-
-	class TextureCubeMap : public Texture
-	{
-		DECLARE_PROTECTED_PROPERTY(path, AssetPath, Vector<String>)
-	public:
-		static Ref<TextureCubeMap> Create(const uint16_t& width, const uint16_t& height, EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM);
-		virtual void FillData(Vector<u8*>& data);
-		virtual void BuildRHIResource() override {};
-		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
-		const uint16_t& GetWidth() const final { return _width; };
-		const uint16_t& GetHeight() const final { return _height; };
-		u8* GetPixelData() override;
-		void* GetNativeCPUHandle() override;
-		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
-		const ETextureType GetTextureType() const final;
-		void Name(const std::string& name) override { _name = name; };
-		const std::string& Name() const override { { return _name; } };
-		const u8& GetMipmap() const final { return _mipmap_count; };
-		EALGFormat GetFormat() const { return _format; };
+		bool IsValidMipmap(u16 mipmap) const final { return mipmap < _pixel_data.size() / 2u; };
 	protected:
-		std::string _name;
-		Vector<u8*> _p_datas;
-		uint16_t _width, _height;
-		u8 _channel;
-		EALGFormat _format;
-		u8 _mipmap_count;
+		ETextureFormat::ETextureFormat _format;
+		//raw 6 face,mip1 6 face...
+		Vector<u8*> _pixel_data;
 	};
 
 	enum class ETextureResState : u8
@@ -260,123 +228,228 @@ namespace Ailu
 		kDefault, kColorTagret, kShaderResource,kDepthTarget
 	};
 
-	struct RTHandle
+	DECLARE_ENUM(ERenderTargetFormat,kUnknown,kDefault,kDefaultHDR,kDepth,kShadowMap,kRGFloat,kRGHalf)
+
+	static EALGFormat::EALGFormat ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::ERenderTargetFormat format)
 	{
-	public:
-		u32 _id;
-		String _name;
-		RTHandle(const String& name) : _name(name)
+		switch (format)
 		{
-			_id = s_global_rt_id++;
-		};
-		RTHandle() : RTHandle("TempRT_" + s_global_rt_id) {};
-	private:
-		inline static u32 s_global_rt_id = 0u;
+		case ERenderTargetFormat::kUnknown:
+			return EALGFormat::EALGFormat::kALGFormatUnknown;
+		case ERenderTargetFormat::kDefault:
+			return EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
+		case ERenderTargetFormat::kDefaultHDR:
+			return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+		case ERenderTargetFormat::kDepth:
+		case ERenderTargetFormat::kShadowMap:
+			return EALGFormat::EALGFormat::kALGFormatD24S8_UINT;
+		case ERenderTargetFormat::kRGFloat:
+			return EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT;
+		case ERenderTargetFormat::kRGHalf:
+			return EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT;
+		default:
+			break;
+		}
+		return EALGFormat::EALGFormat::kALGFormatUnknown;
+	}
+
+	struct RenderTextureDesc
+	{
+		u16 _width;
+		u16 _height;
+		u16 _depth;
+		ERenderTargetFormat::ERenderTargetFormat _color_format;
+		ERenderTargetFormat::ERenderTargetFormat _depth_format;
+		u16 _mipmap_count;
+		bool _random_access;
+		ETextureDimension::ETextureDimension _dimension;
+		u16 _slice_num;
+		RenderTextureDesc() : _width(0), _height(0), _depth(0), _color_format(ERenderTargetFormat::kUnknown), _depth_format(ERenderTargetFormat::kUnknown), _mipmap_count(0), _random_access(false)
+			,_dimension(ETextureDimension::kUnknown),_slice_num(0)
+		{}
+		RenderTextureDesc(u16 w,u16 h,ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefaultHDR) 
+		: _width(w), _height(h), _depth(0),_color_format(format), _depth_format(ERenderTargetFormat::kUnknown), _mipmap_count(0), _random_access(false)
+			, _dimension(ETextureDimension::kTex2D), _slice_num(0)
+		{
+			if (format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap)
+			{
+				_color_format = ERenderTargetFormat::kUnknown;
+				_depth_format = format;
+				_depth = 24;
+			}
+		}
 	};
 
+	class RenderTexture;
+	struct RTHandle
+	{
+		u32 _id;
+		RTHandle() : _id(0) {}
+		RTHandle(u32 id) : _id(id){}
+	};
+	using RTHash = ALHash::Hash<64>;
 	class RenderTexture : public Texture
 	{
+		DECLARE_PROTECTED_PROPERTY(depth,Depth,u16)
 	public:
-		static Ref<RenderTexture> Create(const uint16_t& width, const uint16_t& height, String name,EALGFormat format = EALGFormat::kALGFormatR8G8B8A8_UNORM,bool is_cubemap = false);
+		inline static RenderTexture* s_current_rt = nullptr;
+		static u64 TotalGPUMemerySize() { return s_gpu_memory_size; }
+		static RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
+		static void ReleaseTempRT(RTHandle handle);
+		RenderTexture(const RenderTextureDesc& desc);
+		~RenderTexture();
+		//virtual TextureHandle GetView(ECubemapFace::ECubemapFace face, u16 mimmap) { return 0; };
+		virtual void CreateView() {};
+		//当mipmap为0时，访问srv时，返回原图分辨率，也就是mip0，当访问uav时，实际访问的是mipmap1的uav（cubemap）
+		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
+		static Scope<RenderTexture> Create(u16 width, u16 height, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
+		static Scope<RenderTexture> Create(u16 width,String name = "",ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override;
-		void BuildRHIResource() final {};
-		const uint16_t& GetWidth() const final { return _width; };
-		const uint16_t& GetHeight() const final { return _height; };
 		//return rtv handle
-		void* GetNativeCPUHandle() override;
-		//return rtv handle
-		virtual void* GetNativeCPUHandle(u16 index);
-		void* GetGPUNativePtr(u16 index = 0u) override { return nullptr; };
-		const ETextureType GetTextureType() const final;
-		virtual void Transition(CommandBuffer* cmd,ETextureResState state);
-		const RTHandle& GetRTHandle() const { return _rt_handle; }
-		void Name(const std::string& name) override { _name = name; };
-		const std::string& Name() const override { return _name; };
-		const u8& GetMipmap() const final { return _mipmap_count; };
-		EALGFormat GetFormat() const { return _format; };
-		ETextureResState GetState() const { return _state; }
-		bool IsCubemap() const { return _is_cubemap; }
-		bool operator==(const RenderTexture& other) const { return _rt_handle._id == other._rt_handle._id; }
-		inline static Vector<Ref<RenderTexture>> s_all_render_texture;
+		virtual TextureHandle ColorRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) { return 0; };
+		virtual TextureHandle DepthRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) { return 0; };
+		virtual TextureHandle ColorTexture(u16 index = 0, CommandBuffer* cmd = nullptr) { return 0; };
+		virtual TextureHandle DepthTexture(u16 index = 0, CommandBuffer* cmd = nullptr) { return 0; };
+		virtual void GenerateMipmap(CommandBuffer* cmd) {};
+	private:
+
 	protected:
-		std::string _name;
-		RTHandle _rt_handle;
-		ETextureResState _state;
-		uint16_t _width, _height;
-		bool _is_cubemap;
-		u8 _channel;
-		EALGFormat _format;
-		u8 _mipmap_count;
+		static bool CanAsShaderResource(RenderTexture* rt)
+		{
+			return s_current_rt ? rt != s_current_rt: true;
+		}
+	protected:
+		inline static u64 s_gpu_memory_size = 0u;
+		u16 _slice_num;
 	};
+
+	class RenderTexturePool
+	{
+		struct RTInfo
+		{
+			bool _is_available;
+			u32 _id;
+			u64 _last_access_frame_count;
+			Scope<RenderTexture> _rt;
+			u64 _fence_value = 0;
+		};
+	public:
+		using RTPool = std::unordered_multimap<RTHash, RTInfo, RTHash::HashFunc>;
+		u32 Add(RTHash hash, Scope<RenderTexture> rt);
+		std::optional<u32> GetByIDHash(RTHash hash);
+		void ReleaseRT(RTHandle handle);
+		void TryRelease();
+		RenderTexture* Get(RTHandle handle)
+		{
+			if (_lut_pool.contains(handle._id))
+				return _lut_pool[handle._id]->second._rt.get();
+			else
+				return nullptr;
+		}
+		u32 Size() const { return static_cast<u32>(_pool.size()); }
+		RTPool::iterator begin() { return _pool.begin(); }
+		RTPool::iterator end() { return _pool.end(); }
+	private:
+		// 0->64 0~12=wdth,13~24=height,25~30= format
+		RTPool _pool;
+		Map<u32, RTPool::iterator> _lut_pool;
+	};
+	extern RenderTexturePool* g_pRenderTexturePool;
 
 	class TexturePool
 	{
-	public:
-		//name with ext。图片导入时生成一个可以直接使用的纹理，当导入一个同名纹理时，第二个纹理的gpu资源已经创建并且提交到cmd，
-		// 但是由于存在同名，第二个纹理不会在此处被添加，那么指针就会被释放，执行cmd时便会报错！运行时一般不会有这个错误。
-		// 初始化时，将图片的加载放在最前面
-		static Ref<Texture2D> Add(const String& asset_path, Ref<Texture2D> res)
+	public: 
+		TexturePool()
 		{
-			if (res != nullptr)
+			u8* default_data = new u8[4 * 4 * 4];
+			memset(default_data, 255, 64);
+			auto default_white = Texture2D::Create(4, 4, false);
+			default_white->SetPixelData(default_data, 0);
+			default_white->Name("default_white");
+			default_white->Apply();
+			s_p_default_white = Add(L"Runtime/default_white", default_white).get();
+
+			memset(default_data, 0, 64);
+			for (int i = 3; i < 64; i += 4)
+				default_data[i] = 255;
+			auto default_black = Texture2D::Create(4, 4, false);
+			default_black->SetPixelData(default_data, 0);
+			default_white->Name("default_black");
+			default_black->Apply();
+			s_p_default_black = Add(L"Runtime/default_black", default_black).get();
+
+			memset(default_data, 128, 64);
+			for (int i = 3; i < 64; i += 4)
+				default_data[i] = 255;
+			auto default_gray = Texture2D::Create(4, 4, false);
+			default_gray->SetPixelData(default_data, 0);
+			default_white->Name("default_gray");
+			default_gray->Apply();
+			s_p_default_gray = Add(L"Runtime/default_gray", default_gray).get();
+
+			memset(default_data, 255, 64);
+			for (int i = 0; i < 64; i += 4)
 			{
-				if (s_res_pool.contains(asset_path)) 
-					return std::dynamic_pointer_cast<Texture2D>(s_res_pool[asset_path]);
-				s_res_pool.insert(std::make_pair(asset_path, res));
-				++s_res_num;
-				s_is_dirty = true;
-				return res;
+				default_data[i] = 128;
+				default_data[i+1] = 128;
 			}
-			else
-			{
-				g_pLogMgr->LogWarningFormat("Add texture with name {} to pool failed! texture is null!", asset_path);
-			}
+			auto default_normal = Texture2D::Create(4, 4, false);
+			default_normal->SetPixelData(default_data, 0);
+			default_white->Name("default_normal");
+			default_normal->Apply();
+			s_p_default_normal = Add(L"Runtime/default_normal", default_normal).get();
+			DESTORY_PTRARR(default_data);
+		};
+		Ref<Texture> Add(const WString& name_id, Ref<Texture> tex,bool overwrite = false)
+		{
+			//if (overwrite)
+			//{		
+			//	auto it = _pool.emplace(std::make_pair(name_id, tex)).first;
+			//	_lut_pool[tex->ID()] = it;
+			//}
+			//else
+			//	_pool[name_id] = tex;
+			_pool[name_id] = tex;
+			_lut_pool[tex->ID()] = _pool.find(name_id);
+			return _pool[name_id];
+		}
+		Ref<Texture> Get(const WString& name_id)
+		{
+			auto it = _pool.find(name_id);
+			if (it != _pool.end())
+				return it->second;
+			return nullptr;
+		}
+		Ref<Texture> Get(u64 id)
+		{
+			if (_lut_pool.contains(id))
+				return _lut_pool[id]->second;
 			return nullptr;
 		}
 
-		static Ref<TextureCubeMap> Add(const std::string& name, Ref<TextureCubeMap> res)
+		bool Contain(const WString& name_id)
 		{
-			if (res)
-			{
-				if (s_res_pool.contains(name)) return std::dynamic_pointer_cast<TextureCubeMap>(s_res_pool[name]);
-				s_res_pool.insert(std::make_pair(name, res));
-				res->Name(PathUtils::GetFileName(name));
-				++s_res_num;
-				s_is_dirty = true;
-				return res;
-			}
-			else
-			{
-				g_pLogMgr->LogWarningFormat("Add texture with name {} to pool failed! texture is null!", name);
-			}
-			return nullptr;
+			return _pool.contains(name_id);
 		}
 
-		static Ref<Texture> Get(const std::string& name);
-		static Ref<Texture2D> GetTexture2D(const std::string& name);
-		static Ref<TextureCubeMap> GetCubemap(const std::string& name);
-
-		static bool Contain(const String& asset_path)
+		void Destory(const WString& name_id)
 		{
-			return s_res_pool.contains(asset_path);
+			_pool.erase(name_id);
 		}
+		Map<WString, Ref<Texture>>::iterator begin() { return _pool.begin(); }
+		Map<WString, Ref<Texture>>::iterator end() { return _pool.end(); }
 
-		static Ref<Texture2D> GetDefaultWhite()
-		{
-			auto it = s_res_pool.find("Runtime/default_white");
-			if (it != s_res_pool.end()) return std::dynamic_pointer_cast<Texture2D>(it->second);
-			else return nullptr;
-		}
-
-		static u32 GetResNum()
-		{
-			return s_res_num;
-		}
-		static std::map<std::string, Ref<Texture>>& GetAllResourceMap() { return s_res_pool; };
-	protected:
-		inline static std::map<std::string, Ref<Texture>> s_res_pool{};
-		inline static bool s_is_dirty = true;
-		inline static u32 s_res_num = 0u;
+		u64 Size() const { return _pool.size(); }
+		static inline Texture* s_p_default_white; 
+		static inline Texture* s_p_default_black;
+		static inline Texture* s_p_default_gray;
+		static inline Texture* s_p_default_normal;
+	private:
+		using TexturePoolContainer = Map<WString, Ref<Texture>>;
+		TexturePoolContainer _pool;
+		std::unordered_map<u64, TexturePoolContainer::iterator> _lut_pool;
 	};
+	extern TexturePool* g_pTexturePool;
 }
 
 #endif // !TEXTURE_H__

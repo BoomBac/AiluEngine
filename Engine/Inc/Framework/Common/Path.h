@@ -2,6 +2,7 @@
 #ifndef __PATH_H__
 #define __PATH_H__
 #include "GlobalMarco.h"
+#include <filesystem>
 
 namespace Ailu
 {
@@ -163,6 +164,44 @@ namespace Ailu
 			else
 			{
 				return std::string(filePath.data(), filePath.length());
+			}
+		}
+
+		static WString ToPlatformPath(const WString& sys_path)
+		{
+#ifdef PLATFORM_WINDOWS
+			auto convertedPath = sys_path;
+			// 使用循环替换所有的斜杠
+			for (size_t i = 0; i < convertedPath.length(); ++i) {
+				if (convertedPath[i] == L'/') {
+					convertedPath[i] = L'\\';
+				}
+			}
+			return convertedPath;
+#else
+			return sys_path;
+#endif // PLATFORM_WINDOWS
+			return sys_path;
+		}
+
+		static WString GetFileName(const std::wstring_view filePath, bool include_ext = false)
+		{
+			size_t found = filePath.find_last_of(L"/\\");
+			size_t dot_pos = filePath.find_last_of(L".");
+
+			if (found != std::string::npos && dot_pos != std::string::npos)
+			{
+				if (include_ext)
+					return WString(filePath.substr(found + 1).data());
+				else
+				{
+					size_t name_length = dot_pos - (found + 1);
+					return WString(filePath.substr(found + 1, name_length).data(), name_length);
+				}
+			}
+			else
+			{
+				return WString(filePath.data(), filePath.length());
 			}
 		}
 

@@ -1,7 +1,5 @@
 #include "Ailu.h"
 
-#include "Widgets/WorldOutline.h"
-
 class EditorApp : public Ailu::Application
 {
 public:
@@ -20,8 +18,17 @@ public:
 //	WorldOutline* _p_worldoutile;
 };
 
+using namespace Ailu;
+
+static Ailu::ApplicationDesc LoadApplicationConfig(WString sys_path)
+{
+	LOG_INFO(sys_path);
+	return ApplicationDesc();
+}
+
 int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR cmdline, _In_ int cmdshow)
 {
+	auto desc = LoadApplicationConfig(Ailu::Application::GetWorkingPath());
 	EditorApp* app = new EditorApp();
 	//Ailu::Application* app = new Ailu::Application();
 	app->Initialize();

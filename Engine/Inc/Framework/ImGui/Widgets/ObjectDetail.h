@@ -12,7 +12,7 @@ namespace Ailu
 		ObjectDetail(SceneActor** pp_selected_actor);
 		~ObjectDetail();
 		void Open(const i32& handle) final;
-		void Close() final;
+		void Close(i32 handle) final;
 	private:
 		void ShowImpl() final;
 	private:

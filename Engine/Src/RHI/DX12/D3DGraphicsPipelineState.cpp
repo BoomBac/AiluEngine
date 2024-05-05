@@ -41,7 +41,7 @@ namespace Ailu
 			_d3d_pso_desc.SampleMask = UINT_MAX;
 			_d3d_pso_desc.PrimitiveTopologyType = D3DConvertUtils::ConvertToDXTopologyType(_state_desc._topology);
 
-			_d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::kALGFormatUnknown? 0 : _state_desc._rt_state._color_rt_num;
+			_d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::EALGFormat::kALGFormatUnknown? 0 : _state_desc._rt_state._color_rt_num;
 			if (_state_desc._depth_stencil_state._b_depth_write || _state_desc._depth_stencil_state._depth_test_func != ECompareFunc::kAlways)
 				_d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._rt_state._depth_rt);
 			for (u16 i = 0; i < _d3d_pso_desc.NumRenderTargets; i++)
@@ -82,7 +82,7 @@ namespace Ailu
 	{
 		if (_p_bind_res_desc_infos == nullptr)
 		{
-			AL_ASSERT(true, "SubmitBindResource: bind shader missing!");
+			AL_ASSERT_MSG(true, "SubmitBindResource: bind shader missing!");
 			return;
 		}
 		auto it = _p_bind_res_desc_infos->find(name);
@@ -108,6 +108,8 @@ namespace Ailu
 
 	void D3DGraphicsPipelineState::BindResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot)
 	{
+		if (res == nullptr)
+			return;
 		u8 bind_slot = slot == 255 ? _per_frame_cbuf_bind_slot : slot;
 		if (!IsValidPipelineResource(res_type, bind_slot))
 		{

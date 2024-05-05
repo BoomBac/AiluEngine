@@ -130,9 +130,9 @@ namespace Ailu
 			std::istringstream iss(text);
 			//std::vector<std::string> lines;
 			std::string line;
-			while (std::getline(iss, line)) 
+			while (std::getline(iss, line))
 			{
-				if(line.find("error") != line.npos)
+				if (line.find("error") != line.npos)
 					LOG_WARNING("{}", line)
 			}
 			pErrorBlob->Release();
@@ -171,7 +171,7 @@ namespace Ailu
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneIndex)) return EShaderDateType::kuInt4;
 		else
 		{
-			AL_ASSERT(true, "Unsupported DXGI_FORMAT to ShaderDataType!")
+			AL_ASSERT_MSG(true, "Unsupported DXGI_FORMAT to ShaderDataType!");
 				//LOG_ERROR("Unsupported DXGI_FORMAT to ShaderDataType!");
 				return EShaderDateType::kBool;
 		}
@@ -185,7 +185,7 @@ namespace Ailu
 		case DXGI_FORMAT_R32G32B32A32_FLOAT: return EShaderDateType::kFloat4;
 		case DXGI_FORMAT_R32G32_FLOAT: return EShaderDateType::kFloat2;
 		}
-		AL_ASSERT(true, "Unsupported DXGI_FORMAT to ShaderDataType!")
+		AL_ASSERT_MSG(true, "Unsupported DXGI_FORMAT to ShaderDataType!");
 			//LOG_ERROR("Unsupported DXGI_FORMAT to ShaderDataType!");
 			return EShaderDateType::kBool;
 	}
@@ -420,7 +420,7 @@ namespace Ailu
 		{
 			if (desc.InputParameters > 10)
 			{
-				AL_ASSERT(true, "LayoutDesc count must less than 10");
+				AL_ASSERT_MSG(true, "LayoutDesc count must less than 10");
 				return;
 			}
 			Vector<VertexBufferLayoutDesc> vb_input_desc{};
@@ -563,7 +563,7 @@ namespace Ailu
 		Compile();
 	}
 
-	void D3DComputeShader::Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+	void D3DComputeShader::Bind(CommandBuffer* cmd, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
 	{
 		if (!_is_valid)
 		{
@@ -579,11 +579,50 @@ namespace Ailu
 			{
 				if (bind_info._res_type == EBindResDescType::kTexture2D)
 				{
-					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetSRVGPUHandle());
+					auto tex = static_cast<Texture*>(bind_info._p_res);
+					auto& [face, mipmap] = _texture_addi_bind_info[bind_info._bind_slot];
+					D3D12_GPU_DESCRIPTOR_HANDLE handle{};
+					handle.ptr = tex->GetView(mipmap,false,face);
+					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, handle);
 				}
 				else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
 				{
-					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetUAVGPUHandle());
+					auto tex = static_cast<Texture*>(bind_info._p_res);
+					auto& [face, mipmap] = _texture_addi_bind_info[bind_info._bind_slot];
+					D3D12_GPU_DESCRIPTOR_HANDLE handle{};
+					handle.ptr = tex->GetView(mipmap,true,face);
+					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, handle);
+				}
+				else if (bind_info._res_type == EBindResDescType::kConstBuffer)
+				{
+					reinterpret_cast<ConstantBuffer*>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot);
+				}
+			}
+		}
+		d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
+	}
+
+	void D3DComputeShader::BindOnly(CommandBuffer* cmd, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z, std::function<void()> res_binder)
+	{
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		_pso_sys.Bind(d3dcmd);
+		res_binder();
+		for (auto& info : _bind_res_infos)
+		{
+			auto& bind_info = info.second;
+			if (bind_info._p_res != nullptr)
+			{
+				if (bind_info._res_type == EBindResDescType::kTexture2D)
+				{
+					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetMainGPUSRVHandle());
+				}
+				else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
+				{
+					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, static_cast<D3DTexture2D*>(bind_info._p_res)->GetMainGPUSRVHandle());
+				}
+				else if (bind_info._res_type == EBindResDescType::kConstBuffer)
+				{
+					reinterpret_cast<ConstantBuffer*>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot);
 				}
 			}
 		}
@@ -617,6 +656,31 @@ namespace Ailu
 			else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED)
 			{
 				_temp_bind_res_infos.insert(std::make_pair(bind_desc.Name, ShaderBindResourceInfo{ EBindResDescType::kUAVTexture2D,static_cast<uint16_t>(bind_desc.BindPoint),0u,bind_desc.Name }));
+			}
+		}
+		for (u32 i = 0u; i < desc.ConstantBuffers; i++)
+		{
+			auto cbuf = p_reflect->GetConstantBufferByIndex(i);
+			D3D12_SHADER_BUFFER_DESC desc{};
+			cbuf->GetDesc(&desc);
+			for (u32 j = 0u; j < desc.Variables; j++)
+			{
+				auto variable = cbuf->GetVariableByIndex(j);
+				D3D12_SHADER_VARIABLE_DESC vdesc{};
+				variable->GetDesc(&vdesc);
+				u16 offset = (u16)vdesc.StartOffset;
+				u16 size = (u16)vdesc.Size;
+				u32 variable_info = 0u;
+				variable_info |= offset;
+				variable_info <<= 16;
+				variable_info |= size;
+				auto value_type = EBindResDescType::kCBufferAttribute;
+				if (size == 4) value_type = (EBindResDescType)(EBindResDescType::kCBufferFloat | value_type);
+				else if (size == 16) value_type = (EBindResDescType)(EBindResDescType::kCBufferFloat4 | value_type);
+				else if (size == 64) value_type = (EBindResDescType)(EBindResDescType::kCBufferMatrix4 | value_type);
+				else {}
+				auto info = ShaderBindResourceInfo{ value_type,variable_info,0u,vdesc.Name };
+				_temp_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
 			}
 		}
 	}
@@ -683,6 +747,12 @@ namespace Ailu
 				desc._bind_slot = root_param_index;
 				++root_param_index;
 			}
+			else if (desc._res_type == EBindResDescType::kConstBuffer)
+			{
+				rootParameters[root_param_index].InitAsConstantBufferView(desc._res_slot, 0);
+				desc._bind_slot = root_param_index;
+				++root_param_index;
+			}
 		}
 		auto [sig, pso] = _pso_sys.Back();
 		static Vector<CD3DX12_STATIC_SAMPLER_DESC> samplers{
@@ -707,6 +777,47 @@ namespace Ailu
 			if (SUCCEEDED(device->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&pso))))
 			{
 				_pso_sys.Swap();
+				auto cbuffer_bind_info = _temp_bind_res_infos;
+				cbuffer_bind_info.clear();
+				u32 cbuffer_size = 0;
+				for (auto it = _temp_bind_res_infos.begin(); it != _temp_bind_res_infos.end(); it++)
+				{
+					if (it->second._res_type & EBindResDescType::kCBufferAttribute || it->second._res_type & EBindResDescType::kConstBuffer)
+					{
+						cbuffer_bind_info.insert(std::make_pair(it->first, it->second));
+						if(it->second._res_type & EBindResDescType::kCBufferAttribute)
+							cbuffer_size += ShaderBindResourceInfo::GetVariableSize(it->second);
+					}
+				}
+				AL_ASSERT_MSG(cbuffer_size > 256, "ComputeBuffer size must be less than 256");
+				cbuffer_size = ALIGN_TO_256(cbuffer_size);
+				auto cbuf_it = std::find_if(_temp_bind_res_infos.begin(), _temp_bind_res_infos.end(), [this](auto it) {
+					auto& desc = it.second;
+					return desc._res_type == EBindResDescType::kConstBuffer;
+				});
+				if(cbuf_it != _temp_bind_res_infos.end())
+				{
+					if (_p_cbuffer == nullptr)
+					{
+						_p_cbuffer.reset(ConstantBuffer::Create(cbuffer_size, true));
+					}
+					else
+					{
+						u8* data = new u8[cbuffer_size];
+						for (auto it = cbuffer_bind_info.begin(); it != cbuffer_bind_info.end(); it++)
+						{
+							auto old_variable_it = _bind_res_infos.find(it->first);
+							if(old_variable_it != _bind_res_infos.end())
+							{
+								memcpy(data + ShaderBindResourceInfo::GetVariableOffset(it->second),_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(old_variable_it->second), 
+									ShaderBindResourceInfo::GetVariableSize(it->second));
+							}
+						}
+						memcpy(_p_cbuffer->GetData(), data, cbuffer_size);
+						DESTORY_PTRARR(data);
+					}
+					cbuf_it->second._p_res = _p_cbuffer.get();
+				}
 				_bind_res_infos = std::move(_temp_bind_res_infos);
 				_is_valid = true;
 			}
@@ -718,7 +829,7 @@ namespace Ailu
 			_is_valid = false;
 			LOG_ERROR("Create compute shader {} failed when generate internal pso!", _src_file_path);
 		}
-	
+
 	}
 
 	//-------------------------------------------------------------------------------D3DComputeShader---------------------------------------------------------------------------

@@ -16,7 +16,7 @@ namespace Ailu
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT(false, "None render api used!");
+			AL_ASSERT_MSG(false, "None render api used!");
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
@@ -24,8 +24,8 @@ namespace Ailu
 			return shader;
 		}
 		}
-		AL_ASSERT(false, "Unsupported render api!")
-			return nullptr;
+		AL_ASSERT_MSG(false, "Unsupported render api!");
+		return nullptr;
 	}
 
 	Shader::Shader(const String& sys_path) : _src_file_path(sys_path), _id(_s_global_shader_id), _name(std::format("AnonymityShader_{}", _s_global_shader_id++))
@@ -37,7 +37,7 @@ namespace Ailu
 	{
 		if (index > RenderConstants::kMaxMaterialDataCount)
 		{
-			AL_ASSERT(true, "Material num more than MaxMaterialDataCount!");
+			AL_ASSERT_MSG(true, "Material num more than MaxMaterialDataCount!");
 			return;
 		}
 		GraphicsPipelineStateMgr::ConfigureVertexInputLayout(_pipeline_input_layout.Hash());
@@ -51,7 +51,7 @@ namespace Ailu
 			auto tex_it = _bind_res_infos.find(it.first);
 			if (tex_it != _bind_res_infos.end())
 			{
-				if(tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray ||tex_it->second._res_type == EBindResDescType::kTexture2D)
+				if (tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray || tex_it->second._res_type == EBindResDescType::kTexture2D)
 					GraphicsPipelineStateMgr::SubmitBindResource(it.second, tex_it->second._bind_slot);
 			}
 		}
@@ -121,7 +121,7 @@ namespace Ailu
 	void Shader::SetGlobalMatrix(const String& name, Matrix4x4f* matrix)
 	{
 		if (!s_global_matrix_bind_info.contains(name))
-			s_global_matrix_bind_info.insert(std::make_pair(name, std::make_tuple(matrix,1)));
+			s_global_matrix_bind_info.insert(std::make_pair(name, std::make_tuple(matrix, 1)));
 		else
 			s_global_matrix_bind_info[name] = std::make_tuple(matrix, 1);
 	}
@@ -337,7 +337,7 @@ namespace Ailu
 				}
 				else if (su::Equal(k, ShaderCommand::kZTest, false))
 				{
-					if (su::Equal(v, ShaderCommand::kZTestValue.kAlways,false))
+					if (su::Equal(v, ShaderCommand::kZTestValue.kAlways, false))
 					{
 						need_zbuf_count--;
 						_temp_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
@@ -448,7 +448,7 @@ namespace Ailu
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT(false, "None render api used!");
+			AL_ASSERT_MSG(false, "None render api used!");
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
@@ -458,8 +458,8 @@ namespace Ailu
 			return shader;
 		}
 		}
-		AL_ASSERT(false, "Unsupported render api!")
-			return nullptr;
+		AL_ASSERT_MSG(false, "Unsupported render api!");
+		return nullptr;
 	}
 
 	Ref<ComputeShader> ComputeShader::Get(const String& name)
@@ -486,11 +486,8 @@ namespace Ailu
 		if (texture != nullptr && it != _bind_res_infos.end())
 		{
 			it->second._p_res = texture;
+			_texture_addi_bind_info[it->second._bind_slot] = std::make_pair(ECubemapFace::kUnknown, 0);
 		}
-		//else
-		//{
-		//	LOG_WARNING("Set compute shader {} texture {} failed", _name, name);
-		//}
 	}
 
 	void ComputeShader::SetTexture(u8 bind_slot, Texture* texture)
@@ -500,8 +497,57 @@ namespace Ailu
 			auto rit = std::find_if(_bind_res_infos.begin(), _bind_res_infos.end(), [=](const auto& it) {
 				return it.second._bind_slot == bind_slot;
 				});
-			if(rit != _bind_res_infos.end())
+			if (rit != _bind_res_infos.end())
+			{
 				rit->second._p_res = texture;
+				_texture_addi_bind_info[rit->second._bind_slot] = std::make_pair(ECubemapFace::kUnknown, 0);
+			}
+		}
+	}
+
+	void ComputeShader::SetTexture(const String& name, Texture* texture, ECubemapFace::ECubemapFace face, u16 mipmap)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (texture != nullptr && it != _bind_res_infos.end())
+		{
+			it->second._p_res = texture;
+			_texture_addi_bind_info[it->second._bind_slot] = std::make_pair(face, mipmap);
+		}
+	}
+
+	void ComputeShader::SetFloat(const String& name, f32 value)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (it != _bind_res_infos.end())
+		{
+			memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+		}
+	}
+
+	void ComputeShader::SetBool(const String& name, bool value)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (it != _bind_res_infos.end())
+		{
+			memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+		}
+	}
+
+	void ComputeShader::SetInt(const String& name, i32 value)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (it != _bind_res_infos.end())
+		{
+			memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+		}
+	}
+
+	void ComputeShader::SetVector(const String& name, Vector4f vector)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (it != _bind_res_infos.end())
+		{
+			memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector, sizeof(Vector4f));
 		}
 	}
 

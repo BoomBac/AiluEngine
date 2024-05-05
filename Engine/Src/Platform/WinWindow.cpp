@@ -29,10 +29,6 @@ namespace Ailu
 		while (::ShowCursor(TRUE) < 0); // 显示鼠标指针，直到它可见
 	}
 
-	static Window* Create(const WindowProps& props)
-	{
-		return new WinWindow(props);
-	}
 	WinWindow::WinWindow(const WindowProps& prop)
 	{
 		Init(prop);
@@ -53,9 +49,9 @@ namespace Ailu
 				return true;
 			};
 		auto hinstance = GetModuleHandle(NULL);
-		LOG_INFO(L"Create window {}, ({},{})", prop.Title, prop.Width, prop.Height)
-			// Initialize the window class.
-			WNDCLASSEX windowClass = { 0 };
+		LOG_INFO(L"Create window {}, ({},{})", prop.Title, prop.Width, prop.Height);
+		// Initialize the window class.
+		WNDCLASSEX windowClass = { 0 };
 		windowClass.cbSize = sizeof(WNDCLASSEX);
 		windowClass.style = CS_HREDRAW | CS_VREDRAW;
 		windowClass.lpfnWndProc = WindowProc;
@@ -251,6 +247,7 @@ namespace Ailu
 				u32 w = static_cast<u32>(lParam & 0XFFFF), h = static_cast<u32>(lParam >> 16);
 				_data.Width = w;
 				_data.Height = h;
+				SetWindowText(_hwnd,std::format(L"{} {}x{}", _data.Title,_data.Width,_data.Height).c_str());
 				WindowResizeEvent e(w, h);
 				_data.Handler(e);
 			}

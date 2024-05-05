@@ -14,8 +14,12 @@
 #include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
 
+#include "Framework/ImGui/Widgets/OutputLog.h"
+
 namespace Ailu
 {
+#define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
+
 	TimeMgr* g_pTimeMgr = new TimeMgr();
 	SceneMgr* g_pSceneMgr = new SceneMgr();
 	ResourceMgr* g_pResourceMgr = new ResourceMgr();
@@ -23,13 +27,33 @@ namespace Ailu
 	Renderer* g_pRenderer = new Renderer();
 	Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
 
-#define BIND_EVENT_HANDLER(f) std::bind(&Application::f,this,std::placeholders::_1)
+	WString Application::GetWorkingPath()
+	{
+#ifdef PLATFORM_WINDOWS
+		TCHAR path[MAX_PATH];
+		GetModuleFileName(NULL, path, MAX_PATH);
+		return path;
+#else
+		AL_ASSERT(PLATFORM_WINDOWS != 1)
+#endif // WINDOWS
+	}
+
 	int Application::Initialize()
 	{
-		AL_ASSERT(sp_instance, "Application already init!")
-			sp_instance = this;
+		ApplicationDesc desc;
+		desc._window_width = 1600;
+		desc._window_height = 900;
+		desc._gameview_width = 1600;
+		desc._gameview_height = 900;
+		return Initialize(desc);
+	}
+	int Application::Initialize(ApplicationDesc desc)
+	{
+		AL_ASSERT_MSG(sp_instance, "Application already init!");
+		sp_instance = this;
 		g_pLogMgr->Initialize();
 		g_pLogMgr->AddAppender(new FileAppender());
+		g_pLogMgr->AddAppender(new ImGuiLogAppender());
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		g_pTimeMgr->Initialize();
@@ -39,6 +63,7 @@ namespace Ailu
 
 #endif // DEAR_IMGUI
 		GraphicsContext::InitGlobalContext();
+		g_pGfxContext->ResizeSwapChain(desc._window_width, desc._window_height);
 		g_pLogMgr->Log("Begin init resource mgr...");
 		g_pTimeMgr->Mark();
 		g_pResourceMgr->Initialize();
@@ -52,7 +77,7 @@ namespace Ailu
 		g_pLogMgr->LogFormat("Scene mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
 		g_pLogMgr->Log("Begin init renderer...");
 		g_pTimeMgr->Mark();
-		g_pRenderer->Initialize();
+		g_pRenderer->Initialize(desc._gameview_width,desc._gameview_height);
 		g_pLogMgr->LogFormat("Renderer init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
 		_p_input_layer = new InputLayer();
 		PushLayer(_p_input_layer);
@@ -63,6 +88,7 @@ namespace Ailu
 		_state = EApplicationState::EApplicationState_Running;
 		return 0;
 	}
+
 	void Application::Finalize()
 	{
 		DESTORY_PTR(_layer_stack);
@@ -80,17 +106,6 @@ namespace Ailu
 		DESTORY_PTR(g_pLogMgr);
 	}
 
-	double render_lag = 0.0;
-	double update_lag = 0.0;
-#ifdef COMPANY_ENV
-	constexpr double kTargetFrameRate = 60;
-#else
-	constexpr double kTargetFrameRate = 170;
-#endif // COMPLY
-
-
-	constexpr double kMsPerUpdate = 16.66;
-	constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
 	void Application::Tick(const float& delta_time)
 	{
 		while (_state != EApplicationState::EApplicationState_Exit)
@@ -104,14 +119,14 @@ namespace Ailu
 			{
 				g_pTimeMgr->Tick(0.0f);
 				auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
-				render_lag += last_mark;
-				update_lag += last_mark;
+				_render_lag += last_mark;
+				_update_lag += last_mark;
 				g_pTimeMgr->Mark();
 				for (Layer* layer : *_layer_stack)
 					layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
 				_p_window->OnUpdate();
 				g_pResourceMgr->Tick(delta_time);
-				while (render_lag > kMsPerRender)
+				while (_render_lag > kMsPerRender)
 				{
 					s_frame_count++;
 					g_pSceneMgr->Tick(delta_time);
@@ -122,7 +137,7 @@ namespace Ailu
 					_p_imgui_layer->End();
 #endif // DEAR_IMGUI
 					g_pRenderer->Tick(delta_time);
-					render_lag -= kMsPerRender;
+					_render_lag -= kMsPerRender;
 				}
 			}
 		}
@@ -161,14 +176,15 @@ namespace Ailu
 	bool Application::OnWindowMinimize(WindowMinimizeEvent& e)
 	{
 		_state = EApplicationState::EApplicationState_Pause;
-		LOG_WARNING("Application state: {}",EApplicationState::ToString(_state))
-		return false;
+		LOG_WARNING("Application state: {}", EApplicationState::ToString(_state))
+			return false;
 	}
 	bool Application::OnWindowResize(WindowResizeEvent& e)
 	{
-		if (_state == EApplicationState::EApplicationState_Pause)
-			_state = EApplicationState::EApplicationState_Running;
-		g_pLogMgr->LogWarningFormat("Application state: {}", EApplicationState::ToString(_state));
+		//if (_state == EApplicationState::EApplicationState_Pause)
+		//	_state = EApplicationState::EApplicationState_Running;
+		//g_pLogMgr->LogWarningFormat("Application state: {}", EApplicationState::ToString(_state));
+		g_pLogMgr->LogFormat("Window resize: {}x{}", e.GetWidth(), e.GetHeight());
 		return false;
 	}
 	bool Application::OnDragFile(DragFileEvent& e)

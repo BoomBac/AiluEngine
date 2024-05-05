@@ -97,8 +97,8 @@ namespace Ailu
 		static void ConfigureRasterizerState(const u8& hash);// 41 ~ 43 3
 		static void ConfigureDepthStencilState(const u8& hash);// 44~46 3
 		static void ConfigureRenderTarget(const u8& hash);// 44~46 3
-		static void SetRenderTargetState(EALGFormat color_format,EALGFormat depth_format, u8 color_rt_id = 0);
-		static void SetRenderTargetState(EALGFormat color_format,u8 color_rt_id = 0);
+		static void SetRenderTargetState(EALGFormat::EALGFormat color_format,EALGFormat::EALGFormat depth_format, u8 color_rt_id = 0);
+		static void SetRenderTargetState(EALGFormat::EALGFormat color_format,u8 color_rt_id = 0);
 		//call before cmd->SetRenderTarget
 		static void ResetRenderTargetState();
 

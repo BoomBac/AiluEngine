@@ -65,6 +65,30 @@ namespace Ailu
 		bool _is_import_material = true;
 	};
 
+	class ISearchFilter
+	{
+	public:
+		virtual bool Filter(Asset* asset) const= 0;
+	};
+	class SearchFilterByDirectory : public ISearchFilter
+	{
+	public:
+		SearchFilterByDirectory(Vector<WString> directories) : _directories(directories) {}
+		bool Filter(Asset* asset) const final
+		{
+			for (auto& dir : _directories)
+			{
+				auto path_prex = asset->_sys_path.substr(0, asset->_sys_path.find_last_of(L"/") + 1);
+				if (path_prex == dir)
+					return true;
+			}
+			return false;
+		}
+	private:
+		Vector<WString> _directories;
+	};
+
+
 	class ResourceMgr : public IRuntimeModule
 	{
 		using ResourceTask = std::function<void()>;
@@ -93,7 +117,7 @@ namespace Ailu
 		void SaveAsset(const Asset* asset);
 		//Load系函数负责加载生成资源，不会放置到对应的对象池，不会生成对应的asset
 		Ref<Texture2D> LoadTexture(const WString& asset_path, const ImportSetting* setting = &ImportSetting::Default());
-		Ref<TextureCubeMap> LoadTexture(const Vector<WString>& asset_paths);
+		Ref<CubeMap> LoadTexture(const Vector<WString>& asset_paths);
 		List<Ref<Mesh>> LoadMesh(const WString& asset_path);
 		template<typename T>
 		Ref<T> LoadAsset(const WString& asset_path);
@@ -109,11 +133,22 @@ namespace Ailu
 		static bool ExistInAssetDB(const WString& asset_path);
 		static WString GetAssetPath(const Guid& guid);
 		Asset* GetAsset(const WString& asset_path) const;
+		Vector<Asset*> GetAssets(const ISearchFilter& filter) const;
+
+		void AddAssetChangedListener(std::function<void()> callback) { _asset_changed_callbacks.emplace_back(callback); };
+		void RemoveAssetChangedListener(std::function<void()> callback)
+		{
+			_asset_changed_callbacks.erase(
+				std::remove_if(_asset_changed_callbacks.begin(), _asset_changed_callbacks.end(),
+					[&](const std::function<void()>& fn) { return fn.target<void()>() == callback.target<void()>(); }),
+				_asset_changed_callbacks.end());
+		}
+
 	public:
+		Texture* _test_new_tex;
+		Scope<CubeMap> _test_cubemap;
 		Vector<ImportInfo> _import_infos;
 	private:
-		inline const static String kAssetDatabasePath = kEngineResRootPath + "assetdb.alasset";
-		inline static ImportInfo* s_p_current_import_info;
 		static Ref<Material> LoadMaterialImpl(const WString& asset_path);
 		//static Ref<Material> LoadMaterial(const Vector<String>& blob);
 		static bool ExistInAssetDB(const Asset* asset);
@@ -126,12 +161,16 @@ namespace Ailu
 		void SubmitResourceTask();
 		//导入外部资源并创建对应的asset
 		Ref<void> ImportResourceImpl(const WString& sys_path, const ImportSetting* setting);
+		void OnAssetDataBaseChanged();
 	private:
+		inline const static String kAssetDatabasePath = kEngineResRootPath + "assetdb.alasset";
+		inline static ImportInfo* s_p_current_import_info;
 		inline static List<ResourceTask> s_task_queue;
 		//<GUID,Asset>
 		inline static std::map<Guid, Asset*> s_asset_db{};
 		//AssetPath,GUID
 		inline static std::map<WString, Guid> s_asset_looktable{};
+		Vector<std::function<void()>> _asset_changed_callbacks;
 	};
 	extern ResourceMgr* g_pResourceMgr;
 

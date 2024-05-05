@@ -5,6 +5,7 @@
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Buffer.h"
+#include "Framework/Common/Profiler.h"
 
 namespace Ailu
 {
@@ -19,8 +20,8 @@ namespace Ailu
 	void OpaquePass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
 		auto cmd = CommandBufferPool::Get("OpaquePass");
-		cmd->SetRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target);
-		cmd->ClearRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target, Colors::kBlack, 1.0f);
+		cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+		cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
 		cmd->SetViewport(rendering_data._viewport);
 		cmd->SetScissorRect(rendering_data._scissor_rect);
 
@@ -57,22 +58,27 @@ namespace Ailu
 	//-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
 
 	//-------------------------------------------------------------ReslovePass-------------------------------------------------------------
-	ResolvePass::ResolvePass(Ref<RenderTexture>& source) : RenderPass("ReslovePass")
+	ResolvePass::ResolvePass() : RenderPass("ReslovePass")
 	{
-		_p_src_color = source;
-		_backbuf_rect = Rect(0, 0, 1600, 900);
+
 	}
 	void ResolvePass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
 		auto cmd = CommandBufferPool::Get("ReslovePass");
 		cmd->Clear();
-		cmd->SetViewport(_backbuf_rect);
-		cmd->SetScissorRect(_backbuf_rect);
-		if (!rendering_data._p_final_rt)
-			cmd->ResolveToBackBuffer(_p_src_color);
-		else
 		{
-			cmd->ResolveToBackBuffer(_p_src_color, rendering_data._p_final_rt);
+			ProfileBlock profile(cmd.get(), _name);
+			cmd->SetViewport(rendering_data._viewport);
+			cmd->SetScissorRect(rendering_data._viewport);
+
+			//if (!rendering_data._p_final_rt)
+			//	cmd->ResolveToBackBuffer(rendering_data._p_camera_color_target);
+			//else
+			//{
+			//	cmd->ResolveToBackBuffer(rendering_data._p_camera_color_target, rendering_data._p_final_rt);
+			//}
+			//默认离屏渲染
+			cmd->ResolveToBackBuffer(rendering_data._camera_color_target_handle, rendering_data._final_rt_handle);
 		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
@@ -80,11 +86,7 @@ namespace Ailu
 
 	void ResolvePass::BeginPass(GraphicsContext* context)
 	{
-	}
 
-	void ResolvePass::BeginPass(GraphicsContext* context, Ref<RenderTexture>& source)
-	{
-		_p_src_color = source;
 	}
 
 	void ResolvePass::EndPass(GraphicsContext* context)
@@ -95,7 +97,7 @@ namespace Ailu
 	//-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
 	ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize })
 	{
-		_p_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainShadowMap", EALGFormat::kALGFormatD24S8_UINT);
+		_p_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainShadowMap", ERenderTargetFormat::kShadowMap);
 		_p_shadowcast_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDepthOnly), "ShadowCast");
 	}
 
@@ -103,14 +105,17 @@ namespace Ailu
 	{
 		auto cmd = CommandBufferPool::Get("ShadowCastPass");
 		cmd->Clear();
-		cmd->SetRenderTarget(nullptr, _p_shadow_map.get());
-		cmd->ClearRenderTarget(_p_shadow_map.get(), 1.0f);
-		cmd->SetScissorRect(_rect);
-		cmd->SetViewport(_rect);
-		u32 obj_index = 0u;
-		for (auto& obj : RenderQueue::GetOpaqueRenderables())
 		{
-			cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+			ProfileBlock profile(cmd.get(), _name);
+			cmd->SetRenderTarget(nullptr, _p_shadow_map.get());
+			cmd->ClearRenderTarget(_p_shadow_map.get(), 1.0f);
+			cmd->SetScissorRect(_rect);
+			cmd->SetViewport(_rect);
+			u32 obj_index = 0u;
+			for (auto& obj : RenderQueue::GetOpaqueRenderables())
+			{
+				cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+			}
 		}
 		Shader::SetGlobalTexture("MainLightShadowMap", _p_shadow_map.get());
 		context->ExecuteCommandBuffer(cmd);
@@ -128,15 +133,16 @@ namespace Ailu
 
 	//-------------------------------------------------------------CubeMapGenPass-------------------------------------------------------------
 
-	CubeMapGenPass::CubeMapGenPass(u16 size, String texture_name, String src_texture_name) : RenderPass("CubeMapGenPass"), _rect(Rect{ 0,0,size,size })
+	CubeMapGenPass::CubeMapGenPass(u16 size, String texture_name, String src_texture_name) : RenderPass("CubeMapGenPass"), _cubemap_rect(Rect{ 0,0,size,size }),_ibl_rect(Rect{ 0,0,(u16)(size / 4),(u16)(size / 4) })
 	{
 		float x = 0.f, y = 0.f, z = 0.f;
 		Vector3f center = { x,y,z };
 		Vector3f world_up = Vector3f::kUp;
-		_p_cube_map = RenderTexture::Create(size, size, texture_name, EALGFormat::kALGFormatR16G16B16A16_FLOAT, true);
-		_p_env_map = RenderTexture::Create(size, size, texture_name, EALGFormat::kALGFormatR16G16B16A16_FLOAT, true);
+		_p_cube_map = RenderTexture::Create(size, texture_name + "_cubemap", ERenderTargetFormat::kDefaultHDR, true,true,true);
+		_p_cube_map->CreateView();
+		_p_env_map = RenderTexture::Create(size / 4, texture_name + "_ibl_diffuse", ERenderTargetFormat::kDefaultHDR, false);
 		_p_gen_material = MaterialLibrary::GetMaterial("CubemapGen");
-		_p_gen_material->SetTexture("env", src_texture_name);
+		_p_gen_material->SetTexture("env", ToWChar(src_texture_name));
 		_p_cube_mesh = MeshPool::GetMesh("cube");
 		_p_filter_material = MaterialLibrary::GetMaterial("EnvmapFilter");
 		Matrix4x4f view, proj;
@@ -177,20 +183,23 @@ namespace Ailu
 	{
 		auto cmd = CommandBufferPool::Get();
 		cmd->Clear();
-		cmd->SetScissorRect(_rect);
-		cmd->SetViewport(_rect);
+		cmd->SetScissorRect(_cubemap_rect);
+		cmd->SetViewport(_cubemap_rect);
 		for (u16 i = 0; i < 6; i++)
 		{
-			cmd->SetRenderTarget(_p_cube_map, i);
-			cmd->ClearRenderTarget(_p_cube_map, Colors::kBlack, i);
+			cmd->SetRenderTarget(_p_cube_map.get(), i);
+			cmd->ClearRenderTarget(_p_cube_map.get(), Colors::kBlack, i);
 			cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
 			cmd->DrawRenderer(_p_cube_mesh.get(), _p_gen_material.get(), _per_obj_cb.get());
 		}
-		_p_filter_material->SetTexture("EnvMap", _p_cube_map);
+		_p_cube_map->GenerateMipmap(cmd.get());
+		_p_filter_material->SetTexture("EnvMap", _p_cube_map.get());
+		cmd->SetScissorRect(_ibl_rect);
+		cmd->SetViewport(_ibl_rect);
 		for (u16 i = 0; i < 6; i++)
 		{
-			cmd->SetRenderTarget(_p_env_map, i);
-			cmd->ClearRenderTarget(_p_env_map, Colors::kBlack, i);
+			cmd->SetRenderTarget(_p_env_map.get(), i);
+			cmd->ClearRenderTarget(_p_env_map.get(), Colors::kBlack, i);
 			cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
 			cmd->DrawRenderer(_p_cube_mesh.get(), _p_filter_material.get(), _per_obj_cb.get());
 		}
@@ -212,9 +221,10 @@ namespace Ailu
 	DeferredGeometryPass::DeferredGeometryPass(u16 width, u16 height) : RenderPass("DeferedGeometryPass")
 	{
 		_gbuffers.resize(3);
-		_gbuffers[0] = RenderTexture::Create(width, height, "GBuffer0", EALGFormat::kALGFormatR16G16_FLOAT);
-		_gbuffers[1] = RenderTexture::Create(width, height, "GBuffer1", EALGFormat::kALGFormatR8G8B8A8_UNORM);
-		_gbuffers[2] = RenderTexture::Create(width, height, "GBuffer2", EALGFormat::kALGFormatR8G8B8A8_UNORM);
+		//_gbuffers_cache.resize(3);
+		//_gbuffers_cache[0] = _gbuffers[0].get();
+		//_gbuffers_cache[1] = _gbuffers[1].get();
+		//_gbuffers_cache[2] = _gbuffers[2].get();
 		_p_lighting_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/deferred_lighting.hlsl", "DeferredLightingVSMain", "DeferredLightingPSMain"), "DeferedGbufferLighting");
 		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
 		for (int i = 0; i < _rects.size(); i++)
@@ -222,41 +232,55 @@ namespace Ailu
 	}
 	void DeferredGeometryPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get("DeferredRenderPass");
-		cmd->SetRenderTargets(_gbuffers, rendering_data._p_camera_depth_target);
-		cmd->ClearRenderTarget(_gbuffers, rendering_data._p_camera_depth_target, Colors::kBlack, 1.0f);
-		cmd->SetViewports({ _rects[0],_rects[1],_rects[2] });
-		cmd->SetScissorRects({ _rects[0],_rects[1],_rects[2] });
+		auto w = rendering_data._width, h = rendering_data._height;
+		for (int i = 0; i < _rects.size(); i++)
+			_rects[i] = Rect(0, 0, w, h);
+		_gbuffers[0] = RenderTexture::GetTempRT(w, h, "GBuffer0", ERenderTargetFormat::kRGHalf);
+		_gbuffers[1] = RenderTexture::GetTempRT(w, h, "GBuffer1", ERenderTargetFormat::kDefault);
+		_gbuffers[2] = RenderTexture::GetTempRT(w, h, "GBuffer2", ERenderTargetFormat::kDefault);
 
-		u32 obj_index = 0;
-		for (auto& obj : RenderQueue::GetOpaqueRenderables())
+		auto cmd = CommandBufferPool::Get("DeferredRenderPass");
 		{
-			memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-			auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
-			if (ret != 0)
+			ProfileBlock profile(cmd.get(), _name);
+			cmd->SetRenderTargets(_gbuffers, rendering_data._camera_depth_target_handle);
+			cmd->ClearRenderTarget(_gbuffers, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
+			cmd->SetViewports({ _rects[0],_rects[1],_rects[2] });
+			cmd->SetScissorRects({ _rects[0],_rects[1],_rects[2] });
+
+			u32 obj_index = 0;
+			for (auto& obj : RenderQueue::GetOpaqueRenderables())
 			{
-				//LOG_WARNING("DeferredGeometryPass mesh {} not draw",obj.GetMesh()->Name());
+				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+				auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
+				if (ret != 0)
+				{
+					//LOG_WARNING("DeferredGeometryPass mesh {} not draw",obj.GetMesh()->Name());
+				}
+				else
+					++obj_index;
 			}
-			else
-				++obj_index;
+			_p_lighting_material->SetTexture("_GBuffer0", _gbuffers[0]);
+			_p_lighting_material->SetTexture("_GBuffer1", _gbuffers[1]);
+			_p_lighting_material->SetTexture("_GBuffer2", _gbuffers[2]);
+			_p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_target_handle);
+			cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
+			cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, Colors::kBlack);
+			cmd->SetViewport(rendering_data._viewport);
+			cmd->SetScissorRect(rendering_data._scissor_rect);
+			cmd->DrawRenderer(_p_quad_mesh.get(), _p_lighting_material.get(), 1);
 		}
-		_p_lighting_material->SetTexture("_GBuffer0", _gbuffers[0]);
-		_p_lighting_material->SetTexture("_GBuffer1", _gbuffers[1]);
-		_p_lighting_material->SetTexture("_GBuffer2", _gbuffers[2]);
-		_p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._p_camera_depth_target);
-		cmd->SetRenderTarget(rendering_data._p_camera_color_target);
-		cmd->ClearRenderTarget(rendering_data._p_camera_color_target, Colors::kBlack);
-		cmd->SetViewport(rendering_data._viewport);
-		cmd->SetScissorRect(rendering_data._scissor_rect);
-		cmd->DrawRenderer(_p_quad_mesh.get(), _p_lighting_material.get(), 1);
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}
 	void DeferredGeometryPass::BeginPass(GraphicsContext* context)
 	{
+
 	}
 	void DeferredGeometryPass::EndPass(GraphicsContext* context)
 	{
+		RenderTexture::ReleaseTempRT(_gbuffers[0]);
+		RenderTexture::ReleaseTempRT(_gbuffers[1]);
+		RenderTexture::ReleaseTempRT(_gbuffers[2]);
 	}
 	//-------------------------------------------------------------DeferedGeometryPass-------------------------------------------------------------
 
@@ -276,10 +300,13 @@ namespace Ailu
 	{
 		auto cmd = CommandBufferPool::Get("SkyboxPass");
 		cmd->Clear();
-		cmd->SetViewport(rendering_data._viewport);
-		cmd->SetScissorRect(rendering_data._scissor_rect);
-		cmd->SetRenderTarget(rendering_data._p_camera_color_target, rendering_data._p_camera_depth_target);
-		cmd->DrawRenderer(_p_sky_mesh.get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
+		{
+			ProfileBlock profile(cmd.get(), _name);
+			cmd->SetViewport(rendering_data._viewport);
+			cmd->SetScissorRect(rendering_data._scissor_rect);
+			cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+			cmd->DrawRenderer(_p_sky_mesh.get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
+		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}

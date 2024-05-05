@@ -481,6 +481,7 @@
     <ClInclude Include="Inc\Animation\Skeleton.h" />
     <ClInclude Include="Inc\CompanyEnv.h" />
     <ClInclude Include="Inc\Framework\Common\Application.h" />
+    <ClInclude Include="Inc\Framework\Common\Assert.h" />
     <ClInclude Include="Inc\Framework\Common\Asset.h" />
     <ClInclude Include="Inc\Framework\Common\CommandLineApp.h" />
     <ClInclude Include="Inc\Framework\Common\EntryPoint.h" />
@@ -491,6 +492,7 @@
     <ClInclude Include="Inc\Framework\Common\Log.h" />
     <ClInclude Include="Inc\Framework\Common\LogMgr.h" />
     <ClInclude Include="Inc\Framework\Common\Path.h" />
+    <ClInclude Include="Inc\Framework\Common\Profiler.h" />
     <ClInclude Include="Inc\Framework\Common\Reflect.h" />
     <ClInclude Include="Inc\Framework\Common\ResourceMgr.h" />
     <ClInclude Include="Inc\Framework\Common\SceneMgr.h" />
@@ -514,7 +516,7 @@
     <ClInclude Include="Inc\Framework\ImGui\Widgets\ObjectDetail.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\TextureSelector.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h" />
     <ClInclude Include="Inc\Framework\Interface\IAssetable.h" />
     <ClInclude Include="Inc\Framework\Interface\IParser.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
@@ -527,7 +529,6 @@
     <ClInclude Include="Inc\Framework\Parser\FbxParser.h" />
     <ClInclude Include="Inc\Framework\Parser\HDRParser.h" />
     <ClInclude Include="Inc\Framework\Parser\PngParser.h" />
-    <ClInclude Include="Inc\Framework\Parser\TgaParser.h" />
     <ClInclude Include="Inc\GlobalMarco.h" />
     <ClInclude Include="Inc\Objects\Actor.h" />
     <ClInclude Include="Inc\Objects\CameraComponent.h" />
@@ -546,6 +547,7 @@
     <ClInclude Include="Inc\Render\Camera.h" />
     <ClInclude Include="Inc\Render\CBuffer.h" />
     <ClInclude Include="Inc\Render\CommandBuffer.h" />
+    <ClInclude Include="Inc\Render\FrameResource.h" />
     <ClInclude Include="Inc\Render\Gizmo.h" />
     <ClInclude Include="Inc\Render\GraphicsContext.h" />
     <ClInclude Include="Inc\Render\GraphicsPipelineStateObject.h" />
@@ -561,6 +563,7 @@
     <ClInclude Include="Inc\Render\RenderQueue.h" />
     <ClInclude Include="Inc\Render\Shader.h" />
     <ClInclude Include="Inc\Render\Texture.h" />
+    <ClInclude Include="Inc\RHI\DX12\D3DGPUTimer.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DBuffer.h" />
     <ClInclude Include="Inc\RHI\DX12\D3DCommandBuffer.h" />
     <ClInclude Include="Inc\Render\RenderConstants.h" />
@@ -592,9 +595,11 @@
     <ClCompile Include="Src\Animation\Pose.cpp" />
     <ClCompile Include="Src\Animation\Skeleton.cpp" />
     <ClCompile Include="Src\Framework\Common\Application.cpp" />
+    <ClCompile Include="Src\Framework\Common\Assert.cpp" />
     <ClCompile Include="Src\Framework\Common\Asset.cpp" />
     <ClCompile Include="Src\Framework\Common\FileManager.cpp" />
     <ClCompile Include="Src\Framework\Common\LogMgr.cpp" />
+    <ClCompile Include="Src\Framework\Common\Profiler.cpp" />
     <ClCompile Include="Src\Framework\Common\Reflect.cpp" />
     <ClCompile Include="Src\Framework\Common\ResourceMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\SceneMgr.cpp" />
@@ -611,12 +616,11 @@
     <ClCompile Include="Src\Framework\ImGui\Widgets\ObjectDetail.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\TextureSelector.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp" />
     <ClCompile Include="Src\Framework\Math\Guid.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\HDRParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\PngParser.cpp" />
-    <ClCompile Include="Src\Framework\Parser\TgaParser.cpp" />
     <ClCompile Include="Src\Objects\Actor.cpp" />
     <ClCompile Include="Src\Objects\CameraComponent.cpp" />
     <ClCompile Include="Src\Objects\Component.cpp" />
@@ -637,6 +641,7 @@
     <ClCompile Include="Src\Render\Buffer.cpp" />
     <ClCompile Include="Src\Render\Camera.cpp" />
     <ClCompile Include="Src\Render\CommandBuffer.cpp" />
+    <ClCompile Include="Src\Render\FrameResource.cpp" />
     <ClCompile Include="Src\Render\GraphicsContext.cpp" />
     <ClCompile Include="Src\Render\GraphicsPipelineStateObject.cpp" />
     <ClCompile Include="Src\Render\Material.cpp" />
@@ -652,6 +657,7 @@
     <ClCompile Include="Src\RHI\DX12\D3DBuffer.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DCommandBuffer.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DContext.cpp" />
+    <ClCompile Include="Src\RHI\DX12\D3DGPUTimer.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DGraphicsPipelineState.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DShader.cpp" />
     <ClCompile Include="Src\RHI\DX12\D3DTexture.cpp" />

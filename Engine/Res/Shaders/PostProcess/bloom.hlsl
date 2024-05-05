@@ -45,9 +45,9 @@ float3 ACESFilm(float3 x)
 float4 PSMain(PSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearSampler, input.uv).rgb;
-	return float4(color,1.f); 
+	return color.xyzz;
 	// if (color.r + color.g + color.b > 1.5f)
+	// 	return float4(color,1.f); 
 	// else
 	// 	return float4(0.f, 0.f, 0.f, 1.f);
-
 }

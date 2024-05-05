@@ -64,7 +64,7 @@ namespace Ailu
 					actor->AddComponent(Deserialize<SkinedMeshComponent>(formated_str));
 				else
 				{
-					AL_ASSERT(true, "Unhandled component type");
+					AL_ASSERT_MSG(true, "Unhandled component type");
 					g_pLogMgr->LogWarningFormat("Unhandled component type {}",comp_type);
 				}
 				comp_type = TP_ZERO(formated_str.front());

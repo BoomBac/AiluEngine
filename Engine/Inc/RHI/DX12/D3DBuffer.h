@@ -82,7 +82,7 @@ namespace Ailu
 	class D3DConstantBuffer : public ConstantBuffer
 	{
 	public:
-		D3DConstantBuffer(u32 size);
+		D3DConstantBuffer(u32 size,bool compute_buffer);
 		~D3DConstantBuffer();
 		void Bind(CommandBuffer* cmd, u8 bind_slot) const final;
 		u8* GetData() final {return s_p_data + _offset;};
@@ -94,6 +94,7 @@ namespace Ailu
 		inline static u8* s_p_data;
 		u32 _offset,_index;
 		GPUVisibleDescriptorAllocation _allocation;
+		bool _is_compute_buffer;
 	};
 }
 #endif // !D3DBUFFER_H__

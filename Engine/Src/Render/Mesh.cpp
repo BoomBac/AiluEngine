@@ -44,7 +44,7 @@ namespace Ailu
 	{
 		if (index >= 8)
 		{
-			AL_ASSERT(true, "Uv index in mesh must be less than 8!");
+			AL_ASSERT_MSG(true, "Uv index in mesh must be less than 8!");
 			return;
 		}
 		_uv[index] = uv;
@@ -94,11 +94,11 @@ namespace Ailu
 
 	void Mesh::AttachToAsset(Asset* asset)
 	{
-		AL_ASSERT(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
+		AL_ASSERT_MSG(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
 		_p_asset_owned_this = asset;
 		asset->_p_inst_asset = this;
 		asset->_name = ToWChar(_name);
-		asset->_full_name = asset->_name.append(L".almat");
+		asset->_full_name = asset->_name.append(L".fbx");
 	}
 	void Mesh::BuildRHIResource()
 	{

@@ -44,11 +44,11 @@ namespace Ailu
         u8 _actived_shadow_count = 0;
         ConstantBuffer* _p_per_frame_cbuf;
         ConstantBuffer** _p_per_object_cbuf;
-        Ref<RenderTexture> _p_camera_color_target;
-        Ref<RenderTexture> _p_camera_depth_target;
-        Ref<RenderTexture> _p_final_rt;
+        RTHandle _camera_color_target_handle;
+        RTHandle _camera_depth_target_handle;
+        RTHandle _final_rt_handle;
         Rect _viewport,_scissor_rect;
-        u32 width, height;
+        u32 _width, _height;
         CommandBuffer* cmd;
         void Reset()
         {

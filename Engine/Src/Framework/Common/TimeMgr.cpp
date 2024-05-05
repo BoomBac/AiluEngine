@@ -65,6 +65,16 @@ namespace Ailu
 		return smooth_scale ? TimeSinceLoad * scale * scale : TimeSinceLoad * scale;
 	}
 
+	String TimeMgr::CurrentTime(String format)
+	{
+		time_t time_seconds = time(0);
+		struct tm now_time;
+		localtime_s(&now_time, &time_seconds);
+		std::stringstream ss;
+		ss << std::put_time(&now_time, format.c_str());
+		return ss.str();
+	}
+
 
 	void TimeMgr::Resume()
 	{

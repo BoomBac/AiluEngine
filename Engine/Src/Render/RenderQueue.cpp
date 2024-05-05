@@ -11,12 +11,12 @@ namespace Ailu
 		s_all_matrix.emplace_back(transform);
 		if (it != _s_renderables.end())
 		{
-			it->second.emplace_back(RenderableObjectData(static_cast<u16>(s_all_meshes.size() - 1), s_all_materials.size() - 1, s_all_matrix.size() - 1, submesh_index, instance_count));
+			it->second.emplace_back(RenderableObjectData(static_cast<u16>(s_all_meshes.size() - 1), static_cast<u16>(s_all_materials.size() - 1), static_cast<u16>(s_all_matrix.size() - 1), submesh_index, instance_count));
 		}
 		else
 		{
 			_s_renderables.insert(std::make_pair(queue_id, std::vector<RenderableObjectData>()));
-			_s_renderables[queue_id].emplace_back(RenderableObjectData(static_cast<u16>(s_all_meshes.size() - 1), s_all_materials.size() - 1, s_all_matrix.size() - 1, submesh_index,instance_count));
+			_s_renderables[queue_id].emplace_back(RenderableObjectData(static_cast<u16>(s_all_meshes.size() - 1), static_cast<u16>(s_all_materials.size() - 1), static_cast<u16>(s_all_matrix.size() - 1), submesh_index,instance_count));
 		}
 	}
 

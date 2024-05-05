@@ -21,21 +21,24 @@ namespace Ailu
 
 			if (available)
 			{
-				available = false;
-				cmd_buf->Clear();
-				cmd_buf->SetName(name);
-				return cmd_buf;
-			}
-			else
-			{
-				if (g_pGfxContext->GetFenceValue(cmd_buf->GetID()) < g_pGfxContext->GetCurFenceValue())
+				if (g_pGfxContext->IsCommandBufferReady(cmd_buf->GetID()))
 				{
-					//LOG_WARNING("cmd {} is ready cmd value {},gpu value {}!", cmd_buf->GetID(), g_pGfxContext->GetFenceValue(cmd_buf->GetID()), g_pGfxContext->GetCurFenceValue());
+					available = false;
 					cmd_buf->Clear();
 					cmd_buf->SetName(name);
 					return cmd_buf;
 				}
 			}
+			//else
+			//{
+			//	if (g_pGfxContext->GetFenceValue(cmd_buf->GetID()) < g_pGfxContext->GetCurFenceValue())
+			//	{
+			//		LOG_WARNING("cmd {} is ready cmd value {},gpu value {}!", cmd_buf->GetID(), g_pGfxContext->GetFenceValue(cmd_buf->GetID()), g_pGfxContext->GetCurFenceValue());
+			//		cmd_buf->Clear();
+			//		cmd_buf->SetName(name);
+			//		return cmd_buf;
+			//	}
+			//}
 		}
 		std::unique_lock<std::mutex> lock(_mutex);
 		if (Renderer::GetAPI() == RendererAPI::ERenderAPI::kDirectX12)
@@ -46,16 +49,17 @@ namespace Ailu
 			++s_cur_pool_size;
 			LOG_WARNING("Expand commandbuffer pool to {}", s_cur_pool_size);
 			cmd->SetName(name);
+			cmd->Clear();
 			return cmd;
 		}
 		else
-			AL_ASSERT(true, "None render api used!")
+			AL_ASSERT_MSG(true, "None render api used!");
 	}
 
-	void CommandBufferPool::Release(std::shared_ptr<CommandBuffer> cmd)
+	void CommandBufferPool::Release(std::shared_ptr<CommandBuffer>& cmd)
 	{
-		//std::unique_lock<std::mutex> lock(_mutex);
-		//std::get<0>(s_cmd_buffers[cmd->GetID()]) = true;
+		std::unique_lock<std::mutex> lock(_mutex);
+		std::get<0>(s_cmd_buffers[cmd->GetID()]) = true;
 		//cmd->Clear();
 	}
 
@@ -75,7 +79,7 @@ namespace Ailu
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT(false, "None render api used!");
+			AL_ASSERT_MSG(false, "None render api used!");
 			return;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
@@ -86,7 +90,7 @@ namespace Ailu
 			}
 		}
 		}
-		AL_ASSERT(false, "Unsupport render api!")
+		AL_ASSERT_MSG(false, "Unsupport render api!");
 			return;
 	}
 }

@@ -379,6 +379,11 @@ float4 PSMain(PSInput input) : SV_TARGET
 		virtual void Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
 		virtual void SetTexture(const String& name, Texture* texture);
 		virtual void SetTexture(u8 bind_slot, Texture* texture);
+		virtual void SetTexture(const String& name, Texture* texture, ECubemapFace::ECubemapFace face, u16 mipmap);
+		virtual void SetFloat(const String& name, f32 value);
+		virtual void SetBool(const String& name, bool value);
+		virtual void SetInt(const String& name, i32 value);
+		virtual void SetVector(const String& name, Vector4f vector);
 
 		bool Compile();
 	protected:
@@ -387,7 +392,10 @@ float4 PSMain(PSInput input) : SV_TARGET
 		inline static std::unordered_map<String,Ref<ComputeShader>> s_cs_library{};
 		std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
 		std::unordered_map<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
+		//bind_slot:cubemapface,mipmap
+		std::unordered_map<u16,std::tuple<ECubemapFace::ECubemapFace, u16>> _texture_addi_bind_info{};
 		bool _is_valid;
+		Scope<ConstantBuffer> _p_cbuffer;
 	private:
 		inline static u32 s_global_cs_id = 0u;
 	};

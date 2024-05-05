@@ -18,10 +18,30 @@ namespace Ailu
         EApplicationState_Pause,
         EApplicationState_Exit
     )
+    struct AILU_API ApplicationDesc
+    {
+        u32 _window_width,_window_height;
+        u32 _gameview_width, _gameview_height;
+    };
+
+    //class AILU_API ApplicationDescription : public Object
+    //{
+
+    //};
+
     class AILU_API Application : public IRuntimeModule
     {
     public:
+#ifdef COMPANY_ENV
+        static constexpr double kTargetFrameRate = 60;
+#else
+        static constexpr double kTargetFrameRate = 170;
+#endif // COMPLY
+        static constexpr double kMsPerUpdate = 16.66;
+        static constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
+        static WString GetWorkingPath();
         int Initialize() override;
+        int Initialize(ApplicationDesc desc);
         void Finalize() override;
         void Tick(const float& delta_time) override;
 
@@ -40,6 +60,7 @@ namespace Ailu
         bool OnWindowMinimize(WindowMinimizeEvent& e);
         bool OnWindowResize(WindowResizeEvent& e);
         bool OnDragFile(DragFileEvent& e);
+        void OnEvent(Event& e);
     private:
         LayerStack* _layer_stack;
         ImGUILayer* _p_imgui_layer;
@@ -47,8 +68,9 @@ namespace Ailu
         SceneLayer* _p_scene_layer;
         Window* _p_window = nullptr;
         EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None; 
-        void OnEvent(Event& e);
         inline static Application* sp_instance = nullptr;
+        double _render_lag = 0.0;
+        double _update_lag = 0.0;
     };
 }
 

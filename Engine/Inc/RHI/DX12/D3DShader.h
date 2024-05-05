@@ -246,6 +246,7 @@ namespace Ailu
 		D3DComputeShader(const String& sys_path);
 		//void Dispatch(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 		void Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
+		void BindOnly(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z,std::function<void()> res_binder);
 	private:
 		void LoadReflectionInfo(ID3D12ShaderReflection* p_reflect);
 		bool RHICompileImpl() final;

@@ -7,8 +7,6 @@
 
 namespace Ailu
 {
-#define ALIGN_TO_256(x) (((x) + 255) & ~255)
-
 	static void MarkTextureUsedHelper(u32& mask, const ETextureUsage& usage, const bool& b_use)
 	{
 		switch (usage)
@@ -144,7 +142,7 @@ namespace Ailu
 		return Vector4f::kZero;
 	}
 
-	void Material::SetTexture(const String& name, Ref<Texture> texture)
+	void Material::SetTexture(const String& name, Texture* texture)
 	{
 		if (name == InternalStandardMaterialTexture::kAlbedo) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
 		else if (name == InternalStandardMaterialTexture::kEmssive) MarkTextureUsed({ ETextureUsage::kEmssive }, true);
@@ -167,7 +165,7 @@ namespace Ailu
 		//	LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
 	}
 
-	void Material::SetTexture(const String& name, const String& texture_path)
+	void Material::SetTexture(const String& name, const WString& texture_path)
 	{
 		if (name == InternalStandardMaterialTexture::kAlbedo) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
 		else if (name == InternalStandardMaterialTexture::kEmssive) MarkTextureUsed({ ETextureUsage::kEmssive }, true);
@@ -176,10 +174,10 @@ namespace Ailu
 		else if (name == InternalStandardMaterialTexture::kSpecular) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
 		else if (name == InternalStandardMaterialTexture::kNormal) MarkTextureUsed({ ETextureUsage::kNormal }, true);
 		else {};
-		auto texture = TexturePool::Get(texture_path);
+		auto texture = g_pTexturePool->Get(texture_path);
 		if (texture == nullptr)
 		{
-			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", texture_path, _name, name);
+			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
 			return;
 		}
 		auto it = _textures.find(name);
@@ -187,13 +185,34 @@ namespace Ailu
 		{
 			return;
 		}
-		std::get<1>(_textures[name]) = texture;
+		std::get<1>(_textures[name]) = texture.get();
 		if (_properties.find(name) != _properties.end())
 		{
 			_properties[name]._value_ptr = reinterpret_cast<void*>(&_textures[name]);
 		}
 		else
 			LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
+	}
+
+	void Material::SetTexture(const String& name, RTHandle texture)
+	{
+		if (name == InternalStandardMaterialTexture::kAlbedo) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
+		else if (name == InternalStandardMaterialTexture::kEmssive) MarkTextureUsed({ ETextureUsage::kEmssive }, true);
+		else if (name == InternalStandardMaterialTexture::kMetallic) MarkTextureUsed({ ETextureUsage::kMetallic }, true);
+		else if (name == InternalStandardMaterialTexture::kRoughness) MarkTextureUsed({ ETextureUsage::kRoughness }, true);
+		else if (name == InternalStandardMaterialTexture::kSpecular) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
+		else if (name == InternalStandardMaterialTexture::kNormal) MarkTextureUsed({ ETextureUsage::kNormal }, true);
+		else {};
+		auto it = _textures.find(name);
+		if (it == _textures.end())
+		{
+			return;
+		}
+		std::get<1>(_textures[name]) = g_pRenderTexturePool->Get(texture);
+		if (_properties.find(name) != _properties.end())
+		{
+			_properties[name]._value_ptr = reinterpret_cast<void*>(&_textures[name]);
+		}
 	}
 
 	void Material::EnableKeyword(const String& keyword)
@@ -215,7 +234,7 @@ namespace Ailu
 
 	void Material::AttachToAsset(Asset* asset)
 	{
-		AL_ASSERT(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
+		AL_ASSERT_MSG(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
 		_p_asset_owned_this = asset;
 		asset->_p_inst_asset = this;
 		asset->_name = ToWChar(_name);
@@ -248,7 +267,7 @@ namespace Ailu
 			if (texture != nullptr)
 			{
 				//texture->Bind(slot);
-				GraphicsPipelineStateMgr::SubmitBindResource(texture.get(), slot);
+				GraphicsPipelineStateMgr::SubmitBindResource(texture, slot);
 			}
 			//else
 			//{
@@ -302,6 +321,19 @@ namespace Ailu
 		return ret;
 	}
 
+	//List<std::tuple<String, Texture*>> Material::GetAllTexture()
+	//{
+	//	List<std::tuple<String, Texture*>> ret{};
+	//	for (auto& [name, bind_info] : _p_shader->GetBindResInfo())
+	//	{
+	//		if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kTexture2D)
+	//		{
+	//			ret.emplace_back(std::make_tuple(name, bind_info._p_res));
+	//		}
+	//	}
+	//	return ret;
+	//}
+
 	void Material::Construct(bool first_time)
 	{
 		static u8 s_unused_shader_prop_buf[256]{ 0 };
@@ -311,7 +343,7 @@ namespace Ailu
 		{
 			_properties.clear();
 		}
-		std::map<String, std::tuple<u8, Ref<Texture>>> _tmp_textures{};
+		std::map<String, std::tuple<u8, Texture*>> _tmp_textures{};
 		for (auto& bind_info : _p_shader->GetBindResInfo())
 		{
 			if (bind_info.second._res_type == EBindResDescType::kTexture2D)

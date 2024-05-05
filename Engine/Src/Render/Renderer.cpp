@@ -5,63 +5,68 @@
 #include "Render/Gizmo.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"
+#include "Framework/Common/Profiler.h"
 
 
 namespace Ailu
 {
 	int Renderer::Initialize()
 	{
+		return Initialize(1600, 900);
+	}
+	int Renderer::Initialize(u32 width, u32 height)
+	{
+		_width = width;
+		_height = height;
 		_p_context = g_pGfxContext;
 		_b_init = true;
-
+		Profiler::g_Profiler.Initialize();
 		_p_timemgr = new TimeMgr();
 		_p_timemgr->Initialize();
-		_p_camera_color_attachment = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraColorAttachment", RenderConstants::kColorRange == EColorRange::kLDR ?
-			RenderConstants::kLDRFormat : RenderConstants::kHDRFormat);
+
+		_camera_color_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorAttachment", ERenderTargetFormat::kDefaultHDR);
 		if (_is_offscreen)
 		{
-			_p_gameview_rt = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraColorAttachment", RenderConstants::kColorRange == EColorRange::kLDR ?
-				RenderConstants::kLDRFormat : RenderConstants::kHDRFormat);
+			_gameview_rt_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorFinalAttachment", ERenderTargetFormat::kDefaultHDR);
 		}
-		else
-			_p_gameview_rt = nullptr;
-		_p_camera_depth_attachment = RenderTexture::Create(kRendererWidth, kRendererHeight, "CameraDepthAttachment", EALGFormat::kALGFormatD24S8_UINT);
+
+		_camera_depth_handle = RenderTexture::GetTempRT(_width, _height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
 		_p_opaque_pass = MakeScope<OpaquePass>();
-		_p_reslove_pass = MakeScope<ResolvePass>(_p_camera_color_attachment);
+		_p_reslove_pass = MakeScope<ResolvePass>();
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
-		//_p_postprocess_pass = MakeScope<PostProcessPass>();
-		_p_gbuffer_pass = MakeScope<DeferredGeometryPass>(kRendererWidth, kRendererHeight);
+		_p_postprocess_pass = MakeScope<PostProcessPass>();
+		_p_gbuffer_pass = MakeScope<DeferredGeometryPass>(_width, _height);
 		_p_skybox_pass = MakeScope<SkyboxPass>();
 		auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"small_cave_1k.hdr");
-		TexturePool::Add("Textures/small_cave_1k.hdr", std::dynamic_pointer_cast<Texture2D>(tex));
+		g_pTexturePool->Add(L"Textures/small_cave_1k.hdr", tex);
 
 		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512, "pure_sky", "Textures/small_cave_1k.hdr");
 		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
-		//_p_test_cs = ComputeShader::Create(PathUtils::GetResSysPath("Shaders/Compute/cs_test.hlsl"));
-		//TextureDesc desc(64,64,1,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::kALGFormatR32_UINT,false);
-		//_p_test_texture = Texture2D::Create(desc);
-		//_p_test_texture->Name("cs_out");
-		//TexturePool::Add("cs_out", std::dynamic_pointer_cast<Texture2D>(_p_test_texture));
 
 		_p_per_frame_cbuf.reset(ConstantBuffer::Create(RenderConstants::kPerFrameDataSize));
 		Shader::ConfigurePerFrameConstBuffer(_p_per_frame_cbuf.get());
 		for (int i = 0; i < RenderConstants::kMaxRenderObjectCount; i++)
 			_p_per_object_cbufs[i] = ConstantBuffer::Create(RenderConstants::kPeObjectDataSize);
-		_rendering_data.width = kRendererWidth;
-		_rendering_data.height = kRendererHeight;
-		_rendering_data._p_camera_color_target = _p_camera_color_attachment;
-		_rendering_data._p_camera_depth_target = _p_camera_depth_attachment;
-		_rendering_data._viewport = Rect{ 0,0,(uint16_t)kRendererWidth,(uint16_t)kRendererHeight };
+		_rendering_data._width = _width;
+		_rendering_data._height = _height;
+		_rendering_data._viewport = Rect{ 0,0,(uint16_t)_width,(uint16_t)_height };
 		_rendering_data._scissor_rect = _rendering_data._viewport;
-		_rendering_data._p_final_rt = _p_gameview_rt;
+		_rendering_data._camera_color_target_handle = _camera_color_handle;
+		_rendering_data._camera_depth_target_handle = _camera_depth_handle;
+		_rendering_data._final_rt_handle = _gameview_rt_handle;
+		//_rendering_data._p_camera_color_target = _p_camera_color_attachment.get();
+		//_rendering_data._p_camera_depth_target = _p_camera_depth_attachment.get();
+		//_rendering_data._p_final_rt = _p_gameview_rt.get();
 
 		_render_passes.emplace_back(_p_shadowcast_pass.get());
 		_p_opaque_pass->SetActive(false);
-		_render_passes.emplace_back(_p_opaque_pass.get());
+		//_render_passes.emplace_back(_p_opaque_pass.get());
 		_render_passes.emplace_back(_p_gbuffer_pass.get());
 		_render_passes.emplace_back(_p_skybox_pass.get());
+		_render_passes.emplace_back(_p_postprocess_pass.get());
 		_render_passes.emplace_back(_p_reslove_pass.get());
 		RegisterEventBeforeTick([]() {GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
+		RegisterEventAfterTick([]() {Profiler::g_Profiler.EndFrame(); });
 		return 0;
 	}
 	void Renderer::Finalize()
@@ -83,7 +88,10 @@ namespace Ailu
 			e();
 		}
 		BeginScene();
-		Render();
+		{
+			CPUProfileBlock b("Render");
+			Render();
+		}
 		EndScene();
 		for (auto& e : _events_after_tick)
 		{
@@ -93,14 +101,23 @@ namespace Ailu
 
 	void Renderer::BeginScene()
 	{
-		memset(reinterpret_cast<void*>(&_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
 		_p_scene_camera = g_pSceneMgr->_p_current->GetActiveCamera();
 		Camera::sCurrent = _p_scene_camera;
+		if(!_resize_events.empty())
+			DoResize();
+		memset(reinterpret_cast<void*>(&_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
 		PrepareCamera(_p_scene_camera);
 		PrepareLight(g_pSceneMgr->_p_current);
 		_rendering_data._p_per_frame_cbuf = _p_per_frame_cbuf.get();
 		_rendering_data._p_per_object_cbuf = _p_per_object_cbufs;
 		memcpy(_p_per_frame_cbuf->GetData(), &_per_frame_cbuf_data, sizeof(ScenePerFrameData));
+		_rendering_data._width = _width;
+		_rendering_data._height = _height;
+		_rendering_data._viewport = Rect{ 0,0,(uint16_t)_width,(uint16_t)_height };
+		_rendering_data._scissor_rect = _rendering_data._viewport;
+		_rendering_data._camera_color_target_handle = _camera_color_handle;
+		_rendering_data._camera_depth_target_handle = _camera_depth_handle;
+		_rendering_data._final_rt_handle = _gameview_rt_handle;
 	}
 	void Renderer::EndScene()
 	{
@@ -120,9 +137,17 @@ namespace Ailu
 	{
 		_captures.push(0);
 	}
+	void Renderer::ResizeBuffer(u32 width, u32 height)
+	{
+		_resize_events.emplace(Vector2f{ (f32)width,(f32)height });
+	}
 	void Renderer::RegisterEventBeforeTick(BeforeTickEvent e)
 	{
 		_events_before_tick.emplace_back(e);
+	}
+	void Renderer::RegisterEventAfterTick(AfterTickEvent e)
+	{
+		_events_after_tick.emplace_back(e);
 	}
 	//void Renderer::RegisterEventAfterTick(AfterTickEvent e)
 	//{
@@ -141,7 +166,7 @@ namespace Ailu
 		//TODO:第一帧不渲染，否则会有taskpass执行结果异常，原因未知
 		if (s_frame_index++ > 0)
 		{
-			_p_gbuffer_pass->SetActive(!_p_opaque_pass->IsActive());
+			//_p_gbuffer_pass->SetActive(!_p_opaque_pass->IsActive());
 			//_p_test_cs->SetTexture("gInputA", TexturePool::Get("Textures/MyImage01.jpg").get());
 			//_p_test_cs->SetTexture("gOut", _p_test_texture.get());
 			//cmd->Dispatch(_p_test_cs.get(), 4, 4, 1);
@@ -165,29 +190,19 @@ namespace Ailu
 			Shader::SetGlobalTexture("SkyBox", _p_cubemap_gen_pass->_p_cube_map.get());
 			Shader::SetGlobalTexture("DiffuseIBL", _p_cubemap_gen_pass->_p_env_map.get());
 
+			_p_reslove_pass->SetActive(true);
+
 			for (auto pass : _render_passes)
 			{
 				if (pass->IsActive())
 				{
+					CPUProfileBlock cblock(pass->GetName());
 					pass->BeginPass(_p_context);
 					pass->Execute(_p_context, _rendering_data);
+					pass->EndPass(_p_context);
 				}
 			}
-
-
-
-			//_p_opaque_pass->BeginPass(_p_context);
-			//_p_opaque_pass->Execute(_p_context, _rendering_data);
-
-			//_p_gbuffer_pass->BeginPass(_p_context);
-			//_p_gbuffer_pass->Execute(_p_context, _rendering_data);
-
-
-			//_p_reslove_pass->BeginPass(_p_context);
-			//_p_reslove_pass->Execute(_p_context, _rendering_data);
 		}
-
-
 		DrawRendererGizmo();
 		_p_context->Present();
 	}
@@ -294,7 +309,7 @@ namespace Ailu
 
 	void Renderer::PrepareCamera(Camera* p_camera)
 	{
-		//_p_scene_camera->RecalculateMarix();
+		_p_scene_camera->RecalculateMarix();
 		_per_frame_cbuf_data._CameraPos = _p_scene_camera->Position();
 		_per_frame_cbuf_data._MatrixV = _p_scene_camera->GetView();
 		_per_frame_cbuf_data._MatrixP = _p_scene_camera->GetProjection();
@@ -302,5 +317,27 @@ namespace Ailu
 		auto vp = _per_frame_cbuf_data._MatrixVP;
 		MatrixInverse(vp);
 		_per_frame_cbuf_data._MatrixIVP = vp;
+	}
+	void Renderer::DoResize()
+	{
+		while (_resize_events.size() > 1)
+		{
+			_resize_events.pop();
+		}
+		auto new_size = _resize_events.front();
+		_resize_events.pop();
+		RenderTexture::ReleaseTempRT(_camera_color_handle);
+		RenderTexture::ReleaseTempRT(_camera_depth_handle);
+		RenderTexture::ReleaseTempRT(_gameview_rt_handle);
+		_width =  static_cast<u32>(new_size.x);
+		_height = static_cast<u32>(new_size.y);
+		_camera_color_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorAttachment", ERenderTargetFormat::kDefaultHDR);
+		if (_is_offscreen)
+		{
+			_gameview_rt_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorFinalAttachment", ERenderTargetFormat::kDefaultHDR);
+		}
+		_camera_depth_handle = RenderTexture::GetTempRT(_width, _height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
+		_p_scene_camera->Aspect(new_size.x / new_size.y);
+		g_pLogMgr->LogFormat("Resize game view to {},{}",_width,_height);
 	}
 }

@@ -28,7 +28,7 @@ namespace Ailu
 		case Ailu::EShaderDateType::kuInt4:    return DXGI_FORMAT_R32G32B32A32_UINT;
 		case Ailu::EShaderDateType::kBool:    return DXGI_FORMAT_R8_UINT;
 		}
-		AL_ASSERT(true, "Unknown ShaderDateType or DGXI format");
+		AL_ASSERT_MSG(true, "Unknown ShaderDateType or DGXI format");
 		return DXGI_FORMAT_UNKNOWN;
 	}
 
@@ -37,7 +37,7 @@ namespace Ailu
 		static D3D12_INPUT_ELEMENT_DESC cache_desc[10]{};
 		if (layout.GetDescCount() > 10)
 		{
-			AL_ASSERT(true, "LayoutDesc count must less than 10");
+			AL_ASSERT_MSG(true, "LayoutDesc count must less than 10");
 			return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, u32>(nullptr, 0);
 		}
 		u32 desc_count = 0u;

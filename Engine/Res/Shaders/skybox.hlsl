@@ -67,5 +67,5 @@ float4 PSMain(PSInput input) : SV_TARGET
 	//float3 sky_color = env.Sample(g_LinearSampler,uv).rgb * expo * color.rgb;
 	//return float4(sky_color,1.0);
 	//return 1.0.xxxx;
-	return float4(SkyBox.Sample(g_LinearSampler, normalize(input.wnormal)).rgb, 1.0);
+	return float4(SkyBox.SampleLevel(g_LinearSampler, normalize(input.wnormal),0.0f).rgb, 1.0);
 }

@@ -44,7 +44,7 @@ namespace Ailu
 	class ConstantBuffer
 	{
 	public:
-		static ConstantBuffer* Create(u32 size);
+		static ConstantBuffer* Create(u32 size,bool compute_buffer = false);
 		static void Release(u8* ptr);
 		virtual ~ConstantBuffer() = default;
 		virtual void Bind(CommandBuffer* cmd,u8 bind_slot) const = 0;

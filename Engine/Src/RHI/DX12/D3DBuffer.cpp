@@ -68,14 +68,14 @@ namespace Ailu
 		auto d3d_conetxt = D3DContext::Get();
 		if (_buffer_layout.GetStride(stream_index) == 0)
 		{
-			AL_ASSERT(true, "Try to set a null stream!");
+			AL_ASSERT_MSG(true, "Try to set a null stream!");
 			return;
 		}
 		_vertices_count = size / _buffer_layout.GetStride(stream_index);
 		ComPtr<ID3D12Resource> upload_heap;
 		auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 		auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop,D3D12_HEAP_FLAG_NONE,&res_desc,D3D12_RESOURCE_STATE_GENERIC_READ,nullptr,IID_PPV_ARGS(upload_heap.GetAddressOf())));
+		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(upload_heap.GetAddressOf())));
 		// Copy the triangle data to update heap
 		u8* pVertexDataBegin;
 		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
@@ -87,7 +87,7 @@ namespace Ailu
 		u32 cur_buffer_index = _buf_start + stream_index;
 		s_vertex_bufs[cur_buffer_index].Reset();
 		heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop,D3D12_HEAP_FLAG_NONE,&res_desc,D3D12_RESOURCE_STATE_COMMON,nullptr,IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
+		ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(s_vertex_bufs[cur_buffer_index].GetAddressOf())));
 		auto cmd = CommandBufferPool::Get();
 		auto cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
 		cmdlist->CopyBufferRegion(s_vertex_bufs[cur_buffer_index].Get(), 0, upload_heap.Get(), 0, size);
@@ -95,6 +95,7 @@ namespace Ailu
 			D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 		cmdlist->ResourceBarrier(1, &buf_state);
 		d3d_conetxt->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 		// Initialize the vertex buffer view.
 		s_vertex_buf_views[cur_buffer_index].BufferLocation = s_vertex_bufs[cur_buffer_index]->GetGPUVirtualAddress();
 		s_vertex_buf_views[cur_buffer_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
@@ -103,12 +104,12 @@ namespace Ailu
 		s_vertex_upload_bufs.emplace_back(upload_heap);
 	}
 
-	void D3DVertexBuffer::SetStream(u8* data, u32 size, u8 stream_index,bool dynamic)
+	void D3DVertexBuffer::SetStream(u8* data, u32 size, u8 stream_index, bool dynamic)
 	{
 		auto d3d_conetxt = D3DContext::Get();
 		if (_buffer_layout.GetStride(stream_index) == 0)
 		{
-			AL_ASSERT(true, "Try to set a null stream!");
+			AL_ASSERT_MSG(true, "Try to set a null stream!");
 			return;
 		}
 		_vertices_count = size / _buffer_layout.GetStride(stream_index);
@@ -136,6 +137,7 @@ namespace Ailu
 				D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 			cmdlist->ResourceBarrier(1, &buf_state);
 			d3d_conetxt->ExecuteCommandBuffer(cmd);
+			CommandBufferPool::Release(cmd);
 			s_vertex_upload_bufs.emplace_back(upload_heap);
 		}
 		else
@@ -252,7 +254,7 @@ namespace Ailu
 	{
 		if (_buf_view_index < 0 || _buf_view_index >= s_index_buf_views.size())
 		{
-			AL_ASSERT(false, "Try to bind a index buffer with an invalid index");
+			AL_ASSERT_MSG(false, "Try to bind a index buffer with an invalid index");
 			return;
 		}
 		RenderingStates::s_triangle_num += _index_count / 3;
@@ -271,9 +273,9 @@ namespace Ailu
 		return (byte_size + 255) & ~255;
 	}
 
-	D3DConstantBuffer::D3DConstantBuffer(u32 size)
+	D3DConstantBuffer::D3DConstantBuffer(u32 size, bool compute_buffer) : _is_compute_buffer(compute_buffer)
 	{
-		static bool b_init = false;	
+		static bool b_init = false;
 		if (!b_init)
 		{
 			s_global_index = 0u;
@@ -295,9 +297,9 @@ namespace Ailu
 		size = CalculateConstantBufferByteSize(size);
 		try
 		{
-			AL_ASSERT(s_global_offset + size > s_total_size, "Constant buffer overflow");
+			AL_ASSERT_MSG(s_global_offset + size > s_total_size, "Constant buffer overflow");
 		}
-		catch (const std::runtime_error& e) 
+		catch (const std::runtime_error& e)
 		{
 			std::cerr << "Exception caught: " << e.what() << std::endl;
 			// 这里可以进行适当的处理，如日志记录、清理资源等
@@ -326,7 +328,10 @@ namespace Ailu
 
 	void D3DConstantBuffer::Bind(CommandBuffer* cmd, u8 bind_slot) const
 	{
-		static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
+		if (_is_compute_buffer)
+			static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetComputeRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
+		else
+			static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
 	}
 	//-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
 

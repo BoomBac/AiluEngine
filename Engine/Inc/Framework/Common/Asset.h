@@ -6,7 +6,7 @@
 
 namespace Ailu
 {
-	DECLARE_ENUM(EAssetType,kUndefined, kMesh, kMaterial, kTexture2D)
+	DECLARE_ENUM(EAssetType,kUndefined, kMesh, kMaterial,kTexture2D,kShader,kScene)
 
 	class IAssetable;
 	class Asset

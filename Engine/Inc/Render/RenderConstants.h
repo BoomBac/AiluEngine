@@ -51,8 +51,8 @@ namespace Ailu
 		inline const static std::string kRoughnessTexName = "TexRoughness";
 
 		inline const static EColorRange::EColorRange kColorRange = EColorRange::kHDR;
-		inline const static EALGFormat kLDRFormat = EALGFormat::kALGFormatR8G8B8A8_UNORM;
-		inline const static EALGFormat kHDRFormat = EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+		inline const static EALGFormat::EALGFormat kLDRFormat = EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
+		inline const static EALGFormat::EALGFormat kHDRFormat = EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
 	};
 
 }

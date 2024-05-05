@@ -2,6 +2,7 @@
 #define __GLOBAL_MARCO_H__
 #include "CompanyEnv.h"
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Assert.h"
 #include <memory>
 #include <vector>
 #include <list>
@@ -18,6 +19,7 @@
 #define DEAR_IMGUI
 #define _SIMD
 #define _PIX_DEBUG
+#define PLATFORM_WINDOWS 1
 
 #define CONTACT(x,y) x##y
 #define STR(x) #x
@@ -55,8 +57,7 @@
 #define HIGH_BIT(x, n) ((x) >> (n))
 #define LOW_BIT(x, n) ((x) & ((1 << (n)) - 1))
 
-#define AL_ASSERT(x,msg) if(x) {throw(std::runtime_error(msg));LOG_ERROR(msg);}\
-
+#define ALIGN_TO_256(x) (((x) + 255) & ~255)
 
 #define TP_ZERO(t) std::get<0>(t)
 #define TP_ONE(t) std::get<1>(t)
@@ -159,7 +160,8 @@ using i16 = int16_t;
 using i32 = int32_t;
 using i64 = int64_t;
 using f32 = float;
-using InPtr = void*;
+using f64 = double;
+using Ptr = void*;
 
 using String = std::string;
 using WString = std::wstring;
@@ -185,6 +187,7 @@ using HashMap = std::multimap<Key, Value>;
 template<typename T>
 using Scope = std::unique_ptr<T>;
 
+namespace fs = std::filesystem;
 
 namespace Modules
 {

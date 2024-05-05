@@ -8,7 +8,11 @@
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
+#include "RHI/DX12/D3DGPUTimer.h"
 #include "Render/RenderingData.h"
+#include "Render/FrameResource.h"
+#include "Framework/Common/Assert.h"
+#include "Framework/Common/Profiler.h"
 
 #ifdef _PIX_DEBUG
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
@@ -20,8 +24,8 @@
 
 
 namespace Ailu
-{	
-	static void GetHardwareAdapter(IDXGIFactory6* pFactory, IDXGIAdapter4** ppAdapter)
+{
+	static void GetHardwareAdapter(IDXGIFactory6* pFactory, IDXGIAdapter4** ppAdapter, DXGI_QUERY_VIDEO_MEMORY_INFO* p_local_video_memory_info, DXGI_QUERY_VIDEO_MEMORY_INFO* p_non_local_video_memory_info)
 	{
 		IDXGIAdapter* pAdapter = nullptr;
 		IDXGIAdapter4* pAdapter4 = nullptr;
@@ -29,11 +33,46 @@ namespace Ailu
 		for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != pFactory->EnumAdapters(adapterIndex, &pAdapter); adapterIndex++)
 		{
 			DXGI_ADAPTER_DESC3 desc{};
+			LOG_INFO("Info(Adapter index: {})------------------------------------------------------------------------------", adapterIndex);
 			if (SUCCEEDED(pAdapter->QueryInterface(IID_PPV_ARGS(&pAdapter4))))
 			{
 				pAdapter4->GetDesc3(&desc);
-				OutputDebugStringW(desc.Description);
+				LOG_INFO(L"Description: {}", desc.Description);
+				LOG_INFO("DedicatedSystemMemory: {} mb", desc.DedicatedSystemMemory / 1024 / 1024);
+				LOG_INFO("SharedSystemMemory: {} mb", desc.SharedSystemMemory / 1024 / 1024);
 			}
+			//
+			// Obtain the default video memory information for the local and non-local segment groups.
+			//
+			if (FAILED(pAdapter4->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, p_local_video_memory_info)))
+			{
+				LOG_ERROR("Failed to query initial video memory info for local segment group");
+			}
+			else
+			{
+				//When querying video memory budget for GPU upload heaps, MemorySegmentGroup needs to be DXGI_MEMORY_SEGMENT_GROUP_LOCAL. 
+				LOG_INFO("LocalSegmentGroup");
+				LOG_INFO("AvailableForReservation: {} mb", p_local_video_memory_info->AvailableForReservation / 1024 / 1024);
+				LOG_INFO("Budget: {} mb",                  p_local_video_memory_info->Budget / 1024 / 1024);
+				LOG_INFO("CurrentReservation: {} mb",      p_local_video_memory_info->CurrentReservation / 1024 / 1024);
+				//实时获取这个值
+				LOG_INFO("CurrentUsage: {} mb",            p_local_video_memory_info->CurrentUsage / 1024 / 1024);
+			}
+
+			if (FAILED(pAdapter4->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, p_non_local_video_memory_info)))
+			{
+				LOG_ERROR("Failed to query initial video memory info for non-local segment group");
+			}
+			else
+			{
+				LOG_INFO("NonLocalSegmentGroup");
+				LOG_INFO("AvailableForReservation: {} mb", p_non_local_video_memory_info->AvailableForReservation / 1024 / 1024);
+				LOG_INFO("Budget: {} mb", p_non_local_video_memory_info->Budget / 1024 / 1024);
+				LOG_INFO("CurrentReservation: {} mb", p_non_local_video_memory_info->CurrentReservation / 1024 / 1024);
+				LOG_INFO("CurrentUsage: {} mb", p_non_local_video_memory_info->CurrentUsage / 1024 / 1024);
+			}
+
+			LOG_INFO("-----------------------------------------------------------------------------------------------------");
 			if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
 			{
 				// Don't select the Basic Render Driver adapter.
@@ -52,7 +91,7 @@ namespace Ailu
 	CPUVisibleDescriptorAllocator* g_pCPUDescriptorAllocator;
 	GPUVisibleDescriptorAllocator* g_pGPUDescriptorAllocator;
 
-	D3DContext::D3DContext(WinWindow* window) : _window(window),_width(window->GetWidth()),_height(window->GetHeight())
+	D3DContext::D3DContext(WinWindow* window) : _window(window), _width(window->GetWidth()), _height(window->GetHeight())
 	{
 		m_aspectRatio = (float)_width / (float)_height;
 #ifdef _PIX_DEBUG
@@ -92,45 +131,64 @@ namespace Ailu
 		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
 		m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 		WaitForGpu();
+		_p_gpu_timer = MakeScope<D3DGPUTimer>(m_device.Get(), m_commandQueue.Get(),RenderConstants::kFrameCount);
 	}
 
-	//ComPtr<ID3D12DescriptorHeap> D3DContext::GetDescriptorHeap()
-	//{
-	//	return m_cbvHeap;
-	//}
+	void D3DContext::TryReleaseUnusedResources()
+	{
+		g_pLogMgr->LogFormat("Begin: D3DContext::TryReleaseUnusedResources...");
+		if (_global_tracked_resource.size() > 0)
+		{
+			u64 origin_res_num = _global_tracked_resource.size();
+			auto it = _global_tracked_resource.lower_bound(_frame_count);
+			if (it != _global_tracked_resource.end())
+			{
+				_global_tracked_resource.erase(_global_tracked_resource.begin(), it);
+			}
+			else
+				_global_tracked_resource.clear();
+			origin_res_num -= _global_tracked_resource.size();
+			g_pLogMgr->LogWarningFormat("{} unused upload buffer cleanup.", origin_res_num);
+		}
+		g_pRenderTexturePool->TryRelease();
+		g_pGPUDescriptorAllocator->ReleaseSpace();
+		g_pLogMgr->LogFormat("End: D3DContext::TryReleaseUnusedResources");
+	}
 
-	//std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3DContext::GetSRVDescriptorHandle()
-	//{
-	//	static u32 global_texture_offset = 0u;
-	//	AL_ASSERT(global_texture_offset > (RenderConstants::kMaxTextureCount - 1), "Can't alloc more texture");
-	//	static u32 base = RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * RenderConstants::kFrameCount +
-	//		RenderConstants::kMaxRenderObjectCount * RenderConstants::kFrameCount + RenderConstants::kMaxPassDataCount * RenderConstants::kFrameCount;
-	//	auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
-	//	gpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
-	//	auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
-	//	cpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
-	//	++global_texture_offset;
-	//	return std::make_tuple(cpu_handle, gpu_handle);
-	//}
+	f32 D3DContext::TotalGPUMemeryUsage()
+	{
+		f32 usage = 0.f;
+		if (FAILED(_p_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &_local_video_memory_info)))
+		{
+			LOG_ERROR("Failed to query initial video memory info for local segment group");
+		}
+		else
+		{
+			//When querying video memory budget for GPU upload heaps, MemorySegmentGroup needs to be DXGI_MEMORY_SEGMENT_GROUP_LOCAL. 
+			//LOG_INFO("CurrentUsage: {} mb", );
+			usage = (f32)_local_video_memory_info.CurrentUsage * 9.5367431640625E-07;
+		}
+		return usage;
+		//if (FAILED(_p_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &_non_local_video_memory_info)))
+		//{
+		//	LOG_ERROR("Failed to query initial video memory info for non-local segment group");
+		//}
+		//else
+		//{
+		//	LOG_INFO("CurrentUsage: {} mb", _non_local_video_memory_info.CurrentUsage / 1024 / 1024);
+		//}
+	}
 
-	//std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_GPU_DESCRIPTOR_HANDLE> D3DContext::GetUAVDescriptorHandle()
-	//{
-	//	static u32 global_texture_offset = 0u;
-	//	AL_ASSERT(global_texture_offset > (RenderConstants::kMaxUAVTextureCount - 1), "Can't alloc more uav texture");
-	//	static u32 base = RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * RenderConstants::kFrameCount +
-	//		RenderConstants::kMaxRenderObjectCount * RenderConstants::kFrameCount + RenderConstants::kMaxPassDataCount * RenderConstants::kFrameCount + RenderConstants::kMaxTextureCount;
-	//	auto gpu_handle = m_cbvHeap->GetGPUDescriptorHandleForHeapStart();
-	//	gpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
-	//	auto cpu_handle = m_cbvHeap->GetCPUDescriptorHandleForHeapStart();
-	//	cpu_handle.ptr += _cbv_desc_size * (base + global_texture_offset);
-	//	++global_texture_offset;
-	//	return std::make_tuple(cpu_handle, gpu_handle);
-	//}
+	void D3DContext::TrackResource(ComPtr<ID3D12Resource> resource)
+	{
+		_global_tracked_resource.insert(std::make_pair(_frame_count, resource));
+	}
 
 	u64 D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer>& cmd)
-	{    
+	{
 		cmd->Close();
-		ID3D12CommandList* ppCommandLists[] = { static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList() };
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd.get());
+		ID3D12CommandList* ppCommandLists[] = { d3dcmd->GetCmdList() };
 #ifdef _PIX_DEBUG
 		PIXBeginEvent(m_commandQueue.Get(), cmd->GetID(), ToWChar(cmd->GetName()));
 #endif // _PIX_DEBUG
@@ -145,6 +203,7 @@ namespace Ailu
 			_cmd_target_fence_value[cmd->GetID()] = _fence_value;
 		else
 			_cmd_target_fence_value.insert(std::make_pair(cmd->GetID(), _fence_value));
+
 		return _fence_value;
 	}
 
@@ -168,6 +227,7 @@ namespace Ailu
 
 	void D3DContext::DrawOverlay(CommandBuffer* cmd)
 	{
+		ProfileBlock p(cmd,"ImGui");
 		auto dxcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
 #ifdef DEAR_IMGUI
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxcmd);
@@ -180,21 +240,10 @@ namespace Ailu
 		// cleaned up by the destructor.
 		WaitForGpu();
 		CloseHandle(m_fenceEvent);
+		//_p_gpu_timer->ReleaseDevice();
+		//在这里析构分配器应该会有问题，纹理实际在在这之后还需要归还之前的分配
 		DESTORY_PTR(g_pCPUDescriptorAllocator);
 		DESTORY_PTR(g_pGPUDescriptorAllocator);
-		//m_swapChain.Reset();
-		//m_device.Reset();
-		//for(int i = 0; i < RenderConstants::kFrameCount; ++i)
-		//{
-		//	_color_buffer[i].Reset();
-		//	_depth_buffer[i].Reset();
-		//	m_commandAllocators[i].Reset();
-		//}
-		//m_commandQueue.Reset();
-		//m_commandList.Reset();
-		//m_rtvHeap.Reset();
-		//m_cbvHeap.Reset();
-		//m_dsvHeap.Reset();
 		// 在程序终止时调用 ReportLiveObjects() 函数
 		IDXGIDebug1* pDebug = nullptr;
 		if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
@@ -225,27 +274,27 @@ namespace Ailu
 
 		ComPtr<IDXGIFactory6> factory;
 		ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
-		ComPtr<IDXGIAdapter4> hardwareAdapter;
-		GetHardwareAdapter(factory.Get(), &hardwareAdapter);
-		ThrowIfFailed(D3D12CreateDevice(hardwareAdapter.Get(),D3D_FEATURE_LEVEL_11_0,IID_PPV_ARGS(&m_device)));
+		GetHardwareAdapter(factory.Get(), _p_adapter.GetAddressOf(), &_local_video_memory_info, &_non_local_video_memory_info);
+		ThrowIfFailed(D3D12CreateDevice(_p_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)));
 		// Describe and create the command queue.
 		D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
 		// Describe and create the swap chain.
+		_backbuffer_format = RenderConstants::kColorRange == EColorRange::kLDR ? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat);
 		DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 		swapChainDesc.BufferCount = RenderConstants::kFrameCount;
 		swapChainDesc.Width = _width;
 		swapChainDesc.Height = _height;
-		swapChainDesc.Format = RenderConstants::kColorRange == EColorRange::kLDR? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat);
+		swapChainDesc.Format = _backbuffer_format;
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		swapChainDesc.SampleDesc.Count = 1;
 		swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 		auto hwnd = static_cast<HWND>(_window->GetNativeWindowPtr());
 		ComPtr<IDXGISwapChain1> swapChain;
-		ThrowIfFailed(factory->CreateSwapChainForHwnd(m_commandQueue.Get(),hwnd,&swapChainDesc,nullptr,nullptr,&swapChain));
+		ThrowIfFailed(factory->CreateSwapChainForHwnd(m_commandQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain));
 		// This sample does not support fullscreen transitions.
 		ThrowIfFailed(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
 		ThrowIfFailed(swapChain->SetFullscreenState(FALSE, nullptr));
@@ -254,25 +303,15 @@ namespace Ailu
 		PIXSetTargetWindow(hwnd);
 #endif
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-		//CreateDescriptorHeap();
-		InitCBVSRVUAVDescHeap();
 		_rtv_allocation = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RenderConstants::kFrameCount);
-		// Create frame resources.
+		// Create a RTV for each frame.
+		for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
 		{
-			//CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-			// Create a RTV for each frame.
-			for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
-			{
-				ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
-				m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
-				//rtvHandle.Offset(1, _rtv_desc_size);
-				ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
-			}
+			ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
+			m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
+			//rtvHandle.Offset(1, _rtv_desc_size);
+			ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
 		}
-		//CreateDepthStencilTarget();
-		// Create the command list.
 		ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
 	}
 
@@ -303,10 +342,9 @@ namespace Ailu
 			_resource_task.front()();
 			_resource_task.pop();
 		}
-		ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
-		ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
-		//m_commandList->SetDescriptorHeaps(1, m_cbvHeap.GetAddressOf());
-		ThrowIfFailed(m_commandList->Close());
+		//ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
+		//ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
+		//ThrowIfFailed(m_commandList->Close());
 		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
 		m_commandQueue->ExecuteCommandLists(1, ppCommandLists);
 #ifdef DEAR_IMGUI
@@ -320,7 +358,10 @@ namespace Ailu
 #endif // DEAR_IMGUI
 		// Present the frame.
 		ThrowIfFailed(m_swapChain->Present(1, 0));
-		WaitForGpu();
+		{
+			CPUProfileBlock p("WaitForGPU");
+			WaitForGpu();
+		}
 		if (_is_cur_frame_capture)
 		{
 #ifdef _PIX_DEBUG
@@ -329,7 +370,30 @@ namespace Ailu
 			ShellExecute(NULL, L"open", _cur_capture_name.data(), NULL, NULL, SW_SHOWNORMAL);
 #endif // _PIX_DEBUG
 		}
-		//CommandBufferPool::ReleaseAll();
+
+		++_frame_count;
+		if (_frame_count % kResourceCleanupIntervalTick == 0)
+		{
+			if (_global_tracked_resource.size() > 0)
+			{
+				u64 origin_res_num = _global_tracked_resource.size();
+				auto it = _global_tracked_resource.lower_bound(_frame_count);
+				if (it != _global_tracked_resource.end())
+				{
+					_global_tracked_resource.erase(_global_tracked_resource.begin(), it);
+				}
+				else
+					_global_tracked_resource.clear();
+				origin_res_num -= _global_tracked_resource.size();
+				g_pLogMgr->LogWarningFormat("D3DContext::Present: Resource cleanup, {} resources released.", origin_res_num);
+			}
+			if (RenderTexture::TotalGPUMemerySize() > kMaxRenderTextureMemorySize)
+			{
+				g_pRenderTexturePool->TryRelease();
+				g_pGPUDescriptorAllocator->ReleaseSpace();
+			}
+		}
+		_p_gpu_timer->EndFrame();
 	}
 
 	const u64& D3DContext::GetFenceValue(const u32& cmd_index) const
@@ -348,6 +412,19 @@ namespace Ailu
 		return _p_cmd_buffer_fence->GetCompletedValue();
 	}
 
+	bool D3DContext::IsCommandBufferReady(const u32 cmd_index)
+	{
+		static u64 u64_max = std::numeric_limits<u64>::max();
+		if (!_cmd_target_fence_value.contains(cmd_index))
+		{
+			return true;
+		}
+		else
+		{
+			return _p_cmd_buffer_fence->GetCompletedValue() >= _cmd_target_fence_value.at(cmd_index);
+		}
+	}
+
 	void D3DContext::SubmitRHIResourceBuildTask(RHIResourceTask task)
 	{
 		_resource_task.push(task);
@@ -359,7 +436,7 @@ namespace Ailu
 		LOG_WARNING("Begin take capture...")
 			static PIXCaptureParameters parms{};
 		static u32 s_capture_count = 0u;
-		_cur_capture_name = std::format(L"{}_{}.{}", L"NewCapture", s_capture_count++, L".wpix");
+		_cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWChar(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
 		parms.GpuCaptureParameters.FileName = _cur_capture_name.data();
 		PIXBeginCapture(PIX_CAPTURE_GPU, &parms);
 		_is_cur_frame_capture = true;
@@ -367,6 +444,47 @@ namespace Ailu
 		LOG_WARNING("No available gpu debug enabled!");
 #endif // _PIX_DEBUG
 
+	}
+
+	void D3DContext::TrackResource(FrameResource* resource)
+	{
+		//该函数在cmd记录执行过程中调用，所有该资源的围栏值为当前cmd执行在执行cmd fence value+1时
+		resource->SetFenceValue(_fence_value + 1);
+	}
+
+	bool D3DContext::IsResourceReferencedByGPU(FrameResource* resource)
+	{
+		return _p_cmd_buffer_fence->GetCompletedValue() <= resource->GetFenceValue();
+	}
+
+	void D3DContext::ResizeSwapChain(const u32 width, const u32 height)
+	{
+		WaitForGpu();
+		// Release the resources holding references to the swap chain (requirement of
+		// IDXGISwapChain::ResizeBuffers) and reset the frame fence values to the
+		// current fence value.
+		for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
+		{
+			_color_buffer[n].Reset();
+			//m_fenceValues[n] = m_fenceValues[m_frameIndex];
+		}
+		// Resize the swap chain to the desired dimensions.
+		DXGI_SWAP_CHAIN_DESC desc = {};
+		m_swapChain->GetDesc(&desc);
+		ThrowIfFailed(m_swapChain->ResizeBuffers(RenderConstants::kFrameCount, width, height, desc.BufferDesc.Format, desc.Flags));
+		//BOOL fullscreenState;
+		//ThrowIfFailed(m_swapChain->GetFullscreenState(&fullscreenState, nullptr));
+		//m_windowedMode = !fullscreenState;
+		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+		_width = width;
+		_height = height;
+		for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
+		{
+			ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
+			m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
+			//rtvHandle.Offset(1, _rtv_desc_size);
+			ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
+		}
 	}
 
 
@@ -378,35 +496,12 @@ namespace Ailu
 	void D3DContext::FlushCommandQueue(ID3D12CommandQueue* cmd_queue, ID3D12Fence* fence, u64& fence_value)
 	{
 		++fence_value;
-		_timer.Mark();
-		ThrowIfFailed(cmd_queue->Signal(fence,fence_value));
+		ThrowIfFailed(cmd_queue->Signal(fence, fence_value));
 		if (fence->GetCompletedValue() < fence_value)
 		{
 			ThrowIfFailed(fence->SetEventOnCompletion(fence_value, m_fenceEvent));
 			WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 		}
-		RenderingStates::s_gpu_latency = _timer.GetElapsedSinceLastMark();
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	}
-
-	void D3DContext::InitCBVSRVUAVDescHeap()
-	{
-		//auto device = D3DContext::Get()->GetDevice();
-		////constbuffer desc heap
-		//D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc{};
-		//_cbv_desc_num = (1u + RenderConstants::kMaxMaterialDataCount + RenderConstants::kMaxRenderObjectCount + RenderConstants::kMaxPassDataCount) * RenderConstants::kFrameCount +
-		//	RenderConstants::kMaxTextureCount + RenderConstants::kMaxUAVTextureCount;
-		//cbvHeapDesc.NumDescriptors = _cbv_desc_num + 1;
-		//cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		//cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		//ThrowIfFailed(device->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&m_cbvHeap)));
-		//_cbv_desc_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	}
-
-	//D3D12_GPU_DESCRIPTOR_HANDLE D3DContext::GetCBVGPUDescHandle(u32 index) const
-	//{
-	//	D3D12_GPU_DESCRIPTOR_HANDLE handle{};
-	//	handle.ptr = m_cbvHeap->GetGPUDescriptorHandleForHeapStart().ptr + _cbv_desc_size * index;
-	//	return handle;
-	//}
 }

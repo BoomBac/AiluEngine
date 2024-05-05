@@ -4,264 +4,425 @@
 #include "RHI/DX12/D3DTexture.h"
 #include "Framework/Parser/AssetParser.h"
 #include "Framework/Common/Asset.h"
+#include "Framework/Common/Application.h"
 
 namespace Ailu
 {
-	TextureNew::TextureNew() : _width(0), _height(0), _mipmap_count(0), _pixel_format(EALGFormat::kALGFormatUnknown),_dimension(ETextureDimension::kUnknown),_filter_mode(EFilterMode::kBilinear)
-		,_wrap_mode(EWrapMode::kClamp), _is_readble(false), _is_srgb(false)
+	//-----------------------------------------------------------------------TextureNew----------------------------------------------------------------------------------
+	u16 Texture::MaxMipmapCount(u16 w, u16 h)
+	{
+		u16 lw = 0, lh = 0;
+		while (w != 1)
+		{
+			w >>= 1;
+			++lw;
+		}
+		while (h != 1)
+		{
+			h >>= 1;
+			++lh;
+		}
+		return min(min(lw, lh),7);
+	}
+
+	Texture::Texture() : Texture(0u,0u)
 	{
 
 	}
 
-	TextureNew::TextureNew(u16 width, u16 height) : _width(width), _height(height), _mipmap_count(1), _pixel_format(EALGFormat::kALGFormatUnknown), _dimension(ETextureDimension::kUnknown), 
-		_filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp),_is_readble(false), _is_srgb(false)
+	Texture::Texture(u16 width, u16 height) : _width(width), _height(height), _mipmap_count(0), _pixel_format(EALGFormat::EALGFormat::kALGFormatUnknown), _dimension(ETextureDimension::kUnknown), 
+		_filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp),_is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false),_p_asset(nullptr)
 	{
 	}
 
-	TextureNew::~TextureNew()
+	Texture::~Texture()
 	{ 
 	}
 
-	InPtr TextureNew::GetNativeTexturePtr()
+	Ptr Texture::GetNativeTexturePtr()
 	{
 		return nullptr;
 	}
 
-	Texture2DNew::Texture2DNew(u16 width, u16 height, ETextureFormat::ETextureFormat format, u16 mipmap_count, bool linear) : TextureNew(width, height)
+	const Guid& Texture::GetGuid() const
+	{
+		if (_p_asset)
+			return _p_asset->GetGuid();
+		else
+			return Guid::EmptyGuid();
+	}
+
+	void Texture::AttachToAsset(Asset* owner)
+	{
+		_p_asset = owner;
+		_p_asset->_p_inst_asset = this;
+	}
+
+	bool Texture::IsValidSize(u16 width, u16 height, u16 mipmap) const
+	{
+		u16 w = _width, h = _height;
+		while (mipmap--)
+		{
+			w >>= 1;
+			h >>= 1;
+		}
+		return width <= w && height <= h;
+	}
+
+	std::tuple<u16, u16> Texture::CurMipmapSize(u16 mipmap) const
+	{
+		u16 w = _width, h = _height;
+		while (mipmap--)
+		{
+			w >>= 1;
+			h >>= 1;
+		}
+		return std::make_tuple(w, h);
+	}
+	//-----------------------------------------------------------------------TextureNew----------------------------------------------------------------------------------
+
+	Ref<Texture2D> Texture2D::Create(u16 width, u16 height, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
+	{
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::ERenderAPI::kNone:
+			AL_ASSERT_MSG(false, "None render api used!");
+				return nullptr;
+		case RendererAPI::ERenderAPI::kDirectX12:
+		{
+			return MakeRef<D3DTexture2D>(width,height,mipmap_chain,format,linear,random_access);
+		}
+		}
+		AL_ASSERT_MSG(false, "Unsupport render api!");
+		return nullptr;
+	}
+
+	//-----------------------------------------------------------------------Texture2DNew----------------------------------------------------------------------------------
+	Texture2D::Texture2D(u16 width, u16 height, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access) : Texture(width, height)
 	{
 		_pixel_format = ConvertTextureFormatToPixelFormat(format);
-		_mipmap_count = mipmap_count;
+		_dimension = ETextureDimension::kTex2D;
+		_format = format;
+		_mipmap_count = mipmap_chain ? MaxMipmapCount(width, height) : 0;
 		_is_readble = false;
 		_is_srgb = linear;
+		_pixel_size = GetPixelByteSize(_pixel_format);
+		_pixel_data.resize(_mipmap_count + 1);
+		_is_random_access = random_access;
+		for (int i = 0; i < _pixel_data.size(); i++)
+		{
+			auto [w, h] = CurMipmapSize(i);
+			u64 cur_mipmap_byte_size = w * h * _pixel_size;
+			_pixel_data[i] = new u8[cur_mipmap_byte_size];
+			_gpu_memery_size += cur_mipmap_byte_size;
+		}
+		s_gpu_memory_size += _gpu_memery_size;
 	}
 
-	Texture2DNew::Texture2DNew(u16 width, u16 height, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear) : TextureNew(width, height)
+	Texture2D::~Texture2D()
 	{
-		_pixel_format = ConvertTextureFormatToPixelFormat(format);
-		_mipmap_count = mipmap_chain? 12 : 1;
-		_is_readble = false;
-		_is_srgb = linear;
+		for (auto p : _pixel_data)
+		{
+			DESTORY_PTRARR(p);
+		}
+		s_gpu_memory_size -= _gpu_memery_size;
 	}
 
-	Texture2DNew::~Texture2DNew()
-	{
-	}
-
-	void Texture2DNew::Apply()
-	{
-	}
-
-	Color32 Texture2DNew::GetPixel32(u16 x, u16 y)
+	Color32 Texture2D::GetPixel32(u16 x, u16 y)
 	{
 		return Color32();
 	}
 
-	Color Texture2DNew::GetPixel(u16 x, u16 y)
+	Color Texture2D::GetPixel(u16 x, u16 y)
 	{
 		return Color();
 	}
 
-	Color Texture2DNew::GetPixelBilinear(float u, float v)
+	Color Texture2D::GetPixelBilinear(float u, float v)
 	{
 		return Color();
 	}
 
-	InPtr Texture2DNew::GetPixelData(u16 mipmap)
+	Ptr Texture2D::GetPixelData(u16 mipmap)
 	{
-		return InPtr();
+		if (IsValidMipmap(mipmap))
+			return _pixel_data[mipmap];
+		return nullptr;
 	}
 
-	void Texture2DNew::SetPixel(u16 x, u16 y, Color color, u16 mipmap)
+	void Texture2D::SetPixel(u16 x, u16 y, Color color, u16 mipmap)
 	{
+		if (!IsValidMipmap(mipmap) ||!IsValidSize(x,y,mipmap))
+			return;
+		u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
+		memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y,color,sizeof(Color));
 	}
 
-	void Texture2DNew::SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap)
+	void Texture2D::SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap)
 	{
+		if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
+			return;
+		u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
+		memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color32));
 	}
 
+	void Texture2D::SetPixelData(u8* data, u16 mipmap, u64 offset)
+	{
+		auto [w, h] = CurMipmapSize(mipmap);
+		memcpy(_pixel_data[mipmap], data + offset, w * h * _pixel_size);
+	}
+	//-----------------------------------------------------------------------Texture2DNew----------------------------------------------------------------------------------
 
 
 
-	Ref<Texture2D> Texture2D::Create(const uint16_t& width, const uint16_t& height, EALGFormat res_format, bool read_only)
+	Ref<CubeMap> CubeMap::Create(u16 width, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
 	{
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT(false, "None render api used!")
+			AL_ASSERT_MSG(false, "None render api used!");
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			return MakeRef<D3DTexture2D>(width, height, res_format, read_only);
+			return MakeRef<D3DCubeMap>(width, mipmap_chain, format, linear, random_access);
 		}
 		}
-		AL_ASSERT(false, "Unsupport render api!");
+		AL_ASSERT_MSG(false, "Unsupport render api!");
 		return nullptr;
 	}
 
-	Ref<Texture2D> Texture2D::Create(const TextureDesc& desc)
+	//-----------------------------------------------------------------------CubeMap----------------------------------------------------------------------------------
+	CubeMap::CubeMap(u16 width, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
+	 : Texture(width, width)
 	{
-		switch (Renderer::GetAPI())
+		_pixel_format = ConvertTextureFormatToPixelFormat(format);
+		_format = format;
+		_mipmap_count = mipmap_chain ? MaxMipmapCount(width, width) : 0;
+		_is_readble = false;
+		_is_srgb = linear;
+		_pixel_size = GetPixelByteSize(_pixel_format);
+		_pixel_data.resize((_mipmap_count + 1) * 6);
+		_is_random_access = random_access;
+		_dimension = ETextureDimension::kCube;
+		for (int i = 0; i < _mipmap_count + 1; i++)
 		{
-		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT(false, "None render api used!")
-				return nullptr;
-		case RendererAPI::ERenderAPI::kDirectX12:
+			auto [w, h] = CurMipmapSize(i);
+			for(int j = 0; j < 6; j++)
+				_pixel_data[i * 6 + j] = new u8[w * h * _pixel_size];
+		}
+	}
+
+	CubeMap::~CubeMap()
+	{
+		for (auto p : _pixel_data)
 		{
-			return MakeRef<D3DTexture2D>(desc);
+			DESTORY_PTRARR(p);
 		}
-		}
-		AL_ASSERT(false, "Unsupport render api!");
-		return nullptr;
 	}
 
-	void Texture2D::FillData(u8* data)
+	Color32 CubeMap::GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y)
 	{
-		_mipmap_count = 1;
-		_p_datas.push_back(data);
-	}
-	void Texture2D::FillData(Vector<u8*> datas)
-	{
-		_mipmap_count = static_cast<u8>(datas.size());
-		for (auto p : datas)
-			_p_datas.emplace_back(p);
-	}
-	u8* Texture2D::GetPixelData()
-	{
-		return _p_datas.front();
-	}
-	void* Texture2D::GetNativeCPUHandle()
-	{
-		return nullptr;
+		return Color32();
 	}
 
-	const ETextureType Texture2D::GetTextureType() const
+	Color CubeMap::GetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y)
 	{
-		return ETextureType::kTexture2D;
-	}
-	const Guid& Texture2D::GetGuid() const
-	{
-		if (_p_asset_owned_this)
-		{
-			return _p_asset_owned_this->GetGuid();
-		}
-		return Guid::EmptyGuid();
+		return Color();
 	}
 
-	void Texture2D::AttachToAsset(Asset* asset)
+	Ptr CubeMap::GetPixelData(ECubemapFace::ECubemapFace face, u16 mipmap)
 	{
-		AL_ASSERT(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
-		_p_asset_owned_this = asset;
-		asset->_p_inst_asset = this;
-		asset->_name = ToWChar(_name);
-	}
-	void Texture2D::Name(const std::string& name)
-	{
-		_name = name;
-	}
-	const std::string& Texture2D::Name() const
-	{
-		return _name;
-	}
-	Ref<Texture> TexturePool::Get(const std::string& name)
-	{
-		auto it = s_res_pool.find(name);
-		if (it != s_res_pool.end()) 
-			return it->second;
-		return nullptr;
-	}
-	Ref<Texture2D> TexturePool::GetTexture2D(const std::string& name)
-	{
-		auto it = s_res_pool.find(name);
-		if (it != s_res_pool.end()) 
-			return std::dynamic_pointer_cast<Texture2D>(it->second);
-		return nullptr;
-	}
-	Ref<TextureCubeMap> TexturePool::GetCubemap(const std::string& name)
-	{
-		auto it = s_res_pool.find(name);
-		if (it != s_res_pool.end())
-			return std::dynamic_pointer_cast<TextureCubeMap>(it->second);
-		else
-			return nullptr;
-	}
-	//----------------------------------------------------------TextureCubeMap---------------------------------------------------------------------
-	Ref<TextureCubeMap> TextureCubeMap::Create(const uint16_t& width, const uint16_t& height, EALGFormat format)
-	{
-		switch (Renderer::GetAPI())
-		{
-		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT(false, "None render api used!")
-				return nullptr;
-		case RendererAPI::ERenderAPI::kDirectX12:
-		{
-			return MakeRef<D3DTextureCubeMap>(width, height, format);
-		}
-		}
-		AL_ASSERT(false, "Unsupport render api!");
-		return nullptr;
-	}
-	void TextureCubeMap::FillData(Vector<u8*>& data)
-	{
-		_p_datas = std::move(data);
+		return Ptr();
 	}
 
-	u8* TextureCubeMap::GetPixelData()
+	void CubeMap::SetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color color, u16 mipmap)
 	{
-		return _p_datas[0];
-	}
-	void* TextureCubeMap::GetNativeCPUHandle()
-	{
-		return nullptr;
+		if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
+			return;
+		u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
+		memcpy(_pixel_data[mipmap * 6 + face] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
 	}
 
-	const ETextureType TextureCubeMap::GetTextureType() const
+	void CubeMap::SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap)
 	{
-		return ETextureType::kTextureCubeMap;
+		if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
+			return;
+		u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
+		memcpy(_pixel_data[mipmap * 6 + face] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color32));
 	}
-	//----------------------------------------------------------TextureCubeMap---------------------------------------------------------------------
+
+	void CubeMap::SetPixelData(ECubemapFace::ECubemapFace face, u8* data, u16 mipmap, u64 offset)
+	{
+		auto [w, h] = CurMipmapSize(mipmap);
+		memcpy(_pixel_data[mipmap * 6 + face], data + offset, w * h * _pixel_size);
+	}
+	//-----------------------------------------------------------------------CubeMap----------------------------------------------------------------------------------
 
 	//----------------------------------------------------------RenderTexture---------------------------------------------------------------------
-	Ref<RenderTexture> RenderTexture::Create(const uint16_t& width, const uint16_t& height, String name, EALGFormat format, bool is_cubemap)
+	Scope<RenderTexture> RenderTexture::Create(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
 	{
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT(false, "None render api used!")
+			AL_ASSERT_MSG(false, "None render api used!");
 				return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			auto rt = MakeRef<D3DRenderTexture>(width, height, name, 1, format, is_cubemap);
-			s_all_render_texture.emplace_back(rt);
+			RenderTextureDesc desc(width,height,format);
+			desc._dimension = ETextureDimension::kTex2D;
+			desc._mipmap_count = mipmap_chain? MaxMipmapCount(width, height) : 0;
+			desc._random_access = random_access;
+			auto rt = MakeScope<D3DRenderTexture>(desc);
+			rt->Name(name);
 			return rt;
 		}
 		}
-		AL_ASSERT(false, "Unsupport render api!");
+		AL_ASSERT_MSG(false, "Unsupport render api!");
 		return nullptr;
 	}
+
+	Scope<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+	{
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::ERenderAPI::kNone:
+			AL_ASSERT_MSG(false, "None render api used!");
+				return nullptr;
+		case RendererAPI::ERenderAPI::kDirectX12:
+		{
+			RenderTextureDesc desc(width, width, format);
+			desc._dimension = ETextureDimension::kCube;
+			desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, width) : 0;
+			desc._random_access = random_access;
+			auto rt = MakeScope<D3DRenderTexture>(desc);
+			rt->Name(name);
+			return rt;
+		}
+		}
+		AL_ASSERT_MSG(false, "Unsupport render api!");
+		return nullptr;
+	}
+
+	RTHandle RenderTexture::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+	{
+		RTHash rt_hash;
+		rt_hash.Set(0,12,width);
+		rt_hash.Set(13,24,height);
+		rt_hash.Set(25, 32, format);
+		auto rt = g_pRenderTexturePool->GetByIDHash(rt_hash);
+		if(rt.has_value())
+			return RTHandle(rt.value());
+		auto new_rt = Create(width, height, name.empty() ? std::format("TempRT_{}", g_pRenderTexturePool->Size()) : name, format, mipmap_chain, linear, random_access);
+		return RTHandle(g_pRenderTexturePool->Add(rt_hash, std::move(new_rt)));
+	}
+
+	void RenderTexture::ReleaseTempRT(RTHandle handle)
+	{
+		g_pRenderTexturePool->ReleaseRT(handle);
+	}
+
+	RenderTexture::RenderTexture(const RenderTextureDesc& desc) : Texture(desc._width, desc._height)
+	{
+		_depth = desc._depth;
+		_pixel_format = ConvertRenderTextureFormatToPixelFormat(desc._depth > 0? desc._depth_format : desc._color_format);
+		_dimension = desc._dimension;
+		_slice_num = desc._slice_num;
+		_mipmap_count = desc._mipmap_count;
+		_is_readble = false;
+		_is_srgb = false;
+		_pixel_size = GetPixelByteSize(_pixel_format);
+		_is_random_access = desc._random_access;
+		for (int i = 0; i < _mipmap_count + 1; i++)
+		{
+			auto [w, h] = CurMipmapSize(i);
+			u64 cur_mipmap_byte_size = w * h * _pixel_size;
+			_gpu_memery_size += cur_mipmap_byte_size;
+		}
+		s_gpu_memory_size += _gpu_memery_size;
+	}
+
+	RenderTexture::~RenderTexture()
+	{
+		s_gpu_memory_size -= _gpu_memery_size;
+	}
+
 
 	void RenderTexture::Bind(CommandBuffer* cmd, u8 slot)
 	{
-		Transition(cmd,ETextureResState::kShaderResource);
-	}
 
-	void* RenderTexture::GetNativeCPUHandle()
-	{
-		return nullptr;
 	}
-	void* RenderTexture::GetNativeCPUHandle(u16 index)
-	{
-		return nullptr;
-	}
+	//----------------------------------------------------------RenderTexture-------------------------------------------------------------------------
 
-	const ETextureType RenderTexture::GetTextureType() const
+
+	//----------------------------------------------------------RenderTexturePool---------------------------------------------------------------------
+	u32 RenderTexturePool::Add(RTHash hash, Scope<RenderTexture> rt)
 	{
-		return ETextureType::kRenderTexture;
+		auto id = rt->ID();
+		RTInfo info;
+		info._is_available = false;
+		info._last_access_frame_count = Application::s_frame_count;
+		info._id = id;
+		info._rt = std::move(rt);
+		auto it = _pool.emplace(std::make_pair(hash, std::move(info)));
+		_lut_pool.emplace(std::make_pair(id, it));
+		g_pLogMgr->LogWarningFormat("Expand rt pool to {}", _pool.size());
+		return id;
 	}
-	void RenderTexture::Transition(CommandBuffer* cmd, ETextureResState state)
+	std::optional<u32> RenderTexturePool::GetByIDHash(RTHash hash)
 	{
-		_state = state;
+		auto range = _pool.equal_range(hash);
+		for (auto it = range.first; it != range.second; ++it)
+		{
+			auto& info = it->second;
+			if (info._is_available)
+			{			
+				if (!g_pGfxContext->IsResourceReferencedByGPU(info._rt.get()))
+				{
+					it->second._is_available = false;
+					it->second._last_access_frame_count = Application::s_frame_count;
+					return it->second._id;
+				}
+			}
+		}
+		return {};
 	}
-	//----------------------------------------------------------RenderTexture---------------------------------------------------------------------
+	void RenderTexturePool::ReleaseRT(RTHandle handle)
+	{
+		auto it = _lut_pool.find(handle._id);
+		if (it == _lut_pool.end())
+			return;
+		it->second->second._is_available = true;
+	}
+	void RenderTexturePool::TryRelease()
+	{
+		constexpr u64 MaxInactiveFrames = 500; // 假设超过100帧未使用的 RenderTexture 将被释放
+		u32 released_rt_num = 0;
+		for (auto it = _pool.begin(); it != _pool.end();)
+		{
+			if (!it->second._is_available)
+			{
+				++it;
+				continue;
+			}
+			u64 inactiveFrames = Application::s_frame_count - it->second._last_access_frame_count;
+			if (inactiveFrames > MaxInactiveFrames)
+			{
+				it = _pool.erase(it);
+				++released_rt_num;
+			}
+			else
+			{
+				++it;
+			}
+		}
+		_lut_pool.clear();
+		for (auto it = _pool.begin(); it != _pool.end(); it++)
+		{
+			_lut_pool.emplace(std::make_pair(it->second._id,it));
+		}
+		g_pLogMgr->LogFormat("RT pool release {} rt",released_rt_num);
+	}
+	//----------------------------------------------------------RenderTexturePool---------------------------------------------------------------------
 }
 
 

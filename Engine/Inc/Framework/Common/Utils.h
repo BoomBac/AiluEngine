@@ -134,6 +134,11 @@ namespace Ailu
             if (s.length() < prefix.length()) return false;
             return s.substr(0, prefix.length()) == prefix;
         }
+        static bool BeginWith(const WString& s, const WString& prefix)
+        {
+            if (s.length() < prefix.length()) return false;
+            return s.substr(0, prefix.length()) == prefix;
+        }
 
         //[begin,end]
         static inline String SubStrRange(const String& s, const size_t& begin, const size_t& end)

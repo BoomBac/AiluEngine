@@ -108,6 +108,9 @@ namespace Ailu
 	}
 	void InputLayer::OnUpdate(float delta_time)
 	{
+		Camera::sCurrent->FovH(_camera_fov_h);
+		Camera::sCurrent->Near(_camera_near);
+		Camera::sCurrent->Far(_camera_far);
 		if (Input::s_block_input) return;
 		if (!_b_handle_input) return;
 		float lerp_speed = delta_time / 1000.0f;
@@ -161,9 +164,6 @@ namespace Ailu
 			}
 			pre_mouse_pos = cur_mouse_pos;
 			FirstPersonCameraController::s_instance.InterpolateTo(target_pos,target_rotation.x, target_rotation.y, lerp_speed * _lerp_speed_multifactor);
-			Camera::sCurrent->FovH(_camera_fov_h);
-			Camera::sCurrent->Near(_camera_near);
-			Camera::sCurrent->Far(_camera_far);
 		}
 		pre_tick_camera = Camera::sCurrent;
 	}

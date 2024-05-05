@@ -255,7 +255,7 @@ namespace Ailu
 			try
 			{
 				for (u8 i = 0; i < CountOf(data); i++) {
-					AL_ASSERT(other.data[i] == 0.f, "vector divide by zero commpoent!")
+					AL_ASSERT_MSG(other.data[i] == 0.f, "vector divide by zero commpoent!");
 						//if (other.data[i] == 0.f) throw(std::runtime_error("vector divide by zero commpoent!"));
 						data[i] /= other.data[i];
 				}
@@ -1879,6 +1879,13 @@ namespace Ailu
 			{
 				return std::format("{}", _hash.to_ullong());
 			}
+			struct HashFunc
+			{
+				size_t operator()(const Hash<Size>& obj) const
+				{
+					return std::hash<std::bitset<Size>>{}(obj._hash);
+				}
+			};
 		private:
 			std::bitset<Size> _hash;
 		};

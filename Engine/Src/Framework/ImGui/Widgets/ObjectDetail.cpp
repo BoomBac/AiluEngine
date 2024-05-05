@@ -9,7 +9,8 @@
 
 #include "Render/CommandBuffer.h"
 #include "Render/Renderer.h"
-#include "Framework/ImGui/Widgets/TextureSelector.h"
+#include "Framework/ImGui/Widgets/CommonTextureWidget.h"
+#include "Framework/Common/Asset.h"
 
 namespace Ailu
 {
@@ -19,7 +20,6 @@ namespace Ailu
 	{
 		static i16 s_cur_opened_texture_selector = -1;
 		static bool s_is_texture_selector_open = true;
-		static String s_texture_selector_ret = "none";
 	}
 
 	static void DrawProperty(u32& property_handle,SerializableProperty& prop, Object* obj, TextureSelector& selector_window)
@@ -90,24 +90,24 @@ namespace Ailu
 		case Ailu::ESerializablePropertyType::kTexture2D:
 		{
 			ImGui::Text("Texture2D : %s", prop._name.c_str());
-			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Ref<Texture>>>(prop);
+			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture*>>(prop);
 			auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
-			String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
+			u64 cur_tex_id = tex? tex->ID() : TexturePool::s_p_default_white->ID();
 			//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
 			float contentWidth = ImGui::GetWindowContentRegionWidth();
 			float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
 			ImGui::SetCursorPosX(centerX);
 			if (selector_window.IsCaller(property_handle))
 			{
-				auto new_tex = selector_window.GetSelectedTexture(property_handle);
-				if (new_tex != TextureSelector::kNull && new_tex != cur_tex_nameid)
+				auto new_tex_id = selector_window.GetSelectedTexture(property_handle);
+				if (TextureSelector::IsValidTextureID(new_tex_id) && new_tex_id != cur_tex_id)
 				{
 					auto mat = dynamic_cast<Material*>(obj);
 					if (mat)
-						mat->SetTexture(prop._value_name, new_tex);
+						mat->SetTexture(prop._value_name, g_pTexturePool->Get(new_tex_id).get());
 				}
 			}
-			if (ImGui::ImageButton(tex ? tex->GetGPUNativePtr() : TexturePool::GetDefaultWhite()->GetGPUNativePtr(), ImVec2(s_mini_tex_size, s_mini_tex_size)))
+			if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pTexturePool->Get(cur_tex_id)->GetNativeTextureHandle()), ImVec2(s_mini_tex_size, s_mini_tex_size)))
 			{
 				selector_window.Open(property_handle);
 			}
@@ -178,7 +178,7 @@ namespace Ailu
 				non_tex_prop_name = "BaseColor";
 			};
 			use_textures[mat_prop_index] = mat->IsTextureUsed(tex_usage);
-			ImGui::Checkbox("Texture", &use_textures[mat_prop_index]);
+			ImGui::Checkbox(name.c_str(), &use_textures[mat_prop_index]);
 			mat->MarkTextureUsed({ tex_usage }, use_textures[mat_prop_index]);
 			ImGui::PopID();
 			ImGui::SameLine();
@@ -189,20 +189,28 @@ namespace Ailu
 				{
 					auto prop = mat->GetProperty(name);
 					ImGui::Text(" :%s", prop._name.c_str());
-					auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Ref<Texture>>>(prop);
+					auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture*>>(prop);
 					auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
-					String cur_tex_nameid = tex == nullptr ? "none" : std::dynamic_pointer_cast<Texture2D>(tex)->AssetPath();
-					//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
+					if (tex == nullptr)
+					{
+						tex = mat_prop_index == 1 ? TexturePool::s_p_default_normal : TexturePool::s_p_default_white;
+						mat->SetTexture(name, tex);
+					}
+					u64 cur_tex_id = tex->ID();
 					float contentWidth = ImGui::GetWindowContentRegionWidth();
 					float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
 					ImGui::SetCursorPosX(centerX);
 					if (selector_window.IsCaller(mat_prop_index))
 					{
-						auto new_tex = selector_window.GetSelectedTexture(mat_prop_index);
-						if (new_tex != "null" && new_tex != cur_tex_nameid)
-							mat->SetTexture(name, new_tex);
+						u64 new_tex_id = selector_window.GetSelectedTexture(mat_prop_index);
+						if (TextureSelector::IsValidTextureID(new_tex_id) && new_tex_id != cur_tex_id)
+						{
+							auto new_tex = g_pTexturePool->Get(new_tex_id);
+							mat->SetTexture(name, new_tex.get());
+						}
 					}
-					if (ImGui::ImageButton(tex ? tex->GetGPUNativePtr() : TexturePool::GetDefaultWhite()->GetGPUNativePtr(), ImVec2(s_mini_tex_size, s_mini_tex_size)))
+					
+					if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pTexturePool->Get(cur_tex_id)->GetNativeTextureHandle()) , ImVec2(s_mini_tex_size, s_mini_tex_size)))
 					{
 						selector_window.Open(mat_prop_index);
 					}
@@ -218,15 +226,16 @@ namespace Ailu
 				}
 				else
 				{
+					selector_window.Close(mat_prop_index);
 					if (tex_usage == ETextureUsage::kAlbedo || tex_usage == ETextureUsage::kEmssive || tex_usage == ETextureUsage::kSpecular)
 					{
 						auto prop = mat->GetProperty(non_tex_prop_name);
-						ImGui::ColorEdit4(prop._name.c_str(), static_cast<float*>(prop._value_ptr));
+						ImGui::ColorEdit4(std::format("##{}",name).c_str(), static_cast<float*>(prop._value_ptr));
 					}
 					else if (tex_usage == ETextureUsage::kMetallic || tex_usage == ETextureUsage::kRoughness)
 					{
 						auto prop = mat->GetProperty(non_tex_prop_name);
-						ImGui::SliderFloat(prop._name.c_str(), static_cast<float*>(prop._value_ptr), prop._param[0], prop._param[1]);
+						ImGui::SliderFloat(std::format("##{}", name).c_str(), static_cast<float*>(prop._value_ptr), prop._param[0], prop._param[1]);
 					}
 					else
 					{
@@ -517,9 +526,9 @@ namespace Ailu
 	{
 		ImGuiWidget::Open(handle);
 	}
-	void ObjectDetail::Close()
+	void ObjectDetail::Close(i32 handle)
 	{
-		ImGuiWidget::Close();
+		ImGuiWidget::Close(handle);
 	}
 	void ObjectDetail::ShowImpl()
 	{

@@ -2,7 +2,7 @@
 #define __SHADOW_H__
 #include "common.hlsli"
 
-Texture2D MainLightShadowMap : register(t7);
+Texture2D MainLightShadowMap : register(t10);
 float Random(float4 seed4)
 {
 	float dp = dot(seed4, float4(12.9898, 78.233, 45.164, 94.673));
