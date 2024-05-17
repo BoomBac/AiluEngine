@@ -30,16 +30,19 @@ namespace Ailu
         void ClearRenderTarget(Vector<RenderTexture*>& colors, RenderTexture* depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(RenderTexture* color, Vector4f clear_color, u16 index = 0u) final;
         void ClearRenderTarget(RenderTexture* depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
+        void ClearRenderTarget(RenderTexture* depth, u16 index, float depth_value = 1.0f) final;
         void SetRenderTarget(RenderTexture* color, RenderTexture* depth) final;
         void SetRenderTargets(Vector<RenderTexture*>& colors, RenderTexture* depth) final;
         void SetRenderTarget(RenderTexture* color, u16 index = 0u) final;
+        void SetRenderTarget(RenderTexture* color, RenderTexture* depth, u16 color_index, u16 depth_index) final;
+        void SetRenderTarget(RTHandle color, RTHandle depth) final;
+        void SetRenderTarget(RTHandle color, u16 index = 0u) final;
+
         void ClearRenderTarget(RTHandle color, RTHandle depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(Vector<RTHandle>& colors, RTHandle depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(RTHandle color, Vector4f clear_color, u16 index = 0u) final;
         void ClearRenderTarget(RTHandle depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
         void SetRenderTargets(Vector<RTHandle>& colors, RTHandle depth) final;
-        void SetRenderTarget(RTHandle color, RTHandle depth) final;
-        void SetRenderTarget(RTHandle color, u16 index = 0u) final;
 
         void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) final;
         void DrawIndexedInstanced(u32 index_count, u32 instance_count) final;

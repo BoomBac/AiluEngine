@@ -58,6 +58,10 @@ namespace Ailu
 		{
 			return _name;
 		}
+		bool operator==(const Object& other)
+		{
+			return _id == other._id;
+		}
 	protected:
 		/// <summary>
 		/// DeserializeImpl

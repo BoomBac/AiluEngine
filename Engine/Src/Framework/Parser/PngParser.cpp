@@ -71,13 +71,13 @@ namespace Ailu
 			//all_mip_level = min(all_mip_level, 8);
 			auto mip_level = tex->MipmapLevel();
 			tex->SetPixelData(new_data,0);
-			for (int i = 0; i < mip_level - 1; i++)
+			for (int i = 0; i < mip_level + 1; i++)
 			{
 				mipmaps.emplace_back(TextureUtils::DownSample(mipmaps.back(), x >> i, y >> i, 4));
 				if (x >> i == 1)
 					break;
 			}
-			for (int i = 0; i < mip_level; i++)
+			for (int i = 0; i < mip_level + 1; i++)
 			{
 				tex->SetPixelData(mipmaps[i], i);
 				DESTORY_PTRARR(mipmaps[i]);

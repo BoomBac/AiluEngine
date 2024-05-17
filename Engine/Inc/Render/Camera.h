@@ -10,6 +10,8 @@ namespace Ailu
     DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
     class Camera : public Object
     {
+        friend class CameraComponent;
+
         DECLARE_PROTECTED_PROPERTY(camera_type,Type, ECameraType::ECameraType)
         DECLARE_PROTECTED_PROPERTY(aspect,Aspect,float)
         DECLARE_PROTECTED_PROPERTY(near_clip,Near,float)
@@ -25,9 +27,12 @@ namespace Ailu
         DECLARE_REFLECT_FIELD(Camera)
     public:
         inline static Camera* sCurrent = nullptr;
+        inline static Camera* sSelected = nullptr;
         static Camera* GetDefaultCamera();
         static void DrawGizmo(const Camera* p_camera);
         static void CalcViewFrustumPlane(const Camera* cam, ViewFrustum& vf);
+        //目前当eye_camera转动时，会重新计算aabb从而导致阴影抖动
+        static Camera GetFitShaodwCamera(const Camera& eye_cam, float shadow_dis);
     public:
         Camera();
         Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType::ECameraType camera_type = ECameraType::kPerspective);

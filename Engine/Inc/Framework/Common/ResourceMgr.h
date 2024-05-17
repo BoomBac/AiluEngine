@@ -134,6 +134,8 @@ namespace Ailu
 		static WString GetAssetPath(const Guid& guid);
 		Asset* GetAsset(const WString& asset_path) const;
 		Vector<Asset*> GetAssets(const ISearchFilter& filter) const;
+		void DeleteAsset(Asset* p_asset);
+		bool RenameAsset(Asset* p_asset, const String& new_name);
 
 		void AddAssetChangedListener(std::function<void()> callback) { _asset_changed_callbacks.emplace_back(callback); };
 		void RemoveAssetChangedListener(std::function<void()> callback)
@@ -145,11 +147,10 @@ namespace Ailu
 		}
 
 	public:
-		Texture* _test_new_tex;
-		Scope<CubeMap> _test_cubemap;
-		Vector<ImportInfo> _import_infos;
+		List<ImportInfo> _import_infos;
+		std::mutex _import_infos_mutex;
 	private:
-		static Ref<Material> LoadMaterialImpl(const WString& asset_path);
+		Ref<Material> LoadMaterialImpl(const WString& asset_path);
 		//static Ref<Material> LoadMaterial(const Vector<String>& blob);
 		static bool ExistInAssetDB(const Asset* asset);
 		static void AddToAssetDB(Asset* asset, bool override = true);

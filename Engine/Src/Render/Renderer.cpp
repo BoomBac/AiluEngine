@@ -37,10 +37,16 @@ namespace Ailu
 		_p_postprocess_pass = MakeScope<PostProcessPass>();
 		_p_gbuffer_pass = MakeScope<DeferredGeometryPass>(_width, _height);
 		_p_skybox_pass = MakeScope<SkyboxPass>();
+		_p_gizmo_pass = MakeScope<GizmoPass>();
+
 		auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"small_cave_1k.hdr");
 		g_pTexturePool->Add(L"Textures/small_cave_1k.hdr", tex);
+		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(tex->Height(), "small_cave_1k", "Textures/small_cave_1k.hdr");
 
-		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512, "pure_sky", "Textures/small_cave_1k.hdr");
+		//auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"hdri_forest.hdr");
+		//g_pTexturePool->Add(L"Textures/hdri_forest.hdr", tex);
+		//_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(tex->Height(), "hdri_forest", "Textures/hdri_forest.hdr");
+
 		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
 
 		_p_per_frame_cbuf.reset(ConstantBuffer::Create(RenderConstants::kPerFrameDataSize));
@@ -63,6 +69,7 @@ namespace Ailu
 		//_render_passes.emplace_back(_p_opaque_pass.get());
 		_render_passes.emplace_back(_p_gbuffer_pass.get());
 		_render_passes.emplace_back(_p_skybox_pass.get());
+		_render_passes.emplace_back(_p_gizmo_pass.get());
 		_render_passes.emplace_back(_p_postprocess_pass.get());
 		_render_passes.emplace_back(_p_reslove_pass.get());
 		RegisterEventBeforeTick([]() {GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
@@ -106,6 +113,10 @@ namespace Ailu
 		if(!_resize_events.empty())
 			DoResize();
 		memset(reinterpret_cast<void*>(&_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
+		for (int i = 0; i < kMaxSpotLightNum; i++)
+		{
+			_per_frame_cbuf_data._SpotLights[i]._ShadowDataIndex = -1;
+		}
 		PrepareCamera(_p_scene_camera);
 		PrepareLight(g_pSceneMgr->_p_current);
 		_rendering_data._p_per_frame_cbuf = _p_per_frame_cbuf.get();
@@ -122,6 +133,8 @@ namespace Ailu
 	void Renderer::EndScene()
 	{
 		_rendering_data.Reset();
+		Camera::sSelected = nullptr;
+		Gizmo::EndFrame();
 		//for (auto pass : _p_render_passes)
 		//	pass->EndPass(_p_context);
 		//for (auto pass : _p_task_render_passes)
@@ -136,6 +149,10 @@ namespace Ailu
 	void Renderer::TakeCapture()
 	{
 		_captures.push(0);
+	}
+	void Renderer::SubmitTaskPass(Scope<RenderPass> task)
+	{
+		//_p_task_render_passes.emplace_back(task.get());
 	}
 	void Renderer::ResizeBuffer(u32 width, u32 height)
 	{
@@ -203,42 +220,7 @@ namespace Ailu
 				}
 			}
 		}
-		DrawRendererGizmo();
 		_p_context->Present();
-	}
-	void Renderer::DrawRendererGizmo()
-	{
-		if (Gizmo::s_color.a > 0.0f)
-		{
-			int gridSize = 100;
-			int gridSpacing = 100;
-			Vector3f cameraPosition = Camera::sCurrent->Position();
-			float grid_alpha = lerpf(0.0f, 1.0f, abs(cameraPosition.y) / 2000.0f);
-			Color32 grid_color = Colors::kWhite;
-			grid_color.a = 1.0f - grid_alpha;
-			if (grid_color.a > 0)
-			{
-				Vector3f grid_center_mid(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
-					0.0f,
-					static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
-				Gizmo::DrawGrid(100, 100, grid_center_mid, grid_color);
-			}
-			grid_color.a = grid_alpha;
-			if (grid_color.a > 0.7f)
-			{
-				gridSize = 10;
-				gridSpacing = 1000;
-				Vector3f grid_center_large(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
-					0.0f,
-					static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
-				//grid_color = Colors::kGreen;
-				Gizmo::DrawGrid(10, 1000, grid_center_large, grid_color);
-			}
-
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 500.f,0.0f,0.0f }, Colors::kRed);
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,500.0f,0.0f }, Colors::kGreen);
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,500.0f }, Colors::kBlue);
-		}
 	}
 
 	void Renderer::PrepareLight(Scene* p_scene)
@@ -258,14 +240,27 @@ namespace Ailu
 				if (!light->Active())
 				{
 					_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightDir = Vector3f::kZero;
-					_per_frame_cbuf_data._DirectionalLights[direction_light_index++]._LightColor = Colors::kBlack.xyz;
+					_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightColor = Colors::kBlack.xyz;
+					_per_frame_cbuf_data._DirectionalLights[direction_light_index++]._ShadowDataIndex = -1;
 					continue;
+				}
+				if (light->CastShadow())
+				{
+					Camera& selected_cam = Camera::sSelected ? *Camera::sSelected : *Camera::sCurrent;
+					auto shadow_cam = Camera::GetFitShaodwCamera(selected_cam, _shadow_distance);
+					_per_frame_cbuf_data._DirectionalLights[direction_light_index]._ShadowDataIndex = 0;
+					_per_frame_cbuf_data._DirectionalLights[direction_light_index]._ShadowDistance = _shadow_distance;
+					_per_frame_cbuf_data._ShadowMatrix[0] = shadow_cam.GetView() * shadow_cam.GetProjection();
+					_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_index = 0;
+					_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_matrix = _per_frame_cbuf_data._ShadowMatrix[0];
+					++_rendering_data._actived_shadow_count;
 				}
 				_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightColor = color.xyz;
 				_per_frame_cbuf_data._DirectionalLights[direction_light_index++]._LightDir = light_data._light_dir.xyz;
 			}
 			else if (light->_light_type == ELightType::kPoint)
 			{
+				_per_frame_cbuf_data._PointLights[point_light_index]._ShadowDataIndex = -1;
 				if (!light->Active())
 				{
 					_per_frame_cbuf_data._PointLights[point_light_index]._LightParam0 = 0.0;
@@ -279,32 +274,40 @@ namespace Ailu
 			}
 			else if (light->_light_type == ELightType::kSpot)
 			{
+				_per_frame_cbuf_data._SpotLights[spot_light_index]._ShadowDataIndex = -1;
 				if (!light->Active())
 				{
 					_per_frame_cbuf_data._SpotLights[spot_light_index++]._LightColor = Colors::kBlack.xyz;
 					continue;
+				}
+				if (light->CastShadow())
+				{
+					u32 shadow_index = 1 + spot_light_index; //固定一个为方向光
+					_per_frame_cbuf_data._SpotLights[spot_light_index]._ShadowDataIndex = shadow_index;
+					_per_frame_cbuf_data._SpotLights[spot_light_index]._ShadowDistance = light_data._light_param.x;
+					Camera shadow_cam(1.0,10, light_data._light_param.x);
+					shadow_cam.SetLens(90, 1, 10, light_data._light_param.x);
+					shadow_cam.Position(light_data._light_pos.xyz);
+					shadow_cam.LookTo(light_data._light_dir.xyz,Vector3f::kUp);
+					_per_frame_cbuf_data._ShadowMatrix[shadow_index] = shadow_cam.GetView() * shadow_cam.GetProjection();
+					_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_index = shadow_index;
+					_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_matrix = _per_frame_cbuf_data._ShadowMatrix[shadow_index];
+					++_rendering_data._actived_shadow_count;
 				}
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightColor = color.xyz;
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightDir = light_data._light_dir.xyz;
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._Rdius = light_data._light_param.x;
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._InnerAngle = light_data._light_param.y;
-				_per_frame_cbuf_data._SpotLights[spot_light_index]._OuterAngle = light_data._light_param.z;
+				_per_frame_cbuf_data._SpotLights[spot_light_index++]._OuterAngle = light_data._light_param.z;
 			}
 			++updated_light_num;
-			if (light->CastShadow())
-			{
-				_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_view = light->ShadowCamera()->GetView();
-				_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_proj = light->ShadowCamera()->GetProjection();
-				_rendering_data._shadow_data[_rendering_data._actived_shadow_count++]._shadow_bias = light->_shadow._depth_bias;
-			}
 		}
 		if (updated_light_num == 0)
 		{
 			_per_frame_cbuf_data._DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
 			_per_frame_cbuf_data._DirectionalLights[0]._LightDir = { 0.0f,0.0f,0.0f };
 		}
-		_per_frame_cbuf_data._MainLightShadowMatrix = _rendering_data._shadow_data[0]._shadow_view * _rendering_data._shadow_data[0]._shadow_proj;
 	}
 
 	void Renderer::PrepareCamera(Camera* p_camera)

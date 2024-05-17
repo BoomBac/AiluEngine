@@ -124,6 +124,7 @@ namespace Ailu
 		pso_desc._topology = ETopology::kLine;
 		pso_desc._p_vertex_shader = shader.get();
 		pso_desc._p_pixel_shader = shader.get();
+		pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
 		auto gizmo_pso = GraphicsPipelineStateObject::Create(pso_desc);
 		gizmo_pso->Build();
 		s_gizmo_pso = std::move(gizmo_pso);

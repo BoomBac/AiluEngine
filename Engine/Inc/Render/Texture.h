@@ -152,20 +152,24 @@ namespace Ailu
 		virtual ~Texture();
 		virtual Ptr GetNativeTexturePtr();
 		virtual TextureHandle GetNativeTextureHandle() { return 0; }
+		virtual void CreateView() { _is_have_total_view = true; };
+		virtual void ReleaseView() { _is_have_total_view = false; };
 		virtual TextureHandle GetView(u16 mimmap,bool random_access = false,ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) { return 0; };
 		virtual void Bind(CommandBuffer* cmd, u8 slot) {};
+		bool IsViewCreate() const { return _is_have_total_view; }
 		const Guid& GetGuid() const final;
 		void AttachToAsset(Asset* owner) final;
+		std::tuple<u16,u16> CurMipmapSize(u16 mipmap) const;
 		Asset* GetAsset() { return _p_asset; };
 	protected:
 		// mipmap = 0 means the raw texture
 		virtual bool IsValidMipmap(u16 mipmap) const { return false; };
 		bool IsValidSize(u16 width,u16 height,u16 mipmap) const;
-		std::tuple<u16,u16> CurMipmapSize(u16 mipmap) const;
 		Asset* _p_asset;
 	protected:
 		u16 _pixel_size;
 		bool _is_random_access;
+		bool _is_have_total_view = false;
 	};
 
 	class Texture2D : public Texture
@@ -177,7 +181,6 @@ namespace Ailu
 		virtual ~Texture2D();
 		virtual void Apply() {};
 		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
-		virtual void CreateView() {};
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		Color32 GetPixel32(u16 x, u16 y);
 		Color GetPixel(u16 x, u16 y);
@@ -207,7 +210,6 @@ namespace Ailu
 		virtual ~CubeMap();
 		virtual void Apply() {};
 		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
-		virtual void CreateView() {};
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		Color32 GetPixel32(ECubemapFace::ECubemapFace face,u16 x, u16 y);
 		Color GetPixel(ECubemapFace::ECubemapFace face,u16 x, u16 y);
@@ -299,10 +301,10 @@ namespace Ailu
 		RenderTexture(const RenderTextureDesc& desc);
 		~RenderTexture();
 		//virtual TextureHandle GetView(ECubemapFace::ECubemapFace face, u16 mimmap) { return 0; };
-		virtual void CreateView() {};
 		//当mipmap为0时，访问srv时，返回原图分辨率，也就是mip0，当访问uav时，实际访问的是mipmap1的uav（cubemap）
 		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
 		static Scope<RenderTexture> Create(u16 width, u16 height, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
+		static Scope<RenderTexture> Create(u16 width, u16 height, u16 array_slice, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
 		static Scope<RenderTexture> Create(u16 width,String name = "",ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override;
 		//return rtv handle
@@ -435,6 +437,16 @@ namespace Ailu
 		void Destory(const WString& name_id)
 		{
 			_pool.erase(name_id);
+		}
+
+		bool Rename(const WString& old_name, const WString& new_name)
+		{
+			AL_ASSERT(!Contain(old_name) || Contain(new_name));
+			auto exist_tex = _pool[old_name];
+			_pool.erase(old_name);
+			_pool[new_name] = exist_tex;
+			_lut_pool[exist_tex->ID()] = _pool.find(new_name);
+			return true;
 		}
 		Map<WString, Ref<Texture>>::iterator begin() { return _pool.begin(); }
 		Map<WString, Ref<Texture>>::iterator end() { return _pool.end(); }

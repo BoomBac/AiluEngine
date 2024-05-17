@@ -81,7 +81,7 @@ namespace Ailu
 			}
 			{
 				CPUProfileBlock b("CameraCull");
-				Cull(Camera::sCurrent, _p_current);
+				Cull(Camera::sSelected? Camera::sSelected : Camera::sCurrent, _p_current);
 			}
 		}
 	}
@@ -212,19 +212,21 @@ namespace Ailu
 		{
 			if (static_mesh->GetMesh())
 			{
-				auto& aabb = static_mesh->GetAABB();
+				auto& aabbs = static_mesh->GetAABB();
 				auto submesh_count = static_mesh->GetMesh()->SubmeshCount();
 				auto materials = static_mesh->GetMaterials();
 				auto replace_mat = materials.empty() ? nullptr : materials[0].get();
-				if (ViewFrustum::Conatin(cam_vf, aabb))
-				{
+				if (!ViewFrustum::Conatin(cam_vf, aabbs[0]))
+					continue;
+
 					for (int i = 0; i < submesh_count; i++)
 					{
-						RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(), i < materials.size() ? materials[i].get() : replace_mat,
-							static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), i, 1);
-					}
+						if (ViewFrustum::Conatin(cam_vf, aabbs[i+1]))
+						{
+							RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(), i < materials.size() ? materials[i].get() : replace_mat,
+								static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), i, 1);
+						}
 				}
-
 			}
 		}
 	}

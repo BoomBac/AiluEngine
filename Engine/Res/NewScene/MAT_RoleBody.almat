@@ -1,0 +1,20 @@
+guid: 171e4e1b-a8f2-4436-b024-ff5bc128c200
+type: kMaterial
+name: MAT_RoleBody
+shader_path: Shaders/defered_standard_lit.hlsl
+  prop_type: Uint
+    SamplerMask: 3
+  prop_type: Float
+    MetallicValue: 0
+    RoughnessValue: 1
+  prop_type: Vector
+    SpecularColor: 0,0,0,0
+    BaseColor: 0,45,0,0
+    EmssiveColor: 0,0,0,0
+  prop_type: Texture2D
+    Specular: null guid
+    Metallic: null guid
+    Albedo: 1f48d013-6e6f-4a01-9a35-f19b040ba3c3
+    Normal: cffbfce1-eb20-4319-aa0e-20a68eb19f22
+    Emssive: null guid
+    Roughness: null guid

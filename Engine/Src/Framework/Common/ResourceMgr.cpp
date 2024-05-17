@@ -34,67 +34,13 @@ namespace Ailu
 
 	int ResourceMgr::Initialize()
 	{
-		//auto p = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-		//auto test_path = L"C:/AiluEngine/Engine/Res/Textures/MyImage01.jpg";
-		//_test_new_tex = g_pTexturePool->Add(PathUtils::ExtractAssetPath(test_path), p->Parser(test_path)).get();
-		//constexpr u32 red_raw_size = 4 * 4 * 4;
-		//auto raw_pixel = new u8[red_raw_size];
-		//memset(raw_pixel, 0, red_raw_size);
-		//for (int i = 0; i < red_raw_size; i += 4)
-		//{
-		//	raw_pixel[i] = 255;
-		//	raw_pixel[i + 3] = 255;
-		//}
-		//auto mip1_size = red_raw_size / 4;
-		//auto mipmap1 = new u8[mip1_size];
-		//memset(mipmap1, 0, mip1_size);
-		//for (int i = 0; i < mip1_size; i += 4)
-		//{
-		//	mipmap1[i + 1] = 255;
-		//	mipmap1[i + 3] = 255;
-		//}
-		//_test_new_tex = MakeScope<D3DTexture2DNew>(4,4,true);
-		//_test_new_tex->SetPixelData(raw_pixel,0);
-		//_test_new_tex->SetPixelData(mipmap1,1);
-		//Color blue = Color(0,0,255,255);
-		//_test_new_tex->SetPixelData(reinterpret_cast<u8*>(&blue),2);
-		//_test_new_tex->Apply();
-		//_test_new_tex->CreateView();
-		//delete[] raw_pixel;
-		//delete[] mipmap1;
-
-		_test_cubemap = MakeScope<D3DCubeMap>(4, true);
-		for (int i = 0; i < 6; i++)
-		{
-			auto c = Random::RandomColor(i);
-			for (int u = 0; u < 4; u++)
-			{
-				for (int v = 0; v < 4; v++)
-				{
-					_test_cubemap->SetPixel((ECubemapFace::ECubemapFace)i, u, v, c, 0);
-				}
-			}
-			c = Random::RandomColor(i + 6);
-			for (int u = 0; u < 2; u++)
-			{
-				for (int v = 0; v < 2; v++)
-				{
-					_test_cubemap->SetPixel((ECubemapFace::ECubemapFace)i, u, v, c, 1);
-				}
-			}
-			c = Color(255, 255, 0, 255);
-			_test_cubemap->SetPixel((ECubemapFace::ECubemapFace)i, 0, 0, c, 1);
-		}
-		_test_cubemap->Apply();
-		_test_cubemap->CreateView();
-
-		auto skybox = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Skybox");
+		auto skybox = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Hidden/Skybox");
 		skybox->IsInternal(false);
-		skybox->OriginPath("Skybox");
+		skybox->OriginPath("Hidden/Skybox");
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/defered_standard_lit.hlsl"), "StandardLit");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.hlsl"), "Blit");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "CubemapGen");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/filter_irradiance.hlsl"), "EnvmapFilter");
+		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.hlsl"), "Hidden/Blit");
+		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "Hidden/CubemapGen");
+		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/filter_irradiance.hlsl"), "Hidden/EnvmapFilter");
 
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/unlit.hlsl"), "Hidden/Error")->SetVector("base_color", Vector4f(1.0f, 0.0f, 1.0, 1.0f));
 		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/unlit.hlsl"), "Hidden/WaitCompile")->SetVector("base_color", Vector4f(0.0f, 0.0f, 0.5, 1.0f));
@@ -284,6 +230,8 @@ namespace Ailu
 				{
 					auto tex = g_pResourceMgr->LoadTexture(asset_path);
 					mat->SetTexture(k, g_pTexturePool->Add(asset_path, tex).get());
+					auto exist_asset = GetAsset(asset_path);
+					tex->AttachToAsset(exist_asset);
 				}
 				else
 				{
@@ -334,6 +282,54 @@ namespace Ailu
 				assets.emplace_back(asset);
 		}
 		return assets;
+	}
+
+	void ResourceMgr::DeleteAsset(Asset* p_asset)
+	{
+		if(p_asset->_asset_type == EAssetType::kMaterial)
+		{
+			auto mat = static_cast<Material*>(p_asset->_p_inst_asset);
+			MaterialLibrary::ReleaseMaterial(mat->Name());
+		}
+	}
+
+	bool ResourceMgr::RenameAsset(Asset* p_asset, const String& new_name)
+	{
+		WString new_name_w = ToWChar(new_name);
+		WString old_asset_path = p_asset->_asset_path;
+		WString new_asset_path = PathUtils::RenameFile(p_asset->_asset_path, ToWChar(new_name));
+		WString ext_name = PathUtils::ExtractExt(p_asset->_asset_path);
+		if (ExistInAssetDB(new_asset_path))
+		{
+			g_pLogMgr->LogWarningFormat(L"Rename asset {} whih name {} failed,try another name!", p_asset->_asset_path, new_name_w);
+			return false;
+		}
+		if (p_asset->_asset_type == EAssetType::kMaterial)
+		{
+			if (MaterialLibrary::RenameMaterial(ToChar(old_asset_path), ToChar(new_asset_path)))
+			{
+				auto mat = static_cast<Material*>(p_asset->_p_inst_asset);
+				mat->Name(new_name);
+			}
+			else
+				return false;
+		}
+		else if (p_asset->_asset_type == EAssetType::kTexture2D)
+		{
+			if (g_pTexturePool->Rename(old_asset_path, new_asset_path))
+			{
+				auto tex = static_cast<Texture*>(p_asset->_p_inst_asset);
+				tex->Name(new_name);
+			}
+			else
+				return false;
+		}
+		p_asset->_name = ToWChar(new_name);
+		p_asset->_full_name = p_asset->_name + ext_name;
+		p_asset->_asset_path = new_asset_path;
+		p_asset->_sys_path = PathUtils::GetResSysPath(p_asset->_asset_path);
+		FileManager::RenameDirectory(PathUtils::GetResSysPath(old_asset_path), PathUtils::GetResSysPath(new_asset_path));
+		return true;
 	}
 
 	void ResourceMgr::AddToAssetDB(Asset* asset, bool override)
@@ -689,7 +685,10 @@ namespace Ailu
 		info._msg = std::format("Import {}...", p.filename().string());
 		info._progress = 0.0f;
 		info._sys_path = new_sys_path;
-		_import_infos.push_back(info);
+		{
+			std::lock_guard<std::mutex> lock(_import_infos_mutex);
+			_import_infos.push_back(info);
+		}
 		PathUtils::FormatFilePathInPlace(new_sys_path);
 		WString asset_path = PathUtils::ExtractAssetPath(new_sys_path);
 		TimeMgr time_mgr;
@@ -744,6 +743,36 @@ namespace Ailu
 								if (asset)
 								{
 									mat->AttachToAsset(asset);
+									//if(asset->_p_inst_asset == nullptr)
+										
+									//else //当前导入存在同名材质
+									//{
+									//	WString num_part;
+									//	// 从字符串的末尾开始向前查找数字组合
+									//	for (int i = mat_asset_path.size() - 1; i >= 0; --i) 
+									//	{
+									//		if (std::isdigit(mat_asset_path[i])) 
+									//		{
+									//			num_part = mat_asset_path[i] + num_part;
+									//		}
+									//		else 
+									//		{
+									//			break; // 如果遇到非数字字符，则停止提取数字
+									//		}
+									//	}
+									//	// 如果numberPart非空，则代表提取到了数字组合
+									//	i32 same_count = 1;
+									//	if (!num_part.empty()) 
+									//	{
+									//		same_count = std::stoi(num_part) + 1;
+									//	}
+									//	String new_name = std::format("{}_{}", it->_name, same_count);
+									//	mat_sys_path = std::format(L"{}{}.almat", FileManager::GetCurDirStr(), ToWChar(new_name));
+									//	mat_asset_path = PathUtils::ExtractAssetPath(mat_sys_path);
+									//	mat->Name(new_name);
+									//	SaveAsset(mat_sys_path, mat.get());
+									//	g_pLogMgr->LogWarningFormat("Exist material with the same name: {},rename it to {}", it->_name,new_name);
+									//}
 								}
 								else
 								{
@@ -786,7 +815,10 @@ namespace Ailu
 		{
 			g_pLogMgr->LogFormat("Path: {} isn't valid!");
 		}
-		_import_infos.erase(std::remove_if(_import_infos.begin(), _import_infos.end(), [&](auto it) {return it._msg == info._msg; }), _import_infos.end());
+		{
+			std::lock_guard<std::mutex> lock(_import_infos_mutex);
+			_import_infos.erase(std::remove_if(_import_infos.begin(), _import_infos.end(), [&](auto it) {return it._msg == info._msg; }), _import_infos.end());
+		}
 		OnAssetDataBaseChanged();
 		auto asset = GetAsset(asset_path);
 		return ret_res;

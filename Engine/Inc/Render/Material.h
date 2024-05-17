@@ -127,6 +127,24 @@ namespace Ailu
 			}
 			return nullptr;
 		}
+		static bool RenameMaterial(const String& old_id, const String& new_id)
+		{
+			AL_ASSERT(!Contain(old_id) || Contain(new_id));
+			auto exist_mat = s_materials[old_id];
+			s_materials.erase(old_id);
+			s_materials[new_id] = exist_mat;
+			for (int i = 0; i < s_it_materials.size(); i++)
+			{
+				if (s_it_materials[i]->ID() == exist_mat->ID())
+				{
+					s_it_materials[i] = exist_mat;
+					break;
+				}
+			}
+			//ptrdiff_t index = std::distance(s_it_materials.begin(), std::find_if(s_it_materials.begin(), s_it_materials.end(), [&](auto it)->bool {return it->ID() == exist_mat->ID(); }));
+			//s_it_materials[(u64)index] = exist_mat;
+			return true;
+		}
 		static void ReleaseMaterial(const String& name)
 		{
 			auto it = s_materials.find(name);
@@ -146,7 +164,8 @@ namespace Ailu
 	private:
 		inline static u32 s_next_material_id = 0u;
 		inline static std::unordered_map<String, Ref<Material>> s_materials{};
-		inline static Vector<Ref<Material>> s_it_materials{};
+		//only for iterator,may been replaced by raw pointer
+		inline static Vector<std::shared_ptr<Material>> s_it_materials{};
 	};
 }
 

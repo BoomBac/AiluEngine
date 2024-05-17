@@ -75,19 +75,23 @@ namespace Ailu
 	class AILU_API DragFileEvent : public Event
 	{
 	public:
-		DragFileEvent(WString sys_path) : _sys_path(sys_path)
+		DragFileEvent(std::initializer_list<WString> drag_files) : _sys_pathes(drag_files)
 		{
 			
+		};
+		DragFileEvent(List<WString>& drag_files) : _sys_pathes(std::move(drag_files))
+		{
+
 		};
 		std::string ToString() const override
 		{
 			return "DragFileEvent";
 		}
-		const WString& GetDragedFilePath() const { return _sys_path; }
+		const List<WString>& GetDragedFilesPath() const { return _sys_pathes; }
 		EVENT_CLASS_TYPE(kDragFile)
 		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
 	private:
-		WString _sys_path;
+		List<WString> _sys_pathes;
 	};
 
 	class AILU_API WindowMinimizeEvent : public Event

@@ -7,6 +7,7 @@
 
 #ifdef __cplusplus
 #include "Framework/Math/ALMath.hpp"
+#define float2 Vector2f
 #define float3 Vector3f
 #define float4 Vector4f
 #define float4x4 Matrix4x4f
@@ -31,6 +32,9 @@ namespace Ailu
 		float _LightParam0;
 		float3 _LightColor;
 		float _LightParam1;
+		int _ShadowDataIndex;
+		float _ShadowDistance;
+		float2 _padding0;
 	};
 
 	struct ShaderSpotlLightData
@@ -41,6 +45,9 @@ namespace Ailu
 		float	  _InnerAngle;
 		float3  _LightColor;
 		float   _OuterAngle;
+		int _ShadowDataIndex;
+		float _ShadowDistance;
+		float2 _padding0;
 	};
 
 #ifdef __cplusplus
@@ -67,10 +74,9 @@ namespace Ailu
 		ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLightNum];
 		ShaderDirectionalAndPointLightData _PointLights[kMaxPointLightNum];
 		ShaderSpotlLightData _SpotLights[kMaxSpotLightNum];
-		float4x4 _MainLightShadowMatrix;
-		float4x4 _CubeMapGenCameraMatrix;
+		float4x4 _ShadowMatrix[1 + kMaxSpotLightNum + kMaxPointLightNum];
+		float padding1[36];
 		//float4x4 _JointMatrix[80];
-		float padding1[60];
 	};
 
 #ifdef __cplusplus

@@ -532,7 +532,7 @@ namespace Ailu
 	}
 	void ObjectDetail::ShowImpl()
 	{
-		auto cur_selected_actor = *_pp_actor;
+		auto& cur_selected_actor = *_pp_actor;
 		if (cur_selected_actor != nullptr)
 		{
 			ImGui::BulletText(cur_selected_actor->Name().c_str());

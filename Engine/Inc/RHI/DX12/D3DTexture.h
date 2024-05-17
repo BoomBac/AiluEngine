@@ -23,6 +23,7 @@ namespace Ailu
 		void Bind(CommandBuffer* cmd, u8 slot) final;
 		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
 		void CreateView() final;
+		void ReleaseView() final;
 		void Name(const String& new_name) final;
 		D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _main_srv_handle; };
 	private:

@@ -23,6 +23,10 @@ namespace Ailu
 		auto& transf = static_cast<SceneActor*>(_p_onwer)->GetTransform();
 		_light._light_color.a = _intensity;
 		_light._light_pos = transf._position;
+		Vector4f light_forward = kDefaultDirectionalLightDir;
+		light_forward.xyz = transf._rotation * light_forward.xyz;
+		_light._light_dir.xyz = Normalize(Vector3f{ light_forward.xyz });
+
 		Clamp(_light._light_param.z, 0.0f, 180.0f);
 		Clamp(_light._light_param.y, 0.0f, _light._light_param.z - 0.1f);
 		if (_b_cast_shadow)
@@ -106,11 +110,6 @@ namespace Ailu
 		{
 			case Ailu::ELightType::kDirectional:
 			{
-				Vector4f light_forward = transf._rotation * kDefaultDirectionalLightDir;
-				//auto rot_mat = Quaternion::ToMat4f(transf._rotation);
-				//TransformVector(light_forward, rot_mat);
-				Normalize(light_forward);
-				_light._light_dir = light_forward;
 				Vector3f light_to = _light._light_dir.xyz;
 				light_to.x *= 500;
 				light_to.y *= 500;
@@ -132,15 +131,8 @@ namespace Ailu
 			}
 			case Ailu::ELightType::kSpot:
 			{
-				Vector4f light_forward = kDefaultDirectionalLightDir;
-				//auto rot = transf.Rotation();
-				//auto rot_mat = MatrixRotationX(ToRadius(rot.x)) * MatrixRotationY(ToRadius(rot.y));
-				auto rot_mat = Quaternion::ToMat4f(transf._rotation);
-				//TransformVector(light_forward, rot_mat);
-				//Normalize(light_forward);
-				light_forward.xyz = transf._rotation * light_forward.xyz;
 				float angleIncrement = 90.0;
-				_light._light_dir = light_forward;
+				auto rot_mat = Quaternion::ToMat4f(transf._rotation);
 				Vector3f light_to = _light._light_dir.xyz;
 				light_to *= _light._light_param.x;
 				{

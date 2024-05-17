@@ -63,6 +63,10 @@
 #define TP_ONE(t) std::get<1>(t)
 #define TP_TWO(t) std::get<2>(t)
 
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+    TypeName(const TypeName&) = delete; \
+    void operator=(const TypeName&) = delete;
+
 //#define DECLARE_PRIVATE_PROPERTY(Name,type) \
 //public: \
 //    void Name(const type& value) { _##Name = value; } \

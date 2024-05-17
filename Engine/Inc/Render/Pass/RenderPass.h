@@ -67,8 +67,12 @@ namespace Ailu
 		void EndPass(GraphicsContext* context) final;
 	private:
 		Rect _rect;
-		Scope<RenderTexture> _p_shadow_map;
+		Rect _addlight_rect;
+		Scope<RenderTexture> _p_mainlight_shadow_map;
+		//Scope<RenderTexture> _p_addlight_shadow_map;
+		Scope<RenderTexture> _p_addlight_shadow_maps;
 		Ref<Material> _p_shadowcast_material;
+		Ref<Material> _p_addshadowcast_material;
 	};
 
 	class CubeMapGenPass : public RenderPass
@@ -124,6 +128,16 @@ namespace Ailu
 		Ref<Mesh> _p_sky_mesh;
 		Ref<Material> _p_skybox_material;
 		Scope<ConstantBuffer> _p_cbuffer;
+	};
+
+	class GizmoPass : public RenderPass
+	{
+	public:
+		GizmoPass();
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
+		void BeginPass(GraphicsContext* context) final;
+		void EndPass(GraphicsContext* context) final;
+	private:
 	};
 }
 

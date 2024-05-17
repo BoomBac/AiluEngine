@@ -228,6 +228,21 @@ namespace Ailu
 				path = path.substr(2);
 			return kEngineResRootPathW + path;
 		}
+
+		static auto RenameFile(const WString& asset_path, WString new_name)
+		{
+			auto path_without_file_name = asset_path.substr(0, asset_path.find_last_of(L"/") + 1);
+			path_without_file_name += new_name;
+			auto ext = asset_path.substr(asset_path.find_last_of(L"."));
+			path_without_file_name += ext;
+			return path_without_file_name;
+		}
+		//return .*
+		static WString ExtractExt(const WString& asset_path)
+		{
+			return asset_path.substr(asset_path.find_last_of(L"."));
+		}
+
 	};
 
 }

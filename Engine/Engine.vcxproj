@@ -617,6 +617,7 @@
     <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp" />
+    <ClCompile Include="Src\Framework\Math\Geometry.cpp" />
     <ClCompile Include="Src\Framework\Math\Guid.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />
     <ClCompile Include="Src\Framework\Parser\HDRParser.cpp" />

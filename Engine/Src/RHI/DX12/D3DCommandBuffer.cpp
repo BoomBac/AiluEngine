@@ -82,6 +82,13 @@ namespace Ailu
 		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH, depth_value, stencil_value, 0, nullptr);
 	}
 
+	void D3DCommandBuffer::ClearRenderTarget(RenderTexture* depth, u16 index, float depth_value)
+	{
+		auto drt = static_cast<D3DRenderTexture*>(depth);
+		g_pGfxContext->TrackResource(depth);
+		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this,index), D3D12_CLEAR_FLAG_DEPTH, depth_value, 0, 0, nullptr);
+	}
+
 	void D3DCommandBuffer::DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count)
 	{
 		++RenderingStates::s_draw_call;
@@ -233,6 +240,30 @@ namespace Ailu
 			NULL);
 	}
 
+	void D3DCommandBuffer::SetRenderTarget(RenderTexture* color, RenderTexture* depth, u16 color_index, u16 depth_index)
+	{
+		GraphicsPipelineStateMgr::ResetRenderTargetState();
+		if (color && depth)
+		{
+			auto crt = static_cast<D3DRenderTexture*>(color);
+			auto drt = static_cast<D3DRenderTexture*>(depth);
+			g_pGfxContext->TrackResource(color);
+			g_pGfxContext->TrackResource(depth);
+			GraphicsPipelineStateMgr::SetRenderTargetState(color->PixelFormat(), depth->PixelFormat(), 0);
+			_p_cmd->OMSetRenderTargets(1, crt->TargetCPUHandle(this,color_index), 0, drt->TargetCPUHandle(this, depth_index));
+		}
+		else
+		{
+			if (color == nullptr)
+			{
+				GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUnknown, depth->PixelFormat(), 0);
+				auto drt = static_cast<D3DRenderTexture*>(depth);
+				g_pGfxContext->TrackResource(depth);
+				_p_cmd->OMSetRenderTargets(0, nullptr, 0, drt->TargetCPUHandle(this, depth_index));
+			}
+		}
+	}
+
 	void D3DCommandBuffer::ClearRenderTarget(RTHandle color, RTHandle depth, Vector4f clear_color, float clear_depth)
 	{
 		ClearRenderTarget(g_pRenderTexturePool->Get(color), g_pRenderTexturePool->Get(depth), clear_color, clear_depth);
@@ -307,7 +338,7 @@ namespace Ailu
 	{
 		static const auto& mat = BuildIdentityMatrix();
 		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
-		static const auto material = MaterialLibrary::GetMaterial("Blit");
+		static const auto material = MaterialLibrary::GetMaterial("Hidden/Blit");
 		D3DContext::Get()->BeginBackBuffer(this);
 		mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
 		mesh->GetIndexBuffer()->Bind(this);
@@ -321,11 +352,11 @@ namespace Ailu
 			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
 			PIXEndEvent(_p_cmd.Get());
 			RenderTexture::s_current_rt = nullptr;
-			PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
-			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
-			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
-			Gizmo::Submit(this);
-			PIXEndEvent(_p_cmd.Get());
+			//PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
+			//GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
+			//GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			//Gizmo::Submit(this);
+			//PIXEndEvent(_p_cmd.Get());
 			PIXBeginEvent(_p_cmd.Get(), 110, "GUIPass");
 			D3DContext::Get()->DrawOverlay(this);
 			PIXEndEvent(_p_cmd.Get());
@@ -347,8 +378,7 @@ namespace Ailu
 	{
 		static const auto& mat = BuildIdentityMatrix();
 		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
-		static const auto material = MaterialLibrary::GetMaterial("Blit");
-		//D3DContext::Get()->BeginBackBuffer(this);
+		static const auto material = MaterialLibrary::GetMaterial("Hidden/Blit");
 		SetRenderTarget(destination);
 		ClearRenderTarget(destination, Colors::kBlack);
 		mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
@@ -357,22 +387,18 @@ namespace Ailu
 		material->Bind();
 		GraphicsPipelineStateMgr::EndConfigurePSO(this);
 		auto d3dcmd = static_cast<D3DCommandBuffer*>(this)->GetCmdList();
-		//auto query_heap = D3DContext::Get()->GetQueryHeap();
-		//auto d3dcontext = D3DContext::Get();
 		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
 		{
-			//d3dcmd->BeginQuery(query_heap, D3D12_QUERY_TYPE_TIMESTAMP, 0);
-			//d3dcmd->EndQuery(query_heap,D3D12_QUERY_TYPE_TIMESTAMP, d3dcontext->Offset + 0);
 #ifdef _PIX_DEBUG
 			PIXBeginEvent(_p_cmd.Get(), 100, "FinalBlitPass");
 			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
 			RenderTexture::s_current_rt = nullptr;
 			PIXEndEvent(_p_cmd.Get());
-			PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
-			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
-			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
-			Gizmo::Submit(this);
-			PIXEndEvent(_p_cmd.Get());
+			//PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
+			//GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
+			//GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			//Gizmo::Submit(this);
+			//PIXEndEvent(_p_cmd.Get());
 			PIXBeginEvent(_p_cmd.Get(), 110, "GUIPass");
 			D3DContext::Get()->BeginBackBuffer(this);
 			D3DContext::Get()->DrawOverlay(this);

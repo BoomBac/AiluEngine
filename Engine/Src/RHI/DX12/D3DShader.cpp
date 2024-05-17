@@ -453,7 +453,7 @@ namespace Ailu
 			}
 			for (u32 i = 0u; i < desc.ConstantBuffers; i++)
 			{
-				auto cbuf = ref_ps->GetConstantBufferByIndex(i);
+				auto cbuf = ref_vs->GetConstantBufferByIndex(i);
 				D3D12_SHADER_BUFFER_DESC desc{};
 				cbuf->GetDesc(&desc);
 				for (u32 j = 0u; j < desc.Variables; j++)

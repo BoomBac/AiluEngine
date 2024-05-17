@@ -81,7 +81,8 @@ namespace Ailu
 	}
 	void Mesh::AddSubmesh(u32* indices, u32 indices_count)
 	{
-		_p_indices.emplace_back(std::make_tuple(indices, indices_count));
+		if(indices_count > 0)
+			_p_indices.emplace_back(std::make_tuple(indices, indices_count));
 	}
 	const Guid& Mesh::GetGuid() const
 	{
@@ -94,7 +95,7 @@ namespace Ailu
 
 	void Mesh::AttachToAsset(Asset* asset)
 	{
-		AL_ASSERT_MSG(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
+		AL_ASSERT(asset->_p_inst_asset != nullptr);
 		_p_asset_owned_this = asset;
 		asset->_p_inst_asset = this;
 		asset->_name = ToWChar(_name);
@@ -133,7 +134,8 @@ namespace Ailu
 		_p_ibufs.resize(_p_indices.size());
 		for(int i = 0; i < _p_indices.size(); i++)
 		{
-			_p_ibufs[i].reset(IndexBuffer::Create(std::get<0>(_p_indices[i]), std::get<1>(_p_indices[i])));
+			if(std::get<1>(_p_indices[i]) != 0)
+				_p_ibufs[i].reset(IndexBuffer::Create(std::get<0>(_p_indices[i]), std::get<1>(_p_indices[i])));
 		}
 		_is_rhi_res_ready = true;
 	}

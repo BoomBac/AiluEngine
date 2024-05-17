@@ -132,33 +132,42 @@ namespace Ailu
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 		ImGui::DestroyContext();
-		DESTORY_PTR(_asset_browser);
-		DESTORY_PTR(_asset_table);
-		DESTORY_PTR(_render_view);
-		DESTORY_PTR(_object_detail);
-		DESTORY_PTR(_p_outputlog);
-		DESTORY_PTR(_p_rt_view);
 	}
 
 	void Ailu::ImGUILayer::OnAttach()
 	{
-		_asset_browser = new AssetBrowser();
-		_asset_browser->Open(21);
-		_asset_table = new AssetTable();
-		_render_view = new RenderView();
-		_render_view->Open(22);
-		_object_detail = new ObjectDetail(&s_cur_selected_actor);
-		_object_detail->Open(23);
+		auto tex_detail_view = _widgets.emplace_back(std::move(MakeScope<TextureDetailView>())).get();
+		_widgets.emplace_back(std::move(MakeScope<AssetBrowser>(tex_detail_view)));
+		_widgets.emplace_back(std::move(MakeScope<AssetTable>()));
+		_widgets.emplace_back(std::move(MakeScope<ObjectDetail>(&s_cur_selected_actor)));
+		_widgets.emplace_back(std::move(MakeScope<RenderTextureView>()));
+		_mesh_browser.Open(ImGuiWidget::GetGlobalWidgetHandle());
+		//_asset_browser = new AssetBrowser();
+		//_asset_browser->Open(21);
+		//_asset_table = new AssetTable();
+		//_render_view = new RenderView();
+		//_render_view->Open(22);
+		//_object_detail = new ObjectDetail(&s_cur_selected_actor);
+		//_object_detail->Open(23);
 		for (auto appender : g_pLogMgr->GetAppenders())
 		{
 			auto imgui_appender = dynamic_cast<ImGuiLogAppender*>(appender);
 			if (imgui_appender)
 			{
-				_p_outputlog = new OutputLog(imgui_appender);
-				_p_outputlog->Open(24);
+				_widgets.emplace_back(std::move(MakeScope<OutputLog>(imgui_appender)));
+				//_p_outputlog = new OutputLog(imgui_appender);
+				//_p_outputlog->Open(24);
 			}
 		}
-		_p_rt_view = new RenderTextureView();
+		_widgets.emplace_back(std::move(MakeScope<RenderView>()));
+		//_p_rt_view = new RenderTextureView();
+		for (auto& widget : _widgets)
+		{
+			widget->Open(ImGuiWidget::GetGlobalWidgetHandle());
+		}
+		//默认不显示纹理细节窗口
+		tex_detail_view->Close(tex_detail_view->Handle());
+		ImGuiWidget::SetFocus("AssetBrowser");
 	}
 
 	void Ailu::ImGUILayer::OnDetach()
@@ -243,7 +252,9 @@ namespace Ailu
 
 		ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
 		ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 2.0f, "%.2f");
-
+		float shadow_dis_m = g_pRenderer->_shadow_distance / 100.0f;
+		ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
+		g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
 		ImGui::Checkbox("Expand", &show);
 		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
 		ImGui::Checkbox("ShowRT", &s_show_rt);
@@ -261,26 +272,30 @@ namespace Ailu
 		ImGui::End();
 		ImGui::PopFont();
 
-		if (show) ImGui::ShowDemoWindow(&show);
-		if (s_show_asset_table) _asset_table->Open(-2);
-		else _asset_table->Close(-2);
-		if (s_show_rt) _p_rt_view->Open(-3);
-		else _p_rt_view->Close(-3);
+		if (show) 
+			ImGui::ShowDemoWindow(&show);
+		//if (s_show_asset_table) _asset_table->Open(-2);
+		//else _asset_table->Close(-2);
+		//if (s_show_rt) _p_rt_view->Open(-3);
+		//else _p_rt_view->Close(-3);
 		TreeStats::s_common_property_handle = 0;
-
 		ShowWorldOutline();
+		_mesh_browser.Show();
 		//ShowObjectDetail();
 		//_texture_selector.Show();
-		_mesh_browser.Open(20);
-		_mesh_browser.Show();
-		_asset_browser->Show();
-		_asset_table->Show();
-		_p_rt_view->Show();
-		_object_detail->Show();
-		_p_outputlog->Show();
-		//render view焦点时才不会阻塞输入，所以它必须放在最后渲染
-		_render_view->Show();
-		//ShowTextureExplorer();
+		//_mesh_browser.Open(20);
+		//_mesh_browser.Show();
+		//_asset_browser->Show();
+		//_asset_table->Show();
+		//_p_rt_view->Show();
+		//_object_detail->Show();
+		//_p_outputlog->Show();
+		////render view焦点时才不会阻塞输入，所以它必须放在最后渲染
+		//_render_view->Show();
+		for(auto& widget : _widgets)
+		{
+			widget->Show();
+		}
 	}
 
 	void Ailu::ImGUILayer::Begin()
@@ -296,7 +311,7 @@ namespace Ailu
 		const Window& window = Application::GetInstance()->GetWindow();
 		ImGuiIO& io = ImGui::GetIO();
 		io.DisplaySize = ImVec2(static_cast<float>(window.GetWidth()), static_cast<float>(window.GetHeight()));
-
+		ImGuiWidget::EndFrame();
 		ImGui::EndFrame();
 		ImGui::Render();
 	}

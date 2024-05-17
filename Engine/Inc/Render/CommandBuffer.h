@@ -31,6 +31,12 @@ namespace Ailu
         virtual void ClearRenderTarget(Vector<RenderTexture*>& colors, RenderTexture* depth, Vector4f clear_color, float clear_depth) = 0;
         virtual void ClearRenderTarget(RenderTexture* color, Vector4f clear_color,u16 index = 0u) = 0;
         virtual void ClearRenderTarget(RenderTexture* depth, float depth_value = 1.0f,u8 stencil_value = 0u) = 0;
+        virtual void ClearRenderTarget(RenderTexture* depth, u16 index, float depth_value = 1.0f) = 0;
+        virtual void ClearRenderTarget(Vector<RTHandle>& colors, RTHandle depth, Vector4f clear_color, float clear_depth) = 0;
+        virtual void ClearRenderTarget(RTHandle color, RTHandle depth, Vector4f clear_color, float clear_depth) = 0;
+        virtual void ClearRenderTarget(RTHandle color, Vector4f clear_color, u16 index = 0u) = 0;
+        virtual void ClearRenderTarget(RTHandle depth, float depth_value = 1.0f, u8 stencil_value = 0u) = 0;
+
         virtual void SetRenderTargets(Vector<RenderTexture*>& colors, RenderTexture* depth) = 0;
         virtual void SetRenderTarget(RenderTexture* color, RenderTexture* depth) = 0;
         /// <summary>
@@ -39,11 +45,7 @@ namespace Ailu
         /// <param name="color"></param>
         /// <param name="index"></param>
         virtual void SetRenderTarget(RenderTexture*color,u16 index = 0u) = 0;
-
-        virtual void ClearRenderTarget(RTHandle color, RTHandle depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(Vector<RTHandle>& colors, RTHandle depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(RTHandle color, Vector4f clear_color, u16 index = 0u) = 0;
-        virtual void ClearRenderTarget(RTHandle depth, float depth_value = 1.0f, u8 stencil_value = 0u) = 0;
+        virtual void SetRenderTarget(RenderTexture* color,RenderTexture* depth,u16 color_index,u16 depth_index) = 0;
         virtual void SetRenderTargets(Vector<RTHandle>& colors, RTHandle depth) = 0;
         virtual void SetRenderTarget(RTHandle color, RTHandle depth) = 0;
         virtual void SetRenderTarget(RTHandle color, u16 index = 0u) = 0;

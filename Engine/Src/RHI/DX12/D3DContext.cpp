@@ -203,8 +203,14 @@ namespace Ailu
 			_cmd_target_fence_value[cmd->GetID()] = _fence_value;
 		else
 			_cmd_target_fence_value.insert(std::make_pair(cmd->GetID(), _fence_value));
-
 		return _fence_value;
+	}
+
+	u64 D3DContext::ExecuteAndWaitCommandBuffer(Ref<CommandBuffer>& cmd)
+	{
+		auto ret = ExecuteCommandBuffer(cmd);
+		WaitForGpu();
+		return ret;
 	}
 
 	void D3DContext::BeginBackBuffer(CommandBuffer* cmd)

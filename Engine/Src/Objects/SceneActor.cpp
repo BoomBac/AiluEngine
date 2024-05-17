@@ -26,12 +26,18 @@ namespace Ailu
 		if (this == g_pSceneMgr->_p_selected_actor)
 		{
 			for (auto& comp : _components)
+			{
+				if (comp->GetType() == EComponentType::kCameraComponent)
+				{
+					Camera::sSelected = &static_cast<CameraComponent*>(comp.get())->_camera;
+				}
 				comp->OnGizmo();
+			}
 		}
 	}
 	void SceneActor::Serialize(std::ostream& os, String indent)
 	{
-		Actor::Serialize(os,indent);
+		Actor::Serialize(os, indent);
 	}
 	void* SceneActor::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
@@ -65,7 +71,7 @@ namespace Ailu
 				else
 				{
 					AL_ASSERT_MSG(true, "Unhandled component type");
-					g_pLogMgr->LogWarningFormat("Unhandled component type {}",comp_type);
+					g_pLogMgr->LogWarningFormat("Unhandled component type {}", comp_type);
 				}
 				comp_type = TP_ZERO(formated_str.front());
 			}

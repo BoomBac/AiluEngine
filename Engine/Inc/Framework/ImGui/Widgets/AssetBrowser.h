@@ -4,14 +4,16 @@
 #include "ImGuiWidget.h"
 #include "Ext/imgui/imgui.h"
 
+
 namespace Ailu
 {
 	class Texture;
 	class Asset;
+	class TextureDetailView;
     class AssetBrowser : public ImGuiWidget
     {
 	public:
-		AssetBrowser();
+		AssetBrowser(ImGuiWidget* asset_detail_widget);
 		~AssetBrowser();
 		void Open(const i32& handle) final;
 		void Close(i32 handle) final;
@@ -21,7 +23,7 @@ namespace Ailu
 		void ShowNewMaterialWidget();
 		void DrawFolder(fs::path dir_path,u32 cur_file_index);
 		void DrawFile(fs::path dir_path,u32 cur_file_index);
-		void DrawAsset(Asset* asset);
+		void DrawAsset(Asset* asset,u32 cur_file_index);
 	private:
 		inline static ImVec4 kColorUnimported = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
 		inline static ImVec4 kColorBg = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -31,6 +33,7 @@ namespace Ailu
 		ImVec2 _window_size,_asset_content_size;
 		f32 _preview_tex_size = 64, _paddinged_preview_tex_size_padding = _preview_tex_size * 1.15f;
 		u32 _icon_num_per_row;
+		TextureDetailView* _p_tex_detail_widget;
 		//当前目录下选中的文件索引
 		u32 _selected_file_index = 0;
 		Ref<Texture> _folder_icon;
@@ -41,6 +44,8 @@ namespace Ailu
 		Ref<Texture> _image_icon;
 		Ref<Texture> _scene_icon;
 		Vector<Asset*> _cur_dir_assets;
+		WString _selected_file_sys_path;
+		bool _is_cur_assets_list_newer = false;
     };
 }
 

@@ -229,6 +229,13 @@ namespace Ailu
             _vertex_num = 0;
         }
 
+        //当GizmoPass未激活时，实际可能还会有数据在填充，所以将顶点偏移置空。一定要调用
+        //当激活时，实际就不用调用
+        static void EndFrame()
+        {
+            _vertex_num = 0;
+            p_buf->UploadData();
+        }
     public:
         inline static Color32 s_color = Colors::kGray;
     private:

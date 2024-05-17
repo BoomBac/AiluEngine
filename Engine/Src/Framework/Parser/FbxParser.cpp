@@ -991,8 +991,11 @@ namespace Ailu
 		mgr.Mark();
 		constexpr float minf = std::numeric_limits<float>::lowest();
 		constexpr float maxf = std::numeric_limits<float>::max();
-		Vector3f vmin{ maxf,maxf ,maxf };
-		Vector3f vmax{ minf,minf ,minf };
+		Vector3f vertex_min{ maxf,maxf ,maxf };
+		Vector3f vertex_max{ minf,minf ,minf };
+		Vector3f mesh_vmin = vertex_min;
+		Vector3f mesh_vmax = vertex_max;
+		Map<u32,std::tuple<Vector3f, Vector3f>> subemesh_aabbs;
 		if (raw_bonei)
 		{
 			for (size_t i = 0; i < vertex_count; i++)
@@ -1014,8 +1017,8 @@ namespace Ailu
 					uv0s.emplace_back(uv);
 					bone_indices.emplace_back(bi);
 					bone_weights.emplace_back(bw);
-					vmin = Min(vmin, p);
-					vmax = Max(vmax, p);
+					mesh_vmin = Min(mesh_vmin, p);
+					mesh_vmax = Max(mesh_vmax, p);
 				}
 				else indices.emplace_back(it->second);
 			}
@@ -1024,7 +1027,7 @@ namespace Ailu
 		{
 			for (size_t i = 0; i < vertex_count; i++)
 			{
-				int mat_index = _positon_material_index_mapper[i];
+				int submesh_index = _positon_material_index_mapper[i];
 				auto p = raw_pos[i], n = raw_normals[i];
 				auto uv = raw_uv0[i];
 				auto hash0 = v3hash(n), hash1 = v2hash(uv);
@@ -1033,19 +1036,27 @@ namespace Ailu
 				if (it == vertex_map.end())
 				{
 					vertex_map[vertex_hash] = cur_index_count;
-					submesh_indices[mat_index].emplace_back(cur_index_count);
+					submesh_indices[submesh_index].emplace_back(cur_index_count);
 					indices.emplace_back(cur_index_count);
 					normals.emplace_back(n);
 					positions.emplace_back(p);
 					uv0s.emplace_back(uv);
-					vmin = Min(vmin, p);
-					vmax = Max(vmax, p);
+					if (subemesh_aabbs.contains(submesh_index))
+					{
+						auto& [exist_min, exist_max] = subemesh_aabbs[submesh_index];
+						exist_min = Min(exist_min, p);
+						exist_max = Max(exist_max, p);
+					}
+					else
+					{
+						subemesh_aabbs[submesh_index] = std::make_tuple(vertex_min,vertex_max);
+					}
 					++cur_index_count;
 				}
 				else
 				{
 					indices.emplace_back(it->second);
-					submesh_indices[mat_index].emplace_back(it->second);
+					submesh_indices[submesh_index].emplace_back(it->second);
 				}
 			}
 		}
@@ -1053,8 +1064,15 @@ namespace Ailu
 		//LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
 		mesh->Clear();
 		float aabb_space = 1.0f;
-		mesh->_bound_box._max = vmax + Vector3f::kOne * aabb_space;
-		mesh->_bound_box._min = vmin - Vector3f::kOne * aabb_space;
+		mesh->_bound_boxs.emplace_back(AABB(mesh_vmin, mesh_vmax));
+		for (auto& it : subemesh_aabbs)
+		{
+			auto& [exist_min, exist_max] = it.second;
+			mesh_vmin = Min(mesh_vmin, exist_min);
+			mesh_vmax = Max(mesh_vmax, exist_max);
+			mesh->_bound_boxs.emplace_back(AABB(exist_min, exist_max));
+		}
+		mesh->_bound_boxs[0] = AABB(mesh_vmin, mesh_vmax);
 		vertex_count = (u32)positions.size();
 		//auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;

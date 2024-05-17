@@ -50,16 +50,11 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 	float4 gbuf2 = _GBuffer2.Sample(g_LinearWrapSampler,input.uv);
 
 	float depth = _CameraDepthTexture.Sample(g_LinearWrapSampler,input.uv);
-	//depth = depth * 2.0 - 1.0;
 	input.uv.y = 1.0 - input.uv.y;
-	float4 clipPos = float4(2.0f * input.uv - 1.0f, depth, 1.0);
-	float4 world_pos = mul(_MatrixIVP, clipPos);
-	world_pos /= world_pos.w;
+	float3 world_pos = Unproject(input.uv,depth);
 
 	SurfaceData surface_data;
 	surface_data.wnormal = UnpackNormal(gbuf0);
-	//surface_data.wnormal = float3(0.0,1.0,0.0);
-	//surface_data.wnormal = surface_data.wnormal * 2.0 - 1.0;
 	surface_data.albedo = float4(gbuf1.rgb,1.0f);
 	surface_data.roughness = gbuf1.w;
 	surface_data.metallic = gbuf2.w;
@@ -67,9 +62,9 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 	surface_data.specular = gbuf2.rgb;
 	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
 	light += surface_data.emssive;
-	float4 shadow_pos = TransformFromWorldToLightSpace(0,world_pos.xyz);
-	float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface_data.wnormal));
-	float shadow_factor = ApplyShadow(shadow_pos, nl, world_pos.xyz);
-	light *= lerp(0.1,1.0,shadow_factor);
+	// float4 shadow_pos = TransformFromWorldToLightSpace(0,world_pos.xyz);
+	// float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface_data.wnormal));
+	// float shadow_factor = ApplyShadow(shadow_pos, nl, world_pos.xyz);
+	// light *= lerp(0.1,1.0,shadow_factor);
 	return float4(light, 1.0);
 }

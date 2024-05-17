@@ -8,8 +8,8 @@ shader_path: Shaders/defered_standard_lit.hlsl
     MetallicValue: 1
     RoughnessValue: 0
   prop_type: Vector
-    SpecularColor: 0,0,0,0
-    BaseColor: 0.828431,0.701587,0.109645,0
+    SpecularColor: 0.976471,1,1,1
+    BaseColor: 1,1,1,1
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
     Specular: null guid

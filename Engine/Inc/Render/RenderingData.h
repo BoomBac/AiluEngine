@@ -32,8 +32,8 @@ namespace Ailu
 
     struct RenderingShadowData
     {
-        Matrix4x4f _shadow_view;
-        Matrix4x4f _shadow_proj;
+        Matrix4x4f _shadow_matrix;
+        i16        _shadow_index = -1;
         float _shadow_bias = 0.001f;
     };
     class CommandBuffer;

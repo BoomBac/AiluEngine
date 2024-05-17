@@ -7,10 +7,13 @@ namespace Ailu
 {
 	struct Plane
 	{
-		Vector3f _normal;
-		f32 _distance;
 		Plane() : _normal(Vector3f::kForward), _distance(0.f) {}
 		Plane(Vector3f n, f32 d) : _normal(n), _distance(d) {}
+		Vector3f _normal;
+		f32 _distance;
+        Vector3f _point;
+    private:
+        f32 _padding = 0.0f;
 	};
 
     class AABB
@@ -44,6 +47,17 @@ namespace Ailu
             }
             return AABB(new_min, new_max);
         }
+
+        static Vector3f MaxAABB()
+        {
+            return Vector3f(std::numeric_limits<float>::lowest());
+        }
+
+        static Vector3f MinAABB()
+        {
+            return Vector3f(std::numeric_limits<float>::max());
+        }
+        
 
         AABB() : _min(Vector3f(0.0f)), _max(Vector3f(0.0f)) {}
         AABB(const Vector3f& minPoint, const Vector3f& maxPoint) : _min(minPoint), _max(maxPoint) {}
@@ -88,39 +102,7 @@ namespace Ailu
 
     struct ViewFrustum
     {
-        static bool Conatin(const ViewFrustum& vf,const AABB& aabb)
-        {
-            static Array<Vector3f, 8> points;
-            Vector3f bl = aabb._min;
-            Vector3f tr = aabb._max;
-            Vector3f center = (bl + tr) / 2.0f;
-            Vector3f extent = tr - bl;
-            float l = abs(extent.x), w = abs(extent.y), h = abs(extent.z);
-            points[0] = (center + Vector3f(l / 2, w / 2, h / 2));
-            points[1] = (center + Vector3f(l / 2, w / 2, -h / 2));
-            points[2] = (center + Vector3f(l / 2, -w / 2, h / 2));
-            points[3] = (center + Vector3f(l / 2, -w / 2, -h / 2));
-            points[4] = (center + Vector3f(-l / 2, w / 2, h / 2));
-            points[5] = (center + Vector3f(-l / 2, w / 2, -h / 2));
-            points[6] = (center + Vector3f(-l / 2, -w / 2, h / 2));
-            points[7] = (center + Vector3f(-l / 2, -w / 2, -h / 2));
-            for (int i = 0; i < 6; i++)
-            {
-                if (DotProduct(vf._planes[i]._normal, points[0]) + vf._planes[i]._distance > 0
-                    && DotProduct(vf._planes[i]._normal, points[1]) + vf._planes[i]._distance > 0
-                    && DotProduct(vf._planes[i]._normal, points[2]) + vf._planes[i]._distance > 0
-                    && DotProduct(vf._planes[i]._normal, points[3]) + vf._planes[i]._distance > 0
-                    && DotProduct(vf._planes[i]._normal, points[4]) + vf._planes[i]._distance > 0
-                    && DotProduct(vf._planes[i]._normal, points[5]) + vf._planes[i]._distance > 0
-                    && DotProduct(vf._planes[i]._normal, points[6]) + vf._planes[i]._distance > 0
-                    && DotProduct(vf._planes[i]._normal, points[7]) + vf._planes[i]._distance > 0)
-                {
-                    LOG_INFO("Outside {}",i);
-                    return false;
-                }
-            }
-            return true;
-        };
+        static bool Conatin(const ViewFrustum& vf, const AABB& aabb);
         Array<Plane, 8> _planes;
     };
 }

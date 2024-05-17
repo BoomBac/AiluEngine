@@ -52,7 +52,7 @@ namespace Ailu
 		void AttachToAsset(Asset* owner) final;
 	public:
 		u32 _vertex_count;
-		AABB _bound_box;
+		Vector<AABB> _bound_boxs;
 	protected:
 		Ref<VertexBuffer> _p_vbuf;
 		Vector<Ref<IndexBuffer>> _p_ibufs;

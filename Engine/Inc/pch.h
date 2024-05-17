@@ -20,6 +20,7 @@
 
 #include <unordered_map>
 #include <string>
+#include <cctype>
 #include <sstream>
 #include <format>
 #include <thread>

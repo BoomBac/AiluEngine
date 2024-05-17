@@ -5,6 +5,8 @@
 #include "cbuffer.hlsli"
 #include "brdf.hlsli"
 #include "constants.hlsli"
+#include "shadow.hlsli"
+
 
 Texture2D Albedo : register(t0);
 Texture2D Normal : register(t1);
@@ -121,6 +123,12 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	float3 view_dir = normalize(_CameraPos.xyz - world_pos);
 	ShadingData shading_data;
 	LightData light_data;
+	light_data.shadow_atten = 1.0;
+	float4 shadow_pos = TransformFromWorldToLightSpace(0,world_pos.xyz);
+	float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface.wnormal));
+	float shadow_factor = 1.0;
+	light_data.shadow_atten = shadow_factor;
+	//return light_data.shadow_atten.xxx;
 	shading_data.nv = max(saturate(dot(view_dir,surface.wnormal)),0.000001);
 	for (uint i = 0; i < MAX_DIRECTIONAL_LIGHT; i++)
 	{
@@ -133,8 +141,12 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_dir = light_dir;
 		light_data.light_color = _DirectionalLights[i]._LightColor;
 		light_data.light_pos = _DirectionalLights[i]._LightPosOrDir;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
+		if(_DirectionalLights[i]._ShadowDataIndex != -1)
+			shadow_factor = ApplyShadow(shadow_pos, nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
+		light_data.shadow_atten = shadow_factor;
+		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
 	}
+	light_data.shadow_atten = 1.0f;
 	for (uint j = 0; j < MAX_POINT_LIGHT; j++)
 	{
 		float3 light_dir = -normalize(world_pos - _PointLights[j]._LightPosOrDir);
@@ -146,7 +158,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_dir = light_dir;
 		light_data.light_color = _PointLights[j]._LightColor;
 		light_data.light_pos = _PointLights[j]._LightPosOrDir;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
+		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
 	}
 	for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
 	{
@@ -159,7 +171,14 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_dir = light_dir;
 		light_data.light_color = _SpotLights[k]._LightColor;
 		light_data.light_pos = _SpotLights[k]._LightPos;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos);
+		if(_SpotLights[k]._ShadowDataIndex != -1)
+		{
+			uint shadow_index = _SpotLights[k]._ShadowDataIndex;
+			shadow_pos = TransformFromWorldToLightSpace(shadow_index,world_pos.xyz);
+			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos.xyz,_SpotLights[k]._ShadowDistance,k);
+		}
+		light_data.shadow_atten = shadow_factor;
+		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos);
 	}
 	//indirect light
 	float3 irradiance = DiffuseIBL.Sample(g_LinearWrapSampler, surface.wnormal);
@@ -168,7 +187,8 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	float3 kd = F3_WHITE - ks;
 	float3 diffuse = irradiance * surface.albedo.rgb;
 	float3 specular = SkyBox.SampleLevel(g_LinearWrapSampler, surface.wnormal,lerp(0,9,surface.roughness));
-	light += 0.5f * diffuse * kd + ks * specular * 0.25;
+	specular = pow(specular,1/2.2);
+	light += 0.25f * diffuse * kd + ks * specular;
 	return light; 
 }
  

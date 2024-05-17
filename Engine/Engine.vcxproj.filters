@@ -2342,6 +2342,9 @@
     <ClCompile Include="Src\Framework\Common\Assert.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Src\Framework\Math\Geometry.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat">

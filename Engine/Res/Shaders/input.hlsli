@@ -44,6 +44,7 @@ struct LightData
     float3 light_pos;
     float3 light_dir;
     float3 light_color;
+	float  shadow_atten;
 };
 
 #endif //__INPUT_H__

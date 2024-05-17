@@ -11,15 +11,25 @@
 
 namespace Ailu
 {
-	StaticMeshComponent::StaticMeshComponent() : _p_mesh(nullptr)
+	StaticMeshComponent::StaticMeshComponent() : StaticMeshComponent(nullptr, nullptr)
 	{
 		IMPLEMENT_REFLECT_FIELD(StaticMeshComponent)
 	}
 	StaticMeshComponent::StaticMeshComponent(Ref<Mesh> mesh, Ref<Material> mat) : _p_mesh(mesh)
 	{
 		IMPLEMENT_REFLECT_FIELD(StaticMeshComponent);
-		if(mat)
-			_p_mats.emplace_back(mat);
+		if (_p_mesh && _p_mats.size() != _p_mesh->SubmeshCount())
+		{
+			for (auto it = _p_mesh->GetCacheMaterials().begin(); it != _p_mesh->GetCacheMaterials().end(); it++)
+			{
+				auto loadded_mat = MaterialLibrary::GetMaterial(it->_name);
+				if(loadded_mat)
+					_p_mats.emplace_back(loadded_mat);
+			}
+			_transformed_aabbs = _p_mesh->_bound_boxs;
+		}
+		if (!_p_mats.empty() && _p_mats[0] == nullptr)
+			_p_mats[0] = mat;
 	}
 
 	void StaticMeshComponent::BeginPlay()
@@ -30,19 +40,17 @@ namespace Ailu
 	{
 		if (!_b_enable) return;
 		if (!_p_mesh) return;
-		_aabb = AABB::CaclulateBoundBox(_p_mesh->_bound_box, static_cast<SceneActor*>(_p_onwer)->GetTransformComponent()->GetMatrix());
-		if (_p_mats.size() != _p_mesh->SubmeshCount())
+		for (int i = 0; i < _p_mesh->_bound_boxs.size(); i++)
 		{
-			_p_mats.clear();
-			for (auto it = _p_mesh->GetCacheMaterials().begin(); it != _p_mesh->GetCacheMaterials().end(); it++)
-			{
-				_p_mats.emplace_back(MaterialLibrary::GetMaterial(it->_name));
-			}
+			_transformed_aabbs[i] = AABB::CaclulateBoundBox(_p_mesh->_bound_boxs[i], static_cast<SceneActor*>(_p_onwer)->GetTransformComponent()->GetMatrix());
 		}
 	}
 	void StaticMeshComponent::OnGizmo()
 	{
-		Gizmo::DrawAABB(_aabb, Colors::kGreen);
+		for (auto& aabb : _transformed_aabbs)
+		{
+			Gizmo::DrawAABB(aabb, Colors::kGreen);
+		}
 	}
 	void StaticMeshComponent::SetMesh(Ref<Mesh>& mesh)
 	{
@@ -66,7 +74,7 @@ namespace Ailu
 
 	void StaticMeshComponent::SetMaterial(Ref<Material>& mat, u16 slot)
 	{
-		if(slot < _p_mats.size())
+		if (slot < _p_mats.size())
 			_p_mats[slot] = mat;
 	}
 
@@ -76,9 +84,9 @@ namespace Ailu
 		using namespace std;
 		String prop_indent = indent.append("  ");
 		os << prop_indent << "MeshPath: " << (_p_mesh ? _p_mesh->OriginPath() : String("")) << endl;
-		for(int i = 0; i < _p_mats.size(); ++i)
+		for (int i = 0; i < _p_mats.size(); ++i)
 		{
-			os << prop_indent << std::format("MaterialPath{}: {}", i, _p_mats[i]? _p_mats[i]->GetGuid().ToString() : "missing") << endl;
+			os << prop_indent << std::format("MaterialPath{}: {}", i, _p_mats[i] ? _p_mats[i]->GetGuid().ToString() : "missing") << endl;
 		}
 	}
 	void* StaticMeshComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
@@ -108,7 +116,7 @@ namespace Ailu
 					}
 				}
 			}
-			if(!mesh)
+			if (!mesh)
 			{
 				g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
 			}

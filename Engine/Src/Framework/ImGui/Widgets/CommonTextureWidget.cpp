@@ -192,4 +192,92 @@ namespace Ailu
 	}
 	//--------------------------------------------------------------------------------------------RenderTextureView------------------------------------------------------------------------------------------
 
+	//--------------------------------------------------------------------------------------------TextureDetailView------------------------------------------------------------------------------------------
+	TextureDetailView::TextureDetailView() : ImGuiWidget("TextureDetailView")
+	{
+		_is_hide_common_widget_info = true;
+		OnWidgetClose([this]() {
+			g_pLogMgr->LogWarning("TextureDetailView close");
+			_p_tex = nullptr;
+		});
+	}
+
+	TextureDetailView::~TextureDetailView()
+	{
+	}
+
+	void TextureDetailView::Open(const i32& handle)
+	{
+		ImGuiWidget::Open(handle);
+	}
+
+	void TextureDetailView::Open(const i32& handle, Texture* tex)
+	{
+		if (!tex)
+		{
+			g_pLogMgr->LogWarning("Clocked asset is not texture");
+			return;
+		}
+
+		ImGuiWidget::Open(handle);
+		_p_tex = tex;
+		_title = _p_tex->Name();
+		_cur_mipmap_level = 0;
+	}
+
+	void TextureDetailView::Close(i32 handle)
+	{
+		ImGuiWidget::Close(handle);
+		_p_tex = nullptr;
+	}
+
+	void TextureDetailView::ShowImpl()
+	{
+		if (_p_tex)
+		{
+			TextureHandle cur_tex_handle = _p_tex->GetView(_cur_mipmap_level);
+			ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(cur_tex_handle),ImVec2(_size.x * 0.75f,_size.x * 0.75f));
+			//ImGui::Spacing();
+			ImGui::SameLine();
+			ImGui::BeginGroup();
+			bool is_total_view = _p_tex->IsViewCreate();
+			ImGui::Checkbox("Mipmap", &is_total_view);
+			if (is_total_view != _p_tex->IsViewCreate())
+			{
+				if(is_total_view)
+					_p_tex->CreateView();
+				else
+					_p_tex->ReleaseView();
+			}
+			if (is_total_view)
+			{
+				ImGuiStyle& style = ImGui::GetStyle();
+				float scrollbarWidth = style.ScrollbarSize;
+				//ImGui::SetNextItemWidth(_size.x * 0.20f);
+				ImGui::Text("Mip %d",_cur_mipmap_level);
+				//ImGui::SetNextItemWidth(_size.x * 0.20f);
+				ImGui::SameLine();
+				ImGui::SetNextItemWidth(_size.x * 0.20f - scrollbarWidth);
+				ImGui::SliderInt("##Mip", &_cur_mipmap_level, 0, _p_tex->MipmapLevel());
+			}
+			ImGui::Text("Name: %s", _p_tex->Name().c_str());
+			ImGui::Text("Improted: %d x %d", _p_tex->Width(), _p_tex->Height());
+			auto [w, h] = _p_tex->CurMipmapSize(_cur_mipmap_level);
+			ImGui::Text("Displayed: %d x %d", w, h);
+			ImGui::Text("Mipmap: %d", _p_tex->MipmapLevel() + 1);
+			ImGui::Text("Fomat: %s", EALGFormat::ToString(_p_tex->PixelFormat()));
+			ImGui::Text("Graphics Memory: %.2f mb", (f32)_p_tex->GetGpuMemerySize() * 9.5367431640625E-07);
+			//if (ImGui::CollapsingHeader("Common"))
+			//{
+
+			//}
+			//if (ImGui::CollapsingHeader("Advance"))
+			//{
+
+			//}
+			ImGui::EndGroup();
+		}
+	}
+	//--------------------------------------------------------------------------------------------TextureDetailView------------------------------------------------------------------------------------------
+
 }

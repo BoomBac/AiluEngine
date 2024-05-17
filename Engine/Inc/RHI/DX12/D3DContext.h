@@ -47,6 +47,7 @@ namespace Ailu
 
 
         u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
+        u64 ExecuteAndWaitCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void BeginBackBuffer(CommandBuffer* cmd);
         void EndBackBuffer(CommandBuffer* cmd);
         void DrawOverlay(CommandBuffer* cmd);

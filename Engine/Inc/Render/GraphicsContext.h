@@ -21,6 +21,7 @@ namespace Ailu
 		virtual const u64& GetFenceValue(const u32& cmd_index) const = 0;
 		virtual u64 GetCurFenceValue() const = 0;
 		virtual u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) = 0;
+		virtual u64 ExecuteAndWaitCommandBuffer(Ref<CommandBuffer>& cmd) = 0;
 		virtual bool IsCommandBufferReady(const u32 cmd_index) = 0;
 		virtual void SubmitRHIResourceBuildTask(RHIResourceTask task) = 0;
 		virtual void TakeCapture() = 0;

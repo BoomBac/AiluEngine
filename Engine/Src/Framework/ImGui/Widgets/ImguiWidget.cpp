@@ -58,6 +58,10 @@ namespace Ailu
 		}
 		return String{};
 	}
+	void ImGuiWidget::SetFocus(const String& title)
+	{
+		ImGui::SetWindowFocus(title.c_str());
+	}
 	ImGuiWidget::ImGuiWidget(const String& title) : _title(title),_is_focus(false)
 	{
 	}
@@ -77,31 +81,41 @@ namespace Ailu
 	}
 	void ImGuiWidget::Show()
 	{
+		if (_b_pre_show != _b_show && _b_show == false)
+		{
+			for (auto& e : _close_events)
+				e();
+		}
+		_b_pre_show = _b_show;
 		if (!_b_show)
 		{
 			_handle = -1;
 			return;
 		}
 		if(_allow_close)
-			ImGui::Begin(std::format("{} ,handle {}",_title,_handle).c_str(), &_b_show);
+			ImGui::Begin(_title.c_str(), &_b_show);
 		else
-			ImGui::Begin(std::format("{} ,handle {}", _title, _handle).c_str(), nullptr, ImGuiWindowFlags_NoCollapse);
+			ImGui::Begin(_title.c_str(), nullptr, ImGuiWindowFlags_NoCollapse);
 		_is_focus = ImGui::IsWindowFocused();
 		Input::s_block_input |= _is_focus;
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		ImVec2 windowSize = ImGui::GetWindowSize();
-		_left_top.x = windowPos.x;
-		_left_top.y = windowPos.y;
-		_right_bottom.x = windowSize.x;
-		_right_bottom.y = windowSize.y;
+		_pos.x = windowPos.x;
+		_pos.y = windowPos.y;
+		_size.x = windowSize.x;
+		_size.y = windowSize.y;
 		if (!_is_hide_common_widget_info)
 		{
-			ImGui::Text("State: pos: (%.2f,%.2f),size: (%.2f,%.2f)", _left_top.x, _left_top.y, _right_bottom.x, _right_bottom.y);
+			ImGui::Text("Handle %d,State: pos: (%.2f,%.2f),size: (%.2f,%.2f)", _handle, _pos.x, _pos.y, _size.x, _size.y);
 		}
 		ShowImpl();
 		ImGui::End();
 	}
 	void ImGuiWidget::ShowImpl()
 	{
+	}
+	void ImGuiWidget::OnWidgetClose(WidgetCloseEvent e)
+	{
+		_close_events.emplace_back(e);
 	}
 }

@@ -32,13 +32,14 @@ float3 TransformNormal(float3 object_normal)
 
 float4 TransformToLightSpace(uint shadow_index, float3 object_pos)
 {
-	float4x4 mvp = mul(_MainLightShadowMatrix, _MatrixWorld);
+	
+	float4x4 mvp = mul(_ShadowMatrix[shadow_index], _MatrixWorld);
 	return mul(mvp, float4(object_pos, 1.0f));
 }
 
 float4 TransformFromWorldToLightSpace(uint shadow_index, float3 world_pos)
 {
-	return mul(_MainLightShadowMatrix, float4(world_pos, 1.0f));
+	return mul(_ShadowMatrix[shadow_index], float4(world_pos, 1.0f));
 }
 
 	inline void GammaCorrect
@@ -71,6 +72,15 @@ float3 UnpackNormal(float2 f)
 	float t = saturate(-n.z);
 	n.xy += n.xy >= 0.0 ? -t : t;
 	return normalize(n);
+}
+
+//reconstruct world pos
+float3 Unproject(float2 screen_pos,float depth)
+{
+	float4 clipPos = float4(2.0f * screen_pos - 1.0f, depth, 1.0);
+	float4 world_pos = mul(_MatrixIVP, clipPos);
+	world_pos /= world_pos.w;
+	return world_pos.xyz;
 }
 
 #endif // !__COMMON_H__ 

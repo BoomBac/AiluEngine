@@ -164,18 +164,21 @@ namespace Ailu
 	}
 	bool Application::OnLostFoucus(WindowLostFocusEvent& e)
 	{
+		Input::s_block_input = true;
 		//_layer_stack->PopLayer(_p_input_layer);
 		return true;
 	}
 	bool Application::OnGetFoucus(WindowFocusEvent& e)
 	{
 		_state = EApplicationState::EApplicationState_Running;
+		Input::s_block_input = false;
 		//_layer_stack->PushLayer(_p_input_layer);
 		return true;
 	}
 	bool Application::OnWindowMinimize(WindowMinimizeEvent& e)
 	{
 		_state = EApplicationState::EApplicationState_Pause;
+		g_pTimeMgr->Reset();
 		LOG_WARNING("Application state: {}", EApplicationState::ToString(_state))
 			return false;
 	}
@@ -189,7 +192,11 @@ namespace Ailu
 	}
 	bool Application::OnDragFile(DragFileEvent& e)
 	{
-		g_pResourceMgr->ImportResourceAsync(e.GetDragedFilePath());
+		auto& draged_files = e.GetDragedFilesPath();
+		for (auto& it : draged_files)
+		{
+			g_pResourceMgr->ImportResourceAsync(it);
+		}
 		return false;
 	}
 

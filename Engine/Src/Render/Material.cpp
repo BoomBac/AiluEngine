@@ -234,7 +234,11 @@ namespace Ailu
 
 	void Material::AttachToAsset(Asset* asset)
 	{
-		AL_ASSERT_MSG(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
+		if (asset->_p_inst_asset != nullptr)
+		{
+			auto mat = static_cast<Material*>(asset->_p_inst_asset);
+			MaterialLibrary::ReleaseMaterial(mat->OriginPath());
+		}
 		_p_asset_owned_this = asset;
 		asset->_p_inst_asset = this;
 		asset->_name = ToWChar(_name);

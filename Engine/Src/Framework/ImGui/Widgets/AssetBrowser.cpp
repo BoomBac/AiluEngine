@@ -7,6 +7,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/FileManager.h"
 #include "Render/Texture.h"
+#include "Framework/ImGui/Widgets/CommonTextureWidget.h"
 
 namespace Ailu
 {
@@ -27,11 +28,18 @@ namespace Ailu
 		return vmax - vmin;
 	}
 
-	AssetBrowser::AssetBrowser() : ImGuiWidget("AssetBrowser")
+	static void DrawBorderFrame()
+	{
+		ImVec2 cur_img_pos = ImGui::GetCursorPos();
+		ImVec2 imgMin = ImGui::GetItemRectMin();
+		ImVec2 imgMax = ImGui::GetItemRectMax();
+		ImGui::GetWindowDrawList()->AddRect(imgMin, imgMax, IM_COL32(255, 255, 0, 255), 0.0f, 0, 1.0f);
+	};
+	AssetBrowser::AssetBrowser(ImGuiWidget* asset_detail_widget) : ImGuiWidget("AssetBrowser")
 	{
 		_is_hide_common_widget_info = true;
 		g_pResourceMgr->AddAssetChangedListener(std::bind(&AssetBrowser::OnUpdateAssetList, this));
-		//g_pResourceMgr->AddAssetChangedListener([this]() {OnUpdateAssetList(); });
+		_p_tex_detail_widget = dynamic_cast<TextureDetailView*>(asset_detail_widget);
 	}
 	AssetBrowser::~AssetBrowser()
 	{
@@ -56,6 +64,9 @@ namespace Ailu
 		_cur_dir_assets.clear();
 		SearchFilterByDirectory filter({ FileManager::GetCurDirStr() });
 		_cur_dir_assets = std::move(g_pResourceMgr->GetAssets(filter));
+		_selected_file_index = (u32)(-1);
+		_selected_file_sys_path = FileManager::GetCurDirStr();
+		_is_cur_assets_list_newer = true;
 	}
 	void AssetBrowser::ShowImpl()
 	{
@@ -74,21 +85,15 @@ namespace Ailu
 		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
 		_icon_num_per_row = window_width / (u32)_paddinged_preview_tex_size_padding;
 		_icon_num_per_row += _icon_num_per_row == 0 ? 1 : 0;
-
+		
+		u32 new_material_modal_window_handle = 0;
 		fs::directory_iterator curdir_it{ cur_path };
 
-		ImGui::Text("Current dir: %s", ToChar(FileManager::GetCurDirStr()).data());
+		ImGui::Text("Current dir: %s,Selected id %d", ToChar(_selected_file_sys_path).data(),_selected_file_index);
 		int file_index = 0;
 		for (auto& dir_it : curdir_it)
 		{
 			bool is_dir = dir_it.is_directory();
-			//auto file_name = dir_it.path().filename();
-			//auto file_name_str = file_name.string();
-			//auto asset = g_pResourceMgr->GetAsset(PathUtils::ExtractAssetPath(PathUtils::FormatFilePath(dir_it.path().wstring())));
-			//bool is_cur_asset_imported = asset && asset->_p_inst_asset;
-			//is_cur_asset_imported &= !is_dir;
-			//ImGuiContext* context = ImGui::GetCurrentContext();
-			//auto drawList = context->CurrentWindow->DrawList;
 			if (is_dir)
 			{
 				DrawFolder(dir_it.path(), file_index);
@@ -98,19 +103,19 @@ namespace Ailu
 				}
 				++file_index;
 			}
-			//else
-			//{
-			//	DrawFile(dir_it.path(), file_index);
-			//}
 		}
-		for (auto asset_it : _cur_dir_assets)
+		//如果进入新的文件夹后，那么资产列表就不在和本帧绘制所用的目录对应，跳过对应资产图标的绘制
+		if (!_is_cur_assets_list_newer)
 		{
-			DrawAsset(asset_it);
-			if ((file_index + 1) % _icon_num_per_row != 0)
+			for (auto asset_it : _cur_dir_assets)
 			{
-				ImGui::SameLine();
+				DrawAsset(asset_it, file_index);
+				if ((file_index + 1) % _icon_num_per_row != 0)
+				{
+					ImGui::SameLine();
+				}
+				++file_index;
 			}
-			++file_index;
 		}
 		//右键空白处
 		if (ImGui::BeginPopupContextWindow("AssetBrowserContext", ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverExistingPopup))
@@ -123,7 +128,8 @@ namespace Ailu
 				}
 				if (ImGui::MenuItem("Material"))
 				{
-					MarkModalWindoShow(49);
+					new_material_modal_window_handle = ImGuiWidget::GetGlobalWidgetHandle();
+					MarkModalWindoShow(new_material_modal_window_handle);
 				}
 				if (ImGui::MenuItem("Shader"))
 				{
@@ -142,50 +148,52 @@ namespace Ailu
 			}
 			ImGui::EndPopup();
 		}
-		ShowModalDialog("New Material", std::bind(&AssetBrowser::ShowNewMaterialWidget, this), 49);
+		ShowModalDialog("New Material", std::bind(&AssetBrowser::ShowNewMaterialWidget, this), new_material_modal_window_handle);
+		_is_cur_assets_list_newer = false;
 	}
 	void AssetBrowser::ShowNewMaterialWidget()
 	{
-		//static char buf[256];
-		//ImGui::InputText("##MaterialName", buf, IM_ARRAYSIZE(buf));
-		//static Ref<Shader> selected_shader = nullptr;
-		//int count = 0;
-		//static int selected_index = -1;
-		//if (ImGui::BeginCombo("Select Shader: ", selected_shader ? selected_shader->Name().c_str() : "select shader"))
-		//{
-		//	for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
-		//	{
-		//		if (ImGui::Selectable((*it)->Name().c_str(), selected_index == count))
-		//			selected_index = count;
-		//		if (selected_index == count)
-		//			selected_shader = *it;
-		//		++count;
-		//	}
-		//	ImGui::EndCombo();
-		//}
-		//if (ImGui::Button("OK", ImVec2(120, 0)))
-		//{
-		//	LOG_INFO("{},{}", String{ buf }, selected_shader ? selected_shader->Name() : "null shader");
-		//	String name{ buf };
+		static char buf[256];
+		ImGui::InputText("##MaterialName", buf, IM_ARRAYSIZE(buf));
+		static Ref<Shader> selected_shader = nullptr;
+		int count = 0;
+		static int selected_index = -1;
+		if (ImGui::BeginCombo("Select Shader: ", selected_shader ? selected_shader->Name().c_str() : "select shader"))
+		{
+			for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+			{
+				if (ImGui::Selectable((*it)->Name().c_str(), selected_index == count))
+					selected_index = count;
+				if (selected_index == count)
+					selected_shader = *it;
+				++count;
+			}
+			ImGui::EndCombo();
+		}
+		if (ImGui::Button("OK", ImVec2(120, 0)))
+		{
+			LOG_INFO("{},{}", String{ buf }, selected_shader ? selected_shader->Name() : "null shader");
+			String name{ buf };
 
-		//	if (!name.empty() && selected_shader)
-		//	{
-		//		String sys_path = _cur_dir;
-		//		if (!sys_path.ends_with("\\") && !sys_path.ends_with("/"))
-		//			sys_path.append("/");
-		//		sys_path.append(name).append(".almat");
-		//		auto asset_path = PathUtils::ExtractAssetPath(sys_path);
-		//		auto new_mat = MaterialLibrary::CreateMaterial(selected_shader, name, asset_path);
-		//		new_mat->IsInternal(selected_shader->Name() == "shaders");
-		//		g_pResourceMgr->SaveAsset(sys_path, new_mat.get());
-		//	}
-		//	ImGui::CloseCurrentPopup();
-		//}
-		//ImGui::SameLine();
-		//if (ImGui::Button("Cancel", ImVec2(120, 0)))
-		//{
-		//	ImGui::CloseCurrentPopup();
-		//}
+			if (!name.empty() && selected_shader)
+			{
+				String sys_path = ToChar(FileManager::GetCurDirStr());
+				if (!sys_path.ends_with("\\") && !sys_path.ends_with("/"))
+					sys_path.append("/");
+				sys_path.append(name).append(".almat");
+				auto asset_path = PathUtils::ExtractAssetPath(sys_path);
+				auto new_mat = MaterialLibrary::CreateMaterial(selected_shader, name, asset_path);
+				new_mat->IsInternal(selected_shader->Name() == "shaders");
+				g_pResourceMgr->SaveAsset(ToWChar(sys_path), new_mat.get());
+			}
+			ImGui::CloseCurrentPopup();
+			OnUpdateAssetList();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel", ImVec2(120, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
 	}
 	
 	void AssetBrowser::DrawFolder(fs::path dir_path, u32 cur_file_index)
@@ -213,6 +221,12 @@ namespace Ailu
 			OnUpdateAssetList();
 		}
 		ImGui::PopID();
+		if (cur_file_index == _selected_file_index)
+		{
+			DrawBorderFrame();
+			_selected_file_sys_path = dir_path.wstring();
+			PathUtils::FormatFilePathInPlace(_selected_file_sys_path);
+		}
 	}
 	void AssetBrowser::DrawFile(fs::path dir_path, u32 cur_file_index)
 	{
@@ -268,9 +282,11 @@ namespace Ailu
 			}
 			ImGui::EndPopup();
 		}
+		if (cur_file_index == _selected_file_index)
+			DrawBorderFrame();
 	}
 	
-	void AssetBrowser::DrawAsset(Asset* asset)
+	void AssetBrowser::DrawAsset(Asset* asset, u32 cur_file_index)
 	{
 		String file_name = ToChar(asset->_name);
 		ImGui::BeginGroup();
@@ -290,7 +306,8 @@ namespace Ailu
 		}
 		else if (asset->_asset_type == EAssetType::kTexture2D)
 		{
-			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_image_icon->GetNativeTextureHandle());
+			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(static_cast<Texture*>(asset->_p_inst_asset)->GetNativeTextureHandle());
+			//tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_image_icon->GetNativeTextureHandle());
 		}
 		else {};
 		if (ImGui::ImageButton(tex_id, ImVec2(_preview_tex_size, _preview_tex_size), _uv0, _uv1, 0, kColorBg, kColorTint))
@@ -304,7 +321,11 @@ namespace Ailu
 		//点击了文件
 		if (ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1))
 		{
-			g_pLogMgr->LogFormat("selected file {}", file_name.c_str());
+			if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+				_p_tex_detail_widget->Open(ImGuiWidget::GetGlobalWidgetHandle(),static_cast<Texture*>(asset->_p_inst_asset));
+			g_pLogMgr->LogFormat("selected asset {}", file_name.c_str());
+			_selected_file_sys_path = asset->_sys_path;
+			_selected_file_index = cur_file_index;
 		}
 		if (ImGui::BeginPopupContextItem(file_name.c_str())) // <-- use last item id as popup id
 		{
@@ -315,13 +336,23 @@ namespace Ailu
 			}
 			if (ImGui::MenuItem("Rename"))
 			{
-				g_pLogMgr->LogWarning("Waiting for implement");
+				MarkModalWindoShow(_selected_file_index);
 			}
 			if (ImGui::MenuItem("Delete"))
 			{
 				g_pLogMgr->LogWarning("Waiting for implement");
 			}
 			ImGui::EndPopup();
+		}
+		if (cur_file_index == _selected_file_index)
+		{
+			DrawBorderFrame();
+			auto new_name = ShowModalDialog("Rename asset", _selected_file_index);
+			if (!new_name.empty())
+			{
+				g_pResourceMgr->RenameAsset(asset, new_name);
+				g_pLogMgr->LogWarningFormat("Rename to {}", new_name);
+			}
 		}
 	}
 }

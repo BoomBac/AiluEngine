@@ -6,6 +6,8 @@
 #include "Render/CommandBuffer.h"
 #include "Render/Buffer.h"
 #include "Framework/Common/Profiler.h"
+#include "Render/Gizmo.h"
+#include "Render/RenderConstants.h"
 
 namespace Ailu
 {
@@ -95,36 +97,65 @@ namespace Ailu
 	//-------------------------------------------------------------ReslovePass-------------------------------------------------------------
 
 	//-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
-	ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize })
+	ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize }), _addlight_rect(Rect{ 0,0,(u16)(kShadowMapSize >> 1),(u16)(kShadowMapSize >> 1)})
 	{
-		_p_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainShadowMap", ERenderTargetFormat::kShadowMap);
+		_p_mainlight_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainLightShadowMap", ERenderTargetFormat::kShadowMap);
+		//_p_addlight_shadow_map = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, "AddLightShadowMap", ERenderTargetFormat::kShadowMap);
+		_p_addlight_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, kMaxPointLightNum,"AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
 		_p_shadowcast_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDepthOnly), "ShadowCast");
+		_p_shadowcast_material->SetUint("shadow_index",0);
+		_p_addshadowcast_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDepthOnly), "ShadowCast");
 	}
 
+	void ShadowCastPass::BeginPass(GraphicsContext* context)
+	{
+	}
 	void ShadowCastPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
 		auto cmd = CommandBufferPool::Get("ShadowCastPass");
 		cmd->Clear();
 		{
 			ProfileBlock profile(cmd.get(), _name);
-			cmd->SetRenderTarget(nullptr, _p_shadow_map.get());
-			cmd->ClearRenderTarget(_p_shadow_map.get(), 1.0f);
+			cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get());
+			cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(), 1.0f);
 			cmd->SetScissorRect(_rect);
 			cmd->SetViewport(_rect);
 			u32 obj_index = 0u;
+			_p_shadowcast_material->SetUint("shadow_index", 0);
 			for (auto& obj : RenderQueue::GetOpaqueRenderables())
 			{
 				cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
 			}
+			context->ExecuteAndWaitCommandBuffer(cmd);
+			cmd->Clear();
+			obj_index = 0;
+			if (rendering_data._actived_shadow_count > 1)
+			{
+				for (int i = 0; i < rendering_data._actived_shadow_count; i++)
+				{
+					
+					cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(),0,i);
+					cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), i,1.0f);
+					cmd->SetScissorRect(_addlight_rect);
+					cmd->SetViewport(_addlight_rect);
+					u32 obj_index = 0u;
+					_p_shadowcast_material->SetUint("shadow_index", i + 1);
+					//_p_addshadowcast_material->SetUint("shadow_index", rendering_data._shadow_data[i]._shadow_index);
+					for (auto& obj : RenderQueue::GetOpaqueRenderables())
+					{
+						cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+					}
+					context->ExecuteAndWaitCommandBuffer(cmd);
+					cmd->Clear();
+				}
+			}
 		}
-		Shader::SetGlobalTexture("MainLightShadowMap", _p_shadow_map.get());
+		Shader::SetGlobalTexture("MainLightShadowMap", _p_mainlight_shadow_map.get());
+		Shader::SetGlobalTexture("AddLightShadowMaps", _p_addlight_shadow_maps.get());
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}
 
-	void ShadowCastPass::BeginPass(GraphicsContext* context)
-	{
-	}
 	void ShadowCastPass::EndPass(GraphicsContext* context)
 	{
 	}
@@ -141,10 +172,10 @@ namespace Ailu
 		_p_cube_map = RenderTexture::Create(size, texture_name + "_cubemap", ERenderTargetFormat::kDefaultHDR, true,true,true);
 		_p_cube_map->CreateView();
 		_p_env_map = RenderTexture::Create(size / 4, texture_name + "_ibl_diffuse", ERenderTargetFormat::kDefaultHDR, false);
-		_p_gen_material = MaterialLibrary::GetMaterial("CubemapGen");
+		_p_gen_material = MaterialLibrary::GetMaterial("Hidden/CubemapGen");
 		_p_gen_material->SetTexture("env", ToWChar(src_texture_name));
 		_p_cube_mesh = MeshPool::GetMesh("cube");
-		_p_filter_material = MaterialLibrary::GetMaterial("EnvmapFilter");
+		_p_filter_material = MaterialLibrary::GetMaterial("Hidden/EnvmapFilter");
 		Matrix4x4f view, proj;
 		BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0, 1.0, 100000);
 		float scale = 0.5f;
@@ -317,4 +348,65 @@ namespace Ailu
 	{
 	}
 	//-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
+
+
+
+	//-------------------------------------------------------------GizmoPass-------------------------------------------------------------
+	GizmoPass::GizmoPass() : RenderPass("GizmoPass")
+	{
+	}
+	void GizmoPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
+	{
+		auto cmd = CommandBufferPool::Get("GizmoPass");
+		cmd->Clear();
+		{
+			ProfileBlock profile(cmd.get(), _name);
+			cmd->SetViewport(rendering_data._viewport);
+			cmd->SetScissorRect(rendering_data._scissor_rect);
+			cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(cmd.get());
+			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(cmd.get(), Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
+			Gizmo::Submit(cmd.get());
+		}
+		context->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
+	}
+	void GizmoPass::BeginPass(GraphicsContext* context)
+	{
+		if (Gizmo::s_color.a > 0.0f)
+		{
+			int gridSize = 100;
+			int gridSpacing = 100;
+			Vector3f cameraPosition = Camera::sCurrent->Position();
+			float grid_alpha = lerpf(0.0f, 1.0f, abs(cameraPosition.y) / 2000.0f);
+			Color32 grid_color = Colors::kWhite;
+			grid_color.a = 1.0f - grid_alpha;
+			if (grid_color.a > 0)
+			{
+				Vector3f grid_center_mid(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
+					0.0f,
+					static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
+				Gizmo::DrawGrid(100, 100, grid_center_mid, grid_color);
+			}
+			grid_color.a = grid_alpha;
+			if (grid_color.a > 0.7f)
+			{
+				gridSize = 10;
+				gridSpacing = 1000;
+				Vector3f grid_center_large(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
+					0.0f,
+					static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
+				//grid_color = Colors::kGreen;
+				Gizmo::DrawGrid(10, 1000, grid_center_large, grid_color);
+			}
+
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 500.f,0.0f,0.0f }, Colors::kRed);
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,500.0f,0.0f }, Colors::kGreen);
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,500.0f }, Colors::kBlue);
+		}
+	}
+	void GizmoPass::EndPass(GraphicsContext* context)
+	{
+	}
+	//-------------------------------------------------------------GizmoPass-------------------------------------------------------------
 }

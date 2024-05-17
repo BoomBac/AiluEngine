@@ -530,7 +530,7 @@ namespace Ailu
 	template<template<typename> typename TT, typename T>
 	TT<T> operator/(const TT<T>& v, const T& scalar)
 	{
-		TT<T> res;
+		TT<T> res = v;
 		for (uint32_t i = 0; i < CountOf(v.data); i++)
 		{
 			res.data[i] /= scalar;

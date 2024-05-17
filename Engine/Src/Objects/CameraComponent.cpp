@@ -58,6 +58,53 @@ namespace Ailu
 	void CameraComponent::OnGizmo()
 	{
 		Camera::DrawGizmo(&_camera);
+		//float shadow_distance = _camera.Far() * 0.5f;
+		//float len = shadow_distance / _camera.Far();
+		//Vector<Vector3f> p(8);
+		//p[0] = _camera._position + (_camera._far_bottom_left - _camera._position) * len;
+		//p[1] = _camera._position + (_camera._far_bottom_right - _camera._position) * len;
+		//p[2] = _camera._position + (_camera._far_top_left - _camera._position) * len;
+		//p[3] = _camera._position + (_camera._far_top_right - _camera._position) * len;
+
+		//p[4] = p[0] - _camera._forward * shadow_distance;
+		//p[5] = p[1] - _camera._forward * shadow_distance;
+		//p[6] = p[2] - _camera._forward * shadow_distance;
+		//p[7] = p[3] - _camera._forward * shadow_distance;
+		////for(int i = 0; i < 4; i++)
+		////{
+		////	Gizmo::DrawLine(p[i], p[i + 4], Colors::kRed);
+		////}
+		//auto vmax = AABB::MaxAABB(),vmin = AABB::MinAABB();
+		//for (int i = 0; i < 8; i++)
+		//{
+		//	vmax = Max(vmax, p[i]);
+		//	vmin = Min(vmin, p[i]);
+		//}
+		//Vector3f center = (vmax + vmin) * 0.5f;
+		//float dx = vmax.x - vmin.x;
+		//float dz = vmax.z - vmin.z;
+		//float extent = std::max(dx, dz) * 0.5;
+		////vmin = center - Vector3f(extent);
+		////vmax = center + Vector3f(extent);
+		//Gizmo::DrawAABB(AABB(vmin, vmax), Colors::kYellow);
+		//Vector3f light_dir = { 0,-0.717,0.717 };
+		//Gizmo::DrawLine(_camera._position, _camera._position + light_dir * shadow_distance, Colors::kRed);
+		//Vector3f dir_min = vmin + light_dir * shadow_distance;
+		//Vector3f dir_max = vmax + light_dir * shadow_distance;
+		////dir_min.y = shadow_distance * 2;
+		////dir_max.y = shadow_distance * 2;
+		//Gizmo::DrawLine(vmin, vmin + light_dir * 1000, Colors::kGreen);
+		//Gizmo::DrawLine(vmax, vmax + light_dir * 1000, Colors::kGreen);
+		//
+		//float height = Distance(vmin, vmax) * 2;
+		//Camera cam;
+		//cam.Type(ECameraType::kOrthographic);
+		//cam.SetLens(90, 1, 10, height * 1.5);
+		//cam.Size(extent * 2);
+		//cam.Rotation(Quaternion::AngleAxis(45, Vector3f::kRight));
+		//cam.Position(center + -light_dir * height);
+		//cam.RecalculateMarix(true);
+		//Camera::DrawGizmo(&cam);
 	}
 
 	void* CameraComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)

@@ -10,7 +10,7 @@
 
 #include "cbuffer.hlsli"
 #include "common.hlsli"
-
+//这个shader中指定的pso状态不会应用，其在D3DContext line124设置。
 struct VSInput
 {
 	float3 position : POSITION;
@@ -26,7 +26,6 @@ struct PSInput
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	//result.position = mul(float4(v.position, 1.0f), _MatrixVP);
 	result.position = TransformFromWorldToClipSpace(v.position);
 	result.color = v.color;
 	return result;
@@ -34,6 +33,5 @@ PSInput VSMain(VSInput v)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	return input.color;
-	//return float4(1.0,1.0,1.0,1.0);
+	return saturate(input.color);
 }

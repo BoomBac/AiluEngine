@@ -56,6 +56,7 @@ namespace Ailu
 		ImGUILayer(const String& name);
 		~ImGUILayer();
 
+
 		void OnAttach() override;
 		void OnDetach() override;
 		void OnEvent(Event& e) override;
@@ -70,12 +71,13 @@ namespace Ailu
 	private:
 		ImFont* _font = nullptr;
 		MeshBrowser _mesh_browser;
-		RenderView* _render_view;
-		AssetBrowser* _asset_browser;
-		AssetTable* _asset_table;
-		ObjectDetail* _object_detail;
-		ImGuiWidget* _p_outputlog;
-		ImGuiWidget* _p_rt_view;
+		Vector<Scope<ImGuiWidget>> _widgets;
+		//RenderView* _render_view;
+		//AssetBrowser* _asset_browser;
+		//AssetTable* _asset_table;
+		//ObjectDetail* _object_detail;
+		//ImGuiWidget* _p_outputlog;
+		//ImGuiWidget* _p_rt_view;
 	};
 }
 #pragma warning(pop)

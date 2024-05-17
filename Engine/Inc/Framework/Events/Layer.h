@@ -11,6 +11,7 @@ namespace Ailu
 	class AILU_API Layer
 	{
 	public:
+		DISALLOW_COPY_AND_ASSIGN(Layer)
 		Layer(const std::string& name = "Layer");
 		virtual ~Layer();
 		virtual void OnAttach() {}
@@ -18,7 +19,6 @@ namespace Ailu
 		virtual void OnEvent(Event& e) {}
 		virtual void OnUpdate(float delta_time) {}
 		virtual void OnImguiRender() {}
-
 		inline const std::string GetName() const { return _debug_name; }
 	protected:
 		std::string _debug_name;

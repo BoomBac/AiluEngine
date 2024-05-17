@@ -95,6 +95,9 @@ namespace Ailu
 
 	void D3DTexture2D::CreateView()
 	{
+		if (_is_have_total_view)
+			return;
+		Texture::CreateView();
 		auto p_device{ D3DContext::Get()->GetDevice() };
 		_mimmap_allocation = g_pGPUDescriptorAllocator->Allocate(_mipmap_count);
 		for (int i = 0; i < _mipmap_count; i++)
@@ -109,6 +112,12 @@ namespace Ailu
 			p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, ch);
 			_mipmap_srv_handles.emplace_back(gh);
 		}
+	}
+	void D3DTexture2D::ReleaseView()
+	{
+		Texture::ReleaseView();
+		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_allocation));
+		_mipmap_srv_handles.clear();
 	}
 	void D3DTexture2D::Name(const String& new_name)
 	{
@@ -206,6 +215,7 @@ namespace Ailu
 
 	void D3DCubeMap::CreateView()
 	{
+		Texture::CreateView();
 		auto p_device{ D3DContext::Get()->GetDevice() };
 		_mimmap_allocation = g_pGPUDescriptorAllocator->Allocate((_mipmap_count + 1) * 6);
 		u16 srv_handle_index = 0;
@@ -293,8 +303,24 @@ namespace Ailu
 		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		_srv_desc.Format = is_for_depth ? DXGI_FORMAT_R24_UNORM_X8_TYPELESS : tex_desc.Format;
 		_srv_desc.ViewDimension = main_view_dimension;
-		_srv_desc.Texture2D.MostDetailedMip = 0;
-		_srv_desc.Texture2D.MipLevels = mipmap_level;
+		if (_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
+		{
+			_srv_desc.Texture2D.MostDetailedMip = 0;
+			_srv_desc.Texture2D.MipLevels = mipmap_level;
+		}
+		else if(_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY)
+		{
+			_srv_desc.Texture2DArray.FirstArraySlice = 0;
+			_srv_desc.Texture2DArray.ArraySize = texture_num;
+			_srv_desc.Texture2DArray.MipLevels = mipmap_level;
+			_srv_desc.Texture2DArray.MostDetailedMip = 0;
+		}
+		else if(_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURECUBE)
+		{
+			_srv_desc.TextureCube.MipLevels = mipmap_level;
+			_srv_desc.TextureCube.MostDetailedMip = 0;
+		}
+
 
 		_gpu_allocation = g_pGPUDescriptorAllocator->Allocate(1);
 		auto [s_ch, s_gh] = _gpu_allocation.At(0);
@@ -327,9 +353,14 @@ namespace Ailu
 				auto handle = _cpu_allocation.At(i);
 				_rtv_or_dsv_cpu_handles.emplace_back(handle);
 				D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
+				dsv_desc.ViewDimension = texture_num > 1 ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY : D3D12_DSV_DIMENSION_TEXTURE2D;
 				dsv_desc.Format = tex_desc.Format;
-				dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 				dsv_desc.Texture2D.MipSlice = 0;
+				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY)
+				{
+					dsv_desc.Texture2DArray.FirstArraySlice = i;
+					dsv_desc.Texture2DArray.ArraySize = 1;
+				}
 				p_device->CreateDepthStencilView(_p_buffer.Get(), &dsv_desc, _rtv_or_dsv_cpu_handles.back());
 			}
 		}
@@ -356,6 +387,7 @@ namespace Ailu
 
 	void D3DRenderTexture::CreateView()
 	{
+		Texture::CreateView();
 		if (_dimension == ETextureDimension::kCube)
 		{
 			auto p_device{ D3DContext::Get()->GetDevice() };
@@ -453,7 +485,9 @@ namespace Ailu
 			_p_mipmapgen_cs0->SetTexture("OutMip2", this, (ECubemapFace::ECubemapFace)i, 2);
 			_p_mipmapgen_cs0->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace)i, 3);
 			_p_mipmapgen_cs0->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace)i, 4);
-			static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->Bind(cmd, 32, 32, 1);
+			//static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->Bind(cmd, 32, 32, 1);
+			//保证线程数和第一级输出的mipmap像素数一一对应
+			cmd->Dispatch(_p_mipmapgen_cs0.get(), mip1w / 8, mip1h / 8, 1);
 			auto [mip5w, mip5h] = CurMipmapSize(5);
 			_p_mipmapgen_cs1->SetInt("SrcMipLevel", 4);
 			_p_mipmapgen_cs1->SetInt("NumMipLevels", min(_mipmap_count - 4,4));
@@ -466,7 +500,8 @@ namespace Ailu
 			_p_mipmapgen_cs1->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace)i, 7);
 			if(_mipmap_count > 7)
 				_p_mipmapgen_cs1->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace)i, 8);
-			static_cast<D3DComputeShader*>(_p_mipmapgen_cs1.get())->Bind(cmd, 32, 32, 1);
+			//static_cast<D3DComputeShader*>(_p_mipmapgen_cs1.get())->Bind(cmd, 32, 32, 1);
+			cmd->Dispatch(_p_mipmapgen_cs1.get(), mip5w / 8, mip5h / 8, 1);
 		}
 
 	}

@@ -67,10 +67,13 @@ void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out floa
 	else 
 		specular = SpecularColor;
 	if (SamplerMask & 1)
+	{
 		albedo = Albedo.Sample(g_LinearWrapSampler, input.uv0);
+	}
 	else
 		albedo = BaseColor;
 }
+
 
 struct GBuffer
 {

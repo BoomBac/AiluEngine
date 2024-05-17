@@ -34,17 +34,42 @@ namespace Ailu
 		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, Colors::kWhite);
 		Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, Colors::kWhite);
 
+		auto& vf = p_camera->_vf;
+		for (int i = 0; i < 6; i++)
+		{
+			auto& p = vf._planes[i];
+			float3 start = p_camera->Position();
+			Gizmo::DrawLine(p._point, p._point + p._normal * 100,Color32(1.0f,0.0f,1.0f,1.0f));
+		}
 		//Gizmo::DrawLine(p_camera->Position(), p_camera->Position() + p_camera->_vf._planes[3]._normal * 200.0f, Colors::kWhite);
+	}
+
+	static Vector3f calculateCenter(Vector3f p1, Vector3f p2, Vector3f p3, Vector3f p4)
+	{
+		return (p1 + p2 + p3 + p4) * 0.25f;
 	}
 
 	void Camera::CalcViewFrustumPlane(const Camera* cam, ViewFrustum& vf)
 	{
+		// 计算各个平面的中心位置
+		Vector3f nearPlaneCenter = calculateCenter(cam->_near_top_left, cam->_near_top_right, cam->_near_bottom_left, cam->_near_bottom_right);
+		Vector3f farPlaneCenter = calculateCenter(cam->_far_top_left, cam->_far_top_right, cam->_far_bottom_left, cam->_far_bottom_right);
+		Vector3f leftPlaneCenter = calculateCenter(cam->_near_top_left, cam->_far_top_left, cam->_near_bottom_left, cam->_far_bottom_left);
+		Vector3f rightPlaneCenter = calculateCenter(cam->_near_top_right, cam->_far_top_right, cam->_near_bottom_right, cam->_far_bottom_right);
+		Vector3f topPlaneCenter = calculateCenter(cam->_near_top_left, cam->_far_top_left, cam->_near_top_right, cam->_far_top_right);
+		Vector3f bottomPlaneCenter = calculateCenter(cam->_near_bottom_left, cam->_far_bottom_left, cam->_near_bottom_right, cam->_far_bottom_right);
 		vf._planes[0]._normal = CrossProduct(cam->_near_top_left - cam->_near_bottom_left, cam->_near_bottom_right - cam->_near_bottom_left);
 		vf._planes[1]._normal = -vf._planes[0]._normal;
-		vf._planes[2]._normal = CrossProduct(cam->_far_top_left - cam->_near_top_left, cam->_near_top_right - cam->_near_top_left);
+		vf._planes[2]._normal = CrossProduct(cam->_far_top_left - cam->_near_top_left, cam->_near_top_right - cam->_near_top_left);//top
 		vf._planes[3]._normal = -CrossProduct(cam->_far_bottom_left - cam->_near_bottom_left, cam->_near_bottom_right - cam->_near_bottom_left);//bottom
-		vf._planes[4]._normal = CrossProduct(cam->_far_bottom_left - cam->_near_bottom_left, cam->_near_top_left - cam->_near_bottom_left);
-		vf._planes[5]._normal = -CrossProduct(cam->_far_bottom_right - cam->_near_bottom_right, cam->_near_top_right - cam->_near_bottom_right);
+		vf._planes[4]._normal = CrossProduct(cam->_far_bottom_left - cam->_near_bottom_left, cam->_near_top_left - cam->_near_bottom_left);//left
+		vf._planes[5]._normal = -CrossProduct(cam->_far_bottom_right - cam->_near_bottom_right, cam->_near_top_right - cam->_near_bottom_right);//right
+		vf._planes[0]._point = nearPlaneCenter;
+		vf._planes[1]._point = farPlaneCenter;
+		vf._planes[2]._point = topPlaneCenter;
+		vf._planes[3]._point = bottomPlaneCenter;
+		vf._planes[4]._point = leftPlaneCenter;
+		vf._planes[5]._point = rightPlaneCenter;
 		for (int i = 0; i < 6; ++i)
 		{
 			vf._planes[i]._normal = Normalize(vf._planes[i]._normal);
@@ -55,6 +80,50 @@ namespace Ailu
 		vf._planes[3]._distance = -DotProduct(vf._planes[3]._normal, cam->_near_bottom_left);
 		vf._planes[4]._distance = -DotProduct(vf._planes[4]._normal, cam->_far_bottom_left);
 		vf._planes[5]._distance = -DotProduct(vf._planes[5]._normal, cam->_far_bottom_right);
+	}
+
+	Camera Camera::GetFitShaodwCamera(const Camera& eye_cam, float shadow_dis)
+	{
+		float len = shadow_dis / eye_cam.Far();
+		Vector<Vector3f> p(8);
+		p[0] = eye_cam._position + (eye_cam._far_bottom_left - eye_cam._position) * len;
+		p[1] = eye_cam._position + (eye_cam._far_bottom_right - eye_cam._position) * len;
+		p[2] = eye_cam._position + (eye_cam._far_top_left - eye_cam._position) * len;
+		p[3] = eye_cam._position + (eye_cam._far_top_right - eye_cam._position) * len;
+		p[4] = p[0] - eye_cam._forward * shadow_dis;
+		p[5] = p[1] - eye_cam._forward * shadow_dis;
+		p[6] = p[2] - eye_cam._forward * shadow_dis;
+		p[7] = p[3] - eye_cam._forward * shadow_dis;
+		auto vmax = AABB::MaxAABB(), vmin = AABB::MinAABB();
+		for (int i = 0; i < 8; i++)
+		{
+			vmax = Max(vmax, p[i]);
+			vmin = Min(vmin, p[i]);
+		}
+		Vector3f center = (vmax + vmin) * 0.5f;
+		float dx = vmax.x - vmin.x;
+		float dz = vmax.z - vmin.z;
+		float extent = std::max(dx, dz) * 0.5;
+		Gizmo::DrawAABB(AABB(vmin, vmax), Colors::kYellow);
+		Vector3f light_dir = { 0,-0.717,0.717 };
+		Gizmo::DrawLine(eye_cam._position, eye_cam._position + light_dir * shadow_dis, Colors::kRed);
+		Vector3f dir_min = vmin + light_dir * shadow_dis;
+		Vector3f dir_max = vmax + light_dir * shadow_dis;
+		//dir_min.y = shadow_distance * 2;
+		//dir_max.y = shadow_distance * 2;
+		Gizmo::DrawLine(vmin, vmin + light_dir * 1000, Colors::kGreen);
+		Gizmo::DrawLine(vmax, vmax + light_dir * 1000, Colors::kGreen);
+
+		float height = Distance(vmin, vmax) * 2;
+		Camera cam;
+		cam.Type(ECameraType::kOrthographic);
+		cam.SetLens(90, 1, 10, height * 1.5);
+		cam.Size(extent * 2);
+		cam.Rotation(Quaternion::AngleAxis(45, Vector3f::kRight));
+		cam.Position(center + -light_dir * height);
+		cam.RecalculateMarix(true);
+		Camera::DrawGizmo(&cam);
+		return cam;
 	}
 
 	Camera::Camera() : Camera(16.0F / 9.0F)
@@ -86,8 +155,8 @@ namespace Ailu
 		_forward = _rotation * Vector3f::kForward;
 		_up = _rotation * Vector3f::kUp;
 		_right = CrossProduct(_up, _forward);
-		CalculateFrustum();
 		BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
+		CalculateFrustum();
 	}
 
 	void Camera::SetLens(float fovy, float aspect, float nz, float fz)

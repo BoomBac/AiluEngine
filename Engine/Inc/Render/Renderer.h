@@ -34,6 +34,7 @@ namespace Ailu
         void Tick(const float& delta_time) override;
         float GetDeltaTime() const;
         void TakeCapture();
+        void SubmitTaskPass(Scope<RenderPass> task);
         List<RenderPass*>& GetRenderPasses() { return _render_passes; };
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
         void ResizeBuffer(u32 width, u32 height);
@@ -43,13 +44,13 @@ namespace Ailu
         void UnRegisterEventAfterTick(AfterTickEvent e);
         RenderTexture* GetTargetTexture() const { return g_pRenderTexturePool->Get(_gameview_rt_handle); }
         bool _is_offscreen = true;
+        float _shadow_distance = 1000;
     private:
         RTHandle _camera_color_handle;
         RTHandle _gameview_rt_handle;
         RTHandle _camera_depth_handle;
 
         void Render();
-        void DrawRendererGizmo();
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
         void DoResize();
@@ -68,6 +69,7 @@ namespace Ailu
         Scope<PostProcessPass> _p_postprocess_pass;
         Scope<DeferredGeometryPass> _p_gbuffer_pass;
         Scope<SkyboxPass> _p_skybox_pass;
+        Scope<GizmoPass> _p_gizmo_pass;
         List<RenderPass*> _render_passes;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;

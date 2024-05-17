@@ -87,5 +87,9 @@ namespace Ailu
 	void TimeMgr::Reset()
 	{
 		_pre_stamp = std::chrono::high_resolution_clock::now();
+		while (!_mark_stamps.empty())
+		{
+			_mark_stamps.pop();
+		}
 	}
 }
