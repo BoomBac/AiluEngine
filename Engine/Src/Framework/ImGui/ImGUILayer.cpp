@@ -462,26 +462,33 @@ namespace Ailu
 
 	void MeshBrowser::Show()
 	{
-		ImguiWindow::Show();
-		static int s_cur_mesh_index = 0;
-		static int object_id = 0;
-		ImGui::Begin("MeshBrowser", &_b_show);
-		//LOG_INFO("max:({},{}),min:({},{})", ImGui::GetItemRectMax().x, ImGui::GetItemRectMax().y, ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y)
-		auto [meshs, mesh_count] = MeshPool::GetMeshForGUI();
-		if (ImGui::ListBox("Meshs", &s_cur_mesh_index, meshs, mesh_count))
-		{
-			LOG_INFO(meshs[s_cur_mesh_index]);
-		}
-		if (ImGui::Button("Place in Scene"))
-		{
-			g_pSceneMgr->AddSceneActor(std::format("object{}", object_id++), meshs[s_cur_mesh_index]);
-		}
-		if (ImGui::Button("Add Camera Test"))
-		{
-			Camera cam(1.78f);
-			g_pSceneMgr->AddSceneActor(std::format("camera{}", object_id++), cam);
-		}
-		ImGui::End();
+		//ImguiWindow::Show();
+		//static int s_cur_mesh_index = 0;
+		//static int object_id = 0;
+		//ImGui::Begin("MeshBrowser", &_b_show);
+		//if (ImGui::BeginListBox("Meshs"))
+		//{
+		//	for (auto it = g_pResourceMgr->ResourceBegin<Mesh>(); it != g_pResourceMgr->ResourceEnd<Mesh>(); it++)
+		//	{
+
+		//	}
+		//	ImGui::EndListBox();
+		//}
+		//auto [meshs, mesh_count] = MeshPool::GetMeshForGUI();
+		//if (ImGui::ListBox("Meshs", &s_cur_mesh_index, meshs, mesh_count))
+		//{
+		//	LOG_INFO(meshs[s_cur_mesh_index]);
+		//}
+		//if (ImGui::Button("Place in Scene"))
+		//{
+		//	g_pSceneMgr->AddSceneActor(std::format("object{}", object_id++), meshs[s_cur_mesh_index]);
+		//}
+		//if (ImGui::Button("Add Camera Test"))
+		//{
+		//	Camera cam(1.78f);
+		//	g_pSceneMgr->AddSceneActor(std::format("camera{}", object_id++), cam);
+		//}
+		//ImGui::End();
 	}
 	//----------------------------------------------------------------------------MeshBrowser---------------------------------------------------------------------
 }

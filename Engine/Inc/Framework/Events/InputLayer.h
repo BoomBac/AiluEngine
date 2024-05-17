@@ -18,6 +18,7 @@ namespace Ailu
 		void OnEvent(Event& e) override;
 		void OnImguiRender() override;
 		void OnUpdate(float delta_time) override;
+		void HandleInput(bool is_handle) { _b_handle_input = is_handle; }
 	private:
 		bool _b_handle_input;
 		float _camera_move_speed = 0.4f;

@@ -339,11 +339,13 @@ namespace Ailu
 			_gpu_memery_size += cur_mipmap_byte_size;
 		}
 		s_gpu_memory_size += _gpu_memery_size;
+		g_pRenderTexturePool->Register(this);
 	}
 
 	RenderTexture::~RenderTexture()
 	{
 		s_gpu_memory_size -= _gpu_memery_size;
+		g_pRenderTexturePool->UnRegister(ID());
 	}
 
 
@@ -353,6 +355,13 @@ namespace Ailu
 	}
 	//----------------------------------------------------------RenderTexture-------------------------------------------------------------------------
 
+
+	RenderTexturePool::~RenderTexturePool()
+	{
+		_pool.clear();
+		_lut_pool.clear();
+		_persistent_rts.clear();
+	}
 
 	//----------------------------------------------------------RenderTexturePool---------------------------------------------------------------------
 	u32 RenderTexturePool::Add(RTHash hash, Scope<RenderTexture> rt)
@@ -421,6 +430,14 @@ namespace Ailu
 			_lut_pool.emplace(std::make_pair(it->second._id,it));
 		}
 		g_pLogMgr->LogFormat("RT pool release {} rt",released_rt_num);
+	}
+	void RenderTexturePool::Register(RenderTexture* rt)
+	{
+		_persistent_rts[rt->ID()] = rt;
+	}
+	void RenderTexturePool::UnRegister(u32 rt_id)
+	{
+		_persistent_rts.erase(rt_id);
 	}
 	//----------------------------------------------------------RenderTexturePool---------------------------------------------------------------------
 }

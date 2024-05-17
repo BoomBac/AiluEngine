@@ -164,13 +164,13 @@ namespace Ailu
 	}
 	bool Application::OnLostFoucus(WindowLostFocusEvent& e)
 	{
-		//_layer_stack->PopLayer(_p_input_layer);
+		_p_input_layer->HandleInput(false);
 		return true;
 	}
 	bool Application::OnGetFoucus(WindowFocusEvent& e)
 	{
 		_state = EApplicationState::EApplicationState_Running;
-		//_layer_stack->PushLayer(_p_input_layer);
+		_p_input_layer->HandleInput(true);
 		return true;
 	}
 	bool Application::OnWindowMinimize(WindowMinimizeEvent& e)

@@ -25,6 +25,18 @@ namespace Ailu
         return wideStr;
     }
 
+    static WString ToWStr(const char* multiByteStr)
+    {
+        int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
+        if (size == 0 || size > 256) {
+            throw std::runtime_error("to wstring error!");
+            return WString{};
+        }
+        static wchar_t wideStr[256];
+        MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, wideStr, size);
+        return WString{ wideStr };
+    }
+
     static wchar_t* ToWChar(const String& str)
     {
         auto multiByteStr = str.c_str();
@@ -142,6 +154,12 @@ namespace Ailu
 
         //[begin,end]
         static inline String SubStrRange(const String& s, const size_t& begin, const size_t& end)
+        {
+            if (end < begin) return s;
+            return s.substr(begin, end - begin + 1);
+        }
+        //[begin,end]
+        static inline WString SubStrRange(const WString& s, const size_t& begin, const size_t& end)
         {
             if (end < begin) return s;
             return s.substr(begin, end - begin + 1);

@@ -87,9 +87,9 @@ namespace Ailu
 		Matrix4x4f _world_mat;
 		Rect _cubemap_rect;
 		Rect _ibl_rect;
-		Ref<Material> _p_gen_material;
-		Ref<Material> _p_filter_material;
-		Ref<Mesh> _p_cube_mesh;
+		Material* _p_gen_material;
+		Material* _p_filter_material;
+		Mesh* _p_cube_mesh;
 	};
 	// 32-bit: standard gbuffer layout
 	//ds 24-8
@@ -109,8 +109,9 @@ namespace Ailu
 		//Vector<RenderTexture*> _gbuffers_cache;
 		Vector<RTHandle> _gbuffers;
 		Ref<Material> _p_lighting_material;
-		Ref<Mesh> _p_quad_mesh;
+		Mesh* _p_quad_mesh;
 		Array<Rect, 3> _rects;
+		Texture2D* _p_ibllut;
 	};
 
 	class SkyboxPass : public RenderPass
@@ -121,7 +122,7 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 	private:
-		Ref<Mesh> _p_sky_mesh;
+		Mesh* _p_sky_mesh;
 		Ref<Material> _p_skybox_material;
 		Scope<ConstantBuffer> _p_cbuffer;
 	};

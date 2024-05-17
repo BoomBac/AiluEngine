@@ -94,7 +94,6 @@ namespace Ailu
 
 	void Mesh::AttachToAsset(Asset* asset)
 	{
-		AL_ASSERT_MSG(asset->_p_inst_asset != nullptr, "Asset is nullptr!");
 		_p_asset_owned_this = asset;
 		asset->_p_inst_asset = this;
 		asset->_name = ToWChar(_name);

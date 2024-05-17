@@ -7,6 +7,7 @@
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
@@ -306,8 +307,8 @@ namespace Ailu
 	void D3DCommandBuffer::ResolveToBackBuffer(RenderTexture* color)
 	{
 		static const auto& mat = BuildIdentityMatrix();
-		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
-		static const auto material = MaterialLibrary::GetMaterial("Blit");
+		static const auto mesh = Mesh::s_p_quad;
+		static const auto material = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
 		D3DContext::Get()->BeginBackBuffer(this);
 		mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
 		mesh->GetIndexBuffer()->Bind(this);
@@ -346,8 +347,8 @@ namespace Ailu
 	void D3DCommandBuffer::ResolveToBackBuffer(RenderTexture* color, RenderTexture* destination)
 	{
 		static const auto& mat = BuildIdentityMatrix();
-		static const auto mesh = MeshPool::GetMesh("FullScreenQuad");
-		static const auto material = MaterialLibrary::GetMaterial("Blit");
+		static const auto mesh = Mesh::s_p_quad;
+		static const auto material = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
 		//D3DContext::Get()->BeginBackBuffer(this);
 		SetRenderTarget(destination);
 		ClearRenderTarget(destination, Colors::kBlack);

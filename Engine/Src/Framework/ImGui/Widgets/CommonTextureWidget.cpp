@@ -24,15 +24,17 @@ namespace Ailu
 		imagesPerRow += imagesPerRow == 0 ? 1 : 0;
 		static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
 		int tex_count = 0;
-		u64 tex_num = g_pTexturePool->Size();
-		for (auto& [tex_name, tex] : *g_pTexturePool)
+		u64 tex_num = g_pResourceMgr->TotalNum<Texture2D>();
+		for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
 		{
+			auto tex = ResourceMgr::IterToRefPtr<Texture2D>(it);
+			const String& tex_name = tex->Name();
 			if (tex->Dimension() == ETextureDimension::kTex2D)
 			{
 				TextureHandle cur_tex_handle = tex->GetNativeTextureHandle();
 				if (cur_tex_handle == 0)
 				{
-					g_pLogMgr->LogErrorFormat(L"{} tex handle is 0",tex_name);
+					g_pLogMgr->LogErrorFormat("{} tex handle is 0", tex_name);
 					continue;
 				}
 				ImGui::BeginGroup();
@@ -60,7 +62,7 @@ namespace Ailu
 				++tex_count;
 			}
 		}
-		static const char* mipmaps[] = {"Main","mipmap1","mipmap2" };
+		static const char* mipmaps[] = { "Main","mipmap1","mipmap2" };
 		static int s_mipmap_index = 0;
 		if (ImGui::BeginCombo("select mipmap", mipmaps[s_mipmap_index]))
 		{
@@ -105,7 +107,7 @@ namespace Ailu
 	{
 		ImGuiWidget::Close(handle);
 	}
-	u64 TextureSelector::GetSelectedTexture(i32 handle) const
+	u32 TextureSelector::GetSelectedTexture(i32 handle) const
 	{
 		return _handle == handle ? _cur_selected_texture_id : kInvalidTextureID;
 	}
@@ -133,62 +135,43 @@ namespace Ailu
 		static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
 		int tex_count = 0;
 		u64 tex_num = g_pRenderTexturePool->Size();
-		for (auto& [rt_hash,rt_info] : *g_pRenderTexturePool)
+		for (auto it = g_pRenderTexturePool->PersistentRTBegin(); it != g_pRenderTexturePool->PersistentRTEnd(); it++)
 		{
-			auto tex = rt_info._rt.get();
+			auto tex = it->second;
 			if (tex->Dimension() == ETextureDimension::kTex2D)
 			{
 				TextureHandle cur_tex_handle = tex->GetNativeTextureHandle();
 				AL_ASSERT(cur_tex_handle == 0);
 				ImGui::BeginGroup();
-				//ImGuiContext* context = ImGui::GetCurrentContext();
-				//auto drawList = context->CurrentWindow->DrawList;
-				//if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(cur_tex_handle), ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0))
-				//{
-				//}
 				ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(cur_tex_handle), ImVec2(preview_tex_size, preview_tex_size), uv0, uv1);
-				ImGui::Text(tex->Name().c_str());
 				ImGui::EndGroup();
 				if (tex_count + 1 != tex_num && (tex_count + 1) % imagesPerRow != 0)
 				{
 					ImGui::SameLine();
 				}
-				++tex_count;
 			}
-		}
-		static const char* mipmaps[] = { "Main","mipmap1","mipmap2" };
-		static int s_mipmap_index = 0;
-		if (ImGui::BeginCombo("select mipmap", mipmaps[s_mipmap_index]))
-		{
-			for (int n = 0; n < IM_ARRAYSIZE(mipmaps); n++)
+			else if (tex->Dimension() == ETextureDimension::kCube)
 			{
-				const bool is_selected = (s_mipmap_index == n);
-				if (ImGui::Selectable(mipmaps[n], is_selected))
-					s_mipmap_index = n;
-				if (is_selected)
-					ImGui::SetItemDefaultFocus();
+				//static const char* s_faces[] = { "+Y", "-X", "+Z", "+X","-Z","-Y" };
+				//static int s_face_index = 0;
+				//if (ImGui::BeginCombo("select mipmap face", s_faces[s_face_index]))
+				//{
+				//	for (int n = 0; n < IM_ARRAYSIZE(s_faces); n++)
+				//	{
+				//		const bool is_selected = (s_face_index == n);
+				//		if (ImGui::Selectable(s_faces[n], is_selected))
+				//			s_face_index = n;
+				//		if (is_selected)
+				//			ImGui::SetItemDefaultFocus();
+				//	}
+				//	ImGui::EndCombo();
+				//}
+				//ImGui::ImageButton(reinterpret_cast<void*>(g_pResourceMgr->_test_cubemap->GetView((ECubemapFace::ECubemapFace)s_face_index, s_mipmap_index)),
+				//	ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0);
 			}
-			ImGui::EndCombo();
+			ImGui::Text("Name: &s,Dimension: %s",tex->Name().c_str(),ETextureDimension::ToString(tex->Dimension()));
+			++tex_count;
 		}
-		//ImGui::ImageButton(reinterpret_cast<void*>(s_mipmap_index == 0 ? g_pResourceMgr->_test_new_tex->GetNativeTextureHandle() : g_pResourceMgr->_test_new_tex->GetView(s_mipmap_index)),
-		//	ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0);
-
-		//static const char* s_faces[] = { "+Y", "-X", "+Z", "+X","-Z","-Y" };
-		//static int s_face_index = 0;
-		//if (ImGui::BeginCombo("select mipmap face", s_faces[s_face_index]))
-		//{
-		//	for (int n = 0; n < IM_ARRAYSIZE(s_faces); n++)
-		//	{
-		//		const bool is_selected = (s_face_index == n);
-		//		if (ImGui::Selectable(s_faces[n], is_selected))
-		//			s_face_index = n;
-		//		if (is_selected)
-		//			ImGui::SetItemDefaultFocus();
-		//	}
-		//	ImGui::EndCombo();
-		//}
-		//ImGui::ImageButton(reinterpret_cast<void*>(g_pResourceMgr->_test_cubemap->GetView((ECubemapFace::ECubemapFace)s_face_index, s_mipmap_index)),
-		//	ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0);
 	}
 	//--------------------------------------------------------------------------------------------RenderTextureView------------------------------------------------------------------------------------------
 

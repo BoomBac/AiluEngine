@@ -1,15 +1,16 @@
 guid: 96a597e6-6bb8-4905-8091-ebd23b072b18
 type: kMaterial
 name: Material_MR
-shader_path: Shaders/defered_standard_lit.hlsl
+shader_path: C:/AiluEngine/Engine/Res/Shaders/defered_standard_lit.hlsl
   prop_type: Uint
     SamplerMask: 0
+    MaterialID: 0
   prop_type: Float
     MetallicValue: 1
-    RoughnessValue: 0
+    RoughnessValue: 0.514
   prop_type: Vector
-    SpecularColor: 0,0,0,0
-    BaseColor: 0.828431,0.701587,0.109645,0
+    SpecularColor: 1,1,1,0
+    BaseColor: 1,1,1,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
     Specular: null guid

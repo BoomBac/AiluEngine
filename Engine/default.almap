@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: -493.649,608.066,116.55
-  Rotation: 0.0464721,0.842829,-0.0737353,0.531078
+  Position: -1137.31,1473.16,-888.457
+  Rotation: 0.188711,0.647611,-0.170138,0.71836
   Fov: 60
-  Aspect: 1.7223
+  Aspect: 1.75495
   Near: 86.8
   Far: 29398.2
-  ControllerRotation: 9.99959,36835.6
+  ControllerRotation: 29.4396,38244.1
 SceneGraph: 
   Name: root
     Components: 
@@ -23,7 +23,7 @@ SceneGraph:
             Rotation: 0,9.72351e-06,0,1
             Scale: 25,1,25
           StaticMeshComponent: 
-            MeshPath: plane
+            MeshPath: C:/AiluEngine/Engine/Res/Meshs/plane.fbx
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0
       Name: directional_light
@@ -34,8 +34,8 @@ SceneGraph:
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
-            Color: 0.916667,0.801026,0.13031
-            Intensity: 1
+            Color: 1,1,1
+            Intensity: 0
             CastShadow: true
             ShadowArea: 8776.86
             ShadowDistance: 10521.8
@@ -43,14 +43,14 @@ SceneGraph:
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: 170,407,-479
-            Rotation: 0,6.75513e-08,0,1
+            Position: 170,83,-479
+            Rotation: 1.94707e-07,1,1.94707e-07,6.75513e-08
             Scale: 1,1,1
           LightComponent: 
             Type: Point
             Color: 1,1,1
-            Intensity: 2.26
-            Radius: 733
+            Intensity: 0.374
+            Radius: 500
             CastShadow: false
             ShadowArea: 0
             ShadowDistance: 0
@@ -58,15 +58,15 @@ SceneGraph:
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: 846,845,-1411
+            Position: 846,1355,-1411
             Rotation: -0.00308869,0.148036,-0.120523,0.981606
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
             Color: 0.0395761,0.518758,0.897059
-            Intensity: 3.97
+            Intensity: 1
             Radius: 2868
-            Inner: 42.293
+            Inner: 28.55
             Outer: 60
             CastShadow: false
             ShadowArea: 0
@@ -76,32 +76,32 @@ SceneGraph:
         Components: 
           TransformComponent: 
             Position: 116,413,-284
-            Rotation: -0.254171,0.628777,-0.698327,-0.228856
+            Rotation: -0.254171,0.628777,-0.698328,-0.228856
             Scale: 1,1,1
           StaticMeshComponent: 
-            MeshPath: monkey
+            MeshPath: C:/AiluEngine/Engine/Res/Meshs/monkey.fbx
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0
-      Name: object0
+      Name: sphere
         Components: 
           TransformComponent: 
             Position: 0,544,0
-            Rotation: -0.260224,0.66696,-0.644076,-0.269469
+            Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           StaticMeshComponent: 
-            MeshPath: NewScene/DamagedHelmet.fbx_node_damagedHelmet_-6514
+            MeshPath: C:/AiluEngine/Engine/Res/Meshs/cube.fbx
             MaterialPath0: 96a597e6-6bb8-4905-8091-ebd23b072b18
         Children: 0
       Name: camera0
         Components: 
           TransformComponent: 
             Position: -646,555,0
-            Rotation: -2.73605e-08,0.786072,-2.73605e-08,0.618135
+            Rotation: -3.26985e-08,0.786072,-3.26985e-08,0.618135
             Scale: 1,1,1
           CameraComponent: 8
             Type: kPerspective
             Position: -646,555,0
-            Rotation: -2.7360466e-08,0.78607213,-2.7360466e-08
+            Rotation: -3.2698477e-08,0.78607184,-3.2698477e-08
             Near: 233
             Aspect: 1.78
             Far: 1000

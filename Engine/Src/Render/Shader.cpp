@@ -11,7 +11,7 @@
 
 namespace Ailu
 {
-	Ref<Shader> Shader::Create(const std::string& file_name, String vert_entry, String pixel_entry)
+	Ref<Shader> Shader::Create(const WString& sys_path, String vert_entry, String pixel_entry)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -20,17 +20,20 @@ namespace Ailu
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			auto shader = MakeRef<D3DShader>(file_name, vert_entry, pixel_entry);
+			auto shader = MakeRef<D3DShader>(sys_path, vert_entry, pixel_entry);
+			ResourceMgr::SetObjectSysPath(shader.get(), sys_path);
 			return shader;
 		}
 		}
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;
 	}
-
-	Shader::Shader(const String& sys_path) : _src_file_path(sys_path), _id(_s_global_shader_id), _name(std::format("AnonymityShader_{}", _s_global_shader_id++))
+	Shader::Shader(const WString& sys_path, const String& vs_entry, const String& ps_entry)
 	{
-
+		_src_file_path = sys_path;
+		_source_files.emplace(sys_path);
+		_vert_entry = vs_entry;
+		_pixel_entry = ps_entry;
 	}
 
 	void Shader::Bind(u32 index)
@@ -75,11 +78,13 @@ namespace Ailu
 		{
 			GraphicsPipelineStateMgr::OnShaderRecompiled(this);
 			_is_compile_error = false;
+			//g_pLogMgr->LogFormat("Compile shader {} succeed!", _name);
 			return true;
 		}
 		else
 		{
 			_is_compile_error = true;
+			//g_pLogMgr->LogErrorFormat("Compile shader {} failed!", _name);
 			return false;
 		}
 	}
@@ -93,7 +98,7 @@ namespace Ailu
 		}
 		else
 		{
-			g_pLogMgr->LogWarningFormat("Get vector: {} on shader: {} failed!", name, _name);
+			//g_pLogMgr->LogWarningFormat("Get vector: {} on shader: {} failed!", name, _name);
 			return Vector4f::kZero;
 		}
 	}
@@ -106,7 +111,7 @@ namespace Ailu
 		}
 		else
 		{
-			g_pLogMgr->LogWarningFormat("Get float: {} on shader: {} failed!", name, _name);
+			//g_pLogMgr->LogWarningFormat("Get float: {} on shader: {} failed!", name, _name);
 			return 0.0f;
 		}
 	}
@@ -238,11 +243,10 @@ namespace Ailu
 		if (seri_type != ESerializablePropertyType::kUndefined)
 		{
 			props.emplace_back(ShaderPropertyInfo{ value_name ,prop_name,seri_type ,prop_param });
-			//LOG_INFO("prop name: {},default value {}", prop_name, defalut_value);
 		}
 		else
 		{
-			g_pLogMgr->LogWarningFormat("Undefined shader property type with name {}", prop_name);
+			//g_pLogMgr->LogWarningFormat("Undefined shader property type with name {}", prop_name);
 		}
 	}
 	void Shader::ExtractValidShaderProperty()
@@ -264,8 +268,8 @@ namespace Ailu
 		_shader_prop_infos.clear();
 		List<String> lines{};
 		String line{};
-		u32 line_count = 0;
-		lines = ReadFileToLines(_src_file_path, line_count, "//info bein", "//info end");
+		u32 line_count = 0;	
+		lines = ReadFileToLines(ToChar(_src_file_path), line_count, "//info bein", "//info end");
 		RasterizerState _temp_pipeline_raster_state;
 		DepthStencilState  _temp_pipeline_ds_state;
 		ETopology  _temp_pipeline_topology = ETopology::kTriangle;
@@ -393,7 +397,7 @@ namespace Ailu
 		}
 		else
 		{
-			g_pLogMgr->LogErrorFormat("PreProcess shader: {} with line count 0", _src_file_path);
+			//g_pLogMgr->LogErrorFormat(L"PreProcess shader: {} with line count 0", g_pResourceMgr->GetObjectSysPath(this));
 		}
 
 		if (need_zbuf_count == 0)
@@ -443,7 +447,7 @@ namespace Ailu
 	}
 
 	//---------------------------------------------------------------------ComputeShader-------------------------------------------------------------------
-	Ref<ComputeShader> ComputeShader::Create(const String& file_name)
+	Ref<ComputeShader> ComputeShader::Create(const WString& sys_path)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -452,8 +456,9 @@ namespace Ailu
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			auto shader = MakeRef<D3DComputeShader>(file_name);
-			auto asset_path = PathUtils::ExtractAssetPath(file_name);
+			auto shader = MakeRef<D3DComputeShader>(sys_path);
+			ResourceMgr::SetObjectSysPath(shader.get(), sys_path);
+			auto asset_path = PathUtils::ExtractAssetPath(sys_path);
 			s_cs_library.insert(std::make_pair(asset_path, shader));
 			return shader;
 		}
@@ -462,7 +467,7 @@ namespace Ailu
 		return nullptr;
 	}
 
-	Ref<ComputeShader> ComputeShader::Get(const String& name)
+	Ref<ComputeShader> ComputeShader::Get(const WString& name)
 	{
 		if (s_cs_library.contains(name))
 			return s_cs_library[name];
@@ -470,10 +475,9 @@ namespace Ailu
 			return nullptr;
 	}
 
-	ComputeShader::ComputeShader(const String& sys_path) : _src_file_path(sys_path)
+	ComputeShader::ComputeShader(const WString& sys_path) : _src_file_path(sys_path)
 	{
-		_name = PathUtils::GetFileName(sys_path);
-		_id = s_global_cs_id++;
+		_name = ToChar(PathUtils::GetFileName(sys_path));
 	}
 
 	void ComputeShader::Bind(CommandBuffer* cmd, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)

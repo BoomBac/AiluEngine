@@ -1,12 +1,13 @@
 guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
 type: kMaterial
 name: StandardPBR
-shader_path: Shaders/defered_standard_lit.hlsl
+shader_path: C:/AiluEngine/Engine/Res/Shaders/defered_standard_lit.hlsl
   prop_type: Uint
     SamplerMask: 0
+    MaterialID: 0
   prop_type: Float
     MetallicValue: 0
-    RoughnessValue: 0.012
+    RoughnessValue: 1
   prop_type: Vector
     SpecularColor: 0,0,0,0
     BaseColor: 1,1,1,0

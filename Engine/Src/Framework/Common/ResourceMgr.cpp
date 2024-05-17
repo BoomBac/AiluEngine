@@ -11,8 +11,8 @@
 #include "Render/GraphicsContext.h"
 
 #include "RHI/DX12/D3DTexture.h"
-
 #include "Framework/Math/Random.h"
+
 
 namespace Ailu
 {
@@ -34,86 +34,93 @@ namespace Ailu
 
 	int ResourceMgr::Initialize()
 	{
-		//auto p = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-		//auto test_path = L"C:/AiluEngine/Engine/Res/Textures/MyImage01.jpg";
-		//_test_new_tex = g_pTexturePool->Add(PathUtils::ExtractAssetPath(test_path), p->Parser(test_path)).get();
-		//constexpr u32 red_raw_size = 4 * 4 * 4;
-		//auto raw_pixel = new u8[red_raw_size];
-		//memset(raw_pixel, 0, red_raw_size);
-		//for (int i = 0; i < red_raw_size; i += 4)
-		//{
-		//	raw_pixel[i] = 255;
-		//	raw_pixel[i + 3] = 255;
-		//}
-		//auto mip1_size = red_raw_size / 4;
-		//auto mipmap1 = new u8[mip1_size];
-		//memset(mipmap1, 0, mip1_size);
-		//for (int i = 0; i < mip1_size; i += 4)
-		//{
-		//	mipmap1[i + 1] = 255;
-		//	mipmap1[i + 3] = 255;
-		//}
-		//_test_new_tex = MakeScope<D3DTexture2DNew>(4,4,true);
-		//_test_new_tex->SetPixelData(raw_pixel,0);
-		//_test_new_tex->SetPixelData(mipmap1,1);
-		//Color blue = Color(0,0,255,255);
-		//_test_new_tex->SetPixelData(reinterpret_cast<u8*>(&blue),2);
-		//_test_new_tex->Apply();
-		//_test_new_tex->CreateView();
-		//delete[] raw_pixel;
-		//delete[] mipmap1;
-
-		_test_cubemap = MakeScope<D3DCubeMap>(4, true);
-		for (int i = 0; i < 6; i++)
 		{
-			auto c = Random::RandomColor(i);
-			for (int u = 0; u < 4; u++)
+			u8* default_data = new u8[4 * 4 * 4];
+			memset(default_data, 255, 64);
+			auto default_white = Texture2D::Create(4, 4, false);
+			default_white->SetPixelData(default_data, 0);
+			default_white->Name("default_white");
+			default_white->Apply();
+			_lut_global_texture2d[default_white->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/default_white", default_white)).first;
+			
+			memset(default_data, 0, 64);
+			for (int i = 3; i < 64; i += 4)
+				default_data[i] = 255;
+			auto default_black = Texture2D::Create(4, 4, false);
+			default_black->SetPixelData(default_data, 0);
+			default_white->Name("default_black");
+			default_black->Apply();
+			_lut_global_texture2d[default_black->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/default_white", default_black)).first;
+			memset(default_data, 128, 64);
+			for (int i = 3; i < 64; i += 4)
+				default_data[i] = 255;
+			auto default_gray = Texture2D::Create(4, 4, false);
+			default_gray->SetPixelData(default_data, 0);
+			default_white->Name("default_gray");
+			default_gray->Apply();
+			_lut_global_texture2d[default_gray->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/default_gray", default_black)).first;
+			memset(default_data, 255, 64);
+			for (int i = 0; i < 64; i += 4)
 			{
-				for (int v = 0; v < 4; v++)
-				{
-					_test_cubemap->SetPixel((ECubemapFace::ECubemapFace)i, u, v, c, 0);
-				}
+				default_data[i] = 128;
+				default_data[i + 1] = 128;
 			}
-			c = Random::RandomColor(i + 6);
-			for (int u = 0; u < 2; u++)
-			{
-				for (int v = 0; v < 2; v++)
-				{
-					_test_cubemap->SetPixel((ECubemapFace::ECubemapFace)i, u, v, c, 1);
-				}
-			}
-			c = Color(255, 255, 0, 255);
-			_test_cubemap->SetPixel((ECubemapFace::ECubemapFace)i, 0, 0, c, 1);
+			auto default_normal = Texture2D::Create(4, 4, false);
+			default_normal->SetPixelData(default_data, 0);
+			default_white->Name("default_normal");
+			default_normal->Apply();
+			_lut_global_texture2d[default_normal->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/default_normal", default_black)).first;
+			DESTORY_PTRARR(default_data);
+			Texture::s_p_default_white = default_white.get();
+			Texture::s_p_default_black = default_black.get();
+			Texture::s_p_default_gray = default_gray.get();
+			Texture::s_p_default_normal = default_normal.get();
+			ImportSetting setting("no_name_id", false);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"folder.png", &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"file.png"  , &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"3d.png"    , &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"shader.png", &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"image.png" , &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"scene.png" , &setting);
 		}
-		_test_cubemap->Apply();
-		_test_cubemap->CreateView();
-
-		auto skybox = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Skybox");
+		auto skybox = MakeRef<Material>(Load<Shader>(WString(L"Shaders/skybox.hlsl")), "Skybox");
 		skybox->IsInternal(false);
-		skybox->OriginPath("Skybox");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/defered_standard_lit.hlsl"), "StandardLit");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.hlsl"), "Blit");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "CubemapGen");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/filter_irradiance.hlsl"), "EnvmapFilter");
-
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/unlit.hlsl"), "Hidden/Error")->SetVector("base_color", Vector4f(1.0f, 0.0f, 1.0, 1.0f));
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/unlit.hlsl"), "Hidden/WaitCompile")->SetVector("base_color", Vector4f(0.0f, 0.0f, 0.5, 1.0f));
+		_lut_global_materials[skybox->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/Skybox", skybox)).first;
+		Shader::s_p_defered_standart_lit = Load<Shader>(L"Shaders/defered_standard_lit.hlsl");
+		auto standard_lit = MakeRef<Material>(Shader::s_p_defered_standart_lit, "StandardLit");
+		_lut_global_materials[standard_lit->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/StandardLit", standard_lit)).first;
+		
+		auto blit = MakeRef<Material>(Load<Shader>(L"Shaders/blit.hlsl"), "Blit");
+		_lut_global_materials[blit->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/Blit", blit)).first;
+		auto cubemap_gen = MakeRef<Material>(Load<Shader>(L"Shaders/cubemap_gen.hlsl"), "CubemapGen");
+		_lut_global_materials[cubemap_gen->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/CubemapGen", cubemap_gen)).first;
+		auto filter_irradiance = MakeRef<Material>(Load<Shader>(L"Shaders/filter_irradiance.hlsl"), "EnvmapFilter");
+		_lut_global_materials[filter_irradiance->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/EnvmapFilter", filter_irradiance)).first;
 
 		LoadAssetDB();
+
 		//auto tex0 = LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg", "default");
 		//TexturePool::Add(tex0->AssetPath(), tex0);
 
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"folder.png"), ImportSetting("Editor/folder", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"file.png"), ImportSetting("Editor/file_us", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"3d.png"), ImportSetting("Editor/3d", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"shader.png"), ImportSetting("Editor/shader", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"image.png"), ImportSetting("Editor/image", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"scene.png"), ImportSetting("Editor/scene", false));
+		//ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"folder.png"), ImportSetting("Editor/folder", false));
+		//ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"file.png"), ImportSetting("Editor/file_us", false));
+		//ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"3d.png"), ImportSetting("Editor/3d", false));
+		//ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"shader.png"), ImportSetting("Editor/shader", false));
+		//ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"image.png"), ImportSetting("Editor/image", false));
+		//ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"scene.png"), ImportSetting("Editor/scene", false));
+		TextureImportSetting setting;
+		setting._generate_mipmap = false;
+		setting._is_copy = false;
+		setting._name_id = "Innernal/IBLLUT";
+		Load<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.png", &setting);
+		//ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.png"), setting);
 
 		ImportResource(PathUtils::GetResSysPath(L"Meshs/sphere.fbx"), MeshImportSetting("sphere", false, false));
 		ImportResource(PathUtils::GetResSysPath(L"Meshs/plane.fbx"), MeshImportSetting("plane", false, false));
 		ImportResource(PathUtils::GetResSysPath(L"Meshs/cube.fbx"), MeshImportSetting("cube", false, false));
 		ImportResource(PathUtils::GetResSysPath(L"Meshs/monkey.fbx"), MeshImportSetting("monkey", false, false));
+		Mesh::s_p_cube = static_cast<Mesh*>(_global_resources[L"Meshs/cube.fbx"].get());
+		Mesh::s_p_shpere = static_cast<Mesh*>(_global_resources[L"Meshs/sphere.fbx"].get());
 
 		auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
 		Vector3f* vertices = new Vector3f[4]{ { -1.0f, 1.0f, 0.0f },
@@ -127,8 +134,8 @@ namespace Ailu
 		FullScreenQuad->AddSubmesh(indices, 6);
 		FullScreenQuad->SetUVs(uv0, 0);
 		FullScreenQuad->BuildRHIResource();
-		MeshPool::AddMesh("FullScreenQuad", FullScreenQuad);
-
+		_lut_global_meshs[FullScreenQuad->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Mesh/FullScreenQuad", FullScreenQuad)).first;
+		Mesh::s_p_quad = FullScreenQuad.get();
 		g_pThreadTool->Enqueue(&ResourceMgr::WatchDirectory, this);
 		return 0;
 	}
@@ -216,11 +223,20 @@ namespace Ailu
 		}
 	}
 
-	Ref<Material> ResourceMgr::LoadMaterialImpl(const WString& asset_path)
+	WString ResourceMgr::GetObjectSysPath(Object* obj)
 	{
-		String asset_path_n = ToChar(asset_path);
-		if (MaterialLibrary::Contain(asset_path_n))
-			return MaterialLibrary::GetMaterial(asset_path_n);
+		if (s_object_sys_path_map.contains(obj->ID()))
+			return s_object_sys_path_map[obj->ID()];
+		return L"";
+	}
+
+	void ResourceMgr::SetObjectSysPath(Object* obj, const WString& new_sys_path)
+	{
+		s_object_sys_path_map[obj->ID()] = new_sys_path;
+	}
+
+	Ref<Material> ResourceMgr::LoadMaterial(const WString& asset_path)
+	{
 		WString sys_path = PathUtils::GetResSysPath(asset_path);
 		std::ifstream file(sys_path);
 		if (!file.is_open())
@@ -243,7 +259,7 @@ namespace Ailu
 		FormatLine(lines[1], key, type_str);
 		FormatLine(lines[2], key, name);
 		FormatLine(lines[3], key, shader_path);
-		auto mat = MakeRef<Material>(ShaderLibrary::Load(shader_path), name);
+		auto mat = MakeRef<Material>(Load<Shader>(ToWChar(shader_path)) ,name);
 		std::string cur_type{ " " };
 		std::string prop_type{ "prop_type" };
 		for (int i = 4; i < lines.size(); ++i)
@@ -282,8 +298,7 @@ namespace Ailu
 				auto asset_path = GetAssetPath(Guid(v));
 				if (!asset_path.empty())
 				{
-					auto tex = g_pResourceMgr->LoadTexture(asset_path);
-					mat->SetTexture(k, g_pTexturePool->Add(asset_path, tex).get());
+					mat->SetTexture(k,Load<Texture2D>(asset_path));
 				}
 				else
 				{
@@ -291,12 +306,15 @@ namespace Ailu
 				}
 			}
 		}
-		mat->OriginPath(asset_path_n);
-		MaterialLibrary::AddMaterial(mat, asset_path_n);
-		Asset* asset = new Asset(Guid(guid_str), EAssetType::kMaterial, asset_path);
-		mat->AttachToAsset(asset);
-		AddToAssetDB(asset);
 		return mat;
+	}
+
+	Ref<Shader> ResourceMgr::LoadShader(const WString& asset_path, const ImportSetting* setting)
+	{
+		auto& shader_import_setting = setting ? static_cast<const ShaderImportSetting&>(*setting) : ShaderImportSetting::Default();
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		auto shader = Shader::Create(sys_path, shader_import_setting._vs_entry,shader_import_setting._ps_entry);
+		return shader;
 	}
 
 	bool ResourceMgr::ExistInAssetDB(const Asset* asset)
@@ -347,7 +365,7 @@ namespace Ailu
 			}
 			else
 			{
-				g_pLogMgr->LogWarningFormat(L"Asset {} already exist in database,it will be destory...", asset->_name);
+				g_pLogMgr->LogWarningFormat(L"Asset {} already exist in database,it will be destory...", asset->_asset_path);
 				//不插入的话要销毁，db中的指针最后会统一销毁
 				delete asset;
 			}
@@ -426,7 +444,7 @@ namespace Ailu
 		std::multimap<std::string, SerializableProperty*> props{};
 		//为了写入通用资产头信息，暂时使用追加方式打开
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
-		out_mat << "shader_path: " << ShaderLibrary::GetShaderPath(mat->_p_shader->ID());
+		out_mat << "shader_path: " << ToChar(GetObjectSysPath(mat->_p_shader));
 		for (auto& prop : mat->_properties)
 		{
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
@@ -477,47 +495,23 @@ namespace Ailu
 	{
 		auto image_import_setting = dynamic_cast<const TextureImportSetting*>(setting);
 		image_import_setting = image_import_setting ? image_import_setting : &TextureImportSetting::Default();
-
 		auto sys_path = PathUtils::GetResSysPath(asset_path);
-		String asset_path_n = ToChar(asset_path.c_str());
-		fs::path p(asset_path_n);
-		String ext = p.extension().string();
-		
+		String ext = fs::path(ToChar(asset_path.c_str())).extension().string();
+		Scope<ITextureParser> tex_parser = nullptr;
 		if (kLDRImageExt.contains(ext))
 		{
-			Ref<Texture2D> ret_res;
-			g_pLogMgr->LogFormat(L"Start load common image file {}...", sys_path);
-			if (!g_pTexturePool->Contain(asset_path))
-			{
-				auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-				auto tex = png_parser->Parser(sys_path);
-				g_pGfxContext->SubmitRHIResourceBuildTask([=]() {tex->Apply(); });
-				ret_res = tex;
-			}
-			else
-				ret_res = std::static_pointer_cast<Texture2D>(g_pTexturePool->Get(asset_path));
-			return ret_res;
+			tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG));
 		}
-		else if (ext == ".exr" || ext == ".EXR" || ext == ".hdr" || ext == ".HDR")
+		else if (kHDRImageExt.contains(ext))
 		{
-			Ref<Texture2D> ret_res;
-			g_pLogMgr->LogFormat(L"Start load hdr image file {}...", sys_path);
-			if (!g_pTexturePool->Contain(asset_path))
-			{
-				auto hdr_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kHDR);
-				auto tex = hdr_parser->Parser(sys_path);
-				g_pGfxContext->SubmitRHIResourceBuildTask([=]() {tex->Apply(); });
-				ret_res = tex;
-			}
-			else
-				ret_res = std::static_pointer_cast<Texture2D>(g_pTexturePool->Get(asset_path));
-				return ret_res;
+			tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kHDR));
 		}
-		else
-		{
-
-		}
-		return nullptr;
+		else {};
+		AL_ASSERT(tex_parser == nullptr);
+		g_pLogMgr->LogFormat(L"Start load image file {}...", sys_path);
+		auto tex = tex_parser->Parser(sys_path);
+		g_pGfxContext->SubmitRHIResourceBuildTask([=]() {tex->Apply(); });
+		return tex;
 	}
 
 	Ref<CubeMap> ResourceMgr::LoadTexture(const Vector<WString>& asset_paths)
@@ -548,8 +542,8 @@ namespace Ailu
 				mesh->AddCacheMaterial(*it);
 			}
 			g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
+			SetObjectSysPath(mesh.get(), sys_path);
 		}
-
 		return mesh_list;
 	}
 
@@ -567,15 +561,6 @@ namespace Ailu
 		return nullptr;
 	}
 
-	//void ResourceMgr::AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback)
-	//{
-	//	s_task_queue.emplace_back([=]() {
-	//		task();
-	//		callback();
-	//		return nullptr;
-	//		});
-	//}
-
 	void ResourceMgr::AddResourceTask(ResourceTask task)
 	{
 		s_task_queue.emplace_back(task);
@@ -588,23 +573,22 @@ namespace Ailu
 		std::chrono::duration<int, std::milli> sleep_duration(1000); // 1秒
 		std::unordered_map<fs::path, fs::file_time_type> files;
 		static auto reload_shader = [&](const fs::path& file) {
-			const String cur_path = PathUtils::FormatFilePath(file.string());
-			for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+			const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+			for (auto it = ResourceBegin<Shader>(); it != ResourceEnd<Shader>(); it++)
 			{
-				for (auto& head_file : (*it)->GetSourceFiles())
+				
+				auto shader = static_cast<Shader*>((*it).second->second.get());
+				for (auto& head_file : shader->GetSourceFiles())
 				{
 					if (head_file == cur_path)
 					{
 						AddResourceTask([=]()->Ref<void> {
-							if ((*it)->Compile())
+							if (shader->Compile())
 							{
-								auto mats = (*it)->GetAllReferencedMaterials();
+								auto mats = shader->GetAllReferencedMaterials();
 								for (auto mat = mats.begin(); mat != mats.end(); mat++)
-									(*mat)->ChangeShader((*it));
-								LOG_INFO("Compile shader {} succeed!", (*it)->Name());
+									(*mat)->ChangeShader(shader);
 							}
-							else
-								LOG_ERROR("Compile shader {} failed!", (*it)->Name());
 							return nullptr;
 							});
 						break;
@@ -708,8 +692,9 @@ namespace Ailu
 					mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
 					for (auto& mesh : mesh_list)
 					{
-						String name_id = mesh_import_setting->_name_id.empty() ? ToChar(asset_path) + "_" + mesh->Name() : mesh_import_setting->_name_id;
-						MeshPool::AddMesh(name_id, mesh);
+						//String name_id = mesh_import_setting->_name_id.empty() ? ToChar(asset_path) + "_" + mesh->Name() : mesh_import_setting->_name_id;
+						WString name_id = asset_path + L"_" + ToWStr(mesh->Name().c_str());
+						_lut_global_meshs[mesh->ID()] = _global_resources.emplace(std::make_pair(name_id, mesh)).first;
 						if (ExistInAssetDB(asset_path))
 						{
 							auto asset = GetAsset(asset_path);
@@ -725,7 +710,7 @@ namespace Ailu
 						{
 							for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
 							{
-								auto mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDeferredStandardLit), it->_name);
+								auto mat = MakeRef<Material>(Shader::s_p_defered_standart_lit, it->_name);
 								if (!it->_textures[0].empty())
 								{
 									auto albedo = ImportResource(ToWChar(it->_textures[0]));
@@ -749,6 +734,7 @@ namespace Ailu
 								{
 									SaveAsset(mat_sys_path, mat.get());
 								}
+								_lut_global_materials[mat->ID()] = _global_resources.emplace(std::make_pair(asset_path, mat)).first;
 							}
 						}
 					}
@@ -759,7 +745,7 @@ namespace Ailu
 			{
 				asset_type = EAssetType::kTexture2D;
 				auto tex = LoadTexture(asset_path, setting);
-				g_pTexturePool->Add(setting->_name_id.empty() ? asset_path : ToWChar(setting->_name_id), tex);
+				_lut_global_texture2d[tex->ID()] = _global_resources.emplace(std::make_pair(asset_path, tex)).first;
 				ret_res = std::static_pointer_cast<void>(tex);
 				if (ret_res)
 				{

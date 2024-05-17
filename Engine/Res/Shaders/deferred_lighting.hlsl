@@ -65,11 +65,20 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 	surface_data.metallic = gbuf2.w;
 	surface_data.emssive = float3(0.f,0.f,0.f), 
 	surface_data.specular = gbuf2.rgb;
-	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
-	light += surface_data.emssive;
-	float4 shadow_pos = TransformFromWorldToLightSpace(0,world_pos.xyz);
-	float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface_data.wnormal));
-	float shadow_factor = ApplyShadow(shadow_pos, nl, world_pos.xyz);
-	light *= lerp(0.1,1.0,shadow_factor);
-	return float4(light, 1.0);
+	uint material_id = (uint)gbuf2.r;
+	if(material_id == 0)
+	{
+		float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
+		light += surface_data.emssive;
+		float4 shadow_pos = TransformFromWorldToLightSpace(0,world_pos.xyz);
+		float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface_data.wnormal));
+		float shadow_factor = ApplyShadow(shadow_pos, nl, world_pos.xyz);
+		light += lerp(0.0,0.0001,shadow_factor);
+		return float4(light, 1.0);
+	}
+	else
+	{
+		return float4(1,0,1,1);
+	}
+
 }

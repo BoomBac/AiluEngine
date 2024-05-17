@@ -246,9 +246,8 @@ namespace Ailu
 	{
 		if (_p_mipmapgen_cs0 == nullptr)
 		{
-
-			_p_mipmapgen_cs0 = ComputeShader::Create(PathUtils::GetResSysPath("Shaders/Compute/cs_mipmap_gen.hlsl"));
-			_p_mipmapgen_cs1 = ComputeShader::Create(PathUtils::GetResSysPath("Shaders/Compute/cs_mipmap_gen.hlsl"));
+			_p_mipmapgen_cs0 = ComputeShader::Create(PathUtils::GetResSysPath(L"Shaders/Compute/cs_mipmap_gen.hlsl"));
+			_p_mipmapgen_cs1 = ComputeShader::Create(PathUtils::GetResSysPath(L"Shaders/Compute/cs_mipmap_gen.hlsl"));
 		}
 
 		_cur_res_state = D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON;

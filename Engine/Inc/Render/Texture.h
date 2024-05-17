@@ -146,6 +146,11 @@ namespace Ailu
 		DECLARE_PROTECTED_PROPERTY_RO(height, Height, u16)
 		DECLARE_PROTECTED_PROPERTY_RO(pixel_format, PixelFormat, EALGFormat::EALGFormat)
 	public:
+		inline static Texture* s_p_default_white = nullptr;
+		inline static Texture* s_p_default_black = nullptr;
+		inline static Texture* s_p_default_gray = nullptr;
+		inline static Texture* s_p_default_normal = nullptr;
+	public:
 		static u16 MaxMipmapCount(u16 w, u16 h);
 		Texture();
 		Texture(u16 width, u16 height);
@@ -328,17 +333,22 @@ namespace Ailu
 		struct RTInfo
 		{
 			bool _is_available;
+			bool _is_temp;
 			u32 _id;
 			u64 _last_access_frame_count;
 			Scope<RenderTexture> _rt;
 			u64 _fence_value = 0;
 		};
 	public:
+		~RenderTexturePool();
 		using RTPool = std::unordered_multimap<RTHash, RTInfo, RTHash::HashFunc>;
 		u32 Add(RTHash hash, Scope<RenderTexture> rt);
 		std::optional<u32> GetByIDHash(RTHash hash);
 		void ReleaseRT(RTHandle handle);
 		void TryRelease();
+		//存储一个render texture的指针，只做访问使用，不维护其生命周期
+		void Register(RenderTexture* rt);
+		void UnRegister(u32 rt_id);
 		RenderTexture* Get(RTHandle handle)
 		{
 			if (_lut_pool.contains(handle._id))
@@ -349,107 +359,15 @@ namespace Ailu
 		u32 Size() const { return static_cast<u32>(_pool.size()); }
 		RTPool::iterator begin() { return _pool.begin(); }
 		RTPool::iterator end() { return _pool.end(); }
+		auto PersistentRTBegin() { return _persistent_rts.begin(); }
+		auto PersistentRTEnd() { return _persistent_rts.end(); }
 	private:
 		// 0->64 0~12=wdth,13~24=height,25~30= format
 		RTPool _pool;
 		Map<u32, RTPool::iterator> _lut_pool;
+		Map<u32, RenderTexture*> _persistent_rts;
 	};
 	extern RenderTexturePool* g_pRenderTexturePool;
-
-	class TexturePool
-	{
-	public: 
-		TexturePool()
-		{
-			u8* default_data = new u8[4 * 4 * 4];
-			memset(default_data, 255, 64);
-			auto default_white = Texture2D::Create(4, 4, false);
-			default_white->SetPixelData(default_data, 0);
-			default_white->Name("default_white");
-			default_white->Apply();
-			s_p_default_white = Add(L"Runtime/default_white", default_white).get();
-
-			memset(default_data, 0, 64);
-			for (int i = 3; i < 64; i += 4)
-				default_data[i] = 255;
-			auto default_black = Texture2D::Create(4, 4, false);
-			default_black->SetPixelData(default_data, 0);
-			default_white->Name("default_black");
-			default_black->Apply();
-			s_p_default_black = Add(L"Runtime/default_black", default_black).get();
-
-			memset(default_data, 128, 64);
-			for (int i = 3; i < 64; i += 4)
-				default_data[i] = 255;
-			auto default_gray = Texture2D::Create(4, 4, false);
-			default_gray->SetPixelData(default_data, 0);
-			default_white->Name("default_gray");
-			default_gray->Apply();
-			s_p_default_gray = Add(L"Runtime/default_gray", default_gray).get();
-
-			memset(default_data, 255, 64);
-			for (int i = 0; i < 64; i += 4)
-			{
-				default_data[i] = 128;
-				default_data[i+1] = 128;
-			}
-			auto default_normal = Texture2D::Create(4, 4, false);
-			default_normal->SetPixelData(default_data, 0);
-			default_white->Name("default_normal");
-			default_normal->Apply();
-			s_p_default_normal = Add(L"Runtime/default_normal", default_normal).get();
-			DESTORY_PTRARR(default_data);
-		};
-		Ref<Texture> Add(const WString& name_id, Ref<Texture> tex,bool overwrite = false)
-		{
-			//if (overwrite)
-			//{		
-			//	auto it = _pool.emplace(std::make_pair(name_id, tex)).first;
-			//	_lut_pool[tex->ID()] = it;
-			//}
-			//else
-			//	_pool[name_id] = tex;
-			_pool[name_id] = tex;
-			_lut_pool[tex->ID()] = _pool.find(name_id);
-			return _pool[name_id];
-		}
-		Ref<Texture> Get(const WString& name_id)
-		{
-			auto it = _pool.find(name_id);
-			if (it != _pool.end())
-				return it->second;
-			return nullptr;
-		}
-		Ref<Texture> Get(u64 id)
-		{
-			if (_lut_pool.contains(id))
-				return _lut_pool[id]->second;
-			return nullptr;
-		}
-
-		bool Contain(const WString& name_id)
-		{
-			return _pool.contains(name_id);
-		}
-
-		void Destory(const WString& name_id)
-		{
-			_pool.erase(name_id);
-		}
-		Map<WString, Ref<Texture>>::iterator begin() { return _pool.begin(); }
-		Map<WString, Ref<Texture>>::iterator end() { return _pool.end(); }
-
-		u64 Size() const { return _pool.size(); }
-		static inline Texture* s_p_default_white; 
-		static inline Texture* s_p_default_black;
-		static inline Texture* s_p_default_gray;
-		static inline Texture* s_p_default_normal;
-	private:
-		using TexturePoolContainer = Map<WString, Ref<Texture>>;
-		TexturePoolContainer _pool;
-		std::unordered_map<u64, TexturePoolContainer::iterator> _lut_pool;
-	};
-	extern TexturePool* g_pTexturePool;
 }
 
 #endif // !TEXTURE_H__

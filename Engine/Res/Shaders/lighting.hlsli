@@ -14,104 +14,45 @@ Texture2D Metallic : register(t4);
 Texture2D Specular : register(t5);
 TextureCube DiffuseIBL : register(t6);
 TextureCube SkyBox : register(t7);
+Texture2D IBLLut : register(t8);
 
-float3 CaclulateDirectionalLight(uint index, float3 normal, float3 view_dir)
+float GetDistanceAtt(float distance,float atten_radius)
 {
-	float3 light_dir = normalize(-_DirectionalLights[index]._LightPosOrDir.xyz);
-	float diffuse = max(dot(light_dir, normal), 0.0);
-	float3 half_dir = normalize(light_dir + view_dir);
-	float specular = pow(max(0.0, dot(half_dir, normal)), 256);
-	return saturate(diffuse * _DirectionalLights[index]._LightColor + specular);
+	float atten = 1.0f;
+	float inv_sqr_atten = Pow2(atten_radius) / (Pow2(distance) + 1);
+	float window_func = Pow2(saturate(1-Pow4(distance / atten_radius)));
+	return inv_sqr_atten * window_func;
 }
-
-#define LinearAtten
-float3 CaclulatPointlLight(uint index, float3 normal, float3 pos, float3 view_dir)
+// On the CPU
+// float lightAngleScale = 1.0 f / max (0.001f, ( cosInner - cosOuter ));
+// float lightAngleOffset = -cosOuter * angleScale ;
+// float normalizedLightVector: pos - light_pos
+float getAngleAtt(float3 normalizedLightVector ,float3 lightDir,float lightAngleScale ,float lightAngleOffset)
 {
-	float3 pixel_to_light = _PointLights[index]._LightPosOrDir - pos;
-	float nl = dot(normal, normalize(pixel_to_light));
-	float distance = length(pixel_to_light);
-	float atten = 0;
-	float3 half_dir = normalize(pixel_to_light + view_dir);
-#if defined(QuadAtten)
-	atten = 10 / (1 + _PointLights[index]._LightParam.x * distance + _PointLights[index]._LightParam.b * distance * _PointLights[index]._LightParam.b * distance)
-#elif defined(InvAtten)
-	atten = 10 / distance * distance;
-#elif defined(LinearAtten)
-	atten = (1.0 - saturate(distance / (0.00001 + _PointLights[index]._LightParam0)));
-#endif
-	float diffuse = max(0.0, nl) * atten;
-	float specular = pow(max(0.0, dot(half_dir, normal)), 256) * atten;
-	return saturate(diffuse * _PointLights[index]._LightColor + specular);
-}
-
-float3 CaclulatSpotlLight(uint index, float3 normal, float3 pos, float3 view_dir)
-{
-	float3 pixel_to_light = normalize(_SpotLights[index]._LightPos - pos);
-	float nl = dot(normal, normalize(-_SpotLights[index]._LightDir));
-	float dis = distance(_SpotLights[index]._LightPos , pos);
-	float atten = 0;
-	float3 half_dir = normalize(-_SpotLights[index]._LightDir + view_dir);
-#if defined(QuadAtten)
-	atten = 10 / (1 + _PointLights[index]._LightParam.x * distance + _PointLights[index]._LightParam.b * distance * _PointLights[index]._LightParam.b * distance)
-#elif defined(InvAtten)
-	atten = 10 / distance * distance;
-#elif defined(LinearAtten)
-	atten = (1.0 - saturate(dis / (0.00001 + _SpotLights[index]._Rdius)));
-#endif
-	float angle_cos = dot(-pixel_to_light, _SpotLights[index]._LightDir);
-	float inner_cos = cos(_SpotLights[index]._InnerAngle / 2 * ToRadius);
-	float outer_cos = cos(_SpotLights[index]._OuterAngle / 2 * ToRadius);
-	atten *= step(outer_cos, angle_cos);
-	float angle_lerp = (inner_cos - angle_cos) / (inner_cos - outer_cos + 0.00001);
-	float angle_atten = lerp(1.0, 0.0, angle_lerp);
-	atten *= angle_atten;
-	float diffuse = max(0.0, nl) * atten;
-	float specular = pow(max(0.0, dot(half_dir, normal)), 256) * atten;
-	return saturate(diffuse * _SpotLights[index]._LightColor + specular);
-}
-
-float3 CaclulateDirectionalLightPBR(uint index, float3 normal, float3 view_dir)
-{
-	float3 light_dir = normalize(-_DirectionalLights[index]._LightPosOrDir.xyz);
-	float diffuse = max(dot(light_dir, normal), 0.0);
-	float3 half_dir = normalize(light_dir + view_dir);
-	float specular = pow(max(0.0, dot(half_dir, normal)), 256);
-	return saturate(diffuse * _DirectionalLights[index]._LightColor + specular);
+	float cd = dot (lightDir,normalizedLightVector );
+	float attenuation = saturate ( cd * lightAngleScale + lightAngleOffset ) ;
+	// smooth the transition
+	attenuation *= attenuation ;
+	return attenuation;
 }
 
 float3 GetPointLightIrridance(uint index,float3 world_pos)
 {
 	float dis = distance(_PointLights[index]._LightPosOrDir,world_pos);
-	float atten = 0;
-#if defined(QuadAtten)
-	atten = 10 / (1 + _PointLights[index]._LightParam.x * dis + _PointLights[index]._LightParam.b * dis * _PointLights[index]._LightParam.b * distance)
-#elif defined(InvAtten)
-	atten = 10 / dis * dis;
-#elif defined(LinearAtten)
-	atten = (1.0 - saturate(dis / (0.00001 + _PointLights[index]._LightParam0)));
-#endif
+	float atten = 1;
+	atten *= GetDistanceAtt(dis,_PointLights[index]._LightParam0.x);
 	return _PointLights[index]._LightColor * atten;
 }
 
 float3 GetSpotLightIrridance(uint index,float3 world_pos)
 {
 	float dis = distance(_SpotLights[index]._LightPos,world_pos);
-	float3 pixel_to_light = normalize(_SpotLights[index]._LightPos - world_pos);
-	float atten = 0;
-#if defined(QuadAtten)
-	atten = 10 / (1 + _SpotLights[index]._LightParam.x * dis + _SpotLights[index]._LightParam.b * dis * _SpotLights[index]._LightParam.b * distance)
-#elif defined(InvAtten)
-	atten = 10 / dis * dis;
-#elif defined(LinearAtten)
-	atten = (1.0 - saturate(dis / (0.00001 + _SpotLights[index]._Rdius)));
-#endif
-	float angle_cos = dot(-pixel_to_light, _SpotLights[index]._LightDir);
-	float inner_cos = cos(_SpotLights[index]._InnerAngle / 2 * ToRadius);
-	float outer_cos = cos(_SpotLights[index]._OuterAngle / 2 * ToRadius);
-	atten *= step(outer_cos, angle_cos);
-	float angle_lerp = (inner_cos - angle_cos) / (inner_cos - outer_cos + 0.00001);
-	float angle_atten = lerp(1.0, 0.0, angle_lerp);
-	atten *= angle_atten;
+	float3 l = normalize(world_pos - _SpotLights[index]._LightPos);
+	float light_angle_scale = _SpotLights[index]._LightAngleScale;
+	float light_angle_offset = _SpotLights[index]._LightAngleOffset;
+	float atten = 1;
+	atten *= getAngleAtt(l,_SpotLights[index]._LightDir,light_angle_scale,light_angle_offset);
+	atten *= GetDistanceAtt(dis,_SpotLights[index]._Rdius);
 	return _SpotLights[index]._LightColor * atten;
 }
 
@@ -133,7 +74,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_dir = light_dir;
 		light_data.light_color = _DirectionalLights[i]._LightColor;
 		light_data.light_pos = _DirectionalLights[i]._LightPosOrDir;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
+		light += CookTorranceBRDF(surface, shading_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
 	}
 	for (uint j = 0; j < MAX_POINT_LIGHT; j++)
 	{
@@ -146,7 +87,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_dir = light_dir;
 		light_data.light_color = _PointLights[j]._LightColor;
 		light_data.light_pos = _PointLights[j]._LightPosOrDir;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
+		light += CookTorranceBRDF(surface, shading_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
 	}
 	for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
 	{
@@ -159,38 +100,25 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_dir = light_dir;
 		light_data.light_color = _SpotLights[k]._LightColor;
 		light_data.light_pos = _SpotLights[k]._LightPos;
-		light += CookTorranceBRDF(surface, shading_data, light_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos);
+		light += CookTorranceBRDF(surface, shading_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos);
 	}
 	//indirect light
 	float3 irradiance = DiffuseIBL.Sample(g_LinearWrapSampler, surface.wnormal);
 	float3 F0 = lerp(F0_AIELECTRICS, surface.albedo.rgb, surface.metallic);
-	float3 ks = FresnelSchlickRoughness(saturate(shading_data.nv), F0,surface.roughness);
-	float3 kd = F3_WHITE - ks;
-	float3 diffuse = irradiance * surface.albedo.rgb;
-	float3 specular = SkyBox.SampleLevel(g_LinearWrapSampler, surface.wnormal,lerp(0,9,surface.roughness));
-	light += 0.5f * diffuse * kd + ks * specular * 0.25;
-	return light; 
-}
- 
-float3 CalculateLight
-	(
-	float3 pos, float3 normal)
-{
-	float3 light = float3(0.0, 0.0, 0.0);
-	float3 view_dir = normalize(_CameraPos.xyz - pos);
-	for (uint i = 0; i < MAX_DIRECTIONAL_LIGHT; i++)
-	{
-		light += CaclulateDirectionalLight(i, normal, view_dir);
-	}
-	for (uint j = 0; j < MAX_POINT_LIGHT; j++)
-	{
-		light += CaclulatPointlLight(j, normal, pos, view_dir);
-	}
-	for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
-	{
-		light += CaclulatSpotlLight(k, normal, pos, view_dir);
-	}
-	return light;
+	float3 ks = F_SchlickRoughness(shading_data.nv,F0,surface.roughness);
+	float3 kd = 1.0 - ks;
+	float ao = 1.0;
+	float3 diffuse = ao * kd * irradiance * surface.albedo.rgb;
+	//float3 specular = SkyBox.SampleLevel(g_LinearWrapSampler, surface.wnormal,);
 
+	float lod             = lerp(0,8,surface.roughness);
+	float3 prefilteredColor = SkyBox.SampleLevel(g_LinearWrapSampler, reflect(-view_dir,surface.wnormal),lod);
+	float2 envBRDF          = IBLLut.SampleLevel(g_LinearWrapSampler,float2(lerp(0,0.99,surface.roughness),lerp(0,0.99,shading_data.nv)),0).xy;
+	envBRDF.x = pow(envBRDF.x,1/2.2);
+	envBRDF.y = pow(envBRDF.y,1/2.2);
+	float3 specular = prefilteredColor * (ks * envBRDF.x + envBRDF.y);
+
+	light += (specular + prefilteredColor);
+	return light; 
 }
 #endif //__LIGHTING_H__

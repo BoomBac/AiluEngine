@@ -40,6 +40,13 @@ namespace Ailu
 	{
 		return fs::exists(path);
 	}
+	bool FileManager::IsFileNew(const WString& sys_path)
+	{
+		fs::path p(sys_path);
+		fs::file_time_type last_write_time = fs::last_write_time(p);
+		fs::file_time_type cur_time = std::filesystem::file_time_type::clock::now();
+		return last_write_time > cur_time;
+	}
 	void FileManager::BackToParent()
 	{
 		s_cur_path = s_cur_path.parent_path();

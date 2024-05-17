@@ -9,6 +9,7 @@
 #include "Framework/Math/Geometry.h"
 #include "Animation/Skeleton.h"
 #include "Framework/Interface/IAssetable.h"
+#include "Objects/Object.h"
 
 
 namespace Ailu
@@ -21,10 +22,12 @@ namespace Ailu
 		ImportedMaterialInfo(u16 slot = 0, String name = "") : _slot(slot), _name(name) {};
 	};
 
-	class Mesh : public IAssetable
+	class Mesh : public Object,public IAssetable
 	{
-		DECLARE_PROTECTED_PROPERTY(origin_path, OriginPath, String)
-		DECLARE_PROTECTED_PROPERTY(name, Name, std::string)
+	public:
+		inline static Mesh* s_p_cube = nullptr;
+		inline static Mesh* s_p_shpere = nullptr;
+		inline static Mesh* s_p_quad = nullptr;
 	public:
 		Mesh();
 		Mesh(const std::string& name);
@@ -85,75 +88,6 @@ namespace Ailu
 	private:
 		Vector4f* _bone_weights;
 		Vector4D<u32>* _bone_indices;
-	};
-
-	class MeshPool
-	{
-	public:
-		static Ref<Mesh> CreateMesh(const std::string& name)
-		{
-			auto mesh = MakeRef<Mesh>(name);
-			s_meshes[name] = mesh;
-			s_meshe_names.emplace_back(s_meshes.find(name)->first.c_str());
-			s_it_meshes.emplace_back(mesh);
-			return mesh;
-		}
-
-		static void AddMesh(const std::string& name, Ref<Mesh> mesh)
-		{
-			s_meshes[name] = mesh;
-			s_meshe_names.emplace_back(s_meshes.find(name)->first.c_str());
-			s_it_meshes.emplace_back(mesh);
-			mesh->OriginPath(name);
-			mesh->Name(name);
-		}
-
-		static void AddMesh(Ref<Mesh> mesh)
-		{
-			s_meshes[mesh->Name()] = mesh;
-			s_meshe_names.emplace_back(s_meshes.find(mesh->Name())->first.c_str());
-			s_it_meshes.emplace_back(mesh);
-		}
-
-		static Ref<Mesh> GetMesh(const std::string& name)
-		{
-			auto it = s_meshes.find(name);
-			if (it != s_meshes.end())
-			{
-				return it->second;
-			}
-			return nullptr;
-		}
-
-		static void ReleaseMesh(const std::string& name)
-		{
-			auto it = s_meshes.find(name);
-			if (it != s_meshes.end())
-			{
-				s_it_meshes.erase(std::find(s_it_meshes.begin(), s_it_meshes.end(), it->second));
-				s_meshes.erase(it);
-			}
-		}
-
-		static std::tuple<const char**, u32> GetMeshForGUI()
-		{
-			return std::make_tuple(s_meshe_names.data(), static_cast<u32>(s_meshe_names.size()));
-		}
-
-		static auto Begin()
-		{
-			return s_it_meshes.begin();
-		}
-
-		static auto End()
-		{
-			return s_it_meshes.end();
-		}
-	private:
-		inline static u32 s_next_mesh_id = 0u;
-		inline static std::unordered_map<std::string, Ref<Mesh>> s_meshes;
-		inline static Vector<Ref<Mesh>> s_it_meshes;
-		inline static Vector<const char*> s_meshe_names;
 	};
 }
 

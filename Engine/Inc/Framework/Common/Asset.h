@@ -31,6 +31,8 @@ namespace Ailu
 		WString _sys_path;
 		WString _name;
 		WString _full_name;
+		//使用额外的信息来定位资源对象，对于对于fbx文件，使用资源路径和文件内对象的名称来确定一个mesh，对于shader，目前使用vs/ps的入口。
+		WString _addi_info;
 		EAssetType::EAssetType _asset_type;
 		IAssetable* _p_inst_asset;
 	private:

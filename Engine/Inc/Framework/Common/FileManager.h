@@ -17,6 +17,7 @@ namespace Ailu
 		static void RenameDirectory(const WString& old_name, const WString& new_name);
 		static void CopyFile(const WString& src_file, const WString& dest_file);
 		static bool Exist(const WString& path);
+		static bool IsFileNew(const WString& sys_path);
 		static void BackToParent();
 		static const WString& GetCurPathStr() { return s_cur_path_str; };
 		static const WString& GetCurDirStr() { return s_cur_dir_str; }

@@ -39,12 +39,12 @@ namespace Ailu
 	void AssetBrowser::Open(const i32& handle)
 	{
 		ImGuiWidget::Open(handle);
-		_folder_icon = g_pTexturePool->Get(L"Editor/folder");
-		_file_icon =   g_pTexturePool->Get(L"Editor/file_us");
-		_mesh_icon =   g_pTexturePool->Get(L"Editor/3d");
-		_shader_icon = g_pTexturePool->Get(L"Editor/shader");
-		_image_icon =  g_pTexturePool->Get(L"Editor/image");
-		_scene_icon =  g_pTexturePool->Get(L"Editor/scene");
+		_folder_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"folder.png");
+		_file_icon =   g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"file.png");
+		_mesh_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"3d.png");
+		_shader_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.png");
+		_image_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"image.png");
+		_scene_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"scene.png" );
 		OnUpdateAssetList();
 	}
 	void AssetBrowser::Close(i32 handle)

@@ -182,8 +182,7 @@ namespace Ailu
 	class D3DShader : public Shader
 	{
 	public:
-		D3DShader(const String& sys_path);
-		D3DShader(const String& sys_path,const String& vs_entry,String ps_entry);
+		D3DShader(const WString& sys_path, const String& vs_entry, const String& ps_entry);
 		~D3DShader();
 		void Bind(u32 index) final;
 		void* GetByteCode(EShaderType type) final;
@@ -193,7 +192,7 @@ namespace Ailu
 		bool RHICompileImpl() final;
 		void Reset();
 		void LoadShaderReflection(ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps);
-		void LoadAdditionalShaderReflection(const String& sys_path);
+		void LoadAdditionalShaderReflection(const WString& sys_path);
 		void GenerateInternalPSO();
 
 	private:
@@ -243,7 +242,7 @@ namespace Ailu
 			ComPtr<ID3D12PipelineState> _p_pso_b;
 		};
 	public:
-		D3DComputeShader(const String& sys_path);
+		D3DComputeShader(const WString& sys_path);
 		//void Dispatch(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 		void Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 		void BindOnly(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z,std::function<void()> res_binder);
