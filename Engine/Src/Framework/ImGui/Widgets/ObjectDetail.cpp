@@ -11,6 +11,7 @@
 #include "Render/Renderer.h"
 #include "Framework/ImGui/Widgets/CommonTextureWidget.h"
 #include "Framework/Common/Asset.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
@@ -92,22 +93,22 @@ namespace Ailu
 			ImGui::Text("Texture2D : %s", prop._name.c_str());
 			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture*>>(prop);
 			auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
-			u64 cur_tex_id = tex? tex->ID() : TexturePool::s_p_default_white->ID();
+			u32 cur_tex_id = tex? tex->ID() : Texture::s_p_default_white->ID();
 			//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
 			float contentWidth = ImGui::GetWindowContentRegionWidth();
 			float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
 			ImGui::SetCursorPosX(centerX);
 			if (selector_window.IsCaller(property_handle))
 			{
-				auto new_tex_id = selector_window.GetSelectedTexture(property_handle);
+				u32 new_tex_id = selector_window.GetSelectedTexture(property_handle);
 				if (TextureSelector::IsValidTextureID(new_tex_id) && new_tex_id != cur_tex_id)
 				{
 					auto mat = dynamic_cast<Material*>(obj);
 					if (mat)
-						mat->SetTexture(prop._value_name, g_pTexturePool->Get(new_tex_id).get());
+						mat->SetTexture(prop._value_name, g_pResourceMgr->Get<Texture2D>(new_tex_id));
 				}
 			}
-			if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pTexturePool->Get(cur_tex_id)->GetNativeTextureHandle()), ImVec2(s_mini_tex_size, s_mini_tex_size)))
+			if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pResourceMgr->Get<Texture2D>(cur_tex_id)->GetNativeTextureHandle()), ImVec2(s_mini_tex_size, s_mini_tex_size)))
 			{
 				selector_window.Open(property_handle);
 			}
@@ -193,24 +194,24 @@ namespace Ailu
 					auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
 					if (tex == nullptr)
 					{
-						tex = mat_prop_index == 1 ? TexturePool::s_p_default_normal : TexturePool::s_p_default_white;
+						tex = mat_prop_index == 1 ? Texture::s_p_default_normal : Texture::s_p_default_white;
 						mat->SetTexture(name, tex);
 					}
-					u64 cur_tex_id = tex->ID();
+					u32 cur_tex_id = tex->ID();
 					float contentWidth = ImGui::GetWindowContentRegionWidth();
 					float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
 					ImGui::SetCursorPosX(centerX);
 					if (selector_window.IsCaller(mat_prop_index))
 					{
-						u64 new_tex_id = selector_window.GetSelectedTexture(mat_prop_index);
+						u32 new_tex_id = selector_window.GetSelectedTexture(mat_prop_index);
 						if (TextureSelector::IsValidTextureID(new_tex_id) && new_tex_id != cur_tex_id)
 						{
-							auto new_tex = g_pTexturePool->Get(new_tex_id);
-							mat->SetTexture(name, new_tex.get());
+							auto new_tex = g_pResourceMgr->Get<Texture2D>(new_tex_id);
+							mat->SetTexture(name, new_tex);
 						}
 					}
 					
-					if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pTexturePool->Get(cur_tex_id)->GetNativeTextureHandle()) , ImVec2(s_mini_tex_size, s_mini_tex_size)))
+					if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pResourceMgr->Get<Texture2D>(cur_tex_id)->GetNativeTextureHandle()) , ImVec2(s_mini_tex_size, s_mini_tex_size)))
 					{
 						selector_window.Open(mat_prop_index);
 					}
@@ -250,6 +251,22 @@ namespace Ailu
 			};
 		if (!TreeStats::s_is_texture_selector_open)
 			TreeStats::s_cur_opened_texture_selector = -1;
+		auto mat_type = mat->MaterialID();
+		u32 mat_id = mat_type;
+		ImGui::Text("Materia Type: %s", EMaterialID::ToString(mat_type));
+		if (ImGui::BeginCombo("##MaterialID", EMaterialID::ToString(mat_type)))
+		{
+			for (u32 i = 0; i < EMaterialID::COUNT; i++)
+			{
+				const bool is_selected = (mat_id == i);
+				if (ImGui::Selectable(EMaterialID::ToString((EMaterialID::EMaterialID)i), is_selected))
+					mat_id = i;
+				if (is_selected)
+					ImGui::SetItemDefaultFocus();
+			}
+			ImGui::EndCombo();
+		}
+		mat->MaterialID((EMaterialID::EMaterialID)mat_id);
 		func_show_prop(mat_prop_index, mat, "Albedo");
 		func_show_prop(mat_prop_index, mat, "Normal");
 		func_show_prop(mat_prop_index, mat, "Specular");
@@ -342,15 +359,17 @@ namespace Ailu
 						static int s_mesh_selected_index = -1;
 						if (ImGui::BeginCombo("Select Mesh: ", mesh ? mesh->Name().c_str() : "missing"))
 						{
-							for (auto it = MeshPool::Begin(); it != MeshPool::End(); it++)
+							
+							for (auto it = g_pResourceMgr->ResourceBegin<Mesh>(); it != g_pResourceMgr->ResourceEnd<Mesh>(); it++)
 							{
-								if (is_skined_comp && !dynamic_cast<SkinedMesh*>(it->get()))
+								auto mesh = ResourceMgr::IterToRefPtr<Mesh>(it);
+								if (is_skined_comp && !dynamic_cast<SkinedMesh*>(mesh.get()))
 									continue;
-								if (ImGui::Selectable((*it)->Name().c_str(), s_mesh_selected_index == mesh_count))
+								if (ImGui::Selectable(mesh->Name().c_str(), s_mesh_selected_index == mesh_count))
 									s_mesh_selected_index = mesh_count;
 								if (s_mesh_selected_index == mesh_count)
 								{
-									static_mesh_comp->SetMesh(*it);
+									static_mesh_comp->SetMesh(mesh);
 									g_pSceneMgr->MarkCurSceneDirty();
 								}
 								++mesh_count;
@@ -385,13 +404,14 @@ namespace Ailu
 					{
 						if (ImGui::BeginCombo("Select Material: ", mat ? mat->Name().c_str() : "missing"))
 						{
-							for (auto it = MaterialLibrary::Begin(); it != MaterialLibrary::End(); it++)
+							for (auto it = g_pResourceMgr->ResourceBegin<Material>(); it != g_pResourceMgr->ResourceEnd<Material>(); it++)
 							{
-								if (ImGui::Selectable((*it)->Name().c_str(), s_mat_selected_index == mat_count))
+								auto mat = std::static_pointer_cast<Material>(it->second->second);
+								if (ImGui::Selectable(mat->Name().c_str(), s_mat_selected_index == mat_count))
 									s_mat_selected_index = mat_count;
 								if (s_mat_selected_index == mat_count)
 								{
-									static_mesh_comp->SetMaterial(*it, i);
+									static_mesh_comp->SetMaterial(mat, i);
 									g_pSceneMgr->MarkCurSceneDirty();
 								}
 								++mat_count;
@@ -404,12 +424,14 @@ namespace Ailu
 							static int s_shader_selected_index = -1;
 							if (ImGui::BeginCombo("Select Shader: ", mat->GetShader()->Name().c_str()))
 							{
-								for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+								
+								for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
 								{
-									if (ImGui::Selectable((*it)->Name().c_str(), s_shader_selected_index == shader_count))
+									auto shader = static_cast<Shader*>(it->second->second.get());
+									if (ImGui::Selectable(shader->Name().c_str(), s_shader_selected_index == shader_count))
 										s_shader_selected_index = shader_count;
 									if (s_shader_selected_index == shader_count)
-										mat->ChangeShader(*it);
+										mat->ChangeShader(shader);
 									++shader_count;
 								}
 								ImGui::EndCombo();

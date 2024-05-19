@@ -117,6 +117,7 @@ namespace Ailu
 			}
 			else
 			{
+				f64 target_ms = 1000.0 / s_target_framecount;
 				g_pTimeMgr->Tick(0.0f);
 				auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
 				_render_lag += last_mark;
@@ -126,7 +127,7 @@ namespace Ailu
 					layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
 				_p_window->OnUpdate();
 				g_pResourceMgr->Tick(delta_time);
-				while (_render_lag > kMsPerRender)
+				while (_render_lag > target_ms)
 				{
 					s_frame_count++;
 					g_pSceneMgr->Tick(delta_time);
@@ -137,7 +138,7 @@ namespace Ailu
 					_p_imgui_layer->End();
 #endif // DEAR_IMGUI
 					g_pRenderer->Tick(delta_time);
-					_render_lag -= kMsPerRender;
+					_render_lag -= target_ms;
 				}
 			}
 		}
@@ -164,15 +165,15 @@ namespace Ailu
 	}
 	bool Application::OnLostFoucus(WindowLostFocusEvent& e)
 	{
-		Input::s_block_input = true;
-		//_layer_stack->PopLayer(_p_input_layer);
+		g_pLogMgr->Log("OnLostFoucus");
+		_p_input_layer->HandleInput(false);
 		return true;
 	}
 	bool Application::OnGetFoucus(WindowFocusEvent& e)
 	{
+		g_pLogMgr->Log("OnGetFoucus");
 		_state = EApplicationState::EApplicationState_Running;
-		Input::s_block_input = false;
-		//_layer_stack->PushLayer(_p_input_layer);
+		_p_input_layer->HandleInput(true);
 		return true;
 	}
 	bool Application::OnWindowMinimize(WindowMinimizeEvent& e)

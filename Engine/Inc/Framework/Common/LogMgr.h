@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <type_traits>
 
 #include <source_location>
 #include "Framework/Interface/IRuntimeModule.h"
@@ -61,6 +62,7 @@ namespace Ailu
 		}
 	};
 
+
 	class LogMgr : public IRuntimeModule
 	{
 	private:
@@ -81,16 +83,23 @@ namespace Ailu
 		const std::string& GetOutputPath() const;
 		const ELogLevel& GetOutputLevel() const;
 		const TraceLevle& GetTraceLevel() const;
-		const std::vector<IAppender*>& GetAppenders() const {
-			return _appenders;
-		};
+		const std::vector<IAppender*>& GetAppenders() const {return _appenders;};
 		void Log(std::string msg);
 		void Log(std::wstring msg);
 		void LogWarning(std::string msg);
 		void LogWarning(std::wstring msg);
 		void LogError(std::string msg);
 		void LogError(std::wstring msg);
-		template <typename... Args>
+
+		template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(),bool> = true>
+		void Log(std::string_view msg, Args&&... args)
+		{
+			for (auto& appender : _appenders)
+			{
+				appender->Print(BuildLogMsg(_output_level, msg, args...));
+			}
+		}
+		template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
 		void LogFormat(std::string_view msg, Args&&... args)
 		{
 			for (auto& appender : _appenders)
@@ -98,7 +107,7 @@ namespace Ailu
 				appender->Print(BuildLogMsg(_output_level, msg, args...));
 			}
 		}
-		template <typename... Args>
+		template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
 		void LogErrorFormat(std::string_view msg, Args&&... args)
 		{
 			for (auto& appender : _appenders)
@@ -107,7 +116,7 @@ namespace Ailu
 			}
 		}
 
-		template <typename... Args>
+		template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
 		void LogErrorFormat(const std::source_location& loc, std::string_view msg, Args&&... args)
 		{
 			String new_msg = BuildLogMsg(ELogLevel::kError, msg, args...);
@@ -115,7 +124,7 @@ namespace Ailu
 			LogErrorFormat("{}", new_msg);
 		}
 
-		template <typename... Args>
+		template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
 		void LogErrorFormat(std::wstring_view msg, Args&&... args)
 		{
 			for (auto& appender : _appenders)
@@ -124,7 +133,7 @@ namespace Ailu
 			}
 		}
 
-		template <typename... Args>
+		template<typename... Args,std::enable_if_t<!ContainsString<Args...>(),bool> = true>
 		void LogErrorFormat(const std::source_location& loc, std::wstring_view msg, Args&&... args)
 		{
 			WString new_msg = BuildLogMsg(ELogLevel::kError, msg, args...);
@@ -132,7 +141,7 @@ namespace Ailu
 			LogErrorFormat(L"{}", new_msg);
 		}
 
-		template <typename... Args>
+		template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
 		void LogWarningFormat(std::string_view msg, Args&&... args)
 		{
 			for (auto& appender : _appenders)
@@ -141,7 +150,7 @@ namespace Ailu
 			}
 		}
 
-		template <typename... Args>
+		template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
 		void LogWarningFormat(std::wstring_view msg, Args&&... args)
 		{
 			for (auto& appender : _appenders)
@@ -150,7 +159,7 @@ namespace Ailu
 			}
 		}
 
-		template <typename... Args>
+		template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
 		void LogFormat(std::wstring_view msg, Args&&... args)
 		{
 			for (auto& appender : _appenders)
@@ -158,14 +167,14 @@ namespace Ailu
 				appender->Print(BuildLogMsg(_output_level, msg, args...));
 			}
 		}
-		template <typename... Args>
+		template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
 		void LogFormat(ELogLevel level, std::string_view msg, Args&&... args)
 		{
 			if (level <= _output_level) return;
 			for (auto& appender : _appenders)
 				appender->Print(BuildLogMsg(level, msg, args...));
 		}
-		template <typename... Args>
+		template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
 		void LogFormat(ELogLevel level, std::wstring_view msg, Args&&... args)
 		{
 			if (level <= _output_level) return;
@@ -174,6 +183,7 @@ namespace Ailu
 		}
 	};
 	extern LogMgr* g_pLogMgr;
+
 }
 
 

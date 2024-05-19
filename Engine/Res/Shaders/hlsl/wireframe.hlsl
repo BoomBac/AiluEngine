@@ -5,6 +5,7 @@
 //Cull: Back
 //Queue: Opaque
 //Blend: Src,OneMinusSrc
+//ZTest: LEqual
 //Fill: Wireframe
 //info end
 #include "common.hlsli"

@@ -1,0 +1,6 @@
+guid: 88038f2b-8b36-4a3e-a271-2ed294a5c54f
+type: kShader
+name: deferred_lighting
+  file: Shaders/hlsl/deferred_lighting.hlsl
+  vs_entry: DeferredLightingVSMain
+  ps_entry: DeferredLightingPSMain

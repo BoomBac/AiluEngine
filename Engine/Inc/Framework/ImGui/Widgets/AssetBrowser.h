@@ -36,13 +36,12 @@ namespace Ailu
 		TextureDetailView* _p_tex_detail_widget;
 		//当前目录下选中的文件索引
 		u32 _selected_file_index = 0;
-		Ref<Texture> _folder_icon;
-		Ref<Texture> _file_icon;
-		//Ref<Texture> _material_icon;
-		Ref<Texture> _mesh_icon;
-		Ref<Texture> _shader_icon;
-		Ref<Texture> _image_icon;
-		Ref<Texture> _scene_icon;
+		Texture* _folder_icon;
+		Texture* _file_icon;
+		Texture* _mesh_icon;
+		Texture* _shader_icon;
+		Texture* _image_icon;
+		Texture* _scene_icon;
 		Vector<Asset*> _cur_dir_assets;
 		WString _selected_file_sys_path;
 		bool _is_cur_assets_list_newer = false;

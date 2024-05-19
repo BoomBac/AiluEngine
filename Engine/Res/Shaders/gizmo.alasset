@@ -1,0 +1,6 @@
+guid: 339a1a1a-522a-4872-a110-cfbc21f0215c
+type: kShader
+name: gizmo
+  file: Shaders/hlsl/gizmo.hlsl
+  vs_entry: VSMain
+  ps_entry: PSMain

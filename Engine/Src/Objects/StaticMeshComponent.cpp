@@ -22,7 +22,8 @@ namespace Ailu
 		{
 			for (auto it = _p_mesh->GetCacheMaterials().begin(); it != _p_mesh->GetCacheMaterials().end(); it++)
 			{
-				auto loadded_mat = MaterialLibrary::GetMaterial(it->_name);
+				
+				auto loadded_mat = g_pResourceMgr->Get<Material>(ToWStr(it->_name.c_str()));
 				if(loadded_mat)
 					_p_mats.emplace_back(loadded_mat);
 			}
@@ -83,10 +84,17 @@ namespace Ailu
 		Component::Serialize(os, indent);
 		using namespace std;
 		String prop_indent = indent.append("  ");
-		os << prop_indent << "MeshPath: " << (_p_mesh ? _p_mesh->OriginPath() : String("")) << endl;
-		for (int i = 0; i < _p_mats.size(); ++i)
+		os << prop_indent << "MeshPath: " << (_p_mesh ? g_pResourceMgr->GetLinkedAsset(_p_mesh.get())->GetGuid().ToString() : String("Missing")) << endl;
+		for(int i = 0; i < _p_mats.size(); ++i)
 		{
-			os << prop_indent << std::format("MaterialPath{}: {}", i, _p_mats[i] ? _p_mats[i]->GetGuid().ToString() : "missing") << endl;
+			if (_p_mats[i] != nullptr && g_pResourceMgr->GetLinkedAsset(_p_mats[i].get()))
+			{
+				auto asset = g_pResourceMgr->GetLinkedAsset(_p_mats[i].get());
+				AL_ASSERT(asset->_asset_type != EAssetType::kMaterial);
+				os << prop_indent << std::format("MaterialPath{}: {}", i, asset->GetGuid().ToString()) << endl;
+			}		
+			else
+				os << prop_indent << std::format("MaterialPath{}: {}", i, "missing") << endl;
 		}
 	}
 	void* StaticMeshComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
@@ -99,26 +107,17 @@ namespace Ailu
 		else
 		{
 			formated_str.pop();
-			auto mesh_path = TP_ONE(formated_str.front());
+			Guid mesh_guid(TP_ONE(formated_str.front()).c_str());
 			formated_str.pop();
 			Ref<Mesh> mesh = nullptr;
-			if (!mesh_path.empty())
+			if (!g_pResourceMgr->GuidToAssetPath(mesh_guid).empty())
 			{
-				mesh = MeshPool::GetMesh(mesh_path);
-				if (mesh == nullptr)
-				{
-					auto sys_path = PathUtils::GetResSysPath(mesh_path);
-					sys_path = sys_path.substr(0, sys_path.find_first_of(".") + 4);
-					auto load_mesh = g_pResourceMgr->ImportResource(ToWChar(sys_path), MeshImportSetting("", false, false));
-					if (load_mesh)
-					{
-						mesh = std::static_pointer_cast<Mesh>(load_mesh);
-					}
-				}
+				g_pResourceMgr->Load<Mesh>(mesh_guid);
+				mesh = g_pResourceMgr->GetRef<Mesh>(mesh_guid);
 			}
 			if (!mesh)
 			{
-				g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
+				g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with guid {};", mesh_guid.ToString());
 			}
 
 			//auto mat_path = TP_ONE(formated_str.front());
@@ -128,11 +127,13 @@ namespace Ailu
 			while ((cur_mat_path = TP_ZERO(formated_str.front())).starts_with("MaterialPath"))
 			{
 				cur_mat_path = TP_ONE(formated_str.front());
-				auto mat = g_pResourceMgr->LoadAsset<Material>(Guid(cur_mat_path));
+				auto guid = Guid(cur_mat_path);
+				g_pResourceMgr->Load<Material>(guid);
+				auto mat = g_pResourceMgr->GetRef<Material>(guid);
 				if (mat == nullptr)
 				{
 					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load material failed with id {};", cur_mat_path);
-					mat = MaterialLibrary::GetMaterial("StandardLit");
+					mat = g_pResourceMgr->GetRef<Material>(L"Runtime/Material/StandardLit");	
 				}
 				else
 					comp->AddMaterial(mat);
@@ -164,26 +165,23 @@ namespace Ailu
 		else
 		{
 			formated_str.pop();
-			auto mesh_path = TP_ONE(formated_str.front());
+			Guid mesh_guid(TP_ONE(formated_str.front()).c_str());
 			formated_str.pop();
 			auto mat_path = TP_ONE(formated_str.front());
-			auto mesh = MeshPool::GetMesh(mesh_path);
-			if (mesh == nullptr)
+			Ref<Mesh> mesh = nullptr;
+			if (!g_pResourceMgr->GuidToAssetPath(mesh_guid).empty())
 			{
-				mesh_path = PathUtils::GetResSysPath(mesh_path);
-				auto meshes = g_pResourceMgr->LoadMesh(ToWChar(mesh_path));
-				if (!meshes.empty())
-				{
-					mesh = meshes.front();
-					mesh->OriginPath(mesh_path);
-					g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
-				}
-				else
-				{
-					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with path {};", mesh_path);
-				}
+				g_pResourceMgr->Load<Mesh>(mesh_guid);
+				mesh = g_pResourceMgr->GetRef<Mesh>(mesh_guid);
 			}
-			auto mat = MaterialLibrary::GetMaterial(mat_path);
+			if (!mesh)
+			{
+				g_pLogMgr->LogErrorFormat(std::source_location::current(), "Deserialize failed when load mesh with guid {};", mesh_guid.ToString());
+			}
+			//auto mat = MaterialLibrary::GetMaterial(mat_path);
+			auto guid = Guid(mat_path);
+			g_pResourceMgr->Load<Material>(guid);
+			auto mat = g_pResourceMgr->GetRef<Material>(guid);
 			auto loc = std::source_location::current();
 			if (mat == nullptr)
 			{

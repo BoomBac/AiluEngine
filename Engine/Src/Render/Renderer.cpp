@@ -39,14 +39,7 @@ namespace Ailu
 		_p_skybox_pass = MakeScope<SkyboxPass>();
 		_p_gizmo_pass = MakeScope<GizmoPass>();
 
-		auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"small_cave_1k.hdr");
-		g_pTexturePool->Add(L"Textures/small_cave_1k.hdr", tex);
-		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(tex->Height(), "small_cave_1k", "Textures/small_cave_1k.hdr");
-
-		//auto tex = g_pResourceMgr->LoadTexture(WString{ ToWChar(EnginePath::kEngineTexturePath) } + L"hdri_forest.hdr");
-		//g_pTexturePool->Add(L"Textures/hdri_forest.hdr", tex);
-		//_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(tex->Height(), "hdri_forest", "Textures/hdri_forest.hdr");
-
+		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512, "pure_sky", "Textures/small_cave_1k.alasset");
 		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
 
 		_p_per_frame_cbuf.reset(ConstantBuffer::Create(RenderConstants::kPerFrameDataSize));
@@ -298,8 +291,13 @@ namespace Ailu
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightDir = light_data._light_dir.xyz;
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._Rdius = light_data._light_param.x;
-				_per_frame_cbuf_data._SpotLights[spot_light_index]._InnerAngle = light_data._light_param.y;
-				_per_frame_cbuf_data._SpotLights[spot_light_index++]._OuterAngle = light_data._light_param.z;
+				float inner_cos = cos(light_data._light_param.y / 2 * k2Radius);
+				float outer_cos = cos(light_data._light_param.z / 2 * k2Radius);
+				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightAngleScale = 1.0f / std::max(0.001f,(inner_cos - outer_cos));
+				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightAngleOffset = -outer_cos * _per_frame_cbuf_data._SpotLights[spot_light_index]._LightAngleScale;
+
+				//_per_frame_cbuf_data._SpotLights[spot_light_index]._InnerAngle = light_data._light_param.y;
+				//_per_frame_cbuf_data._SpotLights[spot_light_index]._OuterAngle = light_data._light_param.z;
 			}
 			++updated_light_num;
 		}

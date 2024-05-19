@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: -282.295,153.981,-247.772
-  Rotation: -0.0715024,-0.391846,0.0305667,-0.916739
+  Position: 590.79,609.872,588.192
+  Rotation: 0.0255051,-0.958279,0.0905481,0.269912
   Fov: 60
-  Aspect: 1.86213
-  Near: 1
-  Far: 100000
-  ControllerRotation: 8.9194,39286.3
+  Aspect: 1.7875
+  Near: 86.8
+  Far: 29398.2
+  ControllerRotation: 12610.8,30451.5
 SceneGraph: 
   Name: root
     Components: 
@@ -15,89 +15,76 @@ SceneGraph:
         Position: 0,45,0
         Rotation: 0,9.72351e-06,0,1
         Scale: -13.99,0.01,0.01
-    Children: 6
+    Children: 5
+      Name: plane
+        Components: 
+          TransformComponent: 
+            Position: 0,0,0
+            Rotation: 0,9.72351e-06,0,1
+            Scale: 25,1,25
+          StaticMeshComponent: 
+            MeshPath: c3315e03-1052-4825-98f7-a676beae0615
+            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+        Children: 0
       Name: directional_light
         Components: 
           TransformComponent: 
             Position: -5000,5000,0
-            Rotation: -2.57364e-08,6.24565e-08,0.38099,0.924579
+            Rotation: -2.18419e-08,6.39227e-08,0.323339,0.946283
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
-            Intensity: 1.99
+            Intensity: 0
             CastShadow: true
             ShadowArea: 8776.86
-            ShadowDistance: 8711.94
+            ShadowDistance: 10521.8
         Children: 0
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: -148,288,-46
-            Rotation: -0.238421,0.537295,0.161605,0.792687
+            Position: 170,83,-479
+            Rotation: 1.94707e-07,1,1.94707e-07,6.75513e-08
             Scale: 1,1,1
           LightComponent: 
-            Type: Spot
-            Color: 1,0.0784314,0.0784314
-            Intensity: 1.583
-            Radius: 853
-            Inner: 43.211
-            Outer: 50.723
-            CastShadow: true
+            Type: Point
+            Color: 1,1,1
+            Intensity: 0.374
+            Radius: 500
+            CastShadow: false
             ShadowArea: 0
             ShadowDistance: 0
         Children: 0
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: 316,365,7
-            Rotation: -0.0736317,0.0456274,-0.270685,0.958763
+            Position: 846,1355,-1411
+            Rotation: -0.00308869,0.148036,-0.120523,0.981606
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
             Color: 0.0395761,0.518758,0.897059
             Intensity: 1
-            Radius: 1409
-            Inner: 42.293
+            Radius: 2868
+            Inner: 28.55
             Outer: 60
-            CastShadow: true
-            ShadowArea: 5639.89
-            ShadowDistance: 27247.6
+            CastShadow: false
+            ShadowArea: 0
+            ShadowDistance: 0
         Children: 0
       Name: camera0
         Components: 
           TransformComponent: 
-            Position: 620,787,-3029
-            Rotation: 0,-0.0921968,0,0.995741
+            Position: -646,555,0
+            Rotation: -3.26985e-08,0.786072,-3.26985e-08,0.618135
             Scale: 1,1,1
           CameraComponent: 8
             Type: kPerspective
-            Position: 620,787,-3029
-            Rotation: 0,-0.0921968,0
-            Near: 176
-            Aspect: 1.303
-            Far: 4930
-            Size: 647.668
-            FovH: 59.69
-        Children: 0
-      Name: role
-        Components: 
-          TransformComponent: 
-            Position: 2,0,0
-            Rotation: -0.43261,-0.559329,-0.559327,0.432612
-            Scale: 1,1,1
-          StaticMeshComponent: 
-            MeshPath: NewScene/role.fbx_Path
-            MaterialPath0: b165a501-5eaa-4e5e-a3c6-3271ea1d9352
-            MaterialPath1: 171e4e1b-a8f2-4436-b024-ff5bc128c200
-        Children: 0
-      Name: plane
-        Components: 
-          TransformComponent: 
-            Position: 0,-19,0
-            Rotation: 0,6.75513e-08,0,1
-            Scale: 10,1,10
-          StaticMeshComponent: 
-            MeshPath: plane
-            MaterialPath0: 21ed1f88-ac3b-404c-a296-b16784617df7
+            Position: -646,555,0
+            Rotation: -3.2698477e-08,0.78607184,-3.2698477e-08
+            Near: 233
+            Aspect: 1.78
+            Far: 1000
+            Size: 0
+            FovH: 60
         Children: 0

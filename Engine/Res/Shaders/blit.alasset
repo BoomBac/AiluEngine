@@ -1,0 +1,6 @@
+guid: b3df3b8f-0bd8-4cbf-9510-e063fc6eb49f
+type: kShader
+name: blit
+  file: Shaders/hlsl/blit.hlsl
+  vs_entry: VSMain
+  ps_entry: PSMain

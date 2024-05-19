@@ -169,6 +169,7 @@ using Ptr = void*;
 
 using String = std::string;
 using WString = std::wstring;
+static const WString EmptyWString = L"";
 
 template<typename T>
 using Vector = std::vector<T>;

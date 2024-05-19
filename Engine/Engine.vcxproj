@@ -517,7 +517,6 @@
     <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h" />
-    <ClInclude Include="Inc\Framework\Interface\IAssetable.h" />
     <ClInclude Include="Inc\Framework\Interface\IParser.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />

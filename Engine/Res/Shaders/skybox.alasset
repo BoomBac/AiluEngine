@@ -1,0 +1,6 @@
+guid: b165a501-5eaa-4e5e-a3c6-3271ea1d9352
+type: kShader
+name: skybox
+  file: Shaders/hlsl/skybox.hlsl
+  vs_entry: VSMain
+  ps_entry: PSMain

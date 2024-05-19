@@ -9,13 +9,10 @@ namespace Ailu
     {
     }
 
-    Asset::Asset(Guid guid, EAssetType::EAssetType type, const WString& asset_path) :
-    _instance_id(s_instance_num++), _guid(guid), _asset_type(type), _p_inst_asset(nullptr)
+    Asset::Asset(Guid guid, EAssetType::EAssetType type, const WString& asset_path) : _guid(guid), _asset_type(type), _p_obj(nullptr)
     {
         _asset_path = asset_path;
-        _sys_path = PathUtils::GetResSysPath(_asset_path);
-        _full_name = PathUtils::GetFileName(_asset_path,true);
-        _name = _full_name.substr(0, _full_name.find_last_of('.'));
+        _name = PathUtils::GetFileName(_asset_path,true);
     }
 
     void Asset::AssignGuid(const Guid& guid)

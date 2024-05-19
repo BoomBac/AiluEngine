@@ -42,9 +42,9 @@ namespace Ailu
 		float3  _LightDir;
 		float	  _Rdius;
 		float3  _LightPos;
-		float	  _InnerAngle;
+		float	 _LightAngleScale;
 		float3  _LightColor;
-		float   _OuterAngle;
+		float   _LightAngleOffset;
 		int _ShadowDataIndex;
 		float _ShadowDistance;
 		float2 _padding0;
@@ -102,7 +102,8 @@ namespace Ailu
 		float    _Specular;
 		// low_bit: metallic|roughness|emssive|normal|albedo
 		u32 _SamplerMask;
-		float padding2[53]; // Padding so the constant buffer is 256-byte aligned.
+		u32 _MaterialID;
+		float padding2[52]; // Padding so the constant buffer is 256-byte aligned.
 	};
 	static_assert((sizeof(ScenePerObjectData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 	static_assert((sizeof(ScenePerFrameData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");

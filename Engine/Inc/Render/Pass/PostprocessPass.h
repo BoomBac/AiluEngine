@@ -17,8 +17,8 @@ namespace Ailu
 	private:
 		//Scope<RenderTexture> _p_tex_bloom_threshold;
 		Ref<Material> _p_bloom_thread_mat;
-		Ref<Material> _p_blit_mat;
-		Ref<Mesh> _p_quad_mesh;
+		Material* _p_blit_mat;
+		Mesh* _p_quad_mesh;
 		ConstantBuffer* _p_obj_cb;
 		Rect _bloom_thread_rect;
 	};

@@ -13,8 +13,7 @@
 #include "Framework/Common/ThreadPool.h"
 
 #include "Framework/Common/Reflect.h"
-#include "Framework/Interface/IAssetable.h"
-
+#include "Framework/Common/Asset.h"
 
 namespace Ailu
 {
@@ -134,7 +133,7 @@ namespace Ailu
 	//------------
 	class CommandBuffer;
 	using TextureHandle = size_t;
-	class Texture : public FrameResource,public IAssetable
+	class Texture : public FrameResource
 	{
 		DECLARE_PROTECTED_PROPERTY(mipmap_count,MipmapLevel,u16)
 		DECLARE_PROTECTED_PROPERTY(is_readble,Readble,bool)
@@ -146,6 +145,11 @@ namespace Ailu
 		DECLARE_PROTECTED_PROPERTY_RO(height, Height, u16)
 		DECLARE_PROTECTED_PROPERTY_RO(pixel_format, PixelFormat, EALGFormat::EALGFormat)
 	public:
+		inline static Texture* s_p_default_white = nullptr;
+		inline static Texture* s_p_default_black = nullptr;
+		inline static Texture* s_p_default_gray = nullptr;
+		inline static Texture* s_p_default_normal = nullptr;
+	public:
 		static u16 MaxMipmapCount(u16 w, u16 h);
 		Texture();
 		Texture(u16 width, u16 height);
@@ -155,10 +159,10 @@ namespace Ailu
 		virtual void CreateView() { _is_have_total_view = true; };
 		virtual void ReleaseView() { _is_have_total_view = false; };
 		virtual TextureHandle GetView(u16 mimmap,bool random_access = false,ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) { return 0; };
+		//slot传255的话，表示只设置一下描述符堆
 		virtual void Bind(CommandBuffer* cmd, u8 slot) {};
+		virtual void BindToCompute(CommandBuffer* cmd, u8 slot) {};
 		bool IsViewCreate() const { return _is_have_total_view; }
-		const Guid& GetGuid() const final;
-		void AttachToAsset(Asset* owner) final;
 		std::tuple<u16,u16> CurMipmapSize(u16 mipmap) const;
 		Asset* GetAsset() { return _p_asset; };
 	protected:
@@ -306,7 +310,8 @@ namespace Ailu
 		static Scope<RenderTexture> Create(u16 width, u16 height, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
 		static Scope<RenderTexture> Create(u16 width, u16 height, u16 array_slice, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
 		static Scope<RenderTexture> Create(u16 width,String name = "",ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
-		virtual void Bind(CommandBuffer* cmd, u8 slot) override;
+		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
+		virtual void BindToCompute(CommandBuffer* cmd, u8 slot) override {};
 		//return rtv handle
 		virtual TextureHandle ColorRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) { return 0; };
 		virtual TextureHandle DepthRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) { return 0; };
@@ -330,17 +335,22 @@ namespace Ailu
 		struct RTInfo
 		{
 			bool _is_available;
+			bool _is_temp;
 			u32 _id;
 			u64 _last_access_frame_count;
 			Scope<RenderTexture> _rt;
 			u64 _fence_value = 0;
 		};
 	public:
+		~RenderTexturePool();
 		using RTPool = std::unordered_multimap<RTHash, RTInfo, RTHash::HashFunc>;
 		u32 Add(RTHash hash, Scope<RenderTexture> rt);
 		std::optional<u32> GetByIDHash(RTHash hash);
 		void ReleaseRT(RTHandle handle);
 		void TryRelease();
+		//存储一个render texture的指针，只做访问使用，不维护其生命周期
+		void Register(RenderTexture* rt);
+		void UnRegister(u32 rt_id);
 		RenderTexture* Get(RTHandle handle)
 		{
 			if (_lut_pool.contains(handle._id))
@@ -351,117 +361,15 @@ namespace Ailu
 		u32 Size() const { return static_cast<u32>(_pool.size()); }
 		RTPool::iterator begin() { return _pool.begin(); }
 		RTPool::iterator end() { return _pool.end(); }
+		auto PersistentRTBegin() { return _persistent_rts.begin(); }
+		auto PersistentRTEnd() { return _persistent_rts.end(); }
 	private:
 		// 0->64 0~12=wdth,13~24=height,25~30= format
 		RTPool _pool;
 		Map<u32, RTPool::iterator> _lut_pool;
+		Map<u32, RenderTexture*> _persistent_rts;
 	};
 	extern RenderTexturePool* g_pRenderTexturePool;
-
-	class TexturePool
-	{
-	public: 
-		TexturePool()
-		{
-			u8* default_data = new u8[4 * 4 * 4];
-			memset(default_data, 255, 64);
-			auto default_white = Texture2D::Create(4, 4, false);
-			default_white->SetPixelData(default_data, 0);
-			default_white->Name("default_white");
-			default_white->Apply();
-			s_p_default_white = Add(L"Runtime/default_white", default_white).get();
-
-			memset(default_data, 0, 64);
-			for (int i = 3; i < 64; i += 4)
-				default_data[i] = 255;
-			auto default_black = Texture2D::Create(4, 4, false);
-			default_black->SetPixelData(default_data, 0);
-			default_white->Name("default_black");
-			default_black->Apply();
-			s_p_default_black = Add(L"Runtime/default_black", default_black).get();
-
-			memset(default_data, 128, 64);
-			for (int i = 3; i < 64; i += 4)
-				default_data[i] = 255;
-			auto default_gray = Texture2D::Create(4, 4, false);
-			default_gray->SetPixelData(default_data, 0);
-			default_white->Name("default_gray");
-			default_gray->Apply();
-			s_p_default_gray = Add(L"Runtime/default_gray", default_gray).get();
-
-			memset(default_data, 255, 64);
-			for (int i = 0; i < 64; i += 4)
-			{
-				default_data[i] = 128;
-				default_data[i+1] = 128;
-			}
-			auto default_normal = Texture2D::Create(4, 4, false);
-			default_normal->SetPixelData(default_data, 0);
-			default_white->Name("default_normal");
-			default_normal->Apply();
-			s_p_default_normal = Add(L"Runtime/default_normal", default_normal).get();
-			DESTORY_PTRARR(default_data);
-		};
-		Ref<Texture> Add(const WString& name_id, Ref<Texture> tex,bool overwrite = false)
-		{
-			//if (overwrite)
-			//{		
-			//	auto it = _pool.emplace(std::make_pair(name_id, tex)).first;
-			//	_lut_pool[tex->ID()] = it;
-			//}
-			//else
-			//	_pool[name_id] = tex;
-			_pool[name_id] = tex;
-			_lut_pool[tex->ID()] = _pool.find(name_id);
-			return _pool[name_id];
-		}
-		Ref<Texture> Get(const WString& name_id)
-		{
-			auto it = _pool.find(name_id);
-			if (it != _pool.end())
-				return it->second;
-			return nullptr;
-		}
-		Ref<Texture> Get(u64 id)
-		{
-			if (_lut_pool.contains(id))
-				return _lut_pool[id]->second;
-			return nullptr;
-		}
-
-		bool Contain(const WString& name_id)
-		{
-			return _pool.contains(name_id);
-		}
-
-		void Destory(const WString& name_id)
-		{
-			_pool.erase(name_id);
-		}
-
-		bool Rename(const WString& old_name, const WString& new_name)
-		{
-			AL_ASSERT(!Contain(old_name) || Contain(new_name));
-			auto exist_tex = _pool[old_name];
-			_pool.erase(old_name);
-			_pool[new_name] = exist_tex;
-			_lut_pool[exist_tex->ID()] = _pool.find(new_name);
-			return true;
-		}
-		Map<WString, Ref<Texture>>::iterator begin() { return _pool.begin(); }
-		Map<WString, Ref<Texture>>::iterator end() { return _pool.end(); }
-
-		u64 Size() const { return _pool.size(); }
-		static inline Texture* s_p_default_white; 
-		static inline Texture* s_p_default_black;
-		static inline Texture* s_p_default_gray;
-		static inline Texture* s_p_default_normal;
-	private:
-		using TexturePoolContainer = Map<WString, Ref<Texture>>;
-		TexturePoolContainer _pool;
-		std::unordered_map<u64, TexturePoolContainer::iterator> _lut_pool;
-	};
-	extern TexturePool* g_pTexturePool;
 }
 
 #endif // !TEXTURE_H__

@@ -8,6 +8,15 @@ SamplerState g_LinearBorderSampler : register(s2);
 SamplerComparisonState g_ShadowSampler : register(s3);
 
 
+float Pow2(float x)
+{
+	return x*x;
+}
+float Pow4(float x)
+{
+	return x*x*x*x;
+}
+
 float4 TransformToClipSpace(float3 object_pos)
 {
 	float4x4 mvp = mul(_MatrixVP, _MatrixWorld);

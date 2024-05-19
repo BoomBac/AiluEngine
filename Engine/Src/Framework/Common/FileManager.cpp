@@ -4,7 +4,6 @@
 
 namespace Ailu
 {
-
 	void FileManager::CreateDirectory(const WString& dir_name)
 	{
 		fs::create_directories(dir_name);
@@ -40,6 +39,7 @@ namespace Ailu
 	{
 		return fs::exists(path);
 	}
+
 	void FileManager::BackToParent()
 	{
 		s_cur_path = s_cur_path.parent_path();
@@ -63,5 +63,97 @@ namespace Ailu
 			PathUtils::FormatFilePathInPlace(s_cur_path_str);
 		}
 		s_cur_dir_str += L"/";
+	}
+
+	bool FileManager::CreateFile(const WString& sys_path, bool override)
+	{
+		fs::path p(sys_path);
+		if (fs::exists(p) && !override)
+		{
+			g_pLogMgr->LogWarningFormat(L"CreateFile: File {} already exist!", sys_path);
+			return false;
+		}
+		std::wofstream out_file(sys_path);
+		AL_ASSERT(!out_file.is_open());
+		out_file.close();
+		return true;
+	}
+	bool FileManager::WriteFile(const WString& sys_path, bool append, const WString& data)
+	{
+		fs::path p(sys_path);
+		if (!fs::exists(p))
+		{
+			g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist!", sys_path);
+			return false;
+		}
+		std::wofstream out_asset_file(sys_path, append? std::ios::app : std::ios::trunc);
+		if (!out_asset_file.is_open()) {
+			if (out_asset_file.fail()) {
+				std::cerr << "Failed to open file: Format error or file doesn't exist" << std::endl;
+			}
+			else if (out_asset_file.bad()) {
+				std::cerr << "Failed to open file: Unrecoverable error occurred" << std::endl;
+			}
+			else {
+				std::cerr << "Failed to open file: Unknown reason" << std::endl;
+			}
+		}
+		out_asset_file << data;
+		out_asset_file.close();
+		return true;
+	}
+	bool FileManager::WriteFile(const WString& sys_path, bool append, const u8* data, u64 data_size)
+	{
+		fs::path p(sys_path);
+		if (!fs::exists(p))
+		{
+			g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist!", sys_path);
+			return false;
+		}
+		auto flag = std::ios::trunc | std::ios::binary;
+		std::ofstream out_asset_file(sys_path, append ? flag | std::ios::app : flag);
+		out_asset_file.write(reinterpret_cast<const char*>(data), data_size);
+		out_asset_file.close();
+		return true;
+	}
+	bool FileManager::ReadFile(const WString& sys_path, WString& data)
+	{
+		fs::path p(sys_path);
+		if (!fs::exists(p))
+		{
+			g_pLogMgr->LogWarningFormat(L"ReadFile: File {} not exist!", sys_path);
+			return false;
+		}
+		std::wifstream in_file(sys_path,std::ios::in);
+		AL_ASSERT(!in_file.is_open());
+		WString line;
+		while (std::getline(in_file,line))
+		{
+			data += line;
+			data += L"\n";
+		}
+		in_file.close();
+		return true;
+	}
+	bool FileManager::ReadFile(const WString& sys_path, u8* data, u64 data_start, u64 data_size)
+	{
+		fs::path p(sys_path);
+		if (!fs::exists(p))
+		{
+			g_pLogMgr->LogWarningFormat(L"ReadFile: File {} not exist!", sys_path);
+			return false;
+		}
+		std::ifstream in_file(sys_path, std::ios::binary);
+		AL_ASSERT(!in_file.is_open());
+		in_file.seekg(data_start, std::ios::beg);
+		in_file.read(reinterpret_cast<char*>(data), data_size);
+		if (in_file.fail()) 
+		{
+			g_pLogMgr->LogErrorFormat(L"Failed to read file {} at position {}!", sys_path, data_start);
+			in_file.close();
+			return false;
+		}
+		in_file.close();
+		return true;
 	}
 }

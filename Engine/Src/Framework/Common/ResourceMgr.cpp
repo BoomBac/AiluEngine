@@ -11,8 +11,9 @@
 #include "Render/GraphicsContext.h"
 
 #include "RHI/DX12/D3DTexture.h"
-
 #include "Framework/Math/Random.h"
+#include "Render/GraphicsPipelineStateObject.h"
+
 
 namespace Ailu
 {
@@ -34,32 +35,94 @@ namespace Ailu
 
 	int ResourceMgr::Initialize()
 	{
-		auto skybox = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Hidden/Skybox");
-		skybox->IsInternal(false);
-		skybox->OriginPath("Hidden/Skybox");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/defered_standard_lit.hlsl"), "StandardLit");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/blit.hlsl"), "Hidden/Blit");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/cubemap_gen.hlsl"), "Hidden/CubemapGen");
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/filter_irradiance.hlsl"), "Hidden/EnvmapFilter");
-
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/unlit.hlsl"), "Hidden/Error")->SetVector("base_color", Vector4f(1.0f, 0.0f, 1.0, 1.0f));
-		MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/unlit.hlsl"), "Hidden/WaitCompile")->SetVector("base_color", Vector4f(0.0f, 0.0f, 0.5, 1.0f));
-
 		LoadAssetDB();
-		//auto tex0 = LoadTexture(EnginePath::kEngineTexturePath + "MyImage01.jpg", "default");
-		//TexturePool::Add(tex0->AssetPath(), tex0);
+		{
+			Shader::s_p_defered_standart_lit = Load<Shader>(L"Shaders/defered_standard_lit.alasset");
+			Load<Shader>(L"Shaders/deferred_lighting.alasset");
+			Load<Shader>(L"Shaders/wireframe.alasset");
+			Load<Shader>(L"Shaders/gizmo.alasset");
+			Load<Shader>(L"Shaders/depth_only.alasset");
+			Load<Shader>(L"Shaders/cubemap_gen.alasset");
+			Load<Shader>(L"Shaders/filter_irradiance.alasset");
+			Load<Shader>(L"Shaders/blit.alasset");
+			Load<Shader>(L"Shaders/skybox.alasset");
+			Load<Shader>(L"Shaders/bloom.alasset");
+			GraphicsPipelineStateMgr::BuildPSOCache();
+			Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
+		}
+		{
+			u8* default_data = new u8[4 * 4 * 4];
+			memset(default_data, 255, 64);
+			auto default_white = Texture2D::Create(4, 4, false);
+			default_white->SetPixelData(default_data, 0);
+			default_white->Name("default_white");
+			default_white->Apply();
+			_lut_global_texture2d[default_white->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/default_white", default_white)).first;
+			
+			memset(default_data, 0, 64);
+			for (int i = 3; i < 64; i += 4)
+				default_data[i] = 255;
+			auto default_black = Texture2D::Create(4, 4, false);
+			default_black->SetPixelData(default_data, 0);
+			default_black->Name("default_black");
+			default_black->Apply();
+			_lut_global_texture2d[default_black->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/default_black", default_black)).first;
+			memset(default_data, 128, 64);
+			for (int i = 3; i < 64; i += 4)
+				default_data[i] = 255;
+			auto default_gray = Texture2D::Create(4, 4, false);
+			default_gray->SetPixelData(default_data, 0);
+			default_gray->Name("default_gray");
+			default_gray->Apply();
+			_lut_global_texture2d[default_gray->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/default_gray", default_gray)).first;
+			memset(default_data, 255, 64);
+			for (int i = 0; i < 64; i += 4)
+			{
+				default_data[i] = 128;
+				default_data[i + 1] = 128;
+			}
+			auto default_normal = Texture2D::Create(4, 4, false);
+			default_normal->SetPixelData(default_data, 0);
+			default_normal->Name("default_normal");
+			default_normal->Apply();
+			_lut_global_texture2d[default_normal->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/default_normal", default_normal)).first;
+			DESTORY_PTRARR(default_data);
+			Texture::s_p_default_white = default_white.get();
+			Texture::s_p_default_black = default_black.get();
+			Texture::s_p_default_gray = default_gray.get();
+			Texture::s_p_default_normal = default_normal.get();
+			TextureImportSetting setting;
+			setting._is_copy = false;
+			setting._generate_mipmap = false;
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"folder.alasset", &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"file.alasset"  , &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset"    , &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset", &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset" , &setting);
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"scene.alasset" , &setting);
+			Load<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset", &setting);
+			Load<Texture2D>(EnginePath::kEngineTexturePathW + L"small_cave_1k.alasset", &setting);
+		}
+		{
+			Load<Material>(L"Materials/StandardPBR.alasset");
+			auto runtime_mat = MakeRef<Material>(Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
+			_lut_global_materials[runtime_mat->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/Skybox", runtime_mat)).first;
+			runtime_mat = MakeRef<Material>(Get<Shader>(L"Shaders/cubemap_gen.alasset"), "CubemapGen");
+			_lut_global_materials[runtime_mat->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/CubemapGen", runtime_mat)).first;
+			runtime_mat = MakeRef<Material>(Get<Shader>(L"Shaders/filter_irradiance.alasset"), "EnvmapFilter");
+			_lut_global_materials[runtime_mat->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/EnvmapFilter", runtime_mat)).first;
+			runtime_mat = MakeRef<Material>(Get<Shader>(L"Shaders/blit.alasset"), "Blit");
+			_lut_global_materials[runtime_mat->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Material/Blit", runtime_mat)).first;
+		}
 
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"folder.png"), ImportSetting("Editor/folder", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"file.png"), ImportSetting("Editor/file_us", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"3d.png"), ImportSetting("Editor/3d", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"shader.png"), ImportSetting("Editor/shader", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"image.png"), ImportSetting("Editor/image", false));
-		ImportResource(PathUtils::GetResSysPath(EnginePath::kEngineIconPathW + L"scene.png"), ImportSetting("Editor/scene", false));
+		Load<Mesh>(L"Meshs/sphere.alasset");
+		Load<Mesh>(L"Meshs/plane.alasset");
+		Load<Mesh>(L"Meshs/cube.alasset");
+		Load<Mesh>(L"Meshs/monkey.alasset");
 
-		ImportResource(PathUtils::GetResSysPath(L"Meshs/sphere.fbx"), MeshImportSetting("sphere", false, false));
-		ImportResource(PathUtils::GetResSysPath(L"Meshs/plane.fbx"), MeshImportSetting("plane", false, false));
-		ImportResource(PathUtils::GetResSysPath(L"Meshs/cube.fbx"), MeshImportSetting("cube", false, false));
-		ImportResource(PathUtils::GetResSysPath(L"Meshs/monkey.fbx"), MeshImportSetting("monkey", false, false));
+		Mesh::s_p_cube = static_cast<Mesh*>(_global_resources[L"Meshs/cube.alasset"].get());
+		Mesh::s_p_shpere = static_cast<Mesh*>(_global_resources[L"Meshs/sphere.alasset"].get());
+		Mesh::s_p_plane = static_cast<Mesh*>(_global_resources[L"Meshs/plane.alasset"].get());
 
 		auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
 		Vector3f* vertices = new Vector3f[4]{ { -1.0f, 1.0f, 0.0f },
@@ -73,16 +136,17 @@ namespace Ailu
 		FullScreenQuad->AddSubmesh(indices, 6);
 		FullScreenQuad->SetUVs(uv0, 0);
 		FullScreenQuad->BuildRHIResource();
-		MeshPool::AddMesh("FullScreenQuad", FullScreenQuad);
-
+		_lut_global_meshs[FullScreenQuad->ID()] = _global_resources.emplace(std::make_pair(L"Runtime/Mesh/FullScreenQuad", FullScreenQuad)).first;
+		Mesh::s_p_quad = FullScreenQuad.get();
 		g_pThreadTool->Enqueue(&ResourceMgr::WatchDirectory, this);
 		return 0;
 	}
 	void ResourceMgr::Finalize()
 	{
-		for (auto& [guid, asset] : s_asset_db)
+		_is_watching_directory = false;
+		for (auto& [guid, asset] : _asset_db)
 		{
-			SaveAsset(asset);
+			SaveAsset(asset.get());
 		}
 		SaveAssetDB();
 	}
@@ -101,72 +165,316 @@ namespace Ailu
 		return nullptr;
 	}
 
-	void ResourceMgr::SaveAsset(const WString& sys_path, Material* mat)
-	{
-		using std::endl;
-		WString asset_path = PathUtils::ExtractAssetPath(sys_path);
-		std::ofstream out_mat(sys_path, std::ios::out | std::ios::trunc);
-		if (out_mat.is_open())
-		{
-			auto asset = new Asset(Guid::Generate(), EAssetType::kMaterial, asset_path);
-			while (ExistInAssetDB(asset))
-			{
-				asset->AssignGuid(Guid::Generate());
-			}
-			out_mat << "guid: " << asset->GetGuid().ToString() << endl;
-			out_mat << "type: " << EAssetType::ToString(asset->_asset_type) << endl;
-			out_mat << "name: " << mat->Name() << endl;
-			out_mat.close();
-			SaveMaterialImpl(asset_path, mat);
-			mat->AttachToAsset(asset);
-			AddToAssetDB(asset);
-		}
-		else
-		{
-			LOG_WARNING(L"Save material to {} failed", sys_path);
-		}
-	}
-
 	void ResourceMgr::SaveAsset(const Asset* asset)
 	{
-		if (asset->_p_inst_asset == nullptr)
+		using std::endl;
+		if (asset->_p_obj == nullptr)
 		{
-			LOG_WARNING("Asset: {} save failed!it hasn't a instanced asset!");
+			g_pLogMgr->LogWarningFormat(L"SaveAsset: Asset: {} save failed!it hasn't a instanced object!",asset->_name);
 			return;
 		}
+		AL_ASSERT(asset->_asset_path.empty());
+		//写入公共头
+		auto sys_path = PathUtils::GetResSysPath(asset->_asset_path);
+		std::wofstream out_asset_file(sys_path, std::ios::out | std::ios::trunc);
+		AL_ASSERT(!out_asset_file.is_open());
+		out_asset_file << "guid: " << ToWChar(asset->GetGuid().ToString()) << endl;
+		out_asset_file << "type: " << EAssetType::ToString(asset->_asset_type) << endl;
+		out_asset_file << "name: " << ToWChar(asset->_p_obj->Name()) << endl;
+		out_asset_file.close();
+
 		switch (asset->_asset_type)
 		{
 		case Ailu::EAssetType::kMesh:
-			break;
+		{
+			SaveMesh(sys_path, asset);
+		}
+		return;
+		case Ailu::EAssetType::kShader:
+		{
+			SaveShader(sys_path, asset);
+		}
+		return;
+		case Ailu::EAssetType::kComputeShader:
+		{
+			SaveComputeShader(sys_path, asset);
+		}
+		return;
 		case Ailu::EAssetType::kMaterial:
 		{
-			using std::endl;
-			std::wofstream out_mat(asset->_sys_path, std::ios::out | std::ios::trunc);
-			if (out_mat.is_open())
-			{
-				out_mat << "guid: " << ToWChar(asset->GetGuid().ToString()) << endl;
-				out_mat << "type: " << EAssetType::ToString(EAssetType::kMaterial) << endl;
-				auto mat = dynamic_cast<Material*>(asset->_p_inst_asset);
-				out_mat << "name: " << ToWChar(mat->Name()) << endl;
-				out_mat.close();
-				SaveMaterialImpl(asset->_sys_path, mat);
-			}
-			else
-			{
-				LOG_WARNING(L"Save material to {} failed", asset->_sys_path);
-			}
+			SaveMaterial(sys_path, asset->As<Material>());
 		}
-		break;
+		return;
 		case Ailu::EAssetType::kTexture2D:
-			break;
+		{
+			SaveTexture2D(sys_path, asset);
+		}
+		return;
+		}
+		AL_ASSERT(true);
+	}
+
+	void ResourceMgr::SaveAllUnsavedAssets()
+	{
+		while (!s_pending_save_assets.empty())
+		{
+			SaveAsset(s_pending_save_assets.front());
+			s_pending_save_assets.pop();
 		}
 	}
 
-	Ref<Material> ResourceMgr::LoadMaterialImpl(const WString& asset_path)
+	Asset* ResourceMgr::GetLinkedAsset(Object* obj)
 	{
-		String asset_path_n = ToChar(asset_path);
-		if (MaterialLibrary::Contain(asset_path_n))
-			return MaterialLibrary::GetMaterial(asset_path_n);
+		if(_object_to_asset.contains(obj->ID()))
+			return _object_to_asset[obj->ID()];
+		return nullptr;
+	}
+
+	WString ResourceMgr::GetObjectSysPath(Object* obj)
+	{
+		if (s_object_sys_path_map.contains(obj->ID()))
+			return s_object_sys_path_map[obj->ID()];
+		return L"";
+	}
+
+	void ResourceMgr::SetObjectSysPath(Object* obj, const WString& new_sys_path)
+	{
+		s_object_sys_path_map[obj->ID()] = new_sys_path;
+	}
+
+	Ref<Shader> ResourceMgr::LoadExternalShader(const WString& asset_path, const ImportSetting* setting)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		auto s_setting = dynamic_cast<const ShaderImportSetting*>(setting);
+		if (setting)
+		{
+			return Shader::Create(sys_path, s_setting->_vs_entry,s_setting->_ps_entry);
+		}
+		return Shader::Create(sys_path);
+	}
+
+	Ref<ComputeShader> ResourceMgr::LoadExternalComputeShader(const WString& asset_path, const ImportSetting* setting)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		auto s_setting = dynamic_cast<const ShaderImportSetting*>(setting);
+		if (setting)
+		{
+			return ComputeShader::Create(sys_path);
+		}
+		return ComputeShader::Create(sys_path);
+	}
+
+	void ResourceMgr::SaveShader(const WString& asset_path, const Asset* asset)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		if (FileManager::Exist(sys_path))
+		{
+			auto shader = asset->As<Shader>();
+			auto [vs, ps] = shader->GetShaderEntry();
+			std::wstringstream wss;
+			WString indent = L"  ";
+			wss << indent << L"file: " << asset->_external_asset_path << std::endl;
+			wss << indent << L"vs_entry: " << ToWStr(vs.c_str()) << std::endl;
+			wss << indent << L"ps_entry: " << ToWStr(ps.c_str()) << std::endl;
+			if (FileManager::WriteFile(sys_path, true, wss.str()))
+			{
+				return;
+			}
+		}
+		g_pLogMgr->LogErrorFormat(L"Save shader to {} failed!", sys_path);
+	}
+
+	void ResourceMgr::SaveComputeShader(const WString& asset_path, const Asset* asset)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		if (FileManager::Exist(sys_path))
+		{
+			auto cs = asset->As<ComputeShader>();
+			String kernel = cs->KernelName();
+			std::wstringstream wss;
+			WString indent = L"  ";
+			wss << indent << L"file: " << asset->_external_asset_path << std::endl;
+			wss << indent << L"kernel: " << ToWStr(kernel.c_str()) << std::endl;
+			if (FileManager::WriteFile(sys_path, true, wss.str()))
+			{
+				return;
+			}
+		}
+		g_pLogMgr->LogErrorFormat(L"Save compute shader to {} failed!", sys_path);
+	}
+
+	Asset* ResourceMgr::LoadShader(const WString& asset_path)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		WString data;
+		Ref<Shader>	shader;
+		if (FileManager::ReadFile(sys_path, data))
+		{
+			auto c = StringUtils::Split(data,L"\n");
+			WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+			WString vs_entry = c[4].substr(c[4].find_first_of(L":") + 2);
+			WString ps_entry = c[5].substr(c[5].find_first_of(L":") + 2);
+			ShaderImportSetting setting;
+			setting._vs_entry = ToChar(vs_entry);
+			setting._ps_entry = ToChar(ps_entry);
+			Asset* asset = new Asset();
+			asset->_asset_path = asset_path;
+			asset->_asset_type = EAssetType::kShader;
+			asset->_external_asset_path = file;
+			asset->_p_obj = LoadExternalShader(file, &setting);
+			return asset;
+		}
+		return nullptr;
+	}
+
+	void ResourceMgr::SaveMaterial(const WString& asset_path, Material* mat)
+	{
+		using std::endl;
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		std::multimap<std::string, SerializableProperty*> props{};
+		//为了写入通用资产头信息，暂时使用追加方式打开
+		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
+		out_mat << "shader_guid: " << GetAssetGuid(mat->_p_shader).ToString();
+		for (auto& prop : mat->_properties)
+		{
+			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
+		}
+		out_mat << endl;
+		auto float_props = mat->GetAllFloatValue();
+		auto vector_props = mat->GetAllVectorValue();
+		auto uint_props = mat->GetAllUintValue();
+		//auto tex_props = mat->GetAllTexture();
+		out_mat << "  prop_type: " << "Uint" << endl;
+		for (auto& [name, value] : uint_props)
+		{
+			out_mat << "    " << name << ": " << value << endl;
+		}
+		out_mat << "  prop_type: " << "Float" << endl;
+		for (auto& [name, value] : float_props)
+		{
+			out_mat << "    " << name << ": " << value << endl;
+		}
+		out_mat << "  prop_type: " << "Vector" << endl;
+		for (auto& [name, value] : vector_props)
+		{
+			out_mat << "    " << name << ": " << value << endl;
+		}
+		out_mat << "  prop_type: " << "Texture2D" << endl;
+		for (auto& [prop_name, prop] : props)
+		{
+			if (prop->_type == ESerializablePropertyType::kTexture2D)
+			{
+				auto tex_opti = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture*>>(*prop);
+				Guid tex_guid;
+				if (tex_opti.has_value() && std::get<1>(tex_opti.value()))
+				{
+					auto [bind_slot, tex] = tex_opti.value();
+					if (tex->GetAsset())
+						tex_guid = tex->GetAsset()->GetGuid();
+				}
+				else
+					tex_guid = Guid::EmptyGuid();
+				out_mat << "    " << prop->_value_name << ": " << tex_guid.ToString() << endl;
+			}
+		}
+		out_mat.close();
+		LOG_WARNING(L"Save material to {}", sys_path);
+	}
+
+	void ResourceMgr::SaveMesh(const WString& asset_path, const Asset* asset)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		if (FileManager::Exist(sys_path))
+		{
+			std::wstringstream wss;
+			wss << L"file: " << asset->_external_asset_path << std::endl;
+			wss << L"inner_file_name: " << ToWStr(asset->_p_obj->Name().c_str()) << std::endl;
+			if (FileManager::WriteFile(sys_path, true, wss.str()))
+			{
+				return;
+			}
+		}
+		g_pLogMgr->LogErrorFormat(L"Save mesh to {} failed!", sys_path);
+	}
+
+	void ResourceMgr::SaveTexture2D(const WString& asset_path, const Asset* asset)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		if (FileManager::Exist(sys_path))
+		{
+			std::wstringstream wss;
+			WString indent = L"  ";
+			wss << indent << L"file: " << asset->_external_asset_path << std::endl;
+			if (FileManager::WriteFile(sys_path, true, wss.str()))
+			{
+				return;
+			}
+		}
+		g_pLogMgr->LogErrorFormat(L"Save texture2d to {} failed!", sys_path);
+	}
+
+	List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString& asset_path)
+	{
+		static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		auto mesh_list = parser->Parser(sys_path);
+		auto& imported_mat_infos = parser->GetImportedMaterialInfos();
+		for (auto& mesh : mesh_list)
+		{
+			for (auto it = imported_mat_infos.begin(); it != imported_mat_infos.end(); ++it)
+			{
+				mesh->AddCacheMaterial(*it);
+			}
+			g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
+		}
+		return mesh_list;
+	}
+
+	Ref<Texture2D> ResourceMgr::LoadExternalTexture(const WString& asset_path, const ImportSetting* setting)
+	{
+		auto image_import_setting = dynamic_cast<const TextureImportSetting*>(setting);
+		image_import_setting = image_import_setting ? image_import_setting : &TextureImportSetting::Default();
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		String ext = fs::path(ToChar(asset_path.c_str())).extension().string();
+		Scope<ITextureParser> tex_parser = nullptr;
+		if (kLDRImageExt.contains(ext))
+		{
+			tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG));
+		}
+		else if (kHDRImageExt.contains(ext))
+		{
+			tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kHDR));
+		}
+		else {};
+		AL_ASSERT(tex_parser == nullptr);
+		g_pLogMgr->LogFormat(L"Start load image file {}...", sys_path);
+		auto tex = tex_parser->Parser(sys_path);
+		g_pGfxContext->SubmitRHIResourceBuildTask([=]() {tex->Apply(); });
+		return tex;
+	}
+
+	Asset* ResourceMgr::LoadTexture(const WString& asset_path, const ImportSetting* setting)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		WString data;
+		Ref<Texture2D>	shader;
+		if (FileManager::ReadFile(sys_path, data))
+		{
+			auto c = StringUtils::Split(data, L"\n");
+			WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+			auto tex = LoadExternalTexture(file);
+			Asset* asset = new Asset();
+			asset->_asset_path = asset_path;
+			asset->_asset_type = EAssetType::kTexture2D;
+			asset->_external_asset_path = file;
+			asset->_p_obj = tex;
+			return asset;
+		}
+		return nullptr;
+	}
+
+	Asset* ResourceMgr::LoadMaterial(const WString& asset_path)
+	{
 		WString sys_path = PathUtils::GetResSysPath(asset_path);
 		std::ifstream file(sys_path);
 		if (!file.is_open())
@@ -184,12 +492,12 @@ namespace Ailu
 		}
 		file.close();
 		AL_ASSERT_MSG(line_count <= 3, "material file error");
-		String key{}, guid_str{}, type_str{}, name{}, shader_path{};
+		String key{}, guid_str{}, type_str{}, name{}, shader_guid{};
 		FormatLine(lines[0], key, guid_str);
 		FormatLine(lines[1], key, type_str);
 		FormatLine(lines[2], key, name);
-		FormatLine(lines[3], key, shader_path);
-		auto mat = MakeRef<Material>(ShaderLibrary::Load(shader_path), name);
+		FormatLine(lines[3], key, shader_guid);
+		auto mat = MakeRef<Material>(Get<Shader>(Guid(shader_guid)) ,name);
 		std::string cur_type{ " " };
 		std::string prop_type{ "prop_type" };
 		for (int i = 4; i < lines.size(); ++i)
@@ -225,13 +533,10 @@ namespace Ailu
 			else if (cur_type == ShaderPropertyType::Texture2D)
 			{
 				if (v.empty() || v == "null guid") continue;
-				auto asset_path = GetAssetPath(Guid(v));
+				auto asset_path = g_pResourceMgr->GuidToAssetPath(Guid(v));
 				if (!asset_path.empty())
 				{
-					auto tex = g_pResourceMgr->LoadTexture(asset_path);
-					mat->SetTexture(k, g_pTexturePool->Add(asset_path, tex).get());
-					auto exist_asset = GetAsset(asset_path);
-					tex->AttachToAsset(exist_asset);
+					mat->SetTexture(k,Load<Texture2D>(asset_path));
 				}
 				else
 				{
@@ -239,36 +544,160 @@ namespace Ailu
 				}
 			}
 		}
-		mat->OriginPath(asset_path_n);
-		MaterialLibrary::AddMaterial(mat, asset_path_n);
-		Asset* asset = new Asset(Guid(guid_str), EAssetType::kMaterial, asset_path);
-		mat->AttachToAsset(asset);
-		AddToAssetDB(asset);
-		return mat;
+		Asset* asset = new Asset();
+		asset->_asset_path = asset_path;
+		asset->_asset_type = EAssetType::kMaterial;
+		asset->_p_obj = mat;
+		return asset;
+	}
+
+	Asset* ResourceMgr::LoadMesh(const WString& asset_path, const ImportSetting* setting)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		WString data;
+		Ref<Mesh> mesh;
+		if (FileManager::ReadFile(sys_path, data))
+		{
+			auto c = StringUtils::Split(data, L"\n");
+			WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+			String innear_file_name = ToChar(c[4].substr(c[4].find_first_of(L":") + 2));
+			auto mesh_list = std::move(LoadExternalMesh(file));
+			for(auto it = mesh_list.begin(); it != mesh_list.end(); ++it)
+			{
+				if (it->get()->Name() == innear_file_name)
+				{
+					Asset* asset = new Asset();
+					asset->_asset_path = asset_path;
+					asset->_asset_type = EAssetType::kMesh;
+					asset->_external_asset_path = file;
+					asset->_p_obj = *it;
+					return asset;
+				}
+			}
+		}
+		return nullptr;
+	}
+
+	Asset* ResourceMgr::LoadComputeShader(const WString& asset_path)
+	{
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		WString data;
+		Ref<ComputeShader> cs;
+		if (FileManager::ReadFile(sys_path, data))
+		{
+			auto c = StringUtils::Split(data, L"\n");
+			WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+			String kernel = ToChar(c[4].substr(c[4].find_first_of(L":") + 2));
+			Asset* asset = new Asset();
+			asset->_asset_path = asset_path;
+			asset->_asset_type = EAssetType::kComputeShader;
+			asset->_external_asset_path = file;
+			asset->_p_obj = LoadExternalComputeShader(file);
+			return asset;
+		}
+		return nullptr;
+	}
+
+
+	Asset* ResourceMgr::CreateAsset(const WString& asset_path, Ref<Object> obj, bool overwrite)
+	{
+		bool is_already_exist = _asset_looktable.contains(asset_path);
+		if(is_already_exist && !overwrite)
+		{
+			g_pLogMgr->LogWarningFormat(L"CreateAsset: Asset: {} already exist!", asset_path);
+			return nullptr;
+		}
+		Guid new_guid = Guid::Generate();
+		Asset* new_asset = nullptr;;
+		while (_asset_db.contains(new_guid))
+		{
+			new_guid = Guid::Generate();
+		}
+		if (dynamic_cast<Material*>(obj.get()))
+		{
+			new_asset = new Asset(new_guid, EAssetType::kMaterial, asset_path);
+		}
+		else if (dynamic_cast<Texture2D*>(obj.get()))
+		{
+			new_asset = new Asset(new_guid, EAssetType::kTexture2D, asset_path);
+		}
+		else if (dynamic_cast<Mesh*>(obj.get()))
+		{
+			new_asset = new Asset(new_guid, EAssetType::kMesh, asset_path);
+			new_asset->_addi_info = std::format(L"_{}", ToWStr(obj->Name().c_str()));
+		}
+		else if (dynamic_cast<Shader*>(obj.get()))
+		{
+			Shader* shader = dynamic_cast<Shader*>(obj.get());
+			auto[vs,ps] = shader->GetShaderEntry();
+			new_asset = new Asset(new_guid, EAssetType::kShader, asset_path);
+			new_asset->_addi_info = std::format(L"_{}_{}", ToWStr(vs.c_str()), ToWStr(ps.c_str()));
+		}
+		AL_ASSERT(new_asset == nullptr);
+		AddToAssetDB(new_asset);
+		new_asset->_p_obj = std::shared_ptr<Object>(obj);
+		s_pending_save_assets.emplace(_asset_db[new_guid].get());
+		return new_asset;
+	}
+
+	void ResourceMgr::AttachToAsset(Asset* asset, Ref<Object> obj)
+	{
+		if(obj != asset->_p_obj)
+			asset->_p_obj.swap(obj);
+		_object_to_asset[asset->_p_obj->ID()] = asset;
+	}
+
+	void ResourceMgr::DeleteAsset(Asset* asset)
+	{
+		if (ExistInAssetDB(asset))
+		{
+			Release(asset->_asset_path);
+			RemoveFromAssetDB(asset);
+		}
 	}
 
 	bool ResourceMgr::ExistInAssetDB(const Asset* asset)
 	{
-		return s_asset_db.contains(asset->GetGuid());
+		return _asset_db.contains(asset->GetGuid());
 	}
 
 	bool ResourceMgr::ExistInAssetDB(const WString& asset_path)
 	{
-		return s_asset_looktable.contains(asset_path);
+		return _asset_looktable.contains(asset_path);
 	}
 
-	WString ResourceMgr::GetAssetPath(const Guid& guid)
+	const WString& ResourceMgr::GetAssetPath(Object* obj) const
 	{
-		if (s_asset_db.contains(guid))
-			return s_asset_db.at(guid)->_asset_path;
-		return L"";
+		if (_object_to_asset.contains(obj->ID()))
+		{
+			return _object_to_asset.at(obj->ID())->_asset_path;
+		}
+		return EmptyWString;
+	}
+
+	const Guid& ResourceMgr::GetAssetGuid(Object* obj) const
+	{
+		if (_object_to_asset.contains(obj->ID()))
+		{
+			return _object_to_asset.at(obj->ID())->GetGuid();
+		}
+		return Guid::EmptyGuid();
+	}
+
+	const WString& ResourceMgr::GuidToAssetPath(const Guid& guid) const
+	{
+		if (_asset_db.contains(guid))
+		{
+			return _asset_db.at(guid)->_asset_path;
+		}
+		return EmptyWString;
 	}
 
 	Asset* ResourceMgr::GetAsset(const WString& asset_path) const
 	{
-		if (s_asset_looktable.contains(asset_path))
+		if (_asset_looktable.contains(asset_path))
 		{
-			return s_asset_db.contains(s_asset_looktable[asset_path]) ? s_asset_db.at(s_asset_looktable[asset_path]) : nullptr;
+			return _asset_db.contains(_asset_looktable.at(asset_path)) ? _asset_db.at(_asset_looktable.at(asset_path)).get() : nullptr;
 		}
 		return nullptr;
 	}
@@ -276,25 +705,17 @@ namespace Ailu
 	Vector<Asset*> ResourceMgr::GetAssets(const ISearchFilter& filter) const
 	{
 		Vector<Asset*> assets;
-		for(auto& [guid, asset] : s_asset_db)
+		for(auto& [guid, asset] : _asset_db)
 		{
-			if(filter.Filter(asset))
-				assets.emplace_back(asset);
+			if(filter.Filter(asset.get()))
+				assets.emplace_back(asset.get());
 		}
 		return assets;
 	}
 
-	void ResourceMgr::DeleteAsset(Asset* p_asset)
-	{
-		if(p_asset->_asset_type == EAssetType::kMaterial)
-		{
-			auto mat = static_cast<Material*>(p_asset->_p_inst_asset);
-			MaterialLibrary::ReleaseMaterial(mat->Name());
-		}
-	}
-
 	bool ResourceMgr::RenameAsset(Asset* p_asset, const String& new_name)
 	{
+		AL_ASSERT(true);
 		WString new_name_w = ToWChar(new_name);
 		WString old_asset_path = p_asset->_asset_path;
 		WString new_asset_path = PathUtils::RenameFile(p_asset->_asset_path, ToWChar(new_name));
@@ -304,54 +725,75 @@ namespace Ailu
 			g_pLogMgr->LogWarningFormat(L"Rename asset {} whih name {} failed,try another name!", p_asset->_asset_path, new_name_w);
 			return false;
 		}
-		if (p_asset->_asset_type == EAssetType::kMaterial)
-		{
-			if (MaterialLibrary::RenameMaterial(ToChar(old_asset_path), ToChar(new_asset_path)))
-			{
-				auto mat = static_cast<Material*>(p_asset->_p_inst_asset);
-				mat->Name(new_name);
-			}
-			else
-				return false;
-		}
-		else if (p_asset->_asset_type == EAssetType::kTexture2D)
-		{
-			if (g_pTexturePool->Rename(old_asset_path, new_asset_path))
-			{
-				auto tex = static_cast<Texture*>(p_asset->_p_inst_asset);
-				tex->Name(new_name);
-			}
-			else
-				return false;
-		}
-		p_asset->_name = ToWChar(new_name);
-		p_asset->_full_name = p_asset->_name + ext_name;
-		p_asset->_asset_path = new_asset_path;
-		p_asset->_sys_path = PathUtils::GetResSysPath(p_asset->_asset_path);
-		FileManager::RenameDirectory(PathUtils::GetResSysPath(old_asset_path), PathUtils::GetResSysPath(new_asset_path));
+		//if (p_asset->_asset_type == EAssetType::kMaterial)
+		//{
+		//	if (MaterialLibrary::RenameMaterial(ToChar(old_asset_path), ToChar(new_asset_path)))
+		//	{
+		//		auto mat = static_cast<Material*>(p_asset->_p_inst_asset);
+		//		mat->Name(new_name);
+		//	}
+		//	else
+		//		return false;
+		//}
+		//else if (p_asset->_asset_type == EAssetType::kTexture2D)
+		//{
+		//	if (g_pTexturePool->Rename(old_asset_path, new_asset_path))
+		//	{
+		//		auto tex = static_cast<Texture*>(p_asset->_p_inst_asset);
+		//		tex->Name(new_name);
+		//	}
+		//	else
+		//		return false;
+		//}
+		//p_asset->_name = ToWChar(new_name);
+		//p_asset->_full_name = p_asset->_name + ext_name;
+		//p_asset->_asset_path = new_asset_path;
+		//p_asset->_sys_path = PathUtils::GetResSysPath(p_asset->_asset_path);
+		//FileManager::RenameDirectory(PathUtils::GetResSysPath(old_asset_path), PathUtils::GetResSysPath(new_asset_path));
 		return true;
 	}
 
 	void ResourceMgr::AddToAssetDB(Asset* asset, bool override)
 	{
-		if (ExistInAssetDB(asset))
+		auto is_exist = ExistInAssetDB(asset);
+		if (is_exist && _asset_db[asset->GetGuid()]->_asset_path != asset->_asset_path)
+		{
+			Guid new_guid = Guid::Generate();
+			while (_asset_db.contains(new_guid))
+			{
+				new_guid = Guid::Generate();
+			}
+			is_exist = false;
+			g_pLogMgr->LogWarningFormat(L"Asset {} guid conflict, assign a new one!", asset->_asset_path);
+			asset->AssignGuid(new_guid);
+		}
+		if (is_exist)
 		{
 			if (override)
 			{
-				s_asset_db[asset->GetGuid()] = asset;
-				s_asset_looktable[asset->_asset_path] = asset->GetGuid();
+				_asset_db[asset->GetGuid()].reset(asset);
+				_asset_looktable[asset->_asset_path] = asset->GetGuid();
 			}
 			else
 			{
-				g_pLogMgr->LogWarningFormat(L"Asset {} already exist in database,it will be destory...", asset->_name);
+				g_pLogMgr->LogWarningFormat(L"Asset {} already exist in database,it will be destory...", asset->_asset_path);
 				//不插入的话要销毁，db中的指针最后会统一销毁
 				delete asset;
 			}
 		}
 		else
 		{
-			s_asset_db[asset->GetGuid()] = asset;
-			s_asset_looktable[asset->_asset_path] = asset->GetGuid();
+			_asset_db[asset->GetGuid()].reset(asset);
+			_asset_looktable[asset->_asset_path] = asset->GetGuid();
+		}
+	}
+
+	void ResourceMgr::RemoveFromAssetDB(const Asset* asset)
+	{
+		if (ExistInAssetDB(asset))
+		{
+			_asset_db.erase(asset->GetGuid());
+			_asset_looktable.erase(asset->_asset_path);
 		}
 	}
 
@@ -398,12 +840,12 @@ namespace Ailu
 	void ResourceMgr::SaveAssetDB()
 	{
 		std::wofstream file(kAssetDatabasePath, std::ios::out | std::ios::trunc);
-		for (auto& [guid, asset] : s_asset_db)
+		for (auto& [guid, asset] : _asset_db)
 		{
-			if(asset->_p_inst_asset)
+			if(asset->_p_obj)
 				file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
-			delete asset;
 		}
+		_asset_db.clear();
 	}
 
 	void ResourceMgr::FormatLine(const String& line, String& key, String& value)
@@ -416,138 +858,21 @@ namespace Ailu
 		}
 	}
 
-	void ResourceMgr::SaveMaterialImpl(const WString& sys_path, Material* mat)
+	void ResourceMgr::ExtractCommonAssetInfo(const WString& asset_path, WString& name, Guid& guid, EAssetType::EAssetType& type)
 	{
-		using std::endl;
-		std::multimap<std::string, SerializableProperty*> props{};
-		//为了写入通用资产头信息，暂时使用追加方式打开
-		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
-		out_mat << "shader_path: " << ShaderLibrary::GetShaderPath(mat->_p_shader->ID());
-		for (auto& prop : mat->_properties)
-		{
-			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
-		}
-		out_mat << endl;
-		auto float_props = mat->GetAllFloatValue();
-		auto vector_props = mat->GetAllVectorValue();
-		auto uint_props = mat->GetAllUintValue();
-		//auto tex_props = mat->GetAllTexture();
-		out_mat << "  prop_type: " << "Uint" << endl;
-		for (auto& [name, value] : uint_props)
-		{
-			out_mat << "    " << name << ": " << value << endl;
-		}
-		out_mat << "  prop_type: " << "Float" << endl;
-		for (auto& [name, value] : float_props)
-		{
-			out_mat << "    " << name << ": " << value << endl;
-		}
-		out_mat << "  prop_type: " << "Vector" << endl;
-		for (auto& [name, value] : vector_props)
-		{
-			out_mat << "    " << name << ": " << value << endl;
-		}
-		out_mat << "  prop_type: " << "Texture2D" << endl;
-		for (auto& [prop_name, prop] : props)
-		{
-			if (prop->_type == ESerializablePropertyType::kTexture2D)
-			{
-				auto tex_opti = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture*>>(*prop);
-				Guid tex_guid;
-				if (tex_opti.has_value() && std::get<1>(tex_opti.value()))
-				{
-					auto [bind_slot, tex] = tex_opti.value();
-					if(tex->GetAsset())
-						tex_guid = tex->GetAsset()->GetGuid();
-				}
-				else
-					tex_guid = Guid::EmptyGuid();
-				out_mat << "    " << prop->_value_name << ": " << tex_guid.ToString() << endl;
-			}
-		}
-		out_mat.close();
-		LOG_WARNING(L"Save material to {}", sys_path);
-	}
-
-	Ref<Texture2D> ResourceMgr::LoadTexture(const WString& asset_path, const ImportSetting* setting)
-	{
-		auto image_import_setting = dynamic_cast<const TextureImportSetting*>(setting);
-		image_import_setting = image_import_setting ? image_import_setting : &TextureImportSetting::Default();
-
 		auto sys_path = PathUtils::GetResSysPath(asset_path);
-		String asset_path_n = ToChar(asset_path.c_str());
-		fs::path p(asset_path_n);
-		String ext = p.extension().string();
-		
-		if (kLDRImageExt.contains(ext))
+		WString data;
+		if (FileManager::ReadFile(sys_path, data))
 		{
-			Ref<Texture2D> ret_res;
-			g_pLogMgr->LogFormat(L"Start load common image file {}...", sys_path);
-			if (!g_pTexturePool->Contain(asset_path))
-			{
-				auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-				auto tex = png_parser->Parser(sys_path);
-				g_pGfxContext->SubmitRHIResourceBuildTask([=]() {tex->Apply(); });
-				ret_res = tex;
-			}
-			else
-				ret_res = std::static_pointer_cast<Texture2D>(g_pTexturePool->Get(asset_path));
-			return ret_res;
+			auto c = StringUtils::Split(data, L"\n");
+			guid = Guid(ToChar(c[0].substr(c[0].find_first_of(L":") + 2)));
+			name = c[2].substr(c[2].find_first_of(L":") + 2);
+			type = EAssetType::FromString(ToChar(c[1].substr(c[1].find_first_of(L":") + 2)));
 		}
-		else if (ext == ".exr" || ext == ".EXR" || ext == ".hdr" || ext == ".HDR")
-		{
-			Ref<Texture2D> ret_res;
-			g_pLogMgr->LogFormat(L"Start load hdr image file {}...", sys_path);
-			if (!g_pTexturePool->Contain(asset_path))
-			{
-				auto hdr_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kHDR);
-				auto tex = hdr_parser->Parser(sys_path);
-				g_pGfxContext->SubmitRHIResourceBuildTask([=]() {tex->Apply(); });
-				ret_res = tex;
-			}
-			else
-				ret_res = std::static_pointer_cast<Texture2D>(g_pTexturePool->Get(asset_path));
-				return ret_res;
-		}
-		else
-		{
-
-		}
-		return nullptr;
 	}
 
-	Ref<CubeMap> ResourceMgr::LoadTexture(const Vector<WString>& asset_paths)
-	{
-		auto png_parser = TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG);
-		Vector<String> sys_paths{};
-		for (auto& asset_path : asset_paths)
-		{
-			String asset_path_n = ToChar(asset_path.c_str());
-			sys_paths.emplace_back(kEngineResRootPath + asset_path_n);
-		}
-		auto tex = png_parser->Parser(sys_paths);
-		//tex->AssetPath(sys_paths);
-		return tex;
-	}
 
-	List<Ref<Mesh>> ResourceMgr::LoadMesh(const WString& asset_path)
-	{
-		static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-		auto sys_path = PathUtils::GetResSysPath(asset_path);
-		g_pLogMgr->LogFormat(L"Start load mesh file {}...", sys_path);
-		auto mesh_list = parser->Parser(sys_path);
-		auto& imported_mat_infos = parser->GetImportedMaterialInfos();
-		for (auto& mesh : mesh_list)
-		{
-			for (auto it = imported_mat_infos.begin(); it != imported_mat_infos.end(); ++it)
-			{
-				mesh->AddCacheMaterial(*it);
-			}
-			g_pGfxContext->SubmitRHIResourceBuildTask([=]() {mesh->BuildRHIResource(); });
-		}
 
-		return mesh_list;
-	}
 
 	Ref<void> ResourceMgr::ImportResource(const WString& sys_path, const ImportSetting& setting)
 	{
@@ -563,15 +888,6 @@ namespace Ailu
 		return nullptr;
 	}
 
-	//void ResourceMgr::AddResourceTask(ResourceTask task, OnResourceTaskCompleted callback)
-	//{
-	//	s_task_queue.emplace_back([=]() {
-	//		task();
-	//		callback();
-	//		return nullptr;
-	//		});
-	//}
-
 	void ResourceMgr::AddResourceTask(ResourceTask task)
 	{
 		s_task_queue.emplace_back(task);
@@ -584,23 +900,22 @@ namespace Ailu
 		std::chrono::duration<int, std::milli> sleep_duration(1000); // 1秒
 		std::unordered_map<fs::path, fs::file_time_type> files;
 		static auto reload_shader = [&](const fs::path& file) {
-			const String cur_path = PathUtils::FormatFilePath(file.string());
-			for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+			const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+			for (auto it = ResourceBegin<Shader>(); it != ResourceEnd<Shader>(); it++)
 			{
-				for (auto& head_file : (*it)->GetSourceFiles())
+				
+				auto shader = static_cast<Shader*>((*it).second->second.get());
+				for (auto& head_file : shader->GetSourceFiles())
 				{
 					if (head_file == cur_path)
 					{
 						AddResourceTask([=]()->Ref<void> {
-							if ((*it)->Compile())
+							if (shader->Compile())
 							{
-								auto mats = (*it)->GetAllReferencedMaterials();
+								auto mats = shader->GetAllReferencedMaterials();
 								for (auto mat = mats.begin(); mat != mats.end(); mat++)
-									(*mat)->ChangeShader((*it));
-								LOG_INFO("Compile shader {} succeed!", (*it)->Name());
+									(*mat)->ChangeShader(shader);
 							}
-							else
-								LOG_ERROR("Compile shader {} failed!", (*it)->Name());
 							return nullptr;
 							});
 						break;
@@ -619,7 +934,7 @@ namespace Ailu
 		bool is_first_execute = true;
 		static std::set<fs::path> path_set{};
 		static std::unordered_map<fs::path, fs::file_time_type> current_files;
-		while (true)
+		while (_is_watching_directory)
 		{
 			TraverseDirectory(dir, path_set);
 			for (auto& cur_path : path_set)
@@ -641,6 +956,7 @@ namespace Ailu
 			is_first_execute = false;
 		}
 	}
+
 	void ResourceMgr::SubmitResourceTask()
 	{
 		for (auto& task : s_task_queue)
@@ -652,177 +968,151 @@ namespace Ailu
 
 	Ref<void> ResourceMgr::ImportResourceImpl(const WString& sys_path, const ImportSetting* setting)
 	{
-		namespace fs = std::filesystem;
-		fs::path p(sys_path);
-		if (!FileManager::Exist(sys_path))
-		{
-			g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} not exist on the disk!", sys_path);
-			return nullptr;
-		}
-		auto ext = p.extension().string();
-		auto new_sys_path = FileManager::GetCurDirStr();
-		if (setting->_is_copy)
-		{
-			new_sys_path += p.filename().wstring();
-			if(sys_path.find_first_of(L".") != sys_path.npos)
-				FileManager::CopyFile(sys_path, new_sys_path);
-			else
-			{
-				g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} is not a file!", sys_path);
-			}
-		}
-		else
-		{
-			new_sys_path = sys_path;
-		}
-		if (!FileManager::Exist(new_sys_path))
-		{
-			return nullptr;
-		}
-		ImportInfo info;
-		info._is_succeed = false;
-		info._last_write_time = fs::last_write_time(p);
-		info._msg = std::format("Import {}...", p.filename().string());
-		info._progress = 0.0f;
-		info._sys_path = new_sys_path;
-		{
-			std::lock_guard<std::mutex> lock(_import_infos_mutex);
-			_import_infos.push_back(info);
-		}
-		PathUtils::FormatFilePathInPlace(new_sys_path);
-		WString asset_path = PathUtils::ExtractAssetPath(new_sys_path);
-		TimeMgr time_mgr;
-		Ref<void> ret_res = nullptr;
-		EAssetType::EAssetType asset_type = EAssetType::kUndefined;
-		if (!ext.empty())
-		{
-			time_mgr.Mark();
-			if (ext == ".fbx" || ext == ".FBX")
-			{
-				asset_type = EAssetType::kMesh;
-				auto mesh_list = std::move(LoadMesh(asset_path));
-				if (!mesh_list.empty())
-				{
-					auto mesh_import_setting = dynamic_cast<const MeshImportSetting*>(setting);
-					mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
-					for (auto& mesh : mesh_list)
-					{
-						String name_id = mesh_import_setting->_name_id.empty() ? ToChar(asset_path) + "_" + mesh->Name() : mesh_import_setting->_name_id;
-						MeshPool::AddMesh(name_id, mesh);
-						if (ExistInAssetDB(asset_path))
-						{
-							auto asset = GetAsset(asset_path);
-							mesh->AttachToAsset(asset);
-						}
-						else
-						{
-							auto asset = new Asset(asset_type, asset_path);
-							mesh->AttachToAsset(asset);
-							AddToAssetDB(asset);
-						}
-						if (mesh_import_setting->_is_import_material)
-						{
-							for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
-							{
-								auto mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDeferredStandardLit), it->_name);
-								if (!it->_textures[0].empty())
-								{
-									auto albedo = ImportResource(ToWChar(it->_textures[0]));
-									if (albedo != nullptr)
-										mat->SetTexture(InternalStandardMaterialTexture::kAlbedo, std::static_pointer_cast<Texture>(albedo).get());
-								}
-								if (!it->_textures[1].empty())
-								{
-									auto normal = ImportResource(ToWChar(it->_textures[1]));
-									if (normal != nullptr)
-										mat->SetTexture(InternalStandardMaterialTexture::kNormal, std::static_pointer_cast<Texture>(normal).get());
-								}
-								auto mat_sys_path = std::format(L"{}{}.almat", FileManager::GetCurDirStr(), ToWChar(it->_name));
-								auto mat_asset_path = PathUtils::ExtractAssetPath(mat_sys_path);
-								auto asset = GetAsset(mat_asset_path);
-								if (asset)
-								{
-									mat->AttachToAsset(asset);
-									//if(asset->_p_inst_asset == nullptr)
-										
-									//else //当前导入存在同名材质
-									//{
-									//	WString num_part;
-									//	// 从字符串的末尾开始向前查找数字组合
-									//	for (int i = mat_asset_path.size() - 1; i >= 0; --i) 
-									//	{
-									//		if (std::isdigit(mat_asset_path[i])) 
-									//		{
-									//			num_part = mat_asset_path[i] + num_part;
-									//		}
-									//		else 
-									//		{
-									//			break; // 如果遇到非数字字符，则停止提取数字
-									//		}
-									//	}
-									//	// 如果numberPart非空，则代表提取到了数字组合
-									//	i32 same_count = 1;
-									//	if (!num_part.empty()) 
-									//	{
-									//		same_count = std::stoi(num_part) + 1;
-									//	}
-									//	String new_name = std::format("{}_{}", it->_name, same_count);
-									//	mat_sys_path = std::format(L"{}{}.almat", FileManager::GetCurDirStr(), ToWChar(new_name));
-									//	mat_asset_path = PathUtils::ExtractAssetPath(mat_sys_path);
-									//	mat->Name(new_name);
-									//	SaveAsset(mat_sys_path, mat.get());
-									//	g_pLogMgr->LogWarningFormat("Exist material with the same name: {},rename it to {}", it->_name,new_name);
-									//}
-								}
-								else
-								{
-									SaveAsset(mat_sys_path, mat.get());
-								}
-							}
-						}
-					}
-					ret_res = std::static_pointer_cast<void>(mesh_list.front());
-				}
-			}
-			else if (kHDRImageExt.contains(ext) || kLDRImageExt.contains(ext))
-			{
-				asset_type = EAssetType::kTexture2D;
-				auto tex = LoadTexture(asset_path, setting);
-				g_pTexturePool->Add(setting->_name_id.empty() ? asset_path : ToWChar(setting->_name_id), tex);
-				ret_res = std::static_pointer_cast<void>(tex);
-				if (ret_res)
-				{
-					if (ExistInAssetDB(asset_path))
-					{
-						auto asset = GetAsset(asset_path);
-						tex->AttachToAsset(asset);
-					}
-					else
-					{
-						auto asset = new Asset(asset_type, asset_path);
-						tex->AttachToAsset(asset);
-						AddToAssetDB(asset);
-					}
-				}
-			}
-			else
-			{
-				g_pLogMgr->LogFormat("Haven't handled asset type: {}", ext);
-			}
-			g_pLogMgr->LogFormat(L"Import asset: {} succeed,cost {}ms", new_sys_path, time_mgr.GetElapsedSinceLastMark());
-		}
-		else
-		{
-			g_pLogMgr->LogFormat("Path: {} isn't valid!");
-		}
-		{
-			std::lock_guard<std::mutex> lock(_import_infos_mutex);
-			_import_infos.erase(std::remove_if(_import_infos.begin(), _import_infos.end(), [&](auto it) {return it._msg == info._msg; }), _import_infos.end());
-		}
-		OnAssetDataBaseChanged();
-		auto asset = GetAsset(asset_path);
-		return ret_res;
+		return nullptr;
+		//namespace fs = std::filesystem;
+		//fs::path p(sys_path);
+		//if (!FileManager::Exist(sys_path))
+		//{
+		//	g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} not exist on the disk!", sys_path);
+		//	return nullptr;
+		//}
+		//auto ext = p.extension().string();
+		//auto new_sys_path = FileManager::GetCurDirStr();
+		//if (setting->_is_copy)
+		//{
+		//	new_sys_path += p.filename().wstring();
+		//	if(sys_path.find_first_of(L".") != sys_path.npos)
+		//		FileManager::CopyFile(sys_path, new_sys_path);
+		//	else
+		//	{
+		//		g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} is not a file!", sys_path);
+		//	}
+		//}
+		//else
+		//{
+		//	new_sys_path = sys_path;
+		//}
+		//if (!FileManager::Exist(new_sys_path))
+		//{
+		//	return nullptr;
+		//}
+		//ImportInfo info;
+		//info._is_succeed = false;
+		//info._last_write_time = fs::last_write_time(p);
+		//info._msg = std::format("Import {}...", p.filename().string());
+		//info._progress = 0.0f;
+		//info._sys_path = new_sys_path;
+		//{
+		//	std::lock_guard<std::mutex> lock(_import_infos_mutex);
+		//	_import_infos.push_back(info);
+		//}
+		//PathUtils::FormatFilePathInPlace(new_sys_path);
+		//WString asset_path = PathUtils::ExtractAssetPath(new_sys_path);
+		//TimeMgr time_mgr;
+		//Ref<void> ret_res = nullptr;
+		//EAssetType::EAssetType asset_type = EAssetType::kUndefined;
+		//if (!ext.empty())
+		//{
+		//	time_mgr.Mark();
+		//	if (ext == ".fbx" || ext == ".FBX")
+		//	{
+		//		asset_type = EAssetType::kMesh;
+		//		auto mesh_list = std::move(LoadMesh(asset_path));
+		//		if (!mesh_list.empty())
+		//		{
+		//			auto mesh_import_setting = dynamic_cast<const MeshImportSetting*>(setting);
+		//			mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
+		//			for (auto& mesh : mesh_list)
+		//			{
+		//				//String name_id = mesh_import_setting->_name_id.empty() ? ToChar(asset_path) + "_" + mesh->Name() : mesh_import_setting->_name_id;
+		//				WString name_id = asset_path + L"_" + ToWStr(mesh->Name().c_str());
+		//				_lut_global_meshs[mesh->ID()] = _global_resources.emplace(std::make_pair(name_id, mesh)).first;
+		//				if (ExistInAssetDB(asset_path))
+		//				{
+		//					auto asset = GetAsset(asset_path);
+		//					mesh->AttachToAsset(asset);
+		//				}
+		//				else
+		//				{
+		//					auto asset = new Asset(asset_type, asset_path);
+		//					mesh->AttachToAsset(asset);
+		//					AddToAssetDB(asset);
+		//				}
+		//				if (mesh_import_setting->_is_import_material)
+		//				{
+		//					for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
+		//					{
+		//						auto mat = MakeRef<Material>(Shader::s_p_defered_standart_lit, it->_name);
+		//						if (!it->_textures[0].empty())
+		//						{
+		//							auto albedo = ImportResource(ToWChar(it->_textures[0]));
+		//							if (albedo != nullptr)
+		//								mat->SetTexture(InternalStandardMaterialTexture::kAlbedo, std::static_pointer_cast<Texture>(albedo).get());
+		//						}
+		//						if (!it->_textures[1].empty())
+		//						{
+		//							auto normal = ImportResource(ToWChar(it->_textures[1]));
+		//							if (normal != nullptr)
+		//								mat->SetTexture(InternalStandardMaterialTexture::kNormal, std::static_pointer_cast<Texture>(normal).get());
+		//						}
+		//						auto mat_sys_path = std::format(L"{}{}.almat", FileManager::GetCurDirStr(), ToWChar(it->_name));
+		//						auto mat_asset_path = PathUtils::ExtractAssetPath(mat_sys_path);
+		//						auto asset = GetAsset(mat_asset_path);
+		//						if (asset)
+		//						{
+		//							mat->AttachToAsset(asset);
+		//						}
+		//						else
+		//						{
+		//							SaveAsset(mat_sys_path, mat.get());
+		//						}
+		//						_lut_global_materials[mat->ID()] = _global_resources.emplace(std::make_pair(asset_path, mat)).first;
+		//					}
+		//				}
+		//			}
+		//			ret_res = std::static_pointer_cast<void>(mesh_list.front());
+		//		}
+		//	}
+		//	else if (kHDRImageExt.contains(ext) || kLDRImageExt.contains(ext))
+		//	{
+		//		asset_type = EAssetType::kTexture2D;
+		//		auto tex = LoadTexture(asset_path, setting);
+		//		_lut_global_texture2d[tex->ID()] = _global_resources.emplace(std::make_pair(asset_path, tex)).first;
+		//		ret_res = std::static_pointer_cast<void>(tex);
+		//		if (ret_res)
+		//		{
+		//			if (ExistInAssetDB(asset_path))
+		//			{
+		//				auto asset = GetAsset(asset_path);
+		//				tex->AttachToAsset(asset);
+		//			}
+		//			else
+		//			{
+		//				auto asset = new Asset(asset_type, asset_path);
+		//				tex->AttachToAsset(asset);
+		//				AddToAssetDB(asset);
+		//			}
+		//		}
+		//	}
+		//	else
+		//	{
+		//		g_pLogMgr->LogFormat("Haven't handled asset type: {}", ext);
+		//	}
+		//	g_pLogMgr->LogFormat(L"Import asset: {} succeed,cost {}ms", new_sys_path, time_mgr.GetElapsedSinceLastMark());
+		//}
+		//else
+		//{
+		//	g_pLogMgr->LogFormat("Path: {} isn't valid!");
+		//}
+		//{
+		//	std::lock_guard<std::mutex> lock(_import_infos_mutex);
+		//	_import_infos.erase(std::remove_if(_import_infos.begin(), _import_infos.end(), [&](auto it) {return it._msg == info._msg; }), _import_infos.end());
+		//}
+		//OnAssetDataBaseChanged();
+		//auto asset = GetAsset(asset_path);
+		//return ret_res;
 	}
+
 	void ResourceMgr::OnAssetDataBaseChanged()
 	{
 		for (auto& f : _asset_changed_callbacks)

@@ -8,6 +8,7 @@
 #include "Render/RenderQueue.h"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/Profiler.h"
+#include "Framework/Common/ResourceMgr.h"
 
 
 namespace Ailu
@@ -95,7 +96,7 @@ namespace Ailu
 	SceneActor* SceneMgr::AddSceneActor(std::string_view name, std::string_view mesh)
 	{
 		auto p_actor = Actor::Create<SceneActor>(name.data());
-		p_actor->AddComponent<StaticMeshComponent>(MeshPool::GetMesh(mesh.data()), MaterialLibrary::GetMaterial("Materials/StandardPBR_new.alasset"));
+		p_actor->AddComponent<StaticMeshComponent>(g_pResourceMgr->GetRef<Mesh>(ToWStr(name.data())), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR_new.alasset"));
 		_p_current->AddObject(p_actor);
 		return p_actor;
 	}
@@ -323,7 +324,7 @@ namespace Ailu
 	Scene* Scene::GetDefaultScene()
 	{
 		auto _p_actor = Actor::Create<SceneActor>("stone");
-		_p_actor->AddComponent<StaticMeshComponent>(MeshPool::GetMesh("sphere"), MaterialLibrary::GetMaterial("Materials/StandardPBR_new.alasset"));
+		_p_actor->AddComponent<StaticMeshComponent>(g_pResourceMgr->GetRef<Mesh>(L"Meshs/sphere.fbx"), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR_new.alasset"));
 		auto _p_light = Actor::Create<LightActor>("directional_light");
 		SceneActor* point_light = Actor::Create<LightActor>("point_light");
 		point_light->GetComponent<LightComponent>()->_light_type = ELightType::kPoint;

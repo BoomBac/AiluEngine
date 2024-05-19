@@ -9,14 +9,14 @@ namespace Ailu
 	class Object
 	{
 		//--------------------Reflect
-	protected: 
+	protected:
 		std::unordered_map<String, SerializableProperty> _properties{};
-	public: 
-		template<typename T> T GetProperty(const String& name) 
+	public:
+		template<typename T> T GetProperty(const String& name)
 		{
 			return *reinterpret_cast<T*>(_properties.find(name)->second._value_ptr);
-		} 
-		SerializableProperty& GetProperty(const String& name) 
+		}
+		SerializableProperty& GetProperty(const String& name)
 		{
 			static SerializableProperty null{};
 			if (_properties.contains(name))
@@ -29,7 +29,7 @@ namespace Ailu
 			return _properties;
 		}
 		auto PropertyBegin()
-		{	
+		{
 			return _properties.begin();
 		}
 		auto PropertyEnd()
@@ -37,10 +37,14 @@ namespace Ailu
 			return _properties.end();
 		}
 		//--------------------Reflect
-		DECLARE_PRIVATE_PROPERTY(id,ID,u64)
 	public:
 		Object();
 		Object(const Object& other);
+		Object(Object&& other) noexcept;
+		Object& operator=(const Object& other);
+		Object& operator=(Object&& other) noexcept;
+		bool operator==(const Object& other) const {return _id == other._id;};
+		bool operator<(const Object& other) const {return _id < other._id;};
 		virtual void Serialize(std::ostream& os, String indent);
 		/// <summary>
 		/// Deserialize
@@ -49,30 +53,23 @@ namespace Ailu
 		/// <param name="formated_str">prop name,prop value</param>
 		/// <returns></returns>
 		template<class T>
-		friend static T* Deserialize(Queue<std::tuple<String,String>>& formated_str);
-		virtual void Name(const String& value)
-		{
-			_name = value;
-		} 
-		const String& Name() const 
-		{
-			return _name;
-		}
-		bool operator==(const Object& other)
-		{
-			return _id == other._id;
-		}
+		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
+		virtual void Name(const String& value) { _name = value; }
+		const String& Name() const { return _name; }
+		void ID(const u32& value) { _id = value; }
+		const u32& ID() const { return _id; }
 	protected:
 		/// <summary>
 		/// DeserializeImpl
 		/// </summary>
 		/// <param name="formated_str">prop name,prop value</param>
 		/// <returns></returns>
-		virtual void* DeserializeImpl(Queue<std::tuple<String,String>>& formated_str);
-	protected: 
+		virtual void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str);
+	protected:
 		String _name;
+		u32 _id;
 	private:
-		inline static u64 s_global_object_id = 0u;
+		inline static u32 s_global_object_id = 0u;
 	};
 
 	template<class T>

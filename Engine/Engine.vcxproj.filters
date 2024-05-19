@@ -2082,9 +2082,6 @@
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\Interface\IAssetable.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2350,26 +2347,26 @@
     <None Include="after_build.bat">
       <Filter>源文件</Filter>
     </None>
-    <None Include="Res\Shaders\cbuffer.hlsli">
+    <None Include="Res\Shaders\cbuffer.alasseti">
       <Filter>头文件</Filter>
     </None>
-    <None Include="Res\Shaders\gizmo.hlsl" />
-    <None Include="Res\Shaders\PureColor.hlsl" />
-    <None Include="Res\Shaders\common.hlsli" />
-    <None Include="Res\Shaders\lighting.hlsli">
+    <None Include="Res\Shaders\gizmo.alasset" />
+    <None Include="Res\Shaders\PureColor.alasset" />
+    <None Include="Res\Shaders\common.alasseti" />
+    <None Include="Res\Shaders\lighting.alasseti">
       <Filter>头文件</Filter>
     </None>
-    <None Include="Res\Shaders\brdf.hlsli" />
-    <None Include="Res\Shaders\constants.hlsli" />
-    <None Include="Res\Shaders\input.hlsli" />
-    <None Include="Res\Shaders\filter_irradiance.hlsl" />
-    <None Include="Res\Shaders\blit.hlsl" />
-    <None Include="Res\Shaders\cubemap_gen.hlsl" />
-    <None Include="Res\Shaders\depth_only.hlsl" />
-    <None Include="Res\Shaders\error_fallback.hlsl" />
-    <None Include="Res\Shaders\skybox.hlsl" />
-    <None Include="Res\Shaders\wireframe.hlsl" />
-    <None Include="Res\Shaders\deferred_shading.hlsl" />
+    <None Include="Res\Shaders\brdf.alasseti" />
+    <None Include="Res\Shaders\constants.alasseti" />
+    <None Include="Res\Shaders\input.alasseti" />
+    <None Include="Res\Shaders\filter_irradiance.alasset" />
+    <None Include="Res\Shaders\blit.alasset" />
+    <None Include="Res\Shaders\cubemap_gen.alasset" />
+    <None Include="Res\Shaders\depth_only.alasset" />
+    <None Include="Res\Shaders\error_fallback.alasset" />
+    <None Include="Res\Shaders\skybox.alasset" />
+    <None Include="Res\Shaders\wireframe.alasset" />
+    <None Include="Res\Shaders\deferred_shading.alasset" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

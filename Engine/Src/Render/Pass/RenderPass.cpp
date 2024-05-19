@@ -8,6 +8,7 @@
 #include "Framework/Common/Profiler.h"
 #include "Render/Gizmo.h"
 #include "Render/RenderConstants.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
@@ -21,35 +22,35 @@ namespace Ailu
 	}
 	void OpaquePass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get("OpaquePass");
-		cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
-		cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
-		cmd->SetViewport(rendering_data._viewport);
-		cmd->SetScissorRect(rendering_data._scissor_rect);
+		//auto cmd = CommandBufferPool::Get("OpaquePass");
+		//cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+		//cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
+		//cmd->SetViewport(rendering_data._viewport);
+		//cmd->SetScissorRect(rendering_data._scissor_rect);
 
-		u32 obj_index = 0u;
-		if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
-		{
-			for (auto& obj : RenderQueue::GetOpaqueRenderables())
-			{
-				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
-				++obj_index;
-			}
-		}
-		obj_index = 0;
-		if (RenderingStates::s_shadering_mode == EShaderingMode::kWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
-		{
-			static auto wireframe_mat = MaterialLibrary::GetMaterial("Materials/WireFrame_new.alasset");
-			for (auto& obj : RenderQueue::GetOpaqueRenderables())
-			{
-				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj.GetMesh(), wireframe_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
-				++obj_index;
-			}
-		}
-		context->ExecuteCommandBuffer(cmd);
-		CommandBufferPool::Release(cmd);
+		//u32 obj_index = 0u;
+		//if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
+		//{
+		//	for (auto& obj : RenderQueue::GetOpaqueRenderables())
+		//	{
+		//		memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+		//		cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
+		//		++obj_index;
+		//	}
+		//}
+		//obj_index = 0;
+		//if (RenderingStates::s_shadering_mode == EShaderingMode::kWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
+		//{
+		//	static auto wireframe_mat = MaterialLibrary::GetMaterial("Materials/WireFrame_new.alasset");
+		//	for (auto& obj : RenderQueue::GetOpaqueRenderables())
+		//	{
+		//		memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+		//		cmd->DrawRenderer(obj.GetMesh(), wireframe_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
+		//		++obj_index;
+		//	}
+		//}
+		//context->ExecuteCommandBuffer(cmd);
+		//CommandBufferPool::Release(cmd);
 	}
 	void OpaquePass::BeginPass(GraphicsContext* context)
 	{
@@ -102,9 +103,9 @@ namespace Ailu
 		_p_mainlight_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainLightShadowMap", ERenderTargetFormat::kShadowMap);
 		//_p_addlight_shadow_map = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, "AddLightShadowMap", ERenderTargetFormat::kShadowMap);
 		_p_addlight_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, kMaxPointLightNum,"AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
-		_p_shadowcast_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDepthOnly), "ShadowCast");
+		_p_shadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
 		_p_shadowcast_material->SetUint("shadow_index",0);
-		_p_addshadowcast_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Get(ShaderLibrary::kInternalShaderStringID.kDepthOnly), "ShadowCast");
+		_p_addshadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
 	}
 
 	void ShadowCastPass::BeginPass(GraphicsContext* context)
@@ -172,10 +173,10 @@ namespace Ailu
 		_p_cube_map = RenderTexture::Create(size, texture_name + "_cubemap", ERenderTargetFormat::kDefaultHDR, true,true,true);
 		_p_cube_map->CreateView();
 		_p_env_map = RenderTexture::Create(size / 4, texture_name + "_ibl_diffuse", ERenderTargetFormat::kDefaultHDR, false);
-		_p_gen_material = MaterialLibrary::GetMaterial("Hidden/CubemapGen");
+		_p_gen_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/CubemapGen");
 		_p_gen_material->SetTexture("env", ToWChar(src_texture_name));
-		_p_cube_mesh = MeshPool::GetMesh("cube");
-		_p_filter_material = MaterialLibrary::GetMaterial("Hidden/EnvmapFilter");
+		_p_cube_mesh = Mesh::s_p_cube;
+		_p_filter_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/EnvmapFilter");
 		Matrix4x4f view, proj;
 		BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0, 1.0, 100000);
 		float scale = 0.5f;
@@ -221,9 +222,8 @@ namespace Ailu
 			cmd->SetRenderTarget(_p_cube_map.get(), i);
 			cmd->ClearRenderTarget(_p_cube_map.get(), Colors::kBlack, i);
 			cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
-			cmd->DrawRenderer(_p_cube_mesh.get(), _p_gen_material.get(), _per_obj_cb.get());
+			cmd->DrawRenderer(_p_cube_mesh, _p_gen_material, _per_obj_cb.get());
 		}
-		_p_cube_map->GenerateMipmap(cmd.get());
 		_p_filter_material->SetTexture("EnvMap", _p_cube_map.get());
 		cmd->SetScissorRect(_ibl_rect);
 		cmd->SetViewport(_ibl_rect);
@@ -232,10 +232,11 @@ namespace Ailu
 			cmd->SetRenderTarget(_p_env_map.get(), i);
 			cmd->ClearRenderTarget(_p_env_map.get(), Colors::kBlack, i);
 			cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
-			cmd->DrawRenderer(_p_cube_mesh.get(), _p_filter_material.get(), _per_obj_cb.get());
+			cmd->DrawRenderer(_p_cube_mesh, _p_filter_material, _per_obj_cb.get());
 		}
 		Shader::SetGlobalTexture("SkyBox", _p_env_map.get());
-		context->ExecuteCommandBuffer(cmd);
+		context->ExecuteAndWaitCommandBuffer(cmd);
+		_p_cube_map->GenerateMipmap(cmd.get());
 		CommandBufferPool::Release(cmd);
 	}
 
@@ -252,14 +253,14 @@ namespace Ailu
 	DeferredGeometryPass::DeferredGeometryPass(u16 width, u16 height) : RenderPass("DeferedGeometryPass")
 	{
 		_gbuffers.resize(3);
-		//_gbuffers_cache.resize(3);
-		//_gbuffers_cache[0] = _gbuffers[0].get();
-		//_gbuffers_cache[1] = _gbuffers[1].get();
-		//_gbuffers_cache[2] = _gbuffers[2].get();
-		_p_lighting_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/deferred_lighting.hlsl", "DeferredLightingVSMain", "DeferredLightingPSMain"), "DeferedGbufferLighting");
-		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
+		//ShaderImportSetting setting;
+		//setting._vs_entry = "DeferredLightingVSMain";
+		//setting._ps_entry = "DeferredLightingPSMain";
+		_p_lighting_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/deferred_lighting.alasset"), "DeferedGbufferLighting");
+		_p_quad_mesh = Mesh::s_p_quad;
 		for (int i = 0; i < _rects.size(); i++)
 			_rects[i] = Rect(0, 0, width, height);
+		_p_ibllut = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset");
 	}
 	void DeferredGeometryPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
@@ -294,11 +295,12 @@ namespace Ailu
 			_p_lighting_material->SetTexture("_GBuffer1", _gbuffers[1]);
 			_p_lighting_material->SetTexture("_GBuffer2", _gbuffers[2]);
 			_p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_target_handle);
+			_p_lighting_material->SetTexture("IBLLut", _p_ibllut);
 			cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
 			cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, Colors::kBlack);
 			cmd->SetViewport(rendering_data._viewport);
 			cmd->SetScissorRect(rendering_data._scissor_rect);
-			cmd->DrawRenderer(_p_quad_mesh.get(), _p_lighting_material.get(), 1);
+			cmd->DrawRenderer(_p_quad_mesh, _p_lighting_material.get(), 1);
 		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
@@ -319,9 +321,9 @@ namespace Ailu
 	//-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
 	SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
 	{
-		//_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.hlsl"), "SkyboxPP");
-		_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox.hlsl"), "Skybox");
-		_p_sky_mesh = MeshPool::GetMesh("sphere");
+		//_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.alasset"), "SkyboxPP");
+		_p_skybox_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
+		_p_sky_mesh = Mesh::s_p_shpere;
 		Matrix4x4f world_mat;
 		MatrixScale(world_mat, 10000.f, 10000.f, 10000.f);
 		_p_cbuffer.reset(ConstantBuffer::Create(RenderConstants::kPeObjectDataSize));
@@ -336,7 +338,7 @@ namespace Ailu
 			cmd->SetViewport(rendering_data._viewport);
 			cmd->SetScissorRect(rendering_data._scissor_rect);
 			cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
-			cmd->DrawRenderer(_p_sky_mesh.get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
+			cmd->DrawRenderer(_p_sky_mesh, _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
 		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);

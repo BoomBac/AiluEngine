@@ -2,19 +2,18 @@
 #include "Render/Pass/PostprocessPass.h"
 #include "Render/CommandBuffer.h"
 #include "Framework/Common/Profiler.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
 	PostProcessPass::PostProcessPass() : RenderPass("PostProcessPass")
 	{
-		//_p_tex_bloom_threshold = RenderTexture::Create(800,450,"BloomThreshold",ERenderTargetFormat::kDefaultHDR);
-		_p_bloom_thread_mat = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/PostProcess/bloom.hlsl"),"BloomThread");
-		_p_blit_mat = MaterialLibrary::GetMaterial("Hidden/Blit");
+		_p_bloom_thread_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/bloom.alasset"),"BloomThread");
+		_p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
 		_p_obj_cb = ConstantBuffer::Create(256);
 		memcpy(_p_obj_cb->GetData(),&BuildIdentityMatrix(),sizeof(Matrix4x4f));
 		_bloom_thread_rect = Rect(0, 0, 800, 450);
-		_p_quad_mesh = MeshPool::GetMesh("FullScreenQuad");
-		//static const auto material = MaterialLibrary::GetMaterial("Blit");
+		_p_quad_mesh = g_pResourceMgr->Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
 	}
 	PostProcessPass::~PostProcessPass()
 	{

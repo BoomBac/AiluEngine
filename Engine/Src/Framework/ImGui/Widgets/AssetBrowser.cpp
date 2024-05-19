@@ -47,12 +47,12 @@ namespace Ailu
 	void AssetBrowser::Open(const i32& handle)
 	{
 		ImGuiWidget::Open(handle);
-		_folder_icon = g_pTexturePool->Get(L"Editor/folder");
-		_file_icon =   g_pTexturePool->Get(L"Editor/file_us");
-		_mesh_icon =   g_pTexturePool->Get(L"Editor/3d");
-		_shader_icon = g_pTexturePool->Get(L"Editor/shader");
-		_image_icon =  g_pTexturePool->Get(L"Editor/image");
-		_scene_icon =  g_pTexturePool->Get(L"Editor/scene");
+		_folder_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"folder.alasset");
+		_file_icon =   g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"file.alasset");
+		_mesh_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset");
+		_shader_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
+		_image_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
+		_scene_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"scene.alasset" );
 		OnUpdateAssetList();
 	}
 	void AssetBrowser::Close(i32 handle)
@@ -62,7 +62,7 @@ namespace Ailu
 	void AssetBrowser::OnUpdateAssetList()
 	{
 		_cur_dir_assets.clear();
-		SearchFilterByDirectory filter({ FileManager::GetCurDirStr() });
+		SearchFilterByDirectory filter({ PathUtils::ExtractAssetPath(FileManager::GetCurDirStr())});
 		_cur_dir_assets = std::move(g_pResourceMgr->GetAssets(filter));
 		_selected_file_index = (u32)(-1);
 		_selected_file_sys_path = FileManager::GetCurDirStr();
@@ -153,6 +153,7 @@ namespace Ailu
 	}
 	void AssetBrowser::ShowNewMaterialWidget()
 	{
+		AL_ASSERT(true);
 		static char buf[256];
 		ImGui::InputText("##MaterialName", buf, IM_ARRAYSIZE(buf));
 		static Ref<Shader> selected_shader = nullptr;
@@ -160,12 +161,14 @@ namespace Ailu
 		static int selected_index = -1;
 		if (ImGui::BeginCombo("Select Shader: ", selected_shader ? selected_shader->Name().c_str() : "select shader"))
 		{
-			for (auto it = ShaderLibrary::Begin(); it != ShaderLibrary::End(); it++)
+			
+			for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
 			{
-				if (ImGui::Selectable((*it)->Name().c_str(), selected_index == count))
+				auto shader = ResourceMgr::IterToRefPtr<Shader>(it);
+				if (ImGui::Selectable(shader->Name().c_str(), selected_index == count))
 					selected_index = count;
 				if (selected_index == count)
-					selected_shader = *it;
+					selected_shader = shader;
 				++count;
 			}
 			ImGui::EndCombo();
@@ -182,9 +185,9 @@ namespace Ailu
 					sys_path.append("/");
 				sys_path.append(name).append(".almat");
 				auto asset_path = PathUtils::ExtractAssetPath(sys_path);
-				auto new_mat = MaterialLibrary::CreateMaterial(selected_shader, name, asset_path);
+				auto new_mat = MakeRef<Material>(selected_shader.get(), name);
 				new_mat->IsInternal(selected_shader->Name() == "shaders");
-				g_pResourceMgr->SaveAsset(ToWChar(sys_path), new_mat.get());
+				g_pResourceMgr->CreateAsset(ToWChar(sys_path), new_mat);
 			}
 			ImGui::CloseCurrentPopup();
 			OnUpdateAssetList();
@@ -240,7 +243,7 @@ namespace Ailu
 		{
 			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_mesh_icon->GetNativeTextureHandle());
 		}
-		else if (ext_str == ".hlsl")
+		else if (ext_str == ".alasset")
 		{
 			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_shader_icon->GetNativeTextureHandle());
 		}
@@ -305,8 +308,8 @@ namespace Ailu
 			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_scene_icon->GetNativeTextureHandle());
 		}
 		else if (asset->_asset_type == EAssetType::kTexture2D)
-		{
-			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(static_cast<Texture*>(asset->_p_inst_asset)->GetNativeTextureHandle());
+		{	
+			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(asset->As<Texture>()->GetNativeTextureHandle());
 			//tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_image_icon->GetNativeTextureHandle());
 		}
 		else {};
@@ -322,9 +325,9 @@ namespace Ailu
 		if (ImGui::IsItemClicked(0) || ImGui::IsItemClicked(1))
 		{
 			if(ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-				_p_tex_detail_widget->Open(ImGuiWidget::GetGlobalWidgetHandle(),static_cast<Texture*>(asset->_p_inst_asset));
+				_p_tex_detail_widget->Open(ImGuiWidget::GetGlobalWidgetHandle(), asset->As<Texture>());
 			g_pLogMgr->LogFormat("selected asset {}", file_name.c_str());
-			_selected_file_sys_path = asset->_sys_path;
+			_selected_file_sys_path = asset->_asset_path;
 			_selected_file_index = cur_file_index;
 		}
 		if (ImGui::BeginPopupContextItem(file_name.c_str())) // <-- use last item id as popup id

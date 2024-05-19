@@ -1156,14 +1156,6 @@ namespace Ailu
 		{
 			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);
 		}
-		String asset_path = PathUtils::FormatFilePath(PathUtils::ExtractAssetPath(path));
-		for (auto& mesh : loaded_meshs)
-			mesh->OriginPath(asset_path);
-		for (auto& anim : _loaded_anims)
-		{
-			anim->OriginPath(asset_path);
-			AnimationClipLibrary::AddClip(asset_path, anim);
-		}
 		return loaded_meshs;
 	}
 
@@ -1263,14 +1255,6 @@ namespace Ailu
 		if (loaded_meshs.empty())
 		{
 			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);
-		}
-		String asset_path = PathUtils::FormatFilePath(PathUtils::ExtractAssetPath(path));
-		for (auto& mesh : loaded_meshs)
-			mesh->OriginPath(asset_path);
-		for (auto& anim : _loaded_anims)
-		{
-			anim->OriginPath(asset_path);
-			AnimationClipLibrary::AddClip(asset_path, anim);
 		}
 		return loaded_meshs;
 	}

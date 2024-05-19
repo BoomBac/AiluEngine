@@ -25,6 +25,18 @@ namespace Ailu
         return wideStr;
     }
 
+    static WString ToWStr(const char* multiByteStr)
+    {
+        int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
+        if (size == 0 || size > 256) {
+            throw std::runtime_error("to wstring error!");
+            return WString{};
+        }
+        static wchar_t wideStr[256];
+        MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, wideStr, size);
+        return WString{ wideStr };
+    }
+
     static wchar_t* ToWChar(const String& str)
     {
         auto multiByteStr = str.c_str();
@@ -101,6 +113,21 @@ namespace Ailu
             size_t last = str.find_last_not_of(" \t\n\r");
             return str.substr(first, (last - first + 1));
         }
+        /// <summary>
+        /// 移除字符串前后的空格和换行符
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        static WString Trim(const WString& str)
+        {
+            size_t first = str.find_first_not_of(L" \t\n\r");
+            if (first == String::npos)
+            {
+                return L"";
+            }
+            size_t last = str.find_last_not_of(L" \t\n\r");
+            return str.substr(first, (last - first + 1));
+        }
 
         /// <summary>
         /// 按分隔符提取字符串
@@ -120,6 +147,25 @@ namespace Ailu
             tokens.push_back(input.substr(start));
             return tokens;
         }
+        /// <summary>
+        /// 按分隔符提取字符串
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="delimiter"></param>
+        /// <returns></returns>
+        static Vector<WString> Split(const WString& input, const wchar_t* delimiter)
+        {
+            Vector<WString> tokens;
+            size_t start = 0, end = 0;
+            while ((end = input.find(delimiter, start)) != WString::npos)
+            {
+                tokens.push_back(input.substr(start, end - start));
+                start = end + 1;
+            }
+            tokens.push_back(input.substr(start));
+            return tokens;
+        }
+
 
         static String Join(const Vector<String>& strings, const String& delimiter)
         {
@@ -142,6 +188,12 @@ namespace Ailu
 
         //[begin,end]
         static inline String SubStrRange(const String& s, const size_t& begin, const size_t& end)
+        {
+            if (end < begin) return s;
+            return s.substr(begin, end - begin + 1);
+        }
+        //[begin,end]
+        static inline WString SubStrRange(const WString& s, const size_t& begin, const size_t& end)
         {
             if (end < begin) return s;
             return s.substr(begin, end - begin + 1);

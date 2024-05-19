@@ -324,9 +324,6 @@ namespace Ailu
 
 	void D3DContext::LoadAssets()
 	{
-		GraphicsPipelineStateMgr::BuildPSOCache();
-
-
 		// Create synchronization objects.
 		{
 			//ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));

@@ -4,6 +4,7 @@
 #include "Framework/Common/LogMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Framework/Common/Asset.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
@@ -26,7 +27,7 @@ namespace Ailu
 		}
 	}
 
-	Material::Material(Ref<Shader> shader, String name) : _p_shader(shader)
+	Material::Material(Shader* shader, String name) : _p_shader(shader)
 	{
 		_name = name;
 		_b_internal = false;
@@ -38,14 +39,48 @@ namespace Ailu
 			_b_internal = true;
 			_sampler_mask_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
 		}
+		it = _p_shader->GetBindResInfo().find("MaterialID");
+		if (it != _p_shader->GetBindResInfo().end())
+		{
+			_b_internal = true;
+			_material_id_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+		}
+		_material_id = EMaterialID::kStandard;
 	}
 
 	Material::~Material()
 	{
 
 	}
-
-	void Material::ChangeShader(Ref<Shader> shader)
+	void Material::Bind()
+	{
+		if (_p_shader->IsCompileError())
+			return;
+		if (_material_id_offset != 0)
+		{
+			memset(_p_cbuf->GetData() + _material_id_offset, (u32)_material_id, sizeof(u32));
+		}
+		_p_shader->Bind(0);
+		i8 cbuf_bind_slot = _p_shader->GetPerMatBufferBindSlot();
+		if (cbuf_bind_slot != -1)
+		{
+			GraphicsPipelineStateMgr::SubmitBindResource(_p_cbuf.get(), EBindResDescType::kConstBuffer, (u8)cbuf_bind_slot);
+		}
+		for (auto it = _textures.begin(); it != _textures.end(); it++)
+		{
+			auto& [slot, texture] = it->second;
+			if (texture != nullptr)
+			{
+				//texture->Bind(slot);
+				GraphicsPipelineStateMgr::SubmitBindResource(texture, slot);
+			}
+			//else
+			//{
+			//	LOG_WARNING("Material: {} haven't set texture on bind slot {}",_name,(short)slot);
+			//}
+		}
+	}
+	void Material::ChangeShader(Shader* shader)
 	{
 		_p_shader->RemoveMaterialRef(this);
 		_p_shader = shader;
@@ -174,7 +209,7 @@ namespace Ailu
 		else if (name == InternalStandardMaterialTexture::kSpecular) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
 		else if (name == InternalStandardMaterialTexture::kNormal) MarkTextureUsed({ ETextureUsage::kNormal }, true);
 		else {};
-		auto texture = g_pTexturePool->Get(texture_path);
+		auto texture = g_pResourceMgr->Get<Texture2D>(texture_path);
 		if (texture == nullptr)
 		{
 			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
@@ -185,7 +220,7 @@ namespace Ailu
 		{
 			return;
 		}
-		std::get<1>(_textures[name]) = texture.get();
+		std::get<1>(_textures[name]) = texture;
 		if (_properties.find(name) != _properties.end())
 		{
 			_properties[name]._value_ptr = reinterpret_cast<void*>(&_textures[name]);
@@ -223,28 +258,6 @@ namespace Ailu
 	{
 	}
 
-	const Guid& Material::GetGuid() const
-	{
-		if (_p_asset_owned_this)
-		{
-			return _p_asset_owned_this->GetGuid();
-		}
-		return Guid::EmptyGuid();
-	}
-
-	void Material::AttachToAsset(Asset* asset)
-	{
-		if (asset->_p_inst_asset != nullptr)
-		{
-			auto mat = static_cast<Material*>(asset->_p_inst_asset);
-			MaterialLibrary::ReleaseMaterial(mat->OriginPath());
-		}
-		_p_asset_owned_this = asset;
-		asset->_p_inst_asset = this;
-		asset->_name = ToWChar(_name);
-		asset->_full_name = asset->_name.append(L".almat");
-	}
-
 	void Material::RemoveTexture(const String& name)
 	{
 		auto it = _textures.find(name);
@@ -253,35 +266,6 @@ namespace Ailu
 			return;
 		}
 		std::get<1>(_textures[name]) = nullptr;
-	}
-
-	void Material::Bind()
-	{
-		if (_p_shader->IsCompileError())
-			return;
-		_p_shader->Bind(0);
-		i8 cbuf_bind_slot = _p_shader->GetPerMatBufferBindSlot();
-		if (cbuf_bind_slot != -1)
-		{
-			GraphicsPipelineStateMgr::SubmitBindResource(_p_cbuf.get(), EBindResDescType::kConstBuffer, (u8)cbuf_bind_slot);
-		}
-		for (auto it = _textures.begin(); it != _textures.end(); it++)
-		{
-			auto& [slot, texture] = it->second;
-			if (texture != nullptr)
-			{
-				//texture->Bind(slot);
-				GraphicsPipelineStateMgr::SubmitBindResource(texture, slot);
-			}
-			//else
-			//{
-			//	LOG_WARNING("Material: {} haven't set texture on bind slot {}",_name,(short)slot);
-			//}
-		}
-	}
-	Shader* Material::GetShader() const
-	{
-		return _p_shader.get();
 	}
 
 	List<std::tuple<String, float>> Material::GetAllFloatValue()
@@ -438,7 +422,7 @@ prop_info._prop_name,prop_info._value_name,prop_info._prop_type };
 		}
 	}
 	//-------------------------------------------StandardMaterial--------------------------------------------------------
-	StandardMaterial::StandardMaterial(Ref<Shader> shader, String name) : Material(shader, name)
+	StandardMaterial::StandardMaterial(Shader* shader, String name) : Material(shader, name)
 	{
 
 	}

@@ -4,7 +4,7 @@
 //#include "constants.hlsli"
 #define HSLS
 #include "constants.hlsli"
-#include "../../Inc/Render/CBuffer.h"
+#include "../../../Inc/Render/CBuffer.h"
 
 #endif // !CBUFFER_H__
 

@@ -1,0 +1,6 @@
+guid: 54238902-542d-44ca-9bed-dbe40c90cdcb
+type: kShader
+name: wireframe
+  file: Shaders/hlsl/wireframe.hlsl
+  vs_entry: VSMain
+  ps_entry: PSMain

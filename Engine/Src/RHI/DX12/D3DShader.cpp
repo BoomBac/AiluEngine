@@ -14,7 +14,6 @@
 #include "Render/GraphicsPipelineStateObject.h"
 
 
-
 namespace Ailu
 {
 	//shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
@@ -289,14 +288,14 @@ namespace Ailu
 			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), _vert_entry, "vs_5_0", _tmp_p_vblob, _p_v_reflection);
-			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), _pixel_entry, "ps_5_0", _tmp_p_pblob, _p_p_reflection);
+			succeed &= CreateFromFileFXC(_src_file_path, _vert_entry, "vs_5_0", _tmp_p_vblob, _p_v_reflection);
+			succeed &= CreateFromFileFXC(_src_file_path, _pixel_entry, "ps_5_0", _tmp_p_pblob, _p_p_reflection);
 #endif // SHADER_DXC
 		}
 		catch (const std::exception&)
 		{
 			succeed = false;
-			g_pLogMgr->LogErrorFormat("Compile shader with src {0} failed!", _src_file_path);
+			g_pLogMgr->LogErrorFormat(L"Compile shader with src {0} failed!", _src_file_path);
 		}
 		if (succeed)
 		{
@@ -308,7 +307,7 @@ namespace Ailu
 		return succeed;
 	}
 
-	void D3DShader::LoadAdditionalShaderReflection(const String& sys_path)
+	void D3DShader::LoadAdditionalShaderReflection(const WString& sys_path)
 	{
 		using namespace std;
 		namespace su = StringUtils;
@@ -316,8 +315,8 @@ namespace Ailu
 		ifstream src(sys_path, ios::in);
 		string line;
 		vector<string> lines;
-		List<String> cur_file_head_files{};
-		String parent_path = su::SubStrRange(_src_file_path, 0, _src_file_path.find_last_of("/"));
+		List<WString> cur_file_head_files{};
+		WString parent_path = su::SubStrRange(_src_file_path, 0, _src_file_path.find_last_of(L"/"));
 		while (getline(src, line))
 		{
 			line = su::Trim(line);
@@ -325,7 +324,7 @@ namespace Ailu
 			{
 				size_t path_start = line.find_first_of("\"");
 				size_t path_end = line.find_last_of("\"");
-				auto head_file = su::SubStrRange(line, path_start + 1, path_end - 1);
+				WString head_file = ToWStr(su::SubStrRange(line, path_start + 1, path_end - 1).c_str());
 				_source_files.insert(parent_path + head_file);
 				cur_file_head_files.emplace_back(head_file);
 			}
@@ -367,24 +366,12 @@ namespace Ailu
 		{
 			fs::path temp = pwd;
 			temp.append(head_file);
-			cout << temp.string() << endl;
-			LoadAdditionalShaderReflection(temp.string());
+			LoadAdditionalShaderReflection(temp.wstring());
 		}
 	}
 
-	D3DShader::D3DShader(const String& sys_path) : Shader(sys_path)
+	D3DShader::D3DShader(const WString& sys_path, const String& vs_entry, const String& ps_entry) :Shader(sys_path,vs_entry,ps_entry)
 	{
-		_src_file_path = sys_path;
-		_source_files.insert(sys_path);
-		Compile();
-	}
-
-	D3DShader::D3DShader(const String& sys_path, const String& vs_entry, String ps_entry) : Shader(sys_path)
-	{
-		_vert_entry = vs_entry;
-		_pixel_entry = ps_entry;
-		_src_file_path = sys_path;
-		_source_files.insert(sys_path);
 		Compile();
 	}
 
@@ -558,7 +545,7 @@ namespace Ailu
 
 
 	//-------------------------------------------------------------------------------D3DComputeShader---------------------------------------------------------------------------
-	D3DComputeShader::D3DComputeShader(const String& sys_path) : ComputeShader(sys_path)
+	D3DComputeShader::D3DComputeShader(const WString& sys_path) : ComputeShader(sys_path)
 	{
 		Compile();
 	}
@@ -582,6 +569,7 @@ namespace Ailu
 					auto tex = static_cast<Texture*>(bind_info._p_res);
 					auto& [face, mipmap] = _texture_addi_bind_info[bind_info._bind_slot];
 					D3D12_GPU_DESCRIPTOR_HANDLE handle{};
+					tex->Bind(cmd, 255);
 					handle.ptr = tex->GetView(mipmap,false,face);
 					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, handle);
 				}
@@ -590,6 +578,7 @@ namespace Ailu
 					auto tex = static_cast<Texture*>(bind_info._p_res);
 					auto& [face, mipmap] = _texture_addi_bind_info[bind_info._bind_slot];
 					D3D12_GPU_DESCRIPTOR_HANDLE handle{};
+					tex->Bind(cmd, 255);
 					handle.ptr = tex->GetView(mipmap,true,face);
 					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, handle);
 				}
@@ -695,13 +684,13 @@ namespace Ailu
 			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			succeed &= CreateFromFileFXC(ToWChar(_src_file_path.data()), "cs_main", "cs_5_0", _tmp_blob, _p_reflection);
+			succeed &= CreateFromFileFXC(_src_file_path, "cs_main", "cs_5_0", _tmp_blob, _p_reflection);
 #endif // SHADER_DXC
 		}
 		catch (const std::exception&)
 		{
 			succeed = false;
-			g_pLogMgr->LogErrorFormat("Compile shader with src {0} failed!", _src_file_path);
+			g_pLogMgr->LogErrorFormat(L"Compile shader with src {0} failed!", _src_file_path);
 			_is_valid = false;
 		}
 		if (succeed)
@@ -710,7 +699,7 @@ namespace Ailu
 			LoadReflectionInfo(_p_reflection.Get());
 			GenerateInternalPSO();
 			succeed = _is_valid;
-			LOG_INFO("Compile shader with src {0} succeed!", _src_file_path);
+			g_pLogMgr->LogFormat(L"Compile shader with src {0} succeed!", WString(_src_file_path));
 		}
 		return succeed;
 	}
@@ -827,7 +816,7 @@ namespace Ailu
 		else
 		{
 			_is_valid = false;
-			LOG_ERROR("Create compute shader {} failed when generate internal pso!", _src_file_path);
+			LOG_ERROR(L"Create compute shader {} failed when generate internal pso!", _src_file_path);
 		}
 
 	}

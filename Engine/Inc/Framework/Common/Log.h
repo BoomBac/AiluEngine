@@ -9,6 +9,25 @@
 
 namespace Ailu
 {
+	template<typename... Args>
+	inline static constexpr bool ContainsString()
+	{
+		constexpr bool a = (... || std::is_same_v<std::string, std::remove_cvref_t<Args>>);
+		constexpr bool b = (... || std::is_same_v<char*, std::remove_cvref_t<Args>>);
+		constexpr bool c = (... || std::is_same_v<const char*, std::decay_t<Args>>);//移除数组属性
+		return a || b || c;
+	}
+
+	template<typename... Args>
+	inline static constexpr bool ContainsWString()
+	{
+		constexpr bool a = (... || std::is_same_v<std::wstring, std::remove_cvref_t<Args>>);
+		constexpr bool b = (... || std::is_same_v<wchar_t*, std::remove_cvref_t<Args>>);
+		constexpr bool c = (... || std::is_same_v<const wchar_t*, std::decay_t<Args>>);//移除数组属性
+		return a || b || c;
+		//return false;
+	}
+
 	template<typename T>
 	static void format_helper(std::wostringstream& oss, std::wstring_view& str, const T& value)
 	{
@@ -77,7 +96,7 @@ namespace Ailu
 		s.append(format(str, args...));
 		return s;
 	}
-	template<typename... Targs>
+	template<typename... Targs, std::enable_if_t<!ContainsWString<Targs...>(), bool> = true>
 	static void Log(uint8_t maker, ELogLevel level, std::string_view str, Targs... args)
 	{
 		if (level >= kLogLevel && (maker == 0 || (maker & kTraceLevel) != 0))
@@ -85,7 +104,7 @@ namespace Ailu
 			OutputDebugStringA(BuildLogMsg(level, str, args...).append("\r\n").c_str());
 		}
 	}
-	template<typename... Targs>
+	template<typename... Targs, std::enable_if_t<!ContainsString<Targs...>(), bool> = true>
 	static void Log(uint8_t maker, ELogLevel level, std::wstring_view str, Targs... args)
 	{
 		if (level >= kLogLevel && (maker == 0 || (maker & kTraceLevel) != 0))
@@ -97,7 +116,6 @@ namespace Ailu
 #define LOG_INFO(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
 #define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
 #define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
-#define BOOL_STR(b) b? "true" : "false"
 	extern class LogMgr* g_pLogMgr;
 }
 

@@ -59,7 +59,7 @@ namespace Ailu
 				{
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					auto p_asset = it->second;
+					auto p_asset = it->second.get();
 					if (!p_asset)
 					{
 						ImGui::Text("?????????");
@@ -74,9 +74,9 @@ namespace Ailu
 					ImGui::TableSetColumnIndex(2);
 					ImGui::Text(EAssetType::ToString(p_asset->_asset_type));
 					ImGui::TableSetColumnIndex(3);
-					if (p_asset->_p_inst_asset)
+					if (p_asset->_p_obj)
 					{
-						ImGui::Text("%p", &p_asset->_p_inst_asset);
+						ImGui::Text("%p", &p_asset->_p_obj);
 					}
 					else
 					{

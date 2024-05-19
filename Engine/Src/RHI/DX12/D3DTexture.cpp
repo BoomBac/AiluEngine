@@ -4,6 +4,7 @@
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DShader.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
@@ -256,9 +257,8 @@ namespace Ailu
 	{
 		if (_p_mipmapgen_cs0 == nullptr)
 		{
-
-			_p_mipmapgen_cs0 = ComputeShader::Create(PathUtils::GetResSysPath("Shaders/Compute/cs_mipmap_gen.hlsl"));
-			_p_mipmapgen_cs1 = ComputeShader::Create(PathUtils::GetResSysPath("Shaders/Compute/cs_mipmap_gen.hlsl"));
+			_p_mipmapgen_cs0 = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
+			_p_mipmapgen_cs1 = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
 		}
 
 		_cur_res_state = D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON;
@@ -377,6 +377,11 @@ namespace Ailu
 
 	void D3DRenderTexture::Bind(CommandBuffer* cmd, u8 slot)
 	{
+		if (slot == 255)
+		{
+			_mimmap_uav_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
+			return;
+		}
 		if (s_current_rt != this)
 		{
 			RenderTexture::Bind(cmd, slot);
@@ -470,7 +475,8 @@ namespace Ailu
 
 	void D3DRenderTexture::GenerateMipmap(CommandBuffer* cmd)
 	{
-		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		auto tcmd = CommandBufferPool::Get("MipmapGen");
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(tcmd.get())->GetCmdList();
 		//_p_test_cs->SetTexture("gInputA", TexturePool::Get("Textures/MyImage01.jpg").get());
 		for (int i = 1; i < 7; i++)
 		{	
@@ -487,7 +493,9 @@ namespace Ailu
 			_p_mipmapgen_cs0->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace)i, 4);
 			//static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->Bind(cmd, 32, 32, 1);
 			//保证线程数和第一级输出的mipmap像素数一一对应
-			cmd->Dispatch(_p_mipmapgen_cs0.get(), mip1w / 8, mip1h / 8, 1);
+			tcmd->Dispatch(_p_mipmapgen_cs0.get(), mip1w / 8, mip1h / 8, 1);
+			g_pGfxContext->ExecuteAndWaitCommandBuffer(tcmd);
+			tcmd->Clear();
 			auto [mip5w, mip5h] = CurMipmapSize(5);
 			_p_mipmapgen_cs1->SetInt("SrcMipLevel", 4);
 			_p_mipmapgen_cs1->SetInt("NumMipLevels", min(_mipmap_count - 4,4));
@@ -500,10 +508,11 @@ namespace Ailu
 			_p_mipmapgen_cs1->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace)i, 7);
 			if(_mipmap_count > 7)
 				_p_mipmapgen_cs1->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace)i, 8);
-			//static_cast<D3DComputeShader*>(_p_mipmapgen_cs1.get())->Bind(cmd, 32, 32, 1);
-			cmd->Dispatch(_p_mipmapgen_cs1.get(), mip5w / 8, mip5h / 8, 1);
+			tcmd->Dispatch(_p_mipmapgen_cs1.get(), mip5w / 8, mip5h / 8, 1);
+			g_pGfxContext->ExecuteAndWaitCommandBuffer(tcmd);
+			tcmd->Clear();
 		}
-
+		CommandBufferPool::Release(tcmd);
 	}
 
 	void D3DRenderTexture::Name(const String& value)

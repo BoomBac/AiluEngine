@@ -158,8 +158,9 @@ namespace Ailu
 			{
 				if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f && abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
 				{
-					target_rotation.y += (cur_mouse_pos.x - pre_mouse_pos.x) * _camera_wander_speed * _camera_wander_speed;
-					target_rotation.x += (cur_mouse_pos.y - pre_mouse_pos.y) * _camera_wander_speed * _camera_wander_speed;
+					float angle_offset = _camera_wander_speed * _camera_wander_speed;
+					target_rotation.y += (cur_mouse_pos.x - pre_mouse_pos.x) * angle_offset;
+					target_rotation.x += (cur_mouse_pos.y - pre_mouse_pos.y) * angle_offset;
 				}
 			}
 			pre_mouse_pos = cur_mouse_pos;
