@@ -42,8 +42,12 @@ namespace Ailu
 
 	void FileManager::BackToParent()
 	{
-		s_cur_path = s_cur_path.parent_path();
-		SetCurPath(s_cur_path);
+		auto parent = s_cur_path.parent_path();
+		if(parent.string().find("Res") != std::string::npos)
+		{
+			s_cur_path = parent;
+			SetCurPath(s_cur_path);
+		}
 	}
 	void FileManager::SetCurPath(const fs::path& path)
 	{

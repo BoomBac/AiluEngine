@@ -243,6 +243,13 @@ namespace Ailu
 			return asset_path.substr(asset_path.find_last_of(L"."));
 		}
 
+		static WString ExtarctDirectory(const WString& asset_path)
+		{
+			WString	dir = asset_path;
+			if(dir.find(L"/\\") != dir.npos)
+				FormatFilePathInPlace(dir);
+			return dir.substr(0, asset_path.find_last_of(L"/") + 1);
+		}
 	};
 
 }

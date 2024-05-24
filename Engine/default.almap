@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 590.79,609.872,588.192
-  Rotation: 0.0255051,-0.958279,0.0905481,0.269912
+  Position: 590.824,609.866,588.198
+  Rotation: 0.0723158,-0.300674,0.0228709,0.950706
   Fov: 60
-  Aspect: 1.7875
+  Aspect: 1.88158
   Near: 86.8
   Far: 29398.2
-  ControllerRotation: 12610.8,30451.5
+  ControllerRotation: 12608.7,30564.9
 SceneGraph: 
   Name: root
     Components: 

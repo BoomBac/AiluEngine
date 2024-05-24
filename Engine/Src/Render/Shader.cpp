@@ -21,7 +21,6 @@ namespace Ailu
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
 			auto shader = MakeRef<D3DShader>(sys_path, vert_entry, pixel_entry);
-			ResourceMgr::SetObjectSysPath(shader.get(), sys_path);
 			return shader;
 		}
 		}
@@ -457,7 +456,6 @@ namespace Ailu
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
 			auto shader = MakeRef<D3DComputeShader>(sys_path);
-			ResourceMgr::SetObjectSysPath(shader.get(), sys_path);
 			auto asset_path = PathUtils::ExtractAssetPath(sys_path);
 			s_cs_library.insert(std::make_pair(asset_path, shader));
 			return shader;

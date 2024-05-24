@@ -1,17 +1,15 @@
-#include "pch.h"
-#include "Framework/ImGui/Widgets/ObjectDetail.h"
+#include "Inc/Widgets/ObjectDetail.h"
+#include "Inc/Widgets/CommonTextureWidget.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 
-#include "Objects/TransformComponent.h"
-#include "Objects/StaticMeshComponent.h"
-#include "Objects/CameraComponent.h"
-
-#include "Render/CommandBuffer.h"
-#include "Render/Renderer.h"
-#include "Framework/ImGui/Widgets/CommonTextureWidget.h"
-#include "Framework/Common/Asset.h"
-#include "Framework/Common/ResourceMgr.h"
+#include "Engine/Inc/Objects/TransformComponent.h"
+#include "Engine/Inc/Objects/StaticMeshComponent.h"
+#include "Engine/Inc/Objects/CameraComponent.h"
+#include "Engine/Inc/Render/CommandBuffer.h"
+#include "Engine/Inc/Render/Renderer.h"
+#include "Engine/Inc/Framework/Common/Asset.h"
+#include "Engine/Inc/Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
@@ -405,7 +403,7 @@ namespace Ailu
 						if (ImGui::BeginCombo("Select Material: ", mat ? mat->Name().c_str() : "missing"))
 						{
 							for (auto it = g_pResourceMgr->ResourceBegin<Material>(); it != g_pResourceMgr->ResourceEnd<Material>(); it++)
-							{				
+							{
 								auto mat = ResourceMgr::IterToRefPtr<Material>(it);
 								if (ImGui::Selectable(mat->Name().c_str(), s_mat_selected_index == mat_count))
 									s_mat_selected_index = mat_count;

@@ -1,0 +1,38 @@
+Normal: Begin init resource mgr...
+Warning: Unused shader prop Color been added;
+Warning: Unused shader prop Exposure been added;
+Warning: Unused shader prop InvertColor been added;
+Warning: Unused shader prop ColorOverlay been added;
+Normal: Resource mgr init finish after 18.6313ms
+Normal: Begin init scene mgr...
+Normal: Begin load scene from C:/AiluEngine/Engine/Scenes/default.almap...
+Normal: SceneMgr end
+Normal: Scene mgr init finish after 9.9006ms
+Normal: Begin init renderer...
+Warning: Expand rt pool to 1
+Warning: Expand rt pool to 2
+Warning: Expand rt pool to 3
+Warning: Unused shader prop Color been added;
+Warning: Unused shader prop Exposure been added;
+Warning: Unused shader prop InvertColor been added;
+Warning: Unused shader prop ColorOverlay been added;
+Normal: Renderer init finish after 14.4242ms
+Normal: Application Init end
+Warning: Expand rt pool to 4
+Warning: Expand rt pool to 5
+Warning: Expand rt pool to 6
+Warning: Expand rt pool to 7
+Warning: Expand rt pool to 8
+Warning: Expand rt pool to 9
+Normal: Resize game view to 1001,532
+Warning: Expand rt pool to 10
+Warning: Expand rt pool to 11
+Warning: Expand rt pool to 12
+Normal: OnLostFoucus
+Normal: OnGetFoucus
+Normal: OnLostFoucus
+Normal: OnGetFoucus
+Normal: selected asset DepthOnly
+Normal: selected asset deferred_lighting
+Normal: OnLostFoucus
+Warning: D3DContext::Present: Resource cleanup, 12 resources released.

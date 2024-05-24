@@ -1,11 +1,9 @@
-#include "pch.h"
-#include "Framework/ImGui/Widgets/RenderView.h"
-#include "Framework/ImGui/Widgets/AssetBrowser.h"
+#include "Inc/Widgets/RenderView.h"
 #include "Ext/imgui/imgui.h"
-#include "Framework/Common/Input.h"
-#include "Render/CommandBuffer.h"
-#include "Render/Renderer.h"
-#include "Framework/Common/Application.h"
+#include "Engine/Inc/Framework/Common/Input.h"
+#include "Engine/Inc/Render/CommandBuffer.h"
+#include "Engine/Inc/Render/Renderer.h"
+#include "Engine/Inc/Framework/Common/Application.h"
 
 namespace Ailu
 {
@@ -37,7 +35,9 @@ namespace Ailu
 			vMin.y += ImGui::GetWindowPos().y;
 			vMax.x += ImGui::GetWindowPos().x;
 			vMax.y += ImGui::GetWindowPos().y;
-			ImVec2 gameview_size = vMax - vMin;
+			ImVec2 gameview_size;
+			gameview_size.x = vMax.x - vMin.x;
+			gameview_size.y = vMax.y - vMin.y;
 			Vector2D<u32> window_size = Vector2D<u32>{ static_cast<u32>(cur_window.GetWidth()), static_cast<u32>(cur_window.GetHeight()) };
 			// 设置窗口背景颜色
 			ImGuiStyle& style = ImGui::GetStyle();
@@ -57,7 +57,7 @@ namespace Ailu
 				s_is_begin_resize = true;
 				if (!s_is_begin_resize)
 				{
-					_pre_tick_window_width = (f32)window_size.x;
+					_pre_tick_window_width =  (f32)window_size.x;
 					_pre_tick_window_height = (f32)window_size.y;
 				}
 			}
@@ -80,19 +80,6 @@ namespace Ailu
 			}
 			_pre_tick_width = gameview_size.x;
 			_pre_tick_height = gameview_size.y;
-			if (ImGui::BeginDragDropTarget())
-			{
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_ITEM"))
-				{
-					// 处理拖放目标
-					const Asset* dragged_asset = *(const Asset**)payload->Data;
-					g_pLogMgr->LogFormat(L"Dropped asset: {}", dragged_asset->_name.c_str());
-					// 在这里可以执行拖放后的操作，例如交换或移动资源等
-					AssetBrowser::s_draging_asset = nullptr;
-				}
-				ImGui::EndDragDropTarget();
-			}
-
 		}
 		else
 		{

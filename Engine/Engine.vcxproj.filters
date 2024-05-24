@@ -87,30 +87,6 @@
     <ClInclude Include="Inc\Framework\Events\LayerStack.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Ext\imgui\imgui.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Ext\imgui\backends\imgui_impl_win32.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Ext\imgui\imgui_internal.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Ext\imgui\imstb_rectpack.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Ext\imgui\imstb_textedit.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Ext\imgui\imstb_truetype.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Ext\imgui\imconfig.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Framework\Events\WindowEvent.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -129,13 +105,7 @@
     <ClInclude Include="Inc\Platform\WinInput.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Ext\imgui\backends\imgui_impl_dx12.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Render\Camera.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\Events\InputLayer.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Framework\Common\KeyCode.h">
@@ -2007,9 +1977,6 @@
     <ClInclude Include="Inc\Framework\Common\Path.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\ImGUIDLL.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Objects\CameraComponent.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2073,31 +2040,10 @@
     <ClInclude Include="Inc\Framework\Common\FileManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\RHI\DX12\CPUDescriptorManager.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\RHI\DX12\GPUDescriptorManager.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\ObjectDetail.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Render\FrameResource.h">
@@ -2110,6 +2056,60 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Framework\Common\Assert.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\imgui\backends\imgui_impl_win32.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\imgui\backends\imgui_impl_dx12.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\imgui\imgui.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\ObjectDetail.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\ImGUIDLL.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\imgui\imgui_internal.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\imgui\imconfig.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\imgui\imstb_rectpack.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\imgui\imstb_textedit.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Ext\imgui\imstb_truetype.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Framework\Events\InputLayer.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -2144,40 +2144,13 @@
     <ClCompile Include="Src\Framework\Events\LayerStack.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Ext\imgui\imgui.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Ext\imgui\imgui_demo.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Ext\imgui\imgui_draw.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Ext\imgui\imgui_tables.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Ext\imgui\imgui_widgets.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Ext\imgui\backends\imgui_impl_win32.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\Framework\Common\TimeMgr.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Platform\WinInput.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Ext\imgui\backends\imgui_impl_dx12.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\Render\Camera.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\Events\InputLayer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\Mesh.cpp">
@@ -2255,9 +2228,6 @@
     <ClCompile Include="Src\Objects\Object.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\ImGUIDLL.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\Objects\CameraComponent.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -2300,31 +2270,10 @@
     <ClCompile Include="Src\Framework\Common\FileManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\RHI\DX12\CPUDescriptorManager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\RHI\DX12\GPUDescriptorManager.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\ObjectDetail.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Render\FrameResource.cpp">
@@ -2342,31 +2291,78 @@
     <ClCompile Include="Src\Framework\Math\Geometry.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Ext\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Ext\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Ext\imgui\imgui.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\ObjectDetail.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\ImGUIDLL.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Ext\imgui\imgui_demo.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Ext\imgui\imgui_draw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Ext\imgui\imgui_tables.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Ext\imgui\imgui_widgets.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\Events\InputLayer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="after_build.bat">
       <Filter>源文件</Filter>
     </None>
-    <None Include="Res\Shaders\cbuffer.alasseti">
-      <Filter>头文件</Filter>
-    </None>
-    <None Include="Res\Shaders\gizmo.alasset" />
-    <None Include="Res\Shaders\PureColor.alasset" />
-    <None Include="Res\Shaders\common.alasseti" />
-    <None Include="Res\Shaders\lighting.alasseti">
-      <Filter>头文件</Filter>
-    </None>
-    <None Include="Res\Shaders\brdf.alasseti" />
-    <None Include="Res\Shaders\constants.alasseti" />
-    <None Include="Res\Shaders\input.alasseti" />
-    <None Include="Res\Shaders\filter_irradiance.alasset" />
-    <None Include="Res\Shaders\blit.alasset" />
-    <None Include="Res\Shaders\cubemap_gen.alasset" />
-    <None Include="Res\Shaders\depth_only.alasset" />
-    <None Include="Res\Shaders\error_fallback.alasset" />
-    <None Include="Res\Shaders\skybox.alasset" />
-    <None Include="Res\Shaders\wireframe.alasset" />
-    <None Include="Res\Shaders\deferred_shading.alasset" />
+    <None Include="Res\Shaders\blit.hlsl" />
+    <None Include="Res\Shaders\lighting.hlsli" />
+    <None Include="Res\Shaders\cbuffer.hlsli" />
+    <None Include="Res\Shaders\gizmo.hlsl" />
+    <None Include="Res\Shaders\PureColor.hlsl" />
+    <None Include="Res\Shaders\common.hlsli" />
+    <None Include="Res\Shaders\brdf.hlsli" />
+    <None Include="Res\Shaders\constants.hlsli" />
+    <None Include="Res\Shaders\input.hlsli" />
+    <None Include="Res\Shaders\filter_irradiance.hlsl" />
+    <None Include="Res\Shaders\cubemap_gen.hlsl" />
+    <None Include="Res\Shaders\depth_only.hlsl" />
+    <None Include="Res\Shaders\error_fallback.hlsl" />
+    <None Include="Res\Shaders\skybox.hlsl" />
+    <None Include="Res\Shaders\wireframe.hlsl" />
+    <None Include="Res\Shaders\deferred_shading.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Font Include="Res\Fonts\VictorMono-Regular.ttf" />

@@ -1,7 +1,6 @@
 #pragma once
 #ifndef __ASSET_BROWSER_H__
 #define __ASSET_BROWSER_H__
-#include <filesystem>
 #include "ImGuiWidget.h"
 #include "Ext/imgui/imgui.h"
 
@@ -14,16 +13,15 @@ namespace Ailu
     class AssetBrowser : public ImGuiWidget
     {
 	public:
-		inline static Asset* s_draging_asset = nullptr;
 		AssetBrowser(ImGuiWidget* asset_detail_widget);
 		~AssetBrowser();
 		void Open(const i32& handle) final;
 		void Close(i32 handle) final;
 	private:
-		void OnUpdateAssetList();
+		void OnAssetsChanged();
 		void ShowImpl() final;
 		void ShowNewMaterialWidget();
-		void DrawFolder(std::filesystem::path dir_path,u32 cur_file_index);
+		void DrawFolder(fs::path dir_path,u32 cur_file_index);
 		void DrawAsset(Asset* asset,u32 cur_file_index);
 		void MarkDirty() { _dirty = true; };
 	private:
@@ -38,7 +36,6 @@ namespace Ailu
 		TextureDetailView* _p_tex_detail_widget;
 		//当前目录下选中的文件索引
 		u32 _selected_file_index = 0;
-		u32 _selected_file_rename_index = -1;
 		Texture* _folder_icon;
 		Texture* _file_icon;
 		Texture* _mesh_icon;
@@ -47,9 +44,7 @@ namespace Ailu
 		Texture* _scene_icon;
 		Vector<Asset*> _cur_dir_assets;
 		WString _selected_file_sys_path;
-		bool _dirty;
-		char _rename_buffer[256];
-
+		bool _dirty = false;
     };
 }
 
