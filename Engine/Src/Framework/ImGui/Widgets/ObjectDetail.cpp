@@ -23,7 +23,7 @@ namespace Ailu
 		static bool s_is_texture_selector_open = true;
 	}
 
-	static void DrawProperty(u32& property_handle,SerializableProperty& prop, Object* obj, TextureSelector& selector_window)
+	static void DrawProperty(u32& property_handle, SerializableProperty& prop, Object* obj, TextureSelector& selector_window)
 	{
 		++property_handle;
 		switch (prop._type)
@@ -93,7 +93,7 @@ namespace Ailu
 			ImGui::Text("Texture2D : %s", prop._name.c_str());
 			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture*>>(prop);
 			auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
-			u32 cur_tex_id = tex? tex->ID() : Texture::s_p_default_white->ID();
+			u32 cur_tex_id = tex ? tex->ID() : Texture::s_p_default_white->ID();
 			//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
 			float contentWidth = ImGui::GetWindowContentRegionWidth();
 			float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
@@ -210,8 +210,8 @@ namespace Ailu
 							mat->SetTexture(name, new_tex);
 						}
 					}
-					
-					if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pResourceMgr->Get<Texture2D>(cur_tex_id)->GetNativeTextureHandle()) , ImVec2(s_mini_tex_size, s_mini_tex_size)))
+
+					if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pResourceMgr->Get<Texture2D>(cur_tex_id)->GetNativeTextureHandle()), ImVec2(s_mini_tex_size, s_mini_tex_size)))
 					{
 						selector_window.Open(mat_prop_index);
 					}
@@ -231,7 +231,7 @@ namespace Ailu
 					if (tex_usage == ETextureUsage::kAlbedo || tex_usage == ETextureUsage::kEmssive || tex_usage == ETextureUsage::kSpecular)
 					{
 						auto prop = mat->GetProperty(non_tex_prop_name);
-						ImGui::ColorEdit4(std::format("##{}",name).c_str(), static_cast<float*>(prop._value_ptr));
+						ImGui::ColorEdit4(std::format("##{}", name).c_str(), static_cast<float*>(prop._value_ptr));
 					}
 					else if (tex_usage == ETextureUsage::kMetallic || tex_usage == ETextureUsage::kRoughness)
 					{
@@ -275,7 +275,7 @@ namespace Ailu
 		func_show_prop(mat_prop_index, mat, "Emssive");
 	}
 
-	static void DrawComponentProperty(u32& property_handle,Component* comp, TextureSelector& selector_window)
+	static void DrawComponentProperty(u32& property_handle, Component* comp, TextureSelector& selector_window)
 	{
 		if (ImGui::CollapsingHeader(Component::GetTypeName(comp->GetType()).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 		{
@@ -359,7 +359,6 @@ namespace Ailu
 						static int s_mesh_selected_index = -1;
 						if (ImGui::BeginCombo("Select Mesh: ", mesh ? mesh->Name().c_str() : "missing"))
 						{
-							
 							for (auto it = g_pResourceMgr->ResourceBegin<Mesh>(); it != g_pResourceMgr->ResourceEnd<Mesh>(); it++)
 							{
 								auto mesh = ResourceMgr::IterToRefPtr<Mesh>(it);
@@ -424,7 +423,7 @@ namespace Ailu
 							static int s_shader_selected_index = -1;
 							if (ImGui::BeginCombo("Select Shader: ", mat->GetShader()->Name().c_str()))
 							{
-								
+
 								for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
 								{
 									auto shader = static_cast<Shader*>(it->second->second.get());
@@ -444,7 +443,7 @@ namespace Ailu
 							{
 								for (auto& prop : mat->GetAllProperties())
 								{
-									DrawProperty(property_handle,prop.second, mat.get(), selector_window);
+									DrawProperty(property_handle, prop.second, mat.get(), selector_window);
 								}
 							}
 						}
@@ -592,14 +591,18 @@ namespace Ailu
 				bool b_active = comp->Active();
 				ImGui::Checkbox("", &b_active);
 				ImGui::PopID();
-				comp->Active(b_active);
+				if (b_active != comp->Active())
+				{
+					comp->Active(b_active);
+					g_pSceneMgr->MarkCurSceneDirty();
+				}
 				ImGui::SameLine();
 				ImGui::PushID(comp_index);
 				if (ImGui::Button("x"))
 					comp_will_remove = comp.get();
 				ImGui::PopID();
 				ImGui::SameLine();
-				DrawComponentProperty(_property_handle,comp.get(), *_p_texture_selector);
+				DrawComponentProperty(_property_handle, comp.get(), *_p_texture_selector);
 				++comp_index;
 			}
 			if (comp_will_remove && comp_will_remove->GetType() != EComponentType::kTransformComponent)

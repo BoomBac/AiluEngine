@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: 590.79,609.872,588.192
-  Rotation: 0.0255051,-0.958279,0.0905481,0.269912
+  Position: -1051.41,684.823,479.093
+  Rotation: 0.0353875,0.842618,-0.0557924,0.534444
   Fov: 60
-  Aspect: 1.7875
+  Aspect: 3.71429
   Near: 86.8
   Far: 29398.2
-  ControllerRotation: 12610.8,30451.5
+  ControllerRotation: 12607.5,31435.2
 SceneGraph: 
   Name: root
     Components: 
@@ -15,11 +15,11 @@ SceneGraph:
         Position: 0,45,0
         Rotation: 0,9.72351e-06,0,1
         Scale: -13.99,0.01,0.01
-    Children: 5
+    Children: 6
       Name: plane
         Components: 
           TransformComponent: 
-            Position: 0,0,0
+            Position: 0,-2,0
             Rotation: 0,9.72351e-06,0,1
             Scale: 25,1,25
           StaticMeshComponent: 
@@ -35,7 +35,7 @@ SceneGraph:
           LightComponent: 
             Type: Directional
             Color: 1,1,1
-            Intensity: 0
+            Intensity: 1
             CastShadow: true
             ShadowArea: 8776.86
             ShadowDistance: 10521.8
@@ -58,7 +58,7 @@ SceneGraph:
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: 846,1355,-1411
+            Position: 108,1675,-45
             Rotation: -0.00308869,0.148036,-0.120523,0.981606
             Scale: 1,1,1
           LightComponent: 
@@ -68,7 +68,7 @@ SceneGraph:
             Radius: 2868
             Inner: 28.55
             Outer: 60
-            CastShadow: false
+            CastShadow: true
             ShadowArea: 0
             ShadowDistance: 0
         Children: 0
@@ -87,4 +87,14 @@ SceneGraph:
             Far: 1000
             Size: 0
             FovH: 60
+        Children: 0
+      Name: Actor6
+        Components: 
+          TransformComponent: 
+            Position: -408,541,31
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
+          StaticMeshComponent: 
+            MeshPath: 2ff30e48-6661-479b-a90c-863e606734f6
+            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0

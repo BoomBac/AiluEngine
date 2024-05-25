@@ -113,7 +113,6 @@ namespace Ailu
 		Camera::sCurrent->Far(_camera_far);
 		if (Input::s_block_input) return;
 		if (!_b_handle_input) return;
-		float lerp_speed = delta_time / 1000.0f;
 		static bool init = false;
 		static Vector2f pre_mouse_pos;
 		float move_speed = 0.1f;
@@ -164,7 +163,7 @@ namespace Ailu
 				}
 			}
 			pre_mouse_pos = cur_mouse_pos;
-			FirstPersonCameraController::s_instance.InterpolateTo(target_pos,target_rotation.x, target_rotation.y, lerp_speed * _lerp_speed_multifactor);
+			FirstPersonCameraController::s_instance.InterpolateTo(target_pos,target_rotation.x, target_rotation.y, delta_time * _lerp_speed_multifactor);
 		}
 		pre_tick_camera = Camera::sCurrent;
 	}

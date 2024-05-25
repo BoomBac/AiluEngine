@@ -903,22 +903,24 @@ namespace Ailu
 			const WString cur_path = PathUtils::FormatFilePath(file.wstring());
 			for (auto it = ResourceBegin<Shader>(); it != ResourceEnd<Shader>(); it++)
 			{
-				
-				auto shader = static_cast<Shader*>((*it).second->second.get());
-				for (auto& head_file : shader->GetSourceFiles())
+				auto shader = dynamic_cast<Shader*>((*it).second->second.get());
+				if (shader)
 				{
-					if (head_file == cur_path)
+					for (auto& head_file : shader->GetSourceFiles())
 					{
-						AddResourceTask([=]()->Ref<void> {
-							if (shader->Compile())
-							{
-								auto mats = shader->GetAllReferencedMaterials();
-								for (auto mat = mats.begin(); mat != mats.end(); mat++)
-									(*mat)->ChangeShader(shader);
-							}
-							return nullptr;
-							});
-						break;
+						if (head_file == cur_path)
+						{
+							AddResourceTask([=]()->Ref<void> {
+								if (shader->Compile())
+								{
+									auto mats = shader->GetAllReferencedMaterials();
+									for (auto mat = mats.begin(); mat != mats.end(); mat++)
+										(*mat)->ChangeShader(shader);
+								}
+								return nullptr;
+								});
+							break;
+						}
 					}
 				}
 			}

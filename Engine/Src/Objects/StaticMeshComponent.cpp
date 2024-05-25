@@ -56,6 +56,7 @@ namespace Ailu
 	void StaticMeshComponent::SetMesh(Ref<Mesh>& mesh)
 	{
 		_p_mesh = mesh;
+		_transformed_aabbs.resize(_p_mesh->_bound_boxs.size());
 	}
 
 	void StaticMeshComponent::AddMaterial(Ref<Material> mat)

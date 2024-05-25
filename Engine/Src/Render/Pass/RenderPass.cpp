@@ -113,7 +113,7 @@ namespace Ailu
 	}
 	void ShadowCastPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		auto cmd = CommandBufferPool::Get("ShadowCastPass");
+		auto cmd = CommandBufferPool::Get("MainLightShadowCastPass");
 		cmd->Clear();
 		{
 			ProfileBlock profile(cmd.get(), _name);
@@ -129,10 +129,11 @@ namespace Ailu
 			}
 			context->ExecuteAndWaitCommandBuffer(cmd);
 			cmd->Clear();
+			cmd->SetName("AddiShadowCast");
 			obj_index = 0;
 			if (rendering_data._actived_shadow_count > 1)
 			{
-				for (int i = 0; i < rendering_data._actived_shadow_count; i++)
+				for (int i = 0; i < rendering_data._actived_shadow_count - 1; i++)
 				{
 					
 					cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(),0,i);

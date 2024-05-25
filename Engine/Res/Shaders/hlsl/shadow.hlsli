@@ -46,8 +46,8 @@ float ShadowDistaanceAtten(float dis, float max_dis)
 		float dis = distance(_CameraPos.xyz,world_pos);
 		if(dis > shadow_distance)
 			return 1.0;	
-		float z_bias = 0.0025 * tan(acos(nl));
-		z_bias = clamp(z_bias, 0, 0.0005);
+		float z_bias = 0.025 * tan(acos(nl));
+		z_bias = clamp(z_bias, 0, 0.01);
 		shadow_coord.xyz /= shadow_coord.w;
 		float depth = saturate(shadow_coord.z);
 		float2 shadow_uv;

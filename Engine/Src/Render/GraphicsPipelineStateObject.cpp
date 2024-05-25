@@ -122,6 +122,7 @@ namespace Ailu
 		shader = g_pResourceMgr->Get<Shader>(L"Shaders/gizmo.alasset");
 		pso_desc = GraphicsPipelineStateInitializer::GetNormalTransparentPSODesc();
 		pso_desc._blend_state._color_mask = EColorMask::k_RGB;//不写入alpha，否则其最后拷贝到GameView时还会和imgui背景色混合，会导致颜色不对
+		pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLess>::GetRHI();
 		pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
 		pso_desc._topology = ETopology::kLine;
 		pso_desc._p_vertex_shader = shader;

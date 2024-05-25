@@ -124,7 +124,7 @@ namespace Ailu
 				_update_lag += last_mark;
 				g_pTimeMgr->Mark();
 				for (Layer* layer : *_layer_stack)
-					layer->OnUpdate(ModuleTimeStatics::RenderDeltatime);
+					layer->OnUpdate(ModuleTimeStatics::RenderDeltatime * 0.001f);
 				_p_window->OnUpdate();
 				g_pResourceMgr->Tick(delta_time);
 				while (_render_lag > target_ms)
