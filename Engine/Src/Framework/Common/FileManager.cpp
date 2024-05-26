@@ -10,29 +10,57 @@ namespace Ailu
 	}
 	void FileManager::DeleteDirectory(const WString& dir_name)
 	{
-		fs::remove(fs::path(dir_name));
+		fs::remove_all(fs::path(dir_name));
 	}
 	void FileManager::RenameDirectory(const WString& old_name, const WString& new_name)
 	{
 		fs::rename(fs::path(old_name), fs::path(new_name));
 	}
-	void FileManager::CopyFile(const WString& src_file, const WString& dest_file)
+	bool FileManager::CopyFile(const WString& src_file, const WString& dest_file)
 	{
 		if (PathUtils::FormatFilePath(src_file) == PathUtils::FormatFilePath(dest_file))
-			return;
+			return true;
 		try 
 		{
 			if (!FileManager::Exist(src_file))
 			{
-				g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} not exist on the disk!", src_file);
-				return;
+				g_pLogMgr->LogErrorFormat(std::source_location::current(), L"CopyFile: Path {} not exist on the disk!", src_file);
+				return false;
 			}
 			fs::copy_file(src_file, dest_file, fs::copy_options::overwrite_existing);
 			LOG_INFO("File copied successfully.");
+			return true;
 		}
 		catch (const std::filesystem::filesystem_error& e)
 		{
 			LOG_ERROR("Failed to copy file: {}", e.what());
+			return false;
+		}
+	}
+	bool FileManager::CopyDirectory(const WString& src_file, const WString& dest_file, bool recursive)
+	{
+		if (PathUtils::FormatFilePath(src_file) == PathUtils::FormatFilePath(dest_file))
+			return true;
+		try
+		{
+			if (!FileManager::Exist(src_file))
+			{
+				g_pLogMgr->LogErrorFormat(std::source_location::current(), L"CopyDirectory: Path {} not exist on the disk!", src_file);
+				return false;
+			}
+			auto flag = fs::copy_options::overwrite_existing;
+			if (recursive)
+			{
+				flag |= fs::copy_options::recursive;
+			}
+			fs::copy(src_file, dest_file, flag);
+			LOG_INFO("Directory copied successfully.");
+			return true;
+		}
+		catch (const std::filesystem::filesystem_error& e)
+		{
+			LOG_ERROR("Failed to copy file: {}", e.what());
+			return false;
 		}
 	}
 	bool FileManager::Exist(const WString& path)
@@ -42,8 +70,12 @@ namespace Ailu
 
 	void FileManager::BackToParent()
 	{
-		s_cur_path = s_cur_path.parent_path();
-		SetCurPath(s_cur_path);
+		auto parent = s_cur_path.parent_path();
+		if(parent.string().find("Res") != std::string::npos)
+		{
+			s_cur_path = parent;
+			SetCurPath(s_cur_path);
+		}
 	}
 	void FileManager::SetCurPath(const fs::path& path)
 	{
@@ -62,7 +94,6 @@ namespace Ailu
 			s_cur_path_str = path.wstring();
 			PathUtils::FormatFilePathInPlace(s_cur_path_str);
 		}
-		s_cur_dir_str += L"/";
 	}
 
 	bool FileManager::CreateFile(const WString& sys_path, bool override)

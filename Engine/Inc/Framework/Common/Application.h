@@ -40,6 +40,7 @@ namespace Ailu
         static constexpr double kMsPerUpdate = 16.66;
         static constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
         inline static double s_target_framecount = kTargetFrameRate; 
+        inline static double s_target_lag = kMsPerRender;
         static WString GetWorkingPath();
         int Initialize() override;
         int Initialize(ApplicationDesc desc);

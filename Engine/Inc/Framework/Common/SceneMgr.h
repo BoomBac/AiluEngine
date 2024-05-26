@@ -47,7 +47,7 @@ namespace Ailu
 		void Finalize() final;
 		void Tick(const float& delta_time) final;
 		static Scene* Create(const std::string& name);
-		SceneActor* AddSceneActor(std::string_view name,std::string_view mesh);
+		SceneActor* AddSceneActor(std::string_view name,Ref<Mesh> mesh);
 		SceneActor* AddSceneActor(std::string_view name,const Camera& camera);
 		SceneActor* AddSceneActor();
 		void MarkCurSceneDirty() { _p_current->MarkDirty(); };

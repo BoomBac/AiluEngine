@@ -1,17 +1,15 @@
-#include "pch.h"
-#include "Framework/ImGui/Widgets/ObjectDetail.h"
+#include "Inc/Widgets/ObjectDetail.h"
+#include "Inc/Widgets/CommonTextureWidget.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 
-#include "Objects/TransformComponent.h"
-#include "Objects/StaticMeshComponent.h"
-#include "Objects/CameraComponent.h"
-
-#include "Render/CommandBuffer.h"
-#include "Render/Renderer.h"
-#include "Framework/ImGui/Widgets/CommonTextureWidget.h"
-#include "Framework/Common/Asset.h"
-#include "Framework/Common/ResourceMgr.h"
+#include "Engine/Inc/Objects/TransformComponent.h"
+#include "Engine/Inc/Objects/StaticMeshComponent.h"
+#include "Engine/Inc/Objects/CameraComponent.h"
+#include "Engine/Inc/Render/CommandBuffer.h"
+#include "Engine/Inc/Render/Renderer.h"
+#include "Engine/Inc/Framework/Common/Asset.h"
+#include "Engine/Inc/Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
@@ -23,7 +21,7 @@ namespace Ailu
 		static bool s_is_texture_selector_open = true;
 	}
 
-	static void DrawProperty(u32& property_handle, SerializableProperty& prop, Object* obj, TextureSelector& selector_window)
+	static void DrawProperty(u32& property_handle,SerializableProperty& prop, Object* obj, TextureSelector& selector_window)
 	{
 		++property_handle;
 		switch (prop._type)
@@ -93,7 +91,7 @@ namespace Ailu
 			ImGui::Text("Texture2D : %s", prop._name.c_str());
 			auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture*>>(prop);
 			auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
-			u32 cur_tex_id = tex ? tex->ID() : Texture::s_p_default_white->ID();
+			u32 cur_tex_id = tex? tex->ID() : Texture::s_p_default_white->ID();
 			//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
 			float contentWidth = ImGui::GetWindowContentRegionWidth();
 			float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
@@ -210,8 +208,8 @@ namespace Ailu
 							mat->SetTexture(name, new_tex);
 						}
 					}
-
-					if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pResourceMgr->Get<Texture2D>(cur_tex_id)->GetNativeTextureHandle()), ImVec2(s_mini_tex_size, s_mini_tex_size)))
+					
+					if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pResourceMgr->Get<Texture2D>(cur_tex_id)->GetNativeTextureHandle()) , ImVec2(s_mini_tex_size, s_mini_tex_size)))
 					{
 						selector_window.Open(mat_prop_index);
 					}
@@ -231,7 +229,7 @@ namespace Ailu
 					if (tex_usage == ETextureUsage::kAlbedo || tex_usage == ETextureUsage::kEmssive || tex_usage == ETextureUsage::kSpecular)
 					{
 						auto prop = mat->GetProperty(non_tex_prop_name);
-						ImGui::ColorEdit4(std::format("##{}", name).c_str(), static_cast<float*>(prop._value_ptr));
+						ImGui::ColorEdit4(std::format("##{}",name).c_str(), static_cast<float*>(prop._value_ptr));
 					}
 					else if (tex_usage == ETextureUsage::kMetallic || tex_usage == ETextureUsage::kRoughness)
 					{
@@ -275,7 +273,7 @@ namespace Ailu
 		func_show_prop(mat_prop_index, mat, "Emssive");
 	}
 
-	static void DrawComponentProperty(u32& property_handle, Component* comp, TextureSelector& selector_window)
+	static void DrawComponentProperty(u32& property_handle,Component* comp, TextureSelector& selector_window)
 	{
 		if (ImGui::CollapsingHeader(Component::GetTypeName(comp->GetType()).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 		{
@@ -359,6 +357,7 @@ namespace Ailu
 						static int s_mesh_selected_index = -1;
 						if (ImGui::BeginCombo("Select Mesh: ", mesh ? mesh->Name().c_str() : "missing"))
 						{
+							
 							for (auto it = g_pResourceMgr->ResourceBegin<Mesh>(); it != g_pResourceMgr->ResourceEnd<Mesh>(); it++)
 							{
 								auto mesh = ResourceMgr::IterToRefPtr<Mesh>(it);
@@ -404,7 +403,7 @@ namespace Ailu
 						if (ImGui::BeginCombo("Select Material: ", mat ? mat->Name().c_str() : "missing"))
 						{
 							for (auto it = g_pResourceMgr->ResourceBegin<Material>(); it != g_pResourceMgr->ResourceEnd<Material>(); it++)
-							{				
+							{
 								auto mat = ResourceMgr::IterToRefPtr<Material>(it);
 								if (ImGui::Selectable(mat->Name().c_str(), s_mat_selected_index == mat_count))
 									s_mat_selected_index = mat_count;
@@ -423,7 +422,7 @@ namespace Ailu
 							static int s_shader_selected_index = -1;
 							if (ImGui::BeginCombo("Select Shader: ", mat->GetShader()->Name().c_str()))
 							{
-
+								
 								for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
 								{
 									auto shader = ResourceMgr::IterToRefPtr<Shader>(it);
@@ -443,7 +442,7 @@ namespace Ailu
 							{
 								for (auto& prop : mat->GetAllProperties())
 								{
-									DrawProperty(property_handle, prop.second, mat.get(), selector_window);
+									DrawProperty(property_handle,prop.second, mat.get(), selector_window);
 								}
 							}
 						}
@@ -591,18 +590,14 @@ namespace Ailu
 				bool b_active = comp->Active();
 				ImGui::Checkbox("", &b_active);
 				ImGui::PopID();
-				if (b_active != comp->Active())
-				{
-					comp->Active(b_active);
-					g_pSceneMgr->MarkCurSceneDirty();
-				}
+				comp->Active(b_active);
 				ImGui::SameLine();
 				ImGui::PushID(comp_index);
 				if (ImGui::Button("x"))
 					comp_will_remove = comp.get();
 				ImGui::PopID();
 				ImGui::SameLine();
-				DrawComponentProperty(_property_handle, comp.get(), *_p_texture_selector);
+				DrawComponentProperty(_property_handle,comp.get(), *_p_texture_selector);
 				++comp_index;
 			}
 			if (comp_will_remove && comp_will_remove->GetType() != EComponentType::kTransformComponent)

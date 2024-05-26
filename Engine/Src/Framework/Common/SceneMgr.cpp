@@ -93,10 +93,10 @@ namespace Ailu
 		return s_all_scene.back().get();
 	}
 
-	SceneActor* SceneMgr::AddSceneActor(std::string_view name, std::string_view mesh)
+	SceneActor* SceneMgr::AddSceneActor(std::string_view name, Ref<Mesh> mesh)
 	{
 		auto p_actor = Actor::Create<SceneActor>(name.data());
-		p_actor->AddComponent<StaticMeshComponent>(g_pResourceMgr->GetRef<Mesh>(ToWStr(name.data())), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR_new.alasset"));
+		p_actor->AddComponent<StaticMeshComponent>(mesh, g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR_new.alasset"));
 		_p_current->AddObject(p_actor);
 		return p_actor;
 	}

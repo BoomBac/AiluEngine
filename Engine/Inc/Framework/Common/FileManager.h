@@ -17,12 +17,18 @@ namespace Ailu
 		static void CreateDirectory(const WString& dir_name);
 		static void DeleteDirectory(const WString& dir_name);
 		static void RenameDirectory(const WString& old_name, const WString& new_name);
-		static void CopyFile(const WString& src_file, const WString& dest_file);
+		static bool CopyFile(const WString& src_file, const WString& dest_file);
+		static bool CopyDirectory(const WString& src_file, const WString& dest_file,bool recursive = true);
 		static bool Exist(const WString& path);
 		static void BackToParent();
-		static const WString& GetCurPathStr() { return s_cur_path_str; };
-		static const WString& GetCurDirStr() { return s_cur_dir_str; }
-		static const fs::path& GetCurPath() { return s_cur_path; }
+		static const WString& GetCurSysPathStr() { return s_cur_path_str; };
+		//系统路径 aa/bb
+		static const WString& GetCurSysDirStr() { return s_cur_dir_str; }
+		static const fs::path& GetCurSysPath() { return s_cur_path; }
+		static WString GetCurAssetDirStr()
+		{
+			return PathUtils::ExtractAssetPath(s_cur_path_str);
+		}
 		static void SetCurPath(const fs::path& path);
 
 		static bool CreateFile(const WString& sys_path,bool override = true);

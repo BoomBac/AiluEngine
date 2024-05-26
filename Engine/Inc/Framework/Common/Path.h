@@ -189,14 +189,18 @@ namespace Ailu
 			size_t found = filePath.find_last_of(L"/\\");
 			size_t dot_pos = filePath.find_last_of(L".");
 
-			if (found != std::string::npos && dot_pos != std::string::npos)
+			if (found != std::string::npos)
 			{
 				if (include_ext)
 					return WString(filePath.substr(found + 1).data());
 				else
 				{
-					size_t name_length = dot_pos - (found + 1);
-					return WString(filePath.substr(found + 1, name_length).data(), name_length);
+					if (dot_pos != std::string::npos)
+					{
+						size_t name_length = dot_pos - (found + 1);
+						return WString(filePath.substr(found + 1, name_length).data(), name_length);
+					}
+					return WString(filePath.substr(found + 1).data());
 				}
 			}
 			else
@@ -243,6 +247,13 @@ namespace Ailu
 			return asset_path.substr(asset_path.find_last_of(L"."));
 		}
 
+		static WString ExtarctDirectory(const WString& asset_path)
+		{
+			WString	dir = asset_path;
+			if(dir.find(L"/\\") != dir.npos)
+				FormatFilePathInPlace(dir);
+			return dir.substr(0, asset_path.find_last_of(L"/") + 1);
+		}
 	};
 
 }

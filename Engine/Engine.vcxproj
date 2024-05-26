@@ -119,7 +119,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)\Engine\;$(SolutionDir)\Engine\Inc\;$(SolutionDir)\Engine\Ext\;$(SolutionDir)\Engine\Ext\imgui;$(SolutionDir)\Engine\Ext\fbxsdk\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\;$(SolutionDir)\Engine\Inc\;$(SolutionDir)\Engine\Ext\;$(SolutionDir)\Engine\Ext\imgui;$(SolutionDir)\Engine\Ext\fbxsdk\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/FS /utf-8 %(AdditionalOptions)</AdditionalOptions>
       <EnableModules>true</EnableModules>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -512,11 +512,11 @@
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h" />
+    <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\ObjectDetail.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h" />
     <ClInclude Include="Inc\Framework\Interface\IParser.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
@@ -611,11 +611,11 @@
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp" />
+    <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\ObjectDetail.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp" />
     <ClCompile Include="Src\Framework\Math\Geometry.cpp" />
     <ClCompile Include="Src\Framework\Math\Guid.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />

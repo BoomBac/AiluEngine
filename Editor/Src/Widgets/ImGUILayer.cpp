@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "Framework/ImGui/ImGuiLayer.h"
+#include "Inc/Widgets/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/backends/imgui_impl_win32.h"
@@ -22,11 +22,6 @@
 #include "Render/Mesh.h"
 #include "Animation/Clip.h"
 #include "Render/Renderer.h"
-#include "Framework/ImGui/Widgets/AssetBrowser.h"
-#include "Framework/ImGui/Widgets/AssetTable.h"
-#include "Framework/ImGui/Widgets/ObjectDetail.h"
-#include "Framework/ImGui/Widgets/Outputlog.h"
-#include "Framework/ImGui/Widgets/CommonTextureWidget.h"
 #include "Framework/Common/Profiler.h"
 
 namespace ImguiTree
@@ -136,28 +131,28 @@ namespace Ailu
 
 	void Ailu::ImGUILayer::OnAttach()
 	{
-		auto tex_detail_view = _widgets.emplace_back(std::move(MakeScope<TextureDetailView>())).get();
-		_widgets.emplace_back(std::move(MakeScope<AssetBrowser>(tex_detail_view)));
-		_widgets.emplace_back(std::move(MakeScope<AssetTable>()));
-		_widgets.emplace_back(std::move(MakeScope<ObjectDetail>(&s_cur_selected_actor)));
-		_widgets.emplace_back(std::move(MakeScope<RenderTextureView>()));
-		_mesh_browser.Open(ImGuiWidget::GetGlobalWidgetHandle());
-		for (auto appender : g_pLogMgr->GetAppenders())
-		{
-			auto imgui_appender = dynamic_cast<ImGuiLogAppender*>(appender);
-			if (imgui_appender)
-			{
-				_widgets.emplace_back(std::move(MakeScope<OutputLog>(imgui_appender)));
-			}
-		}
-		_widgets.emplace_back(std::move(MakeScope<RenderView>()));
-		for (auto& widget : _widgets)
-		{
-			widget->Open(ImGuiWidget::GetGlobalWidgetHandle());
-		}
-		//默认不显示纹理细节窗口
-		tex_detail_view->Close(tex_detail_view->Handle());
-		ImGuiWidget::SetFocus("AssetBrowser");
+		//auto tex_detail_view = _widgets.emplace_back(std::move(MakeScope<TextureDetailView>())).get();
+		//_widgets.emplace_back(std::move(MakeScope<AssetBrowser>(tex_detail_view)));
+		//_widgets.emplace_back(std::move(MakeScope<AssetTable>()));
+		//_widgets.emplace_back(std::move(MakeScope<ObjectDetail>(&s_cur_selected_actor)));
+		//_widgets.emplace_back(std::move(MakeScope<RenderTextureView>()));
+		//_mesh_browser.Open(ImGuiWidget::GetGlobalWidgetHandle());
+		//for (auto appender : g_pLogMgr->GetAppenders())
+		//{
+		//	auto imgui_appender = dynamic_cast<ImGuiLogAppender*>(appender);
+		//	if (imgui_appender)
+		//	{
+		//		_widgets.emplace_back(std::move(MakeScope<OutputLog>(imgui_appender)));
+		//	}
+		//}
+		//_widgets.emplace_back(std::move(MakeScope<RenderView>()));
+		//for (auto& widget : _widgets)
+		//{
+		//	widget->Open(ImGuiWidget::GetGlobalWidgetHandle());
+		//}
+		////默认不显示纹理细节窗口
+		//tex_detail_view->Close(tex_detail_view->Handle());
+		//ImGuiWidget::SetFocus("AssetBrowser");
 	}
 
 	void Ailu::ImGUILayer::OnDetach()
@@ -214,12 +209,12 @@ namespace Ailu
 			else
 				space = space.substr(0, space.size() - 1);
 		}
-		for (auto pass : g_pRenderer->GetRenderPasses())
-		{
-			bool active = pass->IsActive();
-			ImGui::Checkbox(pass->GetName().c_str(), &active);
-			pass->SetActive(active);
-		}
+		//for (auto pass : g_pRenderer->GetRenderPasses())
+		//{
+		//	bool active = pass->IsActive();
+		//	ImGui::Checkbox(pass->GetName().c_str(), &active);
+		//	pass->SetActive(active);
+		//}
 
 		static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame" };
 		static int item_current_idx = 0; // Here we store our selection data as an index.
@@ -242,18 +237,18 @@ namespace Ailu
 
 		ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
 		ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 2.0f, "%.2f");
-		float shadow_dis_m = g_pRenderer->_shadow_distance / 100.0f;
-		ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
+		//float shadow_dis_m = g_pRenderer->_shadow_distance / 100.0f;
+		//ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
 		f32 u = Application::s_target_framecount;
 		ImGui::SliderFloat("TargetFrame m", &u, 1.f, 999.0f, "%.2f");
 		Application::s_target_framecount = u;
-		g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
+		//g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
 		ImGui::Checkbox("Expand", &show);
 		ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
 		ImGui::Checkbox("ShowRT", &s_show_rt);
 		if (ImGui::Button("Capture"))
 		{
-			g_pRenderer->TakeCapture();
+			//g_pRenderer->TakeCapture();
 		}
 		for (auto& info : g_pResourceMgr->_import_infos)
 		{
@@ -270,10 +265,10 @@ namespace Ailu
 		TreeStats::s_common_property_handle = 0;
 		ShowWorldOutline();
 		_mesh_browser.Show();
-		for(auto& widget : _widgets)
-		{
-			widget->Show();
-		}
+		//for(auto& widget : _widgets)
+		//{
+		//	widget->Show();
+		//}
 	}
 
 	void Ailu::ImGUILayer::Begin()
@@ -289,7 +284,7 @@ namespace Ailu
 		const Window& window = Application::GetInstance()->GetWindow();
 		ImGuiIO& io = ImGui::GetIO();
 		io.DisplaySize = ImVec2(static_cast<float>(window.GetWidth()), static_cast<float>(window.GetHeight()));
-		ImGuiWidget::EndFrame();
+		//ImGuiWidget::EndFrame();
 		ImGui::EndFrame();
 		ImGui::Render();
 	}
@@ -455,37 +450,33 @@ namespace Ailu
 
 	void MeshBrowser::Show()
 	{
-		ImguiWindow::Show();
-		static int s_cur_mesh_index = 0;
-		static int object_id = 0;
-		u32 mesh_count = 0;
-		Ref<Mesh> selected_mesh = nullptr;
-		ImGui::Begin("MeshBrowser", &_b_show);
-		if (ImGui::BeginListBox("Meshs"))
-		{
-			for (auto it = g_pResourceMgr->ResourceBegin<Mesh>(); it != g_pResourceMgr->ResourceEnd<Mesh>(); it++)
-			{
-				auto mesh = ResourceMgr::IterToRefPtr<Mesh>(it);
-				bool is_selected = mesh_count == s_cur_mesh_index;
-				if (ImGui::Selectable(mesh->Name().c_str(), &is_selected))
-				{
-					s_cur_mesh_index = mesh_count;
-					selected_mesh = mesh;
-				}
-				++mesh_count;
-			}
-			ImGui::EndListBox();
-		}
-		if (ImGui::Button("Place in Scene"))
-		{
-			g_pSceneMgr->AddSceneActor(std::format("object{}", object_id++), selected_mesh);
-		}
-		if (ImGui::Button("Add Camera Test"))
-		{
-			Camera cam(1.78f);
-			g_pSceneMgr->AddSceneActor(std::format("camera{}", object_id++), cam);
-		}
-		ImGui::End();
+		//ImguiWindow::Show();
+		//static int s_cur_mesh_index = 0;
+		//static int object_id = 0;
+		//ImGui::Begin("MeshBrowser", &_b_show);
+		//if (ImGui::BeginListBox("Meshs"))
+		//{
+		//	for (auto it = g_pResourceMgr->ResourceBegin<Mesh>(); it != g_pResourceMgr->ResourceEnd<Mesh>(); it++)
+		//	{
+
+		//	}
+		//	ImGui::EndListBox();
+		//}
+		//auto [meshs, mesh_count] = MeshPool::GetMeshForGUI();
+		//if (ImGui::ListBox("Meshs", &s_cur_mesh_index, meshs, mesh_count))
+		//{
+		//	LOG_INFO(meshs[s_cur_mesh_index]);
+		//}
+		//if (ImGui::Button("Place in Scene"))
+		//{
+		//	g_pSceneMgr->AddSceneActor(std::format("object{}", object_id++), meshs[s_cur_mesh_index]);
+		//}
+		//if (ImGui::Button("Add Camera Test"))
+		//{
+		//	Camera cam(1.78f);
+		//	g_pSceneMgr->AddSceneActor(std::format("camera{}", object_id++), cam);
+		//}
+		//ImGui::End();
 	}
 	//----------------------------------------------------------------------------MeshBrowser---------------------------------------------------------------------
 }

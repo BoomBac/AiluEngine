@@ -1,7 +1,6 @@
 #pragma once
 #ifndef __ASSET_BROWSER_H__
 #define __ASSET_BROWSER_H__
-#include <filesystem>
 #include "ImGuiWidget.h"
 #include "Ext/imgui/imgui.h"
 
@@ -14,21 +13,17 @@ namespace Ailu
     class AssetBrowser : public ImGuiWidget
     {
 	public:
-		inline static Asset* s_draging_asset = nullptr;
 		AssetBrowser(ImGuiWidget* asset_detail_widget);
 		~AssetBrowser();
 		void Open(const i32& handle) final;
 		void Close(i32 handle) final;
 	private:
-		void OnUpdateAssetList();
+		void OnAssetsChanged();
 		void ShowImpl() final;
 		void ShowNewMaterialWidget();
-		void DrawFolder(std::filesystem::path dir_path,u32 cur_file_index);
+		void DrawFolder(fs::path dir_path,u32 cur_file_index);
 		void DrawAsset(Asset* asset,u32 cur_file_index);
 		void MarkDirty() { _dirty = true; };
-		void DrawTreePannelHelper(const WString& cur_path,String& indent);
-		void DrawTreePannel();
-		void DrawMainPannel();
 	private:
 		inline static ImVec4 kColorUnimported = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
 		inline static ImVec4 kColorBg = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -38,17 +33,9 @@ namespace Ailu
 		ImVec2 _window_size,_asset_content_size;
 		f32 _preview_tex_size = 64, _paddinged_preview_tex_size_padding = _preview_tex_size * 1.15f;
 		u32 _icon_num_per_row;
-		f32 _left_pannel_width, _right_pannel_width;
-		const String DragFolderType = "DRAG_FOLDER_INNEAR";
-		const String DragFolderTreeType = "DRAG_FOLDER_TREE_INNEAR";
-		const String DragAssetType = "DRAG_ASSET_INNEAR";
-		WString _draging_file;
-		bool _is_drag_enable = false;
 		TextureDetailView* _p_tex_detail_widget;
-		Map<WString, Vector<Asset*>> _dir_asset_map;
 		//当前目录下选中的文件索引
 		u32 _selected_file_index = 0;
-		u32 _selected_file_rename_index = -1;
 		Texture* _folder_icon;
 		Texture* _file_icon;
 		Texture* _mesh_icon;
@@ -57,9 +44,7 @@ namespace Ailu
 		Texture* _scene_icon;
 		Vector<Asset*> _cur_dir_assets;
 		WString _selected_file_sys_path;
-		bool _dirty;
-		char _rename_buffer[256];
-
+		bool _dirty = false;
     };
 }
 

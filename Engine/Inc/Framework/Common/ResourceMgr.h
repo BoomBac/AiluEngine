@@ -84,12 +84,14 @@ namespace Ailu
 	class SearchFilterByDirectory : public ISearchFilter
 	{
 	public:
-		SearchFilterByDirectory(Vector<WString> directories) : _directories(directories) {}
+		SearchFilterByDirectory(Vector<WString> directories) : _directories(directories) 
+		{
+		}
 		bool Filter(Asset* asset) const final
 		{
 			for (auto& dir : _directories)
 			{
-				auto path_prex = asset->_asset_path.substr(0, asset->_asset_path.find_last_of(L"/") + 1);
+				auto path_prex = asset->_asset_path.substr(0, asset->_asset_path.find_last_of(L"/"));
 				if (path_prex == dir)
 					return true;
 			}
@@ -102,6 +104,7 @@ namespace Ailu
 	class ResourceMgr : public IRuntimeModule
 	{
 		using ResourcePoolContainer = Map<WString, Ref<Object>>;
+		using ResourcePoolContainerIter = ResourcePoolContainer::iterator;
 		using ResourcePoolLut = Map<u32, ResourcePoolContainer::iterator>;
 		using ResourceTask = std::function<void()>;
 		using OnResourceTaskCompleted = std::function<void(Ref<void> asset)>;
@@ -116,6 +119,7 @@ namespace Ailu
 	public:
 		inline const static std::set<String> kLDRImageExt = { ".png",".PNG",".tga",".TGA",".jpg",".JPG",".jpg",".JPEG" };
 		inline const static std::set<String> kHDRImageExt = { ".exr",".EXR",".hdr",".HDR" };
+		inline const static std::set<String> kMeshExt = { ".obj",".OBJ" ,".fbx",".FBX"};
 	public:
 		int Initialize() final;
 		void Finalize() final;
@@ -125,13 +129,19 @@ namespace Ailu
 		u64 AssetNum() { return _asset_db.size(); }
 		void SaveScene(Scene* scene, std::string& scene_path);
 		Scene* LoadScene(std::string& scene_path);
-
+		//在目标位置创建资产对象并将其注册
 		Asset* CreateAsset(const WString& asset_path, Ref<Object> obj,bool overwrite = true);
-		void AttachToAsset(Asset* asset, Ref<Object> obj);
 		void DeleteAsset(Asset* asset);
+		bool RenameAsset(Asset* p_asset, const WString& new_name);
+		bool MoveAsset(Asset* p_asset,const WString& new_asset_path);
 		void SaveAsset(const Asset* asset);
 		void SaveAllUnsavedAssets();
 		Asset* GetLinkedAsset(Object* obj);
+		//.../Res，最后不带斜杠
+		const WString& GetProjectRootSysPath() const
+		{
+			return _project_root_path;
+		}
 
 		//static Material* LoadAsset(const String& asset_path);
 		Ref<void> ImportResource(const WString& sys_path, const ImportSetting& setting = ImportSetting::Default());
@@ -145,10 +155,6 @@ namespace Ailu
 
 		Asset* GetAsset(const WString& asset_path) const;
 		Vector<Asset*> GetAssets(const ISearchFilter& filter) const;
-		bool RenameAsset(Asset* p_asset, const String& new_name);
-
-		static WString GetObjectSysPath(Object* obj);
-		static void SetObjectSysPath(Object* obj, const WString& new_sys_path);
 
 		void AddAssetChangedListener(std::function<void()> callback) { _asset_changed_callbacks.emplace_back(callback); };
 		void RemoveAssetChangedListener(std::function<void()> callback)
@@ -160,15 +166,9 @@ namespace Ailu
 		}
 
 		template<typename T>
-		T* Load(const WString& asset_path, const ImportSetting* import_setting = nullptr);
+		T* Load(const WString& asset_path);
 		template<typename T>
-		T* Load(const Guid& guid, const ImportSetting* import_setting = nullptr);
-		/// <summary>
-		/// 
-		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="res_id">: texture and material: AssetPath，mesh: AssetPath_Name，shader: AssetPath_VS_PS</param>
-		/// <returns></returns>
+		T* Load(const Guid& guid);
 		template<typename T>
 		T* Get(const WString& res_id);
 		template<typename T>
@@ -190,10 +190,6 @@ namespace Ailu
 				obj_id = _global_resources[asset_path]->ID();
 				_global_resources.erase(asset_path);
 				g_pLogMgr->LogFormat(L"Release resource: {},and current ref count is {}", asset_path.c_str(), ref_count - 1);
-				_lut_global_texture2d.erase(obj_id);
-				_lut_global_meshs.erase(obj_id);
-				_lut_global_materials.erase(obj_id);
-				_lut_global_shaders.erase(obj_id);
 			}
 		}
 		void Release(Object* obj)
@@ -205,34 +201,39 @@ namespace Ailu
 		template<typename T>
 		auto ResourceEnd();
 		template<typename T>
-		static Ref<T> IterToRefPtr(const Map<u32, ResourcePoolContainer::iterator>::iterator& iter);
+		static Ref<T> IterToRefPtr(const Vector<ResourcePoolContainer::iterator>::iterator& iter);
 
 	public:
 		List<ImportInfo> _import_infos;
 		std::mutex _import_infos_mutex;
+		std::mutex _asset_db_mutex;
 	private:
 		static void FormatLine(const String& line, String& key, String& value);
+		static void ExtractCommonAssetInfo(const WString& asset_path, WString& name, Guid& guid,EAssetType::EAssetType& type);
+		static EAssetType::EAssetType GetObjectAssetType(Object* obj);
 		void AddResourceTask(ResourceTask task);
 		bool ExistInAssetDB(const Asset* asset);
 		bool ExistInAssetDB(const WString& asset_path);
-		void AddToAssetDB(Asset* asset, bool override = true);
 		void RemoveFromAssetDB(const Asset* asset);
 
 		void LoadAssetDB();
 		void SaveAssetDB();
 
-		static void ExtractCommonAssetInfo(const WString& asset_path, WString& name, Guid& guid,EAssetType::EAssetType& type);
+		Asset* RegisterAsset(Scope<Asset>&& asset,bool override = true);
+		void UnRegisterAsset(Asset* asset);
+		void RegisterResource(const WString& asset_path, Ref<Object> obj,bool override = true);
+		void UnRegisterResource(const WString& asset_path);
 
 		//加载引擎处理后的资产
-		Asset* LoadMaterial(const WString& asset_path);
-		Asset* LoadShader(const WString& asset_path);
-		Asset* LoadTexture(const WString& asset_path, const ImportSetting* setting);
-		Asset* LoadMesh(const WString& asset_path, const ImportSetting* setting);
-		Asset* LoadComputeShader(const WString& asset_path);
+		Scope<Asset> LoadMaterial(const WString& asset_path);
+		Scope<Asset> LoadShader(const WString& asset_path);
+		Scope<Asset> LoadTexture(const WString& asset_path);
+		Scope<Asset> LoadMesh(const WString& asset_path);
+		Scope<Asset> LoadComputeShader(const WString& asset_path);
 		//加载原始资产
-		List<Ref<Mesh>> LoadExternalMesh(const WString& asset_path);
-		Ref<Texture2D>  LoadExternalTexture(const WString& asset_path, const ImportSetting* setting = nullptr);
-		Ref<Shader>     LoadExternalShader(const WString& asset_path, const ImportSetting* setting = nullptr);
+		List<Ref<Mesh>>    LoadExternalMesh(const WString& asset_path);
+		Ref<Texture2D>     LoadExternalTexture(const WString& asset_path, const ImportSetting* setting = nullptr);
+		Ref<Shader>        LoadExternalShader(const WString& asset_path, const ImportSetting* setting = nullptr);
 		Ref<ComputeShader> LoadExternalComputeShader(const WString& asset_path, const ImportSetting* setting = nullptr);
 
 		void SaveMaterial(const WString& asset_path, Material* mat);
@@ -267,6 +268,7 @@ namespace Ailu
 		inline static Queue<Asset*> s_pending_save_assets;
 		inline static std::unordered_map<WString,fs::file_time_type> s_file_last_load_time;
 		bool _is_watching_directory = true;
+		WString _project_root_path;
 		//<GUID,Asset>
 		std::map<Guid, Scope<Asset>> _asset_db{};
 		//AssetPath,GUID
@@ -274,147 +276,68 @@ namespace Ailu
 		//object_id,asset*
 		std::map<u32, Asset*> _object_to_asset{};
 
-		Vector<std::function<void()>> _asset_changed_callbacks;
-
-		//所有从文件中加载的资源同一管理,使用资产路径来索引,所有资源对象的所有权也归于_global_resources
-		//纹理和材质使用资产路径索引，网格使用 AssetPath_Name，shader使用AssetPath_vs_ps。区别于asset，这里的res只负责运行时的相关信息。
 		ResourcePoolContainer _global_resources;
 		ResourcePoolLut _lut_global_resources;
-		ResourcePoolLut _lut_global_texture2d;
-		ResourcePoolLut _lut_global_meshs;
-		ResourcePoolLut _lut_global_materials;
-		ResourcePoolLut _lut_global_shaders;
+		Map<EAssetType::EAssetType, Vector<ResourcePoolContainerIter>> _lut_global_resources_by_type;
+
+		Vector<std::function<void()>> _asset_changed_callbacks;
 	};
 	extern ResourceMgr* g_pResourceMgr;
 
 	template<typename T>
-	inline T* ResourceMgr::Load(const WString& asset_path, const ImportSetting* import_setting)
+	inline T* ResourceMgr::Load(const WString& asset_path)
 	{
+		using Loader = std::function<Scope<Asset>(ResourceMgr*,const WString&)>;
 		WString sys_path = PathUtils::GetResSysPath(asset_path);
 		bool is_engine_asset = PathUtils::ExtractExt(sys_path) == L".alasset";
+		AL_ASSERT(!is_engine_asset);
 		WString asset_name;
 		Guid guid;
 		EAssetType::EAssetType type = EAssetType::kUndefined;
 		ExtractCommonAssetInfo(asset_path, asset_name, guid, type);
+		AL_ASSERT(type == EAssetType::kUndefined);
 		bool is_skip_load = false;
-		Ref<Object> out_obj = nullptr;
-		Asset* out_asset = nullptr;
+		Loader asset_loader = nullptr;
 		if (!IsFileOnDiskNewer(sys_path))
 		{
 			g_pLogMgr->LogWarningFormat(L"File {} is new,skip load!",sys_path);
-			is_skip_load = true;
+			return _global_resources.contains(asset_path) ? static_cast<T*>(_global_resources[asset_path].get()) : nullptr;
 		}
 		if constexpr (std::is_same<T, Texture2D>::value)
 		{
-			if (!is_skip_load)
-			{
-				const TextureImportSetting* setting;
-				if (import_setting == nullptr || dynamic_cast<const TextureImportSetting*>(import_setting) == nullptr)
-					setting = &TextureImportSetting::Default();
-				else
-					setting = dynamic_cast<const TextureImportSetting*>(import_setting);
-				if (is_engine_asset)
-				{
-					out_asset = LoadTexture(asset_path, setting);
-					out_obj = out_asset->AsRef<T>();
-				} 
-				//直接替换应该会有问题，依然被gpu引用，暂时先这么写
-				_global_resources[asset_path] = out_obj;
-				_lut_global_texture2d[out_obj->ID()] = _global_resources.find(asset_path);
-			}
+			asset_loader = &ResourceMgr::LoadTexture;
 		}
 		else if constexpr (std::is_same<T, Mesh>::value)
 		{
-			if (!is_skip_load)
-			{
-				if (is_engine_asset)
-				{
-					out_asset = LoadMesh(asset_path,nullptr);
-					out_obj = out_asset->AsRef<T>();
-					_global_resources[asset_path] = out_obj;
-					_lut_global_meshs[out_obj->ID()] = _global_resources.find(asset_path);
-				}
-				else
-				{
-					auto mesh_list = std::move(LoadExternalMesh(asset_path));
-					for (auto& m : mesh_list)
-					{
-						WString name_id = asset_path + L"_" + ToWStr(m->Name().c_str());
-						_global_resources[name_id] = m;
-						_lut_global_meshs[m->ID()] = _global_resources.find(name_id);
-					}
-				}
-			}
+			asset_loader = &ResourceMgr::LoadMesh;
 		}
 		else if constexpr (std::is_same<T, Shader>::value)
 		{
-			if (!is_skip_load)
-			{
-				const ShaderImportSetting* setting;
-				if (import_setting == nullptr || dynamic_cast<const ShaderImportSetting*>(import_setting) == nullptr)
-					setting = &ShaderImportSetting::Default();
-				else
-					setting = dynamic_cast<const ShaderImportSetting*>(import_setting);
-				if (is_engine_asset)
-				{
-					out_asset = LoadShader(asset_path);
-					out_obj = out_asset->AsRef<T>();
-				}
-				else
-				{
-					out_obj = LoadExternalShader(asset_path, setting);
-				}
-				_global_resources[asset_path] = out_obj;
-				_lut_global_shaders[out_obj->ID()] = _global_resources.find(asset_path);
-			}
+			asset_loader = &ResourceMgr::LoadShader;
 		}
 		else if constexpr (std::is_same<T, ComputeShader>::value)
 		{
-			if (!is_skip_load)
-			{
-				const ShaderImportSetting* setting;
-				if (import_setting == nullptr || dynamic_cast<const ShaderImportSetting*>(import_setting) == nullptr)
-					setting = &ShaderImportSetting::Default();
-				else
-					setting = dynamic_cast<const ShaderImportSetting*>(import_setting);
-				if (is_engine_asset)
-				{
-					out_asset = LoadComputeShader(asset_path);
-					out_obj = out_asset->AsRef<T>();
-				}
-				else
-				{
-					out_obj = LoadExternalComputeShader(asset_path, setting);
-				}
-				_global_resources[asset_path] = out_obj;
-				_lut_global_shaders[out_obj->ID()] = _global_resources.find(asset_path);
-			}
+			asset_loader = &ResourceMgr::LoadComputeShader;
 		}
 		else if constexpr (std::is_same<T, Material>::value)
 		{
-			if (!is_skip_load)
-			{
-				out_asset = LoadMaterial(asset_path);
-				out_obj = out_asset->AsRef<T>();
-				_global_resources[asset_path] = out_obj;
-				_lut_global_materials[out_obj->ID()] = _global_resources.find(asset_path);
-			}
+			asset_loader = &ResourceMgr::LoadMaterial;
 		}
-		if (out_obj && is_engine_asset)
+		Scope<Asset> out_asset = std::move(asset_loader(this, asset_path));
+		if (out_asset != nullptr)
 		{
 			out_asset->_name = asset_name;
 			out_asset->AssignGuid(guid);
-			AddToAssetDB(out_asset);
-			AttachToAsset(out_asset,out_obj);
-			_lut_global_resources[out_obj->ID()] = _global_resources.find(asset_path);
+			RegisterResource(asset_path, out_asset->_p_obj);
+			RegisterAsset(std::move(out_asset));
 			s_file_last_load_time[sys_path] = std::filesystem::last_write_time(sys_path);
-		}	
-		return static_cast<T*>(out_obj.get());
+		}
+		return _global_resources.contains(asset_path) ? static_cast<T*>(_global_resources[asset_path].get()) : nullptr;
 	}
 	template<typename T>
-	inline T* ResourceMgr::Load(const Guid& guid, const ImportSetting* import_setting)
+	inline T* ResourceMgr::Load(const Guid& guid)
 	{
-		return Load<T>(GuidToAssetPath(guid), import_setting);
+		return Load<T>(GuidToAssetPath(guid));
 	}
 	template<typename T>
 	inline T* ResourceMgr::Get(const WString& res_id)
@@ -444,7 +367,7 @@ namespace Ailu
 				return std::static_pointer_cast<T>(_global_resources[res_id]);
 			else
 			{
-				std::static_pointer_cast<Texture2D>(_lut_global_texture2d[Texture::s_p_default_white->ID()]->second);
+				std::static_pointer_cast<Texture2D>(_lut_global_resources[Texture::s_p_default_white->ID()]->second);
 			}
 		}
 		else
@@ -467,36 +390,38 @@ namespace Ailu
 	template<typename T>
 	inline T* ResourceMgr::Get(u32 object_id)
 	{
-		if constexpr (std::is_same<T, Texture2D>::value)
+		if (_lut_global_resources.contains(object_id))
 		{
-			AL_ASSERT(!_lut_global_texture2d.contains(object_id));
-			return std::static_pointer_cast<T>(_lut_global_texture2d[object_id]->second).get();
+			return std::static_pointer_cast<T>(_lut_global_resources[object_id]->second).get();
 		}
-		else if constexpr (std::is_same<T, Mesh>::value)
-		{
-			AL_ASSERT(!_lut_global_meshs.contains(object_id));
-			return std::static_pointer_cast<T>(_lut_global_meshs[object_id]->second).get();
-		}
-		else if constexpr (std::is_same<T, Shader>::value)
-		{
-			AL_ASSERT(!_lut_global_shaders.contains(object_id));
-			return std::static_pointer_cast<T>(_lut_global_shaders[object_id]->second).get();
-		}
+		return nullptr;
 	}
 	template<typename T>
 	inline u32 ResourceMgr::TotalNum() const
 	{
-		if (std::is_same<T, Texture2D>::value)
+		if constexpr (std::is_same<T, Texture2D>::value)
 		{
-			return static_cast<u32>(_lut_global_texture2d.size());
+			return _lut_global_resources_by_type.at(EAssetType::kTexture2D).size();
 		}
-		else if (std::is_same<T, Mesh>::value)
+		else if constexpr (std::is_same<T, Shader>::value)
 		{
-			return static_cast<u32>(_lut_global_meshs.size());
+			return _lut_global_resources_by_type.at(EAssetType::kShader).size();
 		}
-		else if (std::is_same<T, Mesh>::value)
+		else if constexpr (std::is_same<T, ComputeShader>::value)
 		{
-			return static_cast<u32>(_lut_global_shaders.size());
+			return _lut_global_resources_by_type.at(EAssetType::kComputeShader).size();
+		}
+		else if constexpr (std::is_same<T, Mesh>::value)
+		{
+			return _lut_global_resources_by_type.at(EAssetType::kMesh).size();
+		}
+		else if constexpr (std::is_same<T, Material>::value)
+		{
+			return _lut_global_resources_by_type.at(EAssetType::kMaterial).size();
+		}
+		else
+		{
+			AL_ASSERT(true);
 		}
 		return 0;
 	}
@@ -505,19 +430,27 @@ namespace Ailu
 	{
 		if constexpr (std::is_same<T, Texture2D>::value)
 		{
-			return _lut_global_texture2d.begin();
+			return _lut_global_resources_by_type[EAssetType::kTexture2D].begin();
 		}
 		else if constexpr (std::is_same<T, Shader>::value)
 		{
-			return _lut_global_shaders.begin();
+			return _lut_global_resources_by_type[EAssetType::kShader].begin();
+		}
+		else if constexpr (std::is_same<T, ComputeShader>::value)
+		{
+			return _lut_global_resources_by_type[EAssetType::kComputeShader].begin();
 		}
 		else if constexpr (std::is_same<T, Mesh>::value)
 		{
-			return _lut_global_meshs.begin();
+			return _lut_global_resources_by_type[EAssetType::kMesh].begin();
 		}
 		else if constexpr (std::is_same<T, Material>::value)
 		{
-			return _lut_global_materials.begin();
+			return _lut_global_resources_by_type[EAssetType::kMaterial].begin();
+		}
+		else
+		{
+			AL_ASSERT(true);
 		}
 	}
 	template<typename T>
@@ -525,25 +458,33 @@ namespace Ailu
 	{
 		if constexpr (std::is_same<T, Texture2D>::value)
 		{
-			return _lut_global_texture2d.end();
+			return _lut_global_resources_by_type[EAssetType::kTexture2D].end();
 		}
 		else if constexpr (std::is_same<T, Shader>::value)
 		{
-			return _lut_global_shaders.end();
+			return _lut_global_resources_by_type[EAssetType::kShader].end();
+		}
+		else if constexpr (std::is_same<T, ComputeShader>::value)
+		{
+			return _lut_global_resources_by_type[EAssetType::kComputeShader].end();
 		}
 		else if constexpr (std::is_same<T, Mesh>::value)
 		{
-			return _lut_global_meshs.end();
+			return _lut_global_resources_by_type[EAssetType::kMesh].end();
 		}
 		else if constexpr (std::is_same<T, Material>::value)
 		{
-			return _lut_global_materials.end();
+			return _lut_global_resources_by_type[EAssetType::kMaterial].end();
+		}
+		else
+		{
+			AL_ASSERT(true);
 		}
 	}
 	template<typename T>
-	inline Ref<T> ResourceMgr::IterToRefPtr(const Map<u32, ResourcePoolContainer::iterator>::iterator& iter)
+	inline Ref<T> ResourceMgr::IterToRefPtr(const Vector<ResourcePoolContainer::iterator>::iterator& iter)
 	{
-		auto t_ptr = std::dynamic_pointer_cast<T>(iter->second->second);
+		auto t_ptr = std::dynamic_pointer_cast<T>((*iter)->second);
 		AL_ASSERT(t_ptr == nullptr);
 		return t_ptr;
 	}
