@@ -60,14 +60,13 @@ namespace Ailu
 				ImDrawList* drawList = ImGui::GetWindowDrawList();
 				ImVec2 treeNodeMin = ImGui::GetItemRectMin();
 				ImVec2 treeNodeMax = ImGui::GetItemRectMax();
-				ImVec4 bgColor = ImVec4(1.0f, 0.43, 0.098f, 0.25f);
+				ImVec4 bgColor = ImVec4(1.0f, 0.43f, 0.098f, 0.25f);
 				drawList->AddRectFilled(treeNodeMin, treeNodeMax, ImGui::GetColorU32(bgColor));
 			}
 			if (ImGui::IsItemClicked())
 			{
-				g_pLogMgr->LogWarningFormat("DrawTreeNode: {}", p.string());
 				FileManager::SetCurPath(cur_path);
-				OnUpdateAssetList();
+				MarkDirty();
 			}
 			if (ImGui::BeginDragDropSource())
 			{
@@ -76,7 +75,6 @@ namespace Ailu
 				ImGui::SetDragDropPayload(DragFolderTreeType.c_str(), &_draging_file, _draging_file.size() * sizeof(wchar_t));
 				ImGui::Text("Dragging %s", file_name.c_str());
 				ImGui::EndDragDropSource();
-				_is_drag_enable = true;
 			}
 			if (ImGui::BeginDragDropTarget())
 			{
@@ -84,38 +82,27 @@ namespace Ailu
 				const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(DragFolderType.c_str());
 				if (payload)
 				{
-					auto source_file_path = *(WString*)(payload->Data);
-					WString target_path = PathUtils::FormatFilePath(cur_path);
-					target_path.append(L"/").append(PathUtils::GetFileName(source_file_path));
-					if (FileManager::CopyDirectory(PathUtils::FormatFilePath(source_file_path), PathUtils::FormatFilePath(target_path)))
-					{
-						FileManager::DeleteDirectory(source_file_path);
-					}
-					g_pLogMgr->LogWarningFormat(L"Cut file: from {} to {}", source_file_path, target_path);
+					auto source_file_path = PathUtils::FormatFilePath(*(WString*)(payload->Data));
+					WString target_dir = PathUtils::FormatFilePath(cur_path);
+					target_dir.append(L"/");
+					WString target_dir_path = PathUtils::FormatFilePath(target_dir.append(PathUtils::GetFileName(source_file_path,true)));
+					OnFileDropDown(source_file_path, target_dir_path);
 				}
 				//树视图内拖动
 				const ImGuiPayload* payload1 = ImGui::AcceptDragDropPayload(DragFolderTreeType.c_str());
 				if (payload1)
 				{
-					auto source_file_path = *(WString*)(payload1->Data);
+					auto source_file_path = PathUtils::FormatFilePath(*(WString*)(payload1->Data));
 					WString target_dir = PathUtils::FormatFilePath(cur_path);
 					target_dir.append(L"/");
 					WString target_dir_path = PathUtils::FormatFilePath(target_dir.append(PathUtils::GetFileName(source_file_path)));
-					if (FileManager::CopyDirectory(PathUtils::FormatFilePath(source_file_path), PathUtils::FormatFilePath(target_dir_path)))
+					if (OnFileDropDown(source_file_path, target_dir_path))
 					{
-						for (auto asset : g_pResourceMgr->GetAssets(SearchFilterByDirectory{ {source_file_path} }))
-						{
-							WString new_asset_path = target_dir.append(PathUtils::GetFileName(asset->_asset_path, true));
-							g_pResourceMgr->MoveAsset(asset, new_asset_path);
-						}
-						FileManager::DeleteDirectory(source_file_path);
-						//假如移动的是右侧正在展示的面板时，设置路径
 						if (source_file_path == FileManager::GetCurSysDirStr())
 						{
 							FileManager::SetCurPath(target_dir_path);
 						}
 					}
-					g_pLogMgr->LogWarningFormat(L"Cut file: from {} to {}", source_file_path, target_dir_path);
 				}
 				ImGui::EndDragDropTarget();
 			}
@@ -145,9 +132,11 @@ namespace Ailu
 		_p_tex_detail_widget = dynamic_cast<TextureDetailView*>(asset_detail_widget);
 		_left_pannel_width = 200;
 	}
+
 	AssetBrowser::~AssetBrowser()
 	{
 	}
+
 	void AssetBrowser::Open(const i32& handle)
 	{
 		ImGuiWidget::Open(handle);
@@ -157,12 +146,15 @@ namespace Ailu
 		_shader_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
 		_image_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
 		_scene_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"scene.alasset");
-		OnUpdateAssetList();
+		_material_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"material.alasset");
+		MarkDirty();
 	}
+
 	void AssetBrowser::Close(i32 handle)
 	{
 		ImGuiWidget::Close(handle);
 	}
+
 	void AssetBrowser::OnUpdateAssetList()
 	{
 		_cur_dir_assets.clear();
@@ -175,6 +167,8 @@ namespace Ailu
 
 	void AssetBrowser::ShowImpl()
 	{
+		if (_dirty)
+			OnUpdateAssetList();
 		_right_pannel_width = _size.x - _left_pannel_width - 10;
 		// 定义一个矩形区域来表示分割线的位置
 		ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -192,16 +186,9 @@ namespace Ailu
 		ImGui::BeginChild("RightPane", ImVec2(_right_pannel_width, 0), true);
 		DrawMainPannel();
 		ImGui::EndChild();
-
-		if (_is_drag_enable)
-		{
-
-		}
-
 		//ShowModalDialog("New Material", std::bind(&AssetBrowser::ShowNewMaterialWidget, this), new_material_modal_window_handle);
-		if (_dirty)
-			OnUpdateAssetList();
 	}
+
 	void AssetBrowser::ShowNewMaterialWidget()
 	{
 		AL_ASSERT(true);
@@ -271,27 +258,17 @@ namespace Ailu
 			ImGui::SetDragDropPayload(DragFolderType.c_str(), &_draging_file, _draging_file.size() * sizeof(wchar_t));
 			ImGui::Text("Dragging %s", file_name.c_str());
 			ImGui::EndDragDropSource();
-			_is_drag_enable = true;
 		}
 		if (ImGui::BeginDragDropTarget())
 		{
 			const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(DragFolderType.c_str());
 			if (payload)
 			{
-				auto source_file_path = *(WString*)(payload->Data);
+				auto source_file_sys_path = *(WString*)(payload->Data);
 				WString target_dir = PathUtils::FormatFilePath(dir_path.wstring());
 				target_dir.append(L"/");
-				WString target_dir_path = PathUtils::FormatFilePath(target_dir.append(PathUtils::GetFileName(source_file_path)));
-				if (FileManager::CopyDirectory(PathUtils::FormatFilePath(source_file_path), target_dir_path))
-				{
-					for (auto asset : g_pResourceMgr->GetAssets(SearchFilterByDirectory{ {source_file_path} }))
-					{
-						WString new_asset_path = target_dir.append(PathUtils::GetFileName(asset->_asset_path, true));
-						g_pResourceMgr->MoveAsset(asset, new_asset_path);
-					}
-					FileManager::DeleteDirectory(source_file_path);
-					g_pLogMgr->LogWarningFormat(L"Cut file: from {} to {}", source_file_path, target_dir_path);
-				}
+				WString target_dir_path = PathUtils::FormatFilePath(target_dir.append(PathUtils::GetFileName(source_file_sys_path,true)));
+				OnFileDropDown(source_file_sys_path,target_dir_path);
 			}
 			ImGui::EndDragDropTarget();
 		}
@@ -310,15 +287,16 @@ namespace Ailu
 					WString path_str = dir_path.wstring();
 					PathUtils::FormatFilePathInPlace(path_str);
 					WString new_dir = path_str.substr(0, path_str.find_last_of(L"/") + 1) + ToWChar(_rename_buffer);
-					SearchFilterByDirectory filter({ FileManager::GetCurAssetDirStr() });
+					new_dir.append(L"/");
+					SearchFilterByDirectory filter({ PathUtils::ExtractAssetPath(path_str)});
 					for (auto p : g_pResourceMgr->GetAssets(filter))
 					{
-						WString new_asset_path = PathUtils::ExtarctDirectory(new_dir) + PathUtils::GetFileName(p->_asset_path, true);
+						WString new_asset_path = PathUtils::ExtractAssetPath(new_dir + PathUtils::GetFileName(p->_asset_path, true));
 						g_pResourceMgr->MoveAsset(p, new_asset_path);
 					}
 					FileManager::RenameDirectory(dir_path, fs::path(new_dir));
-					_selected_file_rename_index = -1;
 				}
+				_selected_file_rename_index = -1;
 			}
 		}
 		else
@@ -348,7 +326,15 @@ namespace Ailu
 			}
 			if (ImGui::MenuItem("Delete"))
 			{
+				WString path_str = dir_path.wstring();
+				PathUtils::FormatFilePathInPlace(path_str);
+				SearchFilterByDirectory filter({ PathUtils::ExtractAssetPath(path_str) });
+				for (auto p : g_pResourceMgr->GetAssets(filter))
+				{
+					g_pResourceMgr->DeleteAsset(p);
+				}
 				FileManager::DeleteDirectory(dir_path);
+				g_pLogMgr->LogWarningFormat(L"Delete directory {}",dir_path.wstring());
 				MarkDirty();
 			}
 			ImGui::EndPopup();
@@ -375,20 +361,27 @@ namespace Ailu
 		{
 			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(asset->As<Texture>()->GetNativeTextureHandle());
 		}
+		else if(asset->_asset_type == EAssetType::kMaterial)
+			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_material_icon->GetNativeTextureHandle());
 		else {};
 		ImGui::PushStyleColor(ImGuiCol_Button, kColorBgTransparent);
 		ImGui::BeginGroup();
+		if (tex_id == 0)
+		{
+			tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_file_icon->GetNativeTextureHandle());
+		}
 		if (ImGui::ImageButton(tex_id, ImVec2(_preview_tex_size, _preview_tex_size), _uv0, _uv1, 0, kColorBg, kColorTint))
 		{
 			g_pLogMgr->LogFormat("selected file {}", file_name.c_str());
 		}
-		ImGui::PushID(asset->_p_obj->ID());
+		ImGui::PushID(asset->_name.c_str());
 		if (ImGui::BeginDragDropSource())
 		{
 			if (cur_file_index == _selected_file_index)
 			{
+				_draging_file = PathUtils::GetResSysPath(asset->_asset_path);
 				ImGui::SetDragDropPayload(DragFolderType.c_str(), &_draging_file, _draging_file.size() * sizeof(wchar_t));
-				g_pLogMgr->LogFormat(L"Dragging asset {}...", asset->_name);
+				ImGui::Text("Dragging %s", file_name.c_str());
 				s_draging_asset = asset;
 			}
 			ImGui::EndDragDropSource();
@@ -402,19 +395,22 @@ namespace Ailu
 		}
 		else
 		{
-			static char buffer[256];
-			memcpy(buffer, file_name.c_str(), file_name.size());
+			memcpy(_rename_buffer, file_name.c_str(), file_name.size());
 			ImGui::SetNextItemWidth(_preview_tex_size);
 			ImGui::SetKeyboardFocusHere();
-			if (ImGui::InputText("##rename_file", buffer, 256, ImGuiInputTextFlags_::ImGuiInputTextFlags_EnterReturnsTrue))
+			if (ImGui::InputText("##rename_file", _rename_buffer, 256, ImGuiInputTextFlags_::ImGuiInputTextFlags_EnterReturnsTrue))
 			{
-				if (!strcmp(file_name.c_str(), buffer))
+				if (strcmp(file_name.c_str(), _rename_buffer) != 0)
 				{
-					g_pResourceMgr->RenameAsset(asset, ToWStr(buffer));
-					g_pLogMgr->LogWarningFormat("Rename to {}", buffer);
-					_selected_file_rename_index = -1;
+					WString new_name = ToWStr(_rename_buffer);
+					WString old_path = PathUtils::GetResSysPath(asset->_asset_path);
+					WString new_path = PathUtils::RenameFile(old_path, new_name);
+					g_pResourceMgr->RenameAsset(asset, new_name);
+					FileManager::RenameDirectory(old_path, new_path);
+					g_pLogMgr->LogWarningFormat("Rename to {}", _rename_buffer);
 					MarkDirty();
 				}
+				_selected_file_rename_index = -1;
 			}
 		}
 		ImGui::EndGroup();
@@ -424,7 +420,7 @@ namespace Ailu
 			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 				_p_tex_detail_widget->Open(ImGuiWidget::GetGlobalWidgetHandle(), asset->As<Texture>());
 			g_pLogMgr->LogFormat("selected asset {}", file_name.c_str());
-			_selected_file_sys_path = asset->_asset_path;
+			_selected_file_sys_path = PathUtils::GetResSysPath(asset->_asset_path);
 			_selected_file_index = cur_file_index;
 		}
 		if (ImGui::BeginPopupContextItem(file_name.c_str())) // <-- use last item id as popup id
@@ -439,8 +435,9 @@ namespace Ailu
 			}
 			if (ImGui::MenuItem("Delete"))
 			{
+				g_pLogMgr->LogWarningFormat(L"Delete asset: {}",asset->_asset_path);
 				g_pResourceMgr->DeleteAsset(asset);
-				g_pLogMgr->LogWarning("Delete asset");
+				FileManager::DeleteDirectory(PathUtils::GetResSysPath(asset->_asset_path));
 				MarkDirty();
 			}
 			ImGui::EndPopup();
@@ -456,6 +453,7 @@ namespace Ailu
 		String indent = "";
 		DrawTreePannelHelper(g_pResourceMgr->GetProjectRootSysPath(), indent);
 	}
+
 	void AssetBrowser::DrawMainPannel()
 	{
 		if (ImGui::Button("<-"))
@@ -463,13 +461,14 @@ namespace Ailu
 			FileManager::BackToParent();
 			OnUpdateAssetList();
 		}
+		ImGui::SameLine();
 		const fs::path& cur_path = FileManager::GetCurSysPath();
 		_window_size = GetCurImguiWindowSize();
 		_asset_content_size = _window_size;
 		_asset_content_size.x *= 0.9f;
 		_asset_content_size.y *= 0.8f;
 		_paddinged_preview_tex_size_padding = _preview_tex_size * 1.15f;
-		ImGui::SliderFloat(" ", &_preview_tex_size, 16, 256, "%.0f");
+		ImGui::SliderFloat("IconSize", &_preview_tex_size, 16, 256, "%.0f");
 		u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
 		_icon_num_per_row = window_width / (u32)_paddinged_preview_tex_size_padding;
 		_icon_num_per_row += _icon_num_per_row == 0 ? 1 : 0;
@@ -533,5 +532,43 @@ namespace Ailu
 			}
 			ImGui::EndPopup();
 		}
+	}
+
+	bool AssetBrowser::OnFileDropDown(const WString& from, const WString& to)
+	{
+		fs::path src_p(from);
+		WString source_file_asset_path = PathUtils::ExtractAssetPath(from);
+		if (fs::is_directory(src_p))
+		{
+			if (FileManager::CopyDirectory(from, to))
+			{
+				WString to_dir = to;
+				to_dir.append(L"/");//新资产的父目录为新创建的目录
+				for (auto asset : g_pResourceMgr->GetAssets(SearchFilterByDirectory{ {source_file_asset_path} }))
+				{
+					WString new_asset_path = to_dir.append(PathUtils::GetFileName(asset->_asset_path, true));
+					g_pResourceMgr->MoveAsset(asset, PathUtils::ExtractAssetPath(new_asset_path));
+				}
+				FileManager::DeleteDirectory(from);
+				g_pLogMgr->LogWarningFormat(L"Cut folder: from {} to {}", from, to);
+				MarkDirty();
+				return true;
+			}
+		}
+		else
+		{
+			if (FileManager::CopyFile(from,to))
+			{
+				for (auto asset : g_pResourceMgr->GetAssets(SearchFilterByPath{ {source_file_asset_path} }))
+				{
+					g_pResourceMgr->MoveAsset(asset, PathUtils::ExtractAssetPath(to));
+				}
+				FileManager::DeleteDirectory(from);
+				g_pLogMgr->LogWarningFormat(L"Cut file: from {} to {}", from, to);
+				MarkDirty();
+				return true;
+			}
+		}
+		return false;
 	}
 }

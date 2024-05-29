@@ -137,7 +137,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	envBRDF.y = pow(envBRDF.y,1/2.2);
 	float3 specular = prefilteredColor * (ks * envBRDF.x + envBRDF.y);
 
-	light += (specular + prefilteredColor) * 0.1f;
+	light += (specular + diffuse) * 0.1f;
 	return light; 
 }
 #endif //__LIGHTING_H__

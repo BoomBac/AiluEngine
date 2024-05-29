@@ -2088,9 +2088,6 @@
     <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\ImGUIDLL.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2316,9 +2313,6 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\ImGUIDLL.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp">

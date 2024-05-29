@@ -1,9 +1,11 @@
 //info bein
+//pass begin::
 //name: skybox
 //vert: VSMain
 //pixel: PSMain
 //Cull: Front
 //Queue: Opaque
+//pass end::
 //Properties
 //{
 //	color("Color",Color) = (1,1,1,1)

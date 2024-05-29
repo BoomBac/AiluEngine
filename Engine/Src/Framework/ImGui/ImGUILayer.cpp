@@ -184,6 +184,13 @@ namespace Ailu
 		ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
 		ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
 
+		for (auto pass : g_pRenderer->GetRenderPasses())
+		{
+			bool active = pass->IsActive();
+			ImGui::Checkbox(pass->GetName().c_str(), &active);
+			pass->SetActive(active);
+		}
+
 		String space = "";
 		ImGui::Text("CPU Time:");
 		while (!Profiler::g_Profiler._cpu_profiler_queue.empty())
@@ -214,12 +221,7 @@ namespace Ailu
 			else
 				space = space.substr(0, space.size() - 1);
 		}
-		for (auto pass : g_pRenderer->GetRenderPasses())
-		{
-			bool active = pass->IsActive();
-			ImGui::Checkbox(pass->GetName().c_str(), &active);
-			pass->SetActive(active);
-		}
+
 
 		static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame" };
 		static int item_current_idx = 0; // Here we store our selection data as an index.

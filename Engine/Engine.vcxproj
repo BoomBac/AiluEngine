@@ -508,7 +508,6 @@
     <ClInclude Include="Inc\Framework\Events\MouseEvent.h" />
     <ClInclude Include="Inc\Framework\Events\SceneLayer.h" />
     <ClInclude Include="Inc\Framework\Events\WindowEvent.h" />
-    <ClInclude Include="Inc\Framework\ImGui\ImGUIDLL.h" />
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h" />
     <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h" />
@@ -607,7 +606,6 @@
     <ClCompile Include="Src\Framework\Events\Layer.cpp" />
     <ClCompile Include="Src\Framework\Events\LayerStack.cpp" />
     <ClCompile Include="Src\Framework\Events\SceneLayer.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\ImGUIDLL.cpp" />
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp" />
     <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp" />

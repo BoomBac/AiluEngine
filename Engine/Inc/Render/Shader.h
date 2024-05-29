@@ -155,66 +155,19 @@ namespace Ailu
 		} kZWriteValue;
 	};
 
-	class Shader : public Object
+	struct ShaderPass
 	{
-		friend class Material;
-	public:
-		inline static Shader* s_p_defered_standart_lit = nullptr;
-	public:
-		static Ref<Shader> Create(const WString& sys_path,String vert_entry = "", String pixel_entry = "");
-		static void SetGlobalTexture(const String& name, Texture* texture);
-		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
-		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
-		static void ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf);
-		static ConstantBuffer* GetPerFrameConstBuffer() { return	s_p_per_frame_cbuffer; };
-
-		Shader(const WString& sys_path, const String& vs_entry, const String& ps_entry);
-		virtual ~Shader() = default;
-		virtual void Bind(u32 index);
-		virtual bool Compile();
-		virtual bool PreProcessShader();
-		virtual void* GetByteCode(EShaderType type);
-
-		const i8& GetPerMatBufferBindSlot() const {return _per_mat_buf_bind_slot;}
-		const i8& GetPerFrameBufferBindSlot() const {return _per_frame_buf_bind_slot;}
-		const i8& GetPrePassBufferBindSlot() const  {return _per_pass_buf_bind_slot;}
-		const bool IsCompileError() const {return _is_compile_error;}
-
-		const VertexInputLayout& PipelineInputLayout() const { return _pipeline_input_layout; };
-		const RasterizerState& PipelineRasterizerState() const { return _pipeline_raster_state; };
-		const DepthStencilState& PipelineDepthStencilState() const { return _pipeline_ds_state; };
-		const ETopology& PipelineTopology() const { return _pipeline_topology; };
-		const BlendState& PipelineBlendState() const { return _pipeline_blend_state; };
-
-		Vector4f GetVectorValue(const String& name);
-		float GetFloatValue(const String& name);
-
-		const std::set<WString>& GetSourceFiles() {return _source_files;}
-		const WString& GetMainSourceFile() {return _src_file_path;}
-		const std::map<String, Vector<String>> GetKeywordGroups() {return _keywords;};
-		Vector<class Material*> GetAllReferencedMaterials();
-		void AddMaterialRef(class Material* mat);
-		void RemoveMaterialRef(class Material* mat);
-		const std::unordered_map<String, ShaderBindResourceInfo>& GetBindResInfo() {return	_bind_res_infos;}
-		const List<ShaderPropertyInfo>& GetShaderPropertyInfos() {return _shader_prop_infos;}
-		std::tuple<String&, String&> GetShaderEntry(u16 pass_index = 0)
-		{	
-			return std::tie(_vert_entry, _pixel_entry);
-		}
-	protected:
-		virtual bool RHICompileImpl();
-	protected:
-		inline static u8* _p_cbuffer = nullptr;
-		inline static u16 _s_global_shader_id = 0u;
-		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
+		//pass info
+		u16 _index;
+		String _name;
+		String _tag;
+		//shader info
 		String _vert_entry, _pixel_entry;
-		WString _src_file_path;
 		std::set<WString> _source_files;
 		u8 _vertex_input_num = 0u;
 		i8 _per_mat_buf_bind_slot = -1;
 		i8 _per_frame_buf_bind_slot = -1;
 		i8 _per_pass_buf_bind_slot = -1;
-		bool _is_compile_error;
 		VertexInputLayout _pipeline_input_layout;
 		RasterizerState _pipeline_raster_state;
 		DepthStencilState _pipeline_ds_state;
@@ -225,10 +178,77 @@ namespace Ailu
 		std::map<String, std::tuple<u8, u8>> _keywords_ids;
 		std::set<uint64_t> _shader_variant;
 		List<ShaderPropertyInfo> _shader_prop_infos;
+	};
+
+	class Shader : public Object
+	{
+		friend class Material;
+	public:
+		inline static Shader* s_p_defered_standart_lit = nullptr;
+	public:
+		static Ref<Shader> Create(const WString& sys_path);
+		static u32 ConstructHash(const u32& shader_id, const u16& pass_hash, u16 variant_hash = 0u);
+		static void ExtractInfoFromHash(const u32& shader_hash, u32& shader_id, u16& pass_hash, u16& variant_hash);
+
+		static void SetGlobalTexture(const String& name, Texture* texture);
+		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
+		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
+
+		static void ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf);
+		static ConstantBuffer* GetPerFrameConstBuffer() { return	s_p_per_frame_cbuffer; };
+
+		Shader(const WString& sys_path);
+		virtual ~Shader() = default;
+		virtual void Bind(u16 pass_index, u16 variant_id);
+		virtual bool Compile();
+		virtual bool PreProcessShader();
+		virtual void* GetByteCode(EShaderType type, u16 pass_index, u16 variant_id);
+		const bool IsCompileError() const {return _is_compile_error;}
+		const WString& GetMainSourceFile() { return _src_file_path; }
+
+		const ShaderPass& GetPassInfo(u16 pass_index) const
+		{
+			AL_ASSERT(pass_index >= _passes.size());
+			return _passes[pass_index];
+		}
+		const u32 PassCount() const { return static_cast<u32>(_passes.size()); }
+
+		const i8& GetPerMatBufferBindSlot(u16 pass_index = 0) const {return _passes[pass_index]._per_mat_buf_bind_slot;}
+		const i8& GetPerFrameBufferBindSlot(u16 pass_index = 0) const {return _passes[pass_index]._per_frame_buf_bind_slot;}
+		const i8& GetPrePassBufferBindSlot(u16 pass_index = 0) const  {return _passes[pass_index]._per_pass_buf_bind_slot;}
+
+		const VertexInputLayout& PipelineInputLayout(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_input_layout; };
+		const RasterizerState& PipelineRasterizerState(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_raster_state; };
+		const DepthStencilState& PipelineDepthStencilState(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_ds_state; };
+		const ETopology& PipelineTopology(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_topology; };
+		const BlendState& PipelineBlendState(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_blend_state; };
+		//const std::set<WString>& GetSourceFiles(u16 pass_index) {return _source_files;}
+		const std::map<String, Vector<String>> GetKeywordGroups() {return _passshared_keywords;};
+		const std::unordered_map<String, ShaderBindResourceInfo>& GetBindResInfo(u16 pass_index) {return _passes[pass_index]._bind_res_infos;}
+		const List<ShaderPropertyInfo>& GetShaderPropertyInfos(u16 pass_index) {return _passes[pass_index]._shader_prop_infos;}
+
+		Vector<class Material*> GetAllReferencedMaterials();
+		void AddMaterialRef(class Material* mat);
+		void RemoveMaterialRef(class Material* mat);
+		std::tuple<String&, String&> GetShaderEntry(u16 pass_index = 0)
+		{
+			AL_ASSERT(pass_index >= _passes.size());
+			return std::tie(_passes[pass_index]._vert_entry, _passes[pass_index]._pixel_entry);
+		}
+	protected:
+		virtual bool RHICompileImpl();
+	protected:
+		inline static u8* _p_cbuffer = nullptr;
+		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
+		bool _is_compile_error;
+		std::atomic<bool> _is_compiling = false;
+		WString _src_file_path;
+		Vector<ShaderPass> _passes;
+		std::map<String, Vector<String>> _passshared_keywords;
 		std::set<Material*> _reference_mats;
 	private:
 		void ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props);
-		void ExtractValidShaderProperty();
+		void ExtractValidShaderProperty(u16 pass_index);
 	private:
 		inline static std::map<String, Texture*> s_global_textures_bind_info{};
 		inline static std::map<String, std::tuple<Matrix4x4f*,u32>> s_global_matrix_bind_info{};

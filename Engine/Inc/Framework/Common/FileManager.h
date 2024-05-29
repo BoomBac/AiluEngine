@@ -35,7 +35,9 @@ namespace Ailu
 		static bool WriteFile(const WString& sys_path, bool append, const WString& data);
 		static bool WriteFile(const WString& sys_path, bool append, const u8* data,u64 data_size);
 		static bool ReadFile(const WString& sys_path,WString& data);
-		static bool ReadFile(const WString& sys_path,u8* data, u64 data_start,u64 data_size);
+		static bool ReadFile(const WString& sys_path,u8* data, u64 data_start = 0u,u64 data_size = -1);
+		//使用结束后记得销毁
+		static std::tuple<u8*,u64> ReadFile(const WString& sys_path,u64 data_start = 0u, u64 data_size = -1);
 		//-------------------------static end-----------------------------
 	public:
 

@@ -11,8 +11,8 @@ namespace Ailu
 	class Texture;
 	class Asset;
 	class TextureDetailView;
-    class AssetBrowser : public ImGuiWidget
-    {
+	class AssetBrowser : public ImGuiWidget
+	{
 	public:
 		inline static Asset* s_draging_asset = nullptr;
 		AssetBrowser(ImGuiWidget* asset_detail_widget);
@@ -29,6 +29,8 @@ namespace Ailu
 		void DrawTreePannelHelper(const WString& cur_path,String& indent);
 		void DrawTreePannel();
 		void DrawMainPannel();
+		//两个格式化之后的系统路径
+		bool OnFileDropDown(const WString& from, const WString& to);
 	private:
 		inline static ImVec4 kColorUnimported = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
 		inline static ImVec4 kColorBg = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
@@ -43,7 +45,6 @@ namespace Ailu
 		const String DragFolderTreeType = "DRAG_FOLDER_TREE_INNEAR";
 		const String DragAssetType = "DRAG_ASSET_INNEAR";
 		WString _draging_file;
-		bool _is_drag_enable = false;
 		TextureDetailView* _p_tex_detail_widget;
 		Map<WString, Vector<Asset*>> _dir_asset_map;
 		//当前目录下选中的文件索引
@@ -55,12 +56,13 @@ namespace Ailu
 		Texture* _shader_icon;
 		Texture* _image_icon;
 		Texture* _scene_icon;
+		Texture* _material_icon;
 		Vector<Asset*> _cur_dir_assets;
 		WString _selected_file_sys_path;
 		bool _dirty;
 		char _rename_buffer[256];
 
-    };
+	};
 }
 
 #endif // !ASSET_BROWSER_H__

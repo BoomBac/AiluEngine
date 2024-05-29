@@ -2,8 +2,8 @@
 #ifndef __EDITOR_APP__
 #define __EDITOR_APP__
 
-#include "Engine/Ailu.h"
-#include "Engine/Inc/Framework/Common/Application.h"
+#include "Ailu.h"
+#include "Framework/Common/Application.h"
 
 using namespace Ailu;
 

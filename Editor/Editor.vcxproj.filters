@@ -18,7 +18,7 @@
     <ClCompile Include="Src\EditorMain.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Widgets\WorldOutline.cpp">
+    <ClCompile Include="Src\EditorApp.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
@@ -26,8 +26,8 @@
     <ClInclude Include="Inc\Widgets\Common.h">
       <Filter>源文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Widgets\WorldOutline.h">
-      <Filter>源文件</Filter>
+    <ClInclude Include="Inc\EditorApp.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

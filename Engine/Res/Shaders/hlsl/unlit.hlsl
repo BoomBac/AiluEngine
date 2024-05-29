@@ -1,9 +1,11 @@
 //info bein
+//pass begin::
 //name: unlit
 //vert: VSMain
 //pixel: PSMain
 //Cull: None
 //Queue: Opaque
+//pass end::
 //info end
 
 #include "common.hlsli"

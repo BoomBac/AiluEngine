@@ -1,4 +1,5 @@
 //info bein
+//pass begin::
 //name: blit
 //vert: VSMain
 //pixel: PSMain
@@ -7,11 +8,21 @@
 //Fill: Solid
 //ZTest: Always
 //ZWrite: Off
+//pass end::
+//pass begin::
+//name: blit
+//vert: VSMain
+//pixel: PSMainCopy
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: Always
+//ZWrite: Off
+//pass end::
 //info end
 #include "common.hlsli"
 
 Texture2D _SourceTex : register(t0);
-SamplerState g_LinearSampler : register(s0);
 
 struct VSInput
 {
@@ -45,8 +56,13 @@ float3 ACESFilm(float3 x)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	float3 color = _SourceTex.Sample(g_LinearSampler, input.uv).rgb;
+	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
 	color = ACESFilm(color);
 	//GammaCorrect(color,2.0f);
+	return float4(color,1.0);
+}
+float4 PSMainCopy(PSInput input) : SV_TARGET
+{
+	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
 	return float4(color,1.0);
 }

@@ -177,7 +177,8 @@ namespace Ailu
 		std::ifstream in_file(sys_path, std::ios::binary);
 		AL_ASSERT(!in_file.is_open());
 		in_file.seekg(data_start, std::ios::beg);
-		in_file.read(reinterpret_cast<char*>(data), data_size);
+		auto file_size = in_file.tellg();
+		in_file.read(reinterpret_cast<char*>(data), data_size == -1? (u64)file_size : data_size);
 		if (in_file.fail()) 
 		{
 			g_pLogMgr->LogErrorFormat(L"Failed to read file {} at position {}!", sys_path, data_start);
@@ -186,5 +187,31 @@ namespace Ailu
 		}
 		in_file.close();
 		return true;
+	}
+	std::tuple<u8*, u64> FileManager::ReadFile(const WString& sys_path, u64 data_start, u64 data_size)
+	{
+		fs::path p(sys_path);
+		u64 file_byte_size = -1;
+		if (!fs::exists(p))
+		{
+			g_pLogMgr->LogWarningFormat(L"ReadFile: File {} not exist!", sys_path);
+			return std::tuple<u8*, u64>(nullptr,-1);
+		}
+		std::ifstream in_file(sys_path, std::ios::binary);
+		AL_ASSERT(!in_file.is_open());
+		in_file.seekg(data_start, std::ios::end);
+		file_byte_size = (u64)in_file.tellg();
+		in_file.seekg(data_start, std::ios::beg);
+		data_size = data_size == -1 ? file_byte_size : data_size;
+		u8* read_data = new u8[data_size];
+		in_file.read(reinterpret_cast<char*>(read_data), data_size);
+		in_file.close();
+		if (in_file.fail())
+		{
+			g_pLogMgr->LogErrorFormat(L"Failed to read file {} at position {}!", sys_path, data_start);		
+			delete[] read_data;
+			return std::tuple<u8*, u64>(nullptr, -1);
+		}
+		return std::tuple<u8*, u64>(read_data,file_byte_size);
 	}
 }

@@ -412,4 +412,40 @@ namespace Ailu
 	{
 	}
 	//-------------------------------------------------------------GizmoPass-------------------------------------------------------------
+
+	//-------------------------------------------------------------CopyColorPass-------------------------------------------------------------
+	CopyColorPass::CopyColorPass(): RenderPass("CopyColor")
+	{
+		_p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
+		_p_obj_cb = ConstantBuffer::Create(256);
+		memcpy(_p_obj_cb->GetData(), &BuildIdentityMatrix(), sizeof(Matrix4x4f));
+		_p_quad_mesh = g_pResourceMgr->Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
+	}
+	CopyColorPass::~CopyColorPass()
+	{
+	}
+	void CopyColorPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
+	{
+		auto cmd = CommandBufferPool::Get("CopyColor");
+		cmd->Clear();
+		{
+			ProfileBlock profile(cmd.get(), _name);
+			cmd->SetViewport(rendering_data._viewport);
+			cmd->SetScissorRect(rendering_data._viewport);
+			cmd->SetRenderTarget(rendering_data._camera_opaque_tex_handle);
+			_p_blit_mat->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
+			cmd->DrawRenderer(_p_quad_mesh,_p_blit_mat,1,1);
+		}
+		context->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
+	}
+	void CopyColorPass::BeginPass(GraphicsContext* context)
+	{
+
+	}
+	void CopyColorPass::EndPass(GraphicsContext* context)
+	{
+		_p_blit_mat->SetTexture("_SourceTex", nullptr);
+	}
+	//-------------------------------------------------------------CopyColorPass-------------------------------------------------------------
 }

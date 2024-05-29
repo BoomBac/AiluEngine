@@ -1,4 +1,5 @@
 //info bein
+//pass begin::
 //name: wireframe
 //vert: VSMain
 //pixel: PSMain
@@ -7,6 +8,7 @@
 //Blend: Src,OneMinusSrc
 //ZTest: LEqual
 //Fill: Wireframe
+//pass end::
 //info end
 #include "common.hlsli"
 

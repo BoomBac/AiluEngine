@@ -19,12 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Inc\EditorApp.h" />
     <ClInclude Include="Inc\Widgets\Common.h" />
-    <ClInclude Include="Inc\Widgets\WorldOutline.h">
-      <FileType>Document</FileType>
-    </ClInclude>
+    <ClCompile Include="Src\EditorApp.cpp" />
     <ClCompile Include="Src\EditorMain.cpp" />
-    <ClCompile Include="Src\Widgets\WorldOutline.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

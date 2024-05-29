@@ -19,7 +19,10 @@ namespace Ailu
 		D3DTexture2D(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
 		~D3DTexture2D();
 		void Apply() final;
-		TextureHandle GetNativeTextureHandle() final { return _main_srv_handle.ptr; };
+		TextureHandle GetNativeTextureHandle() final 
+		{ 
+			return _is_ready_for_rendering? _main_srv_handle.ptr : 0;
+		};
 		void Bind(CommandBuffer* cmd, u8 slot) final;
 		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
 		void CreateView() final;

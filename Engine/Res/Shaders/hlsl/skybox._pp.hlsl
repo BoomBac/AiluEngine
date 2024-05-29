@@ -1,4 +1,5 @@
 //info bein
+//pass begin::
 //name: skybox_pp
 //vert: VSMain
 //pixel: PSMain
@@ -7,6 +8,7 @@
 //Fill: Solid
 //ZTest: LEqual
 //ZWrite: Off
+//pass end::
 //info end
 #include "common.hlsli"
 

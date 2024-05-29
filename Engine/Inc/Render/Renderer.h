@@ -69,6 +69,7 @@ namespace Ailu
         Scope<PostProcessPass> _p_postprocess_pass;
         Scope<DeferredGeometryPass> _p_gbuffer_pass;
         Scope<SkyboxPass> _p_skybox_pass;
+        Scope<CopyColorPass> _p_copycolor_pass;
         Scope<GizmoPass> _p_gizmo_pass;
         List<RenderPass*> _render_passes;
         bool _b_init = false;

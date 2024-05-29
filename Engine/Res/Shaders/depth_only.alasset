@@ -1,6 +1,6 @@
 guid: 4628176c-30e5-4a79-84a6-8d5700326cc7
 type: kShader
-name: DepthOnly
+name: depth_only
   file: Shaders/hlsl/depth_only.hlsl
   vs_entry: VSMain
   ps_entry: PSMain

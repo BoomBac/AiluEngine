@@ -174,6 +174,7 @@ namespace Ailu
 		u16 _pixel_size;
 		bool _is_random_access;
 		bool _is_have_total_view = false;
+		bool _is_ready_for_rendering = false;
 	};
 
 	class Texture2D : public Texture

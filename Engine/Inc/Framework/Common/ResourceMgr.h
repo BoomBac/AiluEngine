@@ -76,11 +76,13 @@ namespace Ailu
 		String _vs_entry, _ps_entry;
 		String _cs_kernel;
 	};
+
 	class ISearchFilter
 	{
 	public:
 		virtual bool Filter(Asset* asset) const= 0;
 	};
+
 	class SearchFilterByDirectory : public ISearchFilter
 	{
 	public:
@@ -99,6 +101,25 @@ namespace Ailu
 		}
 	private:
 		Vector<WString> _directories;
+	};
+
+	class SearchFilterByPath : public ISearchFilter
+	{
+	public:
+		SearchFilterByPath(Vector<WString> asset_pathes) : _asset_pathes(asset_pathes)
+		{
+		}
+		bool Filter(Asset* asset) const final
+		{
+			for (auto& dir : _asset_pathes)
+			{
+				if (dir == asset->_asset_path)
+					return true;
+			}
+			return false;
+		}
+	private:
+		Vector<WString> _asset_pathes;
 	};
 
 	class ResourceMgr : public IRuntimeModule
@@ -211,6 +232,8 @@ namespace Ailu
 		static void FormatLine(const String& line, String& key, String& value);
 		static void ExtractCommonAssetInfo(const WString& asset_path, WString& name, Guid& guid,EAssetType::EAssetType& type);
 		static EAssetType::EAssetType GetObjectAssetType(Object* obj);
+		static bool IsFileOnDiskUpdated(const WString& sys_path);
+
 		void AddResourceTask(ResourceTask task);
 		bool ExistInAssetDB(const Asset* asset);
 		bool ExistInAssetDB(const WString& asset_path);
@@ -242,19 +265,6 @@ namespace Ailu
 		void SaveMesh(const WString& asset_path, const Asset* asset);
 		void SaveTexture2D(const WString& asset_path, const Asset* asset);
 
-		static bool IsFileOnDiskNewer(const WString& sys_path)
-		{
-			fs::path p(sys_path);
-			fs::file_time_type last_load_time;
-			fs::file_time_type last_write_time = std::filesystem::last_write_time(p);
-			bool newer = true;
-			if (s_file_last_load_time.contains(sys_path))
-			{
-				last_load_time = s_file_last_load_time[sys_path];
-				newer = last_write_time > last_load_time;
-			}
-			return newer;
-		}
 		void WatchDirectory();
 		void SubmitResourceTask();
 		//导入外部资源并创建对应的asset
@@ -281,6 +291,7 @@ namespace Ailu
 		Map<EAssetType::EAssetType, Vector<ResourcePoolContainerIter>> _lut_global_resources_by_type;
 
 		Vector<std::function<void()>> _asset_changed_callbacks;
+		Queue<Asset*> _pending_delete_assets;
 	};
 	extern ResourceMgr* g_pResourceMgr;
 
@@ -298,7 +309,7 @@ namespace Ailu
 		AL_ASSERT(type == EAssetType::kUndefined);
 		bool is_skip_load = false;
 		Loader asset_loader = nullptr;
-		if (!IsFileOnDiskNewer(sys_path))
+		if (!IsFileOnDiskUpdated(sys_path))
 		{
 			g_pLogMgr->LogWarningFormat(L"File {} is new,skip load!",sys_path);
 			return _global_resources.contains(asset_path) ? static_cast<T*>(_global_resources[asset_path].get()) : nullptr;

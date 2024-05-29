@@ -1,4 +1,5 @@
 //info bein
+//pass begin::
 //name: gizmo
 //vert: VSMain
 //pixel: PSMain
@@ -6,6 +7,7 @@
 //Queue: Opaque
 //ZTest: LEqual
 //Fill: Solid
+//pass end::
 //info end
 
 #include "cbuffer.hlsli"

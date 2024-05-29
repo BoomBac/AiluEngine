@@ -1,9 +1,11 @@
 //info bein
+//pass begin::
 //name: deferred_lighting
-//vert: VSMain
-//pixel: PSMain
+//vert: DeferredLightingVSMain
+//pixel: DeferredLightingPSMain
 //Cull: Back
 //Queue: Opaque
+//pass end::
 //Properties
 //{
 //}
@@ -16,15 +18,15 @@
 #include "shadow.hlsli"
 
 
-//Texture2D MainLightShadowMap : register(t7);
+//Texture2D MainLightShadowMap : register(t7); 
 
-Texture2D _GBuffer0 : register(t0);
+Texture2D _GBuffer0 : register(t0); 
 Texture2D _GBuffer1 : register(t1);
 Texture2D _GBuffer2 : register(t2);
 Texture2D _CameraDepthTexture : register(t3);
 
 struct DeferredVSInput
-{
+{ 
 	float3 position : POSITION;
 	float2 uv : TEXCOORD;
 };

@@ -80,6 +80,7 @@ namespace Ailu
 		D3DContext::Get()->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 		_p_d3dres->SetName(ToWChar(_name));
+		_is_ready_for_rendering = true;
 	}
 
 	void D3DTexture2D::Bind(CommandBuffer* cmd, u8 slot)
@@ -387,6 +388,10 @@ namespace Ailu
 			RenderTexture::Bind(cmd, slot);
 			MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			_gpu_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+		}
+		else
+		{
+			g_pLogMgr->LogWarningFormat("D3DRenderTexture::Bind: try to use a render texture: {} as rt and srv at the same time!",_name);
 		}
 	}
 

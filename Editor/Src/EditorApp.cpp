@@ -1,11 +1,11 @@
-#include "Inc/EditorApp.h"
-#include "Engine/Inc/Render/Renderer.h"
+#include "EditorApp.h"
+#include "Render/Renderer.h"
 
 using namespace Ailu;
 
 namespace Editor
 {
-	Renderer* g_pRenderer = new Renderer();
+	//Renderer* g_pRenderer = new Renderer();
 	int EditorApp::Initialize()
 	{
 		ApplicationDesc desc;
@@ -19,9 +19,9 @@ namespace Editor
 		//PushLayer(_p_input_layer);
 		_p_scene_layer = new SceneLayer();
 		PushLayer(_p_scene_layer);
-		g_pRenderer->Initialize(desc._gameview_width, desc._gameview_height);
+		//g_pRenderer->Initialize(desc._gameview_width, desc._gameview_height);
 
-		return Application::Initialize();
+		return ret;
 	}
 	void EditorApp::Finalize()
 	{
