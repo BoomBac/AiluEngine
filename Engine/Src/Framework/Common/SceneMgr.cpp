@@ -28,36 +28,12 @@ namespace Ailu
 		return kEngineRootPath + scene_path;
 	}
 
-	inline static void ProcessValueAndPop(Queue<std::tuple<String, String>>& scene_data, std::function<void(String)> func)
-	{
-		func(std::get<1>(scene_data.front()));
-		scene_data.pop();
-	}
-
-	static void LoadCamera(Queue<std::tuple<String, String>>& scene_data, Camera& out_camera)
-	{
-		while (std::get<0>(scene_data.front()) != "Type") scene_data.pop();
-		out_camera.Type(std::get<1>(scene_data.front()) == ECameraType::ToString(ECameraType::kPerspective) ? ECameraType::kPerspective : ECameraType::kOrthographic);
-		scene_data.pop();
-		Vector3f v3{};
-		Vector4f v4{};
-		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v3); out_camera.Position(v3); });
-		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v4); out_camera.Rotation(v4); });
-		ProcessValueAndPop(scene_data, [&](String str) {out_camera.FovH(LoadFloat(str.c_str())); });
-		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Aspect(LoadFloat(str.c_str())); });
-		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Near(LoadFloat(str.c_str())); });
-		ProcessValueAndPop(scene_data, [&](String str) {out_camera.Far(LoadFloat(str.c_str())); });
-		Vector2f v2{};
-		ProcessValueAndPop(scene_data, [&](String str) {LoadVector(str.c_str(), v2); FirstPersonCameraController::s_instance._rotation = v2; });
-		out_camera.RecalculateMarix(true);
-	}
-
 	int SceneMgr::Initialize()
 	{
 		g_pLogMgr->LogFormat("Begin load scene from {}...", GetSceneSysPath("Scenes/default.almap").c_str());
 		g_pSceneMgr->_p_current = LoadScene("default.almap");
 		//g_pSceneMgr->_p_current = Scene::GetDefaultScene();
-		Camera::sCurrent = _p_current->GetActiveCamera();
+		//Camera::sCurrent = _p_current->GetActiveCamera();
 		g_pLogMgr->Log("SceneMgr end");
 		return 0;
 	}
@@ -129,17 +105,7 @@ namespace Ailu
 		{
 			String level1 = GetIndentation(1), level2 = GetIndentation(2), level3 = GetIndentation(3), level4 = GetIndentation(4);
 			ss << "SceneName: " << scene->Name() << endl;
-			ss << "SceneCamera: " << "scene_camera" << endl;
-			ss << level1 << "Type: " << ECameraType::ToString(Camera::sCurrent->Type()) << endl;
-			ss << level1 << "Position: " << Camera::sCurrent->Position() << endl;
-			ss << level1 << "Rotation: " << Camera::sCurrent->Rotation() << endl;
-			ss << level1 << "Fov: " << Camera::sCurrent->FovH() << endl;
-			ss << level1 << "Aspect: " << Camera::sCurrent->Aspect() << endl;
-			ss << level1 << "Near: " << Camera::sCurrent->Near() << endl;
-			ss << level1 << "Far: " << Camera::sCurrent->Far() << endl;
-			ss << level1 << "ControllerRotation: " << FirstPersonCameraController::s_instance._rotation << endl;
 			ss << "SceneGraph: " << endl;
-			//SerializeActor(ss, scene->GetSceneRoot(), 2);
 			scene->Root()->Serialize(ss, level1);
 		}
 		catch (const std::exception&)
@@ -196,8 +162,8 @@ namespace Ailu
 		lines.pop();
 		lines.pop();
 		Scene* loaded_scene = SceneMgr::Create(scene_name);
-		LoadCamera(lines, *loaded_scene->GetActiveCamera());
-		lines.pop();
+		//LoadCamera(lines, *loaded_scene->GetActiveCamera());
+		//lines.pop();
 		SceneActor* scene_root = Deserialize<SceneActor>(lines);
 		loaded_scene->Root(scene_root);
 		loaded_scene->MarkDirty();
@@ -316,11 +282,6 @@ namespace Ailu
 		_b_dirty = true;
 	}
 
-	Camera* Scene::GetActiveCamera()
-	{
-		return &_scene_cam;
-	}
-
 	Scene* Scene::GetDefaultScene()
 	{
 		auto _p_actor = Actor::Create<SceneActor>("stone");
@@ -346,7 +307,6 @@ namespace Ailu
 		scene->AddObject(_p_light);
 		scene->AddObject(point_light);
 		scene->AddObject(spot_light);
-		scene->_scene_cam = *Camera::GetDefaultCamera();
 		return scene;
 	}
 

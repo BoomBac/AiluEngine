@@ -116,7 +116,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\;$(SolutionDir)\Engine\Inc\;$(SolutionDir)\Engine\Ext\;$(SolutionDir)\Engine\Ext\imgui;$(SolutionDir)\Engine\Ext\fbxsdk\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -501,21 +501,12 @@
     <ClInclude Include="Inc\Framework\Common\Utils.h" />
     <ClInclude Include="Inc\Framework\Common\Window.h" />
     <ClInclude Include="Inc\Framework\Events\Event.h" />
-    <ClInclude Include="Inc\Framework\Events\InputLayer.h" />
     <ClInclude Include="Inc\Framework\Events\KeyEvent.h" />
     <ClInclude Include="Inc\Framework\Events\Layer.h" />
     <ClInclude Include="Inc\Framework\Events\LayerStack.h" />
     <ClInclude Include="Inc\Framework\Events\MouseEvent.h" />
-    <ClInclude Include="Inc\Framework\Events\SceneLayer.h" />
     <ClInclude Include="Inc\Framework\Events\WindowEvent.h" />
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\ObjectDetail.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h" />
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h" />
     <ClInclude Include="Inc\Framework\Interface\IParser.h" />
     <ClInclude Include="Inc\Framework\Interface\IRuntimeModule.h" />
     <ClInclude Include="Inc\Framework\Math\ALMath.hpp" />
@@ -572,6 +563,7 @@
     <ClInclude Include="Inc\RHI\DX12\CPUDescriptorManager.h" />
     <ClInclude Include="Inc\RHI\DX12\dxhelper.h" />
     <ClInclude Include="Inc\RHI\DX12\GPUDescriptorManager.h" />
+    <ClCompile Include="Src\Framework\Common\test.cpp" />
     <None Include="Res\Shaders\blit.hlsl" />
     <None Include="Res\Shaders\lighting.hlsli">
       <FileType>Document</FileType>
@@ -602,18 +594,9 @@
     <ClCompile Include="Src\Framework\Common\ResourceMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\SceneMgr.cpp" />
     <ClCompile Include="Src\Framework\Common\TimeMgr.cpp" />
-    <ClCompile Include="Src\Framework\Events\InputLayer.cpp" />
     <ClCompile Include="Src\Framework\Events\Layer.cpp" />
     <ClCompile Include="Src\Framework\Events\LayerStack.cpp" />
-    <ClCompile Include="Src\Framework\Events\SceneLayer.cpp" />
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\ObjectDetail.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp" />
-    <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp" />
     <ClCompile Include="Src\Framework\Math\Geometry.cpp" />
     <ClCompile Include="Src\Framework\Math\Guid.cpp" />
     <ClCompile Include="Src\Framework\Parser\FbxParser.cpp" />

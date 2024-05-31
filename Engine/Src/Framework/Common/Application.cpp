@@ -5,7 +5,6 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/TimeMgr.h"
-#include "Framework/Events/InputLayer.h"
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
 
@@ -13,8 +12,6 @@
 #include "Framework/Common/ThreadPool.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
-
-#include "Framework/ImGui/Widgets/OutputLog.h"
 
 namespace Ailu
 {
@@ -32,7 +29,7 @@ namespace Ailu
 #ifdef PLATFORM_WINDOWS
 		TCHAR path[MAX_PATH];
 		GetModuleFileName(NULL, path, MAX_PATH);
-		return path;
+		return PathUtils::FormatFilePath(WString(path));
 #else
 		AL_ASSERT(PLATFORM_WINDOWS != 1)
 #endif // WINDOWS
@@ -53,14 +50,13 @@ namespace Ailu
 		sp_instance = this;
 		g_pLogMgr->Initialize();
 		g_pLogMgr->AddAppender(new FileAppender());
-		g_pLogMgr->AddAppender(new ImGuiLogAppender());
 		_p_window = new Ailu::WinWindow(Ailu::WindowProps());
 		_p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
 		g_pTimeMgr->Initialize();
 		_layer_stack = new LayerStack();
 #ifdef DEAR_IMGUI
+		//初始化imgui gfx时要求imgui window已经初始化
 		_p_imgui_layer = new ImGUILayer();
-
 #endif // DEAR_IMGUI
 		GraphicsContext::InitGlobalContext();
 		g_pGfxContext->ResizeSwapChain(desc._window_width, desc._window_height);
@@ -69,6 +65,7 @@ namespace Ailu
 		g_pResourceMgr->Initialize();
 #ifdef DEAR_IMGUI
 		PushLayer(_p_imgui_layer);
+		
 #endif // DEAR_IMGUI
 		g_pLogMgr->LogFormat("Resource mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
 		g_pLogMgr->Log("Begin init scene mgr...");
@@ -77,12 +74,7 @@ namespace Ailu
 		g_pLogMgr->LogFormat("Scene mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
 		g_pLogMgr->Log("Begin init renderer...");
 		g_pTimeMgr->Mark();
-		g_pRenderer->Initialize(desc._gameview_width,desc._gameview_height);
 		g_pLogMgr->LogFormat("Renderer init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
-		_p_input_layer = new InputLayer();
-		PushLayer(_p_input_layer);
-		_p_scene_layer = new SceneLayer();
-		PushLayer(_p_scene_layer);
 		SetThreadDescription(GetCurrentThread(), L"ALEngineMainThread");
 		g_pLogMgr->Log("Application Init end");
 		_state = EApplicationState::EApplicationState_Running;
@@ -164,9 +156,8 @@ namespace Ailu
 	}
 	bool Application::OnLostFoucus(WindowLostFocusEvent& e)
 	{
-		s_target_lag = 1000 / 30.0;
 		g_pLogMgr->Log("OnLostFoucus");
-		_p_input_layer->HandleInput(false);
+		s_target_lag = 1000 / 30.0;
 		return true;
 	}
 	bool Application::OnGetFoucus(WindowFocusEvent& e)
@@ -174,7 +165,6 @@ namespace Ailu
 		g_pLogMgr->Log("OnGetFoucus");
 		s_target_lag = kMsPerRender;
 		_state = EApplicationState::EApplicationState_Running;
-		_p_input_layer->HandleInput(true);
 		return true;
 	}
 	bool Application::OnWindowMinimize(WindowMinimizeEvent& e)

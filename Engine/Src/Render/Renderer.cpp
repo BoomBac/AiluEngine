@@ -102,8 +102,6 @@ namespace Ailu
 
 	void Renderer::BeginScene()
 	{
-		_p_scene_camera = g_pSceneMgr->_p_current->GetActiveCamera();
-		Camera::sCurrent = _p_scene_camera;
 		if(!_resize_events.empty())
 			DoResize();
 		memset(reinterpret_cast<void*>(&_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));

@@ -1,3 +1,4 @@
+#pragma warning(disable : 4251)
 #pragma once
 #ifndef __CAMERA_COMP_H__
 #define __CAMERA_COMP_H__

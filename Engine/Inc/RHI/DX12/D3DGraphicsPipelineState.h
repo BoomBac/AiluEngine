@@ -48,7 +48,7 @@ namespace Ailu
 		return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, u32>(&cache_desc[0], std::move(desc_count));
 	}
 
-	namespace ALHash
+	namespace Math::ALHash
 	{
 		template<>
 		static u32 Hasher(const D3D12_PRIMITIVE_TOPOLOGY_TYPE& obj)

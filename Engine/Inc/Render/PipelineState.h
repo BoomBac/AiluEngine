@@ -457,7 +457,7 @@ namespace Ailu
 		}
 	};
 
-	namespace ALHash
+	namespace Math::ALHash
 	{
 		template<>
 		static u32 Hasher(const ETopology& obj)

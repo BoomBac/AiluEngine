@@ -1,4 +1,4 @@
-#include "Inc/Widgets/OutputLog.h"
+#include "Widgets/OutputLog.h"
 
 
 namespace Ailu

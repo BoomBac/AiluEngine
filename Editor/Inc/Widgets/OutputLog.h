@@ -25,7 +25,7 @@ namespace Ailu
 			AddLog("%s\r\n", ToChar(str).c_str());
 		}
 
-		void    Draw(const char* title)
+		void Draw(const char* title)
 		{
 			// Options menu
 			if (ImGui::BeginPopup("Options"))

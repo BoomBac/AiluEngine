@@ -1,9 +1,9 @@
-#include "Inc/Widgets/RenderView.h"
+#include "Widgets/RenderView.h"
 #include "Ext/imgui/imgui.h"
-#include "Engine/Inc/Framework/Common/Input.h"
-#include "Engine/Inc/Render/CommandBuffer.h"
-#include "Engine/Inc/Render/Renderer.h"
-#include "Engine/Inc/Framework/Common/Application.h"
+#include "Framework/Common/Input.h"
+#include "Render/CommandBuffer.h"
+#include "Render/Renderer.h"
+#include "Framework/Common/Application.h"
 
 namespace Ailu
 {

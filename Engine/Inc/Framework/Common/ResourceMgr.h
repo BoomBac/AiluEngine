@@ -1,3 +1,6 @@
+#pragma warning(push)
+#pragma warning(disable: 4251) //std库直接暴露为接口dll在客户端上使用时可能会有问题，禁用该编译警告
+
 #pragma once
 #ifndef __RESOURCE_MGR_H__
 #define __RESOURCE_MGR_H__
@@ -15,7 +18,7 @@
 
 namespace Ailu
 {
-	struct ImportSetting
+	struct AILU_API ImportSetting
 	{
 	public:
 		static ImportSetting& Default()
@@ -38,7 +41,7 @@ namespace Ailu
 		//virtual void operator delete[](void* ptr) = 0;)
 	};
 
-	struct TextureImportSetting : public ImportSetting
+	struct AILU_API TextureImportSetting : public ImportSetting
 	{
 	public:
 		static TextureImportSetting& Default()
@@ -49,7 +52,7 @@ namespace Ailu
 		bool _is_srgb = false;
 		bool _generate_mipmap = true;
 	};
-	struct MeshImportSetting : public ImportSetting
+	struct AILU_API MeshImportSetting : public ImportSetting
 	{
 	public:
 		static MeshImportSetting& Default()
@@ -65,7 +68,7 @@ namespace Ailu
 		}
 		bool _is_import_material = true;
 	};
-	struct ShaderImportSetting : public ImportSetting
+	struct AILU_API ShaderImportSetting : public ImportSetting
 	{
 	public:
 		static ShaderImportSetting& Default()
@@ -77,13 +80,13 @@ namespace Ailu
 		String _cs_kernel;
 	};
 
-	class ISearchFilter
+	class AILU_API ISearchFilter
 	{
 	public:
 		virtual bool Filter(Asset* asset) const= 0;
 	};
 
-	class SearchFilterByDirectory : public ISearchFilter
+	class AILU_API SearchFilterByDirectory : public ISearchFilter
 	{
 	public:
 		SearchFilterByDirectory(Vector<WString> directories) : _directories(directories) 
@@ -103,7 +106,7 @@ namespace Ailu
 		Vector<WString> _directories;
 	};
 
-	class SearchFilterByPath : public ISearchFilter
+	class AILU_API SearchFilterByPath : public ISearchFilter
 	{
 	public:
 		SearchFilterByPath(Vector<WString> asset_pathes) : _asset_pathes(asset_pathes)
@@ -122,7 +125,7 @@ namespace Ailu
 		Vector<WString> _asset_pathes;
 	};
 
-	class ResourceMgr : public IRuntimeModule
+	class AILU_API ResourceMgr : public IRuntimeModule
 	{
 		using ResourcePoolContainer = Map<WString, Ref<Object>>;
 		using ResourcePoolContainerIter = ResourcePoolContainer::iterator;
@@ -142,6 +145,8 @@ namespace Ailu
 		inline const static std::set<String> kHDRImageExt = { ".exr",".EXR",".hdr",".HDR" };
 		inline const static std::set<String> kMeshExt = { ".obj",".OBJ" ,".fbx",".FBX"};
 	public:
+		DISALLOW_COPY_AND_ASSIGN(ResourceMgr)
+		ResourceMgr() = default;
 		int Initialize() final;
 		void Finalize() final;
 		void Tick(const float& delta_time) final;
@@ -293,7 +298,7 @@ namespace Ailu
 		Vector<std::function<void()>> _asset_changed_callbacks;
 		Queue<Asset*> _pending_delete_assets;
 	};
-	extern ResourceMgr* g_pResourceMgr;
+	extern AILU_API ResourceMgr* g_pResourceMgr;
 
 	template<typename T>
 	inline T* ResourceMgr::Load(const WString& asset_path)
@@ -502,3 +507,4 @@ namespace Ailu
 }
 
 #endif // !RESOURCE_MGR_H__
+#pragma warning(pop)

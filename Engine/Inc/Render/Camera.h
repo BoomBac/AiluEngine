@@ -1,3 +1,4 @@
+#pragma warning(disable: 4275) //dll interface warning
 #ifndef __CAMERA_H__
 #define __CAMERA_H__
 #include "Framework/Math/ALMath.hpp"
@@ -8,7 +9,7 @@
 namespace Ailu
 {
     DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
-    class Camera : public Object
+    class AILU_API Camera : public Object
     {
         friend class CameraComponent;
 
@@ -71,7 +72,7 @@ namespace Ailu
     DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, FovH,_fov_h)
     REFLECT_FILED_END
 
-    class FirstPersonCameraController
+    class AILU_API FirstPersonCameraController
     {
     public:
         FirstPersonCameraController();

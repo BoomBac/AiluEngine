@@ -7,8 +7,6 @@
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/LayerStack.h"
 #include "Framework/ImGui/ImGuiLayer.h"
-#include "Framework/Events/InputLayer.h"
-#include "Framework/Events/SceneLayer.h"
 
 namespace Ailu
 {
@@ -24,11 +22,6 @@ namespace Ailu
         u32 _gameview_width, _gameview_height;
     };
 
-    //class AILU_API ApplicationDescription : public Object
-    //{
-
-    //};
-
     class AILU_API Application : public IRuntimeModule
     {
     public:
@@ -41,6 +34,7 @@ namespace Ailu
         static constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
         inline static double s_target_framecount = kTargetFrameRate; 
         inline static double s_target_lag = kMsPerRender;
+        //**\\**\\**\\*.exe
         static WString GetWorkingPath();
         int Initialize() override;
         int Initialize(ApplicationDesc desc);
@@ -55,19 +49,17 @@ namespace Ailu
 
         static Application* GetInstance();
         inline static u64 s_frame_count = 0u;
-    private:
-        bool OnWindowClose(WindowCloseEvent& e);
-        bool OnGetFoucus(WindowFocusEvent& e);
-        bool OnLostFoucus(WindowLostFocusEvent& e);
-        bool OnWindowMinimize(WindowMinimizeEvent& e);
-        bool OnWindowResize(WindowResizeEvent& e);
-        bool OnDragFile(DragFileEvent& e);
-        void OnEvent(Event& e);
+    protected:
+        virtual bool OnWindowClose(WindowCloseEvent& e);
+        virtual bool OnGetFoucus(WindowFocusEvent& e);
+        virtual bool OnLostFoucus(WindowLostFocusEvent& e);
+        virtual bool OnWindowMinimize(WindowMinimizeEvent& e);
+        virtual bool OnWindowResize(WindowResizeEvent& e);
+        virtual bool OnDragFile(DragFileEvent& e);
+        virtual void OnEvent(Event& e);
     private:
         LayerStack* _layer_stack;
         ImGUILayer* _p_imgui_layer;
-        InputLayer* _p_input_layer;
-        SceneLayer* _p_scene_layer;
         Window* _p_window = nullptr;
         EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None; 
         inline static Application* sp_instance = nullptr;

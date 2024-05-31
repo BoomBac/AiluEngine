@@ -1,7 +1,7 @@
-#include "Inc/Widgets/AssetTable.h"
+#include "Widgets/AssetTable.h"
 #include "Ext/imgui/imgui.h"
-#include "Engine/Inc/Framework/Common/ResourceMgr.h"
-#include "Engine/Inc/Render/GraphicsContext.h"
+#include "Framework/Common/ResourceMgr.h"
+#include "Render/GraphicsContext.h"
 
 namespace Ailu
 {

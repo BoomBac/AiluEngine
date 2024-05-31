@@ -180,7 +180,7 @@ namespace Ailu
 		List<ShaderPropertyInfo> _shader_prop_infos;
 	};
 
-	class Shader : public Object
+	class AILU_API Shader : public Object
 	{
 		friend class Material;
 	public:

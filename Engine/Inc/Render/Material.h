@@ -30,13 +30,14 @@ namespace Ailu
 		inline static String kNormal = "Normal";
 	};
 
-	class Material : public Object
+	class AILU_API Material : public Object
 	{
 		friend class ResourceMgr;
 		DECLARE_REFLECT_FIELD(Material)
 		DECLARE_PRIVATE_PROPERTY(b_internal,IsInternal,bool)
 		DECLARE_PRIVATE_PROPERTY(material_id,MaterialID, EMaterialID::EMaterialID)
 	public:
+		DISALLOW_COPY_AND_ASSIGN(Material)
 		Material(Shader* shader,String name);
 		~Material();
 		void ChangeShader(Shader* shader);

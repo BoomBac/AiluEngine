@@ -81,7 +81,7 @@ namespace Ailu
         List<AfterTickEvent> _events_after_tick;
 
     };
-    extern Renderer* g_pRenderer;
+    extern AILU_API Renderer* g_pRenderer;
 }
 #pragma warning(pop)
 #endif // !RENDERER_H__

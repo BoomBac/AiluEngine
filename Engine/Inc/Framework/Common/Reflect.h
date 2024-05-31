@@ -60,7 +60,7 @@ namespace Ailu
         T _value;
     };
 
-    struct SerializableProperty
+    struct AILU_API SerializableProperty
     {
         void* _value_ptr;
         String _name;

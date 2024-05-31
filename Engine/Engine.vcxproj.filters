@@ -2067,27 +2067,6 @@
     <ClInclude Include="Ext\imgui\imgui.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetBrowser.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\AssetTable.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\CommonTextureWidget.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\ImGuiWidget.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\ObjectDetail.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\OutputLog.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\ImGui\Widgets\RenderView.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="Inc\Framework\ImGui\ImGuiLayer.h">
       <Filter>头文件</Filter>
     </ClInclude>
@@ -2104,9 +2083,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Ext\imgui\imstb_truetype.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="Inc\Framework\Events\InputLayer.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -2297,24 +2273,6 @@
     <ClCompile Include="Ext\imgui\imgui.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetTable.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\CommonTextureWidget.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\ImguiWidget.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\ObjectDetail.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\OutputLog.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\RenderView.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="Src\Framework\ImGui\ImGUILayer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -2330,11 +2288,8 @@
     <ClCompile Include="Ext\imgui\imgui_widgets.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Framework\Events\InputLayer.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\Framework\ImGui\Widgets\AssetBrowser.cpp">
-      <Filter>源文件</Filter>
+    <ClCompile Include="Src\Framework\Common\test.cpp">
+      <Filter>头文件</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

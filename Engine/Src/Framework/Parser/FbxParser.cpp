@@ -983,10 +983,10 @@ namespace Ailu
 		auto raw_bonei = skined_mesh ? skined_mesh->GetBoneIndices() : nullptr;
 		auto raw_bonew = skined_mesh ? skined_mesh->GetBoneWeights() : nullptr;
 
-		ALHash::Vector3fHash v3hash{};
-		ALHash::Vector2fHash v2hash{};
-		ALHash::VectorHash<Vector4D, float> v4fhash{};
-		ALHash::VectorHash<Vector4D, u32> u4fhash{};
+		Math::ALHash::Vector3fHash v3hash{};
+		Math::ALHash::Vector2fHash v2hash{};
+		Math::ALHash::VectorHash<Vector4D, float> v4fhash{};
+		Math::ALHash::VectorHash<Vector4D, u32> u4fhash{};
 		TimeMgr mgr;
 		mgr.Mark();
 		constexpr float minf = std::numeric_limits<float>::lowest();
@@ -1004,7 +1004,7 @@ namespace Ailu
 				auto n = raw_normals[_b_normal_by_controlpoint ? _positon_conrtol_index_mapper[i] : i];
 				auto uv = raw_uv0[i];
 				auto hash0 = v3hash(n), hash1 = v2hash(uv);
-				auto vertex_hash = ALHash::CombineHashes(hash0, hash1);
+				auto vertex_hash = Math::ALHash::CombineHashes(hash0, hash1);
 				auto bi = raw_bonei[i];
 				auto bw = raw_bonew[i];
 				auto it = vertex_map.find(vertex_hash);
@@ -1031,7 +1031,7 @@ namespace Ailu
 				auto p = raw_pos[i], n = raw_normals[i];
 				auto uv = raw_uv0[i];
 				auto hash0 = v3hash(n), hash1 = v2hash(uv);
-				auto vertex_hash = ALHash::CombineHashes(hash0, hash1);
+				auto vertex_hash = Math::ALHash::CombineHashes(hash0, hash1);
 				auto it = vertex_map.find(vertex_hash);
 				if (it == vertex_map.end())
 				{

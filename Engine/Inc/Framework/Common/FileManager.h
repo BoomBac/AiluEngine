@@ -10,8 +10,7 @@ namespace Ailu
 #undef CopyFile
 #undef CreateFile
 	namespace fs = std::filesystem;
-	DECLARE_ENUM(EFileContentType, kText, kBinary);
-	class FileManager
+	class AILU_API FileManager
 	{
 	public:
 		static void CreateDirectory(const WString& dir_name);

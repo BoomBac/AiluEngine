@@ -2,8 +2,8 @@
 #ifndef __IMGUIWIDGET_H__
 #define __IMGUIWIDGET_H__
 #include <functional>
-#include "Engine/Inc/GlobalMarco.h"
-#include "Engine/Inc/Framework/Math/ALMath.hpp"
+#include "GlobalMarco.h"
+#include "Framework/Math/ALMath.hpp"
 
 namespace Ailu
 {

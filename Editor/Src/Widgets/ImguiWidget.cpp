@@ -1,8 +1,8 @@
-#include "Inc/Widgets/ImGuiWidget.h"
+#include "Widgets/ImGuiWidget.h"
 #include "Ext/imgui/imgui.h"
-#include "Engine/Inc/Framework/Common/Input.h"
-#include "Engine/Inc/Render/CommandBuffer.h"
-#include "Engine/Inc/Render/Renderer.h"
+#include "Framework/Common/Input.h"
+#include "Render/CommandBuffer.h"
+#include "Render/Renderer.h"
 
 namespace Ailu
 {

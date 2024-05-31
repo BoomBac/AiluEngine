@@ -1,15 +1,15 @@
-#include "Inc/Widgets/ObjectDetail.h"
-#include "Inc/Widgets/CommonTextureWidget.h"
+#include "Widgets/ObjectDetail.h"
+#include "Widgets/CommonTextureWidget.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 
-#include "Engine/Inc/Objects/TransformComponent.h"
-#include "Engine/Inc/Objects/StaticMeshComponent.h"
-#include "Engine/Inc/Objects/CameraComponent.h"
-#include "Engine/Inc/Render/CommandBuffer.h"
-#include "Engine/Inc/Render/Renderer.h"
-#include "Engine/Inc/Framework/Common/Asset.h"
-#include "Engine/Inc/Framework/Common/ResourceMgr.h"
+#include "Objects/TransformComponent.h"
+#include "Objects/StaticMeshComponent.h"
+#include "Objects/CameraComponent.h"
+#include "Render/CommandBuffer.h"
+#include "Render/Renderer.h"
+#include "Framework/Common/Asset.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {

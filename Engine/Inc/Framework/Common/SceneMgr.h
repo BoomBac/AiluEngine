@@ -3,6 +3,8 @@
 #pragma once
 #ifndef __SCENE_MGR_H__
 #define __SCENE_MGR_H__
+#include <queue>
+
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Objects/SceneActor.h"
 #include "Objects/LightComponent.h"
@@ -27,12 +29,10 @@ namespace Ailu
 		SceneActor* GetSceneActorByID(const u32& id);
 		SceneActor* GetSceneActorByIndex(const u32& index);
 		void MarkDirty();
-		Camera* GetActiveCamera();
 		static Scene* GetDefaultScene();
 		std::list<LightComponent*>& GetAllLight();
 		Vector<StaticMeshComponent*>& GetAllStaticRenderable() {return _all_static_renderalbes;};
 	private:
-		Camera _scene_cam;
 		std::list<SceneActor*> _all_objects{};
 		std::list<LightComponent*> _all_lights{};
 		Vector<StaticMeshComponent*> _all_static_renderalbes{};
@@ -40,12 +40,12 @@ namespace Ailu
 		ActorEvent FillActorList;
 	};
 
-	class SceneMgr : public IRuntimeModule
+	class AILU_API SceneMgr// : public IRuntimeModule
 	{
 	public:
-		int Initialize() final;
-		void Finalize() final;
-		void Tick(const float& delta_time) final;
+		int Initialize();
+		void Finalize();
+		void Tick(const float& delta_time);
 		static Scene* Create(const std::string& name);
 		SceneActor* AddSceneActor(std::string_view name,Ref<Mesh> mesh);
 		SceneActor* AddSceneActor(std::string_view name,const Camera& camera);
@@ -60,7 +60,7 @@ namespace Ailu
 		void Cull(Camera* cam,Scene* p_scene);
 		inline static std::list<Scope<Scene>> s_all_scene{};
 		inline static uint16_t s_scene_index = 0u;
-		Queue<SceneActor*> _pending_delete_actors;
+		std::queue<SceneActor*> _pending_delete_actors;
 	};
 	extern AILU_API SceneMgr* g_pSceneMgr;
 }
