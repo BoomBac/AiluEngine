@@ -1,13 +1,13 @@
 SceneName: default_scene
 SceneCamera: scene_camera
   Type: kPerspective
-  Position: -590.238,570.129,-37.7785
-  Rotation: -0.0953944,-0.887446,0.212983,-0.397465
+  Position: -177.481,608.375,470.576
+  Rotation: 0.0206247,0.97692,-0.111201,0.181209
   Fov: 60
-  Aspect: 1.87103
-  Near: 86.8
+  Aspect: 1.71698
+  Near: 11.8
   Far: 29398.2
-  ControllerRotation: 12627,30371.8
+  ControllerRotation: 12613,31479
 SceneGraph: 
   Name: root
     Components: 
@@ -15,7 +15,7 @@ SceneGraph:
         Position: 0,45,0
         Rotation: 0,9.72351e-06,0,1
         Scale: -13.99,0.01,0.01
-    Children: 5
+    Children: 6
       Name: plane
         Components: 
           TransformComponent: 
@@ -58,17 +58,17 @@ SceneGraph:
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: 846,1355,-1411
+            Position: 363,1590,-187
             Rotation: -0.00308869,0.148036,-0.120523,0.981606
             Scale: 1,1,1
           LightComponent: 
             Type: Spot
             Color: 0.0395761,0.518758,0.897059
-            Intensity: 1
+            Intensity: 0
             Radius: 2868
             Inner: 28.55
             Outer: 60
-            CastShadow: false
+            CastShadow: true
             ShadowArea: 0
             ShadowDistance: 0
         Children: 0
@@ -87,4 +87,14 @@ SceneGraph:
             Far: 1000
             Size: 0
             FovH: 60
+        Children: 0
+      Name: object0
+        Components: 
+          TransformComponent: 
+            Position: 0,517,21
+            Rotation: 0.211537,-0.69329,0.651043,0.225264
+            Scale: 1,1,1
+          StaticMeshComponent: 
+            MeshPath: c2d94023-f30c-4e30-b42e-95ac70436d40
+            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0

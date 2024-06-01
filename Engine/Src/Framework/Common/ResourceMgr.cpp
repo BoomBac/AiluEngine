@@ -992,13 +992,13 @@ namespace Ailu
 		fs::path p(sys_path);
 		if (!FileManager::Exist(sys_path))
 		{
-			g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} not exist on the disk!", sys_path);
+			g_pLogMgr->LogErrorFormat(L"Path {} not exist on the disk!", sys_path);
 			return nullptr;
 		}
 		auto ext = p.extension().string();
 		if (ext.empty() || (!kHDRImageExt.contains(ext) && !kLDRImageExt.contains(ext) && !kMeshExt.contains(ext)))
 		{
-			g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} is not a supported file!", sys_path);
+			g_pLogMgr->LogErrorFormat(L"Path {} is not a supported file!", sys_path);
 			return nullptr;
 		}
 		auto new_sys_path = FileManager::GetCurSysDirStr();

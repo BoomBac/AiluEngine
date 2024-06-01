@@ -44,7 +44,8 @@ namespace Ailu
         void UnRegisterEventAfterTick(AfterTickEvent e);
         RenderTexture* GetTargetTexture() const { return g_pRenderTexturePool->Get(_gameview_rt_handle); }
         bool _is_offscreen = true;
-        float _shadow_distance = 1000;
+        //cm
+        float _shadow_distance = 4000;
     private:
         RTHandle _camera_color_handle;
         RTHandle _gameview_rt_handle;

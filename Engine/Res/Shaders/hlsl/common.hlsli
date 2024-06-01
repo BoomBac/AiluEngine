@@ -6,6 +6,7 @@ SamplerState g_LinearWrapSampler : register(s0);
 SamplerState g_LinearClampSampler : register(s1);
 SamplerState g_LinearBorderSampler : register(s2);
 SamplerComparisonState g_ShadowSampler : register(s3);
+SamplerState g_AnisotropicClampSampler : register(s4);
 
 
 float Pow2(float x)

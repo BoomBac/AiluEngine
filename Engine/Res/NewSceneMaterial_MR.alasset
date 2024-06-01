@@ -1,21 +1,21 @@
-guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+guid: 5e5f5078-cf6b-42f0-a498-0e0f39d1b981
 type: kMaterial
-name: StandardPBR
+name: Material_MR
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
   prop_type: Uint
-    SamplerMask: 7
-    MaterialID: 16843009
+    SamplerMask: 0
+    MaterialID: 0
   prop_type: Float
-    MetallicValue: 1
+    MetallicValue: 0
     RoughnessValue: 0
   prop_type: Vector
-    SpecularColor: 1,1,1,1
-    BaseColor: 1,1,1,1
+    SpecularColor: 0,0,0,0
+    BaseColor: 1,1,1,0
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D
-    Albedo: 
-    Normal: 
-    Emssive: 
+    Albedo: null guid
+    Normal: null guid
+    Emssive: null guid
     Roughness: null guid
     Metallic: null guid
     Specular: null guid

@@ -8,7 +8,7 @@
 
 DECLARE_ENUM(EALGFormat, kALGFormatUnknown,
     kALGFormatR8G8B8A8_UNORM, kALGFormatR8G8B8A8_UNORM_SRGB,
-    kALGFormatR24G8_TYPELESS, kALGFormatR32_FLOAT, kALGFormatD32_FLOAT, kALGFormatD24S8_UINT,
+    kALGFormatR24G8_TYPELESS, kALGFormatR32_FLOAT, kALGFormatD32_FLOAT, kALGFormatD16_FLOAT,kALGFormatD24S8_UINT,
     kALGFormatR32G32B32A32_FLOAT, kALGFormatR32G32B32_FLOAT, kALGFormatR16G16B16A16_FLOAT, kALGFormatR16G16_FLOAT, kALGFormatR32G32_FLOAT, kALGFormatR32_UINT, kALGFormatR32_SINT)
 
 
@@ -23,6 +23,7 @@ static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatD24S8_UINT: return DXGI_FORMAT_D24_UNORM_S8_UINT;
     case EALGFormat::kALGFormatR32_FLOAT: return DXGI_FORMAT_R32_FLOAT;
     case EALGFormat::kALGFormatD32_FLOAT: return DXGI_FORMAT_D32_FLOAT;
+    case EALGFormat::kALGFormatD16_FLOAT: return DXGI_FORMAT_R16_FLOAT;
     case EALGFormat::kALGFormatR32G32B32A32_FLOAT: return DXGI_FORMAT_R32G32B32A32_FLOAT;
     case EALGFormat::kALGFormatR32G32B32_FLOAT: return DXGI_FORMAT_R32G32B32_FLOAT;
     case EALGFormat::kALGFormatR32G32_FLOAT: return DXGI_FORMAT_R32G32_FLOAT;
@@ -83,6 +84,8 @@ static u16 GetPixelByteSize(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatR32_FLOAT: return 4;
         break;
     case EALGFormat::kALGFormatD32_FLOAT: return 4;
+        break;
+    case EALGFormat::kALGFormatD16_FLOAT: return 2;
         break;
     case EALGFormat::kALGFormatD24S8_UINT: return 4;
         break;

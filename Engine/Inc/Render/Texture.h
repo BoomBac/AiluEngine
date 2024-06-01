@@ -247,8 +247,9 @@ namespace Ailu
 		case ERenderTargetFormat::kDefaultHDR:
 			return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
 		case ERenderTargetFormat::kDepth:
-		case ERenderTargetFormat::kShadowMap:
 			return EALGFormat::EALGFormat::kALGFormatD24S8_UINT;
+		case ERenderTargetFormat::kShadowMap:
+			return EALGFormat::EALGFormat::kALGFormatD32_FLOAT;
 		case ERenderTargetFormat::kRGFloat:
 			return EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT;
 		case ERenderTargetFormat::kRGHalf:

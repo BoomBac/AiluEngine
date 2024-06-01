@@ -280,6 +280,8 @@ namespace Ailu
 		auto p_device{ D3DContext::Get()->GetDevice() };
 		D3D12_RESOURCE_DESC tex_desc{};
 		tex_desc.MipLevels = mipmap_level;
+		//https://gamedev.stackexchange.com/questions/26687/what-are-the-valid-depthbuffer-texture-formats-in-directx-11-and-which-are-also
+		//depth buffer format
 		tex_desc.Format = ConvertToDXGIFormat(_pixel_format);
 		tex_desc.Flags = is_for_depth ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 		if (_is_random_access)
@@ -301,7 +303,20 @@ namespace Ailu
 			&clear_value, IID_PPV_ARGS(_p_buffer.GetAddressOf())));
 		_p_buffer->SetName(ToWChar(_name));
 		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		_srv_desc.Format = is_for_depth ? DXGI_FORMAT_R24_UNORM_X8_TYPELESS : tex_desc.Format;
+		if (is_for_depth)
+		{
+			if (tex_desc.Format == DXGI_FORMAT_D24_UNORM_S8_UINT)
+				_srv_desc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+			else if(tex_desc.Format == DXGI_FORMAT_D32_FLOAT)
+				_srv_desc.Format = DXGI_FORMAT_R32_FLOAT;
+			else if(tex_desc.Format == DXGI_FORMAT_R16_FLOAT)
+				_srv_desc.Format == DXGI_FORMAT_R16_FLOAT;
+		}
+		else
+		{
+			_srv_desc.Format = tex_desc.Format;
+		}
+		
 		_srv_desc.ViewDimension = main_view_dimension;
 		if (_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
 		{
@@ -356,7 +371,7 @@ namespace Ailu
 				dsv_desc.ViewDimension = texture_num > 1 ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY : D3D12_DSV_DIMENSION_TEXTURE2D;
 				dsv_desc.Format = tex_desc.Format;
 				dsv_desc.Texture2D.MipSlice = 0;
-				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY)
+				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY ||main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBE)
 				{
 					dsv_desc.Texture2DArray.FirstArraySlice = i;
 					dsv_desc.Texture2DArray.ArraySize = 1;

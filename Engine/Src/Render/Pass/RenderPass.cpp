@@ -103,6 +103,7 @@ namespace Ailu
 		_p_mainlight_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainLightShadowMap", ERenderTargetFormat::kShadowMap);
 		//_p_addlight_shadow_map = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, "AddLightShadowMap", ERenderTargetFormat::kShadowMap);
 		_p_addlight_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, kMaxPointLightNum,"AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
+		_p_point_light_shadow_map = RenderTexture::Create(kShadowMapSize >> 1,"PointLightShadowMap", ERenderTargetFormat::kShadowMap);
 		_p_shadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
 		_p_shadowcast_material->SetUint("shadow_index",0);
 		_p_addshadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
