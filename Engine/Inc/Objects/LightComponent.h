@@ -1,3 +1,4 @@
+#pragma warning(disable : 4251)
 #pragma once
 #ifndef __LIGHT_COMP_H__
 #define __LIGHT_COMP_H__
@@ -39,7 +40,7 @@ namespace Ailu
 		}
 	};
 
-	class LightComponent : public Component
+	class AILU_API LightComponent : public Component
 	{
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);

@@ -1,9 +1,9 @@
-#include "Inc/Widgets/RenderView.h"
+#include "Widgets/RenderView.h"
 #include "Ext/imgui/imgui.h"
-#include "Engine/Inc/Framework/Common/Input.h"
-#include "Engine/Inc/Render/CommandBuffer.h"
-#include "Engine/Inc/Render/Renderer.h"
-#include "Engine/Inc/Framework/Common/Application.h"
+#include "Framework/Common/Input.h"
+#include "Render/CommandBuffer.h"
+#include "Render/Renderer.h"
+#include "Framework/Common/Application.h"
 
 namespace Ailu
 {
@@ -80,6 +80,16 @@ namespace Ailu
 			}
 			_pre_tick_width = gameview_size.x;
 			_pre_tick_height = gameview_size.y;
+			if (ImGui::BeginDragDropTarget())
+			{
+				const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kDragAssetMesh.c_str());
+				if (payload)
+				{
+					auto mesh = *(Asset**)(payload->Data);
+					g_pSceneMgr->AddSceneActor(mesh->AsRef<Mesh>());
+				}
+				ImGui::EndDragDropTarget();
+			}
 		}
 		else
 		{

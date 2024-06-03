@@ -1,3 +1,4 @@
+#pragma warning(disable : 4251)
 #pragma once
 #ifndef __STATICMESH_COMP__
 #define __STATICMESH_COMP__
@@ -9,13 +10,14 @@
 
 namespace Ailu
 {
-	class StaticMeshComponent : public Component
+	class AILU_API StaticMeshComponent : public Component
 	{
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
 		COMPONENT_CLASS_TYPE(StaticMeshComponent)
 		DECLARE_REFLECT_FIELD(StaticMeshComponent)
 	public:
+		DISALLOW_COPY_AND_ASSIGN(StaticMeshComponent)
 		StaticMeshComponent();
 		StaticMeshComponent(Ref<Mesh> mesh, Ref<Material> mat);
 		void BeginPlay() override;
@@ -45,13 +47,14 @@ namespace Ailu
 	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kStaticMesh, StaticMesh, _p_mesh)
 	REFLECT_FILED_END
 
-	class SkinedMeshComponent : public StaticMeshComponent
+	class AILU_API SkinedMeshComponent : public StaticMeshComponent
 	{
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
 		COMPONENT_CLASS_TYPE(SkinedMeshComponent)
 		DECLARE_REFLECT_FIELD(SkinedMeshComponent)
 	public:
+		DISALLOW_COPY_AND_ASSIGN(SkinedMeshComponent)
 		SkinedMeshComponent();
 		SkinedMeshComponent(Ref<Mesh> mesh, Ref<Material> mat);
 		void BeginPlay() override;
@@ -69,7 +72,7 @@ namespace Ailu
 		inline constexpr static u16 s_skin_thread_num = 12u;
 		Ref<AnimationClip> _p_clip;
 		u16 _per_skin_task_vertex_num = 0u;
-		Vector<std::future<void>> _skin_tasks;
+		//Vector<std::future<void>> _skin_tasks;
 	private:
 		float _pre_anim_time = 0.0f;
 		void Skin(float time);

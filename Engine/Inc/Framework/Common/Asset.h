@@ -8,7 +8,7 @@
 namespace Ailu
 {
 	DECLARE_ENUM(EAssetType,kUndefined, kMesh, kMaterial,kTexture2D,kShader,kComputeShader,kScene)
-	class Asset
+	class AILU_API Asset
 	{
 	public:
 		Asset() = default;
@@ -16,6 +16,7 @@ namespace Ailu
 		Asset(Guid guid, EAssetType::EAssetType type,const WString& asset_path);
 		Asset(const Asset& other) = delete;
 		Asset& operator=(const Asset& other) = delete;
+		void CopyFrom(const Asset& other);
 		//Asset(Asset&& other);
 		//Asset& operator=(Asset&& other);
 		virtual ~Asset();

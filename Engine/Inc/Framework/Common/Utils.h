@@ -2,9 +2,10 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 //#include "pch.h"
+#include "GlobalMarco.h"
 #include <algorithm>
 #include <numeric>
-#include "GlobalMarco.h"
+#include <fstream>
 
 namespace Ailu
 {
@@ -73,6 +74,16 @@ namespace Ailu
         WideCharToMultiByte(CP_UTF8, 0, wideStr.data(), -1, multiByteStr, size, nullptr, nullptr);
         return String{ multiByteStr };
     }
+    static String GetIndentation(int level)
+    {
+        String ret{ "" };
+        while (level--)
+        {
+            ret.append("  ");
+        }
+        return ret;
+    }
+
 
     namespace StringUtils
     {
@@ -96,6 +107,14 @@ namespace Ailu
         static void RemoveSpaces(String& str)
         {
             str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
+        }
+        /// <summary>
+        /// 移除字符串中的所有空格
+        /// </summary>
+        /// <param name="str"></param>
+        static void RemoveSpaces(WString& str)
+        {
+            str.erase(std::remove(str.begin(), str.end(), L' '), str.end());
         }
 
         /// <summary>

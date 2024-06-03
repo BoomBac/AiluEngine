@@ -1,4 +1,6 @@
 #pragma once
+#pragma warning(disable: 4251)
+#pragma warning(disable: 4275) //dll interface warning
 #ifndef __TEXTURE_H__
 #define __TEXTURE_H__
 
@@ -133,7 +135,7 @@ namespace Ailu
 	//------------
 	class CommandBuffer;
 	using TextureHandle = size_t;
-	class Texture : public FrameResource
+	class AILU_API Texture : public FrameResource
 	{
 		DECLARE_PROTECTED_PROPERTY(mipmap_count,MipmapLevel,u16)
 		DECLARE_PROTECTED_PROPERTY(is_readble,Readble,bool)
@@ -174,9 +176,10 @@ namespace Ailu
 		u16 _pixel_size;
 		bool _is_random_access;
 		bool _is_have_total_view = false;
+		bool _is_ready_for_rendering = false;
 	};
 
-	class Texture2D : public Texture
+	class AILU_API Texture2D : public Texture
 	{
 	public:
 		static u64 TotalGPUMemerySize() { return s_gpu_memory_size; }
@@ -294,8 +297,8 @@ namespace Ailu
 		RTHandle() : _id(0) {}
 		RTHandle(u32 id) : _id(id){}
 	};
-	using RTHash = ALHash::Hash<64>;
-	class RenderTexture : public Texture
+	using RTHash = Math::ALHash::Hash<64>;
+	class AILU_API RenderTexture : public Texture
 	{
 		DECLARE_PROTECTED_PROPERTY(depth,Depth,u16)
 	public:
@@ -331,7 +334,7 @@ namespace Ailu
 		u16 _slice_num;
 	};
 
-	class RenderTexturePool
+	class AILU_API RenderTexturePool
 	{
 		struct RTInfo
 		{
@@ -343,6 +346,8 @@ namespace Ailu
 			u64 _fence_value = 0;
 		};
 	public:
+		DISALLOW_COPY_AND_ASSIGN(RenderTexturePool)
+		RenderTexturePool() = default;
 		~RenderTexturePool();
 		using RTPool = std::unordered_multimap<RTHash, RTInfo, RTHash::HashFunc>;
 		u32 Add(RTHash hash, Scope<RenderTexture> rt);
@@ -370,7 +375,7 @@ namespace Ailu
 		Map<u32, RTPool::iterator> _lut_pool;
 		Map<u32, RenderTexture*> _persistent_rts;
 	};
-	extern RenderTexturePool* g_pRenderTexturePool;
+	extern AILU_API RenderTexturePool* g_pRenderTexturePool;
 }
 
 #endif // !TEXTURE_H__

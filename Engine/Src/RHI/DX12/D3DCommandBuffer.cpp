@@ -141,11 +141,7 @@ namespace Ailu
 		auto d3d_rect = CD3DX12_RECT(rect.left, rect.top, rect.width, rect.height);
 		_p_cmd->RSSetScissorRects(1, &d3d_rect);
 	}
-	u16 D3DCommandBuffer::DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, u32 instance_count)
-	{
-		throw std::runtime_error("error");
-		return 0;
-	}
+
 	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count)
 	{
 		throw std::runtime_error("error");
@@ -188,14 +184,43 @@ namespace Ailu
 		return 0;
 	}
 
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count)
+	{
+		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || material->GetShader()->IsCompileError())
+		{
+			//LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
+			return 1;
+		}
+		material->Bind(pass_index);
+		GraphicsPipelineStateMgr::EndConfigurePSO(this);
+		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+		{
+			mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+			mesh->GetIndexBuffer(submesh_index)->Bind(this);
+			per_obj_cbuf->Bind(this, 0);
+			++RenderingStates::s_draw_call;
+			_p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
+		}
+		else
+		{
+			LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
+			return 2;
+		}
+		return 0;
+	}
+
 	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, u32 instance_count)
+	{
+		return DrawRenderer(mesh, material, instance_count, 0);
+	}
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, u32 instance_count, u16 pass_index)
 	{
 		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || material->GetShader()->IsCompileError())
 		{
 			LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
 			return 1;
 		}
-		material->Bind();
+		material->Bind(pass_index);
 		GraphicsPipelineStateMgr::EndConfigurePSO(this);
 		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
 		{

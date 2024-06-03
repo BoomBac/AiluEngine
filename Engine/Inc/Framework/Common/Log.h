@@ -116,7 +116,7 @@ namespace Ailu
 #define LOG_INFO(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
 #define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
 #define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
-	extern class LogMgr* g_pLogMgr;
+	//extern AILU_API class LogMgr* g_pLogMgr;
 }
 
 #endif // !LOG_H__

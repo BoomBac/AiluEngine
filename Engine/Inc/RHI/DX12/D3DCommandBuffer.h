@@ -52,11 +52,12 @@ namespace Ailu
         void SetScissorRects(const std::initializer_list<Rect>& rects) final;
         void SetViewport(const Rect& viewport) final;
         void SetScissorRect(const Rect& rect) final;
-        u16 DrawRenderer(const Ref<Mesh>& mesh, const Matrix4x4f& transform, const Ref<Material>& material, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh* mesh, Material* material, u32 instance_count, u16 pass_index) final;
         void ResolveToBackBuffer(RenderTexture* color) final;
         void ResolveToBackBuffer(RenderTexture* color, RenderTexture* destination) final;
         void ResolveToBackBuffer(RTHandle color) final;

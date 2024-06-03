@@ -1,3 +1,4 @@
+#pragma warning(disable: 4275) //dll interface warning
 #ifndef __CAMERA_H__
 #define __CAMERA_H__
 #include "Framework/Math/ALMath.hpp"
@@ -8,7 +9,7 @@
 namespace Ailu
 {
     DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
-    class Camera : public Object
+    class AILU_API Camera : public Object
     {
         friend class CameraComponent;
 
@@ -70,29 +71,6 @@ namespace Ailu
     DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Size,_size)
     DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, FovH,_fov_h)
     REFLECT_FILED_END
-
-    class FirstPersonCameraController
-    {
-    public:
-        FirstPersonCameraController();
-        FirstPersonCameraController(Camera* camera);
-        void Attach(Camera* camera);
-        void SetPosition(const Vector3f& position);
-        void SetRotation(float x,float y);
-        void Move(const Vector3f& d);
-        void MoveForward(float distance);
-        void MoveRight(float distance);
-        void MoveUp(float distance);
-        void TurnHorizontal(float angle);
-        void TurnVertical(float angle);
-        void InterpolateTo(const Vector3f target_pos,float rot_x,float rot_y,float speed);
-        Vector2f _rotation;
-        static FirstPersonCameraController s_instance;
-    private:
-        Camera* _p_camera;
-        Quaternion _rot_object_x;
-        Quaternion _rot_world_y;
-    };
 }
 
 #endif // !__CAMERA_H__

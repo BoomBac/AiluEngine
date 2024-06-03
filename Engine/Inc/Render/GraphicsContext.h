@@ -8,7 +8,7 @@ namespace Ailu
 	class CommandBuffer;
 	class FrameResource;
 	class IGPUTimer;
-	class GraphicsContext
+	class AILU_API GraphicsContext
 	{
 	public:
 		using RHIResourceTask = std::function<void()>;
@@ -35,7 +35,7 @@ namespace Ailu
 		//return mb byte/1024/1024
 		virtual f32 TotalGPUMemeryUsage() = 0;
 	};
-	extern GraphicsContext* g_pGfxContext;
+	extern AILU_API GraphicsContext* g_pGfxContext;
 }
 
 #endif // !GFX_CONTEXT_H__

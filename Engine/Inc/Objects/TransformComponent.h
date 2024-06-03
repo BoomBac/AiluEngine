@@ -1,3 +1,4 @@
+#pragma warning(disable : 4251)
 #pragma once
 #ifndef __TRANSFORM_COMP_H__
 #define __TRANSFORM_COMP_H__
@@ -8,7 +9,7 @@
 
 namespace Ailu
 {
-	class TransformComponent : public Component
+	class AILU_API TransformComponent : public Component
 	{
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
@@ -32,6 +33,7 @@ namespace Ailu
 			this->_pos_data = other._pos_data;
 			this->_rotation_data = other._rotation_data;
 			this->_scale_data = other._scale_data;
+			return *this;
 		}
 	private:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) final;

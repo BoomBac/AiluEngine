@@ -14,7 +14,7 @@ namespace Ailu
         kShader,kWireFrame,kShaderedWireFrame
     };
 
-    struct RenderingStates
+    struct AILU_API RenderingStates
     {      
         inline static u32 s_vertex_num = 0u;
         inline static u32 s_triangle_num = 0u;
@@ -47,6 +47,8 @@ namespace Ailu
         RTHandle _camera_color_target_handle;
         RTHandle _camera_depth_target_handle;
         RTHandle _final_rt_handle;
+        RTHandle _camera_opaque_tex_handle;
+        RTHandle _camera_depth_tex_handle;
         Rect _viewport,_scissor_rect;
         u32 _width, _height;
         CommandBuffer* cmd;

@@ -2,5 +2,5 @@ guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
 type: kShader
 name: defered_standard_lit
   file: Shaders/hlsl/defered_standard_lit.hlsl
-  vs_entry: GBufferVSMain
-  ps_entry: GBufferPSMain
+  vs_entry: DeferredLightingVSMain
+  ps_entry: DeferredLightingPSMain

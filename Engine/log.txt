@@ -3,36 +3,57 @@ Warning: Unused shader prop Color been added;
 Warning: Unused shader prop Exposure been added;
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
-Normal: Resource mgr init finish after 18.6313ms
+Normal: Resource mgr init finish after 14.3628ms
 Normal: Begin init scene mgr...
 Normal: Begin load scene from C:/AiluEngine/Engine/Scenes/default.almap...
 Normal: SceneMgr end
-Normal: Scene mgr init finish after 9.9006ms
+Normal: Scene mgr init finish after 8.3397ms
 Normal: Begin init renderer...
+Normal: Renderer init finish after 0.0039ms
+Normal: Application Init end
 Warning: Expand rt pool to 1
 Warning: Expand rt pool to 2
 Warning: Expand rt pool to 3
+Warning: Expand rt pool to 4
 Warning: Unused shader prop Color been added;
 Warning: Unused shader prop Exposure been added;
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
-Normal: Renderer init finish after 14.4242ms
-Normal: Application Init end
-Warning: Expand rt pool to 4
 Warning: Expand rt pool to 5
 Warning: Expand rt pool to 6
 Warning: Expand rt pool to 7
 Warning: Expand rt pool to 8
 Warning: Expand rt pool to 9
-Normal: Resize game view to 1001,532
 Warning: Expand rt pool to 10
 Warning: Expand rt pool to 11
 Warning: Expand rt pool to 12
+Warning: Expand rt pool to 13
+Warning: Expand rt pool to 14
+Normal: Resize game view to 1059,540
+Warning: Expand rt pool to 15
+Warning: Expand rt pool to 16
+Warning: Expand rt pool to 17
+Warning: Expand rt pool to 18
+Warning: Expand rt pool to 19
+Warning: Expand rt pool to 20
+Warning: Expand rt pool to 21
+Warning: Expand rt pool to 22
+Warning: Expand rt pool to 23
+Warning: Expand rt pool to 24
+Normal: Resize game view to 1024,540
+Warning: Expand rt pool to 25
+Warning: Expand rt pool to 26
+Warning: Expand rt pool to 27
+Warning: Expand rt pool to 28
+Warning: Expand rt pool to 29
+Warning: Expand rt pool to 30
+Warning: D3DContext::Present: Resource cleanup, 14 resources released.
+Normal: RT pool release 20 rt
+Normal: Release GPUVisibleDescripto at page0 with num 20.
+Normal: Begin: D3DContext::TryReleaseUnusedResources...
+Normal: RT pool release 0 rt
+Normal: Release GPUVisibleDescripto at page0 with num 0.
+Normal: End: D3DContext::TryReleaseUnusedResources
 Normal: OnLostFoucus
-Normal: OnGetFoucus
-Normal: OnLostFoucus
-Normal: OnGetFoucus
-Normal: selected asset DepthOnly
-Normal: selected asset deferred_lighting
-Normal: OnLostFoucus
-Warning: D3DContext::Present: Resource cleanup, 12 resources released.
+Normal: Exit
+Normal: Save scene: default_scene to C:/AiluEngine/Engine/default.almap;

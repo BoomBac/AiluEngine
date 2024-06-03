@@ -54,8 +54,24 @@ namespace Ailu
 		void EndPass(GraphicsContext* context) final;
 		bool _is_offscreen = false;
 	private:
-
 	};
+
+	class CopyColorPass : public RenderPass
+	{
+	public:
+		CopyColorPass();
+		~CopyColorPass();
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
+		void BeginPass(GraphicsContext* context) final;
+		void EndPass(GraphicsContext* context) final;
+	private:
+		Ref<Material> _p_bloom_thread_mat;
+		Material* _p_blit_mat;
+		Mesh* _p_quad_mesh;
+		ConstantBuffer* _p_obj_cb;
+		Rect _half_sceen_rect;
+	};
+
 
 	class ShadowCastPass : public RenderPass
 	{

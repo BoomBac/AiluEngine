@@ -1,3 +1,4 @@
+#pragma warning(disable : 4251)
 #pragma once
 #ifndef __ACTOR_H__
 #define __ACTOR_H__
@@ -11,11 +12,12 @@
 
 namespace Ailu
 {
-	class Actor : public Object
+	class AILU_API Actor : public Object
 	{
 		DECLARE_PROTECTED_PROPERTY(Id, Id, u32)
 		DECLARE_PROTECTED_PROPERTY_PTR(Parent, Actor)
 	public:
+		DISALLOW_COPY_AND_ASSIGN(Actor)
 		virtual ~Actor();
 		Actor();
 		virtual void BeginPlay();
@@ -54,15 +56,15 @@ namespace Ailu
 		{
 			return this->_Id == other._Id;
 		}
-		Actor& operator=(const Actor& other) 
-		{
-			if (this != &other) 
-			{
-				_children = other._children;
-				_chilren_num = other._chilren_num;
-			}
-			return *this;
-		}
+		//Actor& operator=(const Actor& other) 
+		//{
+		//	if (this != &other) 
+		//	{
+		//		_children = other._children;
+		//		_chilren_num = other._chilren_num;
+		//	}
+		//	return *this;
+		//}
 	public:
 		inline static std::vector<Scope<Actor>> s_global_actors{};
 	protected:

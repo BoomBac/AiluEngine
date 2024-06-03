@@ -2,8 +2,8 @@
 #ifndef __IMGUIWIDGET_H__
 #define __IMGUIWIDGET_H__
 #include <functional>
-#include "Engine/Inc/GlobalMarco.h"
-#include "Engine/Inc/Framework/Math/ALMath.hpp"
+#include "GlobalMarco.h"
+#include "Framework/Math/ALMath.hpp"
 
 namespace Ailu
 {
@@ -13,6 +13,11 @@ namespace Ailu
 		DECLARE_PROTECTED_PROPERTY(is_focus,Focus,bool)
 		using WidgetCloseEvent = std::function<void(void)>;
 	public:
+		inline static const String kDragFolderType = "DRAG_FOLDER_INNEAR";
+		inline static const String kDragFolderTreeType = "DRAG_FOLDER_TREE_INNEAR";
+		inline static const String kDragAssetType = "DRAG_ASSET_INNEAR";
+		inline static const String kDragAssetMesh = "DRAG_ASSET_MESH";
+
 		inline static WString kNull = L"null";
 		inline static bool s_global_modal_window_info[256]{ false };
 		static void MarkModalWindoShow(const int& handle);

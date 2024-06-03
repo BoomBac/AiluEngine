@@ -1,9 +1,11 @@
 //info bein
+//pass begin::
 //name: filter_irradiance
 //vert: VSMain
 //pixel: PSMain
 //Cull: Front
 //Queue: Opaque
+//pass end::
 //Properties
 //{
 //}

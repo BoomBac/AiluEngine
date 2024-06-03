@@ -1,12 +1,20 @@
 #pragma once
 #ifndef __ASSERT_H__
 #define __ASSERT_H__
+
 //https://github.com/TheRealMJP/DeferredTexturing/blob/849304047f1cca0f23fe9d0fd201758d77ed3c41/SampleFramework12/v1.01/Assert.h#L110
 #define POW2_ASSERTS_ENABLED
 
+#ifdef AILU_BUILD_DLL
+#define AILU_API __declspec(dllexport)
+#else
+#define AILU_API __declspec(dllimport)
+#endif
+
 namespace Ailu
 {
-	namespace pow2 {
+	namespace pow2 
+	{
 		namespace Assert
 		{
 			enum FailBehavior
@@ -14,19 +22,10 @@ namespace Ailu
 				Halt,
 				Continue,
 			};
-
-			typedef FailBehavior(*Handler)(const char* condition,
-				const char* msg,
-				const char* file,
-				int line);
-
+			typedef FailBehavior(*Handler)(const char* condition,const char* msg,const char* file,int line);
 			Handler GetHandler();
 			void SetHandler(Handler newHandler);
-
-			FailBehavior ReportFailure(const char* condition,
-				const char* file,
-				int line,
-				const char* msg, ...);
+			AILU_API FailBehavior ReportFailure(const char* condition,const char* file,int line,const char* msg, ...);
 		}
 	}
 

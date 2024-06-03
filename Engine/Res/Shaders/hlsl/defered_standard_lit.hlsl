@@ -1,10 +1,12 @@
 //info bein
+//pass begin::
 //name: defered_standard_lit
 //vert: GBufferVSMain
 //pixel: GBufferPSMain
 //Cull: Back
 //Queue: Opaque
 //Blend: Src,OneMinusSrc
+//pass end::
 //Properties
 //{
 //	Albedo("Albedo",Texture2D) = "white"
@@ -22,7 +24,6 @@
 //info end
 
 #include "common.hlsli"
-#include "cbuffer.hlsli"
 #include "input.hlsli"
 #include "lighting.hlsli"
 
@@ -82,22 +83,8 @@ struct GBuffer
 	float4 specular_metallic : SV_Target2;
 };
 
-GBuffer GBufferPSMain
-	(PSInput input) :
-	SV_TARGET
-{
-	SurfaceData surface_data;
-	InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
-	GBuffer output;
-	output.packed_normal = PackNormal(surface_data.wnormal);
-	output.color_roughness = float4(surface_data.albedo.rgb,surface_data.roughness);
-	//output.specular_metallic = float4(surface_data.specular,surface_data.metallic);
-	output.specular_metallic = float4(float(MaterialID).xxx,surface_data.metallic);
-	return output;
-}
 
-PSInput GBufferVSMain
-	(VSInput v)
+PSInput GBufferVSMain(VSInput v)
 {
 	PSInput result;
 	result.position = TransformToClipSpace(v.position);
@@ -112,4 +99,16 @@ PSInput GBufferVSMain
 	result.world_pos = TransformToWorldSpace(v.position);
 	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
 	return result;
+}
+
+GBuffer GBufferPSMain(PSInput input) : SV_TARGET
+{
+	SurfaceData surface_data;
+	InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
+	GBuffer output;
+	output.packed_normal = PackNormal(surface_data.wnormal);
+	output.color_roughness = float4(surface_data.albedo.rgb,surface_data.roughness);
+	//output.specular_metallic = float4(surface_data.specular,surface_data.metallic);
+	output.specular_metallic = float4(float(MaterialID).xxx,surface_data.metallic);
+	return output;
 }

@@ -6,7 +6,7 @@
 using std::string;
 namespace Ailu
 {
-    class Guid
+    class AILU_API Guid
     {
     public:
         static Guid Generate();

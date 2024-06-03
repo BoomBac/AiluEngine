@@ -1,10 +1,10 @@
-#include "Inc/Widgets/CommonTextureWidget.h"
+#include "Widgets/CommonTextureWidget.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "Ext/imgui/imgui_internal.h"
-#include "Engine/Inc/Render/Texture.h"
-#include "Engine/Inc/Framework/Common/ResourceMgr.h"
-#include "Engine/Inc/Framework/Common/Assert.h"
+#include "Render/Texture.h"
+#include "Framework/Common/ResourceMgr.h"
+#include "Framework/Common/Assert.h"
 
 namespace Ailu
 {

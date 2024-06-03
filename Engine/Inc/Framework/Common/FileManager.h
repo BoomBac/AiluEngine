@@ -10,8 +10,7 @@ namespace Ailu
 #undef CopyFile
 #undef CreateFile
 	namespace fs = std::filesystem;
-	DECLARE_ENUM(EFileContentType, kText, kBinary);
-	class FileManager
+	class AILU_API FileManager
 	{
 	public:
 		static void CreateDirectory(const WString& dir_name);
@@ -33,9 +32,13 @@ namespace Ailu
 
 		static bool CreateFile(const WString& sys_path,bool override = true);
 		static bool WriteFile(const WString& sys_path, bool append, const WString& data);
+		static bool WriteFile(const WString& sys_path, bool append, const String& data);
 		static bool WriteFile(const WString& sys_path, bool append, const u8* data,u64 data_size);
 		static bool ReadFile(const WString& sys_path,WString& data);
-		static bool ReadFile(const WString& sys_path,u8* data, u64 data_start,u64 data_size);
+		static bool ReadFile(const WString& sys_path,String& data);
+		static bool ReadFile(const WString& sys_path,u8* data, u64 data_start = 0u,u64 data_size = -1);
+		//使用结束后记得销毁
+		static std::tuple<u8*,u64> ReadFile(const WString& sys_path,u64 data_start = 0u, u64 data_size = -1);
 		//-------------------------static end-----------------------------
 	public:
 

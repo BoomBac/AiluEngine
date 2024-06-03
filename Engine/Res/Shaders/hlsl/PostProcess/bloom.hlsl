@@ -1,5 +1,6 @@
 //info bein
-//name: bloom
+//pass begin::
+//name: ThresholdExtract
 //vert: VSMain
 //pixel: PSMain
 //Cull: Back
@@ -7,11 +8,42 @@
 //Fill: Solid
 //ZTest: Off
 //ZWrite: Off
+//pass end::
+//pass begin::
+//name: BlurX
+//vert: VSMain
+//pixel: BlurX
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: Off
+//ZWrite: Off
+//pass end::
+//pass begin::
+//name: BlurY
+//vert: VSMain
+//pixel: BlurY
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: Off
+//ZWrite: Off
+//pass end::
+//pass begin::
+//name: Composite
+//vert: VSMain
+//pixel: Composite
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: Off
+//ZWrite: Off
+//pass end::
 //info end
-
 Texture2D _SourceTex : register(t0);
-SamplerState g_LinearSampler : register(s0);
+Texture2D _BloomTex : register(t1);
 
+SamplerState g_LinearClampSampler : register(s1);
 struct VSInput
 {
 	float3 position : POSITION;
@@ -32,22 +64,45 @@ PSInput VSMain(VSInput v)
 	return result;
 }
 
-float3 ACESFilm(float3 x)
-{
-	float a = 2.51f;
-	float b = 0.03f;
-	float c = 2.43f;
-	float d = 0.59f;
-	float e = 0.14f;
-	return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
-}
-
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	float3 color = _SourceTex.Sample(g_LinearSampler, input.uv).rgb;
+	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
+	color *= step(1.8,(color.r + color.b + color.g));
 	return color.xyzz;
-	// if (color.r + color.g + color.b > 1.5f)
-	// 	return float4(color,1.f); 
-	// else
-	// 	return float4(0.f, 0.f, 0.f, 1.f);
+}
+#define RADIUS 3
+#define RADIUS_SCALE 16
+const static float weights[7] = {0.05,0.1,0.15,0.4,0.15,0.1,0.05};
+
+float4 BlurX(PSInput input) : SV_TARGET
+{	 
+	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
+	float3 sum = 0.0.xxx;
+	for (int i = -RADIUS; i<=RADIUS; i++)
+	{
+		float2 uv = input.uv;
+		uv.x += i * 0.000625 * RADIUS_SCALE;
+		sum += weights[i + RADIUS] * _SourceTex.Sample(g_LinearClampSampler, uv).rgb;
+	}
+	return sum.xyzz;
+}
+
+float4 BlurY(PSInput input) : SV_TARGET
+{
+	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
+	float3 sum = 0.0.xxx;
+	for (int i = -RADIUS; i<=RADIUS; i++)
+	{
+		float2 uv = input.uv;
+		uv.y += i * 0.001111 * RADIUS_SCALE;
+		sum += weights[i + RADIUS] * _SourceTex.Sample(g_LinearClampSampler, uv).rgb;
+	}
+	return sum.xyzz;
+}
+float4 Composite(PSInput input) : SV_TARGET
+{
+	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
+	float3 bloom_color = _BloomTex.Sample(g_LinearClampSampler, input.uv).rgb;
+	color += bloom_color;
+	return color.xyzz; 
 }

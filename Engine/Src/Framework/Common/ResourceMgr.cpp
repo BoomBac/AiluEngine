@@ -18,6 +18,7 @@
 namespace Ailu
 {
 	namespace fs = std::filesystem;
+
 	static void TraverseDirectory(const fs::path& directoryPath, std::set<fs::path>& path_set)
 	{
 		for (const auto& entry : fs::directory_iterator(directoryPath))
@@ -39,7 +40,7 @@ namespace Ailu
 		{
 			_lut_global_resources_by_type[EAssetType::FromString(EAssetType::_Strings[i])] = Vector<ResourcePoolContainer::iterator>();
 		}
-		_project_root_path = kEngineResRootPathW.substr(0,kEngineResRootPathW.find_last_of(L"/"));
+		_project_root_path = kEngineResRootPathW.substr(0, kEngineResRootPathW.find_last_of(L"/"));
 		LoadAssetDB();
 		{
 			Shader::s_p_defered_standart_lit = Load<Shader>(L"Shaders/defered_standard_lit.alasset");
@@ -142,6 +143,7 @@ namespace Ailu
 		g_pThreadTool->Enqueue(&ResourceMgr::WatchDirectory, this);
 		return 0;
 	}
+
 	void ResourceMgr::Finalize()
 	{
 		_is_watching_directory = false;
@@ -151,19 +153,22 @@ namespace Ailu
 		}
 		SaveAssetDB();
 	}
+
 	void ResourceMgr::Tick(const float& delta_time)
 	{
+		while (!_pending_delete_assets.empty())
+		{
+			Asset* asset = _pending_delete_assets.front();
+			auto asset_sys_path = PathUtils::GetResSysPath(asset->_asset_path);
+			if (s_file_last_load_time.contains(asset_sys_path))
+			{
+				s_file_last_load_time.erase(asset_sys_path);
+			}
+			UnRegisterResource(asset->_asset_path);
+			UnRegisterAsset(asset);
+			_pending_delete_assets.pop();
+		}
 		SubmitResourceTask();
-	}
-
-	void ResourceMgr::SaveScene(Scene* scene, std::string& scene_path)
-	{
-
-	}
-
-	Scene* ResourceMgr::LoadScene(std::string& scene_path)
-	{
-		return nullptr;
 	}
 
 	void ResourceMgr::SaveAsset(const Asset* asset)
@@ -211,6 +216,11 @@ namespace Ailu
 			SaveTexture2D(sys_path, asset);
 		}
 		return;
+		case Ailu::EAssetType::kScene:
+		{
+			SaveScene(sys_path, asset);
+		}
+		return;
 		}
 		AL_ASSERT(true);
 	}
@@ -237,7 +247,7 @@ namespace Ailu
 		auto s_setting = dynamic_cast<const ShaderImportSetting*>(setting);
 		if (setting)
 		{
-			return Shader::Create(sys_path, s_setting->_vs_entry, s_setting->_ps_entry);
+			return Shader::Create(sys_path);
 		}
 		return Shader::Create(sys_path);
 	}
@@ -400,6 +410,46 @@ namespace Ailu
 			}
 		}
 		g_pLogMgr->LogErrorFormat(L"Save texture2d to {} failed!", sys_path);
+	}
+
+	void ResourceMgr::SaveScene(const WString& asset_path, const Asset* asset)
+	{
+		Scene* scene = asset->As<Scene>();
+		using namespace std;
+		std::ostringstream ss;
+		try
+		{
+			String level1 = GetIndentation(1), level2 = GetIndentation(2), level3 = GetIndentation(3), level4 = GetIndentation(4);
+			//ss << "SceneName: " << scene->Name() << endl;
+			ss << "SceneGraph: " << endl;
+			scene->Root()->Serialize(ss, level1);
+		}
+		catch (const std::exception&)
+		{
+			g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {}!", scene->Name());
+			return;
+		}
+		WString sys_path = PathUtils::GetResSysPath(asset->_asset_path);
+		if (!FileManager::WriteFile(sys_path, true, ss.str()))
+		{
+			g_pLogMgr->LogErrorFormat(L"Save scene failed to {}", sys_path);
+			return;
+		}
+		g_pLogMgr->LogErrorFormat(L"Save scene to {}", sys_path);
+		//auto sys_path = GetSceneSysPath(scene_path);
+		//ofstream file(sys_path, ios_base::out);
+		//if (!file.is_open())
+		//{
+
+		//}
+		//String serialized_str = ss.str();
+		//std::istringstream iss(serialized_str);
+		//std::string line;
+		//while (std::getline(iss, line))
+		//{
+		//	file << line << endl;
+		//}
+		//file.close();
 	}
 
 	List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString& asset_path)
@@ -587,6 +637,56 @@ namespace Ailu
 		return nullptr;
 	}
 
+	Scope<Asset> ResourceMgr::LoadScene(const WString& asset_path)
+	{
+		using namespace std;
+		auto sys_path = PathUtils::GetResSysPath(asset_path);
+		String scene_data;
+		if (FileManager::ReadFile(sys_path, scene_data))
+		{
+			Queue<std::tuple<String, String>> lines{};
+			int line_count = 0;
+			auto scene_data_lines = su::Split(scene_data, "\n");
+			for (auto& line : scene_data_lines)
+			{
+				std::istringstream iss(line);
+				std::string key;
+				std::string value;
+				if (std::getline(iss, key, ':') && std::getline(iss, value))
+				{
+					key.erase(key.begin(), std::find_if(key.begin(), key.end(), [](int ch) {return !std::isspace(ch); }));
+					value.erase(value.begin(), std::find_if(value.begin(), value.end(), [](int ch) {return !std::isspace(ch); }));
+					lines.push(std::make_pair(key, value));
+					++line_count;
+				}
+			}
+			String name_str{ "name" };
+			while (std::get<0>(lines.front()) != name_str)
+			{
+				lines.pop();
+			}
+			String scene_name = std::get<1>(lines.front());
+			lines.pop();
+			lines.pop();
+			//这里到达场景根节点
+			auto loaded_scene = SceneMgr::Create(ToWStr(scene_name.c_str()));
+			SceneActor* scene_root = Deserialize<SceneActor>(lines);
+			loaded_scene->Root(scene_root);
+			loaded_scene->MarkDirty();
+			loaded_scene->GetAllActor();
+			auto asset = MakeScope<Asset>();
+			asset->_asset_path = asset_path;
+			asset->_asset_type = EAssetType::kScene;
+			asset->_p_obj = loaded_scene;
+			return asset;
+		}
+		else
+		{
+			g_pLogMgr->LogErrorFormat(L"Load scene failed at path {}", asset_path);
+		}
+		return nullptr;
+	}
+
 	Asset* ResourceMgr::CreateAsset(const WString& asset_path, Ref<Object> obj, bool overwrite)
 	{
 		bool is_already_exist = _asset_looktable.contains(asset_path);
@@ -620,6 +720,11 @@ namespace Ailu
 			new_asset = MakeScope<Asset>(new_guid, EAssetType::kShader, asset_path);
 			new_asset->_addi_info = std::format(L"_{}_{}", ToWStr(vs.c_str()), ToWStr(ps.c_str()));
 		}
+		else if (dynamic_cast<Scene*>(obj.get()))
+		{
+			Scene* scene = dynamic_cast<Scene*>(obj.get());
+			new_asset = MakeScope<Asset>(new_guid, EAssetType::kScene, asset_path);
+		}
 		AL_ASSERT(new_asset == nullptr);
 		if (obj)
 		{
@@ -634,10 +739,7 @@ namespace Ailu
 	void ResourceMgr::DeleteAsset(Asset* asset)
 	{
 		if (ExistInAssetDB(asset))
-		{
-			UnRegisterResource(asset->_asset_path);
-			UnRegisterAsset(asset);
-		}
+			_pending_delete_assets.push(asset);
 	}
 
 	bool ResourceMgr::ExistInAssetDB(const Asset* asset)
@@ -762,8 +864,16 @@ namespace Ailu
 			String guid = ToChar(tokens[0]);
 			WString asset_path = tokens[1];
 			EAssetType::EAssetType asset_type = EAssetType::FromString(ToChar(tokens[2]));
-			//先占位，不进行资源加载，实际有使用时才加载。
-			RegisterAsset(MakeScope<Asset>(Guid(guid), asset_type, asset_path));
+			if (asset_type == EAssetType::kTexture2D)
+			{
+				Load<Texture2D>(asset_path);
+			}
+			else
+			{
+				//先占位，不进行资源加载，实际有使用时才加载。
+				RegisterAsset(MakeScope<Asset>(Guid(guid), asset_type, asset_path));
+			}
+
 		}
 		file.close();
 	}
@@ -771,10 +881,26 @@ namespace Ailu
 	void ResourceMgr::SaveAssetDB()
 	{
 		std::wofstream file(kAssetDatabasePath, std::ios::out | std::ios::trunc);
+		u64 db_size = _asset_db.size() - 1, cur_count = 0;
 		for (auto& [guid, asset] : _asset_db)
 		{
-			if (asset->_p_obj)
+			if (cur_count != db_size)
 				file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
+			else
+				file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type);
+			++cur_count;
+			//if (asset->_p_obj)
+			//{
+			//	if (cur_count != db_size)
+			//		file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
+			//	else
+			//		file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type);
+			//	++cur_count;
+			//}
+			//else
+			//{
+			//	g_pLogMgr->LogWarningFormat(L"SaveAssetDB: skip save asset {},because linked obj is null!", asset->_asset_path);
+			//}
 		}
 		_asset_db.clear();
 	}
@@ -799,15 +925,25 @@ namespace Ailu
 			g_pLogMgr->LogWarningFormat(L"Asset {} guid conflict, assign a new one!", asset->_asset_path);
 			asset->AssignGuid(new_guid);
 		}
-		if (asset->_p_obj)
-		{
-			_object_to_asset[asset->_p_obj->ID()] = asset.get();
-		}
 		auto guid = asset->GetGuid();
 		auto asset_path = asset->_asset_path;
-		_asset_db[guid].swap(asset);
+		//延迟加载的资产
+		if (is_exist && _asset_db[guid]->_p_obj == nullptr)
+		{
+			_asset_db[guid]->CopyFrom(*asset.get());
+		}
+		else
+		{
+			_asset_db[guid].swap(asset);
+		}
+
+		auto cache_asset = _asset_db[guid].get();
+		if (cache_asset->_p_obj)
+		{
+			_object_to_asset[cache_asset->_p_obj->ID()] = cache_asset;
+		}
 		_asset_looktable[asset_path] = guid;
-		return _asset_db[guid].get();
+		return cache_asset;
 	}
 
 	void ResourceMgr::UnRegisterAsset(Asset* asset)
@@ -824,10 +960,17 @@ namespace Ailu
 	void ResourceMgr::RegisterResource(const WString& asset_path, Ref<Object> obj, bool override)
 	{
 		std::lock_guard<std::mutex> lock(_asset_db_mutex);
-		AL_ASSERT(_global_resources.contains(asset_path));
-		_global_resources[asset_path] = obj;
-		_lut_global_resources[obj->ID()] = _global_resources.find(asset_path);
-		_lut_global_resources_by_type[GetObjectAssetType(obj.get())].push_back(_global_resources.find(asset_path));
+		bool exist = _global_resources.contains(asset_path);
+		if (exist && override || !exist)
+		{
+			_global_resources[asset_path] = obj;
+			_lut_global_resources[obj->ID()] = _global_resources.find(asset_path);
+			_lut_global_resources_by_type[GetObjectAssetType(obj.get())].push_back(_global_resources.find(asset_path));
+		}
+		else
+		{
+			g_pLogMgr->LogWarningFormat("RegisterResource: skip register {}",obj->Name());
+		}
 	}
 
 	void ResourceMgr::UnRegisterResource(const WString& asset_path)
@@ -893,6 +1036,23 @@ namespace Ailu
 		return EAssetType::kUndefined;
 	}
 
+	bool ResourceMgr::IsFileOnDiskUpdated(const WString& sys_path)
+	{
+		fs::path p(sys_path);
+		fs::file_time_type last_load_time;
+		fs::file_time_type last_write_time = std::filesystem::last_write_time(p);
+		bool newer = true;
+		if (s_file_last_load_time.contains(sys_path))
+		{
+			last_load_time = s_file_last_load_time[sys_path];
+			//前者大于后者就表示其表示的时间点晚于后者
+			newer = last_write_time > last_load_time;
+		}
+		if (newer)
+			s_file_last_load_time[sys_path] = fs::file_time_type::clock::now();
+		return newer;
+	}
+
 	Ref<void> ResourceMgr::ImportResource(const WString& sys_path, const ImportSetting& setting)
 	{
 		return ImportResourceImpl(sys_path, &setting);
@@ -925,22 +1085,31 @@ namespace Ailu
 				auto shader = IterToRefPtr<Shader>(it);
 				if (shader)
 				{
-					for (auto& head_file : shader->GetSourceFiles())
+					bool match_file = false;
+					for (int i = 0; i < shader->PassCount(); i++)
 					{
-						if (head_file == cur_path)
-						{
-							AddResourceTask([=]()->Ref<void> {
-								if (shader->Compile())
-								{
-									auto mats = shader->GetAllReferencedMaterials();
-									for (auto mat = mats.begin(); mat != mats.end(); mat++)
-										(*mat)->ChangeShader(shader.get());
-								}
-								return nullptr;
-								});
+						if (match_file)
 							break;
+						const auto& pass = shader->GetPassInfo(i);
+						for (auto& head_file : pass._source_files)
+						{
+							if (head_file == cur_path)
+							{
+								match_file = true;
+								AddResourceTask([=]()->Ref<void> {
+									if (shader->Compile())
+									{
+										auto mats = shader->GetAllReferencedMaterials();
+										for (auto mat = mats.begin(); mat != mats.end(); mat++)
+											(*mat)->ChangeShader(shader.get());
+									}
+									return nullptr;
+									});
+								break;
+							}
 						}
 					}
+
 				}
 			}
 			auto cs = ComputeShader::Get(PathUtils::ExtractAssetPath(cur_path));
@@ -1001,6 +1170,11 @@ namespace Ailu
 			g_pLogMgr->LogErrorFormat(L"Path {} is not a supported file!", sys_path);
 			return nullptr;
 		}
+		if (!IsFileOnDiskUpdated(sys_path))
+		{
+			g_pLogMgr->LogWarningFormat(L"File {} is new,skip load!", sys_path);
+			return nullptr;
+		}
 		auto new_sys_path = FileManager::GetCurSysDirStr();
 		new_sys_path.append(L"/");
 		if (setting->_is_copy)
@@ -1038,6 +1212,9 @@ namespace Ailu
 		Queue<std::tuple<WString, Ref<Object>>> loaded_objects;
 		EAssetType::EAssetType asset_type = EAssetType::kUndefined;
 		time_mgr.Mark();
+		WString created_asset_dir = FileManager::GetCurSysDirStr();
+		created_asset_dir.append(L"/");
+		created_asset_dir = PathUtils::ExtractAssetPath(created_asset_dir);
 		if (ext == ".fbx" || ext == ".FBX")
 		{
 			asset_type = EAssetType::kMesh;
@@ -1048,7 +1225,7 @@ namespace Ailu
 				mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
 				for (auto& mesh : mesh_list)
 				{
-					WString imported_asset_path = external_asset_path.substr(0, external_asset_path.find_last_of(L"/" + 1));
+					WString imported_asset_path = created_asset_dir;
 					imported_asset_path.append(std::format(L"{}.alasset", ToWStr(mesh->Name().c_str())));
 					loaded_objects.push(std::make_tuple(imported_asset_path, mesh));
 					if (mesh_import_setting->_is_import_material)
@@ -1068,9 +1245,9 @@ namespace Ailu
 								if (normal != nullptr)
 									mat->SetTexture(InternalStandardMaterialTexture::kNormal, std::static_pointer_cast<Texture>(normal).get());
 							}
-							auto mat_sys_path = std::format(L"{}{}.alasset", FileManager::GetCurSysDirStr(), ToWChar(it->_name));
-							auto mat_asset_path = PathUtils::ExtractAssetPath(mat_sys_path);
-							loaded_objects.push(std::make_tuple(mat_asset_path, mat));
+							imported_asset_path = created_asset_dir;
+							imported_asset_path.append(std::format(L"{}.alasset", ToWStr(it->_name.c_str())));
+							loaded_objects.push(std::make_tuple(imported_asset_path, mat));
 						}
 					}
 				}
@@ -1081,9 +1258,9 @@ namespace Ailu
 		{
 			asset_type = EAssetType::kTexture2D;
 			auto tex = LoadExternalTexture(external_asset_path, setting);
-			auto mat_sys_path = std::format(L"{}{}.alasset", FileManager::GetCurSysDirStr(), ToWChar(tex->Name().c_str()));
-			auto mat_asset_path = PathUtils::ExtractAssetPath(mat_sys_path);
-			loaded_objects.push(std::make_tuple(mat_asset_path, tex));
+			WString imported_asset_path = created_asset_dir;
+			imported_asset_path.append(std::format(L"{}.alasset", ToWStr(tex->Name().c_str())));
+			loaded_objects.push(std::make_tuple(imported_asset_path, tex));
 		}
 		else {}
 		g_pLogMgr->LogFormat(L"Import asset: {} succeed,cost {}ms", new_sys_path, time_mgr.GetElapsedSinceLastMark());
@@ -1095,9 +1272,11 @@ namespace Ailu
 		{
 			auto& [path, obj] = loaded_objects.front();
 			CreateAsset(path, obj)->_external_asset_path = external_asset_path;
+			g_pLogMgr->LogFormat(L"Create asset at path {}", path);
 			loaded_objects.pop();
 		}
 		OnAssetDataBaseChanged();
+		SaveAllUnsavedAssets();
 		return ret_res;
 	}
 

@@ -179,32 +179,51 @@ namespace Ailu
 		}
 	}
 
+	class D3DShaderInclude : public ID3DInclude
+	{
+		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* ppData, UINT* pBytes) override;
+
+		HRESULT Close(LPCVOID pData) override;
+	private:
+		List<WString> _addi_include_pathes = {
+			kEngineRootPathW,
+			L"Shaders/hlsl/",
+			L"Shaders/hlsl/Compute/",
+			L"Shaders/hlsl/PostProcess/",
+		};
+		u8* _data;
+	};
+
 	class D3DShader : public Shader
 	{
+		struct D3DShaderElement
+		{
+			List<D3D_SHADER_MACRO*> _keyword_defines;
+			D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
+			ComPtr<ID3D12RootSignature> _p_sig;
+			//keyword,<kwgroup_id,kw_inner_group_id>
+			ComPtr<ID3DBlob> _p_vblob = nullptr;
+			ComPtr<ID3DBlob> _p_pblob = nullptr;
+			ComPtr<ID3D12ShaderReflection> _p_v_reflection;
+			ComPtr<ID3D12ShaderReflection> _p_p_reflection;
+			D3D12_PRIMITIVE_TOPOLOGY _topology;
+		};
 	public:
-		D3DShader(const WString& sys_path, const String& vs_entry, const String& ps_entry);
+		D3DShader(const WString& sys_path);
 		~D3DShader();
-		void Bind(u32 index) final;
-		void* GetByteCode(EShaderType type) final;
-		ID3D12RootSignature* GetSignature();
-		std::pair<D3D12_INPUT_ELEMENT_DESC*,u8> GetVertexInputLayout();
+		void Bind(u16 pass_index, u16 variant_id) final;
+		void* GetByteCode(EShaderType type, u16 pass_index, u16 variant_id) final;
+		ID3D12RootSignature* GetSignature(u16 pass_index,u16 variant_id);
+		std::pair<D3D12_INPUT_ELEMENT_DESC*,u8> GetVertexInputLayout(u16 pass_index, u16 variant_id);
 	private:
 		bool RHICompileImpl() final;
 		void Reset();
-		void LoadShaderReflection(ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps);
-		void LoadAdditionalShaderReflection(const WString& sys_path);
-		void GenerateInternalPSO();
+		void LoadShaderReflection(u16 pass_index,u16 variant_id);
+		void LoadAdditionalShaderReflection(const WString& sys_path,u16 pass_index,u16 variant_id);
+		void GenerateInternalPSO(u16 pass_index,u16 variant_id);
 
 	private:
-		D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
-		ComPtr<ID3D12RootSignature> _p_sig;
-		List<D3D_SHADER_MACRO*> _keyword_defines;
-		//keyword,<kwgroup_id,kw_inner_group_id>
-		ComPtr<ID3DBlob> _p_vblob = nullptr;
-		ComPtr<ID3DBlob> _p_pblob = nullptr;
-		ComPtr<ID3D12ShaderReflection> _p_v_reflection;
-		ComPtr<ID3D12ShaderReflection> _p_p_reflection;
-		D3D12_PRIMITIVE_TOPOLOGY _topology;
+		Vector<D3DShaderElement> _elements;
 	};
 
 	class D3DComputeShader : public ComputeShader

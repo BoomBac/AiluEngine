@@ -70,6 +70,7 @@ namespace Ailu
         Scope<PostProcessPass> _p_postprocess_pass;
         Scope<DeferredGeometryPass> _p_gbuffer_pass;
         Scope<SkyboxPass> _p_skybox_pass;
+        Scope<CopyColorPass> _p_copycolor_pass;
         Scope<GizmoPass> _p_gizmo_pass;
         List<RenderPass*> _render_passes;
         bool _b_init = false;
@@ -81,7 +82,7 @@ namespace Ailu
         List<AfterTickEvent> _events_after_tick;
 
     };
-    extern Renderer* g_pRenderer;
+    extern AILU_API Renderer* g_pRenderer;
 }
 #pragma warning(pop)
 #endif // !RENDERER_H__

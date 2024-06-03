@@ -31,6 +31,8 @@ namespace Ailu
 		}
 
 		_camera_depth_handle = RenderTexture::GetTempRT(_width, _height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
+		_rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorAttachment", ERenderTargetFormat::kDefaultHDR);
+
 		_p_opaque_pass = MakeScope<OpaquePass>();
 		_p_reslove_pass = MakeScope<ResolvePass>();
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
@@ -38,6 +40,7 @@ namespace Ailu
 		_p_gbuffer_pass = MakeScope<DeferredGeometryPass>(_width, _height);
 		_p_skybox_pass = MakeScope<SkyboxPass>();
 		_p_gizmo_pass = MakeScope<GizmoPass>();
+		_p_copycolor_pass = MakeScope<CopyColorPass>();
 
 		_p_cubemap_gen_pass = MakeScope<CubeMapGenPass>(512, "pure_sky", "Textures/small_cave_1k.alasset");
 		_p_task_render_passes.emplace_back(_p_cubemap_gen_pass.get());
@@ -53,17 +56,15 @@ namespace Ailu
 		_rendering_data._camera_color_target_handle = _camera_color_handle;
 		_rendering_data._camera_depth_target_handle = _camera_depth_handle;
 		_rendering_data._final_rt_handle = _gameview_rt_handle;
-		//_rendering_data._p_camera_color_target = _p_camera_color_attachment.get();
-		//_rendering_data._p_camera_depth_target = _p_camera_depth_attachment.get();
-		//_rendering_data._p_final_rt = _p_gameview_rt.get();
 
 		_render_passes.emplace_back(_p_shadowcast_pass.get());
 		_p_opaque_pass->SetActive(false);
 		//_render_passes.emplace_back(_p_opaque_pass.get());
 		_render_passes.emplace_back(_p_gbuffer_pass.get());
 		_render_passes.emplace_back(_p_skybox_pass.get());
-		_render_passes.emplace_back(_p_gizmo_pass.get());
+		_render_passes.emplace_back(_p_copycolor_pass.get());
 		_render_passes.emplace_back(_p_postprocess_pass.get());
+		_render_passes.emplace_back(_p_gizmo_pass.get());
 		_render_passes.emplace_back(_p_reslove_pass.get());
 		RegisterEventBeforeTick([]() {GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
 		RegisterEventAfterTick([]() {Profiler::g_Profiler.EndFrame(); });
@@ -101,8 +102,6 @@ namespace Ailu
 
 	void Renderer::BeginScene()
 	{
-		_p_scene_camera = g_pSceneMgr->_p_current->GetActiveCamera();
-		Camera::sCurrent = _p_scene_camera;
 		if(!_resize_events.empty())
 			DoResize();
 		memset(reinterpret_cast<void*>(&_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
@@ -310,6 +309,7 @@ namespace Ailu
 
 	void Renderer::PrepareCamera(Camera* p_camera)
 	{
+		_p_scene_camera = Camera::sCurrent;
 		_p_scene_camera->RecalculateMarix();
 		_per_frame_cbuf_data._CameraPos = _p_scene_camera->Position();
 		_per_frame_cbuf_data._MatrixV = _p_scene_camera->GetView();
@@ -319,6 +319,7 @@ namespace Ailu
 		MatrixInverse(vp);
 		_per_frame_cbuf_data._MatrixIVP = vp;
 	}
+
 	void Renderer::DoResize()
 	{
 		while (_resize_events.size() > 1)
@@ -330,6 +331,7 @@ namespace Ailu
 		RenderTexture::ReleaseTempRT(_camera_color_handle);
 		RenderTexture::ReleaseTempRT(_camera_depth_handle);
 		RenderTexture::ReleaseTempRT(_gameview_rt_handle);
+		RenderTexture::ReleaseTempRT(_rendering_data._camera_opaque_tex_handle);
 		_width =  static_cast<u32>(new_size.x);
 		_height = static_cast<u32>(new_size.y);
 		_camera_color_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorAttachment", ERenderTargetFormat::kDefaultHDR);
@@ -338,6 +340,7 @@ namespace Ailu
 			_gameview_rt_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorFinalAttachment", ERenderTargetFormat::kDefaultHDR);
 		}
 		_camera_depth_handle = RenderTexture::GetTempRT(_width, _height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
+		_rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorAttachment", ERenderTargetFormat::kDefaultHDR);
 		_p_scene_camera->Aspect(new_size.x / new_size.y);
 		g_pLogMgr->LogFormat("Resize game view to {},{}",_width,_height);
 	}

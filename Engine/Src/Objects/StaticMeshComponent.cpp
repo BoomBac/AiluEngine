@@ -154,7 +154,7 @@ namespace Ailu
 	{
 		IMPLEMENT_REFLECT_FIELD(SkinedMeshComponent);
 		_per_skin_task_vertex_num = (mesh->_vertex_count + s_skin_thread_num - 1) / s_skin_thread_num;
-		_skin_tasks.resize(s_skin_thread_num);
+		//_skin_tasks.resize(s_skin_thread_num);
 	}
 	void* SkinedMeshComponent::DeserializeImpl(Queue<std::tuple<String, String>>& formated_str)
 	{
@@ -247,6 +247,7 @@ namespace Ailu
 		u32 vert_count = skined_mesh->_vertex_count;
 		u32 utime = u32(time) % _p_clip->FrameCount();
 		auto vert = reinterpret_cast<Vector3f*>(skined_mesh->GetVertexBuffer()->GetStream(0));
+		Vector<std::future<void>> skin_tasks;
 		g_pTimeMgr->Mark();
 		if (!_is_mt_skin)
 		{
@@ -258,9 +259,11 @@ namespace Ailu
 			{
 				u32 startIdx = i * _per_skin_task_vertex_num;
 				u32 endIdx = min((i + 1) * _per_skin_task_vertex_num, vert_count);
-				_skin_tasks[i] = g_pThreadTool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx);
+				//_skin_tasks[i] = g_pThreadTool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx);
+				skin_tasks.push_back(g_pThreadTool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx));
+
 			}
-			for (auto& future : _skin_tasks)
+			for (auto& future : skin_tasks)
 			{
 				future.wait();
 			}
@@ -290,8 +293,8 @@ namespace Ailu
 	{
 		_p_mesh = mesh;
 		_per_skin_task_vertex_num = (mesh->_vertex_count + s_skin_thread_num - 1) / s_skin_thread_num;
-		_skin_tasks.clear();
-		_skin_tasks.resize(s_skin_thread_num);
+		//_skin_tasks.clear();
+		//_skin_tasks.resize(s_skin_thread_num);
 		auto skined_mesh = dynamic_cast<SkinedMesh*>(_p_mesh.get());
 		if (_p_clip && skined_mesh->CurSkeleton() != _p_clip->CurSkeletion())
 		{

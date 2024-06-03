@@ -13,7 +13,7 @@
 
 namespace Ailu
 {
-	class IAppender
+	class AILU_API IAppender
 	{
 	public:
 		virtual void Print(std::string str) = 0;
@@ -63,7 +63,7 @@ namespace Ailu
 	};
 
 
-	class LogMgr : public IRuntimeModule
+	class AILU_API LogMgr : public IRuntimeModule
 	{
 	private:
 		std::vector<IAppender*> _appenders;
@@ -182,7 +182,7 @@ namespace Ailu
 				appender->Print(BuildLogMsg(level, msg, args...));
 		}
 	};
-	extern LogMgr* g_pLogMgr;
+	extern AILU_API LogMgr* g_pLogMgr;
 
 }
 

@@ -1,3 +1,4 @@
+#pragma warning(disable : 4251)
 #pragma once
 #ifndef __OBJECT_H__
 #define __OBJECT_H__
@@ -6,7 +7,7 @@
 
 namespace Ailu
 {
-	class Object
+	class AILU_API Object
 	{
 		//--------------------Reflect
 	protected:

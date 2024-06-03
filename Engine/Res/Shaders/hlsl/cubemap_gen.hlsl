@@ -1,9 +1,11 @@
 //info bein
+//pass begin::
 //name: cubemap_gen
 //vert: VSMain
 //pixel: PSMain
 //Cull: Front
 //Queue: Opaque
+//pass end::
 //Properties
 //{
 //  env("Env",Texture2D) = white

@@ -23,7 +23,7 @@ public:\
 	inline EComponentType GetType() override {return GetStaticType();};
 
 	class Actor;
-	class Component : public Object
+	class AILU_API Component : public Object
 	{
 		DECLARE_PROTECTED_PROPERTY(b_enable, Active, bool)
 	public:

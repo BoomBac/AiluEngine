@@ -1,3 +1,6 @@
+#pragma warning(push)
+#pragma warning(disable: 4251) //std库直接暴露为接口dll在客户端上使用时可能会有问题，禁用该编译警告
+
 #pragma once
 #ifndef __RESOURCE_MGR_H__
 #define __RESOURCE_MGR_H__
@@ -15,7 +18,7 @@
 
 namespace Ailu
 {
-	struct ImportSetting
+	struct AILU_API ImportSetting
 	{
 	public:
 		static ImportSetting& Default()
@@ -38,7 +41,7 @@ namespace Ailu
 		//virtual void operator delete[](void* ptr) = 0;)
 	};
 
-	struct TextureImportSetting : public ImportSetting
+	struct AILU_API TextureImportSetting : public ImportSetting
 	{
 	public:
 		static TextureImportSetting& Default()
@@ -49,7 +52,7 @@ namespace Ailu
 		bool _is_srgb = false;
 		bool _generate_mipmap = true;
 	};
-	struct MeshImportSetting : public ImportSetting
+	struct AILU_API MeshImportSetting : public ImportSetting
 	{
 	public:
 		static MeshImportSetting& Default()
@@ -65,7 +68,7 @@ namespace Ailu
 		}
 		bool _is_import_material = true;
 	};
-	struct ShaderImportSetting : public ImportSetting
+	struct AILU_API ShaderImportSetting : public ImportSetting
 	{
 	public:
 		static ShaderImportSetting& Default()
@@ -76,12 +79,14 @@ namespace Ailu
 		String _vs_entry, _ps_entry;
 		String _cs_kernel;
 	};
-	class ISearchFilter
+
+	class AILU_API ISearchFilter
 	{
 	public:
 		virtual bool Filter(Asset* asset) const= 0;
 	};
-	class SearchFilterByDirectory : public ISearchFilter
+
+	class AILU_API SearchFilterByDirectory : public ISearchFilter
 	{
 	public:
 		SearchFilterByDirectory(Vector<WString> directories) : _directories(directories) 
@@ -101,7 +106,26 @@ namespace Ailu
 		Vector<WString> _directories;
 	};
 
-	class ResourceMgr : public IRuntimeModule
+	class AILU_API SearchFilterByPath : public ISearchFilter
+	{
+	public:
+		SearchFilterByPath(Vector<WString> asset_pathes) : _asset_pathes(asset_pathes)
+		{
+		}
+		bool Filter(Asset* asset) const final
+		{
+			for (auto& dir : _asset_pathes)
+			{
+				if (dir == asset->_asset_path)
+					return true;
+			}
+			return false;
+		}
+	private:
+		Vector<WString> _asset_pathes;
+	};
+
+	class AILU_API ResourceMgr : public IRuntimeModule
 	{
 		using ResourcePoolContainer = Map<WString, Ref<Object>>;
 		using ResourcePoolContainerIter = ResourcePoolContainer::iterator;
@@ -121,14 +145,14 @@ namespace Ailu
 		inline const static std::set<String> kHDRImageExt = { ".exr",".EXR",".hdr",".HDR" };
 		inline const static std::set<String> kMeshExt = { ".obj",".OBJ" ,".fbx",".FBX"};
 	public:
+		DISALLOW_COPY_AND_ASSIGN(ResourceMgr)
+		ResourceMgr() = default;
 		int Initialize() final;
 		void Finalize() final;
 		void Tick(const float& delta_time) final;
 		auto Begin() { return _asset_db.begin(); };
 		auto End() { return _asset_db.end(); };
 		u64 AssetNum() { return _asset_db.size(); }
-		void SaveScene(Scene* scene, std::string& scene_path);
-		Scene* LoadScene(std::string& scene_path);
 		//在目标位置创建资产对象并将其注册
 		Asset* CreateAsset(const WString& asset_path, Ref<Object> obj,bool overwrite = true);
 		void DeleteAsset(Asset* asset);
@@ -211,6 +235,8 @@ namespace Ailu
 		static void FormatLine(const String& line, String& key, String& value);
 		static void ExtractCommonAssetInfo(const WString& asset_path, WString& name, Guid& guid,EAssetType::EAssetType& type);
 		static EAssetType::EAssetType GetObjectAssetType(Object* obj);
+		static bool IsFileOnDiskUpdated(const WString& sys_path);
+
 		void AddResourceTask(ResourceTask task);
 		bool ExistInAssetDB(const Asset* asset);
 		bool ExistInAssetDB(const WString& asset_path);
@@ -230,6 +256,7 @@ namespace Ailu
 		Scope<Asset> LoadTexture(const WString& asset_path);
 		Scope<Asset> LoadMesh(const WString& asset_path);
 		Scope<Asset> LoadComputeShader(const WString& asset_path);
+		Scope<Asset> LoadScene(const WString& asset_path);
 		//加载原始资产
 		List<Ref<Mesh>>    LoadExternalMesh(const WString& asset_path);
 		Ref<Texture2D>     LoadExternalTexture(const WString& asset_path, const ImportSetting* setting = nullptr);
@@ -241,20 +268,8 @@ namespace Ailu
 		void SaveComputeShader(const WString& asset_path, const Asset* asset);
 		void SaveMesh(const WString& asset_path, const Asset* asset);
 		void SaveTexture2D(const WString& asset_path, const Asset* asset);
+		void SaveScene(const WString& asset_path, const Asset* asset);
 
-		static bool IsFileOnDiskNewer(const WString& sys_path)
-		{
-			fs::path p(sys_path);
-			fs::file_time_type last_load_time;
-			fs::file_time_type last_write_time = std::filesystem::last_write_time(p);
-			bool newer = true;
-			if (s_file_last_load_time.contains(sys_path))
-			{
-				last_load_time = s_file_last_load_time[sys_path];
-				newer = last_write_time > last_load_time;
-			}
-			return newer;
-		}
 		void WatchDirectory();
 		void SubmitResourceTask();
 		//导入外部资源并创建对应的asset
@@ -281,15 +296,17 @@ namespace Ailu
 		Map<EAssetType::EAssetType, Vector<ResourcePoolContainerIter>> _lut_global_resources_by_type;
 
 		Vector<std::function<void()>> _asset_changed_callbacks;
+		Queue<Asset*> _pending_delete_assets;
 	};
-	extern ResourceMgr* g_pResourceMgr;
+	extern AILU_API ResourceMgr* g_pResourceMgr;
 
 	template<typename T>
 	inline T* ResourceMgr::Load(const WString& asset_path)
 	{
 		using Loader = std::function<Scope<Asset>(ResourceMgr*,const WString&)>;
 		WString sys_path = PathUtils::GetResSysPath(asset_path);
-		bool is_engine_asset = PathUtils::ExtractExt(sys_path) == L".alasset";
+		auto ext = PathUtils::ExtractExt(sys_path);
+		bool is_engine_asset = ext == L".alasset" || L".almap";
 		AL_ASSERT(!is_engine_asset);
 		WString asset_name;
 		Guid guid;
@@ -298,7 +315,7 @@ namespace Ailu
 		AL_ASSERT(type == EAssetType::kUndefined);
 		bool is_skip_load = false;
 		Loader asset_loader = nullptr;
-		if (!IsFileOnDiskNewer(sys_path))
+		if (!IsFileOnDiskUpdated(sys_path))
 		{
 			g_pLogMgr->LogWarningFormat(L"File {} is new,skip load!",sys_path);
 			return _global_resources.contains(asset_path) ? static_cast<T*>(_global_resources[asset_path].get()) : nullptr;
@@ -322,6 +339,10 @@ namespace Ailu
 		else if constexpr (std::is_same<T, Material>::value)
 		{
 			asset_loader = &ResourceMgr::LoadMaterial;
+		}
+		else if constexpr (std::is_same<T, Scene>::value)
+		{
+			asset_loader = &ResourceMgr::LoadScene;
 		}
 		Scope<Asset> out_asset = std::move(asset_loader(this, asset_path));
 		if (out_asset != nullptr)
@@ -419,6 +440,10 @@ namespace Ailu
 		{
 			return _lut_global_resources_by_type.at(EAssetType::kMaterial).size();
 		}
+		else if constexpr (std::is_same<T, Scene>::value)
+		{
+			return _lut_global_resources_by_type.at(EAssetType::kScene).size();
+		}
 		else
 		{
 			AL_ASSERT(true);
@@ -448,6 +473,10 @@ namespace Ailu
 		{
 			return _lut_global_resources_by_type[EAssetType::kMaterial].begin();
 		}
+		else if constexpr (std::is_same<T, Scene>::value)
+		{
+			return _lut_global_resources_by_type[EAssetType::kScene].begin();
+		}
 		else
 		{
 			AL_ASSERT(true);
@@ -476,6 +505,10 @@ namespace Ailu
 		{
 			return _lut_global_resources_by_type[EAssetType::kMaterial].end();
 		}
+		else if constexpr (std::is_same<T, Scene>::value)
+		{
+			return _lut_global_resources_by_type[EAssetType::kScene].end();
+		}
 		else
 		{
 			AL_ASSERT(true);
@@ -491,3 +524,4 @@ namespace Ailu
 }
 
 #endif // !RESOURCE_MGR_H__
+#pragma warning(pop)

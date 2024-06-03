@@ -48,7 +48,7 @@ namespace Ailu
 		return std::make_tuple<D3D12_INPUT_ELEMENT_DESC*, u32>(&cache_desc[0], std::move(desc_count));
 	}
 
-	namespace ALHash
+	namespace Math::ALHash
 	{
 		template<>
 		static u32 Hasher(const D3D12_PRIMITIVE_TOPOLOGY_TYPE& obj)
@@ -70,7 +70,7 @@ namespace Ailu
 	{
 	public:
 		D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer);
-		void Build() final;
+		void Build(u16 pass_index = 0, u16 variant_id = 0) final;
 		void Bind(CommandBuffer* cmd) final;
 		void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) final;
 		void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, const String& name) final;

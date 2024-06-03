@@ -1,0 +1,110 @@
+guid: 7ac5d887-551f-4363-b38f-299f318b23dc
+type: kScene
+name: palace
+SceneGraph: 
+  Name: root
+    Components: 
+      TransformComponent: 
+        Position: 0,0,0
+        Rotation: 0,6.75513e-08,0,1
+        Scale: 1,1,1
+    Children: 7
+      Name: directional_light
+        Components: 
+          TransformComponent: 
+            Position: 0,1071,0
+            Rotation: 1.70162e-08,6.5373e-08,-0.2519,0.967753
+            Scale: 1,1,1
+          LightComponent: 
+            Type: Directional
+            Color: 1,1,1
+            Intensity: 1
+            CastShadow: true
+            ShadowArea: 0
+            ShadowDistance: 0
+        Children: 0
+      Name: point_light
+        Components: 
+          TransformComponent: 
+            Position: -85,427,-338
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
+          LightComponent: 
+            Type: Point
+            Color: 0.848039,0.58101,0.199539
+            Intensity: 0.435
+            Radius: 1004
+            CastShadow: false
+            ShadowArea: 0
+            ShadowDistance: 0
+        Children: 0
+      Name: spot_light
+        Components: 
+          TransformComponent: 
+            Position: 865,417,0
+            Rotation: -0.0845537,-0.0298755,0.331806,0.939076
+            Scale: 1,1,1
+          LightComponent: 
+            Type: Spot
+            Color: 0.138552,0.84354,0.911765
+            Intensity: 1
+            Radius: 617
+            Inner: 63.272
+            Outer: 74.612
+            CastShadow: false
+            ShadowArea: 0
+            ShadowDistance: 0
+        Children: 0
+      Name: palace
+        Components: 
+          TransformComponent: 
+            Position: 0,0,0
+            Rotation: 0,0.70087,0,0.713289
+            Scale: 2,2,2
+          StaticMeshComponent: 
+            MeshPath: 32414c6f-47f1-47a1-883c-678fac6e47e8
+            MaterialPath0: 324335bf-8def-4583-911a-047863b48455
+            MaterialPath1: af277291-1e6f-4732-89ba-d0dce1dc12af
+        Children: 0
+      Name: point_light1
+        Components: 
+          TransformComponent: 
+            Position: -100,264,-1814
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
+          LightComponent: 
+            Type: Point
+            Color: 0.209919,0.823529,0.570866
+            Intensity: 0.544
+            Radius: 782
+            CastShadow: false
+            ShadowArea: -4.31602e+08
+            ShadowDistance: -4.31602e+08
+        Children: 0
+      Name: spot_light1
+        Components: 
+          TransformComponent: 
+            Position: -109,317,846
+            Rotation: -0.351351,6.32444e-08,2.37343e-08,0.936244
+            Scale: 1,1,1
+          LightComponent: 
+            Type: Spot
+            Color: 0.79902,0.693613,0.082252
+            Intensity: 1
+            Radius: 606
+            Inner: 44.544
+            Outer: 70.408
+            CastShadow: true
+            ShadowArea: 100
+            ShadowDistance: 100
+        Children: 0
+      Name: Actor23
+        Components: 
+          TransformComponent: 
+            Position: 0,194,582
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
+          StaticMeshComponent: 
+            MeshPath: 7baa598b-7eb4-478d-91ae-bf758da25d3b
+            MaterialPath0: 324335bf-8def-4583-911a-047863b48455
+        Children: 0

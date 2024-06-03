@@ -5,11 +5,12 @@
 #include "TransformComponent.h"
 namespace Ailu
 {
-	class SceneActor : public Actor
+	class AILU_API SceneActor : public Actor
 	{
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
 	public:
+		DISALLOW_COPY_AND_ASSIGN(SceneActor)
 		SceneActor();
 		~SceneActor();
 		void Tick(const float& delta_time) override;
@@ -17,10 +18,10 @@ namespace Ailu
 		const Transform& GetTransform() const { return _p_transform->SelfTransform(); }
 		TransformComponent* GetTransformComponent() { return _p_transform; }
 		void Serialize(std::ostream& os, String indent) override;
-		SceneActor& operator=(const SceneActor& other)
-		{
-			return *this;
-		}
+		//SceneActor& operator=(const SceneActor& other)
+		//{
+		//	return *this;
+		//}
 	protected:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;
 	private:

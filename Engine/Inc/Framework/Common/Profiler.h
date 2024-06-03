@@ -24,7 +24,7 @@ namespace Ailu
 		u64 CurrSample = 0;
 	};
 	class CommandBuffer;
-	class Profiler
+	class AILU_API Profiler
 	{
 		friend class ProfileBlock;
 		friend class CPUProfileBlock;

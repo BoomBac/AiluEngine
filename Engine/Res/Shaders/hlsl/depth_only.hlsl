@@ -1,9 +1,11 @@
 //info bein
+//pass begin::
 //name: DepthOnly
 //vert: VSMain
 //pixel: PSMain
 //Cull: Back
 //Queue: Opaque
+//pass end::
 //info end
 
 #include "common.hlsli"

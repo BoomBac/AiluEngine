@@ -9,7 +9,7 @@
 
 namespace Ailu
 {
-	class ModuleTimeStatics
+	class AILU_API ModuleTimeStatics
 	{
 	public:
 		inline static float RenderDeltatime = 0.0f;

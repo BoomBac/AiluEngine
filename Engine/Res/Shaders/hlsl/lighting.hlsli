@@ -131,13 +131,13 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	//float3 specular = SkyBox.SampleLevel(g_LinearWrapSampler, surface.wnormal,);
 
 	float lod             = lerp(0,8,surface.roughness);
-	float3 prefilteredColor = SkyBox.SampleLevel(g_AnisotropicClampSampler, reflect(-view_dir,surface.wnormal),lod);
-	float2 envBRDF          = IBLLut.Sample(g_LinearWrapSampler,float2(surface.roughness,shading_data.nv)).xy;
-	// envBRDF.x = pow(envBRDF.x,1/2.2);
-	// envBRDF.y = pow(envBRDF.y,1/2.2);
+	float3 prefilteredColor = SkyBox.SampleLevel(g_LinearWrapSampler, reflect(-view_dir,surface.wnormal),lod);
+	float2 envBRDF          = IBLLut.SampleLevel(g_LinearWrapSampler,float2(lerp(0,0.99,surface.roughness),lerp(0,0.99,shading_data.nv)),0).xy;
+	envBRDF.x = pow(envBRDF.x,1/2.2);
+	envBRDF.y = pow(envBRDF.y,1/2.2);
 	float3 specular = prefilteredColor * (ks * envBRDF.x + envBRDF.y);
 
-	light += (specular + diffuse);
+	light += (specular + diffuse) * 0.1f;
 	return light; 
 }
 #endif //__LIGHTING_H__

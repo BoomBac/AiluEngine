@@ -19,12 +19,30 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Src\Widgets\AssetBrowser.cpp" />
+    <ClCompile Include="Src\Widgets\AssetTable.cpp" />
+    <ClCompile Include="Src\Widgets\CommonTextureWidget.cpp" />
+    <ClCompile Include="Src\Widgets\EditorLayer.cpp" />
+    <ClCompile Include="Src\Widgets\ImguiWidget.cpp" />
+    <ClCompile Include="Src\Widgets\InputLayer.cpp" />
+    <ClCompile Include="Src\Widgets\ObjectDetail.cpp" />
+    <ClCompile Include="Src\Widgets\OutputLog.cpp" />
+    <ClCompile Include="Src\Widgets\RenderView.cpp" />
+    <ClCompile Include="Src\Widgets\SceneLayer.cpp" />
+    <ClInclude Include="Inc\EditorApp.h" />
+    <ClInclude Include="Inc\Widgets\AssetBrowser.h" />
+    <ClInclude Include="Inc\Widgets\AssetTable.h" />
     <ClInclude Include="Inc\Widgets\Common.h" />
-    <ClInclude Include="Inc\Widgets\WorldOutline.h">
-      <FileType>Document</FileType>
-    </ClInclude>
+    <ClCompile Include="Src\EditorApp.cpp" />
     <ClCompile Include="Src\EditorMain.cpp" />
-    <ClCompile Include="Src\Widgets\WorldOutline.cpp" />
+    <ClInclude Include="Inc\Widgets\CommonTextureWidget.h" />
+    <ClInclude Include="Inc\Widgets\EditorLayer.h" />
+    <ClInclude Include="Inc\Widgets\ImGuiWidget.h" />
+    <ClInclude Include="Inc\Widgets\InputLayer.h" />
+    <ClInclude Include="Inc\Widgets\ObjectDetail.h" />
+    <ClInclude Include="Inc\Widgets\OutputLog.h" />
+    <ClInclude Include="Inc\Widgets\RenderView.h" />
+    <ClInclude Include="Inc\Widgets\SceneLayer.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -118,7 +136,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\Inc\;$(SolutionDir)Engine\;$(SolutionDir)Engine\Ext\;$(SolutionDir)Editor\Inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\Inc\;$(SolutionDir)Engine\;$(SolutionDir)Engine\Ext\;$(SolutionDir)Editor\Inc\;$(SolutionDir)Engine\Ext\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableModules>true</EnableModules>
       <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
