@@ -12,7 +12,7 @@ namespace Ailu
 	namespace RenderConstants
 	{
 		constexpr static u8  kFrameCount = 2u;
-		constexpr static uint16_t kMaxMaterialDataCount = 128u;
+		constexpr static u16 kMaxMaterialDataCount = 128u;
 		constexpr static u32 kMaxRenderObjectCount = 50u;
 		constexpr static u32 kMaxPassDataCount = 10u;
 		constexpr static u32 kMaxTextureCount = 128u;
@@ -20,13 +20,17 @@ namespace Ailu
 		constexpr static u32 kMaxRenderTextureCount = 32u;
 		constexpr static u32 KMaxDynamicVertexNum = 2048;
 		constexpr static u8  kMaxVertexAttrNum = 10u;
+		constexpr static u16 kMaxDirectionalLightNum = kMaxDirectionalLight;
+		constexpr static u16 kMaxPointLightNum = kMaxPointLight;
+		constexpr static u16 kMaxSpotLightNum = kMaxSpotLight;
 
-		constexpr static u32 kPerFrameTotalSize = sizeof(ScenePerFrameData) + sizeof(ScenePerMaterialData) * kMaxMaterialDataCount + + sizeof(ScenePerPassData) * kMaxPassDataCount+
-			sizeof(ScenePerObjectData) * kMaxRenderObjectCount;
-		constexpr static u32 kPerFrameDataSize = sizeof(ScenePerFrameData);
 		constexpr static u32 kPerMaterialDataSize = sizeof(ScenePerMaterialData);
 		constexpr static u32 kPeObjectDataSize = sizeof(ScenePerObjectData);
 		constexpr static u32 kPePassDataSize = sizeof(ScenePerPassData);
+		constexpr static u32 kPerFrameDataSize = sizeof(ScenePerFrameData);
+		//2 is pass count,create cbv for each pass
+		constexpr static u32 kPerFrameTotalSize = kPerFrameDataSize + kPerMaterialDataSize * kMaxMaterialDataCount * 2 + kPePassDataSize * kMaxPassDataCount+
+			kPeObjectDataSize * kMaxRenderObjectCount;
 		constexpr static wchar_t kVSModel_5_0[] = L"vs_5_0";
 		constexpr static wchar_t kPSModel_5_0[] = L"ps_5_0";
 		constexpr static wchar_t kVSModel_6_1[] = L"vs_6_1";

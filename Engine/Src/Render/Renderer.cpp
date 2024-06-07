@@ -105,7 +105,7 @@ namespace Ailu
 		if(!_resize_events.empty())
 			DoResize();
 		memset(reinterpret_cast<void*>(&_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
-		for (int i = 0; i < kMaxSpotLightNum; i++)
+		for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
 		{
 			_per_frame_cbuf_data._SpotLights[i]._ShadowDataIndex = -1;
 		}
@@ -220,6 +220,7 @@ namespace Ailu
 		auto& light_comps = p_scene->GetAllLight();
 		uint16_t updated_light_num = 0u;
 		uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0;
+		u16 total_shadow_matrix_count = 1;//阴影绘制和采样时来索引虚拟摄像机的矩阵，对于点光源，其采样不需要该值，只用作标志位确认是否需要处理阴影
 		for (auto light : light_comps)
 		{
 			auto& light_data = light->_light;
@@ -227,28 +228,30 @@ namespace Ailu
 			color.r *= color.a;
 			color.g *= color.a;
 			color.b *= color.a;
+			bool is_exist_directional_shaodw = false;
 			if (light->_light_type == ELightType::kDirectional)
 			{
+				_per_frame_cbuf_data._DirectionalLights[direction_light_index]._ShadowDataIndex = -1;
 				if (!light->Active())
 				{
 					_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightDir = Vector3f::kZero;
 					_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightColor = Colors::kBlack.xyz;
-					_per_frame_cbuf_data._DirectionalLights[direction_light_index++]._ShadowDataIndex = -1;
 					continue;
 				}
-				if (light->CastShadow())
+				if (light->CastShadow() && !is_exist_directional_shaodw)
 				{
 					Camera& selected_cam = Camera::sSelected ? *Camera::sSelected : *Camera::sCurrent;
 					auto shadow_cam = Camera::GetFitShaodwCamera(selected_cam, _shadow_distance);
 					_per_frame_cbuf_data._DirectionalLights[direction_light_index]._ShadowDataIndex = 0;
 					_per_frame_cbuf_data._DirectionalLights[direction_light_index]._ShadowDistance = _shadow_distance;
 					_per_frame_cbuf_data._ShadowMatrix[0] = shadow_cam.GetView() * shadow_cam.GetProjection();
-					_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_index = 0;
-					_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_matrix = _per_frame_cbuf_data._ShadowMatrix[0];
-					++_rendering_data._actived_shadow_count;
+					_rendering_data._shadow_data[0]._shadow_index = 0;
+					_rendering_data._shadow_data[0]._shadow_matrix = _per_frame_cbuf_data._ShadowMatrix[0];
+					is_exist_directional_shaodw = true;
 				}
 				_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightColor = color.xyz;
-				_per_frame_cbuf_data._DirectionalLights[direction_light_index++]._LightDir = light_data._light_dir.xyz;
+				_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightDir = light_data._light_dir.xyz;
+				++direction_light_index;
 			}
 			else if (light->_light_type == ELightType::kPoint)
 			{
@@ -258,6 +261,46 @@ namespace Ailu
 					_per_frame_cbuf_data._PointLights[point_light_index]._LightParam0 = 0.0;
 					_per_frame_cbuf_data._PointLights[point_light_index++]._LightColor = Colors::kBlack.xyz;
 					continue;
+				}
+				if (light->CastShadow())
+				{
+					const static Vector3f targets[] =
+					{
+						{1.f,0,0}, //+x
+						{-1.f,0,0}, //-x
+						{0,1.0f,0}, //+y
+						{0,- 1.f,0}, //-y
+						{0,0,+1.f}, //+z
+						{0,0,-1.f}  //-z
+					};
+					const static Vector3f ups[] =
+					{
+						{0.f,1.f,0.f}, //+x
+						{0.f,1.f,0.f}, //-x
+						{0.f,0.f,-1.f}, //+y
+						{0.f,0.f,1.f}, //-y
+						{0.f,1.f,0.f}, //+z
+						{0.f,1.f,0.f}  //-z
+					};
+
+					u32 shadow_index = total_shadow_matrix_count;
+					_per_frame_cbuf_data._PointLights[point_light_index]._ShadowDataIndex = shadow_index;
+					_per_frame_cbuf_data._PointLights[point_light_index]._ShadowDistance = light_data._light_param.x;
+					_per_frame_cbuf_data._PointLights[point_light_index]._ShadowNear = 10;
+					for (int i = 0; i < 6; i++)
+					{
+						Camera shadow_cam(1.0, 10, light_data._light_param.x);
+						shadow_cam.SetLens(90, 1, 10, light_data._light_param.x);
+						shadow_cam.Position(light_data._light_pos.xyz);
+						shadow_cam.LookTo(targets[i], ups[i]);
+						_per_frame_cbuf_data._ShadowMatrix[shadow_index + i] = shadow_cam.GetView() * shadow_cam.GetProjection();
+						_rendering_data._point_shadow_data[point_light_index]._shadow_indices[i] = shadow_index + i;
+						++total_shadow_matrix_count;
+					}
+					_rendering_data._point_shadow_data[point_light_index]._light_world_pos = light_data._light_pos.xyz;
+					_rendering_data._point_shadow_data[point_light_index]._camera_near = 10;
+					_rendering_data._point_shadow_data[point_light_index]._camera_far = light_data._light_param.x;
+					++_rendering_data._addi_point_shadow_num;
 				}
 				_per_frame_cbuf_data._PointLights[point_light_index]._LightColor = color.xyz;
 				_per_frame_cbuf_data._PointLights[point_light_index]._LightPos = light_data._light_pos.xyz;
@@ -274,7 +317,7 @@ namespace Ailu
 				}
 				if (light->CastShadow())
 				{
-					u32 shadow_index = 1 + spot_light_index; //固定一个为方向光
+					u32 shadow_index = total_shadow_matrix_count++; //固定一个为方向光
 					_per_frame_cbuf_data._SpotLights[spot_light_index]._ShadowDataIndex = shadow_index;
 					_per_frame_cbuf_data._SpotLights[spot_light_index]._ShadowDistance = light_data._light_param.x;
 					Camera shadow_cam(1.0,10, light_data._light_param.x);
@@ -282,9 +325,9 @@ namespace Ailu
 					shadow_cam.Position(light_data._light_pos.xyz);
 					shadow_cam.LookTo(light_data._light_dir.xyz,Vector3f::kUp);
 					_per_frame_cbuf_data._ShadowMatrix[shadow_index] = shadow_cam.GetView() * shadow_cam.GetProjection();
-					_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_index = shadow_index;
-					_rendering_data._shadow_data[_rendering_data._actived_shadow_count]._shadow_matrix = _per_frame_cbuf_data._ShadowMatrix[shadow_index];
-					++_rendering_data._actived_shadow_count;
+					_rendering_data._shadow_data[shadow_index]._shadow_index = shadow_index;
+					_rendering_data._shadow_data[shadow_index]._shadow_matrix = _per_frame_cbuf_data._ShadowMatrix[shadow_index];
+					++_rendering_data._addi_shadow_num;
 				}
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightColor = color.xyz;
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightPos = light_data._light_pos.xyz;

@@ -489,6 +489,7 @@ namespace Ailu
 				auto cbuf = ref_vs->GetConstantBufferByIndex(i);
 				D3D12_SHADER_BUFFER_DESC desc{};
 				cbuf->GetDesc(&desc);
+				u8 flag = ShaderBindResourceInfo::GetBindResourceFlag(desc.Name);
 				for (u32 j = 0u; j < desc.Variables; j++)
 				{
 					auto variable = cbuf->GetVariableByIndex(j);
@@ -506,6 +507,7 @@ namespace Ailu
 					else if (size == 64) value_type = (EBindResDescType)(EBindResDescType::kCBufferMatrix4 | value_type);
 					else {}
 					auto info = ShaderBindResourceInfo{ value_type,variable_info,0u,vdesc.Name };
+					info._bind_flag = flag;
 					_passes[pass_index]._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
 				}
 			}
@@ -536,6 +538,7 @@ namespace Ailu
 				auto cbuf = ref_ps->GetConstantBufferByIndex(i);
 				D3D12_SHADER_BUFFER_DESC desc{};
 				cbuf->GetDesc(&desc);
+				u8 flag = ShaderBindResourceInfo::GetBindResourceFlag(desc.Name);
 				for (u32 j = 0u; j < desc.Variables; j++)
 				{
 					auto variable = cbuf->GetVariableByIndex(j);
@@ -553,6 +556,7 @@ namespace Ailu
 					else if (size == 64) value_type = (EBindResDescType)(EBindResDescType::kCBufferMatrix4 | value_type);
 					else {}
 					auto info = ShaderBindResourceInfo{ value_type,variable_info,0u,vdesc.Name };
+					info._bind_flag = flag;
 					_passes[pass_index]._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
 				}
 			}

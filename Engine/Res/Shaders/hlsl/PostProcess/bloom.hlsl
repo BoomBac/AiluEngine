@@ -67,11 +67,12 @@ PSInput VSMain(VSInput v)
 float4 PSMain(PSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
-	color *= step(1.8,(color.r + color.b + color.g));
+	float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
+	color *= step(1.0, brightness);
 	return color.xyzz;
 }
 #define RADIUS 3
-#define RADIUS_SCALE 16
+#define RADIUS_SCALE 8
 const static float weights[7] = {0.05,0.1,0.15,0.4,0.15,0.1,0.05};
 
 float4 BlurX(PSInput input) : SV_TARGET

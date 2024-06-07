@@ -49,7 +49,7 @@ namespace Ailu
 			bool _b_handle_input;
 			float _camera_move_speed = 0.4f;
 			float _camera_wander_speed = 0.6f;
-			float _lerp_speed_multifactor = 0.1f;
+			float _lerp_speed_multifactor = 15.0f;
 			float _camera_fov_h = 60.0f;
 			float _camera_near = 1.0f;
 			float _camera_far = 10000.0f;

@@ -315,6 +315,18 @@ namespace Ailu
 			_data.Handler(e);
 		}
 		return 0;
+		case WM_ENTERSIZEMOVE:
+		{
+			WindowMovedEvent e(true);
+			_data.Handler(e);
+		}
+		return 0;
+		case WM_EXITSIZEMOVE:
+		{
+			WindowMovedEvent e(false);
+			_data.Handler(e);
+		}
+		return 0;
 		}
 		// Handle any messages the switch statement didn't.
 		return DefWindowProc(hWnd, message, wParam, lParam);

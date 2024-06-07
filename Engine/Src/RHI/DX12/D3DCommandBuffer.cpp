@@ -37,6 +37,7 @@ namespace Ailu
 			_b_cmd_closed = false;
 		}
 		_cur_cbv_heap_id = 65535;
+		_is_custom_viewport = false;
 	}
 	void D3DCommandBuffer::Close()
 	{
@@ -113,6 +114,23 @@ namespace Ailu
 
 	void D3DCommandBuffer::SetViewports(const std::initializer_list<Rect>& viewports)
 	{
+		Vector<Rect> rects{ viewports };
+		SetViewports(rects);
+	}
+	void D3DCommandBuffer::SetViewport(const Rect& viewport)
+	{
+		_is_custom_viewport = true;
+		auto rect = CD3DX12_VIEWPORT(viewport.left, viewport.top, viewport.width, viewport.height);
+		_p_cmd->RSSetViewports(1, &rect);
+	}
+	void D3DCommandBuffer::SetScissorRects(const std::initializer_list<Rect>& rects)
+	{
+		Vector<Rect> rs{ rects };
+		SetScissorRects(rs);
+	}
+	void D3DCommandBuffer::SetViewports(const Vector<Rect>& viewports)
+	{
+		_is_custom_viewport = true;
 		static CD3DX12_VIEWPORT d3d_viewports[8];
 		u8 nums = 0u;
 		for (auto it = viewports.begin(); it != viewports.end(); it++)
@@ -121,13 +139,9 @@ namespace Ailu
 		}
 		_p_cmd->RSSetViewports(nums, d3d_viewports);
 	}
-	void D3DCommandBuffer::SetViewport(const Rect& viewport)
+	void D3DCommandBuffer::SetScissorRects(const Vector<Rect>& rects)
 	{
-		auto rect = CD3DX12_VIEWPORT(viewport.left, viewport.top, viewport.width, viewport.height);
-		_p_cmd->RSSetViewports(1, &rect);
-	}
-	void D3DCommandBuffer::SetScissorRects(const std::initializer_list<Rect>& rects)
-	{
+		_is_custom_viewport = true;
 		static CD3DX12_RECT d3d_rects[8];
 		u8 nums = 0u;
 		for (auto it = rects.begin(); it != rects.end(); it++)
@@ -138,6 +152,7 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::SetScissorRect(const Rect& rect)
 	{
+		_is_custom_viewport = true;
 		auto d3d_rect = CD3DX12_RECT(rect.left, rect.top, rect.width, rect.height);
 		_p_cmd->RSSetScissorRects(1, &d3d_rect);
 	}
@@ -238,6 +253,15 @@ namespace Ailu
 	}
 	void D3DCommandBuffer::SetRenderTargets(Vector<RenderTexture*>& colors, RenderTexture* depth)
 	{
+		if (!_is_custom_viewport)
+		{
+			Vector<Rect> rects(colors.size());
+			for (int i = 0; i < colors.size(); i++)
+				rects[i] = Rect(0, 0, colors[i]->Width(),colors[i]->Height());
+			SetViewports(rects);
+			SetScissorRects(rects);
+			_is_custom_viewport = false;
+		}
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		u16 rt_num = 0;
 		static D3D12_CPU_DESCRIPTOR_HANDLE handles[8];
@@ -258,6 +282,13 @@ namespace Ailu
 
 	void D3DCommandBuffer::SetRenderTarget(RenderTexture* color, u16 index)
 	{
+		if (!_is_custom_viewport)
+		{
+			Rect r(0, 0, color->Width(),color->Height());
+			SetViewport(r);
+			SetScissorRect(r);
+			_is_custom_viewport = false;
+		}
 		auto crt = static_cast<D3DRenderTexture*>(color);
 		g_pGfxContext->TrackResource(color);
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
@@ -268,6 +299,14 @@ namespace Ailu
 
 	void D3DCommandBuffer::SetRenderTarget(RenderTexture* color, RenderTexture* depth, u16 color_index, u16 depth_index)
 	{
+		if (!_is_custom_viewport)
+		{
+			auto rt = color == nullptr ? depth : color;
+			Rect r(0, 0, rt->Width(), rt->Height());
+			SetViewport(r);
+			SetScissorRect(r);
+			_is_custom_viewport = false;
+		}
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		if (color && depth)
 		{
@@ -339,6 +378,14 @@ namespace Ailu
 
 	void D3DCommandBuffer::SetRenderTarget(RenderTexture* color, RenderTexture* depth)
 	{
+		if (!_is_custom_viewport)
+		{
+			auto rt = color == nullptr ? depth : color;
+			Rect r(0, 0, rt->Width(), rt->Height());
+			SetViewport(r);
+			SetScissorRect(r);
+			_is_custom_viewport = false;
+		}
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		if (color && depth)
 		{
@@ -360,6 +407,7 @@ namespace Ailu
 			}
 		}
 	}
+
 	void D3DCommandBuffer::ResolveToBackBuffer(RenderTexture* color)
 	{
 		static const auto& mat = BuildIdentityMatrix();

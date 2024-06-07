@@ -66,6 +66,7 @@ namespace Ailu
 	private:
 	};
 
+	//command must been execute out of prifile scope
 	class ProfileBlock
 	{
 	public:

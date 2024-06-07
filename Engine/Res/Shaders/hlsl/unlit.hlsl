@@ -9,9 +9,9 @@
 //info end
 
 #include "common.hlsli"
-CBufBegin
+PerMaterialCBufferBegin
 	float4 base_color;
-CBufEnd
+PerMaterialCBufferEnd
 
 struct VSInput
 {

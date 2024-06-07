@@ -33,35 +33,37 @@ namespace Ailu
 			blur_y = RenderTexture::GetTempRT(_bloom_thread_rect.width, _bloom_thread_rect.height, "BlurY", ERenderTargetFormat::kDefaultHDR);
 			//提取高亮
 			{
-				cmd->SetViewport(_bloom_thread_rect);
-				cmd->SetScissorRect(_bloom_thread_rect);
 				cmd->SetRenderTarget(rt);
 				_p_bloom_thread_mat->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
 				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get());
 			}
 			//横向模糊
 			{
-				cmd->SetViewport(_bloom_thread_rect);
-				cmd->SetScissorRect(_bloom_thread_rect);
 				cmd->SetRenderTarget(blur_x);
 				_p_bloom_thread_mat->SetTexture("_SourceTex", rt);
 				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get(),1,1);
 			}
 			//纵向模糊
 			{
-				cmd->SetViewport(_bloom_thread_rect);
-				cmd->SetScissorRect(_bloom_thread_rect);
 				cmd->SetRenderTarget(blur_y);
 				_p_bloom_thread_mat->SetTexture("_SourceTex", blur_x);
 				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get(), 1, 2);
 			}
+			RTHandle blur_src, blur_target;
+			for (int i = 0; i < _bloom_iterator_count - 1; i++)
+			{
+				bool apply_x = i % 2 == 0;
+				blur_target = apply_x ? blur_x : blur_y;
+				blur_src = apply_x ? blur_y : blur_x;
+				cmd->SetRenderTarget(blur_target);
+				_p_bloom_thread_mat->SetTexture("_SourceTex", blur_src);
+				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get(), 1, apply_x? 1 : 2);
+			}
 			//合成
 			{
-				cmd->SetViewport(rendering_data._scissor_rect);
-				cmd->SetScissorRect(rendering_data._scissor_rect);
 				cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
 				_p_bloom_thread_mat->SetTexture("_SourceTex", rendering_data._camera_opaque_tex_handle);
-				_p_bloom_thread_mat->SetTexture("_BloomTex", blur_y);
+				_p_bloom_thread_mat->SetTexture("_BloomTex", blur_target);
 				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get(),1,3);
 			}
 		}

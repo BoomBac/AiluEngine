@@ -102,11 +102,16 @@ namespace Ailu
 	{
 		_p_mainlight_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainLightShadowMap", ERenderTargetFormat::kShadowMap);
 		//_p_addlight_shadow_map = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, "AddLightShadowMap", ERenderTargetFormat::kShadowMap);
-		_p_addlight_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, kMaxPointLightNum,"AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
+		_p_addlight_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, RenderConstants::kMaxSpotLightNum,"AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
 		_p_point_light_shadow_map = RenderTexture::Create(kShadowMapSize >> 1,"PointLightShadowMap", ERenderTargetFormat::kShadowMap);
-		_p_shadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
-		_p_shadowcast_material->SetUint("shadow_index",0);
-		_p_addshadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
+//		_p_shadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
+//		_p_shadowcast_material->SetUint("shadow_index",0);
+//		_p_addshadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
+		for (int i = 0; i < 1 + RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxPointLightNum * 6; i++)
+		{
+			_shadowcast_materials.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast"));
+			_shadowcast_materials[i]->SetUint("shadow_index", 0);
+		}
 	}
 
 	void ShadowCastPass::BeginPass(GraphicsContext* context)
@@ -118,43 +123,61 @@ namespace Ailu
 		cmd->Clear();
 		{
 			ProfileBlock profile(cmd.get(), _name);
-			cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get());
-			cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(), 1.0f);
-			cmd->SetScissorRect(_rect);
-			cmd->SetViewport(_rect);
 			u32 obj_index = 0u;
-			_p_shadowcast_material->SetUint("shadow_index", 0);
-			for (auto& obj : RenderQueue::GetOpaqueRenderables())
+			//方向光阴影，只有一个
+			if (rendering_data._shadow_data[0]._shadow_index != -1)
 			{
-				cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
-			}
-			context->ExecuteAndWaitCommandBuffer(cmd);
-			cmd->Clear();
-			cmd->SetName("AddiShadowCast");
-			obj_index = 0;
-			if (rendering_data._actived_shadow_count > 1)
-			{
-				for (int i = 0; i < rendering_data._actived_shadow_count - 1; i++)
+				cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get());
+				//cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(), 1.0f);
+				for (auto& obj : RenderQueue::GetOpaqueRenderables())
 				{
-					
+					cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[0].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+				}
+			}
+			//投灯阴影
+			if (rendering_data._addi_shadow_num > 0)
+			{		
+				for (int i = 0; i < rendering_data._addi_shadow_num; i++)
+				{
 					cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(),0,i);
-					cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), i,1.0f);
-					cmd->SetScissorRect(_addlight_rect);
-					cmd->SetViewport(_addlight_rect);
-					u32 obj_index = 0u;
-					_p_shadowcast_material->SetUint("shadow_index", i + 1);
-					//_p_addshadowcast_material->SetUint("shadow_index", rendering_data._shadow_data[i]._shadow_index);
+					//cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), i,1.0f);
+					_shadowcast_materials[i + 1]->SetUint("shadow_index", rendering_data._shadow_data[i + 1]._shadow_index);
 					for (auto& obj : RenderQueue::GetOpaqueRenderables())
 					{
-						cmd->DrawRenderer(obj.GetMesh(), _p_shadowcast_material.get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+						cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[i + 1].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
 					}
-					context->ExecuteAndWaitCommandBuffer(cmd);
-					cmd->Clear();
+					obj_index = 0;
+				}
+			}
+			//点光阴影
+			if (rendering_data._addi_point_shadow_num > 0)
+			{
+				static const u32 pointshadow_mat_start = 1 + RenderConstants::kMaxSpotLightNum;
+				for (int i = 0; i < rendering_data._addi_point_shadow_num; i++)
+				{
+					for (int j = 0; j < 6; j++)
+					{
+						cmd->SetRenderTarget(nullptr, _p_point_light_shadow_map.get(), 0, j);
+						cmd->ClearRenderTarget(_p_point_light_shadow_map.get(), j, 1.0f);
+						Vector4f light_pos = rendering_data._point_shadow_data[0]._light_world_pos;
+						_shadowcast_materials[pointshadow_mat_start + j]->SetVector("_point_light_wpos", light_pos);
+						light_pos.x = rendering_data._point_shadow_data[0]._camera_near;
+						light_pos.y = rendering_data._point_shadow_data[0]._camera_far;
+						_shadowcast_materials[pointshadow_mat_start + j]->SetVector("_shadow_params", light_pos);
+						_shadowcast_materials[pointshadow_mat_start + j]->SetUint("shadow_index", rendering_data._point_shadow_data[0]._shadow_indices[j]);
+						for (auto& obj : RenderQueue::GetOpaqueRenderables())
+						{
+							cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + j].get(), rendering_data._p_per_object_cbuf[obj_index++], 
+							obj._submesh_index,1,obj._instance_count);
+						}
+						obj_index = 0;
+					}
 				}
 			}
 		}
 		Shader::SetGlobalTexture("MainLightShadowMap", _p_mainlight_shadow_map.get());
 		Shader::SetGlobalTexture("AddLightShadowMaps", _p_addlight_shadow_maps.get());
+		Shader::SetGlobalTexture("PointLightShadowMap", _p_point_light_shadow_map.get());
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}

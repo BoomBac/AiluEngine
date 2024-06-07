@@ -29,6 +29,7 @@ namespace Ailu
 
 	Material::Material(Shader* shader, String name) : _p_shader(shader)
 	{
+		AL_ASSERT(s_total_material_num > RenderConstants::kMaxMaterialDataCount);
 		_name = name;
 		_b_internal = false;
 		Construct(true);
@@ -53,11 +54,12 @@ namespace Ailu
 				break;
 		}
 		_material_id = EMaterialID::kStandard;
+		++s_total_material_num;
 	}
 
 	Material::~Material()
 	{
-
+		--s_total_material_num;
 	}
 	void Material::Bind(u16 pass_index)
 	{
@@ -189,6 +191,18 @@ namespace Ailu
 				return *reinterpret_cast<float*>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
 		}
 		return 0.0f;
+	}
+
+	u32 Material::GetUint(const String& name)
+	{
+		for (auto& pass : _p_shader->_passes)
+		{
+			auto& res_info = pass._bind_res_infos;
+			auto it = res_info.find(name);
+			if (it != res_info.end())
+				return *reinterpret_cast<u32*>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
+		}
+		return -1;
 	}
 
 	Vector4f Material::GetVector(const String& name)
@@ -394,7 +408,7 @@ namespace Ailu
 						_tmp_textures_all_passes[i].insert(std::make_pair(bind_info.second._name, tex_info));
 					}
 				}
-				else if (bind_info.second._res_type & EBindResDescType::kCBufferAttribute && !ShaderBindResourceInfo::s_reversed_res_name.contains(bind_info.first))
+				else if (bind_info.second._res_type & EBindResDescType::kCBufferAttribute && bind_info.second._bind_flag & ShaderBindResourceInfo::kBindFlagPerMaterial)
 				{
 					auto byte_size = ShaderBindResourceInfo::GetVariableSize(bind_info.second);
 					cbuf_size_per_passes[i] += byte_size;
@@ -422,6 +436,7 @@ namespace Ailu
 		{
 			//处理cbuffer
 			cbuf_size_per_passes[i] = ALIGN_TO_256(cbuf_size_per_passes[i]);
+			AL_ASSERT(cbuf_size_per_passes[i] > 256);
 			if (first_time)
 			{
 				_mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];

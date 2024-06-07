@@ -38,10 +38,10 @@ struct PSInput
 	float3 wnormal : NORMAL;
 };
 
-CBufBegin
+PerMaterialCBufferBegin
 	float expo;
 	float4 color;
-CBufEnd
+PerMaterialCBufferEnd
 
 static const float2 inv_atan = {0.1591f,0.3183f};
 float2 SampleSphericalMap(float3 v)

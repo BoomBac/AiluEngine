@@ -284,10 +284,11 @@ namespace Ailu
 			//s_p_d3d_heap = D3DContext::Get()->GetDescriptorHeap();
 			//constbuffer
 			auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-			s_total_size = RenderConstants::kPerFrameTotalSize * RenderConstants::kFrameCount;
+			s_total_size = RenderConstants::kPerFrameTotalSize * RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * 256;
 			s_desc_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 			auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(s_total_size);
 			ThrowIfFailed(device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&s_p_d3d_res)));
+			s_p_d3d_res->SetName(L"GlobalConstBuffer");
 			// Map and initialize the constant buffer. We don't unmap this until the
 			// app closes. Keeping things mapped for the lifetime of the resource is okay.
 			CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
@@ -324,6 +325,8 @@ namespace Ailu
 	}
 	D3DConstantBuffer::~D3DConstantBuffer()
 	{
+		//const buffer 在这之后析构，此时page已经空了
+		//g_pGPUDescriptorAllocator->Free(std::move(_allocation));
 	}
 
 	void D3DConstantBuffer::Bind(CommandBuffer* cmd, u8 bind_slot) const

@@ -1,9 +1,9 @@
 #ifndef __COMMON_CBUFFER__
 #define __COMMON_CBUFFER__
 
-#define kMaxDirectionalLightNum 2
-#define kMaxPointLightNum 4
-#define kMaxSpotLightNum 4
+#define kMaxDirectionalLight 2
+#define kMaxPointLight 4
+#define kMaxSpotLight 4
 
 #ifdef __cplusplus
 #include "Framework/Math/ALMath.hpp"
@@ -34,7 +34,9 @@ namespace Ailu
 		float _LightParam1;
 		int _ShadowDataIndex;
 		float _ShadowDistance;
-		float2 _padding0;
+		float _ShadowNear;
+		float _padding0;
+
 	};
 
 	struct ShaderSpotlLightData
@@ -71,11 +73,11 @@ namespace Ailu
 		float4x4 _MatrixVP;
 		float4x4 _MatrixIVP;
 		float4   _CameraPos;
-		ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLightNum];
-		ShaderDirectionalAndPointLightData _PointLights[kMaxPointLightNum];
-		ShaderSpotlLightData _SpotLights[kMaxSpotLightNum];
-		float4x4 _ShadowMatrix[1 + kMaxSpotLightNum + kMaxPointLightNum];
-		float padding1[36];
+		ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLight];
+		ShaderDirectionalAndPointLightData _PointLights[kMaxPointLight];
+		ShaderSpotlLightData _SpotLights[kMaxSpotLight];
+		float4x4 _ShadowMatrix[1 + kMaxSpotLight + kMaxPointLight * 6];
+		float padding1[100];
 		//float4x4 _JointMatrix[80];
 	};
 
@@ -110,8 +112,8 @@ namespace Ailu
 	static_assert((sizeof(ScenePerMaterialData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 	static_assert((sizeof(ScenePerPassData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 #else
-#define CBufBegin cbuffer ScenePerMaterialData : register(b1) {
-#define CBufEnd }
+#define PerMaterialCBufferBegin cbuffer ScenePerMaterialData : register(b1) {
+#define PerMaterialCBufferEnd }
 #endif //__cplusplus
 
 

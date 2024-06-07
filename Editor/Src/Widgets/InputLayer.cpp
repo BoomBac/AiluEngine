@@ -165,7 +165,7 @@ namespace Ailu
 				ImGui::Begin("CameraDetail");
 				ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 10.0f, "%.2f");
 				ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f, "%.2f");
-				ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.0f, 8.0f, "%.2f");
+				ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.0f, 100.0f, "%.2f");
 				ImGui::SliderFloat("FovH", &_camera_fov_h, 0.0f, 120.0f, "%.2f");
 				ImGui::SliderFloat("NearClip", &_camera_near, 0.00001f, 1000.0f, "%.2f");
 				ImGui::SliderFloat("FarClip", &_camera_far, 5000.0f, 200000.0f, "%.2f");
@@ -187,7 +187,8 @@ namespace Ailu
 			if (!_b_handle_input) return;
 			static bool init = false;
 			static Vector2f pre_mouse_pos;
-			float move_speed = 0.1f;
+			static const f32 move_distance = 100.0f;// 1 m
+			f32 final_move_distance = move_distance * _camera_move_speed * _camera_move_speed;
 			if (!init)
 			{
 				pre_mouse_pos = Input::GetMousePos();
@@ -199,29 +200,29 @@ namespace Ailu
 				Vector3f move_dis{ 0,0,0 };
 				if (Input::IsKeyPressed(AL_KEY_W))
 				{
-					move_dis += Camera::sCurrent->Forward() * _camera_move_speed * _camera_move_speed;
+					move_dis += Camera::sCurrent->Forward();
 				}
 				if (Input::IsKeyPressed(AL_KEY_S))
 				{
-					move_dis -= Camera::sCurrent->Forward() * _camera_move_speed * _camera_move_speed;
+					move_dis -= Camera::sCurrent->Forward();
 				}
 				if (Input::IsKeyPressed(AL_KEY_D))
 				{
-					move_dis += Camera::sCurrent->Right() * _camera_move_speed * _camera_move_speed;
+					move_dis += Camera::sCurrent->Right();
 				}
 				if (Input::IsKeyPressed(AL_KEY_A))
 				{
-					move_dis -= Camera::sCurrent->Right() * _camera_move_speed * _camera_move_speed;
+					move_dis -= Camera::sCurrent->Right();
 				}
 				if (Input::IsKeyPressed(AL_KEY_E))
 				{
-					move_dis += Camera::sCurrent->Up() * _camera_move_speed * _camera_move_speed;
+					move_dis += Camera::sCurrent->Up();
 				}
 				if (Input::IsKeyPressed(AL_KEY_Q))
 				{
-					move_dis -= Camera::sCurrent->Up() * _camera_move_speed * _camera_move_speed;
+					move_dis -= Camera::sCurrent->Up();
 				}
-				target_pos += move_dis;
+				target_pos += move_dis * final_move_distance;
 				static Vector2f target_rotation = { 0.f,0.f };
 				target_rotation = FirstPersonCameraController::s_instance._rotation;
 				auto cur_mouse_pos = Input::GetMousePos();

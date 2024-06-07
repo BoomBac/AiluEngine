@@ -54,10 +54,13 @@ namespace Ailu
         virtual void DrawIndexedInstanced(u32 index_count, u32 instance_count) = 0;
         virtual void DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count) = 0;
         virtual void DrawInstanced(u32 vert_count,u32 instance_count) = 0;
-        virtual void SetViewports(const std::initializer_list<Rect>& viewports) = 0;
-        virtual void SetScissorRects(const std::initializer_list<Rect>& rects) = 0;
+
         virtual void SetViewport(const Rect& viewport) = 0;
         virtual void SetScissorRect(const Rect& rect) = 0;
+        virtual void SetViewports(const std::initializer_list<Rect>& viewports) = 0;
+        virtual void SetScissorRects(const std::initializer_list<Rect>& rects) = 0;
+        virtual void SetViewports(const Vector<Rect>& viewports) = 0;
+        virtual void SetScissorRects(const Vector<Rect>& rects) = 0;
 
         virtual u16 DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count = 1u) = 0;
         virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) = 0;

@@ -47,6 +47,7 @@ namespace Ailu
 		void SetUint(const String& name, const u32& value);
 		void SetVector(const String& name, const Vector4f& vector);
 		float GetFloat(const String& name);
+		u32 GetUint(const String& name);
 		Vector4f GetVector(const String& name);
 		void RemoveTexture(const String& name);
 		void SetTexture(const String& name, Texture* texture);
@@ -66,6 +67,7 @@ namespace Ailu
 	private:
 		void Construct(bool first_time);
 	private:
+		inline static u32 s_total_material_num = 0;
 		u16 _sampler_mask_offset = 0u;
 		u16 _material_id_offset = 0u;
 		//标准pass才会使用上面两个变量

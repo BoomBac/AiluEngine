@@ -81,12 +81,23 @@ namespace Ailu
 		SetThreadDescription(GetCurrentThread(), L"ALEngineMainThread");
 		g_pLogMgr->Log("Application Init end");
 		_state = EApplicationState::EApplicationState_Running;
+		_render_lag = s_target_lag;
+		_update_lag = s_target_lag;
+		_is_handling_event.store(true);
+		//_p_event_handle_thread = new std::thread([this]() {
+		//	while (_is_handling_event)
+		//	{
+		//		_p_window->OnUpdate();
+		//	}
+		//});
+		//_p_event_handle_thread->detach();
 		return 0;
 	}
 
 	void Application::Finalize()
 	{
 		DESTORY_PTR(_layer_stack);
+		//DESTORY_PTR(_p_event_handle_thread);
 		DESTORY_PTR(_p_window);
 		g_pSceneMgr->Finalize();
 		g_pResourceMgr->Finalize();
@@ -103,6 +114,7 @@ namespace Ailu
 
 	void Application::Tick(const float& delta_time)
 	{
+		g_pTimeMgr->Mark();
 		while (_state != EApplicationState::EApplicationState_Exit)
 		{
 			if (_state == EApplicationState::EApplicationState_Pause)
@@ -112,16 +124,25 @@ namespace Ailu
 			}
 			else
 			{
+				_p_window->OnUpdate();
+				//处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
+				//这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
+				if (_state == EApplicationState::EApplicationState_Pause)
+					continue;
 				g_pTimeMgr->Tick(0.0f);
 				auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
 				_render_lag += last_mark;
 				_update_lag += last_mark;
+				AL_ASSERT(_update_lag > 1000);
 				g_pTimeMgr->Mark();
-				_p_window->OnUpdate();
-				for (Layer* layer : *_layer_stack)
-					layer->OnUpdate(ModuleTimeStatics::RenderDeltatime * 0.001f);
-				g_pResourceMgr->Tick(delta_time);
-				while (_render_lag > s_target_lag)
+				if (_update_lag >= s_target_lag)
+				{
+					g_pResourceMgr->Tick(delta_time);
+					for (Layer* layer : *_layer_stack)
+						layer->OnUpdate(_update_lag * 0.001f);
+					_update_lag -= s_target_lag;
+				}
+				if (_render_lag >= s_target_lag)
 				{
 					s_frame_count++;
 					g_pSceneMgr->Tick(delta_time);
@@ -155,6 +176,7 @@ namespace Ailu
 	bool Application::OnWindowClose(WindowCloseEvent& e)
 	{
 		_state = EApplicationState::EApplicationState_Exit;
+		_is_handling_event.store(false);
 		return false;
 	}
 	bool Application::OnLostFoucus(WindowLostFocusEvent& e)
@@ -185,6 +207,18 @@ namespace Ailu
 		g_pLogMgr->LogFormat("Window resize: {}x{}", e.GetWidth(), e.GetHeight());
 		return false;
 	}
+	bool Application::OnWindowMove(WindowMovedEvent& e)
+	{
+		if (e.IsBegin())
+		{
+			g_pTimeMgr->Pause();
+		}
+		else
+		{
+			g_pTimeMgr->Resume();
+		}
+		return true;
+	}
 	bool Application::OnDragFile(DragFileEvent& e)
 	{
 		auto& draged_files = e.GetDragedFilesPath();
@@ -204,6 +238,7 @@ namespace Ailu
 		dispather.Dispatch<DragFileEvent>(BIND_EVENT_HANDLER(OnDragFile));
 		dispather.Dispatch<WindowMinimizeEvent>(BIND_EVENT_HANDLER(OnWindowMinimize));
 		dispather.Dispatch<WindowResizeEvent>(BIND_EVENT_HANDLER(OnWindowResize));
+		dispather.Dispatch<WindowMovedEvent>(BIND_EVENT_HANDLER(OnWindowMove));
 		//		dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseBtnClicked));
 				//static bool b_handle_input = true;
 				//if (e.GetEventType() == EEventType::kWindowLostFocus) b_handle_input = false;

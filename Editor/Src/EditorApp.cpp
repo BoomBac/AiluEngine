@@ -115,7 +115,7 @@ namespace Ailu
 			ss << "Aspect = " << Camera::sCurrent->Aspect() << endl;
 			ss << "Near = " << Camera::sCurrent->Near() << endl;
 			ss << "Far = " << Camera::sCurrent->Far() << endl;
-			ss << "ControllerRotation = " << FirstPersonCameraController::s_instance._rotation;
+			ss << "ControllerRotation = " << FirstPersonCameraController::s_instance._rotation << endl;
 			ss << "[Scene]" << endl;
 			ss << "Scene = " << ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->_p_current));
 			FileManager::WriteFile(kEditorConfigPath,false,ss.str());

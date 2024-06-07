@@ -34,6 +34,30 @@ namespace Ailu
 
 	struct ShaderBindResourceInfo
 	{
+		inline static const u8 kBindFlagPerObject   = 0x01;
+		inline static const u8 kBindFlagPerMaterial = 0x02;
+		inline static const u8 kBindFlagPerPass     = 0x04;
+		inline static const u8 kBindFlagPerFrame    = 0x08;
+		static u8 GetBindResourceFlag(const char* name)
+		{
+			const static String kPerObj = "ScenePerObjectData";
+			const static String kPerMat = "ScenePerMaterialData";
+			const static String kPerPass = "ScenePerPassData";
+			const static String kPerFrame = "ScenePerFrameData";
+			String name_str(name);
+			if (name_str == kPerObj)
+				return kBindFlagPerObject;
+			else if (name_str == kPerMat)
+				return kBindFlagPerMaterial;
+			else if (name_str == kPerPass)
+				return kBindFlagPerPass;
+			else if (name_str == kPerFrame)
+				return kBindFlagPerFrame;
+			else
+			{
+				AL_ASSERT(true);
+			}
+		}
 		inline const static std::set<String> s_reversed_res_name
 		{
 			"SceneObjectBuffer",
@@ -48,19 +72,11 @@ namespace Ailu
 			"_PointLights",
 			"_SpotLights",
 			"padding",
-			"padding0"
+			"padding0",
+			"padding1"
 		};
 		inline static u16 GetVariableSize(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset & 0XFFFF;}
 		inline static u16 GetVariableOffset(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset >> 16;}
-		EBindResDescType _res_type;
-		union
-		{
-			u32 _res_slot;
-			u32 _cbuf_member_offset;
-		};
-		u8 _bind_slot;
-		String _name;
-		void* _p_res = nullptr;
 		ShaderBindResourceInfo() = default;
 		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, u8 bind_slot, const String& name)
 			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
@@ -73,6 +89,17 @@ namespace Ailu
 		{
 			return _name == other._name;
 		}
+		EBindResDescType _res_type;
+		union
+		{
+			u32 _res_slot;
+			u32 _cbuf_member_offset;
+		};
+		u8 _bind_slot;
+		String _name;
+		void* _p_res = nullptr;
+		//1 for per obj,2for per mat,4 for per pass,8 for per frame
+		u8 _bind_flag = 0u;
 	};
 
 	// Hash function for ShaderBindResourceInfo

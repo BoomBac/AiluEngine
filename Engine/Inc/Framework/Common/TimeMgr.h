@@ -40,8 +40,9 @@ namespace Ailu
 		ALTimeStamp _init_stamp;
 		ALTimeStamp _pause_stamp;
 		std::stack<ALTimeStamp> _mark_stamps{};
-		float _total_time = 0.0f;
-		float _pause_time = 0.0f;
+		f32 _total_time = 0.0f;
+		f32 _total_pause_time = 0.0f;
+		f32 _last_pause_time = 0.0f;
 		bool _b_stop = false;
 	};
 	extern TimeMgr* g_pTimeMgr;

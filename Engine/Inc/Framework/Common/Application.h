@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __APPLICATION_H__
 #define __APPLICATION_H__
+#include <thread>
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/Window.h"
 #include "Framework/Events/Event.h"
@@ -55,12 +56,15 @@ namespace Ailu
         virtual bool OnLostFoucus(WindowLostFocusEvent& e);
         virtual bool OnWindowMinimize(WindowMinimizeEvent& e);
         virtual bool OnWindowResize(WindowResizeEvent& e);
+        virtual bool OnWindowMove(WindowMovedEvent& e);
         virtual bool OnDragFile(DragFileEvent& e);
         virtual void OnEvent(Event& e);
     protected:
         LayerStack* _layer_stack;
         ImGUILayer* _p_imgui_layer;
         Window* _p_window = nullptr;
+        std::atomic<bool> _is_handling_event;
+        std::thread* _p_event_handle_thread;
         EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None; 
         inline static Application* sp_instance = nullptr;
         double _render_lag = 0.0;

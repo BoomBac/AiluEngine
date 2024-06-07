@@ -36,12 +36,22 @@ namespace Ailu
         i16        _shadow_index = -1;
         float _shadow_bias = 0.001f;
     };
+    struct RenderingPointShadowData
+    {
+        i16   _shadow_indices[6];
+        float _shadow_bias = 0.001f;
+        Vector3f _light_world_pos;
+        float _camera_near, _camera_far;
+    };
+
     class CommandBuffer;
     struct RenderingData
     {
     public:
-        RenderingShadowData _shadow_data[8];
-        u8 _actived_shadow_count = 0;
+        //index 0 for directional shadow
+        RenderingShadowData _shadow_data[1 + RenderConstants::kMaxSpotLightNum];
+        RenderingPointShadowData _point_shadow_data[RenderConstants::kMaxPointLightNum];
+        u8 _addi_shadow_num = 0,_addi_point_shadow_num = 0;
         ConstantBuffer* _p_per_frame_cbuf;
         ConstantBuffer** _p_per_object_cbuf;
         RTHandle _camera_color_target_handle;
@@ -54,7 +64,8 @@ namespace Ailu
         CommandBuffer* cmd;
         void Reset()
         {
-            _actived_shadow_count = 0;
+            _addi_shadow_num = 0;
+            _addi_point_shadow_num = 0;
         }
     };
 }

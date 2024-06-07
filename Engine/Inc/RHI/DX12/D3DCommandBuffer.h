@@ -48,10 +48,14 @@ namespace Ailu
         void DrawIndexedInstanced(u32 index_count, u32 instance_count) final;
         void DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count) final;
         void DrawInstanced(u32 vert_count, u32 instance_count) final;
-        void SetViewports(const std::initializer_list<Rect>& viewports) final;
-        void SetScissorRects(const std::initializer_list<Rect>& rects) final;
+
         void SetViewport(const Rect& viewport) final;
         void SetScissorRect(const Rect& rect) final;
+        void SetViewports(const std::initializer_list<Rect>& viewports) final;
+        void SetScissorRects(const std::initializer_list<Rect>& rects) final;
+        void SetViewports(const Vector<Rect>& viewports) final;
+        void SetScissorRects(const Vector<Rect>& rects) final;
+
         u16 DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
@@ -72,6 +76,7 @@ namespace Ailu
         u32 _id = 0u;
         bool _b_cmd_closed;
         u16 _cur_cbv_heap_id = 65535u;
+        bool _is_custom_viewport = false;
         ComPtr<ID3D12GraphicsCommandList> _p_cmd;
         ComPtr<ID3D12CommandAllocator> _p_alloc;
     };

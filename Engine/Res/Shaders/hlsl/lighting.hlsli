@@ -99,6 +99,12 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_dir = light_dir;
 		light_data.light_color = _PointLights[j]._LightColor;
 		light_data.light_pos = _PointLights[j]._LightPosOrDir;
+		if(_PointLights[i]._ShadowDataIndex != -1)
+		{
+			shadow_factor = ApplyShadowPointLight(_PointLights[0]._ShadowNear,_PointLights[0]._ShadowDistance,shading_data.nl,
+				world_pos,light_data.light_pos,_PointLights[i]._ShadowDataIndex);
+		}
+		light_data.shadow_atten = shadow_factor;
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
 	}
 	for (uint k = 0; k < MAX_SPOT_LIGHT; k++)

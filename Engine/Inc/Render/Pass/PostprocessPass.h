@@ -21,6 +21,7 @@ namespace Ailu
 		Mesh* _p_quad_mesh;
 		ConstantBuffer* _p_obj_cb;
 		Rect _bloom_thread_rect;
+		u16 _bloom_iterator_count = 3;
 	};
 }
 

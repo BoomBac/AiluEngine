@@ -29,7 +29,7 @@
 
 
 
-CBufBegin
+PerMaterialCBufferBegin
 	float4 BaseColor; //0
 	float4 EmssiveColor; //16
 	float4 SpecularColor; //32
@@ -37,7 +37,7 @@ CBufBegin
 	float MetallicValue; //40
 	uint SamplerMask; //44
 	uint MaterialID;
-CBufEnd
+PerMaterialCBufferEnd
 
 
 void InitSurfaceData(PSInput input,out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out float3 emssive,out float3 specular)

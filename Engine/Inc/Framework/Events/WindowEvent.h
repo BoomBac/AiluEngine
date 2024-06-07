@@ -63,13 +63,16 @@ namespace Ailu
 	class AILU_API WindowMovedEvent : public Event
 	{
 	public:
-		WindowMovedEvent() {};
+		WindowMovedEvent(bool begin):_is_begin(begin) {};
 		std::string ToString() const override
 		{
-			return "WindowMovedEvent";
+			return _is_begin? "BeginWindowMovedEvent" : "EndWindowMovedEvent";
 		}
+		bool IsBegin() const { return _is_begin; }
 		EVENT_CLASS_TYPE(kWindowMoved)
 		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
+	private:
+		bool _is_begin;
 	};
 
 	class AILU_API DragFileEvent : public Event
