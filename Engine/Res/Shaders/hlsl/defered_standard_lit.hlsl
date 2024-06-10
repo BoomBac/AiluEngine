@@ -3,7 +3,7 @@
 //name: defered_standard_lit
 //vert: GBufferVSMain
 //pixel: GBufferPSMain
-//Cull: Back
+//Cull: Off
 //Queue: Opaque
 //Blend: Src,OneMinusSrc
 //pass end::

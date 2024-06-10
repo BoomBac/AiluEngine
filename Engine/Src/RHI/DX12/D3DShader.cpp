@@ -216,6 +216,7 @@ namespace Ailu
 				*pBytes = byte_size;
 				return S_OK;
 			}
+			//AL_ASSERT(true);
 		}
 		return E_FAIL;
 	}

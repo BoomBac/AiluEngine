@@ -88,7 +88,7 @@ namespace Ailu
 		_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
 	}
 
-	TextureHandle D3DTexture2D::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face)
+	TextureHandle D3DTexture2D::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
 	{
 		if (mipmap > _mipmap_count + 1)
 			return 0;
@@ -208,7 +208,7 @@ namespace Ailu
 		_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
 	}
 
-	TextureHandle D3DCubeMap::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face)
+	TextureHandle D3DCubeMap::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
 	{
 		if (mipmap > _mipmap_count + 1)
 			return 0;
@@ -275,6 +275,13 @@ namespace Ailu
 			main_view_dimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 			texture_num = _slice_num;
 		}
+		else if (_dimension == ETextureDimension::kCubeArray)
+		{
+			main_view_dimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+			texture_num = _slice_num * 6;
+			_mipmap_count = 0;
+			g_pLogMgr->LogWarningFormat("Cubemap array not support multi mipmap");
+		}
 		else {}
 		auto mipmap_level = _mipmap_count + 1;
 		bool is_for_depth = _depth > 0;
@@ -336,6 +343,17 @@ namespace Ailu
 			_srv_desc.TextureCube.MipLevels = mipmap_level;
 			_srv_desc.TextureCube.MostDetailedMip = 0;
 		}
+		else if (_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY)
+		{
+			_srv_desc.TextureCubeArray.MipLevels = mipmap_level;
+			_srv_desc.TextureCubeArray.First2DArrayFace = 0;
+			_srv_desc.TextureCubeArray.MostDetailedMip = 0;
+			_srv_desc.TextureCubeArray.NumCubes = _slice_num;
+		}
+		else
+		{
+			AL_ASSERT(true);
+		}
 
 
 		_gpu_allocation = g_pGPUDescriptorAllocator->Allocate(1);
@@ -357,7 +375,7 @@ namespace Ailu
 				rtv_desc.Format = tex_desc.Format;
 				rtv_desc.Texture2D.MipSlice = 0;
 				rtv_desc.Texture2D.PlaneSlice = 0;
-				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBE)
+				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBE || main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY)
 				{
 					rtv_desc.Texture2DArray.FirstArraySlice = i;
 					rtv_desc.Texture2DArray.ArraySize = 1;
@@ -372,7 +390,7 @@ namespace Ailu
 				dsv_desc.ViewDimension = texture_num > 1 ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY : D3D12_DSV_DIMENSION_TEXTURE2D;
 				dsv_desc.Format = tex_desc.Format;
 				dsv_desc.Texture2D.MipSlice = 0;
-				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY ||main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBE)
+				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY ||main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY)
 				{
 					dsv_desc.Texture2DArray.FirstArraySlice = i;
 					dsv_desc.Texture2DArray.ArraySize = 1;
@@ -624,7 +642,7 @@ namespace Ailu
 		return _main_srv_gpu_handle.ptr;
 	}
 
-	TextureHandle D3DRenderTexture::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face)
+	TextureHandle D3DRenderTexture::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
 	{
 		if (mipmap > _mipmap_count)
 			return 0;

@@ -11,6 +11,10 @@ namespace Ailu
 		~RenderView();
 		void Open(const i32& handle) final;
 		void Close(i32 handle) final;
+		Vector2f GetViewportSize() const 
+		{
+			return Vector2f(_pre_tick_width, _pre_tick_height);
+		}
 	private:
 		void ShowImpl() final;
 		f32 _pre_tick_width, _pre_tick_height;

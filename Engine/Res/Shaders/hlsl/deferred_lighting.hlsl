@@ -50,7 +50,7 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 	float2 gbuf0 = _GBuffer0.Sample(g_LinearWrapSampler,input.uv).xy;
 	float4 gbuf1 = _GBuffer1.Sample(g_LinearWrapSampler,input.uv);
 	float4 gbuf2 = _GBuffer2.Sample(g_LinearWrapSampler,input.uv);
-
+  
 	float depth = _CameraDepthTexture.Sample(g_LinearWrapSampler,input.uv);
 	input.uv.y = 1.0 - input.uv.y;
 	float3 world_pos = Unproject(input.uv,depth);
@@ -63,7 +63,7 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 	surface_data.emssive = float3(0.f,0.f,0.f), 
 	surface_data.specular = gbuf2.rgb;
 	uint material_id = (uint)gbuf2.r;
-	if(material_id == 0)
+	if(material_id == 0) 
 	{
 		float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
 		light += surface_data.emssive;

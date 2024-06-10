@@ -31,7 +31,7 @@ namespace Ailu
 		}
 
 		_camera_depth_handle = RenderTexture::GetTempRT(_width, _height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
-		_rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorAttachment", ERenderTargetFormat::kDefaultHDR);
+		_rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorOpaqueTex", ERenderTargetFormat::kDefaultHDR);
 
 		_p_opaque_pass = MakeScope<OpaquePass>();
 		_p_reslove_pass = MakeScope<ResolvePass>();
@@ -105,9 +105,16 @@ namespace Ailu
 		if(!_resize_events.empty())
 			DoResize();
 		memset(reinterpret_cast<void*>(&_per_frame_cbuf_data), 0, sizeof(ScenePerFrameData));
+		_rendering_data._shadow_data[0]._shadow_index = -1;
 		for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
 		{
 			_per_frame_cbuf_data._SpotLights[i]._ShadowDataIndex = -1;
+			_rendering_data._shadow_data[i + 1]._shadow_index = -1;
+		}
+		for (int i = 0; i < RenderConstants::kMaxPointLightNum; i++)
+		{
+			_per_frame_cbuf_data._PointLights[i]._ShadowDataIndex = -1;
+			_rendering_data._point_shadow_data[i]._camera_far = 0; //标记不投影
 		}
 		PrepareCamera(_p_scene_camera);
 		PrepareLight(g_pSceneMgr->_p_current);
@@ -284,13 +291,13 @@ namespace Ailu
 					};
 
 					u32 shadow_index = total_shadow_matrix_count;
-					_per_frame_cbuf_data._PointLights[point_light_index]._ShadowDataIndex = shadow_index;
-					_per_frame_cbuf_data._PointLights[point_light_index]._ShadowDistance = light_data._light_param.x;
+					_per_frame_cbuf_data._PointLights[point_light_index]._ShadowDataIndex = _rendering_data._addi_point_shadow_num;//点光源使用这个值来索引cubearray
+					_per_frame_cbuf_data._PointLights[point_light_index]._ShadowDistance = _shadow_distance; //light_data._light_param.x;
 					_per_frame_cbuf_data._PointLights[point_light_index]._ShadowNear = 10;
 					for (int i = 0; i < 6; i++)
 					{
-						Camera shadow_cam(1.0, 10, light_data._light_param.x);
-						shadow_cam.SetLens(90, 1, 10, light_data._light_param.x);
+						Camera shadow_cam(1.0, 10, _shadow_distance);
+						shadow_cam.SetLens(90, 1, 10, _shadow_distance);
 						shadow_cam.Position(light_data._light_pos.xyz);
 						shadow_cam.LookTo(targets[i], ups[i]);
 						_per_frame_cbuf_data._ShadowMatrix[shadow_index + i] = shadow_cam.GetView() * shadow_cam.GetProjection();
@@ -299,7 +306,7 @@ namespace Ailu
 					}
 					_rendering_data._point_shadow_data[point_light_index]._light_world_pos = light_data._light_pos.xyz;
 					_rendering_data._point_shadow_data[point_light_index]._camera_near = 10;
-					_rendering_data._point_shadow_data[point_light_index]._camera_far = light_data._light_param.x;
+					_rendering_data._point_shadow_data[point_light_index]._camera_far = _shadow_distance;
 					++_rendering_data._addi_point_shadow_num;
 				}
 				_per_frame_cbuf_data._PointLights[point_light_index]._LightColor = color.xyz;
@@ -319,14 +326,14 @@ namespace Ailu
 				{
 					u32 shadow_index = total_shadow_matrix_count++; //固定一个为方向光
 					_per_frame_cbuf_data._SpotLights[spot_light_index]._ShadowDataIndex = shadow_index;
-					_per_frame_cbuf_data._SpotLights[spot_light_index]._ShadowDistance = light_data._light_param.x;
+					_per_frame_cbuf_data._SpotLights[spot_light_index]._ShadowDistance = _shadow_distance; //light_data._light_param.x;
 					Camera shadow_cam(1.0,10, light_data._light_param.x);
 					shadow_cam.SetLens(90, 1, 10, light_data._light_param.x);
 					shadow_cam.Position(light_data._light_pos.xyz);
 					shadow_cam.LookTo(light_data._light_dir.xyz,Vector3f::kUp);
 					_per_frame_cbuf_data._ShadowMatrix[shadow_index] = shadow_cam.GetView() * shadow_cam.GetProjection();
 					_rendering_data._shadow_data[shadow_index]._shadow_index = shadow_index;
-					_rendering_data._shadow_data[shadow_index]._shadow_matrix = _per_frame_cbuf_data._ShadowMatrix[shadow_index];
+					//_rendering_data._shadow_data[shadow_index]._shadow_matrix = _per_frame_cbuf_data._ShadowMatrix[shadow_index];
 					++_rendering_data._addi_shadow_num;
 				}
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightColor = color.xyz;
@@ -337,7 +344,7 @@ namespace Ailu
 				float outer_cos = cos(light_data._light_param.z / 2 * k2Radius);
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightAngleScale = 1.0f / std::max(0.001f,(inner_cos - outer_cos));
 				_per_frame_cbuf_data._SpotLights[spot_light_index]._LightAngleOffset = -outer_cos * _per_frame_cbuf_data._SpotLights[spot_light_index]._LightAngleScale;
-
+				++spot_light_index;
 				//_per_frame_cbuf_data._SpotLights[spot_light_index]._InnerAngle = light_data._light_param.y;
 				//_per_frame_cbuf_data._SpotLights[spot_light_index]._OuterAngle = light_data._light_param.z;
 			}
@@ -383,7 +390,7 @@ namespace Ailu
 			_gameview_rt_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorFinalAttachment", ERenderTargetFormat::kDefaultHDR);
 		}
 		_camera_depth_handle = RenderTexture::GetTempRT(_width, _height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
-		_rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorAttachment", ERenderTargetFormat::kDefaultHDR);
+		_rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorOpaqueTex", ERenderTargetFormat::kDefaultHDR);
 		_p_scene_camera->Aspect(new_size.x / new_size.y);
 		g_pLogMgr->LogFormat("Resize game view to {},{}",_width,_height);
 	}

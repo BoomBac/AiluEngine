@@ -119,7 +119,7 @@ namespace Ailu
 				if (e.GetButton() == 0)
 				{
 					while (::ShowCursor(TRUE) < 0);
-					return true;
+					return false;
 				}
 				return false;
 				});
@@ -127,16 +127,16 @@ namespace Ailu
 			dispater.Dispatch<MouseScrollEvent>([this](MouseScrollEvent& e)->bool {
 				_camera_move_speed += e.GetOffsetY() > 0 ? 0.01f : -0.01f;
 				_camera_move_speed = std::ranges::max(0.0f, _camera_move_speed);
-				return true;
+				return false;
 				});
 			EventDispather dispater0(e);
 			dispater0.Dispatch <MouseButtonPressedEvent>([this](MouseButtonPressedEvent& e)->bool {
 				if (e.GetButton() == AL_KEY_RBUTTON)
 				{
 					while (::ShowCursor(FALSE) >= 0); // 隐藏鼠标指针，直到它不再可见
-					return true;
+					return false;
 				}
-				return true;
+				return false;
 				});
 			//dispater0.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e)->bool {
 			//	if (!e.Handled())

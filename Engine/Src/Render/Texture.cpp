@@ -312,6 +312,29 @@ namespace Ailu
 		return nullptr;
 	}
 
+	Scope<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat::ERenderTargetFormat format, u16 array_slice, bool linear, bool random_access)
+	{
+		switch (Renderer::GetAPI())
+		{
+		case RendererAPI::ERenderAPI::kNone:
+			AL_ASSERT_MSG(false, "None render api used!");
+			return nullptr;
+		case RendererAPI::ERenderAPI::kDirectX12:
+		{
+			RenderTextureDesc desc(width, width, format);
+			desc._slice_num = array_slice;
+			desc._dimension = ETextureDimension::kCubeArray;
+			desc._mipmap_count = 0;
+			desc._random_access = random_access;
+			auto rt = MakeScope<D3DRenderTexture>(desc);
+			rt->Name(name);
+			return rt;
+		}
+		}
+		AL_ASSERT_MSG(false, "Unsupport render api!");
+		return nullptr;
+	}
+
 	RTHandle RenderTexture::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
 	{
 		RTHash rt_hash;

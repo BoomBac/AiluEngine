@@ -41,6 +41,19 @@ namespace Ailu
 			SaveEditorConfig();
 			delete _p_scene_camera;
 			Application::Finalize();
+			fs::path p(kEditorRootPathW);
+			fs::directory_iterator dir_it(p);
+
+			List<WString> deleted_wpix_files;
+			for (auto it : dir_it)
+			{
+				if (su::EndWith(it.path().string(), ".wpix"))
+				{
+					deleted_wpix_files.emplace_back(it.path().wstring());
+				}
+			}
+			for (auto& dp : deleted_wpix_files)
+				FileManager::DeleteDirectory(dp);
 		}
 		void EditorApp::Tick(const float& delta_time)
 		{

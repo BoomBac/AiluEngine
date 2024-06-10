@@ -160,7 +160,7 @@ namespace Ailu
 		virtual TextureHandle GetNativeTextureHandle() { return 0; }
 		virtual void CreateView() { _is_have_total_view = true; };
 		virtual void ReleaseView() { _is_have_total_view = false; };
-		virtual TextureHandle GetView(u16 mimmap,bool random_access = false,ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) { return 0; };
+		virtual TextureHandle GetView(u16 mimmap,bool random_access = false,ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown,u16 array_slice = 0) { return 0; };
 		//slot传255的话，表示只设置一下描述符堆
 		virtual void Bind(CommandBuffer* cmd, u8 slot) {};
 		virtual void BindToCompute(CommandBuffer* cmd, u8 slot) {};
@@ -187,7 +187,7 @@ namespace Ailu
 		Texture2D(u16 width, u16 height, bool mipmap_chain = true,ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32,bool linear = false, bool random_access = false);
 		virtual ~Texture2D();
 		virtual void Apply() {};
-		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
+		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		Color32 GetPixel32(u16 x, u16 y);
 		Color GetPixel(u16 x, u16 y);
@@ -216,7 +216,7 @@ namespace Ailu
 		CubeMap(u16 width,bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
 		virtual ~CubeMap();
 		virtual void Apply() {};
-		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
+		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		Color32 GetPixel32(ECubemapFace::ECubemapFace face,u16 x, u16 y);
 		Color GetPixel(ECubemapFace::ECubemapFace face,u16 x, u16 y);
@@ -310,10 +310,12 @@ namespace Ailu
 		~RenderTexture();
 		//virtual TextureHandle GetView(ECubemapFace::ECubemapFace face, u16 mimmap) { return 0; };
 		//当mipmap为0时，访问srv时，返回原图分辨率，也就是mip0，当访问uav时，实际访问的是mipmap1的uav（cubemap）
-		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) override { return 0; };
+		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
 		static Scope<RenderTexture> Create(u16 width, u16 height, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
 		static Scope<RenderTexture> Create(u16 width, u16 height, u16 array_slice, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
 		static Scope<RenderTexture> Create(u16 width,String name = "",ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
+		//cubemap array not support mipmap
+		static Scope<RenderTexture> Create(u16 width,String name = "",ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, u16 array_slice = 1, bool linear = false, bool random_access = false);
 		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
 		virtual void BindToCompute(CommandBuffer* cmd, u8 slot) override {};
 		//return rtv handle

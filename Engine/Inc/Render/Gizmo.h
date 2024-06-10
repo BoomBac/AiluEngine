@@ -8,7 +8,7 @@
 
 namespace Ailu
 {
-    class Gizmo
+    class AILU_API Gizmo
     {
     private: 
         enum class EGeometryType {kLine, kCircle, kAABB, kOBB, kSphere};

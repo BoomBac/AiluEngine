@@ -9,7 +9,7 @@ namespace Ailu
 {
 	RenderView::RenderView() : ImGuiWidget("RenderView")
 	{
-		_is_hide_common_widget_info = true;
+		_is_hide_common_widget_info = false;
 		_allow_close = false;
 	}
 	RenderView::~RenderView()

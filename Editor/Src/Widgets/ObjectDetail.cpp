@@ -324,7 +324,8 @@ namespace Ailu
 				}
 				bool b_cast_shadow = light->CastShadow();
 				ImGui::Checkbox("CastShadow", &b_cast_shadow);
-				light->CastShadow(b_cast_shadow);
+				if(b_cast_shadow != light->CastShadow())
+					light->CastShadow(b_cast_shadow);
 				if (b_cast_shadow)
 				{
 					auto& shadow_data = light->_shadow;
@@ -589,6 +590,10 @@ namespace Ailu
 				ImGui::PushID(comp_index);
 				bool b_active = comp->Active();
 				ImGui::Checkbox("", &b_active);
+				if (b_active != comp->Active())
+				{
+					g_pSceneMgr->MarkCurSceneDirty();
+				}
 				ImGui::PopID();
 				comp->Active(b_active);
 				ImGui::SameLine();

@@ -5,7 +5,8 @@
 Texture2D MainLightShadowMap : register(t10);
 //Texture2D AddLightShadowMap : register(t11);
 Texture2DArray AddLightShadowMaps : register(t11);
-TextureCube PointLightShadowMap : register(t12);
+//TextureCube PointLightShadowMap : register(t12);
+TextureCubeArray PointLightShadowMaps : register(t12);
 
 float Random(float4 seed4)
 {
@@ -71,7 +72,7 @@ float ShadowDistaanceAtten(float dis, float max_dis)
 		if(dis > shadow_distance)
 			return 1.0;	
 		float z_bias = 0.0025 * tan(acos(nl));
-		z_bias = clamp(z_bias, 0, 0.0005);
+		z_bias = clamp(z_bias, 0, 0.005);
 		shadow_coord.xyz /= shadow_coord.w;
 		float depth = saturate(shadow_coord.z);
 		float2 shadow_uv;
@@ -94,7 +95,7 @@ float ShadowDistaanceAtten(float dis, float max_dis)
 		if(dis > shadow_far)
 			return 1.0;	
 		float z_bias = 0.0025 * tan(acos(nl));
-		z_bias = clamp(z_bias, 0, 0.0005);
+		z_bias = clamp(z_bias, 0, 0.5);
 		float3 shaodw_dir = world_pos - light_pos;
 		float linear_z = (dis - shadow_near) / (shadow_far - shadow_near);
 		// float2 shadow_uv;
@@ -105,10 +106,11 @@ float ShadowDistaanceAtten(float dis, float max_dis)
 		{
 			uint random_index = uint(16.0 * Random(float4(world_pos.xyy, i))) % 16;
 			//uint random_index = i;
-			shadow_factor += lerp(0.0, 1.0, PointLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
-				shaodw_dir, linear_z).r);
+			// shadow_factor += lerp(0.0, 1.0, PointLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
+			// 	shaodw_dir, linear_z).r);
+			shadow_factor += PointLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float4(shaodw_dir,(float)shadow_index),linear_z - z_bias);
 		}
-		shadow_factor =  (1.0 - shadow_factor) * ShadowDistaanceAtten(dis,shadow_far);
-		return 1.0 - shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
+		//shadow_factor =  (1.0 - shadow_factor) * ShadowDistaanceAtten(dis,shadow_far);
+		return shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
 	}
 #endif

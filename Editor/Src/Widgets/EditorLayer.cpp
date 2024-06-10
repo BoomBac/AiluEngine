@@ -19,6 +19,12 @@
 #include "RHI/DX12/D3DTexture.h"
 #include "Framework/Common/LogMgr.h"
 
+#include "Objects/SceneActor.h"
+#include "Framework/Events/MouseEvent.h"
+#include "Render/Gizmo.h"
+#include "Framework/Common/SceneMgr.h"
+#include "Framework/Common/Input.h"
+
 #include "Render/Mesh.h"
 #include "Animation/Clip.h"
 #include "Render/Renderer.h"
@@ -105,10 +111,104 @@ namespace Ailu
 
 		}
 
+		//https://tavianator.com/2011/ray_box.html
+		//https://www.cnblogs.com/amazonove/articles/7884465.html
+		bool static Intersect(Vector3f origin, Vector3f dir, const AABB& aabb, float& intersectionDistance)
+		{
+			Vector3f invDir = Vector3f::kOne;
+			invDir.x /= dir.x;
+			invDir.y /= dir.y;
+			invDir.z /= dir.z;
+
+			Vector3f imin = (aabb._min - origin) * invDir;
+			Vector3f imax = (aabb._max - origin) * invDir;
+
+			if (dir.x < 0) { std::swap(imin.x, imax.x); }
+			if (dir.y < 0) { std::swap(imin.y, imax.y); }
+			if (dir.z < 0) { std::swap(imin.z, imax.z); }
+
+			float n = std::max<float>(imin.x, std::max<float>(imin.y, imin.z));
+			float f = std::min<float>(imax.x, std::min<float>(imax.y, imax.z));
+
+			if (f >= n)
+			{
+				intersectionDistance = n;
+				return true;
+			}
+			return false;
+		}
+
+
 		void EditorLayer::OnEvent(Event& e)
 		{
+			Vector2f vp_size = static_cast<RenderView*>(_p_render_view)->GetViewportSize();
+			//auto m_pos = Input::GetMousePos();
+			////m_pos -= _p_render_view->_pos;
+			//LOG_INFO("mouse pos {},{}", m_pos.x, m_pos.y);
+			//LOG_INFO("vo pos {}", _p_render_view->_pos.ToString());
+			//LOG_INFO("{}",e.ToString());
+			if (e.GetEventType() == EEventType::kMouseButtonPressed)
+			{
+				MouseButtonPressedEvent& event = static_cast<MouseButtonPressedEvent&>(e);
+				static std::chrono::seconds duration(5);
+				if (event.GetButton() == 1)
+				{
+					auto inv_vp = Camera::sCurrent->GetView() * Camera::sCurrent->GetProjection();
+					MatrixInverse(inv_vp);
+					auto p = Camera::sCurrent->GetProjection();
+					auto m_pos = Input::GetMousePos();
+					// 获取Win32窗口的位置
+					RECT rect;
+					GetWindowRect((HWND)(Application::GetInstance()->GetWindowPtr()->GetNativeWindowPtr()), &rect);
+					Vector2f win32_window_pos = Vector2f((f32)rect.left, (f32)rect.top);
 
+					m_pos -= (_p_render_view->_pos - win32_window_pos);
+
+
+					LOG_INFO("mouse pos {},{}", m_pos.x, m_pos.y);
+					float vx = (2.0f * m_pos.x / vp_size.x - 1.0f) / p[0][0];
+					float vy = (-2.0f * m_pos.y / vp_size.y + 1.0f) / p[1][1];
+					auto view = Camera::sCurrent->GetView();
+					MatrixInverse(view);
+					Vector3f ray_dir = Vector3f(vx, vy, 1.0f);
+					Vector3f start = Camera::sCurrent->Position();
+					Vector3f end = start + TransformNormal(ray_dir, view) * 10000.0f;
+					Gizmo::DrawLine(start, end, duration, Colors::kRed);
+					f32 min_dis = std::numeric_limits<f32>::max();
+					SceneActor* p_closetest_obj = nullptr;
+					for (auto& actor : g_pSceneMgr->_p_current->GetAllActor())
+					{
+						auto comp = actor->GetComponent<StaticMeshComponent>();
+						if (comp)
+						{
+							for (auto& aabb : comp->GetAABB())
+							{
+								auto& [aabb_min, aabb_max] = aabb;
+								f32 dis = 0;
+								if (Intersect(start, Normalize(TransformNormal(ray_dir, view)), aabb, dis))
+								{
+									LOG_INFO("Intersect {}!",actor->Name());
+									if (min_dis > dis)
+									{
+										min_dis = dis;
+										g_pSceneMgr->_p_selected_actor = actor;
+									}
+								}
+								//float dis = AABB::DistanceFromRayToAABB(start, Camera::sCurrent->Forward(), aabb_min, aabb_max);
+								//if (dis < min_dis)
+								//{
+								//	min_dis = dis;
+
+								//}
+							}
+						}
+					}
+					//g_pSceneMgr->_p_selected_actor = p_closetest_obj;
+					//g_pLogMgr->LogFormat("Selected obj: {}", g_pSceneMgr->_p_selected_actor->Name());
+				}
+			}
 		}
+
 		static bool show = false;
 		static bool s_show_asset_table = false;
 		static bool s_show_rt = false;
@@ -213,7 +313,7 @@ namespace Ailu
 			TreeStats::s_common_property_handle = 0;
 			ShowWorldOutline();
 			_mesh_browser.Show();
-			for(auto& widget : _widgets)
+			for (auto& widget : _widgets)
 			{
 				widget->Show();
 			}
@@ -364,7 +464,11 @@ namespace Ailu
 			{
 				g_pSceneMgr->AddSceneActor();
 			}
-			ImGui::Text("Scene: %s",g_pSceneMgr->_p_current->Name().c_str());
+			ImGui::Text("Scene: %s", g_pSceneMgr->_p_current->Name().c_str());
+			//if (g_pSceneMgr->_p_selected_actor != nullptr)
+			//{
+			//	s_node_clicked = g_pSceneMgr->_p_selected_actor->ID();
+			//}
 			DrawTreeNode(g_pSceneMgr->_p_current->GetSceneRoot());
 			s_cur_frame_selected_actor_id = s_node_clicked;
 			if (s_pre_frame_selected_actor_id != s_cur_frame_selected_actor_id)
@@ -372,7 +476,11 @@ namespace Ailu
 				s_cur_selected_actor = s_cur_frame_selected_actor_id == 0 ? nullptr : g_pSceneMgr->_p_current->GetSceneActorByIndex(s_cur_frame_selected_actor_id);
 			}
 			s_pre_frame_selected_actor_id = s_cur_frame_selected_actor_id;
-			g_pSceneMgr->_p_selected_actor = s_cur_selected_actor;
+			//if (s_cur_selected_actor != nullptr && g_pSceneMgr->_p_selected_actor != s_cur_selected_actor)
+			//{
+			//	g_pSceneMgr->_p_selected_actor = s_cur_selected_actor;
+			//}
+
 			cur_tree_node_index = 0;
 			ImGui::End();
 		}

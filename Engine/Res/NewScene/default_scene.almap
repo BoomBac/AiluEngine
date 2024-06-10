@@ -8,11 +8,11 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,6.75513e-08,0,1
         Scale: 1,1,1
-    Children: 10
-      Name: stone
+    Children: 7
+      Name: plane
         Components: 
           TransformComponent: 
-            Position: 0,0,0
+            Position: -2490,0,0
             Rotation: 0,6.75513e-08,0,1
             Scale: 40,1,40
           StaticMeshComponent: 
@@ -22,7 +22,7 @@ SceneGraph:
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: 0,0,0
+            Position: 17,0,0
             Rotation: -0.351351,6.32445e-08,2.37342e-08,0.936244
             Scale: 1,1,1
           LightComponent: 
@@ -36,14 +36,14 @@ SceneGraph:
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: 0,1046,0
+            Position: -81,621,234
             Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           LightComponent: 
             Type: Point
             Color: 1,0.192157,0.192157
-            Intensity: 0.552
-            Radius: 2280
+            Intensity: 1
+            Radius: 2360
             CastShadow: true
             ShadowArea: 0
             ShadowDistance: 0
@@ -51,36 +51,34 @@ SceneGraph:
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: -61,938,447
-            Rotation: 0.309017,6.42451e-08,-2.08745e-08,0.951057
+            Position: 57,867,-403
+            Rotation: -7.19971e-22,6.75513e-08,1.06581e-14,1
             Scale: 1,1,1
           LightComponent: 
-            Type: Spot
-            Color: 1,1,1
+            Type: Point
+            Color: 0.0544983,0.926471,0.900824
             Intensity: 1
-            Radius: 1845
-            Inner: 45
-            Outer: 60
-            CastShadow: false
-            ShadowArea: 0
+            Radius: 2232
+            CastShadow: true
+            ShadowArea: 100
             ShadowDistance: 0
         Children: 0
-      Name: Actor10
+      Name: shpere
         Components: 
           TransformComponent: 
             Position: 0,405,0
             Rotation: 0,6.75513e-08,0,1
-            Scale: 1,1,1
+            Scale: 5,5,5
           StaticMeshComponent: 
             MeshPath: 2ff30e48-6661-479b-a90c-863e606734f6
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0
-      Name: Actor11
+      Name: plane
         Components: 
           TransformComponent: 
-            Position: 0,0,-619
-            Rotation: 0.707107,4.77659e-08,-4.7766e-08,0.707107
-            Scale: 20,1,20
+            Position: -788,480,299
+            Rotation: 4.7766e-08,4.77659e-08,-0.707107,0.707107
+            Scale: 5,1,5
           StaticMeshComponent: 
             MeshPath: c3315e03-1052-4825-98f7-a676beae0615
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
@@ -88,40 +86,10 @@ SceneGraph:
       Name: Actor12
         Components: 
           TransformComponent: 
-            Position: 0,0,619
-            Rotation: -8.99126e-08,0.707106,-0.707108,1.85445e-07
-            Scale: 20,1,20
+            Position: -1177,273,0
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
           StaticMeshComponent: 
-            MeshPath: c3315e03-1052-4825-98f7-a676beae0615
-            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        Children: 0
-      Name: Actor13
-        Components: 
-          TransformComponent: 
-            Position: 0,1076,0
-            Rotation: -1,-2.95276e-15,6.75513e-08,-4.37114e-08
-            Scale: 20,1,20
-          StaticMeshComponent: 
-            MeshPath: c3315e03-1052-4825-98f7-a676beae0615
-            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        Children: 0
-      Name: Actor14
-        Components: 
-          TransformComponent: 
-            Position: -729,531,0
-            Rotation: 4.7766e-08,4.77659e-08,-0.707107,0.707107
-            Scale: 10,1,10
-          StaticMeshComponent: 
-            MeshPath: c3315e03-1052-4825-98f7-a676beae0615
-            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        Children: 0
-      Name: Actor15
-        Components: 
-          TransformComponent: 
-            Position: 777,0,0
-            Rotation: -4.7766e-08,4.77659e-08,0.707107,0.707107
-            Scale: 20,1,20
-          StaticMeshComponent: 
-            MeshPath: c3315e03-1052-4825-98f7-a676beae0615
+            MeshPath: 7baa598b-7eb4-478d-91ae-bf758da25d3b
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0

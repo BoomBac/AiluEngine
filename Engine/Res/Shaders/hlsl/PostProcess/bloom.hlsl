@@ -72,7 +72,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 	return color.xyzz;
 }
 #define RADIUS 3
-#define RADIUS_SCALE 8
+#define RADIUS_SCALE 2
 const static float weights[7] = {0.05,0.1,0.15,0.4,0.15,0.1,0.05};
 
 float4 BlurX(PSInput input) : SV_TARGET

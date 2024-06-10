@@ -133,13 +133,17 @@ namespace Ailu
 				auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
 				_render_lag += last_mark;
 				_update_lag += last_mark;
-				AL_ASSERT(_update_lag > 1000);
+				//AL_ASSERT(_update_lag > 1000);
+				_update_lag = std::min<float>(_update_lag,1000);
+				_update_lag = std::max<float>(_update_lag,0.1);
 				g_pTimeMgr->Mark();
 				if (_update_lag >= s_target_lag)
 				{
 					g_pResourceMgr->Tick(delta_time);
 					for (Layer* layer : *_layer_stack)
+					{
 						layer->OnUpdate(_update_lag * 0.001f);
+					}
 					_update_lag -= s_target_lag;
 				}
 				if (_render_lag >= s_target_lag)

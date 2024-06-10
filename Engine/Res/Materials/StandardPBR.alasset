@@ -7,7 +7,7 @@ shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
     MaterialID: 0
   prop_type: Float
     MetallicValue: 0
-    RoughnessValue: 1
+    RoughnessValue: 0.628
   prop_type: Vector
     SpecularColor: 0,0,0,0
     BaseColor: 1,1,1,0

@@ -24,7 +24,7 @@ namespace Ailu
 			return _is_ready_for_rendering? _main_srv_handle.ptr : 0;
 		};
 		void Bind(CommandBuffer* cmd, u8 slot) final;
-		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
+		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) final;
 		void CreateView() final;
 		void ReleaseView() final;
 		void Name(const String& new_name) final;
@@ -46,7 +46,7 @@ namespace Ailu
 		TextureHandle GetNativeTextureHandle() final { return _main_srv_handle.ptr; };
 		void Bind(CommandBuffer* cmd, u8 slot) final;
 
-		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
+		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) final;
 		void CreateView() final;
 	private:
 		D3D12_GPU_DESCRIPTOR_HANDLE _main_srv_handle;
@@ -68,7 +68,7 @@ namespace Ailu
 		void CreateView() final;
 		void Name(const String& value) final;
 		TextureHandle GetNativeTextureHandle() final;
-		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
+		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) final;
 		TextureHandle ColorRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) final;
 		TextureHandle DepthRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) final;
 		TextureHandle ColorTexture(u16 index = 0,CommandBuffer* cmd = nullptr) final;

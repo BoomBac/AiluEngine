@@ -87,7 +87,7 @@ namespace Ailu
 		Scope<RenderTexture> _p_mainlight_shadow_map;
 		//Scope<RenderTexture> _p_addlight_shadow_map;
 		Scope<RenderTexture> _p_addlight_shadow_maps;
-		Scope<RenderTexture> _p_point_light_shadow_map;
+		Scope<RenderTexture> _p_point_light_shadow_maps;
 		//Ref<Material> _p_shadowcast_material;
 		//Ref<Material> _p_addshadowcast_material;
 		Vector<Ref<Material>> _shadowcast_materials;
