@@ -100,6 +100,7 @@ static u16 GetPixelByteSize(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatR32_SINT: return 4;
         break;
     case EALGFormat::kALGFormatR16G16_FLOAT: return 4;
+    case EALGFormat::kALGFormatR32G32_FLOAT: return 8;
     default:
         break;
     }

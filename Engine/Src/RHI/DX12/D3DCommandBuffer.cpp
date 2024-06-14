@@ -260,8 +260,8 @@ namespace Ailu
 				rects[i] = Rect(0, 0, colors[i]->Width(),colors[i]->Height());
 			SetViewports(rects);
 			SetScissorRects(rects);
-			_is_custom_viewport = false;
 		}
+		_is_custom_viewport = false;
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		u16 rt_num = 0;
 		static D3D12_CPU_DESCRIPTOR_HANDLE handles[8];
@@ -287,8 +287,8 @@ namespace Ailu
 			Rect r(0, 0, color->Width(),color->Height());
 			SetViewport(r);
 			SetScissorRect(r);
-			_is_custom_viewport = false;
 		}
+		_is_custom_viewport = false;
 		auto crt = static_cast<D3DRenderTexture*>(color);
 		g_pGfxContext->TrackResource(color);
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
@@ -384,8 +384,8 @@ namespace Ailu
 			Rect r(0, 0, rt->Width(), rt->Height());
 			SetViewport(r);
 			SetScissorRect(r);
-			_is_custom_viewport = false;
 		}
+		_is_custom_viewport = false;
 		GraphicsPipelineStateMgr::ResetRenderTargetState();
 		if (color && depth)
 		{

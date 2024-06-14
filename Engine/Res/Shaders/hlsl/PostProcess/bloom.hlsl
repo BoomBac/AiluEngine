@@ -43,7 +43,8 @@
 Texture2D _SourceTex : register(t0);
 Texture2D _BloomTex : register(t1);
 
-SamplerState g_LinearClampSampler : register(s1);
+#include "../common.hlsli"
+
 struct VSInput
 {
 	float3 position : POSITION;
@@ -82,7 +83,7 @@ float4 BlurX(PSInput input) : SV_TARGET
 	for (int i = -RADIUS; i<=RADIUS; i++)
 	{
 		float2 uv = input.uv;
-		uv.x += i * 0.000625 * RADIUS_SCALE;
+		uv.x += i * _ScreenParams.z * RADIUS_SCALE;
 		sum += weights[i + RADIUS] * _SourceTex.Sample(g_LinearClampSampler, uv).rgb;
 	}
 	return sum.xyzz;
@@ -95,7 +96,7 @@ float4 BlurY(PSInput input) : SV_TARGET
 	for (int i = -RADIUS; i<=RADIUS; i++)
 	{
 		float2 uv = input.uv;
-		uv.y += i * 0.001111 * RADIUS_SCALE;
+		uv.y += i * _ScreenParams.w * RADIUS_SCALE;
 		sum += weights[i + RADIUS] * _SourceTex.Sample(g_LinearClampSampler, uv).rgb;
 	}
 	return sum.xyzz;

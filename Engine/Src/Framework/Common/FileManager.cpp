@@ -10,7 +10,14 @@ namespace Ailu
 	}
 	void FileManager::DeleteDirectory(const WString& dir_name)
 	{
-		fs::remove_all(fs::path(dir_name));
+		try
+		{
+			fs::remove_all(dir_name);
+		}
+		catch (const std::exception& e)
+		{
+			LOG_WARNING(e.what());
+		}
 	}
 	void FileManager::RenameDirectory(const WString& old_name, const WString& new_name)
 	{

@@ -14,8 +14,8 @@ Texture2D Emssive : register(t2);
 Texture2D Roughness : register(t3);
 Texture2D Metallic : register(t4);
 Texture2D Specular : register(t5);
-TextureCube DiffuseIBL : register(t6);
-TextureCube SkyBox : register(t7);
+TextureCube RadianceTex : register(t6);
+TextureCube PrefilterEnvTex : register(t7);
 Texture2D IBLLut : register(t8);
 
 float GetDistanceAtt(float distance,float atten_radius)
@@ -29,7 +29,7 @@ float GetDistanceAtt(float distance,float atten_radius)
 // float lightAngleScale = 1.0 f / max (0.001f, ( cosInner - cosOuter ));
 // float lightAngleOffset = -cosOuter * angleScale ;
 // float normalizedLightVector: pos - light_pos
-float getAngleAtt(float3 normalizedLightVector ,float3 lightDir,float lightAngleScale ,float lightAngleOffset)
+float GetAngleAtt(float3 normalizedLightVector ,float3 lightDir,float lightAngleScale ,float lightAngleOffset)
 {
 	float cd = dot (lightDir,normalizedLightVector );
 	float attenuation = saturate ( cd * lightAngleScale + lightAngleOffset ) ;
@@ -53,7 +53,7 @@ float3 GetSpotLightIrridance(uint index,float3 world_pos)
 	float light_angle_scale = _SpotLights[index]._LightAngleScale;
 	float light_angle_offset = _SpotLights[index]._LightAngleOffset;
 	float atten = 1;
-	atten *= getAngleAtt(l,_SpotLights[index]._LightDir,light_angle_scale,light_angle_offset);
+	atten *= GetAngleAtt(l,_SpotLights[index]._LightDir,light_angle_scale,light_angle_offset);
 	atten *= GetDistanceAtt(dis,_SpotLights[index]._Rdius);
 	return _SpotLights[index]._LightColor * atten;
 }
@@ -70,7 +70,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	float shadow_factor = 1.0;
 	light_data.shadow_atten = shadow_factor;
 	//return light_data.shadow_atten.xxx;
-	shading_data.nv = max(saturate(dot(view_dir,surface.wnormal)),0.000001);
+	shading_data.nv = saturate(dot(view_dir,surface.wnormal));//max(saturate(dot(view_dir,surface.wnormal)),0.000001);
 	for (uint i = 0; i < MAX_DIRECTIONAL_LIGHT; i++)
 	{
 		float3 light_dir = -_DirectionalLights[i]._LightPosOrDir;
@@ -128,22 +128,24 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos);
 	}
 	//indirect light
-	float3 irradiance = DiffuseIBL.Sample(g_LinearWrapSampler, surface.wnormal);
-	float3 F0 = lerp(F0_AIELECTRICS, surface.albedo.rgb, surface.metallic);
-	float3 ks = F_SchlickRoughness(shading_data.nv,F0,surface.roughness);
-	float3 kd = 1.0 - ks;
-	float ao = 1.0;
-	float3 diffuse = ao * kd * irradiance * surface.albedo.rgb;
-	//float3 specular = SkyBox.SampleLevel(g_LinearWrapSampler, surface.wnormal,);
+	float3 diffuse_color = surface.albedo.rgb * (1.0 - DIELECTRIC_SPECULAR) * (1.0 - surface.metallic);
+	float3 F0 = lerp(DIELECTRIC_SPECULAR.xxx, surface.albedo.rgb, surface.metallic);
+	float lod = surface.roughness * 7;
+	float3 irradiance 		= RadianceTex.Sample(g_LinearWrapSampler, surface.wnormal);
+	float3 radiance = PrefilterEnvTex.SampleLevel(g_AnisotropicClampSampler, reflect(view_dir,surface.wnormal),lod);
+	float2 envBRDF  = IBLLut.Sample(g_LinearClampSampler,float2(shading_data.nv,surface.roughness)).xy;
 
-	float lod             = lerp(0,8,surface.roughness);
-	float3 prefilteredColor = SkyBox.SampleLevel(g_LinearWrapSampler, reflect(-view_dir,surface.wnormal),lod);
-	float2 envBRDF          = IBLLut.SampleLevel(g_LinearWrapSampler,float2(lerp(0,0.99,surface.roughness),lerp(0,0.99,shading_data.nv)),0).xy;
-	envBRDF.x = pow(envBRDF.x,1/2.2);
-	envBRDF.y = pow(envBRDF.y,1/2.2);
-	float3 specular = prefilteredColor * (ks * envBRDF.x + envBRDF.y);
-
-	light += (specular + diffuse) * 0.1f;
+	// // Roughness dependent fresnel, from Fdez-Aguera
+    // float3 Fr = max((1.0 - surface.roughness).xxx, F0) - F0;
+    // float3 k_S = F0 + Fr * pow(1.0 - shading_data.nv, 5.0);
+    // float3 FssEss = k_S * envBRDF.x + envBRDF.y;
+	// // Multiple scattering, from Fdez-Aguera
+    // float Ems = (1.0 - (envBRDF.x + envBRDF.y));
+    // float3 F_avg = F0 + (1.0 - F0) / 21.0;
+    // float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
+    // float3 k_D = diffuse_color * (1.0 - FssEss - FmsEms);
+	float3 FssEss = F0 * envBRDF.x + envBRDF.y;
+	light += FssEss * radiance + diffuse_color * irradiance;
 	return light; 
 }
 #endif //__LIGHTING_H__

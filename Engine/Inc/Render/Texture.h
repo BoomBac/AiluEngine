@@ -112,7 +112,7 @@ namespace Ailu
 	DECLARE_ENUM(ETextureDimension,kUnknown, kTex2D, kTex3D, kCube, kTex2DArray,kCubeArray)
 	DECLARE_ENUM(EFilterMode,kPoint,kBilinear,kTrilinear)
 	DECLARE_ENUM(EWrapMode, kClamp, kRepeat, kMirror)
-	DECLARE_ENUM(ETextureFormat,kRGBA32,kRGBAFloat,kRGBFloat,kRGBAHalf)
+	DECLARE_ENUM(ETextureFormat,kRGBA32,kRGBAFloat,kRGBFloat,kRGBAHalf,kRGFloat)
 	DECLARE_ENUM(ECubemapFace, kUnknown, kPositiveX, kNegativeX, kPositiveY, kNegativeY, kPositiveZ, kNegativeZ)
 	static EALGFormat::EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format)
 	{
@@ -126,6 +126,8 @@ namespace Ailu
 			return EALGFormat::EALGFormat::kALGFormatR32G32B32_FLOAT;
 		case ETextureFormat::kRGBAHalf:
 			return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+		case ETextureFormat::kRGFloat:
+			return EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT;
 		default:
 			break;
 		}
@@ -162,8 +164,7 @@ namespace Ailu
 		virtual void ReleaseView() { _is_have_total_view = false; };
 		virtual TextureHandle GetView(u16 mimmap,bool random_access = false,ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown,u16 array_slice = 0) { return 0; };
 		//slot传255的话，表示只设置一下描述符堆
-		virtual void Bind(CommandBuffer* cmd, u8 slot) {};
-		virtual void BindToCompute(CommandBuffer* cmd, u8 slot) {};
+		virtual void Bind(CommandBuffer* cmd, u8 slot,bool compute_pipiline = false) {};
 		bool IsViewCreate() const { return _is_have_total_view; }
 		std::tuple<u16,u16> CurMipmapSize(u16 mipmap) const;
 		Asset* GetAsset() { return _p_asset; };
@@ -188,7 +189,7 @@ namespace Ailu
 		virtual ~Texture2D();
 		virtual void Apply() {};
 		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
-		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
+		virtual void Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline = false) override {};
 		Color32 GetPixel32(u16 x, u16 y);
 		Color GetPixel(u16 x, u16 y);
 		Color GetPixelBilinear(float u, float v);
@@ -217,7 +218,7 @@ namespace Ailu
 		virtual ~CubeMap();
 		virtual void Apply() {};
 		virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
-		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
+		virtual void Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline = false) override {};
 		Color32 GetPixel32(ECubemapFace::ECubemapFace face,u16 x, u16 y);
 		Color GetPixel(ECubemapFace::ECubemapFace face,u16 x, u16 y);
 		Ptr GetPixelData(ECubemapFace::ECubemapFace face,u16 mipmap);
@@ -316,8 +317,7 @@ namespace Ailu
 		static Scope<RenderTexture> Create(u16 width,String name = "",ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
 		//cubemap array not support mipmap
 		static Scope<RenderTexture> Create(u16 width,String name = "",ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, u16 array_slice = 1, bool linear = false, bool random_access = false);
-		virtual void Bind(CommandBuffer* cmd, u8 slot) override {};
-		virtual void BindToCompute(CommandBuffer* cmd, u8 slot) override {};
+		virtual void Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline = false) override {};
 		//return rtv handle
 		virtual TextureHandle ColorRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) { return 0; };
 		virtual TextureHandle DepthRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) { return 0; };

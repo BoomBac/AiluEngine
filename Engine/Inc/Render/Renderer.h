@@ -46,6 +46,10 @@ namespace Ailu
         bool _is_offscreen = true;
         //cm
         float _shadow_distance = 4000;
+        //temp
+        RenderTexture* _p_radiance_tex;
+        RenderTexture* _p_prefilter_env_tex;
+        RenderTexture* _p_env_tex;
     private:
         RTHandle _camera_color_handle;
         RTHandle _gameview_rt_handle;
@@ -54,6 +58,7 @@ namespace Ailu
         void Render();
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
+        void PrepareShaderConstants();
         void DoResize();
     private:
         static inline List<RenderPass*> _p_task_render_passes{};
@@ -80,7 +85,6 @@ namespace Ailu
         Queue<Vector2f> _resize_events;
         List<BeforeTickEvent> _events_before_tick;
         List<AfterTickEvent> _events_after_tick;
-
     };
     extern AILU_API Renderer* g_pRenderer;
 }

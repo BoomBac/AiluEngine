@@ -3,20 +3,33 @@ Warning: Unused shader prop Color been added;
 Warning: Unused shader prop Exposure been added;
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
-Normal: Resource mgr init finish after 13.4331ms
+Normal: Resource mgr init finish after 13.3126ms
 Normal: Begin init scene mgr...
-Normal: Scene mgr init finish after 0.0031ms
+Normal: Scene mgr init finish after 0.0021ms
 Normal: Begin init renderer...
-Normal: Renderer init finish after 0.0024ms
+Normal: Renderer init finish after 0.0013ms
 Normal: Application Init end
 Warning: Expand rt pool to 1
 Warning: Expand rt pool to 2
 Warning: Expand rt pool to 3
 Warning: Expand rt pool to 4
+Warning: Cubemap array not support multi mipmap
 Warning: Unused shader prop Color been added;
 Warning: Unused shader prop Exposure been added;
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
+Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
 Warning: Expand rt pool to 5
 Warning: Expand rt pool to 6
 Warning: Expand rt pool to 7
@@ -27,7 +40,7 @@ Warning: Expand rt pool to 11
 Warning: Expand rt pool to 12
 Warning: Expand rt pool to 13
 Warning: Expand rt pool to 14
-Normal: Resize game view to 906,619
+Normal: Resize game view to 1035,544
 Warning: Expand rt pool to 15
 Warning: Expand rt pool to 16
 Warning: Expand rt pool to 17
@@ -35,4 +48,5 @@ Warning: Expand rt pool to 18
 Warning: Expand rt pool to 19
 Warning: Expand rt pool to 20
 Normal: OnLostFoucus
-Warning: D3DContext::Present: Resource cleanup, 14 resources released.
+Normal: OnGetFoucus
+Normal: OnLostFoucus

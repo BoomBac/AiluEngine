@@ -68,6 +68,9 @@ namespace Ailu
 		_render_passes.emplace_back(_p_reslove_pass.get());
 		RegisterEventBeforeTick([]() {GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
 		RegisterEventAfterTick([]() {Profiler::g_Profiler.EndFrame(); });
+		_p_radiance_tex = _p_cubemap_gen_pass->_radiance_map.get();
+		_p_prefilter_env_tex = _p_cubemap_gen_pass->_prefilter_cubemap.get();
+		_p_env_tex = _p_cubemap_gen_pass->_src_cubemap.get();
 		return 0;
 	}
 	void Renderer::Finalize()
@@ -116,6 +119,7 @@ namespace Ailu
 			_per_frame_cbuf_data._PointLights[i]._ShadowDataIndex = -1;
 			_rendering_data._point_shadow_data[i]._camera_far = 0; //标记不投影
 		}
+		PrepareShaderConstants();
 		PrepareCamera(_p_scene_camera);
 		PrepareLight(g_pSceneMgr->_p_current);
 		_rendering_data._p_per_frame_cbuf = _p_per_frame_cbuf.get();
@@ -203,8 +207,9 @@ namespace Ailu
 				_p_task_render_passes.clear();
 			}
 
-			Shader::SetGlobalTexture("SkyBox", _p_cubemap_gen_pass->_p_cube_map.get());
-			Shader::SetGlobalTexture("DiffuseIBL", _p_cubemap_gen_pass->_p_env_map.get());
+			//Shader::SetGlobalTexture("SkyBox", _p_cubemap_gen_pass->_src_cubemap.get());
+			Shader::SetGlobalTexture("RadianceTex", _p_cubemap_gen_pass->_radiance_map.get());
+			Shader::SetGlobalTexture("PrefilterEnvTex", _p_cubemap_gen_pass->_prefilter_cubemap.get());
 
 			_p_reslove_pass->SetActive(true);
 
@@ -368,6 +373,14 @@ namespace Ailu
 		auto vp = _per_frame_cbuf_data._MatrixVP;
 		MatrixInverse(vp);
 		_per_frame_cbuf_data._MatrixIVP = vp;
+	}
+
+	void Renderer::PrepareShaderConstants()
+	{
+		_per_frame_cbuf_data._ScreenParams.x = (f32)_width;
+		_per_frame_cbuf_data._ScreenParams.y = (f32)_height;
+		_per_frame_cbuf_data._ScreenParams.z = 1.0f / (f32)_width;
+		_per_frame_cbuf_data._ScreenParams.w = 1.0f / (f32)_height;
 	}
 
 	void Renderer::DoResize()

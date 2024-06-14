@@ -129,7 +129,7 @@ namespace Ailu
 	{
 	public:
 		PipelineStateHash() = default;
-		u8 GenHash(T& obj)
+		static u8 GenHash(T& obj)
 		{
 			std::lock_guard<std::mutex> lock(_mutex);
 			for (u32 i = 0; i < _s_data.size(); i++)
@@ -141,7 +141,7 @@ namespace Ailu
 			_s_data.push_back(obj);
 			return static_cast<u8>(obj.Hash());
 		}
-		const T& Get(const u8& hash) const
+		static const T& Get(const u8& hash)
 		{
 			std::lock_guard<std::mutex> lock(_mutex);
 			if (hash < _s_data.size())
@@ -152,8 +152,8 @@ namespace Ailu
 			throw std::out_of_range("Invalid hash");
 		}
 	private:
-		Vector<T> _s_data;
-		mutable std::mutex _mutex;
+		inline static Vector<T> _s_data;
+		inline static std::mutex _mutex;
 	};
 
 	class VertexBufferLayout

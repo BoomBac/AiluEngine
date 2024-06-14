@@ -51,6 +51,12 @@
     <ClCompile Include="Src\Widgets\SceneLayer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Src\Widgets\WorldOutline.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Widgets\EnvironmentSetting.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Inc\Widgets\Common.h">
@@ -87,6 +93,12 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Inc\Widgets\SceneLayer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Widgets\WorldOutline.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Widgets\EnvironmentSetting.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

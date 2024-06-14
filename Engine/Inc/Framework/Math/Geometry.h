@@ -24,6 +24,24 @@ namespace Ailu
             Vector3f p = 0.5f * (aabbMin + aabbMax);
             return DistanceToRay(rayOrigin, rayDirection, p);
         }
+        //https://tavianator.com/2022/ray_box_boundary.html, slob method
+        // max(t_enter) < min(t_exit)
+        bool static Intersect(const AABB& aabb, Vector3f origin, Vector3f dir)
+        {
+            Vector3f invDir;
+            invDir.x = 1.0f / dir.x;
+            invDir.y = 1.0f / dir.y;
+            invDir.z = 1.0f / dir.z;
+            f32 t_enter = 0.0f, t_exit = INFINITY;
+            for (int i = 0; i < 3; i++)
+            {
+                float t1 = (aabb._min.data[i] - origin.data[i]) * invDir.data[i];
+                float t2 = (aabb._max.data[i] - origin.data[i]) * invDir.data[i];
+                t_enter = std::max<f32>(std::min<f32>(t1, t2), t_enter);
+                t_exit = std::min<f32>(std::max<f32>(t1, t2), t_exit);
+            }
+            return t_enter < t_exit;
+        }
 
         static AABB CaclulateBoundBox(const AABB& aabb, const Matrix4x4f& mat)
         {

@@ -3,6 +3,7 @@
 #define __WINDOW_H__
 
 #include <string>
+#include <tuple>
 #include <functional>
 
 #include "GlobalMarco.h"
@@ -26,20 +27,15 @@ namespace Ailu
 	{
 	public:
 		using EventHandler = std::function<void(Event&)>;
-		virtual ~Window() {}
+		virtual ~Window() {};
 		virtual void OnUpdate() = 0;
 		virtual u32 GetWidth() const = 0;
 		virtual u32 GetHeight() const = 0;
+		virtual std::tuple<u32, u32> GetWindowPosition() const = 0;
 		virtual void SetEventHandler(const EventHandler& handler) = 0;
 		virtual void SetVSync(bool enabled) = 0;
 		virtual bool IsVSync() const = 0;
 		virtual void* GetNativeWindowPtr() const = 0;
-		//template<class T>
-		//static auto Create(const WindowProps& props = WindowProps(), T window)
-		//{
-		//	window = new T();
-		//	return window;
-		//}
 	};
 }
 

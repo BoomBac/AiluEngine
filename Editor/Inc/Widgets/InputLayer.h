@@ -47,7 +47,7 @@ namespace Ailu
 			void HandleInput(bool is_handle) { _b_handle_input = is_handle; }
 		private:
 			bool _b_handle_input;
-			float _camera_move_speed = 0.4f;
+			float _camera_move_speed = 0.9f;
 			float _camera_wander_speed = 0.6f;
 			float _lerp_speed_multifactor = 15.0f;
 			float _camera_fov_h = 60.0f;

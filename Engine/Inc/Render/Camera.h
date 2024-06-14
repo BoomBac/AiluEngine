@@ -32,7 +32,7 @@ namespace Ailu
         static Camera* GetDefaultCamera();
         static void DrawGizmo(const Camera* p_camera);
         static void CalcViewFrustumPlane(const Camera* cam, ViewFrustum& vf);
-        //目前当eye_camera转动时，会重新计算aabb从而导致阴影抖动
+        //when the eye_camera turns, the AABB is recalculated, resulting in shadow jitter
         static Camera GetFitShaodwCamera(const Camera& eye_cam, float shadow_dis);
     public:
         Camera();

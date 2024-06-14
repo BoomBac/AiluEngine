@@ -141,6 +141,13 @@ namespace Ailu
 		return static_cast<void*>(_hwnd);
 	}
 
+	std::tuple<u32, u32> WinWindow::GetWindowPosition() const
+	{
+		RECT rect;
+		GetWindowRect(_hwnd, &rect);
+		return std::tuple<u32, u32>(rect.left, rect.top);
+	}
+
 	void WinWindow::Shutdown()
 	{
 

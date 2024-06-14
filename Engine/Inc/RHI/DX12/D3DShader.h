@@ -184,12 +184,15 @@ namespace Ailu
 		HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* ppData, UINT* pBytes) override;
 
 		HRESULT Close(LPCVOID pData) override;
+	public:
+		WString _cur_source_file_path;
 	private:
 		List<WString> _addi_include_pathes = {
 			kEngineRootPathW,
+			L"Shaders/",
 			L"Shaders/hlsl/",
 			L"Shaders/hlsl/Compute/",
-			L"Shaders/hlsl/PostProcess/",
+			L"Shaders/hlsl/PostProcess/"
 		};
 		u8* _data;
 	};

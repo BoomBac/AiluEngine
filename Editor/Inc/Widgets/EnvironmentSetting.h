@@ -1,17 +1,18 @@
 #pragma once
-#ifndef __ASSET_TABLE_H__
-#define __ASSET_TABLE_H__
+#ifndef __ENV_SETTING__
+#define __ENV_SETTING__
+
 #include "ImGuiWidget.h"
 
 namespace Ailu
 {
 	namespace Editor
 	{
-		class AssetTable : public ImGuiWidget
+		class EnvironmentSetting : public ImGuiWidget
 		{
 		public:
-			AssetTable();
-			~AssetTable();
+			EnvironmentSetting();
+			~EnvironmentSetting();
 			void Open(const i32& handle) final;
 			void Close(i32 handle) final;
 		private:
@@ -21,5 +22,5 @@ namespace Ailu
 }
 
 
-#endif // !ASSET_TABLE_H__
+#endif // !ENV_SETTING__
 

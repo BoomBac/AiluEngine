@@ -1,0 +1,67 @@
+guid: 3110f020-ca16-4ded-ad94-0332327a2bde
+type: kScene
+name: new_scene
+SceneGraph: 
+  Name: root
+    Components: 
+      TransformComponent: 
+        Position: 0,0,0
+        Rotation: 0,6.75513e-08,0,1
+        Scale: 1,1,1
+    Children: 4
+      Name: stone
+        Components: 
+          TransformComponent: 
+            Position: 0,0,0
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 5,5,5
+          StaticMeshComponent: 
+            MeshPath: 7baa598b-7eb4-478d-91ae-bf758da25d3b
+            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+        Children: 0
+      Name: directional_light
+        Components: 
+          TransformComponent: 
+            Position: 0,0,0
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
+          LightComponent: 
+            Type: Directional
+            Color: 1,1,1
+            Intensity: 1
+            CastShadow: false
+            ShadowArea: 0
+            ShadowDistance: 0
+        Children: 0
+      Name: point_light
+        Components: 
+          TransformComponent: 
+            Position: 0,0,0
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
+          LightComponent: 
+            Type: Point
+            Color: 1,1,1
+            Intensity: 1
+            Radius: 500
+            CastShadow: false
+            ShadowArea: 0
+            ShadowDistance: 0
+        Children: 0
+      Name: spot_light
+        Components: 
+          TransformComponent: 
+            Position: 0,0,0
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
+          LightComponent: 
+            Type: Spot
+            Color: 1,1,1
+            Intensity: 1
+            Radius: 500
+            Inner: 45
+            Outer: 60
+            CastShadow: false
+            ShadowArea: 0
+            ShadowDistance: 0
+        Children: 0

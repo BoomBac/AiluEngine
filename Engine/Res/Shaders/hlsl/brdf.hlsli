@@ -4,8 +4,12 @@
 //#include "cbuffer.hlsl"
 #include "input.hlsli"
 
-#define F0_AIELECTRICS float3(0.04,0.04,0.04)
+#define DIELECTRIC_SPECULAR 0.04
 #define FROSTBITE_BRDF
+
+#ifndef MEDIUMP_FLT_MAX
+#define MEDIUMP_FLT_MAX    65504.0
+#endif //MEDIUMP_FLT_MAX
 
 //https://github.com/EpicGames/UnrealEngine/blob/release/Engine/Shaders/Private/BRDF.ush
 
@@ -36,6 +40,13 @@ float D_GTR2_aniso(float dotHX, float dotHY, float dotNH, float ax, float ay)
 {
 	float deno = dotHX * dotHX / (ax * ax) + dotHY * dotHY / (ay * ay) + dotNH * dotNH;
 	return 1.0 / (PI * ax * ay * deno * deno);
+}
+// GGX / Trowbridge-Reitz
+// [Walter et al. 2007, "Microfacet models for refraction through rough surfaces"]
+float D_GGX( float a2, float NoH )
+{
+	float d = ( NoH * a2 - NoH ) * NoH + 1;	// 2 mad
+	return a2 / ( PI*d*d );					// 4 mul, 1 rcp
 }
 //-----------------------------------------------------------------------------------------------------
 
@@ -103,17 +114,59 @@ float smithG_GGX_aniso(float dotVN, float dotVX, float dotVY, float ax, float ay
 // G GGX function for clearcoat
 float G_GGX(float dotVN, float alphag)
 {
-        float a = alphag * alphag;
-        float b = dotVN * dotVN;
-        return 1.0 / (dotVN + sqrt(a + b - a * b));
+	float a = alphag * alphag;
+	float b = dotVN * dotVN;
+	return 1.0 / (dotVN + sqrt(a + b - a * b));
 }
-float G_SmithGGXCorrealated(float nol,float nov,float alpha_g)
+// From the filament docs. Geometric Shadowing function
+// https://google.github.io/filament/Filament.html#toc4.4.2
+// float V_SmithGGXCorrelated(float NoV, float NoL, float roughness) 
+// {
+//     // float a2 = pow(roughness, 4.0);
+//     // float GGXV = NoL * sqrt(NoV * NoV * (1.0 - a2) + a2);
+//     // float GGXL = NoV * sqrt(NoL * NoL * (1.0 - a2) + a2);
+//     // return 0.5 / (GGXV + GGXL);
+// 	//Original formulation of G_SmithGGX Correlated
+// 	float NoV2 = NoV * NoV;
+// 	float NoL2 = NoL * NoL;
+// 	float a2 = pow(roughness, 4.0);
+// 	float lambda_v = ( -1 + sqrt ( a2 * (1 - NoL2 ) / NoL2 + 1) ) * 0.5f;
+// 	float lambda_l = ( -1 + sqrt ( a2 * (1 - NoV2 ) / NoV2 + 1) ) * 0.5f;
+// 	float G_SmithGGXCorrelated = 1 / (1 + lambda_v + lambda_l ) ;
+// 	float V_SmithGGXCorrelated = G_SmithGGXCorrelated / (4.0f * NoL * NoV);
+// 	return V_SmithGGXCorrelated;
+// }
+// Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"
+float V_SmithGGXCorrelated(float NoV, float NoL, float roughness) 
 {
-	float alpha_g2 = alpha_g * alpha_g;
-	float lambda_ggxv = nol * sqrt((-nov * alpha_g2 + nov) * nov + alpha_g2);
-	float lambda_ggxl = nov * sqrt((-nol * alpha_g2 + nol) * nol + alpha_g2);
-	return 0.5f / (lambda_ggxv + lambda_ggxl);
+    float a2 = roughness * roughness;
+    // TODO: lambdaV can be pre-computed for all the lights, it should be moved out of this function
+    float lambdaV = NoL * sqrt((NoV - a2 * NoV) * NoV + a2);
+    float lambdaL = NoV * sqrt((NoL - a2 * NoL) * NoL + a2);
+    float v = 0.5 / (lambdaV + lambdaL);
+    // a2=0 => v = 1 / 4*NoL*NoV   => min=1/4, max=+inf
+    // a2=1 => v = 1 / 2*(NoL+NoV) => min=1/4, max=+inf
+    // clamp to the maximum value representable in mediump
+    return min(v,MEDIUMP_FLT_MAX);
 }
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float a = roughness;
+    float k = (a * a) / 2.0;
+
+    float nom   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+// ----------------------------------------------------------------------------
+float G_SmithGGX(float nol,float nov, float roughness)
+{
+    float ggx2 = GeometrySchlickGGX(nov, roughness);
+    float ggx1 = GeometrySchlickGGX(nol, roughness);
+    return ggx1 * ggx2;
+}  
+
 // Tuned to match behavior of Vis_Smith
 // [Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"]
 // 结合G项和brdf的配平因子，省去除法
@@ -153,11 +206,13 @@ float Diffuse_Frostbite(float nov,float nol,float loh,float linear_roughness)
 
 float3 CookTorranceBRDF(SurfaceData surface,ShadingData shading_data)
 {
-	float3 diffuse = Diffuse_Lambert(surface.albedo.rgb);
+	float3 diffuse_color = surface.albedo.rgb * (1 - DIELECTRIC_SPECULAR) * (1.0 - surface.metallic);
+	float3 diffuse = Diffuse_Lambert(diffuse_color);
 	//float3 diffuse = Diffuse_Burley(surface.albedo.rgb,surface.roughness,shading_data.nv,shading_data.nl,shading_data.vh);
 	float D = D_GTR2(lerp(0.0002,1.0,surface.roughness),shading_data.nh);
-	float G = Vis_Schlick(Pow2(0.5 + surface.roughness/2),shading_data.nv,shading_data.nl);
-	float3 F = F_Schlick(lerp(F0_AIELECTRICS,surface.albedo.rgb,surface.metallic),shading_data.vh);
+	//float G = Vis_Schlick(Pow2(0.5 + surface.roughness/2),shading_data.nv,shading_data.nl);
+	float G = V_SmithGGXCorrelated(shading_data.nv,shading_data.nl,surface.roughness);
+	float3 F = F_Schlick(lerp(DIELECTRIC_SPECULAR.xxx,surface.albedo.rgb,surface.metallic),shading_data.vh);
 	float3 specular = D * G * F;
 	float3 kd = (F3_WHITE - F) * (1 - surface.metallic);
 	return diffuse * kd + specular;

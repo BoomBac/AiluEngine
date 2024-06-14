@@ -28,7 +28,7 @@ namespace Ailu
 		auto cmd = CommandBufferPool::Get();
 		auto p_cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
 		//ComPtr<ID3D12Resource> pTextureGPU;
-		ComPtr<ID3D12Resource> pTextureUpload;
+		
 		D3D12_RESOURCE_DESC textureDesc{};
 		textureDesc.MipLevels = mipmap_level;
 		textureDesc.Format = ConvertToDXGIFormat(_pixel_format);
@@ -42,29 +42,36 @@ namespace Ailu
 		CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
 		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _is_random_access ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_COPY_DEST,
 			nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-
-		const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
-		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
-		heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-		auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
-		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
-
-		Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
-		for (size_t i = 0; i < mipmap_level; i++)
+		if (_pixel_data[0] != nullptr)
 		{
-			u16 cur_mip_width = _width >> i;
-			u16 cur_mip_height = _height >> i;
-			D3D12_SUBRESOURCE_DATA subdata;
-			subdata.pData = _pixel_data[i];
-			subdata.RowPitch = _pixel_size * cur_mip_width;  // pixel size/byte  * width
-			subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
-			subres_datas.emplace_back(subdata);
-		}
-		UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_d3dres.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		p_cmdlist->ResourceBarrier(1, &barrier);
+			ComPtr<ID3D12Resource> pTextureUpload;
+			const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
+			const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
+			heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
+			auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+			ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+				nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
 
+			Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
+			for (size_t i = 0; i < mipmap_level; i++)
+			{
+				u16 cur_mip_width = _width >> i;
+				u16 cur_mip_height = _height >> i;
+				D3D12_SUBRESOURCE_DATA subdata;
+				subdata.pData = _pixel_data[i];
+				subdata.RowPitch = _pixel_size * cur_mip_width;  // pixel size/byte  * width
+				subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
+				subres_datas.emplace_back(subdata);
+			}
+			UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
+			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_d3dres.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			p_cmdlist->ResourceBarrier(1, &barrier);
+			D3DContext::Get()->TrackResource(pTextureUpload);
+		}
+		D3DContext::Get()->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
+		u16 handle_num = _is_random_access ? 2 : 1;
+		_allocation = g_pGPUDescriptorAllocator->Allocate(handle_num);
 		// Describe and create a SRV for the texture.
 		D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 		srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -72,27 +79,57 @@ namespace Ailu
 		srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srv_desc.Texture2D.MipLevels = mipmap_level;
 		srv_desc.Texture2D.MostDetailedMip = 0;
-		_allocation = g_pGPUDescriptorAllocator->Allocate(1);
 		auto [cpu_handle, gpu_handle] = _allocation.At(0);
 		_main_srv_handle = gpu_handle;
 		p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
-		D3DContext::Get()->TrackResource(pTextureUpload);
-		D3DContext::Get()->ExecuteCommandBuffer(cmd);
-		CommandBufferPool::Release(cmd);
+		if (_is_random_access)
+		{
+			auto [ch, gh] = _allocation.At(1);
+			D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
+			slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
+			slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			slice_uav_desc.Texture2D.MipSlice = 0;
+			p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, ch);
+			_main_uav_handle = gh;
+		}
 		_p_d3dres->SetName(ToWChar(_name));
 		_is_ready_for_rendering = true;
 	}
 
-	void D3DTexture2D::Bind(CommandBuffer* cmd, u8 slot)
+	void D3DTexture2D::Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline)
 	{
-		_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+		if (slot == 255)
+		{
+			_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
+			return;
+		}
+		if (!compute_pipiline)
+		{
+			_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+		}
+		else
+		{
+			_allocation.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
+		}
 	}
 
 	TextureHandle D3DTexture2D::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
 	{
-		if (mipmap > _mipmap_count + 1)
-			return 0;
-		return mipmap == 0? _main_srv_handle.ptr : _mipmap_srv_handles[mipmap - 1].ptr;
+		if (random_access)
+		{
+			if (mipmap == 0)
+				return _main_uav_handle.ptr;
+			else
+			{
+				AL_ASSERT(true);
+			}
+		}
+		else
+		{
+			if (mipmap > _mipmap_count + 1)
+				return 0;
+			return mipmap == 0 ? _main_srv_handle.ptr : _mipmap_handles[mipmap - 1].ptr;
+		}
 	}
 
 	void D3DTexture2D::CreateView()
@@ -112,14 +149,14 @@ namespace Ailu
 			srv_desc.Texture2D.MostDetailedMip = i + 1;
 			auto [ch, gh] = _mimmap_allocation.At(i);
 			p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, ch);
-			_mipmap_srv_handles.emplace_back(gh);
+			_mipmap_handles.emplace_back(gh);
 		}
 	}
 	void D3DTexture2D::ReleaseView()
 	{
 		Texture::ReleaseView();
 		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_allocation));
-		_mipmap_srv_handles.clear();
+		_mipmap_handles.clear();
 	}
 	void D3DTexture2D::Name(const String& new_name)
 	{
@@ -203,9 +240,21 @@ namespace Ailu
 		pTextureGPU->SetName(ToWChar(_name));
 	}
 
-	void D3DCubeMap::Bind(CommandBuffer* cmd, u8 slot)
+	void D3DCubeMap::Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline)
 	{
-		_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+		if (slot == 255)
+		{
+			_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
+			return;
+		}
+		if (!compute_pipiline)
+		{
+			_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+		}
+		else
+		{
+			_allocation.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
+		}
 	}
 
 	TextureHandle D3DCubeMap::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
@@ -318,7 +367,7 @@ namespace Ailu
 			else if(tex_desc.Format == DXGI_FORMAT_D32_FLOAT)
 				_srv_desc.Format = DXGI_FORMAT_R32_FLOAT;
 			else if(tex_desc.Format == DXGI_FORMAT_R16_FLOAT)
-				_srv_desc.Format == DXGI_FORMAT_R16_FLOAT;
+				_srv_desc.Format = DXGI_FORMAT_R16_FLOAT;
 		}
 		else
 		{
@@ -407,24 +456,32 @@ namespace Ailu
 		g_pGPUDescriptorAllocator->Free(std::move(_gpu_allocation));
 		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_srv_allocation));
 		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_uav_allocation));
+		g_pCPUDescriptorAllocator->Free(std::move(_mimmap_rtv_allocation));
 	}
 
-	void D3DRenderTexture::Bind(CommandBuffer* cmd, u8 slot)
+	void D3DRenderTexture::Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline)
 	{
-		if (slot == 255)
+		if (compute_pipiline && slot == 255)
 		{
 			_mimmap_uav_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
 			return;
 		}
-		if (s_current_rt != this)
+		if (!compute_pipiline)
 		{
-			RenderTexture::Bind(cmd, slot);
-			MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-			_gpu_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+			if (s_current_rt != this)
+			{
+				RenderTexture::Bind(cmd, slot);
+				MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+				_gpu_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+			}
+			else
+			{
+				g_pLogMgr->LogWarningFormat("D3DRenderTexture::Bind: try to use a render texture: {} as rt and srv at the same time!", _name);
+			}
 		}
 		else
 		{
-			g_pLogMgr->LogWarningFormat("D3DRenderTexture::Bind: try to use a render texture: {} as rt and srv at the same time!",_name);
+			AL_ASSERT(true);
 		}
 	}
 
@@ -435,7 +492,8 @@ namespace Ailu
 		{
 			auto p_device{ D3DContext::Get()->GetDevice() };
 			_mimmap_srv_allocation = g_pGPUDescriptorAllocator->Allocate((_mipmap_count + 1) * 6);
-			u16 srv_handle_index = 0;
+			_mimmap_rtv_allocation = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV,(_mipmap_count) * 6);
+			u16 srv_handle_index = 0,rtv_handle_index = 0;
 			//for 6 face raw size
 			for (int i = 0; i < 6; i++)
 			{
@@ -452,6 +510,18 @@ namespace Ailu
 					slice_srv_desc.Texture2DArray.MostDetailedMip = j;
 					p_device->CreateShaderResourceView(_p_buffer.Get(), &slice_srv_desc, ch);
 					_mipmap_srv_handles[(ECubemapFace::ECubemapFace)(i + 1)].emplace_back(gh);
+					if (j > 0)
+					{
+						auto ch = _mimmap_rtv_allocation.At(rtv_handle_index++);
+						D3D12_RENDER_TARGET_VIEW_DESC slice_rtv_desc{};
+						slice_rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+						slice_rtv_desc.Format = ConvertToDXGIFormat(_pixel_format);
+						slice_rtv_desc.Texture2DArray.ArraySize = 1;
+						slice_rtv_desc.Texture2DArray.FirstArraySlice = i;
+						slice_rtv_desc.Texture2DArray.MipSlice = j;
+						p_device->CreateRenderTargetView(_p_buffer.Get(), &slice_rtv_desc, ch);
+						_mipmap_rtv_handles[(ECubemapFace::ECubemapFace)(i + 1)].emplace_back(ch);
+					}
 				}
 			}
 			if (_is_random_access)
@@ -644,7 +714,7 @@ namespace Ailu
 
 	TextureHandle D3DRenderTexture::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
 	{
-		if (mipmap > _mipmap_count)
+		if (mipmap > _mipmap_count || !_is_have_total_view)
 			return 0;
 		if (_dimension == ETextureDimension::kCube)
 		{
@@ -655,7 +725,6 @@ namespace Ailu
 			g_pLogMgr->LogWarning("GetView: texture is not a cube texture");
 			return 0;
 		}
-
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE* D3DRenderTexture::TargetCPUHandle(u16 index)
@@ -665,14 +734,48 @@ namespace Ailu
 		D3DContext::Get()->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 		s_current_rt = this;
-		return &_rtv_or_dsv_cpu_handles[index];
+		u16 mipmap_level = _mipmap_count + 1;
+		if (_mipmap_count > 0)
+		{
+			if (index % (mipmap_level) == 0)
+			{
+				return &_rtv_or_dsv_cpu_handles[index / mipmap_level];
+			}
+			else
+			{
+				//index = face_index * 6 + mipmap_index
+				u16 face_index = index / mipmap_level + 1, mipmap_index = index % mipmap_level - 1;//每张纹理的mipmap0不在这个体系内，所有索引从1开始
+				return &_mipmap_rtv_handles[(ECubemapFace::ECubemapFace)face_index][mipmap_index];
+			}
+		}
+		else
+		{
+			return &_rtv_or_dsv_cpu_handles[index];
+		}
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE* D3DRenderTexture::TargetCPUHandle(CommandBuffer* cmd, u16 index)
 	{
 		MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), _depth > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
 		s_current_rt = this;
-		return &_rtv_or_dsv_cpu_handles[index];
+		u16 mipmap_level = _mipmap_count + 1;
+		if (_mipmap_count > 0)
+		{
+			if (index % (mipmap_level) == 0)
+			{
+				return &_rtv_or_dsv_cpu_handles[index / mipmap_level];
+			}
+			else
+			{
+				//index = face_index * 6 + mipmap_index
+				u16 face_index = index / mipmap_level + 1, mipmap_index = index % mipmap_level - 1;
+				return &_mipmap_rtv_handles[(ECubemapFace::ECubemapFace)face_index][mipmap_index];
+			}
+		}
+		else
+		{
+			return &_rtv_or_dsv_cpu_handles[index];
+		}
 	}
 
 

@@ -160,6 +160,25 @@ namespace Ailu
 				}
 				return *this;
 			}
+
+			bool operator>=(const Vector2D<T>& other) const
+			{
+				bool greater = true;
+				for (u8 i = 0; i < CountOf(data); i++) 
+				{
+					greater &= data[i] >= other.data[i];
+				}
+				return greater;
+			}
+			bool operator<=(const Vector2D<T>& other) const
+			{
+				bool less = true;
+				for (u8 i = 0; i < CountOf(data); i++)
+				{
+					less &= data[i] <= other.data[i];
+				}
+				return less;
+			}
 		};
 		template <typename T>
 		const Vector2D<T> Vector2D<T>::kZero(0, 0);
@@ -237,6 +256,16 @@ namespace Ailu
 					data[i] *= other;
 				}
 				return *this;
+			}
+
+			Vector3D<T> operator/(const Vector3D<T>& other) const
+			{
+				Vector3D<T> r;
+				for (u8 i = 0; i < CountOf(data); i++) 
+				{
+					r.data[i] = data[i] / other.data[i];
+				}
+				return r;
 			}
 
 			Vector3D<T>& operator/=(const Vector3D<T>& other) {

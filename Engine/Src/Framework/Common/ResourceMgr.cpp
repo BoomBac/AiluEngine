@@ -435,21 +435,7 @@ namespace Ailu
 			g_pLogMgr->LogErrorFormat(L"Save scene failed to {}", sys_path);
 			return;
 		}
-		g_pLogMgr->LogErrorFormat(L"Save scene to {}", sys_path);
-		//auto sys_path = GetSceneSysPath(scene_path);
-		//ofstream file(sys_path, ios_base::out);
-		//if (!file.is_open())
-		//{
-
-		//}
-		//String serialized_str = ss.str();
-		//std::istringstream iss(serialized_str);
-		//std::string line;
-		//while (std::getline(iss, line))
-		//{
-		//	file << line << endl;
-		//}
-		//file.close();
+		g_pLogMgr->LogFormat(L"Save scene to {}", sys_path);
 	}
 
 	List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString& asset_path)

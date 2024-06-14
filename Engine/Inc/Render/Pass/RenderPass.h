@@ -100,15 +100,18 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		Scope<RenderTexture> _p_cube_map;
-		Scope<RenderTexture> _p_env_map;
+		Scope<RenderTexture> _src_cubemap;
+		Scope<RenderTexture> _prefilter_cubemap;
+		Scope<RenderTexture> _radiance_map;
 	private:
+		bool is_source_by_texture;
 		ScenePerPassData _pass_data[6];
 		Scope<ConstantBuffer> _per_pass_cb[6];
 		Scope<ConstantBuffer> _per_obj_cb;
 		Matrix4x4f _world_mat;
 		Rect _cubemap_rect;
 		Rect _ibl_rect;
+		Vector<Ref<Material>> _reflection_prefilter_mateirals;
 		Material* _p_gen_material;
 		Material* _p_filter_material;
 		Mesh* _p_cube_mesh;
@@ -134,6 +137,8 @@ namespace Ailu
 		Mesh* _p_quad_mesh;
 		Array<Rect, 3> _rects;
 		Texture2D* _p_ibllut;
+		Ref<Texture2D> _brdf_lut;
+		Ref<ComputeShader> _brdflut_gen;
 	};
 
 	class SkyboxPass : public RenderPass

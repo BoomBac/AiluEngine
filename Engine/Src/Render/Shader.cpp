@@ -128,17 +128,25 @@ namespace Ailu
 		g_pLogMgr->LogFormat(L"Begin compile shader: {}....", _src_file_path);
 		if (PreProcessShader() && RHICompileImpl())
 		{
+			for (auto& pass : _passes)
+			{
+				pass._pipeline_raster_state.Hash(PipelineStateHash<RasterizerState>::GenHash(pass._pipeline_raster_state));
+				pass._pipeline_input_layout.Hash(PipelineStateHash<VertexInputLayout>::GenHash(pass._pipeline_input_layout));
+				pass._pipeline_blend_state.Hash(PipelineStateHash<BlendState>::GenHash(pass._pipeline_blend_state));
+				pass._pipeline_ds_state.Hash(PipelineStateHash<DepthStencilState>::GenHash(pass._pipeline_ds_state));
+			}
 			GraphicsPipelineStateMgr::OnShaderRecompiled(this);
+			_is_compiling.store(false);
 			_is_compile_error = false;
 			return true;
 		}
 		else
 		{
 			_is_compile_error = true;
+			_is_compiling.store(false);
 			return false;
 		}
 		g_pLogMgr->Log("Shader compile end");
-		_is_compiling.store(false);
 	}
 
 	void Shader::SetGlobalTexture(const String& name, Texture* texture)
@@ -425,12 +433,13 @@ namespace Ailu
 					pass_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
 				}
 				cur_pass._index = i;
-				cur_pass._pipeline_input_layout = _passes[i]._pipeline_input_layout;//暂时使用旧的数据，其后续会在d3d编译时更新，这里先赋值防止主线程绘制崩溃
 				cur_pass._source_files.insert(_src_file_path);
+				cur_pass._pipeline_input_layout = _passes[i]._pipeline_input_layout;//暂时使用旧的数据，其后续会在d3d编译时更新，这里先赋值防止主线程绘制崩溃
 				cur_pass._pipeline_raster_state = pass_pipeline_raster_state;
 				cur_pass._pipeline_ds_state = pass_pipeline_ds_state;
 				cur_pass._pipeline_topology = pass_pipeline_topology;
 				cur_pass._pipeline_blend_state = pass_pipeline_blend_state;
+				
 				//解析shader属性
 				auto prop_start_it = std::find(lines.begin(), lines.end(), "//Properties");
 				auto prop_end_it = std::find(prop_start_it, lines.end(), "//}");
@@ -597,6 +606,11 @@ namespace Ailu
 
 	bool ComputeShader::Compile()
 	{
+		if (!FileManager::Exist(_src_file_path))
+		{
+			g_pLogMgr->LogErrorFormat(L"ComputeShader::Compile: source:{} not exist!",_src_file_path);
+			return false;
+		}
 		return RHICompileImpl();
 	}
 

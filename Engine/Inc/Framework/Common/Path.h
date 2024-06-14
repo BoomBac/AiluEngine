@@ -146,6 +146,14 @@ namespace Ailu
 			}
 		}
 
+		static fs::path ResolveRelPath(const fs::path& relative_path, const fs::path& base_path) 
+		{
+			std::filesystem::path absolute_base_path = std::filesystem::absolute(base_path);
+			std::filesystem::path combined_path = absolute_base_path / relative_path;
+			std::filesystem::path normalized_path = std::filesystem::weakly_canonical(combined_path);
+			return normalized_path;
+		}
+
 		static std::string GetFileName(const std::string_view filePath, bool include_ext = false)
 		{
 			size_t found = filePath.find_last_of("/\\");

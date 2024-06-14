@@ -5,6 +5,7 @@
 19e162eb-c2bf-4ea6-a9a2-26bb81437c33,Icons/image.alasset,kTexture2D
 21ed1f88-ac3b-404c-a296-b16784617df7,Shaders/cs_mipmap_gen.alasset,kComputeShader
 2ff30e48-6661-479b-a90c-863e606734f6,Meshs/sphere.alasset,kMesh
+3110f020-ca16-4ded-ad94-0332327a2bde,NewScene/new_scene.almap,kScene
 32414c6f-47f1-47a1-883c-678fac6e47e8,NewScene/Palace/Mesh_0.alasset,kMesh
 324335bf-8def-4583-911a-047863b48455,NewScene/Palace/Material_0.alasset,kMaterial
 339a1a1a-522a-4872-a110-cfbc21f0215c,Shaders/gizmo.alasset,kShader

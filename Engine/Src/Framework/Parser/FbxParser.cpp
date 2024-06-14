@@ -1063,7 +1063,7 @@ namespace Ailu
 
 		//LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
 		mesh->Clear();
-		float aabb_space = 1.0f;
+		float aabb_space = 0.25f;
 		mesh->_bound_boxs.emplace_back(AABB(mesh_vmin, mesh_vmax));
 		for (auto& it : subemesh_aabbs)
 		{
@@ -1073,6 +1073,11 @@ namespace Ailu
 			mesh->_bound_boxs.emplace_back(AABB(exist_min, exist_max));
 		}
 		mesh->_bound_boxs[0] = AABB(mesh_vmin, mesh_vmax);
+		for (auto& box : mesh->_bound_boxs)
+		{
+			box._min -= aabb_space;
+			box._max += aabb_space;
+		}
 		vertex_count = (u32)positions.size();
 		//auto index_count = indices.size();
 		mesh->_vertex_count = vertex_count;

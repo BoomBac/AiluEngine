@@ -262,13 +262,13 @@ namespace Ailu
 			AL_ASSERT(pass_index >= _passes.size());
 			return std::tie(_passes[pass_index]._vert_entry, _passes[pass_index]._pixel_entry);
 		}
+		std::atomic<bool> _is_compiling = false;
 	protected:
 		virtual bool RHICompileImpl();
 	protected:
 		inline static u8* _p_cbuffer = nullptr;
 		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
 		bool _is_compile_error;
-		std::atomic<bool> _is_compiling = false;
 		WString _src_file_path;
 		Vector<ShaderPass> _passes;
 		std::map<String, Vector<String>> _passshared_keywords;

@@ -1,5 +1,5 @@
 guid: 21ed1f88-ac3b-404c-a296-b16784617df7
 type: kComputeShader
 name: cs_mipmap_gen
-  file: Shaders/hlsl/Compute/cs_mipmap_gen.hlsl
+  file: Shaders/hlsl/Compute/cs_mipmap_gen.alcp
   kernel: cs_main

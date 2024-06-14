@@ -26,6 +26,7 @@ namespace Ailu
         { 
             return sp_instance->GetMouseYImpl();
         };
+        //mouse pos,start at left-top of the window
         inline static Vector2f GetMousePos()
         {
             return sp_instance->GetMousePosImpl();

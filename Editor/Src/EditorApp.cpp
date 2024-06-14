@@ -118,8 +118,8 @@ namespace Ailu
 			using std::endl;
 			std::stringstream ss;
 			ss << "[Common]" << std::endl;
-			ss << "WindowSize = " << Vector2f(_p_window->GetWidth(), _p_window->GetHeight()) << endl;
-			ss << "ViewPortSize = " << _p_editor_layer->_p_render_view->_size << endl;
+			ss << "WindowSize = " << Vector2f((f32)_p_window->GetWidth(), (f32)_p_window->GetHeight()) << endl;
+			ss << "ViewPortSize = " << _p_editor_layer->_p_render_view->Size() << endl;
 			ss << "[SceneCamera]" << std::endl;
 			ss << "Type = " << ECameraType::ToString(Camera::sCurrent->Type()) <<std::endl;
 			ss << "Position = " << Camera::sCurrent->Position() << endl;

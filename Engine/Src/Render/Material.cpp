@@ -264,7 +264,7 @@ namespace Ailu
 			auto it = pass_tex.find(name);
 			if (it == pass_tex.end())
 			{
-				return;
+				continue;
 			}
 			std::get<1>(pass_tex[name]) = texture;
 			if (_properties.find(name) != _properties.end())

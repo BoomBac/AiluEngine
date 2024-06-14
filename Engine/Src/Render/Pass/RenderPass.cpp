@@ -98,15 +98,15 @@ namespace Ailu
 	//-------------------------------------------------------------ReslovePass-------------------------------------------------------------
 
 	//-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
-	ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize }), _addlight_rect(Rect{ 0,0,(u16)(kShadowMapSize >> 1),(u16)(kShadowMapSize >> 1)})
+	ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize }), _addlight_rect(Rect{ 0,0,(u16)(kShadowMapSize >> 1),(u16)(kShadowMapSize >> 1) })
 	{
 		_p_mainlight_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainLightShadowMap", ERenderTargetFormat::kShadowMap);
 		//_p_addlight_shadow_map = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, "AddLightShadowMap", ERenderTargetFormat::kShadowMap);
-		_p_addlight_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, RenderConstants::kMaxSpotLightNum,"AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
-		_p_point_light_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1,"PointLightShadowMap", ERenderTargetFormat::kShadowMap,RenderConstants::kMaxPointLightNum);
-//		_p_shadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
-//		_p_shadowcast_material->SetUint("shadow_index",0);
-//		_p_addshadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
+		_p_addlight_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, RenderConstants::kMaxSpotLightNum, "AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
+		_p_point_light_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, "PointLightShadowMap", ERenderTargetFormat::kShadowMap, RenderConstants::kMaxPointLightNum);
+		//		_p_shadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
+		//		_p_shadowcast_material->SetUint("shadow_index",0);
+		//		_p_addshadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
 		for (int i = 0; i < 1 + RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxPointLightNum * 6; i++)
 		{
 			_shadowcast_materials.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast"));
@@ -140,7 +140,7 @@ namespace Ailu
 			{
 				for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
 				{
-					if (rendering_data._shadow_data[i+1]._shadow_index == -1)
+					if (rendering_data._shadow_data[i + 1]._shadow_index == -1)
 						continue;
 					cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, i);
 					cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), i, 1.0f);
@@ -201,20 +201,25 @@ namespace Ailu
 
 	//-------------------------------------------------------------CubeMapGenPass-------------------------------------------------------------
 
-	CubeMapGenPass::CubeMapGenPass(u16 size, String texture_name, String src_texture_name) : RenderPass("CubeMapGenPass"), _cubemap_rect(Rect{ 0,0,size,size }),_ibl_rect(Rect{ 0,0,(u16)(size / 4),(u16)(size / 4) })
+	CubeMapGenPass::CubeMapGenPass(u16 size, String texture_name, String src_texture_name) : RenderPass("CubeMapGenPass"), _cubemap_rect(Rect{ 0,0,size,size }), _ibl_rect(Rect{ 0,0,(u16)(size / 4),(u16)(size / 4) })
 	{
+		is_source_by_texture = true;
 		float x = 0.f, y = 0.f, z = 0.f;
 		Vector3f center = { x,y,z };
 		Vector3f world_up = Vector3f::kUp;
-		_p_cube_map = RenderTexture::Create(size, texture_name + "_cubemap", ERenderTargetFormat::kDefaultHDR, true,true,true);
-		_p_cube_map->CreateView();
-		_p_env_map = RenderTexture::Create(size / 4, texture_name + "_ibl_diffuse", ERenderTargetFormat::kDefaultHDR, false);
+		_src_cubemap = RenderTexture::Create(size, texture_name + "_src_cubemap", ERenderTargetFormat::kDefaultHDR, true, true, true);
+		_src_cubemap->CreateView();
+		_prefilter_cubemap = RenderTexture::Create(size, texture_name + "_prefilter_cubemap", ERenderTargetFormat::kDefaultHDR, true, true, true);
+		_prefilter_cubemap->CreateView();
+		_radiance_map = RenderTexture::Create(size / 4, texture_name + "_radiance", ERenderTargetFormat::kDefaultHDR, false);
+		_radiance_map->CreateView();
 		_p_gen_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/CubemapGen");
 		_p_gen_material->SetTexture("env", ToWChar(src_texture_name));
 		_p_cube_mesh = Mesh::s_p_cube;
 		_p_filter_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/EnvmapFilter");
 		Matrix4x4f view, proj;
 		BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0, 1.0, 100000);
+		//BuildPerspectiveFovLHMatrix(proj, 2.0 * atan((f32)size / ((f32)size - 0.5)), 1.0, 1.0, 100000);
 		float scale = 0.5f;
 		MatrixScale(_world_mat, scale, scale, scale);
 		_per_obj_cb.reset(ConstantBuffer::Create(RenderConstants::kPeObjectDataSize));
@@ -245,34 +250,71 @@ namespace Ailu
 			_per_pass_cb[i].reset(ConstantBuffer::Create(RenderConstants::kPePassDataSize));
 			memcpy(_per_pass_cb[i]->GetData(), &_pass_data[i], RenderConstants::kPePassDataSize);
 		}
+		f32 mipmap_level = _prefilter_cubemap->MipmapLevel() + 1;
+		for (f32 i = 0.0f; i < mipmap_level; i++)
+		{
+			u16 cur_mipmap_size = size >> (u16)i;
+			_reflection_prefilter_mateirals.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/filter_irradiance.alasset"), "ReflectionPrefilter"));
+			_reflection_prefilter_mateirals.back()->SetFloat("_roughness", i / mipmap_level);
+			_reflection_prefilter_mateirals.back()->SetFloat("_width", cur_mipmap_size);
+			//_reflection_prefilter_mateirals.back()->SetTexture("SrcTex", ToWChar(src_texture_name));
+			_reflection_prefilter_mateirals.back()->SetTexture("EnvMap", _src_cubemap.get());
+		}
 	}
 
 	void CubeMapGenPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
 		auto cmd = CommandBufferPool::Get();
 		cmd->Clear();
-		cmd->SetScissorRect(_cubemap_rect);
-		cmd->SetViewport(_cubemap_rect);
-		for (u16 i = 0; i < 6; i++)
+		if (is_source_by_texture)
 		{
-			cmd->SetRenderTarget(_p_cube_map.get(), i);
-			cmd->ClearRenderTarget(_p_cube_map.get(), Colors::kBlack, i);
-			cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
-			cmd->DrawRenderer(_p_cube_mesh, _p_gen_material, _per_obj_cb.get());
+			u16 mipmap_level = _src_cubemap->MipmapLevel() + 1;
+			//image tp cubemap
+			for (u16 i = 0; i < 6; i++)
+			{
+				u16 rt_index = mipmap_level * i;
+				cmd->SetRenderTarget(_src_cubemap.get(), rt_index);
+				cmd->ClearRenderTarget(_src_cubemap.get(), Colors::kBlack, rt_index);
+				cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
+				cmd->DrawRenderer(_p_cube_mesh, _p_gen_material, _per_obj_cb.get(), 0, 0, 1);
+			}
+			context->ExecuteAndWaitCommandBuffer(cmd);
+			cmd->Clear();
+			//实际上mipmap生成不使用传入的cmd，但是需要等待原始cubemap生成完毕
+			_src_cubemap->GenerateMipmap(cmd.get());
+			//gen radiance map
+			_p_filter_material->SetTexture("EnvMap", _src_cubemap.get());
+			for (u16 i = 0; i < 6; i++)
+			{
+				cmd->SetRenderTarget(_radiance_map.get(), i);
+				cmd->ClearRenderTarget(_radiance_map.get(), Colors::kBlack, i);
+				cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
+				cmd->DrawRenderer(_p_cube_mesh, _p_filter_material, _per_obj_cb.get());
+			}
+			//filter envmap
+			mipmap_level = _prefilter_cubemap->MipmapLevel() + 1;
+			for (u16 i = 0; i < 6; i++)
+			{
+				Rect r(0, 0, _prefilter_cubemap->Width(), _prefilter_cubemap->Height());
+				for (u16 j = 0; j < mipmap_level; j++)
+				{
+					auto [w, h] = _prefilter_cubemap->CurMipmapSize(j);
+					r.width = w;
+					r.height = h;
+					u16 rt_index = mipmap_level * i + j;
+					cmd->SetViewport(r);
+					cmd->SetScissorRect(r);
+					cmd->SetRenderTarget(_prefilter_cubemap.get(), rt_index);
+					cmd->ClearRenderTarget(_prefilter_cubemap.get(), Colors::kBlack, rt_index);
+					cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _reflection_prefilter_mateirals[0]->GetShader()->GetPrePassBufferBindSlot(1));
+					cmd->DrawRenderer(_p_cube_mesh, _reflection_prefilter_mateirals[j].get(), _per_obj_cb.get(), 0, 1, 1);
+				}
+			}
 		}
-		_p_filter_material->SetTexture("EnvMap", _p_cube_map.get());
-		cmd->SetScissorRect(_ibl_rect);
-		cmd->SetViewport(_ibl_rect);
-		for (u16 i = 0; i < 6; i++)
-		{
-			cmd->SetRenderTarget(_p_env_map.get(), i);
-			cmd->ClearRenderTarget(_p_env_map.get(), Colors::kBlack, i);
-			cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
-			cmd->DrawRenderer(_p_cube_mesh, _p_filter_material, _per_obj_cb.get());
-		}
-		Shader::SetGlobalTexture("SkyBox", _p_env_map.get());
-		context->ExecuteAndWaitCommandBuffer(cmd);
-		_p_cube_map->GenerateMipmap(cmd.get());
+
+		Shader::SetGlobalTexture("SkyBox", _radiance_map.get());
+		context->ExecuteCommandBuffer(cmd);
+		//_p_cube_map->GenerateMipmap(cmd.get());
 		CommandBufferPool::Release(cmd);
 	}
 
@@ -289,14 +331,19 @@ namespace Ailu
 	DeferredGeometryPass::DeferredGeometryPass(u16 width, u16 height) : RenderPass("DeferedGeometryPass")
 	{
 		_gbuffers.resize(3);
-		//ShaderImportSetting setting;
-		//setting._vs_entry = "DeferredLightingVSMain";
-		//setting._ps_entry = "DeferredLightingPSMain";
 		_p_lighting_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/deferred_lighting.alasset"), "DeferedGbufferLighting");
 		_p_quad_mesh = Mesh::s_p_quad;
 		for (int i = 0; i < _rects.size(); i++)
 			_rects[i] = Rect(0, 0, width, height);
 		_p_ibllut = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset");
+		_brdf_lut = Texture2D::Create(256,256,false,ETextureFormat::kRGFloat,false,true);
+		_brdf_lut->Apply();
+		_brdf_lut->Name("brdf_lut_tex");
+		_brdflut_gen = ComputeShader::Create(PathUtils::GetResSysPath(L"Shaders/hlsl/Compute/brdflut_gen.alcp"));
+		_brdflut_gen->SetTexture("_brdf_lut",_brdf_lut.get());
+		auto cmd = CommandBufferPool::Get();
+		cmd->Dispatch(_brdflut_gen.get(),16,16,1);
+		g_pGfxContext->ExecuteCommandBuffer(cmd);
 	}
 	void DeferredGeometryPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
@@ -310,6 +357,7 @@ namespace Ailu
 		auto cmd = CommandBufferPool::Get("DeferredRenderPass");
 		{
 			ProfileBlock profile(cmd.get(), _name);
+			cmd->Dispatch(_brdflut_gen.get(), 16, 16, 1);
 			cmd->SetRenderTargets(_gbuffers, rendering_data._camera_depth_target_handle);
 			cmd->ClearRenderTarget(_gbuffers, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
 			cmd->SetViewports({ _rects[0],_rects[1],_rects[2] });
@@ -331,7 +379,7 @@ namespace Ailu
 			_p_lighting_material->SetTexture("_GBuffer1", _gbuffers[1]);
 			_p_lighting_material->SetTexture("_GBuffer2", _gbuffers[2]);
 			_p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_target_handle);
-			_p_lighting_material->SetTexture("IBLLut", _p_ibllut);
+			_p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
 			cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
 			cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, Colors::kBlack);
 			cmd->SetViewport(rendering_data._viewport);
@@ -437,10 +485,10 @@ namespace Ailu
 				//grid_color = Colors::kGreen;
 				Gizmo::DrawGrid(10, 1000, grid_center_large, grid_color);
 			}
-
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 500.f,0.0f,0.0f }, Colors::kRed);
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,500.0f,0.0f }, Colors::kGreen);
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,500.0f }, Colors::kBlue);
+			static const f32 s_axis_length = 50000.0f;
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ s_axis_length,0.0f,0.0f }, Colors::kRed);
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,s_axis_length,0.0f }, Colors::kGreen);
+			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,s_axis_length }, Colors::kBlue);
 		}
 	}
 	void GizmoPass::EndPass(GraphicsContext* context)
@@ -449,7 +497,7 @@ namespace Ailu
 	//-------------------------------------------------------------GizmoPass-------------------------------------------------------------
 
 	//-------------------------------------------------------------CopyColorPass-------------------------------------------------------------
-	CopyColorPass::CopyColorPass(): RenderPass("CopyColor")
+	CopyColorPass::CopyColorPass() : RenderPass("CopyColor")
 	{
 		_p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
 		_p_obj_cb = ConstantBuffer::Create(256);
@@ -469,7 +517,7 @@ namespace Ailu
 			cmd->SetScissorRect(rendering_data._viewport);
 			cmd->SetRenderTarget(rendering_data._camera_opaque_tex_handle);
 			_p_blit_mat->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
-			cmd->DrawRenderer(_p_quad_mesh,_p_blit_mat,1,1);
+			cmd->DrawRenderer(_p_quad_mesh, _p_blit_mat, 1, 1);
 		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);

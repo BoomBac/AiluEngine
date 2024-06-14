@@ -162,17 +162,22 @@ namespace Ailu
 
 		memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
 		shader = g_pResourceMgr->Get<Shader>(L"Shaders/filter_irradiance.alasset");
-		pso_desc._input_layout = shader->PipelineInputLayout();
-		pso_desc._blend_state = shader->PipelineBlendState();
-		pso_desc._raster_state = shader->PipelineRasterizerState();
-		pso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
-		pso_desc._topology = shader->PipelineTopology();
-		pso_desc._p_pixel_shader = shader;
-		pso_desc._p_vertex_shader = shader;
-		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},EALGFormat::EALGFormat::kALGFormatUnknown };
-		pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
-		pso->Build();
-		GraphicsPipelineStateMgr::AddPSO(std::move(pso));
+		for (int i = 0; i < shader->PassCount(); i++)
+		{
+			auto& pass = shader->GetPassInfo(i);
+			pso_desc._input_layout = shader->PipelineInputLayout(i);
+			pso_desc._blend_state = shader->PipelineBlendState(i);
+			pso_desc._raster_state = shader->PipelineRasterizerState(i);
+			pso_desc._depth_stencil_state = shader->PipelineDepthStencilState(i);
+			pso_desc._topology = shader->PipelineTopology(i);
+			pso_desc._p_pixel_shader = shader;
+			pso_desc._p_vertex_shader = shader;
+			pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},EALGFormat::EALGFormat::kALGFormatUnknown };
+			pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
+			pso->Build(i);
+			GraphicsPipelineStateMgr::AddPSO(std::move(pso));
+		}
+
 
 		LOG_WARNING("Initialize PSO cache done after {}ms!", g_pTimeMgr->GetElapsedSinceLastMark());
 	}
@@ -220,32 +225,35 @@ namespace Ailu
 				u16 pass_index = 0, variant_id = 0;
 				Shader::ExtractInfoFromHash(shader_hash, shader_id, pass_index, variant_id);
 				auto new_shader = g_pResourceMgr->Get<Shader>(shader_id);
-				GraphicsPipelineStateInitializer new_desc;
-				new_desc._input_layout = VertexInputLayout::_s_hash_obj.Get(input_layout);
-				new_desc._blend_state = BlendState::_s_hash_obj.Get(blend_state);
-				new_desc._raster_state = RasterizerState::_s_hash_obj.Get(raster_state);
-				new_desc._depth_stencil_state = DepthStencilState::_s_hash_obj.Get(ds_state);
-				new_desc._topology = GetTopologyByHash(topology);
-				new_desc._p_pixel_shader = new_shader;
-				new_desc._p_vertex_shader = new_shader;
-				new_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
-				auto pso = std::move(GraphicsPipelineStateObject::Create(new_desc));
-				pso->Build(pass_index, variant_id);
-				for (auto& [hash, pso] : s_pso_library)
+				if (!new_shader->_is_compiling.load())
 				{
-					u32 similar_shader_hash;
-					GraphicsPipelineStateObject::ExtractPSOHash(hash, input_layout, similar_shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
-					if (similar_shader_hash == shader_hash)
+					GraphicsPipelineStateInitializer new_desc;
+					new_desc._input_layout = VertexInputLayout::_s_hash_obj.Get(input_layout);
+					new_desc._blend_state = BlendState::_s_hash_obj.Get(blend_state);
+					new_desc._raster_state = RasterizerState::_s_hash_obj.Get(raster_state);
+					new_desc._depth_stencil_state = DepthStencilState::_s_hash_obj.Get(ds_state);
+					new_desc._topology = GetTopologyByHash(topology);
+					new_desc._p_pixel_shader = new_shader;
+					new_desc._p_vertex_shader = new_shader;
+					new_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
+					auto pso = std::move(GraphicsPipelineStateObject::Create(new_desc));
+					pso->Build(pass_index, variant_id);
+					for (auto& [hash, pso] : s_pso_library)
 					{
-						LOG_INFO("Similar pso name:[{}], Input Layout: {}, Shader: {}, Topology: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}, Hash: {}",
-							pso->Name(), (u32)input_layout, shader_hash, (u32)topology, (u32)blend_state, (u32)raster_state, (u32)ds_state, (u32)rt_state, hash.ToString());
+						u32 similar_shader_hash;
+						GraphicsPipelineStateObject::ExtractPSOHash(hash, input_layout, similar_shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
+						if (similar_shader_hash == shader_hash)
+						{
+							LOG_INFO("Similar pso name:[{}], Input Layout: {}, Shader: {}, Topology: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}, Hash: {}",
+								pso->Name(), (u32)input_layout, shader_hash, (u32)topology, (u32)blend_state, (u32)raster_state, (u32)ds_state, (u32)rt_state, hash.ToString());
+						}
 					}
+					GraphicsPipelineStateObject::ExtractPSOHash(pso->Hash(), input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
+					LOG_WARNING("New Pso name:[{}], Input Layout: {}, Shader: {}, Topology: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}, Hash: {}",
+						pso->Name(), (u32)input_layout, shader_hash, (u32)topology, (u32)blend_state, (u32)raster_state, (u32)ds_state, (u32)rt_state, pso->Hash().ToString());
+					//LOG_WARNING("new hash {}", pso->Hash().ToString());
+					GraphicsPipelineStateMgr::AddPSO(std::move(pso));
 				}
-				GraphicsPipelineStateObject::ExtractPSOHash(pso->Hash(), input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
-				LOG_WARNING("New Pso name:[{}], Input Layout: {}, Shader: {}, Topology: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}, Hash: {}",
-					pso->Name(), (u32)input_layout, shader_hash, (u32)topology, (u32)blend_state, (u32)raster_state, (u32)ds_state, (u32)rt_state, pso->Hash().ToString());
-				//LOG_WARNING("new hash {}", pso->Hash().ToString());
-				GraphicsPipelineStateMgr::AddPSO(std::move(pso));
 			}
 		}
 		s_bind_resource_list.clear();
