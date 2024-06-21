@@ -4,7 +4,7 @@
 //#include "../schlick.brdf"
 //#include "../smith.brdf"
 
-RWTexture2D<float4> _brdf_lut;
+RWTexture2D<float2> _brdf_lut;
 
 #ifdef GGX_RAW
 // from iblbacker
@@ -117,7 +117,7 @@ float2 IntegrateBRDF(float roughness, float NoV)
     
     float A = 0.0;
     float B = 0.0;
-    const uint numSamples = 4;
+    const uint numSamples = 1024;
     
     for (uint i = 0u; i < numSamples; i++) {
         float2 Xi = hammersley(i, numSamples);
@@ -149,8 +149,8 @@ float2 IntegrateBRDF(float roughness, float NoV)
 void cs_main(CSInput cs_input)
 {
     uint2 id = cs_input.DispatchThreadID.xy;
-    float roughness = (float)(id.y + 1) / 256.0f;
-    float nv = (float)(id.x + 1) / 256.0f;
+    float roughness = (float)(id.y + 1) / 128.0f;
+    float nv = (float)(id.x + 1) / 128.0f;
 
 	float2 color = IntegrateBRDF(roughness,nv);
     // if(_brdf_lut[uint2(id.x,id.y)].x < 0)
@@ -162,7 +162,7 @@ void cs_main(CSInput cs_input)
 
     // _brdf_lut[uint2(id.x,id.y)].xy += 1;
     // }
-    _brdf_lut[uint2(id.x,id.y)] = color.xyyy;
+    _brdf_lut[uint2(id.x,127 - id.y)] = color.xy;
 }
 
 

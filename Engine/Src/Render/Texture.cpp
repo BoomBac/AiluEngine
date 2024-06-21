@@ -100,6 +100,7 @@ namespace Ailu
 			auto [w, h] = CurMipmapSize(i);
 			u64 cur_mipmap_byte_size = w * h * _pixel_size;
 			_pixel_data[i] = new u8[cur_mipmap_byte_size];
+			memset(_pixel_data[i], -1, cur_mipmap_byte_size);
 			_gpu_memery_size += cur_mipmap_byte_size;
 		}
 		s_gpu_memory_size += _gpu_memery_size;

@@ -30,6 +30,9 @@ namespace Ailu
 		void Name(const String& new_name) final;
 		D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _main_srv_handle; };
 	private:
+		void MakesureResourceState(ID3D12GraphicsCommandList* cmd, D3D12_RESOURCE_STATES target_state);
+	private:
+		D3D12_RESOURCE_STATES _cur_res_state;
 		D3D12_GPU_DESCRIPTOR_HANDLE _main_srv_handle;
 		D3D12_GPU_DESCRIPTOR_HANDLE _main_uav_handle;
 		ComPtr<ID3D12Resource> _p_d3dres;

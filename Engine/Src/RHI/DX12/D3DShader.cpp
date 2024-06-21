@@ -117,7 +117,7 @@ namespace Ailu
 		UINT compileFlags = 0;
 #if defined(_DEBUG)
 		// Enable better shader debugging with the graphics debugging tools.
-		compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+		compileFlags = D3DCOMPILE_DEBUG;// | D3DCOMPILE_SKIP_OPTIMIZATION; //跳过优化会导致compute shader在某些情况写入的值和计算的值不一致
 #else
 		compileFlags = 0;
 #endif

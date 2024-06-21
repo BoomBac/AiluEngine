@@ -145,6 +145,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
     // float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
     // float3 k_D = diffuse_color * (1.0 - FssEss - FmsEms);
 	float3 FssEss = F0 * envBRDF.x + envBRDF.y;
+	//light += FssEss * radiance + diffuse_color * irradiance;
 	light += FssEss * radiance + diffuse_color * irradiance;
 	return light; 
 }

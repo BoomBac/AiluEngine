@@ -40,9 +40,9 @@ namespace Ailu
 		textureDesc.SampleDesc.Quality = 0;
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _is_random_access ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-		if (_pixel_data[0] != nullptr)
+		_cur_res_state = _is_random_access ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_COPY_DEST;
+		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _cur_res_state,nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+		if (*_pixel_data[0] != -1)
 		{
 			ComPtr<ID3D12Resource> pTextureUpload;
 			const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
@@ -64,8 +64,8 @@ namespace Ailu
 				subres_datas.emplace_back(subdata);
 			}
 			UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
-			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_d3dres.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			p_cmdlist->ResourceBarrier(1, &barrier);
+			_cur_res_state = D3D12_RESOURCE_STATE_COPY_DEST;
+			MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			D3DContext::Get()->TrackResource(pTextureUpload);
 		}
 		D3DContext::Get()->ExecuteCommandBuffer(cmd);
@@ -98,17 +98,28 @@ namespace Ailu
 
 	void D3DTexture2D::Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline)
 	{
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
 		if (slot == 255)
 		{
+			if (!compute_pipiline)
+			{
+				MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			}
+			else
+			{
+				MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			}
 			_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
 			return;
 		}
 		if (!compute_pipiline)
 		{
+			MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
 		}
 		else
 		{
+			MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 			_allocation.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
 		}
 	}
@@ -163,6 +174,15 @@ namespace Ailu
 		_name = new_name;
 		if(_p_d3dres)
 			_p_d3dres->SetName(ToWChar(new_name));
+	}
+	void D3DTexture2D::MakesureResourceState(ID3D12GraphicsCommandList* cmd, D3D12_RESOURCE_STATES target_state)
+	{
+		if (_cur_res_state == target_state)
+			return;
+		auto old_state = _cur_res_state;
+		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_d3dres.Get(), old_state, target_state);
+		cmd->ResourceBarrier(1, &barrier);
+		_cur_res_state = target_state;
 	}
 	//----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
 
@@ -471,7 +491,7 @@ namespace Ailu
 			if (s_current_rt != this)
 			{
 				RenderTexture::Bind(cmd, slot);
-				MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+				MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 				_gpu_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
 			}
 			else
@@ -585,6 +605,7 @@ namespace Ailu
 	{
 		auto tcmd = CommandBufferPool::Get("MipmapGen");
 		auto d3dcmd = static_cast<D3DCommandBuffer*>(tcmd.get())->GetCmdList();
+		MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		//_p_test_cs->SetTexture("gInputA", TexturePool::Get("Textures/MyImage01.jpg").get());
 		for (int i = 1; i < 7; i++)
 		{	

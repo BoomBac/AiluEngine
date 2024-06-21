@@ -336,13 +336,13 @@ namespace Ailu
 		for (int i = 0; i < _rects.size(); i++)
 			_rects[i] = Rect(0, 0, width, height);
 		_p_ibllut = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset");
-		_brdf_lut = Texture2D::Create(256,256,false,ETextureFormat::kRGFloat,false,true);
+		_brdf_lut = Texture2D::Create(128,128,false,ETextureFormat::kRGFloat,false,true);
 		_brdf_lut->Apply();
 		_brdf_lut->Name("brdf_lut_tex");
 		_brdflut_gen = ComputeShader::Create(PathUtils::GetResSysPath(L"Shaders/hlsl/Compute/brdflut_gen.alcp"));
 		_brdflut_gen->SetTexture("_brdf_lut",_brdf_lut.get());
 		auto cmd = CommandBufferPool::Get();
-		cmd->Dispatch(_brdflut_gen.get(),16,16,1);
+		cmd->Dispatch(_brdflut_gen.get(),8,8,1);
 		g_pGfxContext->ExecuteCommandBuffer(cmd);
 	}
 	void DeferredGeometryPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
@@ -357,7 +357,6 @@ namespace Ailu
 		auto cmd = CommandBufferPool::Get("DeferredRenderPass");
 		{
 			ProfileBlock profile(cmd.get(), _name);
-			cmd->Dispatch(_brdflut_gen.get(), 16, 16, 1);
 			cmd->SetRenderTargets(_gbuffers, rendering_data._camera_depth_target_handle);
 			cmd->ClearRenderTarget(_gbuffers, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
 			cmd->SetViewports({ _rects[0],_rects[1],_rects[2] });
