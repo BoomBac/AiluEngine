@@ -18,6 +18,10 @@ namespace Ailu
 		const Transform& GetTransform() const { return _p_transform->SelfTransform(); }
 		TransformComponent* GetTransformComponent() { return _p_transform; }
 		void Serialize(std::ostream& os, String indent) override;
+#ifdef EDITOR
+		bool _is_selected;
+#endif // EDITOR
+
 		//SceneActor& operator=(const SceneActor& other)
 		//{
 		//	return *this;

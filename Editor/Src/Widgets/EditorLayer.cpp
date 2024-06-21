@@ -38,6 +38,7 @@
 #include "Widgets/AssetBrowser.h"
 #include "Widgets/WorldOutline.h"
 #include "Widgets/EnvironmentSetting.h"
+#include "Common/Selection.h"
 
 namespace Ailu
 {
@@ -158,7 +159,8 @@ namespace Ailu
 								}
 							}
 						}
-						g_pSceneMgr->_p_selected_actor = p_closetest_obj;
+						Selection::AddAndRemovePreSelection(p_closetest_obj);
+						//g_pSceneMgr->_p_selected_actor = p_closetest_obj;
 					}
 				}
 			}

@@ -131,9 +131,9 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	float3 diffuse_color = surface.albedo.rgb * (1.0 - DIELECTRIC_SPECULAR) * (1.0 - surface.metallic);
 	float3 F0 = lerp(DIELECTRIC_SPECULAR.xxx, surface.albedo.rgb, surface.metallic);
 	float lod = surface.roughness * 7;
-	float3 irradiance 		= RadianceTex.Sample(g_LinearWrapSampler, surface.wnormal);
+	float3 irradiance = RadianceTex.Sample(g_LinearWrapSampler, surface.wnormal);
 	float3 radiance = PrefilterEnvTex.SampleLevel(g_AnisotropicClampSampler, reflect(view_dir,surface.wnormal),lod);
-	float2 envBRDF  = IBLLut.Sample(g_LinearClampSampler,float2(shading_data.nv,surface.roughness)).xy;
+	float2 envBRDF = IBLLut.Sample(g_LinearClampSampler,float2(shading_data.nv,surface.roughness)).xy;
 
 	// // Roughness dependent fresnel, from Fdez-Aguera
     // float3 Fr = max((1.0 - surface.roughness).xxx, F0) - F0;
@@ -144,8 +144,9 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
     // float3 F_avg = F0 + (1.0 - F0) / 21.0;
     // float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
     // float3 k_D = diffuse_color * (1.0 - FssEss - FmsEms);
+	float ibl_intensity = 0.5;
 	float3 FssEss = F0 * envBRDF.x + envBRDF.y;
-	light += FssEss * radiance + diffuse_color * irradiance;
+	light += (FssEss * radiance + diffuse_color * irradiance) * ibl_intensity;
 	return light; 
 }
 #endif //__LIGHTING_H__

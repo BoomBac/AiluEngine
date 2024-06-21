@@ -1,5 +1,6 @@
 #include "Widgets/ObjectDetail.h"
 #include "Widgets/CommonTextureWidget.h"
+#include "Common/Selection.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 
@@ -51,31 +52,31 @@ namespace Ailu
 				auto mat = dynamic_cast<Material*>(obj);
 				if (mat != nullptr)
 				{
-					auto keywords = mat->GetShader()->GetKeywordGroups();
-					auto it = keywords.find(prop._value_name);
-					if (it != keywords.end())
-					{
-						auto prop_value = static_cast<int>(prop.GetProppertyValue<float>().value_or(0.0));
-						if (ImGui::BeginCombo(prop._name.c_str(), it->second[prop_value].substr(it->second[prop_value].rfind("_") + 1).c_str()))
-						{
-							static int s_selected_index = -1;
-							for (int i = 0; i < it->second.size(); i++)
-							{
-								auto x = it->second[i].rfind("_");
-								auto enum_str = it->second[i].substr(x + 1);
-								if (ImGui::Selectable(enum_str.c_str(), i == s_selected_index))
-									s_selected_index = i;
-								if (s_selected_index == i)
-								{
-									mat->EnableKeyword(it->second[i]);
-									prop.SetProppertyValue(static_cast<float>(i));
-								}
-							}
-							ImGui::EndCombo();
-						}
-					}
-					else
-						ImGui::Text("Eunm %s value missing", prop._name.c_str());
+					//auto keywords = mat->GetShader()->GetKeywordGroups();
+					//auto it = keywords.find(prop._value_name);
+					//if (it != keywords.end())
+					//{
+					//	auto prop_value = static_cast<int>(prop.GetProppertyValue<float>().value_or(0.0));
+					//	if (ImGui::BeginCombo(prop._name.c_str(), it->second[prop_value].substr(it->second[prop_value].rfind("_") + 1).c_str()))
+					//	{
+					//		static int s_selected_index = -1;
+					//		for (int i = 0; i < it->second.size(); i++)
+					//		{
+					//			auto x = it->second[i].rfind("_");
+					//			auto enum_str = it->second[i].substr(x + 1);
+					//			if (ImGui::Selectable(enum_str.c_str(), i == s_selected_index))
+					//				s_selected_index = i;
+					//			if (s_selected_index == i)
+					//			{
+					//				mat->EnableKeyword(it->second[i]);
+					//				prop.SetProppertyValue(static_cast<float>(i));
+					//			}
+					//		}
+					//		ImGui::EndCombo();
+					//	}
+					//}
+					//else
+					//	ImGui::Text("Eunm %s value missing", prop._name.c_str());
 				}
 				else
 					ImGui::Text("Non-Material Eunm %s value missing", prop._name.c_str());
@@ -268,6 +269,22 @@ namespace Ailu
 				ImGui::EndCombo();
 			}
 			mat->MaterialID((EMaterialID::EMaterialID)mat_id);
+			auto surface_type = mat->SurfaceType();
+			u16 surface_type_value = surface_type;
+			ImGui::Text("Surface Type: %s", ESurfaceType::ToString(surface_type));
+			if (ImGui::BeginCombo("##SurfaceType", ESurfaceType::ToString(surface_type)))
+			{
+				for (u32 i = 0; i < ESurfaceType::COUNT; i++)
+				{
+					const bool is_selected = (surface_type_value == i);
+					if (ImGui::Selectable(ESurfaceType::ToString((ESurfaceType::ESurfaceType)i), is_selected))
+						surface_type_value = i;
+					if (is_selected)
+						ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+			mat->SurfaceType((ESurfaceType::ESurfaceType)surface_type_value);
 			func_show_prop(mat_prop_index, mat, "Albedo");
 			func_show_prop(mat_prop_index, mat, "Normal");
 			func_show_prop(mat_prop_index, mat, "Specular");
@@ -555,7 +572,23 @@ namespace Ailu
 		}
 		void ObjectDetail::ShowImpl()
 		{
-			auto cur_selected_actor = g_pSceneMgr->_p_selected_actor;
+			auto s = Selection::First<Shader>();
+			auto actor = Selection::First<SceneActor>();
+			if (s)
+			{
+				ShowShaderPannel(s);
+			}
+			else if (actor)
+			{
+				ShowSceneActorPannel(actor);
+			}
+			else
+			{
+
+			}
+		}
+		void ObjectDetail::ShowSceneActorPannel(SceneActor* cur_selected_actor)
+		{
 			if (cur_selected_actor != nullptr)
 			{
 				ImGui::BulletText(cur_selected_actor->Name().c_str());
@@ -614,6 +647,50 @@ namespace Ailu
 				}
 			}
 			_p_texture_selector->Show();
+		}
+
+		void ObjectDetail::ShowShaderPannel(Shader* s)
+		{
+			f32 indent = 10.0f;
+			ImGui::Text("Name: %s", s->Name().c_str());
+			for (u16 i = 0; i < s->PassCount(); i++)
+			{
+				auto& pass = s->GetPassInfo(i);
+				ImGui::Indent(indent);
+				ImGui::Text("Pass_%d: %s",i,pass._name.c_str());
+				{
+					ImGui::Indent(indent);
+					ImGui::Text("vertex entry: %s",pass._vert_entry.c_str());
+					ImGui::Text("pixel entry: %s",pass._pixel_entry.c_str());
+					{
+						ImGui::Text("local keywords: ");
+						for (auto& kw_group : pass._keywords)
+						{
+							String kws;
+							for (auto& kw : kw_group)
+							{
+								kws.append(kw);
+								kws.append(" ");
+							}
+							ImGui::Text("group: %s",kws.c_str());
+						}
+						ImGui::Text("variants: ");
+						for (auto& variant : pass._shader_variants)
+						{
+							auto& [hash, kw_seq] = variant;
+							String kws;
+							for (auto& kw : kw_seq)
+							{
+								kws.append(kw);
+								kws.append(" ");
+							}
+							ImGui::Text(": %s", kws.c_str());
+						}
+					}
+					ImGui::Unindent(indent);
+				}
+				ImGui::Unindent(indent);
+			}
 		}
 	}
 }

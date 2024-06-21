@@ -201,8 +201,7 @@ namespace Ailu
 			{
 				auto& aabbs = static_mesh->GetAABB();
 				auto submesh_count = static_mesh->GetMesh()->SubmeshCount();
-				auto materials = static_mesh->GetMaterials();
-				auto replace_mat = materials.empty() ? nullptr : materials[0].get();
+				auto& materials = static_mesh->GetMaterials();
 				if (!ViewFrustum::Conatin(cam_vf, aabbs[0]))
 					continue;
 
@@ -210,7 +209,26 @@ namespace Ailu
 				{
 					if (ViewFrustum::Conatin(cam_vf, aabbs[i + 1]))
 					{
-						RenderQueue::Enqueue(RenderQueue::kQpaque, static_mesh->GetMesh().get(), i < materials.size() ? materials[i].get() : replace_mat,
+						u32 queue_id = RenderQueue::kQpaque;
+						Material* used_mat = nullptr;
+						if (materials.empty())
+						{
+							queue_id = RenderQueue::kShaderError;
+						}
+						else
+						{
+							used_mat = i < materials.size() ? materials[i].get() : materials[0].get();
+							auto shader_state = Shader::GetShaderState(used_mat->GetShader());
+							if (shader_state != 0)
+							{
+								queue_id = shader_state;
+							}
+							if (used_mat->SurfaceType() == ESurfaceType::kTransparent)
+							{
+								queue_id = RenderQueue::kTransparent;
+							}
+						}
+						RenderQueue::Enqueue(queue_id, static_mesh->GetMesh().get(), used_mat,
 							static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), i, 1);
 					}
 				}

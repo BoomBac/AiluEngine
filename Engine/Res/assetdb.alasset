@@ -30,3 +30,4 @@ c3315e03-1052-4825-98f7-a676beae0615,Meshs/plane.alasset,kMesh
 cffbfce1-eb20-4319-aa0e-20a68eb19f22,Textures/small_cave_1k.alasset,kTexture2D
 d137d2a7-0d2b-40bc-9c76-6d2708923869,Meshs/cube.alasset,kMesh
 ef3ed829-387b-4013-8492-95e574d5e949,Icons/material.alasset,kTexture2D
+D390A432-7AD9-475D-B1A5-726EB91072FB,Shaders/forwardlit.alasset,kShader

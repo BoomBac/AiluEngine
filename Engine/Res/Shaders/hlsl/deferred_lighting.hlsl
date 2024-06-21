@@ -71,7 +71,7 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 	}
 	else
 	{
-		return float4(1,0,1,1);
+		return float4(surface_data.wnormal,1);
 	}
 
 }

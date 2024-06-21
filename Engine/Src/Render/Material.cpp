@@ -32,6 +32,8 @@ namespace Ailu
 		AL_ASSERT(s_total_material_num > RenderConstants::kMaxMaterialDataCount);
 		_name = name;
 		_b_internal = false;
+		_p_active_shader = _p_shader;
+		_surface = ESurfaceType::kOpaque;
 		Construct(true);
 		shader->AddMaterialRef(this);
 		//只有首个pass支持默认着色
@@ -57,21 +59,101 @@ namespace Ailu
 		++s_total_material_num;
 	}
 
+	Material::Material(const Material& other)
+	{
+		_b_internal = other._b_internal;
+		_material_id = other._material_id;
+		_sampler_mask_offset = other._sampler_mask_offset;
+		_material_id_offset = other._material_id_offset;
+		_surface = other._surface;
+		_p_active_shader = other._p_active_shader;
+		//标准pass才会使用上面两个变量
+		_standard_pass_index = other._standard_pass_index;
+		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+		_p_shader = other._p_shader;
+		for (auto& cbuf : other._p_cbufs)
+		{
+			u32 buffer_size = cbuf->GetBufferSize();
+			_p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
+			memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
+		}
+		_textures_all_passes = other._textures_all_passes;
+	}
+
+	Material::Material(Material&& other) noexcept
+	{
+		_b_internal = other._b_internal;
+		_material_id = other._material_id;
+		_sampler_mask_offset = other._sampler_mask_offset;
+		_material_id_offset = other._material_id_offset;
+		_surface = other._surface;
+		//标准pass才会使用上面两个变量
+		_standard_pass_index = other._standard_pass_index;
+		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+		_p_shader = other._p_shader;
+		_p_active_shader = other._p_active_shader;
+		_p_cbufs = std::move(other._p_cbufs);
+		other._p_cbufs.clear();
+		_textures_all_passes = std::move(other._textures_all_passes);
+		other._textures_all_passes.clear();
+	}
+
+	Material& Material::operator=(const Material& other)
+	{
+		_b_internal = other._b_internal;
+		_material_id = other._material_id;
+		_sampler_mask_offset = other._sampler_mask_offset;
+		_material_id_offset = other._material_id_offset;
+		_surface = other._surface;
+		//标准pass才会使用上面两个变量
+		_standard_pass_index = other._standard_pass_index;
+		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+		_p_shader = other._p_shader;
+		_p_active_shader = other._p_active_shader;
+		for (auto& cbuf : other._p_cbufs)
+		{
+			u32 buffer_size = cbuf->GetBufferSize();
+			_p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
+			memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
+		}
+		_textures_all_passes = other._textures_all_passes;
+		return *this;
+	}
+
+	Material& Material::operator=(Material&& other) noexcept
+	{
+		_b_internal = other._b_internal;
+		_material_id = other._material_id;
+		_sampler_mask_offset = other._sampler_mask_offset;
+		_material_id_offset = other._material_id_offset;
+		_surface = other._surface;
+		//标准pass才会使用上面两个变量
+		_standard_pass_index = other._standard_pass_index;
+		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+		_p_shader = other._p_shader;
+		_p_active_shader = other._p_active_shader;
+		_p_cbufs = std::move(other._p_cbufs);
+		other._p_cbufs.clear();
+		_textures_all_passes = std::move(other._textures_all_passes);
+		other._textures_all_passes.clear();
+		return *this;
+	}
+
 	Material::~Material()
 	{
 		--s_total_material_num;
 	}
 	void Material::Bind(u16 pass_index)
 	{
-		if (_p_shader->IsCompileError())
+		if (_p_active_shader->IsCompileError())
 			return;
 		if (_material_id_offset != 0)
 		{
 			memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, (u32)_material_id, sizeof(u32));
 		}
-		_p_shader->Bind(pass_index, 0);
+		_p_active_shader->Bind(pass_index, 0);
 
-		i8 cbuf_bind_slot = _p_shader->_passes[pass_index]._per_mat_buf_bind_slot;
+		i8 cbuf_bind_slot = _p_active_shader->_passes[pass_index]._per_mat_buf_bind_slot;
 		if (cbuf_bind_slot != -1)
 		{
 			GraphicsPipelineStateMgr::SubmitBindResource(_p_cbufs[pass_index].get(), EBindResDescType::kConstBuffer, (u8)cbuf_bind_slot);
@@ -79,7 +161,7 @@ namespace Ailu
 		auto& bind_textures = _textures_all_passes[pass_index];
 		for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
 		{
-			if (_p_shader->_passes[pass_index]._bind_res_infos.find(it->first) != _p_shader->_passes[pass_index]._bind_res_infos.end())
+			if (_p_active_shader->_passes[pass_index]._bind_res_infos.find(it->first) != _p_active_shader->_passes[pass_index]._bind_res_infos.end())
 			{
 				auto& [slot, texture] = it->second;
 				if (texture != nullptr)
@@ -94,12 +176,25 @@ namespace Ailu
 			//}
 		}
 	}
+
 	void Material::ChangeShader(Shader* shader)
 	{
 		_p_shader->RemoveMaterialRef(this);
 		_p_shader = shader;
 		_p_shader->AddMaterialRef(this);
 		Construct(false);
+	}
+	void Material::SurfaceType(const ESurfaceType::ESurfaceType & value)
+	{
+		if (_surface == value)
+			return;
+		if (value == ESurfaceType::kOpaque)
+			_p_active_shader = _p_shader;
+		else if (value == ESurfaceType::kTransparent)
+		{
+			_p_active_shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
+		}
+		_surface = value;
 	}
 
 	void Material::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)

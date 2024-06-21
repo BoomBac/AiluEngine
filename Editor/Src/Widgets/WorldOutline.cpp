@@ -1,4 +1,5 @@
 #include "Widgets/WorldOutline.h"
+#include "Common/Selection.h"
 //----engine--------
 #include "Ext/imgui/imgui.h"
 #include "Framework/Common/SceneMgr.h"
@@ -9,7 +10,7 @@ namespace Ailu
 	{
 		WorldOutline::WorldOutline() : ImGuiWidget("WorldOutline")
 		{
-			_selected_actor = &g_pSceneMgr->_p_selected_actor;
+			//_selected_actor = &g_pSceneMgr->_p_selected_actor;
 		}
 		WorldOutline::~WorldOutline()
 		{
@@ -24,6 +25,18 @@ namespace Ailu
 		}
 		void WorldOutline::ShowImpl()
 		{
+			SceneActor* old_selected_actor = nullptr;
+			_selected_actor = Selection::First<SceneActor>();
+			old_selected_actor = _selected_actor;
+			//for (auto obj : Selection::Selections())
+			//{
+			//	auto scene_obj = dynamic_cast<SceneActor*>(obj);
+			//	if (scene_obj)
+			//	{
+			//		_selected_actor = scene_obj;
+			//		old_selected_actor = scene_obj;
+			//	}
+			//}
 			u32 index = 0;
 			if (ImGui::Button("Reflesh Scene"))
 			{
@@ -36,6 +49,11 @@ namespace Ailu
 			}
 			ImGui::Text("Scene: %s", g_pSceneMgr->_p_current->Name().c_str());
 			DrawTreeNode(g_pSceneMgr->_p_current->GetSceneRoot(),true);
+			if (old_selected_actor != _selected_actor)
+			{
+				Selection::AddAndRemovePreSelection(_selected_actor);
+			}
+			g_pSceneMgr->_p_selected_actor = _selected_actor;
 		}
 
 		void WorldOutline::DrawTreeNode(SceneActor* actor, bool is_root)
@@ -44,7 +62,7 @@ namespace Ailu
 				return;
 			static const ImGuiTreeNodeFlags s_base_node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;;
 			ImGuiTreeNodeFlags node_flags = s_base_node_flags;
-			bool is_cur_node_selected = actor == *_selected_actor;
+			bool is_cur_node_selected = actor == _selected_actor;
 			ImGui::PushID(actor->ID());
 			if (is_cur_node_selected) 
 				node_flags |= ImGuiTreeNodeFlags_Selected;
@@ -56,7 +74,7 @@ namespace Ailu
 			bool b_root_node_open = ImGui::TreeNodeEx(ptr_id, node_flags,"%s",actor->Name().c_str());
 			if (ImGui::IsItemClicked())
 			{
-				*_selected_actor = actor;
+				_selected_actor = actor;
 			}
 			if (b_root_node_open)
 			{
@@ -72,7 +90,7 @@ namespace Ailu
 					}
 					else
 					{
-						is_cur_node_selected = child == *_selected_actor;
+						is_cur_node_selected = child == _selected_actor;
 						node_flags = s_base_node_flags;
 						node_flags |= ImGuiTreeNodeFlags_Leaf;// | ImGuiTreeNodeFlags_NoTreePushOnOpen;
 						if (is_cur_node_selected)
@@ -84,14 +102,14 @@ namespace Ailu
 						{
 							if (ImGui::IsItemClicked())
 							{
-								*_selected_actor = static_cast<SceneActor*>(child);
+								_selected_actor = static_cast<SceneActor*>(child);
 							}
 							if (ImGui::BeginPopupContextItem()) // <-- use last item id as popup id
 							{
 								if (ImGui::MenuItem("Rename"))
 								{
 									//s_global_modal_window_info[cur_tree_node_index] = true;
-									MarkModalWindoShow((*_selected_actor)->ID());
+									MarkModalWindoShow((_selected_actor)->ID());
 								}
 
 								if (ImGui::MenuItem("Delete"))
@@ -100,9 +118,9 @@ namespace Ailu
 								}
 								ImGui::EndPopup();
 							}
-							if (*_selected_actor)
+							if (_selected_actor)
 							{
-								auto new_name = ShowModalDialog("Rename: " + child->Name(), (*_selected_actor)->ID());
+								auto new_name = ShowModalDialog("Rename: " + child->Name(), (_selected_actor)->ID());
 								if (!new_name.empty())
 									child->Name(new_name);
 							}

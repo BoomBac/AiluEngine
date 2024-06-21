@@ -5,6 +5,7 @@
 #include "RHI/DX12/D3DTexture.h"
 #include "Render/RenderingData.h"
 #include "Render/Gizmo.h"
+#include "Render/RenderQueue.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -157,11 +158,6 @@ namespace Ailu
 		_p_cmd->RSSetScissorRects(1, &d3d_rect);
 	}
 
-	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count)
-	{
-		throw std::runtime_error("error");
-		return 0;
-	}
 	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count)
 	{
 		if (mesh)

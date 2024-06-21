@@ -117,7 +117,7 @@ namespace Ailu
 		UINT compileFlags = 0;
 #if defined(_DEBUG)
 		// Enable better shader debugging with the graphics debugging tools.
-		compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+		compileFlags = D3DCOMPILE_DEBUG;// | D3DCOMPILE_SKIP_OPTIMIZATION; //跳过优化的话，compute shader算brdf lut时值有点异常
 #else
 		compileFlags = 0;
 #endif
@@ -238,9 +238,10 @@ namespace Ailu
 	}
 	//-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
 
-	void D3DShader::GenerateInternalPSO(u16 pass_index, u16 variant_id)
+	void D3DShader::GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash)
 	{
 		AL_ASSERT(pass_index >= _passes.size());
+		AL_ASSERT(!_passes[pass_index]._bind_res_infos.contains(variant_hash));
 		D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 		featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		auto device = D3DContext::Get()->GetDevice();
@@ -251,7 +252,8 @@ namespace Ailu
 		CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
 		CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
 		int cbuf_mask = 0, texture_count = 0;
-		for (auto it = _passes[pass_index]._bind_res_infos.begin(); it != _passes[pass_index]._bind_res_infos.end(); it++)
+		auto& variant_bind_res_info = _passes[pass_index]._bind_res_infos[variant_hash];
+		for (auto it = variant_bind_res_info.begin(); it != variant_bind_res_info.end(); it++)
 		{
 			auto& desc = it->second;
 			//if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
@@ -266,28 +268,28 @@ namespace Ailu
 		u8 root_param_index = 0;
 		if (cbuf_mask & 0x01)
 		{
-			_passes[pass_index]._bind_res_infos[RenderConstants::kCBufNameSceneObject]._bind_slot = root_param_index;
+			variant_bind_res_info[RenderConstants::kCBufNameSceneObject]._bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(0u);
 		}
 		if (cbuf_mask & 0x02)
 		{
-			_passes[pass_index]._bind_res_infos[RenderConstants::kCBufNameSceneMaterial]._bind_slot = root_param_index;
+			variant_bind_res_info[RenderConstants::kCBufNameSceneMaterial]._bind_slot = root_param_index;
 			_passes[pass_index]._per_mat_buf_bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(1u);
 		}
 		if (cbuf_mask & 0x04)
 		{
-			_passes[pass_index]._bind_res_infos[RenderConstants::kCBufNameSceneState]._bind_slot = root_param_index;
+			variant_bind_res_info[RenderConstants::kCBufNameSceneState]._bind_slot = root_param_index;
 			_passes[pass_index]._per_frame_buf_bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(2u);
 		}
 		if (cbuf_mask & 0x08)
 		{
-			_passes[pass_index]._bind_res_infos[RenderConstants::kCBufNameScenePass]._bind_slot = root_param_index;
+			variant_bind_res_info[RenderConstants::kCBufNameScenePass]._bind_slot = root_param_index;
 			_passes[pass_index]._per_pass_buf_bind_slot = root_param_index;
 			rootParameters[root_param_index++].InitAsConstantBufferView(3u);
 		}
-		for (auto it = _passes[pass_index]._bind_res_infos.begin(); it != _passes[pass_index]._bind_res_infos.end(); it++)
+		for (auto it = variant_bind_res_info.begin(); it != variant_bind_res_info.end(); it++)
 		{
 			auto& desc = it->second;
 			if (desc._res_type == EBindResDescType::kTexture2D)
@@ -310,28 +312,50 @@ namespace Ailu
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 		ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
-		ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_elements[pass_index]._p_sig)));
+		ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_pass_elements[pass_index]._p_sig)));
 	}
 
-	bool D3DShader::RHICompileImpl()
+	void D3DShader::ConstructVariantMarcos(u16 pass_index)
 	{
+		AL_ASSERT(pass_index > _passes.size());
+		auto& kw_seqs = _passes[pass_index]._shader_variants;
+		for (auto& kw_it : kw_seqs)
+		{
+			auto& [hash, kw_seq] = kw_it;
+			for (auto& kw : kw_seq)
+			{
+				if (kw != "_")
+				{
+					_pass_elements[pass_index]._keyword_defines.emplace_back(D3D_SHADER_MACRO{kw.c_str(),"1"});
+				}
+			}
+		}
+	}
+
+	bool D3DShader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash)
+	{
+
 		bool succeed = true;
-		Vector<ComPtr<ID3DBlob>> tmp_p_vblobs(_passes.size());
-		Vector<ComPtr<ID3DBlob>> tmp_p_pblobs(_passes.size());
+		ComPtr<ID3DBlob> tmp_p_vblob;
+		ComPtr<ID3DBlob> tmp_p_pblob;
+		ComPtr<ID3D12ShaderReflection> tmp_p_vreflect, tmp_p_preflect;
 		try
 		{
-			Reset();
+			//应该可以把全部元素都清空，pso在运行时似乎没有再引用这里的东西
+			if (!_is_pass_elements_init.load())
+			{
+				Reset();
+				_is_pass_elements_init.store(true);
+			}
+			auto& pass = _passes[pass_index];
 #ifdef SHADER_DXC
 			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			for (int i = 0; i < _passes.size(); i++)
-			{
-				succeed &= CreateFromFileFXC(_src_file_path, _passes[i]._vert_entry, "vs_5_0", tmp_p_vblobs[i], _elements[i]._p_v_reflection);
-				succeed &= CreateFromFileFXC(_src_file_path, _passes[i]._pixel_entry, "ps_5_0", tmp_p_pblobs[i], _elements[i]._p_p_reflection);
-			}
+			succeed &= CreateFromFileFXC(_src_file_path, pass._vert_entry, "vs_5_0",  tmp_p_vblob, tmp_p_vreflect);
+			succeed &= CreateFromFileFXC(_src_file_path, pass._pixel_entry, "ps_5_0", tmp_p_pblob, tmp_p_preflect);
 
 #endif // SHADER_DXC
 		}
@@ -342,18 +366,16 @@ namespace Ailu
 		}
 		if (succeed)
 		{
-			for (int i = 0; i < _passes.size(); i++)
-			{
-				LoadShaderReflection(i, 0);
-				_elements[i]._p_vblob = tmp_p_vblobs[i];
-				_elements[i]._p_pblob = tmp_p_pblobs[i];
-				GenerateInternalPSO(i, 0);
-			}
+			_pass_elements[pass_index]._variants.insert(std::make_pair(variant_hash, D3DShaderElement::D3DVariantElement()));
+			LoadShaderReflection(pass_index, variant_hash, tmp_p_vreflect.Get(), tmp_p_preflect.Get());
+			_pass_elements[pass_index]._p_vblob = tmp_p_vblobs[i];
+			_pass_elements[pass_index]._p_pblob = tmp_p_pblobs[i];
+			GenerateInternalPSO(i, 0);
 		}
 		return succeed;
 }
 
-	void D3DShader::LoadAdditionalShaderReflection(const WString& sys_path, u16 pass_index, u16 variant_id)
+	void D3DShader::LoadAdditionalShaderReflection(const WString& sys_path, u16 pass_index, ShaderVariantHash variant_hash)
 	{
 		using namespace std;
 		namespace su = StringUtils;
@@ -423,41 +445,32 @@ namespace Ailu
 
 	D3DShader::~D3DShader()
 	{
-		for (auto& p : _elements)
-		{
-			for (auto m : p._keyword_defines)
-			{
-				DESTORY_PTRARR(m);
-			}
-		}
 
 	}
 
-	std::pair<D3D12_INPUT_ELEMENT_DESC*, u8> D3DShader::GetVertexInputLayout(u16 pass_index, u16 variant_id)
+	std::pair<D3D12_INPUT_ELEMENT_DESC*, u8> D3DShader::GetVertexInputLayout(u16 pass_index, ShaderVariantHash variant_hash)
 	{
-		return std::make_pair(_elements[pass_index]._vertex_input_layout, _passes[pass_index]._vertex_input_num);
+		return std::make_pair(_pass_elements[pass_index]._vertex_input_layout, _passes[pass_index]._vertex_input_num);
 	}
 
 	void D3DShader::Reset()
 	{
-		_elements.clear();
-		_elements.resize(_passes.size());
-		for (int i = 0; i < _passes.size(); i++)
-		{
-			if (_elements[i]._p_vblob != nullptr) _elements[i]._p_vblob.Reset();
-			if (_elements[i]._p_pblob != nullptr) _elements[i]._p_pblob.Reset();
-			if (_elements[i]._p_v_reflection != nullptr) _elements[i]._p_v_reflection.Reset();
-			if (_elements[i]._p_p_reflection != nullptr) _elements[i]._p_p_reflection.Reset();
-			memset(_elements[i]._vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
-			_passes[i]._vertex_input_num = 0u;
-			_passes[i]._pipeline_topology = ETopology::kTriangle;
-		}
+		_pass_elements.clear();
+		_pass_elements.resize(_passes.size());
+		//for (int i = 0; i < _passes.size(); i++)
+		//{
+		//	if (_pass_elements[i]._p_vblob != nullptr) _pass_elements[i]._p_vblob.Reset();
+		//	if (_pass_elements[i]._p_pblob != nullptr) _pass_elements[i]._p_pblob.Reset();
+		//	if (_pass_elements[i]._p_v_reflection != nullptr) _pass_elements[i]._p_v_reflection.Reset();
+		//	if (_pass_elements[i]._p_p_reflection != nullptr) _pass_elements[i]._p_p_reflection.Reset();
+		//	memset(_pass_elements[i]._vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
+		//	_passes[i]._vertex_input_num = 0u;
+		//	_passes[i]._pipeline_topology = ETopology::kTriangle;
+		//}
 	}
 
-	void D3DShader::LoadShaderReflection(u16 pass_index, u16 variant_id)
+	void D3DShader::LoadShaderReflection(u16 pass_index, ShaderVariantHash variant_hash,ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps)
 	{
-		ID3D12ShaderReflection* ref_vs = _elements[pass_index]._p_v_reflection.Get();
-		ID3D12ShaderReflection* ref_ps = _elements[pass_index]._p_p_reflection.Get();
 		D3D12_SHADER_DESC desc{};
 		//parser vs reflecton		
 		{
@@ -472,7 +485,7 @@ namespace Ailu
 			{
 				D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
 				ref_vs->GetInputParameterDesc(i, &input_desc);
-				_elements[pass_index]._vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+				_pass_elements[pass_index]._vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 				++_passes[pass_index]._vertex_input_num;
 				vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, GetShaderDataType(input_desc.SemanticName), input_desc.Register));
 			}
@@ -573,12 +586,12 @@ namespace Ailu
 			}
 		}
 		//parser additon info
-		LoadAdditionalShaderReflection(_src_file_path, pass_index, variant_id);
+		LoadAdditionalShaderReflection(_src_file_path, pass_index, variant_hash);
 	}
 
-	void D3DShader::Bind(u16 pass_index, u16 variant_id)
+	void D3DShader::Bind(u16 pass_index, ShaderVariantHash variant_hash)
 	{
-		Shader::Bind(pass_index, variant_id);
+		Shader::Bind(pass_index, variant_hash);
 		static auto context = D3DContext::Get();
 		if (_passes[pass_index]._per_frame_buf_bind_slot != -1)
 		{
@@ -586,21 +599,21 @@ namespace Ailu
 		}
 	}
 
-	void* D3DShader::GetByteCode(EShaderType type, u16 pass_index, u16 variant_id)
+	void* D3DShader::GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash)
 	{
 		switch (type)
 		{
 		case Ailu::EShaderType::kVertex:
-			return reinterpret_cast<void*>(_elements[pass_index]._p_vblob.Get());
+			return reinterpret_cast<void*>(_pass_elements[pass_index]._p_vblob.Get());
 		case Ailu::EShaderType::kPixel:
-			return reinterpret_cast<void*>(_elements[pass_index]._p_pblob.Get());
+			return reinterpret_cast<void*>(_pass_elements[pass_index]._p_pblob.Get());
 		}
 		return nullptr;
 	}
 
-	ID3D12RootSignature* D3DShader::GetSignature(u16 pass_index, u16 variant_id)
+	ID3D12RootSignature* D3DShader::GetSignature(u16 pass_index, ShaderVariantHash variant_hash)
 	{
-		return _elements[pass_index]._p_sig.Get();
+		return _pass_elements[pass_index]._p_sig.Get();
 	}
 
 

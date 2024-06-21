@@ -59,12 +59,12 @@ namespace Ailu
 		static Scope<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer& initializer);
 		static ALHash::Hash<64> ConstructPSOHash(u8 input_layout,u32 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
 		static void ConstructPSOHash(ALHash::Hash<64>& hash,u8 input_layout,u32 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
-		static ALHash::Hash<64> ConstructPSOHash(const GraphicsPipelineStateInitializer& initializer,u16 pass_index = 0,u16 variant_index = 0);
+		static ALHash::Hash<64> ConstructPSOHash(const GraphicsPipelineStateInitializer& initializer,u16 pass_index = 0, ShaderVariantHash variant_hash = 0);
 		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u8& input_layout, u32& shader, u8& topology, u8& blend_state, u8& raster_state, u8& ds_state, u8& rt_state);
 		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u32& shader);
 
 		virtual ~GraphicsPipelineStateObject() = default;
-		virtual void Build(u16 pass_index = 0,u16 variant_id = 0) = 0;
+		virtual void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) = 0;
 		virtual void Bind(CommandBuffer* cmd) = 0;
 		virtual void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) = 0;
 		virtual void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, const String& name) = 0;
@@ -89,7 +89,7 @@ namespace Ailu
 		static void BuildPSOCache();
 		static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
 		static void EndConfigurePSO(CommandBuffer* cmd);
-		static void OnShaderRecompiled(Shader* shader);
+		static void OnShaderRecompiled(Shader* shader,u16 pass_id,ShaderVariantHash variant_hash);
 		static void ConfigureShader(const u32& shader_hash);
 		static void ConfigureVertexInputLayout(const u8& hash); //0~3 4
 		static void ConfigureTopology(const u8& hash); //36~37 2

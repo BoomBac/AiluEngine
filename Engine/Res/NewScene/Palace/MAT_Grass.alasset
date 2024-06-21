@@ -2,6 +2,7 @@ guid: af277291-1e6f-4732-89ba-d0dce1dc12af
 type: kMaterial
 name: MAT_Grass
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
+surface_type: kOpaque
   prop_type: Uint
     SamplerMask: 0
     MaterialID: 0

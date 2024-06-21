@@ -53,6 +53,9 @@ namespace Ailu
 			Load<Shader>(L"Shaders/blit.alasset");
 			Load<Shader>(L"Shaders/skybox.alasset");
 			Load<Shader>(L"Shaders/bloom.alasset");
+			Load<Shader>(L"Shaders/forwardlit.alasset");
+			RegisterResource(L"Shaders/hlsl/debug.hlsl",LoadExternalShader(L"Shaders/hlsl/debug.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
 			GraphicsPipelineStateMgr::BuildPSOCache();
 			Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
 		}
@@ -167,6 +170,31 @@ namespace Ailu
 			UnRegisterResource(asset->_asset_path);
 			UnRegisterAsset(asset);
 			_pending_delete_assets.pop();
+		}
+		while (!_shader_waiting_for_compile.empty())
+		{
+			Shader* shader = _shader_waiting_for_compile.front();
+			shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
+			AddResourceTask([=]()->Ref<void> {
+				if (shader->Compile())
+				{
+					auto mats = shader->GetAllReferencedMaterials();
+					for (auto mat = mats.begin(); mat != mats.end(); mat++)
+						(*mat)->ChangeShader(shader);
+				}
+				return nullptr;
+			});
+			_shader_waiting_for_compile.pop();
+		}
+		while (!_compute_shader_waiting_for_compile.empty())
+		{
+			ComputeShader* shader = _compute_shader_waiting_for_compile.front();
+			shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
+			AddResourceTask([=]()->void* {
+				shader->Compile();
+				return nullptr;
+				});
+			_compute_shader_waiting_for_compile.pop();
 		}
 		SubmitResourceTask();
 	}
@@ -334,6 +362,7 @@ namespace Ailu
 		//为了写入通用资产头信息，暂时使用追加方式打开
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
 		out_mat << "shader_guid: " << GetAssetGuid(mat->_p_shader).ToString();
+		out_mat << "surface_type: " << ESurfaceType::ToString(mat->SurfaceType());
 		for (auto& prop : mat->_properties)
 		{
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
@@ -517,15 +546,18 @@ namespace Ailu
 		}
 		file.close();
 		AL_ASSERT_MSG(line_count <= 3, "material file error");
-		String key{}, guid_str{}, type_str{}, name{}, shader_guid{};
+		String key{}, guid_str{}, type_str{}, name{}, shader_guid{},surface_type;
 		FormatLine(lines[0], key, guid_str);
 		FormatLine(lines[1], key, type_str);
 		FormatLine(lines[2], key, name);
 		FormatLine(lines[3], key, shader_guid);
+		FormatLine(lines[4], key, surface_type);
 		auto mat = MakeRef<Material>(Get<Shader>(Guid(shader_guid)), name);
+		mat->SurfaceType(ESurfaceType::FromString(surface_type));
 		std::string cur_type{ " " };
 		std::string prop_type{ "prop_type" };
-		for (int i = 4; i < lines.size(); ++i)
+		u32 prop_begin_line = 5;
+		for (u32 i = prop_begin_line; i < lines.size(); ++i)
 		{
 			String k{}, v{};
 			FormatLine(lines[i], k, v);
@@ -1082,15 +1114,16 @@ namespace Ailu
 							if (head_file == cur_path)
 							{
 								match_file = true;
-								AddResourceTask([=]()->Ref<void> {
-									if (shader->Compile())
-									{
-										auto mats = shader->GetAllReferencedMaterials();
-										for (auto mat = mats.begin(); mat != mats.end(); mat++)
-											(*mat)->ChangeShader(shader.get());
-									}
-									return nullptr;
-									});
+								_shader_waiting_for_compile.push(shader.get());
+								//AddResourceTask([=]()->Ref<void> {
+								//	if (shader->Compile())
+								//	{
+								//		auto mats = shader->GetAllReferencedMaterials();
+								//		for (auto mat = mats.begin(); mat != mats.end(); mat++)
+								//			(*mat)->ChangeShader(shader.get());
+								//	}
+								//	return nullptr;
+								//	});
 								break;
 							}
 						}
@@ -1101,10 +1134,11 @@ namespace Ailu
 			auto cs = ComputeShader::Get(PathUtils::ExtractAssetPath(cur_path));
 			if (cs)
 			{
-				AddResourceTask([=]()->void* {
-					cs->Compile();
-					return nullptr;
-					});
+				_compute_shader_waiting_for_compile.push(cs.get());
+				//AddResourceTask([=]()->void* {
+				//	cs->Compile();
+				//	return nullptr;
+				//	});
 			}
 			};
 		bool is_first_execute = true;

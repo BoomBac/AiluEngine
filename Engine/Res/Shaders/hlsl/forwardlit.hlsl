@@ -1,11 +1,14 @@
 //info bein
 //pass begin::
-//name: defered_standard_lit
-//vert: GBufferVSMain
-//pixel: GBufferPSMain
+//name: forward_standard_lit
+//vert: ForwardVSMain
+//pixel: ForwardPSMain
 //Cull: Back
-//Queue: Opaque
+//ZWrite: Off
+//Queue: Transparent
 //Blend: Src,OneMinusSrc
+//multi_compile A B C
+//multi_compile a b c
 //pass end::
 //Properties
 //{
@@ -25,14 +28,7 @@
 
 #include "standard_lit_common.ash"
 
-struct GBuffer
-{
-	float2 packed_normal : SV_Target0;
-	float4 color_roughness : SV_Target1;
-	float4 specular_metallic : SV_Target2;
-};
-
-PSInput GBufferVSMain(VSInput v)
+PSInput ForwardVSMain(VSInput v)
 {
 	PSInput result;
 	result.position = TransformToClipSpace(v.position);
@@ -49,14 +45,12 @@ PSInput GBufferVSMain(VSInput v)
 	return result;
 }
 
-GBuffer GBufferPSMain(PSInput input) : SV_TARGET
+float4 ForwardPSMain(PSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
 	InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
-	GBuffer output;
-	output.packed_normal = PackNormal(surface_data.wnormal);
-	output.color_roughness = float4(surface_data.albedo.rgb,surface_data.roughness);
-	//output.specular_metallic = float4(surface_data.specular,surface_data.metallic);
-	output.specular_metallic = float4(float(MaterialID).xxx,surface_data.metallic);
-	return output;
+    float alpha = surface_data.albedo.a;
+    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos));
+    light += surface_data.emssive;
+    return float4(light, alpha);
 }

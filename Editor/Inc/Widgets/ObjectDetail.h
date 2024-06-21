@@ -5,6 +5,7 @@
 namespace Ailu
 {
 	class SceneActor;
+	class Shader;
 	namespace Editor
 	{
 		class TextureSelector;
@@ -17,6 +18,8 @@ namespace Ailu
 			void Close(i32 handle) final;
 		private:
 			void ShowImpl() final;
+			void ShowSceneActorPannel(SceneActor* cur_selected_actor);
+			void ShowShaderPannel(Shader* s);
 		private:
 			TextureSelector* _p_texture_selector = nullptr;
 			u32 _property_handle = 0u;

@@ -1,5 +1,5 @@
 #pragma warning(push)
-#pragma warning(disable: 4251) //std库直接暴露为接口dll在客户端上使用时可能会有问题，禁用该编译警告
+#pragma warning(disable: 4251) //disable dll export warning
 
 #pragma once
 #ifndef __RESOURCE_MGR_H__
@@ -297,6 +297,8 @@ namespace Ailu
 
 		Vector<std::function<void()>> _asset_changed_callbacks;
 		Queue<Asset*> _pending_delete_assets;
+		Queue<Shader*> _shader_waiting_for_compile;
+		Queue<ComputeShader*> _compute_shader_waiting_for_compile;
 	};
 	extern AILU_API ResourceMgr* g_pResourceMgr;
 

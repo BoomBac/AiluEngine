@@ -33,7 +33,7 @@ namespace Ailu
 		_camera_depth_handle = RenderTexture::GetTempRT(_width, _height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
 		_rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(_width, _height, "CameraColorOpaqueTex", ERenderTargetFormat::kDefaultHDR);
 
-		_p_opaque_pass = MakeScope<OpaquePass>();
+		_p_forward_pass = MakeScope<ForwardPass>();
 		_p_reslove_pass = MakeScope<ResolvePass>();
 		_p_shadowcast_pass = MakeScope<ShadowCastPass>();
 		_p_postprocess_pass = MakeScope<PostProcessPass>();
@@ -58,10 +58,11 @@ namespace Ailu
 		_rendering_data._final_rt_handle = _gameview_rt_handle;
 
 		_render_passes.emplace_back(_p_shadowcast_pass.get());
-		_p_opaque_pass->SetActive(false);
+		//_p_opaque_pass->SetActive(false);
 		//_render_passes.emplace_back(_p_opaque_pass.get());
 		_render_passes.emplace_back(_p_gbuffer_pass.get());
 		_render_passes.emplace_back(_p_skybox_pass.get());
+		_render_passes.emplace_back(_p_forward_pass.get());
 		_render_passes.emplace_back(_p_copycolor_pass.get());
 		_render_passes.emplace_back(_p_postprocess_pass.get());
 		_render_passes.emplace_back(_p_gizmo_pass.get());

@@ -35,14 +35,19 @@ namespace Ailu
 		bool _is_active;
 	};
 
-	class OpaquePass : public RenderPass
+	class ForwardPass : public RenderPass
 	{
 	public:
-		OpaquePass();
-		~OpaquePass();
+		ForwardPass();
+		~ForwardPass();
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
+	private:
+		Ref<Material> shader_state_mat;
+		u16 _error_shader_pass_id, _compiling_shader_pass_id;
+		Map<u32, Ref<Material>> _transparent_replacement_materials;
+		Shader* _forward_lit_shader;
 	};
 
 	class ResolvePass : public RenderPass

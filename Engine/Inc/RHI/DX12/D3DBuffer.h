@@ -86,13 +86,14 @@ namespace Ailu
 		~D3DConstantBuffer();
 		void Bind(CommandBuffer* cmd, u8 bind_slot) const final;
 		u8* GetData() final {return s_p_data + _offset;};
+		u32 GetBufferSize() const final { return _size; };
 	private:
 		inline static ComPtr<ID3D12Resource> s_p_d3d_res;
 		//inline static ComPtr<ID3D12DescriptorHeap> s_p_d3d_heap;
 		inline static std::vector<D3D12_CONSTANT_BUFFER_VIEW_DESC> s_cbuf_views;
 		inline static u32 s_desc_size, s_total_size,s_global_offset,s_global_index;
 		inline static u8* s_p_data;
-		u32 _offset,_index;
+		u32 _offset,_index,_size;
 		GPUVisibleDescriptorAllocation _allocation;
 		bool _is_compute_buffer;
 	};

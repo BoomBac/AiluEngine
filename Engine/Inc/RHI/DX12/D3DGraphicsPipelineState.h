@@ -70,7 +70,7 @@ namespace Ailu
 	{
 	public:
 		D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer& initializer);
-		void Build(u16 pass_index = 0, u16 variant_id = 0) final;
+		void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) final;
 		void Bind(CommandBuffer* cmd) final;
 		void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) final;
 		void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, const String& name) final;

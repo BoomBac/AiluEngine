@@ -14,7 +14,7 @@ namespace Ailu
 		_name = initializer._p_vertex_shader->Name();
 	}
 
-	void D3DGraphicsPipelineState::Build(u16 pass_index, u16 variant_id)
+	void D3DGraphicsPipelineState::Build(u16 pass_index, ShaderVariantHash variant_hash)
 	{
 		if (!_b_build)
 		{
@@ -30,11 +30,11 @@ namespace Ailu
 			{
 				_per_frame_cbuf_bind_slot = it->second._bind_slot;
 			}
-			auto [desc, count] = d3dshader->GetVertexInputLayout(pass_index, variant_id);
+			auto [desc, count] = d3dshader->GetVertexInputLayout(pass_index, variant_hash);
 			_d3d_pso_desc.InputLayout = { desc, count };
-			_d3d_pso_desc.pRootSignature = d3dshader->GetSignature(pass_index, variant_id);
-			_d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex, pass_index, variant_id)));
-			_d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel, pass_index, variant_id)));
+			_d3d_pso_desc.pRootSignature = d3dshader->GetSignature(pass_index, variant_hash);
+			_d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex, pass_index, variant_hash)));
+			_d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob*>(_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel, pass_index, variant_hash)));
 			_d3d_pso_desc.RasterizerState = D3DConvertUtils::ConvertToD3D12RasterizerDesc(_state_desc._raster_state);
 			_d3d_pso_desc.BlendState = D3DConvertUtils::ConvertToD3D12BlendDesc(_state_desc._blend_state, _state_desc._rt_state._color_rt_num);
 			_d3d_pso_desc.DepthStencilState = D3DConvertUtils::ConvertToD3D12DepthStencilDesc(_state_desc._depth_stencil_state);
@@ -48,12 +48,19 @@ namespace Ailu
 			{
 				_d3d_pso_desc.RTVFormats[i] = ConvertToDXGIFormat(_state_desc._rt_state._color_rt[i]);
 			}
-			_p_sig = d3dshader->GetSignature(pass_index, variant_id);
+			_p_sig = d3dshader->GetSignature(pass_index, variant_hash);
 			_d3d_pso_desc.SampleDesc.Count = 1;
 			ThrowIfFailed(D3DContext::Get()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
 			_b_build = true;
 			//LOG_INFO("rt hash {}", (u32)_state_desc._rt_state.Hash());
-			_hash = ConstructPSOHash(_state_desc,pass_index,variant_id);
+			_hash = ConstructPSOHash(_state_desc,pass_index, variant_hash);
+			u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
+			u32 shader_hash;
+			GraphicsPipelineStateObject::ExtractPSOHash(_hash, input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
+			if (_state_desc._raster_state.Hash() != raster_state)
+			{
+				g_pLogMgr->LogErrorFormat("PSO {}: _state_desc._raster_state.Hash() != raster_state",_name);
+			}
 		}
 		static u16 count = 0;
 		//LOG_WARNING("PipelineState build {}!", count++);
