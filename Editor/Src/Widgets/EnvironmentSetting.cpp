@@ -3,23 +3,13 @@
 #include "Ext/imgui/imgui.h"
 #include "Render/Renderer.h"
 
-static ImVec2 RotatePoint(const ImVec2& p, float theta)
-{
-	ImVec2 result;
-	float cosTheta = std::cos(theta);
-	float sinTheta = std::sin(theta);
-	result.x = p.x * cosTheta - p.y * sinTheta;
-	result.y = p.x * sinTheta + p.y * cosTheta;
-	return result;
-}
-
 namespace Ailu
 {
 	namespace Editor
 	{
 		EnvironmentSetting::EnvironmentSetting() : ImGuiWidget("EnvironmentSetting")
 		{
-			
+
 		}
 		EnvironmentSetting::~EnvironmentSetting()
 		{
@@ -27,6 +17,14 @@ namespace Ailu
 		void EnvironmentSetting::Open(const i32& handle)
 		{
 			ImGuiWidget::Open(handle);
+			for (auto& pass : g_pRenderer->GetRenderPasses())
+			{
+				auto gbuffer_pass = dynamic_cast<DeferredGeometryPass*>(pass);
+				if (gbuffer_pass)
+				{
+					_deferred_lighting_mat = gbuffer_pass->_p_lighting_material.get();
+				}
+			}
 		}
 		void EnvironmentSetting::Close(i32 handle)
 		{
@@ -68,39 +66,53 @@ namespace Ailu
 		void EnvironmentSetting::ShowImpl()
 		{
 			ImGui::Text("SkyboxSource:");
-			static u16 s_selected_chechbox = 0u;
+			static u16 s_selected_chechbox = -1;
 			// 复选框1
 			bool checkbox1 = (s_selected_chechbox == 0);
-			if (ImGui::Checkbox("SourceSkyBox", &checkbox1)) {
-				if (checkbox1) {
-					Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_env_tex);
+			if (ImGui::Checkbox("DEBUG_NORMAL", &checkbox1)) 
+			{
+				if (checkbox1) 
+				{
+					_deferred_lighting_mat->EnableKeyword("DEBUG_NORMAL");
+					//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_env_tex);
 					s_selected_chechbox = 0;
 				}
-				else if (s_selected_chechbox == 0) {
+				else if (s_selected_chechbox == 0) 
+				{
+					_deferred_lighting_mat->DisableKeyword("DEBUG_NORMAL");
 					s_selected_chechbox = -1;
 				}
 			}
 
 			// 复选框2
 			bool checkbox2 = (s_selected_chechbox == 1);
-			if (ImGui::Checkbox("RadianceMap", &checkbox2)) {
-				if (checkbox2) {
-					Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_radiance_tex);
+			if (ImGui::Checkbox("DEBUG_ALBEDO", &checkbox2)) 
+			{
+				if (checkbox2) 
+				{
+					_deferred_lighting_mat->EnableKeyword("DEBUG_ALBEDO");
+					//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_radiance_tex);
 					s_selected_chechbox = 1;
 				}
-				else if (s_selected_chechbox == 1) {
+				else if (s_selected_chechbox == 1) 
+				{
+					_deferred_lighting_mat->DisableKeyword("DEBUG_ALBEDO");
 					s_selected_chechbox = -1;
 				}
 			}
 
 			// 复选框3
 			bool checkbox3 = (s_selected_chechbox == 2);
-			if (ImGui::Checkbox("PrefilterEnvMap", &checkbox3)) {
-				if (checkbox3) {
-					Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_prefilter_env_tex);
+			if (ImGui::Checkbox("DEBUG_WORLDPOS", &checkbox3)) 
+			{
+				if (checkbox3) 
+				{
+					_deferred_lighting_mat->EnableKeyword("DEBUG_WORLDPOS");
+					//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_prefilter_env_tex);
 					s_selected_chechbox = 2;
 				}
 				else if (s_selected_chechbox == 2) {
+					_deferred_lighting_mat->DisableKeyword("DEBUG_WORLDPOS");
 					s_selected_chechbox = -1;
 				}
 			}

@@ -201,32 +201,36 @@ namespace Ailu
 	{
 		struct D3DShaderElement
 		{
-			List<D3D_SHADER_MACRO*> _keyword_defines;
-			D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
-			ComPtr<ID3D12RootSignature> _p_sig;
-			//keyword,<kwgroup_id,kw_inner_group_id>
-			ComPtr<ID3DBlob> _p_vblob = nullptr;
-			ComPtr<ID3DBlob> _p_pblob = nullptr;
-			ComPtr<ID3D12ShaderReflection> _p_v_reflection;
-			ComPtr<ID3D12ShaderReflection> _p_p_reflection;
-			D3D12_PRIMITIVE_TOPOLOGY _topology;
+			struct D3DVariantElement
+			{
+				Vector<D3D_SHADER_MACRO> _keyword_defines;
+				ComPtr<ID3D12RootSignature> _p_sig;
+				ComPtr<ID3DBlob> _p_vblob = nullptr;
+				ComPtr<ID3DBlob> _p_pblob = nullptr;
+				ComPtr<ID3D12ShaderReflection> _p_v_reflection;
+				ComPtr<ID3D12ShaderReflection> _p_p_reflection;
+				D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
+			};
+			Map<ShaderVariantHash, D3DVariantElement> _variants;
+			D3D12_PRIMITIVE_TOPOLOGY _topology = D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		};
 	public:
 		D3DShader(const WString& sys_path);
 		~D3DShader();
-		void Bind(u16 pass_index, u16 variant_id) final;
-		void* GetByteCode(EShaderType type, u16 pass_index, u16 variant_id) final;
-		ID3D12RootSignature* GetSignature(u16 pass_index,u16 variant_id);
-		std::pair<D3D12_INPUT_ELEMENT_DESC*,u8> GetVertexInputLayout(u16 pass_index, u16 variant_id);
+		void Bind(u16 pass_index, ShaderVariantHash variant_hash) final;
+		void* GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash) final;
+		ID3D12RootSignature* GetSignature(u16 pass_index,ShaderVariantHash variant_hash);
+		std::pair<D3D12_INPUT_ELEMENT_DESC*,u8> GetVertexInputLayout(u16 pass_index, ShaderVariantHash variant_hash);
 	private:
-		bool RHICompileImpl() final;
+		bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash) final;
 		void Reset();
-		void LoadShaderReflection(u16 pass_index,u16 variant_id);
-		void LoadAdditionalShaderReflection(const WString& sys_path,u16 pass_index,u16 variant_id);
-		void GenerateInternalPSO(u16 pass_index,u16 variant_id);
-
+		void LoadShaderReflection(u16 pass_index, ShaderVariantHash variant_hash, ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps);
+		void LoadAdditionalShaderReflection(const WString& sys_path,u16 pass_index,ShaderVariantHash variant_hash);
+		void GenerateInternalPSO(u16 pass_index,ShaderVariantHash variant_hash);
+		Vector<D3D_SHADER_MACRO> ConstructVariantMarcos(u16 pass_index, ShaderVariantHash variant_hash);
 	private:
-		Vector<D3DShaderElement> _elements;
+		Vector<D3DShaderElement> _pass_elements;
+		std::atomic<bool> _is_pass_elements_init = false;
 	};
 
 	class D3DComputeShader : public ComputeShader

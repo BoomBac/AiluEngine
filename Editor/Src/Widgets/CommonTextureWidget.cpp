@@ -142,6 +142,8 @@ namespace Ailu
 				if (tex->Dimension() == ETextureDimension::kTex2D)
 				{
 					TextureHandle cur_tex_handle = tex->GetNativeTextureHandle();
+					if (cur_tex_handle == 0)
+						continue;
 					AL_ASSERT(cur_tex_handle == 0);
 					ImGui::BeginGroup();
 					ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(cur_tex_handle), ImVec2(preview_tex_size, preview_tex_size), uv0, uv1);

@@ -7,8 +7,10 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/FileManager.h"
 #include "Render/Texture.h"
+
 #include "Widgets/AssetBrowser.h"
 #include "Widgets/CommonTextureWidget.h"
+#include "Common/Selection.h"
 
 namespace Ailu
 {
@@ -377,6 +379,7 @@ namespace Ailu
 			if (ImGui::ImageButton(tex_id, ImVec2(_preview_tex_size, _preview_tex_size), _uv0, _uv1, 0, kColorBg, kColorTint))
 			{
 				g_pLogMgr->LogFormat("selected file {}", file_name.c_str());
+				Selection::AddAndRemovePreSelection(asset->_p_obj.get());
 			}
 			ImGui::PushID(asset->_name.c_str());
 			if (ImGui::BeginDragDropSource())
@@ -434,6 +437,7 @@ namespace Ailu
 						g_pSceneMgr->OpenScene(asset->_asset_path);
 					}
 				}
+				Selection::AddAndRemovePreSelection(asset->_p_obj.get());
 				g_pLogMgr->LogFormat("selected asset {}", file_name.c_str());
 				_selected_file_sys_path = PathUtils::GetResSysPath(asset->_asset_path);
 				_selected_file_index = cur_file_index;

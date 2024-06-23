@@ -20,7 +20,6 @@
 //};
 
 using namespace Ailu;
-
 static Ailu::ApplicationDesc LoadApplicationConfig(WString sys_path)
 {
 	LOG_INFO(sys_path);

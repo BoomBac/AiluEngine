@@ -32,20 +32,23 @@ namespace Ailu
 		AL_ASSERT(s_total_material_num > RenderConstants::kMaxMaterialDataCount);
 		_name = name;
 		_b_internal = false;
+		_p_active_shader = _p_shader;
+		_surface = ESurfaceType::kOpaque;
 		Construct(true);
 		shader->AddMaterialRef(this);
 		//只有首个pass支持默认着色
 		for (int i = 0; i < shader->PassCount(); i++)
 		{
-			auto it = _p_shader->GetBindResInfo(i).find("SamplerMask");
-			if (it != _p_shader->GetBindResInfo(i).end())
+			auto& cur_variant_bind_infos = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
+			auto it = cur_variant_bind_infos.find("SamplerMask");
+			if (it != cur_variant_bind_infos.end())
 			{
 				_b_internal = true;
 				_sampler_mask_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
 				_standard_pass_index = i;
 			}
-			it = _p_shader->GetBindResInfo(i).find("MaterialID");
-			if (it != _p_shader->GetBindResInfo(i).end())
+			it = cur_variant_bind_infos.find("MaterialID");
+			if (it != cur_variant_bind_infos.end())
 			{
 				_b_internal = true;
 				_material_id_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
@@ -57,29 +60,112 @@ namespace Ailu
 		++s_total_material_num;
 	}
 
+	Material::Material(const Material& other)
+	{
+		_b_internal = other._b_internal;
+		_material_id = other._material_id;
+		_sampler_mask_offset = other._sampler_mask_offset;
+		_material_id_offset = other._material_id_offset;
+		_surface = other._surface;
+		_p_active_shader = other._p_active_shader;
+		//标准pass才会使用上面两个变量
+		_standard_pass_index = other._standard_pass_index;
+		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+		_p_shader = other._p_shader;
+		for (auto& cbuf : other._p_cbufs)
+		{
+			u32 buffer_size = cbuf->GetBufferSize();
+			_p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
+			memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
+		}
+		_textures_all_passes = other._textures_all_passes;
+	}
+
+	Material::Material(Material&& other) noexcept
+	{
+		_b_internal = other._b_internal;
+		_material_id = other._material_id;
+		_sampler_mask_offset = other._sampler_mask_offset;
+		_material_id_offset = other._material_id_offset;
+		_surface = other._surface;
+		//标准pass才会使用上面两个变量
+		_standard_pass_index = other._standard_pass_index;
+		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+		_p_shader = other._p_shader;
+		_p_active_shader = other._p_active_shader;
+		_p_cbufs = std::move(other._p_cbufs);
+		other._p_cbufs.clear();
+		_textures_all_passes = std::move(other._textures_all_passes);
+		other._textures_all_passes.clear();
+	}
+
+	Material& Material::operator=(const Material& other)
+	{
+		_b_internal = other._b_internal;
+		_material_id = other._material_id;
+		_sampler_mask_offset = other._sampler_mask_offset;
+		_material_id_offset = other._material_id_offset;
+		_surface = other._surface;
+		//标准pass才会使用上面两个变量
+		_standard_pass_index = other._standard_pass_index;
+		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+		_p_shader = other._p_shader;
+		_p_active_shader = other._p_active_shader;
+		for (auto& cbuf : other._p_cbufs)
+		{
+			u32 buffer_size = cbuf->GetBufferSize();
+			_p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
+			memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
+		}
+		_textures_all_passes = other._textures_all_passes;
+		return *this;
+	}
+
+	Material& Material::operator=(Material&& other) noexcept
+	{
+		_b_internal = other._b_internal;
+		_material_id = other._material_id;
+		_sampler_mask_offset = other._sampler_mask_offset;
+		_material_id_offset = other._material_id_offset;
+		_surface = other._surface;
+		//标准pass才会使用上面两个变量
+		_standard_pass_index = other._standard_pass_index;
+		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
+		_p_shader = other._p_shader;
+		_p_active_shader = other._p_active_shader;
+		_p_cbufs = std::move(other._p_cbufs);
+		other._p_cbufs.clear();
+		_textures_all_passes = std::move(other._textures_all_passes);
+		other._textures_all_passes.clear();
+		return *this;
+	}
+
 	Material::~Material()
 	{
 		--s_total_material_num;
 	}
 	void Material::Bind(u16 pass_index)
 	{
-		if (_p_shader->IsCompileError())
+		auto& cur_pass_variant_hash = _pass_variants[pass_index]._variant_hash;
+		auto variant_state = _p_active_shader->GetVariantState(pass_index, cur_pass_variant_hash);
+		if (variant_state != EShaderVariantState::kReady)
 			return;
 		if (_material_id_offset != 0)
 		{
 			memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, (u32)_material_id, sizeof(u32));
 		}
-		_p_shader->Bind(pass_index, 0);
+		_p_active_shader->Bind(pass_index, cur_pass_variant_hash);
 
-		i8 cbuf_bind_slot = _p_shader->_passes[pass_index]._per_mat_buf_bind_slot;
+		i8 cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._per_mat_buf_bind_slot;
 		if (cbuf_bind_slot != -1)
 		{
 			GraphicsPipelineStateMgr::SubmitBindResource(_p_cbufs[pass_index].get(), EBindResDescType::kConstBuffer, (u8)cbuf_bind_slot);
 		}
 		auto& bind_textures = _textures_all_passes[pass_index];
+		auto& bind_infos = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._bind_res_infos;
 		for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
 		{
-			if (_p_shader->_passes[pass_index]._bind_res_infos.find(it->first) != _p_shader->_passes[pass_index]._bind_res_infos.end())
+			if (bind_infos.find(it->first) != bind_infos.end())
 			{
 				auto& [slot, texture] = it->second;
 				if (texture != nullptr)
@@ -94,12 +180,37 @@ namespace Ailu
 			//}
 		}
 	}
+
 	void Material::ChangeShader(Shader* shader)
 	{
 		_p_shader->RemoveMaterialRef(this);
 		_p_shader = shader;
 		_p_shader->AddMaterialRef(this);
 		Construct(false);
+	}
+	void Material::SurfaceType(const ESurfaceType::ESurfaceType & value)
+	{
+		if (_surface == value)
+			return;
+		if (value == ESurfaceType::kOpaque)
+			_p_active_shader = _p_shader;
+		else if (value == ESurfaceType::kTransparent)
+		{
+			_p_active_shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
+		}
+		_surface = value;
+	}
+
+	bool Material::IsReadyForDraw() const
+	{
+		u16 pass_index = 0;
+		for (auto& pass : _pass_variants)
+		{
+			if (_p_active_shader->GetVariantState(pass_index, pass._variant_hash) != EShaderVariantState::kReady)
+				return false;
+			++pass_index;
+		}
+		return true;
 	}
 
 	void Material::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)
@@ -130,9 +241,10 @@ namespace Ailu
 
 	void Material::SetFloat(const String& name, const float& f)
 	{
+		u16 pass_index = 0;
 		for (auto& pass : _p_shader->_passes)
 		{
-			auto& res_info = pass._bind_res_infos;
+			auto& res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
 			auto it = res_info.find(name);
 			if (it != res_info.end())
 			{
@@ -143,14 +255,16 @@ namespace Ailu
 			{
 				LOG_WARNING("Material: {} set float with name {} failed!", _name, name);
 			}
+			++pass_index;
 		}
 	}
 
 	void Material::SetUint(const String& name, const u32& value)
 	{
+		u16 pass_index = 0;
 		for (auto& pass : _p_shader->_passes)
 		{
-			auto& res_info = pass._bind_res_infos;
+			auto& res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
 			auto it = res_info.find(name);
 			if (it != res_info.end())
 			{
@@ -161,14 +275,16 @@ namespace Ailu
 			{
 				LOG_WARNING("Material: {} set uint with name {} failed!", _name, name);
 			}
+			++pass_index;
 		}
 	}
 
 	void Material::SetVector(const String& name, const Vector4f& vector)
 	{
+		u16 pass_index = 0;
 		for (auto& pass : _p_shader->_passes)
 		{
-			auto& res_info = pass._bind_res_infos;
+			auto& res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
 			auto it = res_info.find(name);
 			if (it != res_info.end())
 			{
@@ -178,41 +294,54 @@ namespace Ailu
 			{
 				LOG_WARNING("Material: {} set vector with name {} failed!", _name, name);
 			}
+			++pass_index;
 		}
 	}
 
 	float Material::GetFloat(const String& name)
 	{
+		u16 pass_index = 0;
 		for (auto& pass : _p_shader->_passes)
 		{
-			auto& res_info = pass._bind_res_infos;
+			auto& res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
 			auto it = res_info.find(name);
 			if (it != res_info.end())
 				return *reinterpret_cast<float*>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
+			++pass_index;
 		}
 		return 0.0f;
 	}
 
+	ShaderVariantHash Material::ActiveVariantHash(u16 pass_index) const
+	{
+		AL_ASSERT(pass_index >= _pass_variants.size());
+		return _pass_variants[pass_index]._variant_hash;
+	};
+
 	u32 Material::GetUint(const String& name)
 	{
+		u16 pass_index = 0;
 		for (auto& pass : _p_shader->_passes)
 		{
-			auto& res_info = pass._bind_res_infos;
+			auto& res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
 			auto it = res_info.find(name);
 			if (it != res_info.end())
 				return *reinterpret_cast<u32*>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
+			++pass_index;
 		}
 		return -1;
 	}
 
 	Vector4f Material::GetVector(const String& name)
 	{
+		u16 pass_index = 0;
 		for (auto& pass : _p_shader->_passes)
 		{
-			auto& res_info = pass._bind_res_infos;
+			auto& res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
 			auto it = res_info.find(name);
 			if (it != res_info.end())
 				return *reinterpret_cast<Vector4f*>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
+			++pass_index;
 		}
 		return Vector4f::kZero;
 	}
@@ -300,10 +429,42 @@ namespace Ailu
 
 	void Material::EnableKeyword(const String& keyword)
 	{
+		u16 pass_index = 0;
+		for (auto& p : _pass_variants)
+		{
+			if (_p_active_shader->IsKeywordValid(pass_index, keyword))
+			{
+				auto group_kws = _p_active_shader->KeywordsSameGroup(pass_index, keyword);
+				for (auto& kw : group_kws)
+				{
+					_pass_variants[pass_index]._keywords.erase(kw);
+				}
+				_pass_variants[pass_index]._keywords.insert(keyword);
+				_pass_variants[pass_index]._variant_hash = _p_active_shader->ConstructVariantHash(pass_index, _pass_variants[pass_index]._keywords);
+				_all_keywords.insert(keyword);
+				UpdateBindTexture(pass_index,_pass_variants[pass_index]._variant_hash);
+			}
+			++pass_index;
+		}
 	}
 
 	void Material::DisableKeyword(const String& keyword)
 	{
+		u16 pass_index = 0;
+		for (auto& p : _pass_variants)
+		{
+			if (_p_active_shader->IsKeywordValid(pass_index, keyword))
+			{
+				if (_pass_variants[pass_index]._keywords.contains(keyword))
+				{
+					_pass_variants[pass_index]._keywords.erase(keyword);
+					_pass_variants[pass_index]._variant_hash = _p_active_shader->ConstructVariantHash(pass_index, _pass_variants[pass_index]._keywords);
+					_all_keywords.erase(keyword);
+					UpdateBindTexture(pass_index, _pass_variants[pass_index]._variant_hash);
+				}
+			}
+			++pass_index;
+		}
 	}
 
 	void Material::RemoveTexture(const String& name)
@@ -322,41 +483,59 @@ namespace Ailu
 	List<std::tuple<String, float>> Material::GetAllFloatValue()
 	{
 		List<std::tuple<String, float>> ret{};
-		for (auto& [name, bind_info] : _p_shader->GetBindResInfo(0))
+		u16 pass_index = 0;
+		for (auto& pass : _pass_variants)
 		{
-			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat
-				&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 4)
+			for (auto& [name, bind_info] : _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
 			{
-				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<float*>(_p_cbufs[0]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+				if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat
+					&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 4)
+				{
+					ret.emplace_back(std::make_tuple(name, *reinterpret_cast<float*>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+				}
 			}
+			++pass_index;
 		}
+
 		return ret;
 	}
 
 	List<std::tuple<String, Vector4f>> Material::GetAllVectorValue()
 	{
 		List<std::tuple<String, Vector4f>> ret{};
-		for (auto& [name, bind_info] : _p_shader->GetBindResInfo(0))
+		u16 pass_index = 0;
+		for (auto& pass : _pass_variants)
 		{
-			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat4
-				&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 16)
+			for (auto& [name, bind_info] : _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
 			{
-				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<Vector4f*>(_p_cbufs[0]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+				if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat4
+					&& ShaderBindResourceInfo::GetVariableSize(bind_info) == 16)
+				{
+					ret.emplace_back(std::make_tuple(name, *reinterpret_cast<Vector4f*>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+				}
 			}
+			++pass_index;
 		}
+
 		return ret;
 	}
 
 	List<std::tuple<String, u32>> Material::GetAllUintValue()
 	{
 		List<std::tuple<String, u32>> ret{};
-		for (auto& [name, bind_info] : _p_shader->GetBindResInfo(0))
+		u16 pass_index = 0;
+		for (auto& pass : _pass_variants)
 		{
-			if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUint)
+			for (auto& [name, bind_info] : _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
 			{
-				ret.emplace_back(std::make_tuple(name, *reinterpret_cast<u32*>(_p_cbufs[0]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+				if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUint)
+				{
+					ret.emplace_back(std::make_tuple(name, *reinterpret_cast<u32*>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
+				}
 			}
+			++pass_index;
 		}
+
 		return ret;
 	}
 
@@ -375,6 +554,7 @@ namespace Ailu
 
 	void Material::Construct(bool first_time)
 	{
+		ConstructKeywords(_p_shader);
 		static u8 s_unused_shader_prop_buf[256]{ 0 };
 		u16 unused_shader_prop_buf_offset = 0u;
 		u16 pass_count = _p_shader->PassCount();
@@ -393,7 +573,7 @@ namespace Ailu
 		Vector<Map<String, std::tuple<u8, Texture*>>> _tmp_textures_all_passes(pass_count);
 		for (int i = 0; i < pass_count; i++)
 		{
-			for (auto& bind_info : _p_shader->GetBindResInfo(i))
+			for (auto& bind_info : _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash))
 			{
 				if (bind_info.second._res_type == EBindResDescType::kTexture2D)
 				{
@@ -454,7 +634,7 @@ namespace Ailu
 			}
 			else {}
 			//处理纹理和属性
-			auto& bind_info = _p_shader->GetBindResInfo(i);
+			auto& bind_info = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
 			auto& textures = _textures_all_passes[i];
 			for (auto& prop_info : _p_shader->GetShaderPropertyInfos(i))
 			{
@@ -501,6 +681,39 @@ namespace Ailu
 					}
 					_properties.insert(std::make_pair(prop_info._value_name, prop));
 				}
+			}
+		}
+	}
+	
+	void Material::ConstructKeywords(Shader* shader)
+	{
+		_pass_variants.clear();
+		for (u16 i = 0; i < shader->_passes.size(); i++)
+		{
+			auto& new_shader_pass = shader->_passes[i];
+			ShaderVariantHash new_variant_hash;
+			std::set<String> active_kws;
+			new_variant_hash = shader->ConstructVariantHash(i, _all_keywords, active_kws);
+			PassVariantInfo info;
+			info._pass_name = new_shader_pass._name;
+			info._keywords = std::move(active_kws);
+			info._variant_hash = new_variant_hash;
+			_pass_variants.emplace_back(info);
+		}
+	}
+
+	void Material::UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash)
+	{
+		auto& bind_textures = _textures_all_passes[pass_index];
+		auto& bind_infos = _p_active_shader->_passes[pass_index]._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
+		for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
+		{
+			auto shader_bind_info_it = bind_infos.find(it->first);
+			if (shader_bind_info_it != bind_infos.end())
+			{
+				auto& [slot, texture] = it->second;
+				u8 new_slot = shader_bind_info_it->second._bind_slot;
+				it->second = std::make_pair(new_slot, texture);
 			}
 		}
 	}

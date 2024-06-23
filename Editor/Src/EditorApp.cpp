@@ -28,9 +28,9 @@ namespace Ailu
 			_p_scene_layer = new SceneLayer();
 			PushLayer(_p_scene_layer);
 			g_pLogMgr->AddAppender(new ImGuiLogAppender());
+			g_pRenderer->Initialize(desc._gameview_width, desc._gameview_height);
 			_p_editor_layer = new EditorLayer();
 			PushLayer(_p_editor_layer);
-			g_pRenderer->Initialize(desc._gameview_width, desc._gameview_height);
 			{
 				g_pSceneMgr->_p_current = g_pResourceMgr->Load<Scene>(_opened_scene_path);
 			}

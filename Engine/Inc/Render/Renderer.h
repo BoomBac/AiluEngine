@@ -68,7 +68,7 @@ namespace Ailu
         ScenePerFrameData _per_frame_cbuf_data;
         RenderingData _rendering_data;
         ConstantBuffer* _p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
-        Scope<OpaquePass> _p_opaque_pass;
+        Scope<ForwardPass> _p_forward_pass;
         Scope<ResolvePass> _p_reslove_pass;
         Scope<ShadowCastPass> _p_shadowcast_pass;
         Scope<CubeMapGenPass> _p_cubemap_gen_pass;

@@ -5,6 +5,7 @@
 //pixel: DeferredLightingPSMain
 //Cull: Back
 //Queue: Opaque
+//multi_compile _ DEBUG_NORMAL DEBUG_ALBEDO DEBUG_WORLDPOS
 //pass end::
 //Properties
 //{
@@ -63,15 +64,26 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 	surface_data.emssive = float3(0.f,0.f,0.f), 
 	surface_data.specular = gbuf2.rgb;
 	uint material_id = (uint)gbuf2.r;
-	if(material_id == 0) 
-	{
-		float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
-		light += surface_data.emssive;
-		return float4(light, 1.0);
-	}
-	else
-	{
-		return float4(1,0,1,1);
-	}
+#ifdef DEBUG_NORMAL
+	return float4(surface_data.wnormal,1);
+#elif DEBUG_ALBEDO
+	return surface_data.albedo;
+#elif DEBUG_WORLDPOS
+	return float4(world_pos.xyz,1);
+#else
+	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
+	light += surface_data.emssive;
+	return float4(light, 1.0);
+#endif
+	// if(material_id == 0) 
+	// {
+	// 	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
+	// 	light += surface_data.emssive;
+	// 	return float4(light, 1.0);
+	// }
+	// else
+	// {
+	// 	return float4(surface_data.wnormal,1);
+	// }
 
 }

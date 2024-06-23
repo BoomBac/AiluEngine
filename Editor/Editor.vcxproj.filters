@@ -101,5 +101,8 @@
     <ClInclude Include="Inc\Widgets\EnvironmentSetting.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Inc\Common\Selection.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

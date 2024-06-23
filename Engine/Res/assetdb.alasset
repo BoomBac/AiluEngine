@@ -22,6 +22,7 @@
 88038f2b-8b36-4a3e-a271-2ed294a5c54f,Shaders/deferred_lighting.alasset,kShader
 881f94ee-2dbb-48e9-b084-72c9bfb729ea,Icons/folder.alasset,kTexture2D
 97913004-ecc3-4cbb-b226-f8d68e5903ab,Shaders/cubemap_gen.alasset,kShader
+D390A432-7AD9-475D-B1A5-726EB91072FB,Shaders/forwardlit.alasset,kShader
 a40c454a-c967-4810-88c9-651706104062,NewScene/default_scene.almap,kScene
 af277291-1e6f-4732-89ba-d0dce1dc12af,NewScene/Palace/MAT_Grass.alasset,kMaterial
 b165a501-5eaa-4e5e-a3c6-3271ea1d9352,Shaders/skybox.alasset,kShader

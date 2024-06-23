@@ -6,6 +6,7 @@
 
 namespace Ailu
 {
+	class Material;
 	namespace Editor
 	{
 		class EnvironmentSetting : public ImGuiWidget
@@ -17,6 +18,8 @@ namespace Ailu
 			void Close(i32 handle) final;
 		private:
 			void ShowImpl() final;
+		private:
+			Material* _deferred_lighting_mat;
 		};
 	}
 }

@@ -49,6 +49,7 @@ namespace Ailu
 		virtual ~ConstantBuffer() = default;
 		virtual void Bind(CommandBuffer* cmd,u8 bind_slot) const = 0;
 		virtual u8* GetData() = 0;
+		virtual u32 GetBufferSize() const= 0;
 	};
 }
 

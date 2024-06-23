@@ -295,10 +295,10 @@ namespace Ailu
 			ThrowIfFailed(s_p_d3d_res->Map(0, &readRange, reinterpret_cast<void**>(&s_p_data)));
 			b_init = true;
 		}
-		size = CalculateConstantBufferByteSize(size);
+		_size = CalculateConstantBufferByteSize(size);
 		try
 		{
-			AL_ASSERT_MSG(s_global_offset + size > s_total_size, "Constant buffer overflow");
+			AL_ASSERT_MSG(s_global_offset + _size > s_total_size, "Constant buffer overflow");
 		}
 		catch (const std::runtime_error& e)
 		{
@@ -316,11 +316,11 @@ namespace Ailu
 			//cbvHandle.ptr = s_p_d3d_heap->GetCPUDescriptorHandleForHeapStart().ptr + _index * s_desc_size;
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
 			cbv_desc.BufferLocation = s_p_d3d_res->GetGPUVirtualAddress() + _offset;
-			cbv_desc.SizeInBytes = size;
+			cbv_desc.SizeInBytes = _size;
 			D3DContext::Get()->GetDevice()->CreateConstantBufferView(&cbv_desc, std::get<0>(_allocation.At(0)));
 			s_cbuf_views.emplace_back(cbv_desc);
 		}
-		s_global_offset += size;
+		s_global_offset += _size;
 		s_global_index++;
 	}
 	D3DConstantBuffer::~D3DConstantBuffer()

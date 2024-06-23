@@ -129,6 +129,9 @@ namespace Ailu
 				//这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
 				if (_state == EApplicationState::EApplicationState_Pause)
 					continue;
+				else if (_state == EApplicationState::EApplicationState_Exit)
+					break;
+				else {};
 				g_pTimeMgr->Tick(0.0f);
 				auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
 				_render_lag += last_mark;

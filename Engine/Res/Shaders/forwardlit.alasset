@@ -1,0 +1,6 @@
+guid: D390A432-7AD9-475D-B1A5-726EB91072FB
+type: kShader
+name: forwardlit
+  file: Shaders/hlsl/forwardlit.hlsl
+  vs_entry: ForwardVSMain
+  ps_entry: ForwardPSMain

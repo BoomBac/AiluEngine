@@ -18,7 +18,7 @@ namespace Ailu
 			void ShowImpl() final;
 			void DrawTreeNode(SceneActor* actor,bool is_root);
 		private:
-			SceneActor** _selected_actor = nullptr;
+			SceneActor* _selected_actor = nullptr;
 		};
 	}
 }

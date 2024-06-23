@@ -5,6 +5,7 @@
 #include "RHI/DX12/D3DTexture.h"
 #include "Render/RenderingData.h"
 #include "Render/Gizmo.h"
+#include "Render/RenderQueue.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -157,11 +158,6 @@ namespace Ailu
 		_p_cmd->RSSetScissorRects(1, &d3d_rect);
 	}
 
-	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, const Matrix4x4f& transform, u32 instance_count)
-	{
-		throw std::runtime_error("error");
-		return 0;
-	}
 	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count)
 	{
 		if (mesh)
@@ -176,7 +172,7 @@ namespace Ailu
 
 	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count)
 	{
-		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || material->GetShader()->IsCompileError())
+		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
 		{
 			//LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
 			return 1;
@@ -201,7 +197,7 @@ namespace Ailu
 
 	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count)
 	{
-		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || material->GetShader()->IsCompileError())
+		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
 		{
 			//LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
 			return 1;
@@ -230,7 +226,7 @@ namespace Ailu
 	}
 	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, u32 instance_count, u16 pass_index)
 	{
-		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || material->GetShader()->IsCompileError())
+		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
 		{
 			LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
 			return 1;

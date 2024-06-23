@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __OUTPUT_LOG_H__
 #define __OUTPUT_LOG_H__
+#include <mutex>
 #include "ImGuiWidget.h"
 #include "Ext/imgui/imgui.h"
 #include "Framework/Common/LogMgr.h"
@@ -20,10 +21,12 @@ namespace Ailu
 
 			void Print(std::string str) final
 			{
+				std::lock_guard<std::mutex> m(_add_mutex);
 				AddLog("%s\r\n", str.c_str());
 			}
 			void Print(std::wstring str) final
 			{
+				std::lock_guard<std::mutex> m(_add_mutex);
 				AddLog("%s\r\n", ToChar(str).c_str());
 			}
 
@@ -156,6 +159,7 @@ namespace Ailu
 			ImVec4 _red_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
 			ImVec4 _yellow_color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
 			ImVec4 _white_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+			std::mutex _add_mutex;
 		};
 
 		//这个类是用来输出日志的，它是一个简单的文本输出窗口，它可以过滤文本，并且可以自动滚动。

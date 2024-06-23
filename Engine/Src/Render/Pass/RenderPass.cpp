@@ -13,22 +13,69 @@
 namespace Ailu
 {
 	//-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
-	OpaquePass::OpaquePass() : RenderPass("OpaquePass")
+	ForwardPass::ForwardPass() : RenderPass("TransparentPass")
 	{
-
+		shader_state_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/debug.hlsl"), "ShaderStateDebug");
+		_error_shader_pass_id = 0;
+		_compiling_shader_pass_id = 1;
+		_forward_lit_shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
+		AL_ASSERT(_forward_lit_shader == nullptr);
 	}
-	OpaquePass::~OpaquePass()
+	ForwardPass::~ForwardPass()
 	{
 	}
-	void OpaquePass::Execute(GraphicsContext* context, RenderingData& rendering_data)
+	void ForwardPass::BeginPass(GraphicsContext* context)
 	{
-		//auto cmd = CommandBufferPool::Get("OpaquePass");
-		//cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
-		//cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
-		//cmd->SetViewport(rendering_data._viewport);
-		//cmd->SetScissorRect(rendering_data._scissor_rect);
-
-		//u32 obj_index = 0u;
+		//for (auto& obj : RenderQueue::GetTransparentRenderables())
+		//{
+		//	if (!_transparent_replacement_materials.contains(obj.GetMaterial()->ID()))
+		//	{
+		//		auto mat = MakeRef<Material>(*(obj.GetMaterial()));
+		//		mat->ChangeShader(_forward_lit_shader);
+		//		_transparent_replacement_materials.emplace(std::make_pair(obj.GetMaterial()->ID(), mat));
+		//	}
+		//}
+	}
+	void ForwardPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
+	{
+		
+		auto& all_renderable = RenderQueue::GetAllRenderables();
+		u32 lowerBound = RenderQueue::kTransparent, upperBound = RenderQueue::kShaderCompiling;
+		auto filtered = all_renderable| std::views::filter([lowerBound, upperBound](const auto& kv) {
+			return kv.first >= lowerBound && kv.first <= upperBound;
+			}) | std::views::values;
+		u32 obj_num = 0;
+		for (auto& r : filtered)
+		{
+			obj_num += r.size();
+		}
+		if (obj_num == 0)
+			return;
+		auto cmd = CommandBufferPool::Get(_name);
+		{
+			ProfileBlock b(cmd.get(), _name);
+			cmd->SetRenderTarget(rendering_data._camera_color_target_handle,rendering_data._camera_depth_target_handle);
+			u32 obj_index = 0u;
+			for (auto& obj : RenderQueue::GetTransparentRenderables())
+			{
+				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+				cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, 0, obj._instance_count);
+				++obj_index;
+			}
+			for (auto& obj : RenderQueue::GetErrorShaderRenderables())
+			{
+				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+				cmd->DrawRenderer(obj.GetMesh(), shader_state_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, _error_shader_pass_id, obj._instance_count);
+				++obj_index;
+			}
+			obj_index = 0u;
+			for (auto& obj : RenderQueue::GetCompilingShaderRenderables())
+			{
+				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+				cmd->DrawRenderer(obj.GetMesh(), shader_state_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, _compiling_shader_pass_id, obj._instance_count);
+				++obj_index;
+			}
+		}
 		//if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
 		//{
 		//	for (auto& obj : RenderQueue::GetOpaqueRenderables())
@@ -49,13 +96,10 @@ namespace Ailu
 		//		++obj_index;
 		//	}
 		//}
-		//context->ExecuteCommandBuffer(cmd);
-		//CommandBufferPool::Release(cmd);
+		context->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
 	}
-	void OpaquePass::BeginPass(GraphicsContext* context)
-	{
-	}
-	void OpaquePass::EndPass(GraphicsContext* context)
+	void ForwardPass::EndPass(GraphicsContext* context)
 	{
 	}
 	//-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
@@ -133,6 +177,10 @@ namespace Ailu
 				{
 					cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[0].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
 				}
+				for (auto& obj : RenderQueue::GetTransparentRenderables())
+				{
+					cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[0].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+				}
 				obj_index = 0u;
 			}
 			//投灯阴影
@@ -146,6 +194,10 @@ namespace Ailu
 					cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), i, 1.0f);
 					_shadowcast_materials[i + 1]->SetUint("shadow_index", rendering_data._shadow_data[i + 1]._shadow_index);
 					for (auto& obj : RenderQueue::GetOpaqueRenderables())
+					{
+						cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[i + 1].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+					}
+					for (auto& obj : RenderQueue::GetTransparentRenderables())
 					{
 						cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[i + 1].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
 					}
@@ -173,6 +225,11 @@ namespace Ailu
 						_shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetVector("_shadow_params", light_pos);
 						_shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetUint("shadow_index", rendering_data._point_shadow_data[i]._shadow_indices[j]);
 						for (auto& obj : RenderQueue::GetOpaqueRenderables())
+						{
+							cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj_index++],
+								obj._submesh_index, 1, obj._instance_count);
+						}
+						for (auto& obj : RenderQueue::GetTransparentRenderables())
 						{
 							cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj_index++],
 								obj._submesh_index, 1, obj._instance_count);
@@ -275,7 +332,7 @@ namespace Ailu
 				u16 rt_index = mipmap_level * i;
 				cmd->SetRenderTarget(_src_cubemap.get(), rt_index);
 				cmd->ClearRenderTarget(_src_cubemap.get(), Colors::kBlack, rt_index);
-				cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
+				cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPerPassBufferBindSlot(0, _p_gen_material->ActiveVariantHash(0)));
 				cmd->DrawRenderer(_p_cube_mesh, _p_gen_material, _per_obj_cb.get(), 0, 0, 1);
 			}
 			context->ExecuteAndWaitCommandBuffer(cmd);
@@ -288,7 +345,7 @@ namespace Ailu
 			{
 				cmd->SetRenderTarget(_radiance_map.get(), i);
 				cmd->ClearRenderTarget(_radiance_map.get(), Colors::kBlack, i);
-				cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPrePassBufferBindSlot());
+				cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _p_gen_material->GetShader()->GetPerPassBufferBindSlot(0,_p_gen_material->ActiveVariantHash(0)));
 				cmd->DrawRenderer(_p_cube_mesh, _p_filter_material, _per_obj_cb.get());
 			}
 			//filter envmap
@@ -306,7 +363,7 @@ namespace Ailu
 					cmd->SetScissorRect(r);
 					cmd->SetRenderTarget(_prefilter_cubemap.get(), rt_index);
 					cmd->ClearRenderTarget(_prefilter_cubemap.get(), Colors::kBlack, rt_index);
-					cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _reflection_prefilter_mateirals[0]->GetShader()->GetPrePassBufferBindSlot(1));
+					cmd->SubmitBindResource(_per_pass_cb[i].get(), EBindResDescType::kConstBuffer, _reflection_prefilter_mateirals[0]->GetShader()->GetPerPassBufferBindSlot(1, _reflection_prefilter_mateirals[0]->ActiveVariantHash(1)));
 					cmd->DrawRenderer(_p_cube_mesh, _reflection_prefilter_mateirals[j].get(), _per_obj_cb.get(), 0, 1, 1);
 				}
 			}
@@ -347,6 +404,8 @@ namespace Ailu
 	}
 	void DeferredGeometryPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
+		if (RenderQueue::GetOpaqueRenderables().size() == 0)
+			return;
 		auto w = rendering_data._width, h = rendering_data._height;
 		for (int i = 0; i < _rects.size(); i++)
 			_rects[i] = Rect(0, 0, w, h);
@@ -367,18 +426,13 @@ namespace Ailu
 			{
 				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
 				auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
-				if (ret != 0)
-				{
-					//LOG_WARNING("DeferredGeometryPass mesh {} not draw",obj.GetMesh()->Name());
-				}
-				else
-					++obj_index;
+				++obj_index;
 			}
 			_p_lighting_material->SetTexture("_GBuffer0", _gbuffers[0]);
 			_p_lighting_material->SetTexture("_GBuffer1", _gbuffers[1]);
 			_p_lighting_material->SetTexture("_GBuffer2", _gbuffers[2]);
 			_p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_target_handle);
-			_p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
+			Shader::SetGlobalTexture("IBLLut", _brdf_lut.get());
 			cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
 			cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, Colors::kBlack);
 			cmd->SetViewport(rendering_data._viewport);
