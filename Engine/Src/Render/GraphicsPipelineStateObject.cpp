@@ -24,47 +24,44 @@ namespace Ailu
 		return nullptr;
 	}
 
-	ALHash::Hash<64> GraphicsPipelineStateObject::ConstructPSOHash(u8 input_layout, u32 shader, u8 topology, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state)
+	ALHash::Hash<64> GraphicsPipelineStateObject::ConstructPSOHash(u8 input_layout, u64 shader, u8 topology, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state)
 	{
 		ALHash::Hash<64> hash;
 		ConstructPSOHash(hash, input_layout, shader, topology, blend_state, raster_state, ds_state, rt_state);
 		return hash;
 	}
 
-	void GraphicsPipelineStateObject::ConstructPSOHash(ALHash::Hash<64>& hash, u8 input_layout, u32 shader, u8 topology, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state)
+	void GraphicsPipelineStateObject::ConstructPSOHash(ALHash::Hash<64>& hash, u8 input_layout, u64 shader, u8 topology, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state)
 	{
-		hash.Set(0, 4, input_layout);
-		hash.Set(4, 32, shader);
-		hash.Set(36, 2, topology);
-		hash.Set(38, 3, blend_state);
-		hash.Set(41, 3, raster_state);
-		hash.Set(44, 3, ds_state);
-		hash.Set(47, 3, rt_state);
+		hash.Set(StateHashStruct::kInputlayout._pos, StateHashStruct::kInputlayout._size, input_layout);
+		hash.Set(StateHashStruct::kShader._pos, StateHashStruct::kShader._size, shader);
+		hash.Set(StateHashStruct::kTopology._pos, StateHashStruct::kTopology._size, topology);
+		hash.Set(StateHashStruct::kBlendState._pos, StateHashStruct::kBlendState._size, blend_state);
+		hash.Set(StateHashStruct::kRasterState._pos, StateHashStruct::kRasterState._size, raster_state);
+		hash.Set(StateHashStruct::kDepthStencilState._pos, StateHashStruct::kDepthStencilState._size, ds_state);
+		hash.Set(StateHashStruct::kRenderTargetState._pos, StateHashStruct::kRenderTargetState._size, rt_state);
 	}
 
 	ALHash::Hash<64> GraphicsPipelineStateObject::ConstructPSOHash(const GraphicsPipelineStateInitializer& initializer, u16 pass_index, ShaderVariantHash variant_hash)
 	{
-		//return ConstructPSOHash(initializer._p_vertex_shader->PipelineInputLayout().Hash(), Shader::ConstructHash(initializer._p_pixel_shader->ID(),pass_index,variant_index),
-		//	ALHash::Hasher(initializer._p_pixel_shader->PipelineTopology()), initializer._p_pixel_shader->PipelineBlendState().Hash(),
-		//	initializer._p_pixel_shader->PipelineRasterizerState().Hash(), initializer._p_pixel_shader->PipelineDepthStencilState().Hash(), initializer._rt_state.Hash());
 		return ConstructPSOHash(initializer._p_vertex_shader->PipelineInputLayout(pass_index,variant_hash).Hash(), Shader::ConstructHash(initializer._p_pixel_shader->ID(),pass_index, variant_hash),
 			ALHash::Hasher(initializer._p_pixel_shader->PipelineTopology()), initializer._blend_state.Hash(),
 			initializer._raster_state.Hash(), initializer._depth_stencil_state.Hash(), initializer._rt_state.Hash());
 	}
 
-	void GraphicsPipelineStateObject::ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u8& input_layout, u32& shader, u8& topology, u8& blend_state, u8& raster_state, u8& ds_state, u8& rt_state)
+	void GraphicsPipelineStateObject::ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u8& input_layout, u64& shader, u8& topology, u8& blend_state, u8& raster_state, u8& ds_state, u8& rt_state)
 	{
-		input_layout = static_cast<u8>(pso_hash.Get(0, 4));
-		shader = pso_hash.Get(4, 32);
-		topology = static_cast<u8>(pso_hash.Get(36, 2));
-		blend_state = static_cast<u8>(pso_hash.Get(38, 3));
-		raster_state = static_cast<u8>(pso_hash.Get(41, 3));
-		ds_state = static_cast<u8>(pso_hash.Get(44, 3));
-		rt_state = static_cast<u8>(pso_hash.Get(47, 3));
+		input_layout = static_cast<u8>(pso_hash.Get(StateHashStruct::kInputlayout._pos, StateHashStruct::kInputlayout._size));
+		shader = pso_hash.Get(StateHashStruct::kShader._pos, StateHashStruct::kShader._size);
+		topology = static_cast<u8>(pso_hash.Get(StateHashStruct::kTopology._pos, StateHashStruct::kTopology._size));
+		blend_state = static_cast<u8>(pso_hash.Get(StateHashStruct::kBlendState._pos, StateHashStruct::kBlendState._size));
+		raster_state = static_cast<u8>(pso_hash.Get(StateHashStruct::kRasterState._pos, StateHashStruct::kRasterState._size));
+		ds_state = static_cast<u8>(pso_hash.Get(StateHashStruct::kDepthStencilState._pos, StateHashStruct::kDepthStencilState._size));
+		rt_state = static_cast<u8>(pso_hash.Get(StateHashStruct::kRenderTargetState._pos, StateHashStruct::kRenderTargetState._size));
 	}
-	void GraphicsPipelineStateObject::ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u32& shader)
+	void GraphicsPipelineStateObject::ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u64& shader)
 	{
-		shader = pso_hash.Get(4, 32);
+		shader = pso_hash.Get(StateHashStruct::kShader._pos, StateHashStruct::kShader._size);
 	}
 	//------------------------------------------------------------------------------GraphicsPipelineStateObject---------------------------------------------------------------------------------
 
@@ -243,7 +240,7 @@ namespace Ailu
 		GraphicsPipelineStateObject::ConstructPSOHash(s_cur_pos_hash, s_hash_input_layout, s_hash_shader, s_hash_topology, s_hash_blend_state, s_hash_raster_state, s_hash_depth_stencil_state, s_hash_rt_state);
 		auto it = s_pso_library.find(s_cur_pos_hash);
 		u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
-		u32 shader_hash;
+		u64 shader_hash;
 		if (it != s_pso_library.end())
 		{
 			GraphicsPipelineStateObject::ExtractPSOHash(s_cur_pos_hash, input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
@@ -257,7 +254,7 @@ namespace Ailu
 		else
 		{
 			GraphicsPipelineStateObject::ExtractPSOHash(s_cur_pos_hash, input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
-			LOG_INFO("Pos hash currently used:  Input Layout: {}, Shader: {}, Topology: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}, Hash: {}",
+			LOG_WARNING("Pos used currently not ready with Input Layout: {}, Shader: {}, Topology: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}, Hash: {}",
 				(u32)input_layout, shader_hash, (u32)topology, (u32)blend_state, (u32)raster_state, (u32)ds_state, (u32)rt_state, s_cur_pos_hash.ToString());
 			{
 				u32 shader_id;
@@ -281,7 +278,7 @@ namespace Ailu
 					pso->Build(pass_index, variant_hash);
 					for (auto& [hash, pso] : s_pso_library)
 					{
-						u32 similar_shader_hash;
+						u64 similar_shader_hash;
 						GraphicsPipelineStateObject::ExtractPSOHash(hash, input_layout, similar_shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
 						if (similar_shader_hash == shader_hash)
 						{
@@ -292,7 +289,6 @@ namespace Ailu
 					GraphicsPipelineStateObject::ExtractPSOHash(pso->Hash(), input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
 					LOG_WARNING("New Pso name:[{}], Input Layout: {}, Shader: {}, Topology: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}, Hash: {}",
 						pso->Name(), (u32)input_layout, shader_hash, (u32)topology, (u32)blend_state, (u32)raster_state, (u32)ds_state, (u32)rt_state, pso->Hash().ToString());
-					//LOG_WARNING("new hash {}", pso->Hash().ToString());
 					GraphicsPipelineStateMgr::AddPSO(std::move(pso));
 				}
 			}
@@ -302,14 +298,16 @@ namespace Ailu
 
 	void GraphicsPipelineStateMgr::OnShaderRecompiled(Shader* shader, u16 pass_id, ShaderVariantHash variant_hash)
 	{
-		auto pass = shader->GetPassInfo(pass_id);
+		auto& pass = shader->GetPassInfo(pass_id);
 		GraphicsPipelineStateInitializer gpso_desc;
 		u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
-		u32 shader_hash;
+		u64 shader_hash;
 		gpso_desc._input_layout = shader->PipelineInputLayout(pass_id);
 		gpso_desc._p_pixel_shader = shader;
 		gpso_desc._p_vertex_shader = shader;
-		u32 new_pso_shader_hash = Shader::ConstructHash(shader->ID(), pass_id, variant_hash);
+		u64 new_pso_shader_hash = Shader::ConstructHash(shader->ID(), pass_id, variant_hash);
+		//更新库中pso的筛选条件：
+		//- pass_name一致即可
 		for (auto& pso : s_pso_library)
 		{
 			GraphicsPipelineStateObject::ExtractPSOHash(pso.first, input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
@@ -336,7 +334,7 @@ namespace Ailu
 		s_update_pso.emplace(std::move(pso));
 	}
 
-	void GraphicsPipelineStateMgr::ConfigureShader(const u32& shader_hash)
+	void GraphicsPipelineStateMgr::ConfigureShader(const u64& shader_hash)
 	{
 		s_hash_shader = shader_hash;
 	}

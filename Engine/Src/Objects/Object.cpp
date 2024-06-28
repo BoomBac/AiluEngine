@@ -8,6 +8,10 @@ namespace Ailu
 		_name = std::format("object_{}", s_global_object_id);
 		_id = s_global_object_id++;
 	}
+	Object::Object(const String& name) : Object()
+	{
+		_name = name;
+	}
 	Object::Object(const Object& other)
 	{
 		_name = other._name;

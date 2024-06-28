@@ -55,13 +55,28 @@ namespace Ailu
 	class CommandBuffer;
 	class GraphicsPipelineStateObject
 	{
+		struct StateHashStruct
+		{
+			struct BitDesc
+			{
+				u8 _pos;
+				u8 _size;
+			};
+			inline static const BitDesc kShader = {0,46};
+			inline static const BitDesc kInputlayout = {46,4};
+			inline static const BitDesc kTopology = {50,2};
+			inline static const BitDesc kBlendState = {52,3};
+			inline static const BitDesc kRasterState = {55,3};
+			inline static const BitDesc kDepthStencilState = {58,3};
+			inline static const BitDesc kRenderTargetState = {61,3};
+		};
 	public:
 		static Scope<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer& initializer);
-		static ALHash::Hash<64> ConstructPSOHash(u8 input_layout,u32 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
-		static void ConstructPSOHash(ALHash::Hash<64>& hash,u8 input_layout,u32 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
+		static ALHash::Hash<64> ConstructPSOHash(u8 input_layout,u64 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
+		static void ConstructPSOHash(ALHash::Hash<64>& hash,u8 input_layout, u64 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
 		static ALHash::Hash<64> ConstructPSOHash(const GraphicsPipelineStateInitializer& initializer,u16 pass_index = 0, ShaderVariantHash variant_hash = 0);
-		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u8& input_layout, u32& shader, u8& topology, u8& blend_state, u8& raster_state, u8& ds_state, u8& rt_state);
-		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u32& shader);
+		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u8& input_layout, u64& shader, u8& topology, u8& blend_state, u8& raster_state, u8& ds_state, u8& rt_state);
+		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u64& shader);
 
 		virtual ~GraphicsPipelineStateObject() = default;
 		virtual void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) = 0;
@@ -90,7 +105,7 @@ namespace Ailu
 		static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
 		static void EndConfigurePSO(CommandBuffer* cmd);
 		static void OnShaderRecompiled(Shader* shader,u16 pass_id,ShaderVariantHash variant_hash);
-		static void ConfigureShader(const u32& shader_hash);
+		static void ConfigureShader(const u64& shader_hash);
 		static void ConfigureVertexInputLayout(const u8& hash); //0~3 4
 		static void ConfigureTopology(const u8& hash); //36~37 2
 		static void ConfigureBlendState(const u8& hash); // 38~40 3
@@ -116,7 +131,7 @@ namespace Ailu
 		static RenderTargetState _s_render_target_state;
 
 		inline static ALHash::Hash<64> s_cur_pos_hash{};
-		inline static u32 s_hash_shader; // 4~35 32
+		inline static u64 s_hash_shader; // 4~35 32
 		inline static u8 s_hash_input_layout; //0~3 4
 		inline static u8 s_hash_topology; //36~37 2
 		inline static u8 s_hash_blend_state; // 38~40 3

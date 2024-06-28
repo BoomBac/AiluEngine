@@ -229,7 +229,6 @@ namespace Ailu
 					sys_path.append(name).append(".alasset");
 					auto asset_path = PathUtils::ExtractAssetPath(sys_path);
 					auto new_mat = MakeRef<Material>(selected_shader.get(), name);
-					new_mat->IsInternal(selected_shader->Name() == "shaders");
 					g_pResourceMgr->CreateAsset(ToWChar(asset_path), new_mat);
 					g_pResourceMgr->SaveAllUnsavedAssets();
 				}

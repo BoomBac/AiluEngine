@@ -2,6 +2,7 @@
 
 #include "Ext/imgui/imgui.h"
 #include "Render/Renderer.h"
+#include "Render/Pass/PostprocessPass.h"
 
 namespace Ailu
 {
@@ -23,6 +24,11 @@ namespace Ailu
 				if (gbuffer_pass)
 				{
 					_deferred_lighting_mat = gbuffer_pass->_p_lighting_material.get();
+				}
+				auto post_pass = dynamic_cast<PostProcessPass*>(pass);
+				if (post_pass)
+				{
+					_post_process_pass = post_pass;
 				}
 			}
 		}
@@ -116,6 +122,8 @@ namespace Ailu
 					s_selected_chechbox = -1;
 				}
 			}
+			ImGui::SliderFloat("BoomRadius", &_post_process_pass->_upsample_radius,0.0f,0.1f);
+			ImGui::SliderFloat("BoomIntensity", &_post_process_pass->_bloom_intensity,0.0f,1.0f);
 			//// 获取窗口的尺寸
 			//ImVec2 windowSize = ImGui::GetContentRegionAvail();
 			//float faceSize = (windowSize.x-25) / 4.0f; // 每个面在窗口中的尺寸

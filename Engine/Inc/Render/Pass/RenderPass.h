@@ -5,6 +5,7 @@
 #include "Render/RenderingData.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
+#include "Objects/Object.h"
 
 namespace Ailu
 {
@@ -20,10 +21,10 @@ namespace Ailu
 		virtual const void SetActive(bool is_active) = 0;
 	};
 
-	class RenderPass : public IRenderPass
+	class RenderPass : public IRenderPass,public Object
 	{
 	public:
-		RenderPass(const String& name) : _name(name), _is_active(true) {};
+		RenderPass(const String& name) : Object(name), _is_active(true) {};
 		virtual void Execute(GraphicsContext* context, RenderingData& rendering_data) override {};
 		virtual void BeginPass(GraphicsContext* context) override {};
 		virtual void EndPass(GraphicsContext* context) override {};
@@ -31,7 +32,6 @@ namespace Ailu
 		virtual const bool IsActive() const final {return _is_active; };
 		virtual const void SetActive(bool is_active) final { _is_active = is_active; };
 	protected:
-		String _name;
 		bool _is_active;
 	};
 

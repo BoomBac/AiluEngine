@@ -40,6 +40,7 @@ namespace Ailu
 		//--------------------Reflect
 	public:
 		Object();
+		Object(const String& name);
 		Object(const Object& other);
 		Object(Object&& other) noexcept;
 		Object& operator=(const Object& other);

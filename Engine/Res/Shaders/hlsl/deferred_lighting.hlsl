@@ -4,6 +4,7 @@
 //vert: DeferredLightingVSMain
 //pixel: DeferredLightingPSMain
 //Cull: Back
+//Stencil: {Ref 5 Comp Always Pass Replace}
 //Queue: Opaque
 //multi_compile _ DEBUG_NORMAL DEBUG_ALBEDO DEBUG_WORLDPOS
 //pass end::
@@ -73,17 +74,6 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 #else
 	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
 	light += surface_data.emssive;
-	return float4(light, 1.0);
-#endif
-	// if(material_id == 0) 
-	// {
-	// 	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
-	// 	light += surface_data.emssive;
-	// 	return float4(light, 1.0);
-	// }
-	// else
-	// {
-	// 	return float4(surface_data.wnormal,1);
-	// }
-
+	return float4(light, 1.0); 
+#endif 
 }

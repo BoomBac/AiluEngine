@@ -223,10 +223,7 @@ namespace Ailu
 							{
 								queue_id = shader_state;
 							}
-							if (used_mat->SurfaceType() == ESurfaceType::kTransparent)
-							{
-								queue_id = RenderQueue::kTransparent;
-							}
+							queue_id = used_mat->RenderQueue();
 						}
 						RenderQueue::Enqueue(queue_id, static_mesh->GetMesh().get(), used_mat,
 							static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix(), i, 1);

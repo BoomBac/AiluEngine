@@ -1,13 +1,35 @@
 Normal: Begin init resource mgr...
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
+Normal: Shader compile end
 Warning: Unused shader prop Color been added;
 Warning: Unused shader prop Exposure been added;
 Warning: Unused shader prop InvertColor been added;
 Warning: Unused shader prop ColorOverlay been added;
-Normal: Resource mgr init finish after 29.489ms
+Normal: Resource mgr init finish after 15.4161ms
 Normal: Begin init scene mgr...
-Normal: Scene mgr init finish after 0.002ms
+Normal: Scene mgr init finish after 0.0029ms
 Normal: Begin init renderer...
-Normal: Renderer init finish after 0.0017ms
+Normal: Renderer init finish after 0.0013ms
 Normal: Application Init end
 Warning: Expand rt pool to 1
 Warning: Expand rt pool to 2
@@ -40,13 +62,29 @@ Warning: Expand rt pool to 11
 Warning: Expand rt pool to 12
 Warning: Expand rt pool to 13
 Warning: Expand rt pool to 14
-Normal: Resize game view to 1035,564
 Warning: Expand rt pool to 15
 Warning: Expand rt pool to 16
 Warning: Expand rt pool to 17
+Normal: Resize game view to 1035,440
 Warning: Expand rt pool to 18
 Warning: Expand rt pool to 19
 Warning: Expand rt pool to 20
-Normal: selected asset forwardlit
-Warning: D3DContext::Present: Resource cleanup, 15 resources released.
+Warning: Expand rt pool to 21
+Warning: Expand rt pool to 22
+Warning: Expand rt pool to 23
+Warning: Expand rt pool to 24
+Warning: Expand rt pool to 25
+Warning: Expand rt pool to 26
 Normal: OnLostFoucus
+Warning: D3DContext::Present: Resource cleanup, 15 resources released.
+Normal: OnGetFoucus
+Normal: OnLostFoucus
+Normal: OnGetFoucus
+Normal: OnLostFoucus
+Normal: OnGetFoucus
+Normal: OnLostFoucus
+Normal: OnGetFoucus
+Normal: OnLostFoucus
+Normal: OnGetFoucus
+Normal: OnLostFoucus
+Normal: Exit

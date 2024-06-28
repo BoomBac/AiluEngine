@@ -7,6 +7,7 @@
 namespace Ailu
 {
 	class Material;
+	class PostProcessPass;
 	namespace Editor
 	{
 		class EnvironmentSetting : public ImGuiWidget
@@ -20,6 +21,7 @@ namespace Ailu
 			void ShowImpl() final;
 		private:
 			Material* _deferred_lighting_mat;
+			PostProcessPass* _post_process_pass;
 		};
 	}
 }

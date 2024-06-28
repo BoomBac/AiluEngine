@@ -1856,7 +1856,11 @@ namespace Ailu
 				{
 					_hash.reset();
 				}
-				void Set(u8 pos, u8 size, u32 value)
+				Hash(u64 hash_value)
+				{
+					_hash = hash_value;
+				}
+				void Set(u8 pos, u8 size, u64 value)
 				{
 					if (pos + size > Size)
 					{
@@ -1869,18 +1873,18 @@ namespace Ailu
 					}
 				}
 
-				u32 Get(u8 pos, u8 size) const
+				u64 Get(u8 pos, u8 size) const
 				{
 					if (pos + size > Size)
 					{
 						throw std::out_of_range("Invalid position and size for Get operation");
 					}
-					std::bitset<32> result;
+					std::bitset<64> result;
 					for (u8 i = 0; i < size; ++i)
 					{
 						result.set(i, _hash.test(pos + i));
 					}
-					return static_cast<u32>(result.to_ulong());
+					return static_cast<u64>(result.to_ulong());
 				}
 
 				bool operator==(const Hash<Size>& other) const

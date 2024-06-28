@@ -137,40 +137,40 @@ namespace Ailu
 			}
 		}
 
-		static void DrawInternalStandardMaterial(Material* mat, TextureSelector& selector_window)
+		static void DrawInternalStandardMaterial(StandardMaterial* mat, TextureSelector& selector_window)
 		{
 			u16 mat_prop_index = 0;
 			static bool use_textures[10]{};
-			static auto func_show_prop = [&](u16& mat_prop_index, Material* mat, String name) {
+			static auto func_show_prop = [&](u16& mat_prop_index, StandardMaterial* mat, String name) {
 				ImGui::PushID(mat_prop_index);
 				ETextureUsage tex_usage{};
 				String non_tex_prop_name;
-				if (name == InternalStandardMaterialTexture::kAlbedo)
+				if (name == StandardMaterial::TexturePropertyName::kAlbedo)
 				{
 					tex_usage = ETextureUsage::kAlbedo;
 					non_tex_prop_name = "BaseColor";
 				}
-				else if (name == InternalStandardMaterialTexture::kEmssive)
+				else if (name == StandardMaterial::TexturePropertyName::kEmssive)
 				{
 					tex_usage = ETextureUsage::kEmssive;
 					non_tex_prop_name = "EmssiveColor";
 				}
-				else if (name == InternalStandardMaterialTexture::kMetallic)
+				else if (name == StandardMaterial::TexturePropertyName::kMetallic)
 				{
 					tex_usage = ETextureUsage::kMetallic;
 					non_tex_prop_name = "MetallicValue";
 				}
-				else if (name == InternalStandardMaterialTexture::kRoughness)
+				else if (name == StandardMaterial::TexturePropertyName::kRoughness)
 				{
 					tex_usage = ETextureUsage::kRoughness;
 					non_tex_prop_name = "RoughnessValue";
 				}
-				else if (name == InternalStandardMaterialTexture::kSpecular)
+				else if (name == StandardMaterial::TexturePropertyName::kSpecular)
 				{
 					tex_usage = ETextureUsage::kSpecular;
 					non_tex_prop_name = "SpecularColor";
 				}
-				else if (name == InternalStandardMaterialTexture::kNormal)
+				else if (name == StandardMaterial::TexturePropertyName::kNormal)
 				{
 					tex_usage = ETextureUsage::kNormal;
 					non_tex_prop_name = "None";
@@ -455,9 +455,10 @@ namespace Ailu
 									}
 									ImGui::EndCombo();
 								}
-								if (mat->IsInternal())
+								auto standard_mat = dynamic_cast<StandardMaterial*>(mat.get());
+								if (standard_mat)
 								{
-									DrawInternalStandardMaterial(mat.get(), selector_window);
+									DrawInternalStandardMaterial(standard_mat, selector_window);
 								}
 								else
 								{

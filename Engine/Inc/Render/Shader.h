@@ -182,7 +182,7 @@ namespace Ailu
 		} kZWriteValue;
 	};
 
-	using ShaderVariantHash = u32;
+	using ShaderVariantHash = u64;
 
 	struct ShaderPass
 	{
@@ -194,7 +194,7 @@ namespace Ailu
 			i8 _per_pass_buf_bind_slot = -1;
 			VertexInputLayout _pipeline_input_layout;
 			std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos;
-			Vector<String> _active_keywords;
+			std::set<String> _active_keywords;
 		};
 		//pass info
 		u16 _index;
@@ -226,15 +226,16 @@ namespace Ailu
 		inline static Shader* s_p_defered_standart_lit = nullptr;
 	public:
 		static Ref<Shader> Create(const WString& sys_path);
-		static u32 ConstructHash(const u32& shader_id, const u16& pass_hash, ShaderVariantHash variant_hash = 0u);
-		static void ExtractInfoFromHash(const u32& shader_hash, u32& shader_id, u16& pass_hash, ShaderVariantHash& variant_hash);
+		static u64 ConstructHash(const u32& shader_id, const u16& pass_hash, ShaderVariantHash variant_hash = 0u);
+		//inline static const BitDesc kShader = {0,46}; 46bit hash
+		static void ExtractInfoFromHash(const u64& shader_hash, u32& shader_id, u16& pass_hash, ShaderVariantHash& variant_hash);
 
 		static void SetGlobalTexture(const String& name, Texture* texture);
 		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
 		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
 
 		static void ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf);
-		static ConstantBuffer* GetPerFrameConstBuffer() { return	s_p_per_frame_cbuffer; };
+		static ConstantBuffer* GetPerFrameConstBuffer() { return s_p_per_frame_cbuffer; };
 		//0 is normal, 4001 is compiling, 4000 is error,same with render queue id
 		static u32 GetShaderState(Shader* shader,u16 pass_index,ShaderVariantHash variant_hash);
 
@@ -274,6 +275,7 @@ namespace Ailu
 		const Vector<std::set<String>>& PassLocalKeywords(u16 pass_index) const { return _passes[pass_index]._keywords; }
 		bool IsKeywordValid(u16 pass_index, const String& kw) const;
 		std::set<String> KeywordsSameGroup(u16 pass_index,const String& kw) const;
+		std::set<String> ActiveKeywords(u16 pass_index, ShaderVariantHash variant_hash) const {return _passes[pass_index]._variants.at(variant_hash)._active_keywords;};
 
 		Vector<class Material*> GetAllReferencedMaterials();
 		void AddMaterialRef(class Material* mat);
@@ -303,7 +305,7 @@ namespace Ailu
 		Vector<ShaderPass> _passes;
 		std::set<Material*> _reference_mats;
 		Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
-		//std::mutex _variant_state_lock;
+		std::atomic<bool> _is_pass_elements_init = false;
 	private:
 		void ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props);
 		//void ExtractValidShaderProperty(u16 pass_index,ShaderVariantHash variant_hash);

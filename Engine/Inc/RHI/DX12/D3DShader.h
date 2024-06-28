@@ -230,7 +230,6 @@ namespace Ailu
 		Vector<D3D_SHADER_MACRO> ConstructVariantMarcos(u16 pass_index, ShaderVariantHash variant_hash);
 	private:
 		Vector<D3DShaderElement> _pass_elements;
-		std::atomic<bool> _is_pass_elements_init = false;
 	};
 
 	class D3DComputeShader : public ComputeShader

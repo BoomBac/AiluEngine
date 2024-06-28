@@ -460,19 +460,19 @@ namespace Ailu
 
 	void D3DShader::Reset()
 	{
-		_pass_elements.clear();
+		//_pass_elements.clear();
 		_pass_elements.resize(_passes.size());
-		for (int i = 0; i < _passes.size(); i++)
-		{
-			_pass_elements[i] = D3DShaderElement();
-			//if (_pass_elements[i]._p_vblob != nullptr) _pass_elements[i]._p_vblob.Reset();
-			//if (_pass_elements[i]._p_pblob != nullptr) _pass_elements[i]._p_pblob.Reset();
-			//if (_pass_elements[i]._p_v_reflection != nullptr) _pass_elements[i]._p_v_reflection.Reset();
-			//if (_pass_elements[i]._p_p_reflection != nullptr) _pass_elements[i]._p_p_reflection.Reset();
-			//memset(_pass_elements[i]._vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
-			//_passes[i]._vertex_input_num = 0u;
-			_passes[i]._pipeline_topology = ETopology::kTriangle;
-		}
+		//for (int i = 0; i < _passes.size(); i++)
+		//{
+		//	_pass_elements[i] = D3DShaderElement();
+		//	//if (_pass_elements[i]._p_vblob != nullptr) _pass_elements[i]._p_vblob.Reset();
+		//	//if (_pass_elements[i]._p_pblob != nullptr) _pass_elements[i]._p_pblob.Reset();
+		//	//if (_pass_elements[i]._p_v_reflection != nullptr) _pass_elements[i]._p_v_reflection.Reset();
+		//	//if (_pass_elements[i]._p_p_reflection != nullptr) _pass_elements[i]._p_p_reflection.Reset();
+		//	//memset(_pass_elements[i]._vertex_input_layout, 0, sizeof(D3D12_INPUT_ELEMENT_DESC) * RenderConstants::kMaxVertexAttrNum);
+		//	//_passes[i]._vertex_input_num = 0u;
+		//	_passes[i]._pipeline_topology = ETopology::kTriangle;
+		//}
 	}
 
 	void D3DShader::LoadShaderReflection(u16 pass_index, ShaderVariantHash variant_hash,ID3D12ShaderReflection* ref_vs, ID3D12ShaderReflection* ref_ps)
@@ -482,7 +482,7 @@ namespace Ailu
 		AL_ASSERT(!pass._variants.contains(variant_hash));
 		auto& pass_variant = pass._variants[variant_hash];
 		D3D12_SHADER_DESC desc{};
-		//parser vs reflecton		
+		//parser vs reflecton
 		{
 			ref_vs->GetDesc(&desc);
 			if (desc.InputParameters > 10)
@@ -496,9 +496,10 @@ namespace Ailu
 				D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
 				ref_vs->GetInputParameterDesc(i, &input_desc);
 				_pass_elements[pass_index]._variants[variant_hash]._vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-				++pass_variant._vertex_input_num;
+				//++pass_variant._vertex_input_num;
 				vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, GetShaderDataType(input_desc.SemanticName), input_desc.Register));
 			}
+			pass_variant._vertex_input_num = (u8)desc.InputParameters;
 			pass_variant._pipeline_input_layout = VertexBufferLayout(vb_input_desc);
 			for (u32 i = 0u; i < desc.BoundResources; i++)
 			{
@@ -602,7 +603,6 @@ namespace Ailu
 	void D3DShader::Bind(u16 pass_index, ShaderVariantHash variant_hash)
 	{
 		Shader::Bind(pass_index, variant_hash);
-		static auto context = D3DContext::Get();
 		if (_passes[pass_index]._variants[variant_hash]._per_frame_buf_bind_slot != -1)
 		{
 			GraphicsPipelineStateMgr::SubmitBindResource(s_p_per_frame_cbuffer, EBindResDescType::kConstBuffer, static_cast<u8>(_passes[pass_index]._variants[variant_hash]._per_frame_buf_bind_slot));

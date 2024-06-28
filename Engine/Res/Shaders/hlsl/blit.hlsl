@@ -51,14 +51,15 @@ float3 ACESFilm(float3 x)
 	float c = 2.43f;
 	float d = 0.59f;
 	float e = 0.14f;
-	return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+	//return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+	return (x*(a*x+b))/(x*(c*x+d)+e);
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
 	color = ACESFilm(color);
-	//GammaCorrect(color,2.0f);
+	//GammaCorrect(color,2.2f);
 	return float4(color,1.0);
 }
 float4 PSMainCopy(PSInput input) : SV_TARGET

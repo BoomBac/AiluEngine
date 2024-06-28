@@ -54,7 +54,7 @@ namespace Ailu
 			Load<Shader>(L"Shaders/skybox.alasset");
 			Load<Shader>(L"Shaders/bloom.alasset");
 			Load<Shader>(L"Shaders/forwardlit.alasset");
-			RegisterResource(L"Shaders/hlsl/debug.hlsl",LoadExternalShader(L"Shaders/hlsl/debug.hlsl"));
+			RegisterResource(L"Shaders/hlsl/debug.hlsl", LoadExternalShader(L"Shaders/hlsl/debug.hlsl"));
 			//RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
 			GraphicsPipelineStateMgr::BuildPSOCache();
 			Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
@@ -173,18 +173,26 @@ namespace Ailu
 		}
 		while (!_shader_waiting_for_compile.empty())
 		{
-			AL_ASSERT(true);
 			Shader* shader = _shader_waiting_for_compile.front();
-			//shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
-			//AddResourceTask([=]()->Ref<void> {
-			//	if (shader->Compile())
-			//	{
-			//		auto mats = shader->GetAllReferencedMaterials();
-			//		for (auto mat = mats.begin(); mat != mats.end(); mat++)
-			//			(*mat)->ChangeShader(shader);
-			//	}
-			//	return nullptr;
-			//});
+			if (shader->PreProcessShader())
+			{
+				AddResourceTask([=]()->Ref<void> {
+					for (auto& mat : shader->GetAllReferencedMaterials())
+					{
+						mat->ConstructKeywords(shader);
+						bool is_all_succeed = true;
+						for (u16 i = 0; i < shader->PassCount(); i++)
+						{
+							is_all_succeed &= shader->Compile(i,mat->ActiveVariantHash(i));
+						}
+						if (is_all_succeed)
+						{
+							mat->ChangeShader(shader);
+						}
+					}
+					return nullptr;
+					});
+			}
 			_shader_waiting_for_compile.pop();
 		}
 		while (!_compute_shader_waiting_for_compile.empty())
@@ -362,13 +370,13 @@ namespace Ailu
 		std::multimap<std::string, SerializableProperty*> props{};
 		//为了写入通用资产头信息，暂时使用追加方式打开
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
-		out_mat << "shader_guid: " << GetAssetGuid(mat->_p_shader).ToString();
-		out_mat << "surface_type: " << ESurfaceType::ToString(mat->SurfaceType());
+		out_mat << "shader_guid: " << GetAssetGuid(mat->_p_shader).ToString() << endl;
+		out_mat << "keywords: " << su::Join(mat->_all_keywords,",") << endl;
 		for (auto& prop : mat->_properties)
 		{
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
 		}
-		out_mat << endl;
+		//out_mat << endl;
 		auto float_props = mat->GetAllFloatValue();
 		auto vector_props = mat->GetAllVectorValue();
 		auto uint_props = mat->GetAllUintValue();
@@ -547,14 +555,30 @@ namespace Ailu
 		}
 		file.close();
 		AL_ASSERT_MSG(line_count <= 3, "material file error");
-		String key{}, guid_str{}, type_str{}, name{}, shader_guid{},surface_type;
+		String key{}, guid_str{}, type_str{}, name{}, shader_guid{},keywords;
 		FormatLine(lines[0], key, guid_str);
 		FormatLine(lines[1], key, type_str);
 		FormatLine(lines[2], key, name);
 		FormatLine(lines[3], key, shader_guid);
-		FormatLine(lines[4], key, surface_type);
-		auto mat = MakeRef<Material>(Get<Shader>(Guid(shader_guid)), name);
-		mat->SurfaceType(ESurfaceType::FromString(surface_type));
+		FormatLine(lines[4], key, keywords);
+		Shader* shader = Get<Shader>(Guid(shader_guid));
+		bool is_standard_mat = shader->Name() == "defered_standard_lit";
+		Ref<Material> mat = nullptr;
+		if (is_standard_mat)
+		{
+			mat = MakeRef<StandardMaterial>(shader, name);
+		}
+		else
+		{
+			mat = MakeRef<Material>(shader, name);
+		}
+		//mat->SurfaceType(ESurfaceType::FromString(surface_type));
+		mat->_all_keywords.clear();
+		for (auto& kw : su::Split(keywords, ","))
+		{
+			mat->_all_keywords.insert(kw);
+		}
+		mat->ConstructKeywords(mat->_p_shader);
 		std::string cur_type{ " " };
 		std::string prop_type{ "prop_type" };
 		u32 prop_begin_line = 5;
@@ -601,6 +625,11 @@ namespace Ailu
 					LOG_WARNING("Load material: {}, property {} failed!", mat->_name, k);
 				}
 			}
+		}
+		if (is_standard_mat)
+		{
+			auto standard_mat = static_cast<StandardMaterial*>(mat.get());
+			standard_mat->SurfaceType((ESurfaceType::ESurfaceType)standard_mat->GetUint("_surface"));
 		}
 		auto asset = MakeScope<Asset>();
 		asset->_asset_path = asset_path;
@@ -988,7 +1017,7 @@ namespace Ailu
 		}
 		else
 		{
-			g_pLogMgr->LogWarningFormat("RegisterResource: skip register {}",obj->Name());
+			g_pLogMgr->LogWarningFormat("RegisterResource: skip register {}", obj->Name());
 		}
 	}
 
@@ -1253,18 +1282,18 @@ namespace Ailu
 					{
 						for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
 						{
-							auto mat = MakeRef<Material>(Shader::s_p_defered_standart_lit, it->_name);
+							auto mat = MakeRef<StandardMaterial>(Shader::s_p_defered_standart_lit, it->_name);
 							if (!it->_textures[0].empty())
 							{
 								auto albedo = ImportResource(ToWChar(it->_textures[0]));
 								if (albedo != nullptr)
-									mat->SetTexture(InternalStandardMaterialTexture::kAlbedo, std::static_pointer_cast<Texture>(albedo).get());
+									mat->SetTexture(StandardMaterial::TexturePropertyName::kAlbedo, std::static_pointer_cast<Texture>(albedo).get());
 							}
 							if (!it->_textures[1].empty())
 							{
 								auto normal = ImportResource(ToWChar(it->_textures[1]));
 								if (normal != nullptr)
-									mat->SetTexture(InternalStandardMaterialTexture::kNormal, std::static_pointer_cast<Texture>(normal).get());
+									mat->SetTexture(StandardMaterial::TexturePropertyName::kNormal, std::static_pointer_cast<Texture>(normal).get());
 							}
 							imported_asset_path = created_asset_dir;
 							imported_asset_path.append(std::format(L"{}.alasset", ToWStr(it->_name.c_str())));

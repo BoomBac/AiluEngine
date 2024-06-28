@@ -54,29 +54,21 @@ namespace Ailu
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;
 	}
-	u32 Shader::ConstructHash(const u32& shader_id, const u16& pass_hash, ShaderVariantHash variant_hash)
+	//46bit hash,0~5 shader_id,6~8 pass_index 9~45 variant_hash
+	u64 Shader::ConstructHash(const u32& shader_id, const u16& pass_hash, ShaderVariantHash variant_hash)
 	{
-		u32 shader_hash = 0;
-		// 将 shader_hash 写入 0~10 位
-		u32 shaderPart = shader_id & 0x7FFu;
-		shader_hash |= shaderPart;
-		// 将 pass_hash 写入 11~13 位
-		u32 passPart = (static_cast<u32>(pass_hash) & 0x7u) << 11;
-		shader_hash |= passPart;
-		// 将 variant_hash 写入 14~31 位
-		u32 variantPart = (static_cast<u32>(variant_hash) & 0xFFFFu) << 14;
-		shader_hash |= variantPart;
-		return shader_hash;
+		ALHash::Hash<64> shader_hash;
+		shader_hash.Set(0, 6, shader_id);
+		shader_hash.Set(6, 3, pass_hash);
+		shader_hash.Set(9, 37, variant_hash);
+		return shader_hash.Get(0,46);
 	}
-	void Shader::ExtractInfoFromHash(const u32& shader_hash, u32& shader_id, u16& pass_hash, ShaderVariantHash& variant_hash)
+	void Shader::ExtractInfoFromHash(const u64& shader_hash, u32& shader_id, u16& pass_hash, ShaderVariantHash& variant_hash)
 	{
-		// 从 s_hash_shader 中提取各个位段的值
-		// 从 0~10 位提取 shader_id
-		shader_id = shader_hash & 0x7FFu;
-		// 从 11~13 位提取 pass_hash
-		pass_hash = static_cast<u16>((shader_hash >> 11) & 0x7u);
-		// 从 14~31 位提取 variant_hash
-		variant_hash = static_cast<ShaderVariantHash>((shader_hash >> 14) & 0xFFFFu);
+		ALHash::Hash<64> hash(shader_hash);
+		shader_id = (u32)hash.Get(0,6);
+		pass_hash = (u16)hash.Get(6,3);
+		variant_hash = hash.Get(9,37);
 	}
 
 	u32 Shader::GetShaderState(Shader* shader, u16 pass_index, ShaderVariantHash variant_hash)
@@ -377,6 +369,7 @@ namespace Ailu
 	//这里后台线程编译时会影响主线程对其的访问
 	bool Shader::PreProcessShader()
 	{
+		bool is_process_succeed = true;
 		List<String> lines{};
 		String line{};
 		u32 line_count = 0;
@@ -517,15 +510,6 @@ namespace Ailu
 					pass_pipeline_ds_state._b_depth_write = false;
 					pass_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
 				}
-				cur_pass._index = i;
-				cur_pass._source_files.insert(_src_file_path);
-				//cur_pass._pipeline_input_layout = _passes[i]._pipeline_input_layout;//暂时使用旧的数据，其后续会在d3d编译时更新，这里先赋值防止主线程绘制崩溃
-				cur_pass._pipeline_raster_state = pass_pipeline_raster_state;
-				cur_pass._pipeline_ds_state = pass_pipeline_ds_state;
-				cur_pass._pipeline_topology = pass_pipeline_topology;
-				cur_pass._pipeline_blend_state = pass_pipeline_blend_state;
-				cur_pass._render_queue = pass_render_queue;
-				
 				//解析shader属性
 				auto prop_start_it = std::find(lines.begin(), lines.end(), "//Properties");
 				auto prop_end_it = std::find(prop_start_it, lines.end(), "//}");
@@ -578,13 +562,15 @@ namespace Ailu
 					for (auto& kw_seq : all_kw_seq)
 					{
 						Math::ALHash::Hash<32> kw_hash;
+						std::set<String> kw_set;
 						for (int i = 0; i < kw_seq.size(); i++)
 						{
 							auto& [group_id, inner_id] = cur_pass._keywords_ids[kw_seq[i]];
 							kw_hash.Set(group_id * 3,3,inner_id);//每个关键字组占三位，也就是每组内最多8个关键字
+							kw_set.insert(kw_seq[i]);
 						}
 						ShaderPass::PassVariant v;
-						v._active_keywords = kw_seq;
+						v._active_keywords = kw_set;
 						cur_pass._variants.insert(std::make_pair(kw_hash.Get(0, 32), v));
 					}
 				}
@@ -593,17 +579,43 @@ namespace Ailu
 					ShaderPass::PassVariant v;
 					cur_pass._variants.insert(std::make_pair(0, v));
 				}
-				_passes[i] = cur_pass;
 				Map<ShaderVariantHash, EShaderVariantState> cur_pass_variant_state;
 				for (auto& it : cur_pass._variants)
 				{
 					auto& [vhash, variant] = it;
 					cur_pass_variant_state[vhash] = EShaderVariantState::kNone;
 				}
+
+				auto pass_it = std::find_if(_passes.begin(), _passes.end(), [&](const ShaderPass& p) {return p._name == cur_pass._name; });
+				//预处理时，从原始pass info中，对于完全一致的变体，复制编译后才能获取的信息并填充,否则这些变体未编译的话，导致引用他们的材质出现问题
+				if (pass_it != _passes.end())
+				{
+					for (auto& it : cur_pass._variants)
+					{
+						auto& [vhash, variant] = it;
+						for (auto& old_it : pass_it->_variants)
+						{
+							auto& [old_vhash, old_variant] = old_it;
+							if (variant._active_keywords == old_variant._active_keywords)
+							{
+								variant = old_variant;
+							}
+						}
+					}
+				}
+				cur_pass._index = i;
+				cur_pass._source_files.insert(_src_file_path);
+				cur_pass._pipeline_raster_state = pass_pipeline_raster_state;
+				cur_pass._pipeline_ds_state = pass_pipeline_ds_state;
+				cur_pass._pipeline_topology = pass_pipeline_topology;
+				cur_pass._pipeline_blend_state = pass_pipeline_blend_state;
+				cur_pass._render_queue = pass_render_queue;
+				_passes[i] = cur_pass;
 				_variant_state.emplace_back(std::move(cur_pass_variant_state));
 			}
 		}
-		return true;
+		_is_pass_elements_init.store(!is_process_succeed);
+		return is_process_succeed;
 	}
 
 	//---------------------------------------------------------------------ComputeShader-------------------------------------------------------------------
