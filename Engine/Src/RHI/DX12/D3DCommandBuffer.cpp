@@ -56,7 +56,7 @@ namespace Ailu
 		g_pGfxContext->TrackResource(color);
 		g_pGfxContext->TrackResource(depth);
 		_p_cmd->ClearRenderTargetView(*crt->TargetCPUHandle(this), clear_color, 0, nullptr);
-		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
+		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clear_depth, 0, 0, nullptr);
 	}
 	void D3DCommandBuffer::ClearRenderTarget(Vector<RenderTexture*>& colors, RenderTexture* depth, Vector4f clear_color, float clear_depth)
 	{
@@ -70,7 +70,7 @@ namespace Ailu
 		}
 		auto drt = static_cast<D3DRenderTexture*>(depth);
 		g_pGfxContext->TrackResource(depth);
-		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH, clear_depth, 0, 0, nullptr);
+		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clear_depth, 0, 0, nullptr);
 	}
 	void D3DCommandBuffer::ClearRenderTarget(RenderTexture* color, Vector4f clear_color, u16 index)
 	{
@@ -82,14 +82,14 @@ namespace Ailu
 	{
 		auto drt = static_cast<D3DRenderTexture*>(depth);
 		g_pGfxContext->TrackResource(depth);
-		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH, depth_value, stencil_value, 0, nullptr);
+		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, stencil_value, 0, nullptr);
 	}
 
 	void D3DCommandBuffer::ClearRenderTarget(RenderTexture* depth, u16 index, float depth_value)
 	{
 		auto drt = static_cast<D3DRenderTexture*>(depth);
 		g_pGfxContext->TrackResource(depth);
-		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this,index), D3D12_CLEAR_FLAG_DEPTH, depth_value, 0, 0, nullptr);
+		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this,index), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, 0, 0, nullptr);
 	}
 
 	void D3DCommandBuffer::DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count)
@@ -228,7 +228,7 @@ namespace Ailu
 	{
 		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
 		{
-			LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
+			//LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
 			return 1;
 		}
 		material->Bind(pass_index);
@@ -242,7 +242,7 @@ namespace Ailu
 		}
 		else
 		{
-			LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
+			//LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
 			return 2;
 		}
 		return 0;

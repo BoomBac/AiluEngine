@@ -302,7 +302,7 @@ namespace Ailu
 					auto light = static_cast<LightComponent*>(comp);
 					static const char* items[] = { "Directional", "Point", "Spot" };
 					int item_current_idx = 0;
-					switch (light->_light_type)
+					switch (light->LightType())
 					{
 					case Ailu::ELightType::kDirectional: item_current_idx = 0;
 						break;
@@ -326,16 +326,16 @@ namespace Ailu
 					}
 					ImGui::SliderFloat("Intensity", &light->_intensity, 0.0f, 16.0f);
 					ImGui::ColorEdit3("Color", static_cast<float*>(light->_light._light_color.data));
-					if (item_current_idx == 0) light->_light_type = ELightType::kDirectional;
-					else if (item_current_idx == 1) light->_light_type = ELightType::kPoint;
-					else light->_light_type = ELightType::kSpot;
+					if (item_current_idx == 0) light->LightType(ELightType::kDirectional);
+					else if (item_current_idx == 1) light->LightType(ELightType::kPoint);
+					else light->LightType(ELightType::kSpot);
 
-					if (light->_light_type == ELightType::kPoint)
+					if (light->LightType() == ELightType::kPoint)
 					{
 						auto& light_data = light->_light;
 						ImGui::DragFloat("Radius", &light_data._light_param.x, 1.0, 0.0, 5000.0f);
 					}
-					else if (light->_light_type == ELightType::kSpot)
+					else if (light->LightType() == ELightType::kSpot)
 					{
 						auto& light_data = light->_light;
 						ImGui::DragFloat("Radius", &light_data._light_param.x);
@@ -349,19 +349,28 @@ namespace Ailu
 					if (b_cast_shadow)
 					{
 						auto& shadow_data = light->_shadow;
-						ImGui::SliderFloat("ShadowArea", &shadow_data._size, 100, 10000);
-						ImGui::SliderFloat("ShadowDistance", &shadow_data._distance, 100, 50000);
+						ImGui::SliderFloat("ConstantBias", &shadow_data._constant_bias, 0.0f, 0.4f);
+						ImGui::SliderFloat("SlopeBias", &shadow_data._slope_bias, 0.0f, 0.4f);
 					}
 				}
 				else if (comp->GetType() == TransformComponent::GetStaticType())
 				{
 					auto transf = static_cast<TransformComponent*>(comp);
-					auto& pos = transf->GetProperty("Position");
-					ImGui::DragFloat3(pos._name.c_str(), static_cast<Vector3f*>(pos._value_ptr)->data);
-					auto& rot = transf->GetProperty("Rotation");
-					ImGui::SliderFloat3(rot._name.c_str(), static_cast<Vector3f*>(rot._value_ptr)->data, -180.f, 180.f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-					auto& scale = transf->GetProperty("Scale");
-					ImGui::DragFloat3(scale._name.c_str(), static_cast<Vector3f*>(scale._value_ptr)->data);
+					auto pos = transf->GetPosition();
+					auto rot = transf->GetEuler();
+					auto scale = transf->GetScale();
+					ImGui::DragFloat3("Position", pos.data);
+					ImGui::SliderFloat3("Rotation", rot.data, -180.f, 180.f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+					ImGui::DragFloat3("Scale", scale.data);
+					transf->SetPosition(pos);
+					transf->SetRotation(rot);
+					transf->SetScale(scale);
+					//auto& pos = transf->GetProperty("Position");
+					//ImGui::DragFloat3(pos._name.c_str(), static_cast<Vector3f*>(pos._value_ptr)->data);
+					//auto& rot = transf->GetProperty("Rotation");
+					//ImGui::SliderFloat3(rot._name.c_str(), static_cast<Vector3f*>(rot._value_ptr)->data, -180.f, 180.f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+					//auto& scale = transf->GetProperty("Scale");
+					//ImGui::DragFloat3(scale._name.c_str(), static_cast<Vector3f*>(scale._value_ptr)->data);
 				}
 				else if (comp->GetType() == StaticMeshComponent::GetStaticType() || comp->GetType() == SkinedMeshComponent::GetStaticType())
 				{
@@ -613,6 +622,10 @@ namespace Ailu
 							{
 								cur_selected_actor->AddComponent<LightComponent>();
 							}
+							else if (comp_type == Component::GetTypeName(CameraComponent::GetStaticType()))
+							{
+								cur_selected_actor->AddComponent<CameraComponent>();
+							}
 						}
 						++new_comp_count;
 					}
@@ -658,11 +671,11 @@ namespace Ailu
 			{
 				auto& pass = s->GetPassInfo(i);
 				ImGui::Indent(indent);
-				ImGui::Text("Pass_%d: %s",i,pass._name.c_str());
+				ImGui::Text("Pass_%d: %s", i, pass._name.c_str());
 				{
 					ImGui::Indent(indent);
-					ImGui::Text("vertex entry: %s",pass._vert_entry.c_str());
-					ImGui::Text("pixel entry: %s",pass._pixel_entry.c_str());
+					ImGui::Text("vertex entry: %s", pass._vert_entry.c_str());
+					ImGui::Text("pixel entry: %s", pass._pixel_entry.c_str());
 					{
 						ImGui::Text("local keywords: ");
 						for (auto& kw_group : pass._keywords)
@@ -673,7 +686,7 @@ namespace Ailu
 								kws.append(kw);
 								kws.append(" ");
 							}
-							ImGui::Text("group: %s",kws.c_str());
+							ImGui::Text("group: %s", kws.c_str());
 						}
 						ImGui::Text("variants: ");
 						for (auto& it : pass._variants)

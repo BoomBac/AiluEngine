@@ -100,6 +100,11 @@ namespace Ailu
             return _max - _min;
         }
 
+        inline f32 Diagon() const
+        {
+            return Distance(_min, _max);
+        }
+
         bool Intersects(const AABB& other) const
         {
             return (_min.x <= other._max.x && _max.x >= other._min.x) &&
@@ -122,6 +127,12 @@ namespace Ailu
     {
         static bool Conatin(const ViewFrustum& vf, const AABB& aabb);
         Array<Plane, 8> _planes;
+    };
+
+    struct Sphere
+    {
+        Vector3f _center;
+        f32 _radius;
     };
 }
 

@@ -140,6 +140,7 @@ namespace Ailu
 		inline static const String KFill = "Fill";
 		inline static const String kZTest = "ZTest";
 		inline static const String kZWrite = "ZWrite";
+		inline static const String kStencil = "Stencil";
 		static struct Queue
 		{
 			inline static const String kGeometry = "Geometry";
@@ -168,18 +169,36 @@ namespace Ailu
 			inline static const String kSolid = "Solid";
 			inline static const String kWireframe = "Wireframe";
 		} kFillValue;
-		static struct ZTest
+		static struct Comparison
 		{
 			inline static const String kOff = "Off";
 			inline static const String kLEqual = "LEqual";
 			inline static const String kEqual = "Equal";
 			inline static const String kAlways = "Always";
+			inline static const String kGreater = "Greater";
+			inline static const String kNotEqual = "NotEqual";
+			inline static const String kGEqual = "GEqual";
 		} kZTestValue;
 		static struct ZWrite
 		{
 			inline static const String kOff = "Off";
 			inline static const String kOn = "On";
 		} kZWriteValue;
+		static struct StencilState
+		{
+			inline static const String kStencilRef = "Ref";
+			inline static const String kStencilComp = "Comp";
+			inline static const String kStencilPass = "Pass";
+			static struct StencilOperation
+			{
+				inline static const String kReplace = "Replace";
+				inline static const String kKeep = "Keep";//z and stencil all passed
+				inline static const String kZero = "Zero";
+				inline static const String kIncr = "Incr";
+				inline static const String kDecr = "Decr";
+			} StencilPassValue;
+		} kStencilStateValue;
+
 	};
 
 	using ShaderVariantHash = u64;
@@ -224,6 +243,9 @@ namespace Ailu
 		friend class Material;
 	public:
 		inline static Shader* s_p_defered_standart_lit = nullptr;
+		inline static const u16 kRenderQueueOpaque      = 2000;
+		inline static const u16 kRenderQueueTransparent = 3000;
+		inline static const u16 kRenderQueueEnd = 4000;
 	public:
 		static Ref<Shader> Create(const WString& sys_path);
 		static u64 ConstructHash(const u32& shader_id, const u16& pass_hash, ShaderVariantHash variant_hash = 0u);

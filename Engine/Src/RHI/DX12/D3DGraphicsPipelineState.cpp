@@ -12,6 +12,7 @@ namespace Ailu
 	{
 		_hash = GraphicsPipelineStateObject::ConstructPSOHash(initializer);
 		_name = initializer._p_vertex_shader->Name();
+		memset(&_d3d_pso_desc, 0, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));//置空，否则编译不加 /sdl时创建pso时会有空指针
 	}
 
 	void D3DGraphicsPipelineState::Build(u16 pass_index, ShaderVariantHash variant_hash)
@@ -88,6 +89,8 @@ namespace Ailu
 			return;
 		}
 		_p_cmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		if(_state_desc._depth_stencil_state._b_front_stencil)
+		_p_cmd->OMSetStencilRef(_state_desc._depth_stencil_state._stencil_ref_value);
 		_p_cmd->SetGraphicsRootSignature(_p_sig.Get());
 		_p_cmd->SetPipelineState(_p_plstate.Get());
 		_p_cmd->IASetPrimitiveTopology(D3DConvertUtils::ConvertToDXTopology(_state_desc._topology));

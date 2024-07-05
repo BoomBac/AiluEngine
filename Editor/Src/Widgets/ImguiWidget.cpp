@@ -15,6 +15,11 @@ namespace Ailu
 		}
 		String ImGuiWidget::ShowModalDialog(const String& title, int handle)
 		{
+			if (handle > 255)
+			{
+				//g_pLogMgr->LogWarningFormat("ImGuiWidget::ShowModalDialog invalid handle : {}", handle);
+				return String{};
+			}
 			static char buf[256] = {};
 			String str_id = std::format("{}-{}", title, handle);
 			if (s_global_modal_window_info[handle])

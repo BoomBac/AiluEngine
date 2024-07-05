@@ -82,6 +82,7 @@ namespace Ailu
 		pso_desc._p_vertex_shader = shader;
 		pso_desc._p_pixel_shader = shader;
 		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT,EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM,EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM},EALGFormat::EALGFormat::kALGFormatD24S8_UINT };
+		pso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
 		auto stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
 		stand_pso->Build();
 		AddPSO(std::move(stand_pso));
@@ -92,7 +93,8 @@ namespace Ailu
 		pso_desc._input_layout = shader->PipelineInputLayout();
 		pso_desc._p_vertex_shader = shader;
 		pso_desc._p_pixel_shader = shader;
-		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},EALGFormat::EALGFormat::kALGFormatUnknown };
+		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT},EALGFormat::EALGFormat::kALGFormatD24S8_UINT };
+		pso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
 		stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
 		stand_pso->Build();
 		AddPSO(std::move(stand_pso));
@@ -103,7 +105,7 @@ namespace Ailu
 		pso_desc._input_layout = shader->PipelineInputLayout();
 		pso_desc._p_vertex_shader = shader;
 		pso_desc._p_pixel_shader = shader;
-		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},EALGFormat::EALGFormat::kALGFormatUnknown };
+		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT},EALGFormat::EALGFormat::kALGFormatUnknown };
 		pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
 		stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
 		stand_pso->Build();
@@ -115,6 +117,7 @@ namespace Ailu
 		pso_desc._p_pixel_shader = shader;
 		pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
 		pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
+		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT},EALGFormat::EALGFormat::kALGFormatD24S8_UINT };
 		auto wireframe_pso = GraphicsPipelineStateObject::Create(pso_desc);
 		wireframe_pso->Build();
 		AddPSO(std::move(wireframe_pso));
@@ -128,6 +131,7 @@ namespace Ailu
 		pso_desc._topology = ETopology::kLine;
 		pso_desc._p_vertex_shader = shader;
 		pso_desc._p_pixel_shader = shader;
+		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT},EALGFormat::EALGFormat::kALGFormatD24S8_UINT };
 		auto gizmo_pso = GraphicsPipelineStateObject::Create(pso_desc);
 		gizmo_pso->Build();
 		s_gizmo_pso = std::move(gizmo_pso);
@@ -191,7 +195,7 @@ namespace Ailu
 			pso_desc._topology = shader->PipelineTopology(i);
 			pso_desc._p_pixel_shader = shader;
 			pso_desc._p_vertex_shader = shader;
-			pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},EALGFormat::EALGFormat::kALGFormatD24S8_UINT };
+			pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT},EALGFormat::EALGFormat::kALGFormatD24S8_UINT };
 			pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
 			pso->Build(i);
 			GraphicsPipelineStateMgr::AddPSO(std::move(pso));
@@ -208,7 +212,7 @@ namespace Ailu
 			pso_desc._topology = shader->PipelineTopology(i);
 			pso_desc._p_pixel_shader = shader;
 			pso_desc._p_vertex_shader = shader;
-			pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},EALGFormat::EALGFormat::kALGFormatD24S8_UINT };
+			pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT},EALGFormat::EALGFormat::kALGFormatD24S8_UINT };
 			pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
 			pso->Build(i);
 			GraphicsPipelineStateMgr::AddPSO(std::move(pso));

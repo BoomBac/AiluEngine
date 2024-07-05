@@ -2,10 +2,14 @@ guid: 324335bf-8def-4583-911a-047863b48455
 type: kMaterial
 name: Material_0
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
-surface_type: kOpaque
+keywords: kOpaque
   prop_type: Uint
     SamplerMask: 0
     MaterialID: 0
+    MaterialID: 0
+    SamplerMask: 0
+    _material_id: 0
+    _surface: 0
   prop_type: Float
     MetallicValue: 0
     RoughnessValue: 1

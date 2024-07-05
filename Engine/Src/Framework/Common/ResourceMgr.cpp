@@ -19,6 +19,7 @@ namespace Ailu
 {
 	namespace fs = std::filesystem;
 
+	//填充监听路径下的所有文件
 	static void TraverseDirectory(const fs::path& directoryPath, std::set<fs::path>& path_set)
 	{
 		for (const auto& entry : fs::directory_iterator(directoryPath))
@@ -55,6 +56,7 @@ namespace Ailu
 			Load<Shader>(L"Shaders/bloom.alasset");
 			Load<Shader>(L"Shaders/forwardlit.alasset");
 			RegisterResource(L"Shaders/hlsl/debug.hlsl", LoadExternalShader(L"Shaders/hlsl/debug.hlsl"));
+			RegisterResource(L"Shaders/hlsl/billboard.hlsl", LoadExternalShader(L"Shaders/hlsl/billboard.hlsl"));
 			//RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
 			GraphicsPipelineStateMgr::BuildPSOCache();
 			Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
@@ -106,6 +108,7 @@ namespace Ailu
 			Load<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
 			Load<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
 			Load<Texture2D>(EnginePath::kEngineIconPathW + L"scene.alasset");
+			Load<Texture2D>(EnginePath::kEngineIconPathW + L"point_light.alasset");
 			Load<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset");
 			Load<Texture2D>(EnginePath::kEngineTexturePathW + L"small_cave_1k.alasset");
 		}
@@ -118,6 +121,8 @@ namespace Ailu
 			mat_creator(L"Shaders/cubemap_gen.alasset", L"Runtime/Material/CubemapGen", "CubemapGen");
 			mat_creator(L"Shaders/filter_irradiance.alasset", L"Runtime/Material/EnvmapFilter", "EnvmapFilter");
 			mat_creator(L"Shaders/blit.alasset", L"Runtime/Material/Blit", "Blit");
+			mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/PointLightBillboard", "PointLightBillboard");
+			g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"point_light.alasset");
 		}
 
 		Load<Mesh>(L"Meshs/sphere.alasset");
@@ -1145,15 +1150,6 @@ namespace Ailu
 							{
 								match_file = true;
 								_shader_waiting_for_compile.push(shader.get());
-								//AddResourceTask([=]()->Ref<void> {
-								//	if (shader->Compile())
-								//	{
-								//		auto mats = shader->GetAllReferencedMaterials();
-								//		for (auto mat = mats.begin(); mat != mats.end(); mat++)
-								//			(*mat)->ChangeShader(shader.get());
-								//	}
-								//	return nullptr;
-								//	});
 								break;
 							}
 						}
@@ -1165,10 +1161,6 @@ namespace Ailu
 			if (cs)
 			{
 				_compute_shader_waiting_for_compile.push(cs.get());
-				//AddResourceTask([=]()->void* {
-				//	cs->Compile();
-				//	return nullptr;
-				//	});
 			}
 			};
 		bool is_first_execute = true;

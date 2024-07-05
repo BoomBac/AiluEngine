@@ -4,6 +4,7 @@
 #define kMaxDirectionalLight 2
 #define kMaxPointLight 4
 #define kMaxSpotLight 4
+#define kMaxCascadeShadowMapSplit 4
 
 #ifdef __cplusplus
 #include "Framework/Math/ALMath.hpp"
@@ -34,8 +35,8 @@ namespace Ailu
 		float _LightParam1;
 		int _ShadowDataIndex;
 		float _ShadowDistance;
-		float _ShadowNear;
-		float _padding0;
+		float _constant_bias;
+		float _slope_bias;
 
 	};
 
@@ -49,7 +50,8 @@ namespace Ailu
 		float   _LightAngleOffset;
 		int _ShadowDataIndex;
 		float _ShadowDistance;
-		float2 _padding0;
+		float _constant_bias;
+		float _slope_bias;
 	};
 
 #ifdef __cplusplus
@@ -76,11 +78,14 @@ namespace Ailu
 		//float4(w,h,1/w,1/h)
 		float4   _ScreenParams;
 		float4   _ZBufferParams;
+		float4   _CascadeShadowSplit[kMaxCascadeShadowMapSplit];//sphere center,radius * radius
+		float4   _CascadeShadowParams;//cascade count,1/shadow_fade_out_factor,1/max_shadow_distance
 		ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLight];
 		ShaderDirectionalAndPointLightData _PointLights[kMaxPointLight];
 		ShaderSpotlLightData _SpotLights[kMaxSpotLight];
-		float4x4 _ShadowMatrix[1 + kMaxSpotLight + kMaxPointLight * 6];
-		float padding1[92];
+		float4x4 _ShadowMatrix[kMaxCascadeShadowMapSplit + kMaxSpotLight + kMaxPointLight * 6];
+		float g_IndirectLightingIntensity;
+		float padding1[23];
 		//float4x4 _JointMatrix[80];
 	};
 

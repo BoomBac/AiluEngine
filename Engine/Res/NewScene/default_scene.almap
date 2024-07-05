@@ -8,7 +8,7 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,6.75513e-08,0,1
         Scale: 1,1,1
-    Children: 7
+    Children: 8
       Name: plane
         Components: 
           TransformComponent: 
@@ -22,16 +22,16 @@ SceneGraph:
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: 17,0,0
-            Rotation: -0.351351,6.32445e-08,2.37342e-08,0.936244
+            Position: 17,1188,0
+            Rotation: 0.297542,1.22426e-07,1.6579e-07,0.954709
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
-            Intensity: 0
+            Intensity: 1.218
             CastShadow: false
-            ShadowArea: 0
-            ShadowDistance: 0
+            ConstantBias: 0.046
+            SlopeBias: 0.03
         Children: 0
       Name: point_light
         Components: 
@@ -42,31 +42,33 @@ SceneGraph:
           LightComponent: 
             Type: Point
             Color: 1,0.192157,0.192157
-            Intensity: 0
+            Intensity: 1.543
             Radius: 2360
-            CastShadow: true
-            ShadowArea: 0
-            ShadowDistance: 0
+            CastShadow: false
+            ConstantBias: 0
+            SlopeBias: 0
         Children: 0
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: 57,867,-403
-            Rotation: -7.19971e-22,6.75513e-08,1.06581e-14,1
+            Position: 4,1240,-762
+            Rotation: -0.297542,6.44918e-08,2.00993e-08,0.954709
             Scale: 1,1,1
           LightComponent: 
-            Type: Point
+            Type: Spot
             Color: 0.0544983,0.926471,0.900824
-            Intensity: 0
-            Radius: 2232
-            CastShadow: false
-            ShadowArea: 100
-            ShadowDistance: 0
+            Intensity: 1.137
+            Radius: 3320
+            Inner: 50.208
+            Outer: 59.153
+            CastShadow: true
+            ConstantBias: 0.132
+            SlopeBias: 0.071
         Children: 0
       Name: shpere
         Components: 
           TransformComponent: 
-            Position: 0,405,0
+            Position: -5,477,0
             Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           StaticMeshComponent: 
@@ -76,8 +78,8 @@ SceneGraph:
       Name: plane
         Components: 
           TransformComponent: 
-            Position: -1307,480,299
-            Rotation: 4.7766e-08,4.77659e-08,-0.707107,0.707107
+            Position: -1004,485,299
+            Rotation: -0.25075,0.250755,-0.66116,0.661146
             Scale: 5,1,5
           StaticMeshComponent: 
             MeshPath: c3315e03-1052-4825-98f7-a676beae0615
@@ -92,4 +94,20 @@ SceneGraph:
           StaticMeshComponent: 
             MeshPath: 2ff30e48-6661-479b-a90c-863e606734f6
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+        Children: 0
+      Name: Actor13
+        Components: 
+          TransformComponent: 
+            Position: 153,1069,-2507
+            Rotation: 0,6.75513e-08,0,1
+            Scale: 1,1,1
+          CameraComponent: 8
+            Type: kPerspective
+            Position: 153,1069,-2507
+            Rotation: 0,6.75513e-08,0
+            Near: 68
+            Aspect: 1.7777778
+            Far: 8000
+            Size: 0
+            FovH: 60
         Children: 0

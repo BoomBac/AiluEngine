@@ -3,8 +3,9 @@
 //name: deferred_lighting
 //vert: DeferredLightingVSMain
 //pixel: DeferredLightingPSMain
+//ZTest: Always
 //Cull: Back
-//Stencil: {Ref 5 Comp Always Pass Replace}
+//Stencil: {Ref:127,Comp:Equal,Pass:Keep}
 //Queue: Opaque
 //multi_compile _ DEBUG_NORMAL DEBUG_ALBEDO DEBUG_WORLDPOS
 //pass end::
@@ -70,7 +71,18 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 #elif DEBUG_ALBEDO
 	return surface_data.albedo;
 #elif DEBUG_WORLDPOS
-	return float4(world_pos.xyz,1);
+	float dis = distance(_CameraPos.xyz,world_pos);	
+	float c = saturate((_CascadeShadowParams.y * (1.0 - dis * _CascadeShadowParams.z)));
+	return c.xxxx; 
+	// if(SqrDistance(world_pos,_CascadeShadowSplit[0].xyz) <= _CascadeShadowSplit[0].w)
+	// {
+	// 	return float4(1,0,0,1);
+	// }
+	// if(SqrDistance(world_pos,_CascadeShadowSplit[1].xyz) <= _CascadeShadowSplit[1].w)
+	// {
+	// 	return float4(0,1,0,1);
+	// }
+	// return float4(world_pos.xyz,1);
 #else
 	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
 	light += surface_data.emssive;

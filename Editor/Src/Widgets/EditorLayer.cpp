@@ -244,9 +244,9 @@ namespace Ailu
 
 			ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
 			ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 2.0f, "%.2f");
-			float shadow_dis_m = g_pRenderer->_shadow_distance / 100.0f;
+			float shadow_dis_m = QuailtySetting::s_main_light_shaodw_distance / 100u;
 			ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
-			g_pRenderer->_shadow_distance = shadow_dis_m * 100;
+			QuailtySetting::s_main_light_shaodw_distance = shadow_dis_m * 100;
 			f32 u = Application::s_target_framecount;
 			ImGui::SliderFloat("TargetFrame m", &u, 1.f, 999.0f, "%.2f");
 			Application::s_target_framecount = u;

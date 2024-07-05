@@ -13,13 +13,16 @@
 
 namespace Ailu
 {
+	struct LightingData
+	{
+		f32 _indirect_lighting_intensity = 0.5f;
+	};
 	class AILU_API Scene : public Object
 	{
 		using ActorEvent = std::function<void(SceneActor*)>;
 		DECLARE_PRIVATE_PROPERTY_PTR(p_root,Root,SceneActor)
 		DECLARE_PRIVATE_PROPERTY(b_dirty, Dirty, bool)
 	public:
-		inline static u32 kMaxStaticRenderableNum = 500;
 		Scene(const std::string& name);
 		void AddObject(SceneActor* actor);
 		void RemoveObject(SceneActor* actor);
@@ -30,10 +33,15 @@ namespace Ailu
 		void MarkDirty();
 		std::list<LightComponent*>& GetAllLight();
 		Vector<StaticMeshComponent*>& GetAllStaticRenderable() {return _all_static_renderalbes;};
+		//world_pos:gizmo type
+		const Vector<std::tuple<Vector3f, u32>>& GetAllGizmoPosition() const { return _gizmo_icons; }
+		LightingData _light_data;
 	private:
+		u16 _total_renderable_count = 0u;
 		std::list<SceneActor*> _all_objects{};
 		std::list<LightComponent*> _all_lights{};
 		Vector<StaticMeshComponent*> _all_static_renderalbes{};
+		Vector<std::tuple<Vector3f,u32>> _gizmo_icons;
 		void TravelAllActor(SceneActor* actor, ActorEvent& e);
 		ActorEvent FillActorList;
 	};
@@ -56,7 +64,6 @@ namespace Ailu
 		Scene* _p_current = nullptr;
 		SceneActor* _p_selected_actor = nullptr;
 	private:
-		void Cull(Camera* cam,Scene* p_scene);
 		inline static std::list<Ref<Scene>> s_all_scene{};
 		inline static uint16_t s_scene_index = 0u;
 		std::queue<SceneActor*> _pending_delete_actors;

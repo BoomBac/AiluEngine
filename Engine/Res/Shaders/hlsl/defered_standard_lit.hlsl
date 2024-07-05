@@ -5,7 +5,7 @@
 //pixel: GBufferPSMain
 //Cull: Back
 //Queue: Opaque
-//Blend: Src,OneMinusSrc
+//Stencil: {Ref:127,Comp:Always,Pass:Replace}
 //pass end::
 //Properties
 //{

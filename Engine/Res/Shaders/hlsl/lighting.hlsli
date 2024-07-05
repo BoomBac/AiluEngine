@@ -65,7 +65,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	ShadingData shading_data;
 	LightData light_data;
 	light_data.shadow_atten = 1.0;
-	float4 shadow_pos = TransformFromWorldToLightSpace(0,world_pos.xyz);
+	//float4 shadow_pos = TransformFromWorldToLightSpace(0,world_pos.xyz);
 	float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface.wnormal));
 	float shadow_factor = 1.0;
 	light_data.shadow_atten = shadow_factor;
@@ -83,7 +83,9 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_color = _DirectionalLights[i]._LightColor;
 		light_data.light_pos = _DirectionalLights[i]._LightPosOrDir;
 		if(_DirectionalLights[i]._ShadowDataIndex != -1)
-			shadow_factor = ApplyShadow(shadow_pos, nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
+		{
+			shadow_factor = ApplyCascadeShadow(nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
+		}
 		light_data.shadow_atten = shadow_factor;
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
 	}
@@ -101,7 +103,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_pos = _PointLights[j]._LightPosOrDir;
 		if(_PointLights[j]._ShadowDataIndex != -1)
 		{
-			shadow_factor = ApplyShadowPointLight(_PointLights[j]._ShadowNear,_PointLights[j]._ShadowDistance,shading_data.nl,
+			shadow_factor = ApplyShadowPointLight(10,_PointLights[j]._LightParam0 * 1.5f,shading_data.nl,
 				world_pos,light_data.light_pos,j);
 		}
 		light_data.shadow_atten = shadow_factor;
@@ -119,10 +121,10 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_color = _SpotLights[k]._LightColor;
 		light_data.light_pos = _SpotLights[k]._LightPos;
 		if(_SpotLights[k]._ShadowDataIndex != -1)
-		{
+		{ 
 			uint shadow_index = _SpotLights[k]._ShadowDataIndex;
-			shadow_pos = TransformFromWorldToLightSpace(shadow_index,world_pos.xyz);
-			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos.xyz,_SpotLights[k]._ShadowDistance,k);
+			float4 shadow_pos = TransformFromWorldToLightSpace(shadow_index,world_pos.xyz);
+			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos.xyz,k);
 		}
 		light_data.shadow_atten = shadow_factor;
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos);
@@ -144,9 +146,8 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
     // float3 F_avg = F0 + (1.0 - F0) / 21.0;
     // float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
     // float3 k_D = diffuse_color * (1.0 - FssEss - FmsEms);
-	float ibl_intensity = 0.5;
 	float3 FssEss = F0 * envBRDF.x + envBRDF.y;
-	light += (FssEss * radiance + diffuse_color * irradiance) * ibl_intensity;
+	light += (FssEss * radiance + diffuse_color * irradiance) * g_IndirectLightingIntensity;
 	return light; 
 }
 #endif //__LIGHTING_H__

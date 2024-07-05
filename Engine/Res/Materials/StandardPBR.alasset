@@ -12,11 +12,13 @@ keywords:
     _surface: 0
   prop_type: Float
     MetallicValue: 0
+    g_IndirectLightingIntensity: 0
     RoughnessValue: 0
   prop_type: Vector
     SpecularColor: 0,0,0,0
     _ScreenParams: 0,0,0,0
     _ZBufferParams: 0,0,0,0
+    _CascadeShadowParams: 0,0,0,0
     BaseColor: 1,1,1,1
     EmssiveColor: 0,0,0,0
   prop_type: Texture2D

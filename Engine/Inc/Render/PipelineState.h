@@ -28,7 +28,7 @@ namespace Ailu
 	{
 		kStencilZero = 0,
 		kKeep,	//(default)
-		kReplace, kIncrementAndClamp, kDecrementAndClamp, kInvert, kIncrementAndWrap, kDecrementAndWrap
+		kZero,kReplace, kIncrementAndClamp, kDecrementAndClamp, kInvert, kIncrement, kDecrement
 	};
 
 	enum class EBlendOp : u8
@@ -264,6 +264,7 @@ namespace Ailu
 		bool _b_depth_write;
 		ECompareFunc _depth_test_func;
 		bool _b_front_stencil;
+		u8 _stencil_ref_value = 0u;
 		ECompareFunc _stencil_test_func;
 		EStencilOp _stencil_test_fail_op;
 		EStencilOp _stencil_depth_test_fail_op;
@@ -279,6 +280,7 @@ namespace Ailu
 		bool operator==(const DepthStencilState& other) const
 		{
 			return (_b_depth_write == other._b_depth_write &&
+				_stencil_ref_value == other._stencil_ref_value &&
 				_depth_test_func == other._depth_test_func &&
 				_b_front_stencil == other._b_front_stencil &&
 				_stencil_test_func == other._stencil_test_func &&

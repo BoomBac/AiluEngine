@@ -116,8 +116,15 @@ namespace Ailu
 		D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
 		UINT compileFlags = 0;
 #if defined(_DEBUG)
-		// Enable better shader debugging with the graphics debugging tools.
-		compileFlags = D3DCOMPILE_DEBUG;// | D3DCOMPILE_SKIP_OPTIMIZATION; //跳过优化的话，compute shader算brdf lut时值有点异常
+		if (pTarget == RenderConstants::kCSModel_5_0)
+		{
+			compileFlags = D3DCOMPILE_DEBUG;// | D3DCOMPILE_SKIP_OPTIMIZATION; //跳过优化的话，compute shader算brdf lut时值有点异常
+		}
+		else
+		{
+			// Enable better shader debugging with the graphics debugging tools.
+			compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+		}
 #else
 		compileFlags = 0;
 #endif
@@ -358,8 +365,8 @@ namespace Ailu
 			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			succeed &= CreateFromFileFXC(_src_file_path, pass._vert_entry,"vs_5_0", keyword_defines,tmp_p_vblob, tmp_p_vreflect);
-			succeed &= CreateFromFileFXC(_src_file_path, pass._pixel_entry, "ps_5_0", keyword_defines,tmp_p_pblob, tmp_p_preflect);
+			succeed &= CreateFromFileFXC(_src_file_path, pass._vert_entry,RenderConstants::kVSModel_5_0, keyword_defines,tmp_p_vblob, tmp_p_vreflect);
+			succeed &= CreateFromFileFXC(_src_file_path, pass._pixel_entry, RenderConstants::kPSModel_5_0, keyword_defines,tmp_p_pblob, tmp_p_preflect);
 
 #endif // SHADER_DXC
 		}
@@ -768,7 +775,7 @@ namespace Ailu
 			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			succeed &= CreateFromFileFXC(_src_file_path, "cs_main", "cs_5_0", v,_tmp_blob, _p_reflection);
+			succeed &= CreateFromFileFXC(_src_file_path, "cs_main", RenderConstants::kCSModel_5_0, v,_tmp_blob, _p_reflection);
 #endif // SHADER_DXC
 		}
 		catch (const std::exception&)

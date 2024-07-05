@@ -238,7 +238,7 @@ namespace Ailu
 		kDefault, kColorTagret, kShaderResource,kDepthTarget
 	};
 
-	DECLARE_ENUM(ERenderTargetFormat,kUnknown,kDefault,kDefaultHDR,kDepth,kShadowMap,kRGFloat,kRGHalf)
+	DECLARE_ENUM(ERenderTargetFormat,kUnknown,kDefault,kDefaultHDR,kDepth,kShadowMap,kRGFloat,kRGHalf,kRFloat,kRGBAHalf)
 
 	static EALGFormat::EALGFormat ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::ERenderTargetFormat format)
 	{
@@ -249,7 +249,7 @@ namespace Ailu
 		case ERenderTargetFormat::kDefault:
 			return EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
 		case ERenderTargetFormat::kDefaultHDR:
-			return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+			return EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT;
 		case ERenderTargetFormat::kDepth:
 			return EALGFormat::EALGFormat::kALGFormatD24S8_UINT;
 		case ERenderTargetFormat::kShadowMap:
@@ -258,6 +258,10 @@ namespace Ailu
 			return EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT;
 		case ERenderTargetFormat::kRGHalf:
 			return EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT;
+		case ERenderTargetFormat::kRFloat:
+			return EALGFormat::EALGFormat::kALGFormatR32_FLOAT;
+		case ERenderTargetFormat::kRGBAHalf:
+			return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
 		default:
 			break;
 		}

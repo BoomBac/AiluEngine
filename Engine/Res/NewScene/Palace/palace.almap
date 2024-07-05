@@ -75,7 +75,7 @@ SceneGraph:
           LightComponent: 
             Type: Point
             Color: 0.209919,0.823529,0.570866
-            Intensity: 0.544
+            Intensity: 1.356
             Radius: 782
             CastShadow: false
             ShadowArea: -4.31602e+08

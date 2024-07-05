@@ -10,6 +10,9 @@ SamplerComparisonState g_ShadowSampler : register(s3);
 SamplerState g_AnisotropicClampSampler : register(s4);
 
 
+#define TEXTURE2D(name,slot) Texture2D name : register(t##slot);
+#define SAMPLE_TEXTURE2D(t,s,uv) t.Sample(s, uv)
+
 float Pow2(float x)
 {
 	return x*x;
@@ -17,6 +20,10 @@ float Pow2(float x)
 float Pow4(float x)
 {
 	return x*x*x*x;
+}
+float SqrDistance(float3 p1,float3 p2)
+{
+	return dot(p1-p2,p1-p2);
 }
 
 float4 TransformToClipSpace(float3 object_pos)

@@ -24,6 +24,7 @@
 97913004-ecc3-4cbb-b226-f8d68e5903ab,Shaders/cubemap_gen.alasset,kShader
 D390A432-7AD9-475D-B1A5-726EB91072FB,Shaders/forwardlit.alasset,kShader
 a40c454a-c967-4810-88c9-651706104062,NewScene/default_scene.almap,kScene
+acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c,Icons/point_light.alasset,kTexture2D
 af277291-1e6f-4732-89ba-d0dce1dc12af,NewScene/Palace/MAT_Grass.alasset,kMaterial
 b165a501-5eaa-4e5e-a3c6-3271ea1d9352,Shaders/skybox.alasset,kShader
 b3df3b8f-0bd8-4cbf-9510-e063fc6eb49f,Shaders/blit.alasset,kShader

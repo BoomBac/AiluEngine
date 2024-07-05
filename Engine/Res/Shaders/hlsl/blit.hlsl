@@ -64,6 +64,6 @@ float4 PSMain(PSInput input) : SV_TARGET
 }
 float4 PSMainCopy(PSInput input) : SV_TARGET
 {
-	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
-	return float4(color,1.0);
+	float4 color = _SourceTex.Sample(g_LinearClampSampler, input.uv);
+	return color;
 }

@@ -12,6 +12,7 @@
 #include "Framework/Common/ThreadPool.h"
 #include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
+#include "Framework/Common/Profiler.h"
 
 namespace Ailu
 {
@@ -152,14 +153,20 @@ namespace Ailu
 				if (_render_lag >= s_target_lag)
 				{
 					s_frame_count++;
-					g_pSceneMgr->Tick(delta_time);
+					{
+						CPUProfileBlock b("SceneTick");
+						g_pSceneMgr->Tick(delta_time);
+					}
 #ifdef DEAR_IMGUI
 					_p_imgui_layer->Begin();
 					for (Layer* layer : *_layer_stack)
 						layer->OnImguiRender();
 					_p_imgui_layer->End();
 #endif // DEAR_IMGUI
-					g_pRenderer->Tick(delta_time);
+					{
+						CPUProfileBlock b("Render");
+						g_pRenderer->Tick(delta_time);
+					}
 					_render_lag -= s_target_lag;
 				}
 			}

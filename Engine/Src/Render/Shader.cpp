@@ -1,4 +1,6 @@
 #include "pch.h"
+#include <regex>
+
 #include "Render/Shader.h"
 #include "Render/Renderer.h"
 #include "Render/RenderQueue.h"
@@ -390,7 +392,7 @@ namespace Ailu
 				ETopology          pass_pipeline_topology = ETopology::kTriangle;
 				BlendState         pass_pipeline_blend_state;
 				u8                 need_zbuf_count = 2;
-				u32                pass_render_queue = RenderQueue::kQpaque;
+				u32                pass_render_queue = kRenderQueueOpaque;
 				//Pass基本信息和管线状态信息
 				for (auto it = pass_blocks[i].begin(); it != pass_blocks[i].end(); it++)
 				{
@@ -441,7 +443,7 @@ namespace Ailu
 					{
 						if (su::Equal(v, ShaderCommand::kQueueValue.kTransplant, false))
 						{
-							pass_render_queue = RenderQueue::kTransparent;
+							pass_render_queue = kRenderQueueTransparent;
 							is_transparent = true;
 						}
 					}
@@ -470,6 +472,91 @@ namespace Ailu
 						{
 							need_zbuf_count--;
 							pass_pipeline_ds_state._b_depth_write = false;
+						}
+					}
+					else if (su::Equal(k, ShaderCommand::kStencil, false))
+					{
+						pass_pipeline_ds_state._b_front_stencil = true;
+						//v = {Ref 5,Comp Always,Pass Replace}
+						std::regex regex("\\{([^}]*)\\}");
+						std::smatch match;
+						if (std::regex_search(v, match, regex)) 
+						{
+							String extracted = match[1].str();
+							Map<String, String> stencil_values;
+							std::stringstream ss(extracted);
+							String item;
+							while (std::getline(ss, item, ',')) 
+							{
+								std::stringstream item_ss(item);
+								std::string key, value;
+								std::getline(item_ss, key, ':');
+								std::getline(item_ss, value, ':');
+								stencil_values[key] = value;
+							}
+							if (!stencil_values.empty())
+							{
+								if (stencil_values.contains(ShaderCommand::kStencilStateValue.kStencilRef))
+								{
+									pass_pipeline_ds_state._stencil_ref_value = std::stoi(stencil_values[ShaderCommand::kStencilStateValue.kStencilRef]);
+								}
+								if (stencil_values.contains(ShaderCommand::kStencilStateValue.kStencilComp))
+								{
+									auto& comp_str = stencil_values[ShaderCommand::kStencilStateValue.kStencilComp];
+									if (su::Equal(comp_str, ShaderCommand::Comparison::kAlways, false))
+									{
+										pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kAlways;
+									}
+									else if (su::Equal(comp_str, ShaderCommand::Comparison::kEqual, false))
+									{
+										pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kEqual;
+									}
+									else if (su::Equal(comp_str, ShaderCommand::Comparison::kNotEqual, false))
+									{
+										pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kNotEqual;
+									}
+									else if (su::Equal(comp_str, ShaderCommand::Comparison::kLEqual, false))
+									{
+										pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kLessEqual;
+									}
+									else if (su::Equal(comp_str, ShaderCommand::Comparison::kGreater, false))
+									{
+										pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kGreater;
+									}
+									else if (su::Equal(comp_str, ShaderCommand::Comparison::kGEqual, false))
+									{
+										pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kGreaterEqual;
+									}
+									else
+									{
+										AL_ASSERT(true);
+									}
+								}
+								if (stencil_values.contains(ShaderCommand::kStencilStateValue.kStencilPass))
+								{
+									auto& pass_str = stencil_values[ShaderCommand::kStencilStateValue.kStencilPass];
+									if (su::Equal(pass_str, ShaderCommand::kStencilStateValue.StencilPassValue.kReplace, false))
+									{
+										pass_pipeline_ds_state._stencil_test_pass_op = EStencilOp::kReplace;
+									}
+									else if (su::Equal(pass_str, ShaderCommand::kStencilStateValue.StencilPassValue.kKeep, false))
+									{
+										pass_pipeline_ds_state._stencil_test_pass_op = EStencilOp::kKeep;
+									}
+									else if (su::Equal(pass_str, ShaderCommand::kStencilStateValue.StencilPassValue.kIncr, false))
+									{
+										pass_pipeline_ds_state._stencil_test_pass_op = EStencilOp::kIncrementAndClamp;
+									}
+									else if (su::Equal(pass_str, ShaderCommand::kStencilStateValue.StencilPassValue.kDecr, false))
+									{
+										pass_pipeline_ds_state._stencil_test_pass_op = EStencilOp::kDecrementAndClamp;
+									}
+									else
+									{
+										AL_ASSERT(true);
+									}
+								}
+							}
 						}
 					}
 					else {};

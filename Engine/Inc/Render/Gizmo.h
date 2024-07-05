@@ -52,6 +52,12 @@ namespace Ailu
             }
         }
 
+        static void DrawSphere(const Sphere& s, Color32 color = Gizmo::s_color)
+        {
+            Gizmo::DrawCircle(s._center, s._radius, 24, color, MatrixRotationX(ToRadius(90.0f)));
+            Gizmo::DrawCircle(s._center, s._radius, 24, color, MatrixRotationZ(ToRadius(90.0f)));
+            Gizmo::DrawCircle(s._center, s._radius, 24, color);
+        }
         static void DrawAABB(const AABB& aabb, Color32 color = Gizmo::s_color)
         {
             DrawAABB(aabb._min, aabb._max, color);

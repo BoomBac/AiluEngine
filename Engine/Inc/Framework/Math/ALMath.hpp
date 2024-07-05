@@ -98,6 +98,26 @@ namespace Ailu
 				}
 				return *(TT<T>*)this;
 			}
+			TT<T> operator*(T s) const
+			{
+				TT<T> r = *this;
+				int indexes[] = { Indexes... };
+				for (int i = 0; i < sizeof...(Indexes); i++)
+				{
+					r[indexes[i]] *= s;
+				}
+				return r;
+			}
+			TT<T> operator-() const
+			{
+				TT<T> r = *this;
+				int indexes[] = { Indexes... };
+				for (int i = 0; i < sizeof...(Indexes); i++)
+				{
+					r[indexes[i]] *= -1;
+				}
+				return r;
+			}
 		};
 		template<typename T>
 		struct Vector2D

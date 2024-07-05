@@ -31,6 +31,10 @@ namespace Ailu
 				{
 					Camera::sSelected = &static_cast<CameraComponent*>(comp.get())->_camera;
 				}
+				else
+				{
+					Camera::sSelected = nullptr;
+				}
 				comp->OnGizmo();
 			}
 		}

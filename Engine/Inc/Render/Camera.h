@@ -5,9 +5,11 @@
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
 #include "Framework/Math/Geometry.h"
+#include "Render/RenderingData.h"
 
 namespace Ailu
 {
+    class Scene;
     DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
     class AILU_API Camera : public Object
     {
@@ -30,13 +32,15 @@ namespace Ailu
         inline static Camera* sCurrent = nullptr;
         inline static Camera* sSelected = nullptr;
         static Camera* GetDefaultCamera();
-        static void DrawGizmo(const Camera* p_camera);
+        static void DrawGizmo(const Camera* p_camera,Color32 c);
         static void CalcViewFrustumPlane(const Camera* cam, ViewFrustum& vf);
         //when the eye_camera turns, the AABB is recalculated, resulting in shadow jitter
-        static Camera GetFitShaodwCamera(const Camera& eye_cam, float shadow_dis);
+        static AABB GetShadowCascadeAABB(const Camera& eye_cam, f32 start = 0.0f,f32 end = -1.0f);
+        static Sphere GetShadowCascadeSphere(const Camera& eye_cam, f32 start = 0.0f, f32 end = -1.0f);
     public:
         Camera();
         Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType::ECameraType camera_type = ECameraType::kPerspective);
+        void Cull(Scene* s);
         void RecalculateMarix(bool force = false);
         void SetLens(float fovh, float aspect, float nz, float fz);
         const Matrix4x4f& GetProjection() const { return _proj_matrix; }
@@ -45,6 +49,7 @@ namespace Ailu
         bool IsInFrustum(const Vector3f& pos);
         void MarkDirty() { _is_dirty = true; }
         const ViewFrustum& GetViewFrustum() const { return _vf; }
+        const CullResult& CullResults() const { return _cull_results; };
     private:
         void CalculateFrustum();
     private:
@@ -61,6 +66,8 @@ namespace Ailu
         Vector3f _far_top_right;
         Vector3f _far_bottom_left;
         Vector3f _far_bottom_right;
+
+        CullResult _cull_results;
     };
     REFLECT_FILED_BEGIN(Camera)
     DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f,Position,_position)

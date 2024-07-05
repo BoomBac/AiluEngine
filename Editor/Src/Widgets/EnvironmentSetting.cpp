@@ -20,7 +20,7 @@ namespace Ailu
 			ImGuiWidget::Open(handle);
 			for (auto& pass : g_pRenderer->GetRenderPasses())
 			{
-				auto gbuffer_pass = dynamic_cast<DeferredGeometryPass*>(pass);
+				auto gbuffer_pass = dynamic_cast<DeferredLightingPass*>(pass);
 				if (gbuffer_pass)
 				{
 					_deferred_lighting_mat = gbuffer_pass->_p_lighting_material.get();
@@ -124,6 +124,32 @@ namespace Ailu
 			}
 			ImGui::SliderFloat("BoomRadius", &_post_process_pass->_upsample_radius,0.0f,0.1f);
 			ImGui::SliderFloat("BoomIntensity", &_post_process_pass->_bloom_intensity,0.0f,1.0f);
+			int cascade_count = (int)QuailtySetting::s_cascade_shadow_map_count;
+			ImGui::SliderInt("CascadeShadowMapCount",&cascade_count,1,4);
+			QuailtySetting::s_cascade_shadow_map_count = cascade_count;
+			for(int i = 0; i < cascade_count; i++)
+			{
+				std::string name = "CascadeShadowSplit_" + std::to_string(i);
+				f32 s = 0.0f, e = 1.0f;
+				if (i == 0)
+				{
+					s = 0.0f;
+					e = 1.0f;
+				}
+			    else if(i == cascade_count - 1)
+				{
+					s = QuailtySetting::s_cascade_shadow_map_split[i-1];
+					e = 1.0;
+				}
+				else
+				{
+					s = QuailtySetting::s_cascade_shadow_map_split[i-1];
+					e = QuailtySetting::s_cascade_shadow_map_split[i];
+				}
+				ImGui::SliderFloat(name.c_str(), &QuailtySetting::s_cascade_shadow_map_split[i], s, e);
+			}
+			ImGui::SliderFloat("ShadowFadeOut", &QuailtySetting::s_shadow_fade_out_factor, 0.f, 1.0f);
+			ImGui::SliderFloat("IndirectIntensity", &g_pSceneMgr->_p_current->_light_data._indirect_lighting_intensity, 0.f, 1.0f);
 			//// 获取窗口的尺寸
 			//ImVec2 windowSize = ImGui::GetContentRegionAvail();
 			//float faceSize = (windowSize.x-25) / 4.0f; // 每个面在窗口中的尺寸
