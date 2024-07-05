@@ -31,7 +31,15 @@ namespace Ailu
         {
             return sp_instance->GetMousePosImpl();
         }
-        inline static bool s_block_input = false;
+        inline static bool IsInputBlock()
+        {
+            return  s_block_input;
+        }
+        inline static void BlockInput(bool block)
+        {
+            s_block_input = block;
+        }
+
     protected:
         virtual bool IsKeyPressedImpl(int keycode) = 0;
 
@@ -41,6 +49,7 @@ namespace Ailu
         virtual Vector2f GetMousePosImpl() = 0;
     protected:
         inline static Input* sp_instance;
+        inline static bool s_block_input = false;
     };
 }
 

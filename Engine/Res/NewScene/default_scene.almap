@@ -12,7 +12,7 @@ SceneGraph:
       Name: plane
         Components: 
           TransformComponent: 
-            Position: 0,-2,0
+            Position: 0,-370.472,0
             Rotation: 0,6.75513e-08,0,1
             Scale: 40,1,40
           StaticMeshComponent: 
@@ -28,8 +28,8 @@ SceneGraph:
           LightComponent: 
             Type: Directional
             Color: 1,1,1
-            Intensity: 0
-            CastShadow: false
+            Intensity: 1.758
+            CastShadow: true
             ShadowArea: 0
             ShadowDistance: 0
         Children: 0
@@ -66,7 +66,7 @@ SceneGraph:
       Name: shpere
         Components: 
           TransformComponent: 
-            Position: 0,405,0
+            Position: 179.441,83.26,130.959
             Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           StaticMeshComponent: 

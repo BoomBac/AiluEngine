@@ -105,7 +105,7 @@ namespace Ailu
 			{
 				if (profile.TimeSamples[i] <= 0.0)
 					continue;
-				maxTime = max(profile.TimeSamples[i], maxTime);
+				maxTime = std::max<f64>(profile.TimeSamples[i], maxTime);
 				avgTime += profile.TimeSamples[i];
 				++avgTimeSamples;
 			}

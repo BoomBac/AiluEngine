@@ -5,24 +5,11 @@
 #include "Ext/imgui/backends/imgui_impl_win32.h"
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "Ext/imgui/imgui_internal.h"
+#include "Ext/ImGuizmo/ImGuizmo.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/TimeMgr.h"
-#include "Render/RenderingData.h"
-#include "Render/Gizmo.h"
-
-#include "Objects/Actor.h"
-#include "Objects/TransformComponent.h"
-#include "Objects/StaticMeshComponent.h"
-#include "Objects/CameraComponent.h"
 #include "Framework/Common/SceneMgr.h"
-#include "Framework/Common/ResourceMgr.h"
-#include "RHI/DX12/D3DTexture.h"
-#include "Framework/Common/LogMgr.h"
 
-#include "Render/Mesh.h"
-#include "Animation/Clip.h"
-#include "Render/Renderer.h"
-#include "Framework/Common/Profiler.h"
 
 namespace Ailu
 {
@@ -173,7 +160,7 @@ namespace Ailu
 		//else RenderingStates::s_shadering_mode = EShaderingMode::kShaderedWireFrame;
 
 		//ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
-		//ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 2.0f, "%.2f");
+		//ImGui::SliderFloat("Game Time Scale:", &TimeMgr::s_time_scale, 0.0f, 2.0f, "%.2f");
 		//float shadow_dis_m = g_pRenderer->_shadow_distance / 100.0f;
 		//ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
 		//f32 u = Application::s_target_framecount;
@@ -213,7 +200,8 @@ namespace Ailu
 		// Start the Dear ImGui frame
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();
+        ImGui::NewFrame();
+        ImGuizmo::BeginFrame();
 	}
 
 	void Ailu::ImGUILayer::End()

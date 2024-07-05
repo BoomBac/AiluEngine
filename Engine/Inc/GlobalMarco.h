@@ -9,6 +9,7 @@
 #include <queue>
 #include <array>
 #include <map>
+#include <filesystem>
 
 #ifdef AILU_BUILD_DLL
 #define AILU_API __declspec(dllexport)

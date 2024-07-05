@@ -22,7 +22,7 @@ namespace Ailu
 			h >>= 1;
 			++lh;
 		}
-		return min(min(lw, lh),7);
+		return std::min<u16>(std::min<u16>(lw, lh),7);
 	}
 
 	Texture::Texture() : Texture(0u,0u)

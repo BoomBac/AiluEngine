@@ -35,6 +35,8 @@ namespace Ailu
 #endif // WINDOWS
 	}
 
+        double Application::s_target_framecount = Application::kTargetFrameRate;
+
 	int Application::Initialize()
 	{
 		ApplicationDesc desc;

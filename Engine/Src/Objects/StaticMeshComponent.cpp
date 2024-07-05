@@ -258,7 +258,7 @@ namespace Ailu
 			for (u32 i = 0; i < s_skin_thread_num; ++i)
 			{
 				u32 startIdx = i * _per_skin_task_vertex_num;
-				u32 endIdx = min((i + 1) * _per_skin_task_vertex_num, vert_count);
+				u32 endIdx = std::min<u32>((i + 1) * _per_skin_task_vertex_num, vert_count);
 				//_skin_tasks[i] = g_pThreadTool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx);
 				skin_tasks.push_back(g_pThreadTool->Enqueue(&SkinedMeshComponent::SkinTask, this, _p_clip.get(), utime, vert, startIdx, endIdx));
 

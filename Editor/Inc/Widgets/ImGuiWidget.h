@@ -42,6 +42,8 @@ namespace Ailu
 			Vector2f GlobalToLocal(const Vector2f& screen_pos) const;
 			Vector2f Size() const { return _size; }
 			Vector2f Position() const { return _pos; }
+            //start at screen left top
+            Vector2f GlobalPostion() const {return _global_pos;}
 		public:
 			String _title;
 		protected:
@@ -49,7 +51,7 @@ namespace Ailu
 			void OnWidgetClose(WidgetCloseEvent e);
 		protected:
 			//local pos,reletive to window
-			Vector2f _pos, _size;
+			Vector2f _pos, _size,_global_pos;
 			i32  _handle = -1;
 			bool _b_show = false;
 			bool _b_pre_show = false;

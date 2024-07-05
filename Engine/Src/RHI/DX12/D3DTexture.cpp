@@ -627,7 +627,7 @@ namespace Ailu
 			tcmd->Clear();
 			auto [mip5w, mip5h] = CurMipmapSize(5);
 			_p_mipmapgen_cs1->SetInt("SrcMipLevel", 4);
-			_p_mipmapgen_cs1->SetInt("NumMipLevels", min(_mipmap_count - 4,4));
+			_p_mipmapgen_cs1->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 4,4));
 			_p_mipmapgen_cs1->SetInt("SrcDimension", 0);
 			_p_mipmapgen_cs1->SetBool("IsSRGB", false);
 			_p_mipmapgen_cs1->SetVector("TexelSize", Vector4f(1.0f/ (float)mip5w, 1.0f / (float)mip5h, 0.0f, 0.0f));

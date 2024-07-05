@@ -362,13 +362,12 @@ namespace Ailu
 		std::multimap<std::string, SerializableProperty*> props{};
 		//为了写入通用资产头信息，暂时使用追加方式打开
 		std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
-		out_mat << "shader_guid: " << GetAssetGuid(mat->_p_shader).ToString();
-		out_mat << "surface_type: " << ESurfaceType::ToString(mat->SurfaceType());
+		out_mat << "shader_guid: " << GetAssetGuid(mat->_p_shader).ToString() << endl;
+		out_mat << "surface_type: " << ESurfaceType::ToString(mat->SurfaceType()) << endl;
 		for (auto& prop : mat->_properties)
 		{
 			props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
 		}
-		out_mat << endl;
 		auto float_props = mat->GetAllFloatValue();
 		auto vector_props = mat->GetAllVectorValue();
 		auto uint_props = mat->GetAllUintValue();

@@ -1,32 +1,24 @@
 //#include "pch.h"
 #include "Widgets/EditorLayer.h"
-#include "Platform/WinWindow.h"
+
 #include "Ext/imgui/imgui.h"
-#include "Ext/imgui/backends/imgui_impl_win32.h"
-#include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "Ext/imgui/imgui_internal.h"
+
 #include "Framework/Common/Application.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Render/RenderingData.h"
 #include "Render/Gizmo.h"
 
-#include "Objects/Actor.h"
-#include "Objects/TransformComponent.h"
 #include "Objects/StaticMeshComponent.h"
 #include "Objects/CameraComponent.h"
 #include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/ResourceMgr.h"
-#include "RHI/DX12/D3DTexture.h"
 #include "Framework/Common/LogMgr.h"
 
 #include "Objects/SceneActor.h"
 #include "Framework/Events/MouseEvent.h"
-#include "Render/Gizmo.h"
-#include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/Input.h"
 
-#include "Render/Mesh.h"
-#include "Animation/Clip.h"
 #include "Render/Renderer.h"
 #include "Framework/Common/Profiler.h"
 
@@ -223,27 +215,27 @@ namespace Ailu
 					space = space.substr(0, space.size() - 1);
 			}
 
-			static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame" };
-			static int item_current_idx = 0; // Here we store our selection data as an index.
-			const char* combo_preview_value = items[item_current_idx];  // Pass in the preview value visible before opening the combo (it could be anything)
-			if (ImGui::BeginCombo("Shadering Mode", combo_preview_value, 0))
-			{
-				for (int n = 0; n < IM_ARRAYSIZE(items); n++)
-				{
-					const bool is_selected = (item_current_idx == n);
-					if (ImGui::Selectable(items[n], is_selected))
-						item_current_idx = n;
-					if (is_selected)
-						ImGui::SetItemDefaultFocus();
-				}
-				ImGui::EndCombo();
-			}
-			if (item_current_idx == 0) RenderingStates::s_shadering_mode = EShaderingMode::kShader;
-			else if (item_current_idx == 1) RenderingStates::s_shadering_mode = EShaderingMode::kWireFrame;
-			else RenderingStates::s_shadering_mode = EShaderingMode::kShaderedWireFrame;
+//			static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame" };
+//			static int item_current_idx = 0; // Here we store our selection data as an index.
+//			const char* combo_preview_value = items[item_current_idx];  // Pass in the preview value visible before opening the combo (it could be anything)
+//			if (ImGui::BeginCombo("Shadering Mode", combo_preview_value, 0))
+//			{
+//				for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+//				{
+//					const bool is_selected = (item_current_idx == n);
+//					if (ImGui::Selectable(items[n], is_selected))
+//						item_current_idx = n;
+//					if (is_selected)
+//						ImGui::SetItemDefaultFocus();
+//				}
+//				ImGui::EndCombo();
+//			}
+//			if (item_current_idx == 0) RenderingStates::s_shadering_mode = EShaderingMode::kShader;
+//			else if (item_current_idx == 1) RenderingStates::s_shadering_mode = EShaderingMode::kWireFrame;
+//			else RenderingStates::s_shadering_mode = EShaderingMode::kShaderedWireFrame;
 
 			ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
-			ImGui::SliderFloat("Game Time Scale:", &TimeMgr::TimeScale, 0.0f, 2.0f, "%.2f");
+			ImGui::SliderFloat("Game Time Scale:", &TimeMgr::s_time_scale, 0.0f, 2.0f, "%.2f");
 			float shadow_dis_m = g_pRenderer->_shadow_distance / 100.0f;
 			ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
 			g_pRenderer->_shadow_distance = shadow_dis_m * 100;

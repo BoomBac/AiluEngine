@@ -2082,6 +2082,9 @@
     <ClInclude Include="Ext\imgui\imstb_truetype.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Ext\ImGuizmo\ImGuizmo.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -2280,6 +2283,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Ext\imgui\imgui_widgets.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Ext\ImGuizmo\ImGuizmo.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

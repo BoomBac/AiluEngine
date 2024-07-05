@@ -23,10 +23,7 @@ namespace Ailu
 		}
 		_transform._position = _pos_data;
 		_transform._scale = _scale_data;
-		//auto r_d = _rotation_data - _pre_rotation_data;
-		//_transform._rotation = _transform._rotation * Quaternion::EulerAngles(r_d);
 		_transform._rotation = Quaternion::EulerAngles(_rotation_data);
-		//_pre_rotation_data = _rotation_data;
 		Transform::ToMatrix(_transform, _matrix);
 	}
 	void TransformComponent::OnGizmo()
@@ -37,6 +34,7 @@ namespace Ailu
 	}
 	void TransformComponent::SetPosition(const Vector3f& pos)
 	{
+        _pos_data = pos;
 		_transform._position = pos;
 	}
 	void TransformComponent::SetRotation(const Quaternion& quat)
@@ -45,6 +43,7 @@ namespace Ailu
 	}
 	void TransformComponent::SetScale(const Vector3f& scale)
 	{
+        _scale_data = scale;
 		_transform._scale = scale;
 	}
 

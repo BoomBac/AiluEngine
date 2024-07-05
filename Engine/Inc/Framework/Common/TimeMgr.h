@@ -22,8 +22,8 @@ namespace Ailu
 		using ALTimeStamp = std::chrono::high_resolution_clock::time_point;
 		inline static float DeltaTime = 0.0f;
 		inline static float TimeSinceLoad = 0.0f;
-		inline static float TimeScale = 1.0f;
-		static float GetScaledWorldTime(float scale = TimeMgr::TimeScale,bool smooth_scale = true);
+                static f32 s_time_scale;
+		static float GetScaledWorldTime(float scale = TimeMgr::s_time_scale,bool smooth_scale = true);
 		static String CurrentTime(String format = "%Y-%m-%d_%H:%M:%S");
 
 		int Initialize() override;

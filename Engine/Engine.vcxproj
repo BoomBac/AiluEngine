@@ -441,6 +441,7 @@
     <ClInclude Include="Ext\fbxsdk\include\libxml2\libxml\xpath.h" />
     <ClInclude Include="Ext\fbxsdk\include\libxml2\libxml\xpathInternals.h" />
     <ClInclude Include="Ext\fbxsdk\include\libxml2\libxml\xpointer.h" />
+    <ClInclude Include="Ext\ImGuizmo\ImGuizmo.h" />
     <ClInclude Include="Ext\imgui\backends\imgui_impl_dx12.h" />
     <ClInclude Include="Ext\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="Ext\imgui\imconfig.h" />
@@ -573,6 +574,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="Ext\ImGuizmo\ImGuizmo.cpp" />
     <ClCompile Include="Ext\imgui\backends\imgui_impl_dx12.cpp" />
     <ClCompile Include="Ext\imgui\backends\imgui_impl_win32.cpp" />
     <ClCompile Include="Ext\imgui\imgui.cpp" />

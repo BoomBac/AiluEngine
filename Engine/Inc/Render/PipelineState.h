@@ -212,7 +212,7 @@ namespace Ailu
 					AL_ASSERT_MSG(true, "Stream count must less than kMaxStreamCount");
 					return;
 				}
-				desc.Offset += offset[min(desc.Stream, kMaxStreamCount)];
+				desc.Offset += offset[std::min<u8>(desc.Stream, kMaxStreamCount)];
 				offset[desc.Stream] += desc.Size;
 				_stride[desc.Stream] += desc.Size;
 			}

@@ -12,6 +12,7 @@ namespace Ailu
 	{
 		_hash = GraphicsPipelineStateObject::ConstructPSOHash(initializer);
 		_name = initializer._p_vertex_shader->Name();
+                ZeroMemory(&_d3d_pso_desc,sizeof(_d3d_pso_desc));
 	}
 
 	void D3DGraphicsPipelineState::Build(u16 pass_index, ShaderVariantHash variant_hash)

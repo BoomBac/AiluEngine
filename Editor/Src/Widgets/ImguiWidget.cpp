@@ -98,11 +98,12 @@ namespace Ailu
 			else
 				ImGui::Begin(_title.c_str(), nullptr, ImGuiWindowFlags_NoCollapse);
 			_is_focus = ImGui::IsWindowFocused();
-			Input::s_block_input |= _is_focus;
+			Input::BlockInput(Input::IsInputBlock() || _is_focus);
 			ImVec2 windowPos = ImGui::GetWindowPos();
 			ImVec2 windowSize = ImGui::GetWindowSize();
 			_pos.x = windowPos.x;
 			_pos.y = windowPos.y;
+            _global_pos = _pos;
 			_size.x = windowSize.x;
 			_size.y = windowSize.y;
 			auto [wx, wy] = Application::GetInstance()->GetWindowPtr()->GetWindowPosition();

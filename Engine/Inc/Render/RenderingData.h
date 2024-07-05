@@ -27,7 +27,6 @@ namespace Ailu
             s_draw_call = 0u;
             s_gpu_latency = 0.0f;
         }
-        inline static EShaderingMode s_shadering_mode = EShaderingMode::kShader;
     };
 
     struct RenderingShadowData

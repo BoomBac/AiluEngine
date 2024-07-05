@@ -1,9 +1,11 @@
 #include "Widgets/RenderView.h"
+#include "Common/Selection.h"
 #include "Ext/imgui/imgui.h"
+#include "Framework/Common/Application.h"
 #include "Framework/Common/Input.h"
+#include "ImGuizmo.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Renderer.h"
-#include "Framework/Common/Application.h"
 
 namespace Ailu
 {
@@ -11,7 +13,7 @@ namespace Ailu
 	{
 		RenderView::RenderView() : ImGuiWidget("RenderView")
 		{
-			_is_hide_common_widget_info = false;
+			_is_hide_common_widget_info = true;
 			_allow_close = false;
 		}
 		RenderView::~RenderView()
@@ -92,12 +94,29 @@ namespace Ailu
 					}
 					ImGui::EndDragDropTarget();
 				}
+                auto* selected_actor = Selection::First<SceneActor>();
+                if(selected_actor)
+                {
+                    ImGuizmo::SetOrthographic(false);
+                    ImGuizmo::SetDrawlist();
+                    ImGuizmo::SetRect(_global_pos.x, _global_pos.y, _size.x, _size.y);
+                    auto world_mat = selected_actor->GetTransformComponent()->GetMatrix();
+                    auto view = Camera::sCurrent->GetView();
+                    auto proj = Camera::sCurrent->GetProjection();
+                    ImGuizmo::Manipulate(view,proj,ImGuizmo::OPERATION::TRANSLATE,ImGuizmo::LOCAL,world_mat);
+                    Selection::Active(!ImGuizmo::IsOver());
+                    if(ImGuizmo::IsUsing())
+                    {
+                        Vector3f new_pos = Vector3f{world_mat[3][0],world_mat[3][1],world_mat[3][2]};
+                        selected_actor->GetTransformComponent()->SetPosition(new_pos);
+                    }
+                }
 			}
 			else
 			{
 				ImGui::LabelText("RenderView", "No Render Target");
 			}
-			Input::s_block_input = !_is_focus;
+			Input::BlockInput(!_is_focus);
 		}
 	}
 }
