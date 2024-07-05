@@ -20,7 +20,9 @@ namespace Ailu
 		void TextureSelector::ShowImpl()
 		{
 			static float preview_tex_size = 128;
-			u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
+            ImVec2 vMin = ImGui::GetWindowContentRegionMin();
+            ImVec2 vMax = ImGui::GetWindowContentRegionMax();
+			u32 window_width = (u32)(vMax.x-vMin.x);
 			int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
 			imagesPerRow += imagesPerRow == 0 ? 1 : 0;
 			static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };
@@ -130,7 +132,9 @@ namespace Ailu
 		void RenderTextureView::ShowImpl()
 		{
 			static float preview_tex_size = 128;
-			u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
+            ImVec2 vMin = ImGui::GetWindowContentRegionMin();
+            ImVec2 vMax = ImGui::GetWindowContentRegionMax();
+            u32 window_width = (u32)(vMax.x-vMin.x);
 			int numImages = 10, imagesPerRow = window_width / (u32)preview_tex_size;
 			imagesPerRow += imagesPerRow == 0 ? 1 : 0;
 			static ImVec2 uv0{ 0,0 }, uv1{ 1,1 };

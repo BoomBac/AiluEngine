@@ -488,7 +488,9 @@ namespace Ailu
 			_asset_content_size.y *= 0.8f;
 			_paddinged_preview_tex_size_padding = _preview_tex_size * 1.15f;
 			ImGui::SliderFloat("IconSize", &_preview_tex_size, 16, 256, "%.0f");
-			u32 window_width = (u32)ImGui::GetWindowContentRegionWidth();
+            auto wmax = ImGui::GetWindowContentRegionMax();
+            auto wmin = ImGui::GetWindowContentRegionMin();
+			u32 window_width = (u32)(wmax.x - wmin.y);
 			_icon_num_per_row = window_width / (u32)_paddinged_preview_tex_size_padding;
 			_icon_num_per_row += _icon_num_per_row == 0 ? 1 : 0;
 

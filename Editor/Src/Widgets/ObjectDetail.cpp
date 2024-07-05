@@ -97,7 +97,9 @@ namespace Ailu
 				auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
 				u32 cur_tex_id = tex ? tex->ID() : Texture::s_p_default_white->ID();
 				//auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
-				float contentWidth = ImGui::GetWindowContentRegionWidth();
+                ImVec2 vMin = ImGui::GetWindowContentRegionMin();
+                ImVec2 vMax = ImGui::GetWindowContentRegionMax();
+				float contentWidth = (vMax.x-vMin.x);
 				float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
 				ImGui::SetCursorPosX(centerX);
 				if (selector_window.IsCaller(property_handle))
@@ -200,7 +202,9 @@ namespace Ailu
 							mat->SetTexture(name, tex);
 						}
 						u32 cur_tex_id = tex->ID();
-						float contentWidth = ImGui::GetWindowContentRegionWidth();
+                        ImVec2 vMin = ImGui::GetWindowContentRegionMin();
+                        ImVec2 vMax = ImGui::GetWindowContentRegionMax();
+                        float contentWidth = (vMax.x-vMin.x);
 						float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
 						ImGui::SetCursorPosX(centerX);
 						if (selector_window.IsCaller(mat_prop_index))

@@ -165,7 +165,7 @@ namespace Ailu
 
 		void EditorLayer::OnImguiRender()
 		{
-			ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+			ImGui::DockSpaceOverViewport(0,ImGui::GetMainViewport());
 			ImGui::PushFont(_font);
 			ImGui::Begin("Performace Statics");                          // Create a window called "Hello, world!" and append into it.
 			ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);

@@ -66,7 +66,7 @@ SceneGraph:
       Name: shpere
         Components: 
           TransformComponent: 
-            Position: 179.441,83.26,130.959
+            Position: 179.441,83.26,298.218
             Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           StaticMeshComponent: 
