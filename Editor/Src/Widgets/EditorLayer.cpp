@@ -28,6 +28,7 @@
 #include "Render/Mesh.h"
 #include "Animation/Clip.h"
 #include "Render/Renderer.h"
+#include "Render/RenderPipeline.h"
 #include "Framework/Common/Profiler.h"
 
 #include "Widgets/CommonTextureWidget.h"
@@ -183,9 +184,9 @@ namespace Ailu
 			ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
 			if (ImGui::Button("Capture"))
 			{
-				g_pRenderer->TakeCapture();
+				g_pGfxContext->GetPipeline()->GetRenderer()->TakeCapture();
 			}
-			for (auto pass : g_pRenderer->GetRenderPasses())
+			for (auto& pass : g_pGfxContext->GetPipeline()->GetRenderer()->GetRenderPasses())
 			{
 				bool active = pass->IsActive();
 				ImGui::Checkbox(pass->GetName().c_str(), &active);

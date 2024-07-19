@@ -78,6 +78,9 @@ namespace Ailu
 			//}
 			_defines = _state_desc._p_vertex_shader->ActiveKeywords(pass_index, variant_hash);
 			_pass_name = _state_desc._p_vertex_shader->GetPassInfo(pass_index)._name;
+			WString debug_name = ToWChar(std::format("{}_{}_{}", d3dshader->Name(), pass_index, variant_hash));
+			_p_plstate->SetName(debug_name.c_str());
+			_p_sig->SetName(debug_name.c_str());
 		}
 	}
 
@@ -147,13 +150,13 @@ namespace Ailu
 		{
 			//D3D12_CONSTANT_BUFFER_VIEW_DESC view = *reinterpret_cast<D3D12_CONSTANT_BUFFER_VIEW_DESC*>(res);
 			//context->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, view.BufferLocation);
-			static_cast<ConstantBuffer*>(res)->Bind(cmd,bind_slot);
+			static_cast<IConstantBuffer*>(res)->Bind(cmd,bind_slot);
 			return;
 		}
 		break;
 		case Ailu::EBindResDescType::kTexture2D:
 		{
-			reinterpret_cast<Texture*>(res)->Bind(cmd,slot);
+			reinterpret_cast<Texture*>(res)->Bind(cmd,Texture::kMainSRVIndex,slot);
 		}
 		break;
 		case Ailu::EBindResDescType::kSampler:

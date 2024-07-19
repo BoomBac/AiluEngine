@@ -4,8 +4,6 @@ name: StandardPBR
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
 keywords: 
   prop_type: Uint
-    SamplerMask: 0
-    MaterialID: 0
     MaterialID: 0
     SamplerMask: 0
     _material_id: 0
@@ -13,7 +11,9 @@ keywords:
   prop_type: Float
     MetallicValue: 0
     g_IndirectLightingIntensity: 0
-    RoughnessValue: 0
+    RoughnessValue: 1
+    SamplerMask: 0
+    MaterialID: 0
   prop_type: Vector
     SpecularColor: 0,0,0,0
     _ScreenParams: 0,0,0,0

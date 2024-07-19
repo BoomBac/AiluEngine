@@ -2,5 +2,5 @@ guid: 171e4e1b-a8f2-4436-b024-ff5bc128c200
 type: kShader
 name: bloom
   file: Shaders/hlsl/PostProcess/bloom.hlsl
-  vs_entry: VSMain
+  vs_entry: FullscreenVSMain
   ps_entry: PSMain

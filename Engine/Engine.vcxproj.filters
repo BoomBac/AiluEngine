@@ -2016,7 +2016,7 @@
     <ClInclude Include="Inc\Framework\Math\Geometry.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="Inc\Render\Pass\SSAO.h">
+    <ClInclude Include="Inc\Render\Pass\SSAOPass.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Ext\pix\Include\WinPixEventRuntime\pix3.h">
@@ -2080,6 +2080,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="Ext\imgui\imstb_truetype.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Inc\Render\RenderPipeline.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -2231,7 +2234,7 @@
     <ClCompile Include="Src\Render\Pass\PostprocessPass.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Render\Pass\SSAO.cpp">
+    <ClCompile Include="Src\Render\Pass\SSAOPass.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Src\Framework\Common\FileManager.cpp">
@@ -2280,6 +2283,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Ext\imgui\imgui_widgets.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Render\RenderPipeline.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

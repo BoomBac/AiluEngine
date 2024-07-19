@@ -17,6 +17,7 @@ Texture2D Specular : register(t5);
 TextureCube RadianceTex : register(t6);
 TextureCube PrefilterEnvTex : register(t7);
 Texture2D IBLLut : register(t8);
+TEXTURE2D(_OcclusionTex,9)
 
 float GetDistanceAtt(float distance,float atten_radius)
 {
@@ -58,7 +59,7 @@ float3 GetSpotLightIrridance(uint index,float3 world_pos)
 	return _SpotLights[index]._LightColor * atten;
 }
 
-float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
+float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 {
 	float3 light = float3(0.0, 0.0, 0.0);
 	float3 view_dir = normalize(_CameraPos.xyz - world_pos);
@@ -147,7 +148,8 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
     // float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
     // float3 k_D = diffuse_color * (1.0 - FssEss - FmsEms);
 	float3 FssEss = F0 * envBRDF.x + envBRDF.y;
-	light += (FssEss * radiance + diffuse_color * irradiance) * g_IndirectLightingIntensity;
+	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;
+	light += (FssEss * radiance + diffuse_color * irradiance) * g_IndirectLightingIntensity * ao;
 	return light; 
 }
 #endif //__LIGHTING_H__

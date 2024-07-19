@@ -26,9 +26,9 @@
 
 #include "standard_lit_common.ash"
 
-PSInput ForwardVSMain(VSInput v)
+StandardPSInput ForwardVSMain(StandardVSInput v)
 {
-	PSInput result;
+	StandardPSInput result;
 	result.position = TransformToClipSpace(v.position);
 	result.normal = v.normal;
 	result.uv0 = v.uv0;
@@ -43,12 +43,12 @@ PSInput ForwardVSMain(VSInput v)
 	return result;
 }
 
-float4 ForwardPSMain(PSInput input) : SV_TARGET
+float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
 	InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
     float alpha = surface_data.albedo.a;
-    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos));
+    float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos,input.uv0));
     light += surface_data.emssive;
     return float4(light, alpha);
 }

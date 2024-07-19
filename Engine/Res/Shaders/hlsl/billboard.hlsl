@@ -31,7 +31,7 @@ TEXTURE2D(_MainTex,0)
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-// 获取视图矩阵的旋转部分
+    // 获取视图矩阵的旋转部分
     float3x3 viewRotation = (float3x3)_MatrixV;
 
     // 在世界坐标系中旋转顶点

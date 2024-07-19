@@ -69,7 +69,7 @@ namespace Ailu
 		Vector<PassVariantInfo> _pass_variants;
 		//跟随材质持久化的关键字
 		std::set<String> _all_keywords;
-		Vector<Scope<ConstantBuffer>> _p_cbufs;
+		Vector<Scope<IConstantBuffer>> _p_cbufs;
 		Vector<Map<String, std::tuple<u8, Texture*>>> _textures_all_passes{};
 		//非shader使用的变量
 		Map<String, u32> _common_uint_property;

@@ -21,7 +21,7 @@ namespace Ailu
 		Ref<Material> _p_bloom_thread_mat;
 		Material* _p_blit_mat;
 		Mesh* _p_quad_mesh;
-		ConstantBuffer* _p_obj_cb;
+		IConstantBuffer* _p_obj_cb;
 		Rect _bloom_thread_rect;
 		u16 _bloom_iterator_count = 6;
 

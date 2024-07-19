@@ -9,7 +9,7 @@
 
 namespace Ailu
 {
-	class IRenderPass
+	class AILU_API IRenderPass
 	{
 	public:
 		~IRenderPass() = default;
@@ -21,8 +21,9 @@ namespace Ailu
 		virtual const void SetActive(bool is_active) = 0;
 	};
 
-	class RenderPass : public IRenderPass,public Object
+	class AILU_API RenderPass : public IRenderPass,public Object
 	{
+		DISALLOW_COPY_AND_ASSIGN(RenderPass)
 	public:
 		RenderPass(const String& name) : Object(name), _is_active(true) {};
 		virtual void Execute(GraphicsContext* context, RenderingData& rendering_data) override {};
@@ -50,17 +51,6 @@ namespace Ailu
 		Shader* _forward_lit_shader;
 	};
 
-	class ResolvePass : public RenderPass
-	{
-	public:
-		ResolvePass();
-		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
-		void BeginPass(GraphicsContext* context) final;
-		void EndPass(GraphicsContext* context) final;
-		bool _is_offscreen = false;
-	private:
-	};
-
 	class CopyColorPass : public RenderPass
 	{
 	public:
@@ -72,7 +62,7 @@ namespace Ailu
 	private:
 		Material* _p_blit_mat;
 		Mesh* _p_quad_mesh;
-		ConstantBuffer* _p_obj_cb;
+		IConstantBuffer* _p_obj_cb;
 		Rect _half_sceen_rect;
 	};
 
@@ -86,7 +76,7 @@ namespace Ailu
 		void EndPass(GraphicsContext* context) final;
 	private:
 		Material* _p_blit_mat;
-		ConstantBuffer* _p_obj_cb;
+		IConstantBuffer* _p_obj_cb;
 	};
 
 	class ShadowCastPass : public RenderPass
@@ -119,8 +109,8 @@ namespace Ailu
 	private:
 		bool is_source_by_texture;
 		ScenePerPassData _pass_data[6];
-		Scope<ConstantBuffer> _per_pass_cb[6];
-		Scope<ConstantBuffer> _per_obj_cb;
+		Scope<IConstantBuffer> _per_pass_cb[6];
+		Scope<IConstantBuffer> _per_obj_cb;
 		Matrix4x4f _world_mat;
 		Rect _cubemap_rect;
 		Rect _ibl_rect;
@@ -138,7 +128,7 @@ namespace Ailu
 	class DeferredGeometryPass : public RenderPass
 	{
 	public:
-		DeferredGeometryPass(u16 width,u16 height);
+		DeferredGeometryPass();
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
@@ -169,10 +159,10 @@ namespace Ailu
 	private:
 		Mesh* _p_sky_mesh;
 		Ref<Material> _p_skybox_material;
-		Scope<ConstantBuffer> _p_cbuffer;
+		Scope<IConstantBuffer> _p_cbuffer;
 	};
 
-	class GizmoPass : public RenderPass
+	class AILU_API GizmoPass : public RenderPass
 	{
 	public:
 		GizmoPass();
@@ -180,7 +170,7 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 	private:
-		Vector<Scope<ConstantBuffer>> _p_cbuffers;
+		Vector<Scope<IConstantBuffer>> _p_cbuffers;
 	};
 }
 

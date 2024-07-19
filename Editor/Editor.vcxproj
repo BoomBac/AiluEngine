@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Inc\Render\CommonRenderPipeline.cpp" />
     <ClCompile Include="Src\Widgets\AssetBrowser.cpp" />
     <ClCompile Include="Src\Widgets\AssetTable.cpp" />
     <ClCompile Include="Src\Widgets\CommonTextureWidget.cpp" />
@@ -33,6 +34,7 @@
     <ClCompile Include="Src\Widgets\WorldOutline.cpp" />
     <ClInclude Include="Inc\Common\Selection.h" />
     <ClInclude Include="Inc\EditorApp.h" />
+    <ClInclude Include="Inc\Render\CommonRenderPipeline.h" />
     <ClInclude Include="Inc\Widgets\AssetBrowser.h" />
     <ClInclude Include="Inc\Widgets\AssetTable.h" />
     <ClInclude Include="Inc\Widgets\Common.h" />

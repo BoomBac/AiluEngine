@@ -8,6 +8,7 @@
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/LayerStack.h"
 #include "Framework/ImGui/ImGuiLayer.h"
+#include "Render/RenderPipeline.h"
 
 namespace Ailu
 {
@@ -65,6 +66,7 @@ namespace Ailu
         Window* _p_window = nullptr;
         std::atomic<bool> _is_handling_event;
         std::thread* _p_event_handle_thread;
+        Scope<RenderPipeline> _pipeline;
         EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None; 
         inline static Application* sp_instance = nullptr;
         double _render_lag = 0.0;

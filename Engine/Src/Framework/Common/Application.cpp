@@ -11,7 +11,7 @@
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Render/GraphicsContext.h"
-#include "Render/Renderer.h"
+#include "Render/RenderPipeline.h"
 #include "Framework/Common/Profiler.h"
 
 namespace Ailu
@@ -22,7 +22,6 @@ namespace Ailu
 	SceneMgr* g_pSceneMgr = new SceneMgr();
 	ResourceMgr* g_pResourceMgr = new ResourceMgr();
 	LogMgr* g_pLogMgr = new LogMgr();
-	Renderer* g_pRenderer = new Renderer();
 	Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
 
 	WString Application::GetWorkingPath()
@@ -104,8 +103,6 @@ namespace Ailu
 		g_pResourceMgr->Finalize();
 		DESTORY_PTR(g_pSceneMgr);
 		DESTORY_PTR(g_pResourceMgr);
-		g_pRenderer->Finalize();
-		DESTORY_PTR(g_pRenderer);
 		GraphicsContext::FinalizeGlobalContext();
 		g_pTimeMgr->Finalize();
 		DESTORY_PTR(g_pTimeMgr);
@@ -157,15 +154,16 @@ namespace Ailu
 						CPUProfileBlock b("SceneTick");
 						g_pSceneMgr->Tick(delta_time);
 					}
-#ifdef DEAR_IMGUI
-					_p_imgui_layer->Begin();
-					for (Layer* layer : *_layer_stack)
-						layer->OnImguiRender();
-					_p_imgui_layer->End();
-#endif // DEAR_IMGUI
 					{
 						CPUProfileBlock b("Render");
-						g_pRenderer->Tick(delta_time);
+						g_pGfxContext->GetPipeline()->Render();
+#ifdef DEAR_IMGUI
+						_p_imgui_layer->Begin();
+						for (Layer* layer : *_layer_stack)
+							layer->OnImguiRender();
+						_p_imgui_layer->End();
+#endif // DEAR_IMGUI
+						g_pGfxContext->Present();
 					}
 					_render_lag -= s_target_lag;
 				}

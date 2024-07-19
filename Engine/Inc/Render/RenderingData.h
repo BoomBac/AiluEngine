@@ -78,8 +78,8 @@ namespace Ailu
         RenderingShadowData _shadow_data[RenderConstants::kMaxCascadeShadowMapSplitNum + RenderConstants::kMaxSpotLightNum];
         RenderingPointShadowData _point_shadow_data[RenderConstants::kMaxPointLightNum];
         u8 _addi_shadow_num = 0,_addi_point_shadow_num = 0;
-        ConstantBuffer* _p_per_frame_cbuf;
-        ConstantBuffer** _p_per_object_cbuf;
+        IConstantBuffer* _p_per_frame_cbuf;
+        IConstantBuffer** _p_per_object_cbuf;
         RTHandle _camera_color_target_handle;
         RTHandle _camera_depth_target_handle;
         RTHandle _final_rt_handle;

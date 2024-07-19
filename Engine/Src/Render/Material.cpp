@@ -28,7 +28,7 @@ namespace Ailu
 		for (auto& cbuf : other._p_cbufs)
 		{
 			u32 buffer_size = cbuf->GetBufferSize();
-			_p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
+			_p_cbufs.emplace_back(IConstantBuffer::Create(buffer_size));
 			memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
 		}
 		_textures_all_passes = other._textures_all_passes;
@@ -57,7 +57,7 @@ namespace Ailu
 		for (auto& cbuf : other._p_cbufs)
 		{
 			u32 buffer_size = cbuf->GetBufferSize();
-			_p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
+			_p_cbufs.emplace_back(IConstantBuffer::Create(buffer_size));
 			memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
 		}
 		_textures_all_passes = other._textures_all_passes;
@@ -98,13 +98,14 @@ namespace Ailu
 		auto& bind_infos = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._bind_res_infos;
 		for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
 		{
-			if (bind_infos.find(it->first) != bind_infos.end())
+			auto bind_it = bind_infos.find(it->first);
+			if (bind_it != bind_infos.end())
 			{
 				auto& [slot, texture] = it->second;
 				if (texture != nullptr)
 				{
 					//texture->Bind(slot);
-					GraphicsPipelineStateMgr::SubmitBindResource(texture, slot);
+					GraphicsPipelineStateMgr::SubmitBindResource(texture, bind_it->second._bind_slot);
 				}
 			}
 			//else
@@ -471,7 +472,7 @@ namespace Ailu
 			if (first_time)
 			{
 				_mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];
-				_p_cbufs[i].reset(ConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
+				_p_cbufs[i].reset(IConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
 				memset(_p_cbufs[i]->GetData(), 0, _mat_cbuf_per_pass_size[i]);
 			}
 			else if (_mat_cbuf_per_pass_size[i] != cbuf_size_per_passes[i])

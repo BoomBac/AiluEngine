@@ -1,5 +1,12 @@
 Normal: Begin init resource mgr...
 Normal: Shader compile end
+Warning: LoadShaderReflection deferred_lighting skip input element: SV_VERTEXID
+Normal: Shader compile end
+Warning: LoadShaderReflection deferred_lighting skip input element: SV_VERTEXID
+Normal: Shader compile end
+Warning: LoadShaderReflection deferred_lighting skip input element: SV_VERTEXID
+Normal: Shader compile end
+Warning: LoadShaderReflection deferred_lighting skip input element: SV_VERTEXID
 Normal: Shader compile end
 Normal: Shader compile end
 Normal: Shader compile end
@@ -8,30 +15,31 @@ Normal: Shader compile end
 Normal: Shader compile end
 Normal: Shader compile end
 Normal: Shader compile end
+Warning: LoadShaderReflection blit skip input element: SV_VERTEXID
+Normal: Shader compile end
+Normal: Shader compile end
+Warning: LoadShaderReflection bloom skip input element: SV_VERTEXID
+Normal: Shader compile end
+Warning: LoadShaderReflection bloom skip input element: SV_VERTEXID
+Normal: Shader compile end
+Warning: LoadShaderReflection bloom skip input element: SV_VERTEXID
+Normal: Shader compile end
+Warning: LoadShaderReflection bloom skip input element: SV_VERTEXID
 Normal: Shader compile end
 Normal: Shader compile end
 Normal: Shader compile end
 Normal: Shader compile end
 Normal: Shader compile end
 Normal: Shader compile end
+Warning: LoadShaderReflection ssao skip input element: SV_VERTEXID
 Normal: Shader compile end
-Normal: Shader compile end
-Normal: Shader compile end
-Normal: Shader compile end
-Normal: Shader compile end
-Normal: Shader compile end
-Normal: Shader compile end
-Normal: Shader compile end
-Warning: Unused shader prop Color been added;
-Warning: Unused shader prop Exposure been added;
-Warning: Unused shader prop InvertColor been added;
-Warning: Unused shader prop ColorOverlay been added;
-Normal: Resource mgr init finish after 14.0239ms
+Normal: Resource mgr init finish after 21.0729ms
 Normal: Begin init scene mgr...
-Normal: Scene mgr init finish after 0.0023ms
+Normal: Scene mgr init finish after 0.0022ms
 Normal: Begin init renderer...
-Normal: Renderer init finish after 0.0017ms
+Normal: Renderer init finish after 0.0024ms
 Normal: Application Init end
+Warning: Cubemap array not support multi mipmap
 Warning: Expand rt pool to 1
 Warning: Expand rt pool to 2
 Warning: Expand rt pool to 3
@@ -40,48 +48,10 @@ Warning: Expand rt pool to 5
 Warning: Expand rt pool to 6
 Warning: Expand rt pool to 7
 Warning: Expand rt pool to 8
-Warning: Cubemap array not support multi mipmap
-Warning: Unused shader prop Color been added;
-Warning: Unused shader prop Exposure been added;
-Warning: Unused shader prop InvertColor been added;
-Warning: Unused shader prop ColorOverlay been added;
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
-Warning: D3DRenderTexture::Bind: try to use a render texture: pure_sky_src_cubemap as rt and srv at the same time!
 Warning: Expand rt pool to 9
 Warning: Expand rt pool to 10
 Warning: Expand rt pool to 11
 Warning: Expand rt pool to 12
 Warning: Expand rt pool to 13
 Warning: Expand rt pool to 14
-Warning: Expand rt pool to 15
-Warning: Expand rt pool to 16
-Warning: Expand rt pool to 17
-Warning: Expand rt pool to 18
-Warning: Expand rt pool to 19
-Warning: Expand rt pool to 20
-Warning: Expand rt pool to 21
-Warning: Expand rt pool to 22
-Normal: Resize game view to 1062,553
-Warning: Expand rt pool to 23
-Warning: Expand rt pool to 24
-Warning: Expand rt pool to 25
-Warning: Expand rt pool to 26
-Warning: Expand rt pool to 27
-Warning: Expand rt pool to 28
-Warning: D3DContext::Present: Resource cleanup, 16 resources released.
 Normal: OnLostFoucus
-Normal: OnGetFoucus
-Normal: OnLostFoucus
-Normal: OnGetFoucus
-Normal: OnLostFoucus
-Normal: Exit

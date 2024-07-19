@@ -19,7 +19,7 @@ namespace Ailu
 {
 	enum class EShaderType : u8
 	{
-		kVertex,kPixel
+		kVertex, kPixel
 	};
 
 	struct ShaderPropertyType
@@ -34,10 +34,10 @@ namespace Ailu
 
 	struct ShaderBindResourceInfo
 	{
-		inline static const u8 kBindFlagPerObject   = 0x01;
+		inline static const u8 kBindFlagPerObject = 0x01;
 		inline static const u8 kBindFlagPerMaterial = 0x02;
-		inline static const u8 kBindFlagPerPass     = 0x04;
-		inline static const u8 kBindFlagPerFrame    = 0x08;
+		inline static const u8 kBindFlagPerPass = 0x04;
+		inline static const u8 kBindFlagPerFrame = 0x08;
 		static u8 GetBindResourceFlag(const char* name)
 		{
 			const static String kPerObj = "ScenePerObjectData";
@@ -75,15 +75,16 @@ namespace Ailu
 			"padding0",
 			"padding1"
 		};
-		inline static u16 GetVariableSize(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset & 0XFFFF;}
-		inline static u16 GetVariableOffset(const ShaderBindResourceInfo& info){ return info._cbuf_member_offset >> 16;}
+		inline static u16 GetVariableSize(const ShaderBindResourceInfo& info) { return info._cbuf_member_size_and_offset & 0XFFFF; }
+		inline static u16 GetVariableOffset(const ShaderBindResourceInfo& info) { return info._cbuf_member_size_and_offset >> 16; }
 		ShaderBindResourceInfo() = default;
 		ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, u8 bind_slot, const String& name)
-			: _res_type(res_type), _bind_slot(bind_slot), _name(name) 
+			: _res_type(res_type), _bind_slot(bind_slot), _name(name)
 		{
-			if (res_type & EBindResDescType::kCBufferAttribute) 
-				_cbuf_member_offset = slot_or_offset;
-			else _res_slot = slot_or_offset;
+			if (res_type & EBindResDescType::kCBufferAttribute)
+				_cbuf_member_size_and_offset = slot_or_offset;
+			else 
+				_res_slot = slot_or_offset;
 		}
 		bool operator==(const ShaderBindResourceInfo& other) const
 		{
@@ -93,11 +94,13 @@ namespace Ailu
 		union
 		{
 			u32 _res_slot;
-			u32 _cbuf_member_offset;
+			u32 _cbuf_member_size_and_offset;
 		};
 		u8 _bind_slot;
 		String _name;
 		void* _p_res = nullptr;
+		//constbuffer member only
+		ShaderBindResourceInfo* _p_root_cbuf = nullptr;
 		//1 for per obj,2for per mat,4 for per pass,8 for per frame
 		u8 _bind_flag = 0u;
 	};
@@ -236,14 +239,14 @@ namespace Ailu
 
 	enum class EShaderVariantState
 	{
-		kNone,kCompiling,kError,kReady
+		kNone, kCompiling, kError, kReady
 	};
 	class AILU_API Shader : public Object
 	{
 		friend class Material;
 	public:
 		inline static Shader* s_p_defered_standart_lit = nullptr;
-		inline static const u16 kRenderQueueOpaque      = 2000;
+		inline static const u16 kRenderQueueOpaque = 2000;
 		inline static const u16 kRenderQueueTransparent = 3000;
 		inline static const u16 kRenderQueueEnd = 4000;
 	public:
@@ -253,13 +256,14 @@ namespace Ailu
 		static void ExtractInfoFromHash(const u64& shader_hash, u32& shader_id, u16& pass_hash, ShaderVariantHash& variant_hash);
 
 		static void SetGlobalTexture(const String& name, Texture* texture);
+		static void SetGlobalTexture(const String& name, RTHandle handle);
 		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
 		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
 
-		static void ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf);
-		static ConstantBuffer* GetPerFrameConstBuffer() { return s_p_per_frame_cbuffer; };
+		static void ConfigurePerFrameConstBuffer(IConstantBuffer* cbuf);
+		static IConstantBuffer* GetPerFrameConstBuffer() { return s_p_per_frame_cbuffer; };
 		//0 is normal, 4001 is compiling, 4000 is error,same with render queue id
-		static u32 GetShaderState(Shader* shader,u16 pass_index,ShaderVariantHash variant_hash);
+		static u32 GetShaderState(Shader* shader, u16 pass_index, ShaderVariantHash variant_hash);
 
 		Shader(const WString& sys_path);
 		virtual ~Shader() = default;
@@ -280,12 +284,12 @@ namespace Ailu
 		const u32 PassCount() const { return static_cast<u32>(_passes.size()); }
 		i16 FindPass(String pass_name);
 		//根据任意字符序列构建变体hash，并返回合法的序列
-		ShaderVariantHash ConstructVariantHash(u16 pass_index, const std::set<String>& kw_seq,std::set<String>& active_kw_seq) const;
+		ShaderVariantHash ConstructVariantHash(u16 pass_index, const std::set<String>& kw_seq, std::set<String>& active_kw_seq) const;
 		ShaderVariantHash ConstructVariantHash(u16 pass_index, const std::set<String>& kw_seq) const;
-		const i8& GetPerMatBufferBindSlot(u16 pass_index,ShaderVariantHash variant_hash) const {return _passes[pass_index]._variants.at(variant_hash)._per_mat_buf_bind_slot;}
-		const i8& GetPerFrameBufferBindSlot(u16 pass_index, ShaderVariantHash variant_hash) const {return _passes[pass_index]._variants.at(variant_hash)._per_frame_buf_bind_slot;}
-		const i8& GetPerPassBufferBindSlot(u16 pass_index, ShaderVariantHash variant_hash) const  {return _passes[pass_index]._variants.at(variant_hash)._per_pass_buf_bind_slot;}
-		const std::unordered_map<String, ShaderBindResourceInfo>& GetBindResInfo(u16 pass_index,ShaderVariantHash variant_hash) {return _passes[pass_index]._variants.at(variant_hash)._bind_res_infos; }
+		const i8& GetPerMatBufferBindSlot(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._per_mat_buf_bind_slot; }
+		const i8& GetPerFrameBufferBindSlot(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._per_frame_buf_bind_slot; }
+		const i8& GetPerPassBufferBindSlot(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._per_pass_buf_bind_slot; }
+		const std::unordered_map<String, ShaderBindResourceInfo>& GetBindResInfo(u16 pass_index, ShaderVariantHash variant_hash) { return _passes[pass_index]._variants.at(variant_hash)._bind_res_infos; }
 
 		const VertexInputLayout& PipelineInputLayout(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) const { return _passes[pass_index]._variants.at(variant_hash)._pipeline_input_layout; };
 		const RasterizerState& PipelineRasterizerState(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_raster_state; };
@@ -293,11 +297,11 @@ namespace Ailu
 		const ETopology& PipelineTopology(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_topology; };
 		const BlendState& PipelineBlendState(u16 pass_index = 0) const { return _passes[pass_index]._pipeline_blend_state; };
 		const u32& RenderQueue(u16 pass_index = 0) const { return _passes[pass_index]._render_queue; };
-		const List<ShaderPropertyInfo>& GetShaderPropertyInfos(u16 pass_index) {return _passes[pass_index]._shader_prop_infos;}
+		const List<ShaderPropertyInfo>& GetShaderPropertyInfos(u16 pass_index) { return _passes[pass_index]._shader_prop_infos; }
 		const Vector<std::set<String>>& PassLocalKeywords(u16 pass_index) const { return _passes[pass_index]._keywords; }
 		bool IsKeywordValid(u16 pass_index, const String& kw) const;
-		std::set<String> KeywordsSameGroup(u16 pass_index,const String& kw) const;
-		std::set<String> ActiveKeywords(u16 pass_index, ShaderVariantHash variant_hash) const {return _passes[pass_index]._variants.at(variant_hash)._active_keywords;};
+		std::set<String> KeywordsSameGroup(u16 pass_index, const String& kw) const;
+		std::set<String> ActiveKeywords(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._active_keywords; };
 
 		Vector<class Material*> GetAllReferencedMaterials();
 		void AddMaterialRef(class Material* mat);
@@ -307,7 +311,7 @@ namespace Ailu
 			AL_ASSERT(pass_index >= _passes.size());
 			return std::tie(_passes[pass_index]._vert_entry, _passes[pass_index]._pixel_entry);
 		}
-		EShaderVariantState GetVariantState(u16 pass_index,ShaderVariantHash hash)
+		EShaderVariantState GetVariantState(u16 pass_index, ShaderVariantHash hash)
 		{
 			AL_ASSERT(pass_index >= _variant_state.size());
 			auto& info = _variant_state[pass_index];
@@ -319,10 +323,10 @@ namespace Ailu
 			}
 		}
 	protected:
-		virtual bool RHICompileImpl(u16 pass_index,ShaderVariantHash variant_hash);
+		virtual bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash);
 	protected:
 		inline static u8* _p_cbuffer = nullptr;
-		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
+		inline static IConstantBuffer* s_p_per_frame_cbuffer = nullptr;
 		WString _src_file_path;
 		Vector<ShaderPass> _passes;
 		std::set<Material*> _reference_mats;
@@ -333,7 +337,7 @@ namespace Ailu
 		//void ExtractValidShaderProperty(u16 pass_index,ShaderVariantHash variant_hash);
 	private:
 		inline static std::map<String, Texture*> s_global_textures_bind_info{};
-		inline static std::map<String, std::tuple<Matrix4x4f*,u32>> s_global_matrix_bind_info{};
+		inline static std::map<String, std::tuple<Matrix4x4f*, u32>> s_global_matrix_bind_info{};
 	};
 
 	class ComputeShader : public Object
@@ -343,15 +347,18 @@ namespace Ailu
 		static Ref<ComputeShader> Get(const WString& asset_path);
 		ComputeShader(const WString& sys_path);
 		virtual ~ComputeShader() = default;
-		virtual void Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+		virtual void Bind(CommandBuffer* cmd, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
 		virtual void SetTexture(const String& name, Texture* texture);
+		virtual void SetTexture(const String& name, RTHandle handle);
 		virtual void SetTexture(u8 bind_slot, Texture* texture);
 		virtual void SetTexture(const String& name, Texture* texture, ECubemapFace::ECubemapFace face, u16 mipmap);
 		virtual void SetFloat(const String& name, f32 value);
 		virtual void SetBool(const String& name, bool value);
 		virtual void SetInt(const String& name, i32 value);
 		virtual void SetVector(const String& name, Vector4f vector);
-		const String& KernelName(u16 index = 0) 
+		virtual void SetBuffer(const String& name, IConstantBuffer* buf);
+		std::set<Texture*>& AllBindTexture() { return _all_bind_textures; };
+		const String& KernelName(u16 index = 0)
 		{
 			AL_ASSERT(index > _kernels.size());
 			return _kernels[index];
@@ -361,15 +368,20 @@ namespace Ailu
 	protected:
 		virtual bool RHICompileImpl();
 	protected:
-		inline static std::unordered_map<WString,Ref<ComputeShader>> s_cs_library{};
+		inline static std::unordered_map<WString, Ref<ComputeShader>> s_cs_library{};
 		Vector<String> _kernels;
 		WString _src_file_path;
+		std::set<WString> _all_dep_file_pathes;
 		std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
 		std::unordered_map<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
+		/*维护一个纹理集合，用于标记temp rt的围栏值，常规用于图形管线的rt在set / clear时会进行标记，
+		* 计算管线不用这两个接口，所以在commandbuffer dispatch时调用该接口标记
+		*/
+		std::set<Texture*> _all_bind_textures;
 		//bind_slot:cubemapface,mipmap
-		std::unordered_map<u16,std::tuple<ECubemapFace::ECubemapFace, u16>> _texture_addi_bind_info{};
+		std::unordered_map<u16, std::tuple<ECubemapFace::ECubemapFace, u16>> _texture_addi_bind_info{};
 		bool _is_valid;
-		Scope<ConstantBuffer> _p_cbuffer;
+		Scope<IConstantBuffer> _p_cbuffer;
 	};
 }
 

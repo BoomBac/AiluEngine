@@ -44,9 +44,9 @@ namespace Ailu
         void ClearRenderTarget(RTHandle depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
         void SetRenderTargets(Vector<RTHandle>& colors, RTHandle depth) final;
 
-        void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) final;
+        void DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) final;
         void DrawIndexedInstanced(u32 index_count, u32 instance_count) final;
-        void DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count) final;
+        void DrawInstanced(const std::shared_ptr<IVertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count) final;
         void DrawInstanced(u32 vert_count, u32 instance_count) final;
 
         void SetViewport(const Rect& viewport) final;
@@ -56,15 +56,15 @@ namespace Ailu
         void SetViewports(const Vector<Rect>& viewports) final;
         void SetScissorRects(const Vector<Rect>& rects) final;
 
-        u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) final;
-        u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
-        u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) final;
+        void Blit(RTHandle src, RTHandle dst, Material* mat = nullptr, u16 pass_index = 0u) final;
+        void Blit(RenderTexture* src, RenderTexture* dst, Material* mat = nullptr, u16 pass_index = 0u) final;
+        void DrawFullScreenQuad(Material* mat, u16 pass_index = 0u);
+        u16 DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, u32 instance_count, u16 pass_index) final;
-        void ResolveToBackBuffer(RenderTexture* color) final;
-        void ResolveToBackBuffer(RenderTexture* color, RenderTexture* destination) final;
-        void ResolveToBackBuffer(RTHandle color) final;
-        void ResolveToBackBuffer(RTHandle color, RTHandle destination) final;
+
         void Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 
         ID3D12GraphicsCommandList* GetCmdList() { return _p_cmd.Get(); }
@@ -78,6 +78,7 @@ namespace Ailu
         bool _is_custom_viewport = false;
         ComPtr<ID3D12GraphicsCommandList> _p_cmd;
         ComPtr<ID3D12CommandAllocator> _p_alloc;
+        Map<String, Texture*> _texture_used;
     };
 }
 

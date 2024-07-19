@@ -8,13 +8,13 @@ SceneGraph:
         Position: 0,0,0
         Rotation: 0,6.75513e-08,0,1
         Scale: 1,1,1
-    Children: 8
+    Children: 6
       Name: plane
         Components: 
           TransformComponent: 
-            Position: 0,-2,0
+            Position: 0,0,0
             Rotation: 0,6.75513e-08,0,1
-            Scale: 40,1,40
+            Scale: 20,1,20
           StaticMeshComponent: 
             MeshPath: c3315e03-1052-4825-98f7-a676beae0615
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
@@ -22,13 +22,13 @@ SceneGraph:
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: 17,1188,0
-            Rotation: 0.297542,1.22426e-07,1.6579e-07,0.954709
+            Position: 17,1215,0
+            Rotation: -0.410401,-1.83088e-08,2.0528e-07,0.911905
             Scale: 1,1,1
           LightComponent: 
             Type: Directional
             Color: 1,1,1
-            Intensity: 1.218
+            Intensity: 1.213
             CastShadow: false
             ConstantBias: 0.046
             SlopeBias: 0.03
@@ -42,7 +42,7 @@ SceneGraph:
           LightComponent: 
             Type: Point
             Color: 1,0.192157,0.192157
-            Intensity: 1.543
+            Intensity: 0
             Radius: 2360
             CastShadow: false
             ConstantBias: 0
@@ -57,7 +57,7 @@ SceneGraph:
           LightComponent: 
             Type: Spot
             Color: 0.0544983,0.926471,0.900824
-            Intensity: 1.137
+            Intensity: 0
             Radius: 3320
             Inner: 50.208
             Outer: 59.153
@@ -68,31 +68,11 @@ SceneGraph:
       Name: shpere
         Components: 
           TransformComponent: 
-            Position: -5,477,0
+            Position: 0,83.5,0
             Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           StaticMeshComponent: 
-            MeshPath: 2ff30e48-6661-479b-a90c-863e606734f6
-            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        Children: 0
-      Name: plane
-        Components: 
-          TransformComponent: 
-            Position: -1004,485,299
-            Rotation: -0.25075,0.250755,-0.66116,0.661146
-            Scale: 5,1,5
-          StaticMeshComponent: 
-            MeshPath: c3315e03-1052-4825-98f7-a676beae0615
-            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        Children: 0
-      Name: Actor12
-        Components: 
-          TransformComponent: 
-            Position: -2716,929,0
-            Rotation: 0,6.75513e-08,0,1
-            Scale: 1,1,1
-          StaticMeshComponent: 
-            MeshPath: 2ff30e48-6661-479b-a90c-863e606734f6
+            MeshPath: 7baa598b-7eb4-478d-91ae-bf758da25d3b
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         Children: 0
       Name: Actor13

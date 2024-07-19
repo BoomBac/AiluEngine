@@ -45,6 +45,7 @@ namespace Ailu
 		inline const static char* kSemanticTexcoord = "TEXCOORD";
 		inline const static char* kSemanticBoneWeight = "BONEWEIGHT";
 		inline const static char* kSemanticBoneIndex = "BONEINDEX";
+		inline const static char* kSemanticVertexIndex = "SV_VERTEXID";
 
 		constexpr static char kCBufNameSceneObject[] = "ScenePerObjectData";
 		constexpr static char kCBufNameSceneMaterial[] = "ScenePerMaterialData";
@@ -58,6 +59,7 @@ namespace Ailu
 
 		inline const static EColorRange::EColorRange kColorRange = EColorRange::kHDR;
 		inline const static EALGFormat::EALGFormat kLDRFormat = EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
+		//swap chain not support hdr 32bit
 		inline const static EALGFormat::EALGFormat kHDRFormat = EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
 	};
 

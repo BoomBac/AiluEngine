@@ -179,6 +179,16 @@ namespace Ailu
 		//}
 	}
 
+	RenderPipeline* D3DContext::GetPipeline()
+	{
+		return _pipiline;
+	}
+
+	void D3DContext::RegisterPipeline(RenderPipeline* pipiline)
+	{
+		_pipiline = pipiline;
+	};
+
 	void D3DContext::TrackResource(ComPtr<ID3D12Resource> resource)
 	{
 		_global_tracked_resource.insert(std::make_pair(_frame_count, resource));
@@ -234,9 +244,10 @@ namespace Ailu
 	void D3DContext::DrawOverlay(CommandBuffer* cmd)
 	{
 		ProfileBlock p(cmd,"ImGui");
-		auto dxcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd);
+		_imgui_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
 #ifdef DEAR_IMGUI
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxcmd);
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), d3dcmd->GetCmdList());
 #endif // DEAR_IMGUI
 	}
 
@@ -340,6 +351,17 @@ namespace Ailu
 
 	void D3DContext::Present()
 	{
+		auto cmd = CommandBufferPool::Get("GUI Reslove");
+		{
+			ProfileBlock p(cmd.get(), "GUI Reslove");
+			g_pGfxContext->BeginBackBuffer(cmd.get());
+			g_pGfxContext->DrawOverlay(cmd.get());
+			g_pGfxContext->EndBackBuffer(cmd.get());
+		}
+		g_pGfxContext->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
+		//g_pGfxContext->Present();
+
 		while (!_resource_task.empty())
 		{
 			_resource_task.front()();

@@ -1,7 +1,7 @@
 #ifndef __INPUT_H__
 #define __INPUT_H__
 
-struct VSInput
+struct StandardVSInput
 {
 	float3 position : POSITION;
 	float3 normal : NORMAL;
@@ -9,7 +9,7 @@ struct VSInput
 	float4 tangent : TANGENT;
 };
 
-struct PSInput
+struct StandardPSInput
 {
 	float4 position : SV_POSITION;
 	float3 world_pos : POSITION;

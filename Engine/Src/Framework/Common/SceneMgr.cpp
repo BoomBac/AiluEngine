@@ -219,11 +219,6 @@ namespace Ailu
 		_b_dirty = true;
 	}
 
-	std::list<LightComponent*>& Scene::GetAllLight()
-	{
-		return _all_lights;
-	}
-
 	void Scene::TravelAllActor(SceneActor* actor, ActorEvent& e)
 	{
 		e(actor);
