@@ -32,7 +32,9 @@ namespace Ailu
 		static void RemoveFromRoot(Actor* actor);
 		template <typename Type>
 		Type* GetComponent();
-		template <typename Type>
+        template<typename T>
+        bool HasComponent() const;
+        template <typename Type>
 		inline Type* AddComponent();
 
 		template <typename Type,typename... Args>
@@ -104,6 +106,17 @@ namespace Ailu
 		}
 		return nullptr;
 	}
+    template<typename T>
+    bool Actor::HasComponent() const
+    {
+        for (auto& component : _components)
+        {
+            if (auto castedComponent = dynamic_cast<T*>(component.get())) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 	template<typename Type>
 	inline Type* Actor::AddComponent()

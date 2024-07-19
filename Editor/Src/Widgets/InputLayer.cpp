@@ -10,7 +10,7 @@ namespace Ailu
     namespace Editor
     {
         //---------------------------------------------------------FirstPersonCameraController--------------------------------------------------------
-        FirstPersonCameraController FirstPersonCameraController::s_instance;
+        FirstPersonCameraController FirstPersonCameraController::s_inst;
 
         FirstPersonCameraController::FirstPersonCameraController()
             : FirstPersonCameraController(nullptr) {}
@@ -23,91 +23,79 @@ namespace Ailu
             _rot_world_y = Quaternion::AngleAxis(_rotation.y, Vector3f::kUp);
             Vector3f new_camera_right = _rot_world_y * Vector3f::kRight;
             _rot_object_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
-        }
-        void FirstPersonCameraController::SetPosition(const Vector3f &position)
-        {
-            _p_camera->Position(position);
-        }
-        void FirstPersonCameraController::SetRotation(float x, float y)
-        {
-            _rotation.x = x;
-            _rotation.y = y;
-        }
-        void FirstPersonCameraController::MoveForward(float distance)
-        {
-            _p_camera->Position(_p_camera->Position() + _p_camera->Forward() * distance);
-        }
-        void FirstPersonCameraController::MoveRight(float distance)
-        {
-            _p_camera->Position(_p_camera->Position() + _p_camera->Right() * distance);
-        }
-        void FirstPersonCameraController::MoveUp(float distance)
-        {
-            _p_camera->Position(_p_camera->Position() + _p_camera->Up() * distance);
-        }
-        void FirstPersonCameraController::TurnHorizontal(float angle)
-        {
-            _rotation.y = angle;
-            _rot_world_y = Quaternion::AngleAxis(angle, Vector3f::kUp);
-        }
-        void FirstPersonCameraController::TurnVertical(float angle)
-        {
-            _rotation.x = angle;
-            Vector3f camera_right = _rot_world_y * Vector3f::kRight;
-            _rot_object_x = Quaternion::AngleAxis(angle, camera_right);
-        }
-        void FirstPersonCameraController::InterpolateTo(const Vector3f target_pos,
-                                                        float rot_x, float rot_y,
-                                                        float speed)
-        {
-            _rotation.x = rot_x;
-            _rotation.y = rot_y;
-            Quaternion new_quat_y = Quaternion::AngleAxis(rot_y, Vector3f::kUp);
-            Vector3f new_camera_right = new_quat_y * Vector3f::kRight;
-            auto new_quat_x = Quaternion::AngleAxis(rot_x, new_camera_right);
-            _rot_object_x = Quaternion::NLerp(_rot_object_x, new_quat_x, speed);
-            _rot_world_y = Quaternion::NLerp(_rot_world_y, new_quat_y, speed);
-            _p_camera->Position(lerp(_p_camera->Position(), target_pos, speed));
-            auto r = _rot_world_y * _rot_object_x;
-            _p_camera->Rotation(r);
-            _p_camera->RecalculateMarix(true);
+            _target_pos = camera->Position();
         }
 
         void FirstPersonCameraController::Move(const Vector3f &d)
         {
+            if(!_is_receive_input)
+                return ;
             _p_camera->Position(d);
+        }
+        void FirstPersonCameraController::SetTargetRotation(f32 x, f32 y)
+        {
+            if(!_is_receive_input)
+                return ;
+            _rotation.x = x;
+            _rotation.y = y;
+        }
+        void FirstPersonCameraController::Interpolate(float speed)
+        {
+            Quaternion new_quat_y = Quaternion::AngleAxis(_rotation.y, Vector3f::kUp);
+            Vector3f new_camera_right = new_quat_y * Vector3f::kRight;
+            auto new_quat_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
+            _rot_object_x = Quaternion::NLerp(_rot_object_x, new_quat_x, speed);
+            _rot_world_y = Quaternion::NLerp(_rot_world_y, new_quat_y, speed);
+            _p_camera->Position(lerp(_p_camera->Position(), _target_pos, speed));
+            auto r = _rot_world_y * _rot_object_x;
+            _p_camera->Rotation(r);
+            _p_camera->RecalculateMarix(true);
+        }
+        void FirstPersonCameraController::SetTargetPosition(const Vector3f &position,bool is_force)
+        {
+            if(!_is_receive_input && !is_force)
+                return ;
+            _target_pos = position;
         }
         //---------------------------------------------------------FirstPersonCameraController--------------------------------------------------------
 
-        static Vector3f target_pos;
         InputLayer::InputLayer() : Layer("InputLayer")
         {
-            _b_handle_input = true;
             if (Camera::sCurrent == nullptr)
             {
                 LOG_WARNING("Current Camera is null");
                 Camera::GetDefaultCamera();
             }
-            _camera_near = Camera::sCurrent->Near();
-            _camera_far = Camera::sCurrent->Far();
-            FirstPersonCameraController::s_instance.Attach(Camera::sCurrent);
-            target_pos = Camera::sCurrent->Position();
+            FirstPersonCameraController::s_inst.Attach(Camera::sCurrent);
+            FirstPersonCameraController::s_inst._is_receive_input = true;
+            FirstPersonCameraController::s_inst._camera_near = Camera::sCurrent->Near();
+            FirstPersonCameraController::s_inst._camera_far = Camera::sCurrent->Far();
         }
         InputLayer::InputLayer(const String &name) : InputLayer()
         {
             _debug_name = name;
         }
-        InputLayer::~InputLayer() {}
-        void InputLayer::OnAttach() { _b_handle_input = true; }
-        void InputLayer::OnDetach() { _b_handle_input = false; }
+        InputLayer::~InputLayer()
+        {
+        }
+        void InputLayer::OnAttach()
+        {
+
+        }
+        void InputLayer::OnDetach()
+        {
+
+        }
         void InputLayer::OnEvent(Event &e)
         {
             EventDispather dispater1(e);
             dispater1.Dispatch<MouseButtonReleasedEvent>(
                     [this](MouseButtonReleasedEvent &e) -> bool
                     {
-                        if (e.GetButton() == 0)
+                        if (e.GetButton() == AL_KEY_RBUTTON)
                         {
+                            FirstPersonCameraController::s_inst._is_receive_input = false;
+                            LOG_INFO("Close");
                             while (::ShowCursor(TRUE) < 0)
                                 ;
                             return false;
@@ -115,37 +103,46 @@ namespace Ailu
                         return false;
                     });
             EventDispather dispater(e);
-            dispater.Dispatch<MouseScrollEvent>([this](MouseScrollEvent &e) -> bool
-                                                {
-    _camera_move_speed += e.GetOffsetY() > 0 ? 0.01f : -0.01f;
-    _camera_move_speed = std::ranges::max(0.0f, _camera_move_speed);
-    return false; });
+            dispater.Dispatch<MouseScrollEvent>([this](MouseScrollEvent &e) -> bool{
+                if(FirstPersonCameraController::s_inst._is_receive_input)
+                {
+                    FirstPersonCameraController::s_inst._camera_move_speed += e.GetOffsetY() > 0 ? 0.01f : -0.01f;
+                    FirstPersonCameraController::s_inst._camera_move_speed = std::ranges::max(0.0f, FirstPersonCameraController::s_inst._camera_move_speed);
+                }
+                return false; });
             EventDispather dispater0(e);
             dispater0.Dispatch<MouseButtonPressedEvent>(
                     [this](MouseButtonPressedEvent &e) -> bool
                     {
                         if (e.GetButton() == AL_KEY_RBUTTON)
                         {
+                            FirstPersonCameraController::s_inst._is_receive_input = true;
+                            LOG_INFO("Open");
                             while (::ShowCursor(FALSE) >= 0)
                                 ;// 隐藏鼠标指针，直到它不再可见
                             return false;
                         }
                         return false;
                     });
-            // dispater0.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e)->bool {
-            //	if (!e.Handled())
-            //	{
-            //		Input::s_key_pressed_map[e.GetKeyCode()] = true;
-            //		return true;
-            //	}
-            //	});
-            // dispater0.Dispatch<KeyReleasedEvent>([this](KeyReleasedEvent& e)->bool {
-            //	if (!e.Handled())
-            //	{
-            //		Input::s_key_pressed_map[e.GetKeyCode()] = false;
-            //		return true;
-            //	}
-            //	});
+            static Vector2f target_rotation = {0.f, 0.f};
+            static Vector2f pre_mouse_pos;
+            dispater0.Dispatch<MouseMovedEvent>([this](MouseMovedEvent& e)->bool{
+                target_rotation = FirstPersonCameraController::s_inst._rotation;
+                auto cur_mouse_pos = Input::GetMousePos();
+                if (Input::IsKeyPressed(AL_KEY_RBUTTON))
+                {
+                    if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f &&
+                        abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
+                    {
+                        float angle_offset = FirstPersonCameraController::s_inst._camera_wander_speed * FirstPersonCameraController::s_inst._camera_wander_speed;
+                        target_rotation.y += (cur_mouse_pos.x - pre_mouse_pos.x) * angle_offset;
+                        target_rotation.x += (cur_mouse_pos.y - pre_mouse_pos.y) * angle_offset;
+                    }
+                }
+                pre_mouse_pos = cur_mouse_pos;
+                FirstPersonCameraController::s_inst.SetTargetRotation(target_rotation.x, target_rotation.y);
+                return false;
+            });
         }
 
         void InputLayer::OnImguiRender()
@@ -153,18 +150,18 @@ namespace Ailu
             if (Camera::sCurrent)
             {
                 auto camera_pos = Camera::sCurrent->Position();
-                auto camera_rotation = FirstPersonCameraController::s_instance._rotation;
-                _camera_near = Camera::sCurrent->Near();
-                _camera_far = Camera::sCurrent->Far();
+                auto camera_rotation = FirstPersonCameraController::s_inst._rotation;
+                FirstPersonCameraController::s_inst._camera_near = Camera::sCurrent->Near();
+                FirstPersonCameraController::s_inst._camera_far = Camera::sCurrent->Far();
                 ImGui::Begin("CameraDetail");
-                ImGui::SliderFloat("MoveSpeed", &_camera_move_speed, 0.00f, 10.0f, "%.2f");
-                ImGui::SliderFloat("WanderSpeed", &_camera_wander_speed, 0.00f, 2.0f,
+                ImGui::SliderFloat("MoveSpeed", &FirstPersonCameraController::s_inst._camera_move_speed, 0.00f, 10.0f, "%.2f");
+                ImGui::SliderFloat("WanderSpeed", &FirstPersonCameraController::s_inst._camera_wander_speed, 0.00f, 2.0f,
                                    "%.2f");
-                ImGui::SliderFloat("LerpSpeed", &_lerp_speed_multifactor, 0.0f, 100.0f,
+                ImGui::SliderFloat("LerpSpeed", &FirstPersonCameraController::s_inst._lerp_speed_multifactor, 0.0f, 1.0f,
                                    "%.2f");
-                ImGui::SliderFloat("FovH", &_camera_fov_h, 0.0f, 120.0f, "%.2f");
-                ImGui::SliderFloat("NearClip", &_camera_near, 0.00001f, 1000.0f, "%.2f");
-                ImGui::SliderFloat("FarClip", &_camera_far, 5000.0f, 200000.0f, "%.2f");
+                ImGui::SliderFloat("FovH", &FirstPersonCameraController::s_inst._camera_fov_h, 0.0f, 120.0f, "%.2f");
+                ImGui::SliderFloat("NearClip", &FirstPersonCameraController::s_inst._camera_near, 0.00001f, 1000.0f, "%.2f");
+                ImGui::SliderFloat("FarClip", &FirstPersonCameraController::s_inst._camera_far, 5000.0f, 200000.0f, "%.2f");
                 ImGui::Text("Position:");
                 ImGui::SameLine();
                 ImGui::Text(camera_pos.ToString().c_str());
@@ -176,26 +173,13 @@ namespace Ailu
         }
         void InputLayer::OnUpdate(float delta_time)
         {
-            Camera::sCurrent->FovH(_camera_fov_h);
-            Camera::sCurrent->Near(_camera_near);
-            Camera::sCurrent->Far(_camera_far);
-            if (Input::IsInputBlock())
-                return;
-            if (!_b_handle_input)
-                return;
-            static bool init = false;
-            static Vector2f pre_mouse_pos;
-            static const f32 move_distance = 100.0f;// 1 m
-            f32 final_move_distance =
-                    move_distance * _camera_move_speed * _camera_move_speed;
-            if (!init)
+            Camera::sCurrent->FovH(FirstPersonCameraController::s_inst._camera_fov_h);
+            Camera::sCurrent->Near(FirstPersonCameraController::s_inst._camera_near);
+            Camera::sCurrent->Far(FirstPersonCameraController::s_inst._camera_far);
+            if (Camera::sCurrent && !Input::IsInputBlock())
             {
-                pre_mouse_pos = Input::GetMousePos();
-                init = true;
-            }
-            static Camera *pre_tick_camera = Camera::sCurrent;
-            if (Camera::sCurrent)
-            {
+                static const f32 move_distance = 100.0f;// 1 m
+                f32 final_move_distance = move_distance * FirstPersonCameraController::s_inst._camera_move_speed * FirstPersonCameraController::s_inst._camera_move_speed;
                 Vector3f move_dis{0, 0, 0};
                 if (Input::IsKeyPressed(AL_KEY_W))
                 {
@@ -221,26 +205,15 @@ namespace Ailu
                 {
                     move_dis -= Camera::sCurrent->Up();
                 }
+                auto target_pos = FirstPersonCameraController::s_inst._target_pos;
                 target_pos += move_dis * final_move_distance;
-                static Vector2f target_rotation = {0.f, 0.f};
-                target_rotation = FirstPersonCameraController::s_instance._rotation;
-                auto cur_mouse_pos = Input::GetMousePos();
-                if (Input::IsKeyPressed(AL_KEY_RBUTTON))
-                {
-                    if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f &&
-                        abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
-                    {
-                        float angle_offset = _camera_wander_speed * _camera_wander_speed;
-                        target_rotation.y += (cur_mouse_pos.x - pre_mouse_pos.x) * angle_offset;
-                        target_rotation.x += (cur_mouse_pos.y - pre_mouse_pos.y) * angle_offset;
-                    }
-                }
-                pre_mouse_pos = cur_mouse_pos;
-                FirstPersonCameraController::s_instance.InterpolateTo(
-                        target_pos, target_rotation.x, target_rotation.y,
-                        std::clamp(delta_time * _lerp_speed_multifactor, 0.0f, 1.0f));
+                FirstPersonCameraController::s_inst.SetTargetPosition(target_pos);
             }
-            pre_tick_camera = Camera::sCurrent;
+            f32 lerp_factor = std::clamp(delta_time * FirstPersonCameraController::s_inst._lerp_speed_multifactor, 0.0f, 1.0f);
+            lerp_factor = delta_time * FirstPersonCameraController::s_inst._lerp_speed_multifactor * FirstPersonCameraController::s_inst._lerp_speed_multifactor;
+            lerp_factor = std::clamp(lerp_factor, 0.0f, 1.5f);
+            FirstPersonCameraController::s_inst.Interpolate(lerp_factor);
         }
+
     }// namespace Editor
 }// namespace Ailu

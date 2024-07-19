@@ -2,6 +2,7 @@
 #include "Widgets/OutputLog.h"
 #include "Widgets/InputLayer.h"
 #include "Widgets/SceneLayer.h"
+#include "Common/Undo.h"
 
 #include "Render/Renderer.h"
 #include "Render/Camera.h"
@@ -14,6 +15,7 @@ namespace Ailu
 {
 	namespace Editor
 	{
+        CommandManager* g_pCommandMgr = new CommandManager;
 		int EditorApp::Initialize()
 		{
 			ApplicationDesc desc;
@@ -40,6 +42,7 @@ namespace Ailu
 		{
 			SaveEditorConfig();
 			delete _p_scene_camera;
+            DESTORY_PTR(g_pCommandMgr);
 			Application::Finalize();
 			fs::path p(kEditorRootPathW);
 			fs::directory_iterator dir_it(p);
@@ -62,13 +65,11 @@ namespace Ailu
 		bool EditorApp::OnGetFoucus(WindowFocusEvent& e)
 		{
 			Application::OnGetFoucus(e);
-			_p_input_layer->HandleInput(true);
 			return true;
 		}
 		bool EditorApp::OnLostFoucus(WindowLostFocusEvent& e)
 		{
 			Application::OnLostFoucus(e);
-			_p_input_layer->HandleInput(false);
 			return true;
 		}
 		void EditorApp::LoadEditorConfig(ApplicationDesc& desc)
@@ -101,7 +102,7 @@ namespace Ailu
 			_p_scene_camera->Near(LoadFloat(config_pairs["Near"].c_str()));
 			_p_scene_camera->Far(LoadFloat(config_pairs["Far"].c_str()));
 			LoadVector(config_pairs["ControllerRotation"].c_str(), v2);
-			FirstPersonCameraController::s_instance._rotation = v2;
+			FirstPersonCameraController::s_inst._rotation = v2;
 			_p_scene_camera->RecalculateMarix(true);
 			_opened_scene_path = ToWStr(config_pairs["Scene"].c_str());
 
@@ -128,7 +129,7 @@ namespace Ailu
 			ss << "Aspect = " << Camera::sCurrent->Aspect() << endl;
 			ss << "Near = " << Camera::sCurrent->Near() << endl;
 			ss << "Far = " << Camera::sCurrent->Far() << endl;
-			ss << "ControllerRotation = " << FirstPersonCameraController::s_instance._rotation << endl;
+			ss << "ControllerRotation = " << FirstPersonCameraController::s_inst._rotation << endl;
 			ss << "[Scene]" << endl;
 			ss << "Scene = " << ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->_p_current));
 			FileManager::WriteFile(kEditorConfigPath,false,ss.str());

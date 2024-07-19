@@ -125,6 +125,25 @@ namespace Ailu
 		Vector<WString> _asset_pathes;
 	};
 
+    class AILU_API SearchFilterByFileName : public ISearchFilter
+    {
+    public:
+        SearchFilterByFileName(Vector<WString> asset_names) : _asset_names(asset_names)
+        {
+        }
+        bool Filter(Asset* asset) const final
+        {
+            for (auto& file_name : _asset_names)
+            {
+                if (PathUtils::GetFileName(asset->_asset_path).substr(0,file_name.size()) == file_name)
+                    return true;
+            }
+            return false;
+        }
+    private:
+        Vector<WString> _asset_names;
+    };
+
 	class AILU_API ResourceMgr : public IRuntimeModule
 	{
 		using ResourcePoolContainer = Map<WString, Ref<Object>>;
@@ -294,7 +313,6 @@ namespace Ailu
 		ResourcePoolContainer _global_resources;
 		ResourcePoolLut _lut_global_resources;
 		Map<EAssetType::EAssetType, Vector<ResourcePoolContainerIter>> _lut_global_resources_by_type;
-
 		Vector<std::function<void()>> _asset_changed_callbacks;
 		Queue<Asset*> _pending_delete_assets;
 		Queue<Shader*> _shader_waiting_for_compile;
@@ -305,6 +323,8 @@ namespace Ailu
 	template<typename T>
 	inline T* ResourceMgr::Load(const WString& asset_path)
 	{
+        if(asset_path.empty())
+            return nullptr;
 		using Loader = std::function<Scope<Asset>(ResourceMgr*,const WString&)>;
 		WString sys_path = PathUtils::GetResSysPath(asset_path);
 		auto ext = PathUtils::ExtractExt(sys_path);
@@ -315,6 +335,11 @@ namespace Ailu
 		EAssetType::EAssetType type = EAssetType::kUndefined;
 		ExtractCommonAssetInfo(asset_path, asset_name, guid, type);
 		AL_ASSERT(type == EAssetType::kUndefined);
+        if(type == EAssetType::kUndefined)
+        {
+            g_pLogMgr->LogErrorFormat(L"Load at {} failed!",asset_path);
+            return nullptr;
+        }
 		bool is_skip_load = false;
 		Loader asset_loader = nullptr;
 		if (!IsFileOnDiskUpdated(sys_path))

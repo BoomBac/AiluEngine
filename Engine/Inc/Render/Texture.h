@@ -159,7 +159,7 @@ namespace Ailu
 		Texture(u16 width, u16 height);
 		virtual ~Texture();
 		virtual Ptr GetNativeTexturePtr();
-		virtual TextureHandle GetNativeTextureHandle() { return 0; }
+		virtual const TextureHandle GetNativeTextureHandle() { return 0; }
 		virtual void CreateView() { _is_have_total_view = true; };
 		virtual void ReleaseView() { _is_have_total_view = false; };
 		virtual TextureHandle GetView(u16 mimmap,bool random_access = false,ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown,u16 array_slice = 0) { return 0; };
@@ -167,12 +167,10 @@ namespace Ailu
 		virtual void Bind(CommandBuffer* cmd, u8 slot,bool compute_pipiline = false) {};
 		bool IsViewCreate() const { return _is_have_total_view; }
 		std::tuple<u16,u16> CurMipmapSize(u16 mipmap) const;
-		Asset* GetAsset() { return _p_asset; };
 	protected:
 		// mipmap = 0 means the raw texture
 		virtual bool IsValidMipmap(u16 mipmap) const { return false; };
 		bool IsValidSize(u16 width,u16 height,u16 mipmap) const;
-		Asset* _p_asset;
 	protected:
 		u16 _pixel_size;
 		bool _is_random_access;
@@ -238,7 +236,7 @@ namespace Ailu
 		kDefault, kColorTagret, kShaderResource,kDepthTarget
 	};
 
-	DECLARE_ENUM(ERenderTargetFormat,kUnknown,kDefault,kDefaultHDR,kDepth,kShadowMap,kRGFloat,kRGHalf)
+	DECLARE_ENUM(ERenderTargetFormat,kUnknown,kDefault,kDefaultHDR,kDepth,kShadowMap,kRGFloat,kRGHalf,kRFloat,kRGBAHalf)
 
 	static EALGFormat::EALGFormat ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::ERenderTargetFormat format)
 	{
@@ -249,7 +247,7 @@ namespace Ailu
 		case ERenderTargetFormat::kDefault:
 			return EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
 		case ERenderTargetFormat::kDefaultHDR:
-			return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
+			return EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT;
 		case ERenderTargetFormat::kDepth:
 			return EALGFormat::EALGFormat::kALGFormatD24S8_UINT;
 		case ERenderTargetFormat::kShadowMap:
@@ -258,6 +256,10 @@ namespace Ailu
 			return EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT;
 		case ERenderTargetFormat::kRGHalf:
 			return EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT;
+		case ERenderTargetFormat::kRFloat:
+			return EALGFormat::EALGFormat::kALGFormatR32_FLOAT;
+		case ERenderTargetFormat::kRGBAHalf:
+			return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
 		default:
 			break;
 		}

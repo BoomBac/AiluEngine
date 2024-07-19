@@ -1,9 +1,10 @@
 #include "Widgets/ImGuiWidget.h"
 #include "Ext/imgui/imgui.h"
+#include "Framework/Common/Application.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Events/MouseEvent.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Renderer.h"
-#include "Framework/Common/Application.h"
 
 namespace Ailu
 {
@@ -15,6 +16,11 @@ namespace Ailu
 		}
 		String ImGuiWidget::ShowModalDialog(const String& title, int handle)
 		{
+			if (handle > 255)
+			{
+				//g_pLogMgr->LogWarningFormat("ImGuiWidget::ShowModalDialog invalid handle : {}", handle);
+				return String{};
+			}
 			static char buf[256] = {};
 			String str_id = std::format("{}-{}", title, handle);
 			if (s_global_modal_window_info[handle])
@@ -25,6 +31,7 @@ namespace Ailu
 			}
 			if (ImGui::BeginPopupModal(str_id.c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
 			{
+                Input::BlockInput(true);
 				ImGui::Text("Enter Text:");
 				ImGui::InputText("##inputText", buf, IM_ARRAYSIZE(buf));
 				if (ImGui::Button("OK", ImVec2(120, 0)))
@@ -53,6 +60,7 @@ namespace Ailu
 			}
 			if (ImGui::BeginPopupModal(str_id.c_str(), NULL, ImGuiWindowFlags_AlwaysAutoResize))
 			{
+                Input::BlockInput(true);
 				ImGui::Text(title.c_str());
 				show_widget();
 				ImGui::EndPopup();
@@ -112,9 +120,11 @@ namespace Ailu
 			{
 				ImGui::Text("Handle %d,State: Local pos: (%.2f,%.2f),size: (%.2f,%.2f)", _handle, _pos.x, _pos.y, _size.x, _size.y);
 			}
-			ShowImpl();
+            if (!ImGui::IsWindowCollapsed())
+                ShowImpl();
 			ImGui::End();
 		}
+
 		bool ImGuiWidget::Hover(const Vector2f& mouse_pos) const
 		{
 			return mouse_pos >= _pos && mouse_pos <= (_pos + _size);
@@ -131,5 +141,62 @@ namespace Ailu
 		{
 			_close_events.emplace_back(e);
 		}
-	}
+        void ImGuiWidget::OnEvent(Event &e)
+        {
+            if (!Hover(Input::GetMousePos()))
+                return ;
+            if (e.GetEventType() == EEventType::kMouseButtonPressed)
+            {
+                auto& event = static_cast<MouseButtonPressedEvent&>(e);
+                if (event.GetButton() == AL_KEY_RBUTTON)
+                {
+                    ImGui::SetNextWindowFocus();
+                }
+            }
+        }
+
+        void ImGuiWidget::OnObjectDropdown(const String &tag, std::function<void(Object*)> f)
+        {
+            if (ImGui::BeginDragDropTarget())
+            {
+                const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(tag.c_str());
+                if (payload)
+                {
+                    Object* obj = *(Object **) (payload->Data);
+                    LOG_INFO("Object {} drop down...",obj->Name());
+                    f(obj);
+                }
+                ImGui::EndDragDropTarget();
+            }
+        }
+        void ImGuiWidget::DisplayProgressBar(const String &title, f32 progress)
+        {
+            std::lock_guard<std::mutex> lock(s_progress_lock);
+            s_progress_infos[title] = progress;
+            if(progress >= 1.0f)
+            {
+                s_progress_infos.erase(title);
+            }
+        }
+        void ImGuiWidget::ClearProgressBar()
+        {
+            std::lock_guard<std::mutex> lock(s_progress_lock);
+            s_progress_infos.clear();
+        }
+        void ImGuiWidget::ShowProgressBar()
+        {
+            std::lock_guard<std::mutex> lock(s_progress_lock);
+            if (s_progress_infos.empty())
+                return ;
+            ImGui::Begin("##Example: ProgressBar");
+            for(auto& it : s_progress_infos)
+            {
+                auto& [title,progress] = it;
+                ImGui::Text("%s: ", title.c_str());
+                ImGui::SameLine();
+                ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
+            }
+            ImGui::End();
+        }
+    }
 }

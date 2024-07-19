@@ -17,11 +17,21 @@ namespace Ailu
 			{
 				return Vector2f(_pre_tick_width, _pre_tick_height);
 			}
+            void OnEvent(Event &e) final;
 		private:
 			void ShowImpl() final;
+            void ProcessTransformGizmo();
+            void OnActorPlaced(String obj_type);
+            Vector3f ScreenPosToWorldDir(Vector2f pos);
+        private:
 			f32 _pre_tick_width, _pre_tick_height;
 			//当gameview尺寸改变时的window大小
 			f32 _pre_tick_window_width, _pre_tick_window_height;
+            i16 _transform_gizmo_type = -1;
+            bool _is_transform_gizmo_snap = false;
+            bool _is_transform_gizmo_world = true;
+            bool _is_begin_gizmo_transform = false;
+            bool _is_end_gizmo_transform = true;
 		};
 	}
 }

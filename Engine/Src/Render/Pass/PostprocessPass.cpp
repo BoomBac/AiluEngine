@@ -14,6 +14,10 @@ namespace Ailu
 		memcpy(_p_obj_cb->GetData(),&BuildIdentityMatrix(),sizeof(Matrix4x4f));
 		_bloom_thread_rect = Rect(0, 0, 800, 450);
 		_p_quad_mesh = g_pResourceMgr->Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
+		for (u16 i = 0; i < _bloom_iterator_count; i++)
+		{
+			_bloom_mats.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/bloom.alasset"), std::format("bloom_mip_{}",i)));
+		}
 	}
 	PostProcessPass::~PostProcessPass()
 	{
@@ -24,53 +28,57 @@ namespace Ailu
 		_bloom_thread_rect.height = rendering_data._height >> 1;
 		auto cmd = CommandBufferPool::Get("PostProcessPass");
 		RTHandle rt,blur_x,blur_y;
+
+		u16 iterator_count = std::min<u16>(Texture::MaxMipmapCount(rendering_data._width, rendering_data._height), _bloom_iterator_count);
+		Vector<RTHandle> bloom_mips;
+		for (u16 i = 1; i <= iterator_count; i++)
+		{
+			u16 cur_mip_width = rendering_data._width >> i;
+			u16 cur_mip_height = rendering_data._height >> i;
+			bloom_mips.emplace_back(RenderTexture::GetTempRT(cur_mip_width, cur_mip_height, std::format("bloom_mip_{}", i), ERenderTargetFormat::kDefaultHDR));
+		}
 		cmd->Clear();
 		{
 			ProfileBlock p(cmd.get(), _name);
 			cmd->SetName("Bloom");
-			rt = RenderTexture::GetTempRT(_bloom_thread_rect.width, _bloom_thread_rect.height, "BloomThreshold", ERenderTargetFormat::kDefaultHDR);
-			blur_x = RenderTexture::GetTempRT(_bloom_thread_rect.width, _bloom_thread_rect.height, "BlurX", ERenderTargetFormat::kDefaultHDR);
-			blur_y = RenderTexture::GetTempRT(_bloom_thread_rect.width, _bloom_thread_rect.height, "BlurY", ERenderTargetFormat::kDefaultHDR);
-			//提取高亮
+			//down sample
+			for (u16 i = 0; i < iterator_count; i++)
 			{
-				cmd->SetRenderTarget(rt);
-				_p_bloom_thread_mat->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
-				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get());
+				cmd->SetRenderTarget(bloom_mips[i]);
+				f32 blur_radius = _upsample_radius / (f32)i;
+				Vector4f v{1.0f / (f32)(rendering_data._width >>i),1.0f / (f32)(rendering_data._height >> i),blur_radius,_bloom_intensity};
+				_bloom_mats[i]->SetVector("_SampleParams", v);
+				if (i == 0)
+				{
+					_bloom_mats[i]->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
+				}
+				else
+				{
+					_bloom_mats[i]->SetTexture("_SourceTex", bloom_mips[i - 1]);
+				}
+				cmd->DrawRenderer(_p_quad_mesh, _bloom_mats[i].get(), 1, 1);
 			}
-			//横向模糊
+			//up sample
+			for (u16 i = bloom_mips.size() - 1; i > 0; i--)
 			{
-				cmd->SetRenderTarget(blur_x);
-				_p_bloom_thread_mat->SetTexture("_SourceTex", rt);
-				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get(),1,1);
-			}
-			//纵向模糊
-			{
-				cmd->SetRenderTarget(blur_y);
-				_p_bloom_thread_mat->SetTexture("_SourceTex", blur_x);
-				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get(), 1, 2);
-			}
-			RTHandle blur_src, blur_target;
-			for (int i = 0; i < _bloom_iterator_count - 1; i++)
-			{
-				bool apply_x = i % 2 == 0;
-				blur_target = apply_x ? blur_x : blur_y;
-				blur_src = apply_x ? blur_y : blur_x;
-				cmd->SetRenderTarget(blur_target);
-				_p_bloom_thread_mat->SetTexture("_SourceTex", blur_src);
-				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get(), 1, apply_x? 1 : 2);
+				auto cur_mip = bloom_mips[i],next_mip = bloom_mips[i-1];
+				cmd->SetRenderTarget(next_mip);
+				_bloom_mats[i]->SetTexture("_SourceTex", cur_mip);
+				cmd->DrawRenderer(_p_quad_mesh, _bloom_mats[i].get(), 1, 2);
 			}
 			//合成
 			{
 				cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
-				_p_bloom_thread_mat->SetTexture("_SourceTex", rendering_data._camera_opaque_tex_handle);
-				_p_bloom_thread_mat->SetTexture("_BloomTex", blur_target);
-				cmd->DrawRenderer(_p_quad_mesh, _p_bloom_thread_mat.get(),1,3);
+				_bloom_mats[0]->SetTexture("_SourceTex", rendering_data._camera_opaque_tex_handle);
+				_bloom_mats[0]->SetTexture("_BloomTex", bloom_mips[0]);
+				cmd->DrawRenderer(_p_quad_mesh, _bloom_mats[0].get(), 1, 3);
 			}
 		}
 		context->ExecuteCommandBuffer(cmd);
-		RenderTexture::ReleaseTempRT(rt);
-		RenderTexture::ReleaseTempRT(blur_x);
-		RenderTexture::ReleaseTempRT(blur_y);
+		for (auto& handle : bloom_mips)
+		{
+			RenderTexture::ReleaseTempRT(handle);
+		}
 		CommandBufferPool::Release(cmd);
 	}
 	void PostProcessPass::BeginPass(GraphicsContext* context)

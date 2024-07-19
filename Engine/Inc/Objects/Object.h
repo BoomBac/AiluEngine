@@ -40,6 +40,7 @@ namespace Ailu
 		//--------------------Reflect
 	public:
 		Object();
+		Object(const String& name);
 		Object(const Object& other);
 		Object(Object&& other) noexcept;
 		Object& operator=(const Object& other);
@@ -70,7 +71,8 @@ namespace Ailu
 		String _name;
 		u32 _id;
 	private:
-		inline static u32 s_global_object_id = 0u;
+        //0~64 reserve for shader, shader id hash only hash 6bit
+		inline static u32 s_global_object_id = 65u;
 	};
 
 	template<class T>

@@ -8,7 +8,7 @@
 namespace Ailu
 {
 	DECLARE_ENUM(EAssetType,kUndefined, kMesh, kMaterial,kTexture2D,kShader,kComputeShader,kScene)
-	class AILU_API Asset
+	class AILU_API Asset : public Object
 	{
 	public:
 		Asset() = default;

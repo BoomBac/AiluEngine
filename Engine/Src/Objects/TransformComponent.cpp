@@ -7,10 +7,6 @@ namespace Ailu
 	TransformComponent::TransformComponent()
 	{
 		IMPLEMENT_REFLECT_FIELD(TransformComponent)
-		_pos_data = _transform._position;
-		_scale_data = _transform._scale;
-		_rotation_data = Quaternion::EulerAngles(_transform._rotation);
-		//_pre_rotation_data = _rotation_data;
 	}
 	TransformComponent::~TransformComponent()
 	{
@@ -21,10 +17,9 @@ namespace Ailu
 		{
 			LOG_WARNING("TransformComponent can't been disable!");
 		}
-		_transform._position = _pos_data;
-		_transform._scale = _scale_data;
-		_transform._rotation = Quaternion::EulerAngles(_rotation_data);
-		Transform::ToMatrix(_transform, _matrix);
+        if(_is_need_update_mat)
+		    Transform::ToMatrix(_transform, _matrix);
+        _is_need_update_mat = true;
 	}
 	void TransformComponent::OnGizmo()
 	{
@@ -32,18 +27,24 @@ namespace Ailu
 		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._up * 100, Colors::kGreen);
 		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._right * 100, Colors::kRed);
 	}
+	//Vector3f TransformComponent::GetEuler() const
+	//{
+	//	return Quaternion::GetAngle(_transform._rotation);
+	//}
 	void TransformComponent::SetPosition(const Vector3f& pos)
 	{
-        _pos_data = pos;
 		_transform._position = pos;
 	}
 	void TransformComponent::SetRotation(const Quaternion& quat)
 	{
 		_transform._rotation = quat;
 	}
+	void TransformComponent::SetRotation(const Vector3f& euler)
+	{
+		_transform._rotation = Quaternion::EulerAngles(euler);
+	}
 	void TransformComponent::SetScale(const Vector3f& scale)
 	{
-        _scale_data = scale;
 		_transform._scale = scale;
 	}
 
@@ -63,16 +64,21 @@ namespace Ailu
 		TransformComponent* trans = new TransformComponent();
 		Vector3f vec;
 		Vector4f vec4;
-		LoadVector(std::get<1>(formated_str.front()).c_str(), trans->_pos_data);
-		trans->_transform._position = _pos_data;
+		LoadVector(std::get<1>(formated_str.front()).c_str(), vec);
+		trans->_transform._position = vec;
 		formated_str.pop();
 		LoadVector(std::get<1>(formated_str.front()).c_str(), vec4);
 		trans->_transform._rotation = Quaternion(vec4);
-		trans->_rotation_data =  Quaternion::EulerAngles(trans->_transform._rotation);
+		//trans->_rotation_data =  Quaternion::EulerAngles(trans->_transform._rotation);
 		formated_str.pop();
-		LoadVector(std::get<1>(formated_str.front()).c_str(), trans->_scale_data);
-		trans->_transform._scale = _scale_data;
+		LoadVector(std::get<1>(formated_str.front()).c_str(), vec);
+		trans->_transform._scale = vec;
 		formated_str.pop();
 		return trans;
 	}
+    void TransformComponent::SetMatrix(const Matrix4x4f &new_mat)
+    {
+        _matrix = new_mat;
+        _is_need_update_mat = false;
+    }
 }

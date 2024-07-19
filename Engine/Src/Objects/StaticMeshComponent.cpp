@@ -134,7 +134,7 @@ namespace Ailu
 				if (mat == nullptr)
 				{
 					g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load material failed with id {};", cur_mat_path);
-					mat = g_pResourceMgr->GetRef<Material>(L"Runtime/Material/StandardLit");	
+					mat = g_pResourceMgr->GetRef<Material>(L"Runtime/Material/StandardLit");
 				}
 				else
 					comp->AddMaterial(mat);

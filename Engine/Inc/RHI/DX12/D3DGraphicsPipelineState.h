@@ -83,6 +83,8 @@ namespace Ailu
 	private:
 		String _name;
 		u8 _per_frame_cbuf_bind_slot = 255u;
+		std::set<String> _defines;
+		String _pass_name;
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC _d3d_pso_desc;
 		GraphicsPipelineStateInitializer _state_desc;
 		bool _b_build = false;

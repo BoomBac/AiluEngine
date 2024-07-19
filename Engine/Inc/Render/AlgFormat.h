@@ -9,7 +9,8 @@
 DECLARE_ENUM(EALGFormat, kALGFormatUnknown,
     kALGFormatR8G8B8A8_UNORM, kALGFormatR8G8B8A8_UNORM_SRGB,
     kALGFormatR24G8_TYPELESS, kALGFormatR32_FLOAT, kALGFormatD32_FLOAT, kALGFormatD16_FLOAT,kALGFormatD24S8_UINT,
-    kALGFormatR32G32B32A32_FLOAT, kALGFormatR32G32B32_FLOAT, kALGFormatR16G16B16A16_FLOAT, kALGFormatR16G16_FLOAT, kALGFormatR32G32_FLOAT, kALGFormatR32_UINT, kALGFormatR32_SINT)
+    kALGFormatR32G32B32A32_FLOAT, kALGFormatR32G32B32_FLOAT, kALGFormatR16G16B16A16_FLOAT, kALGFormatR11G11B10_FLOAT,
+    kALGFormatR16G16_FLOAT, kALGFormatR32G32_FLOAT, kALGFormatR32_UINT, kALGFormatR32_SINT)
 
 
 static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat::EALGFormat& format)
@@ -28,6 +29,7 @@ static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatR32G32B32_FLOAT: return DXGI_FORMAT_R32G32B32_FLOAT;
     case EALGFormat::kALGFormatR32G32_FLOAT: return DXGI_FORMAT_R32G32_FLOAT;
     case EALGFormat::kALGFormatR16G16B16A16_FLOAT: return DXGI_FORMAT_R16G16B16A16_FLOAT;
+    case EALGFormat::kALGFormatR11G11B10_FLOAT: return DXGI_FORMAT_R11G11B10_FLOAT;
     case EALGFormat::kALGFormatR16G16_FLOAT: return DXGI_FORMAT_R16G16_FLOAT;
     case EALGFormat::kALGFormatR32_UINT: return DXGI_FORMAT_R32_UINT;
     case EALGFormat::kALGFormatR32_SINT: return DXGI_FORMAT_R32_SINT;
@@ -48,6 +50,7 @@ static i8 GetFormatChannel(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatR32G32B32A32_FLOAT: return 4;
     case EALGFormat::kALGFormatR32G32B32_FLOAT: return 3;
     case EALGFormat::kALGFormatR16G16B16A16_FLOAT: return 4;
+    case EALGFormat::kALGFormatR11G11B10_FLOAT: return 1;
     }
     return -1;
 }
@@ -64,11 +67,6 @@ static bool IsShadowMapFormat(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatD32_FLOAT: return true;
     }
     return false;
-}
-
-static bool IsHDRFormat(const EALGFormat::EALGFormat& format)
-{
-    return format == EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT || format == EALGFormat::EALGFormat::kALGFormatR32G32B32_FLOAT;
 }
 
 static u16 GetPixelByteSize(const EALGFormat::EALGFormat& format)
@@ -94,6 +92,8 @@ static u16 GetPixelByteSize(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatR32G32B32_FLOAT: return 12;
         break;
     case EALGFormat::kALGFormatR16G16B16A16_FLOAT: return 8;
+        break;
+    case EALGFormat::kALGFormatR11G11B10_FLOAT: return 4;
         break;
     case EALGFormat::kALGFormatR32_UINT: return 4;
         break;

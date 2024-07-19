@@ -650,7 +650,7 @@ namespace Ailu
 		_p_buffer->SetName(ToWChar(value));
 	}
 
-	TextureHandle D3DRenderTexture::GetNativeTextureHandle()
+	const TextureHandle D3DRenderTexture::GetNativeTextureHandle()
 	{
 		return _depth > 0? DepthTexture(0) : ColorTexture(0);
 	}

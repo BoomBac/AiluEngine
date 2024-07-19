@@ -134,22 +134,49 @@ namespace Ailu
 			return ConvertToD3D12BlendDesc(state, 1);
 		}
 
+		static D3D12_COMPARISON_FUNC ConvertToD3D12CompareFunc(const ECompareFunc& func)
+		{
+			switch (func)
+			{
+			case ECompareFunc::kLess:             return D3D12_COMPARISON_FUNC_LESS;
+			case ECompareFunc::kLessEqual:        return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+			case ECompareFunc::kGreater:          return D3D12_COMPARISON_FUNC_GREATER;
+			case ECompareFunc::kGreaterEqual:     return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+			case ECompareFunc::kAlways:           return D3D12_COMPARISON_FUNC_ALWAYS;
+			case ECompareFunc::kNever:            return D3D12_COMPARISON_FUNC_NEVER;
+			case ECompareFunc::kEqual:            return D3D12_COMPARISON_FUNC_EQUAL;
+			case ECompareFunc::kNotEqual:         return D3D12_COMPARISON_FUNC_NOT_EQUAL;
+			}
+			return D3D12_COMPARISON_FUNC_LESS;
+		}
+
+		static D3D12_STENCIL_OP ConvertToD3D12StencilOp(const EStencilOp& op)
+		{
+			switch (op)
+			{
+			case EStencilOp::kKeep:                     return D3D12_STENCIL_OP_KEEP;
+			case EStencilOp::kZero:                     return D3D12_STENCIL_OP_ZERO;
+			case EStencilOp::kReplace:                  return D3D12_STENCIL_OP_REPLACE;
+			case EStencilOp::kIncrementAndClamp:        return D3D12_STENCIL_OP_INCR_SAT;
+			case EStencilOp::kDecrementAndClamp:        return D3D12_STENCIL_OP_DECR_SAT;
+			case EStencilOp::kInvert:                   return D3D12_STENCIL_OP_INVERT;
+			case EStencilOp::kIncrement:                return D3D12_STENCIL_OP_INCR;
+			case EStencilOp::kDecrement:                return D3D12_STENCIL_OP_DECR;
+			}
+			return D3D12_STENCIL_OP_KEEP;
+		}
+
 		static D3D12_DEPTH_STENCIL_DESC ConvertToD3D12DepthStencilDesc(const DepthStencilState& state)
 		{
 			auto ds_state = CD3DX12_DEPTH_STENCIL_DESC(CD3DX12_DEFAULT{});
 			ds_state.DepthEnable = state._depth_test_func != ECompareFunc::kAlways && state._depth_test_func != ECompareFunc::kNever;
-			switch (state._depth_test_func)
-			{
-			case ECompareFunc::kLess: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_LESS; break;
-			case ECompareFunc::kLessEqual: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_LESS_EQUAL; break;
-			case ECompareFunc::kGreater: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_GREATER; break;
-			case ECompareFunc::kGreaterEqual: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_GREATER_EQUAL; break;
-			case ECompareFunc::kAlways: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_ALWAYS; break;
-			case ECompareFunc::kNever: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_NEVER; break;
-			case ECompareFunc::kEqual: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_EQUAL; break;
-			case ECompareFunc::kNotEqual: ds_state.DepthFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_NOT_EQUAL; break;
-			}
+			ds_state.DepthFunc = ConvertToD3D12CompareFunc(state._depth_test_func);
 			ds_state.StencilEnable = state._b_front_stencil;
+			if (state._b_front_stencil)
+			{
+				ds_state.FrontFace.StencilFunc = ConvertToD3D12CompareFunc(state._stencil_test_func);
+				ds_state.FrontFace.StencilPassOp = ConvertToD3D12StencilOp(state._stencil_test_pass_op);
+			}
 			ds_state.DepthWriteMask = state._b_depth_write ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
 			return ds_state;
 		}
@@ -230,7 +257,6 @@ namespace Ailu
 		Vector<D3D_SHADER_MACRO> ConstructVariantMarcos(u16 pass_index, ShaderVariantHash variant_hash);
 	private:
 		Vector<D3DShaderElement> _pass_elements;
-		std::atomic<bool> _is_pass_elements_init = false;
 	};
 
 	class D3DComputeShader : public ComputeShader

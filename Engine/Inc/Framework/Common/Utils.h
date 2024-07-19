@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <numeric>
 #include <fstream>
+#include <set>
 
 namespace Ailu
 {
@@ -189,6 +190,21 @@ namespace Ailu
         static String Join(const Vector<String>& strings, const String& delimiter)
         {
             return std::accumulate(strings.begin() + 1, strings.end(), strings[0],
+                [&delimiter](const String& a, const String& b) {
+                    return a + delimiter + b;
+                });
+        }
+
+        static String Join(const std::set<String>& strings, const String& delimiter)
+        {
+            if (strings.empty()) 
+            {
+                return "";
+            }
+            auto iter = strings.begin();
+            String result = *iter;
+            ++iter;
+            return std::accumulate(iter, strings.end(), result,
                 [&delimiter](const String& a, const String& b) {
                     return a + delimiter + b;
                 });

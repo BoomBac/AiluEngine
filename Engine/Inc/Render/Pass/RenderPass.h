@@ -5,6 +5,7 @@
 #include "Render/RenderingData.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
+#include "Objects/Object.h"
 
 namespace Ailu
 {
@@ -20,10 +21,10 @@ namespace Ailu
 		virtual const void SetActive(bool is_active) = 0;
 	};
 
-	class RenderPass : public IRenderPass
+	class RenderPass : public IRenderPass,public Object
 	{
 	public:
-		RenderPass(const String& name) : _name(name), _is_active(true) {};
+		RenderPass(const String& name) : Object(name), _is_active(true) {};
 		virtual void Execute(GraphicsContext* context, RenderingData& rendering_data) override {};
 		virtual void BeginPass(GraphicsContext* context) override {};
 		virtual void EndPass(GraphicsContext* context) override {};
@@ -31,7 +32,6 @@ namespace Ailu
 		virtual const bool IsActive() const final {return _is_active; };
 		virtual const void SetActive(bool is_active) final { _is_active = is_active; };
 	protected:
-		String _name;
 		bool _is_active;
 	};
 
@@ -70,13 +70,24 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 	private:
-		Ref<Material> _p_bloom_thread_mat;
 		Material* _p_blit_mat;
 		Mesh* _p_quad_mesh;
 		ConstantBuffer* _p_obj_cb;
 		Rect _half_sceen_rect;
 	};
 
+	class CopyDepthPass : public RenderPass
+	{
+	public:
+		CopyDepthPass();
+		~CopyDepthPass();
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
+		void BeginPass(GraphicsContext* context) final;
+		void EndPass(GraphicsContext* context) final;
+	private:
+		Material* _p_blit_mat;
+		ConstantBuffer* _p_obj_cb;
+	};
 
 	class ShadowCastPass : public RenderPass
 	{
@@ -90,11 +101,8 @@ namespace Ailu
 		Rect _rect;
 		Rect _addlight_rect;
 		Scope<RenderTexture> _p_mainlight_shadow_map;
-		//Scope<RenderTexture> _p_addlight_shadow_map;
 		Scope<RenderTexture> _p_addlight_shadow_maps;
 		Scope<RenderTexture> _p_point_light_shadow_maps;
-		//Ref<Material> _p_shadowcast_material;
-		//Ref<Material> _p_addshadowcast_material;
 		Vector<Ref<Material>> _shadowcast_materials;
 	};
 
@@ -134,14 +142,19 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
+	private:
+		Array<Rect, 3> _rects;
+	};
+
+	class DeferredLightingPass : public RenderPass
+	{
+	public:
+		DeferredLightingPass();
+		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
+		void BeginPass(GraphicsContext* context) final;
+		void EndPass(GraphicsContext* context) final;
 		Ref<Material> _p_lighting_material;
 	private:
-		//Vector<Ref<RenderTexture>> _gbuffers;
-		//Vector<RenderTexture*> _gbuffers_cache;
-		Vector<RTHandle> _gbuffers;
-		Mesh* _p_quad_mesh;
-		Array<Rect, 3> _rects;
-		Texture2D* _p_ibllut;
 		Ref<Texture2D> _brdf_lut;
 		Ref<ComputeShader> _brdflut_gen;
 	};
@@ -167,6 +180,7 @@ namespace Ailu
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
 	private:
+		Vector<Scope<ConstantBuffer>> _p_cbuffers;
 	};
 }
 

@@ -7,7 +7,7 @@
 
 namespace Ailu
 {
-	class CameraComponent : public Component
+	class AILU_API CameraComponent : public Component
 	{
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
@@ -20,10 +20,6 @@ namespace Ailu
 		void Tick(const float& delta_time) final;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
 		void OnGizmo() final;
-		CameraComponent& operator=(const CameraComponent& other)
-		{
-			
-		}
 		Camera _camera;
 	private:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) final;

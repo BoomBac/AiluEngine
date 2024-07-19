@@ -32,6 +32,7 @@ namespace Ailu
 		};
 		WindowData _data;
 		HWND _hwnd;
+        bool _is_focused;
 	};
 }
 

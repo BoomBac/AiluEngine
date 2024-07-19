@@ -140,6 +140,7 @@ namespace Ailu
 		inline static const String KFill = "Fill";
 		inline static const String kZTest = "ZTest";
 		inline static const String kZWrite = "ZWrite";
+		inline static const String kStencil = "Stencil";
 		static struct Queue
 		{
 			inline static const String kGeometry = "Geometry";
@@ -168,21 +169,39 @@ namespace Ailu
 			inline static const String kSolid = "Solid";
 			inline static const String kWireframe = "Wireframe";
 		} kFillValue;
-		static struct ZTest
+		static struct Comparison
 		{
 			inline static const String kOff = "Off";
 			inline static const String kLEqual = "LEqual";
 			inline static const String kEqual = "Equal";
 			inline static const String kAlways = "Always";
+			inline static const String kGreater = "Greater";
+			inline static const String kNotEqual = "NotEqual";
+			inline static const String kGEqual = "GEqual";
 		} kZTestValue;
 		static struct ZWrite
 		{
 			inline static const String kOff = "Off";
 			inline static const String kOn = "On";
 		} kZWriteValue;
+		static struct StencilState
+		{
+			inline static const String kStencilRef = "Ref";
+			inline static const String kStencilComp = "Comp";
+			inline static const String kStencilPass = "Pass";
+			static struct StencilOperation
+			{
+				inline static const String kReplace = "Replace";
+				inline static const String kKeep = "Keep";//z and stencil all passed
+				inline static const String kZero = "Zero";
+				inline static const String kIncr = "Incr";
+				inline static const String kDecr = "Decr";
+			} StencilPassValue;
+		} kStencilStateValue;
+
 	};
 
-	using ShaderVariantHash = u32;
+	using ShaderVariantHash = u64;
 
 	struct ShaderPass
 	{
@@ -194,7 +213,7 @@ namespace Ailu
 			i8 _per_pass_buf_bind_slot = -1;
 			VertexInputLayout _pipeline_input_layout;
 			std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos;
-			Vector<String> _active_keywords;
+			std::set<String> _active_keywords;
 		};
 		//pass info
 		u16 _index;
@@ -224,17 +243,22 @@ namespace Ailu
 		friend class Material;
 	public:
 		inline static Shader* s_p_defered_standart_lit = nullptr;
+		inline static const u16 kRenderQueueOpaque      = 2000;
+		inline static const u16 kRenderQueueAlphaTest   = 2500;
+		inline static const u16 kRenderQueueTransparent = 3000;
+		inline static const u16 kRenderQueueEnd = 4000;
 	public:
 		static Ref<Shader> Create(const WString& sys_path);
-		static u32 ConstructHash(const u32& shader_id, const u16& pass_hash, ShaderVariantHash variant_hash = 0u);
-		static void ExtractInfoFromHash(const u32& shader_hash, u32& shader_id, u16& pass_hash, ShaderVariantHash& variant_hash);
+		static u64 ConstructHash(const u32& shader_id, const u16& pass_hash, ShaderVariantHash variant_hash = 0u);
+		//inline static const BitDesc kShader = {0,46}; 46bit hash
+		static void ExtractInfoFromHash(const u64& shader_hash, u32& shader_id, u16& pass_hash, ShaderVariantHash& variant_hash);
 
 		static void SetGlobalTexture(const String& name, Texture* texture);
 		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
 		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
 
 		static void ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf);
-		static ConstantBuffer* GetPerFrameConstBuffer() { return	s_p_per_frame_cbuffer; };
+		static ConstantBuffer* GetPerFrameConstBuffer() { return s_p_per_frame_cbuffer; };
 		//0 is normal, 4001 is compiling, 4000 is error,same with render queue id
 		static u32 GetShaderState(Shader* shader,u16 pass_index,ShaderVariantHash variant_hash);
 
@@ -274,6 +298,7 @@ namespace Ailu
 		const Vector<std::set<String>>& PassLocalKeywords(u16 pass_index) const { return _passes[pass_index]._keywords; }
 		bool IsKeywordValid(u16 pass_index, const String& kw) const;
 		std::set<String> KeywordsSameGroup(u16 pass_index,const String& kw) const;
+		std::set<String> ActiveKeywords(u16 pass_index, ShaderVariantHash variant_hash) const {return _passes[pass_index]._variants.at(variant_hash)._active_keywords;};
 
 		Vector<class Material*> GetAllReferencedMaterials();
 		void AddMaterialRef(class Material* mat);
@@ -299,15 +324,17 @@ namespace Ailu
 	protected:
 		inline static u8* _p_cbuffer = nullptr;
 		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
+        //shader id 0~64
 		WString _src_file_path;
 		Vector<ShaderPass> _passes;
 		std::set<Material*> _reference_mats;
 		Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
-		//std::mutex _variant_state_lock;
+		std::atomic<bool> _is_pass_elements_init = false;
 	private:
 		void ParserShaderProperty(String& line, List<ShaderPropertyInfo>& props);
 		//void ExtractValidShaderProperty(u16 pass_index,ShaderVariantHash variant_hash);
 	private:
+        inline static u16 s_global_shader_unique_id = 0u;
 		inline static std::map<String, Texture*> s_global_textures_bind_info{};
 		inline static std::map<String, std::tuple<Matrix4x4f*,u32>> s_global_matrix_bind_info{};
 	};

@@ -12,7 +12,7 @@ namespace Ailu
 	{
 		_hash = GraphicsPipelineStateObject::ConstructPSOHash(initializer);
 		_name = initializer._p_vertex_shader->Name();
-                ZeroMemory(&_d3d_pso_desc,sizeof(_d3d_pso_desc));
+		memset(&_d3d_pso_desc, 0, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));//置空，否则编译不加 /sdl时创建pso时会有空指针
 	}
 
 	void D3DGraphicsPipelineState::Build(u16 pass_index, ShaderVariantHash variant_hash)
@@ -66,22 +66,19 @@ namespace Ailu
 			inputLayoutDesc.pInputElementDescs = v.data();
 			inputLayoutDesc.NumElements = v.size();
 			_d3d_pso_desc.InputLayout = inputLayoutDesc;
-
-			auto hr = D3DContext::Get()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate));
-			ThrowIfFailed(hr);
+			ThrowIfFailed(D3DContext::Get()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
 			_b_build = true;
-			//LOG_INFO("rt hash {}", (u32)_state_desc._rt_state.Hash());
 			_hash = ConstructPSOHash(_state_desc,pass_index, variant_hash);
-			u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
-			u32 shader_hash;
-			GraphicsPipelineStateObject::ExtractPSOHash(_hash, input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
-			if (_state_desc._raster_state.Hash() != raster_state)
-			{
-				g_pLogMgr->LogErrorFormat("PSO {}: _state_desc._raster_state.Hash() != raster_state",_name);
-			}
+			//u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
+			//u64 shader_hash;
+			//GraphicsPipelineStateObject::ExtractPSOHash(_hash, input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
+			//if (_state_desc._raster_state.Hash() != raster_state)
+			//{
+			//	g_pLogMgr->LogErrorFormat("PSO {}: _state_desc._raster_state.Hash() != raster_state",_name);
+			//}
+			_defines = _state_desc._p_vertex_shader->ActiveKeywords(pass_index, variant_hash);
+			_pass_name = _state_desc._p_vertex_shader->GetPassInfo(pass_index)._name;
 		}
-		static u16 count = 0;
-		//LOG_WARNING("PipelineState build {}!", count++);
 	}
 
 	void D3DGraphicsPipelineState::Bind(CommandBuffer* cmd)
@@ -92,6 +89,8 @@ namespace Ailu
 			return;
 		}
 		_p_cmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		if(_state_desc._depth_stencil_state._b_front_stencil)
+		_p_cmd->OMSetStencilRef(_state_desc._depth_stencil_state._stencil_ref_value);
 		_p_cmd->SetGraphicsRootSignature(_p_sig.Get());
 		_p_cmd->SetPipelineState(_p_plstate.Get());
 		_p_cmd->IASetPrimitiveTopology(D3DConvertUtils::ConvertToDXTopology(_state_desc._topology));

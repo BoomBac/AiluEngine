@@ -4,6 +4,8 @@
 #define kMaxDirectionalLight 2
 #define kMaxPointLight 4
 #define kMaxSpotLight 4
+#define kMaxCascadeShadowMapSplit 4
+
 
 #ifdef __cplusplus
 #include "Framework/Math/ALMath.hpp"
@@ -34,8 +36,8 @@ namespace Ailu
 		float _LightParam1;
 		int _ShadowDataIndex;
 		float _ShadowDistance;
-		float _ShadowNear;
-		float _padding0;
+		float _constant_bias;
+		float _slope_bias;
 
 	};
 
@@ -49,7 +51,8 @@ namespace Ailu
 		float   _LightAngleOffset;
 		int _ShadowDataIndex;
 		float _ShadowDistance;
-		float2 _padding0;
+		float _constant_bias;
+		float _slope_bias;
 	};
 
 #ifdef __cplusplus
@@ -76,11 +79,14 @@ namespace Ailu
 		//float4(w,h,1/w,1/h)
 		float4   _ScreenParams;
 		float4   _ZBufferParams;
+		float4   _CascadeShadowSplit[kMaxCascadeShadowMapSplit];//sphere center,radius * radius
+		float4   _CascadeShadowParams;//cascade count,1/shadow_fade_out_factor,1/max_shadow_distance
 		ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLight];
 		ShaderDirectionalAndPointLightData _PointLights[kMaxPointLight];
 		ShaderSpotlLightData _SpotLights[kMaxSpotLight];
-		float4x4 _ShadowMatrix[1 + kMaxSpotLight + kMaxPointLight * 6];
-		float padding1[92];
+		float4x4 _ShadowMatrix[kMaxCascadeShadowMapSplit + kMaxSpotLight + kMaxPointLight * 6];
+		float g_IndirectLightingIntensity;
+		float padding1[23];
 		//float4x4 _JointMatrix[80];
 	};
 
@@ -98,21 +104,22 @@ namespace Ailu
 	};
 
 #ifdef __cplusplus
-	struct ScenePerMaterialData
-	{
-		float4 _BaseColor;
-		float	 _Roughness;
-		float3 _Emssive;
-		float	 _Metallic;
-		float    _Specular;
-		// low_bit: metallic|roughness|emssive|normal|albedo
-		u32 _SamplerMask;
-		u32 _MaterialID;
-		float padding2[52]; // Padding so the constant buffer is 256-byte aligned.
-	};
+//	struct ScenePerMaterialData
+//	{
+//		float4 _BaseColor;
+//		float	 _Roughness;
+//		float3 _Emssive;
+//		float	 _Metallic;
+//		float    _Specular;
+//		// low_bit: metallic|roughness|emssive|normal|albedo
+//		u32 _SamplerMask;
+//		u32 _MaterialID;
+//        float _AlphaCulloff;
+//		float padding2[51]; // Padding so the constant buffer is 256-byte aligned.
+//	};
 	static_assert((sizeof(ScenePerObjectData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 	static_assert((sizeof(ScenePerFrameData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
-	static_assert((sizeof(ScenePerMaterialData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+	//static_assert((sizeof(ScenePerMaterialData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 	static_assert((sizeof(ScenePerPassData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
 #else
 #define PerMaterialCBufferBegin cbuffer ScenePerMaterialData : register(b1) {
@@ -124,5 +131,6 @@ namespace Ailu
 #ifdef __cplusplus
 }
 #endif //__cplusplus
+
 
 #endif // !COMMON_CBUFFER__

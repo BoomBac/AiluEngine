@@ -18,10 +18,11 @@ namespace Ailu
 
 	struct ShadowData
 	{
-		float _size;
-		float _depth_bias;
-		float _near;
-		float _distance;
+		float _constant_bias;
+		float _slope_bias;
+		Vector2f _padding;
+		//float _near;
+		//float _distance;
 	};
 
 	enum class ELightType : u8
@@ -52,25 +53,30 @@ namespace Ailu
 		void Tick(const float& delta_time) final;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
 		void OnGizmo() final;
-		Camera* ShadowCamera() { return _p_shadow_camera.get(); }
+		Camera* ShadowCamera(u16 index = 0) { return &_shadow_cameras[index]; }
+		ELightType LightType() const {return _light_type; };
+		void LightType(ELightType type);
+		const Vector4f& CascadeShadowMData(u16 index) const { return _cascade_shadow_data[index]; }
 	public:
 		const inline static Vector3f kDefaultDirectionalLightDir = { 0.0f,-1.0f,0.0f };
-		ELightType _light_type;
 		LightData _light;
 		ShadowData _shadow;
 		float _intensity;
+		Vector4f _cascade_shadow_data[RenderConstants::kMaxCascadeShadowMapSplitNum];
 	private:
+		ELightType _light_type;
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) final;
 		void DrawLightGizmo();
+		void UpdateShadowCamera();
 	private:
-		Scope<Camera> _p_shadow_camera;
+		Vector<Camera> _shadow_cameras;
 	};
 	REFLECT_FILED_BEGIN(LightComponent)
 	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kColor, Color32, _light._light_color)
 	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Intensity, _intensity)
 	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kBool, CastShadow, _b_cast_shadow)
-	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, ShadowDistance, _shadow._distance)
-	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, ShadowArea, _shadow._size)
+	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, ShadowConstantBias, _shadow._constant_bias)
+	DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, ShadowSlopeBias, _shadow._slope_bias)
 	REFLECT_FILED_END
 }
 

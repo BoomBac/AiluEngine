@@ -30,7 +30,7 @@ namespace Ailu
 		kRunning,
 		kCompleted
 	};
-	class ThreadPool
+	class AILU_API ThreadPool
 	{
 	public:
 		inline static u8 _s_cur_thread_num = 0;
@@ -208,7 +208,7 @@ namespace Ailu
 		std::string _pool_name;
 		std::vector<TimeMgr> _timers;
 	};
-	extern Scope<ThreadPool> g_pThreadTool;
+	extern AILU_API Scope<ThreadPool> g_pThreadTool;
 }
 
 

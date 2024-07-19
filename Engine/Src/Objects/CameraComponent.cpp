@@ -57,7 +57,7 @@ namespace Ailu
 	}
 	void CameraComponent::OnGizmo()
 	{
-		Camera::DrawGizmo(&_camera);
+		Camera::DrawGizmo(&_camera,Gizmo::s_color);
 		//float shadow_distance = _camera.Far() * 0.5f;
 		//float len = shadow_distance / _camera.Far();
 		//Vector<Vector3f> p(8);

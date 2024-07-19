@@ -95,6 +95,7 @@ namespace Ailu
         std::unordered_map<u32, u64> _cmd_target_fence_value;
         std::multimap<u64, ComPtr<ID3D12Resource>> _global_tracked_resource;
         Queue<RHIResourceTask> _resource_task;
+        std::mutex _resource_task_lock;
         u32 _width;
         u32 _height;
         float m_aspectRatio;

@@ -12,6 +12,17 @@ namespace Ailu
 		Vector3f _normal;
 		f32 _distance;
         Vector3f _point;
+        bool Intersect(const Vector3f ray_start,const Vector3f ray_dir,Vector3f& intersect_point)
+        {
+            float denom = DotProduct(_normal,ray_dir);
+            if (std::abs(denom) > 1e-6)
+            { // Check if the line is not parallel to the plane
+                float t = (_distance - DotProduct(_normal,ray_start)) / denom;
+                intersect_point = ray_start + t * ray_dir;
+                return true;
+            }
+            return false; // The line is parallel to the plane
+        }
     private:
         f32 _padding = 0.0f;
 	};
@@ -100,6 +111,11 @@ namespace Ailu
             return _max - _min;
         }
 
+        inline f32 Diagon() const
+        {
+            return Distance(_min, _max);
+        }
+
         bool Intersects(const AABB& other) const
         {
             return (_min.x <= other._max.x && _max.x >= other._min.x) &&
@@ -122,6 +138,12 @@ namespace Ailu
     {
         static bool Conatin(const ViewFrustum& vf, const AABB& aabb);
         Array<Plane, 8> _planes;
+    };
+
+    struct Sphere
+    {
+        Vector3f _center;
+        f32 _radius;
     };
 }
 

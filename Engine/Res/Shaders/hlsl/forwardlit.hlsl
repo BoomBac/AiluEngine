@@ -10,21 +10,21 @@
 //pass end::
 //Properties
 //{
-//	Albedo("Albedo",Texture2D) = "white"
-//	Normal("Normal",Texture2D) = "white"
-//	Emssive("Emssive",Texture2D) = "white"
-//	Roughness("Roughness",Texture2D) = "white"
-//	Metallic("Metallic",Texture2D) = "white"
-//	Specular("Specular",Texture2D) = "white"
-//	BaseColor("BaseColor",Color) = (1,1,1,0)
-//	EmssiveColor("Emssive",Color) = (0,0,0,0)
-//	SpecularColor("Specular",Color) = (0,0,0,0)
-//	RoughnessValue("Roughness",Range(0,1)) = 0
-//	MetallicValue("Metallic",Range(0,1)) = 0
+//	_AlbedoTex("Albedo",Texture2D) = "white"
+//	_NormalTex("Normal",Texture2D) = "white"
+//	_EmissionTex("Emission",Texture2D) = "white"
+//	_RoughnessMetallicTex("RoughnessMetallicTex",Texture2D) = "white"
+//	_SpecularTex("Specular",Texture2D) = "white"
+//	_AlbedoValue("BaseColor",Color) = (1,1,1,0)
+//	_EmissionValue("Emission",Color) = (0,0,0,0)
+//	_SpecularValue("Specular",Color) = (0,0,0,0)
+//	_RoughnessValue("Roughness",Range(0,1)) = 0
+//	_MetallicValue("Metallic",Range(0,1)) = 0
 //}
 //info end
 
-#include "standard_lit_common.ash"
+#include "standard_lit_common.hlsli"
+#include "lighting.hlsli"
 
 PSInput ForwardVSMain(VSInput v)
 {

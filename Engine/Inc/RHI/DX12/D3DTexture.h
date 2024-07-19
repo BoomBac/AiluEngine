@@ -19,7 +19,7 @@ namespace Ailu
 		D3DTexture2D(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
 		~D3DTexture2D();
 		void Apply() final;
-		TextureHandle GetNativeTextureHandle() final 
+		const TextureHandle GetNativeTextureHandle() final
 		{ 
 			return _is_ready_for_rendering? _main_srv_handle.ptr : 0;
 		};
@@ -48,7 +48,7 @@ namespace Ailu
 		D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
 		~D3DCubeMap();
 		void Apply() final;
-		TextureHandle GetNativeTextureHandle() final { return _main_srv_handle.ptr; };
+        const TextureHandle GetNativeTextureHandle() final { return _main_srv_handle.ptr; };
 		void Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline = false) final;
 
 		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) final;
@@ -72,7 +72,7 @@ namespace Ailu
 		void Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline = false) final;
 		void CreateView() final;
 		void Name(const String& value) final;
-		TextureHandle GetNativeTextureHandle() final;
+        const TextureHandle GetNativeTextureHandle() final;
 		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) final;
 		TextureHandle ColorRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) final;
 		TextureHandle DepthRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) final;

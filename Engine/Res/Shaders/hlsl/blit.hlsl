@@ -22,7 +22,10 @@
 //info end
 #include "common.hlsli"
 
-Texture2D _SourceTex : register(t0);
+//imgui hdr backbuffer need to Gamma 2.2 space
+#define OFF_SCREEN
+
+TEXTURE2D(_SourceTex,0)
 
 struct VSInput
 {
@@ -51,18 +54,22 @@ float3 ACESFilm(float3 x)
 	float c = 2.43f;
 	float d = 0.59f;
 	float e = 0.14f;
-	return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+	//return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+	return (x*(a*x+b))/(x*(c*x+d)+e);
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
+	float3 color = SAMPLE_TEXTURE2D(_SourceTex,g_LinearClampSampler, input.uv).rgb;
 	color = ACESFilm(color);
-	//GammaCorrect(color,2.0f);
+#ifdef OFF_SCREEN
+	GammaCorrect(color.rgb,2.2f);
+#endif
 	return float4(color,1.0);
 }
+
 float4 PSMainCopy(PSInput input) : SV_TARGET
 {
-	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
-	return float4(color,1.0);
+	float4 color = SAMPLE_TEXTURE2D(_SourceTex,g_LinearClampSampler, input.uv);
+	return color;
 }

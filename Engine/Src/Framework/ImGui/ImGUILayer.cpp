@@ -51,17 +51,44 @@ namespace Ailu
 		ImGuiStyle& style = ImGui::GetStyle();
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark(&style);
-		style.WindowPadding = ImVec2(3.0f, 3.0f);
+		style.WindowPadding = ImVec2(2.0f, 2.0f);
 		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
 		{
-			style.WindowRounding = 10.0f;
-			style.ChildRounding = 10.0f;
-			style.FrameRounding = 10.0f;
+			style.WindowRounding = 0.0f;
+			style.ChildRounding = 0.0f;
+			style.FrameRounding = 0.0f;
 			style.Colors[ImGuiCol_WindowBg].w = 0.8f;
 		}
-
-		ImGui_ImplWin32_Init(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
+        ImVec4* colors = ImGui::GetStyle().Colors;
+        colors[ImGuiCol_WindowBg]               = ImVec4(0.06f, 0.06f, 0.06f, 0.99f);
+        colors[ImGuiCol_FrameBg]                = ImVec4(0.25f, 0.25f, 0.25f, 0.54f);
+        colors[ImGuiCol_FrameBgHovered]         = ImVec4(0.71f, 0.34f, 0.74f, 0.40f);
+        colors[ImGuiCol_FrameBgActive]          = ImVec4(0.71f, 0.34f, 0.74f, 0.68f);
+        colors[ImGuiCol_TitleBgActive]          = ImVec4(0.47f, 0.71f, 0.58f, 0.86f);
+        colors[ImGuiCol_TitleBg]                = ImVec4(0.47f, 0.71f, 0.58f, 0.86f);
+        colors[ImGuiCol_CheckMark]              = ImVec4(0.98f, 0.26f, 0.95f, 1.00f);
+        colors[ImGuiCol_SliderGrab]             = ImVec4(0.24f, 0.88f, 0.85f, 0.28f);
+        colors[ImGuiCol_SliderGrabActive]       = ImVec4(0.24f, 0.88f, 0.85f, 1.00f);
+        colors[ImGuiCol_Button]                 = ImVec4(0.66f, 0.33f, 0.69f, 0.43f);
+        colors[ImGuiCol_ButtonHovered]          = ImVec4(0.71f, 0.34f, 0.74f, 0.72f);
+        colors[ImGuiCol_ButtonActive]           = ImVec4(0.71f, 0.34f, 0.74f, 1.00f);
+        colors[ImGuiCol_Header]                 = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
+        colors[ImGuiCol_HeaderHovered]          = ImVec4(0.47f, 0.71f, 0.58f, 1.00f);
+        colors[ImGuiCol_HeaderActive]           = ImVec4(0.47f, 0.71f, 0.58f, 1.00f);
+        colors[ImGuiCol_SeparatorHovered]       = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
+        colors[ImGuiCol_SeparatorActive]        = ImVec4(0.47f, 0.71f, 0.58f, 1.00f);
+        colors[ImGuiCol_ResizeGrip]             = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
+        colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.47f, 0.71f, 0.58f, 1.00f);
+        colors[ImGuiCol_ResizeGripActive]       = ImVec4(0.47f, 0.71f, 0.58f, 1.00f);
+        colors[ImGuiCol_TabHovered]             = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
+        colors[ImGuiCol_Tab]                    = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
+        colors[ImGuiCol_TabSelected]            = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
+        colors[ImGuiCol_TabSelectedOverline]    = ImVec4(0.43f, 0.55f, 0.70f, 1.00f);
+        colors[ImGuiCol_TabDimmedSelected]      = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
+        colors[ImGuiCol_TabDimmed]              = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
+        colors[ImGuiCol_DockingPreview]         = ImVec4(0.26f, 0.98f, 0.71f, 0.70f);
+        ImGui_ImplWin32_Init(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
 	}
 
 	Ailu::ImGUILayer::~ImGUILayer()
@@ -93,106 +120,7 @@ namespace Ailu
 
 	void Ailu::ImGUILayer::OnImguiRender()
 	{
-		//ImGui::PushFont(_font);
-		//ImGui::Begin("Performace Statics");                          // Create a window called "Hello, world!" and append into it.
-		//ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
-		//ImGui::Text("FrameTime: %.2f ms", ModuleTimeStatics::RenderDeltatime);
-		//ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
-		//ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
-		//ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
 
-		//for (auto pass : g_pRenderer->GetRenderPasses())
-		//{
-		//	bool active = pass->IsActive();
-		//	ImGui::Checkbox(pass->GetName().c_str(), &active);
-		//	pass->SetActive(active);
-		//}
-
-		//String space = "";
-		//ImGui::Text("CPU Time:");
-		//while (!Profiler::g_Profiler._cpu_profiler_queue.empty())
-		//{
-		//	auto [is_start, profiler_id] = Profiler::g_Profiler._cpu_profiler_queue.front();
-		//	Profiler::g_Profiler._cpu_profiler_queue.pop();
-		//	if (is_start)
-		//	{
-		//		space.append("-");
-		//		const auto& profiler = Profiler::g_Profiler.GetCPUProfileData(profiler_id);
-		//		ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
-		//	}
-		//	else
-		//		space = space.substr(0, space.size() - 1);
-		//}
-		//space = "";
-		//ImGui::Text("GPU Time:");
-		//while (!Profiler::g_Profiler._gpu_profiler_queue.empty())
-		//{
-		//	auto [is_start, profiler_id] = Profiler::g_Profiler._gpu_profiler_queue.front();
-		//	Profiler::g_Profiler._gpu_profiler_queue.pop();
-		//	if (is_start)
-		//	{
-		//		space.append("-");
-		//		const auto& profiler = Profiler::g_Profiler.GetProfileData(profiler_id);
-		//		ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
-		//	}
-		//	else
-		//		space = space.substr(0, space.size() - 1);
-		//}
-
-
-		//static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame" };
-		//static int item_current_idx = 0; // Here we store our selection data as an index.
-		//const char* combo_preview_value = items[item_current_idx];  // Pass in the preview value visible before opening the combo (it could be anything)
-		//if (ImGui::BeginCombo("Shadering Mode", combo_preview_value, 0))
-		//{
-		//	for (int n = 0; n < IM_ARRAYSIZE(items); n++)
-		//	{
-		//		const bool is_selected = (item_current_idx == n);
-		//		if (ImGui::Selectable(items[n], is_selected))
-		//			item_current_idx = n;
-		//		if (is_selected)
-		//			ImGui::SetItemDefaultFocus();
-		//	}
-		//	ImGui::EndCombo();
-		//}
-		//if (item_current_idx == 0) RenderingStates::s_shadering_mode = EShaderingMode::kShader;
-		//else if (item_current_idx == 1) RenderingStates::s_shadering_mode = EShaderingMode::kWireFrame;
-		//else RenderingStates::s_shadering_mode = EShaderingMode::kShaderedWireFrame;
-
-		//ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
-		//ImGui::SliderFloat("Game Time Scale:", &TimeMgr::s_time_scale, 0.0f, 2.0f, "%.2f");
-		//float shadow_dis_m = g_pRenderer->_shadow_distance / 100.0f;
-		//ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
-		//f32 u = Application::s_target_framecount;
-		//ImGui::SliderFloat("TargetFrame m", &u, 1.f, 999.0f, "%.2f");
-		//Application::s_target_framecount = u;
-		//g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
-		//ImGui::Checkbox("Expand", &show);
-		//ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
-		//ImGui::Checkbox("ShowRT", &s_show_rt);
-		//if (ImGui::Button("Capture"))
-		//{
-		//	g_pRenderer->TakeCapture();
-		//}
-		//for (auto& info : g_pResourceMgr->_import_infos)
-		//{
-		//	float x = g_pTimeMgr->GetScaledWorldTime(0.25f);
-		//	ImGui::Text("%s", info._msg.c_str());
-		//	ImGui::SameLine();
-		//	ImGui::ProgressBar(x - static_cast<int>(x), ImVec2(0.f, 0.f));
-		//}
-		//ImGui::End();
-		//ImGui::PopFont();
-
-		//if (show) 
-		//	ImGui::ShowDemoWindow(&show);
-		//TreeStats::s_common_property_handle = 0;
-		//ShowWorldOutline();
-		//_mesh_browser.Show();
-		//for(auto& widget : _widgets)
-		//{
-		//	widget->Show();
-		//}
 	}
 
 	void Ailu::ImGUILayer::Begin()

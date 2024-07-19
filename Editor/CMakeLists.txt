@@ -30,7 +30,7 @@ add_source_files_recursive(${EDITOR_ROOT_PATH}/Src)
 # aux_source_directory (Src Editor_src_dir)
 # 为目标添加 include 目录
 
-add_executable(Editor WIN32 ${PROJECT_SOURCES})
+add_executable(Editor WIN32 ${PROJECT_SOURCES} Src/Common/Undo.cpp Inc/Common/Undo.h Inc/Widgets/PlaceActors.h)
 
 
 # 包含路径

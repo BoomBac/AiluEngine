@@ -52,6 +52,12 @@ namespace Ailu
             }
         }
 
+        static void DrawSphere(const Sphere& s, Color32 color = Gizmo::s_color)
+        {
+            Gizmo::DrawCircle(s._center, s._radius, 24, color, MatrixRotationX(ToRadius(90.0f)));
+            Gizmo::DrawCircle(s._center, s._radius, 24, color, MatrixRotationZ(ToRadius(90.0f)));
+            Gizmo::DrawCircle(s._center, s._radius, 24, color);
+        }
         static void DrawAABB(const AABB& aabb, Color32 color = Gizmo::s_color)
         {
             DrawAABB(aabb._min, aabb._max, color);
@@ -84,6 +90,10 @@ namespace Ailu
             DrawLine(vertices[6], vertices[7], color);
         }
 
+        static void DrawCube(const Vector3f& center, const Vector3f& size, u32 sec_duration,Color32 color = Gizmo::s_color)
+        {
+            s_geometry_draw_list.emplace_back(std::make_tuple([=]() { DrawCube(center, size, color);},std::chrono::system_clock::now(),std::chrono::seconds(sec_duration)));
+        }
         static void DrawLine(const Vector3f& from, const Vector3f& to, const Color32& color_from, const Color32& color_to)
         {
             if (Gizmo::s_color.a < 0.1f) return;

@@ -369,3 +369,4 @@ FodyWeavers.xsd
 /Engine/Ext/fbxsdk/include
 /cmake-build-ailu
 .idea/
+/Engine/Res/NewScene/Palace

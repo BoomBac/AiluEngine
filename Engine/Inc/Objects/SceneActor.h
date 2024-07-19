@@ -2,6 +2,7 @@
 #ifndef __SCENE_ACTOR_H__
 #define __SCENE_ACTOR_H__
 #include "Actor.h"
+#include "Framework/Math/Geometry.h"
 #include "TransformComponent.h"
 namespace Ailu
 {
@@ -10,6 +11,8 @@ namespace Ailu
 		template<class T>
 		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
 	public:
+        inline static f32 s_global_aabb_scale = 1.0f;
+        inline static const f32 kBasAABBInitialSize = 100.0f;
 		DISALLOW_COPY_AND_ASSIGN(SceneActor)
 		SceneActor();
 		~SceneActor();
@@ -18,15 +21,14 @@ namespace Ailu
 		const Transform& GetTransform() const { return _p_transform->SelfTransform(); }
 		TransformComponent* GetTransformComponent() { return _p_transform; }
 		void Serialize(std::ostream& os, String indent) override;
-#ifdef EDITOR
-		bool _is_selected;
-#endif // EDITOR
-
+        const AABB& BaseAABB() const {return _base_aabb;}
 		//SceneActor& operator=(const SceneActor& other)
 		//{
 		//	return *this;
 		//}
 	protected:
+        //for pick
+        AABB _base_aabb;
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;
 	private:
 		TransformComponent* _p_transform = nullptr;

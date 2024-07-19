@@ -1,5 +1,6 @@
 #include "Widgets/WorldOutline.h"
 #include "Common/Selection.h"
+#include "Widgets/InputLayer.h"
 //----engine--------
 #include "Ext/imgui/imgui.h"
 #include "Framework/Common/SceneMgr.h"
@@ -76,6 +77,10 @@ namespace Ailu
 			{
 				_selected_actor = actor;
 			}
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            {
+                OnOutlineDoubleClicked(actor);
+            }
 			if (b_root_node_open)
 			{
 				//s_cur_frame_selected_actor_id = actor->Id();
@@ -104,6 +109,10 @@ namespace Ailu
 							{
 								_selected_actor = static_cast<SceneActor*>(child);
 							}
+                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                            {
+                                OnOutlineDoubleClicked(dynamic_cast<SceneActor *>(child));
+                            }
 							if (ImGui::BeginPopupContextItem()) // <-- use last item id as popup id
 							{
 								if (ImGui::MenuItem("Rename"))
@@ -133,5 +142,22 @@ namespace Ailu
 			}
 			ImGui::PopID();
 		}
-	}
+
+        void WorldOutline::OnOutlineDoubleClicked(SceneActor* actor)
+        {
+            auto target_pos = actor->GetTransformComponent()->GetPosition();
+            auto static_mesh = actor->GetComponent<StaticMeshComponent>();
+            f32 dis = 200.0f;
+            if(static_mesh)
+            {
+                dis = static_mesh->GetAABB()[0].Diagon() * 1.1f;
+            }
+            else
+            {
+                dis = actor->BaseAABB().Diagon() * 1.1f;
+            }
+            target_pos += -Camera::sCurrent->Forward() * dis;
+            FirstPersonCameraController::s_inst.SetTargetPosition(target_pos,true);
+        }
+    }
 }

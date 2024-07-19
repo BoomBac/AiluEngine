@@ -2,23 +2,30 @@ guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
 type: kMaterial
 name: StandardPBR
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
-surface_type: kOpaque
+keywords: 
   prop_type: Uint
+    _SamplerMask: 0
+    _MaterialID: 0
     SamplerMask: 0
-    MaterialID: 0
+    _MaterialID: 0
+    _SamplerMask: 0
+    _material_id: 0
+    _surface: 0
   prop_type: Float
-    MetallicValue: 0
-    RoughnessValue: 0
+    g_IndirectLightingIntensity: 0
+    _RoughnessValue: 0
+    _MetallicValue: 0
+    _AlphaCulloff: 0.602
   prop_type: Vector
-    SpecularColor: 0,0,0,0
     _ScreenParams: 0,0,0,0
     _ZBufferParams: 0,0,0,0
-    BaseColor: 1,1,1,1
-    EmssiveColor: 0,0,0,0
+    _CascadeShadowParams: 0,0,0,0
+    _EmissionValue: 0,0,0,0
+    _AlbedoValue: 1,1,1,0.898039
+    _SpecularValue: 0,0,0,0
   prop_type: Texture2D
-    Specular: null guid
-    Metallic: null guid
-    Albedo: null guid
-    Normal: null guid
-    Emssive: null guid
-    Roughness: null guid
+    _AlbedoTex: null guid
+    _EmissionTex: null guid
+    _NormalTex: null guid
+    _RoughnessMetallicTex: null guid
+    _SpecularTex: null guid

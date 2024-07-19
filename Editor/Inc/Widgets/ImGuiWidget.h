@@ -1,9 +1,12 @@
 #pragma once
 #ifndef __IMGUIWIDGET_H__
 #define __IMGUIWIDGET_H__
-#include <functional>
-#include "GlobalMarco.h"
+#include "Framework/Events/Event.h"
 #include "Framework/Math/ALMath.hpp"
+#include "GlobalMarco.h"
+#include "Objects/Object.h"
+#include <functional>
+#include <mutex>
 
 namespace Ailu
 {
@@ -19,17 +22,24 @@ namespace Ailu
 			inline static const String kDragFolderTreeType = "DRAG_FOLDER_TREE_INNEAR";
 			inline static const String kDragAssetType =		 "DRAG_ASSET_INNEAR";
 			inline static const String kDragAssetMesh =		 "DRAG_ASSET_MESH";
+			inline static const String kDragAssetMaterial =		 "DRAG_ASSET_MATERIAL";
+			inline static const String kDragAssetTexture2D =		 "DRAG_ASSET_TEXTURE2D";
 			inline static const WString kNull = L"null";
 
 			inline static bool s_global_modal_window_info[256]{ false };
 			static void MarkModalWindoShow(const int& handle);
 			static String ShowModalDialog(const String& title, int handle = 0);
 			static String ShowModalDialog(const String& title, std::function<void()> show_widget, int handle = 0);
+            static void DisplayProgressBar(const String& title,f32 progress);
+            static void ClearProgressBar();
+            static void ShowProgressBar();
 			static void SetFocus(const String& title);
 			static void EndFrame() { s_global_widegt_handle = 0; }
 			static u32 GetGlobalWidgetHandle() { return s_global_widegt_handle++; }
 
-			ImGuiWidget(const String& title);
+            static void OnObjectDropdown(const String& tag,std::function<void(Object*)> f);
+
+            ImGuiWidget(const String& title);
 			~ImGuiWidget();
 			virtual void Open(const i32& handle);
 			virtual void Close(i32 handle);
@@ -44,6 +54,7 @@ namespace Ailu
 			Vector2f Position() const { return _pos; }
             //start at screen left top
             Vector2f GlobalPostion() const {return _global_pos;}
+            virtual void OnEvent(Event& e);
 		public:
 			String _title;
 		protected:
@@ -55,10 +66,12 @@ namespace Ailu
 			i32  _handle = -1;
 			bool _b_show = false;
 			bool _b_pre_show = false;
-			bool _is_hide_common_widget_info = false;
+			bool _is_hide_common_widget_info = true;
 			bool _allow_close = true;
 		private:
 			inline static u32 s_global_widegt_handle = 0u;
+            inline static Map<String,f32> s_progress_infos{};
+            inline static std::mutex s_progress_lock{};
 			List<WidgetCloseEvent> _close_events;
 		};
 	}

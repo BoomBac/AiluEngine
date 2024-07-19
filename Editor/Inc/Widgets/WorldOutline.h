@@ -19,6 +19,7 @@ namespace Ailu
 			void DrawTreeNode(SceneActor* actor,bool is_root);
 		private:
 			SceneActor* _selected_actor = nullptr;
+            void OnOutlineDoubleClicked(SceneActor* actor);
 		};
 	}
 }

@@ -10,6 +10,8 @@
 #include "Render/RenderConstants.h"
 #include "Framework/Common/ResourceMgr.h"
 
+#include "Objects/CameraComponent.h"
+
 namespace Ailu
 {
 	//-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
@@ -38,9 +40,8 @@ namespace Ailu
 	}
 	void ForwardPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		
-		auto& all_renderable = RenderQueue::GetAllRenderables();
-		u32 lowerBound = RenderQueue::kTransparent, upperBound = RenderQueue::kShaderCompiling;
+		auto& all_renderable = *rendering_data._cull_results;
+		u32 lowerBound = Shader::kRenderQueueOpaque, upperBound = Shader::kRenderQueueEnd;
 		auto filtered = all_renderable| std::views::filter([lowerBound, upperBound](const auto& kv) {
 			return kv.first >= lowerBound && kv.first <= upperBound;
 			}) | std::views::values;
@@ -55,47 +56,35 @@ namespace Ailu
 		{
 			ProfileBlock b(cmd.get(), _name);
 			cmd->SetRenderTarget(rendering_data._camera_color_target_handle,rendering_data._camera_depth_target_handle);
-			u32 obj_index = 0u;
-			for (auto& obj : RenderQueue::GetTransparentRenderables())
+			for (auto& it : all_renderable)
 			{
-				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, 0, obj._instance_count);
-				++obj_index;
+				auto& [queue, objs] = it;
+				if (queue >= Shader::kRenderQueueTransparent)
+				{
+					for (auto& obj : objs)
+					{
+						cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+					}
+				}
 			}
-			for (auto& obj : RenderQueue::GetErrorShaderRenderables())
-			{
-				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj.GetMesh(), shader_state_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, _error_shader_pass_id, obj._instance_count);
-				++obj_index;
-			}
-			obj_index = 0u;
-			for (auto& obj : RenderQueue::GetCompilingShaderRenderables())
-			{
-				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-				cmd->DrawRenderer(obj.GetMesh(), shader_state_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, _compiling_shader_pass_id, obj._instance_count);
-				++obj_index;
-			}
+			//for (auto& obj : RenderQueue::GetTransparentRenderables())
+			//{
+
+			//}
+			//for (auto& obj : RenderQueue::GetErrorShaderRenderables())
+			//{
+			//	memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+			//	cmd->DrawRenderer(obj.GetMesh(), shader_state_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, _error_shader_pass_id, obj._instance_count);
+			//	++obj_index;
+			//}
+			//obj_index = 0u;
+			//for (auto& obj : RenderQueue::GetCompilingShaderRenderables())
+			//{
+			//	memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+			//	cmd->DrawRenderer(obj.GetMesh(), shader_state_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, _compiling_shader_pass_id, obj._instance_count);
+			//	++obj_index;
+			//}
 		}
-		//if (RenderingStates::s_shadering_mode == EShaderingMode::kShader || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
-		//{
-		//	for (auto& obj : RenderQueue::GetOpaqueRenderables())
-		//	{
-		//		memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-		//		cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
-		//		++obj_index;
-		//	}
-		//}
-		//obj_index = 0;
-		//if (RenderingStates::s_shadering_mode == EShaderingMode::kWireFrame || RenderingStates::s_shadering_mode == EShaderingMode::kShaderedWireFrame)
-		//{
-		//	static auto wireframe_mat = MaterialLibrary::GetMaterial("Materials/WireFrame_new.alasset");
-		//	for (auto& obj : RenderQueue::GetOpaqueRenderables())
-		//	{
-		//		memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-		//		cmd->DrawRenderer(obj.GetMesh(), wireframe_mat.get(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
-		//		++obj_index;
-		//	}
-		//}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 	}
@@ -144,14 +133,10 @@ namespace Ailu
 	//-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
 	ShadowCastPass::ShadowCastPass() : RenderPass("ShadowCastPass"), _rect(Rect{ 0,0,kShadowMapSize,kShadowMapSize }), _addlight_rect(Rect{ 0,0,(u16)(kShadowMapSize >> 1),(u16)(kShadowMapSize >> 1) })
 	{
-		_p_mainlight_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize, "MainLightShadowMap", ERenderTargetFormat::kShadowMap);
-		//_p_addlight_shadow_map = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, "AddLightShadowMap", ERenderTargetFormat::kShadowMap);
+		_p_mainlight_shadow_map = RenderTexture::Create(kShadowMapSize, kShadowMapSize,RenderConstants::kMaxCascadeShadowMapSplitNum, "MainLightShadowMap",ERenderTargetFormat::kShadowMap);
 		_p_addlight_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, kShadowMapSize >> 1, RenderConstants::kMaxSpotLightNum, "AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
 		_p_point_light_shadow_maps = RenderTexture::Create(kShadowMapSize >> 1, "PointLightShadowMap", ERenderTargetFormat::kShadowMap, RenderConstants::kMaxPointLightNum);
-		//		_p_shadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
-		//		_p_shadowcast_material->SetUint("shadow_index",0);
-		//		_p_addshadowcast_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast");
-		for (int i = 0; i < 1 + RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxPointLightNum * 6; i++)
+		for (int i = 0; i < RenderConstants::kMaxCascadeShadowMapSplitNum + RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxPointLightNum * 6; i++)
 		{
 			_shadowcast_materials.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast"));
 			_shadowcast_materials[i]->SetUint("shadow_index", 0);
@@ -171,35 +156,39 @@ namespace Ailu
 			//方向光阴影，只有一个
 			if (rendering_data._shadow_data[0]._shadow_index != -1)
 			{
-				cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get());
-				cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(), 1.0f);
-				for (auto& obj : RenderQueue::GetOpaqueRenderables())
+				for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
 				{
-					cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[0].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+					cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get(),0,i);
+					cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(),i,1.0f);
+					_shadowcast_materials[i]->SetUint("shadow_index", rendering_data._shadow_data[i]._shadow_index);
+					for (auto& it : *rendering_data._shadow_data[i]._cull_results)
+					{
+						auto& [queue, objs] = it;
+						for (auto& obj : objs)
+						{
+							cmd->DrawRenderer(obj._mesh, _shadowcast_materials[i].get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, obj._instance_count);
+						}
+					}
 				}
-				for (auto& obj : RenderQueue::GetTransparentRenderables())
-				{
-					cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[0].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
-				}
-				obj_index = 0u;
 			}
 			//投灯阴影
 			if (rendering_data._addi_shadow_num > 0)
 			{
 				for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
 				{
-					if (rendering_data._shadow_data[i + 1]._shadow_index == -1)
+					int shadow_data_index = i + RenderConstants::kMaxCascadeShadowMapSplitNum;
+					if (rendering_data._shadow_data[shadow_data_index]._shadow_index == -1)
 						continue;
 					cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, i);
 					cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), i, 1.0f);
-					_shadowcast_materials[i + 1]->SetUint("shadow_index", rendering_data._shadow_data[i + 1]._shadow_index);
-					for (auto& obj : RenderQueue::GetOpaqueRenderables())
+					_shadowcast_materials[i + RenderConstants::kMaxCascadeShadowMapSplitNum]->SetUint("shadow_index", rendering_data._shadow_data[shadow_data_index]._shadow_index);
+					for (auto& it : *rendering_data._shadow_data[shadow_data_index]._cull_results)
 					{
-						cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[i + 1].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
-					}
-					for (auto& obj : RenderQueue::GetTransparentRenderables())
-					{
-						cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[i + 1].get(), rendering_data._p_per_object_cbuf[obj_index++], obj._submesh_index, obj._instance_count);
+						auto& [queue, objs] = it;
+						for (auto& obj : objs)
+						{
+							cmd->DrawRenderer(obj._mesh, _shadowcast_materials[shadow_data_index].get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, obj._instance_count);
+						}
 					}
 					obj_index = 0;
 				}
@@ -207,7 +196,7 @@ namespace Ailu
 			//点光阴影
 			if (rendering_data._addi_point_shadow_num > 0)
 			{
-				static const u32 pointshadow_mat_start = 1 + RenderConstants::kMaxSpotLightNum;
+				static const u32 pointshadow_mat_start = RenderConstants::kMaxCascadeShadowMapSplitNum + RenderConstants::kMaxSpotLightNum;
 				for (int i = 0; i < RenderConstants::kMaxPointLightNum; i++)
 				{
 					if (rendering_data._point_shadow_data[i]._camera_far == 0)
@@ -224,16 +213,25 @@ namespace Ailu
 						light_pos.y = rendering_data._point_shadow_data[i]._camera_far;
 						_shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetVector("_shadow_params", light_pos);
 						_shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetUint("shadow_index", rendering_data._point_shadow_data[i]._shadow_indices[j]);
-						for (auto& obj : RenderQueue::GetOpaqueRenderables())
+						for (auto& it : *rendering_data._point_shadow_data[i]._cull_results[j])
 						{
-							cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj_index++],
-								obj._submesh_index, 1, obj._instance_count);
+							auto& [queue, objs] = it;
+							for (auto& obj : objs)
+							{
+								cmd->DrawRenderer(obj._mesh, _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj._scene_id],
+								obj._submesh_index, 1,obj._instance_count);
+							}
 						}
-						for (auto& obj : RenderQueue::GetTransparentRenderables())
-						{
-							cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj_index++],
-								obj._submesh_index, 1, obj._instance_count);
-						}
+						//for (auto& obj : RenderQueue::GetOpaqueRenderables())
+						//{
+						//	cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj_index++],
+						//		obj._submesh_index, 1, obj._instance_count);
+						//}
+						//for (auto& obj : RenderQueue::GetTransparentRenderables())
+						//{
+						//	cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj_index++],
+						//		obj._submesh_index, 1, obj._instance_count);
+						//}
 						obj_index = 0;
 					}
 				}
@@ -264,11 +262,11 @@ namespace Ailu
 		float x = 0.f, y = 0.f, z = 0.f;
 		Vector3f center = { x,y,z };
 		Vector3f world_up = Vector3f::kUp;
-		_src_cubemap = RenderTexture::Create(size, texture_name + "_src_cubemap", ERenderTargetFormat::kDefaultHDR, true, true, true);
+		_src_cubemap = RenderTexture::Create(size, texture_name + "_src_cubemap", ERenderTargetFormat::kRGBAHalf, true, true, true);
 		_src_cubemap->CreateView();
-		_prefilter_cubemap = RenderTexture::Create(size, texture_name + "_prefilter_cubemap", ERenderTargetFormat::kDefaultHDR, true, true, true);
+		_prefilter_cubemap = RenderTexture::Create(size, texture_name + "_prefilter_cubemap", ERenderTargetFormat::kRGBAHalf, true, true, true);
 		_prefilter_cubemap->CreateView();
-		_radiance_map = RenderTexture::Create(size / 4, texture_name + "_radiance", ERenderTargetFormat::kDefaultHDR, false);
+		_radiance_map = RenderTexture::Create(size / 4, texture_name + "_radiance", ERenderTargetFormat::kRGBAHalf, false);
 		_radiance_map->CreateView();
 		_p_gen_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/CubemapGen");
 		_p_gen_material->SetTexture("env", ToWChar(src_texture_name));
@@ -369,7 +367,7 @@ namespace Ailu
 			}
 		}
 
-		Shader::SetGlobalTexture("SkyBox", _radiance_map.get());
+		Shader::SetGlobalTexture("SkyBox", _src_cubemap.get());
 		context->ExecuteCommandBuffer(cmd);
 		//_p_cube_map->GenerateMipmap(cmd.get());
 		CommandBufferPool::Release(cmd);
@@ -387,57 +385,42 @@ namespace Ailu
 	//-------------------------------------------------------------DeferedGeometryPass-------------------------------------------------------------
 	DeferredGeometryPass::DeferredGeometryPass(u16 width, u16 height) : RenderPass("DeferedGeometryPass")
 	{
-		_gbuffers.resize(3);
-		_p_lighting_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/deferred_lighting.alasset"), "DeferedGbufferLighting");
-		_p_quad_mesh = Mesh::s_p_quad;
 		for (int i = 0; i < _rects.size(); i++)
 			_rects[i] = Rect(0, 0, width, height);
-		_p_ibllut = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset");
-		_brdf_lut = Texture2D::Create(128,128,false,ETextureFormat::kRGFloat,false,true);
-		_brdf_lut->Apply();
-		_brdf_lut->Name("brdf_lut_tex");
-		_brdflut_gen = ComputeShader::Create(PathUtils::GetResSysPath(L"Shaders/hlsl/Compute/brdflut_gen.alcp"));
-		_brdflut_gen->SetTexture("_brdf_lut",_brdf_lut.get());
-		auto cmd = CommandBufferPool::Get();
-		cmd->Dispatch(_brdflut_gen.get(),8,8,1);
-		g_pGfxContext->ExecuteCommandBuffer(cmd);
 	}
 	void DeferredGeometryPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
-		if (RenderQueue::GetOpaqueRenderables().size() == 0)
+		if (rendering_data._cull_results->size() == 0)
 			return;
 		auto w = rendering_data._width, h = rendering_data._height;
 		for (int i = 0; i < _rects.size(); i++)
 			_rects[i] = Rect(0, 0, w, h);
-		_gbuffers[0] = RenderTexture::GetTempRT(w, h, "GBuffer0", ERenderTargetFormat::kRGHalf);
-		_gbuffers[1] = RenderTexture::GetTempRT(w, h, "GBuffer1", ERenderTargetFormat::kDefault);
-		_gbuffers[2] = RenderTexture::GetTempRT(w, h, "GBuffer2", ERenderTargetFormat::kDefault);
 
 		auto cmd = CommandBufferPool::Get("DeferredRenderPass");
 		{
 			ProfileBlock profile(cmd.get(), _name);
-			cmd->SetRenderTargets(_gbuffers, rendering_data._camera_depth_target_handle);
-			cmd->ClearRenderTarget(_gbuffers, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
+			cmd->SetRenderTargets(rendering_data._gbuffers, rendering_data._camera_depth_target_handle);
+			cmd->ClearRenderTarget(rendering_data._gbuffers, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
 			cmd->SetViewports({ _rects[0],_rects[1],_rects[2] });
 			cmd->SetScissorRects({ _rects[0],_rects[1],_rects[2] });
 
 			u32 obj_index = 0;
-			for (auto& obj : RenderQueue::GetOpaqueRenderables())
+			for (auto& it : *rendering_data._cull_results)
 			{
-				memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-				auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
-				++obj_index;
+				auto& [queue, objs] = it;
+				for (auto& obj : objs)
+				{
+					//memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj._world_matrix, sizeof(Matrix4x4f));
+					auto ret = cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, obj._instance_count);
+					++obj_index;
+				}
 			}
-			_p_lighting_material->SetTexture("_GBuffer0", _gbuffers[0]);
-			_p_lighting_material->SetTexture("_GBuffer1", _gbuffers[1]);
-			_p_lighting_material->SetTexture("_GBuffer2", _gbuffers[2]);
-			_p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_target_handle);
-			Shader::SetGlobalTexture("IBLLut", _brdf_lut.get());
-			cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
-			cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, Colors::kBlack);
-			cmd->SetViewport(rendering_data._viewport);
-			cmd->SetScissorRect(rendering_data._scissor_rect);
-			cmd->DrawRenderer(_p_quad_mesh, _p_lighting_material.get(), 1);
+			//for (auto& obj : RenderQueue::GetOpaqueRenderables())
+			//{
+			//	memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+			//	auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
+			//	++obj_index;
+			//}
 		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
@@ -448,11 +431,50 @@ namespace Ailu
 	}
 	void DeferredGeometryPass::EndPass(GraphicsContext* context)
 	{
-		RenderTexture::ReleaseTempRT(_gbuffers[0]);
-		RenderTexture::ReleaseTempRT(_gbuffers[1]);
-		RenderTexture::ReleaseTempRT(_gbuffers[2]);
+
 	}
 	//-------------------------------------------------------------DeferedGeometryPass-------------------------------------------------------------
+
+	//-------------------------------------------------------------DeferedLightingPass-------------------------------------------------------------
+	DeferredLightingPass::DeferredLightingPass() : RenderPass("DeferredLightingPass")
+	{
+		_p_lighting_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/deferred_lighting.alasset"), "DeferedGbufferLighting");
+		_brdf_lut = Texture2D::Create(128, 128, false, ETextureFormat::kRGFloat, false, true);
+		_brdf_lut->Apply();
+		_brdf_lut->Name("brdf_lut_tex");
+		_brdflut_gen = ComputeShader::Create(PathUtils::GetResSysPath(L"Shaders/hlsl/Compute/brdflut_gen.alcp"));
+		_brdflut_gen->SetTexture("_brdf_lut", _brdf_lut.get());
+		auto cmd = CommandBufferPool::Get();
+		cmd->Dispatch(_brdflut_gen.get(), 8, 8, 1);
+		g_pGfxContext->ExecuteCommandBuffer(cmd);
+	}
+	void DeferredLightingPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
+	{
+		_p_lighting_material->SetTexture("_GBuffer0", rendering_data._gbuffers[0]);
+		_p_lighting_material->SetTexture("_GBuffer1", rendering_data._gbuffers[1]);
+		_p_lighting_material->SetTexture("_GBuffer2", rendering_data._gbuffers[2]);
+		_p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
+		Shader::SetGlobalTexture("IBLLut", _brdf_lut.get());
+		auto cmd = CommandBufferPool::Get("DeferredLightingPass");
+		{
+			ProfileBlock profile(cmd.get(), _name);
+			//cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+			cmd->SetRenderTarget(rendering_data._camera_color_target_handle,rendering_data._camera_depth_target_handle);
+			cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, Colors::kBlack);
+			//cmd->SetViewport(rendering_data._viewport);
+			//cmd->SetScissorRect(rendering_data._scissor_rect);
+			cmd->DrawRenderer(Mesh::s_p_quad, _p_lighting_material.get(), 1);
+		}
+		context->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
+	}
+	void DeferredLightingPass::BeginPass(GraphicsContext* context)
+	{
+	}
+	void DeferredLightingPass::EndPass(GraphicsContext* context)
+	{
+	}
+	//-------------------------------------------------------------DeferedLightingPass-------------------------------------------------------------
 
 
 	//-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
@@ -493,10 +515,18 @@ namespace Ailu
 	//-------------------------------------------------------------GizmoPass-------------------------------------------------------------
 	GizmoPass::GizmoPass() : RenderPass("GizmoPass")
 	{
+		for (int i = 0; i < 10; i++)
+		{
+			_p_cbuffers.push_back(std::unique_ptr<ConstantBuffer>(ConstantBuffer::Create(256)));
+		}
 	}
 	void GizmoPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
 		auto cmd = CommandBufferPool::Get("GizmoPass");
+        static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
+        static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
+        static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
+        static auto mat_camera_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
 		cmd->Clear();
 		{
 			ProfileBlock profile(cmd.get(), _name);
@@ -506,6 +536,39 @@ namespace Ailu
 			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(cmd.get());
 			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(cmd.get(), Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
 			Gizmo::Submit(cmd.get());
+			u16 index = 0;
+			for (auto it : g_pSceneMgr->_p_current->GetAllComponents())
+			{
+                if(it == nullptr)
+                    continue ;
+                auto light_comp = dynamic_cast<LightComponent*>(it);
+                auto world_pos = it->GetOwner()->GetComponent<TransformComponent>()->GetPosition();
+                auto m = MatrixTranslation(world_pos);
+                f32 scale = dynamic_cast<SceneActor*>(it->GetOwner())->BaseAABB().Size().x;
+                m = MatrixScale(scale, scale, scale) * m;
+                memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
+                if(light_comp)
+                {
+                    switch (light_comp->LightType())
+                    {
+                        case ELightType::kDirectional:
+                            cmd->DrawRenderer(Mesh::s_p_quad,mat_directional_light, _p_cbuffers[index++].get(), 0, 0, 1);
+                            break;
+                        case ELightType::kPoint:
+                            cmd->DrawRenderer(Mesh::s_p_quad,mat_point_light, _p_cbuffers[index++].get(), 0, 0, 1);
+                            break;
+                        case ELightType::kSpot:
+                            cmd->DrawRenderer(Mesh::s_p_quad,mat_spot_light, _p_cbuffers[index++].get(), 0, 0, 1);
+                            break;
+                    }
+                    continue;
+                }
+                auto cam_comp = dynamic_cast<CameraComponent*>(it);
+                if(cam_comp)
+                {
+                    cmd->DrawRenderer(Mesh::s_p_quad,mat_camera_light, _p_cbuffers[index++].get(), 0, 0, 1);
+                }
+			}
 		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
@@ -584,4 +647,37 @@ namespace Ailu
 		_p_blit_mat->SetTexture("_SourceTex", nullptr);
 	}
 	//-------------------------------------------------------------CopyColorPass-------------------------------------------------------------
+
+	//-------------------------------------------------------------CopyDepthPass-------------------------------------------------------------
+	CopyDepthPass::CopyDepthPass() : RenderPass("CopyDepthPass")
+	{
+		_p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
+		//_p_obj_cb = ConstantBuffer::Create(256);
+		//memcpy(_p_obj_cb->GetData(), &BuildIdentityMatrix(), sizeof(Matrix4x4f));
+	}
+	CopyDepthPass::~CopyDepthPass()
+	{
+	}
+	void CopyDepthPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
+	{
+		auto cmd = CommandBufferPool::Get("CopyDepth");
+		cmd->Clear();
+		{
+			ProfileBlock profile(cmd.get(), _name);
+			//cmd->SetRenderTarget(rendering_data._camera_depth_target_handle);
+			cmd->SetRenderTarget(rendering_data._camera_depth_tex_handle);
+			_p_blit_mat->SetTexture("_SourceTex", rendering_data._camera_depth_target_handle);
+			cmd->DrawRenderer(Mesh::s_p_quad, _p_blit_mat, 1,1);
+		}
+		context->ExecuteCommandBuffer(cmd);
+		CommandBufferPool::Release(cmd);
+	}
+	void CopyDepthPass::BeginPass(GraphicsContext* context)
+	{
+	}
+	void CopyDepthPass::EndPass(GraphicsContext* context)
+	{
+		_p_blit_mat->SetTexture("_SourceTex", nullptr);
+	}
+	//-------------------------------------------------------------CopyDepthPass-------------------------------------------------------------
 }

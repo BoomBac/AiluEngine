@@ -1,0 +1,31 @@
+guid: 46601513-96ea-4cc4-86db-0400c8824ec1
+type: kMaterial
+name: MAT_Red
+shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
+keywords: 
+  prop_type: Uint
+    _SamplerMask: 0
+    _MaterialID: 0
+    SamplerMask: 0
+    _MaterialID: 0
+    _SamplerMask: 0
+    _material_id: 0
+    _surface: 0
+  prop_type: Float
+    g_IndirectLightingIntensity: 0
+    _RoughnessValue: 0.012
+    _MetallicValue: 0
+    _AlphaCulloff: 0.602
+  prop_type: Vector
+    _ScreenParams: 0,0,0,0
+    _ZBufferParams: 0,0,0,0
+    _CascadeShadowParams: 0,0,0,0
+    _EmissionValue: 0,0,0,0
+    _AlbedoValue: 0.853982,0.853982,0.853982,0.258824
+    _SpecularValue: 0,0,0,0
+  prop_type: Texture2D
+    _AlbedoTex: null guid
+    _EmissionTex: null guid
+    _NormalTex: null guid
+    _RoughnessMetallicTex: null guid
+    _SpecularTex: null guid

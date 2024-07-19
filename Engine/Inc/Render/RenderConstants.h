@@ -23,18 +23,20 @@ namespace Ailu
 		constexpr static u16 kMaxDirectionalLightNum = kMaxDirectionalLight;
 		constexpr static u16 kMaxPointLightNum = kMaxPointLight;
 		constexpr static u16 kMaxSpotLightNum = kMaxSpotLight;
+		constexpr static u16 kMaxCascadeShadowMapSplitNum = kMaxCascadeShadowMapSplit;
 
-		constexpr static u32 kPerMaterialDataSize = sizeof(ScenePerMaterialData);
+		constexpr static u32 kPerMaterialDataSize = 256;//sizeof(ScenePerMaterialData);
 		constexpr static u32 kPeObjectDataSize = sizeof(ScenePerObjectData);
 		constexpr static u32 kPePassDataSize = sizeof(ScenePerPassData);
 		constexpr static u32 kPerFrameDataSize = sizeof(ScenePerFrameData);
 		//2 is pass count,create cbv for each pass
 		constexpr static u32 kPerFrameTotalSize = kPerFrameDataSize + kPerMaterialDataSize * kMaxMaterialDataCount * 2 + kPePassDataSize * kMaxPassDataCount+
 			kPeObjectDataSize * kMaxRenderObjectCount;
-		constexpr static wchar_t kVSModel_5_0[] = L"vs_5_0";
-		constexpr static wchar_t kPSModel_5_0[] = L"ps_5_0";
-		constexpr static wchar_t kVSModel_6_1[] = L"vs_6_1";
-		constexpr static wchar_t kPSModel_6_1[] = L"ps_6_1";
+		inline const static String kVSModel_5_0 = "vs_5_0";
+		inline const static String kPSModel_5_0 = "ps_5_0";
+		inline const static String kVSModel_6_1 = "vs_6_1";
+		inline const static String kPSModel_6_1 = "ps_6_1";
+		inline const static String kCSModel_5_0 = "cs_5_0";
 
 		inline const static char* kSemanticPosition = "POSITION";
 		inline const static char* kSemanticColor = "COLOR";

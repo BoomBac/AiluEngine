@@ -10,6 +10,9 @@ SamplerComparisonState g_ShadowSampler : register(s3);
 SamplerState g_AnisotropicClampSampler : register(s4);
 
 
+#define TEXTURE2D(name,slot) Texture2D name : register(t##slot);
+#define SAMPLE_TEXTURE2D(t,s,uv) t.Sample(s, uv)
+
 float Pow2(float x)
 {
 	return x*x;
@@ -17,6 +20,20 @@ float Pow2(float x)
 float Pow4(float x)
 {
 	return x*x*x*x;
+}
+float SqrDistance(float3 p1,float3 p2)
+{
+	return dot(p1-p2,p1-p2);
+}
+
+float3 TransformToViewSpace(float3 obj_pos)
+{
+    return mul(_MatrixV,float4(obj_pos,1.0f));
+}
+
+float3 GetObjectWorldPos()
+{
+	return float3(_MatrixWorld[0][3],_MatrixWorld[1][3],_MatrixWorld[2][3]);
 }
 
 float4 TransformToClipSpace(float3 object_pos)
@@ -51,13 +68,10 @@ float4 TransformFromWorldToLightSpace(uint shadow_index, float3 world_pos)
 	return mul(_ShadowMatrix[shadow_index], float4(world_pos, 1.0f));
 }
 
-	inline void GammaCorrect
-
-	(inout
-	float3 color, float gamma)
+inline void GammaCorrect(inout float3 color, float gamma)
 {
-		color = pow(color, F3_WHITE / gamma);
-	}
+	color = pow(color, F3_WHITE / gamma);
+}
 
 //https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
 float2 OctWrap(float2 v)

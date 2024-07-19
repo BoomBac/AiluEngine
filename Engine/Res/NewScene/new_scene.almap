@@ -30,8 +30,8 @@ SceneGraph:
             Color: 1,1,1
             Intensity: 1
             CastShadow: false
-            ShadowArea: 0
-            ShadowDistance: 0
+            ConstantBias: 0
+            SlopeBias: 0
         Children: 0
       Name: point_light
         Components: 
@@ -45,8 +45,8 @@ SceneGraph:
             Intensity: 1
             Radius: 500
             CastShadow: false
-            ShadowArea: 0
-            ShadowDistance: 0
+            ConstantBias: 0
+            SlopeBias: 0
         Children: 0
       Name: spot_light
         Components: 
@@ -62,6 +62,6 @@ SceneGraph:
             Inner: 45
             Outer: 60
             CastShadow: false
-            ShadowArea: 0
-            ShadowDistance: 0
+            ConstantBias: 0
+            SlopeBias: 0
         Children: 0

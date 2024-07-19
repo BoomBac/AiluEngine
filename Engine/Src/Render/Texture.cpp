@@ -31,7 +31,7 @@ namespace Ailu
 	}
 
 	Texture::Texture(u16 width, u16 height) : _width(width), _height(height), _mipmap_count(0), _pixel_format(EALGFormat::EALGFormat::kALGFormatUnknown), _dimension(ETextureDimension::kUnknown), 
-		_filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp),_is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false),_p_asset(nullptr)
+		_filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp),_is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false)
 	{
 	}
 

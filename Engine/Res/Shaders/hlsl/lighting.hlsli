@@ -6,17 +6,11 @@
 #include "brdf.hlsli"
 #include "constants.hlsli"
 #include "shadow.hlsli"
+#include "standard_lit_common.hlsli"
 
-
-Texture2D Albedo : register(t0);
-Texture2D Normal : register(t1);
-Texture2D Emssive : register(t2);
-Texture2D Roughness : register(t3);
-Texture2D Metallic : register(t4);
-Texture2D Specular : register(t5);
-TextureCube RadianceTex : register(t6);
-TextureCube PrefilterEnvTex : register(t7);
-Texture2D IBLLut : register(t8);
+TextureCube RadianceTex : register(t5);
+TextureCube PrefilterEnvTex : register(t6);
+Texture2D   IBLLut : register(t7);
 
 float GetDistanceAtt(float distance,float atten_radius)
 {
@@ -64,15 +58,11 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 	float3 view_dir = normalize(_CameraPos.xyz - world_pos);
 	ShadingData shading_data;
 	LightData light_data;
-	light_data.shadow_atten = 1.0;
-	float4 shadow_pos = TransformFromWorldToLightSpace(0,world_pos.xyz);
 	float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface.wnormal));
-	float shadow_factor = 1.0;
-	light_data.shadow_atten = shadow_factor;
-	//return light_data.shadow_atten.xxx;
 	shading_data.nv = saturate(dot(view_dir,surface.wnormal));//max(saturate(dot(view_dir,surface.wnormal)),0.000001);
 	for (uint i = 0; i < MAX_DIRECTIONAL_LIGHT; i++)
 	{
+		light_data.shadow_atten = 1.0;
 		float3 light_dir = -_DirectionalLights[i]._LightPosOrDir;
 		float3 hv = normalize(view_dir + light_dir);
 		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
@@ -83,13 +73,15 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_color = _DirectionalLights[i]._LightColor;
 		light_data.light_pos = _DirectionalLights[i]._LightPosOrDir;
 		if(_DirectionalLights[i]._ShadowDataIndex != -1)
-			shadow_factor = ApplyShadow(shadow_pos, nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
-		light_data.shadow_atten = shadow_factor;
+		{
+			light_data.shadow_atten = ApplyCascadeShadow(nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
+		}
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
 	}
 	light_data.shadow_atten = 1.0f;
 	for (uint j = 0; j < MAX_POINT_LIGHT; j++)
 	{
+		light_data.shadow_atten = 1.0;
 		float3 light_dir = -normalize(world_pos - _PointLights[j]._LightPosOrDir);
 		float3 hv = normalize(view_dir + light_dir);
 		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
@@ -101,14 +93,14 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_pos = _PointLights[j]._LightPosOrDir;
 		if(_PointLights[j]._ShadowDataIndex != -1)
 		{
-			shadow_factor = ApplyShadowPointLight(_PointLights[j]._ShadowNear,_PointLights[j]._ShadowDistance,shading_data.nl,
+			light_data.shadow_atten = ApplyShadowPointLight(10,_PointLights[j]._LightParam0 * 1.5f,shading_data.nl,
 				world_pos,light_data.light_pos,j);
 		}
-		light_data.shadow_atten = shadow_factor;
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
 	}
 	for (uint k = 0; k < MAX_SPOT_LIGHT; k++)
 	{
+		light_data.shadow_atten = 1.0;
 		float3 light_dir = -normalize(_SpotLights[k]._LightDir);
 		float3 hv = normalize(view_dir + light_dir);
 		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
@@ -119,12 +111,11 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
 		light_data.light_color = _SpotLights[k]._LightColor;
 		light_data.light_pos = _SpotLights[k]._LightPos;
 		if(_SpotLights[k]._ShadowDataIndex != -1)
-		{
+		{ 
 			uint shadow_index = _SpotLights[k]._ShadowDataIndex;
-			shadow_pos = TransformFromWorldToLightSpace(shadow_index,world_pos.xyz);
-			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos.xyz,_SpotLights[k]._ShadowDistance,k);
+			float4 shadow_pos = TransformFromWorldToLightSpace(shadow_index,world_pos.xyz);
+			light_data.shadow_atten = ApplyShadowAddLight(shadow_pos, nl, world_pos.xyz,k);
 		}
-		light_data.shadow_atten = shadow_factor;
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos);
 	}
 	//indirect light
@@ -144,9 +135,8 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos)
     // float3 F_avg = F0 + (1.0 - F0) / 21.0;
     // float3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
     // float3 k_D = diffuse_color * (1.0 - FssEss - FmsEms);
-	float ibl_intensity = 0.5;
 	float3 FssEss = F0 * envBRDF.x + envBRDF.y;
-	light += (FssEss * radiance + diffuse_color * irradiance) * ibl_intensity;
+	light += (FssEss * radiance + diffuse_color * irradiance) * g_IndirectLightingIntensity;
 	return light; 
 }
 #endif //__LIGHTING_H__

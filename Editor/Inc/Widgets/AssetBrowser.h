@@ -21,7 +21,7 @@ namespace Ailu
 			void Open(const i32& handle) final;
 			void Close(i32 handle) final;
 		private:
-			void OnUpdateAssetList();
+			void OnUpdateAssetList(const ISearchFilter& filter);
 			void ShowImpl() final;
 			void ShowNewMaterialWidget();
 			void DrawFolder(std::filesystem::path dir_path, u32 cur_file_index);
@@ -44,6 +44,7 @@ namespace Ailu
 			f32 _left_pannel_width, _right_pannel_width;
 			u32 _new_material_modal_window_handle = 0;
 			WString _draging_file;
+            Asset* _hovered_asset = nullptr;
 			TextureDetailView* _p_tex_detail_widget;
 			Map<WString, Vector<Asset*>> _dir_asset_map;
 			//当前目录下选中的文件索引
@@ -56,6 +57,9 @@ namespace Ailu
 			Texture* _image_icon;
 			Texture* _scene_icon;
 			Texture* _material_icon;
+            bool _is_search_active = false;
+            char _search_buf[256];
+            WString _search_str;
 			Vector<Asset*> _cur_dir_assets;
 			WString _selected_file_sys_path;
 			bool _dirty;

@@ -8,65 +8,18 @@
 
 namespace Ailu
 {
-	static void MarkTextureUsedHelper(u32& mask, const ETextureUsage& usage, const bool& b_use)
-	{
-		switch (usage)
-		{
-		case Ailu::ETextureUsage::kAlbedo: mask = b_use ? mask | 0x01 : mask & (~0x01);
-			break;
-		case Ailu::ETextureUsage::kNormal: mask = b_use ? mask | 0x02 : mask & (~0x02);
-			break;
-		case Ailu::ETextureUsage::kEmssive: mask = b_use ? mask | 0x04 : mask & (~0x04);
-			break;
-		case Ailu::ETextureUsage::kRoughness: mask = b_use ? mask | 0x08 : mask & (~0x08);
-			break;
-		case Ailu::ETextureUsage::kSpecular: mask = b_use ? mask | 0x10 : mask & (~0x10);
-			break;
-		case Ailu::ETextureUsage::kMetallic: mask = b_use ? mask | 0x20 : mask & (~0x20);
-			break;
-		}
-	}
-
 	Material::Material(Shader* shader, String name) : _p_shader(shader)
 	{
 		AL_ASSERT(s_total_material_num > RenderConstants::kMaxMaterialDataCount);
 		_name = name;
-		_b_internal = false;
 		_p_active_shader = _p_shader;
-		_surface = ESurfaceType::kOpaque;
 		Construct(true);
 		shader->AddMaterialRef(this);
-		//只有首个pass支持默认着色
-		for (int i = 0; i < shader->PassCount(); i++)
-		{
-			auto& cur_variant_bind_infos = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
-			auto it = cur_variant_bind_infos.find("SamplerMask");
-			if (it != cur_variant_bind_infos.end())
-			{
-				_b_internal = true;
-				_sampler_mask_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
-				_standard_pass_index = i;
-			}
-			it = cur_variant_bind_infos.find("MaterialID");
-			if (it != cur_variant_bind_infos.end())
-			{
-				_b_internal = true;
-				_material_id_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
-			}
-			if (_standard_pass_index != -1)
-				break;
-		}
-		_material_id = EMaterialID::kStandard;
 		++s_total_material_num;
 	}
 
 	Material::Material(const Material& other)
 	{
-		_b_internal = other._b_internal;
-		_material_id = other._material_id;
-		_sampler_mask_offset = other._sampler_mask_offset;
-		_material_id_offset = other._material_id_offset;
-		_surface = other._surface;
 		_p_active_shader = other._p_active_shader;
 		//标准pass才会使用上面两个变量
 		_standard_pass_index = other._standard_pass_index;
@@ -83,11 +36,6 @@ namespace Ailu
 
 	Material::Material(Material&& other) noexcept
 	{
-		_b_internal = other._b_internal;
-		_material_id = other._material_id;
-		_sampler_mask_offset = other._sampler_mask_offset;
-		_material_id_offset = other._material_id_offset;
-		_surface = other._surface;
 		//标准pass才会使用上面两个变量
 		_standard_pass_index = other._standard_pass_index;
 		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
@@ -101,11 +49,6 @@ namespace Ailu
 
 	Material& Material::operator=(const Material& other)
 	{
-		_b_internal = other._b_internal;
-		_material_id = other._material_id;
-		_sampler_mask_offset = other._sampler_mask_offset;
-		_material_id_offset = other._material_id_offset;
-		_surface = other._surface;
 		//标准pass才会使用上面两个变量
 		_standard_pass_index = other._standard_pass_index;
 		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
@@ -123,11 +66,6 @@ namespace Ailu
 
 	Material& Material::operator=(Material&& other) noexcept
 	{
-		_b_internal = other._b_internal;
-		_material_id = other._material_id;
-		_sampler_mask_offset = other._sampler_mask_offset;
-		_material_id_offset = other._material_id_offset;
-		_surface = other._surface;
 		//标准pass才会使用上面两个变量
 		_standard_pass_index = other._standard_pass_index;
 		_mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
@@ -150,12 +88,7 @@ namespace Ailu
 		auto variant_state = _p_active_shader->GetVariantState(pass_index, cur_pass_variant_hash);
 		if (variant_state != EShaderVariantState::kReady)
 			return;
-		if (_material_id_offset != 0)
-		{
-			memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, (u32)_material_id, sizeof(u32));
-		}
 		_p_active_shader->Bind(pass_index, cur_pass_variant_hash);
-
 		i8 cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._per_mat_buf_bind_slot;
 		if (cbuf_bind_slot != -1)
 		{
@@ -171,7 +104,7 @@ namespace Ailu
 				if (texture != nullptr)
 				{
 					//texture->Bind(slot);
-					GraphicsPipelineStateMgr::SubmitBindResource(texture, slot);
+					GraphicsPipelineStateMgr::SubmitBindResource(texture, bind_infos[it->first]._bind_slot);
 				}
 			}
 			//else
@@ -188,18 +121,6 @@ namespace Ailu
 		_p_shader->AddMaterialRef(this);
 		Construct(false);
 	}
-	void Material::SurfaceType(const ESurfaceType::ESurfaceType & value)
-	{
-		if (_surface == value)
-			return;
-		if (value == ESurfaceType::kOpaque)
-			_p_active_shader = _p_shader;
-		else if (value == ESurfaceType::kTransparent)
-		{
-			_p_active_shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
-		}
-		_surface = value;
-	}
 
 	bool Material::IsReadyForDraw() const
 	{
@@ -211,32 +132,6 @@ namespace Ailu
 			++pass_index;
 		}
 		return true;
-	}
-
-	void Material::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)
-	{
-		//40 根据shader中MaterialBuf计算，可能会有变动
-		u32* sampler_mask = reinterpret_cast<u32*>(_p_cbufs[_standard_pass_index]->GetData() + _sampler_mask_offset);
-		//*sampler_mask = 0;
-		for (auto& usage : use_infos)
-		{
-			MarkTextureUsedHelper(*sampler_mask, usage, b_use);
-		}
-	}
-
-	bool Material::IsTextureUsed(ETextureUsage use_info)
-	{
-		u32 sampler_mask = *reinterpret_cast<u32*>(_p_cbufs[_standard_pass_index]->GetData() + _sampler_mask_offset);
-		switch (use_info)
-		{
-		case Ailu::ETextureUsage::kAlbedo: return sampler_mask & 1;
-		case Ailu::ETextureUsage::kNormal: return sampler_mask & 2;
-		case Ailu::ETextureUsage::kEmssive: return sampler_mask & 4;
-		case Ailu::ETextureUsage::kRoughness: return sampler_mask & 8;
-		case Ailu::ETextureUsage::kSpecular: return sampler_mask & 16;
-		case Ailu::ETextureUsage::kMetallic: return sampler_mask & 32;
-		}
-		return false;
 	}
 
 	void Material::SetFloat(const String& name, const float& f)
@@ -277,6 +172,7 @@ namespace Ailu
 			}
 			++pass_index;
 		}
+		_common_uint_property[name] = value;
 	}
 
 	void Material::SetVector(const String& name, const Vector4f& vector)
@@ -292,7 +188,7 @@ namespace Ailu
 			}
 			else
 			{
-				LOG_WARNING("Material: {} set vector with name {} failed!", _name, name);
+				//LOG_WARNING("Material: {} set vector with name {} failed!", _name, name);
 			}
 			++pass_index;
 		}
@@ -316,7 +212,13 @@ namespace Ailu
 	{
 		AL_ASSERT(pass_index >= _pass_variants.size());
 		return _pass_variants[pass_index]._variant_hash;
-	};
+	}
+	std::set<String> Material::ActiveKeywords(u16 pass_index) const
+	{
+		AL_ASSERT(pass_index >= _pass_variants.size());
+		return _pass_variants[pass_index]._keywords;
+	}
+	;
 
 	u32 Material::GetUint(const String& name)
 	{
@@ -328,6 +230,10 @@ namespace Ailu
 			if (it != res_info.end())
 				return *reinterpret_cast<u32*>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
 			++pass_index;
+		}
+		if (_common_uint_property.contains(name))
+		{
+			return _common_uint_property[name];
 		}
 		return -1;
 	}
@@ -348,19 +254,12 @@ namespace Ailu
 
 	void Material::SetTexture(const String& name, Texture* texture)
 	{
-		if (name == InternalStandardMaterialTexture::kAlbedo) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
-		else if (name == InternalStandardMaterialTexture::kEmssive) MarkTextureUsed({ ETextureUsage::kEmssive }, true);
-		else if (name == InternalStandardMaterialTexture::kMetallic) MarkTextureUsed({ ETextureUsage::kMetallic }, true);
-		else if (name == InternalStandardMaterialTexture::kRoughness) MarkTextureUsed({ ETextureUsage::kRoughness }, true);
-		else if (name == InternalStandardMaterialTexture::kSpecular) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
-		else if (name == InternalStandardMaterialTexture::kNormal) MarkTextureUsed({ ETextureUsage::kNormal }, true);
-		else {};
 		for (auto& pass_tex : _textures_all_passes)
 		{
 			auto it = pass_tex.find(name);
 			if (it == pass_tex.end())
 			{
-				return;
+				continue;
 			}
 			std::get<1>(pass_tex[name]) = texture;
 			if (_properties.find(name) != _properties.end())
@@ -368,63 +267,25 @@ namespace Ailu
 				_properties[name]._value_ptr = reinterpret_cast<void*>(&pass_tex[name]);
 			}
 		}
-
 		//else
 		//	LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
 	}
 
 	void Material::SetTexture(const String& name, const WString& texture_path)
 	{
-		if (name == InternalStandardMaterialTexture::kAlbedo) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
-		else if (name == InternalStandardMaterialTexture::kEmssive) MarkTextureUsed({ ETextureUsage::kEmssive }, true);
-		else if (name == InternalStandardMaterialTexture::kMetallic) MarkTextureUsed({ ETextureUsage::kMetallic }, true);
-		else if (name == InternalStandardMaterialTexture::kRoughness) MarkTextureUsed({ ETextureUsage::kRoughness }, true);
-		else if (name == InternalStandardMaterialTexture::kSpecular) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
-		else if (name == InternalStandardMaterialTexture::kNormal) MarkTextureUsed({ ETextureUsage::kNormal }, true);
-		else {};
 		auto texture = g_pResourceMgr->Get<Texture2D>(texture_path);
 		if (texture == nullptr)
 		{
 			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
 			return;
 		}
-		for (auto& pass_tex : _textures_all_passes)
-		{
-			auto it = pass_tex.find(name);
-			if (it == pass_tex.end())
-			{
-				continue;
-			}
-			std::get<1>(pass_tex[name]) = texture;
-			if (_properties.find(name) != _properties.end())
-			{
-				_properties[name]._value_ptr = reinterpret_cast<void*>(&pass_tex[name]);
-			}
-		}
+		SetTexture(name, texture);
 	}
 
 	void Material::SetTexture(const String& name, RTHandle texture)
 	{
-		if (name == InternalStandardMaterialTexture::kAlbedo) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
-		else if (name == InternalStandardMaterialTexture::kEmssive) MarkTextureUsed({ ETextureUsage::kEmssive }, true);
-		else if (name == InternalStandardMaterialTexture::kMetallic) MarkTextureUsed({ ETextureUsage::kMetallic }, true);
-		else if (name == InternalStandardMaterialTexture::kRoughness) MarkTextureUsed({ ETextureUsage::kRoughness }, true);
-		else if (name == InternalStandardMaterialTexture::kSpecular) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
-		else if (name == InternalStandardMaterialTexture::kNormal) MarkTextureUsed({ ETextureUsage::kNormal }, true);
-		else {};
-		for (auto& pass_tex : _textures_all_passes)
-		{
-			auto it = pass_tex.find(name);
-			if (it == pass_tex.end())
-			{
-				continue;
-			}
-			std::get<1>(pass_tex[name]) = g_pRenderTexturePool->Get(texture);
-			if (_properties.find(name) != _properties.end())
-			{
-				_properties[name]._value_ptr = reinterpret_cast<void*>(&pass_tex[name]);
-			}
-		}
+		auto raw_texture = g_pRenderTexturePool->Get(texture);
+		SetTexture(name, raw_texture);
 	}
 
 	void Material::EnableKeyword(const String& keyword)
@@ -459,10 +320,10 @@ namespace Ailu
 				{
 					_pass_variants[pass_index]._keywords.erase(keyword);
 					_pass_variants[pass_index]._variant_hash = _p_active_shader->ConstructVariantHash(pass_index, _pass_variants[pass_index]._keywords);
-					_all_keywords.erase(keyword);
 					UpdateBindTexture(pass_index, _pass_variants[pass_index]._variant_hash);
 				}
 			}
+			_all_keywords.erase(keyword);
 			++pass_index;
 		}
 	}
@@ -535,22 +396,12 @@ namespace Ailu
 			}
 			++pass_index;
 		}
-
+		for (auto& prop : _common_uint_property)
+		{
+			ret.emplace_back(std::make_tuple(prop.first, prop.second));
+		}
 		return ret;
 	}
-
-	//List<std::tuple<String, Texture*>> Material::GetAllTexture()
-	//{
-	//	List<std::tuple<String, Texture*>> ret{};
-	//	for (auto& [name, bind_info] : _p_shader->GetBindResInfo())
-	//	{
-	//		if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kTexture2D)
-	//		{
-	//			ret.emplace_back(std::make_tuple(name, bind_info._p_res));
-	//		}
-	//	}
-	//	return ret;
-	//}
 
 	void Material::Construct(bool first_time)
 	{
@@ -604,12 +455,12 @@ namespace Ailu
 				auto& textures = _textures_all_passes[i];
 				for (auto it = tmp_textures.begin(); it != tmp_textures.end(); it++)
 				{
-					if (textures.contains(it->first))
+					if (!textures.contains(it->first))
 					{
-						std::get<1>(it->second) = std::get<1>(textures[it->first]);
+						_textures_all_passes[i].insert(*it);
 					}
 				}
-				_textures_all_passes[i] = std::move(_tmp_textures_all_passes[i]);
+				//_textures_all_passes[i] = std::move(_tmp_textures_all_passes[i]);
 			}
 		}
 		for (int i = 0; i < pass_count; i++)
@@ -683,6 +534,7 @@ namespace Ailu
 				}
 			}
 		}
+		_render_queue = _p_shader->RenderQueue(0);
 	}
 	
 	void Material::ConstructKeywords(Shader* shader)
@@ -718,12 +570,169 @@ namespace Ailu
 		}
 	}
 	//-------------------------------------------StandardMaterial--------------------------------------------------------
-	StandardMaterial::StandardMaterial(Shader* shader, String name) : Material(shader, name)
+	static void MarkTextureUsedHelper(u32& mask, const ETextureUsage& usage, const bool& b_use)
 	{
-
+		switch (usage)
+		{
+		case Ailu::ETextureUsage::kAlbedo: mask = b_use ? mask | StandardMaterial::StandardPropertyName::kAlbedo._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kAlbedo._mask_flag);
+			break;
+        case Ailu::ETextureUsage::kNormal: mask = b_use ? mask | StandardMaterial::StandardPropertyName::kNormal._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kNormal._mask_flag);
+			break;
+		case Ailu::ETextureUsage::kEmission: mask = b_use ? mask | StandardMaterial::StandardPropertyName::kEmission._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kEmission._mask_flag);
+			break;
+		case Ailu::ETextureUsage::kRoughness: mask = b_use ? mask | StandardMaterial::StandardPropertyName::kRoughness._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kRoughness._mask_flag);
+			break;
+        case Ailu::ETextureUsage::kMetallic: mask = b_use ? mask | StandardMaterial::StandardPropertyName::kMetallic._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kMetallic._mask_flag);
+            break;
+		case Ailu::ETextureUsage::kSpecular: mask = b_use ? StandardMaterial::StandardPropertyName::kSpecular._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kSpecular._mask_flag);
+			break;
+		}
+	}
+	StandardMaterial::StandardMaterial(String name) : Material(Shader::s_p_defered_standart_lit, name)
+	{
+		//只有首个pass支持默认着色
+		for (int i = 0; i < _p_shader->PassCount(); i++)
+		{
+			auto& cur_variant_bind_infos = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
+			auto it = cur_variant_bind_infos.find("_SamplerMask");
+			if (it != cur_variant_bind_infos.end())
+			{
+				_sampler_mask_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+				_standard_pass_index = i;
+			}
+			it = cur_variant_bind_infos.find("_MaterialID");
+			if (it != cur_variant_bind_infos.end())
+			{
+				_material_id_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+			}
+			if (_standard_pass_index != -1)
+				break;
+		}
+		_material_id = EMaterialID::kStandard;
+		_surface = ESurfaceType::kOpaque;
+		_common_uint_property["_SamplerMask"] = (u32)_material_id;
+		_common_uint_property["_MaterialID"] = (u32)_surface;
 	}
 	StandardMaterial::~StandardMaterial()
 	{
 	}
-	//-------------------------------------------StandardMaterial--------------------------------------------------------
+	void StandardMaterial::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)
+	{
+		//40 根据shader中MaterialBuf计算，可能会有变动
+		u32* sampler_mask = reinterpret_cast<u32*>(_p_cbufs[_standard_pass_index]->GetData() + _sampler_mask_offset);
+		//*sampler_mask = 0;
+		for (auto& usage : use_infos)
+		{
+			MarkTextureUsedHelper(*sampler_mask, usage, b_use);
+		}
+	}
+
+	bool StandardMaterial::IsTextureUsed(ETextureUsage use_info)
+	{
+		u32 sampler_mask = *reinterpret_cast<u32*>(_p_cbufs[_standard_pass_index]->GetData() + _sampler_mask_offset);
+		switch (use_info)
+		{
+        case Ailu::ETextureUsage::kAlbedo: return sampler_mask & StandardPropertyName::kAlbedo._mask_flag;
+		case Ailu::ETextureUsage::kNormal: return sampler_mask & StandardPropertyName::kNormal._mask_flag;
+		case Ailu::ETextureUsage::kEmission: return sampler_mask & StandardPropertyName::kEmission._mask_flag;
+		case Ailu::ETextureUsage::kRoughness: return sampler_mask & StandardPropertyName::kRoughness._mask_flag;
+		case Ailu::ETextureUsage::kMetallic: return sampler_mask & StandardPropertyName::kMetallic._mask_flag;
+		case Ailu::ETextureUsage::kSpecular: return sampler_mask & StandardPropertyName::kSpecular._mask_flag;
+		}
+		return false;
+	}
+	void StandardMaterial::Bind(u16 pass_index)
+	{
+		Material::Bind(pass_index);
+		if (_material_id_offset != 0)
+		{
+			memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, (u32)_material_id, sizeof(u32));
+		}
+	}
+	void StandardMaterial::SurfaceType(const ESurfaceType::ESurfaceType& value)
+	{
+		if (_surface == value)
+			return;
+		if (value == ESurfaceType::kOpaque)
+        {
+            _p_active_shader = _p_shader;
+            _render_queue = Shader::kRenderQueueOpaque;
+            DisableKeyword("ALPHA_TEST");
+        }
+		else if (value == ESurfaceType::kTransparent)
+		{
+            DisableKeyword("ALPHA_TEST");
+			_p_active_shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
+            _render_queue = Shader::kRenderQueueTransparent;
+		}
+        else if(value == ESurfaceType::kAlphaTest)
+        {
+            if(_p_active_shader != _p_shader)
+                _p_active_shader = _p_shader;
+            EnableKeyword("ALPHA_TEST");
+            _render_queue = Shader::kRenderQueueAlphaTest;
+        }
+		_surface = value;
+	}
+	void StandardMaterial::SetTexture(const String& name, Texture* texture)
+	{
+        Material::SetTexture(name,texture);
+		if (name == StandardPropertyName::kAlbedo._tex_name) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
+		else if (name == StandardPropertyName::kEmission._tex_name) MarkTextureUsed({ ETextureUsage::kEmission}, true);
+		else if (name == StandardPropertyName::kRoughness._tex_name) MarkTextureUsed({ ETextureUsage::kRoughness }, true);
+		else if (name == StandardPropertyName::kMetallic._tex_name) MarkTextureUsed({ ETextureUsage::kMetallic }, true);
+		else if (name == StandardPropertyName::kSpecular._tex_name) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
+		else if (name == StandardPropertyName::kNormal._tex_name) MarkTextureUsed({ ETextureUsage::kNormal }, true);
+		else {};
+//		for (auto& pass_tex : _textures_all_passes)
+//		{
+//			auto it = pass_tex.find(name);
+//			if (it == pass_tex.end())
+//			{
+//				return;
+//			}
+//			std::get<1>(pass_tex[name]) = texture;
+//			if (_properties.find(name) != _properties.end())
+//			{
+//				_properties[name]._value_ptr = reinterpret_cast<void*>(&pass_tex[name]);
+//			}
+//		}
+	}
+
+	void StandardMaterial::SetTexture(const String& name, const WString& texture_path)
+	{
+        Material::SetTexture(name, texture_path);
+        if (name == StandardPropertyName::kAlbedo._tex_name) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
+        else if (name == StandardPropertyName::kEmission._tex_name) MarkTextureUsed({ ETextureUsage::kEmission}, true);
+        else if (name == StandardPropertyName::kRoughness._tex_name) MarkTextureUsed({ ETextureUsage::kRoughness }, true);
+        else if (name == StandardPropertyName::kMetallic._tex_name) MarkTextureUsed({ ETextureUsage::kMetallic }, true);
+        else if (name == StandardPropertyName::kSpecular._tex_name) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
+        else if (name == StandardPropertyName::kNormal._tex_name) MarkTextureUsed({ ETextureUsage::kNormal }, true);
+        else {};
+	}
+
+	void StandardMaterial::SetTexture(const String& name, RTHandle texture)
+	{
+		auto raw_texture = g_pRenderTexturePool->Get(texture);
+		SetTexture(name, raw_texture);
+	}
+    const Texture *StandardMaterial::MainTex(ETextureUsage usage) const
+    {
+        auto& info = StandardPropertyName::GetInfoByUsage(usage);
+        auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture *>>(_properties.at(info._tex_name));
+        auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
+        return tex;
+    }
+    const SerializableProperty& StandardMaterial::MainProperty(ETextureUsage usage)
+    {
+        auto& info = StandardPropertyName::GetInfoByUsage(usage);
+        return GetProperty(info._value_name);
+    }
+    void StandardMaterial::SetTexture(ETextureUsage usage, Texture *tex)
+    {
+        MarkTextureUsed({usage}, tex == nullptr? false : true);
+        auto& info = StandardPropertyName::GetInfoByUsage(usage);
+        SetTexture(info._tex_name,tex);
+    }
+    //-------------------------------------------StandardMaterial--------------------------------------------------------
 }

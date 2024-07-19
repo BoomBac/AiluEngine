@@ -44,8 +44,6 @@ namespace Ailu
         void UnRegisterEventAfterTick(AfterTickEvent e);
         RenderTexture* GetTargetTexture() const { return g_pRenderTexturePool->Get(_gameview_rt_handle); }
         bool _is_offscreen = true;
-        //cm
-        float _shadow_distance = 4000;
         //temp
         RenderTexture* _p_radiance_tex;
         RenderTexture* _p_prefilter_env_tex;
@@ -54,8 +52,10 @@ namespace Ailu
         RTHandle _camera_color_handle;
         RTHandle _gameview_rt_handle;
         RTHandle _camera_depth_handle;
+        RTHandle _camera_depth_tex_handle;
 
         void Render();
+        void PrepareScene(Scene* p_scene);
         void PrepareLight(Scene* p_scene);
         void PrepareCamera(Camera* p_camera);
         void PrepareShaderConstants();
@@ -74,8 +74,10 @@ namespace Ailu
         Scope<CubeMapGenPass> _p_cubemap_gen_pass;
         Scope<PostProcessPass> _p_postprocess_pass;
         Scope<DeferredGeometryPass> _p_gbuffer_pass;
+        Scope<DeferredLightingPass> _p_lighting_pass;
         Scope<SkyboxPass> _p_skybox_pass;
         Scope<CopyColorPass> _p_copycolor_pass;
+        Scope<CopyDepthPass> _p_copydepth_pass;
         Scope<GizmoPass> _p_gizmo_pass;
         List<RenderPass*> _render_passes;
         bool _b_init = false;
