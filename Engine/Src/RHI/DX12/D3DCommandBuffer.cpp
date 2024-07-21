@@ -92,7 +92,7 @@ namespace Ailu
 		_p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this,index), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, 0, 0, nullptr);
 	}
 
-	void D3DCommandBuffer::DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count)
+	void D3DCommandBuffer::DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count)
 	{
 		++RenderingStates::s_draw_call;
 		_p_cmd->DrawIndexedInstanced(index_buffer->GetCount(), instance_count, 0, 0, 0);
@@ -102,7 +102,7 @@ namespace Ailu
 		++RenderingStates::s_draw_call;
 		_p_cmd->DrawIndexedInstanced(index_count, instance_count, 0, 0, 0);
 	}
-	void D3DCommandBuffer::DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count)
+	void D3DCommandBuffer::DrawInstanced(const std::shared_ptr<IVertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count)
 	{
 		++RenderingStates::s_draw_call;
 		_p_cmd->DrawInstanced(vertex_buf->GetVertexCount(), instance_count, 0, 0);
@@ -151,6 +151,38 @@ namespace Ailu
 		}
 		_p_cmd->RSSetScissorRects(nums, d3d_rects);
 	}
+	void D3DCommandBuffer::Blit(RTHandle src, RTHandle dst, Material* mat, u16 pass_index)
+	{
+		RenderTexture* src_tex = g_pRenderTexturePool->Get(src);
+		RenderTexture* dst_tex = g_pRenderTexturePool->Get(dst);
+		Blit(src_tex, dst_tex, mat, pass_index);
+	}
+	void D3DCommandBuffer::Blit(RenderTexture* src, RenderTexture* dst, Material* mat, u16 pass_index)
+	{
+		static const auto blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
+		mat = mat ? mat : blit_mat;
+		SetRenderTarget(dst);
+		ClearRenderTarget(dst, Colors::kBlack);
+		mat->SetTexture("_SourceTex", src);
+		DrawFullScreenQuad(mat, pass_index);
+		//GraphicsPipelineStateMgr::EndConfigurePSO(this);
+		//auto d3dcmd = static_cast<D3DCommandBuffer*>(this)->GetCmdList();
+		//if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+		//{
+		//	DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
+		//}
+	}
+	void D3DCommandBuffer::DrawFullScreenQuad(Material* mat, u16 pass_index)
+	{
+		Mesh::s_p_fullscreen_triangle->GetIndexBuffer()->Bind(this);
+		mat->Bind(pass_index);
+		GraphicsPipelineStateMgr::EndConfigurePSO(this);
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(this)->GetCmdList();
+		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+		{
+			DrawIndexedInstanced(3, 1);
+		}
+	}
 	void D3DCommandBuffer::SetScissorRect(const Rect& rect)
 	{
 		_is_custom_viewport = true;
@@ -158,7 +190,7 @@ namespace Ailu
 		_p_cmd->RSSetScissorRects(1, &d3d_rect);
 	}
 
-	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count)
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u32 instance_count)
 	{
 		if (mesh)
 		{
@@ -170,7 +202,7 @@ namespace Ailu
 		return 0;
 	}
 
-	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count)
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u16 submesh_index, u32 instance_count)
 	{
 		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
 		{
@@ -195,7 +227,7 @@ namespace Ailu
 		return 0;
 	}
 
-	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count)
+	u16 D3DCommandBuffer::DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count)
 	{
 		if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
 		{
@@ -404,103 +436,12 @@ namespace Ailu
 		}
 	}
 
-	void D3DCommandBuffer::ResolveToBackBuffer(RenderTexture* color)
-	{
-		static const auto& mat = BuildIdentityMatrix();
-		static const auto mesh = Mesh::s_p_quad;
-		static const auto material = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
-		D3DContext::Get()->BeginBackBuffer(this);
-		mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
-		mesh->GetIndexBuffer()->Bind(this);
-		material->SetTexture("_SourceTex", color);
-		material->Bind();
-		GraphicsPipelineStateMgr::EndConfigurePSO(this);
-		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
-		{
-#ifdef _PIX_DEBUG
-			PIXBeginEvent(_p_cmd.Get(), 100, "FinalBlitPass");
-			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
-			PIXEndEvent(_p_cmd.Get());
-			RenderTexture::s_current_rt = nullptr;
-			//PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
-			//GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
-			//GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
-			//Gizmo::Submit(this);
-			//PIXEndEvent(_p_cmd.Get());
-			PIXBeginEvent(_p_cmd.Get(), 110, "GUIPass");
-			D3DContext::Get()->DrawOverlay(this);
-			PIXEndEvent(_p_cmd.Get());
-#else
-			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
-			RenderTexture::s_current_rt = nullptr;
-			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
-			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
-			Gizmo::Submit(this);
-			D3DContext::Get()->DrawOverlay(this);
-#endif // _PIX_DEBUG
-
-
-		}
-		D3DContext::Get()->EndBackBuffer(this);
-	}
-
-	void D3DCommandBuffer::ResolveToBackBuffer(RenderTexture* color, RenderTexture* destination)
-	{
-		static const auto& mat = BuildIdentityMatrix();
-		static const auto mesh = Mesh::s_p_quad;
-		static const auto material = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
-		//D3DContext::Get()->BeginBackBuffer(this);
-		SetRenderTarget(destination);
-		ClearRenderTarget(destination, Colors::kBlack);
-		mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
-		mesh->GetIndexBuffer()->Bind(this);
-		material->SetTexture("_SourceTex", color);
-		material->Bind();
-		GraphicsPipelineStateMgr::EndConfigurePSO(this);
-		auto d3dcmd = static_cast<D3DCommandBuffer*>(this)->GetCmdList();
-		if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
-		{
-#ifdef _PIX_DEBUG
-			PIXBeginEvent(_p_cmd.Get(), 100, "FinalBlitPass");
-			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
-			RenderTexture::s_current_rt = nullptr;
-			PIXEndEvent(_p_cmd.Get());
-			//PIXBeginEvent(_p_cmd.Get(), 105, "GizmoPass");
-			//GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
-			//GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
-			//Gizmo::Submit(this);
-			//PIXEndEvent(_p_cmd.Get());
-			PIXBeginEvent(_p_cmd.Get(), 110, "GUIPass");
-			D3DContext::Get()->BeginBackBuffer(this);
-			D3DContext::Get()->DrawOverlay(this);
-			PIXEndEvent(_p_cmd.Get());
-#else
-			DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), 1);
-			RenderTexture::s_current_rt = nullptr;
-			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(this);
-			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(this, Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
-			Gizmo::Submit(this);
-			D3DContext::Get()->BeginBackBuffer(this);
-			D3DContext::Get()->DrawOverlay(this);
-#endif // _PIX_DEBUG
-			//d3dcmd->EndQuery(query_heap, D3D12_QUERY_TYPE_TIMESTAMP, d3dcontext->Offset + 1);
-			//d3dcmd->ResolveQueryData(query_heap, D3D12_QUERY_TYPE_TIMESTAMP, d3dcontext->Offset, 2, D3DContext::Get()->_p_query_buffer.Get(), d3dcontext->Offset * sizeof(u64));
-		}
-		D3DContext::Get()->EndBackBuffer(this);
-	}
-
-	void D3DCommandBuffer::ResolveToBackBuffer(RTHandle color)
-	{
-		ResolveToBackBuffer(g_pRenderTexturePool->Get(color));
-	}
-
-	void D3DCommandBuffer::ResolveToBackBuffer(RTHandle color, RTHandle destination)
-	{
-		ResolveToBackBuffer(g_pRenderTexturePool->Get(color), g_pRenderTexturePool->Get(destination));
-	}
-
 	void D3DCommandBuffer::Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
 	{
+		for (auto it : cs->AllBindTexture())
+		{
+			g_pGfxContext->TrackResource(it);
+		}
 		cs->Bind(this, thread_group_x, thread_group_y, thread_group_z);
 	}
 }

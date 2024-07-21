@@ -13,9 +13,9 @@
 
 namespace Ailu
 {
-	class VertexBuffer;
-	class IndexBuffer;
-	class ConstantBuffer;
+	class IVertexBuffer;
+	class IIndexBuffer;
+	class IConstantBuffer;
 	class CommandBuffer
 	{
 	public:
@@ -50,9 +50,9 @@ namespace Ailu
 		virtual void SetRenderTarget(RTHandle color, RTHandle depth) = 0;
 		virtual void SetRenderTarget(RTHandle color, u16 index = 0u) = 0;
 
-		virtual void DrawIndexedInstanced(const std::shared_ptr<IndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) = 0;
+		virtual void DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) = 0;
 		virtual void DrawIndexedInstanced(u32 index_count, u32 instance_count) = 0;
-		virtual void DrawInstanced(const std::shared_ptr<VertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count) = 0;
+		virtual void DrawInstanced(const std::shared_ptr<IVertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count) = 0;
 		virtual void DrawInstanced(u32 vert_count,u32 instance_count) = 0;
 
 		virtual void SetViewport(const Rect& viewport) = 0;
@@ -62,16 +62,16 @@ namespace Ailu
 		virtual void SetViewports(const Vector<Rect>& viewports) = 0;
 		virtual void SetScissorRects(const Vector<Rect>& rects) = 0;
 
-		virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) = 0;
-		virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index,u32 instance_count = 1u) = 0;
-		virtual u16 DrawRenderer(Mesh* mesh, Material* material, ConstantBuffer* per_obj_cbuf, u16 submesh_index,u16 pass_index,u32 instance_count) = 0;
+		virtual void Blit(RTHandle src, RTHandle dst, Material* mat = nullptr, u16 pass_index = 0u) = 0;
+		virtual void Blit(RenderTexture* src, RenderTexture* dst, Material* mat = nullptr, u16 pass_index = 0u) = 0;
+		virtual void DrawFullScreenQuad(Material* mat, u16 pass_index = 0u) = 0;
+
+		virtual u16 DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u32 instance_count = 1u) = 0;
+		virtual u16 DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u16 submesh_index,u32 instance_count = 1u) = 0;
+		virtual u16 DrawRenderer(Mesh* mesh, Material* material, IConstantBuffer* per_obj_cbuf, u16 submesh_index,u16 pass_index,u32 instance_count) = 0;
 		virtual u16 DrawRenderer(Mesh* mesh, Material* material,u32 instance_count = 1u) = 0;
 		virtual u16 DrawRenderer(Mesh* mesh, Material* material,u32 instance_count, u16 pass_index) = 0;
 
-		virtual void ResolveToBackBuffer(RenderTexture* color) = 0;
-		virtual void ResolveToBackBuffer(RenderTexture* color, RenderTexture* destination) = 0;
-		virtual void ResolveToBackBuffer(RTHandle color) = 0;
-		virtual void ResolveToBackBuffer(RTHandle color, RTHandle destination) = 0;
 		virtual void Dispatch(ComputeShader* cs,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
 	};
 

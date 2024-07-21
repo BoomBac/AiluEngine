@@ -10,7 +10,7 @@ using Microsoft::WRL::ComPtr;
 
 namespace Ailu
 {
-	class D3DVertexBuffer : public VertexBuffer
+	class D3DVertexBuffer : public IVertexBuffer
 	{
 	public:
 		D3DVertexBuffer(VertexBufferLayout layout);
@@ -21,6 +21,7 @@ namespace Ailu
 		const VertexBufferLayout& GetLayout() const override;
 		void SetStream(float* vertices, u32 size,u8 stream_index) final;
 		void SetStream(u8* data, u32 size, u8 stream_index, bool dynamic = false) final;
+		void SetName(const String& name) final;
 		u8* GetStream(u8 index) final
 		{
 			return _mapped_data[index];
@@ -29,18 +30,14 @@ namespace Ailu
 	private:
 		VertexBufferLayout _buffer_layout;
 		u32 _vertices_count;
-		u32 _buf_start;
-		u8 _buf_num;
 		//just for dynamic buffer
 		Vector<u8*> _mapped_data;
-		inline static std::vector<ComPtr<ID3D12Resource>> s_vertex_bufs{};
-		inline static std::vector<ComPtr<ID3D12Resource>> s_vertex_upload_bufs{};
-		inline static std::vector<D3D12_VERTEX_BUFFER_VIEW> s_vertex_buf_views{};
 		std::map<String, u8> _buffer_layout_indexer;
-		inline static u32 s_global_offset = 0u;
+		Vector<ComPtr<ID3D12Resource>> _vertex_buffers;
+		Vector<D3D12_VERTEX_BUFFER_VIEW> _buffer_views;
 	};
 
-	class D3DDynamicVertexBuffer : public DynamicVertexBuffer
+	class D3DDynamicVertexBuffer : public IDynamicVertexBuffer
 	{
 	public:
 		D3DDynamicVertexBuffer(VertexBufferLayout layout = {
@@ -49,6 +46,7 @@ namespace Ailu
 			});
 		~D3DDynamicVertexBuffer();
 		void Bind(CommandBuffer* cmd) const final;
+		void SetName(const String& name) final {};
 		void UploadData() final;
 		void AppendData(float* data0, u32 num0, float* data1, u32 num1) final;
 	private:
@@ -64,29 +62,29 @@ namespace Ailu
 		D3D12_VERTEX_BUFFER_VIEW _buf_views[2];
 	};
 
-	class D3DIndexBuffer : public IndexBuffer
+	class D3DIndexBuffer : public IIndexBuffer
 	{
 	public:
 		D3DIndexBuffer(u32* indices, u32 count);
 		~D3DIndexBuffer();
 		void Bind(CommandBuffer* cmd) const final;
 		u32 GetCount() const override;
+		void SetName(const String& name) final;
 	private:
 		u32 _index_count;
-		u32 _buf_view_index;
 		ComPtr<ID3D12Resource> _index_buf;
-		inline static std::vector<D3D12_INDEX_BUFFER_VIEW> s_index_buf_views{};
-		inline static u32 s_cur_view_offset = 0u;
+		D3D12_INDEX_BUFFER_VIEW _index_buf_view;
 	};
 
-	class D3DConstantBuffer : public ConstantBuffer
+	class D3DConstantBuffer : public IConstantBuffer
 	{
 	public:
 		D3DConstantBuffer(u32 size,bool compute_buffer);
 		~D3DConstantBuffer();
-		void Bind(CommandBuffer* cmd, u8 bind_slot) const final;
+		void Bind(CommandBuffer* cmd, u8 bind_slot, bool is_compute_pipeline) const final;
 		u8* GetData() final {return s_p_data + _offset;};
 		u32 GetBufferSize() const final { return _size; };
+		void SetName(const String& name) final {};
 	private:
 		inline static ComPtr<ID3D12Resource> s_p_d3d_res;
 		//inline static ComPtr<ID3D12DescriptorHeap> s_p_d3d_heap;

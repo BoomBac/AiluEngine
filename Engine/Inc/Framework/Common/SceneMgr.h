@@ -31,8 +31,8 @@ namespace Ailu
 		SceneActor* GetSceneActorByID(const u32& id);
 		SceneActor* GetSceneActorByIndex(const u32& index);
 		void MarkDirty();
-		std::list<LightComponent*>& GetAllLight();
-		Vector<StaticMeshComponent*>& GetAllStaticRenderable() {return _all_static_renderalbes;};
+		const std::list<LightComponent*>& GetAllLight() const { return _all_lights; };
+		const Vector<StaticMeshComponent*>& GetAllStaticRenderable() const {return _all_static_renderalbes;};
 		//world_pos:gizmo type
         Vector<Component*> GetAllComponents() {return _all_comps;}
 		LightingData _light_data;

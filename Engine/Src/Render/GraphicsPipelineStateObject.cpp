@@ -101,15 +101,20 @@ namespace Ailu
 
 		memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
 		shader = g_pResourceMgr->Get<Shader>(L"Shaders/blit.alasset");
-		pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
-		pso_desc._input_layout = shader->PipelineInputLayout();
-		pso_desc._p_vertex_shader = shader;
-		pso_desc._p_pixel_shader = shader;
-		pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT},EALGFormat::EALGFormat::kALGFormatUnknown };
-		pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
-		stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
-		stand_pso->Build();
-		AddPSO(std::move(stand_pso));
+		for (int i = 0; i < shader->PassCount(); i++)
+		{
+			auto& pass = shader->GetPassInfo(i);
+			pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
+			pso_desc._input_layout = shader->PipelineInputLayout(i);
+			pso_desc._p_vertex_shader = shader;
+			pso_desc._p_pixel_shader = shader;
+			pso_desc._rt_state = RenderTargetState{ {EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT},EALGFormat::EALGFormat::kALGFormatUnknown };
+			pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
+			stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
+			stand_pso->Build(i);
+			AddPSO(std::move(stand_pso));
+		}
+
 
 		memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
 		shader = g_pResourceMgr->Get<Shader>(L"Shaders/wireframe.alasset");

@@ -110,10 +110,10 @@ namespace Ailu
 	}
 
 	static bool CreateFromFileFXC(const std::wstring& filename, const std::string& entryPoint, const std::string& pTarget, const Vector<D3D_SHADER_MACRO>& keywords,ComPtr<ID3DBlob>& p_blob,
-		ComPtr<ID3D12ShaderReflection>& shader_reflection)
+		ComPtr<ID3D12ShaderReflection>& shader_reflection,std::set<WString>& include_files)
 	{
 		ID3DBlob* pErrorBlob = nullptr;
-		D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
+		//D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
 		UINT compileFlags = 0;
 #if defined(_DEBUG)
 		if (pTarget == RenderConstants::kCSModel_5_0)
@@ -150,6 +150,8 @@ namespace Ailu
 		{
 			ID3D12ShaderReflection* pReflection = NULL;
 			D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void**)&shader_reflection);
+			for (auto& p : include._include_files)
+				include_files.insert(p);
 			return true;
 		}
 		return false;
@@ -178,11 +180,12 @@ namespace Ailu
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticTexcoord)) return EShaderDateType::kFloat2;
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneWeight)) return EShaderDateType::kFloat4;
 		else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneIndex)) return EShaderDateType::kuInt4;
+		else if (!std::strcmp(semantic, RenderConstants::kSemanticVertexIndex)) return EShaderDateType::kNone;
 		else
 		{
 			AL_ASSERT_MSG(true, "Unsupported DXGI_FORMAT to ShaderDataType!");
 			//LOG_ERROR("Unsupported DXGI_FORMAT to ShaderDataType!");
-			return EShaderDateType::kBool;
+			return EShaderDateType::kNone;
 		}
 	}
 
@@ -231,6 +234,7 @@ namespace Ailu
 				_data = file_data;
 				*ppData = _data;
 				*pBytes = byte_size;
+				_include_files.insert(p);
 				return S_OK;
 			}
 			//AL_ASSERT(true);
@@ -365,8 +369,8 @@ namespace Ailu
 			CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			succeed &= CreateFromFileFXC(_src_file_path, pass._vert_entry,RenderConstants::kVSModel_5_0, keyword_defines,tmp_p_vblob, tmp_p_vreflect);
-			succeed &= CreateFromFileFXC(_src_file_path, pass._pixel_entry, RenderConstants::kPSModel_5_0, keyword_defines,tmp_p_pblob, tmp_p_preflect);
+			succeed &= CreateFromFileFXC(_src_file_path, pass._vert_entry,RenderConstants::kVSModel_5_0, keyword_defines,tmp_p_vblob, tmp_p_vreflect,pass._source_files);
+			succeed &= CreateFromFileFXC(_src_file_path, pass._pixel_entry, RenderConstants::kPSModel_5_0, keyword_defines,tmp_p_pblob, tmp_p_preflect,pass._source_files);
 
 #endif // SHADER_DXC
 		}
@@ -402,11 +406,12 @@ namespace Ailu
 			line = su::Trim(line);
 			if (su::BeginWith(line, "#include"))
 			{
-				size_t path_start = line.find_first_of("\"");
-				size_t path_end = line.find_last_of("\"");
-				WString head_file = ToWStr(su::SubStrRange(line, path_start + 1, path_end - 1).c_str());
-				_passes[pass_index]._source_files.insert(parent_path + head_file);
-				cur_file_head_files.emplace_back(head_file);
+				//头文件解析转移到创还能字节码时
+				//size_t path_start = line.find_first_of("\"");
+				//size_t path_end = line.find_last_of("\"");
+				//WString head_file = ToWStr(su::SubStrRange(line, path_start + 1, path_end - 1).c_str());
+				//_passes[pass_index]._source_files.insert(parent_path + head_file);
+				//cur_file_head_files.emplace_back(head_file);
 			}
 			else if (su::BeginWith(line, "Texture2D"))
 			{
@@ -504,9 +509,15 @@ namespace Ailu
 				ref_vs->GetInputParameterDesc(i, &input_desc);
 				_pass_elements[pass_index]._variants[variant_hash]._vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{ input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 				//++pass_variant._vertex_input_num;
-				vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, GetShaderDataType(input_desc.SemanticName), input_desc.Register));
+				EShaderDateType data_type = GetShaderDataType(input_desc.SemanticName);
+				if (data_type != EShaderDateType::kNone)
+					vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, data_type, input_desc.Register));
+				else
+				{
+					g_pLogMgr->LogWarningFormat("LoadShaderReflection {} skip input element: {}",_name,input_desc.SemanticName);
+				}
 			}
-			pass_variant._vertex_input_num = (u8)desc.InputParameters;
+			pass_variant._vertex_input_num = (u8)vb_input_desc.size();
 			pass_variant._pipeline_input_layout = VertexBufferLayout(vb_input_desc);
 			for (u32 i = 0u; i < desc.BoundResources; i++)
 			{
@@ -550,6 +561,7 @@ namespace Ailu
 					else {}
 					auto info = ShaderBindResourceInfo{ value_type,variable_info,0u,vdesc.Name };
 					info._bind_flag = flag;
+					info._p_root_cbuf = &pass_variant._bind_res_infos.find(desc.Name)->second;
 					pass_variant._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
 				}
 			}
@@ -658,23 +670,17 @@ namespace Ailu
 				{
 					auto tex = static_cast<Texture*>(bind_info._p_res);
 					auto& [face, mipmap] = _texture_addi_bind_info[bind_info._bind_slot];
-					D3D12_GPU_DESCRIPTOR_HANDLE handle{};
-					tex->Bind(cmd, 255);
-					handle.ptr = tex->GetView(mipmap, false, face);
-					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, handle);
+					tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, face, mipmap, 0), bind_info._bind_slot, true);
 				}
 				else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
 				{
 					auto tex = static_cast<Texture*>(bind_info._p_res);
 					auto& [face, mipmap] = _texture_addi_bind_info[bind_info._bind_slot];
-					D3D12_GPU_DESCRIPTOR_HANDLE handle{};
-					tex->Bind(cmd, 255,true);
-					handle.ptr = tex->GetView(mipmap, true, face);
-					d3dcmd->SetComputeRootDescriptorTable(bind_info._bind_slot, handle);
+					tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, face, mipmap, 0), bind_info._bind_slot, true);
 				}
 				else if (bind_info._res_type == EBindResDescType::kConstBuffer)
 				{
-					reinterpret_cast<ConstantBuffer*>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot);
+					reinterpret_cast<IConstantBuffer*>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot,true);
 				}
 			}
 		}
@@ -701,7 +707,7 @@ namespace Ailu
 				}
 				else if (bind_info._res_type == EBindResDescType::kConstBuffer)
 				{
-					reinterpret_cast<ConstantBuffer*>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot);
+					reinterpret_cast<IConstantBuffer*>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot);
 				}
 			}
 		}
@@ -759,6 +765,7 @@ namespace Ailu
 				else if (size == 64) value_type = (EBindResDescType)(EBindResDescType::kCBufferMatrix4 | value_type);
 				else {}
 				auto info = ShaderBindResourceInfo{ value_type,variable_info,0u,vdesc.Name };
+				info._p_root_cbuf = &_temp_bind_res_infos.find(desc.Name)->second;
 				_temp_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
 			}
 		}
@@ -768,14 +775,14 @@ namespace Ailu
 	{
 		bool succeed = true;
 		ComPtr<ID3DBlob> _tmp_blob = nullptr;
-		Vector<D3D_SHADER_MACRO> v = { {"D3D_COMPILE","1"},{NULL,NULL} };
+		Vector<D3D_SHADER_MACRO> v = { {"COMPUTE","1"},{NULL,NULL} };
 		try
 		{
 #ifdef SHADER_DXC
 			CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
 			LoadShaderReflection(_p_reflection.Get());
 #else
-			succeed &= CreateFromFileFXC(_src_file_path, "cs_main", RenderConstants::kCSModel_5_0, v,_tmp_blob, _p_reflection);
+			succeed &= CreateFromFileFXC(_src_file_path, "cs_main", RenderConstants::kCSModel_5_0, v, _tmp_blob, _p_reflection,_all_dep_file_pathes);
 #endif // SHADER_DXC
 		}
 		catch (const std::exception&)
@@ -790,7 +797,7 @@ namespace Ailu
 			LoadReflectionInfo(_p_reflection.Get());
 			GenerateInternalPSO();
 			succeed = _is_valid;
-			g_pLogMgr->LogFormat(L"Compile shader with src {0} succeed!", WString(_src_file_path));
+			g_pLogMgr->LogFormat(L"Compile shader with src {0} succeed!", _src_file_path);
 		}
 		return succeed;
 	}
@@ -806,8 +813,22 @@ namespace Ailu
 		}
 		CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
 		CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
-		int texture_count = 0;
+		int cbuf_mask = 0, texture_count = 0;
 		u8 root_param_index = 0;
+		//for (auto it = _temp_bind_res_infos.begin(); it != _temp_bind_res_infos.end(); it++)
+		//{
+		//	auto& desc = it->second;
+		//	//if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
+		//	if (desc._res_type == EBindResDescType::kConstBuffer)
+		//	{
+		//		//if (desc._name == RenderConstants::kCBufNameSceneObject) cbuf_mask |= 0x01;
+		//		if (desc._name == RenderConstants::kCBufNameScenePass) cbuf_mask |= 0x01;
+		//	}
+		//}
+		//if (cbuf_mask & 0x01)
+		//{
+		//	rootParameters[root_param_index++].InitAsConstantBufferView(1u);
+		//}
 		for (auto it = _temp_bind_res_infos.begin(); it != _temp_bind_res_infos.end(); it++)
 		{
 			auto& desc = it->second;
@@ -857,12 +878,13 @@ namespace Ailu
 			if (SUCCEEDED(device->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&pso))))
 			{
 				_pso_sys.Swap();
-				auto cbuffer_bind_info = _temp_bind_res_infos;
-				cbuffer_bind_info.clear();
+				std::unordered_map<String, ShaderBindResourceInfo> cbuffer_bind_info;
 				u32 cbuffer_size = 0;
+				u16 cbuffer_count = 0;
 				for (auto it = _temp_bind_res_infos.begin(); it != _temp_bind_res_infos.end(); it++)
 				{
-					if (it->second._res_type & EBindResDescType::kCBufferAttribute || it->second._res_type & EBindResDescType::kConstBuffer)
+					//临时方案，kCBufNameSceneState外部创建
+					if (it->second._res_type & EBindResDescType::kCBufferAttribute && it->second._p_root_cbuf->_name != RenderConstants::kCBufNameSceneState)
 					{
 						cbuffer_bind_info.insert(std::make_pair(it->first, it->second));
 						if (it->second._res_type & EBindResDescType::kCBufferAttribute)
@@ -871,6 +893,7 @@ namespace Ailu
 				}
 				AL_ASSERT_MSG(cbuffer_size > 256, "ComputeBuffer size must be less than 256");
 				cbuffer_size = ALIGN_TO_256(cbuffer_size);
+				//这里暂时只支持一个cbuffer，以后按需修改
 				auto cbuf_it = std::find_if(_temp_bind_res_infos.begin(), _temp_bind_res_infos.end(), [this](auto it) {
 					auto& desc = it.second;
 					return desc._res_type == EBindResDescType::kConstBuffer;
@@ -879,7 +902,7 @@ namespace Ailu
 				{
 					if (_p_cbuffer == nullptr)
 					{
-						_p_cbuffer.reset(ConstantBuffer::Create(cbuffer_size, true));
+						_p_cbuffer.reset(IConstantBuffer::Create(cbuffer_size, true));
 					}
 					else
 					{

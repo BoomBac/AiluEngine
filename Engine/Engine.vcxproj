@@ -544,12 +544,13 @@
     <ClInclude Include="Inc\Render\Material.h" />
     <ClInclude Include="Inc\Render\Mesh.h" />
     <ClInclude Include="Inc\Render\Pass\PostprocessPass.h" />
-    <ClInclude Include="Inc\Render\Pass\SSAO.h" />
+    <ClInclude Include="Inc\Render\Pass\SSAOPass.h" />
     <ClInclude Include="Inc\Render\PipelineState.h" />
     <ClInclude Include="Inc\Render\Renderer.h" />
     <ClInclude Include="Inc\Render\RendererAPI.h" />
     <ClInclude Include="Inc\Render\RenderingData.h" />
     <ClInclude Include="Inc\Render\Pass\RenderPass.h" />
+    <ClInclude Include="Inc\Render\RenderPipeline.h" />
     <ClInclude Include="Inc\Render\RenderQueue.h" />
     <ClInclude Include="Inc\Render\Shader.h" />
     <ClInclude Include="Inc\Render\Texture.h" />
@@ -629,10 +630,11 @@
     <ClCompile Include="Src\Render\Material.cpp" />
     <ClCompile Include="Src\Render\Mesh.cpp" />
     <ClCompile Include="Src\Render\Pass\PostprocessPass.cpp" />
-    <ClCompile Include="Src\Render\Pass\SSAO.cpp" />
+    <ClCompile Include="Src\Render\Pass\SSAOPass.cpp" />
     <ClCompile Include="Src\Render\PipelineState.cpp" />
     <ClCompile Include="Src\Render\Renderer.cpp" />
     <ClCompile Include="Src\Render\Pass\RenderPass.cpp" />
+    <ClCompile Include="Src\Render\RenderPipeline.cpp" />
     <ClCompile Include="Src\Render\RenderQueue.cpp" />
     <ClCompile Include="Src\Render\Shader.cpp" />
     <ClCompile Include="Src\Render\Texture.cpp" />

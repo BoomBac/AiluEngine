@@ -1,26 +1,22 @@
-//#include "pch.h"
 #include "Widgets/EditorLayer.h"
-
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 
-#include "Framework/Common/Application.h"
 #include "Framework/Common/TimeMgr.h"
-#include "Render/Gizmo.h"
 #include "Render/RenderingData.h"
+#include "Render/Gizmo.h"
 
-#include "Framework/Common/LogMgr.h"
-#include "Framework/Common/ResourceMgr.h"
 #include "Objects/CameraComponent.h"
+#include "Framework/Common/ResourceMgr.h"
+#include "Framework/Common/LogMgr.h"
 
 #include "Framework/Events/MouseEvent.h"
+#include "Framework/Common/Input.h"
 
+#include "Render/RenderPipeline.h"
 #include "Framework/Common/Profiler.h"
-#include "Render/Renderer.h"
 
 #include "Common/Undo.h"
-#include "Framework/Common/Input.h"
-#include "Framework/Common/KeyCode.h"
 #include "Framework/Events/KeyEvent.h"
 #include "Widgets/AssetBrowser.h"
 #include "Widgets/AssetTable.h"
@@ -34,71 +30,94 @@
 
 namespace Ailu
 {
-    namespace Editor
-    {
-        EditorLayer::EditorLayer() : Layer("EditorLayer")
-        {
-            ImGuiIO &io = ImGui::GetIO();
-            (void) io;
-            //https://fonts.google.com/
-            //_font = io.Fonts->AddFontFromFileTTF(PathUtils::GetResSysPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
-            //_font =
-            io.FontDefault = io.Fonts->AddFontFromFileTTF(PathUtils::GetResSysPath("Fonts/Open_Sans/static/OpenSans-Regular.ttf").c_str(), 15.0f);
-            //io.Fonts->Build();
-        }
+	namespace Editor
+	{
+		//static SceneActor* s_cur_selected_actor = nullptr;
+		//static int cur_object_index = 0u;
+		//static u32 cur_tree_node_index = 0u;
+		//static u16 s_mini_tex_size = 64;
 
-        EditorLayer::EditorLayer(const String &name) : Layer(name)
-        {
-        }
+		//namespace TreeStats
+		//{
+		//	static ImGuiTreeNodeFlags s_base_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+		//	static int s_selected_mask = 0;
+		//	static bool s_b_selected = (s_selected_mask & (1 << cur_tree_node_index)) != 0;
+		//	static int s_node_clicked = -1;
+		//	static u32 s_pre_frame_selected_actor_id = 10;
+		//	static u32 s_cur_frame_selected_actor_id = 0;
+		//	static i16 s_cur_opened_texture_selector = -1;
+		//	static bool s_is_texture_selector_open = true;
+		//	static u32 s_common_property_handle = 0u;
+		//	static String s_texture_selector_ret = "none";
+		//}
 
-        EditorLayer::~EditorLayer()
-        {
-        }
 
-        void EditorLayer::OnAttach()
-        {
-            auto tex_detail_view = _widgets.emplace_back(std::move(MakeScope<TextureDetailView>())).get();
-            _widgets.emplace_back(std::move(MakeScope<AssetBrowser>(tex_detail_view)));
-            _widgets.emplace_back(std::move(MakeScope<AssetTable>()));
-            _widgets.emplace_back(std::move(MakeScope<WorldOutline>()));
-            _widgets.emplace_back(std::move(MakeScope<ObjectDetail>()));
-            _widgets.emplace_back(std::move(MakeScope<PlaceActors>()));
-            _widgets.emplace_back(std::move(MakeScope<RenderTextureView>()));
-            for (auto appender: g_pLogMgr->GetAppenders())
-            {
-                auto imgui_appender = dynamic_cast<ImGuiLogAppender *>(appender);
-                if (imgui_appender)
-                {
-                    _widgets.emplace_back(std::move(MakeScope<OutputLog>(imgui_appender)));
-                }
-            }
+		EditorLayer::EditorLayer() : Layer("EditorLayer")
+		{
+			ImGuiIO& io = ImGui::GetIO(); (void)io;
+			_font = io.Fonts->AddFontFromFileTTF(PathUtils::GetResSysPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
+			io.Fonts->Build();
+		}
 
-            _widgets.emplace_back(std::move(MakeScope<RenderView>()));
-            _p_render_view = _widgets.back().get();
-            _widgets.emplace_back(std::move(MakeScope<EnvironmentSetting>()));
-            _p_env_setting = _widgets.back().get();
-            for (auto &widget: _widgets)
-            {
-                widget->Open(ImGuiWidget::GetGlobalWidgetHandle());
-            }
-            //默认不显示纹理细节窗口
-            tex_detail_view->Close(tex_detail_view->Handle());
-            ImGuiWidget::SetFocus("AssetBrowser");
-        }
+		EditorLayer::EditorLayer(const String& name) : Layer(name)
+		{
 
-        void EditorLayer::OnDetach()
-        {
-        }
+		}
 
-        void EditorLayer::OnEvent(Event &e)
-        {
+		EditorLayer::~EditorLayer()
+		{
+
+		}
+
+		void EditorLayer::OnAttach()
+		{
+			auto tex_detail_view = _widgets.emplace_back(std::move(MakeScope<TextureDetailView>())).get();
+			_widgets.emplace_back(std::move(MakeScope<AssetBrowser>(tex_detail_view)));
+			_widgets.emplace_back(std::move(MakeScope<AssetTable>()));
+			_widgets.emplace_back(std::move(MakeScope<WorldOutline>()));
+			_widgets.emplace_back(std::move(MakeScope<ObjectDetail>()));
+			_widgets.emplace_back(std::move(MakeScope<PlaceActors>()));
+			_widgets.emplace_back(std::move(MakeScope<RenderTextureView>()));
+			for (auto appender : g_pLogMgr->GetAppenders())
+			{
+				auto imgui_appender = dynamic_cast<ImGuiLogAppender*>(appender);
+				if (imgui_appender)
+				{
+					_widgets.emplace_back(std::move(MakeScope<OutputLog>(imgui_appender)));
+				}
+			}
+
+			_widgets.emplace_back(std::move(MakeScope<RenderView>()));
+			_p_render_view = _widgets.back().get();
+			_widgets.emplace_back(std::move(MakeScope<EnvironmentSetting>()));
+			_p_env_setting = _widgets.back().get();
+			for (auto& widget : _widgets)
+			{
+				widget->Open(ImGuiWidget::GetGlobalWidgetHandle());
+			}
+			//默认不显示纹理细节窗口
+			tex_detail_view->Close(tex_detail_view->Handle());
+			ImGuiWidget::SetFocus("AssetBrowser");
+		}
+
+		void EditorLayer::OnDetach()
+		{
+
+		}
+
+		void EditorLayer::OnEvent(Event& e)
+		{
             for (auto &w: _widgets)
                 w->OnEvent(e);
             if (e.GetEventType() == EEventType::kKeyPressed)
             {
                 auto &key_e = static_cast<KeyPressedEvent &>(e);
                 if (key_e.GetKeyCode() == AL_KEY_F11)
-                    g_pRenderer->TakeCapture();
+                {
+                    g_pGfxContext->GetPipeline()->GetRenderer()->TakeCapture();
+                    //g_pLogMgr->Log("g_pRenderer->TakeCapture();");
+                }
+
                 if (key_e.GetKeyCode() == AL_KEY_S)
                 {
                     if (Input::IsKeyPressed(AL_KEY_CONTROL))
@@ -130,15 +149,16 @@ namespace Ailu
                     }
                 }
             }
-        }
+		}
 
-    static bool show = false;
-    static bool s_show_asset_table = false;
-    static bool s_show_rt = false;
-    static bool s_show_renderview = true;
+		static bool show = false;
+		static bool s_show_asset_table = false;
+		static bool s_show_rt = false;
+		static bool s_show_renderview = true;
 
     void EditorLayer::OnImguiRender()
     {
+        ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
         if (ImGui::BeginMainMenuBar())
         {
             if (ImGui::BeginMenu("File"))
@@ -158,50 +178,49 @@ namespace Ailu
             ImGui::EndMainMenuBar();
         }
 
-        ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
         ImGui::Begin("Performace Statics");// Create a window called "Hello, world!" and append into it.
         ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
         ImGui::Text("FrameTime: %.2f ms", ModuleTimeStatics::RenderDeltatime);
         ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
         ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
         ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
-        for (auto pass: g_pRenderer->GetRenderPasses())
+        for (auto& pass : g_pGfxContext->GetPipeline()->GetRenderer()->GetRenderPasses())
         {
             bool active = pass->IsActive();
             ImGui::Checkbox(pass->GetName().c_str(), &active);
             pass->SetActive(active);
         }
 
-        String space = "";
-        ImGui::Text("CPU Time:");
-        while (!Profiler::g_Profiler._cpu_profiler_queue.empty())
-        {
-            auto [is_start, profiler_id] = Profiler::g_Profiler._cpu_profiler_queue.front();
-            Profiler::g_Profiler._cpu_profiler_queue.pop();
-            if (is_start)
-            {
-                space.append("-");
-                const auto &profiler = Profiler::g_Profiler.GetCPUProfileData(profiler_id);
-                ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
-            }
-            else
-                space = space.substr(0, space.size() - 1);
-        }
-        space = "";
-        ImGui::Text("GPU Time:");
-        while (!Profiler::g_Profiler._gpu_profiler_queue.empty())
-        {
-            auto [is_start, profiler_id] = Profiler::g_Profiler._gpu_profiler_queue.front();
-            Profiler::g_Profiler._gpu_profiler_queue.pop();
-            if (is_start)
-            {
-                space.append("-");
-                const auto &profiler = Profiler::g_Profiler.GetProfileData(profiler_id);
-                ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
-            }
-            else
-                space = space.substr(0, space.size() - 1);
-        }
+			String space = "";
+			ImGui::Text("CPU Time:");
+			while (!Profiler::g_Profiler._cpu_profiler_queue.empty())
+			{
+				auto [is_start, profiler_id] = Profiler::g_Profiler._cpu_profiler_queue.front();
+				Profiler::g_Profiler._cpu_profiler_queue.pop();
+				if (is_start)
+				{
+					space.append("-");
+					const auto& profiler = Profiler::g_Profiler.GetCPUProfileData(profiler_id);
+					ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
+				}
+				else
+					space = space.substr(0, space.size() - 1);
+			}
+			space = "";
+			ImGui::Text("GPU Time:");
+			while (!Profiler::g_Profiler._gpu_profiler_queue.empty())
+			{
+				auto [is_start, profiler_id] = Profiler::g_Profiler._gpu_profiler_queue.front();
+				Profiler::g_Profiler._gpu_profiler_queue.pop();
+				if (is_start)
+				{
+					space.append("-");
+					const auto& profiler = Profiler::g_Profiler.GetProfileData(profiler_id);
+					ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
+				}
+				else
+					space = space.substr(0, space.size() - 1);
+			}
 
         //			static const char* items[] = { "Shadering", "WireFrame", "ShaderingWireFrame" };
         //			static int item_current_idx = 0; // Here we store our selection data as an index.
@@ -227,9 +246,7 @@ namespace Ailu
         float shadow_dis_m = QuailtySetting::s_main_light_shaodw_distance / 100u;
         ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
         QuailtySetting::s_main_light_shaodw_distance = shadow_dis_m * 100;
-        f32 u = Application::s_target_framecount;
-        ImGui::SliderFloat("TargetFrame m", &u, 1.f, 999.0f, "%.2f");
-        Application::s_target_framecount = u;
+
         //g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
         ImGui::Checkbox("Expand", &show);
         ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
@@ -251,13 +268,16 @@ namespace Ailu
         ImGuiWidget::ShowProgressBar();
     }
 
-    void EditorLayer::Begin()
-    {
-    }
+		void EditorLayer::Begin()
+		{
 
-    void EditorLayer::End()
-    {
-        ImGuiWidget::EndFrame();
-    }
-}// namespace Editor
-}// namespace Ailu
+		}
+
+		void EditorLayer::End()
+		{
+			ImGuiWidget::EndFrame();
+		}
+	}
+}
+
+

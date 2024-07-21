@@ -8,6 +8,18 @@
 
 namespace Ailu
 {
+	static DXGI_FORMAT GetCompatibleSRVFormat(DXGI_FORMAT dx_format)
+	{
+		if (dx_format == DXGI_FORMAT_D24_UNORM_S8_UINT)
+			return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+		else if (dx_format == DXGI_FORMAT_D32_FLOAT)
+			return DXGI_FORMAT_R32_FLOAT;
+		else if (dx_format == DXGI_FORMAT_R16_FLOAT)
+			return DXGI_FORMAT_R16_FLOAT;
+		else
+			return dx_format;
+	}
+
 	//----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
 	D3DTexture2D::D3DTexture2D(u16 width, u16 height, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access) :
 		Texture2D(width, height, mipmap_chain, format, linear, random_access)
@@ -17,8 +29,7 @@ namespace Ailu
 
 	D3DTexture2D::~D3DTexture2D()
 	{
-		g_pGPUDescriptorAllocator->Free(std::move(_allocation));
-		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_allocation));
+
 	}
 
 	void D3DTexture2D::Apply()
@@ -28,7 +39,7 @@ namespace Ailu
 		auto cmd = CommandBufferPool::Get();
 		auto p_cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
 		//ComPtr<ID3D12Resource> pTextureGPU;
-		
+
 		D3D12_RESOURCE_DESC textureDesc{};
 		textureDesc.MipLevels = mipmap_level;
 		textureDesc.Format = ConvertToDXGIFormat(_pixel_format);
@@ -40,9 +51,10 @@ namespace Ailu
 		textureDesc.SampleDesc.Quality = 0;
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-		_cur_res_state = _is_random_access ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_COPY_DEST;
-		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _cur_res_state,nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-		if (*_pixel_data[0] != -1)
+		_state_guard = D3DResourceStateGuard(_is_data_filled ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON);
+		//_state_guard = D3DResourceStateGuard(D3D12_RESOURCE_STATE_COPY_DEST);
+		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _state_guard.CurState(), nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+		if (_is_data_filled)
 		{
 			ComPtr<ID3D12Resource> pTextureUpload;
 			const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
@@ -64,125 +76,123 @@ namespace Ailu
 				subres_datas.emplace_back(subdata);
 			}
 			UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
-			_cur_res_state = D3D12_RESOURCE_STATE_COPY_DEST;
-			MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+			_state_guard.MakesureResourceState(p_cmdlist, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 			D3DContext::Get()->TrackResource(pTextureUpload);
 		}
 		D3DContext::Get()->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
-		u16 handle_num = _is_random_access ? 2 : 1;
-		_allocation = g_pGPUDescriptorAllocator->Allocate(handle_num);
-		// Describe and create a SRV for the texture.
-		D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-		srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srv_desc.Format = textureDesc.Format;
-		srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srv_desc.Texture2D.MipLevels = mipmap_level;
-		srv_desc.Texture2D.MostDetailedMip = 0;
-		auto [cpu_handle, gpu_handle] = _allocation.At(0);
-		_main_srv_handle = gpu_handle;
-		p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
-		if (_is_random_access)
 		{
-			auto [ch, gh] = _allocation.At(1);
-			D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
-			slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
-			slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-			slice_uav_desc.Texture2D.MipSlice = 0;
-			p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, ch);
-			_main_uav_handle = gh;
+			D3DTextureViewInfo view_info(ETextureViewType::kSRV, false);
+			auto p_device = dynamic_cast<D3DContext*>(g_pGfxContext)->GetDevice();
+			GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+			auto [cpu_handle, gpu_handle] = alloc.At(0);
+			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srv_desc.Format = ConvertToDXGIFormat(_pixel_format);
+			srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srv_desc.Texture2D.MipLevels = mipmap_level;
+			srv_desc.Texture2D.MostDetailedMip = 0;
+			p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
+			view_info._gpu_handle = gpu_handle;
+			view_info._gpu_alloc = std::move(alloc);
+			_views[kMainSRVIndex] = std::move(view_info);
 		}
+		CreateView(ETextureViewType::kSRV, 0);
+		if (_is_random_access)
+			CreateView(ETextureViewType::kUAV, 0);
 		_p_d3dres->SetName(ToWChar(_name));
 		_is_ready_for_rendering = true;
 	}
 
-	void D3DTexture2D::Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline)
+	void D3DTexture2D::Bind(CommandBuffer* cmd, u16 view_index, u8 slot, bool is_target_compute_pipiline)
 	{
 		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
-		if (slot == 255)
+		if (_views.contains(view_index))
 		{
-			if (!compute_pipiline)
+			auto view_type = _views[view_index]._view_type;
+			if (view_type == ETextureViewType::kSRV)
 			{
-				MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				if (is_target_compute_pipiline)
+					_views[view_index]._gpu_alloc.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
+				else
+					_views[view_index]._gpu_alloc.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
 			}
-			else
+			else if (view_type == ETextureViewType::kUAV)
 			{
-				MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				_views[view_index]._gpu_alloc.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
 			}
-			_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
-			return;
-		}
-		if (!compute_pipiline)
-		{
-			MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-			_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
-		}
-		else
-		{
-			MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			_allocation.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
-		}
-	}
-
-	TextureHandle D3DTexture2D::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
-	{
-		if (random_access)
-		{
-			if (mipmap == 0)
-				return _main_uav_handle.ptr;
 			else
 			{
 				AL_ASSERT(true);
 			}
 		}
-		else
-		{
-			if (mipmap > _mipmap_count + 1)
-				return 0;
-			return mipmap == 0 ? _main_srv_handle.ptr : _mipmap_handles[mipmap - 1].ptr;
-		}
 	}
 
-	void D3DTexture2D::CreateView()
+	void D3DTexture2D::CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
 	{
-		if (_is_have_total_view)
-			return;
-		Texture::CreateView();
-		auto p_device{ D3DContext::Get()->GetDevice() };
-		_mimmap_allocation = g_pGPUDescriptorAllocator->Allocate(_mipmap_count);
-		for (int i = 0; i < _mipmap_count; i++)
+		if (view_type == kDSV || view_type == kRTV)
 		{
-			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+			g_pLogMgr->LogWarningFormat("Try to create dsv/rtv on a raw texture2d,call is on render texture instead!");
+			return;
+		}
+		u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
+		if (_views.contains(view_index) || view_index == kMainSRVIndex)
+			return;
+		D3DTextureViewInfo view_info(view_type, false);
+		auto p_device = dynamic_cast<D3DContext*>(g_pGfxContext)->GetDevice();
+		GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+		auto [cpu_handle, gpu_handle] = alloc.At(0);
+		if (view_type == ETextureViewType::kSRV)
+		{
+			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
 			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			srv_desc.Format = ConvertToDXGIFormat(_pixel_format);
 			srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 			srv_desc.Texture2D.MipLevels = 1;
-			srv_desc.Texture2D.MostDetailedMip = i + 1;
-			auto [ch, gh] = _mimmap_allocation.At(i);
-			p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, ch);
-			_mipmap_handles.emplace_back(gh);
+			srv_desc.Texture2D.MostDetailedMip = mipmap;
+			p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
 		}
+		else if (view_type == kUAV)
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
+			slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
+			slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			slice_uav_desc.Texture2D.MipSlice = 0;
+			p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
+		}
+		else
+		{
+			AL_ASSERT(true);
+		}
+		view_info._gpu_handle = gpu_handle;
+		view_info._gpu_alloc = std::move(alloc);
+		_views[view_index] = std::move(view_info);
 	}
-	void D3DTexture2D::ReleaseView()
+
+	TextureHandle D3DTexture2D::GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice) const
 	{
-		Texture::ReleaseView();
-		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_allocation));
-		_mipmap_handles.clear();
+		u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
+		if (_views.contains(idx))
+		{
+			return _views.at(idx)._gpu_handle.ptr;
+		}
+		else
+			return 0;
 	}
+
+	void D3DTexture2D::ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
+	{
+		u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
+		_views.erase(idx);
+	}
+
 	void D3DTexture2D::Name(const String& new_name)
 	{
 		_name = new_name;
-		if(_p_d3dres)
+		if (_p_d3dres)
 			_p_d3dres->SetName(ToWChar(new_name));
-	}
-	void D3DTexture2D::MakesureResourceState(ID3D12GraphicsCommandList* cmd, D3D12_RESOURCE_STATES target_state)
-	{
-		if (_cur_res_state == target_state)
-			return;
-		auto old_state = _cur_res_state;
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_d3dres.Get(), old_state, target_state);
-		cmd->ResourceBarrier(1, &barrier);
-		_cur_res_state = target_state;
 	}
 	//----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
 
@@ -195,8 +205,7 @@ namespace Ailu
 
 	D3DCubeMap::~D3DCubeMap()
 	{
-		g_pGPUDescriptorAllocator->Free(std::move(_allocation));
-		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_allocation));
+
 	}
 
 	void D3DCubeMap::Apply()
@@ -205,7 +214,7 @@ namespace Ailu
 		auto p_device{ D3DContext::Get()->GetDevice() };
 		auto cmd = CommandBufferPool::Get();
 		auto p_cmdlist = static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
-		ComPtr<ID3D12Resource> pTextureGPU;
+		//ComPtr<ID3D12Resource> pTextureGPU;
 		ComPtr<ID3D12Resource> pTextureUpload;
 		D3D12_RESOURCE_DESC textureDesc{};
 		textureDesc.MipLevels = mipmap_level;
@@ -218,11 +227,12 @@ namespace Ailu
 		textureDesc.SampleDesc.Quality = 0;
 		textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _is_random_access ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_COPY_DEST,
-			nullptr, IID_PPV_ARGS(pTextureGPU.GetAddressOf())));
+		_state_guard = D3DResourceStateGuard(_is_random_access ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_COPY_DEST);
+		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _state_guard.CurState(),
+			nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
 
 		const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
-		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(pTextureGPU.Get(), 0, subresourceCount);
+		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
 		heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
 		auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -239,73 +249,106 @@ namespace Ailu
 				cubemap_datas.emplace_back(textureData);
 			}
 		}
-		UpdateSubresources(p_cmdlist, pTextureGPU.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, cubemap_datas.data());
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(pTextureGPU.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-		p_cmdlist->ResourceBarrier(1, &barrier);
-		// Describe and create a SRV for the texture.
-		D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-		srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srv_desc.Format = textureDesc.Format;
-		srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-		srv_desc.TextureCube.MipLevels = mipmap_level;
-		srv_desc.TextureCube.MostDetailedMip = 0;
-		_allocation = g_pGPUDescriptorAllocator->Allocate(1);
-		auto [cpu_handle, gpu_handle] = _allocation.At(0);
-		_main_srv_handle = gpu_handle;
-		p_device->CreateShaderResourceView(pTextureGPU.Get(), &srv_desc, cpu_handle);
-		_textures.emplace_back(pTextureGPU);
+		UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, cubemap_datas.data());
+		_state_guard.MakesureResourceState(p_cmdlist, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 		D3DContext::Get()->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
 		D3DContext::Get()->TrackResource(pTextureUpload);
-		pTextureGPU->SetName(ToWChar(_name));
+		for (u16 face = 1; face <= 6; face++)
+		{
+			if (_is_random_access)
+				CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace)face, 0);
+			else
+				CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace)face, 0);
+		}
+		_p_d3dres->SetName(ToWChar(_name));
 	}
 
-	void D3DCubeMap::Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline)
+	void D3DCubeMap::CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
 	{
-		if (slot == 255)
+		if (view_type == kDSV || view_type == kRTV)
 		{
-			_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
+			g_pLogMgr->LogWarningFormat("Try to create dsv/rtv on a raw cubemap,call is on render texture instead!");
 			return;
 		}
-		if (!compute_pipiline)
+		u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
+		if (_views.contains(view_index))
+			return;
+		D3DTextureViewInfo view_info(view_type, false);
+		auto p_device = dynamic_cast<D3DContext*>(g_pGfxContext)->GetDevice();
+		GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+		auto [cpu_handle, gpu_handle] = alloc.At(0);
+		if (view_type == ETextureViewType::kSRV)
 		{
-			_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+			srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srv_desc.Format = ConvertToDXGIFormat(_pixel_format);
+			srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+			srv_desc.Texture2DArray.ArraySize = 1;
+			srv_desc.Texture2DArray.FirstArraySlice = ((u16)face - 1) * array_slice;
+			srv_desc.Texture2DArray.MipLevels = 1;
+			srv_desc.Texture2DArray.MostDetailedMip = mipmap;
+
+			p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, cpu_handle);
+		}
+		else if (view_type == kUAV)
+		{
+			D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
+			slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
+			slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+			slice_uav_desc.Texture2DArray.ArraySize = 1;
+			slice_uav_desc.Texture2DArray.FirstArraySlice = ((u16)face - 1) * array_slice;
+			slice_uav_desc.Texture2DArray.MipSlice = mipmap;
+			p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
 		}
 		else
 		{
-			_allocation.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
+			AL_ASSERT(true);
 		}
+		view_info._gpu_handle = gpu_handle;
+		view_info._gpu_alloc = std::move(alloc);
+		_views[view_index] = std::move(view_info);
 	}
 
-	TextureHandle D3DCubeMap::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
+	TextureHandle D3DCubeMap::GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const
 	{
-		if (mipmap > _mipmap_count + 1)
-			return 0;
-		return _mipmap_srv_handles[face][mipmap].ptr;
-	}
-
-	void D3DCubeMap::CreateView()
-	{
-		Texture::CreateView();
-		auto p_device{ D3DContext::Get()->GetDevice() };
-		_mimmap_allocation = g_pGPUDescriptorAllocator->Allocate((_mipmap_count + 1) * 6);
-		u16 srv_handle_index = 0;
-		//for 6 face raw size
-		for (int i = 0; i < 6; i++)
+		u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
+		if (_views.contains(idx))
 		{
-			for (int j = 0; j < _mipmap_count + 1; j++)
+			return _views.at(idx)._gpu_handle.ptr;
+		}
+		else
+			return 0;
+	}
+
+	void D3DCubeMap::ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
+	{
+		u16 idx = CalculateViewIndex(view_type, face, mipmap, array_slice);
+		_views.erase(idx);
+	}
+
+	void D3DCubeMap::Bind(CommandBuffer* cmd, u16 view_index, u8 slot, bool is_target_compute_pipiline)
+	{
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		if (_views.contains(view_index))
+		{
+			auto view_type = _views[view_index]._view_type;
+			if (view_type == ETextureViewType::kSRV)
 			{
-				auto [ch, gh] = _mimmap_allocation.At(srv_handle_index++);
-				D3D12_SHADER_RESOURCE_VIEW_DESC slice_srv_desc{};
-				slice_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				slice_srv_desc.Format = ConvertToDXGIFormat(_pixel_format);
-				slice_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-				slice_srv_desc.Texture2DArray.ArraySize = 1;
-				slice_srv_desc.Texture2DArray.FirstArraySlice = i;
-				slice_srv_desc.Texture2DArray.MipLevels = 1;
-				slice_srv_desc.Texture2DArray.MostDetailedMip = j;
-				p_device->CreateShaderResourceView(_textures[0].Get(), &slice_srv_desc, ch);
-				_mipmap_srv_handles[(ECubemapFace::ECubemapFace)i].emplace_back(gh);
+				_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				if (is_target_compute_pipiline)
+					_views[view_index]._gpu_alloc.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
+				else
+					_views[view_index]._gpu_alloc.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+			}
+			else if (view_type == ETextureViewType::kUAV)
+			{
+				_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				_views[view_index]._gpu_alloc.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
+			}
+			else
+			{
+				AL_ASSERT(true);
 			}
 		}
 	}
@@ -330,8 +373,6 @@ namespace Ailu
 			_p_mipmapgen_cs0 = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
 			_p_mipmapgen_cs1 = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
 		}
-
-		_cur_res_state = D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON;
 		D3D12_SRV_DIMENSION main_view_dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		u16 texture_num = 1u;
 		if (_dimension == ETextureDimension::kCube)
@@ -376,246 +417,369 @@ namespace Ailu
 		else
 			memcpy(clear_value.Color, kClearColor, sizeof(kClearColor));
 		CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &tex_desc, is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET,
-			&clear_value, IID_PPV_ARGS(_p_buffer.GetAddressOf())));
-		_p_buffer->SetName(ToWChar(_name));
-		_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		if (is_for_depth)
+		_state_guard = D3DResourceStateGuard(is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
+		ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &tex_desc, _state_guard.CurState(),
+			&clear_value, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+		_p_d3dres->SetName(ToWChar(_name));
+		u16 view_slice_count = std::max<u16>(1, _slice_num);
+		//Main srv
 		{
-			if (tex_desc.Format == DXGI_FORMAT_D24_UNORM_S8_UINT)
-				_srv_desc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-			else if(tex_desc.Format == DXGI_FORMAT_D32_FLOAT)
-				_srv_desc.Format = DXGI_FORMAT_R32_FLOAT;
-			else if(tex_desc.Format == DXGI_FORMAT_R16_FLOAT)
-				_srv_desc.Format = DXGI_FORMAT_R16_FLOAT;
+			GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+			D3DTextureViewInfo view_info(ETextureViewType::kSRV, false);
+			auto [cpu_handle, gpu_handle] = alloc.At(0);
+			D3D12_SHADER_RESOURCE_VIEW_DESC view_desc{};
+			view_desc.Format = GetCompatibleSRVFormat(tex_desc.Format);
+			view_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			if (_dimension == ETextureDimension::kTex2D)
+			{
+				view_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				view_desc.Texture2D.MostDetailedMip = 0;
+				view_desc.Texture2D.MipLevels = mipmap_level;
+			}
+			else if (_dimension == ETextureDimension::kTex2DArray)
+			{
+				view_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+				view_desc.Texture2DArray.FirstArraySlice = 0;
+				view_desc.Texture2DArray.ArraySize = texture_num;
+				view_desc.Texture2DArray.MipLevels = mipmap_level;
+				view_desc.Texture2DArray.MostDetailedMip = 0;
+			}
+			else if (_dimension == ETextureDimension::kCube)
+			{
+				view_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+				view_desc.TextureCube.MipLevels = mipmap_level;
+				view_desc.TextureCube.MostDetailedMip = 0;
+			}
+			else if (_dimension == ETextureDimension::kCubeArray)
+			{
+				view_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+				view_desc.TextureCubeArray.MipLevels = mipmap_level;
+				view_desc.TextureCubeArray.First2DArrayFace = 0;
+				view_desc.TextureCubeArray.MostDetailedMip = 0;
+				view_desc.TextureCubeArray.NumCubes = _slice_num;
+			}
+			else
+				AL_ASSERT(true);
+			p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
+			view_info._gpu_handle = gpu_handle;
+			view_info._gpu_alloc = std::move(alloc);
+			_views[kMainSRVIndex] = std::move(view_info);
 		}
-		else
+		if (_dimension == ETextureDimension::kTex2D || _dimension == ETextureDimension::kTex2DArray)
 		{
-			_srv_desc.Format = tex_desc.Format;
+			for (u16 i = 0; i < view_slice_count; i++)
+			{
+				if (is_for_depth)
+					CreateView(ETextureViewType::kDSV, 0, i);
+				else
+					CreateView(ETextureViewType::kRTV, 0, i);
+				CreateView(ETextureViewType::kSRV, 0, i);
+				if (_is_random_access)
+					CreateView(ETextureViewType::kUAV, 0, i);
+			}
 		}
-		
-		_srv_desc.ViewDimension = main_view_dimension;
-		if (_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2D)
+		else if (_dimension == ETextureDimension::kCube || _dimension == ETextureDimension::kCubeArray)
 		{
-			_srv_desc.Texture2D.MostDetailedMip = 0;
-			_srv_desc.Texture2D.MipLevels = mipmap_level;
-		}
-		else if(_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY)
-		{
-			_srv_desc.Texture2DArray.FirstArraySlice = 0;
-			_srv_desc.Texture2DArray.ArraySize = texture_num;
-			_srv_desc.Texture2DArray.MipLevels = mipmap_level;
-			_srv_desc.Texture2DArray.MostDetailedMip = 0;
-		}
-		else if(_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURECUBE)
-		{
-			_srv_desc.TextureCube.MipLevels = mipmap_level;
-			_srv_desc.TextureCube.MostDetailedMip = 0;
-		}
-		else if (_srv_desc.ViewDimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY)
-		{
-			_srv_desc.TextureCubeArray.MipLevels = mipmap_level;
-			_srv_desc.TextureCubeArray.First2DArrayFace = 0;
-			_srv_desc.TextureCubeArray.MostDetailedMip = 0;
-			_srv_desc.TextureCubeArray.NumCubes = _slice_num;
+			for (u16 i = 0; i < view_slice_count; i++)
+			{
+				for (u16 j = 1; j <= 6; j++)
+				{
+					if (is_for_depth)
+						CreateView(ETextureViewType::kDSV, (ECubemapFace::ECubemapFace)j, 0, i);
+					else
+						CreateView(ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)j, 0, i);
+					CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace)j, 0, i);
+					if (_is_random_access)
+						CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace)j, 0, i);
+				}
+			}
 		}
 		else
 		{
 			AL_ASSERT(true);
 		}
-
-
-		_gpu_allocation = g_pGPUDescriptorAllocator->Allocate(1);
-		auto [s_ch, s_gh] = _gpu_allocation.At(0);
-		_main_srv_cpu_handle = s_ch;
-		_main_srv_gpu_handle = s_gh;
-		p_device->CreateShaderResourceView(_p_buffer.Get(), &_srv_desc, _main_srv_cpu_handle);
-
-		_cpu_allocation = is_for_depth ? std::move(g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, texture_num)) :
-			std::move(g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, texture_num));
-		for (u16 i = 0; i < texture_num; ++i)
-		{
-			if (!is_for_depth)
-			{
-				auto handle = _cpu_allocation.At(i);
-				_rtv_or_dsv_cpu_handles.emplace_back(handle);
-				D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
-				rtv_desc.ViewDimension = texture_num > 1 ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY : D3D12_RTV_DIMENSION_TEXTURE2D;
-				rtv_desc.Format = tex_desc.Format;
-				rtv_desc.Texture2D.MipSlice = 0;
-				rtv_desc.Texture2D.PlaneSlice = 0;
-				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBE || main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY)
-				{
-					rtv_desc.Texture2DArray.FirstArraySlice = i;
-					rtv_desc.Texture2DArray.ArraySize = 1;
-				}
-				p_device->CreateRenderTargetView(_p_buffer.Get(), &rtv_desc, _rtv_or_dsv_cpu_handles.back());
-			}
-			else
-			{
-				auto handle = _cpu_allocation.At(i);
-				_rtv_or_dsv_cpu_handles.emplace_back(handle);
-				D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
-				dsv_desc.ViewDimension = texture_num > 1 ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY : D3D12_DSV_DIMENSION_TEXTURE2D;
-				dsv_desc.Format = tex_desc.Format;
-				dsv_desc.Texture2D.MipSlice = 0;
-				if (main_view_dimension == D3D12_SRV_DIMENSION_TEXTURE2DARRAY ||main_view_dimension == D3D12_SRV_DIMENSION_TEXTURECUBEARRAY)
-				{
-					dsv_desc.Texture2DArray.FirstArraySlice = i;
-					dsv_desc.Texture2DArray.ArraySize = 1;
-				}
-				p_device->CreateDepthStencilView(_p_buffer.Get(), &dsv_desc, _rtv_or_dsv_cpu_handles.back());
-			}
-		}
-		_cur_res_state = is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
 	}
 
 	D3DRenderTexture::~D3DRenderTexture()
 	{
-		g_pCPUDescriptorAllocator->Free(std::move(_cpu_allocation));
-		g_pGPUDescriptorAllocator->Free(std::move(_gpu_allocation));
-		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_srv_allocation));
-		g_pGPUDescriptorAllocator->Free(std::move(_mimmap_uav_allocation));
-		g_pCPUDescriptorAllocator->Free(std::move(_mimmap_rtv_allocation));
+
 	}
 
-	void D3DRenderTexture::Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline)
+	void D3DRenderTexture::Bind(CommandBuffer* cmd, u16 view_index, u8 slot, bool is_target_compute_pipiline)
 	{
-		if (compute_pipiline && slot == 255)
+		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+		//if (view_index == 0 && _dimension == ETextureDimension::kTex2D)
+		//	view_index = kMainSRVIndex;
+		if (_views.contains(view_index))
 		{
-			_mimmap_uav_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer*>(cmd));
-			return;
-		}
-		if (!compute_pipiline)
-		{
-			if (s_current_rt != this)
+			if (!RenderTexture::CanAsShaderResource(this) && !is_target_compute_pipiline)
 			{
-				RenderTexture::Bind(cmd, slot);
-				MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-				_gpu_allocation.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+				g_pLogMgr->LogWarningFormat("D3DRenderTexture::Bind: try to use a render texture: {} as rt and srv at the same time!", _name);
+				return;
+			}
+			auto view_type = _views[view_index]._view_type;
+			if (view_type == ETextureViewType::kSRV)
+			{
+				_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+				if (is_target_compute_pipiline)
+					_views[view_index]._gpu_alloc.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
+				else
+					_views[view_index]._gpu_alloc.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer*>(cmd), slot);
+			}
+			else if (view_type == ETextureViewType::kUAV)
+			{
+				_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+				_views[view_index]._gpu_alloc.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer*>(cmd), slot);
 			}
 			else
 			{
-				g_pLogMgr->LogWarningFormat("D3DRenderTexture::Bind: try to use a render texture: {} as rt and srv at the same time!", _name);
+				AL_ASSERT(true);
 			}
 		}
 		else
 		{
 			AL_ASSERT(true);
+			LOG_WARNING("D3DRenderTexture({})::Bind: invalid view index", _name);
 		}
 	}
 
-	void D3DRenderTexture::CreateView()
+	void D3DRenderTexture::CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
 	{
-		Texture::CreateView();
-		if (_dimension == ETextureDimension::kCube)
+		if (_dimension == ETextureDimension::kCube || _dimension == ETextureDimension::kCubeArray)
+			return;
+		u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
+		if (_views.contains(view_index))
+			return;
+		auto p_device = dynamic_cast<D3DContext*>(g_pGfxContext)->GetDevice();
+		DXGI_FORMAT dx_format = ConvertToDXGIFormat(_pixel_format);
+		if (view_type == ETextureViewType::kRTV)
 		{
-			auto p_device{ D3DContext::Get()->GetDevice() };
-			_mimmap_srv_allocation = g_pGPUDescriptorAllocator->Allocate((_mipmap_count + 1) * 6);
-			_mimmap_rtv_allocation = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV,(_mipmap_count) * 6);
-			u16 srv_handle_index = 0,rtv_handle_index = 0;
-			//for 6 face raw size
-			for (int i = 0; i < 6; i++)
+			CPUVisibleDescriptorAllocation alloc = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1);
+			D3DTextureViewInfo view_info(view_type, true);
+			auto cpu_handle = alloc.At(0);
+			D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
+			rtv_desc.ViewDimension = _dimension == ETextureDimension::kTex2DArray ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY : D3D12_RTV_DIMENSION_TEXTURE2D;
+			rtv_desc.Format = dx_format;
+			if (_dimension == ETextureDimension::kTex2D)
 			{
-				for (int j = 0; j < _mipmap_count + 1; j++)
-				{
-					auto [ch, gh] = _mimmap_srv_allocation.At(srv_handle_index++);
-					D3D12_SHADER_RESOURCE_VIEW_DESC slice_srv_desc{};
-					slice_srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-					slice_srv_desc.Format = ConvertToDXGIFormat(_pixel_format);
-					slice_srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-					slice_srv_desc.Texture2DArray.ArraySize = 1;
-					slice_srv_desc.Texture2DArray.FirstArraySlice = i;
-					slice_srv_desc.Texture2DArray.MipLevels = 1;
-					slice_srv_desc.Texture2DArray.MostDetailedMip = j;
-					p_device->CreateShaderResourceView(_p_buffer.Get(), &slice_srv_desc, ch);
-					_mipmap_srv_handles[(ECubemapFace::ECubemapFace)(i + 1)].emplace_back(gh);
-					if (j > 0)
-					{
-						auto ch = _mimmap_rtv_allocation.At(rtv_handle_index++);
-						D3D12_RENDER_TARGET_VIEW_DESC slice_rtv_desc{};
-						slice_rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-						slice_rtv_desc.Format = ConvertToDXGIFormat(_pixel_format);
-						slice_rtv_desc.Texture2DArray.ArraySize = 1;
-						slice_rtv_desc.Texture2DArray.FirstArraySlice = i;
-						slice_rtv_desc.Texture2DArray.MipSlice = j;
-						p_device->CreateRenderTargetView(_p_buffer.Get(), &slice_rtv_desc, ch);
-						_mipmap_rtv_handles[(ECubemapFace::ECubemapFace)(i + 1)].emplace_back(ch);
-					}
-				}
+				rtv_desc.Texture2D.MipSlice = mipmap;
+				rtv_desc.Texture2D.PlaneSlice = 0;
 			}
-			if (_is_random_access)
+			else if (_dimension == ETextureDimension::kTex2DArray)
 			{
-				_mimmap_uav_allocation = g_pGPUDescriptorAllocator->Allocate(_mipmap_count * 6);
-				u16 uav_handle_index = 0;
-				for (int i = 0; i < 6; i++)
-				{
-					//mipmap第一级（原图）不需要随机读写，是给uav只为mipmap创建
-					for (int j = 1; j < _mipmap_count + 1; j++)
-					{
-						auto [ch, gh] = _mimmap_uav_allocation.At(uav_handle_index++);
-						D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
-						slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
-						slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-						slice_uav_desc.Texture2DArray.ArraySize = 1;
-						slice_uav_desc.Texture2DArray.FirstArraySlice = i;
-						slice_uav_desc.Texture2DArray.MipSlice = j;
-						p_device->CreateUnorderedAccessView(_p_buffer.Get(), nullptr, &slice_uav_desc, ch);
-						_mipmap_uav_handles[(ECubemapFace::ECubemapFace)(i + 1)].emplace_back(gh);
-					}
-				}
+				rtv_desc.Texture2DArray.FirstArraySlice = array_slice;
+				rtv_desc.Texture2DArray.MipSlice = mipmap;
+				rtv_desc.Texture2DArray.ArraySize = 1;
 			}
+			else { AL_ASSERT(true); }
+			p_device->CreateRenderTargetView(_p_d3dres.Get(), &rtv_desc, cpu_handle);
+			view_info._cpu_handle = cpu_handle;
+			view_info._cpu_alloc = std::move(alloc);
+			_views[view_index] = std::move(view_info);
+		}
+		else if (view_type == ETextureViewType::kDSV)
+		{
+			CPUVisibleDescriptorAllocation alloc = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
+			D3DTextureViewInfo view_info(view_type, true);
+			auto cpu_handle = alloc.At(0);
+			D3D12_DEPTH_STENCIL_VIEW_DESC view_desc{};
+			view_desc.ViewDimension = _dimension == ETextureDimension::kTex2DArray ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY : D3D12_DSV_DIMENSION_TEXTURE2D;
+			if (_dimension == ETextureDimension::kTex2D)
+			{
+				view_desc.Texture2D.MipSlice = mipmap;
+			}
+			else if (_dimension == ETextureDimension::kTex2DArray)
+			{
+				view_desc.Texture2DArray.FirstArraySlice = array_slice;
+				view_desc.Texture2DArray.MipSlice = mipmap;
+				view_desc.Texture2DArray.ArraySize = 1;
+			}
+			else { AL_ASSERT(true); }
+			p_device->CreateDepthStencilView(_p_d3dres.Get(), &view_desc, cpu_handle);
+			view_info._cpu_handle = cpu_handle;
+			view_info._cpu_alloc = std::move(alloc);
+			_views[view_index] = std::move(view_info);
+		}
+		else if (view_type == ETextureViewType::kSRV)
+		{
+			GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+			D3DTextureViewInfo view_info(view_type, false);
+			auto [cpu_handle, gpu_handle] = alloc.At(0);
+			D3D12_SHADER_RESOURCE_VIEW_DESC view_desc{};
+			view_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			view_desc.ViewDimension = _dimension == ETextureDimension::kTex2DArray ? D3D12_SRV_DIMENSION_TEXTURE2DARRAY : D3D12_SRV_DIMENSION_TEXTURE2D;
+			view_desc.Format = GetCompatibleSRVFormat(dx_format);
+			if (_dimension == ETextureDimension::kTex2D)
+			{
+				view_desc.Texture2D.MostDetailedMip = mipmap;
+				view_desc.Texture2D.MipLevels = 1;
+			}
+			else if (_dimension == ETextureDimension::kTex2DArray)
+			{
+				view_desc.Texture2DArray.FirstArraySlice = array_slice;
+				view_desc.Texture2DArray.ArraySize = 1;
+				view_desc.Texture2DArray.MipLevels = 1;
+				view_desc.Texture2DArray.MostDetailedMip = mipmap;
+			}
+			else { AL_ASSERT(true); }
+			p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
+			view_info._gpu_handle = gpu_handle;
+			view_info._gpu_alloc = std::move(alloc);
+			_views[view_index] = std::move(view_info);
+		}
+		else//UAV
+		{
+			GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+			D3DTextureViewInfo view_info(view_type, false);
+			auto [cpu_handle, gpu_handle] = alloc.At(0);
+			D3D12_UNORDERED_ACCESS_VIEW_DESC view_desc{};
+			view_desc.ViewDimension = _dimension == ETextureDimension::kTex2DArray ? D3D12_UAV_DIMENSION_TEXTURE2DARRAY : D3D12_UAV_DIMENSION_TEXTURE2D;
+			view_desc.Format = dx_format;
+			if (_dimension == ETextureDimension::kTex2D)
+			{
+				view_desc.Texture2D.MipSlice = mipmap;
+			}
+			else if (_dimension == ETextureDimension::kTex2DArray)
+			{
+				view_desc.Texture2DArray.FirstArraySlice = array_slice;
+				view_desc.Texture2DArray.ArraySize = 1;
+				view_desc.Texture2DArray.MipSlice = mipmap;
+			}
+			else { AL_ASSERT(true); }
+			p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &view_desc, cpu_handle);
+			view_info._gpu_handle = gpu_handle;
+			view_info._gpu_alloc = std::move(alloc);
+			_views[view_index] = std::move(view_info);
+		}
+	}
+
+	TextureHandle D3DRenderTexture::GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice) const
+	{
+		u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
+		if (_views.contains(idx))
+		{
+			return _views.at(idx)._gpu_handle.ptr;
 		}
 		else
+			return 0;
+	}
+
+	void D3DRenderTexture::ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
+	{
+		u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
+		_views.erase(idx);
+	}
+
+	void D3DRenderTexture::CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
+	{
+		if (_dimension == ETextureDimension::kTex2D || _dimension == ETextureDimension::kTex2DArray)
+			return;
+		u16 view_index = CalculateViewIndex(view_type, face, mipmap, array_slice);
+		if (_views.contains(view_index))
+			return;
+		auto p_device = dynamic_cast<D3DContext*>(g_pGfxContext)->GetDevice();
+		DXGI_FORMAT dx_format = ConvertToDXGIFormat(_pixel_format);
+		u16 face_index = (u16)face - 1;
+		if (view_type == ETextureViewType::kRTV)
 		{
-			auto p_device{ D3DContext::Get()->GetDevice() };
-			_mimmap_srv_allocation = g_pGPUDescriptorAllocator->Allocate(_mipmap_count);
-			for (int i = 0; i < _mipmap_count; i++)
-			{
-				D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
-				srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				srv_desc.Format = ConvertToDXGIFormat(_pixel_format);
-				srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				srv_desc.Texture2D.MipLevels = 1;
-				srv_desc.Texture2D.MostDetailedMip = i + 1;
-				auto [ch, gh] = _mimmap_srv_allocation.At(i);
-				p_device->CreateShaderResourceView(_p_buffer.Get(), &srv_desc, ch);
-				_mipmap_srv_handles[ECubemapFace::kUnknown].emplace_back(gh);
-			}
-			if (_is_random_access)
-			{
-				//为原图也创建
-				_mimmap_uav_allocation = g_pGPUDescriptorAllocator->Allocate(_mipmap_count + 1);
-				u16 uav_handle_index = 0;
-				for (int j = 0; j < _mipmap_count + 1; j++)
-				{
-					auto [ch, gh] = _mimmap_uav_allocation.At(uav_handle_index++);
-					D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
-					uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
-					uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-					uav_desc.Texture2D.MipSlice = j;
-					p_device->CreateUnorderedAccessView(_p_buffer.Get(), nullptr, &uav_desc, ch);
-					_mipmap_uav_handles[ECubemapFace::kUnknown].emplace_back(gh);
-				}
-			}
+			CPUVisibleDescriptorAllocation alloc = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 1);
+			D3DTextureViewInfo view_info(view_type, true);
+			auto cpu_handle = alloc.At(0);
+			D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
+			rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+			rtv_desc.Format = dx_format;
+			rtv_desc.Texture2DArray.FirstArraySlice = array_slice * 6 + face_index;
+			rtv_desc.Texture2DArray.MipSlice = mipmap;
+			rtv_desc.Texture2DArray.ArraySize = 1;
+			p_device->CreateRenderTargetView(_p_d3dres.Get(), &rtv_desc, cpu_handle);
+			view_info._cpu_handle = cpu_handle;
+			view_info._cpu_alloc = std::move(alloc);
+			_views[view_index] = std::move(view_info);
 		}
+		else if (view_type == ETextureViewType::kDSV)
+		{
+			CPUVisibleDescriptorAllocation alloc = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1);
+			D3DTextureViewInfo view_info(view_type, true);
+			auto cpu_handle = alloc.At(0);
+			D3D12_DEPTH_STENCIL_VIEW_DESC view_desc{};
+			view_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
+			view_desc.Texture2DArray.FirstArraySlice = array_slice * 6 + face_index;
+			view_desc.Texture2DArray.MipSlice = mipmap;
+			view_desc.Texture2DArray.ArraySize = 1;
+			p_device->CreateDepthStencilView(_p_d3dres.Get(), &view_desc, cpu_handle);
+			view_info._cpu_handle = cpu_handle;
+			view_info._cpu_alloc = std::move(alloc);
+			_views[view_index] = std::move(view_info);
+		}
+		else if (view_type == ETextureViewType::kSRV)
+		{
+			GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+			D3DTextureViewInfo view_info(view_type, false);
+			auto [cpu_handle, gpu_handle] = alloc.At(0);
+			D3D12_SHADER_RESOURCE_VIEW_DESC view_desc{};
+			//view_desc.ViewDimension = _dimension == ETextureDimension::kCube? D3D12_SRV_DIMENSION_TEXTURE2DARRAY : D3D12_SRV_DIMENSION::D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+			view_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+			view_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			view_desc.Format = GetCompatibleSRVFormat(dx_format);
+			view_desc.Texture2DArray.FirstArraySlice = array_slice * 6 + face_index;
+			view_desc.Texture2DArray.ArraySize = 1;
+			view_desc.Texture2DArray.MipLevels = 1;
+			view_desc.Texture2DArray.MostDetailedMip = mipmap;
+			p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
+			view_info._gpu_handle = gpu_handle;
+			view_info._gpu_alloc = std::move(alloc);
+			_views[view_index] = std::move(view_info);
+		}
+		else//UAV
+		{
+			GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+			D3DTextureViewInfo view_info(view_type, false);
+			auto [cpu_handle, gpu_handle] = alloc.At(0);
+			D3D12_UNORDERED_ACCESS_VIEW_DESC view_desc{};
+			view_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+			view_desc.Format = dx_format;
+			view_desc.Texture2DArray.FirstArraySlice = array_slice * 6 + face_index;
+			view_desc.Texture2DArray.ArraySize = 1;
+			view_desc.Texture2DArray.MipSlice = mipmap;
+			p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &view_desc, cpu_handle);
+			view_info._gpu_handle = gpu_handle;
+			view_info._gpu_alloc = std::move(alloc);
+			_views[view_index] = std::move(view_info);
+		}
+	}
+
+	TextureHandle D3DRenderTexture::GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const
+	{
+		u16 idx = CalculateViewIndex(view_type, face, mipmap, array_slice);
+		if (_views.contains(idx))
+		{
+			return _views.at(idx)._gpu_handle.ptr;
+		}
+		else
+			return 0;
+	}
+
+	void D3DRenderTexture::ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
+	{
+		u16 idx = CalculateViewIndex(view_type, face, mipmap, array_slice);
+		_views.erase(idx);
 	}
 
 	void D3DRenderTexture::GenerateMipmap(CommandBuffer* cmd)
 	{
 		auto tcmd = CommandBufferPool::Get("MipmapGen");
 		auto d3dcmd = static_cast<D3DCommandBuffer*>(tcmd.get())->GetCmdList();
-		MakesureResourceState(d3dcmd, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		//_p_test_cs->SetTexture("gInputA", TexturePool::Get("Textures/MyImage01.jpg").get());
 		for (int i = 1; i < 7; i++)
-		{	
+		{
 			_p_mipmapgen_cs0->SetInt("SrcMipLevel", 0);
 			_p_mipmapgen_cs0->SetInt("NumMipLevels", 4);
 			_p_mipmapgen_cs0->SetInt("SrcDimension", 0);
 			_p_mipmapgen_cs0->SetBool("IsSRGB", false);
 			auto [mip1w, mip1h] = CurMipmapSize(1);
 			_p_mipmapgen_cs0->SetVector("TexelSize", Vector4f(1.0f / (float)mip1w, 1.0f / (float)mip1h, 0.0f, 0.0f));
-			_p_mipmapgen_cs0->SetTexture("SrcMip", this,  (ECubemapFace::ECubemapFace)i, 0);
+			_p_mipmapgen_cs0->SetTexture("SrcMip", this, (ECubemapFace::ECubemapFace)i, 0);
 			_p_mipmapgen_cs0->SetTexture("OutMip1", this, (ECubemapFace::ECubemapFace)i, 1);
 			_p_mipmapgen_cs0->SetTexture("OutMip2", this, (ECubemapFace::ECubemapFace)i, 2);
 			_p_mipmapgen_cs0->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace)i, 3);
@@ -627,15 +791,15 @@ namespace Ailu
 			tcmd->Clear();
 			auto [mip5w, mip5h] = CurMipmapSize(5);
 			_p_mipmapgen_cs1->SetInt("SrcMipLevel", 4);
-			_p_mipmapgen_cs1->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 4,4));
+			_p_mipmapgen_cs1->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 4, 4));
 			_p_mipmapgen_cs1->SetInt("SrcDimension", 0);
 			_p_mipmapgen_cs1->SetBool("IsSRGB", false);
-			_p_mipmapgen_cs1->SetVector("TexelSize", Vector4f(1.0f/ (float)mip5w, 1.0f / (float)mip5h, 0.0f, 0.0f));
+			_p_mipmapgen_cs1->SetVector("TexelSize", Vector4f(1.0f / (float)mip5w, 1.0f / (float)mip5h, 0.0f, 0.0f));
 			_p_mipmapgen_cs1->SetTexture("SrcMip", this, (ECubemapFace::ECubemapFace)i, 4);
 			_p_mipmapgen_cs1->SetTexture("OutMip1", this, (ECubemapFace::ECubemapFace)i, 5);
 			_p_mipmapgen_cs1->SetTexture("OutMip2", this, (ECubemapFace::ECubemapFace)i, 6);
 			_p_mipmapgen_cs1->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace)i, 7);
-			if(_mipmap_count > 7)
+			if (_mipmap_count > 7)
 				_p_mipmapgen_cs1->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace)i, 8);
 			tcmd->Dispatch(_p_mipmapgen_cs1.get(), mip5w / 8, mip5h / 8, 1);
 			g_pGfxContext->ExecuteAndWaitCommandBuffer(tcmd);
@@ -647,169 +811,114 @@ namespace Ailu
 	void D3DRenderTexture::Name(const String& value)
 	{
 		_name = value;
-		_p_buffer->SetName(ToWChar(value));
+		_p_d3dres->SetName(ToWChar(value));
 	}
 
-	const TextureHandle D3DRenderTexture::GetNativeTextureHandle()
+	TextureHandle D3DRenderTexture::ColorRenderTargetHandle(u16 view_index, CommandBuffer* cmd)
 	{
-		return _depth > 0? DepthTexture(0) : ColorTexture(0);
-	}
-
-	TextureHandle D3DRenderTexture::ColorRenderTargetHandle(u16 index, CommandBuffer* cmd)
-	{
-		if (index < _rtv_or_dsv_cpu_handles.size())
+		if (_views.contains(view_index))
 		{
 			if (cmd)
 			{
-				MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+				_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
 			}
 			else
 			{
 				auto cmd = CommandBufferPool::Get("StateTransition");
-				MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+				_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET);
 				D3DContext::Get()->ExecuteCommandBuffer(cmd);
 				CommandBufferPool::Release(cmd);
 			}
-			s_current_rt = this;
-			return _rtv_or_dsv_cpu_handles[index].ptr;
+			RenderTexture::ResetRenderTarget(this);
+			return _views[view_index]._cpu_handle.ptr;
 		}
 		return 0;
 	}
 
-	TextureHandle D3DRenderTexture::DepthRenderTargetHandle(u16 index, CommandBuffer* cmd)
+	TextureHandle D3DRenderTexture::DepthRenderTargetHandle(u16 view_index, CommandBuffer* cmd)
 	{
-		if (index < _rtv_or_dsv_cpu_handles.size())
+		if (_views.contains(view_index))
 		{
 			if (cmd)
 			{
-				MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
 			}
 			else
 			{
 				auto cmd = CommandBufferPool::Get("StateTransition");
-				MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
 				D3DContext::Get()->ExecuteCommandBuffer(cmd);
 				CommandBufferPool::Release(cmd);
 			}
-			s_current_rt = this;
-			return _rtv_or_dsv_cpu_handles[index].ptr;
+			RenderTexture::ResetRenderTarget(this);
+			return _views[view_index]._cpu_handle.ptr;
 		}
 		return 0;
 	}
 
-	TextureHandle D3DRenderTexture::ColorTexture(u16 index, CommandBuffer* cmd)
+	TextureHandle D3DRenderTexture::ColorTexture(u16 view_index, CommandBuffer* cmd)
 	{
-		if (!CanAsShaderResource(this))
+		if (!CanAsShaderResource(this) || !_views.contains(view_index))
 			return 0;
 		if (cmd)
 		{
-			MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		}
 		else
 		{
 			auto cmd = CommandBufferPool::Get("StateTransition");
-			MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			D3DContext::Get()->ExecuteCommandBuffer(cmd);
 			CommandBufferPool::Release(cmd);
 		}
-		return _main_srv_gpu_handle.ptr;
+		return _views[view_index]._gpu_handle.ptr;
 	}
 
-	TextureHandle D3DRenderTexture::DepthTexture(u16 index, CommandBuffer* cmd)
+	TextureHandle D3DRenderTexture::DepthTexture(u16 view_index, CommandBuffer* cmd)
 	{
-		if (!CanAsShaderResource(this))
+		if (!CanAsShaderResource(this) || !_views.contains(view_index))
 			return 0;
 		if (cmd)
 		{
-			MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		}
 		else
 		{
 			auto cmd = CommandBufferPool::Get("StateTransition");
-			MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			D3DContext::Get()->ExecuteCommandBuffer(cmd);
 			CommandBufferPool::Release(cmd);
 		}
-		return _main_srv_gpu_handle.ptr;
-	}
-
-	TextureHandle D3DRenderTexture::GetView(u16 mipmap, bool random_access, ECubemapFace::ECubemapFace face, u16 array_slice)
-	{
-		if (mipmap > _mipmap_count || !_is_have_total_view)
-			return 0;
-		if (_dimension == ETextureDimension::kCube)
-		{
-			return random_access ? _mipmap_uav_handles[face][mipmap - 1].ptr : _mipmap_srv_handles[face][mipmap].ptr;
-		}
-		else
-		{
-			g_pLogMgr->LogWarning("GetView: texture is not a cube texture");
-			return 0;
-		}
+		return _views[view_index]._gpu_handle.ptr;
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE* D3DRenderTexture::TargetCPUHandle(u16 index)
 	{
+		if (index == 0)
+		{
+			index = _depth > 0 ? kMainDSVIndex : kMainRTVIndex;
+		}
+		if (!_views.contains(index))
+			return nullptr;
 		auto cmd = CommandBufferPool::Get("StateTransition");
-		MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), _depth > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
+		_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList(), _p_d3dres.Get(), _depth > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
 		D3DContext::Get()->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
-		s_current_rt = this;
-		u16 mipmap_level = _mipmap_count + 1;
-		if (_mipmap_count > 0)
-		{
-			if (index % (mipmap_level) == 0)
-			{
-				return &_rtv_or_dsv_cpu_handles[index / mipmap_level];
-			}
-			else
-			{
-				//index = face_index * 6 + mipmap_index
-				u16 face_index = index / mipmap_level + 1, mipmap_index = index % mipmap_level - 1;//每张纹理的mipmap0不在这个体系内，所有索引从1开始
-				return &_mipmap_rtv_handles[(ECubemapFace::ECubemapFace)face_index][mipmap_index];
-			}
-		}
-		else
-		{
-			return &_rtv_or_dsv_cpu_handles[index];
-		}
+		RenderTexture::ResetRenderTarget(this);
+		return &_views[index]._cpu_handle;
 	}
 
 	D3D12_CPU_DESCRIPTOR_HANDLE* D3DRenderTexture::TargetCPUHandle(CommandBuffer* cmd, u16 index)
 	{
-		MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), _depth > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
-		s_current_rt = this;
-		u16 mipmap_level = _mipmap_count + 1;
-		if (_mipmap_count > 0)
+		if (index == 0)
 		{
-			if (index % (mipmap_level) == 0)
-			{
-				return &_rtv_or_dsv_cpu_handles[index / mipmap_level];
-			}
-			else
-			{
-				//index = face_index * 6 + mipmap_index
-				u16 face_index = index / mipmap_level + 1, mipmap_index = index % mipmap_level - 1;
-				return &_mipmap_rtv_handles[(ECubemapFace::ECubemapFace)face_index][mipmap_index];
-			}
+			index = _depth > 0 ? kMainDSVIndex : kMainRTVIndex;
 		}
-		else
-		{
-			return &_rtv_or_dsv_cpu_handles[index];
-		}
+		if (!_views.contains(index))
+			return nullptr;
+		_state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(cmd)->GetCmdList(), _p_d3dres.Get(), _depth > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
+		RenderTexture::ResetRenderTarget(this);
+		return &_views[index]._cpu_handle;
 	}
-
-
-	void D3DRenderTexture::MakesureResourceState(ID3D12GraphicsCommandList* cmd, D3D12_RESOURCE_STATES target_state)
-	{
-		if (_cur_res_state == target_state)
-			return;
-		auto old_state = _cur_res_state;
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_p_buffer.Get(), old_state, target_state);
-		cmd->ResourceBarrier(1, &barrier);
-		_cur_res_state = target_state;
-	}
-
-
 	//----------------------------------------------------------D3DRenderTexture----------------------------------------------------------------------
 }

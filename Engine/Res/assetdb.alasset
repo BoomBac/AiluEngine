@@ -43,6 +43,7 @@
 6b616d87-aefe-4b8d-9914-531b11a6efc5,NewScene/Palace/textures/sponza_column_a_baseColor.alasset,kTexture2D
 6d1148fb-00a4-4720-8ca0-7dd877b0da55,NewScene/Palace/textures/sponza_arch_baseColor.alasset,kTexture2D
 7182a502-ba5e-4de5-a517-ed226a6b7805,NewScene/Palace/MAT_column_a.alasset,kMaterial
+731c4c95-0f59-48a9-9fc9-5411ed7c2ae4,NewScene/Material_MR.alasset,kMaterial
 777ae3e2-d1ef-4087-8838-10a063b0fdcd,NewScene/Palace/MAT_fabric_e.alasset,kMaterial
 793cbfbb-97ad-41c7-905d-28e1da26495d,NewScene/Palace/textures/sponza_column_c_normal.alasset,kTexture2D
 7ac5d887-551f-4363-b38f-299f318b23dc,NewScene/Palace/palace.almap,kScene
@@ -54,6 +55,7 @@
 83c42d92-7849-402e-a91c-64967c4e9c49,NewScene/Palace/textures/sponza_curtain_normal.alasset,kTexture2D
 8618fcbd-4cab-4d92-94b2-151c3f1d40c6,NewScene/Palace/textures/sponza_column_a_normal.alasset,kTexture2D
 88038f2b-8b36-4a3e-a271-2ed294a5c54f,Shaders/deferred_lighting.alasset,kShader
+880ca96c-98e3-4b02-904a-0146448b47e0,NewScene/Default_normal.alasset,kTexture2D
 881f94ee-2dbb-48e9-b084-72c9bfb729ea,Icons/folder.alasset,kTexture2D
 8cfd12eb-99bd-464d-acbd-63b433d14614,NewScene/Palace/textures/sponza_column_b_normal.alasset,kTexture2D
 92f5350a-f983-4448-93a3-ae0fd06ce1f3,NewScene/Palace/MAT_vase_hanging.alasset,kMaterial
@@ -63,8 +65,10 @@
 999eb3c6-b57f-4bca-834a-bda77367a7a0,NewScene/Palace/materials/MAT_roof.alasset,kMaterial
 9a42b924-f98b-487e-8996-c285bf17f017,NewScene/Palace/textures/sponza_roof_baseColor.alasset,kTexture2D
 9b07c454-1831-4137-ac11-04deb4baeca3,NewScene/Palace/textures/sponza_flagpole_normal.alasset,kTexture2D
+9bb10f26-291a-4614-861e-2c667b6b4c63,NewScene/node_damagedHelmet_-6514.alasset,kMesh
 D390A432-7AD9-475D-B1A5-726EB91072FB,Shaders/forwardlit.alasset,kShader
 a40c454a-c967-4810-88c9-651706104062,NewScene/default_scene.almap,kScene
+a5e5ce06-3542-4eb0-8087-5b4034c4dcf6,NewScene/Default_albedo.alasset,kTexture2D
 aaf13c3a-39fa-4ca3-b221-d0f1671474f7,NewScene/Palace/textures/sponza_bricks_a_normal.alasset,kTexture2D
 acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c,Icons/point_light.alasset,kTexture2D
 adbe79a7-7a5b-430a-a82b-c1204c6e91c2,NewScene/Palace/textures/sponza_arch_normal.alasset,kTexture2D

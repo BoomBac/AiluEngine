@@ -10,6 +10,7 @@
 namespace Ailu
 {
     class Scene;
+    class Renderer;
     DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
     class AILU_API Camera : public Object
     {
@@ -43,6 +44,12 @@ namespace Ailu
         void Cull(Scene* s);
         void RecalculateMarix(bool force = false);
         void SetLens(float fovh, float aspect, float nz, float fz);
+        void Rect(u16 w, u16 h) 
+        {
+            _pixel_width = w;
+            _pixel_height = h;
+        };
+        Vector2D<u32> Rect() const {return Vector2D<u32>{_pixel_width, _pixel_height};}
         const Matrix4x4f& GetProjection() const { return _proj_matrix; }
         const Matrix4x4f& GetView() const { return _view_matrix; }
         void LookTo(const Vector3f& direction, const Vector3f& up);
@@ -50,6 +57,8 @@ namespace Ailu
         void MarkDirty() { _is_dirty = true; }
         const ViewFrustum& GetViewFrustum() const { return _vf; }
         const CullResult& CullResults() const { return _cull_results; };
+        void SetRenderer(Renderer* r);
+        RenderTexture* TargetTexture() { return _target_texture; }
     private:
         void CalculateFrustum();
     private:
@@ -66,8 +75,10 @@ namespace Ailu
         Vector3f _far_top_right;
         Vector3f _far_bottom_left;
         Vector3f _far_bottom_right;
-
         CullResult _cull_results;
+        u16 _pixel_width = 1600u, _pixel_height = 900u;
+        Renderer* _renderer = nullptr;
+        RenderTexture* _target_texture = nullptr;
     };
     REFLECT_FILED_BEGIN(Camera)
     DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f,Position,_position)

@@ -4,15 +4,15 @@ name: StandardPBR
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
 keywords: 
   prop_type: Uint
-    _SamplerMask: 0
-    _MaterialID: 0
     SamplerMask: 0
     _MaterialID: 0
     _SamplerMask: 0
     _material_id: 0
     _surface: 0
   prop_type: Float
+    _SamplerMask: 0
     g_IndirectLightingIntensity: 0
+    _MaterialID: 0
     _RoughnessValue: 0
     _MetallicValue: 0
     _AlphaCulloff: 0.602
@@ -21,7 +21,7 @@ keywords:
     _ZBufferParams: 0,0,0,0
     _CascadeShadowParams: 0,0,0,0
     _EmissionValue: 0,0,0,0
-    _AlbedoValue: 1,1,1,0.898039
+    _AlbedoValue: 1,1,1,1
     _SpecularValue: 0,0,0,0
   prop_type: Texture2D
     _AlbedoTex: null guid

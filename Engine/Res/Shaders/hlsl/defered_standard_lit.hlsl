@@ -33,9 +33,9 @@ struct GBuffer
 	float4 specular_metallic : SV_Target2;
 };
 
-PSInput GBufferVSMain(VSInput v)
+StandardPSInput GBufferVSMain(StandardVSInput v)
 {
-	PSInput result;
+	StandardPSInput result;
 	result.position = TransformToClipSpace(v.position);
 	result.normal = v.normal;
 	result.uv0 = v.uv0;
@@ -50,7 +50,7 @@ PSInput GBufferVSMain(VSInput v)
 	return result;
 }
 
-GBuffer GBufferPSMain(PSInput input) : SV_TARGET
+GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
 	InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);

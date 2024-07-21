@@ -1,0 +1,28 @@
+guid: 731c4c95-0f59-48a9-9fc9-5411ed7c2ae4
+type: kMaterial
+name: Material_MR
+shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
+keywords: 
+  prop_type: Uint
+    _MaterialID: 0
+    _SamplerMask: 0
+  prop_type: Float
+    _SamplerMask: 4.2039e-45
+    g_IndirectLightingIntensity: 0
+    _MaterialID: 0
+    _RoughnessValue: 0.046
+    _MetallicValue: 0
+    _AlphaCulloff: 0
+  prop_type: Vector
+    _ScreenParams: 1.49012e-07,0.86837,-0.495917,0
+    _ZBufferParams: 0.674305,0.366212,0.641251,0
+    _CascadeShadowParams: 0,0,-39.2348,0
+    _EmissionValue: 0,0,0,0
+    _AlbedoValue: 1,1,1,0
+    _SpecularValue: 0,0,0,0
+  prop_type: Texture2D
+    _AlbedoTex: a5e5ce06-3542-4eb0-8087-5b4034c4dcf6
+    _EmissionTex: null guid
+    _NormalTex: 880ca96c-98e3-4b02-904a-0146448b47e0
+    _RoughnessMetallicTex: null guid
+    _SpecularTex: null guid

@@ -66,9 +66,9 @@ namespace Ailu
 			inline static const BitDesc kInputlayout = {46,4};
 			inline static const BitDesc kTopology = {50,2};
 			inline static const BitDesc kBlendState = {52,3};
-			inline static const BitDesc kRasterState = {55,3};
-			inline static const BitDesc kDepthStencilState = {58,3};
-			inline static const BitDesc kRenderTargetState = {61,3};
+			inline static const BitDesc kRasterState = {55,2};
+			inline static const BitDesc kDepthStencilState = {57,3};
+			inline static const BitDesc kRenderTargetState = {60,4};
 		};
 	public:
 		static Scope<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer& initializer);

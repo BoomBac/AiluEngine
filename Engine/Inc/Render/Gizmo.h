@@ -16,7 +16,7 @@ namespace Ailu
     public:
         static void Init()
         {
-            p_buf = DynamicVertexBuffer::Create();
+            p_buf = IDynamicVertexBuffer::Create();
             s_color.a = 0.75f;
         }
 
@@ -250,7 +250,7 @@ namespace Ailu
         inline static Color32 s_color = Colors::kGray;
     private:
         inline static u32 _vertex_num = 0u;
-        inline static Ref<DynamicVertexBuffer> p_buf = nullptr;
+        inline static Ref<IDynamicVertexBuffer> p_buf = nullptr;
     };
 }
 

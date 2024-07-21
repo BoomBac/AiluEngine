@@ -39,7 +39,7 @@ namespace Ailu
         }
         void RenderView::ShowImpl()
         {
-            auto rt = g_pRenderer->GetTargetTexture();
+            auto rt = g_pGfxContext->GetPipeline()->CameraTarget();
             static const auto &cur_window = Application::GetInstance()->GetWindow();
             if (rt)
             {
@@ -84,7 +84,7 @@ namespace Ailu
                 }
                 if (s_resize_end_frame_count > Application::kTargetFrameRate * 0.5f)
                 {
-                    g_pRenderer->ResizeBuffer(static_cast<u32>(gameview_size.x), static_cast<u32>(gameview_size.y));
+                    //g_pRenderer->ResizeBuffer(static_cast<u32>(gameview_size.x), static_cast<u32>(gameview_size.y));
                     if (_pre_tick_window_width != window_size.x || _pre_tick_window_height != window_size.y)
                     {
                         g_pGfxContext->ResizeSwapChain(window_size.x, window_size.y);

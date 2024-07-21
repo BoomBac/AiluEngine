@@ -8,6 +8,7 @@
 #include "Framework/Events/WindowEvent.h"
 #include "Framework/Events/LayerStack.h"
 #include "Framework/ImGui/ImGuiLayer.h"
+#include "Render/RenderPipeline.h"
 
 namespace Ailu
 {
@@ -33,7 +34,7 @@ namespace Ailu
 #endif // COMPLY
         static constexpr double kMsPerUpdate = 16.66;
         static constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;
-        static double s_target_framecount;
+        inline static double s_target_framecount;
         inline static double s_target_lag = kMsPerRender;
         //**\\**\\**\\*.exe
         static WString GetWorkingPath();
@@ -45,15 +46,15 @@ namespace Ailu
         void PushLayer(Layer* layer);
         void PushOverLayer(Layer* layer);
 
-        const Window& GetWindow() const { return *_p_window; }
+        [[nodiscard]] const Window& GetWindow() const { return *_p_window; }
         Window* GetWindowPtr() { return _p_window; }
 
         static Application* GetInstance();
         inline static u64 s_frame_count = 0u;
     protected:
         virtual bool OnWindowClose(WindowCloseEvent& e);
-        virtual bool OnGetFoucus(WindowFocusEvent& e);
-        virtual bool OnLostFoucus(WindowLostFocusEvent& e);
+        virtual bool OnGetFocus(WindowFocusEvent& e);
+        virtual bool OnLostFocus(WindowLostFocusEvent& e);
         virtual bool OnWindowMinimize(WindowMinimizeEvent& e);
         virtual bool OnWindowResize(WindowResizeEvent& e);
         virtual bool OnWindowMove(WindowMovedEvent& e);
@@ -65,6 +66,7 @@ namespace Ailu
         Window* _p_window = nullptr;
         std::atomic<bool> _is_handling_event;
         std::thread* _p_event_handle_thread;
+        Scope<RenderPipeline> _pipeline;
         EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None; 
         inline static Application* sp_instance = nullptr;
         double _render_lag = 0.0;

@@ -41,7 +41,7 @@ set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # aux_source_directory (Src engine_src_dir)
 # 为目标添加 include 目录
 
-add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC})
+add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC} Src/Render/Pass/SSAOPass.cpp)
 # 包含路径
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Inc)

@@ -10,7 +10,7 @@ namespace Ailu
 	{
 		_p_bloom_thread_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/bloom.alasset"),"BloomThread");
 		_p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
-		_p_obj_cb = ConstantBuffer::Create(256);
+		_p_obj_cb = IConstantBuffer::Create(256);
 		memcpy(_p_obj_cb->GetData(),&BuildIdentityMatrix(),sizeof(Matrix4x4f));
 		_bloom_thread_rect = Rect(0, 0, 800, 450);
 		_p_quad_mesh = g_pResourceMgr->Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
@@ -56,7 +56,7 @@ namespace Ailu
 				{
 					_bloom_mats[i]->SetTexture("_SourceTex", bloom_mips[i - 1]);
 				}
-				cmd->DrawRenderer(_p_quad_mesh, _bloom_mats[i].get(), 1, 1);
+				cmd->DrawFullScreenQuad(_bloom_mats[i].get(), 1);
 			}
 			//up sample
 			for (u16 i = bloom_mips.size() - 1; i > 0; i--)
@@ -64,14 +64,15 @@ namespace Ailu
 				auto cur_mip = bloom_mips[i],next_mip = bloom_mips[i-1];
 				cmd->SetRenderTarget(next_mip);
 				_bloom_mats[i]->SetTexture("_SourceTex", cur_mip);
-				cmd->DrawRenderer(_p_quad_mesh, _bloom_mats[i].get(), 1, 2);
+				cmd->DrawFullScreenQuad(_bloom_mats[i].get(), 2);
 			}
 			//合成
 			{
 				cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
 				_bloom_mats[0]->SetTexture("_SourceTex", rendering_data._camera_opaque_tex_handle);
 				_bloom_mats[0]->SetTexture("_BloomTex", bloom_mips[0]);
-				cmd->DrawRenderer(_p_quad_mesh, _bloom_mats[0].get(), 1, 3);
+				cmd->DrawFullScreenQuad(_bloom_mats[0].get(), 3);
+				//cmd->DrawRenderer(_p_quad_mesh, _bloom_mats[0].get(), 1, 3);
 			}
 		}
 		context->ExecuteCommandBuffer(cmd);

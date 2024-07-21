@@ -34,8 +34,8 @@ namespace Ailu
 			Camera* _p_scene_camera;
 			WString _opened_scene_path;
 		private:
-			bool OnGetFoucus(WindowFocusEvent& e) final;
-			bool OnLostFoucus(WindowLostFocusEvent& e) final;
+			bool OnGetFocus(WindowFocusEvent& e) final;
+			bool OnLostFocus(WindowLostFocusEvent& e) final;
 			void LoadEditorConfig(ApplicationDesc& desc);
 			void SaveEditorConfig();
 		};

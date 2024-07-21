@@ -1,17 +1,7 @@
 //info bein
 //pass begin::
 //name: blit
-//vert: VSMain
-//pixel: PSMain
-//Cull: Back
-//Queue: Opaque
-//Fill: Solid
-//ZTest: Always
-//ZWrite: Off
-//pass end::
-//pass begin::
-//name: blit
-//vert: VSMain
+//vert: FullscreenVSMain
 //pixel: PSMainCopy
 //Cull: Back
 //Queue: Opaque
@@ -21,55 +11,15 @@
 //pass end::
 //info end
 #include "common.hlsli"
+#include "fullscreen_quad.hlsli"
 
-//imgui hdr backbuffer need to Gamma 2.2 space
-#define OFF_SCREEN
+//Texture2D _SourceTex : register(t0);
 
 TEXTURE2D(_SourceTex,0)
 
-struct VSInput
-{
-	float3 position : POSITION;
-	float2 uv : TEXCOORD;
-};
-
-struct PSInput
-{
-	float4 position : SV_POSITION;
-	float2 uv : TEXCOORD0;
-};
-
-PSInput VSMain(VSInput v)
-{
-	PSInput result;
-	result.position = float4(v.position.xy,0.0, 1.0);
-	result.uv = v.uv;
-	return result;
-}
-
-float3 ACESFilm(float3 x)
-{
-	float a = 2.51f;
-	float b = 0.03f;
-	float c = 2.43f;
-	float d = 0.59f;
-	float e = 0.14f;
-	//return saturate((x*(a*x+b))/(x*(c*x+d)+e));
-	return (x*(a*x+b))/(x*(c*x+d)+e);
-}
-
-float4 PSMain(PSInput input) : SV_TARGET
-{
-	float3 color = SAMPLE_TEXTURE2D(_SourceTex,g_LinearClampSampler, input.uv).rgb;
-	color = ACESFilm(color);
-#ifdef OFF_SCREEN
-	GammaCorrect(color.rgb,2.2f);
-#endif
-	return float4(color,1.0);
-}
+PSInput FullscreenVSMain(VSInput v);
 
 float4 PSMainCopy(PSInput input) : SV_TARGET
 {
-	float4 color = SAMPLE_TEXTURE2D(_SourceTex,g_LinearClampSampler, input.uv);
-	return color;
+	return SAMPLE_TEXTURE2D_LOD(_SourceTex, g_LinearClampSampler, input.uv, 0);
 }

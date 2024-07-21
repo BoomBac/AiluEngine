@@ -13,33 +13,77 @@ using Microsoft::WRL::ComPtr;
 
 namespace Ailu
 {
+	struct D3DTextureViewInfo
+	{
+	public:
+		D3DTextureViewInfo() {};
+		D3DTextureViewInfo(Texture::ETextureViewType type,bool is_cpu_view,u16 index = 0) : _view_type(type), _alloc_index(index), _is_cpu_view(is_cpu_view) {};
+		void operator=(D3DTextureViewInfo&& other) noexcept
+		{
+			_alloc_index = other._alloc_index;
+			_cpu_alloc = std::move(other._cpu_alloc);
+			_cpu_handle = other._cpu_handle;
+			_view_type = other._view_type;
+			_is_cpu_view = other._is_cpu_view;
+			other._cpu_handle = (D3D12_CPU_DESCRIPTOR_HANDLE)0;
+		}
+		~D3DTextureViewInfo()
+		{
+			if (_is_cpu_view)
+				g_pCPUDescriptorAllocator->Free(std::move(_cpu_alloc));
+			else
+				g_pGPUDescriptorAllocator->Free(std::move(_gpu_alloc));
+		}
+		union
+		{
+			CPUVisibleDescriptorAllocation _cpu_alloc;
+			GPUVisibleDescriptorAllocation _gpu_alloc;
+		};
+		union
+		{
+			D3D12_CPU_DESCRIPTOR_HANDLE _cpu_handle;
+			D3D12_GPU_DESCRIPTOR_HANDLE _gpu_handle;
+		};
+		u16  _alloc_index;
+		bool _is_cpu_view;
+		Texture::ETextureViewType _view_type;
+	};
+
+	struct D3DResourceStateGuard
+	{
+		void MakesureResourceState(ID3D12GraphicsCommandList* cmd, ID3D12Resource* p_res,D3D12_RESOURCE_STATES target_state)
+		{
+			if (_cur_res_state == target_state)
+				return;
+			auto old_state = _cur_res_state;
+			auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(p_res, old_state, target_state);
+			cmd->ResourceBarrier(1, &barrier);
+			_cur_res_state = target_state;
+		}
+		D3D12_RESOURCE_STATES CurState() const { return _cur_res_state; }
+		D3DResourceStateGuard() = default;
+		D3DResourceStateGuard(D3D12_RESOURCE_STATES initial_state) : _cur_res_state(initial_state) {};
+	private:
+		D3D12_RESOURCE_STATES _cur_res_state;
+	};
+
 	class D3DTexture2D : public Texture2D
 	{
 	public:
 		D3DTexture2D(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
 		~D3DTexture2D();
 		void Apply() final;
-		const TextureHandle GetNativeTextureHandle() final
-		{ 
-			return _is_ready_for_rendering? _main_srv_handle.ptr : 0;
-		};
-		void Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline = false) final;
-		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) final;
-		void CreateView() final;
-		void ReleaseView() final;
+		void Bind(CommandBuffer* cmd, u16 view_index, u8 slot, bool is_target_compute_pipiline = false) final;
+		//for texture2d(s)
+		void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
+		TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
+		void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
 		void Name(const String& new_name) final;
-		D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _main_srv_handle; };
+		D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _views.at(0)._gpu_handle; };
 	private:
-		void MakesureResourceState(ID3D12GraphicsCommandList* cmd, D3D12_RESOURCE_STATES target_state);
-	private:
-		D3D12_RESOURCE_STATES _cur_res_state;
-		D3D12_GPU_DESCRIPTOR_HANDLE _main_srv_handle;
-		D3D12_GPU_DESCRIPTOR_HANDLE _main_uav_handle;
+		D3DResourceStateGuard _state_guard;
 		ComPtr<ID3D12Resource> _p_d3dres;
-		GPUVisibleDescriptorAllocation _allocation;
-		GPUVisibleDescriptorAllocation _mimmap_allocation;
-		//srv and uav
-		Vector<D3D12_GPU_DESCRIPTOR_HANDLE> _mipmap_handles;
+		Map<u16, D3DTextureViewInfo> _views;
 	};
 
 	class D3DCubeMap : public CubeMap
@@ -48,18 +92,15 @@ namespace Ailu
 		D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
 		~D3DCubeMap();
 		void Apply() final;
-        const TextureHandle GetNativeTextureHandle() final { return _main_srv_handle.ptr; };
-		void Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline = false) final;
+		void Bind(CommandBuffer* cmd, u16 view_index, u8 slot, bool is_target_compute_pipiline = false) final;
 
-		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) final;
-		void CreateView() final;
+		void CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
+		TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
+		void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
 	private:
-		D3D12_GPU_DESCRIPTOR_HANDLE _main_srv_handle;
-		Vector<ComPtr<ID3D12Resource>> _textures;
-		Vector<ComPtr<ID3D12Resource>> _upload_textures;
-		GPUVisibleDescriptorAllocation _allocation;
-		GPUVisibleDescriptorAllocation _mimmap_allocation;
-		Map<ECubemapFace::ECubemapFace, Vector<D3D12_GPU_DESCRIPTOR_HANDLE>> _mipmap_srv_handles;
+		ComPtr<ID3D12Resource> _p_d3dres;
+		D3DResourceStateGuard _state_guard;
+		Map<u16, D3DTextureViewInfo> _views;
 	};
 
 	class ComputeShader;
@@ -69,38 +110,31 @@ namespace Ailu
 	public:
 		D3DRenderTexture(const RenderTextureDesc& desc);
 		~D3DRenderTexture();
-		void Bind(CommandBuffer* cmd, u8 slot, bool compute_pipiline = false) final;
-		void CreateView() final;
+		void Bind(CommandBuffer* cmd, u16 view_index, u8 slot, bool is_target_compute_pipiline = false) final;
+		//for texture2d(s)
+		void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
+		TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
+		void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
+		//for cube_map(s)
+		void CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
+		TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
+		void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
 		void Name(const String& value) final;
-        const TextureHandle GetNativeTextureHandle() final;
-		TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) final;
-		TextureHandle ColorRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) final;
-		TextureHandle DepthRenderTargetHandle(u16 index = 0, CommandBuffer* cmd = nullptr) final;
-		TextureHandle ColorTexture(u16 index = 0,CommandBuffer* cmd = nullptr) final;
-		TextureHandle DepthTexture(u16 index = 0,CommandBuffer* cmd = nullptr) final;
+		TextureHandle ColorRenderTargetHandle(u16 view_index = kMainRTVIndex, CommandBuffer* cmd = nullptr) final;
+		TextureHandle DepthRenderTargetHandle(u16 view_index = kMainDSVIndex, CommandBuffer* cmd = nullptr) final;
+		TextureHandle ColorTexture(u16 view_index = kMainSRVIndex, CommandBuffer* cmd = nullptr) final;
+		TextureHandle DepthTexture(u16 view_index = kMainSRVIndex, CommandBuffer* cmd = nullptr) final;
 		void GenerateMipmap(CommandBuffer* cmd) final;
 		D3D12_CPU_DESCRIPTOR_HANDLE* TargetCPUHandle(u16 index = 0);
 		D3D12_CPU_DESCRIPTOR_HANDLE* TargetCPUHandle(CommandBuffer* cmd, u16 index = 0);
 	private:
-		void MakesureResourceState(ID3D12GraphicsCommandList* cmd,D3D12_RESOURCE_STATES target_state);
 		//gen mipmap for 1~4
 		inline static Ref<ComputeShader> _p_mipmapgen_cs0 = nullptr;
 		//gen mipmap for 5~max
 		inline static Ref<ComputeShader> _p_mipmapgen_cs1 = nullptr;
-		D3D12_RESOURCE_STATES _cur_res_state;
-		D3D12_SHADER_RESOURCE_VIEW_DESC _srv_desc{};
-		D3D12_CPU_DESCRIPTOR_HANDLE _main_srv_cpu_handle;
-		D3D12_GPU_DESCRIPTOR_HANDLE _main_srv_gpu_handle;
-		Vector<D3D12_CPU_DESCRIPTOR_HANDLE> _rtv_or_dsv_cpu_handles;
-		ComPtr<ID3D12Resource> _p_buffer;
-		CPUVisibleDescriptorAllocation _cpu_allocation;
-		GPUVisibleDescriptorAllocation _gpu_allocation;
-		GPUVisibleDescriptorAllocation _mimmap_srv_allocation;
-		CPUVisibleDescriptorAllocation _mimmap_rtv_allocation;
-		GPUVisibleDescriptorAllocation _mimmap_uav_allocation;
-		Map<ECubemapFace::ECubemapFace, Vector<D3D12_GPU_DESCRIPTOR_HANDLE>> _mipmap_srv_handles;
-		Map<ECubemapFace::ECubemapFace, Vector<D3D12_GPU_DESCRIPTOR_HANDLE>> _mipmap_uav_handles;
-		Map<ECubemapFace::ECubemapFace, Vector<D3D12_CPU_DESCRIPTOR_HANDLE>> _mipmap_rtv_handles;
+		ComPtr<ID3D12Resource> _p_d3dres;
+		D3DResourceStateGuard _state_guard;
+		Map<u16, D3DTextureViewInfo> _views;
 	};
 }
 

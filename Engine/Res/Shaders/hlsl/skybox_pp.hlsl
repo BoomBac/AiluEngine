@@ -54,7 +54,8 @@ float3(0.f, 0.f, SIZE)
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	result.positionWS = mul(world_matrix, v.position);
+	
+	result.positionWS = mul(v.position,world_matrix);
 	result.vertex = TransformFromWorldToClipSpace(result.positionWS);
 	result.vertex.z = result.vertex.w;
 	result.viewDirWS = result.positionWS - _CameraPos.xyz;
@@ -196,6 +197,7 @@ float4 render_scene(float3 pos, float3 dir, float3 light_dir)
 
 float4 PSMain(PSInput vertex_output) : SV_TARGET
 {
+	return 1.0.xxxx;
 	float4 fragColor = 0;
 	float2 fragCoord = vertex_output.vertex.xy;
 	float3 camera_vector = normalize(vertex_output.viewDirWS);

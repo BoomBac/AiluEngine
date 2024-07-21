@@ -3,9 +3,11 @@
 #include "Ext/imgui/imgui.h"
 #include "Render/Renderer.h"
 #include "Render/Pass/PostprocessPass.h"
+#include "Render/Pass/SSAOPass.h"
 
 namespace Ailu
 {
+	SSAOPass* p_ssao_pass;
 	namespace Editor
 	{
 		EnvironmentSetting::EnvironmentSetting() : ImGuiWidget("EnvironmentSetting")
@@ -18,19 +20,24 @@ namespace Ailu
 		void EnvironmentSetting::Open(const i32& handle)
 		{
 			ImGuiWidget::Open(handle);
-			for (auto& pass : g_pRenderer->GetRenderPasses())
-			{
-				auto gbuffer_pass = dynamic_cast<DeferredLightingPass*>(pass);
-				if (gbuffer_pass)
-				{
-					_deferred_lighting_mat = gbuffer_pass->_p_lighting_material.get();
-				}
-				auto post_pass = dynamic_cast<PostProcessPass*>(pass);
-				if (post_pass)
-				{
-					_post_process_pass = post_pass;
-				}
-			}
+			//for (auto& pass : g_pRenderer->GetRenderPasses())
+			//{
+			//	auto gbuffer_pass = dynamic_cast<DeferredLightingPass*>(pass);
+			//	if (gbuffer_pass)
+			//	{
+			//		_deferred_lighting_mat = gbuffer_pass->_p_lighting_material.get();
+			//	}
+			//	auto post_pass = dynamic_cast<PostProcessPass*>(pass);
+			//	if (post_pass)
+			//	{
+			//		_post_process_pass = post_pass;
+			//	}
+			//	auto ao_pass = dynamic_cast<SSAOPass*>(pass);
+			//	if (ao_pass)
+			//	{
+			//		p_ssao_pass = ao_pass;
+			//	}
+			//}
 		}
 		void EnvironmentSetting::Close(i32 handle)
 		{
@@ -71,85 +78,87 @@ namespace Ailu
 
 		void EnvironmentSetting::ShowImpl()
 		{
-			ImGui::Text("SkyboxSource:");
-			static u16 s_selected_chechbox = -1;
-			// 复选框1
-			bool checkbox1 = (s_selected_chechbox == 0);
-			if (ImGui::Checkbox("DEBUG_NORMAL", &checkbox1)) 
-			{
-				if (checkbox1) 
-				{
-					_deferred_lighting_mat->EnableKeyword("DEBUG_NORMAL");
-					//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_env_tex);
-					s_selected_chechbox = 0;
-				}
-				else if (s_selected_chechbox == 0) 
-				{
-					_deferred_lighting_mat->DisableKeyword("DEBUG_NORMAL");
-					s_selected_chechbox = -1;
-				}
-			}
+			ImGui::Text("EnvironmentSetting:");
+			//static u16 s_selected_chechbox = -1;
+			//// 复选框1
+			//bool checkbox1 = (s_selected_chechbox == 0);
+			//if (ImGui::Checkbox("DEBUG_NORMAL", &checkbox1)) 
+			//{
+			//	if (checkbox1) 
+			//	{
+			//		_deferred_lighting_mat->EnableKeyword("DEBUG_NORMAL");
+			//		//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_env_tex);
+			//		s_selected_chechbox = 0;
+			//	}
+			//	else if (s_selected_chechbox == 0) 
+			//	{
+			//		_deferred_lighting_mat->DisableKeyword("DEBUG_NORMAL");
+			//		s_selected_chechbox = -1;
+			//	}
+			//}
 
-			// 复选框2
-			bool checkbox2 = (s_selected_chechbox == 1);
-			if (ImGui::Checkbox("DEBUG_ALBEDO", &checkbox2)) 
-			{
-				if (checkbox2) 
-				{
-					_deferred_lighting_mat->EnableKeyword("DEBUG_ALBEDO");
-					//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_radiance_tex);
-					s_selected_chechbox = 1;
-				}
-				else if (s_selected_chechbox == 1) 
-				{
-					_deferred_lighting_mat->DisableKeyword("DEBUG_ALBEDO");
-					s_selected_chechbox = -1;
-				}
-			}
+			//// 复选框2
+			//bool checkbox2 = (s_selected_chechbox == 1);
+			//if (ImGui::Checkbox("DEBUG_ALBEDO", &checkbox2)) 
+			//{
+			//	if (checkbox2) 
+			//	{
+			//		_deferred_lighting_mat->EnableKeyword("DEBUG_ALBEDO");
+			//		//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_radiance_tex);
+			//		s_selected_chechbox = 1;
+			//	}
+			//	else if (s_selected_chechbox == 1) 
+			//	{
+			//		_deferred_lighting_mat->DisableKeyword("DEBUG_ALBEDO");
+			//		s_selected_chechbox = -1;
+			//	}
+			//}
 
-			// 复选框3
-			bool checkbox3 = (s_selected_chechbox == 2);
-			if (ImGui::Checkbox("DEBUG_WORLDPOS", &checkbox3)) 
-			{
-				if (checkbox3) 
-				{
-					_deferred_lighting_mat->EnableKeyword("DEBUG_WORLDPOS");
-					//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_prefilter_env_tex);
-					s_selected_chechbox = 2;
-				}
-				else if (s_selected_chechbox == 2) {
-					_deferred_lighting_mat->DisableKeyword("DEBUG_WORLDPOS");
-					s_selected_chechbox = -1;
-				}
-			}
-			ImGui::SliderFloat("BoomRadius", &_post_process_pass->_upsample_radius,0.0f,0.1f);
-			ImGui::SliderFloat("BoomIntensity", &_post_process_pass->_bloom_intensity,0.0f,1.0f);
-			int cascade_count = (int)QuailtySetting::s_cascade_shadow_map_count;
-			ImGui::SliderInt("CascadeShadowMapCount",&cascade_count,1,4);
-			QuailtySetting::s_cascade_shadow_map_count = cascade_count;
-			for(int i = 0; i < cascade_count; i++)
-			{
-				std::string name = "CascadeShadowSplit_" + std::to_string(i);
-				f32 s = 0.0f, e = 1.0f;
-				if (i == 0)
-				{
-					s = 0.0f;
-					e = 1.0f;
-				}
-			    else if(i == cascade_count - 1)
-				{
-					s = QuailtySetting::s_cascade_shadow_map_split[i-1];
-					e = 1.0;
-				}
-				else
-				{
-					s = QuailtySetting::s_cascade_shadow_map_split[i-1];
-					e = QuailtySetting::s_cascade_shadow_map_split[i];
-				}
-				ImGui::SliderFloat(name.c_str(), &QuailtySetting::s_cascade_shadow_map_split[i], s, e);
-			}
-			ImGui::SliderFloat("ShadowFadeOut", &QuailtySetting::s_shadow_fade_out_factor, 0.f, 1.0f);
-			ImGui::SliderFloat("IndirectIntensity", &g_pSceneMgr->_p_current->_light_data._indirect_lighting_intensity, 0.f, 1.0f);
+			//// 复选框3
+			//bool checkbox3 = (s_selected_chechbox == 2);
+			//if (ImGui::Checkbox("DEBUG_WORLDPOS", &checkbox3)) 
+			//{
+			//	if (checkbox3) 
+			//	{
+			//		_deferred_lighting_mat->EnableKeyword("DEBUG_WORLDPOS");
+			//		//Shader::SetGlobalTexture("SkyBox", g_pRenderer->_p_prefilter_env_tex);
+			//		s_selected_chechbox = 2;
+			//	}
+			//	else if (s_selected_chechbox == 2) {
+			//		_deferred_lighting_mat->DisableKeyword("DEBUG_WORLDPOS");
+			//		s_selected_chechbox = -1;
+			//	}
+			//}
+			//ImGui::SliderFloat("BoomRadius", &_post_process_pass->_upsample_radius,0.0f,0.1f);
+			//ImGui::SliderFloat("BoomIntensity", &_post_process_pass->_bloom_intensity,0.0f,1.0f);
+			//int cascade_count = (int)QuailtySetting::s_cascade_shadow_map_count;
+			//ImGui::SliderInt("CascadeShadowMapCount",&cascade_count,1,4);
+			//QuailtySetting::s_cascade_shadow_map_count = cascade_count;
+			//for(int i = 0; i < cascade_count; i++)
+			//{
+			//	std::string name = "CascadeShadowSplit_" + std::to_string(i);
+			//	f32 s = 0.0f, e = 1.0f;
+			//	if (i == 0)
+			//	{
+			//		s = 0.0f;
+			//		e = 1.0f;
+			//	}
+			//    else if(i == cascade_count - 1)
+			//	{
+			//		s = QuailtySetting::s_cascade_shadow_map_split[i-1];
+			//		e = 1.0;
+			//	}
+			//	else
+			//	{
+			//		s = QuailtySetting::s_cascade_shadow_map_split[i-1];
+			//		e = QuailtySetting::s_cascade_shadow_map_split[i];
+			//	}
+			//	ImGui::SliderFloat(name.c_str(), &QuailtySetting::s_cascade_shadow_map_split[i], s, e);
+			//}
+			//ImGui::SliderFloat("ShadowFadeOut", &QuailtySetting::s_shadow_fade_out_factor, 0.f, 1.0f);
+			//ImGui::SliderFloat("IndirectIntensity", &g_pSceneMgr->_p_current->_light_data._indirect_lighting_intensity, 0.f, 1.0f);
+			//ImGui::DragFloat4("AO Params", p_ssao_pass->_ao_params, 1.f, 0.f, 10000.0f);
+			//ImGui::Checkbox("AO Debug", &p_ssao_pass->_is_debug_mode);
 			//// 获取窗口的尺寸
 			//ImVec2 windowSize = ImGui::GetContentRegionAvail();
 			//float faceSize = (windowSize.x-25) / 4.0f; // 每个面在窗口中的尺寸

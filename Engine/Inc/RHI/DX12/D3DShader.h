@@ -213,6 +213,7 @@ namespace Ailu
 		HRESULT Close(LPCVOID pData) override;
 	public:
 		WString _cur_source_file_path;
+		std::set<WString> _include_files;
 	private:
 		List<WString> _addi_include_pathes = {
 			kEngineRootPathW,

@@ -1,7 +1,7 @@
 //info bein
 //pass begin::
 //name: deferred_lighting
-//vert: DeferredLightingVSMain
+//vert: FullscreenVSMain
 //pixel: DeferredLightingPSMain
 //ZTest: Always
 //Cull: Back
@@ -19,6 +19,7 @@
 #include "cbuffer.hlsli"
 #include "lighting.hlsli"
 #include "shadow.hlsli"
+#include "fullscreen_quad.hlsli"
 
 
 //Texture2D MainLightShadowMap : register(t7); 
@@ -28,35 +29,27 @@ Texture2D _GBuffer1 : register(t1);
 Texture2D _GBuffer2 : register(t2);
 Texture2D _CameraDepthTexture : register(t3);
 
-struct DeferredVSInput
-{ 
-	float3 position : POSITION;
-	float2 uv : TEXCOORD;
-};
 
-struct DeferredPSInput
-{
-	float4 position : SV_POSITION;
-	float2 uv : TEXCOORD0;
-};
+// PSInput DeferredLightingVSMain(VSInput v)
+// {
+// 	PSInput result;
+// 	result.position = float4(v.position.xy,0.0, 1.0);
+// 	result.uv = v.uv;
+// 	return result;
+// }
+PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
 
-DeferredPSInput DeferredLightingVSMain(DeferredVSInput v)
+float4 DeferredLightingPSMain(PSInput input) : SV_TARGET
 {
-	DeferredPSInput result;
-	result.position = float4(v.position.xy,0.0, 1.0);
-	result.uv = v.uv;
-	return result;
-}
-
-float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
-{
-	float2 gbuf0 = _GBuffer0.Sample(g_LinearWrapSampler,input.uv).xy;
+	//float2 gbuf0 = _GBuffer0.SampleLevel(g_LinearWrapSampler,input.uv,0).xy;
+	float2 gbuf0 = SAMPLE_TEXTURE2D_LOD(_GBuffer0, g_LinearClampSampler, input.uv,0).xy;
 	float4 gbuf1 = _GBuffer1.Sample(g_LinearWrapSampler,input.uv);
 	float4 gbuf2 = _GBuffer2.Sample(g_LinearWrapSampler,input.uv);
   
 	float depth = _CameraDepthTexture.Sample(g_LinearWrapSampler,input.uv);
-	input.uv.y = 1.0 - input.uv.y;
-	float3 world_pos = Unproject(input.uv,depth);
+	float2 screen_uv = input.uv;
+	screen_uv.y = 1.0 - screen_uv.y;
+	float3 world_pos = Unproject(screen_uv,depth);
 
 	SurfaceData surface_data;
 	surface_data.wnormal = UnpackNormal(gbuf0);
@@ -71,9 +64,10 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 #elif DEBUG_ALBEDO
 	return surface_data.albedo;
 #elif DEBUG_WORLDPOS
-	float dis = distance(_CameraPos.xyz,world_pos);	
-	float c = saturate((_CascadeShadowParams.y * (1.0 - dis * _CascadeShadowParams.z)));
-	return c.xxxx; 
+	return float4(world_pos.xyz,1);
+	// float dis = distance(_CameraPos.xyz,world_pos);	
+	// float c = saturate((_CascadeShadowParams.y * (1.0 - dis * _CascadeShadowParams.z)));
+	// return c.xxxx; 
 	// if(SqrDistance(world_pos,_CascadeShadowSplit[0].xyz) <= _CascadeShadowSplit[0].w)
 	// {
 	// 	return float4(1,0,0,1);
@@ -84,7 +78,7 @@ float4 DeferredLightingPSMain(DeferredPSInput input) : SV_TARGET
 	// }
 	// return float4(world_pos.xyz,1);
 #else
-	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz));
+	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz,input.uv));
 	light += surface_data.emssive;
 	return float4(light, 1.0); 
 #endif 

@@ -12,7 +12,7 @@
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Render/GraphicsContext.h"
-#include "Render/Renderer.h"
+#include "Render/RenderPipeline.h"
 
 namespace Ailu
 {
@@ -22,7 +22,6 @@ namespace Ailu
     SceneMgr *g_pSceneMgr = new SceneMgr();
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     LogMgr *g_pLogMgr = new LogMgr();
-    Renderer *g_pRenderer = new Renderer();
     Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
 
     WString Application::GetWorkingPath()
@@ -35,8 +34,6 @@ namespace Ailu
         AL_ASSERT(PLATFORM_WINDOWS != 1)
 #endif// WINDOWS
     }
-
-    double Application::s_target_framecount = Application::kTargetFrameRate;
 
     int Application::Initialize()
     {
@@ -106,8 +103,6 @@ namespace Ailu
         g_pResourceMgr->Finalize();
         DESTORY_PTR(g_pSceneMgr);
         DESTORY_PTR(g_pResourceMgr);
-        g_pRenderer->Finalize();
-        DESTORY_PTR(g_pRenderer);
         GraphicsContext::FinalizeGlobalContext();
         g_pTimeMgr->Finalize();
         DESTORY_PTR(g_pTimeMgr);
@@ -161,15 +156,16 @@ namespace Ailu
                         CPUProfileBlock b("SceneTick");
                         g_pSceneMgr->Tick(delta_time);
                     }
-#ifdef DEAR_IMGUI
-                    _p_imgui_layer->Begin();
-                    for (Layer *layer: *_layer_stack)
-                        layer->OnImguiRender();
-                    _p_imgui_layer->End();
-#endif// DEAR_IMGUI
                     {
                         CPUProfileBlock b("Render");
-                        g_pRenderer->Tick(delta_time);
+                        g_pGfxContext->GetPipeline()->Render();
+#ifdef DEAR_IMGUI
+                        _p_imgui_layer->Begin();
+                        for (Layer *layer: *_layer_stack)
+                            layer->OnImguiRender();
+                        _p_imgui_layer->End();
+#endif// DEAR_IMGUI
+                        g_pGfxContext->Present();
                     }
                     _render_lag -= s_target_lag;
                 }
@@ -197,15 +193,15 @@ namespace Ailu
         _is_handling_event.store(false);
         return false;
     }
-    bool Application::OnLostFoucus(WindowLostFocusEvent &e)
+    bool Application::OnLostFocus(WindowLostFocusEvent &e)
     {
         g_pLogMgr->Log("OnLostFoucus");
-        s_target_lag = 1000 / 30.0;
+        s_target_lag = 1000.0f / 15.0f;
         return true;
     }
-    bool Application::OnGetFoucus(WindowFocusEvent &e)
+    bool Application::OnGetFocus(WindowFocusEvent &e)
     {
-        g_pLogMgr->Log("OnGetFoucus");
+        g_pLogMgr->Log("OnGetFocus");
         s_target_lag = kMsPerRender;
         _state = EApplicationState::EApplicationState_Running;
         return true;
@@ -214,7 +210,7 @@ namespace Ailu
     {
         _state = EApplicationState::EApplicationState_Pause;
         g_pTimeMgr->Reset();
-        LOG_WARNING("Application state: {}", EApplicationState::ToString(_state));
+        LOG_WARNING("Application state: {}", EApplicationState::ToString(_state))
         return false;
     }
     bool Application::OnWindowResize(WindowResizeEvent &e)
@@ -251,8 +247,8 @@ namespace Ailu
     {
         EventDispather dispather(e);
         dispather.Dispatch<WindowCloseEvent>(BIND_EVENT_HANDLER(OnWindowClose));
-        dispather.Dispatch<WindowFocusEvent>(BIND_EVENT_HANDLER(OnGetFoucus));
-        dispather.Dispatch<WindowLostFocusEvent>(BIND_EVENT_HANDLER(OnLostFoucus));
+        dispather.Dispatch<WindowFocusEvent>(BIND_EVENT_HANDLER(OnGetFocus));
+        dispather.Dispatch<WindowLostFocusEvent>(BIND_EVENT_HANDLER(OnLostFocus));
         dispather.Dispatch<DragFileEvent>(BIND_EVENT_HANDLER(OnDragFile));
         dispather.Dispatch<WindowMinimizeEvent>(BIND_EVENT_HANDLER(OnWindowMinimize));
         dispather.Dispatch<WindowResizeEvent>(BIND_EVENT_HANDLER(OnWindowResize));

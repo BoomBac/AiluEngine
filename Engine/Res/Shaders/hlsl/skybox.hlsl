@@ -62,11 +62,16 @@ PSInput VSMain(VSInput v)
 	return result;
 }
 
+#define GROUND_COLOR float3(1,1,1)
+#define SKY_COLOR float3(0.05,0.14,0.42)
+
 float4 PSMain(PSInput input) : SV_TARGET
 {
+	input.wnormal = normalize(input.wnormal);
 	//float2 uv = SampleSphericalMap(normalize(-input.wnormal)); 
 	//float3 sky_color = env.Sample(g_LinearSampler,uv).rgb * expo * color.rgb;
 	//return float4(sky_color,1.0);
 	//return 1.0.xxxx;
-	return float4(SkyBox.Sample(g_LinearClampSampler, normalize(input.wnormal)).rgb, 4.0);
+	//return float4(SkyBox.Sample(g_LinearClampSampler, normalize(input.wnormal)).rgb, 4.0);
+	return lerp(GROUND_COLOR,SKY_COLOR,lerp(0.7,1.0,input.wnormal.y)).xyzz * 2.0;
 }

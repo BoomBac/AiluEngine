@@ -3,6 +3,7 @@
 #include "Render/Gizmo.h"
 //#include "Render/RenderQueue.h"
 #include "Framework/Common/SceneMgr.h"
+#include "Render/Renderer.h"
 
 namespace Ailu
 {
@@ -256,6 +257,12 @@ namespace Ailu
 	bool Camera::IsInFrustum(const Vector3f& pos)
 	{
 		return true;
+	}
+
+	void Camera::SetRenderer(Renderer* r)
+	{
+		_renderer = r;
+		_target_texture = g_pRenderTexturePool->Get(r->GetRenderingData()._camera_color_target_handle);
 	}
 
 	void Camera::CalculateFrustum()

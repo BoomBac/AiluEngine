@@ -10,32 +10,34 @@
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Common/TimeMgr.h"
 #include "RendererAPI.h"
-#include "Camera.h"
 #include "Texture.h"
 #include "Framework/Common/SceneMgr.h"
 #include "./Pass/RenderPass.h"
 #include "./Pass/PostprocessPass.h"
+#include "./Pass/SSAOPass.h"
 #include "RenderingData.h"
 
 
 namespace Ailu
 {
-    class AILU_API Renderer : public IRuntimeModule
+    DECLARE_ENUM(ERenderPassEvent,kAfterPostprocess,kBeforePostprocess)
+    class Camera;
+    class AILU_API Renderer
     {
     public:
         using BeforeTickEvent = std::function<void()>;
         using AfterTickEvent = std::function<void()>;
     public:
-        void BeginScene();
+        Renderer();
+        ~Renderer();
+        void Render(const Camera& cam,Scene& s);
+        void BeginScene(const Camera& cam,const Scene& s);
         void EndScene();
-        int Initialize() override;
-        int Initialize(u32 width,u32 height);
-        void Finalize() override;
-        void Tick(const float& delta_time) override;
         float GetDeltaTime() const;
         void TakeCapture();
+        void EnqueuePass(ERenderPassEvent::ERenderPassEvent event,Scope<RenderPass> pass);
         void SubmitTaskPass(Scope<RenderPass> task);
-        List<RenderPass*>& GetRenderPasses() { return _render_passes; };
+        List<Scope<RenderPass>>& GetRenderPasses() { return _render_passes; };
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
         void ResizeBuffer(u32 width, u32 height);
         void RegisterEventBeforeTick(BeforeTickEvent e);
@@ -43,52 +45,32 @@ namespace Ailu
         void UnRegisterEventBeforeTick(BeforeTickEvent e);
         void UnRegisterEventAfterTick(AfterTickEvent e);
         RenderTexture* GetTargetTexture() const { return g_pRenderTexturePool->Get(_gameview_rt_handle); }
-        bool _is_offscreen = true;
-        //temp
-        RenderTexture* _p_radiance_tex;
-        RenderTexture* _p_prefilter_env_tex;
-        RenderTexture* _p_env_tex;
+        const RenderingData& GetRenderingData() const { return _rendering_data; }
     private:
         RTHandle _camera_color_handle;
         RTHandle _gameview_rt_handle;
         RTHandle _camera_depth_handle;
         RTHandle _camera_depth_tex_handle;
-
-        void Render();
-        void PrepareScene(Scene* p_scene);
-        void PrepareLight(Scene* p_scene);
-        void PrepareCamera(Camera* p_camera);
-        void PrepareShaderConstants();
-        void DoResize();
+        void PrepareScene(const Scene& s);
+        void PrepareLight(const Scene& s);
+        void PrepareCamera(const Camera& cam);
     private:
         static inline List<RenderPass*> _p_task_render_passes{};
         GraphicsContext* _p_context = nullptr;
-        u32 _width, _height;
-        Scope<ConstantBuffer> _p_per_frame_cbuf;
+        Scope<IConstantBuffer> _p_per_frame_cbuf;
         ScenePerFrameData _per_frame_cbuf_data;
         RenderingData _rendering_data;
-        ConstantBuffer* _p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
-        Scope<ForwardPass> _p_forward_pass;
-        Scope<ResolvePass> _p_reslove_pass;
-        Scope<ShadowCastPass> _p_shadowcast_pass;
-        Scope<CubeMapGenPass> _p_cubemap_gen_pass;
-        Scope<PostProcessPass> _p_postprocess_pass;
-        Scope<DeferredGeometryPass> _p_gbuffer_pass;
-        Scope<DeferredLightingPass> _p_lighting_pass;
-        Scope<SkyboxPass> _p_skybox_pass;
-        Scope<CopyColorPass> _p_copycolor_pass;
-        Scope<CopyDepthPass> _p_copydepth_pass;
-        Scope<GizmoPass> _p_gizmo_pass;
-        List<RenderPass*> _render_passes;
+        IConstantBuffer* _p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
+        List<Scope<RenderPass>> _render_passes;
         bool _b_init = false;
         TimeMgr* _p_timemgr = nullptr;
-        Camera* _p_scene_camera;
+        Camera* _active_cam;
         Queue<int> _captures;
         Queue<Vector2f> _resize_events;
         List<BeforeTickEvent> _events_before_tick;
         List<AfterTickEvent> _events_after_tick;
     };
-    extern AILU_API Renderer* g_pRenderer;
+
 }
 #pragma warning(pop)
 #endif // !RENDERER_H__

@@ -28,7 +28,7 @@ namespace Ailu
 		for (auto& cbuf : other._p_cbufs)
 		{
 			u32 buffer_size = cbuf->GetBufferSize();
-			_p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
+			_p_cbufs.emplace_back(IConstantBuffer::Create(buffer_size));
 			memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
 		}
 		_textures_all_passes = other._textures_all_passes;
@@ -57,7 +57,7 @@ namespace Ailu
 		for (auto& cbuf : other._p_cbufs)
 		{
 			u32 buffer_size = cbuf->GetBufferSize();
-			_p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
+			_p_cbufs.emplace_back(IConstantBuffer::Create(buffer_size));
 			memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
 		}
 		_textures_all_passes = other._textures_all_passes;
@@ -98,13 +98,14 @@ namespace Ailu
 		auto& bind_infos = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._bind_res_infos;
 		for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
 		{
-			if (bind_infos.find(it->first) != bind_infos.end())
+			auto bind_it = bind_infos.find(it->first);
+			if (bind_it != bind_infos.end())
 			{
 				auto& [slot, texture] = it->second;
 				if (texture != nullptr)
 				{
 					//texture->Bind(slot);
-					GraphicsPipelineStateMgr::SubmitBindResource(texture, bind_infos[it->first]._bind_slot);
+					GraphicsPipelineStateMgr::SubmitBindResource(texture, bind_it->second._bind_slot);
 				}
 			}
 			//else
@@ -471,7 +472,7 @@ namespace Ailu
 			if (first_time)
 			{
 				_mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];
-				_p_cbufs[i].reset(ConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
+				_p_cbufs[i].reset(IConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
 				memset(_p_cbufs[i]->GetData(), 0, _mat_cbuf_per_pass_size[i]);
 			}
 			else if (_mat_cbuf_per_pass_size[i] != cbuf_size_per_passes[i])
@@ -684,31 +685,32 @@ namespace Ailu
 		else if (name == StandardPropertyName::kSpecular._tex_name) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
 		else if (name == StandardPropertyName::kNormal._tex_name) MarkTextureUsed({ ETextureUsage::kNormal }, true);
 		else {};
-//		for (auto& pass_tex : _textures_all_passes)
-//		{
-//			auto it = pass_tex.find(name);
-//			if (it == pass_tex.end())
-//			{
-//				return;
-//			}
-//			std::get<1>(pass_tex[name]) = texture;
-//			if (_properties.find(name) != _properties.end())
-//			{
-//				_properties[name]._value_ptr = reinterpret_cast<void*>(&pass_tex[name]);
-//			}
-//		}
+		for (auto& pass_tex : _textures_all_passes)
+		{
+			auto it = pass_tex.find(name);
+			if (it == pass_tex.end())
+			{
+				return;
+			}
+			std::get<1>(pass_tex[name]) = texture;
+			if (_properties.find(name) != _properties.end())
+			{
+				_properties[name]._value_ptr = reinterpret_cast<void*>(&pass_tex[name]);
+			}
+		}
+		//else
+		//	LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
 	}
 
 	void StandardMaterial::SetTexture(const String& name, const WString& texture_path)
 	{
-        Material::SetTexture(name, texture_path);
-        if (name == StandardPropertyName::kAlbedo._tex_name) MarkTextureUsed({ ETextureUsage::kAlbedo }, true);
-        else if (name == StandardPropertyName::kEmission._tex_name) MarkTextureUsed({ ETextureUsage::kEmission}, true);
-        else if (name == StandardPropertyName::kRoughness._tex_name) MarkTextureUsed({ ETextureUsage::kRoughness }, true);
-        else if (name == StandardPropertyName::kMetallic._tex_name) MarkTextureUsed({ ETextureUsage::kMetallic }, true);
-        else if (name == StandardPropertyName::kSpecular._tex_name) MarkTextureUsed({ ETextureUsage::kSpecular }, true);
-        else if (name == StandardPropertyName::kNormal._tex_name) MarkTextureUsed({ ETextureUsage::kNormal }, true);
-        else {};
+		auto texture = g_pResourceMgr->Get<Texture2D>(texture_path);
+		if (texture == nullptr)
+		{
+			g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
+			return;
+		}
+		SetTexture(name, texture);
 	}
 
 	void StandardMaterial::SetTexture(const String& name, RTHandle texture)
@@ -734,5 +736,5 @@ namespace Ailu
         auto& info = StandardPropertyName::GetInfoByUsage(usage);
         SetTexture(info._tex_name,tex);
     }
-    //-------------------------------------------StandardMaterial--------------------------------------------------------
+	//-------------------------------------------StandardMaterial--------------------------------------------------------
 }

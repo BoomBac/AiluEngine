@@ -180,6 +180,11 @@ namespace Ailu
 		else
 			s_global_textures_bind_info[name] = texture;
 	}
+	void Shader::SetGlobalTexture(const String& name, RTHandle handle)
+	{
+		auto tex = g_pRenderTexturePool->Get(handle);
+		SetGlobalTexture(name,tex);
+	}
 	void Shader::SetGlobalMatrix(const String& name, Matrix4x4f* matrix)
 	{
 		if (!s_global_matrix_bind_info.contains(name))
@@ -196,7 +201,7 @@ namespace Ailu
 			s_global_matrix_bind_info[name] = std::make_tuple(matrix, num);
 	}
 
-	void Shader::ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf)
+	void Shader::ConfigurePerFrameConstBuffer(IConstantBuffer* cbuf)
 	{
 		s_p_per_frame_cbuffer = cbuf;
 	}
@@ -738,6 +743,7 @@ namespace Ailu
 	{
 		_name = ToChar(PathUtils::GetFileName(sys_path));
 		_kernels.emplace_back("cs_main");
+		_all_dep_file_pathes.insert(sys_path);
 	}
 
 	void ComputeShader::Bind(CommandBuffer* cmd, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
@@ -751,7 +757,14 @@ namespace Ailu
 		{
 			it->second._p_res = texture;
 			_texture_addi_bind_info[it->second._bind_slot] = std::make_pair(ECubemapFace::kUnknown, 0);
+			_all_bind_textures.insert(texture);
 		}
+	}
+
+	void ComputeShader::SetTexture(const String& name, RTHandle handle)
+	{
+		auto texture = g_pRenderTexturePool->Get(handle);
+		SetTexture(name, texture);
 	}
 
 	void ComputeShader::SetTexture(u8 bind_slot, Texture* texture)
@@ -765,6 +778,7 @@ namespace Ailu
 			{
 				rit->second._p_res = texture;
 				_texture_addi_bind_info[rit->second._bind_slot] = std::make_pair(ECubemapFace::kUnknown, 0);
+				_all_bind_textures.insert(texture);
 			}
 		}
 	}
@@ -776,6 +790,7 @@ namespace Ailu
 		{
 			it->second._p_res = texture;
 			_texture_addi_bind_info[it->second._bind_slot] = std::make_pair(face, mipmap);
+			_all_bind_textures.insert(texture);
 		}
 	}
 
@@ -812,6 +827,15 @@ namespace Ailu
 		if (it != _bind_res_infos.end())
 		{
 			memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector, sizeof(Vector4f));
+		}
+	}
+
+	void ComputeShader::SetBuffer(const String& name, IConstantBuffer* buf)
+	{
+		auto it = _bind_res_infos.find(name);
+		if (buf != nullptr && it != _bind_res_infos.end())
+		{
+			it->second._p_res = buf;
 		}
 	}
 

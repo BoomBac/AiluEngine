@@ -1,7 +1,7 @@
 //info bein
 //pass begin::
 //name: ThresholdExtract
-//vert: VSMain
+//vert: FullscreenVSMain
 //pixel: PSMain
 //Cull: Back
 //Queue: Opaque
@@ -11,7 +11,7 @@
 //pass end::
 //pass begin::
 //name: DownSample
-//vert: VSMain
+//vert: FullscreenVSMain
 //pixel: DownSamplePS
 //Cull: Back
 //Queue: Opaque
@@ -21,7 +21,7 @@
 //pass end::
 //pass begin::
 //name: UpSample
-//vert: VSMain
+//vert: FullscreenVSMain
 //pixel: UpSamplePS
 //Cull: Back
 //ZWrite: Off
@@ -30,7 +30,7 @@
 //pass end::
 //pass begin::
 //name: Composite
-//vert: VSMain
+//vert: FullscreenVSMain
 //pixel: Composite
 //Cull: Back
 //Queue: Opaque
@@ -43,19 +43,9 @@ Texture2D _SourceTex : register(t0);
 Texture2D _BloomTex : register(t1);
 
 #include "../common.hlsli"
+#include "../fullscreen_quad.hlsli"
 
-struct VSInput
-{
-	float3 position : POSITION;
-	float2 uv : TEXCOORD;
-};
-
-struct PSInput
-{
-	float4 position : SV_POSITION;
-	float2 uv : TEXCOORD0;
-};
-
+PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
@@ -196,10 +186,20 @@ float4 BlurY(PSInput input) : SV_TARGET
 	}
 	return sum.xyzz;
 }
+
+float3 ACESFilm(float3 x)
+{
+	float a = 2.51f;
+	float b = 0.03f;
+	float c = 2.43f;
+	float d = 0.59f;
+	float e = 0.14f;
+	return saturate((x*(a*x+b))/(x*(c*x+d)+e));
+}
+
 float4 Composite(PSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
 	float3 bloom_color = _BloomTex.Sample(g_LinearClampSampler, input.uv).rgb;
-	color = lerp(color,bloom_color,_SampleParams.w);
-	return color.xyzz; 
+	return float4(ACESFilm(lerp(color,bloom_color,_SampleParams.w)),1.0f);
 }

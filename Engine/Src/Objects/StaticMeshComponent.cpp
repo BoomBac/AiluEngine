@@ -76,8 +76,9 @@ namespace Ailu
 
 	void StaticMeshComponent::SetMaterial(Ref<Material>& mat, u16 slot)
 	{
-		if (slot < _p_mats.size())
-			_p_mats[slot] = mat;
+		if (slot >= _p_mats.size())
+            _p_mats.resize(std::max<u16>(slot,1));
+        _p_mats[slot] = mat;
 	}
 
 	void StaticMeshComponent::Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent)

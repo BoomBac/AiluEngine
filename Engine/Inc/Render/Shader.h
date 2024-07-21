@@ -98,6 +98,7 @@ namespace Ailu
 		u8 _bind_slot;
 		String _name;
 		void* _p_res = nullptr;
+        ShaderBindResourceInfo* _p_root_cbuf;
 		//1 for per obj,2for per mat,4 for per pass,8 for per frame
 		u8 _bind_flag = 0u;
 	};
@@ -254,13 +255,14 @@ namespace Ailu
 		static void ExtractInfoFromHash(const u64& shader_hash, u32& shader_id, u16& pass_hash, ShaderVariantHash& variant_hash);
 
 		static void SetGlobalTexture(const String& name, Texture* texture);
+		static void SetGlobalTexture(const String& name, RTHandle handle);
 		static void SetGlobalMatrix(const String& name, Matrix4x4f* matrix);
 		static void SetGlobalMatrixArray(const String& name, Matrix4x4f* matrix, u32 num);
 
-		static void ConfigurePerFrameConstBuffer(ConstantBuffer* cbuf);
-		static ConstantBuffer* GetPerFrameConstBuffer() { return s_p_per_frame_cbuffer; };
+		static void ConfigurePerFrameConstBuffer(IConstantBuffer* cbuf);
+		static IConstantBuffer* GetPerFrameConstBuffer() { return s_p_per_frame_cbuffer; };
 		//0 is normal, 4001 is compiling, 4000 is error,same with render queue id
-		static u32 GetShaderState(Shader* shader,u16 pass_index,ShaderVariantHash variant_hash);
+		static u32 GetShaderState(Shader* shader, u16 pass_index, ShaderVariantHash variant_hash);
 
 		Shader(const WString& sys_path);
 		virtual ~Shader() = default;
@@ -323,8 +325,7 @@ namespace Ailu
 		virtual bool RHICompileImpl(u16 pass_index,ShaderVariantHash variant_hash);
 	protected:
 		inline static u8* _p_cbuffer = nullptr;
-		inline static ConstantBuffer* s_p_per_frame_cbuffer = nullptr;
-        //shader id 0~64
+		inline static IConstantBuffer* s_p_per_frame_cbuffer = nullptr;
 		WString _src_file_path;
 		Vector<ShaderPass> _passes;
 		std::set<Material*> _reference_mats;
@@ -349,11 +350,14 @@ namespace Ailu
 		virtual void Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
 		virtual void SetTexture(const String& name, Texture* texture);
 		virtual void SetTexture(u8 bind_slot, Texture* texture);
+        virtual void SetTexture(const String& name, RTHandle handle);
 		virtual void SetTexture(const String& name, Texture* texture, ECubemapFace::ECubemapFace face, u16 mipmap);
 		virtual void SetFloat(const String& name, f32 value);
 		virtual void SetBool(const String& name, bool value);
 		virtual void SetInt(const String& name, i32 value);
 		virtual void SetVector(const String& name, Vector4f vector);
+        virtual void SetBuffer(const String& name, IConstantBuffer* buf);
+        const std::set<Texture*>& AllBindTexture() const {return _all_bind_textures;}
 		const String& KernelName(u16 index = 0) 
 		{
 			AL_ASSERT(index > _kernels.size());
@@ -367,12 +371,17 @@ namespace Ailu
 		inline static std::unordered_map<WString,Ref<ComputeShader>> s_cs_library{};
 		Vector<String> _kernels;
 		WString _src_file_path;
+		std::set<WString> _all_dep_file_pathes;
 		std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
 		std::unordered_map<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
+		/*维护一个纹理集合，用于标记temp rt的围栏值，常规用于图形管线的rt在set / clear时会进行标记，
+		* 计算管线不用这两个接口，所以在commandbuffer dispatch时调用该接口标记
+		*/
+		std::set<Texture*> _all_bind_textures;
 		//bind_slot:cubemapface,mipmap
-		std::unordered_map<u16,std::tuple<ECubemapFace::ECubemapFace, u16>> _texture_addi_bind_info{};
+		std::unordered_map<u16, std::tuple<ECubemapFace::ECubemapFace, u16>> _texture_addi_bind_info{};
 		bool _is_valid;
-		Scope<ConstantBuffer> _p_cbuffer;
+		Scope<IConstantBuffer> _p_cbuffer;
 	};
 }
 

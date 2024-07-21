@@ -29,6 +29,7 @@ namespace Ailu
 		inline static Mesh* s_p_shpere = nullptr;
 		inline static Mesh* s_p_quad = nullptr;
 		inline static Mesh* s_p_plane = nullptr;
+		inline static Mesh* s_p_fullscreen_triangle = nullptr;
 	public:
 		Mesh();
 		Mesh(const std::string& name);
@@ -45,8 +46,8 @@ namespace Ailu
 		inline Vector2f* GetUVs(u8 index) { return _uv[index]; };
 		inline u32* GetIndices(u16 submesh_index = 0) { return std::get<0>(_p_indices[submesh_index]); };
 		inline u32 GetIndicesCount(u16 submesh_index = 0) { return std::get<1>(_p_indices[submesh_index]); };
-		const Ref<VertexBuffer>& GetVertexBuffer() const;
-		const Ref<IndexBuffer>& GetIndexBuffer(u16 submesh_index = 0) const;
+		const Ref<IVertexBuffer>& GetVertexBuffer() const;
+		const Ref<IIndexBuffer>& GetIndexBuffer(u16 submesh_index = 0) const;
 		void AddSubmesh(u32* indices, u32 indices_count);
 		bool _is_rhi_res_ready = false;
 		const u16 SubmeshCount() const { return static_cast<u16>(_p_indices.size()); };
@@ -56,8 +57,8 @@ namespace Ailu
 		u32 _vertex_count;
 		Vector<AABB> _bound_boxs;
 	protected:
-		Ref<VertexBuffer> _p_vbuf;
-		Vector<Ref<IndexBuffer>> _p_ibufs;
+		Ref<IVertexBuffer> _p_vbuf;
+		Vector<Ref<IIndexBuffer>> _p_ibufs;
 		Vector3f* _vertices;
 		Vector3f* _normals;
 		Color32* _colors;

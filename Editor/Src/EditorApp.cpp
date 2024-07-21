@@ -8,6 +8,7 @@
 #include "Render/Camera.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/CommonRenderPipeline.h"
 
 using namespace Ailu;
 
@@ -30,12 +31,13 @@ namespace Ailu
 			_p_scene_layer = new SceneLayer();
 			PushLayer(_p_scene_layer);
 			g_pLogMgr->AddAppender(new ImGuiLogAppender());
-			g_pRenderer->Initialize(desc._gameview_width, desc._gameview_height);
 			_p_editor_layer = new EditorLayer();
 			PushLayer(_p_editor_layer);
 			{
 				g_pSceneMgr->_p_current = g_pResourceMgr->Load<Scene>(_opened_scene_path);
 			}
+			_pipeline.reset(new CommonRenderPipeline());
+			g_pGfxContext->RegisterPipeline(_pipeline.get());
 			return ret;
 		}
 		void EditorApp::Finalize()
@@ -62,14 +64,14 @@ namespace Ailu
 		{
 			Application::Tick(delta_time);
 		}
-		bool EditorApp::OnGetFoucus(WindowFocusEvent& e)
+		bool EditorApp::OnGetFocus(WindowFocusEvent& e)
 		{
-			Application::OnGetFoucus(e);
+            Application::OnGetFocus(e);
 			return true;
 		}
-		bool EditorApp::OnLostFoucus(WindowLostFocusEvent& e)
+		bool EditorApp::OnLostFocus(WindowLostFocusEvent& e)
 		{
-			Application::OnLostFoucus(e);
+            Application::OnLostFocus(e);
 			return true;
 		}
 		void EditorApp::LoadEditorConfig(ApplicationDesc& desc)

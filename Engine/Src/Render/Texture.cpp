@@ -22,26 +22,21 @@ namespace Ailu
 			h >>= 1;
 			++lh;
 		}
-		return std::min<u16>(std::min<u16>(lw, lh),7);
+		return std::min<u16>(std::min<u16>(lw, lh), 7);
 	}
 
-	Texture::Texture() : Texture(0u,0u)
+	Texture::Texture() : Texture(0u, 0u)
 	{
 
 	}
 
-	Texture::Texture(u16 width, u16 height) : _width(width), _height(height), _mipmap_count(0), _pixel_format(EALGFormat::EALGFormat::kALGFormatUnknown), _dimension(ETextureDimension::kUnknown), 
-		_filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp),_is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false)
+	Texture::Texture(u16 width, u16 height) : _width(width), _height(height), _mipmap_count(0), _pixel_format(EALGFormat::EALGFormat::kALGFormatUnknown), _dimension(ETextureDimension::kUnknown),
+		_filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp), _is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false), _p_asset(nullptr)
 	{
 	}
 
 	Texture::~Texture()
-	{ 
-	}
-
-	Ptr Texture::GetNativeTexturePtr()
 	{
-		return nullptr;
 	}
 
 	bool Texture::IsValidSize(u16 width, u16 height, u16 mipmap) const
@@ -65,6 +60,18 @@ namespace Ailu
 		}
 		return std::make_tuple(w, h);
 	}
+	u16 Texture::CalculateViewIndex(ETextureViewType view_type, u16 mipmap, u16 array_slice) const
+	{
+		u16 idx = (_mipmap_count + 1u) * array_slice + mipmap;
+		return (u16)view_type * 10000u + idx;
+	}
+	u16 Texture::CalculateViewIndex(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const
+	{
+		if (face == ECubemapFace::kUnknown)
+			return CalculateViewIndex(view_type, mipmap, array_slice);
+		u16 idx = 6 * (_mipmap_count + 1) * array_slice + ((u16)face - 1) * (_mipmap_count + 1) + mipmap;
+		return (u16)view_type * 10000u + idx;
+	}
 	//-----------------------------------------------------------------------TextureNew----------------------------------------------------------------------------------
 
 	Ref<Texture2D> Texture2D::Create(u16 width, u16 height, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
@@ -73,10 +80,10 @@ namespace Ailu
 		{
 		case RendererAPI::ERenderAPI::kNone:
 			AL_ASSERT_MSG(false, "None render api used!");
-				return nullptr;
+			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			return MakeRef<D3DTexture2D>(width,height,mipmap_chain,format,linear,random_access);
+			return MakeRef<D3DTexture2D>(width, height, mipmap_chain, format, linear, random_access);
 		}
 		}
 		AL_ASSERT_MSG(false, "Unsupport render api!");
@@ -115,6 +122,21 @@ namespace Ailu
 		s_gpu_memory_size -= _gpu_memery_size;
 	}
 
+	void Texture2D::CreateView()
+	{
+		if (_dimension == ETextureDimension::kTex2D)
+		{
+			for (u16 j = 0; j < _mipmap_count + 1; j++)
+			{
+				Texture::CreateView(ETextureViewType::kSRV, j);
+			}
+		}
+		else
+		{
+			AL_ASSERT(true);
+		}
+	}
+
 	Color32 Texture2D::GetPixel32(u16 x, u16 y)
 	{
 		return Color32();
@@ -139,22 +161,25 @@ namespace Ailu
 
 	void Texture2D::SetPixel(u16 x, u16 y, Color color, u16 mipmap)
 	{
-		if (!IsValidMipmap(mipmap) ||!IsValidSize(x,y,mipmap))
+		if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
 			return;
+		_is_data_filled = true;
 		u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
-		memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y,color,sizeof(Color));
+		memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
 	}
 
 	void Texture2D::SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap)
 	{
 		if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
 			return;
+		_is_data_filled = true;
 		u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
 		memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color32));
 	}
 
 	void Texture2D::SetPixelData(u8* data, u16 mipmap, u64 offset)
 	{
+		_is_data_filled = true;
 		auto [w, h] = CurMipmapSize(mipmap);
 		memcpy(_pixel_data[mipmap], data + offset, w * h * _pixel_size);
 	}
@@ -168,7 +193,7 @@ namespace Ailu
 		{
 		case RendererAPI::ERenderAPI::kNone:
 			AL_ASSERT_MSG(false, "None render api used!");
-				return nullptr;
+			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
 			return MakeRef<D3DCubeMap>(width, mipmap_chain, format, linear, random_access);
@@ -180,7 +205,7 @@ namespace Ailu
 
 	//-----------------------------------------------------------------------CubeMap----------------------------------------------------------------------------------
 	CubeMap::CubeMap(u16 width, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
-	 : Texture(width, width)
+		: Texture(width, width)
 	{
 		_pixel_format = ConvertTextureFormatToPixelFormat(format);
 		_format = format;
@@ -194,7 +219,7 @@ namespace Ailu
 		for (int i = 0; i < _mipmap_count + 1; i++)
 		{
 			auto [w, h] = CurMipmapSize(i);
-			for(int j = 0; j < 6; j++)
+			for (int j = 0; j < 6; j++)
 				_pixel_data[i * 6 + j] = new u8[w * h * _pixel_size];
 		}
 	}
@@ -252,12 +277,12 @@ namespace Ailu
 		{
 		case RendererAPI::ERenderAPI::kNone:
 			AL_ASSERT_MSG(false, "None render api used!");
-				return nullptr;
+			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			RenderTextureDesc desc(width,height,format);
+			RenderTextureDesc desc(width, height, format);
 			desc._dimension = ETextureDimension::kTex2D;
-			desc._mipmap_count = mipmap_chain? MaxMipmapCount(width, height) : 0;
+			desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, height) : 0;
 			desc._random_access = random_access;
 			auto rt = MakeScope<D3DRenderTexture>(desc);
 			rt->Name(name);
@@ -297,7 +322,7 @@ namespace Ailu
 		{
 		case RendererAPI::ERenderAPI::kNone:
 			AL_ASSERT_MSG(false, "None render api used!");
-				return nullptr;
+			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
 			RenderTextureDesc desc(width, width, format);
@@ -339,11 +364,11 @@ namespace Ailu
 	RTHandle RenderTexture::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
 	{
 		RTHash rt_hash;
-		rt_hash.Set(0,12,width);
-		rt_hash.Set(13,24,height);
+		rt_hash.Set(0, 12, width);
+		rt_hash.Set(13, 24, height);
 		rt_hash.Set(25, 32, format);
 		auto rt = g_pRenderTexturePool->GetByIDHash(rt_hash);
-		if(rt.has_value())
+		if (rt.has_value())
 			return RTHandle(rt.value());
 		auto new_rt = Create(width, height, name.empty() ? std::format("TempRT_{}", g_pRenderTexturePool->Size()) : name, format, mipmap_chain, linear, random_access);
 		return RTHandle(g_pRenderTexturePool->Add(rt_hash, std::move(new_rt)));
@@ -351,13 +376,14 @@ namespace Ailu
 
 	void RenderTexture::ReleaseTempRT(RTHandle handle)
 	{
-		g_pRenderTexturePool->ReleaseRT(handle);
+		if(RTHandle::Valid(handle))
+			g_pRenderTexturePool->ReleaseRT(handle);
 	}
 
 	RenderTexture::RenderTexture(const RenderTextureDesc& desc) : Texture(desc._width, desc._height)
 	{
 		_depth = desc._depth;
-		_pixel_format = ConvertRenderTextureFormatToPixelFormat(desc._depth > 0? desc._depth_format : desc._color_format);
+		_pixel_format = ConvertRenderTextureFormatToPixelFormat(desc._depth > 0 ? desc._depth_format : desc._color_format);
 		_dimension = desc._dimension;
 		_slice_num = desc._slice_num;
 		_mipmap_count = desc._mipmap_count;
@@ -373,6 +399,50 @@ namespace Ailu
 		}
 		s_gpu_memory_size += _gpu_memery_size;
 		g_pRenderTexturePool->Register(this);
+	}
+
+	void RenderTexture::CreateView()
+	{
+		u16 view_slice_count = std::max<u16>(1, _slice_num);
+		if (_dimension == ETextureDimension::kTex2D || _dimension == ETextureDimension::kTex2DArray)
+		{
+			for (u16 i = 0; i < view_slice_count; i++)
+			{
+				for (u16 j = 0; j < _mipmap_count + 1; j++)
+				{
+					if (_depth > 0)
+						CreateView(ETextureViewType::kDSV, j, i);
+					else
+						CreateView(ETextureViewType::kRTV, j, i);
+					CreateView(ETextureViewType::kSRV, j, i);
+					if(_is_random_access)
+						CreateView(ETextureViewType::kUAV, j, i);
+				}
+			}
+		}
+		else if (_dimension == ETextureDimension::kCube || _dimension == ETextureDimension::kCubeArray)
+		{
+			for (u16 i = 0; i < view_slice_count; i++)
+			{
+				for (u16 j = 1; j <= 6; j++)
+				{
+					for (u16 k = 0; k < _mipmap_count + 1; k++)
+					{
+						if (_depth > 0)
+							CreateView(ETextureViewType::kDSV, (ECubemapFace::ECubemapFace)j, k, i);
+						else
+							CreateView(ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)j, k, i);
+						CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace)j, k, i);
+						if (_is_random_access)
+							CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace)j,k,i);
+					}
+				}
+			}
+		}
+		else
+		{
+			AL_ASSERT(true);
+		}
 	}
 
 	RenderTexture::~RenderTexture()
@@ -412,7 +482,7 @@ namespace Ailu
 		{
 			auto& info = it->second;
 			if (info._is_available)
-			{			
+			{
 				if (!g_pGfxContext->IsResourceReferencedByGPU(info._rt.get()))
 				{
 					it->second._is_available = false;
@@ -455,9 +525,9 @@ namespace Ailu
 		_lut_pool.clear();
 		for (auto it = _pool.begin(); it != _pool.end(); it++)
 		{
-			_lut_pool.emplace(std::make_pair(it->second._id,it));
+			_lut_pool.emplace(std::make_pair(it->second._id, it));
 		}
-		g_pLogMgr->LogFormat("RT pool release {} rt",released_rt_num);
+		g_pLogMgr->LogFormat("RT pool release {} rt", released_rt_num);
 	}
 	void RenderTexturePool::Register(RenderTexture* rt)
 	{

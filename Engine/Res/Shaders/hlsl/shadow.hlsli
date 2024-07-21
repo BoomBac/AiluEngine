@@ -111,7 +111,7 @@ float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 			{
 				uint random_index = uint(8.0 * Random(float4(world_pos.xyy, i))) % 8;
 				shadow_factor += lerp(0.0, 0.125, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
-					float3(shadow_uv.xy + poissonDisk[i] * 0.00048828125,cascade_index), depth - z_bias).r);
+					float3(shadow_uv.xy + poissonDisk[i] * 0.00024828125,cascade_index), depth - z_bias).r);
 			}
 			shadow_factor =  (1.0 - shadow_factor);
 			return 1.0 - shadow_factor * atten;

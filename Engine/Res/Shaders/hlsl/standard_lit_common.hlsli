@@ -22,7 +22,7 @@ PerMaterialCBufferBegin
 PerMaterialCBufferEnd
 
 
-void InitSurfaceData(PSInput input,
+void InitSurfaceData(StandardPSInput input,
 out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out float3 emssive,out float3 specular)
 {
 	if (_SamplerMask & 1)

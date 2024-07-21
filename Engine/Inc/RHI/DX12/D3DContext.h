@@ -12,6 +12,7 @@
 #include "Framework/Common/TimeMgr.h"
 #include "CPUDescriptorManager.h"
 #include "GPUDescriptorManager.h"
+#include "Render/RenderPipeline.h"
 
 using Microsoft::WRL::ComPtr;
 namespace Ailu
@@ -42,15 +43,18 @@ namespace Ailu
         void TryReleaseUnusedResources() final;
         f32 TotalGPUMemeryUsage() final;
 
+        RenderPipeline* GetPipeline() final;
+        void RegisterPipeline(RenderPipeline* pipiline) final;
+
         ID3D12Device* GetDevice() { return m_device.Get(); };
         void TrackResource(ComPtr<ID3D12Resource> resource);
 
 
         u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         u64 ExecuteAndWaitCommandBuffer(Ref<CommandBuffer>& cmd) final;
-        void BeginBackBuffer(CommandBuffer* cmd);
-        void EndBackBuffer(CommandBuffer* cmd);
-        void DrawOverlay(CommandBuffer* cmd);
+        void BeginBackBuffer(CommandBuffer* cmd) final;
+        void EndBackBuffer(CommandBuffer* cmd) final;
+        void DrawOverlay(CommandBuffer* cmd) final;
         //ID3D12QueryHeap* GetQueryHeap() { return m_queryHeap.Get(); }
         //ComPtr<ID3D12Resource> _p_query_buffer;
         //unsigned int  Offset = 0;
@@ -101,6 +105,7 @@ namespace Ailu
         float m_aspectRatio;
         bool _is_cur_frame_capture = false;
         WString _cur_capture_name;
+        RenderPipeline* _pipiline = nullptr;
     };
 }
 

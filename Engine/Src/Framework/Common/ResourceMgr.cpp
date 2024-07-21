@@ -57,6 +57,8 @@ namespace Ailu
 			Load<Shader>(L"Shaders/forwardlit.alasset");
 			RegisterResource(L"Shaders/hlsl/debug.hlsl", LoadExternalShader(L"Shaders/hlsl/debug.hlsl"));
 			RegisterResource(L"Shaders/hlsl/billboard.hlsl", LoadExternalShader(L"Shaders/hlsl/billboard.hlsl"));
+			RegisterResource(L"Shaders/hlsl/billboard.hlsl", LoadExternalShader(L"Shaders/hlsl/billboard.hlsl"));
+			RegisterResource(L"Shaders/hlsl/ssao.hlsl", LoadExternalShader(L"Shaders/hlsl/ssao.hlsl"));
 			//RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
 			GraphicsPipelineStateMgr::BuildPSOCache();
 			Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
@@ -157,7 +159,13 @@ namespace Ailu
 		FullScreenQuad->SetUVs(uv0, 0);
 		FullScreenQuad->BuildRHIResource();
 		RegisterResource(L"Runtime/Mesh/FullScreenQuad", FullScreenQuad);
-		Mesh::s_p_quad = FullScreenQuad.get();
+		Mesh::Mesh::s_p_quad = FullScreenQuad.get();
+		auto FullScreenTriangle = MakeRef<Mesh>("FullScreenTriangle");
+		FullScreenTriangle->_vertex_count = 3;
+		FullScreenTriangle->AddSubmesh(new u32[3]{ 0, 1, 2 }, 3);
+		FullScreenTriangle->BuildRHIResource();
+		RegisterResource(L"Runtime/Mesh/FullScreenTriangle", FullScreenTriangle);
+		Mesh::Mesh::s_p_fullscreen_triangle = FullScreenTriangle.get();
 		g_pThreadTool->Enqueue(&ResourceMgr::WatchDirectory, this);
 		return 0;
 	}

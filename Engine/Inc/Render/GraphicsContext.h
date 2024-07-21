@@ -8,6 +8,7 @@ namespace Ailu
 	class CommandBuffer;
 	class FrameResource;
 	class IGPUTimer;
+	class RenderPipeline;
 	class AILU_API GraphicsContext
 	{
 	public:
@@ -22,6 +23,11 @@ namespace Ailu
 		virtual u64 GetCurFenceValue() const = 0;
 		virtual u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) = 0;
 		virtual u64 ExecuteAndWaitCommandBuffer(Ref<CommandBuffer>& cmd) = 0;
+
+		virtual void BeginBackBuffer(CommandBuffer* cmd) = 0;
+		virtual void EndBackBuffer(CommandBuffer* cmd) = 0;
+		virtual void DrawOverlay(CommandBuffer* cmd) = 0;
+
 		virtual bool IsCommandBufferReady(const u32 cmd_index) = 0;
 		virtual void SubmitRHIResourceBuildTask(RHIResourceTask task) = 0;
 		virtual void TakeCapture() = 0;
@@ -34,6 +40,8 @@ namespace Ailu
 		virtual void TryReleaseUnusedResources() = 0;
 		//return mb byte/1024/1024
 		virtual f32 TotalGPUMemeryUsage() = 0;
+		virtual RenderPipeline* GetPipeline() = 0;
+		virtual void RegisterPipeline(RenderPipeline* pipiline) = 0;
 	};
 	extern AILU_API GraphicsContext* g_pGfxContext;
 }
