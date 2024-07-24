@@ -155,7 +155,7 @@ namespace Ailu
         /// <param name="input"></param>
         /// <param name="delimiter"></param>
         /// <returns></returns>
-        static Vector<String> Split(const String& input, const char* delimiter) 
+        static Vector<String> Split(const String& input, const String& delimiter) 
         {
             Vector<String> tokens;
             size_t start = 0, end = 0;
@@ -173,7 +173,7 @@ namespace Ailu
         /// <param name="input"></param>
         /// <param name="delimiter"></param>
         /// <returns></returns>
-        static Vector<WString> Split(const WString& input, const wchar_t* delimiter)
+        static Vector<WString> Split(const WString& input, const WString& delimiter)
         {
             Vector<WString> tokens;
             size_t start = 0, end = 0;

@@ -76,6 +76,7 @@ namespace Ailu
 		float4x4 _MatrixVP;
 		float4x4 _MatrixIVP;
 		float4   _CameraPos;
+		float4   _MainlightWorldPosition;
 		//float4(w,h,1/w,1/h)
 		float4   _ScreenParams;
 		float4   _ZBufferParams;
@@ -86,7 +87,7 @@ namespace Ailu
 		ShaderSpotlLightData _SpotLights[kMaxSpotLight];
 		float4x4 _ShadowMatrix[kMaxCascadeShadowMapSplit + kMaxSpotLight + kMaxPointLight * 6];
 		float g_IndirectLightingIntensity;
-		float padding1[23];
+		float padding1[19];
 		//float4x4 _JointMatrix[80];
 	};
 

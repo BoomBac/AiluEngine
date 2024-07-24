@@ -121,11 +121,11 @@ namespace Ailu
 		case Ailu::ELightType::kDirectional:
 		{
 			Vector3f light_to = _light._light_dir.xyz;
-			light_to.x *= 500;
-			light_to.y *= 500;
-			light_to.z *= 500;
+			light_to.x *= 2.0f;
+			light_to.y *= 2.0f;
+			light_to.z *= 2.0f;
 			Gizmo::DrawLine(transf._position, transf._position + light_to, _light._light_color);
-			Gizmo::DrawCircle(transf._position, 50.0f, 24, _light._light_color, Quaternion::ToMat4f(transf._rotation));
+			Gizmo::DrawCircle(transf._position, 2.0f, 24, _light._light_color, Quaternion::ToMat4f(transf._rotation));
 			if (_b_cast_shadow)
 			{
 				//Camera::DrawGizmo(&_shadow_cameras[0]);
@@ -209,7 +209,7 @@ namespace Ailu
 				float height = cascade_sphere._radius * 2.5f;
 				_shadow_cameras[i].Type(ECameraType::kOrthographic);
 				_shadow_cameras[i].SetLens(90, 1, 10, height * 1.5f);
-				_shadow_cameras[i].Size(cascade_sphere._radius * 2.0f + 200.0f);
+				_shadow_cameras[i].Size(cascade_sphere._radius * 2.f);
 				_shadow_cameras[i].Position(cascade_sphere._center + -_light._light_dir.xyz * height);
 				_shadow_cameras[i].LookTo(_light._light_dir.xyz, Vector3f::kUp);
 				//Camera::DrawGizmo(&_shadow_cameras[i], Random::RandomColor32(i));

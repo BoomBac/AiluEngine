@@ -393,7 +393,7 @@ namespace Ailu
 		_brdflut_gen = ComputeShader::Create(PathUtils::GetResSysPath(L"Shaders/hlsl/Compute/brdflut_gen.alcp"));
 		_brdflut_gen->SetTexture("_brdf_lut", _brdf_lut.get());
 		auto cmd = CommandBufferPool::Get();
-		cmd->Dispatch(_brdflut_gen.get(), 8, 8, 1);
+		cmd->Dispatch(_brdflut_gen.get(), _brdflut_gen->FindKernel("cs_main"),8, 8, 1);
 		g_pGfxContext->ExecuteCommandBuffer(cmd);
 	}
 	void DeferredLightingPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
@@ -425,24 +425,51 @@ namespace Ailu
 	//-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
 	SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
 	{
+		_p_lut_gen = ComputeShader::Create(PathUtils::GetResSysPath(L"Shaders/hlsl/Compute/atmosphere_lut_gen.hlsl"));
 		//_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.alasset"), "SkyboxPP");
 		_p_skybox_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
 		_p_sky_mesh = Mesh::s_p_shpere;
 		Matrix4x4f world_mat;
-		MatrixScale(world_mat, 10000.f, 10000.f, 10000.f);
+		MatrixScale(world_mat, 1000.f, 1000.f, 1000.f);
 		_p_cbuffer.reset(IConstantBuffer::Create(RenderConstants::kPeObjectDataSize));
 		memcpy(_p_cbuffer->GetData(), &world_mat, RenderConstants::kPeObjectDataSize);
 	}
 	void SkyboxPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
+		u16 transmittance_lut_gen_kernel = _p_lut_gen->FindKernel("TransmittanceGen");
+		u16 mult_scatter_lut_gen_kernel = _p_lut_gen->FindKernel("MultiScattGen");
+		u16 sky_lut_gen_kernel = _p_lut_gen->FindKernel("SkyLightGen");
+
 		auto cmd = CommandBufferPool::Get("SkyboxPass");
 		cmd->Clear();
 		{
 			ProfileBlock profile(cmd.get(), _name);
-			cmd->SetViewport(rendering_data._viewport);
-			cmd->SetScissorRect(rendering_data._scissor_rect);
+			auto t_lut = cmd->GetTempRT(_transmittance_lut_size.x,_transmittance_lut_size.y,"_TransmittanceLUT",ERenderTargetFormat::kRGBAHalf,false,false,true);
+			auto ms_lut = cmd->GetTempRT(_mult_scatter_lut_size.x,_mult_scatter_lut_size.y,"_MultScatterLUT",ERenderTargetFormat::kRGBAHalf,false,false,true);
+			auto sv_lut = cmd->GetTempRT(_sky_lut_size.x,_sky_lut_size.y,"_SkyLightLUT",ERenderTargetFormat::kRGBAHalf,false,false,true);
+
+			_p_lut_gen->SetTexture("_TransmittanceLUT",t_lut);
+			cmd->Dispatch(_p_lut_gen.get(),transmittance_lut_gen_kernel,_transmittance_lut_size.x / 16, _transmittance_lut_size.y / 16, 1);
+
+			_p_lut_gen->SetTexture("_TexTransmittanceLUT",t_lut);
+			_p_lut_gen->SetTexture("_MultScatterLUT",ms_lut);
+			cmd->Dispatch(_p_lut_gen.get(),mult_scatter_lut_gen_kernel,_mult_scatter_lut_size.x / 16, _mult_scatter_lut_size.y / 16, 1);
+
+			_p_lut_gen->SetTexture("_TexTransmittanceLUT",t_lut);
+			_p_lut_gen->SetTexture("_TexMultScatterLUT",ms_lut);
+			_p_lut_gen->SetTexture("_SkyLightLUT",sv_lut);
+			_p_lut_gen->SetVector("_MainLightPosition",rendering_data._mainlight_world_position);
+			cmd->Dispatch(_p_lut_gen.get(),sky_lut_gen_kernel,_sky_lut_size.x / 16, _sky_lut_size.y / 16, 1);
+
+			//cmd->SetViewport(rendering_data._viewport);
+			//cmd->SetScissorRect(rendering_data._scissor_rect);
+			_p_skybox_material->SetTexture("_TexSkyViewLUT",sv_lut);
 			cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
 			cmd->DrawRenderer(_p_sky_mesh, _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
+
+			cmd->ReleaseTempRT(t_lut);
+			cmd->ReleaseTempRT(ms_lut);
+			cmd->ReleaseTempRT(sv_lut);
 		}
 		context->ExecuteCommandBuffer(cmd);
 		CommandBufferPool::Release(cmd);
@@ -464,6 +491,8 @@ namespace Ailu
 		{
 			_p_cbuffers.push_back(std::unique_ptr<IConstantBuffer>(IConstantBuffer::Create(256)));
 		}
+		auto grid_plane_pos = MatrixScale(1000.0f,1000.f,1000.f);
+		memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));
 	}
 	void GizmoPass::Execute(GraphicsContext* context, RenderingData& rendering_data)
 	{
@@ -472,6 +501,7 @@ namespace Ailu
         static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
         static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
         static auto mat_camera_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
+        static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
 		cmd->Clear();
 		{
 			ProfileBlock profile(cmd.get(), _name);
@@ -481,9 +511,12 @@ namespace Ailu
 			GraphicsPipelineStateMgr::s_gizmo_pso->Bind(cmd.get());
 			GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(cmd.get(), Shader::GetPerFrameConstBuffer(), EBindResDescType::kConstBuffer);
 			Gizmo::Submit(cmd.get());
-			u16 index = 0;
+			cmd->DrawRenderer(Mesh::s_p_plane,mat_gird_plane,_p_cbuffers[0].get(),0,0,1);
+			u16 index = 1;
 			for (auto it : g_pSceneMgr->_p_current->GetAllComponents())
 			{
+				if (index >= 10)
+					break;
                 if(it == nullptr)
                     continue ;
                 auto light_comp = dynamic_cast<LightComponent*>(it);
@@ -520,37 +553,37 @@ namespace Ailu
 	}
 	void GizmoPass::BeginPass(GraphicsContext* context)
 	{
-		if (Gizmo::s_color.a > 0.0f)
-		{
-			int gridSize = 100;
-			int gridSpacing = 100;
-			Vector3f cameraPosition = Camera::sCurrent->Position();
-			float grid_alpha = lerpf(0.0f, 1.0f, abs(cameraPosition.y) / 2000.0f);
-			Color32 grid_color = Colors::kWhite;
-			grid_color.a = 1.0f - grid_alpha;
-			if (grid_color.a > 0)
-			{
-				Vector3f grid_center_mid(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
-					0.0f,
-					static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
-				Gizmo::DrawGrid(100, 100, grid_center_mid, grid_color);
-			}
-			grid_color.a = grid_alpha;
-			if (grid_color.a > 0.7f)
-			{
-				gridSize = 10;
-				gridSpacing = 1000;
-				Vector3f grid_center_large(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
-					0.0f,
-					static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
-				//grid_color = Colors::kGreen;
-				Gizmo::DrawGrid(10, 1000, grid_center_large, grid_color);
-			}
-			static const f32 s_axis_length = 50000.0f;
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ s_axis_length,0.0f,0.0f }, Colors::kRed);
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,s_axis_length,0.0f }, Colors::kGreen);
-			Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,s_axis_length }, Colors::kBlue);
-		}
+		// if (Gizmo::s_color.a > 0.0f)
+		// {
+		// 	int gridSize = 100;
+		// 	int gridSpacing = 100;
+		// 	Vector3f cameraPosition = Camera::sCurrent->Position();
+		// 	float grid_alpha = lerpf(0.0f, 1.0f, abs(cameraPosition.y) / 2000.0f);
+		// 	Color32 grid_color = Colors::kWhite;
+		// 	grid_color.a = 1.0f - grid_alpha;
+		// 	if (grid_color.a > 0)
+		// 	{
+		// 		Vector3f grid_center_mid(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
+		// 			0.0f,
+		// 			static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
+		// 		Gizmo::DrawGrid(100, 100, grid_center_mid, grid_color);
+		// 	}
+		// 	grid_color.a = grid_alpha;
+		// 	if (grid_color.a > 0.7f)
+		// 	{
+		// 		gridSize = 10;
+		// 		gridSpacing = 1000;
+		// 		Vector3f grid_center_large(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
+		// 			0.0f,
+		// 			static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
+		// 		//grid_color = Colors::kGreen;
+		// 		Gizmo::DrawGrid(10, 1000, grid_center_large, grid_color);
+		// 	}
+		// 	static const f32 s_axis_length = 50000.0f;
+		// 	Gizmo::DrawLine(Vector3f::kZero, Vector3f{ s_axis_length,0.0f,0.0f }, Colors::kRed);
+		// 	Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,s_axis_length,0.0f }, Colors::kGreen);
+		// 	Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,s_axis_length }, Colors::kBlue);
+		// }
 	}
 	void GizmoPass::EndPass(GraphicsContext* context)
 	{

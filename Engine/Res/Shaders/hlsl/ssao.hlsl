@@ -11,6 +11,26 @@
 //ZTest: Always
 //ZWrite: Off
 //pass end::
+//pass begin::
+//name: SSAO BlurX
+//vert: FullscreenVSMain
+//pixel: SSAOBlurXPSMain
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: Always
+//ZWrite: Off
+//pass end::
+//pass begin::
+//name: SSAO BlurY
+//vert: FullscreenVSMain
+//pixel: SSAOBlurYPSMain
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: Always
+//ZWrite: Off
+//pass end::
 //info end
 
 #include "fullscreen_quad.hlsli"
@@ -21,6 +41,10 @@
 PerMaterialCBufferBegin
     float4 _HBAOParams;
     float4 _AOScreenParams;
+    float _KernelSize;
+    float _Space_Sigma;
+    float _Range_Sigma;
+    float _padding;
 PerMaterialCBufferEnd
 
 
@@ -29,7 +53,7 @@ PerMaterialCBufferEnd
 #define MAXRADIUSPIXEL _HBAOParams.z
 #define ANGLEBIAS _HBAOParams.w
 
-static const float R = 8;
+static const float R = 2;
 static const float R2 = R * R;
 static const float NegInvR2 = - 1.0 / (R*R);
 static const float TanBias = tan(30.0 * PI / 180.0);
@@ -182,37 +206,49 @@ float4 SSAOGenPSMain(PSInput i) : SV_TARGET
 }
 
 
-// half3 BilateralBlur(float2 uv,float2 offset,float space_sigma, float range_sigma)
-// {
-//     float weight_sum = 0;
-//     float3 color_sum = 0;
-//     float3 normal_origin = SAMPLE_TEXTURE2D(_CameraNormalsTexture, sampler_CameraNormalsTexture, uv);
-//     half3 color = 0;
-//     for(int i = -_KernelSize; i < _KernelSize; i++)
-//     {
-//         //空域高斯
-//         float2 varible = uv + float2(i * _MainTex_TexelSize.x * offset.x, i * _MainTex_TexelSize.y * offset.y);
-//         float space_factor = i * i;
-//         space_factor = (-space_factor) / (2 * space_sigma * space_sigma);
-//         float space_weight = 1/(space_sigma * space_sigma * 2 * PI) * exp(space_factor);
+TEXTURE2D(_SourceTex,0)
 
-//         //值域高斯
-//         float3 normal_neighbor = SAMPLE_TEXTURE2D(_CameraNormalsTexture, sampler_CameraNormalsTexture, varible);
-//         float3 normal_distance = (normal_neighbor - normal_origin);
-//         float value_factor = normal_distance.r * normal_distance.r ;
-//         value_factor = (-value_factor) / (2 * range_sigma * range_sigma);
-//         float value_weight = saturate(1 / (2 * PI * range_sigma)) * exp(value_factor);
+half3 BilateralBlur(float2 uv,float2 offset,float space_sigma, float range_sigma)
+{
+    float weight_sum = 0;
+    float3 color_sum = 0;
+    float3 normal_origin = SAMPLE_TEXTURE2D(_CameraNormalsTexture, g_LinearClampSampler, uv);
+    half3 color = 0;
+    for(int i = -_KernelSize; i < _KernelSize; i++)
+    {
+        //空域高斯
+        float2 varible = uv + float2(i * _AOScreenParams.z * offset.x, i * _AOScreenParams.w * offset.y);
+        float space_factor = i * i;
+        space_factor = (-space_factor) / (2 * space_sigma * space_sigma);
+        float space_weight = 1/(space_sigma * space_sigma * 2 * PI) * exp(space_factor);
 
-//         weight_sum += space_weight * value_weight;
-//         color_sum += SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, varible) * space_weight * value_weight;
-//     }
-//     if(weight_sum > 0)
-//     {
-//         color = color_sum / weight_sum;
-//     }
-//     return color;
-// }
+        //值域高斯
+        float3 normal_neighbor = SAMPLE_TEXTURE2D(_CameraNormalsTexture, g_LinearClampSampler, varible);
+        float3 normal_distance = (normal_neighbor - normal_origin);
+        float value_factor = normal_distance.r * normal_distance.r ;
+        value_factor = (-value_factor) / (2 * range_sigma * range_sigma);
+        float value_weight = saturate(1 / (2 * PI * range_sigma)) * exp(value_factor);
 
+        weight_sum += space_weight * value_weight;
+        color_sum += SAMPLE_TEXTURE2D(_SourceTex, g_LinearClampSampler, varible) * space_weight * value_weight;
+    }
+    if(weight_sum > 0)
+    {
+        color = color_sum / weight_sum;
+    }
+    return color;
+}
+
+float4 SSAOBlurYPSMain(PSInput i): SV_TARGET
+{
+    half3 c = BilateralBlur(i.uv,float2(0.0,1.0),_Space_Sigma,_Range_Sigma);
+    return float4(c,1.0);
+}
+float4 SSAOBlurXPSMain(PSInput i): SV_TARGET
+{
+    half3 c = BilateralBlur(i.uv,float2(1.0,0.0),_Space_Sigma,_Range_Sigma);
+    return float4(c,1.0);
+}
 // half3 BilateralBlur(float2 uv,float space_sigma, float range_sigma)
 // {
 //     float3 v = BilateralBlur(uv,float2(0.0,1.0),space_sigma,range_sigma);
@@ -220,7 +256,7 @@ float4 SSAOGenPSMain(PSInput i) : SV_TARGET
 //     return (v + h) / 2;
 // }
 
-// TEXTURE2D(_MainTex,0)
+// 
 
 // static const half kGeometryCoeff = half(0.8);
 // half CompareNormal(half3 d1, half3 d2)

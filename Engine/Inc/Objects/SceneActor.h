@@ -12,7 +12,7 @@ namespace Ailu
 		friend static T* Deserialize(Queue<std::tuple<String, String>>& formated_str);
 	public:
         inline static f32 s_global_aabb_scale = 1.0f;
-        inline static const f32 kBasAABBInitialSize = 100.0f;
+        inline static const f32 kBasAABBInitialSize = 1.0f;
 		DISALLOW_COPY_AND_ASSIGN(SceneActor)
 		SceneActor();
 		~SceneActor();

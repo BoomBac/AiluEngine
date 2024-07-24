@@ -62,6 +62,9 @@ namespace Ailu
 		virtual void SetViewports(const Vector<Rect>& viewports) = 0;
 		virtual void SetScissorRects(const Vector<Rect>& rects) = 0;
 
+		virtual RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access) = 0;
+		virtual void ReleaseTempRT(RTHandle handle) = 0;
+		
 		virtual void Blit(RTHandle src, RTHandle dst, Material* mat = nullptr, u16 pass_index = 0u) = 0;
 		virtual void Blit(RenderTexture* src, RenderTexture* dst, Material* mat = nullptr, u16 pass_index = 0u) = 0;
 		virtual void DrawFullScreenQuad(Material* mat, u16 pass_index = 0u) = 0;
@@ -72,7 +75,7 @@ namespace Ailu
 		virtual u16 DrawRenderer(Mesh* mesh, Material* material,u32 instance_count = 1u) = 0;
 		virtual u16 DrawRenderer(Mesh* mesh, Material* material,u32 instance_count, u16 pass_index) = 0;
 
-		virtual void Dispatch(ComputeShader* cs,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
+		virtual void Dispatch(ComputeShader* cs,u16 kernel,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
 	};
 
 	class CommandBufferPool

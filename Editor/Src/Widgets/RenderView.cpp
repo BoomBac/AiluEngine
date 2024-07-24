@@ -84,6 +84,7 @@ namespace Ailu
                 }
                 if (s_resize_end_frame_count > Application::kTargetFrameRate * 0.5f)
                 {
+                    Camera::sCurrent->Rect((u16)gameview_size.x,(u16)gameview_size.y);
                     //g_pRenderer->ResizeBuffer(static_cast<u32>(gameview_size.x), static_cast<u32>(gameview_size.y));
                     if (_pre_tick_window_width != window_size.x || _pre_tick_window_height != window_size.y)
                     {

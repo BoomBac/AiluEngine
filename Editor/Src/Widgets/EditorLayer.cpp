@@ -243,9 +243,7 @@ namespace Ailu
 
         ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
         ImGui::SliderFloat("Game Time Scale:", &TimeMgr::s_time_scale, 0.0f, 2.0f, "%.2f");
-        float shadow_dis_m = QuailtySetting::s_main_light_shaodw_distance / 100u;
-        ImGui::SliderFloat("ShadowDistance m", &shadow_dis_m, 0.f, 100.0f, "%.2f");
-        QuailtySetting::s_main_light_shaodw_distance = shadow_dis_m * 100;
+        ImGui::SliderFloat("ShadowDistance m", &QuailtySetting::s_main_light_shaodw_distance, 0.f, 100.0f, "%.2f");
 
         //g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
         ImGui::Checkbox("Expand", &show);

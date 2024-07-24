@@ -14,7 +14,8 @@ namespace Ailu
 		kLightComponent,
 		kStaticMeshComponent,
 		kCameraComponent,
-		kSkinedMeshComponent
+		kSkinedMeshComponent,
+		kLightProbeComponent
 	};
 
 #define COMPONENT_CLASS_TYPE(type)\

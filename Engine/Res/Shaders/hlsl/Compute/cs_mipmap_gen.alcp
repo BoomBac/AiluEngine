@@ -1,6 +1,8 @@
 #ifndef __MIPMAP_GEN_H__
 #define __MIPMAP_GEN_H__
 
+#pragma kernel cs_main
+
 #include "cs_common.hlsli"
 #define BLOCK_SIZE 8
 //process non-2 power

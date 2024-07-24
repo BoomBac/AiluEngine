@@ -4,7 +4,7 @@ cmake_minimum_required (VERSION 3.5)
 project (AiluEditor)
 set(EDITOR_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/bin/x64/debug)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/bin/x64)
 set(ENGINE_LIB_ROOT ${ENGINE_ROOT_PATH}/lib/x64)
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 20)

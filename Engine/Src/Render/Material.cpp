@@ -406,6 +406,7 @@ namespace Ailu
 
 	void Material::Construct(bool first_time)
 	{
+		AL_ASSERT(_p_shader->PassCount() == 0);
 		ConstructKeywords(_p_shader);
 		static u8 s_unused_shader_prop_buf[256]{ 0 };
 		u16 unused_shader_prop_buf_offset = 0u;

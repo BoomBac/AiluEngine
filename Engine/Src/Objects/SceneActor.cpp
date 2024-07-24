@@ -25,7 +25,7 @@ namespace Ailu
         Vector3f world_pos = _p_transform->GetPosition();
         f32 scale = kBasAABBInitialSize;
         f32 dis = Distance(Camera::sCurrent->Position(),world_pos);
-        f32 scale_factor = std::max<f32>(dis * 0.00025,1.0f);
+        f32 scale_factor = std::max<f32>(dis * 0.00025f,1.0f);
         scale *= scale_factor;
         _base_aabb._min = -scale + world_pos;
         _base_aabb._max = scale + world_pos;

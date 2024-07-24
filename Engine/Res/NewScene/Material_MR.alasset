@@ -14,9 +14,10 @@ keywords:
     _MetallicValue: 0
     _AlphaCulloff: 0
   prop_type: Vector
-    _ScreenParams: 1.49012e-07,0.86837,-0.495917,0
-    _ZBufferParams: 0.674305,0.366212,0.641251,0
-    _CascadeShadowParams: 0,0,-39.2348,0
+    _MainlightWorldPosition: -2.98023e-08,0.906762,-0.421644,0
+    _ScreenParams: 0.842411,0.227197,0.488596,0
+    _ZBufferParams: -5.95563,0.311062,5.14617,1
+    _CascadeShadowParams: 0.48724,-0.61522,-0.764018,-0.763866
     _EmissionValue: 0,0,0,0
     _AlbedoValue: 1,1,1,0
     _SpecularValue: 0,0,0,0

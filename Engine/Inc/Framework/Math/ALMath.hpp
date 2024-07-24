@@ -227,6 +227,7 @@ namespace Ailu
         template<typename T>
         const Vector2D<T> Vector2D<T>::kOne(1, 1);
         using Vector2f = Vector2D<float>;
+        using Vector2Int = Vector2D<i32>;
 
         template<typename T>
         struct Vector3D

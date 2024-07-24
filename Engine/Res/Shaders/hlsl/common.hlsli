@@ -55,6 +55,11 @@ float4x4 GetWorldToViewMatrix()
     return _MatrixV;
 }
 
+float3 GetCameraPositionWS()
+{
+	return _CameraPos.xyz;
+}
+
 // float4x4 GetViewToWorldMatrix()
 // {
 //     return _Matrix_I_V;

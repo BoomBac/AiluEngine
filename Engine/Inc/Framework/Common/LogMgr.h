@@ -37,7 +37,7 @@ namespace Ailu
 			std::ofstream out(s_out_path, std::ios_base::app);
 			if (out.is_open())
 			{
-				out << str << std::endl;
+				out << str.substr(8,str.size()-8) << std::endl;
 				out.close();
 			}
 		}

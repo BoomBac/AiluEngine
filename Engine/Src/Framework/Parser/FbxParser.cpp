@@ -1128,9 +1128,9 @@ namespace Ailu
 		fbx_importer_->Import(_p_cur_fbx_scene);
 		FbxNode* fbx_rt = _p_cur_fbx_scene->GetRootNode();
 		fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(_p_cur_fbx_scene);
-		if (_p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit() != fbxsdk::FbxSystemUnit::cm)
+		if (_p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit() != fbxsdk::FbxSystemUnit::m)
 		{
-			const FbxSystemUnit::ConversionOptions lConversionOptions = {
+			const fbxsdk::FbxSystemUnit::ConversionOptions lConversionOptions = {
 			false, /* mConvertRrsNodes */
 			true, /* mConvertAllLimits */
 			true, /* mConvertClusters */
@@ -1138,7 +1138,7 @@ namespace Ailu
 			true, /* mConvertPhotometricLProperties */
 			true  /* mConvertCameraClipPlanes */
 			};
-			fbxsdk::FbxSystemUnit::cm.ConvertScene(_p_cur_fbx_scene, lConversionOptions);
+			fbxsdk::FbxSystemUnit::m.ConvertScene(_p_cur_fbx_scene, lConversionOptions);
 		}
 		FillPoseArray(_p_cur_fbx_scene, _fbx_poses);
 		Queue<FbxNode*> mesh_node, skeleton_node;
@@ -1207,9 +1207,9 @@ namespace Ailu
 			FbxAxisSystem scene_axis_system = _p_cur_fbx_scene->GetGlobalSettings().GetAxisSystem();
 			if (scene_axis_system != FbxAxisSystem::DirectX)
 				FbxAxisSystem::DirectX.DeepConvertScene(_p_cur_fbx_scene);
-			FbxSystemUnit scene_sys_unit = _p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit();
+			fbxsdk::FbxSystemUnit scene_sys_unit = _p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit();
 			if (scene_sys_unit.GetScaleFactor() != 1.0)
-				FbxSystemUnit::cm.ConvertScene(_p_cur_fbx_scene);
+				fbxsdk::FbxSystemUnit::cm.ConvertScene(_p_cur_fbx_scene);
 			_p_cur_fbx_scene->FillAnimStackNameArray(_fbx_anim_stack_names);
 			SetCurrentAnimStack(0);
 			//convert all geometry object to triangle mesh

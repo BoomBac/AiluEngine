@@ -12,7 +12,7 @@ SceneGraph:
       Name: plane
         Components: 
           TransformComponent: 
-            Position: 0.000823975,-45.7742,0
+            Position: 0.000823975,-1,0
             Rotation: 0,6.75513e-08,0,1
             Scale: 40,0.21,40
           StaticMeshComponent: 
@@ -22,9 +22,9 @@ SceneGraph:
       Name: directional_light
         Components: 
           TransformComponent: 
-            Position: -574.82,2020.8,1628.61
-            Rotation: -0.434366,1.04853e-05,-2.15876e-05,0.900736
-            Scale: 0.99996,0.999964,0.999963
+            Position: -3.8147e-06,11.0407,-9.51489
+            Rotation: -0.4568,1.68975e-07,-1.81181e-07,0.88957
+            Scale: 0.999923,0.999923,0.999914
           LightComponent: 
             Type: Directional
             Color: 1,1,1
@@ -36,14 +36,14 @@ SceneGraph:
       Name: point_light
         Components: 
           TransformComponent: 
-            Position: -474.949,199.381,310.39
+            Position: -1.71405,1.48752,-2.23107
             Rotation: 0,6.75513e-08,0,1
             Scale: 1,1,1
           LightComponent: 
             Type: Point
             Color: 0.721239,0.600816,0.197862
             Intensity: 1
-            Radius: 500
+            Radius: 10
             CastShadow: false
             ConstantBias: 0
             SlopeBias: 0
@@ -51,14 +51,14 @@ SceneGraph:
       Name: spot_light
         Components: 
           TransformComponent: 
-            Position: -877.591,449.842,-1885.46
-            Rotation: -0.0133235,0.817226,-0.394936,0.41951
-            Scale: 0.999952,0.999971,0.999964
+            Position: 4.88818,4.97655,-7.63955
+            Rotation: -0.013323,0.817226,-0.394937,0.41951
+            Scale: 0.999937,0.999963,0.999951
           LightComponent: 
             Type: Spot
             Color: 0,0.60177,1
             Intensity: 1
-            Radius: 1500
+            Radius: 15
             Inner: 33.351
             Outer: 59.153
             CastShadow: false
@@ -68,9 +68,9 @@ SceneGraph:
       Name: shpere
         Components: 
           TransformComponent: 
-            Position: -1114.17,54.8506,-1357.91
+            Position: -3.98748,0.129866,-4.14986
             Rotation: 0.00588005,0.953617,0.00644684,0.300896
-            Scale: 0.629186,0.629405,0.629275
+            Scale: 0.999995,1,0.999985
           StaticMeshComponent: 
             MeshPath: 7baa598b-7eb4-478d-91ae-bf758da25d3b
             MaterialPath0: 46601513-96ea-4cc4-86db-0400c8824ec1
@@ -78,9 +78,9 @@ SceneGraph:
       Name: plane
         Components: 
           TransformComponent: 
-            Position: -1541.49,365.54,389.136
+            Position: -10.1076,4.03573,11.9164
             Rotation: -0.488287,-0.184474,-0.111396,0.845657
-            Scale: 5.26225,5.2624,5.26231
+            Scale: 5.26225,5.2624,5.26235
           StaticMeshComponent: 
             MeshPath: c3315e03-1052-4825-98f7-a676beae0615
             MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
@@ -114,8 +114,8 @@ SceneGraph:
       Name: Actor14
         Components: 
           TransformComponent: 
-            Position: -225.573,75.152,-857.53
-            Rotation: -0.0790186,-0.821269,0.552709,-0.117413
+            Position: 3.44727,0,4.18106
+            Rotation: -0.0790188,-0.821269,0.552709,-0.117414
             Scale: 0.939992,0.939998,0.939995
           StaticMeshComponent: 
             MeshPath: 9bb10f26-291a-4614-861e-2c667b6b4c63

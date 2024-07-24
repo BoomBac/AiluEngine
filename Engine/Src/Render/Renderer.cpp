@@ -301,6 +301,8 @@ namespace Ailu
 				}
 				_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightColor = color.xyz;
 				_per_frame_cbuf_data._DirectionalLights[direction_light_index]._LightDir = light_data._light_dir.xyz;
+				_per_frame_cbuf_data._MainlightWorldPosition = light_data._light_dir;//Normalize(light_data._light_dir);
+				_rendering_data._mainlight_world_position = _per_frame_cbuf_data._MainlightWorldPosition;
 				++direction_light_index;
 			}
 			else if (light->LightType() == ELightType::kPoint)

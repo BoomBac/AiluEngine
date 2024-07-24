@@ -394,8 +394,17 @@ namespace Ailu
 		SetRenderTargets(rts, g_pRenderTexturePool->Get(depth));
 	}
 
-	void D3DCommandBuffer::SetRenderTarget(RTHandle color, RTHandle depth)
-	{
+
+    RTHandle D3DCommandBuffer::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    {
+        return RenderTexture::GetTempRT(width,height,name,format,mipmap_chain,linear,random_access);
+    }
+    void D3DCommandBuffer::ReleaseTempRT(RTHandle handle)
+    {
+		RenderTexture::ReleaseTempRT(handle);
+    }
+    void D3DCommandBuffer::SetRenderTarget(RTHandle color, RTHandle depth)
+    {
 		SetRenderTarget(g_pRenderTexturePool->Get(color), g_pRenderTexturePool->Get(depth));
 	}
 
@@ -436,12 +445,12 @@ namespace Ailu
 		}
 	}
 
-	void D3DCommandBuffer::Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+	void D3DCommandBuffer::Dispatch(ComputeShader* cs, u16 kernel,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
 	{
 		for (auto it : cs->AllBindTexture())
 		{
 			g_pGfxContext->TrackResource(it);
 		}
-		cs->Bind(this, thread_group_x, thread_group_y, thread_group_z);
+		cs->Bind(this,kernel,thread_group_x, thread_group_y, thread_group_z);
 	}
 }

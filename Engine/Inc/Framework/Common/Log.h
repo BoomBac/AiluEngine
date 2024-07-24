@@ -64,8 +64,10 @@ namespace Ailu
 		oss << str;
 		return oss.str();
 	}
-	static const char* log_str[]{ "Normal","Warning","Error" };
-	static const wchar_t* log_strw[]{ L"Normal",L"Warning",L"Error" };
+	static const std::string log_str[]{ "Normal","Warning","Error" };
+	static const std::wstring log_strw[]{ L"Normal",L"Warning",L"Error" };
+	static const std::string format_control_block[] {"\u001b[1;37m","\u001b[1;33m","\u001b[1;31m"};
+	static const std::wstring format_control_blockw[] {L"\u001b[1;37m",L"\u001b[1;33m",L"\u001b[1;31m"};
 	using TraceLevle = uint8_t;
 	constexpr TraceLevle TRACE_ALL = 0;
 	constexpr TraceLevle TRACE_1 = 1 << 0;
@@ -83,16 +85,16 @@ namespace Ailu
 	template<typename... Targs>
 	static std::wstring BuildLogMsg(ELogLevel level, std::wstring_view str, Targs... args)
 	{
-		std::wstring s = log_strw[level];
-		s.append(L": ");
+		std::wstring s = format_control_blockw[level];
+		s.append(log_strw[level] + L": ");
 		s.append(format(str, args...));
 		return s;
 	}
 	template<typename... Targs>
 	static std::string BuildLogMsg(ELogLevel level, std::string_view str, Targs... args)
 	{
-		std::string s = log_str[level];
-		s.append(": ");
+		std::string s = format_control_block[level];
+		s.append(log_str[level] + ": ");
 		s.append(format(str, args...));
 		return s;
 	}

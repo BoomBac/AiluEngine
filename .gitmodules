@@ -1,3 +1,6 @@
+[submodule "Engine/Ext/imgui"]
+	path = Engine/Ext/imgui
+	url = https://github.com/BoomBac/imgui.git
 [submodule "Engine/Ext/ImGuizmo"]
 	path = Engine/Ext/ImGuizmo
-	url = https://github.com/CedricGuillemet/ImGuizmo
+	url = https://github.com/BoomBac/ImGuizmo.git

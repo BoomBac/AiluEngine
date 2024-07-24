@@ -31,8 +31,8 @@ namespace Ailu
 
     struct AILU_API QuailtySetting
     {
-        //cm
-        inline static u32 s_main_light_shaodw_distance = 8000u;
+        //m
+        inline static f32 s_main_light_shaodw_distance = 80.0f;
         inline static u16 s_cascade_shadow_map_count = 2;
         inline static f32 s_cascade_shadow_map_split[4] = {0.25f,0.9f,1.0f,1.0f};
         inline static f32 s_shadow_fade_out_factor = 0.1f;
@@ -89,6 +89,8 @@ namespace Ailu
         Vector<RTHandle> _gbuffers;
         CommandBuffer* cmd;
         const CullResult* _cull_results;
+        //temp
+        Vector4f _mainlight_world_position;
         void Reset()
         {
             _addi_shadow_num = 0;

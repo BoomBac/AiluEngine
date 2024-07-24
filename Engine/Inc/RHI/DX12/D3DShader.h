@@ -294,19 +294,22 @@ namespace Ailu
 			ComPtr<ID3D12RootSignature> _p_sig_b;
 			ComPtr<ID3D12PipelineState> _p_pso_b;
 		};
+		struct D3DKernelElement
+		{
+			ComPtr<ID3DBlob> _p_blob;
+			PSOSystem _pso_sys;
+		};
 	public:
 		D3DComputeShader(const WString& sys_path);
 		//void Dispatch(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
-		void Bind(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
-		void BindOnly(CommandBuffer* cmd,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z,std::function<void()> res_binder);
+		void Bind(CommandBuffer *cmd, u16 kernel,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 	private:
-		void LoadReflectionInfo(ID3D12ShaderReflection* p_reflect);
-		bool RHICompileImpl() final;
-		void GenerateInternalPSO();
+		void LoadReflectionInfo(ID3D12ShaderReflection* p_reflect,u16 kernel_index);
+		bool RHICompileImpl(u16 kernel_index) final;
+		void GenerateInternalPSO(u16 kernel_index);
 	private:
-		ComPtr<ID3DBlob> _p_blob;
-		ComPtr<ID3D12ShaderReflection> _p_reflection;
-		PSOSystem _pso_sys;
+		Vector<D3DKernelElement> _elements;
+		std::mutex _ele_lock;
 	};
 }
 

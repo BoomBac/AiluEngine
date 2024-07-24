@@ -1,3 +1,5 @@
+#pragma kernel cs_main
+
 #include "../screen_fx_common.hlsli"
 #include "cs_common.hlsli"
 

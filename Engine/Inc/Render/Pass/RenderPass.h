@@ -160,6 +160,11 @@ namespace Ailu
 		Mesh* _p_sky_mesh;
 		Ref<Material> _p_skybox_material;
 		Scope<IConstantBuffer> _p_cbuffer;
+		Ref<ComputeShader> _p_lut_gen;
+
+		Vector2Int _transmittance_lut_size = Vector2Int(256, 64);
+        Vector2Int _mult_scatter_lut_size = Vector2Int(32, 32);
+        Vector2Int _sky_lut_size = Vector2Int(192, 192);
 	};
 
 	class AILU_API GizmoPass : public RenderPass

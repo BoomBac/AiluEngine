@@ -1,3 +1,5 @@
+#pragma kernel cs_main
+
 #include "cs_common.hlsli"
 #include "../brdf.hlsli"
 #include "../brdf_helper.hlsli"
@@ -149,19 +151,13 @@ float2 IntegrateBRDF(float roughness, float NoV)
 void cs_main(CSInput cs_input)
 {
     uint2 id = cs_input.DispatchThreadID.xy;
-    float roughness = (float)(id.y + 1) / 128.0f;
-    float nv = (float)(id.x + 1) / 128.0f;
+    float2 uv = (float2)cs_input.DispatchThreadID.xy + 0.5.xx;
+    float roughness = uv.y / 128.0f;
+    float nv = uv.x / 128.0f;
+    // float roughness = (float)(id.y + 1) / 128.0f;
+    // float nv = (float)(id.x + 1) / 128.0f;
 
 	float2 color = IntegrateBRDF(roughness,nv);
-    // if(_brdf_lut[uint2(id.x,id.y)].x < 0)
-    // {
-    //     _brdf_lut[uint2(id.x,id.y)].xy = 0;
-    // }
-    // else
-    // {
-
-    // _brdf_lut[uint2(id.x,id.y)].xy += 1;
-    // }
     _brdf_lut[uint2(id.x,127 - id.y)] = color.xy;
 }
 

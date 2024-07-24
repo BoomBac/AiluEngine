@@ -12,8 +12,9 @@ namespace Ailu
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;
-		Vector4f _ao_params = {1.25f,500.f,0.f,0.f};
+		Vector4f _ao_params = {1.25f,125.f,0.f,0.f};
 		bool _is_debug_mode = false;
+		bool _is_half_res = true;
 	private:
 		Ref<ComputeShader> _ssao_computer;
 		Ref<Material> _ssao_gen;

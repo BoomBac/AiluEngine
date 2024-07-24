@@ -44,6 +44,9 @@ namespace Ailu
         void ClearRenderTarget(RTHandle depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
         void SetRenderTargets(Vector<RTHandle>& colors, RTHandle depth) final;
 
+        RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access);
+		void ReleaseTempRT(RTHandle handle);
+
         void DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer>& index_buffer, const Matrix4x4f& transform, u32 instance_count) final;
         void DrawIndexedInstanced(u32 index_count, u32 instance_count) final;
         void DrawInstanced(const std::shared_ptr<IVertexBuffer>& vertex_buf, const Matrix4x4f& transform, u32 instance_count) final;
@@ -65,7 +68,7 @@ namespace Ailu
         u16 DrawRenderer(Mesh* mesh, Material* material, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh* mesh, Material* material, u32 instance_count, u16 pass_index) final;
 
-        void Dispatch(ComputeShader* cs, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
+        void Dispatch(ComputeShader* cs,u16 kernel,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 
         ID3D12GraphicsCommandList* GetCmdList() { return _p_cmd.Get(); }
         u16 GetDescriptorHeapId() const { return _cur_cbv_heap_id; }

@@ -2,6 +2,7 @@
 #ifndef __INPUT_LAYER_H__
 #define __INPUT_LAYER_H__
 
+#include "Inc/Framework/Common/Application.h"
 #include "Inc/Framework/Events/Layer.h"
 #include "Render/Camera.h"
 
@@ -20,15 +21,18 @@ namespace Ailu
             void SetTargetRotation(f32 x,f32 y);
 			void Move(const Vector3f& d);
 			void Interpolate(float speed);
+			void Accelerate(bool faster) {_cur_move_speed = faster? _fast_camera_move_speed : _base_camera_move_speed;};
 			Vector2f _rotation;
             Vector3f _target_pos;
             bool  _is_receive_input = true;
-            float _camera_move_speed = 0.6f;
-            float _camera_wander_speed = 0.6f;
-            float _lerp_speed_multifactor = 0.25f;
-            float _camera_fov_h = 60.0f;
-            float _camera_near = 1.0f;
-            float _camera_far = 10000.0f;
+            f32 _base_camera_move_speed = 0.6f;
+            f32 _fast_camera_move_speed =_base_camera_move_speed * 3.0f;
+			f32 _cur_move_speed = _base_camera_move_speed;
+            f32 _camera_wander_speed = 0.6f;
+            f32 _lerp_speed_multifactor = 170.0f / (f32)Application::kTargetFrameRate * 0.25f;
+            f32 _camera_fov_h = 60.0f;
+            f32 _camera_near = 0.01f;
+            f32 _camera_far = 1000.0f;
 		private:
 			Camera* _p_camera;
 			Quaternion _rot_object_x;

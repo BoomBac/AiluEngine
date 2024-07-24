@@ -23,9 +23,9 @@ namespace Ailu
 	}
 	void TransformComponent::OnGizmo()
 	{
-		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._forward * 100, Colors::kBlue);
-		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._up * 100, Colors::kGreen);
-		Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._right * 100, Colors::kRed);
+		// Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._forward, Colors::kBlue);
+		// Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._up, Colors::kGreen);
+		// Gizmo::DrawLine(_transform._position, _transform._position + _transform._rotation * _transform._right, Colors::kRed);
 	}
 	//Vector3f TransformComponent::GetEuler() const
 	//{

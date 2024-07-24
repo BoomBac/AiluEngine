@@ -41,6 +41,7 @@ namespace Ailu
         }
         void FirstPersonCameraController::Interpolate(float speed)
         {
+            _fast_camera_move_speed = _base_camera_move_speed * 3.0f;
             Quaternion new_quat_y = Quaternion::AngleAxis(_rotation.y, Vector3f::kUp);
             Vector3f new_camera_right = new_quat_y * Vector3f::kRight;
             auto new_quat_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
@@ -106,8 +107,8 @@ namespace Ailu
             dispater.Dispatch<MouseScrollEvent>([this](MouseScrollEvent &e) -> bool{
                 if(FirstPersonCameraController::s_inst._is_receive_input)
                 {
-                    FirstPersonCameraController::s_inst._camera_move_speed += e.GetOffsetY() > 0 ? 0.01f : -0.01f;
-                    FirstPersonCameraController::s_inst._camera_move_speed = std::ranges::max(0.0f, FirstPersonCameraController::s_inst._camera_move_speed);
+                    FirstPersonCameraController::s_inst._base_camera_move_speed += e.GetOffsetY() > 0 ? 0.01f : -0.01f;
+                    FirstPersonCameraController::s_inst._base_camera_move_speed = std::ranges::max(0.0f, FirstPersonCameraController::s_inst._base_camera_move_speed);
                 }
                 return false; });
             EventDispather dispater0(e);
@@ -141,6 +142,17 @@ namespace Ailu
                 }
                 pre_mouse_pos = cur_mouse_pos;
                 FirstPersonCameraController::s_inst.SetTargetRotation(target_rotation.x, target_rotation.y);
+                FirstPersonCameraController::s_inst.Accelerate(Input::IsKeyPressed(AL_KEY_SHIFT));
+                return false;
+            });
+            dispater0.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e)->bool{
+                if (e.GetKeyCode() == AL_KEY_SHIFT)
+                    FirstPersonCameraController::s_inst.Accelerate(true);
+                return false;
+            });
+            dispater0.Dispatch<KeyReleasedEvent>([this](KeyReleasedEvent& e)->bool{
+                if (e.GetKeyCode() == AL_KEY_SHIFT)
+                    FirstPersonCameraController::s_inst.Accelerate(false);
                 return false;
             });
         }
@@ -154,14 +166,14 @@ namespace Ailu
                 FirstPersonCameraController::s_inst._camera_near = Camera::sCurrent->Near();
                 FirstPersonCameraController::s_inst._camera_far = Camera::sCurrent->Far();
                 ImGui::Begin("CameraDetail");
-                ImGui::SliderFloat("MoveSpeed", &FirstPersonCameraController::s_inst._camera_move_speed, 0.00f, 10.0f, "%.2f");
+                ImGui::SliderFloat("MoveSpeed", &FirstPersonCameraController::s_inst._base_camera_move_speed, 0.00f, 10.0f, "%.2f");
                 ImGui::SliderFloat("WanderSpeed", &FirstPersonCameraController::s_inst._camera_wander_speed, 0.00f, 2.0f,
                                    "%.2f");
                 ImGui::SliderFloat("LerpSpeed", &FirstPersonCameraController::s_inst._lerp_speed_multifactor, 0.0f, 1.0f,
                                    "%.2f");
                 ImGui::SliderFloat("FovH", &FirstPersonCameraController::s_inst._camera_fov_h, 0.0f, 120.0f, "%.2f");
-                ImGui::SliderFloat("NearClip", &FirstPersonCameraController::s_inst._camera_near, 0.00001f, 1000.0f, "%.2f");
-                ImGui::SliderFloat("FarClip", &FirstPersonCameraController::s_inst._camera_far, 5000.0f, 200000.0f, "%.2f");
+                ImGui::SliderFloat("NearClip", &FirstPersonCameraController::s_inst._camera_near, 0.00001f, 100.0f, "%.2f");
+                ImGui::SliderFloat("FarClip", &FirstPersonCameraController::s_inst._camera_far, 100.0f, 5000.0f, "%.2f");
                 ImGui::Text("Position:");
                 ImGui::SameLine();
                 ImGui::Text(camera_pos.ToString().c_str());
@@ -178,8 +190,8 @@ namespace Ailu
             Camera::sCurrent->Far(FirstPersonCameraController::s_inst._camera_far);
             if (Camera::sCurrent && !Input::IsInputBlock())
             {
-                static const f32 move_distance = 100.0f;// 1 m
-                f32 final_move_distance = move_distance * FirstPersonCameraController::s_inst._camera_move_speed * FirstPersonCameraController::s_inst._camera_move_speed;
+                static const f32 move_distance = 1.0f;// 1 m
+                f32 final_move_distance = move_distance * FirstPersonCameraController::s_inst._cur_move_speed * FirstPersonCameraController::s_inst._cur_move_speed;
                 Vector3f move_dis{0, 0, 0};
                 if (Input::IsKeyPressed(AL_KEY_W))
                 {

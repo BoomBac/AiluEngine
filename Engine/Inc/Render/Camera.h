@@ -48,6 +48,7 @@ namespace Ailu
         {
             _pixel_width = w;
             _pixel_height = h;
+            _aspect = (f32)_pixel_width / (f32)_pixel_height;
         };
         Vector2D<u32> Rect() const {return Vector2D<u32>{_pixel_width, _pixel_height};}
         const Matrix4x4f& GetProjection() const { return _proj_matrix; }

@@ -770,7 +770,7 @@ namespace Ailu
 		auto tcmd = CommandBufferPool::Get("MipmapGen");
 		auto d3dcmd = static_cast<D3DCommandBuffer*>(tcmd.get())->GetCmdList();
 		_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-		//_p_test_cs->SetTexture("gInputA", TexturePool::Get("Textures/MyImage01.jpg").get());
+		u16 kernel = _p_mipmapgen_cs0->FindKernel("cs_main");
 		for (int i = 1; i < 7; i++)
 		{
 			_p_mipmapgen_cs0->SetInt("SrcMipLevel", 0);
@@ -786,7 +786,7 @@ namespace Ailu
 			_p_mipmapgen_cs0->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace)i, 4);
 			//static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->Bind(cmd, 32, 32, 1);
 			//保证线程数和第一级输出的mipmap像素数一一对应
-			tcmd->Dispatch(_p_mipmapgen_cs0.get(), mip1w / 8, mip1h / 8, 1);
+			tcmd->Dispatch(_p_mipmapgen_cs0.get(), kernel,mip1w / 8, mip1h / 8, 1);
 			g_pGfxContext->ExecuteAndWaitCommandBuffer(tcmd);
 			tcmd->Clear();
 			auto [mip5w, mip5h] = CurMipmapSize(5);
@@ -801,7 +801,7 @@ namespace Ailu
 			_p_mipmapgen_cs1->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace)i, 7);
 			if (_mipmap_count > 7)
 				_p_mipmapgen_cs1->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace)i, 8);
-			tcmd->Dispatch(_p_mipmapgen_cs1.get(), mip5w / 8, mip5h / 8, 1);
+			tcmd->Dispatch(_p_mipmapgen_cs1.get(),kernel,mip5w / 8, mip5h / 8, 1);
 			g_pGfxContext->ExecuteAndWaitCommandBuffer(tcmd);
 			tcmd->Clear();
 		}
