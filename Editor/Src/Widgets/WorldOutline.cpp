@@ -3,7 +3,9 @@
 #include "Widgets/InputLayer.h"
 //----engine--------
 #include "Ext/imgui/imgui.h"
+#include "Framework/Common/KeyCode.h"
 #include "Framework/Common/SceneMgr.h"
+#include "Framework/Events/KeyEvent.h"
 //----engine--------
 namespace Ailu
 {
@@ -158,6 +160,18 @@ namespace Ailu
             }
             target_pos += -Camera::sCurrent->Forward() * dis;
             FirstPersonCameraController::s_inst.SetTargetPosition(target_pos,true);
+        }
+        void WorldOutline::OnEvent(Event &e)
+        {
+            ImGuiWidget::OnEvent(e);
+            if (e.GetEventType() == EEventType::kKeyPressed)
+            {
+                auto &key_e = static_cast<KeyPressedEvent &>(e);
+                if (key_e.GetKeyCode() == AL_KEY_DELETE)
+                {
+                    g_pSceneMgr->DeleteSceneActor(dynamic_cast<SceneActor*>(_selected_actor));
+                }
+            }
         }
     }
 }

@@ -60,6 +60,7 @@ namespace Ailu
 		const String& Name() const { return _name; }
 		void ID(const u32& value) { _id = value; }
 		const u32& ID() const { return _id; }
+		const u64 HashCode() const {return _hash;};
 	protected:
 		/// <summary>
 		/// DeserializeImpl
@@ -70,6 +71,7 @@ namespace Ailu
 	protected:
 		String _name;
 		u32 _id;
+		u64 _hash;
 	private:
         //0~64 reserve for shader, shader id hash only hash 6bit
 		inline static u32 s_global_object_id = 65u;

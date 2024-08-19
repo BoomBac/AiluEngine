@@ -8,6 +8,7 @@
 #include "Object.h"
 #include "Component.h"
 #include "GlobalMarco.h"
+#include "Framework/Common/Log.h"
 
 
 namespace Ailu

@@ -9,6 +9,7 @@
 #include "Ext/imgui/backends/imgui_impl_win32.h"
 #include "Ext/imgui/imgui.h"
 #include "Framework/Common/Path.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 
 #ifdef DEAR_IMGUI
@@ -16,19 +17,110 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #endif// DEAR_IMGUI
 namespace Ailu
 {
-    static const wchar_t *kAppTitleIconPath = ToWChar(kEngineResRootPath + "Icons/app_title_icon.ico");
-    static const wchar_t *kAppIconPath = ToWChar(kEngineResRootPath + "Icons/app_icon.ico");
+    // static const wchar_t *kAppTitleIconPath = ToWChar(kEngineResRootPath + "Icons/app_title_icon.ico");
+    // static const wchar_t *kAppIconPath = ToWChar(kEngineResRootPath + "Icons/app_icon.ico");
 
     static void HideCursor()
     {
-        while (::ShowCursor(FALSE) >= 0)
-            ;// 隐藏鼠标指针，直到它不再可见
+        while (::ShowCursor(FALSE) >= 0);// 隐藏鼠标指针，直到它不再可见
     }
 
     static void ShowCursor()
     {
-        while (::ShowCursor(TRUE) < 0)
-            ;// 显示鼠标指针，直到它可见
+        while (::ShowCursor(TRUE) < 0);// 显示鼠标指针，直到它可见
+    }
+
+    DWORD cmd_id;
+    static void CreateConsoleProcess()
+    {
+        // 创建用于重定向的管道
+        HANDLE hStdOutputRead, hStdOutputWrite;
+        HANDLE hStdInputRead, hStdInputWrite;
+        SECURITY_ATTRIBUTES sa;
+        sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+        sa.lpSecurityDescriptor = nullptr;
+        sa.bInheritHandle = TRUE;
+
+        // 创建输出管道
+        CreatePipe(&hStdOutputRead, &hStdOutputWrite, &sa, 0);
+        SetHandleInformation(hStdOutputRead, HANDLE_FLAG_INHERIT, 0);
+
+        // 创建输入管道
+        CreatePipe(&hStdInputRead, &hStdInputWrite, &sa, 0);
+        SetHandleInformation(hStdInputWrite, HANDLE_FLAG_INHERIT, 0);
+
+        // 设置启动信息
+        STARTUPINFO si = {sizeof(STARTUPINFO)};
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdOutput = hStdOutputWrite;
+        si.hStdError = hStdOutputWrite;
+        si.hStdInput = hStdInputRead;
+
+        // 进程信息
+        PROCESS_INFORMATION pi;
+        wchar_t commandLine[] = L"cmd.exe";
+        // 创建控制台进程
+        if (CreateProcess(
+                    nullptr,           // No module name (use command line)
+                    commandLine,       // Command line
+                    nullptr,           // Process handle not inheritable
+                    nullptr,           // Thread handle not inheritable
+                    TRUE,              // Set handle inheritance to TRUE
+                    CREATE_NEW_CONSOLE,// Create a new console
+                    nullptr,           // Use parent's environment block
+                    nullptr,           // Use parent's starting directory
+                    &si,               // Pointer to STARTUPINFO structure
+                    &pi)               // Pointer to PROCESS_INFORMATION structure
+        )
+        {
+            // 关闭不必要的管道句柄
+            CloseHandle(hStdOutputWrite);
+            CloseHandle(hStdInputRead);
+
+            // // 重定向标准输入、输出和错误流
+            // HANDLE hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+            // HANDLE hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+            // HANDLE hStdError = GetStdHandle(STD_ERROR_HANDLE);
+
+            // SetStdHandle(STD_OUTPUT_HANDLE, hStdOutput);
+            // SetStdHandle(STD_INPUT_HANDLE, hStdInput);
+            // SetStdHandle(STD_ERROR_HANDLE, hStdError);
+            // 等待控制台进程创建完成
+            WaitForInputIdle(pi.hProcess, INFINITE);
+
+            // // 将 C++ 标准流与控制台的文件流关联
+            // std::ios::sync_with_stdio();
+            // std::wcout.clear();
+            // std::cout.clear();
+            // std::wcerr.clear();
+            // std::cerr.clear();
+            // std::wcin.clear();
+            // std::cin.clear();
+
+            // 关闭进程和线程句柄
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+            cmd_id = pi.dwProcessId;
+        }
+        else
+        {
+            std::cerr << "Failed to create console process" << std::endl;
+        }
+    }
+
+    // Function to redirect standard input/output to the console
+    static void RedirectIOToConsole()
+    {
+        // Open the console's standard input, output, and error streams
+        FILE *fp;
+        freopen_s(&fp, "CONOUT$", "w", stdout);
+        freopen_s(&fp, "CONOUT$", "w", stderr);
+        freopen_s(&fp, "CONIN$", "r", stdin);
+
+        // Set the console code page to UTF-8 so console known how to interpret string data
+        SetConsoleOutputCP(CP_UTF8);
+
+        std::cout << "Console attached and ready for output!" << std::endl;
     }
 
     WinWindow::WinWindow(const WindowProps &prop)
@@ -42,6 +134,30 @@ namespace Ailu
 
     void WinWindow::Init(const WindowProps &prop)
     {
+        //调用 alloc分配的console无法对字符进行着色，需要手动创建进程，但是
+        //需要等待控制台创建完成 attach才能成功，复杂的等待机制以后再写
+        // //https://stackoverflow.com/questions/5907917/how-to-use-win32-createprocess-function-to-wait-until-the-child-done-to-write-to
+        // CreateConsoleProcess();
+        // Sleep(1000);
+        // if (AttachConsole(cmd_id))
+        // {
+        //     RedirectIOToConsole();
+        //     std::cout << "Hello from attached console!" << std::endl;
+        // }
+        // Try to attach to the parent process console
+        if (AttachConsole(ATTACH_PARENT_PROCESS))
+        {
+            RedirectIOToConsole();
+            std::cout << "Hello from attached console!" << std::endl;
+        }
+        else
+        {
+            // If attaching failed, allocate a new console
+            AllocConsole();
+            RedirectIOToConsole();
+            std::cout << "Hello from new console!" << std::endl;
+        }
+
         _data.Width = prop.Width;
         _data.Height = prop.Height;
         _data.Title = prop.Title;
@@ -85,9 +201,8 @@ namespace Ailu
         SetWindowLongPtr(_hwnd, GWL_STYLE, style);
         ShowWindow(_hwnd, SW_SHOW);
         UpdateWindow(_hwnd);
-
-        HANDLE hTitleIcon = LoadImage(0, kAppTitleIconPath, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
-        HANDLE hIcon = LoadImage(0, kAppIconPath, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
+        HANDLE hTitleIcon = LoadImage(0, ResourceMgr::GetResSysPath(L"Icons/app_title_icon.ico").c_str(), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
+        HANDLE hIcon = LoadImage(0, ResourceMgr::GetResSysPath(L"Icons/app_icon.ico").c_str(), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         if (hTitleIcon && hIcon)
         {
             //Change both icons to the same icon handle.

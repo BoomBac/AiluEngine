@@ -71,6 +71,7 @@ namespace Ailu
             FirstPersonCameraController::s_inst._is_receive_input = true;
             FirstPersonCameraController::s_inst._camera_near = Camera::sCurrent->Near();
             FirstPersonCameraController::s_inst._camera_far = Camera::sCurrent->Far();
+            Camera::sCurrent->_is_scene_camera = true;
         }
         InputLayer::InputLayer(const String &name) : InputLayer()
         {
@@ -96,7 +97,6 @@ namespace Ailu
                         if (e.GetButton() == AL_KEY_RBUTTON)
                         {
                             FirstPersonCameraController::s_inst._is_receive_input = false;
-                            LOG_INFO("Close");
                             while (::ShowCursor(TRUE) < 0)
                                 ;
                             return false;
@@ -118,7 +118,6 @@ namespace Ailu
                         if (e.GetButton() == AL_KEY_RBUTTON)
                         {
                             FirstPersonCameraController::s_inst._is_receive_input = true;
-                            LOG_INFO("Open");
                             while (::ShowCursor(FALSE) >= 0)
                                 ;// 隐藏鼠标指针，直到它不再可见
                             return false;

@@ -8,6 +8,7 @@
 
 namespace Ailu
 {
+	class CubeMapGenPass;
     class AILU_API LightProbeComponent : public Component
 	{
 		template<class T>
@@ -19,11 +20,20 @@ namespace Ailu
 		void Tick(const float& delta_time) final;
 		void Serialize(std::basic_ostream<char, std::char_traits<char>>& os, String indent) final;
 		void OnGizmo() final;
+        void UpdateProbe();
+        Ref<Material> _debug_mat;
 	public:
+        f32 _size = 10.0f;
+		bool _update_every_tick = false;
+		int _src_type = 0;
+		f32 _mipmap = 0.0f;
 	private:
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) final;
 	private:
 		Vector<Camera> _shadow_cameras;
+        Scope<IConstantBuffer> _obj_cbuf;
+        Ref<RenderTexture> _cubemap;
+		Scope<CubeMapGenPass> _pass;
 	};
 	REFLECT_FILED_BEGIN(LightProbeComponent)
 

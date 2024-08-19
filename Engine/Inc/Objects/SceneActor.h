@@ -22,6 +22,8 @@ namespace Ailu
 		TransformComponent* GetTransformComponent() { return _p_transform; }
 		void Serialize(std::ostream& os, String indent) override;
         const AABB& BaseAABB() const {return _base_aabb;}
+		void IsActive(bool active) {_is_active = active;};
+		bool IsActive() const {return _is_active;};
 		//SceneActor& operator=(const SceneActor& other)
 		//{
 		//	return *this;
@@ -32,6 +34,7 @@ namespace Ailu
 		void* DeserializeImpl(Queue<std::tuple<String, String>>& formated_str) override;
 	private:
 		TransformComponent* _p_transform = nullptr;
+		bool _is_active = true;
 	};
 }
 

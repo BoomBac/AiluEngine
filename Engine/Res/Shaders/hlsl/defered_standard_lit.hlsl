@@ -10,7 +10,7 @@
 //pass end::
 //Properties
 //{
-//  _AlphaCulloff("AlphaCulloff",Range(0,1)) = 0
+//   _AlphaCulloff("AlphaCulloff",Range(0,1)) = 0
 //	_AlbedoTex("Albedo",Texture2D) = "white"
 //	_NormalTex("Normal",Texture2D) = "white"
 //	_EmissionTex("Emission",Texture2D) = "white"
@@ -31,6 +31,7 @@ struct GBuffer
 	float2 packed_normal : SV_Target0;
 	float4 color_roughness : SV_Target1;
 	float4 specular_metallic : SV_Target2;
+	float2 motion_vector : SV_Target3;
 };
 
 StandardPSInput GBufferVSMain(StandardVSInput v)
@@ -47,6 +48,8 @@ StandardPSInput GBufferVSMain(StandardVSInput v)
 	result.normal = N;
 	result.world_pos = TransformToWorldSpace(v.position);
 	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
+	result.clip_pos_cur_frame = mul(_MatrixWorld,float4(v.position,1.0f));
+	result.clip_pos_pre_frame = mul(_MatrixWorldPreTick,float4(v.position,1.0f));
 	return result;
 }
 
@@ -54,12 +57,15 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
 	InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
+	input.clip_pos_cur_frame.xyz /= input.clip_pos_cur_frame.w;
+	input.clip_pos_pre_frame.xyz /= input.clip_pos_pre_frame.w;
 #ifdef ALPHA_TEST
 	clip(surface_data.albedo.a - _AlphaCulloff);
 #endif
 	GBuffer output;
 	output.packed_normal = PackNormal(surface_data.wnormal);
-	output.color_roughness = float4(surface_data.albedo.rgb,surface_data.roughness);
-	output.specular_metallic = float4(surface_data.specular,surface_data.metallic);
+	output.color_roughness = float4(surface_data.albedo.rgb, surface_data.roughness);
+	output.specular_metallic = float4(surface_data.specular, surface_data.metallic);
+	output.motion_vector = float2(input.clip_pos_cur_frame.xy - input.clip_pos_pre_frame.xy);
 	return output;
 }

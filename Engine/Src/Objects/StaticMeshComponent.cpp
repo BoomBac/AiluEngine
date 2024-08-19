@@ -2,7 +2,7 @@
 #include "Objects/StaticMeshComponent.h"
 #include "Objects/SceneActor.h"
 
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsContext.h"
 #include "Framework/Math/Random.h"

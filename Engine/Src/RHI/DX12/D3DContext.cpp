@@ -146,7 +146,7 @@ namespace Ailu
 			origin_res_num -= _global_tracked_resource.size();
 			g_pLogMgr->LogWarningFormat("{} unused upload buffer cleanup.", origin_res_num);
 		}
-		g_pRenderTexturePool->TryRelease();
+		g_pRenderTexturePool->TryCleanUp();
 		g_pGPUDescriptorAllocator->ReleaseSpace();
 		g_pLogMgr->LogFormat("End: D3DContext::TryReleaseUnusedResources");
 	}
@@ -384,13 +384,9 @@ namespace Ailu
 			CPUProfileBlock p("WaitForGPU");
 			WaitForGpu();
 		}
-		if (_is_cur_frame_capture)
+		if (_is_cur_frame_capturing)
 		{
-#ifdef _PIX_DEBUG
-			PIXEndCapture(true);
-			_is_cur_frame_capture = false;
-			ShellExecute(NULL, L"open", _cur_capture_name.data(), NULL, NULL, SW_SHOWNORMAL);
-#endif // _PIX_DEBUG
+            EndCapture();
 		}
 
 		++_frame_count;
@@ -411,11 +407,17 @@ namespace Ailu
 			}
 			if (RenderTexture::TotalGPUMemerySize() > kMaxRenderTextureMemorySize)
 			{
-				g_pRenderTexturePool->TryRelease();
+				g_pRenderTexturePool->TryCleanUp();
 				g_pGPUDescriptorAllocator->ReleaseSpace();
 			}
 		}
 		_p_gpu_timer->EndFrame();
+        if( _is_next_frame_capture)
+        {
+            BeginCapture();
+            _is_next_frame_capture = false;
+            _is_cur_frame_capturing = true;
+        }
 	}
 
 	const u64& D3DContext::GetFenceValue(const u32& cmd_index) const
@@ -454,18 +456,7 @@ namespace Ailu
 
 	void D3DContext::TakeCapture()
 	{
-#ifdef _PIX_DEBUG
-		LOG_WARNING("Begin take capture...")
-			static PIXCaptureParameters parms{};
-		static u32 s_capture_count = 0u;
-		_cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWChar(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
-		parms.GpuCaptureParameters.FileName = _cur_capture_name.data();
-		PIXBeginCapture(PIX_CAPTURE_GPU, &parms);
-		_is_cur_frame_capture = true;
-#else
-		LOG_WARNING("No available gpu debug enabled!");
-#endif // _PIX_DEBUG
-
+        _is_next_frame_capture = true;
 	}
 
 	void D3DContext::TrackResource(FrameResource* resource)
@@ -526,4 +517,27 @@ namespace Ailu
 		}
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	}
+    void D3DContext::BeginCapture()
+    {
+#ifdef _PIX_DEBUG
+        LOG_WARNING("Begin take capture...");
+        static PIXCaptureParameters parms{};
+        static u32 s_capture_count = 0u;
+        _cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWChar(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
+        parms.GpuCaptureParameters.FileName = _cur_capture_name.data();
+        PIXBeginCapture(PIX_CAPTURE_GPU, &parms);
+        _is_next_frame_capture = true;
+#else
+        LOG_WARNING("No available gpu debug enabled!");
+#endif // _PIX_DEBUG
+    }
+    void D3DContext::EndCapture()
+    {
+#ifdef _PIX_DEBUG
+        PIXEndCapture(true);
+        _is_cur_frame_capturing = false;
+        PIXOpenCaptureInUI(_cur_capture_name.data());
+        //ShellExecute(NULL, L"open", _cur_capture_name.data(), NULL, NULL, SW_SHOWNORMAL);
+#endif // _PIX_DEBUG
+    }
 }

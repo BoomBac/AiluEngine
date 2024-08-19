@@ -46,13 +46,6 @@ Texture2D _BloomTex : register(t1);
 #include "../fullscreen_quad.hlsli"
 
 PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
-PSInput VSMain(VSInput v)
-{
-	PSInput result;
-	result.position = float4(v.position.xy, 0.0, 1.0);
-	result.uv = v.uv;
-	return result;
-}
 
 float4 PSMain(PSInput input) : SV_TARGET
 {

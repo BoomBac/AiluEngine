@@ -59,5 +59,6 @@ out float3 wnormal,out float4 albedo,out float roughness,out float metallic,out 
 		specular = _SpecularTex.Sample(g_LinearWrapSampler, input.uv0).rgb;
 	else 
 		specular = _SpecularValue;
+	albedo.rgb += emssive.rgb * 2.0f;
 }
 #endif

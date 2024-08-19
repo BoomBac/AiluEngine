@@ -6,10 +6,15 @@
 SamplerState g_LinearWrapSampler : register(s0);
 SamplerState g_LinearClampSampler : register(s1);
 SamplerState g_LinearBorderSampler : register(s2);
-SamplerComparisonState g_ShadowSampler : register(s3);
-SamplerState g_AnisotropicClampSampler : register(s4);
+SamplerState g_PointWrapSampler : register(s3);
+SamplerState g_PointClampSampler : register(s4);
+SamplerState g_PointBorderSampler : register(s5);
+SamplerComparisonState g_ShadowSampler : register(s6);
+SamplerState g_AnisotropicClampSampler : register(s7);
+
 
 #define TEXTURE2D(name,slot) Texture2D name : register(t##slot);
+#define TEXTURECUBE(name,slot) TextureCube name : register(t##slot);
 
 //Ref:https://github.com/Unity-Technologies/Graphics/blob/master/Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl
 #define SAMPLE_TEXTURE2D(textureName, samplerName, coord2)                               textureName.Sample(samplerName, coord2)
@@ -148,6 +153,7 @@ float3 UnpackNormal(float2 f)
 //reconstruct world pos
 float3 Unproject(float2 screen_pos,float depth)
 {
+	screen_pos.y = 1.0 - screen_pos.y;
 	float4 clipPos = float4(2.0f * screen_pos - 1.0f, depth, 1.0);
 	float4 world_pos = mul(_MatrixIVP, clipPos);
 	world_pos /= world_pos.w;

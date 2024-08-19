@@ -3,7 +3,7 @@
 //name: cubemap_gen
 //vert: VSMain
 //pixel: PSMain
-//Cull: Front
+//Cull: Off
 //Queue: Opaque
 //pass end::
 //Properties
@@ -43,7 +43,7 @@ float2 SampleSphericalMap(float3 v)
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	float4x4 mvp = mul(_PassMatrixVP, _MatrixWorld);
+	float4x4 mvp = mul(_MatrixVP, _MatrixWorld);
 	result.position = mul(mvp, float4(v.position, 1.0f));
 	result.wnormal = normalize(v.position);
 	return result;

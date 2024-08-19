@@ -33,6 +33,7 @@
 4428ffdf-97de-4732-b74b-240a0bce3872,NewScene/Palace/MAT_ceil.alasset,kMaterial
 4628176c-30e5-4a79-84a6-8d5700326cc7,Shaders/depth_only.alasset,kShader
 46601513-96ea-4cc4-86db-0400c8824ec1,Materials/MAT_Red.alasset,kMaterial
+4c66b646-9e1a-489c-8344-133b5036bf17,NewScene/Default_emissive.alasset,kTexture2D
 4eac1bdc-8122-4414-809e-80d7fd4b8fbf,NewScene/Palace/textures/sponza_column_b_baseColor.alasset,kTexture2D
 4f6e2fa4-c9af-4800-9ff9-70874abfbd50,Materials/StandardPBR.alasset,kMaterial
 5259f495-57c8-4891-83eb-85366126db1d,NewScene/Palace/textures/background.alasset,kTexture2D

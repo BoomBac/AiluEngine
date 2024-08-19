@@ -12,6 +12,15 @@
 #include <string>
 
 
+//https://github.com/blender/blender/blob/756538b4a117cb51a15e848fa6170143b6aafcd8/source/blender/blenlib/intern/math_rotation.c#L272
+/* hints for branch prediction, only use in code that runs a _lot_ */
+#if defined(__GNUC__) && !defined(__KERNEL_GPU__)
+#define LIKELY(x) __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define LIKELY(x) (x)
+#define UNLIKELY(x) (x)
+#endif
 namespace Ailu
 {
     namespace MathInternal
@@ -47,6 +56,19 @@ namespace Ailu
 
     namespace Math
     {
+        static u64 AlignTo(u64 sizeInBytes, u64 alignment)
+        {
+            if (alignment == 0)
+            {
+                return sizeInBytes;
+            }
+            u64 remainder = sizeInBytes % alignment;
+            if (remainder == 0)
+            {
+                return sizeInBytes;
+            }
+            return sizeInBytes + alignment - remainder;
+        }
         template<typename T>
         T Normalize(const T &var)
         {
@@ -341,7 +363,7 @@ namespace Ailu
                 }
                 catch (const std::exception &e)
                 {
-                    LOG_ERROR(e.what());
+                    //LOG_ERROR(e.what());
                 }
                 return *this;
             }
@@ -848,7 +870,7 @@ namespace Ailu
             return res;
         }
         template<typename T, int rows, int cols>
-        Matrix<T, rows, cols> Normalize(const Matrix<T, rows, cols>& mat)
+        Matrix<T, rows, cols> Normalize(const Matrix<T, rows, cols> &mat)
         {
             Matrix<T, rows, cols> ret;
             Vector3D<T> x = {mat[0][0], mat[1][0], mat[2][0]};
@@ -1167,24 +1189,105 @@ namespace Ailu
             return;
         }
 
-        [[nodiscard]] static Matrix4x4f MatrixInverse(const Matrix4x4f& mat)
+        //https://github.com/blender/blender/blob/756538b4a117cb51a15e848fa6170143b6aafcd8/source/blender/blenlib/intern/math_matrix.c#L1214
+        static bool invert_m4_m4(float inverse[4][4], const float mat[4][4])
         {
-            Matrix4x4f adj{};
-            for (int i = 0; i < 4; ++i)
+#ifndef MATH_STANDALONE
+            //eigen opti editon
+            //if (EIG_invert_m4_m4(inverse, mat))
+            //{
+            //    return true;
+            //}
+#endif
+
+            int i, j, k;
+            double temp;
+            float tempmat[4][4];
+            float max;
+            int maxj;
+
+            AL_ASSERT(inverse == mat);
+
+            /* Set inverse to identity */
+            for (i = 0; i < 4; i++)
             {
-                for (int j = 0; j < 4; ++j)
+                for (j = 0; j < 4; j++)
                 {
-                    auto sub = SubMatrix(mat, i, j);
-                    adj[i][j] = MatrixDeterminat(sub) * powf(-1.f, static_cast<float>((i + j)));
+                    inverse[i][j] = 0;
                 }
             }
-            float f = MatrixDeterminat(mat);
-            if (f == 0)
-                return mat;
-            return MatrixTranspose(adj);
+            for (i = 0; i < 4; i++)
+            {
+                inverse[i][i] = 1;
+            }
+
+            /* Copy original matrix so we don't mess it up */
+            for (i = 0; i < 4; i++)
+            {
+                for (j = 0; j < 4; j++)
+                {
+                    tempmat[i][j] = mat[i][j];
+                }
+            }
+
+            for (i = 0; i < 4; i++)
+            {
+                /* Look for row with max pivot */
+                max = fabsf(tempmat[i][i]);
+                maxj = i;
+                for (j = i + 1; j < 4; j++)
+                {
+                    if (fabsf(tempmat[j][i]) > max)
+                    {
+                        max = fabsf(tempmat[j][i]);
+                        maxj = j;
+                    }
+                }
+                /* Swap rows if necessary */
+                if (maxj != i)
+                {
+                    for (k = 0; k < 4; k++)
+                    {
+                        std::swap(tempmat[i][k], tempmat[maxj][k]);
+                        std::swap(inverse[i][k], inverse[maxj][k]);
+                    }
+                }
+
+                if (UNLIKELY(tempmat[i][i] == 0.0f))
+                {
+                    return false; /* No non-zero pivot */
+                }
+                temp = (double) tempmat[i][i];
+                for (k = 0; k < 4; k++)
+                {
+                    tempmat[i][k] = (float) ((double) tempmat[i][k] / temp);
+                    inverse[i][k] = (float) ((double) inverse[i][k] / temp);
+                }
+                for (j = 0; j < 4; j++)
+                {
+                    if (j != i)
+                    {
+                        temp = tempmat[j][i];
+                        for (k = 0; k < 4; k++)
+                        {
+                            tempmat[j][k] -= (float) ((double) tempmat[i][k] * temp);
+                            inverse[j][k] -= (float) ((double) inverse[i][k] * temp);
+                        }
+                    }
+                }
+            }
+            return true;
         }
+
+        [[nodiscard]] static Matrix4x4f MatrixInverse(const Matrix4x4f &mat)
+        {
+            Matrix4x4f ret;
+            invert_m4_m4(ret.data,mat.data);
+            return ret;
+        }
+
         //The matrix is first inverted and then transposed to obtain the matrix with the correct transformation normals
-        static Matrix4x4f MatrixInverseTanspose(const Matrix4x4f& mat)
+        static Matrix4x4f MatrixInverseTanspose(const Matrix4x4f &mat)
         {
             auto inver = MatrixInverse(mat);
             return MatrixTranspose(inver);
@@ -1429,10 +1532,10 @@ namespace Ailu
             };
 
         public:
-            Quaternion() : _quat(0.0f, 0.0f, 0.0f, 1.0f){};
-            Quaternion(const Vector4f &quat) : _quat(quat){};
-            Quaternion(float x, float y, float z, float w) : _quat(Vector4f(x, y, z, w)){};
-            Quaternion(Vector3f v, float s) : _quat(Vector4f(v, w)){};
+            Quaternion() : _quat(0.0f, 0.0f, 0.0f, 1.0f) {};
+            Quaternion(const Vector4f &quat) : _quat(quat) {};
+            Quaternion(float x, float y, float z, float w) : _quat(Vector4f(x, y, z, w)) {};
+            Quaternion(Vector3f v, float s) : _quat(Vector4f(v, w)) {};
             friend std::ostream &operator<<(std::ostream &os, const Quaternion &q)
             {
                 os << q.x << "," << q.y << "," << q.z << "," << q.w;
@@ -1747,13 +1850,6 @@ namespace Ailu
             }
 //https://github.com/blender/blender/blob/756538b4a117cb51a15e848fa6170143b6aafcd8/source/blender/blenlib/intern/math_rotation.c#L272
 /* hints for branch prediction, only use in code that runs a _lot_ */
-#if defined(__GNUC__) && !defined(__KERNEL_GPU__)
-#define LIKELY(x) __builtin_expect(!!(x), 1)
-#define UNLIKELY(x) __builtin_expect(!!(x), 0)
-#else
-#define LIKELY(x) (x)
-#define UNLIKELY(x) (x)
-#endif
             static Quaternion FromMat4f(const Matrix4x4f &mat)
             {
                 Quaternion q;
@@ -1849,9 +1945,9 @@ namespace Ailu
             t = mat.GetRow(3).xyz;
             s = mat.LossyScale();
             auto rot_mat = mat;
-            rot_mat.SetRow(0,Normalize(rot_mat.GetRow(0)));
-            rot_mat.SetRow(1,Normalize(rot_mat.GetRow(1)));
-            rot_mat.SetRow(2,Normalize(rot_mat.GetRow(2)));
+            rot_mat.SetRow(0, Normalize(rot_mat.GetRow(0)));
+            rot_mat.SetRow(1, Normalize(rot_mat.GetRow(1)));
+            rot_mat.SetRow(2, Normalize(rot_mat.GetRow(2)));
             r = Quaternion::FromMat4f(rot_mat);
         }
 
@@ -2147,7 +2243,7 @@ namespace Ailu
                 return static_cast<u32>(hashes.size() - 1);
             }
         }// namespace ALHash
-    }    // namespace Math
+    }// namespace Math
 #pragma warning(pop)
 
 }// namespace Ailu

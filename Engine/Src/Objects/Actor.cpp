@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "Objects/Actor.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 
 namespace Ailu
 {

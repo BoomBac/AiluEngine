@@ -16,8 +16,8 @@ namespace Ailu
 		void Destory();
 		void Setup();
 		void Render();
-		RenderTexture* CameraTarget(u16 index = 0) { return index < _cameras.size() ? _cameras[index]->TargetTexture() : nullptr; }
 		Renderer* GetRenderer(u16 index = 0) { return index < _renderers.size()? _renderers[index].get() : nullptr; };
+		RenderTexture* GetTarget(u16 index = 0);
 	private:
 		void RenderSingleCamera(Camera& cam, Renderer& renderer);
 		void FrameCleanUp();
@@ -25,6 +25,7 @@ namespace Ailu
 		virtual void BeforeReslove() {};
 		Vector<Camera*> _cameras;
 		Vector<Scope<Renderer>> _renderers;
+		Vector<RenderTexture*> _targets;
 	};
 }
 

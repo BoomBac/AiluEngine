@@ -2,6 +2,12 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 //#include "pch.h"
+#if !defined(_M_X64) && !defined(_M_IX86)
+#error "No Target Architecture"
+#endif
+
+//#include <stringapiset.h>
+#include <Windows.h>
 #include "GlobalMarco.h"
 #include <algorithm>
 #include <numeric>
@@ -255,7 +261,7 @@ namespace Ailu
         List<String> lines{};
         if (!file.is_open())
         {
-            LOG_ERROR("Load asset with path: {} failed!", sys_path);
+            //LOG_ERROR("Load asset with path: {} failed!", sys_path);
             return lines;
         }
         String line;

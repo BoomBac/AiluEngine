@@ -73,9 +73,9 @@ namespace Ailu
         colors[ImGuiCol_Button]                 = ImVec4(0.66f, 0.33f, 0.69f, 0.43f);
         colors[ImGuiCol_ButtonHovered]          = ImVec4(0.71f, 0.34f, 0.74f, 0.72f);
         colors[ImGuiCol_ButtonActive]           = ImVec4(0.71f, 0.34f, 0.74f, 1.00f);
-        colors[ImGuiCol_Header]                 = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
-        colors[ImGuiCol_HeaderHovered]          = ImVec4(0.47f, 0.71f, 0.58f, 1.00f);
-        colors[ImGuiCol_HeaderActive]           = ImVec4(0.47f, 0.71f, 0.58f, 1.00f);
+        colors[ImGuiCol_Header]                 = ImVec4(0.33f, 0.48f, 0.40f, 1.00f);
+        colors[ImGuiCol_HeaderHovered]          = ImVec4(0.71f, 0.34f, 0.74f, 0.72f);
+        colors[ImGuiCol_HeaderActive]           = ImVec4(0.33f, 0.48f, 0.40f, 1.00f);
         colors[ImGuiCol_SeparatorHovered]       = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
         colors[ImGuiCol_SeparatorActive]        = ImVec4(0.47f, 0.71f, 0.58f, 1.00f);
         colors[ImGuiCol_ResizeGrip]             = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);

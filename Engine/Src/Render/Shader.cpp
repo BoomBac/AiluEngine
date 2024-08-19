@@ -113,7 +113,7 @@ namespace Ailu
             if (tex_it != pass_bind_res_info.end())
             {
                 if (tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray || tex_it->second._res_type == EBindResDescType::kTexture2D)
-                    GraphicsPipelineStateMgr::SubmitBindResource(it.second, tex_it->second._bind_slot);
+                    GraphicsPipelineStateMgr::SubmitBindResource(it.second, EBindResDescType::kTexture2D,tex_it->second._bind_slot,PipelineResourceInfo::kPriporityGlobal);
             }
         }
         for (auto &it: s_global_matrix_bind_info)
@@ -127,6 +127,15 @@ namespace Ailu
             //	u32 mat_num = std::get<1>(it.second);
             //	memcpy(s_p_per_frame_cbuffer->GetData() + offset, mat_ptr, sizeof(Matrix4x4f) * mat_num);
             //}
+        }
+        for (auto& it : s_global_buffer_bind_info)
+        {
+            auto& pass_bind_res_info = _passes[pass_index]._variants[variant_hash]._bind_res_infos;
+            auto buf_it = pass_bind_res_info.find(it.first);
+            if (buf_it != pass_bind_res_info.end())
+            {
+                GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void*>(it.second),EBindResDescType::kConstBuffer,buf_it->second._bind_slot,PipelineResourceInfo::kPriporityGlobal);
+            }
         }
     }
 
@@ -201,10 +210,14 @@ namespace Ailu
             s_global_matrix_bind_info[name] = std::make_tuple(matrix, num);
     }
 
-    void Shader::ConfigurePerFrameConstBuffer(IConstantBuffer *cbuf)
+    void Shader::SetGlobalBuffer(const String &name, IConstantBuffer *buffer)
     {
-        s_p_per_frame_cbuffer = cbuf;
+        if (!s_global_buffer_bind_info.contains(name))
+            s_global_buffer_bind_info.insert(std::make_pair(name, buffer));
+        else
+            s_global_buffer_bind_info[name] = buffer;
     }
+
 
     void *Shader::GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash)
     {

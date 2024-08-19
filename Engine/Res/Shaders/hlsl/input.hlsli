@@ -17,6 +17,8 @@ struct StandardPSInput
 	float3 normal : NORMAL;
 	float2 uv0 : TEXCOORD0;
 	float3x3 btn : BTN;
+	float4 clip_pos_cur_frame: TEXCOORD1;
+	float4 clip_pos_pre_frame: TEXCOORD2;
 };
 
 

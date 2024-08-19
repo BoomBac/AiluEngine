@@ -1,42 +1,66 @@
-#include "pch.h"
 #include "Render/RenderPipeline.h"
-#include "Render/CommandBuffer.h"
 #include "Framework/Common/Profiler.h"
+#include "Render/CommandBuffer.h"
+#include "pch.h"
+
+#ifdef _PIX_DEBUG
+#include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
+#endif// _PIX_DEBUG
 
 namespace Ailu
 {
-	RenderPipeline::RenderPipeline()
-	{
-		Init();
-	}
-	void RenderPipeline::Init()
-	{
-		_renderers.push_back(MakeScope<Renderer>());
-		_cameras.emplace_back(Camera::sCurrent);
-	}
-	void RenderPipeline::Destory()
-	{
-	}
-	void RenderPipeline::Setup()
-	{
-
-	}
-	void RenderPipeline::Render()
-	{
-		Setup();
-		for (auto cam : _cameras)
-		{
-			RenderSingleCamera(*cam, *_renderers[0].get());
-		}
-		FrameCleanUp();
-	}
-	void RenderPipeline::RenderSingleCamera(Camera& cam, Renderer& renderer)
-	{
-		renderer.Render(cam,*g_pSceneMgr->_p_current);
-		cam.SetRenderer(&renderer);
-	}
-	void RenderPipeline::FrameCleanUp()
-	{
-		RenderTexture::ResetRenderTarget();
-	}
-}
+    RenderPipeline::RenderPipeline()
+    {
+        Init();
+    }
+    void RenderPipeline::Init()
+    {
+        _renderers.push_back(MakeScope<Renderer>());
+        _cameras.emplace_back(Camera::sCurrent);
+    }
+    void RenderPipeline::Destory()
+    {
+    }
+    void RenderPipeline::Setup()
+    {
+        _targets.clear();
+        _cameras.clear();
+        _cameras.emplace_back(Camera::sCurrent);
+        for (auto &cam: g_pSceneMgr->_p_current->GetAllCameras())
+        {
+            _cameras.emplace_back(&cam->_camera);
+        }
+    }
+    void RenderPipeline::Render()
+    {
+        Setup();
+        for (auto cam: _cameras)
+        {
+#ifdef _PIX_DEBUG
+            PIXBeginEvent(cam->HashCode(),L"DeferedRenderer");
+            RenderSingleCamera(*cam, *_renderers[0].get());
+            PIXEndEvent();
+#else
+            RenderSingleCamera(*cam, *_renderers[0].get());
+#endif
+            _targets.push_back(_renderers[0]->TargetTexture());
+        }
+        FrameCleanUp();
+    }
+    RenderTexture *RenderPipeline::GetTarget(u16 index)
+    {
+        if (index < _targets.size())
+            return _targets[index];
+        return nullptr;
+    }
+    void RenderPipeline::RenderSingleCamera(Camera &cam, Renderer &renderer)
+    {
+        renderer.Render(cam, *g_pSceneMgr->_p_current);
+        cam.SetRenderer(&renderer);
+    }
+    void RenderPipeline::FrameCleanUp()
+    {
+        RenderTexture::ResetRenderTarget();
+        g_pRenderTexturePool->RelesaeUnusedRT();
+    }
+}// namespace Ailu

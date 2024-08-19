@@ -3,7 +3,7 @@
 //
 
 #include "Ext/imgui/imgui.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 #include "Render/Texture.h"
 
 #include "Inc/Widgets/PlaceActors.h"
@@ -15,6 +15,7 @@ namespace Ailu
 
         PlaceActors::PlaceActors() : ImGuiWidget("PlaceActors")
         {
+            _allow_close = false;
         }
         PlaceActors::~PlaceActors() = default;
         void PlaceActors::Open(const i32 &handle)
@@ -51,7 +52,7 @@ namespace Ailu
                     _group_selected_index = i;
             }
             ImGui::EndChild();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(0.f,0.f));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
             ImGui::SameLine();
             ImVec2 topLeft = ImGui::GetCursorScreenPos();
             ImVec2 bottomRight = ImVec2(topLeft.x + ImGui::GetContentRegionAvail().x, topLeft.y + right_size.y);
@@ -60,29 +61,44 @@ namespace Ailu
             header_color.y *= 255.0f;
             header_color.z *= 255.0f;
             header_color.w *= 255.0f;
-            ImU32 color = IM_COL32(header_color.x,header_color.y,header_color.z,header_color.w); // Solid red color
+            ImU32 color = IM_COL32(header_color.x, header_color.y, header_color.z, header_color.w);// Solid red color
 
-            ImGui::GetWindowDrawList()->AddRectFilled(topLeft,bottomRight,color);
+            ImGui::GetWindowDrawList()->AddRectFilled(topLeft, bottomRight, color);
 
             ImGui::BeginChild("##GroupItem", right_size);
             const ImVec2 image_size = {32.0f, 32.0f};
 
             if (ImGui::BeginTable("##GroupItemTabel", 2))
             {
-
                 ImGui::TableSetupColumn("Icon");
                 ImGui::TableSetupColumn("Text");
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0);
-                ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_normal->GetNativeTextureHandle()), image_size);
-                ImGui::TableSetColumnIndex(1);
-                ImGui::Text("Cube");
-                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
                 {
-                    String cube = "Cube";
-                    ImGui::SetDragDropPayload(kDragPlacementObj.c_str(), cube.c_str(), cube.size() + 1);
-                    ImGui::Text("Place cube...");
-                    ImGui::EndDragDropSource();
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_normal->GetNativeTextureHandle()), image_size);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("Cube");
+                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                    {
+                        String cube = "Cube";
+                        ImGui::SetDragDropPayload(kDragPlacementObj.c_str(), cube.c_str(), cube.size() + 1);
+                        ImGui::Text("Place cube...");
+                        ImGui::EndDragDropSource();
+                    }
+                }
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_normal->GetNativeTextureHandle()), image_size);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("LightProbe");
+                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                    {
+                        String cube = "LightProbe";
+                        ImGui::SetDragDropPayload(kDragPlacementObj.c_str(), cube.c_str(), cube.size() + 1);
+                        ImGui::Text("Place LightProbe...");
+                        ImGui::EndDragDropSource();
+                    }
                 }
                 ImGui::EndTable();
             }

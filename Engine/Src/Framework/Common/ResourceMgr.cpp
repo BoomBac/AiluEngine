@@ -1,7 +1,6 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
-#include "Framework/Common/LogMgr.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Parser/AssetParser.h"
@@ -35,13 +34,37 @@ namespace Ailu
         }
     }
 
+    String ResourceMgr::GetResSysPath(const String &sub_path)
+    {
+        String path = sub_path;
+        if (PathUtils::IsSystemPath(path))
+            return sub_path;
+        if (sub_path.starts_with("/"))
+            path = path.substr(1);
+        else if (sub_path.starts_with("\\"))
+            path = path.substr(2);
+        return ToChar(s_engine_res_root_pathw) + path;
+    }
+    WString ResourceMgr::GetResSysPath(const WString &sub_path)
+    {
+        WString path = sub_path;
+        if (PathUtils::IsSystemPath(path))
+            return sub_path;
+        if (sub_path.starts_with(L"/"))
+            path = path.substr(1);
+        else if (sub_path.starts_with(L"\\"))
+            path = path.substr(2);
+        return s_engine_res_root_pathw + path;
+    }
     int ResourceMgr::Initialize()
     {
+        AL_ASSERT(s_engine_res_root_pathw.empty());
+        FileManager::SetCurPath(s_engine_res_root_pathw);
         for (int i = 0; i < EAssetType::COUNT; i++)
         {
             _lut_global_resources_by_type[EAssetType::FromString(EAssetType::_Strings[i])] = Vector<ResourcePoolContainer::iterator>();
         }
-        _project_root_path = kEngineResRootPathW.substr(0, kEngineResRootPathW.find_last_of(L"/"));
+        _project_root_path = s_engine_res_root_pathw.substr(0, s_engine_res_root_pathw.find_last_of(L"/"));
         LoadAssetDB();
         {
             Shader::s_p_defered_standart_lit = Load<Shader>(L"Shaders/defered_standard_lit.alasset");
@@ -57,9 +80,10 @@ namespace Ailu
             Load<Shader>(L"Shaders/forwardlit.alasset");
             RegisterResource(L"Shaders/hlsl/debug.hlsl", LoadExternalShader(L"Shaders/hlsl/debug.hlsl"));
             RegisterResource(L"Shaders/hlsl/billboard.hlsl", LoadExternalShader(L"Shaders/hlsl/billboard.hlsl"));
-            RegisterResource(L"Shaders/hlsl/billboard.hlsl", LoadExternalShader(L"Shaders/hlsl/billboard.hlsl"));
             RegisterResource(L"Shaders/hlsl/ssao.hlsl", LoadExternalShader(L"Shaders/hlsl/ssao.hlsl"));
             RegisterResource(L"Shaders/hlsl/plane_grid.hlsl", LoadExternalShader(L"Shaders/hlsl/plane_grid.hlsl"));
+            RegisterResource(L"Shaders/hlsl/cubemap_debug.hlsl", LoadExternalShader(L"Shaders/hlsl/cubemap_debug.hlsl"));
+            RegisterResource(L"Shaders/hlsl/taa.hlsl", LoadExternalShader(L"Shaders/hlsl/taa.hlsl"));
             //RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
             GraphicsPipelineStateMgr::BuildPSOCache();
             Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
@@ -101,6 +125,8 @@ namespace Ailu
             default_normal->Apply();
             RegisterResource(L"Runtime/default_normal", default_normal);
             DESTORY_PTRARR(default_data);
+            //            auto default_cubemap = RenderTexture::Create(4,"DefaultCubemap",ERenderTargetFormat::kDefault, false, false, false);
+            //            RegisterResource(L"Runtime/default_cubemap",default_cubemap);
             Texture::s_p_default_white = default_white.get();
             Texture::s_p_default_black = default_black.get();
             Texture::s_p_default_gray = default_gray.get();
@@ -188,7 +214,7 @@ namespace Ailu
         while (!_pending_delete_assets.empty())
         {
             Asset *asset = _pending_delete_assets.front();
-            auto asset_sys_path = PathUtils::GetResSysPath(asset->_asset_path);
+            auto asset_sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
             if (s_file_last_load_time.contains(asset_sys_path))
             {
                 s_file_last_load_time.erase(asset_sys_path);
@@ -244,7 +270,7 @@ namespace Ailu
         }
         AL_ASSERT(asset->_asset_path.empty());
         //写入公共头
-        auto sys_path = PathUtils::GetResSysPath(asset->_asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
         std::wofstream out_asset_file(sys_path, std::ios::out | std::ios::trunc);
         AL_ASSERT(!out_asset_file.is_open());
         out_asset_file << "guid: " << ToWChar(asset->GetGuid().ToString()) << endl;
@@ -305,9 +331,15 @@ namespace Ailu
         return nullptr;
     }
 
+
+    void ResourceMgr::ConfigRootPath(const WString &prex)
+    {
+        s_engine_res_root_pathw = prex + L"Engine/Res/";
+        kAssetDatabasePath = ToChar(s_engine_res_root_pathw) + "assetdb.alasset";
+    }
     Ref<Shader> ResourceMgr::LoadExternalShader(const WString &asset_path, const ImportSetting *setting)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         auto s_setting = dynamic_cast<const ShaderImportSetting *>(setting);
         if (setting)
         {
@@ -318,7 +350,7 @@ namespace Ailu
 
     Ref<ComputeShader> ResourceMgr::LoadExternalComputeShader(const WString &asset_path, const ImportSetting *setting)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         auto s_setting = dynamic_cast<const ShaderImportSetting *>(setting);
         if (setting)
         {
@@ -329,7 +361,7 @@ namespace Ailu
 
     void ResourceMgr::SaveShader(const WString &asset_path, const Asset *asset)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         if (FileManager::Exist(sys_path))
         {
             auto shader = asset->As<Shader>();
@@ -349,7 +381,7 @@ namespace Ailu
 
     void ResourceMgr::SaveComputeShader(const WString &asset_path, const Asset *asset)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         if (FileManager::Exist(sys_path))
         {
             auto cs = asset->As<ComputeShader>();
@@ -369,7 +401,7 @@ namespace Ailu
 
     Scope<Asset> ResourceMgr::LoadShader(const WString &asset_path)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
         Ref<Shader> shader;
         if (FileManager::ReadFile(sys_path, data))
@@ -394,7 +426,7 @@ namespace Ailu
     void ResourceMgr::SaveMaterial(const WString &asset_path, Material *mat)
     {
         using std::endl;
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         std::multimap<std::string, SerializableProperty *> props{};
         //为了写入通用资产头信息，暂时使用追加方式打开
         std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
@@ -409,22 +441,26 @@ namespace Ailu
         auto vector_props = mat->GetAllVectorValue();
         auto uint_props = mat->GetAllUintValue();
         //auto tex_props = mat->GetAllTexture();
-        out_mat << "  prop_type: " << "Uint" << endl;
+        out_mat << "  prop_type: "
+                << "Uint" << endl;
         for (auto &[name, value]: uint_props)
         {
             out_mat << "    " << name << ": " << value << endl;
         }
-        out_mat << "  prop_type: " << "Float" << endl;
+        out_mat << "  prop_type: "
+                << "Float" << endl;
         for (auto &[name, value]: float_props)
         {
             out_mat << "    " << name << ": " << value << endl;
         }
-        out_mat << "  prop_type: " << "Vector" << endl;
+        out_mat << "  prop_type: "
+                << "Vector" << endl;
         for (auto &[name, value]: vector_props)
         {
             out_mat << "    " << name << ": " << value << endl;
         }
-        out_mat << "  prop_type: " << "Texture2D" << endl;
+        out_mat << "  prop_type: "
+                << "Texture2D" << endl;
         for (auto &[prop_name, prop]: props)
         {
             if (prop->_type == ESerializablePropertyType::kTexture2D)
@@ -449,7 +485,7 @@ namespace Ailu
 
     void ResourceMgr::SaveMesh(const WString &asset_path, const Asset *asset)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         if (FileManager::Exist(sys_path))
         {
             std::wstringstream wss;
@@ -465,7 +501,7 @@ namespace Ailu
 
     void ResourceMgr::SaveTexture2D(const WString &asset_path, const Asset *asset)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         if (FileManager::Exist(sys_path))
         {
             std::wstringstream wss;
@@ -496,7 +532,7 @@ namespace Ailu
             g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {}!", scene->Name());
             return;
         }
-        WString sys_path = PathUtils::GetResSysPath(asset->_asset_path);
+        WString sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
         if (!FileManager::WriteFile(sys_path, true, ss.str()))
         {
             g_pLogMgr->LogErrorFormat(L"Save scene failed to {}", sys_path);
@@ -508,7 +544,7 @@ namespace Ailu
     List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString &asset_path)
     {
         static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         auto mesh_list = parser->Parser(sys_path);
         auto &imported_mat_infos = parser->GetImportedMaterialInfos();
         for (auto &mesh: mesh_list)
@@ -527,7 +563,7 @@ namespace Ailu
     {
         auto image_import_setting = dynamic_cast<const TextureImportSetting *>(setting);
         image_import_setting = image_import_setting ? image_import_setting : &TextureImportSetting::Default();
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         String ext = fs::path(ToChar(asset_path.c_str())).extension().string();
         Scope<ITextureParser> tex_parser = nullptr;
         if (kLDRImageExt.contains(ext))
@@ -549,7 +585,7 @@ namespace Ailu
 
     Scope<Asset> ResourceMgr::LoadTexture(const WString &asset_path)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
         Ref<Texture2D> shader;
         if (FileManager::ReadFile(sys_path, data))
@@ -569,7 +605,7 @@ namespace Ailu
 
     Scope<Asset> ResourceMgr::LoadMaterial(const WString &asset_path)
     {
-        WString sys_path = PathUtils::GetResSysPath(asset_path);
+        WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         std::ifstream file(sys_path);
         if (!file.is_open())
         {
@@ -674,7 +710,7 @@ namespace Ailu
 
     Scope<Asset> ResourceMgr::LoadMesh(const WString &asset_path)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
         Ref<Mesh> mesh;
         if (FileManager::ReadFile(sys_path, data))
@@ -701,7 +737,7 @@ namespace Ailu
 
     Scope<Asset> ResourceMgr::LoadComputeShader(const WString &asset_path)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
         Ref<ComputeShader> cs;
         if (FileManager::ReadFile(sys_path, data))
@@ -722,7 +758,7 @@ namespace Ailu
     Scope<Asset> ResourceMgr::LoadScene(const WString &asset_path)
     {
         using namespace std;
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         String scene_data;
         if (FileManager::ReadFile(sys_path, scene_data))
         {
@@ -1051,6 +1087,11 @@ namespace Ailu
         {
             _global_resources[asset_path] = obj;
             _lut_global_resources[obj->ID()] = _global_resources.find(asset_path);
+            auto &v = _lut_global_resources_by_type[GetObjectAssetType(obj.get())];
+            auto it = std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter iter) -> bool
+                                   { return iter->second->Name() == obj->Name(); });
+            if (it != v.end())
+                v.erase(it);
             _lut_global_resources_by_type[GetObjectAssetType(obj.get())].push_back(_global_resources.find(asset_path));
         }
         else
@@ -1089,7 +1130,7 @@ namespace Ailu
 
     void ResourceMgr::ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, EAssetType::EAssetType &type)
     {
-        auto sys_path = PathUtils::GetResSysPath(asset_path);
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
         if (FileManager::ReadFile(sys_path, data))
         {
@@ -1164,7 +1205,7 @@ namespace Ailu
     void ResourceMgr::WatchDirectory()
     {
         namespace fs = std::filesystem;
-        fs::path dir(kEngineResRootPath + EnginePath::kEngineShaderPath);
+        fs::path dir(s_engine_res_root_pathw + EnginePath::kEngineShaderPathW);
         std::chrono::duration<int, std::milli> sleep_duration(1000);// 1秒
         std::unordered_map<fs::path, fs::file_time_type> files;
         static auto reload_shader = [&](const fs::path &file)

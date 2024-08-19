@@ -9,7 +9,7 @@ namespace Ailu
 {
 	namespace Editor
 	{
-		class RenderView;
+		class SceneView;
 		class EditorLayer : public Layer
 		{
 		public:
@@ -26,7 +26,8 @@ namespace Ailu
 			void Begin();
 			void End();
 			Vector2f     _viewport_size;
-			ImGuiWidget* _p_render_view;
+			ImGuiWidget* _p_scene_view;
+			ImGuiWidget* _p_preview_cam_view;
 		private:
 			ImFont* _font = nullptr;
 			Vector<Scope<ImGuiWidget>> _widgets;

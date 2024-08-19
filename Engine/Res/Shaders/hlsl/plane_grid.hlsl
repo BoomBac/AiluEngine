@@ -47,15 +47,21 @@ float4 Grid(float3 fragPos3D, float scale,float axis_scale)
     float4 color = float4(0.2, 0.2, 0.2, 1.0 - min(a, 1.0));
     // z axis
     if(fragPos3D.x > -0.1 * minimumx && fragPos3D.x < 0.1 * minimumx)
+    {
         color.z = 1.0;
+        color.a *= 4.0;
+    }
     // x axis
     if(fragPos3D.z > -0.1 * minimumz && fragPos3D.z < 0.1 * minimumz)
+    {
         color.x = 1.0;
+        color.a *= 4.0;
+    }
     return color;
 }
 
 const static float _GridWidth = 10.0f;
-const static float _GridAlpha = 0.75f;
+const static float _GridAlpha = 0.25f;
 
 float4 PSMain(PSInput i) : SV_TARGET
 {

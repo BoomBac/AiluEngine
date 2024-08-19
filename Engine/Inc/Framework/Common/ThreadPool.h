@@ -14,6 +14,7 @@
 
 #include "TimeMgr.h"
 #include "GlobalMarco.h"
+#include "Framework/Common/Log.h"
 
 using std::unique_lock;
 using std::packaged_task;

@@ -30,7 +30,7 @@ namespace Ailu
 #ifdef COMPANY_ENV
         static constexpr double kTargetFrameRate = 60;
 #else
-        static constexpr double kTargetFrameRate = 170;
+        static constexpr double kTargetFrameRate = 60;
 #endif // COMPLY
         static constexpr double kMsPerUpdate = 16.66;
         static constexpr double kMsPerRender = 1000.0 / kTargetFrameRate;

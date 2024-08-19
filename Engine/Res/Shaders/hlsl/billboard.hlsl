@@ -27,6 +27,7 @@ struct PSInput
 {
 	float4 position : SV_POSITION;
     float2 uv : TEXCOORD0;
+    float3 world_pos : TEXCOORD1;
 };
 TEXTURE2D(_MainTex,0)
 
@@ -39,11 +40,12 @@ PSInput VSMain(VSInput v)
     view_pos += float3(scaleRotatePos.xy, -scaleRotatePos.z);
     result.position = mul(_MatrixP,float4(view_pos,1));
     result.uv = v.uv;
+    result.world_pos = GetObjectWorldPos();
 	return result;
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
     float alpha = SAMPLE_TEXTURE2D(_MainTex,g_LinearClampSampler,input.uv).a;
-    return float4(1.0,1.0,1.0,alpha);
+    return float4(1.0,1.0,1.0,alpha * lerp(0.0f,1.0f,distance(input.world_pos,GetCameraPositionWS()) / 100.0f));
 }

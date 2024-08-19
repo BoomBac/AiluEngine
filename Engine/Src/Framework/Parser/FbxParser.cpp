@@ -2,7 +2,7 @@
 #include "Framework/Parser/FbxParser.h"
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Common/Utils.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 #include "Framework/Common/Utils.h"
 //#include "Animation/Skeleton.h"
 #include "Animation/Clip.h"
@@ -1063,7 +1063,7 @@ namespace Ailu
 
 		//LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
 		mesh->Clear();
-		float aabb_space = 0.25f;
+		float aabb_space = 0.01f;
 		mesh->_bound_boxs.emplace_back(AABB(mesh_vmin, mesh_vmax));
 		for (auto& it : subemesh_aabbs)
 		{

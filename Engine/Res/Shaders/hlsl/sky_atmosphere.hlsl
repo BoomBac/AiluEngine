@@ -5,6 +5,7 @@
 //pixel: PSMain
 //Cull: Front
 //Queue: Opaque
+//Stencil: {Ref:127,Comp:NotEqual,Pass:Keep}
 //pass end::
 //Properties
 //{

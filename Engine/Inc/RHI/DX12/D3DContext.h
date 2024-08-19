@@ -67,6 +67,8 @@ namespace Ailu
         void LoadAssets();
         void WaitForGpu();
         void FlushCommandQueue(ID3D12CommandQueue* cmd_queue,ID3D12Fence* fence,u64& fence_value);
+        void BeginCapture();
+        void EndCapture();
 
     private:
         inline static const u32 kResourceCleanupIntervalTick = 2000u;
@@ -103,7 +105,8 @@ namespace Ailu
         u32 _width;
         u32 _height;
         float m_aspectRatio;
-        bool _is_cur_frame_capture = false;
+        bool _is_next_frame_capture = false;
+        bool _is_cur_frame_capturing = false;
         WString _cur_capture_name;
         RenderPipeline* _pipiline = nullptr;
     };

@@ -150,9 +150,9 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
     // float3 k_D = diffuse_color * (1.0 - FssEss - FmsEms);
 	float3 FssEss = F0 * envBRDF.x + envBRDF.y;
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;
-	//light += (FssEss * radiance + diffuse_color * irradiance) * g_IndirectLightingIntensity * ao;
+	light += (FssEss * radiance + diffuse_color * irradiance) * g_IndirectLightingIntensity * ao;
+	//light += diffuse_color * float3(0.20, 0.27, 0.48) * ao;
 	//light += diffuse_color * float3(0.05,0.14,0.21) * g_IndirectLightingIntensity * ao;
-	light += diffuse_color * float3(0.20, 0.27, 0.48) * ao;
 	return light; 
 }
 #endif //__LIGHTING_H__

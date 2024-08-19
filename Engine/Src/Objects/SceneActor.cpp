@@ -1,5 +1,5 @@
 #include "Objects/SceneActor.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 #include "Framework/Common/SceneMgr.h"
 #include "Objects/CameraComponent.h"
 #include "Objects/LightComponent.h"

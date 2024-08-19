@@ -4,7 +4,7 @@
 #include <mutex>
 #include "ImGuiWidget.h"
 #include "Ext/imgui/imgui.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 
 namespace Ailu
 {
@@ -19,12 +19,12 @@ namespace Ailu
 				Clear();
 			}
 
-			void Print(std::string str) final
+			void Print(const String& str) final
 			{
 				std::lock_guard<std::mutex> m(_add_mutex);
 				AddLog("%s\r\n", str.c_str());
 			}
-			void Print(std::wstring str) final
+			void Print(const WString& str) final
 			{
 				std::lock_guard<std::mutex> m(_add_mutex);
 				AddLog("%s\r\n", ToChar(str).c_str());

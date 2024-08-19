@@ -14,6 +14,7 @@ namespace Ailu
 			~WorldOutline();
 			void Open(const i32& handle) final;
 			void Close(i32 handle) final;
+            void OnEvent(Event& e) final;
 		private:
 			void ShowImpl() final;
 			void DrawTreeNode(SceneActor* actor,bool is_root);

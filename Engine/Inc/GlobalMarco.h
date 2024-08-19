@@ -1,7 +1,8 @@
+#pragma once
 #ifndef __GLOBAL_MARCO_H__
 #define __GLOBAL_MARCO_H__
 #include "CompanyEnv.h"
-#include "Framework/Common/Log.h"
+//#include "Framework/Common/Log.h"
 #include "Framework/Common/Assert.h"
 #include <memory>
 #include <vector>

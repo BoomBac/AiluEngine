@@ -4,7 +4,8 @@
 #include <dxcapi.h>
 
 #include "Framework/Common/FileManager.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 #include "GlobalMarco.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
@@ -118,7 +119,7 @@ namespace Ailu
 #if defined(_DEBUG)
         if (pTarget == RenderConstants::kCSModel_5_0)
         {
-            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION; //跳过优化的话，compute shader算brdf lut时值有点异常
+            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
         }
         else
         {
@@ -141,8 +142,14 @@ namespace Ailu
             std::string line;
             while (std::getline(iss, line))
             {
-                if (line.find("error") != line.npos)
+                if (line.find("ERROR") != line.npos || line.find("error") != line.npos)
+                {
+                    LOG_ERROR("{}", line)
+                }
+                else if (line.find("WARNING") != line.npos || line.find("warning") != line.npos)
+                {
                     LOG_WARNING("{}", line)
+                }
             }
             pErrorBlob->Release();
         }
@@ -218,8 +225,11 @@ namespace Ailu
                 CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP),
                 CD3DX12_STATIC_SAMPLER_DESC(1, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
                 CD3DX12_STATIC_SAMPLER_DESC(2, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER),
-                CD3DX12_STATIC_SAMPLER_DESC(3, D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, 0.0f, 16, D3D12_COMPARISON_FUNC_LESS, D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK),
-                CD3DX12_STATIC_SAMPLER_DESC(4, D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP)};
+                CD3DX12_STATIC_SAMPLER_DESC(3, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP),
+                CD3DX12_STATIC_SAMPLER_DESC(4, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
+                CD3DX12_STATIC_SAMPLER_DESC(5, D3D12_FILTER_MIN_MAG_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER),
+                CD3DX12_STATIC_SAMPLER_DESC(6, D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, 0.0f, 16, D3D12_COMPARISON_FUNC_LESS, D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK),
+                CD3DX12_STATIC_SAMPLER_DESC(7, D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP)};
         return samplers;
     }
 
@@ -235,7 +245,7 @@ namespace Ailu
             }
             else
             {
-                p = PathUtils::GetResSysPath(include_path) + ToWStr(pFileName);
+                p = ResourceMgr::GetResSysPath(include_path) + ToWStr(pFileName);
             }
             if (FileManager::Exist(p))
             {
@@ -282,43 +292,52 @@ namespace Ailu
             //if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
             if (desc._res_type == EBindResDescType::kConstBuffer)
             {
-                if (desc._name == RenderConstants::kCBufNameSceneObject) cbuf_mask |= 0x01;
-                else if (desc._name == RenderConstants::kCBufNameSceneMaterial)
+                if (desc._name == RenderConstants::kCBufNamePerObject)
+                    cbuf_mask |= 0x01;
+                else if (desc._name == RenderConstants::kCBufNamePerMaterial)
                     cbuf_mask |= 0x02;
-                else if (desc._name == RenderConstants::kCBufNameSceneState)
+                else if (desc._name == RenderConstants::kCBufNamePerCamera)
                     cbuf_mask |= 0x04;
-                else if (desc._name == RenderConstants::kCBufNameScenePass)
+                else if (desc._name == RenderConstants::kCBufNamePerScene)
                     cbuf_mask |= 0x08;
             }
         }
         u8 root_param_index = 0;
         if (cbuf_mask & 0x01)
         {
-            variant_bind_res_info[RenderConstants::kCBufNameSceneObject]._bind_slot = root_param_index;
+            variant_bind_res_info[RenderConstants::kCBufNamePerObject]._bind_slot = root_param_index;
             rootParameters[root_param_index++].InitAsConstantBufferView(0u);
         }
         if (cbuf_mask & 0x02)
         {
-            variant_bind_res_info[RenderConstants::kCBufNameSceneMaterial]._bind_slot = root_param_index;
+            variant_bind_res_info[RenderConstants::kCBufNamePerMaterial]._bind_slot = root_param_index;
             pass_variant._per_mat_buf_bind_slot = root_param_index;
             rootParameters[root_param_index++].InitAsConstantBufferView(1u);
         }
         if (cbuf_mask & 0x04)
         {
-            variant_bind_res_info[RenderConstants::kCBufNameSceneState]._bind_slot = root_param_index;
-            pass_variant._per_frame_buf_bind_slot = root_param_index;
-            rootParameters[root_param_index++].InitAsConstantBufferView(2u);
+            variant_bind_res_info[RenderConstants::kCBufNamePerCamera]._bind_slot = root_param_index;
+            pass_variant._per_pass_buf_bind_slot = root_param_index;
+            rootParameters[root_param_index++].InitAsConstantBufferView(3u);
         }
         if (cbuf_mask & 0x08)
         {
-            variant_bind_res_info[RenderConstants::kCBufNameScenePass]._bind_slot = root_param_index;
-            pass_variant._per_pass_buf_bind_slot = root_param_index;
-            rootParameters[root_param_index++].InitAsConstantBufferView(3u);
+            variant_bind_res_info[RenderConstants::kCBufNamePerScene]._bind_slot = root_param_index;
+            pass_variant._per_frame_buf_bind_slot = root_param_index;
+            rootParameters[root_param_index++].InitAsConstantBufferView(2u);
         }
         for (auto it = variant_bind_res_info.begin(); it != variant_bind_res_info.end(); it++)
         {
             auto &desc = it->second;
             if (desc._res_type == EBindResDescType::kTexture2D)
+            {
+                ++texture_count;
+                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot);
+                rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
+                desc._bind_slot = root_param_index;
+                ++root_param_index;
+            }
+            else if (desc._res_type == EBindResDescType::kCubeMap)
             {
                 ++texture_count;
                 ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot);
@@ -338,6 +357,7 @@ namespace Ailu
         ComPtr<ID3DBlob> signature;
         ComPtr<ID3DBlob> error;
         ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, featureData.HighestVersion, &signature, &error));
+        //如果参数一致，实际上会从池中返回已有的根签名，这就意味着在使用一个重复的根签名之前，需要清空其绑定的资源
         ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_pass_elements[pass_index]._variants[variant_hash]._p_sig)));
     }
 
@@ -435,6 +455,17 @@ namespace Ailu
             {
                 size_t name_begin = line.find_last_of("e") + 1;
                 size_t name_end = line.find_first_of(":") - 1;
+                String tex_name = line.substr(name_begin, name_end - name_begin);
+                auto it = _passes[pass_index]._variants[variant_hash]._bind_res_infos.find(tex_name);
+                if (it != _passes[pass_index]._variants[variant_hash]._bind_res_infos.end())
+                {
+                    it->second._res_type = EBindResDescType::kCubeMap;
+                }
+            }
+            else if (su::BeginWith(line, "TEXTURECUBE"))
+            {
+                size_t name_begin = line.find_first_of("(") + 1;
+                size_t name_end = line.find_last_of(",");
                 String tex_name = line.substr(name_begin, name_end - name_begin);
                 auto it = _passes[pass_index]._variants[variant_hash]._bind_res_infos.find(tex_name);
                 if (it != _passes[pass_index]._variants[variant_hash]._bind_res_infos.end())
@@ -637,10 +668,6 @@ namespace Ailu
     void D3DShader::Bind(u16 pass_index, ShaderVariantHash variant_hash)
     {
         Shader::Bind(pass_index, variant_hash);
-        if (_passes[pass_index]._variants[variant_hash]._per_frame_buf_bind_slot != -1)
-        {
-            GraphicsPipelineStateMgr::SubmitBindResource(s_p_per_frame_cbuffer, EBindResDescType::kConstBuffer, static_cast<u8>(_passes[pass_index]._variants[variant_hash]._per_frame_buf_bind_slot));
-        }
     }
 
     void *D3DShader::GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash)
@@ -667,7 +694,7 @@ namespace Ailu
         Compile();
     }
 
-    void D3DComputeShader::Bind(CommandBuffer *cmd, u16 kernel,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+    void D3DComputeShader::Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
     {
         if (!_is_valid && kernel >= _kernels.size())
         {
@@ -704,9 +731,9 @@ namespace Ailu
         d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
     }
 
-    void D3DComputeShader::LoadReflectionInfo(ID3D12ShaderReflection *p_reflect,u16 kernel_index)
+    void D3DComputeShader::LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index)
     {
-		auto& cs_ele = _kernels[kernel_index];
+        auto &cs_ele = _kernels[kernel_index];
         D3D12_SHADER_DESC desc{};
         cs_ele._temp_bind_res_infos.clear();
         //parser vs reflecton
@@ -795,7 +822,7 @@ namespace Ailu
         if (succeed)
         {
             _elements[kernel_index]._p_blob = tmp_blob;
-            LoadReflectionInfo(tmp_reflection.Get(),kernel_index);
+            LoadReflectionInfo(tmp_reflection.Get(), kernel_index);
             GenerateInternalPSO(kernel_index);
             succeed = _is_valid;
             g_pLogMgr->LogFormat(L"Compile shader with src {0} succeed!", _src_file_path);
@@ -822,15 +849,15 @@ namespace Ailu
         //	//if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
         //	if (desc._res_type == EBindResDescType::kConstBuffer)
         //	{
-        //		//if (desc._name == RenderConstants::kCBufNameSceneObject) cbuf_mask |= 0x01;
-        //		if (desc._name == RenderConstants::kCBufNameScenePass) cbuf_mask |= 0x01;
+        //		//if (desc._name == RenderConstants::kCBufNamePerObject) cbuf_mask |= 0x01;
+        //		if (desc._name == RenderConstants::kCBufNamePerCamera) cbuf_mask |= 0x01;
         //	}
         //}
         //if (cbuf_mask & 0x01)
         //{
         //	rootParameters[root_param_index++].InitAsConstantBufferView(1u);
         //}
-		auto& cs_ele = _kernels[kernel_index];
+        auto &cs_ele = _kernels[kernel_index];
         for (auto it = cs_ele._temp_bind_res_infos.begin(); it != cs_ele._temp_bind_res_infos.end(); it++)
         {
             auto &desc = it->second;
@@ -857,7 +884,7 @@ namespace Ailu
                 ++root_param_index;
             }
         }
-		auto& d3d_ele = _elements[kernel_index];
+        auto &d3d_ele = _elements[kernel_index];
         auto [sig, pso] = d3d_ele._pso_sys.Back();
         static Vector<CD3DX12_STATIC_SAMPLER_DESC> samplers{
                 CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP),
@@ -886,7 +913,7 @@ namespace Ailu
                 for (auto it = cs_ele._temp_bind_res_infos.begin(); it != cs_ele._temp_bind_res_infos.end(); it++)
                 {
                     //临时方案，kCBufNameSceneState外部创建
-                    if (it->second._res_type & EBindResDescType::kCBufferAttribute && it->second._p_root_cbuf->_name != RenderConstants::kCBufNameSceneState)
+                    if (it->second._res_type & EBindResDescType::kCBufferAttribute && it->second._p_root_cbuf->_name != RenderConstants::kCBufNamePerScene && it->second._p_root_cbuf->_name != RenderConstants::kCBufNamePerCamera)
                     {
                         cbuffer_bind_info.insert(std::make_pair(it->first, it->second));
                         if (it->second._res_type & EBindResDescType::kCBufferAttribute)

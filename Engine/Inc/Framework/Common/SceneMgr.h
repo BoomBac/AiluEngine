@@ -9,6 +9,7 @@
 #include "Objects/SceneActor.h"
 #include "Objects/LightComponent.h"
 #include "Objects/StaticMeshComponent.h"
+#include "Objects/CameraComponent.h"
 #include "Render/Camera.h"
 
 namespace Ailu
@@ -31,7 +32,8 @@ namespace Ailu
 		SceneActor* GetSceneActorByID(const u32& id);
 		SceneActor* GetSceneActorByIndex(const u32& index);
 		void MarkDirty();
-		const std::list<LightComponent*>& GetAllLight() const { return _all_lights; };
+		const List<LightComponent*>& GetAllLight() const { return _all_lights; };
+		const List<CameraComponent*>& GetAllCameras() const { return _all_cameras; };
 		const Vector<StaticMeshComponent*>& GetAllStaticRenderable() const {return _all_static_renderalbes;};
 		//world_pos:gizmo type
         Vector<Component*> GetAllComponents() {return _all_comps;}
@@ -40,6 +42,7 @@ namespace Ailu
 		u16 _total_renderable_count = 0u;
 		std::list<SceneActor*> _all_objects{};
 		std::list<LightComponent*> _all_lights{};
+		List<CameraComponent*> _all_cameras{};
 		Vector<StaticMeshComponent*> _all_static_renderalbes{};
 		Vector<Component*> _all_comps;
 		ActorEvent FillActorList;

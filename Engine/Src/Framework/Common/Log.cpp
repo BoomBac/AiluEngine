@@ -1,4 +1,4 @@
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 #include "pch.h"
 
 namespace Ailu

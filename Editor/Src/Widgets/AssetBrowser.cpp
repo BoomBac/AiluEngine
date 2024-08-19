@@ -1,6 +1,5 @@
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
-#include "Framework/Common/FileManager.h"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Material.h"
@@ -11,7 +10,12 @@
 #include "Common/Selection.h"
 #include "Widgets/AssetBrowser.h"
 #include "Widgets/CommonTextureWidget.h"
+//放最最后导入，否则copyfile和同名宏冲突
+//#include "Framework/Common/FileManager.h"
 
+#undef CreateDirectory
+#undef CopyFile
+#undef CreateFile
 namespace Ailu
 {
     namespace Editor
@@ -157,7 +161,7 @@ namespace Ailu
             _image_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
             _scene_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"scene.alasset");
             _material_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/material.alasset");
-            memset(_search_buf,0,256);
+            memset(_search_buf, 0, 256);
             MarkDirty();
         }
 
@@ -409,7 +413,7 @@ namespace Ailu
             {
                 if (_hovered_asset != asset)
                 {
-                    _draging_file = PathUtils::GetResSysPath(asset->_asset_path);
+                    _draging_file = ResourceMgr::GetResSysPath(asset->_asset_path);
                     LOG_INFO("Dragging: {}", file_name.c_str());
                     _hovered_asset = asset;
                     s_draging_asset = asset;
@@ -442,7 +446,7 @@ namespace Ailu
                 else
                 {
                     auto str_name = ToChar(s_draging_asset->_name);
-                    ImGui::Text("Please import asset asset %s first!",str_name.c_str());
+                    ImGui::Text("Please import asset asset %s first!", str_name.c_str());
                 }
                 ImGui::EndDragDropSource();
             }
@@ -464,7 +468,7 @@ namespace Ailu
                     if (strcmp(file_name.c_str(), _rename_buffer) != 0)
                     {
                         WString new_name = ToWStr(_rename_buffer);
-                        WString old_path = PathUtils::GetResSysPath(asset->_asset_path);
+                        WString old_path = ResourceMgr::GetResSysPath(asset->_asset_path);
                         WString new_path = PathUtils::RenameFile(old_path, new_name);
                         g_pResourceMgr->RenameAsset(asset, new_name);
                         FileManager::RenameDirectory(old_path, new_path);
@@ -494,7 +498,7 @@ namespace Ailu
             {
                 Selection::AddAndRemovePreSelection(asset->_p_obj.get());
                 g_pLogMgr->LogFormat("selected asset {}", file_name.c_str());
-                _selected_file_sys_path = PathUtils::GetResSysPath(asset->_asset_path);
+                _selected_file_sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
                 _selected_file_index = cur_file_index;
             }
             if (ImGui::BeginPopupContextItem(file_name.c_str()))// <-- use last item id as popup id
@@ -529,7 +533,7 @@ namespace Ailu
                 {
                     g_pLogMgr->LogWarningFormat(L"Delete asset: {}", asset->_asset_path);
                     g_pResourceMgr->DeleteAsset(asset);
-                    FileManager::DeleteDirectory(PathUtils::GetResSysPath(asset->_asset_path));
+                    FileManager::DeleteDirectory(ResourceMgr::GetResSysPath(asset->_asset_path));
                     MarkDirty();
                 }
                 ImGui::EndPopup();
@@ -580,13 +584,13 @@ namespace Ailu
                 {
                     if (strlen(_search_buf) != _search_str.size())
                         _search_str = ToWStr(_search_buf);
-                    if(!_search_str.empty())
+                    if (!_search_str.empty())
                     {
                         SearchFilterByFileName filter({_search_str});
                         OnUpdateAssetList(filter);
                         _is_search_active = true;
                     }
-                    LOG_INFO("SearchBlock size {}",_search_str.size());
+                    LOG_INFO("SearchBlock size {}", _search_str.size());
                     if (strlen(_search_buf) == 0)
                     {
                         SearchFilterByDirectory filter({PathUtils::ExtractAssetPath(FileManager::GetCurSysDirStr())});
@@ -597,7 +601,7 @@ namespace Ailu
                 }
                 ImGui::PopItemWidth();
                 ImGui::SameLine(width_avail - line_height - 2.0f);
-                if (ImGui::Button("X",ImVec2{line_height,line_height}))
+                if (ImGui::Button("X", ImVec2{line_height, line_height}))
                 {
                     SearchFilterByDirectory filter({PathUtils::ExtractAssetPath(FileManager::GetCurSysDirStr())});
                     OnUpdateAssetList(filter);
@@ -616,7 +620,7 @@ namespace Ailu
                     bool should_draw = true;
                     if (_is_search_active)
                     {
-                        should_draw = dir_it.path().filename().wstring().substr(0,_search_str.size()) == _search_str;
+                        should_draw = dir_it.path().filename().wstring().substr(0, _search_str.size()) == _search_str;
                     }
                     if (should_draw)
                     {

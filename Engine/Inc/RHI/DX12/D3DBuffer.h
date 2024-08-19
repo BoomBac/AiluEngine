@@ -88,11 +88,12 @@ namespace Ailu
 	private:
 		inline static ComPtr<ID3D12Resource> s_p_d3d_res;
 		//inline static ComPtr<ID3D12DescriptorHeap> s_p_d3d_heap;
-		inline static std::vector<D3D12_CONSTANT_BUFFER_VIEW_DESC> s_cbuf_views;
+		//inline static std::vector<D3D12_CONSTANT_BUFFER_VIEW_DESC> s_cbuf_views;
 		inline static u32 s_desc_size, s_total_size,s_global_offset,s_global_index;
 		inline static u8* s_p_data;
 		u32 _offset,_index,_size;
-		GPUVisibleDescriptorAllocation _allocation;
+		D3D12_GPU_VIRTUAL_ADDRESS _gpu_ptr;
+		//GPUVisibleDescriptorAllocation _allocation;
 		bool _is_compute_buffer;
 	};
 }

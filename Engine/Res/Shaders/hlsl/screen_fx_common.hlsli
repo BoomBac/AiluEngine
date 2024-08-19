@@ -50,6 +50,7 @@ float3 GetPosViewSpace(float2 screen_pos)
     
     return viewPos;
 }
+
 float3 GetPosViewSpace(float2 screen_pos,float depth)
 {
     float2 uv = screen_pos;

@@ -37,23 +37,19 @@ namespace Ailu
     {
         inline static const u8 kBindFlagPerObject = 0x01;
         inline static const u8 kBindFlagPerMaterial = 0x02;
-        inline static const u8 kBindFlagPerPass = 0x04;
-        inline static const u8 kBindFlagPerFrame = 0x08;
+        inline static const u8 kBindFlagPerCamera = 0x04;
+        inline static const u8 kBindFlagPerScene = 0x08;
         static u8 GetBindResourceFlag(const char *name)
         {
-            const static String kPerObj = "ScenePerObjectData";
-            const static String kPerMat = "ScenePerMaterialData";
-            const static String kPerPass = "ScenePerPassData";
-            const static String kPerFrame = "ScenePerFrameData";
             String name_str(name);
-            if (name_str == kPerObj)
+            if (name_str == RenderConstants::kCBufNamePerObject)
                 return kBindFlagPerObject;
-            else if (name_str == kPerMat)
+            else if (name_str == RenderConstants::kCBufNamePerMaterial)
                 return kBindFlagPerMaterial;
-            else if (name_str == kPerPass)
-                return kBindFlagPerPass;
-            else if (name_str == kPerFrame)
-                return kBindFlagPerFrame;
+            else if (name_str == RenderConstants::kCBufNamePerCamera)
+                return kBindFlagPerCamera;
+            else if (name_str == RenderConstants::kCBufNamePerScene)
+                return kBindFlagPerScene;
             else
             {
                 AL_ASSERT(true);
@@ -260,11 +256,10 @@ namespace Ailu
 
         static void SetGlobalTexture(const String &name, Texture *texture);
         static void SetGlobalTexture(const String &name, RTHandle handle);
+        static void SetGlobalBuffer(const String &name,IConstantBuffer* buffer);
         static void SetGlobalMatrix(const String &name, Matrix4x4f *matrix);
         static void SetGlobalMatrixArray(const String &name, Matrix4x4f *matrix, u32 num);
 
-        static void ConfigurePerFrameConstBuffer(IConstantBuffer *cbuf);
-        static IConstantBuffer *GetPerFrameConstBuffer() { return s_p_per_frame_cbuffer; };
         //0 is normal, 4001 is compiling, 4000 is error,same with render queue id
         static u32 GetShaderState(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash);
 
@@ -330,8 +325,6 @@ namespace Ailu
         virtual bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash);
 
     protected:
-        inline static u8 *_p_cbuffer = nullptr;
-        inline static IConstantBuffer *s_p_per_frame_cbuffer = nullptr;
         WString _src_file_path;
         Vector<ShaderPass> _passes;
         std::set<Material *> _reference_mats;
@@ -345,6 +338,7 @@ namespace Ailu
         inline static u16 s_global_shader_unique_id = 0u;
         inline static std::map<String, Texture *> s_global_textures_bind_info{};
         inline static std::map<String, std::tuple<Matrix4x4f *, u32>> s_global_matrix_bind_info{};
+        inline static Map<String,IConstantBuffer*> s_global_buffer_bind_info{};
     };
 
     class ComputeShader : public Object
@@ -374,6 +368,8 @@ namespace Ailu
         virtual void SetVector(const String &name, Vector4f vector);
         virtual void SetBuffer(const String &name, IConstantBuffer *buf);
         const std::set<Texture *> &AllBindTexture() const { return _all_bind_textures; }
+        //防止同一个资源被当前帧重复追踪使得其无法被复用
+        void ClearBindTexture() {_all_bind_textures.clear();}
 		u16 FindKernel(const String& kernel)
 		{
 			auto it = std::find_if(_kernels.begin(),_kernels.end(),[&](auto e)->bool{

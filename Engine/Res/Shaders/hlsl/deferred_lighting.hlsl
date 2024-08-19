@@ -27,7 +27,8 @@
 Texture2D _GBuffer0 : register(t0); 
 Texture2D _GBuffer1 : register(t1);
 Texture2D _GBuffer2 : register(t2);
-Texture2D _CameraDepthTexture : register(t3);
+TEXTURE2D(_GBuffer3,3);
+TEXTURE2D(_CameraDepthTexture,4);
 
 
 // PSInput DeferredLightingVSMain(VSInput v)
@@ -45,11 +46,11 @@ float4 DeferredLightingPSMain(PSInput input) : SV_TARGET
 	float2 gbuf0 = SAMPLE_TEXTURE2D_LOD(_GBuffer0, g_LinearClampSampler, input.uv,0).xy;
 	float4 gbuf1 = _GBuffer1.Sample(g_LinearWrapSampler,input.uv);
 	float4 gbuf2 = _GBuffer2.Sample(g_LinearWrapSampler,input.uv);
+	float2 motion_vector = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv,0).xy;
+	motion_vector = motion_vector * 0.5 + 0.5;
   
 	float depth = _CameraDepthTexture.Sample(g_LinearWrapSampler,input.uv);
-	float2 screen_uv = input.uv;
-	screen_uv.y = 1.0 - screen_uv.y;
-	float3 world_pos = Unproject(screen_uv,depth);
+	float3 world_pos = Unproject(input.uv,depth);
 
 	SurfaceData surface_data;
 	surface_data.wnormal = UnpackNormal(gbuf0);

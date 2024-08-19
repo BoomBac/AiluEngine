@@ -53,7 +53,7 @@ PerMaterialCBufferEnd
 #define MAXRADIUSPIXEL _HBAOParams.z
 #define ANGLEBIAS _HBAOParams.w
 
-static const float R = 2;
+static const float R = 1;
 static const float R2 = R * R;
 static const float NegInvR2 = - 1.0 / (R*R);
 static const float TanBias = tan(30.0 * PI / 180.0);
@@ -161,7 +161,7 @@ float4 SSAOGenPSMain(PSInput i) : SV_TARGET
     float2x2 rot = BuildRotationMatrix(uv);
     float2 noise = float2(Random(uv.xy),Random(uv.yx));
     //float stride = min(RADIUS / -vpos.z, MAXRADIUSPIXEL) / (STEP_COUNT + 1.0);
-    float stride = (RADIUS / -vpos.z) / (STEP_COUNT + 1.0);
+    float stride = (0.1f * RADIUS / -vpos.z) / (STEP_COUNT + 1.0);
    // if (stride < 1) return 1.0;
     half ao = 0.0;
     float3 pr = GetPosViewSpace(uv + float2(InvAORes.x,0.0));

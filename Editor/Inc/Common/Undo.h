@@ -7,7 +7,7 @@
 
 #include <stack>
 #include "Objects/TransformComponent.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 
 namespace Ailu
 {

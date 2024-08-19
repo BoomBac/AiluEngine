@@ -100,7 +100,7 @@ float3 FilterCubeMap(float3 normal)
 CubeFilterPSInput VSMain(CubeFilterVSInput v)
 {
 	CubeFilterPSInput result;
-	float4x4 mvp = mul(_PassMatrixVP, _MatrixWorld);
+	float4x4 mvp = mul(_MatrixVP, _MatrixWorld);
 	result.position = mul(mvp, float4(v.position, 1.0f));
 	result.wnormal = normalize(v.position);
 	return result;

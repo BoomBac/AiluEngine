@@ -30,10 +30,6 @@ PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID)
 	result.position = fullscreen_triangle[vertex_id];
 	result.uv = uvs[vertex_id];
 	return result;
-	// PSInput result; 
-	// result.position = float4(v.position.xy,0.0, 1.0);
-	// result.uv = v.uv;
-	// return result;
 }
 
 #endif//__FULLSCREEN_QUAD__

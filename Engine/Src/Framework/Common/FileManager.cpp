@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "Framework/Common/FileManager.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 
 namespace Ailu
 {

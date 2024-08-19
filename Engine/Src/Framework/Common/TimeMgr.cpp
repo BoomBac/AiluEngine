@@ -1,4 +1,5 @@
 #include "Framework/Common/TimeMgr.h"
+//#include "Framework/Common/Log.h"
 #include "pch.h"
 
 namespace Ailu
@@ -78,7 +79,7 @@ namespace Ailu
         }
         else
         {
-            LOG_WARNING("TimeMgr hasn't mark brfore! will return 0.0");
+            //LOG_WARNING("TimeMgr hasn't mark brfore! will return 0.0");
             return 0.0f;
         }
     }

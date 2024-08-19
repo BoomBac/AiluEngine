@@ -82,10 +82,11 @@ namespace Ailu
 		virtual void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) = 0;
 		virtual void Bind(CommandBuffer* cmd) = 0;
 		virtual void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) = 0;
-		virtual void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, const String& name) = 0;
 		virtual bool IsValidPipelineResource(const EBindResDescType& res_type, u8 slot) const = 0;
 		virtual const ALHash::Hash<64>& Hash() = 0;
 		virtual const String& Name() const = 0;
+		virtual const String& SlotToName(u8 slot) = 0;
+		virtual const u8 NameToSlot(const String& name) = 0;
 	protected:
 		virtual void BindResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) = 0;
 		struct BindResDescSlotOffset
@@ -119,8 +120,8 @@ namespace Ailu
 
 		static bool IsReadyForCurrentDrawCall() { return s_is_ready; }
 
-		static void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot = 255);
-		static void SubmitBindResource(Texture* texture, u8 slot = -1);
+		static void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot,u16 priority);
+		static void SubmitBindResource(void* res, const EBindResDescType& res_type, const String& name,u16 priority);
 		static void UpdateAllPSOObject();
 	private:
 		inline static Queue<Scope<GraphicsPipelineStateObject>> s_update_pso{};

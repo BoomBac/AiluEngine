@@ -1,6 +1,6 @@
 #include "pch.h"
 #include "Framework/Parser/PngParser.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "Ext/stb/stb_image.h"
 #include "Framework/Common/Path.h"

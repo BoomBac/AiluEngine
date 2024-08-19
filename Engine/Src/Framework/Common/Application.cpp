@@ -1,6 +1,6 @@
 #include "Framework/Common/Application.h"
 #include "CompanyEnv.h"
-#include "Framework/Common/LogMgr.h"
+#include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/TimeMgr.h"
@@ -50,6 +50,7 @@ namespace Ailu
         sp_instance = this;
         g_pLogMgr->Initialize();
         g_pLogMgr->AddAppender(new FileAppender());
+        g_pLogMgr->AddAppender(new ConsoleAppender());
         auto window_props = Ailu::WindowProps();
         window_props.Width = desc._window_width;
         window_props.Height = desc._window_height;

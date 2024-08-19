@@ -7,6 +7,7 @@ namespace Ailu
 	{
 		_name = std::format("object_{}", s_global_object_id);
 		_id = s_global_object_id++;
+		_hash = _id;
 	}
 	Object::Object(const String& name) : Object()
 	{
@@ -16,6 +17,7 @@ namespace Ailu
 	{
 		_name = other._name;
 		_id = other._id;
+		_hash = other._hash;
 		for (const auto& [prop_name, prop] : other._properties)
 		{
 			_properties[prop_name] = prop;
@@ -28,6 +30,7 @@ namespace Ailu
 	{
 		_name = other._name;
 		_id = other._id;
+		_hash = other._hash;
 		_properties = std::move(other._properties);
 		other._name.clear();
 		other._id = -1;
@@ -38,6 +41,7 @@ namespace Ailu
 	{
 		_name = other._name;
 		_id = other._id;
+		_hash = other._hash;
 		for (const auto& [prop_name, prop] : other._properties)
 		{
 			_properties[prop_name] = prop;
@@ -51,6 +55,7 @@ namespace Ailu
 	{
 		_name = other._name;
 		_id = other._id;
+		_hash = other._hash;
 		_properties = std::move(other._properties);
 		other._name.clear();
 		other._id = -1;

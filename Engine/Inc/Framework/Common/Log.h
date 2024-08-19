@@ -2,10 +2,19 @@
 #ifndef __LOG_H__
 #define __LOG_H__
 
-#include <Windows.h>
+//#include <Windows.h>
 #include <string>
 #include <sstream>
 #include <format>
+
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <type_traits>
+
+#include "Utils.h"
+#include <source_location>
+#include "Framework/Interface/IRuntimeModule.h"
 
 namespace Ailu
 {
@@ -114,11 +123,185 @@ namespace Ailu
 			OutputDebugStringW(BuildLogMsg(level, str, args...).append(L"\r\n").c_str());
 		}
 	}
+    class AILU_API IAppender
+    {
+    public:
+        virtual void Print(const String &str) = 0;
+        virtual void Print(const WString &str) = 0;
+    };
+    class ConsoleAppender : public IAppender
+    {
+    public:
+        void Print(const String &str) override
+        {
+            std::cout << str.c_str() << std::endl;
+        }
+        void Print(const WString &str) override
+        {
+            std::wcout << str.c_str() << std::endl;
+        }
+    };
+    class FileAppender : public IAppender
+    {
+    public:
+        //static const const String&& GetLogPath() { return s_out_path; }
+        inline static const String &s_out_path = GET_ENGINE_FULL_PATH(log.txt);
+        void Print(const String &str) override
+        {
+            std::ofstream out(s_out_path, std::ios_base::app);
+            if (out.is_open())
+            {
+                out << str.substr(8, str.size() - 8) << std::endl;
+                out.close();
+            }
+        }
+        void Print(const WString &str) override
+        {
+        }
+    };
+    class OutputAppender : public IAppender
+    {
+    public:
+        OutputAppender() = default;
+        void Print(const String &str) override
+        {
+            OutputDebugStringA((str + "\r\n").c_str());
+        }
+        void Print(const WString &str)
+        {
+            OutputDebugString((str + L"\r\n").c_str());
+        }
+    };
+
+
+    class AILU_API LogMgr : public IRuntimeModule
+    {
+    private:
+        std::vector<IAppender *> _appenders;
+        ELogLevel _output_level;
+        TraceLevle _output_mark;
+        std::string _output_path;
+        std::string _name;
+
+    public:
+        LogMgr();
+        LogMgr(std::string name, ELogLevel output_level = kLogLevel, TraceLevle output_mark = kTraceLevel);
+        int Initialize() override;
+        void Finalize() override;
+        void Tick(const float &delta_time) override;
+        void AddAppender(IAppender *appender);
+        void SetOutputLevel(ELogLevel level);
+        void SetTraceLevel(TraceLevle trace);
+        const std::string &GetOutputPath() const;
+        const ELogLevel &GetOutputLevel() const;
+        const TraceLevle &GetTraceLevel() const;
+        const std::vector<IAppender *> &GetAppenders() const { return _appenders; };
+        void Log(std::string msg);
+        void Log(std::wstring msg);
+        void LogWarning(std::string msg);
+        void LogWarning(std::wstring msg);
+        void LogError(std::string msg);
+        void LogError(std::wstring msg);
+
+        template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
+        void Log(std::string_view msg, Args &&...args)
+        {
+            for (auto &appender: _appenders)
+            {
+                appender->Print(BuildLogMsg(_output_level, msg, args...));
+            }
+        }
+        template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
+        void LogFormat(std::string_view msg, Args &&...args)
+        {
+            for (auto &appender: _appenders)
+            {
+                appender->Print(BuildLogMsg(_output_level, msg, args...));
+            }
+        }
+        template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
+        void LogErrorFormat(std::string_view msg, Args &&...args)
+        {
+            for (auto &appender: _appenders)
+            {
+                appender->Print(BuildLogMsg(ELogLevel::kError, msg, args...));
+            }
+        }
+
+        template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
+        void LogErrorFormat(const std::source_location &loc, std::string_view msg, Args &&...args)
+        {
+            String new_msg = BuildLogMsg(ELogLevel::kError, msg, args...);
+            new_msg.append(std::format("\n  File: {},Line: {};\n    Function: {}", loc.file_name(), loc.line(), loc.function_name()));
+            LogErrorFormat("{}", new_msg);
+        }
+
+        template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
+        void LogErrorFormat(std::wstring_view msg, Args &&...args)
+        {
+            for (auto &appender: _appenders)
+            {
+                appender->Print(BuildLogMsg(ELogLevel::kError, msg, args...));
+            }
+        }
+
+        template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
+        void LogErrorFormat(const std::source_location &loc, std::wstring_view msg, Args &&...args)
+        {
+            WString new_msg = BuildLogMsg(ELogLevel::kError, msg, args...);
+            new_msg.append(std::format(L"\n  File: {},Line: {};\n    Function: {}", ToWChar(loc.file_name()), loc.line(), ToWChar(loc.function_name())));
+            LogErrorFormat(L"{}", new_msg);
+        }
+
+        template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
+        void LogWarningFormat(std::string_view msg, Args &&...args)
+        {
+            for (auto &appender: _appenders)
+            {
+                appender->Print(BuildLogMsg(ELogLevel::kWarning, msg, args...));
+            }
+        }
+
+        template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
+        void LogWarningFormat(std::wstring_view msg, Args &&...args)
+        {
+            for (auto &appender: _appenders)
+            {
+                appender->Print(BuildLogMsg(ELogLevel::kWarning, msg, args...));
+            }
+        }
+
+        template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
+        void LogFormat(std::wstring_view msg, Args &&...args)
+        {
+            for (auto &appender: _appenders)
+            {
+                appender->Print(BuildLogMsg(_output_level, msg, args...));
+            }
+        }
+        template<typename... Args, std::enable_if_t<!ContainsWString<Args...>(), bool> = true>
+        void LogFormat(ELogLevel level, std::string_view msg, Args &&...args)
+        {
+            if (level <= _output_level) return;
+            for (auto &appender: _appenders)
+                appender->Print(BuildLogMsg(level, msg, args...));
+        }
+        template<typename... Args, std::enable_if_t<!ContainsString<Args...>(), bool> = true>
+        void LogFormat(ELogLevel level, std::wstring_view msg, Args &&...args)
+        {
+            if (level <= _output_level) return;
+            for (auto &appender: _appenders)
+                appender->Print(BuildLogMsg(level, msg, args...));
+        }
+    };
+	extern AILU_API LogMgr* g_pLogMgr;
 #define AE_LOG(maker,Level,msg,...) Log(maker,Level,msg,##__VA_ARGS__);
-#define LOG_INFO(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
-#define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
-#define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
-	//extern AILU_API class LogMgr* g_pLogMgr;
+//#define LOG_INFO(msg,...) Log(TRACE_ALL,ELogLevel::kNormal,msg,##__VA_ARGS__);
+//#define LOG_WARNING(msg,...) Log(TRACE_ALL,ELogLevel::kWarning,msg,##__VA_ARGS__);
+//#define LOG_ERROR(msg,...) Log(TRACE_ALL,ELogLevel::kError,msg,##__VA_ARGS__);
+#define LOG_ERROR(msg,...) g_pLogMgr->LogErrorFormat(msg,##__VA_ARGS__);
+#define LOG_WARNING(msg,...) g_pLogMgr->LogWarningFormat(msg,##__VA_ARGS__);
+#define LOG_INFO(msg,...) g_pLogMgr->LogFormat(msg,##__VA_ARGS__);
 }
 
 #endif // !LOG_H__

@@ -311,31 +311,36 @@ namespace Ailu
 
 		_offset = s_global_offset;
 		_index = s_global_index;
-		{
-			_allocation = g_pGPUDescriptorAllocator->Allocate(1);
-			//D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
-			//cbvHandle.ptr = s_p_d3d_heap->GetCPUDescriptorHandleForHeapStart().ptr + _index * s_desc_size;
-			D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
-			cbv_desc.BufferLocation = s_p_d3d_res->GetGPUVirtualAddress() + _offset;
-			cbv_desc.SizeInBytes = _size;
-			D3DContext::Get()->GetDevice()->CreateConstantBufferView(&cbv_desc, std::get<0>(_allocation.At(0)));
-			s_cbuf_views.emplace_back(cbv_desc);
-		}
+		_gpu_ptr = s_p_d3d_res->GetGPUVirtualAddress() + _offset;
+		// {
+		// 	_allocation = g_pGPUDescriptorAllocator->Allocate(1);
+		// 	//D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
+		// 	//cbvHandle.ptr = s_p_d3d_heap->GetCPUDescriptorHandleForHeapStart().ptr + _index * s_desc_size;
+		// 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
+		// 	cbv_desc.BufferLocation = s_p_d3d_res->GetGPUVirtualAddress() + _offset;
+		// 	cbv_desc.SizeInBytes = _size;
+		// 	D3DContext::Get()->GetDevice()->CreateConstantBufferView(&cbv_desc, std::get<0>(_allocation.At(0)));
+		// 	s_cbuf_views.emplace_back(cbv_desc);
+		// }
 		s_global_offset += _size;
 		s_global_index++;
 	}
 	D3DConstantBuffer::~D3DConstantBuffer()
 	{
-		//const buffer 在这之后析构，此时page已经空了
-		//g_pGPUDescriptorAllocator->Free(std::move(_allocation));
+		//好像会报错 unmaped，不知道为啥
+		s_p_d3d_res->Unmap(0,nullptr);
 	}
 
 	void D3DConstantBuffer::Bind(CommandBuffer* cmd, u8 bind_slot, bool is_compute_pipeline) const
 	{
-		if (is_compute_pipeline)
-			static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetComputeRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
+		// if (is_compute_pipeline)
+		// 	static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetComputeRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
+		// else
+		// 	static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
+				if (is_compute_pipeline)
+			static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetComputeRootConstantBufferView(bind_slot, _gpu_ptr);
 		else
-			static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, s_cbuf_views[_index].BufferLocation);
+			static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot,_gpu_ptr);
 	}
 	//-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
 
