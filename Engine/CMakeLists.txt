@@ -2,7 +2,7 @@
 cmake_minimum_required (VERSION 3.5)
 
 project (AiluEngine)
-
+message("AiluEngine generator is set to ${CMAKE_GENERATOR}")
 # 设置输出目录的根目录
 set(OUTPUT_ROOT "${PROJECT_SOURCE_DIR}/lib/x64")
 # set (LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib/x64/${CONFIG})
@@ -28,6 +28,7 @@ add_source_files_recursive(${ENGINE_ROOT_PATH}/Src)
 aux_source_directory (${ENGINE_ROOT_PATH}/Ext/imgui IMGUI_ROOT)
 set(IMGUI_BACKENDS ${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_dx12.cpp;${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_win32.cpp)
 set(IMGUIZMO_SRC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo/ImGuizmo.cpp)
+set(DDS_LOADER ${ENGINE_ROOT_PATH}/Ext/dds_loader/DDSTextureLoader12.cpp)
 # 禁用特定文件的预编译头
 # 使用 file(GLOB_RECURSE) 获取所有源文件
 file(GLOB_RECURSE NO_PCH_SOURCES "${ENGINE_ROOT_PATH}/Ext/imgui/*.cpp")
@@ -41,7 +42,9 @@ set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # aux_source_directory (Src engine_src_dir)
 # 为目标添加 include 目录
 
-add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC} Src/Render/Pass/SSAOPass.cpp)
+add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${DDS_LOADER} Src/Render/Pass/SSAOPass.cpp 
+"Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp" "Inc/RHI/DX12/D3DUtils.h"
+"Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp")
 # 包含路径
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Inc)
@@ -59,11 +62,11 @@ set_target_properties (Engine PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>"
         RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>")
 # 编译器参数
-if(MSVC)
+# if(MSVC)
     target_compile_options(Engine PUBLIC /MP)
     # MSVC 编译器的警告选项不同，以下是一个示例
-    target_compile_options(Engine PUBLIC /D_UNICODE /DUNICODE /wd4819) # /wd4100 禁用未使用的参数警告
-endif()
+    target_compile_options(Engine PUBLIC /D_UNICODE /DUNICODE /wd4819 /wd4251) # /wd4100 禁用未使用的参数警告
+# endif()
 target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库
 target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;

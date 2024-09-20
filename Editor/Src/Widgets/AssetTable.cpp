@@ -47,7 +47,7 @@ namespace Ailu
 			if (ImGui::TreeNode("AssetTableInfo"))
 			{
 				ImGui::Text("Total Asset Num: %d", g_pResourceMgr->AssetNum());
-				if (ImGui::BeginTable("AssetTable", 4, flags))
+				if (ImGui::BeginTable("AssetTable", 5, flags))
 				{
 					// Submit columns name with TableSetupColumn() and call TableHeadersRow() to create a row with a header in each column.
 					// (Later we will show how TableSetupColumn() has other uses, optional flags, sizing weight etc.)
@@ -55,6 +55,7 @@ namespace Ailu
 					ImGui::TableSetupColumn("Path");
 					ImGui::TableSetupColumn("Type");
 					ImGui::TableSetupColumn("Object");
+					ImGui::TableSetupColumn("RefCount");
 					ImGui::TableHeadersRow();
 					for (auto it = g_pResourceMgr->Begin(); it != g_pResourceMgr->End(); it++)
 					{
@@ -76,13 +77,11 @@ namespace Ailu
 						ImGui::Text(EAssetType::ToString(p_asset->_asset_type));
 						ImGui::TableSetColumnIndex(3);
 						if (p_asset->_p_obj)
-						{
-							ImGui::Text("%p", &p_asset->_p_obj);
-						}
+                            ImGui::Text("%p", &p_asset->_p_obj);
 						else
-						{
-							ImGui::Text("Null");
-						}
+                            ImGui::Text("Null");
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::Text("%d", std::max<u32>(p_asset->_p_obj.use_count() - 1,0));
 					}
 					ImGui::EndTable();
 				}

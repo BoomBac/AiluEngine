@@ -206,7 +206,7 @@ float4 SSAOGenPSMain(PSInput i) : SV_TARGET
 }
 
 
-TEXTURE2D(_SourceTex,0)
+TEXTURE2D(_SourceTex)
 
 half3 BilateralBlur(float2 uv,float2 offset,float space_sigma, float range_sigma)
 {

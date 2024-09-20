@@ -2,7 +2,9 @@
 #ifndef __RENDER_VIEW_H__
 #define __RENDER_VIEW_H__
 #include "ImGuiWidget.h"
-#include "Render/Texture.h"
+#include "PlaceActors.h"
+#include <Render/Texture.h>
+#include "Render/PickPass.h"
 namespace Ailu
 {
 	namespace Editor
@@ -39,13 +41,14 @@ namespace Ailu
 		private:
 			void ShowImpl() final;
             void ProcessTransformGizmo();
-            void OnActorPlaced(String obj_type,bool dropped = false);
+            void OnActorPlaced(EPlaceActorsType::EPlaceActorsType type,bool dropped = false);
         private:
             i16 _transform_gizmo_type = -1;
             bool _is_transform_gizmo_snap = false;
             bool _is_transform_gizmo_world = true;
             bool _is_begin_gizmo_transform = false;
             bool _is_end_gizmo_transform = true;
+            PickFeature _pick;
 		};
 	}
 }

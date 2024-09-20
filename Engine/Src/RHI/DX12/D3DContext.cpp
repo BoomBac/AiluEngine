@@ -383,6 +383,7 @@ namespace Ailu
 		{
 			CPUProfileBlock p("WaitForGPU");
 			WaitForGpu();
+            m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 		}
 		if (_is_cur_frame_capturing)
 		{
@@ -412,6 +413,7 @@ namespace Ailu
 			}
 		}
 		_p_gpu_timer->EndFrame();
+        CommandBufferPool::ReleaseAll();
         if( _is_next_frame_capture)
         {
             BeginCapture();
@@ -515,7 +517,6 @@ namespace Ailu
 			ThrowIfFailed(fence->SetEventOnCompletion(fence_value, m_fenceEvent));
 			WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 		}
-		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	}
     void D3DContext::BeginCapture()
     {

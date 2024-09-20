@@ -1,9 +1,10 @@
 #pragma once
 #ifndef __ASSET_PARSER_H__
 #define __ASSET_PARSER_H__
+#include "DDSParser.h"
 #include "FbxParser.h"
-#include "PngParser.h"
 #include "HDRParser.h"
+#include "PngParser.h"
 
 namespace Ailu
 {
@@ -48,7 +49,12 @@ namespace Ailu
         {
             if (loader == EImageLoader::kPNG) return MakeScope<PngParser>();
             else if (loader == EImageLoader::kHDR) return MakeScope<HDRParser>();
-            else return nullptr;
+            else if (loader == EImageLoader::kDDS) return MakeScope<DDSParser>();
+            else
+            {
+                AL_ASSERT(true);
+                return nullptr;
+            }
         }
     };
 }

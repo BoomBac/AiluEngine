@@ -9,6 +9,12 @@
 //ZWrite: Off
 //ZTest: Always
 //pass end::
+//pass begin::
+//name: billboard_pickbuffer
+//vert: VSMain
+//pixel: PSMainPickBuffer
+//Cull: Off
+//pass end::
 //Properties
 //{
 //  _MainTex("MainTex",Texture2D) = white
@@ -29,7 +35,7 @@ struct PSInput
     float2 uv : TEXCOORD0;
     float3 world_pos : TEXCOORD1;
 };
-TEXTURE2D(_MainTex,0)
+TEXTURE2D(_MainTex)
 
 PSInput VSMain(VSInput v)
 {
@@ -48,4 +54,11 @@ float4 PSMain(PSInput input) : SV_TARGET
 {
     float alpha = SAMPLE_TEXTURE2D(_MainTex,g_LinearClampSampler,input.uv).a;
     return float4(1.0,1.0,1.0,alpha * lerp(0.0f,1.0f,distance(input.world_pos,GetCameraPositionWS()) / 100.0f));
+}
+
+uint PSMainPickBuffer(PSInput input) : SV_TARGET
+{
+    float alpha = SAMPLE_TEXTURE2D(_MainTex,g_LinearClampSampler,input.uv).a;
+    clip(alpha - 0.5f);
+	return uint(_ObjectID);
 }

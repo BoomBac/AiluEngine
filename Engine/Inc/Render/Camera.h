@@ -6,6 +6,7 @@
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
 #include "Render/RenderingData.h"
+#include "Objects/Serialize.h"
 
 namespace Ailu
 {
@@ -14,7 +15,7 @@ namespace Ailu
     DECLARE_ENUM(ECameraType, kOrthographic, kPerspective)
     class AILU_API Camera : public Object
     {
-        friend class CameraComponent;
+        friend struct CCamera;
 
         DECLARE_PROTECTED_PROPERTY(camera_type, Type, ECameraType::ECameraType)
         DECLARE_PROTECTED_PROPERTY(aspect, Aspect, float)
@@ -41,7 +42,6 @@ namespace Ailu
         static Camera &GetCubemapGenCamera(const Camera &base_cam, ECubemapFace::ECubemapFace face);
         Camera();
         Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType::ECameraType camera_type = ECameraType::kPerspective);
-        void Cull(Scene *s);
         void RecalculateMarix(bool force = false);
         void SetLens(float fovh, float aspect, float nz, float fz);
         void Rect(u16 w, u16 h)
@@ -57,12 +57,14 @@ namespace Ailu
         bool IsInFrustum(const Vector3f &pos);
         void MarkDirty() { _is_dirty = true; }
         const ViewFrustum &GetViewFrustum() const { return _vf; }
-        const CullResult &CullResults() const { return _cull_results; };
         void SetRenderer(Renderer *r);
         RenderTexture *TargetTexture() const { return _target_texture; }
         void TargetTexture(RenderTexture *output) { _target_texture = output; }
         void SetViewAndProj(const Matrix4x4f &view, const Matrix4x4f &proj);
-
+        //temp
+        bool IsCustomVP() const { return _is_custom_vp; }
+        friend Archive &operator<<(Archive &ar, const Camera &c);
+        friend Archive &operator>>(Archive &ar, Camera &c);
     public:
         u32 _layer_mask = (u32) -1;
         bool _is_scene_camera = false;
@@ -88,7 +90,6 @@ namespace Ailu
         Vector3f _far_top_right;
         Vector3f _far_bottom_left;
         Vector3f _far_bottom_right;
-        CullResult _cull_results;
         u16 _pixel_width = 800u, _pixel_height = 450u;
         Renderer *_renderer = nullptr;
         RenderTexture *_target_texture = nullptr;
@@ -102,6 +103,9 @@ namespace Ailu
     DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Size, _size)
     DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, FovH, _fov_h)
     REFLECT_FILED_END
+
+    Archive &operator<<(Archive &ar, const Camera &c);
+    Archive &operator>>(Archive &ar, Camera &c);
 }// namespace Ailu
 
 #endif// !__CAMERA_H__

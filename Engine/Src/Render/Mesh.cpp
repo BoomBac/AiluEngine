@@ -44,7 +44,7 @@ namespace Ailu
 	{
 		if (index >= 8)
 		{
-			AL_ASSERT_MSG(true, "Uv index in mesh must be less than 8!");
+			AL_ASSERT_MSG(false, "Uv index in mesh must be less than 8!");
 			return;
 		}
 		_uv[index] = uv;

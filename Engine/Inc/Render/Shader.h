@@ -52,7 +52,7 @@ namespace Ailu
                 return kBindFlagPerScene;
             else
             {
-                AL_ASSERT(true);
+                AL_ASSERT(false);
             }
         }
         inline const static std::set<String> s_reversed_res_name{
@@ -138,6 +138,7 @@ namespace Ailu
         inline static const String kZTest = "ZTest";
         inline static const String kZWrite = "ZWrite";
         inline static const String kStencil = "Stencil";
+        inline static const String kColorMask = "ColorMask";
         static struct Queue
         {
             inline static const String kGeometry = "Geometry";
@@ -217,6 +218,7 @@ namespace Ailu
         String _tag;
         //shader info
         String _vert_entry, _pixel_entry;
+        WString _vert_src_file,_pixel_src_file;
         RasterizerState _pipeline_raster_state;
         DepthStencilState _pipeline_ds_state;
         ETopology _pipeline_topology;
@@ -242,7 +244,7 @@ namespace Ailu
         friend class Material;
 
     public:
-        inline static Shader *s_p_defered_standart_lit = nullptr;
+        inline static Weak<Shader> s_p_defered_standart_lit;
         inline static const u16 kRenderQueueOpaque = 2000;
         inline static const u16 kRenderQueueAlphaTest = 2500;
         inline static const u16 kRenderQueueTransparent = 3000;
@@ -256,7 +258,7 @@ namespace Ailu
 
         static void SetGlobalTexture(const String &name, Texture *texture);
         static void SetGlobalTexture(const String &name, RTHandle handle);
-        static void SetGlobalBuffer(const String &name,IConstantBuffer* buffer);
+        static void SetGlobalBuffer(const String &name, IConstantBuffer *buffer);
         static void SetGlobalMatrix(const String &name, Matrix4x4f *matrix);
         static void SetGlobalMatrixArray(const String &name, Matrix4x4f *matrix, u32 num);
 
@@ -273,10 +275,12 @@ namespace Ailu
         virtual bool Compile();
         virtual void *GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash);
         const WString &GetMainSourceFile() { return _src_file_path; }
+        void SetVertexShader(u16 pass_index,const WString& sys_path,const String& entry);
+        void SetPixelShader(u16 pass_index, const WString &sys_path, const String &entry);
 
         const ShaderPass &GetPassInfo(u16 pass_index) const
         {
-            AL_ASSERT(pass_index >= _passes.size());
+            AL_ASSERT(pass_index < _passes.size());
             return _passes[pass_index];
         }
         const u32 PassCount() const { return static_cast<u32>(_passes.size()); }
@@ -306,19 +310,20 @@ namespace Ailu
         void RemoveMaterialRef(class Material *mat);
         std::tuple<String &, String &> GetShaderEntry(u16 pass_index = 0)
         {
-            AL_ASSERT(pass_index >= _passes.size());
+            AL_ASSERT(pass_index < _passes.size());
             return std::tie(_passes[pass_index]._vert_entry, _passes[pass_index]._pixel_entry);
         }
         EShaderVariantState GetVariantState(u16 pass_index, ShaderVariantHash hash)
         {
-            AL_ASSERT(pass_index >= _variant_state.size());
+            AL_ASSERT(pass_index < _variant_state.size());
             auto &info = _variant_state[pass_index];
             if (info.contains(hash))
                 return info[hash];
             else
             {
-                AL_ASSERT(true);
+                AL_ASSERT(false);
             }
+            return EShaderVariantState::kNone;
         }
 
     protected:
@@ -338,18 +343,18 @@ namespace Ailu
         inline static u16 s_global_shader_unique_id = 0u;
         inline static std::map<String, Texture *> s_global_textures_bind_info{};
         inline static std::map<String, std::tuple<Matrix4x4f *, u32>> s_global_matrix_bind_info{};
-        inline static Map<String,IConstantBuffer*> s_global_buffer_bind_info{};
+        inline static Map<String, IConstantBuffer *> s_global_buffer_bind_info{};
     };
 
-    class ComputeShader : public Object
+    class AILU_API ComputeShader : public Object
     {
         struct KernelElement
         {
-			u16 _id;
-			String _name;
+            u16 _id;
+            String _name;
             std::set<WString> _all_dep_file_pathes;
-			std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
-        	std::unordered_map<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
+            std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
+            std::unordered_map<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
         };
 
     public:
@@ -357,7 +362,7 @@ namespace Ailu
         static Ref<ComputeShader> Get(const WString &asset_path);
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
-        virtual void Bind(CommandBuffer *cmd, u16 kernel,u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+        virtual void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
         virtual void SetTexture(const String &name, Texture *texture);
         virtual void SetTexture(u8 bind_slot, Texture *texture);
         virtual void SetTexture(const String &name, RTHandle handle);
@@ -367,24 +372,25 @@ namespace Ailu
         virtual void SetInt(const String &name, i32 value);
         virtual void SetVector(const String &name, Vector4f vector);
         virtual void SetBuffer(const String &name, IConstantBuffer *buf);
+        virtual void SetBuffer(const String &name, IGPUBuffer *buf);
         const std::set<Texture *> &AllBindTexture() const { return _all_bind_textures; }
         //防止同一个资源被当前帧重复追踪使得其无法被复用
-        void ClearBindTexture() {_all_bind_textures.clear();}
-		u16 FindKernel(const String& kernel)
-		{
-			auto it = std::find_if(_kernels.begin(),_kernels.end(),[&](auto e)->bool{
-				return e._name == kernel;
-			});
-			if (it != _kernels.end())
-				return it->_id;
-			else
-				return (u16)-1;
-		}
-        bool IsDependencyFile(const WString& sys_path) const;
+        void ClearBindTexture() { _all_bind_textures.clear(); }
+        u16 FindKernel(const String &kernel)
+        {
+            auto it = std::find_if(_kernels.begin(), _kernels.end(), [&](auto e) -> bool
+                                   { return e._name == kernel; });
+            if (it != _kernels.end())
+                return it->_id;
+            else
+                return (u16) -1;
+        }
+        bool IsDependencyFile(const WString &sys_path) const;
         bool Compile();
         std::atomic<bool> _is_compiling = false;
-        static auto begin() {return s_cs_library.begin();}
-        static auto end() {return s_cs_library.end();}
+        static auto begin() { return s_cs_library.begin(); }
+        static auto end() { return s_cs_library.end(); }
+
     protected:
         virtual bool RHICompileImpl(u16 kernel_index);
 
@@ -393,7 +399,7 @@ namespace Ailu
 
     protected:
         inline static std::unordered_map<WString, Ref<ComputeShader>> s_cs_library{};
-		Vector<KernelElement> _kernels;
+        Vector<KernelElement> _kernels;
         WString _src_file_path;
         /*维护一个纹理集合，用于标记temp rt的围栏值，常规用于图形管线的rt在set / clear时会进行标记，
 		* 计算管线不用这两个接口，所以在commandbuffer dispatch时调用该接口标记

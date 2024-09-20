@@ -187,7 +187,7 @@ namespace Ailu
 			_pages.reserve(10);
 			s_first_alloc = false;
 		}
-		AL_ASSERT_MSG(num >= kMaxDescriptorNumPerPage, "GPUVisibleDescriptorAllocator bad alloc: num to large!");
+		AL_ASSERT_MSG(num < kMaxDescriptorNumPerPage, "GPUVisibleDescriptorAllocator bad alloc: num to large!");
 		if (!_page_free_space_lut.contains(type))
 		{
 			_page_free_space_lut[type] = HashMap<u16, u16>{};

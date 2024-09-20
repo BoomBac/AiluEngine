@@ -25,11 +25,14 @@ struct StandardPSInput
 struct SurfaceData
 {
 	float3 wnormal;
-	float4 albedo;
 	float roughness;
-	float metallic;
+	float4 albedo;
 	float3 emssive;
+	float metallic;
 	float3 specular;
+	float anisotropy;
+	float3 tangent;
+	float3 bitangent;
 };
 
 struct ShadingData
@@ -39,6 +42,8 @@ struct ShadingData
 	float vh;
 	float lh;
 	float nh;
+	float th;
+	float bh;
 };
 
 struct LightData

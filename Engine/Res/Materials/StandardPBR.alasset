@@ -4,26 +4,53 @@ name: StandardPBR
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
 keywords: 
   prop_type: Uint
-    SamplerMask: 0
     _MaterialID: 0
     _SamplerMask: 0
-    _material_id: 0
     _surface: 0
   prop_type: Float
+    _ObjectID: 0
     _SamplerMask: 0
     g_IndirectLightingIntensity: 0
     _MetallicValue: 0
     _MaterialID: 0
-    _RoughnessValue: 1
-    _AlphaCulloff: 0.602
+    _Anisotropy: 0
+    _RoughnessValue: 0
+    _AlphaCulloff: 0
+    shadow_index: 0
+    _ObjectID: 0
+    g_IndirectLightingIntensity: 0
+    _SamplerMask: 0
+    _Anisotropy: 0
+    _RoughnessValue: 0
+    _MetallicValue: 0
+    _MaterialID: 0
+    _AlphaCulloff: 0
+    shadow_index: 0
   prop_type: Vector
+    _DeltaTime: 0,0,0,0
+    _MainlightWorldPosition: 1,1,1,0
     _ZBufferParams: 0,0,0,0
-    _MainlightWorldPosition: 1,1,1,1
     _CascadeShadowParams: 0,0,0,0
-    _ScreenParams: 0,0,0,0
-    _EmissionValue: 0,0,0,0
-    _AlbedoValue: 1,1,1,1
+    _ActiveLightCount: 0,0,0,0
+    _Time: 0,0,0,0
+    _SinTime: 0,0,0,0
     _SpecularValue: 0,0,0,0
+    _CosTime: 0,0,0,0
+    _ScreenParams: 0,0,0,-1
+    _EmissionValue: 0,0,0,-1
+    _AlbedoValue: 1,1,1,0
+    _shadow_params: 0,0,0,0
+    _DeltaTime: 0,0,0,0
+    _MainlightWorldPosition: 1,1,1,0
+    _CascadeShadowParams: 0,0,0,0
+    _ActiveLightCount: 0,0,0,0
+    _Time: 0,0,0,0
+    _SinTime: 0,0,0,0
+    _SpecularValue: 0,0,0,0
+    _CosTime: 0,0,0,0
+    _AlbedoValue: 1,1,1,0
+    _EmissionValue: 0,0,0,-1
+    _shadow_params: 0,0,0,0
   prop_type: Texture2D
     _AlbedoTex: null guid
     _EmissionTex: null guid

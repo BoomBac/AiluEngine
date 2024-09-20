@@ -6,6 +6,23 @@
 
 namespace Ailu
 {
+    IGPUBuffer *IGPUBuffer::Create(GPUBufferDesc desc, const String &name)
+    {
+        switch (Renderer::GetAPI())
+        {
+            case RendererAPI::ERenderAPI::kNone:
+                AL_ASSERT_MSG(false, "None render api used!");
+                return nullptr;
+            case RendererAPI::ERenderAPI::kDirectX12:
+            {
+                auto buf = new D3DGPUBuffer(desc);
+                buf->SetName(name);
+                return buf;
+            }
+        }
+        AL_ASSERT_MSG(false, "Unsupported render api!");
+        return nullptr;
+    }
 	IVertexBuffer* IVertexBuffer::Create(VertexBufferLayout layout, const String& name)
 	{
 		switch (Renderer::GetAPI())

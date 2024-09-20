@@ -1,130 +1,125 @@
 guid: a40c454a-c967-4810-88c9-651706104062
 type: kScene
 name: default_scene
-SceneGraph: 
-  Name: root
-    Components: 
-      TransformComponent: 
-        Position: -397.43,42.0979,89.1241
-        Rotation: 0,6.75513e-08,0,1
-        Scale: 1,1,1
-    Children: 10
-      Name: plane
-        Components: 
-          TransformComponent: 
-            Position: 0.000823975,-0.167011,0
-            Rotation: 0,-0.00459015,0,0.999989
-            Scale: 37.2786,1,37.2786
-          StaticMeshComponent: 
-            MeshPath: c3315e03-1052-4825-98f7-a676beae0615
-            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        Children: 0
-      Name: directional_light
-        Components: 
-          TransformComponent: 
-            Position: 0,9.45835,0
-            Rotation: -0.35094,-0.368432,-0.15261,0.847236
-            Scale: 0.999622,0.999837,0.999855
-          LightComponent: 
-            Type: Directional
-            Color: 1,1,1
-            Intensity: 1.384
-            CastShadow: true
-            ConstantBias: 0.417
-            SlopeBias: 0.792
-        Children: 0
-      Name: point_light
-        Components: 
-          TransformComponent: 
-            Position: -1.98014,5.86015,-3.59107
-            Rotation: 0.382683,6.24092e-08,-2.58508e-08,0.92388
-            Scale: 1,1,1
-          LightComponent: 
-            Type: Point
-            Color: 0.721239,0.600816,0.197862
-            Intensity: 1.83
-            Radius: 13
-            CastShadow: false
-            ConstantBias: 0
-            SlopeBias: 0
-        Children: 0
-      Name: spot_light
-        Components: 
-          TransformComponent: 
-            Position: -6.2423,4.97663,-6.36237
-            Rotation: -0.134669,0.906855,-0.371495,0.146526
-            Scale: 0.999934,0.999969,0.999949
-          LightComponent: 
-            Type: Spot
-            Color: 0,0.60177,1
-            Intensity: 1
-            Radius: 15
-            Inner: 33.351
-            Outer: 59.153
-            CastShadow: false
-            ConstantBias: 0.132
-            SlopeBias: 0.071
-        Children: 0
-      Name: shpere
-        Components: 
-          TransformComponent: 
-            Position: -8.5411,1.98931,3.38434
-            Rotation: 0,6.75513e-08,0,1
-            Scale: 0.999961,0.99988,0.999949
-          StaticMeshComponent: 
-            MeshPath: d137d2a7-0d2b-40bc-9c76-6d2708923869
-            MaterialPath0: 46601513-96ea-4cc4-86db-0400c8824ec1
-        Children: 0
-      Name: plane
-        Components: 
-          TransformComponent: 
-            Position: 19.4458,3.61647,22.5524
-            Rotation: -6.22527e-10,0.000172802,1.07566e-13,1
-            Scale: 5.26225,5.26241,5.26236
-          StaticMeshComponent: 
-            MeshPath: c3315e03-1052-4825-98f7-a676beae0615
-            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        Children: 0
-      Name: Actor12
-        Components: 
-          TransformComponent: 
-            Position: -2717.05,-21.5584,1.06991
-            Rotation: 0,6.75513e-08,0,1
-            Scale: 1,1,1
-          StaticMeshComponent: 
-            MeshPath: 2ff30e48-6661-479b-a90c-863e606734f6
-            MaterialPath0: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        Children: 0
-      Name: Actor14
-        Components: 
-          TransformComponent: 
-            Position: 7.89836,1.58669,7.38321
-            Rotation: 0.261075,0.733338,-0.493507,0.387951
-            Scale: 0.939988,0.939985,0.939995
-          StaticMeshComponent: 
-            MeshPath: 9bb10f26-291a-4614-861e-2c667b6b4c63
-            MaterialPath0: 731c4c95-0f59-48a9-9fc9-5411ed7c2ae4
-        Children: 0
-      Name: LightProbe
-        Components: 
-          TransformComponent: 
-            Position: 1.16733,6.51143,-83.8942
-            Rotation: -1.69032e-07,0.098355,-1.68903e-08,0.995151
-            Scale: 0.999909,1.00002,0.999909
-          CameraComponent: 8
-            Type: kPerspective
-            Position: 1.16733,6.51143,-83.8942
-            Rotation: -1.69032e-07,0.098355,-1.68903e-08
-            Near: 0.01
-            Aspect: 1.7777778
-            Far: 31
-            Size: 0
-            FovH: 60
-        Children: 0
-      Name: LightProbe
-        Components: 
-          TransformComponent: 
-            Position: 0,0,0
-            Rotation: 0,6.75513e-08,0,1
-            Scale: 1,1,1
-        Children: 0
+scene_register:
+Entity:1
+        _tag_component:
+            _name:empty
+        _transform_component:
+            _transform:
+                _position:0.00,0.00,0.00
+                _rotation:0.00,0.00,0.00,1.00
+                _scale:1.00,1.00,1.00
+        _hierarchy_component:
+            _first_child:2
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:1
+            _inv_matrix_attach:0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0
+Entity:2
+        _tag_component:
+            _name:new_object_2
+        _transform_component:
+            _transform:
+                _position:-11.82,0.24,0.35
+                _rotation:0.00,0.00,0.00,1.00
+                _scale:0.94,0.94,0.94
+        _static_mesh_component:
+            _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
+            _material_num:1
+            _p_mats[0]:abcb7c17-1767-4b43-9850-f7a36a428b96
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:1
+            _children_num:0
+            _inv_matrix_attach:1, 0, 0, 0; 0, 1, 0, 0; 0, 0, 1, 0; 0, 0, 0, 1
+Entity:3
+        _tag_component:
+            _name:directional_light
+        _transform_component:
+            _transform:
+                _position:3.13,4.33,1.34
+                _rotation:-0.21,0.78,-0.33,-0.49
+                _scale:1.00,1.00,1.00
+        _light_component:
+            _type:kDirectional
+            _light:
+                _light_color:1,1,1,1
+                _light_param:10,4.9,5,0
+                _is_two_side:0
+            _shadow:
+                _is_cast_shadow:1
+                _constant_bias:0.114
+                _slope_bias:0.259
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0
+Entity:4
+        _tag_component:
+            _name:cube
+        _transform_component:
+            _transform:
+                _position:0.00,-1.21,0.00
+                _rotation:0.00,0.00,0.00,1.00
+                _scale:18.89,18.89,18.89
+        _static_mesh_component:
+            _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
+            _material_num:1
+            _p_mats[0]:e3891c79-694a-4968-bb84-49c409a611ce
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0
+Entity:5
+        _tag_component:
+            _name:LightProbe_4
+        _transform_component:
+            _transform:
+                _position:-1.41,15.16,-1.61
+                _rotation:0.00,0.00,0.00,1.00
+                _scale:1.00,1.00,1.00
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0
+        _lightprobe_component:
+            _size:11
+            _is_update_every_tick:0
+Entity:6
+        _tag_component:
+            _name:point_light_6
+        _transform_component:
+            _transform:
+                _position:-4.25,1.10,10.51
+                _rotation:0.00,0.00,0.00,1.00
+                _scale:1.00,1.00,1.00
+        _light_component:
+            _type:kPoint
+            _light:
+                _light_color:1,1,1,1
+                _light_param:5,0,0,0
+                _is_two_side:0
+            _shadow:
+                _is_cast_shadow:0
+                _constant_bias:0
+                _slope_bias:0
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0; 0, 0, 0, 0

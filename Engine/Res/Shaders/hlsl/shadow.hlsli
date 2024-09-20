@@ -195,6 +195,7 @@ float ApplyShadowAddLight(float4 shadow_coord, float nl, float3 world_pos,int li
 	return 1.0 - shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
 }
 
+
 float ApplyShadowPointLight(float shadow_near,float shadow_far ,float nl, float3 world_pos,float3 light_pos,int shadow_index)
 {
 	float dis = distance(light_pos,world_pos);
@@ -208,9 +209,9 @@ float ApplyShadowPointLight(float shadow_near,float shadow_far ,float nl, float3
 	// shadow_uv.x = shadow_coord.x * 0.5f + 0.5f;
 	// shadow_uv.y = shadow_coord.y * -0.5f + 0.5f;
 	float shadow_factor = 0.0;
-	for (int i = 0; i < 1; i++)
+	for (int q = 0; q < 1; q++)
 	{
-		uint random_index = uint(16.0 * Random(float4(world_pos.xyy, i))) % 16;
+		uint random_index = uint(16.0 * Random(float4(world_pos.xyy, q))) % 16;
 		//uint random_index = i;
 		// shadow_factor += lerp(0.0, 1.0, PointLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
 		// 	shaodw_dir, linear_z).r);

@@ -142,6 +142,7 @@ namespace Ailu
                 cmd->DrawFullScreenQuad(_taa_material);
                 cmd->Blit(rendering_data._camera_color_target_handle, cur_info._pre_camera_color.get());
                 cmd->Blit(rendering_data._camera_color_target_handle, rendering_data._camera_opaque_tex_handle);
+                cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProjection());
             }
         }
 
@@ -153,5 +154,6 @@ namespace Ailu
     }
     void TAAExecutePass::EndPass(GraphicsContext *context)
     {
+        
     }
 }// namespace Ailu

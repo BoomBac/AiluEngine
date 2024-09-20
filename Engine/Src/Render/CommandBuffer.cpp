@@ -47,13 +47,13 @@ namespace Ailu
             auto cmd = std::make_shared<D3DCommandBuffer>(newId, type);
             s_cmd_buffers.emplace_back(std::make_tuple(false, cmd));
             ++s_cur_pool_size;
-            LOG_WARNING("Expand commandbuffer pool to {}", s_cur_pool_size);
+            LOG_WARNING("Expand commandbuffer pool to {} with name {}", s_cur_pool_size,name);
             cmd->SetName(name);
             cmd->Clear();
             return cmd;
         }
         else
-            AL_ASSERT_MSG(true, "None render api used!");
+            AL_ASSERT_MSG(false, "None render api used!");
     }
 
     void CommandBufferPool::Release(std::shared_ptr<CommandBuffer> &cmd)
@@ -65,13 +65,13 @@ namespace Ailu
 
     void CommandBufferPool::ReleaseAll()
     {
-        //std::unique_lock<std::mutex> lock(_mutex);
-        //for (auto& it : s_cmd_buffers)
-        //{
-        //    auto& [available, cmd] = it;
-        //    available = true;
-        //    cmd->Clear();
-        //}
+        std::unique_lock<std::mutex> lock(_mutex);
+        for (auto& it : s_cmd_buffers)
+        {
+            auto& [available, cmd] = it;
+            available = true;
+            cmd->Clear();
+        }
     }
 
     void CommandBufferPool::Init()
@@ -88,9 +88,10 @@ namespace Ailu
                     auto cmd = std::make_shared<D3DCommandBuffer>(i);
                     s_cmd_buffers.emplace_back(std::make_tuple(true, cmd));
                 }
+                return;
             }
+            AL_ASSERT_MSG(false, "Unsupport render api!");
         }
-        AL_ASSERT_MSG(false, "Unsupport render api!");
         return;
     }
     void CommandBufferPool::WaitForAllCommand()

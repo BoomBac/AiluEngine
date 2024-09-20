@@ -67,7 +67,7 @@ namespace Ailu
 			bool _b_show = false;
 			bool _b_pre_show = false;
 			bool _is_hide_common_widget_info = true;
-			bool _allow_close = true;
+			bool _allow_close = false;
 		private:
 			inline static u32 s_global_widegt_handle = 0u;
             inline static Map<String,f32> s_progress_infos{};

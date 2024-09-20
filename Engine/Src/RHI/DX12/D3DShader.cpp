@@ -119,7 +119,7 @@ namespace Ailu
 #if defined(_DEBUG)
         if (pTarget == RenderConstants::kCSModel_5_0)
         {
-            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
+            compileFlags = D3DCOMPILE_DEBUG;// | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
         }
         else
         {
@@ -145,10 +145,6 @@ namespace Ailu
                 if (line.find("ERROR") != line.npos || line.find("error") != line.npos)
                 {
                     LOG_ERROR("{}", line)
-                }
-                else if (line.find("WARNING") != line.npos || line.find("warning") != line.npos)
-                {
-                    LOG_WARNING("{}", line)
                 }
             }
             pErrorBlob->Release();
@@ -197,7 +193,7 @@ namespace Ailu
             return EShaderDateType::kNone;
         else
         {
-            AL_ASSERT_MSG(true, "Unsupported DXGI_FORMAT to ShaderDataType!");
+            AL_ASSERT_MSG(false, "Unsupported DXGI_FORMAT to ShaderDataType!");
             //LOG_ERROR("Unsupported DXGI_FORMAT to ShaderDataType!");
             return EShaderDateType::kNone;
         }
@@ -214,7 +210,7 @@ namespace Ailu
             case DXGI_FORMAT_R32G32_FLOAT:
                 return EShaderDateType::kFloat2;
         }
-        AL_ASSERT_MSG(true, "Unsupported DXGI_FORMAT to ShaderDataType!");
+        AL_ASSERT_MSG(false, "Unsupported DXGI_FORMAT to ShaderDataType!");
         //LOG_ERROR("Unsupported DXGI_FORMAT to ShaderDataType!");
         return EShaderDateType::kBool;
     }
@@ -270,10 +266,10 @@ namespace Ailu
 
     void D3DShader::GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash)
     {
-        AL_ASSERT(pass_index >= _passes.size());
-        AL_ASSERT(!_passes[pass_index]._variants.contains(variant_hash));
-        AL_ASSERT(pass_index >= _pass_elements.size());
-        AL_ASSERT(!_pass_elements[pass_index]._variants.contains(variant_hash));
+        AL_ASSERT(pass_index < _passes.size());
+        AL_ASSERT(_passes[pass_index]._variants.contains(variant_hash));
+        AL_ASSERT(pass_index < _pass_elements.size());
+        AL_ASSERT(_pass_elements[pass_index]._variants.contains(variant_hash));
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
         auto device = D3DContext::Get()->GetDevice();
@@ -363,7 +359,7 @@ namespace Ailu
 
     Vector<D3D_SHADER_MACRO> D3DShader::ConstructVariantMarcos(u16 pass_index, ShaderVariantHash variant_hash)
     {
-        AL_ASSERT(pass_index > _passes.size());
+        AL_ASSERT(pass_index < _passes.size());
         auto &kw_seqs = _passes[pass_index]._variants[variant_hash]._active_keywords;
         Vector<D3D_SHADER_MACRO> v;
         for (auto &kw: kw_seqs)
@@ -401,8 +397,8 @@ namespace Ailu
             CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
 #else
-            succeed &= CreateFromFileFXC(_src_file_path, pass._vert_entry, RenderConstants::kVSModel_5_0, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files);
-            succeed &= CreateFromFileFXC(_src_file_path, pass._pixel_entry, RenderConstants::kPSModel_5_0, keyword_defines, tmp_p_pblob, tmp_p_preflect, pass._source_files);
+            succeed &= CreateFromFileFXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_5_0, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files);
+            succeed &= CreateFromFileFXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_5_0, keyword_defines, tmp_p_pblob, tmp_p_preflect, pass._source_files);
 
 #endif// SHADER_DXC
         }
@@ -531,9 +527,9 @@ namespace Ailu
 
     void D3DShader::LoadShaderReflection(u16 pass_index, ShaderVariantHash variant_hash, ID3D12ShaderReflection *ref_vs, ID3D12ShaderReflection *ref_ps)
     {
-        AL_ASSERT(pass_index >= _passes.size());
+        AL_ASSERT(pass_index < _passes.size());
         auto &pass = _passes[pass_index];
-        AL_ASSERT(!pass._variants.contains(variant_hash));
+        AL_ASSERT(pass._variants.contains(variant_hash));
         auto &pass_variant = pass._variants[variant_hash];
         D3D12_SHADER_DESC desc{};
         //parser vs reflecton
@@ -541,7 +537,7 @@ namespace Ailu
             ref_vs->GetDesc(&desc);
             if (desc.InputParameters > 10)
             {
-                AL_ASSERT_MSG(true, "LayoutDesc count must less than 10");
+                AL_ASSERT_MSG(false, "LayoutDesc count must less than 10");
                 return;
             }
             Vector<VertexBufferLayoutDesc> vb_input_desc{};
@@ -662,7 +658,9 @@ namespace Ailu
             }
         }
         //parser additon info
-        LoadAdditionalShaderReflection(_src_file_path, pass_index, variant_hash);
+        LoadAdditionalShaderReflection(_src_file_path,pass_index, variant_hash);
+        //for (auto &p: pass._source_files)
+        //    LoadAdditionalShaderReflection(p, pass_index, variant_hash);
     }
 
     void D3DShader::Bind(u16 pass_index, ShaderVariantHash variant_hash)
@@ -721,6 +719,11 @@ namespace Ailu
                     auto tex = static_cast<Texture *>(bind_info._p_res);
                     auto &[face, mipmap] = _texture_addi_bind_info[bind_info._bind_slot];
                     tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, face, mipmap, 0), bind_info._bind_slot, true);
+                }
+                else if (bind_info._res_type == EBindResDescType::kRWBuffer)
+                {
+                    auto buf = static_cast<IGPUBuffer *>(bind_info._p_res);
+                    buf->Bind(cmd, bind_info._bind_slot, true);
                 }
                 else if (bind_info._res_type == EBindResDescType::kConstBuffer)
                 {
@@ -790,6 +793,60 @@ namespace Ailu
         }
     }
 
+    void D3DComputeShader::LoadAdditionalShaderReflection(const WString &sys_path, u16 kernel_index, ShaderVariantHash variant_hash)
+    {
+        using namespace std;
+        namespace su = StringUtils;
+        namespace fs = std::filesystem;
+        ifstream src(sys_path, ios::in);
+        string line;
+        vector<string> lines;
+        List<WString> cur_file_head_files{};
+        WString parent_path = su::SubStrRange(_src_file_path, 0, _src_file_path.find_last_of(L"/"));
+        while (getline(src, line))
+        {
+            line = su::Trim(line);
+            if (su::BeginWith(line, "#include"))
+            {
+                //头文件解析转移到创还能字节码时
+                //size_t path_start = line.find_first_of("\"");
+                //size_t path_end = line.find_last_of("\"");
+                //WString head_file = ToWStr(su::SubStrRange(line, path_start + 1, path_end - 1).c_str());
+                //_passes[pass_index]._source_files.insert(parent_path + head_file);
+                //cur_file_head_files.emplace_back(head_file);
+            }
+            else if (su::BeginWith(line, "Texture2D"))
+            {
+                size_t name_begin = line.find_first_of("D") + 1;
+                size_t name_end = line.find_first_of(":") - 1;
+                String tex_name = line.substr(name_begin, name_end - name_begin);
+            }
+            else if (su::BeginWith(line, "RWBuffer"))
+            {
+                auto eol = line.find_first_of("<") == line.length() ? "r" : ">";
+                size_t name_begin = line.find_first_of(eol) + 1;
+                size_t name_end = line.find_first_of(";");
+                String tex_name = line.substr(name_begin, name_end - name_begin);
+                su::RemoveSpaces(tex_name);
+                auto it = _kernels[kernel_index]._temp_bind_res_infos.find(tex_name);
+                if (it != _kernels[kernel_index]._temp_bind_res_infos.end())
+                {
+                    it->second._res_type = EBindResDescType::kRWBuffer;
+                }
+            }
+            lines.emplace_back(line);
+        }
+        src.close();
+        fs::path src_path(sys_path);
+        fs::path pwd = src_path.parent_path();
+        for (auto &head_file: cur_file_head_files)
+        {
+            fs::path temp = pwd;
+            temp.append(head_file);
+            LoadAdditionalShaderReflection(temp.wstring(), kernel_index, variant_hash);
+        }
+    }
+
     bool D3DComputeShader::RHICompileImpl(u16 kernel_index)
     {
         if (kernel_index >= _kernels.size())
@@ -823,6 +880,7 @@ namespace Ailu
         {
             _elements[kernel_index]._p_blob = tmp_blob;
             LoadReflectionInfo(tmp_reflection.Get(), kernel_index);
+            LoadAdditionalShaderReflection(_src_file_path, kernel_index);
             GenerateInternalPSO(kernel_index);
             succeed = _is_valid;
             g_pLogMgr->LogFormat(L"Compile shader with src {0} succeed!", _src_file_path);
@@ -877,6 +935,14 @@ namespace Ailu
                 desc._bind_slot = root_param_index;
                 ++root_param_index;
             }
+            else if (desc._res_type == EBindResDescType::kRWBuffer)
+            {
+                ++texture_count;
+                ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot);
+                rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
+                desc._bind_slot = root_param_index;
+                ++root_param_index;
+            }
             else if (desc._res_type == EBindResDescType::kConstBuffer)
             {
                 rootParameters[root_param_index].InitAsConstantBufferView(desc._res_slot, 0);
@@ -920,7 +986,7 @@ namespace Ailu
                             cbuffer_size += ShaderBindResourceInfo::GetVariableSize(it->second);
                     }
                 }
-                AL_ASSERT_MSG(cbuffer_size > 256, "ComputeBuffer size must be less than 256");
+                AL_ASSERT_MSG(cbuffer_size <= 256, "ComputeBuffer size must be less than 256");
                 cbuffer_size = ALIGN_TO_256(cbuffer_size);
                 //这里暂时只支持一个cbuffer，以后按需修改
                 auto cbuf_it = std::find_if(cs_ele._temp_bind_res_infos.begin(), cs_ele._temp_bind_res_infos.end(), [this](auto it)

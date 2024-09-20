@@ -27,6 +27,16 @@ namespace Ailu
         f32 _padding = 0.0f;
 	};
 
+    struct Ray
+    {
+    public:
+        Vector3f _start;
+        Vector3f _dir;
+        Ray(Vector3f s, Vector3f d) : _start(s), _dir(d){};
+    private:
+        Vector2f _padding;
+    };
+
     class AABB
     {
     public:
@@ -52,6 +62,10 @@ namespace Ailu
                 t_exit = std::min<f32>(std::max<f32>(t1, t2), t_exit);
             }
             return t_enter < t_exit;
+        }
+        bool static Intersect(const AABB &aabb, const Ray& ray)
+        {
+            return Intersect(aabb,ray._start,ray._dir);
         }
 
         static AABB CaclulateBoundBox(const AABB& aabb, const Matrix4x4f& mat)

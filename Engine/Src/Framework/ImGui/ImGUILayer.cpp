@@ -13,7 +13,6 @@
 
 namespace Ailu
 {
-	static SceneActor* s_cur_selected_actor = nullptr;
 	static int cur_object_index = 0u;
 	static u32 cur_tree_node_index = 0u;
 	static u16 s_mini_tex_size = 64;

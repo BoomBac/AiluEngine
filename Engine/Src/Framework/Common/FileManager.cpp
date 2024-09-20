@@ -112,7 +112,7 @@ namespace Ailu
 			return false;
 		}
 		std::wofstream out_file(sys_path);
-		AL_ASSERT(!out_file.is_open());
+		AL_ASSERT(out_file.is_open());
 		out_file.close();
 		return true;
 	}
@@ -187,7 +187,7 @@ namespace Ailu
 			return false;
 		}
 		std::wifstream in_file(sys_path,std::ios::in);
-		AL_ASSERT(!in_file.is_open());
+		AL_ASSERT(in_file.is_open());
 		WString line;
 		while (std::getline(in_file,line))
 		{
@@ -206,7 +206,7 @@ namespace Ailu
 			return false;
 		}
 		std::ifstream in_file(sys_path, std::ios::in);
-		AL_ASSERT(!in_file.is_open());
+		AL_ASSERT(in_file.is_open());
 		String line;
 		while (std::getline(in_file, line))
 		{
@@ -225,9 +225,10 @@ namespace Ailu
 			return false;
 		}
 		std::ifstream in_file(sys_path, std::ios::binary);
-		AL_ASSERT(!in_file.is_open());
-		in_file.seekg(data_start, std::ios::beg);
+		AL_ASSERT(in_file.is_open());
+		in_file.seekg(data_start, std::ios::end);
 		auto file_size = in_file.tellg();
+        in_file.seekg(data_start, std::ios::beg);
 		in_file.read(reinterpret_cast<char*>(data), data_size == -1? (u64)file_size : data_size);
 		if (in_file.fail()) 
 		{
@@ -248,7 +249,7 @@ namespace Ailu
 			return std::tuple<u8*, u64>(nullptr,-1);
 		}
 		std::ifstream in_file(sys_path, std::ios::binary);
-		AL_ASSERT(!in_file.is_open());
+		AL_ASSERT(in_file.is_open());
 		in_file.seekg(data_start, std::ios::end);
 		file_byte_size = (u64)in_file.tellg();
 		in_file.seekg(data_start, std::ios::beg);

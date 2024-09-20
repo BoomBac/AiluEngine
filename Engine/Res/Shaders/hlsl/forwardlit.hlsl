@@ -16,10 +16,11 @@
 //	_RoughnessMetallicTex("RoughnessMetallicTex",Texture2D) = "white"
 //	_SpecularTex("Specular",Texture2D) = "white"
 //	_AlbedoValue("BaseColor",Color) = (1,1,1,0)
-//	_EmissionValue("Emission",Color) = (0,0,0,0)
+//	[HDR]_EmissionValue("Emission",Color) = (0,0,0,0)
 //	_SpecularValue("Specular",Color) = (0,0,0,0)
 //	_RoughnessValue("Roughness",Range(0,1)) = 0
 //	_MetallicValue("Metallic",Range(0,1)) = 0
+//	_Anisotropy("Anisotropy",Range(0,1)) = 0
 //}
 //info end
 
@@ -46,7 +47,7 @@ StandardPSInput ForwardVSMain(StandardVSInput v)
 float4 ForwardPSMain(StandardPSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
-	InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
+	InitSurfaceData(input, surface_data);
     float alpha = surface_data.albedo.a;
     float3 light = max(0.0, CalculateLightPBR(surface_data, input.world_pos,input.uv0));
     light += surface_data.emssive;

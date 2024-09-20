@@ -11,13 +11,18 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Events/KeyEvent.h"
 #include "Framework/Events/MouseEvent.h"
-#include "Objects/LightProbeComponent.h"
+#include "Scene/Scene.h"
+
+#include <Render/GraphicsContext.h>
+
 #include "Render/CommandBuffer.h"
+#include "Render/CommonRenderPipeline.h"
 #include "Render/Gizmo.h"
 #include "Render/Renderer.h"
 #include "Widgets/InputLayer.h"
-#include "Widgets/PlaceActors.h"
 
+
+// https://zhuanlan.zhihu.com/p/689092580  gpu pickup
 namespace Ailu
 {
     namespace Editor
@@ -81,6 +86,8 @@ namespace Ailu
         {
             if (_src)
             {
+                static_cast<CommonRenderPipeline *>(g_pGfxContext->GetPipeline())->GetRenderer()->AddFeature(&_pick);
+
                 static const auto &cur_window = Application::GetInstance()->GetWindow();
                 ImVec2 vMin = ImGui::GetWindowContentRegionMin();
                 ImVec2 vMax = ImGui::GetWindowContentRegionMax();
@@ -139,13 +146,13 @@ namespace Ailu
                     if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(kDragAssetMesh.c_str()))
                     {
                         auto mesh = *(Asset **) (payload->Data);
-                        g_pSceneMgr->AddSceneActor(mesh->AsRef<Mesh>());
+                        g_pSceneMgr->ActiveScene()->AddObject(mesh->AsRef<Mesh>(), nullptr);
                     }
-                    OnActorPlaced("mesh");
+                    OnActorPlaced(EPlaceActorsType::kObj);
                     if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(PlaceActors::kDragPlacementObj.c_str()))
                     {
-                        auto mesh = (const char *) (payload->Data);
-                        OnActorPlaced(mesh, true);
+                        auto type_str = (const char *) (payload->Data);
+                        OnActorPlaced(EPlaceActorsType::FromString(type_str), true);
                     }
                     ImGui::EndDragDropTarget();
                 }
@@ -207,48 +214,35 @@ namespace Ailu
                 MouseButtonPressedEvent &event = static_cast<MouseButtonPressedEvent &>(e);
                 if (event.GetButton() == AL_KEY_LBUTTON)
                 {
+                    //LOG_INFO("Pick wait for impl");
                     auto m_pos = Input::GetMousePos();
                     if (Hover(m_pos))
                     {
-                        auto ray_dir = ScreenPosToWorldDir(GlobalToLocal(Input::GetMousePos()));
+                        auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                        auto mpos_l = GlobalToLocal(Input::GetMousePos());
+
+                        auto ray_dir = ScreenPosToWorldDir(mpos_l);
                         Vector3f start = Camera::sCurrent->Position();
-                        SceneActor *p_closetest_obj = nullptr;
-                        for (auto &actor: g_pSceneMgr->_p_current->GetAllActor())
+                        Ray ray(start, ray_dir);
+                        ECS::Entity closest_entity = _pick.GetPickID(mpos_l.x, mpos_l.y);
+                        //;g_pSceneMgr->ActiveScene()->Pick(ray);
+                        if (Input::IsKeyPressed(AL_KEY_SHIFT))
+                            Selection::AddSelection(closest_entity);
+                        else
+                            Selection::AddAndRemovePreSelection(closest_entity);
+                        if (closest_entity == ECS::kInvalidEntity)
                         {
-                            if (p_closetest_obj != nullptr && p_closetest_obj->GetComponent<StaticMeshComponent>() == nullptr)
-                                break;
-                            auto comp = actor->GetComponent<StaticMeshComponent>();
-                            if (comp)
-                            {
-                                auto &aabbs = comp->GetAABB();
-                                if (!AABB::Intersect(aabbs[0], start, ray_dir))
-                                    continue;
-                                for (int i = 1; i < aabbs.size(); i++)
-                                {
-                                    if (AABB::Intersect(aabbs[i], start, ray_dir))
-                                    {
-                                        p_closetest_obj = actor;
-                                        LOG_INFO("Pick {}", actor->Name());
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (AABB::Intersect(actor->BaseAABB(), start, ray_dir))
-                                    p_closetest_obj = actor;
-                            }
-                        }
-                        Selection::AddAndRemovePreSelection(p_closetest_obj);
-                        if (p_closetest_obj == nullptr)
+                            //Selection::RemoveSlection();
                             LOG_INFO("Pick nothing...");
+                        }
                     }
                 }
             }
         }
         void SceneView::ProcessTransformGizmo()
         {
-            auto *selected_actor = Selection::First<SceneActor>();
-            if (selected_actor && _transform_gizmo_type != -1)
+            auto selected_entity = Selection::FirstEntity();
+            if (selected_entity != ECS::kInvalidEntity && _transform_gizmo_type != -1)
             {
                 //snap
                 f32 snap_value = 50.f;//50cm
@@ -266,9 +260,10 @@ namespace Ailu
                 ImGuizmo::SetDrawlist();
                 ImGuizmo::SetRect(_global_pos.x, _global_pos.y, _size.x, _size.y + ImGui::GetFrameHeight());
                 //LOG_INFO("Rect: {},{},MousePos: {}",_global_pos.ToString(),_size.ToString(),Input::GetMousePos().ToString());
-                auto world_mat = selected_actor->GetTransformComponent()->GetMatrix();
-                auto view = Camera::sCurrent->GetView();
-                auto proj = Camera::sCurrent->GetProjection();
+                TransformComponent *transf_comp = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<TransformComponent>(selected_entity);
+                auto &world_mat = transf_comp->_world_matrix;
+                const auto &view = Camera::sCurrent->GetView();
+                const auto &proj = Camera::sCurrent->GetProjection();
                 _is_transform_gizmo_snap = Input::IsKeyPressed(AL_KEY_CONTROL);
                 ImGuizmo::Manipulate(view, proj, (ImGuizmo::OPERATION) _transform_gizmo_type, _is_transform_gizmo_world ? ImGuizmo::WORLD : ImGuizmo::LOCAL, world_mat, nullptr,
                                      _is_transform_gizmo_snap ? snap_values.data : nullptr);
@@ -280,15 +275,15 @@ namespace Ailu
                     {
                         _is_begin_gizmo_transform = true;
                         _is_end_gizmo_transform = false;
-                        old_transf = selected_actor->GetTransform();
+                        old_transf = transf_comp->_transform;
                     }
                     Vector3f new_pos;
                     Vector3f new_scale;
                     Quaternion new_rot;
                     DecomposeMatrix(world_mat, new_pos, new_rot, new_scale);
-                    selected_actor->GetTransformComponent()->SetPosition(new_pos);
-                    selected_actor->GetTransformComponent()->SetScale(new_scale);
-                    selected_actor->GetTransformComponent()->SetRotation(new_rot);
+                    transf_comp->_transform._position = new_pos;
+                    transf_comp->_transform._rotation = new_rot;
+                    transf_comp->_transform._scale = new_scale;
                 }
                 else
                 {
@@ -296,58 +291,90 @@ namespace Ailu
                     {
                         _is_end_gizmo_transform = true;
                         _is_begin_gizmo_transform = false;
-                        std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(selected_actor->GetTransformComponent(), old_transf);
+                        std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(transf_comp, old_transf);
                         g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
                     }
                 }
             }
         }
-        void SceneView::OnActorPlaced(String obj_type, bool dropped)
+        void SceneView::OnActorPlaced(EPlaceActorsType::EPlaceActorsType type, bool dropped)
         {
+            auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+            //LOG_INFO("SceneView::OnActorPlaced wait for impl");
             auto ray_dir = ScreenPosToWorldDir(GlobalToLocal(Input::GetMousePos()));
             Plane p(Vector3f::kUp, 0.0f);
             Vector3f start = Camera::sCurrent->Position();
-            SceneActor *p_closetest_obj = nullptr;
-            for (auto &actor: g_pSceneMgr->_p_current->GetAllActor())
+            Vector3f place_pos;
+            ECS::Entity closest_entity = g_pSceneMgr->ActiveScene()->Pick(Ray(start, ray_dir));
+            if (closest_entity != ECS::kInvalidEntity && r.HasComponent<StaticMeshComponent>(closest_entity))
             {
-                if (p_closetest_obj != nullptr && p_closetest_obj->GetComponent<StaticMeshComponent>() == nullptr)
-                    break;
-                auto comp = actor->GetComponent<StaticMeshComponent>();
-                if (comp)
-                {
-                    auto &aabbs = comp->GetAABB();
-                    if (!AABB::Intersect(aabbs[0], start, ray_dir))
-                        continue;
-                    for (int i = 1; i < aabbs.size(); i++)
-                    {
-                        if (AABB::Intersect(aabbs[i], start, ray_dir))
-                        {
-                            p_closetest_obj = actor;
-                        }
-                    }
-                }
-                else
-                {
-                    if (AABB::Intersect(actor->BaseAABB(), start, ray_dir))
-                        p_closetest_obj = actor;
-                }
-            }
-            if (p_closetest_obj && p_closetest_obj->HasComponent<StaticMeshComponent>())
-            {
-                const auto &box = p_closetest_obj->GetComponent<StaticMeshComponent>()->GetAABB()[0];
-                Vector3f place_pos = box.Center();
+                const auto &box = r.GetComponent<StaticMeshComponent>(closest_entity)->_transformed_aabbs[0];
+                place_pos = box.Center();
                 place_pos.y += box.Size().y * 0.5f + 2.0f;
                 Plane p(Vector3f::kUp, place_pos.y);
                 if (p.Intersect(Camera::sCurrent->Position(), ray_dir, place_pos))
-                    //Gizmo::DrawCube(place_pos, Vector3f{200.f, 200.f, 200.f}, 10, Colors::kRed);
                     Gizmo::DrawCube(place_pos, Vector3f{2.f, 2.f, 2.f}, Colors::kRed);
             }
             if (dropped)
             {
-                auto new_actor = g_pSceneMgr->AddSceneActor();
-                new_actor->Name("LightProbe");
-                new_actor->AddComponent<LightProbeComponent>();
-                //g_pSceneMgr->AddSceneActor(g_pResourceMgr->GetRef<Mesh>(L"Meshs/cube.alasset"));
+                auto new_entity = g_pSceneMgr->ActiveScene()->AddObject();
+                auto tag = r.GetComponent<TagComponent>(new_entity);
+                if (type == EPlaceActorsType::kLightProbe)
+                {
+                    tag->_name = std::format("light_probe_{}", r.EntityNum());
+                    r.AddComponent<CLightProbe>(new_entity);
+                }
+                else if (type == EPlaceActorsType::kCube)
+                {
+                    tag->_name = std::format("cube_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    comp._p_mesh = Mesh::s_p_cube.lock();
+                    comp._p_mats.push_back(Material::s_checker.lock());
+                    comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                }
+                else if (type == EPlaceActorsType::kSphere)
+                {
+                    tag->_name = std::format("sphere_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    comp._p_mesh = Mesh::s_p_shpere.lock();
+                    comp._p_mats.push_back(Material::s_checker.lock());
+                    comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                }
+                else if (type == EPlaceActorsType::kPlane)
+                {
+                    tag->_name = std::format("plane_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    comp._p_mesh = Mesh::s_p_plane.lock();
+                    comp._p_mats.push_back(Material::s_checker.lock());
+                    comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                }
+                else if (type == EPlaceActorsType::kDirectionalLight)
+                {
+                    tag->_name = std::format("directional_light_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<LightComponent>(new_entity);
+                    comp._type = ELightType::kDirectional;
+                }
+                else if (type == EPlaceActorsType::kPointLight)
+                {
+                    tag->_name = std::format("point_light_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<LightComponent>(new_entity);
+                    comp._type = ELightType::kPoint;
+                }
+                else if (type == EPlaceActorsType::kSpotLight)
+                {
+                    tag->_name = std::format("spot_light_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<LightComponent>(new_entity);
+                    comp._type = ELightType::kSpot;
+                }
+                else if (type == EPlaceActorsType::kAreaLight)
+                {
+                    tag->_name = std::format("area_light_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<LightComponent>(new_entity);
+                    comp._type = ELightType::kArea;
+                }
+                else {};
+                r.GetComponent<TransformComponent>(new_entity)->_transform._position = place_pos;
+                LOG_INFO("Place new LightProbe");
             }
         }
 

@@ -29,6 +29,8 @@ namespace Ailu
             return DXGI_FORMAT_R32G32B32A32_FLOAT;
         else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneIndex))
             return DXGI_FORMAT_R32G32B32A32_UINT;
+        else if (!std::strcmp(semantic, RenderConstants::kSemanticVertexIndex))
+            return DXGI_FORMAT_R32_UINT;
         else
         {
             LOG_ERROR("Unsupported vertex shader semantic!");
@@ -371,9 +373,10 @@ namespace Ailu
         void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 
     private:
-        void LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index);
         bool RHICompileImpl(u16 kernel_index) final;
         void GenerateInternalPSO(u16 kernel_index);
+        void LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index);
+        void LoadAdditionalShaderReflection(const WString &sys_path, u16 kernel_index, ShaderVariantHash variant_hash = 0);
 
     private:
         Vector<D3DKernelElement> _elements;

@@ -41,7 +41,7 @@ namespace Ailu
         int Initialize() override;
         int Initialize(ApplicationDesc desc);
         void Finalize() override;
-        void Tick(const float& delta_time) override;
+        void Tick(f32 delta_time) override;
 
         void PushLayer(Layer* layer);
         void PushOverLayer(Layer* layer);

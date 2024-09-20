@@ -1,4 +1,4 @@
-012efc02-825c-42e9-b512-35c19e7eb1db,NewScene/Palace/textures/lion_normal.alasset,kTexture2D
+012efc02-825c-42e9-b512-35c19e7eb1db,Icons/light_probe.alasset,kTexture2D
 04f85376-b16b-43cc-b53e-e5c236755e53,NewScene/Palace/textures/sponza_curtain_baseColor.alasset,kTexture2D
 05027d6c-b9f3-4e05-aa86-e62a2067e69a,NewScene/Palace/textures/background_normal.alasset,kTexture2D
 05ee0670-c4c7-4b96-893e-c0a49cba1434,NewScene/Palace/textures/sponza_flagpole_baseColor.alasset,kTexture2D
@@ -71,6 +71,7 @@ D390A432-7AD9-475D-B1A5-726EB91072FB,Shaders/forwardlit.alasset,kShader
 a40c454a-c967-4810-88c9-651706104062,NewScene/default_scene.almap,kScene
 a5e5ce06-3542-4eb0-8087-5b4034c4dcf6,NewScene/Default_albedo.alasset,kTexture2D
 aaf13c3a-39fa-4ca3-b221-d0f1671474f7,NewScene/Palace/textures/sponza_bricks_a_normal.alasset,kTexture2D
+abcb7c17-1767-4b43-9850-f7a36a428b96,WaterTest/M_Water.alasset,kMaterial
 acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c,Icons/point_light.alasset,kTexture2D
 adbe79a7-7a5b-430a-a82b-c1204c6e91c2,NewScene/Palace/textures/sponza_arch_normal.alasset,kTexture2D
 ae11073d-8322-4047-8a57-2f2407f73711,NewScene/Palace/textures/vase_normal.alasset,kTexture2D
@@ -99,8 +100,9 @@ db739e98-37be-487b-886b-498504ad2e6f,NewScene/Palace/MAT_lion.alasset,kMaterial
 de5c5eb2-4c96-4eca-a05c-c11443b70c87,NewScene/Palace/textures/sponza_ceiling_a_normal.alasset,kTexture2D
 dfc28398-c74d-4bc8-b751-aff53c37c021,NewScene/Palace/MAT_brick.alasset,kMaterial
 e2b9472a-88ca-4a5b-9e2c-689ec8cbf2f1,NewScene/Palace/textures/sponza_thorn_normal.alasset,kTexture2D
-e3891c79-694a-4968-bb84-49c409a611ce,NewScene/Palace/textures/sponza_fabric_baseColor.alasset,kTexture2D
-ea68f293-f49a-45f7-a91d-7ac04bfd3433,NewScene/Palace/textures/vase_plant.alasset,kTexture2D
-eb07fa74-875a-467e-bf40-6d14647da7b4,NewScene/Palace/textures/sponza_roof_normal.alasset,kTexture2D
+e3891c79-694a-4968-bb84-49c409a611ce,Materials/M_Default.alasset,kMaterial
+ea68f293-f49a-45f7-a91d-7ac04bfd3433,Textures/T_Default_Material_Grid_N.alasset,kTexture2D
+eb07fa74-875a-467e-bf40-6d14647da7b4,Textures/T_Default_Material_Grid_M.alasset,kTexture2D
 ef3ed829-387b-4013-8492-95e574d5e949,Icons/dark/material.alasset,kTexture2D
-f891ec73-10c8-404b-91ac-5bac15cda5fb,NewScene/Palace/materials/MAT_bricks.alasset,kMaterial
+efa47da5-c477-49df-a31a-58f086da3946,WaterTest/water_plane.alasset,kMesh
+f891ec73-10c8-404b-91ac-5bac15cda5fb,Shaders/water.alasset,kShader

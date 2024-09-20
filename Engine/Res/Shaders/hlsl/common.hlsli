@@ -13,8 +13,10 @@ SamplerComparisonState g_ShadowSampler : register(s6);
 SamplerState g_AnisotropicClampSampler : register(s7);
 
 
-#define TEXTURE2D(name,slot) Texture2D name : register(t##slot);
-#define TEXTURECUBE(name,slot) TextureCube name : register(t##slot);
+#define TEXTURE2D(name) Texture2D name;
+//#define TEXTURE2D(name,slot) Texture2D name : register(t##slot);
+#define TEXTURECUBE(name) TextureCube name;
+//#define TEXTURECUBE(name,slot) TextureCube name : register(t##slot);
 
 //Ref:https://github.com/Unity-Technologies/Graphics/blob/master/Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl
 #define SAMPLE_TEXTURE2D(textureName, samplerName, coord2)                               textureName.Sample(samplerName, coord2)
@@ -158,6 +160,27 @@ float3 Unproject(float2 screen_pos,float depth)
 	float4 world_pos = mul(_MatrixIVP, clipPos);
 	world_pos /= world_pos.w;
 	return world_pos.xyz;
+}
+//-----------------------------------------------------------------------------
+//-- Orthonormal Basis Function -----------------------------------------------
+//-- @nimitz's "Cheap orthonormal basis" on Shadertoy
+//-- https://www.shadertoy.com/view/4sSSW3
+float3x3 OrthonormalBasis(in float3 n, out float3 u, out float3 v)
+{
+    float3 f,r;
+    if(n.z < -0.999999)
+    {
+        u = float3(0 , -1, 0);
+        v = float3(-1, 0, 0);
+    }
+    else
+    {
+        float a = 1./(1. + n.z);
+        float b = -n.x*n.y*a;
+        u = normalize(float3(1. - n.x*n.x*a, b, -n.x));
+        v = normalize(float3(b, 1. - n.y*n.y*a , -n.y));
+    }
+    return ( float3x3(u,v,n) );
 }
 
 #endif // !__COMMON_H__ 

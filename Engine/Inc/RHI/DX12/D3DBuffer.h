@@ -4,12 +4,35 @@
 #include "Render/Buffer.h"
 
 #include <map>
-#include <d3dx12.h>
+#include "D3DUtils.h"
 #include "GPUDescriptorManager.h"
 using Microsoft::WRL::ComPtr;
 
 namespace Ailu
 {
+    class D3DGPUBuffer : public IGPUBuffer
+    {
+    public:
+        D3DGPUBuffer(GPUBufferDesc desc);
+        ~D3DGPUBuffer();
+        void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) const final;
+        void SetName(const String &name) final;
+        u8 *ReadBack() final;
+        void ReadBack(u8 *dst, u32 size) final;
+        void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete);
+
+    private:
+        String _name;
+        GPUBufferDesc _desc;
+        GPUVisibleDescriptorAllocation _alloc;
+        ComPtr<ID3D12Resource> _p_d3d_res;
+        ComPtr<ID3D12Resource> _p_d3d_res_readback;
+        D3D12_GPU_VIRTUAL_ADDRESS _gpu_ptr;
+        bool _is_compute_buffer;
+        D3DResourceStateGuard _state_guard;
+        D3DResourceStateGuard _state_guard_readback;
+    };
+
 	class D3DVertexBuffer : public IVertexBuffer
 	{
 	public:
@@ -87,13 +110,10 @@ namespace Ailu
 		void SetName(const String& name) final {};
 	private:
 		inline static ComPtr<ID3D12Resource> s_p_d3d_res;
-		//inline static ComPtr<ID3D12DescriptorHeap> s_p_d3d_heap;
-		//inline static std::vector<D3D12_CONSTANT_BUFFER_VIEW_DESC> s_cbuf_views;
 		inline static u32 s_desc_size, s_total_size,s_global_offset,s_global_index;
 		inline static u8* s_p_data;
 		u32 _offset,_index,_size;
 		D3D12_GPU_VIRTUAL_ADDRESS _gpu_ptr;
-		//GPUVisibleDescriptorAllocation _allocation;
 		bool _is_compute_buffer;
 	};
 }

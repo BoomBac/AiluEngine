@@ -97,13 +97,15 @@ namespace Ailu
         virtual u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u32 instance_count = 1u) = 0;
         virtual u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) = 0;
         virtual u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
+        virtual u16 DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
+        virtual u16 DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
         virtual u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count = 1u) = 0;
         virtual u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count, u16 pass_index) = 0;
 
         virtual void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
     };
 
-    class CommandBufferPool
+    class AILU_API CommandBufferPool
     {
     public:
         static std::shared_ptr<CommandBuffer> Get(const String &name = "", ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect);

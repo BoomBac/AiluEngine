@@ -16,6 +16,7 @@ namespace Ailu
         PlaceActors::PlaceActors() : ImGuiWidget("PlaceActors")
         {
             _allow_close = false;
+            memset(_input_buffer, 0, 256);
         }
         PlaceActors::~PlaceActors() = default;
         void PlaceActors::Open(const i32 &handle)
@@ -66,40 +67,36 @@ namespace Ailu
             ImGui::GetWindowDrawList()->AddRectFilled(topLeft, bottomRight, color);
 
             ImGui::BeginChild("##GroupItem", right_size);
-            const ImVec2 image_size = {32.0f, 32.0f};
 
+            static auto placement_element_draw = [](EPlaceActorsType::EPlaceActorsType type, f32 size)
+            {
+                const ImVec2 image_size = {size, size};
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_normal->GetNativeTextureHandle()), image_size);
+                ImGui::TableSetColumnIndex(1);
+                const char *type_str = EPlaceActorsType::ToString(type);
+                ImGui::Text(type_str + 1);
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
+                {
+                    ImGui::SetDragDropPayload(kDragPlacementObj.c_str(), type_str, strlen(type_str));
+                    ImGui::Text(type_str + 1);
+                    ImGui::EndDragDropSource();
+                }
+            };
+            const f32 image_size = 32.f;
             if (ImGui::BeginTable("##GroupItemTabel", 2))
             {
-                ImGui::TableSetupColumn("Icon");
-                ImGui::TableSetupColumn("Text");
-                {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_normal->GetNativeTextureHandle()), image_size);
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::Text("Cube");
-                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-                    {
-                        String cube = "Cube";
-                        ImGui::SetDragDropPayload(kDragPlacementObj.c_str(), cube.c_str(), cube.size() + 1);
-                        ImGui::Text("Place cube...");
-                        ImGui::EndDragDropSource();
-                    }
-                }
-                {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_normal->GetNativeTextureHandle()), image_size);
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::Text("LightProbe");
-                    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID))
-                    {
-                        String cube = "LightProbe";
-                        ImGui::SetDragDropPayload(kDragPlacementObj.c_str(), cube.c_str(), cube.size() + 1);
-                        ImGui::Text("Place LightProbe...");
-                        ImGui::EndDragDropSource();
-                    }
-                }
+                ImGui::TableSetupColumn("Icon",ImGuiTableColumnFlags_WidthFixed,image_size + ImGui::GetStyle().CellPadding.x);
+                ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed,100);
+                placement_element_draw(EPlaceActorsType::kCube, image_size);
+                placement_element_draw(EPlaceActorsType::kSphere, image_size);
+                placement_element_draw(EPlaceActorsType::kPlane, image_size);
+                placement_element_draw(EPlaceActorsType::kDirectionalLight, image_size);
+                placement_element_draw(EPlaceActorsType::kPointLight, image_size);
+                placement_element_draw(EPlaceActorsType::kSpotLight, image_size);
+                placement_element_draw(EPlaceActorsType::kAreaLight, image_size);
+                placement_element_draw(EPlaceActorsType::kLightProbe, image_size);
                 ImGui::EndTable();
             }
             ImGui::EndChild();

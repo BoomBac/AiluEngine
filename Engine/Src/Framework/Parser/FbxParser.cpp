@@ -156,7 +156,7 @@ namespace Ailu
 
 		if (lClusterMode == FbxCluster::eAdditive && pCluster->GetAssociateModel())
 		{
-			AL_ASSERT(true);
+			AL_ASSERT(false);
 			pCluster->GetTransformAssociateModelMatrix(lAssociateGlobalInitPosition);
 			// Geometric transform of the model
 			lAssociateGeometry = GetGeometry(pCluster->GetAssociateModel());
@@ -370,18 +370,18 @@ namespace Ailu
 		}
 		if (use_multi_thread)
 		{
-			//_time_mgr.Mark();
+			_time_mgr.Mark();
 			auto ret4 = g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, node, _cur_skeleton);
 			auto ret1 = g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, mesh.get());
 			auto ret2 = g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), mesh.get());
 			auto ret3 = g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), mesh.get());
 			if (ret1.get() && ret2.get() && ret3.get() && ret4.get())
 			{
-				//LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-				//_time_mgr.Mark();
+				LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				_time_mgr.Mark();
 				GenerateIndexdMesh(mesh.get());
 				CalculateTangant(mesh.get());
-				//LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+				LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
 				//mesh->BuildRHIResource();
 				if (is_skined)
 				{
@@ -811,7 +811,7 @@ namespace Ailu
 	bool FbxParser::ReadTangent(const fbxsdk::FbxMesh& fbx_mesh, Mesh* mesh)
 	{
 		u32 tangent_num = fbx_mesh.GetElementTangentCount();
-		AL_ASSERT_MSG(tangent_num < 0, "ReadTangent");
+		AL_ASSERT_MSG(tangent_num > 0, "ReadTangent");
 		auto* tangents = fbx_mesh.GetElementTangent();
 		if (tangents == nullptr)
 		{
@@ -1125,6 +1125,7 @@ namespace Ailu
 			g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load mesh failed whit invalid path {}", path);
 			return loaded_meshs;
 		}
+        _time_mgr.Mark();
 		fbx_importer_->Import(_p_cur_fbx_scene);
 		FbxNode* fbx_rt = _p_cur_fbx_scene->GetRootNode();
 		fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(_p_cur_fbx_scene);
@@ -1147,14 +1148,19 @@ namespace Ailu
 		_loaded_anims.clear();
 		_imported_fbx_materials.clear();
 		auto skeleton_node_c = skeleton_node;
+        LOG_INFO("preprocess fbx scene cost {}ms",_time_mgr.GetElapsedSinceLastMark());
 		while (!skeleton_node.empty())
 		{
+            _time_mgr.Mark();
 			ParserSkeleton(skeleton_node.front(), _cur_skeleton);
+            LOG_INFO("parser skeleton {} cost {}ms", skeleton_node.front()->GetName(), _time_mgr.GetElapsedSinceLastMark());
 			skeleton_node.pop();
 		}
 		while (!mesh_node.empty())
 		{
+            _time_mgr.Mark();
 			ParserMesh(mesh_node.front(), loaded_meshs);
+            LOG_INFO("parser mesh {} cost {}ms", mesh_node.front()->GetName(), _time_mgr.GetElapsedSinceLastMark());
 			mesh_node.pop();
 		}
 		if (loaded_meshs.empty())

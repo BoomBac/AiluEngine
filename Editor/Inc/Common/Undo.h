@@ -6,8 +6,8 @@
 #define AILU_UNDO_H
 
 #include <stack>
-#include "Objects/TransformComponent.h"
 #include "Framework/Common/Log.h"
+#include "Scene/Component.h"
 
 namespace Ailu
 {
@@ -31,21 +31,21 @@ public:\
             DECLARE_COMMAND(Transform)
         public:
             TransformCommand(TransformComponent* comp, const Transform& old_transf)
-                : _comp(comp), _old_transf(old_transf),_new_transf(comp->SelfTransform()) {}
+                : _comp(comp), _old_transf(old_transf), _new_transf(comp->_transform) {}
 
             void Execute() override
             {
-                _comp->SetPosition(_new_transf._position);
-                _comp->SetRotation(_new_transf._rotation);
-                _comp->SetScale(_new_transf._scale);
+                _comp->_transform._position = _new_transf._position;
+                _comp->_transform._rotation = _new_transf._rotation;
+                _comp->_transform._scale = _new_transf._scale;
                 g_pLogMgr->LogFormat("Exe or redo {}",s_name);
             }
 
             void Undo() override
             {
-                _comp->SetPosition(_old_transf._position);
-                _comp->SetRotation(_old_transf._rotation);
-                _comp->SetScale(_old_transf._scale);
+                _comp->_transform._position = _old_transf._position;
+                _comp->_transform._rotation = _old_transf._rotation;
+                _comp->_transform._scale = _old_transf._scale;
                 g_pLogMgr->LogFormat("Undo {}",s_name);
             }
         private:

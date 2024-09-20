@@ -20,15 +20,16 @@ namespace Ailu
 		using ALSecond = std::chrono::seconds;
 		using ALMSecond = std::chrono::duration<float, std::ratio<1, 1000>>;
 		using ALTimeStamp = std::chrono::high_resolution_clock::time_point;
-		inline static float DeltaTime = 0.0f;
-		inline static float TimeSinceLoad = 0.0f;
-                static f32 s_time_scale;
+		inline static f32 DeltaTime = 0.0f;
+		inline static f32 TimeSinceLoad = 0.0f;
+		inline static f32 s_smooth_delta_time = 0.0f;
+		static f32 s_time_scale;
 		static float GetScaledWorldTime(float scale = TimeMgr::s_time_scale,bool smooth_scale = true);
 		static String CurrentTime(String format = "%Y-%m-%d_%H:%M:%S");
 
-		int Initialize() override;
-		void Finalize() override;
-		void Tick(const float& delta_time) override;
+		int Initialize() final;
+        void Finalize() final;
+		void Tick(f32 delta_time) final;
 		void Pause();
 		void Mark();
 		float GetElapsedSinceLastMark();

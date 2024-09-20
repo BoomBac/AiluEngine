@@ -9,9 +9,6 @@
 #include "Render/RenderQueue.h"
 #include "Render/RenderingData.h"
 #include "pch.h"
-#include <Objects/LightProbeComponent.h>
-
-#include "Objects/CameraComponent.h"
 
 #include "Render/Renderer.h"
 
@@ -37,7 +34,7 @@ namespace Ailu
         _error_shader_pass_id = 0;
         _compiling_shader_pass_id = 1;
         _forward_lit_shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
-        AL_ASSERT(_forward_lit_shader == nullptr);
+        AL_ASSERT(_forward_lit_shader != nullptr);
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeTransparent + 25u);
     }
     ForwardPass::~ForwardPass()
@@ -80,7 +77,10 @@ namespace Ailu
                 {
                     for (auto &obj: objs)
                     {
-                        cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                        if (obj._material == nullptr)
+                            cmd->DrawRenderer(obj._mesh, shader_state_mat.get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, _error_shader_pass_id, obj._instance_count);
+                        else
+                            cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     }
                 }
             }
@@ -121,7 +121,8 @@ namespace Ailu
             //方向光阴影，只有一个
             if (rendering_data._shadow_data[0]._shadow_index != -1)
             {
-                for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
+                for (int i = 0; i < 1; i++)
+                //for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
                 {
                     u16 dsv_rt_index = _p_mainlight_shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
                     cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get(), 0, dsv_rt_index);
@@ -132,7 +133,9 @@ namespace Ailu
                         auto &[queue, objs] = it;
                         for (auto &obj: objs)
                         {
-                            cmd->DrawRenderer(obj._mesh, _shadowcast_materials[i].get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, obj._instance_count);
+                            obj._material->SetUint("shadow_index", rendering_data._shadow_data[i]._shadow_index);
+                            if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
+                                cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16)shadow_pass,obj._instance_count);
                         }
                     }
                 }
@@ -233,19 +236,18 @@ namespace Ailu
         Vector3f world_up = Vector3f::kUp;
         if (!_is_src_cubemap)
         {
-            _src_cubemap = RenderTexture::Create(size, src_tex->Name() + "_src_cubemap", ERenderTargetFormat::kRGBAFloat, true, true, true);
+            _src_cubemap = RenderTexture::Create(size, src_tex->Name() + "_src_cubemap", ERenderTargetFormat::kDefaultHDR, true, true, true);
             _src_cubemap->CreateView();
         }
         else
             _input_src = src_tex;
 
-        _prefilter_cubemap = RenderTexture::Create(size, src_tex->Name() + "_prefilter_cubemap", ERenderTargetFormat::kRGBAFloat, true, true, true);
+        _prefilter_cubemap = RenderTexture::Create(size, src_tex->Name() + "_prefilter_cubemap", ERenderTargetFormat::kDefaultHDR, true, true, true);
         _prefilter_cubemap->CreateView();
-        _radiance_map = RenderTexture::Create(size / 4, src_tex->Name() + "_radiance", ERenderTargetFormat::kRGBAFloat, false);
+        _radiance_map = RenderTexture::Create(size / 4, src_tex->Name() + "_radiance", ERenderTargetFormat::kDefaultHDR, false);
         _radiance_map->CreateView();
         _p_gen_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/CubemapGen");
         _p_gen_material->SetTexture("env", src_tex);
-        _p_cube_mesh = Mesh::s_p_cube;
         _p_filter_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/EnvmapFilter");
         Matrix4x4f view, proj;
         BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0f, 0.01f, 100.f);
@@ -307,7 +309,7 @@ namespace Ailu
                 cmd->SetRenderTarget(_src_cubemap.get(), rt_index);
                 cmd->ClearRenderTarget(_src_cubemap.get(), Colors::kBlack, rt_index);
                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
-                cmd->DrawRenderer(_p_cube_mesh, _p_gen_material, _per_obj_cb.get(), 0, 0, 1);
+                cmd->DrawRenderer(Mesh::s_p_cube.lock().get(), _p_gen_material, _per_obj_cb.get(), 0, 0, 1);
             }
             context->ExecuteAndWaitCommandBuffer(cmd);
             cmd->Clear();
@@ -327,7 +329,7 @@ namespace Ailu
             cmd->SetRenderTarget(_radiance_map.get(), rt_index);
             cmd->ClearRenderTarget(_radiance_map.get(), Colors::kBlack, rt_index);
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
-            cmd->DrawRenderer(_p_cube_mesh, _p_filter_material, _per_obj_cb.get());
+            cmd->DrawRenderer(Mesh::s_p_cube.lock().get(), _p_filter_material, _per_obj_cb.get());
         }
         //filter envmap
         mipmap_level = _prefilter_cubemap->MipmapLevel() + 1;
@@ -346,7 +348,7 @@ namespace Ailu
                 cmd->SetRenderTarget(_prefilter_cubemap.get(), rt_index);
                 cmd->ClearRenderTarget(_prefilter_cubemap.get(), Colors::kBlack, rt_index);
                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
-                cmd->DrawRenderer(_p_cube_mesh, _reflection_prefilter_mateirals[j].get(), _per_obj_cb.get(), 0, 1, 1);
+                cmd->DrawRenderer(Mesh::s_p_cube.lock().get(), _reflection_prefilter_mateirals[j].get(), _per_obj_cb.get(), 0, 1, 1);
             }
         }
 
@@ -381,8 +383,8 @@ namespace Ailu
             ProfileBlock profile(cmd.get(), _name);
             cmd->SetRenderTargets(rendering_data._gbuffers, rendering_data._camera_depth_target_handle);
             cmd->ClearRenderTarget(rendering_data._gbuffers, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
-            cmd->SetViewports({_rects[0], _rects[1], _rects[2], _rects[3]});
-            cmd->SetScissorRects({_rects[0], _rects[1], _rects[2], _rects[3]});
+            cmd->SetViewports({_rects[0], _rects[1], _rects[2], _rects[3], _rects[4]});
+            cmd->SetScissorRects({_rects[0], _rects[1], _rects[2], _rects[3], _rects[4]});
 
             u32 obj_index = 0;
             for (auto &it: *rendering_data._cull_results)
@@ -433,6 +435,7 @@ namespace Ailu
         _p_lighting_material->SetTexture("_GBuffer1", rendering_data._gbuffers[1]);
         _p_lighting_material->SetTexture("_GBuffer2", rendering_data._gbuffers[2]);
         _p_lighting_material->SetTexture("_GBuffer3", rendering_data._gbuffers[3]);
+        _p_lighting_material->SetTexture("_GBuffer4", rendering_data._gbuffers[4]);
         _p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
         Shader::SetGlobalTexture("IBLLut", _brdf_lut.get());
         auto cmd = CommandBufferPool::Get("DeferredLightingPass");
@@ -460,7 +463,6 @@ namespace Ailu
         _p_lut_gen = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/atmosphere_lut_gen.hlsl"));
         //_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.alasset"), "SkyboxPP");
         _p_skybox_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
-        _p_sky_mesh = Mesh::s_p_shpere;
         Matrix4x4f world_mat;
         MatrixScale(world_mat, 1000.f, 1000.f, 1000.f);
         _p_cbuffer.reset(IConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
@@ -488,6 +490,11 @@ namespace Ailu
         cmd->Clear();
         {
             ProfileBlock profile(cmd.get(), _name);
+            if (_is_clear)
+            {
+                cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, Colors::kBlack);
+                cmd->ClearRenderTarget(rendering_data._camera_depth_target_handle, 1.0f);
+            }
             //auto t_lut = cmd->GetTempRT(_transmittance_lut_size.x, _transmittance_lut_size.y, "_TransmittanceLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
             //auto ms_lut = cmd->GetTempRT(_mult_scatter_lut_size.x, _mult_scatter_lut_size.y, "_MultScatterLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
             auto sv_lut = cmd->GetTempRT(_sky_lut_size.x, _sky_lut_size.y, "_SkyLightLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
@@ -503,7 +510,7 @@ namespace Ailu
             _p_skybox_material->SetTexture("_TexSkyViewLUT", sv_lut);
             _p_skybox_material->SetTexture("_TexTransmittanceLUT", _tlut.get());
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
-            cmd->DrawRenderer(_p_sky_mesh, _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
+            cmd->DrawRenderer(Mesh::s_p_shpere.lock().get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
 
             //cmd->ReleaseTempRT(t_lut);
             //cmd->ReleaseTempRT(ms_lut);
@@ -524,7 +531,7 @@ namespace Ailu
     //-------------------------------------------------------------GizmoPass-------------------------------------------------------------
     GizmoPass::GizmoPass() : RenderPass("GizmoPass")
     {
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 20; i++)
         {
             _p_cbuffers.push_back(std::unique_ptr<IConstantBuffer>(IConstantBuffer::Create(256)));
         }
@@ -538,8 +545,9 @@ namespace Ailu
         static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
         static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
         static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
-        static auto mat_camera_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
+        static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
         static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
+        static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
         cmd->Clear();
         {
             cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProjection());
@@ -551,53 +559,54 @@ namespace Ailu
             u8 camera_buf_slot = GraphicsPipelineStateMgr::s_gizmo_pso->NameToSlot(RenderConstants::kCBufNamePerCamera);
             GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(cmd.get(), rendering_data._p_per_camera_cbuf, EBindResDescType::kConstBuffer, camera_buf_slot);
             Gizmo::Submit(cmd.get());
-            cmd->DrawRenderer(Mesh::s_p_plane, mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
+            cmd->DrawRenderer(Mesh::s_p_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
             u16 index = 1;
-            for (auto it: g_pSceneMgr->_p_current->GetAllComponents())
+            u16 entity_index = 0;
+            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<LightComponent>())
             {
-                if (index >= 10)
+                if (index >= 20)
                     break;
-                if (it == nullptr)
-                    continue;
-                auto light_comp = dynamic_cast<LightComponent *>(it);
-                auto world_pos = it->GetOwner()->GetComponent<TransformComponent>()->GetPosition();
+                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<LightComponent, TransformComponent>(entity_index++);
+                auto world_pos = t->_transform._position;
                 auto m = MatrixTranslation(world_pos);
-                f32 scale = dynamic_cast<SceneActor *>(it->GetOwner())->BaseAABB().Size().x;
+                f32 scale = 2.0f;
                 m = MatrixScale(scale, scale, scale) * m;
                 memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
-                if (light_comp)
+                switch (light_comp._type)
                 {
-                    switch (light_comp->LightType())
+                    case ELightType::kDirectional:
                     {
-                        case ELightType::kDirectional:
-                        {
-                            //cmd->DrawRenderer(Mesh::s_p_quad,mat_directional_light, _p_cbuffers[index++].get(), 0, 0, 1);
-                            cmd->DrawMesh(Mesh::s_p_quad, mat_directional_light, m);
-                        }
-                        break;
-                        case ELightType::kPoint:
-                        {
-                            //cmd->DrawRenderer(Mesh::s_p_quad, mat_point_light, _p_cbuffers[index++].get(), 0, 0, 1);
-                            cmd->DrawMesh(Mesh::s_p_quad, mat_point_light, m);
-                        }
-                        break;
-                        case ELightType::kSpot:
-                        {
-                            //cmd->DrawRenderer(Mesh::s_p_quad, mat_spot_light, _p_cbuffers[index++].get(), 0, 0, 1);
-                            cmd->DrawMesh(Mesh::s_p_quad, mat_spot_light, m);
-                        }
-                        break;
+                        cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_directional_light, m);
                     }
-                    continue;
+                    break;
+                    case ELightType::kPoint:
+                    {
+                        cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_point_light, m);
+                    }
+                    break;
+                    case ELightType::kSpot:
+                    {
+                        cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_spot_light, m);
+                    }
+                    break;
                 }
-                if (auto light_probe_comp = dynamic_cast<LightProbeComponent *>(it))
-                {
-                    cmd->DrawRenderer(Mesh::s_p_shpere, light_probe_comp->_debug_mat.get(), _p_cbuffers[index++].get(), 0, 0, 1);
-                }
-                else if (auto cam_comp = dynamic_cast<CameraComponent *>(it))
-                {
-                    cmd->DrawRenderer(Mesh::s_p_quad, mat_camera_light, _p_cbuffers[index++].get(), 0, 0, 1);
-                }
+            }
+            entity_index = 0;
+            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<CLightProbe>())
+            {
+                if (index >= 20)
+                    break;
+                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<CLightProbe, TransformComponent>(entity_index++);
+                auto world_pos = t->_transform._position;
+                auto m = MatrixTranslation(world_pos);
+                f32 scale = 2.0f;
+                m = MatrixScale(scale, scale, scale) * m;
+                memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
+                cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_lightprobe, m);
+            }
+            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<CCamera>())
+            {
+                cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_camera, _p_cbuffers[index++].get(), 0, 0, 1);
             }
         }
         context->ExecuteCommandBuffer(cmd);
@@ -702,4 +711,57 @@ namespace Ailu
         _p_blit_mat->SetTexture("_SourceTex", nullptr);
     }
     //-------------------------------------------------------------CopyDepthPass-------------------------------------------------------------
+
+    //-------------------------------------------------------------WireFramePass-------------------------------------------------------------
+    WireFramePass::WireFramePass() : RenderPass("WireFramePass")
+    {
+
+        _wireframe_mat = g_pResourceMgr->GetRef<Material>(L"Runtime/Material/Wireframe");
+        _event = ERenderPassEvent::kAfterPostprocess;
+    }
+    WireFramePass::~WireFramePass()
+    {
+
+    }
+    void WireFramePass::Execute(GraphicsContext *context, RenderingData &rendering_data)
+    {
+        auto &all_renderable = *rendering_data._cull_results;
+        auto cmd = CommandBufferPool::Get(_name);
+        {
+            ProfileBlock b(cmd.get(), _name);
+            cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+            for (auto &it: all_renderable)
+            {
+                auto &[queue, objs] = it;
+                for (auto &obj: objs)
+                {
+                    if (!_wireframe_mats.contains(obj._material->Name()))
+                    {
+                        WString shader_name_w = ToWStr(obj._material->GetShader()->Name().c_str());
+                        shader_name_w = std::format(L"Runtime/Shader/Wireframe_{}", shader_name_w);
+                        if (!_wireframe_shaders.contains(shader_name_w))
+                        {
+                            auto wireframe_shader = Shader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/wireframe.hlsl"));
+                            auto &pass = obj._material->GetShader()->GetPassInfo(0);
+                            wireframe_shader->SetVertexShader(0, pass._vert_src_file, pass._vert_entry);
+                            wireframe_shader->Compile();
+                            g_pResourceMgr->RegisterResource(shader_name_w, wireframe_shader);
+                        }
+                        auto mat = MakeRef<Material>(*obj._material);
+                        mat->ChangeShader(g_pResourceMgr->Get<Shader>(shader_name_w));
+                        _wireframe_mats[obj._material->Name()] = mat;
+
+                    }
+                    cmd->DrawRenderer(obj._mesh, _wireframe_mats[obj._material->Name()].get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                }
+            }
+        }
+        context->ExecuteCommandBuffer(cmd);
+        CommandBufferPool::Release(cmd);
+    }
+    
+    void WireFramePass::BeginPass(GraphicsContext *context) {};
+    void WireFramePass::EndPass(GraphicsContext *context) {};
+    //-------------------------------------------------------------WireFramePass-------------------------------------------------------------
+
 }// namespace Ailu

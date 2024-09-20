@@ -218,7 +218,9 @@ namespace Ailu
         //return .*
         static WString ExtractExt(const WString &asset_path)
         {
-            return asset_path.substr(asset_path.find_last_of(L"."));
+            if (auto dot_pos = asset_path.find_last_of(L"."); dot_pos != asset_path.npos)
+                return asset_path.substr(asset_path.find_last_of(L"."));
+            return WString();
         }
 
         static WString ExtarctDirectory(const WString &asset_path)

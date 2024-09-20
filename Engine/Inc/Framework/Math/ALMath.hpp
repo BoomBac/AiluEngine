@@ -179,7 +179,7 @@ namespace Ailu
 
             std::string ToString(int precision = 2)
             {
-                return std::format("({:.{}f},{:.{}f})", data[0], precision, data[1], precision);
+                return std::format("{:.{}f},{:.{}f}", data[0], precision, data[1], precision);
             }
 
             friend std::ostream &operator<<(std::ostream &os, const Vector2D<T> &vec)
@@ -289,6 +289,11 @@ namespace Ailu
             Vector3D<T>() : x(0), y(0), z(0){};
             Vector3D<T>(const T &_v) : x(_v), y(_v), z(_v){};
             Vector3D<T>(const T &_x, const T &_y, const T &_z) : x(_x), y(_y), z(_z){};
+            template<typename Archive>
+            void serialize(Archive &ar, u32 version)
+            {
+                ar &ToString();
+            }
 
             bool operator==(const Vector3D<T> &other) const
             {
@@ -356,7 +361,7 @@ namespace Ailu
                 {
                     for (u8 i = 0; i < CountOf(data); i++)
                     {
-                        AL_ASSERT_MSG(other.data[i] == 0.f, "vector divide by zero commpoent!");
+                        AL_ASSERT_MSG(other.data[i] != 0.f, "vector divide by zero commpoent!");
                         //if (other.data[i] == 0.f) throw(std::runtime_error("vector divide by zero commpoent!"));
                         data[i] /= other.data[i];
                     }
@@ -388,7 +393,19 @@ namespace Ailu
 
             std::string ToString(int precision = 2) const
             {
-                return std::format("({:.{}f},{:.{}f},{:.{}f})", data[0], precision, data[1], precision, data[2], precision);
+                return std::format("{:.{}f},{:.{}f},{:.{}f}", data[0], precision, data[1], precision, data[2], precision);
+            }
+            bool FromString(const std::string &str)
+            {
+                std::stringstream ss(str);
+                char delimiter;
+                if (!(ss >> data[0] >> delimiter) || delimiter != ',' ||
+                    !(ss >> data[1] >> delimiter) || delimiter != ',' ||
+                    !(ss >> data[2]))
+                {
+                    return false;
+                }
+                return true;
             }
         };
         template<typename T>
@@ -510,6 +527,23 @@ namespace Ailu
                 Vector4D<T> v{*this};
                 v *= scale;
                 return v;
+            }
+            std::string ToString(int precision = 2) const
+            {
+                return std::format("{:.{}f},{:.{}f},{:.{}f},{:.{}f}", data[0], precision, data[1], precision, data[2], precision, data[3], precision);
+            }
+            bool FromString(const std::string &str)
+            {
+                std::stringstream ss(str);
+                char delimiter;
+                if (!(ss >> data[0] >> delimiter) || delimiter != ',' ||
+                    !(ss >> data[1] >> delimiter) || delimiter != ',' ||
+                    !(ss >> data[2] >> delimiter) || delimiter != ',' ||
+                    !(ss >> data[3]))
+                {
+                    return false;
+                }
+                return true;
             }
         };
         template<typename T>
@@ -840,6 +874,56 @@ namespace Ailu
             }
             operator T *() { return &data[0][0]; };
             operator const T *() const { return static_cast<const T *>(&data[0][0]); };
+            // ToString method
+            std::string ToString() const
+            {
+                std::ostringstream oss;
+                for (int i = 0; i < rows; ++i)
+                {
+                    for (int j = 0; j < cols; ++j)
+                    {
+                        oss << data[i][j];
+                        if (j < cols - 1)
+                        {
+                            oss << ", ";
+                        }
+                    }
+                    if (i < rows - 1)
+                    {
+                        oss << "; ";
+                    }
+                }
+                return oss.str();
+            }
+
+            // FromString method
+            void FromString(const std::string &str)
+            {
+                std::istringstream iss(str);
+                std::string row;
+                for (int i = 0; i < rows; ++i)
+                {
+                    if (!std::getline(iss, row, ';'))
+                    {
+                        throw std::runtime_error("Invalid input string format");
+                    }
+                    std::istringstream rowStream(row);
+                    std::string value;
+                    for (int j = 0; j < cols; ++j)
+                    {
+                        if (!std::getline(rowStream, value, ','))
+                        {
+                            throw std::runtime_error("Invalid input string format");
+                        }
+                        if constexpr (std::is_same_v<T, float>)
+                            data[i][j] = static_cast<T>(std::stof(value));
+                        else if constexpr (std::is_same_v<T, double>)
+                            data[i][j] = static_cast<T>(std::stod(value));
+                        else
+                            data[i][j] = static_cast<T>(std::stoi(value));
+                    }
+                }
+            }
         };
         using Matrix4x4f = Matrix<float, 4, 4>;
         using Matrix3x3f = Matrix<float, 3, 3>;
@@ -1206,7 +1290,7 @@ namespace Ailu
             float max;
             int maxj;
 
-            AL_ASSERT(inverse == mat);
+            AL_ASSERT(inverse != mat);
 
             /* Set inverse to identity */
             for (i = 0; i < 4; i++)
@@ -1282,7 +1366,7 @@ namespace Ailu
         [[nodiscard]] static Matrix4x4f MatrixInverse(const Matrix4x4f &mat)
         {
             Matrix4x4f ret;
-            invert_m4_m4(ret.data,mat.data);
+            invert_m4_m4(ret.data, mat.data);
             return ret;
         }
 
@@ -1541,6 +1625,11 @@ namespace Ailu
                 os << q.x << "," << q.y << "," << q.z << "," << q.w;
                 return os;
             }
+            template<typename Archive>
+            void serialize(Archive &ar, u32 version)
+            {
+                ar &ToString();
+            }
             Quaternion &operator=(const Quaternion &other)
             {
                 memcpy(this, &other, sizeof(Quaternion));
@@ -1609,7 +1698,20 @@ namespace Ailu
 
             std::string ToString(int precision = 2) const
             {
-                return std::format("({:.{}f},{:.{}f},{:.{}f},{:.{}f})", x, precision, y, precision, z, precision, w, precision);
+                return std::format("{:.{}f},{:.{}f},{:.{}f},{:.{}f}", x, precision, y, precision, z, precision, w, precision);
+            }
+            bool FromString(const std::string &str)
+            {
+                std::stringstream ss(str);
+                char delimiter;
+                if (!(ss >> _quat.data[0] >> delimiter) || delimiter != ',' ||
+                    !(ss >> _quat.data[1] >> delimiter) || delimiter != ',' ||
+                    !(ss >> _quat.data[2] >> delimiter) || delimiter != ',' ||
+                    !(ss >> _quat.data[3]))
+                {
+                    return false;
+                }
+                return true;
             }
 
             void NormalizeQ()
@@ -1848,8 +1950,8 @@ namespace Ailu
                         {0.0f, 0.0f, 0.0f, 1.0f},
                 }}};
             }
-//https://github.com/blender/blender/blob/756538b4a117cb51a15e848fa6170143b6aafcd8/source/blender/blenlib/intern/math_rotation.c#L272
-/* hints for branch prediction, only use in code that runs a _lot_ */
+            //https://github.com/blender/blender/blob/756538b4a117cb51a15e848fa6170143b6aafcd8/source/blender/blenlib/intern/math_rotation.c#L272
+            /* hints for branch prediction, only use in code that runs a _lot_ */
             static Quaternion FromMat4f(const Matrix4x4f &mat)
             {
                 Quaternion q;
@@ -1970,7 +2072,7 @@ namespace Ailu
             }
             return res;
         }
-        template<float>
+        template<>
         static float lerp(const float &src, const float &des, const float &weight)
         {
             return (1.f - weight) * src + weight * des;
@@ -2205,11 +2307,16 @@ namespace Ailu
                 }
                 bool operator<(const Hash<Size> &other) const
                 {
-                    return _hash.to_ullong() < other._hash.to_ullong();
+                    for (int i = Size - 1; i >= 0; --i)
+                    {
+                        if (_hash[i] != other._hash[i])
+                            return _hash[i] < other._hash[i];
+                    }
+                    return false;
                 }
                 String ToString() const
                 {
-                    return std::format("{}", _hash.to_ullong());
+                    return _hash.to_string();
                 }
                 struct HashFunc
                 {

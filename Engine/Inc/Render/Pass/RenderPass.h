@@ -51,8 +51,10 @@ namespace Ailu
         RenderFeature(const String &name);
         ~RenderFeature();
         virtual void AddRenderPasses(Renderer *renderer, RenderingData &rendering_data) {};
-
+        bool IsActive() const { return _is_active; };
+        void SetActive(bool is_active) { _is_active = is_active; };
     protected:
+        bool _is_active;
     };
 
     class ForwardPass : public RenderPass
@@ -139,7 +141,6 @@ namespace Ailu
         Vector<Ref<Material>> _reflection_prefilter_mateirals;
         Material *_p_gen_material;
         Material *_p_filter_material;
-        Mesh *_p_cube_mesh;
     };
     // 32-bit: standard gbuffer layout
     //ds 24-8
@@ -156,7 +157,7 @@ namespace Ailu
         void EndPass(GraphicsContext *context) final;
 
     private:
-        Array<Rect, 4> _rects;
+        Array<Rect, 5> _rects;
     };
 
     class DeferredLightingPass : public RenderPass
@@ -177,16 +178,16 @@ namespace Ailu
     {
     public:
         SkyboxPass();
+        void Setup(bool clear_first) {_is_clear = clear_first;}
         void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
         void BeginPass(GraphicsContext *context) final;
         void EndPass(GraphicsContext *context) final;
 
     private:
-        Mesh *_p_sky_mesh;
         Ref<Material> _p_skybox_material;
         Scope<IConstantBuffer> _p_cbuffer;
         Ref<ComputeShader> _p_lut_gen;
-
+        bool _is_clear = false;
         Vector2Int _transmittance_lut_size = Vector2Int(256, 64);
         Vector2Int _mult_scatter_lut_size = Vector2Int(32, 32);
         Vector2Int _sky_lut_size = Vector2Int(192, 192);
@@ -204,6 +205,21 @@ namespace Ailu
 
     private:
         Vector<Scope<IConstantBuffer>> _p_cbuffers;
+    };
+
+    class WireFramePass : public RenderPass
+    {
+    public:
+        WireFramePass();
+        ~WireFramePass();
+        void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
+        void BeginPass(GraphicsContext *context) final;
+        void EndPass(GraphicsContext *context) final;
+    private:
+        Ref<Shader> _wireframe_shader;
+        Ref<Material> _wireframe_mat;
+        std::unordered_map<String, Ref<Material>> _wireframe_mats;
+        std::set<WString> _wireframe_shaders;
     };
 }// namespace Ailu
 

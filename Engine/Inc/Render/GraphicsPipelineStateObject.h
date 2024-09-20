@@ -2,13 +2,12 @@
 #ifndef __GFX_PIPELINE_STATE_H__
 #define __GFX_PIPELINE_STATE_H__
 
-#include "PipelineState.h"
+#include "AlgFormat.h"
 #include "Framework/Math/ALMath.hpp"
 #include "GlobalMarco.h"
+#include "PipelineState.h"
 #include "Shader.h"
-#include "AlgFormat.h"
 #include "Texture.h"
-
 
 
 //ref
@@ -18,129 +17,133 @@
 
 namespace Ailu
 {
-	struct GraphicsPipelineStateInitializer
-	{
-		VertexInputLayout _input_layout; //0~3 4
-		Shader* _p_vertex_shader; //4~13 10
-		Shader* _p_pixel_shader; // 14~35 22
-		ETopology _topology; //36~37 2
-		BlendState _blend_state; // 38~40 3
-		RasterizerState _raster_state;// 41 ~ 43 3
-		DepthStencilState _depth_stencil_state;// 44~46 3
-		RenderTargetState _rt_state;// 47~49 3
+    struct GraphicsPipelineStateInitializer
+    {
+        VertexInputLayout _input_layout;       //0~3 4
+        Shader *_p_vertex_shader;              //4~13 10
+        Shader *_p_pixel_shader;               // 14~35 22
+        ETopology _topology;                   //36~37 2
+        BlendState _blend_state;               // 38~40 3
+        RasterizerState _raster_state;         // 41 ~ 43 3
+        DepthStencilState _depth_stencil_state;// 44~46 3
+        RenderTargetState _rt_state;           // 47~49 3
 
-		static GraphicsPipelineStateInitializer GetNormalOpaquePSODesc()
-		{
-			GraphicsPipelineStateInitializer pso_desc{};
-			pso_desc._blend_state = BlendState{};
-			pso_desc._depth_stencil_state = TStaticDepthStencilState<true, ECompareFunc::kLess>::GetRHI();
-			pso_desc._rt_state = RenderTargetState{};
-			pso_desc._topology = ETopology::kTriangle;
-			pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kSolid>::GetRHI();
-			return pso_desc;
-		}
+        static GraphicsPipelineStateInitializer GetNormalOpaquePSODesc()
+        {
+            GraphicsPipelineStateInitializer pso_desc{};
+            pso_desc._blend_state = BlendState{};
+            pso_desc._depth_stencil_state = TStaticDepthStencilState<true, ECompareFunc::kLess>::GetRHI();
+            pso_desc._rt_state = RenderTargetState{};
+            pso_desc._topology = ETopology::kTriangle;
+            pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kSolid>::GetRHI();
+            return pso_desc;
+        }
 
-		static GraphicsPipelineStateInitializer GetNormalTransparentPSODesc()
-		{
-			GraphicsPipelineStateInitializer pso_desc{};
-			pso_desc._blend_state = TStaticBlendState<true, EBlendFactor::kSrcAlpha, EBlendFactor::kOneMinusSrcAlpha>::GetRHI();
-			pso_desc._rt_state = RenderTargetState{};
-			pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
-			pso_desc._topology = ETopology::kTriangle;
-			pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kSolid>::GetRHI();
-			return pso_desc;
-		}
-	};
+        static GraphicsPipelineStateInitializer GetNormalTransparentPSODesc()
+        {
+            GraphicsPipelineStateInitializer pso_desc{};
+            pso_desc._blend_state = TStaticBlendState<true, EBlendFactor::kSrcAlpha, EBlendFactor::kOneMinusSrcAlpha>::GetRHI();
+            pso_desc._rt_state = RenderTargetState{};
+            pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kAlways>::GetRHI();
+            pso_desc._topology = ETopology::kTriangle;
+            pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kSolid>::GetRHI();
+            return pso_desc;
+        }
+    };
 
-	class CommandBuffer;
-	class GraphicsPipelineStateObject
-	{
-		struct StateHashStruct
-		{
-			struct BitDesc
-			{
-				u8 _pos;
-				u8 _size;
-			};
-			inline static const BitDesc kShader = {0,46};
-			inline static const BitDesc kInputlayout = {46,4};
-			inline static const BitDesc kTopology = {50,2};
-			inline static const BitDesc kBlendState = {52,3};
-			inline static const BitDesc kRasterState = {55,2};
-			inline static const BitDesc kDepthStencilState = {57,3};
-			inline static const BitDesc kRenderTargetState = {60,4};
-		};
-	public:
-		static Scope<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer& initializer);
-		static ALHash::Hash<64> ConstructPSOHash(u8 input_layout,u64 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
-		static void ConstructPSOHash(ALHash::Hash<64>& hash,u8 input_layout, u64 shader,u8 topology,u8 blend_state,u8 raster_state,u8 ds_state,u8 rt_state);
-		static ALHash::Hash<64> ConstructPSOHash(const GraphicsPipelineStateInitializer& initializer,u16 pass_index = 0, ShaderVariantHash variant_hash = 0);
-		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u8& input_layout, u64& shader, u8& topology, u8& blend_state, u8& raster_state, u8& ds_state, u8& rt_state);
-		static void ExtractPSOHash(const ALHash::Hash<64>& pso_hash, u64& shader);
+    using PSOHash = ALHash::Hash<128>;
+    class CommandBuffer;
+    class GraphicsPipelineStateObject
+    {
+        struct StateHashStruct
+        {
+            struct BitDesc
+            {
+                u8 _pos;
+                u8 _size;
+            };
+            inline static const BitDesc kShader = {0, 46};
+            inline static const BitDesc kInputlayout = {46, 4};
+            inline static const BitDesc kTopology = {50, 2};
+            inline static const BitDesc kBlendState = {52, 3};
+            inline static const BitDesc kRasterState = {55, 2};
+            inline static const BitDesc kDepthStencilState = {57, 5};
+            inline static const BitDesc kRenderTargetState = {62, 4};
+        };
 
-		virtual ~GraphicsPipelineStateObject() = default;
-		virtual void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) = 0;
-		virtual void Bind(CommandBuffer* cmd) = 0;
-		virtual void SetPipelineResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) = 0;
-		virtual bool IsValidPipelineResource(const EBindResDescType& res_type, u8 slot) const = 0;
-		virtual const ALHash::Hash<64>& Hash() = 0;
-		virtual const String& Name() const = 0;
-		virtual const String& SlotToName(u8 slot) = 0;
-		virtual const u8 NameToSlot(const String& name) = 0;
-	protected:
-		virtual void BindResource(CommandBuffer* cmd,void* res, const EBindResDescType& res_type, u8 slot = 255) = 0;
-		struct BindResDescSlotOffset
-		{
-			u8 kConstBuffer = 32;
-			u8 kTexture2D = 64;
-			u8 kTextureCube = 96;
-			u8 kSampler = 128;
-		};
-	};
+    public:
+        static Scope<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer &initializer);
+        static PSOHash ConstructPSOHash(u8 input_layout, u64 shader, u8 topology, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state);
+        static void ConstructPSOHash(PSOHash &hash, u8 input_layout, u64 shader, u8 topology, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state);
+        static PSOHash ConstructPSOHash(const GraphicsPipelineStateInitializer &initializer, u16 pass_index = 0, ShaderVariantHash variant_hash = 0);
+        static void ExtractPSOHash(const PSOHash &pso_hash, u8 &input_layout, u64 &shader, u8 &topology, u8 &blend_state, u8 &raster_state, u8 &ds_state, u8 &rt_state);
+        static void ExtractPSOHash(const PSOHash &pso_hash, u64 &shader);
 
-	class GraphicsPipelineStateMgr
-	{
-	public:
-		inline static Scope<GraphicsPipelineStateObject> s_gizmo_pso = nullptr;
-		static void BuildPSOCache();
-		static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
-		static void EndConfigurePSO(CommandBuffer* cmd);
-		static void OnShaderRecompiled(Shader* shader,u16 pass_id,ShaderVariantHash variant_hash);
-		static void ConfigureShader(const u64& shader_hash);
-		static void ConfigureVertexInputLayout(const u8& hash); //0~3 4
-		static void ConfigureTopology(const u8& hash); //36~37 2
-		static void ConfigureBlendState(const u8& hash); // 38~40 3
-		static void ConfigureRasterizerState(const u8& hash);// 41 ~ 43 3
-		static void ConfigureDepthStencilState(const u8& hash);// 44~46 3
-		static void ConfigureRenderTarget(const u8& hash);// 44~46 3
-		static void SetRenderTargetState(EALGFormat::EALGFormat color_format,EALGFormat::EALGFormat depth_format, u8 color_rt_id = 0);
-		static void SetRenderTargetState(EALGFormat::EALGFormat color_format,u8 color_rt_id = 0);
-		//call before cmd->SetRenderTarget
-		static void ResetRenderTargetState();
+        virtual ~GraphicsPipelineStateObject() = default;
+        virtual void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) = 0;
+        virtual void Bind(CommandBuffer *cmd) = 0;
+        virtual void SetPipelineResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) = 0;
+        virtual bool IsValidPipelineResource(const EBindResDescType &res_type, u8 slot) const = 0;
+        virtual const PSOHash &Hash() = 0;
+        virtual const String &Name() const = 0;
+        virtual const String &SlotToName(u8 slot) = 0;
+        virtual const u8 NameToSlot(const String &name) = 0;
 
-		static bool IsReadyForCurrentDrawCall() { return s_is_ready; }
+    protected:
+        virtual void BindResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) = 0;
+        struct BindResDescSlotOffset
+        {
+            u8 kConstBuffer = 32;
+            u8 kTexture2D = 64;
+            u8 kTextureCube = 96;
+            u8 kSampler = 128;
+        };
+    };
 
-		static void SubmitBindResource(void* res, const EBindResDescType& res_type, u8 slot,u16 priority);
-		static void SubmitBindResource(void* res, const EBindResDescType& res_type, const String& name,u16 priority);
-		static void UpdateAllPSOObject();
-	private:
-		inline static Queue<Scope<GraphicsPipelineStateObject>> s_update_pso{};
-		inline static std::map<ALHash::Hash<64>, Scope<GraphicsPipelineStateObject>> s_pso_library{};
-		inline static u32 s_reserved_pso_id = 32u;
-		inline static List<PipelineResourceInfo> s_bind_resource_list{};
-		inline static bool s_is_ready = false;
-		static RenderTargetState _s_render_target_state;
+    class GraphicsPipelineStateMgr
+    {
+    public:
+        inline static Scope<GraphicsPipelineStateObject> s_gizmo_pso = nullptr;
+        static void BuildPSOCache();
+        static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
+        static void EndConfigurePSO(CommandBuffer *cmd);
+        static void OnShaderRecompiled(Shader *shader, u16 pass_id, ShaderVariantHash variant_hash);
+        static void ConfigureShader(const u64 &shader_hash);
+        static void ConfigureVertexInputLayout(const u8 &hash);//0~3 4
+        static void ConfigureTopology(const u8 &hash);         //36~37 2
+        static void ConfigureBlendState(const u8 &hash);       // 38~40 3
+        static void ConfigureRasterizerState(const u8 &hash);  // 41 ~ 43 3
+        static void ConfigureDepthStencilState(const u8 &hash);// 44~46 3
+        static void ConfigureRenderTarget(const u8 &hash);     // 44~46 3
+        static void SetRenderTargetState(EALGFormat::EALGFormat color_format, EALGFormat::EALGFormat depth_format, u8 color_rt_id = 0);
+        static void SetRenderTargetState(EALGFormat::EALGFormat color_format, u8 color_rt_id = 0);
+        //call before cmd->SetRenderTarget
+        static void ResetRenderTargetState();
 
-		inline static ALHash::Hash<64> s_cur_pos_hash{};
-		inline static u64 s_hash_shader; // 4~35 32
-		inline static u8 s_hash_input_layout; //0~3 4
-		inline static u8 s_hash_topology; //36~37 2
-		inline static u8 s_hash_blend_state; // 38~40 3
-		inline static u8 s_hash_raster_state;// 41 ~ 43 3
-		inline static u8 s_hash_depth_stencil_state;// 44~46 3
-		inline static u8 s_hash_rt_state;// 44~46 3
-	};
-}
+        static bool IsReadyForCurrentDrawCall() { return s_is_ready; }
+
+        static void SubmitBindResource(void *res, const EBindResDescType &res_type, u8 slot, u16 priority);
+        static void SubmitBindResource(void *res, const EBindResDescType &res_type, const String &name, u16 priority);
+        static void UpdateAllPSOObject();
+
+    private:
+        inline static Queue<Scope<GraphicsPipelineStateObject>> s_update_pso{};
+        inline static std::map<PSOHash, Scope<GraphicsPipelineStateObject>> s_pso_library{};
+        inline static u32 s_reserved_pso_id = 32u;
+        inline static List<PipelineResourceInfo> s_bind_resource_list{};
+        inline static bool s_is_ready = false;
+        static RenderTargetState _s_render_target_state;
+
+        inline static PSOHash s_cur_pos_hash{};
+        inline static u64 s_hash_shader;            // 4~35 32
+        inline static u8 s_hash_input_layout;       //0~3 4
+        inline static u8 s_hash_topology;           //36~37 2
+        inline static u8 s_hash_blend_state;        // 38~40 3
+        inline static u8 s_hash_raster_state;       // 41 ~ 43 3
+        inline static u8 s_hash_depth_stencil_state;// 44~46 3
+        inline static u8 s_hash_rt_state;           // 44~46 3
+    };
+}// namespace Ailu
 
 
-#endif // !GFX_PIPELINE_STATE_H__
+#endif// !GFX_PIPELINE_STATE_H__

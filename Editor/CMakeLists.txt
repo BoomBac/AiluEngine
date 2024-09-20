@@ -34,7 +34,7 @@ add_source_files_recursive(${EDITOR_ROOT_PATH}/Src)
 # aux_source_directory (Src Editor_src_dir)
 # 为目标添加 include 目录
 
-add_executable(Editor WIN32 ${PROJECT_SOURCES} Src/Common/Undo.cpp Inc/Common/Undo.h Inc/Widgets/PlaceActors.h Src/Render/CommonRenderPipeline.cpp)
+add_executable(Editor WIN32 ${PROJECT_SOURCES} Src/Common/Undo.cpp Inc/Common/Undo.h Inc/Widgets/PlaceActors.h Src/Render/CommonRenderPipeline.cpp "Inc/Render/PickPass.h" "Src/Render/PickPass.cpp")
 
 
 # 包含路径
@@ -51,11 +51,11 @@ target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_compile_definitions(Editor PUBLIC _DEBUG;Editor_EXPORTS;_WINDOWS)
 set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 # 编译器参数
-if(MSVC)
+# if(MSVC)
     target_compile_options(Editor PUBLIC /MP)
     # MSVC 编译器的警告选项不同，以下是一个示例
     target_compile_options(Editor PUBLIC /D_UNICODE /DUNICODE /wd4819) # /wd4100 禁用未使用的参数警告
-endif()
+# endif()
 # 链接库
 # 设置不同配置的库路径
 #target_link_directories(Editor PRIVATE

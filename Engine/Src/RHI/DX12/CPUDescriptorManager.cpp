@@ -163,7 +163,7 @@ namespace Ailu
 
 	CPUVisibleDescriptorAllocation&& CPUVisibleDescriptorAllocator::Allocate(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num)
 	{
-		AL_ASSERT(num >= kMaxDescriptorNumPerPage);
+		AL_ASSERT(num < kMaxDescriptorNumPerPage);
 		if (!_page_free_space_lut.contains(type))
 		{
 			_page_free_space_lut[type] = HashMap<u16, u16>{};

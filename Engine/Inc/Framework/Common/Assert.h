@@ -13,71 +13,84 @@
 
 namespace Ailu
 {
-	namespace pow2 
-	{
-		namespace Assert
-		{
-			enum FailBehavior
-			{
-				Halt,
-				Continue,
-			};
-			typedef FailBehavior(*Handler)(const char* condition,const char* msg,const char* file,int line);
-			Handler GetHandler();
-			void SetHandler(Handler newHandler);
-			AILU_API FailBehavior ReportFailure(const char* condition,const char* file,int line,const char* msg, ...);
-		}
-	}
+    namespace pow2
+    {
+        namespace Assert
+        {
+            enum FailBehavior
+            {
+                Halt,
+                Continue,
+            };
+            typedef FailBehavior (*Handler)(const char *condition, const char *msg, const char *file, int line);
+            Handler GetHandler();
+            void SetHandler(Handler newHandler);
+            AILU_API FailBehavior ReportFailure(const char *condition, const char *file, int line, const char *msg, ...);
+        }// namespace Assert
+    }// namespace pow2
 
 #define POW2_HALT() __debugbreak()
-#define POW2_UNUSED(x) do { (void)sizeof(x); } while(0)
+#define POW2_UNUSED(x)    \
+    do {                  \
+        (void) sizeof(x); \
+    } while (0)
 
 #ifdef POW2_ASSERTS_ENABLED
-#define POW2_ASSERT(cond) \
-		do \
-		{ \
-			if (cond) \
-			{ \
-				if (Ailu::pow2::Assert::ReportFailure(#cond, __FILE__, __LINE__, 0) == \
-					Ailu::pow2::Assert::Halt) \
-					POW2_HALT(); \
-			} \
-		} while(0)
+#define POW2_ASSERT(cond)                                                          \
+    do                                                                             \
+    {                                                                              \
+        if (!(cond))                                                                  \
+        {                                                                          \
+            if (Ailu::pow2::Assert::ReportFailure(#cond, __FILE__, __LINE__, 0) == \
+                Ailu::pow2::Assert::Halt)                                          \
+                POW2_HALT();                                                       \
+        }                                                                          \
+    } while (0)
 
-#define POW2_ASSERT_MSG(cond, msg, ...) \
-		do \
-		{ \
-			if (cond) \
-			{ \
-				if (Ailu::pow2::Assert::ReportFailure(#cond, __FILE__, __LINE__, (msg), __VA_ARGS__) == \
-					Ailu::pow2::Assert::Halt) \
-					POW2_HALT(); \
-			} \
-		} while(0)
+#define POW2_ASSERT_MSG(cond, msg, ...)                                                             \
+    do                                                                                              \
+    {                                                                                               \
+        if (!(cond))                                                                                   \
+        {                                                                                           \
+            if (Ailu::pow2::Assert::ReportFailure(#cond, __FILE__, __LINE__, (msg), __VA_ARGS__) == \
+                Ailu::pow2::Assert::Halt)                                                           \
+                POW2_HALT();                                                                        \
+        }                                                                                           \
+    } while (0)
 
-#define POW2_ASSERT_FAIL(msg, ...) \
-		do \
-		{ \
-			if (Ailu::pow2::Assert::ReportFailure(0, __FILE__, __LINE__, (msg), __VA_ARGS__) == \
-				Ailu::pow2::Assert::Halt) \
-			POW2_HALT(); \
-		} while(0)
+#define POW2_ASSERT_FAIL(msg, ...)                                                          \
+    do                                                                                      \
+    {                                                                                       \
+        if (Ailu::pow2::Assert::ReportFailure(0, __FILE__, __LINE__, (msg), __VA_ARGS__) == \
+            Ailu::pow2::Assert::Halt)                                                       \
+            POW2_HALT();                                                                    \
+    } while (0)
 
 #define POW2_VERIFY(cond) POW2_ASSERT(cond)
 #define POW2_VERIFY_MSG(cond, msg, ...) POW2_ASSERT_MSG(cond, msg, ##__VA_ARGS__)
 #else
-#define POW2_ASSERT(condition) \
-		do { POW2_UNUSED(condition); } while(0)
+#define POW2_ASSERT(condition)  \
+    do {                        \
+        POW2_UNUSED(condition); \
+    } while (0)
 #define POW2_ASSERT_MSG(condition, msg, ...) \
-		do { POW2_UNUSED(condition); POW2_UNUSED(msg); } while(0)
+    do {                                     \
+        POW2_UNUSED(condition);              \
+        POW2_UNUSED(msg);                    \
+    } while (0)
 #define POW2_ASSERT_FAIL(msg, ...) \
-		do { POW2_UNUSED(msg); } while(0)
-#define POW2_VERIFY(cond) (void)(cond)
+    do {                           \
+        POW2_UNUSED(msg);          \
+    } while (0)
+#define POW2_VERIFY(cond) (void) (cond)
 #define POW2_VERIFY_MSG(cond, msg, ...) \
-		do { (void)(cond); POW2_UNUSED(msg); } while(0)
+    do {                                \
+        (void) (cond);                  \
+        POW2_UNUSED(msg);               \
+    } while (0)
 #endif
 
-	// SampleFramework12 Asserts
+    // SampleFramework12 Asserts
 #ifdef _DEBUG
 #define UseAsserts_ 1
 #else
@@ -103,7 +116,7 @@ namespace Ailu
 #define StaticAssert_(x)
 #define StaticAssertMsg_(x, msg)
 #endif
-}
+}// namespace Ailu
 
 
-#endif // !ASSERT_H__
+#endif// !ASSERT_H__

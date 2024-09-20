@@ -2,6 +2,7 @@
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/SceneMgr.h"
+#include "Framework/Common/TimeMgr.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/Pass/PostprocessPass.h"
@@ -24,7 +25,7 @@ namespace Ailu
         for (int i = 0; i < RenderConstants::kMaxRenderObjectCount; i++)
             _p_per_object_cbufs[i] = IConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
 
-        _rendering_data._gbuffers.resize(4);
+        _rendering_data._gbuffers.resize(5);
         _shadowcast_pass = MakeScope<ShadowCastPass>();
         _gbuffer_pass = MakeScope<DeferredGeometryPass>();
         _coptdepth_pass = MakeScope<CopyDepthPass>();
@@ -35,7 +36,8 @@ namespace Ailu
         _copycolor_pass = MakeScope<CopyColorPass>();
         _postprocess_pass = MakeScope<PostProcessPass>();
         _gizmo_pass = MakeScope<GizmoPass>();
-        _features.push_back(std::move(std::unique_ptr<RenderFeature>(new TAAFeature())));
+        _wireframe_pass = MakeScope<WireFramePass>();
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TAAFeature())));
 
         RegisterEventBeforeTick([]()
                                 { GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
@@ -51,7 +53,7 @@ namespace Ailu
             DESTORY_PTR(_p_per_object_cbufs[i]);
     }
 
-    void Renderer::Render(const Camera &cam, Scene &s)
+    void Renderer::Render(const Camera &cam, const Scene &s)
     {
         bool is_output_to_camera_tex = cam.TargetTexture() != nullptr;
         RenderingStates::Reset();
@@ -83,7 +85,7 @@ namespace Ailu
                     tmp_cam._is_scene_camera = false;
                     tmp_cam._is_render_shadow = false;
                     tmp_cam.Rect(cam.TargetTexture()->Width(), cam.TargetTexture()->Height());
-                    tmp_cam.Cull(&s);
+                    Cull(s, tmp_cam);
                     DoRender(tmp_cam, s);
                     auto cmd = CommandBufferPool::Get("FinalBlit");
                     {
@@ -126,22 +128,6 @@ namespace Ailu
     void Renderer::BeginScene(const Camera &cam, const Scene &s)
     {
         _active_camera_hash = cam.HashCode();
-        if (cam._is_render_shadow)
-            _render_passes.emplace_back(_shadowcast_pass.get());
-        _render_passes.emplace_back(_gbuffer_pass.get());
-        _render_passes.emplace_back(_coptdepth_pass.get());
-        _render_passes.emplace_back(_ssao_pass.get());
-        _render_passes.emplace_back(_lighting_pass.get());
-        if (cam._is_render_sky_box)
-            _render_passes.emplace_back(_skybox_pass.get());
-        _render_passes.emplace_back(_forward_pass.get());
-        _render_passes.emplace_back(_copycolor_pass.get());
-        if (cam._is_enable_postprocess)
-            _render_passes.emplace_back(_postprocess_pass.get());
-        if (cam._is_scene_camera)
-            _render_passes.emplace_back(_gizmo_pass.get());
-
-
         memset(reinterpret_cast<void *>(&_per_scene_cbuf_data), 0, sizeof(CBufferPerSceneData));
         memset(reinterpret_cast<void *>(&_per_cam_cbuf_data), 0, sizeof(CBufferPerCameraData));
         _rendering_data._shadow_data[0]._shadow_index = -1;
@@ -176,10 +162,45 @@ namespace Ailu
             _rendering_data._gbuffers[1] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer1", ERenderTargetFormat::kDefault);
             _rendering_data._gbuffers[2] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer2", ERenderTargetFormat::kDefault);
             _rendering_data._gbuffers[3] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer3", ERenderTargetFormat::kRGHalf);
+            _rendering_data._gbuffers[4] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer4", ERenderTargetFormat::kRGBAHalf);
         }
+        Cull(*g_pSceneMgr->ActiveScene(), cam);
         PrepareCamera(cam);
-        PrepareScene(*g_pSceneMgr->_p_current);
-        PrepareLight(*g_pSceneMgr->_p_current);
+        PrepareScene(*g_pSceneMgr->ActiveScene());
+        PrepareLight(*g_pSceneMgr->ActiveScene());
+        if (_mode & EShadingMode::kLit)
+        {
+            _skybox_pass->Setup(false);
+            if (cam._is_render_shadow)
+                _render_passes.emplace_back(_shadowcast_pass.get());
+            _render_passes.emplace_back(_gbuffer_pass.get());
+            _render_passes.emplace_back(_coptdepth_pass.get());
+            _render_passes.emplace_back(_ssao_pass.get());
+            _render_passes.emplace_back(_lighting_pass.get());
+            _render_passes.emplace_back(_forward_pass.get());
+            _render_passes.emplace_back(_copycolor_pass.get());
+            if (cam._is_enable_postprocess)
+                _render_passes.emplace_back(_postprocess_pass.get());
+            for (auto &feature: _owned_features)
+            {
+                feature->AddRenderPasses(this, _rendering_data);
+            }
+            for (auto &feature: _features)
+            {
+                feature->AddRenderPasses(this, _rendering_data);
+            }
+        }
+        if (_mode & EShadingMode::kWireframe)
+        {
+            _skybox_pass->Setup(!(_mode & EShadingMode::kLit));
+            _render_passes.emplace_back(_wireframe_pass.get());
+        }
+        if (cam._is_scene_camera)
+            _render_passes.emplace_back(_gizmo_pass.get());
+        if (cam._is_render_sky_box)
+            _render_passes.emplace_back(_skybox_pass.get());
+        std::stable_sort(_render_passes.begin(), _render_passes.end(), [](RenderPass *a, RenderPass *b) -> bool
+                         { return *a < *b; });
 
         _rendering_data._width = pixel_width;
         _rendering_data._height = pixel_height;
@@ -192,18 +213,20 @@ namespace Ailu
         _target_tex = g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle);
         Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerScene, _p_per_scene_cbuf[s.HashCode()].get());
         Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _p_per_camera_cbuf[cam.HashCode()].get());
+        Shader::SetGlobalTexture("_LTC_Lut1", g_pResourceMgr->Get<Texture2D>(L"Runtime/ltc_lut1"));
+        Shader::SetGlobalTexture("_LTC_Lut2", g_pResourceMgr->Get<Texture2D>(L"Runtime/ltc_lut2"));
     }
     void Renderer::EndScene(const Scene &s)
     {
         u16 obj_index = 0;
-        for (auto static_mesh: s.GetAllStaticRenderable())
+        for (auto &static_mesh: s.GetRegister().View<StaticMeshComponent>())
         {
-            if (static_mesh->GetMesh())
+            if (static_mesh._p_mesh)
             {
-                auto &aabbs = static_mesh->GetAABB();
+                auto &aabbs = static_mesh._transformed_aabbs;
                 Vector3f center;
-                u16 submesh_count = static_mesh->GetMesh()->SubmeshCount();
-                auto &materials = static_mesh->GetMaterials();
+                u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
+                auto &materials = static_mesh._p_mats;
                 for (int i = 0; i < submesh_count; i++)
                 {
                     _per_object_datas[obj_index]._MatrixWorldPreTick = _per_object_datas[obj_index]._MatrixWorld;
@@ -215,6 +238,7 @@ namespace Ailu
 
         _rendering_data.Reset();
         _render_passes.clear();
+        _features.clear();
         Gizmo::EndFrame();
     }
 
@@ -255,21 +279,26 @@ namespace Ailu
     void Renderer::PrepareScene(const Scene &s)
     {
         u16 obj_index = 0;
-        for (auto static_mesh: s.GetAllStaticRenderable())
+        u64 entity_index = 0;
+        auto &r = s.GetRegister();
+        for (auto &static_mesh: s.GetRegister().View<StaticMeshComponent>())
         {
-            if (static_mesh->GetMesh())
+            if (static_mesh._p_mesh)
             {
-                auto &aabbs = static_mesh->GetAABB();
+                auto &aabbs = static_mesh._transformed_aabbs;
                 Vector3f center;
-                u16 submesh_count = static_mesh->GetMesh()->SubmeshCount();
-                auto &materials = static_mesh->GetMaterials();
+                u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
+                auto &materials = static_mesh._p_mats;
                 for (int i = 0; i < submesh_count; i++)
                 {
-                    _per_object_datas[obj_index]._MatrixWorld = static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix();
+                    const auto &t = r.GetComponent<StaticMeshComponent, TransformComponent>(entity_index);
+                    _per_object_datas[obj_index]._MatrixWorld = t->_world_matrix;
+                    _per_object_datas[obj_index]._ObjectID = r.GetEntity<StaticMeshComponent>(entity_index);
                     memcpy(_p_per_object_cbufs[obj_index]->GetData(), &_per_object_datas[obj_index], RenderConstants::kPerObjectDataSize);
                     ++obj_index;
                 }
             }
+            ++entity_index;
         }
         _rendering_data._p_per_object_cbuf = _p_per_object_cbufs;
         f32 cascade_shaodw_max_dis = (f32) QuailtySetting::s_main_light_shaodw_distance * QuailtySetting::s_cascade_shadow_map_split[QuailtySetting::s_cascade_shadow_map_count - 1];
@@ -284,47 +313,54 @@ namespace Ailu
             _p_per_scene_cbuf.insert(std::make_pair(scene_hash, std::move(cbuf)));
         }
         _rendering_data._p_per_scene_cbuf = _p_per_scene_cbuf[scene_hash].get();
+        f32 t = g_pTimeMgr->TimeSinceLoad,dt = g_pTimeMgr->DeltaTime,sdt = g_pTimeMgr->s_smooth_delta_time;
+        _per_scene_cbuf_data._Time = Vector4f(t / 20, t, t * 2, t * 3);
+        _per_scene_cbuf_data._SinTime = Vector4f(sin(t / 8), sin(t / 4), sin(t / 2), sin(t));
+        _per_scene_cbuf_data._CosTime = Vector4f(cos(t / 8), cos(t / 4), cos(t / 2), cos(t));
+        _per_scene_cbuf_data._DeltaTime = Vector4f(dt, 1 / dt, sdt, 1 / sdt);
         memcpy(_p_per_scene_cbuf[scene_hash]->GetData(), &_per_scene_cbuf_data, sizeof(CBufferPerSceneData));
     }
 
     void Renderer::PrepareLight(const Scene &s)
     {
         const static f32 s_shadow_bias_factor = 0.01f;
-        auto &light_comps = s.GetAllLight();
         uint16_t updated_light_num = 0u;
-        uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0;
+        uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0,area_light_index = 0;
         u16 total_shadow_matrix_count = RenderConstants::kMaxCascadeShadowMapSplitNum;//阴影绘制和采样时来索引虚拟摄像机的矩阵，对于点光源，其采样不需要该值，只用作标志位确认是否需要处理阴影
-        for (auto light: light_comps)
+        //_per_scene_cbuf_data._MainlightWorldPosition = {-1.91522e-07f,-0.707107f,-0.707107f,0};//默认太阳位置给物理大气使用，防止
+        for (const auto &comp: s.GetRegister().View<LightComponent>())
         {
-            auto &light_data = light->_light;
+            auto &light_data = comp._light;
             Color32 color = light_data._light_color;
             color.r *= color.a;
             color.g *= color.a;
             color.b *= color.a;
             bool is_exist_directional_shaodw = false;
-            if (light->LightType() == ELightType::kDirectional)
+            bool is_cur_light_comp_active = true;
+            if (comp._type == ELightType::kDirectional)
             {
                 _per_scene_cbuf_data._DirectionalLights[direction_light_index]._ShadowDataIndex = -1;
-                if (!light->Active())
+                if (!is_cur_light_comp_active)
                 {
                     _per_scene_cbuf_data._DirectionalLights[direction_light_index]._LightDir = Vector3f::kZero;
                     _per_scene_cbuf_data._DirectionalLights[direction_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                if (light->CastShadow() && !is_exist_directional_shaodw)
+                if (comp._shadow._is_cast_shadow && !is_exist_directional_shaodw)
                 {
                     for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
                     {
-                        auto shadow_cam = light->ShadowCamera(i);
+                        auto &shadow_cam = comp._shadow_cameras[i];
                         _per_scene_cbuf_data._DirectionalLights[direction_light_index]._ShadowDataIndex = i;
                         _per_scene_cbuf_data._DirectionalLights[direction_light_index]._ShadowDistance = QuailtySetting::s_main_light_shaodw_distance;
-                        _per_scene_cbuf_data._ShadowMatrix[i] = shadow_cam->GetView() * shadow_cam->GetProjection();
+                        _per_scene_cbuf_data._ShadowMatrix[i] = shadow_cam.GetView() * shadow_cam.GetProjection();
                         _rendering_data._shadow_data[i]._shadow_index = i;
                         _rendering_data._shadow_data[i]._shadow_matrix = _per_scene_cbuf_data._ShadowMatrix[i];
-                        _rendering_data._shadow_data[i]._cull_results = &shadow_cam->CullResults();
-                        _per_scene_cbuf_data._CascadeShadowSplit[i] = light->CascadeShadowMData(i);
-                        _per_scene_cbuf_data._DirectionalLights[direction_light_index]._constant_bias = light->_shadow._constant_bias * light->_shadow._constant_bias * s_shadow_bias_factor;
-                        _per_scene_cbuf_data._DirectionalLights[direction_light_index]._slope_bias = light->_shadow._slope_bias * light->_shadow._slope_bias * s_shadow_bias_factor;
+                        Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                        _rendering_data._shadow_data[i]._cull_results = &_cull_results[shadow_cam.HashCode()];
+                        _per_scene_cbuf_data._CascadeShadowSplit[i] = comp._cascade_shadow_data[i];
+                        _per_scene_cbuf_data._DirectionalLights[direction_light_index]._constant_bias = comp._shadow._constant_bias * comp._shadow._constant_bias * s_shadow_bias_factor;
+                        _per_scene_cbuf_data._DirectionalLights[direction_light_index]._slope_bias = comp._shadow._slope_bias * comp._shadow._slope_bias * s_shadow_bias_factor;
                     }
                     is_exist_directional_shaodw = true;
                 }
@@ -334,29 +370,30 @@ namespace Ailu
                 _rendering_data._mainlight_world_position = _per_scene_cbuf_data._MainlightWorldPosition;
                 ++direction_light_index;
             }
-            else if (light->LightType() == ELightType::kPoint)
+            else if (comp._type == ELightType::kPoint)
             {
                 _per_scene_cbuf_data._PointLights[point_light_index]._ShadowDataIndex = -1;
-                if (!light->Active())
+                if (!is_cur_light_comp_active)
                 {
                     _per_scene_cbuf_data._PointLights[point_light_index]._LightParam0 = 0.0;
-                    _per_scene_cbuf_data._PointLights[point_light_index++]._LightColor = Colors::kBlack.xyz;
+                    _per_scene_cbuf_data._PointLights[point_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                if (light->CastShadow())
+                if (comp._shadow._is_cast_shadow)
                 {
                     u32 shadow_index = total_shadow_matrix_count;
                     _per_scene_cbuf_data._PointLights[point_light_index]._ShadowDataIndex = _rendering_data._addi_point_shadow_num;//点光源使用这个值来索引cubearray
                     _per_scene_cbuf_data._PointLights[point_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
-                    _per_scene_cbuf_data._PointLights[point_light_index]._constant_bias = light->_shadow._constant_bias;
-                    _per_scene_cbuf_data._PointLights[point_light_index]._slope_bias = light->_shadow._slope_bias;
+                    _per_scene_cbuf_data._PointLights[point_light_index]._constant_bias = comp._shadow._constant_bias;
+                    _per_scene_cbuf_data._PointLights[point_light_index]._slope_bias = comp._shadow._slope_bias;
                     //_per_frame_cbuf_data._PointLights[point_light_index]._ShadowNear = 10;
                     for (int i = 0; i < 6; i++)
                     {
-                        Camera *shadow_cam = light->ShadowCamera(i);
-                        _per_scene_cbuf_data._ShadowMatrix[shadow_index + i] = shadow_cam->GetView() * shadow_cam->GetProjection();
+                        auto &shadow_cam = comp._shadow_cameras[i];
+                        _per_scene_cbuf_data._ShadowMatrix[shadow_index + i] = shadow_cam.GetView() * shadow_cam.GetProjection();
                         _rendering_data._point_shadow_data[point_light_index]._shadow_indices[i] = shadow_index + i;
-                        _rendering_data._point_shadow_data[point_light_index]._cull_results[i] = &shadow_cam->CullResults();
+                        Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                        _rendering_data._point_shadow_data[point_light_index]._cull_results[i] = &_cull_results[shadow_cam.HashCode()];
                         ++total_shadow_matrix_count;
                     }
                     _rendering_data._point_shadow_data[point_light_index]._light_world_pos = light_data._light_pos.xyz;
@@ -369,25 +406,26 @@ namespace Ailu
                 _per_scene_cbuf_data._PointLights[point_light_index]._LightParam0 = light_data._light_param.x;
                 _per_scene_cbuf_data._PointLights[point_light_index++]._LightParam1 = light_data._light_param.y;
             }
-            else if (light->LightType() == ELightType::kSpot)
+            else if (comp._type == ELightType::kSpot)
             {
                 _per_scene_cbuf_data._SpotLights[spot_light_index]._ShadowDataIndex = -1;
-                if (!light->Active())
+                if (!is_cur_light_comp_active)
                 {
-                    _per_scene_cbuf_data._SpotLights[spot_light_index++]._LightColor = Colors::kBlack.xyz;
+                    _per_scene_cbuf_data._SpotLights[spot_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
-                if (light->CastShadow())
+                if (comp._shadow._is_cast_shadow)
                 {
                     u32 shadow_index = total_shadow_matrix_count++;
                     _per_scene_cbuf_data._SpotLights[spot_light_index]._ShadowDataIndex = shadow_index;
                     _per_scene_cbuf_data._SpotLights[spot_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
-                    _per_scene_cbuf_data._SpotLights[spot_light_index]._constant_bias = light->_shadow._constant_bias * light->_shadow._constant_bias * s_shadow_bias_factor;
-                    _per_scene_cbuf_data._SpotLights[spot_light_index]._slope_bias = light->_shadow._slope_bias * light->_shadow._slope_bias * s_shadow_bias_factor;
-                    Camera *shadow_cam = light->ShadowCamera();
-                    _per_scene_cbuf_data._ShadowMatrix[shadow_index] = shadow_cam->GetView() * shadow_cam->GetProjection();
+                    _per_scene_cbuf_data._SpotLights[spot_light_index]._constant_bias = comp._shadow._constant_bias * comp._shadow._constant_bias * s_shadow_bias_factor;
+                    _per_scene_cbuf_data._SpotLights[spot_light_index]._slope_bias = comp._shadow._slope_bias * comp._shadow._slope_bias * s_shadow_bias_factor;
+                    auto &shadow_cam = comp._shadow_cameras[0];
+                    _per_scene_cbuf_data._ShadowMatrix[shadow_index] = shadow_cam.GetView() * shadow_cam.GetProjection();
                     _rendering_data._shadow_data[shadow_index]._shadow_index = shadow_index;
-                    _rendering_data._shadow_data[shadow_index]._cull_results = &shadow_cam->CullResults();
+                    Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                    _rendering_data._shadow_data[shadow_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
                     ++_rendering_data._addi_shadow_num;
                 }
                 _per_scene_cbuf_data._SpotLights[spot_light_index]._LightColor = color.xyz;
@@ -400,8 +438,43 @@ namespace Ailu
                 _per_scene_cbuf_data._SpotLights[spot_light_index]._LightAngleOffset = -outer_cos * _per_scene_cbuf_data._SpotLights[spot_light_index]._LightAngleScale;
                 ++spot_light_index;
             }
+            else //area_light
+            {
+                _per_scene_cbuf_data._AreaLights[area_light_index]._ShadowDataIndex = -1;
+                if (!is_cur_light_comp_active)
+                {
+                    _per_scene_cbuf_data._AreaLights[area_light_index]._LightColor = Colors::kBlack.xyz;
+                    continue;
+                }
+                if (comp._shadow._is_cast_shadow)
+                {
+                    u32 shadow_index = total_shadow_matrix_count++;
+                    _per_scene_cbuf_data._AreaLights[area_light_index]._ShadowDataIndex = shadow_index;
+                    _per_scene_cbuf_data._AreaLights[area_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
+                    _per_scene_cbuf_data._AreaLights[area_light_index]._constant_bias = comp._shadow._constant_bias * comp._shadow._constant_bias * s_shadow_bias_factor;
+                    _per_scene_cbuf_data._AreaLights[area_light_index]._slope_bias = comp._shadow._slope_bias * comp._shadow._slope_bias * s_shadow_bias_factor;
+                    auto &shadow_cam = comp._shadow_cameras[0];
+                    _per_scene_cbuf_data._ShadowMatrix[shadow_index] = shadow_cam.GetView() * shadow_cam.GetProjection();
+                    _rendering_data._shadow_data[shadow_index]._shadow_index = shadow_index;
+                    Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                    _rendering_data._shadow_data[shadow_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
+                    ++_rendering_data._addi_shadow_num;
+                }
+                _per_scene_cbuf_data._AreaLights[area_light_index]._LightColor = color.xyz;
+                memset(_per_scene_cbuf_data._AreaLights[area_light_index]._points, 0, sizeof(_per_scene_cbuf_data._AreaLights[area_light_index]._points));
+                _per_scene_cbuf_data._AreaLights[area_light_index]._points[0].xyz = light_data._area_points[0];
+                _per_scene_cbuf_data._AreaLights[area_light_index]._points[1].xyz = light_data._area_points[1];
+                _per_scene_cbuf_data._AreaLights[area_light_index]._points[2].xyz = light_data._area_points[2];
+                _per_scene_cbuf_data._AreaLights[area_light_index]._points[3].xyz = light_data._area_points[3];
+                _per_scene_cbuf_data._AreaLights[area_light_index]._is_twosided = light_data._is_two_side;
+                ++area_light_index;
+            }
             ++updated_light_num;
         }
+        _per_scene_cbuf_data._ActiveLightCount.x = direction_light_index;
+        _per_scene_cbuf_data._ActiveLightCount.y = point_light_index;
+        _per_scene_cbuf_data._ActiveLightCount.z = spot_light_index;
+        _per_scene_cbuf_data._ActiveLightCount.w = area_light_index;
         if (updated_light_num == 0)
         {
             _per_scene_cbuf_data._DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
@@ -422,7 +495,7 @@ namespace Ailu
         _per_cam_cbuf_data._MatrixP = cam.GetProjection();
         _per_cam_cbuf_data._MatrixVP = _per_cam_cbuf_data._MatrixV * _per_cam_cbuf_data._MatrixP;
         _per_cam_cbuf_data._MatrixIVP = MatrixInverse(_per_cam_cbuf_data._MatrixVP);
-        _rendering_data._cull_results = &cam.CullResults();
+        _rendering_data._cull_results = &_cull_results[cam.HashCode()];
         _rendering_data._camera = &cam;
         if (!_p_per_camera_cbuf.contains(cam_hash))
         {
@@ -450,15 +523,9 @@ namespace Ailu
         _rendering_data._p_per_camera_cbuf = _p_per_camera_cbuf[_active_camera_hash].get();
         memcpy(_p_per_camera_cbuf[_active_camera_hash]->GetData(), &_per_cam_cbuf_data, RenderConstants::kPerCameraDataSize);
     }
-    void Renderer::DoRender(const Camera &cam, Scene &s)
+    void Renderer::DoRender(const Camera &cam, const Scene &s)
     {
         BeginScene(cam, s);
-        for (auto &feature: _features)
-        {
-            feature->AddRenderPasses(this, _rendering_data);
-        }
-        std::stable_sort(_render_passes.begin(), _render_passes.end(), [](RenderPass *a, RenderPass *b) -> bool
-                         { return *a < *b; });
         {
             if (cam._layer_mask & ERenderLayer::kDefault)
             {
@@ -484,6 +551,65 @@ namespace Ailu
         EndScene(s);
     }
 
+
+    void Renderer::Cull(const Scene &s, const Camera cam)
+    {
+        if (_cull_results.contains(cam.HashCode()))
+            _cull_results[cam.HashCode()].clear();
+        else
+            _cull_results.insert(std::make_pair(cam.HashCode(), CullResult()));
+        u16 scene_render_obj_index = 0;
+        u64 entity_index = 0u;
+        auto &cur_cam_cull_results = _cull_results[cam.HashCode()];
+        auto &vf = cam.GetViewFrustum();
+        for (auto &static_mesh: s.GetAllStaticRenderable())
+        {
+            if (static_mesh._p_mesh)
+            {
+                auto &aabbs = static_mesh._transformed_aabbs;
+                Vector3f center;
+                u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
+                auto &materials = static_mesh._p_mats;
+                if (!cam.IsCustomVP() && !ViewFrustum::Conatin(vf, aabbs[0]))
+                {
+                    ++scene_render_obj_index;
+                    continue;
+                }
+                for (int i = 0; i < submesh_count; i++)
+                {
+                    if (ViewFrustum::Conatin(vf, aabbs[i + 1]) || cam.IsCustomVP())
+                    {
+                        f32 dis = Distance(aabbs[i + 1].Center(), cam.Position());
+                        u32 queue_id;
+                        Material *used_mat = nullptr;
+                        if (!materials.empty())
+                        {
+                            used_mat = i < materials.size() && materials[i] != nullptr ? materials[i].get() : materials[0].get();
+                            if (used_mat)
+                            {
+                                queue_id = used_mat->RenderQueue();
+                                if (!cur_cam_cull_results.contains(queue_id))
+                                {
+                                    cur_cam_cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
+                                }
+                            }
+                            auto e = s.GetRegister().GetEntity<StaticMeshComponent>(entity_index);
+                            cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{scene_render_obj_index, dis,
+                                                                                             (u16) i, 1, static_mesh._p_mesh.get(), used_mat, &s.GetRegister().GetComponent<TransformComponent>(e)->_world_matrix});
+                        }
+                    }
+                    ++scene_render_obj_index;
+                }
+            }
+            ++entity_index;
+        }
+        for (auto &it: cur_cam_cull_results)
+        {
+            auto &objs = it.second;
+            std::sort(objs.begin(), objs.end(), [this](const RenderableObjectData &a, const RenderableObjectData &b)
+                      { return a._distance_to_cam < b._distance_to_cam; });
+        }
+    }
     void Ailu::Renderer::StableSort(Vector<RenderPass *> list)
     {
         for (int i = 0; i < list.size() - 1; i++)

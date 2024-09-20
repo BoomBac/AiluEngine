@@ -28,13 +28,13 @@ namespace Ailu
 		}
 		if (profileIdx == u64(-1))
 		{
-			AL_ASSERT(numProfiles >= kMaxProfileNum);
+			AL_ASSERT(numProfiles < kMaxProfileNum);
 			profileIdx = numProfiles++;
 			profiles[profileIdx].Name = name;
 		}
 		ProfileData& profile_data = profiles[profileIdx];
-		AL_ASSERT(profile_data.QueryStarted == true);
-		AL_ASSERT(profile_data.QueryFinished == false);
+		AL_ASSERT(profile_data.QueryStarted != true);
+		AL_ASSERT(profile_data.QueryFinished != false);
 		profile_data.CPUProfile = false;
 		profile_data.Active = true;
 		_p_gpu_timer->Start(cmdList, profileIdx);
@@ -44,10 +44,10 @@ namespace Ailu
 	}
 	void Profiler::EndProfile(CommandBuffer* cmdList, u64 idx)
 	{
-		AL_ASSERT(idx >= numProfiles);
+		AL_ASSERT(idx < numProfiles);
 		ProfileData& profile_data = profiles[idx];
-		AL_ASSERT(profile_data.QueryStarted == false);
-		AL_ASSERT(profile_data.QueryFinished == true);
+		AL_ASSERT(profile_data.QueryStarted != false);
+		AL_ASSERT(profile_data.QueryFinished != true);
 		_p_gpu_timer->Stop(cmdList, idx);
 		profile_data._time = _p_gpu_timer->GetElapsedMS(idx);
 		profile_data.QueryStarted = false;
@@ -66,13 +66,13 @@ namespace Ailu
 		}
 		if (profileIdx == u64(-1))
 		{
-			AL_ASSERT(numCPUProfiles >= kMaxProfileNum);
+			AL_ASSERT(numCPUProfiles < kMaxProfileNum);
 			profileIdx = numCPUProfiles++;
 			profiles[profileIdx].Name = name;
 		}
 		ProfileData& profile_data = cpuProfiles[profileIdx];
-		AL_ASSERT(profile_data.QueryStarted == true);
-		AL_ASSERT(profile_data.QueryFinished == false);
+		AL_ASSERT(profile_data.QueryStarted != true);
+		AL_ASSERT(profile_data.QueryFinished != false);
 		profile_data.Name = name;
 		profile_data.CPUProfile = true;
 		profile_data.Active = true;
@@ -84,10 +84,10 @@ namespace Ailu
 	}
 	void Profiler::EndCPUProfile(u64 idx)
 	{
-		AL_ASSERT(idx >= numCPUProfiles);
+		AL_ASSERT(idx < numCPUProfiles);
 		ProfileData& profile_data = cpuProfiles[idx];
-		AL_ASSERT(profile_data.QueryStarted == false);
-		AL_ASSERT(profile_data.QueryFinished == true);
+		AL_ASSERT(profile_data.QueryStarted != false);
+		AL_ASSERT(profile_data.QueryFinished != true);
 		profile_data._time = g_pTimeMgr->GetElapsedSinceLastMark();
 		profile_data.QueryStarted = false;
 		profile_data.QueryFinished = true;

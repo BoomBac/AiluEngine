@@ -42,7 +42,7 @@ namespace Ailu
             _p_editor_layer = new EditorLayer();
             PushLayer(_p_editor_layer);
             {
-                g_pSceneMgr->_p_current = g_pResourceMgr->Load<Scene>(_opened_scene_path);
+                g_pResourceMgr->Load<Scene>(_opened_scene_path);
             }
             _pipeline.reset(new CommonRenderPipeline());
             g_pGfxContext->RegisterPipeline(_pipeline.get());
@@ -69,7 +69,7 @@ namespace Ailu
             for (auto &dp: deleted_wpix_files)
                 FileManager::DeleteDirectory(dp);
         }
-        void EditorApp::Tick(const float &delta_time)
+        void EditorApp::Tick(f32 delta_time)
         {
             Application::Tick(delta_time);
         }
@@ -143,7 +143,7 @@ namespace Ailu
             ss << "Far = " << Camera::sCurrent->Far() << endl;
             ss << "ControllerRotation = " << FirstPersonCameraController::s_inst._rotation << endl;
             ss << "[Scene]" << endl;
-            ss << "Scene = " << ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->_p_current));
+            ss << "Scene = " << ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->ActiveScene())) << endl;//;
             FileManager::WriteFile(s_editor_config_path, false, ss.str());
         }
     }// namespace Editor

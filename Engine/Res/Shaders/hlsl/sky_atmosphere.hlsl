@@ -50,7 +50,7 @@ float3 sunWithBloom(float3 rayDir, float3 sunDir)
     float offset = minSunCosTheta - cosTheta;
     float gaussianBloom = exp(-offset*50000.0)*0.5;
     float invBloom = 1.0/(0.02 + offset*300.0)*0.01;
-    return (gaussianBloom+invBloom).xxx;
+    return (gaussianBloom+invBloom).xxx * 4;
 }
 
 const static int numScatteringSteps = 16;

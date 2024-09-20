@@ -11,11 +11,14 @@ namespace Ailu
 {
     namespace Editor
     {
+        DECLARE_ENUM(EPlaceActorsType, kObj, 
+        kCube, kPlane, kSphere, 
+        kDirectionalLight, kPointLight, kSpotLight, kAreaLight, kLightProbe)
 
         class PlaceActors : public ImGuiWidget
         {
         public:
-            inline static const String kDragPlacementObj = "DragPlacementObj";
+            inline static const String kDragPlacementObj    = "DragPlacementObj";
             PlaceActors();
             ~PlaceActors();
             void Open(const i32& handle) final;

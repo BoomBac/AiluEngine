@@ -14,7 +14,7 @@ namespace Ailu
     {
     public:
         D3DCommandBuffer(ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect);
-        D3DCommandBuffer(u32 id,ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect);
+        D3DCommandBuffer(u32 id, ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect);
         void Clear() final;
         //close before execute
         void Close() final;
@@ -22,10 +22,12 @@ namespace Ailu
         const String &GetName() const final { return _name; };
         void SetName(const String &name) final
         {
-            _p_cmd->SetName(ToWChar(name));
+            auto wname = ToWChar(name);
+            _p_cmd->SetName(wname);
+            _p_alloc->SetName(wname);
             _name = name;
         };
-        ECommandBufferType GetType() const final {return _type;}
+        ECommandBufferType GetType() const final { return _type; }
 
         void ClearRenderTarget(RenderTexture *color, RenderTexture *depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(Vector<RenderTexture *> &colors, RenderTexture *depth, Vector4f clear_color, float clear_depth) final;
@@ -78,6 +80,8 @@ namespace Ailu
         u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) final;
+        u16 DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 submesh_index, u16 pass_index, u32 instance_count) final;
+        u16 DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 submesh_index, u16 pass_index, u32 instance_count) final;
         u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count, u16 pass_index) final;
 
@@ -88,6 +92,9 @@ namespace Ailu
         void SetDescriptorHeapId(u16 id) { _cur_cbv_heap_id = id; };
 
     private:
+        inline static Array<Scope<IConstantBuffer>, 20> s_obj_buffers{};
+        inline static u16 s_global_buffer_offset = 0u;
+        u16 _buffer_offset = 0u;
         String _name;
         u32 _id = 0u;
         bool _b_cmd_closed;

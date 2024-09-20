@@ -29,7 +29,7 @@ namespace Ailu
             DESTORY_PTR(logger);
         }
     }
-    void LogMgr::Tick(const float &delta_time)
+    void LogMgr::Tick(f32 delta_time)
     {
     }
     LogMgr::LogMgr()

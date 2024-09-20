@@ -147,7 +147,7 @@ namespace Ailu
                     TextureHandle cur_tex_handle = tex->GetNativeTextureHandle();
                     if (cur_tex_handle == 0)
                         continue;
-                    AL_ASSERT(cur_tex_handle == 0);
+                    AL_ASSERT(cur_tex_handle != 0);
                     ImGui::BeginGroup();
                     ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(cur_tex_handle), ImVec2(preview_tex_size, preview_tex_size), uv0, uv1);
                     ImGui::EndGroup();
@@ -182,7 +182,7 @@ namespace Ailu
                         TextureHandle cur_tex_handle = tex->GetView(Texture::ETextureViewType::kSRV, 0, i);
                         if (cur_tex_handle == 0)
                             continue;
-                        AL_ASSERT(cur_tex_handle == 0);
+                        AL_ASSERT(cur_tex_handle != 0);
                         ImGui::BeginGroup();
                         ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(cur_tex_handle), ImVec2(preview_tex_size, preview_tex_size), uv0, uv1);
                         ImGui::EndGroup();

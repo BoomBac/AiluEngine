@@ -104,7 +104,7 @@ static u16 GetPixelByteSize(const EALGFormat::EALGFormat& format)
     default:
         break;
     }
-    AL_ASSERT_MSG(true, "Unknown format %d", (u32)format);
+    AL_ASSERT_MSG(false, "Unknown format %d", (u32)format);
     return 65535;
 }
 

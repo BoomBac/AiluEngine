@@ -163,7 +163,7 @@ namespace Ailu
             case Ailu::EShaderDateType::kBool:
                 return 1;
         }
-        AL_ASSERT_MSG(true, "Unknown ShaderDateType!");
+        AL_ASSERT_MSG(false, "Unknown ShaderDateType!");
         return 0;
     }
 
@@ -279,7 +279,7 @@ namespace Ailu
             {
                 if (desc.Stream >= kMaxStreamCount)
                 {
-                    AL_ASSERT_MSG(true, "Stream count must less than kMaxStreamCount");
+                    AL_ASSERT_MSG(false, "Stream count must less than kMaxStreamCount");
                     return;
                 }
                 desc.Offset += offset[std::min<u8>(desc.Stream, kMaxStreamCount)];
@@ -353,7 +353,7 @@ namespace Ailu
         bool operator==(const DepthStencilState &other) const
         {
             return (_b_depth_write == other._b_depth_write &&
-                    _stencil_ref_value == other._stencil_ref_value &&
+                    //_stencil_ref_value == other._stencil_ref_value &&
                     _depth_test_func == other._depth_test_func &&
                     _b_front_stencil == other._b_front_stencil &&
                     _stencil_test_func == other._stencil_test_func &&
@@ -598,14 +598,15 @@ namespace Ailu
         kSampler = 0x800,
         kUAVTexture2D = 0x1000,
         kConstBufferRaw = 0x2000,//为了兼容uploadbuffer直接绑定gpu address而不改变现有接口
+        kRWBuffer = 0x3000,
         kUnknown
     };
 
     struct PipelineResourceInfo
     {
         inline static const u16 kPriporityLocal = 0x0u;
-        inline static const u16 kPriporityCmd   = 0x1u;
-        inline static const u16 kPriporityGlobal   = 0x2u;
+        inline static const u16 kPriporityCmd = 0x1u;
+        inline static const u16 kPriporityGlobal = 0x2u;
         void *_p_resource = nullptr;
         EBindResDescType _res_type = EBindResDescType::kUnknown;
         u8 _slot = 0;

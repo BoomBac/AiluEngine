@@ -173,12 +173,16 @@ namespace Ailu
                 ImGui::SliderFloat("FovH", &FirstPersonCameraController::s_inst._camera_fov_h, 0.0f, 120.0f, "%.2f");
                 ImGui::SliderFloat("NearClip", &FirstPersonCameraController::s_inst._camera_near, 0.00001f, 100.0f, "%.2f");
                 ImGui::SliderFloat("FarClip", &FirstPersonCameraController::s_inst._camera_far, 100.0f, 5000.0f, "%.2f");
-                ImGui::Text("Position:");
-                ImGui::SameLine();
-                ImGui::Text(camera_pos.ToString().c_str());
-                ImGui::Text("Rotation:");
-                ImGui::SameLine();
-                ImGui::Text(camera_rotation.ToString().c_str());
+                ImGui::InputFloat3("Position: ",camera_pos.data);
+                ImGui::InputFloat2("Rotation: ", camera_rotation.data);
+                FirstPersonCameraController::s_inst.SetTargetPosition(camera_pos);
+                FirstPersonCameraController::s_inst.SetTargetRotation(camera_rotation.x, camera_rotation.y);
+                //ImGui::Text("Position:");
+                //ImGui::SameLine();
+                //ImGui::Text(camera_pos.ToString().c_str());
+                //ImGui::Text("Rotation:");
+                //ImGui::SameLine();
+                //ImGui::Text(camera_rotation.ToString().c_str());
                 ImGui::End();
             }
         }

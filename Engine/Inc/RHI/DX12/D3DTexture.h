@@ -8,6 +8,7 @@
 #include "Framework/Math/ALMath.hpp"
 #include "RHI/DX12/CPUDescriptorManager.h"
 #include "RHI/DX12/GPUDescriptorManager.h"
+#include "RHI/DX12/D3DUtils.h"
 #include "Render/Texture.h"
 using Microsoft::WRL::ComPtr;
 
@@ -49,27 +50,9 @@ namespace Ailu
         Texture::ETextureViewType _view_type;
     };
 
-    struct D3DResourceStateGuard
-    {
-        void MakesureResourceState(ID3D12GraphicsCommandList *cmd, ID3D12Resource *p_res, D3D12_RESOURCE_STATES target_state)
-        {
-            if (_cur_res_state == target_state)
-                return;
-            auto old_state = _cur_res_state;
-            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(p_res, old_state, target_state);
-            cmd->ResourceBarrier(1, &barrier);
-            _cur_res_state = target_state;
-        }
-        D3D12_RESOURCE_STATES CurState() const { return _cur_res_state; }
-        D3DResourceStateGuard() = default;
-        D3DResourceStateGuard(D3D12_RESOURCE_STATES initial_state) : _cur_res_state(initial_state) {};
-
-    private:
-        D3D12_RESOURCE_STATES _cur_res_state;
-    };
-
     class D3DTexture2D : public Texture2D
     {
+        friend class DDSParser;
     public:
         D3DTexture2D(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         ~D3DTexture2D();
@@ -130,6 +113,7 @@ namespace Ailu
         TextureHandle DepthTexture(u16 view_index = kMainSRVIndex, CommandBuffer *cmd = nullptr) final;
         void GenerateMipmap(CommandBuffer *cmd) final;
         void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
+        void ReadBackAsync(std::function<void(void *)> callback,u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
         D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(u16 index = 0);
         D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(CommandBuffer *cmd, u16 index = 0);
 

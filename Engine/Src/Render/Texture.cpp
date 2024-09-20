@@ -108,8 +108,9 @@ namespace Ailu
             _pixel_data[i] = new u8[cur_mipmap_byte_size];
             memset(_pixel_data[i], -1, cur_mipmap_byte_size);
             _gpu_memery_size += cur_mipmap_byte_size;
+            _total_byte_size += cur_mipmap_byte_size;
         }
-        s_gpu_memory_size += _gpu_memery_size;
+        s_gpu_mem_usage += _gpu_memery_size;
     }
 
     Texture2D::~Texture2D()
@@ -118,7 +119,7 @@ namespace Ailu
         {
             DESTORY_PTRARR(p);
         }
-        s_gpu_memory_size -= _gpu_memery_size;
+        s_gpu_mem_usage -= _gpu_memery_size;
     }
 
     void Texture2D::CreateView()
@@ -132,7 +133,7 @@ namespace Ailu
         }
         else
         {
-            AL_ASSERT(true);
+            AL_ASSERT(false);
         }
     }
 
@@ -214,12 +215,20 @@ namespace Ailu
         _pixel_data.resize((_mipmap_count + 1) * 6);
         _is_random_access = random_access;
         _dimension = ETextureDimension::kCube;
-        for (int i = 0; i < _mipmap_count + 1; i++)
+        u16 mipmap_levels = 1 + _mipmap_count;
+        for (u16 face = 0; face < 6; ++face)
         {
-            auto [w, h] = CurMipmapSize(i);
-            for (int j = 0; j < 6; j++)
-                _pixel_data[i * 6 + j] = new u8[w * h * _pixel_size];
+            for (u16 mipmap = 0; mipmap < mipmap_levels; ++mipmap)
+            {
+                auto [w, h] = CurMipmapSize(mipmap);
+                u64 cur_mipmap_byte_size = w * h * _pixel_size;
+                _pixel_data[face * mipmap_levels + mipmap] = new u8[cur_mipmap_byte_size];
+                memset(_pixel_data[face * mipmap_levels + mipmap], 0, cur_mipmap_byte_size);
+                _gpu_memery_size += cur_mipmap_byte_size;
+                _total_byte_size += cur_mipmap_byte_size;
+            }
         }
+        s_gpu_mem_usage += _gpu_memery_size;
     }
 
     CubeMap::~CubeMap()
@@ -228,6 +237,7 @@ namespace Ailu
         {
             DESTORY_PTRARR(p);
         }
+        s_gpu_mem_usage -= _gpu_memery_size;
     }
 
     Color32 CubeMap::GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y)
@@ -250,7 +260,8 @@ namespace Ailu
         if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
             return;
         u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
-        memcpy(_pixel_data[mipmap * 6 + face] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
+        u16 face_index = face - 1;
+        memcpy(_pixel_data[face_index * (_mipmap_count + 1) + mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
     }
 
     void CubeMap::SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap)
@@ -258,13 +269,15 @@ namespace Ailu
         if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
             return;
         u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
-        memcpy(_pixel_data[mipmap * 6 + face] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color32));
+        u16 face_index = face - 1;
+        memcpy(_pixel_data[face_index * (_mipmap_count + 1) + mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color32));
     }
 
     void CubeMap::SetPixelData(ECubemapFace::ECubemapFace face, u8 *data, u16 mipmap, u64 offset)
     {
         auto [w, h] = CurMipmapSize(mipmap);
-        memcpy(_pixel_data[mipmap * 6 + face], data + offset, w * h * _pixel_size);
+        u16 face_index = face - 1;
+        memcpy(_pixel_data[face_index * (_mipmap_count + 1) + mipmap], data + offset, w * h * _pixel_size);
     }
     //-----------------------------------------------------------------------CubeMap----------------------------------------------------------------------------------
 
@@ -421,13 +434,25 @@ namespace Ailu
         _is_srgb = false;
         _pixel_size = GetPixelByteSize(_pixel_format);
         _is_random_access = desc._random_access;
+        u16 slice_num = 1;
+        if (_dimension == ETextureDimension::kTex2DArray)
+            slice_num = desc._slice_num;
+        else if (_dimension == ETextureDimension::kCubeArray)
+            slice_num = 6 * desc._slice_num;
+        else if (_dimension == ETextureDimension::kCube)
+            slice_num = 6;
+        else {};
         for (int i = 0; i < _mipmap_count + 1; i++)
         {
             auto [w, h] = CurMipmapSize(i);
             u64 cur_mipmap_byte_size = w * h * _pixel_size;
             _gpu_memery_size += cur_mipmap_byte_size;
+            _total_byte_size += cur_mipmap_byte_size;
         }
-        s_gpu_memory_size += _gpu_memery_size;
+        _gpu_memery_size *= slice_num;
+        _total_byte_size *= slice_num;
+        s_render_texture_gpu_mem_usage += _gpu_memery_size;
+        s_gpu_mem_usage += _gpu_memery_size;
         g_pRenderTexturePool->Register(this);
     }
 
@@ -477,7 +502,7 @@ namespace Ailu
 
     RenderTexture::~RenderTexture()
     {
-        s_gpu_memory_size -= _gpu_memery_size;
+        s_render_texture_gpu_mem_usage -= _gpu_memery_size;
         g_pRenderTexturePool->UnRegister(ID());
     }
 

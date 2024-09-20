@@ -43,7 +43,7 @@ namespace Ailu
             case Ailu::EShaderDateType::kBool:
                 return DXGI_FORMAT_R8_UINT;
         }
-        AL_ASSERT_MSG(true, "Unknown ShaderDateType or DGXI format");
+        AL_ASSERT_MSG(false, "Unknown ShaderDateType or DGXI format");
         return DXGI_FORMAT_UNKNOWN;
     }
 
@@ -52,7 +52,7 @@ namespace Ailu
         static D3D12_INPUT_ELEMENT_DESC cache_desc[10]{};
         if (layout.GetDescCount() > 10)
         {
-            AL_ASSERT_MSG(true, "LayoutDesc count must less than 10");
+            AL_ASSERT_MSG(false, "LayoutDesc count must less than 10");
             return std::make_tuple<D3D12_INPUT_ELEMENT_DESC *, u32>(nullptr, 0);
         }
         u32 desc_count = 0u;
@@ -95,7 +95,7 @@ namespace Ailu
         void SetPipelineResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) final;
         //just compare res type is same by slot,maybe cause some error
         bool IsValidPipelineResource(const EBindResDescType &res_type, u8 slot) const final;
-        const ALHash::Hash<64> &Hash() final { return _hash; };
+        const PSOHash &Hash() final { return _hash; };
         const String &Name() const final { return _name; };
         const String &SlotToName(u8 slot) final;
         const u8 NameToSlot(const String &name) final;
@@ -116,8 +116,8 @@ namespace Ailu
         ID3D12GraphicsCommandList *_p_cmd;
         std::unordered_map<std::string, ShaderBindResourceInfo> *_p_bind_res_desc_infos = nullptr;
         std::unordered_multimap<u8, EBindResDescType> _bind_res_desc_type_lut;
-		std::unordered_map<u8,const String&> _bind_res_name_lut;
-        ALHash::Hash<64> _hash;
+        std::unordered_map<u8, const String &> _bind_res_name_lut;
+        PSOHash _hash;
     };
 }// namespace Ailu
 

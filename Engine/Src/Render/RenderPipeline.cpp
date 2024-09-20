@@ -26,9 +26,9 @@ namespace Ailu
         _targets.clear();
         _cameras.clear();
         _cameras.emplace_back(Camera::sCurrent);
-        for (auto &cam: g_pSceneMgr->_p_current->GetAllCameras())
+        for (auto &cam: g_pSceneMgr->ActiveScene()->GetRegister().View<CCamera>())
         {
-            _cameras.emplace_back(&cam->_camera);
+            _cameras.push_back(&cam._camera);
         }
     }
     void RenderPipeline::Render()
@@ -36,6 +36,7 @@ namespace Ailu
         Setup();
         for (auto cam: _cameras)
         {
+            cam->SetRenderer(_renderers[0].get());
 #ifdef _PIX_DEBUG
             PIXBeginEvent(cam->HashCode(),L"DeferedRenderer");
             RenderSingleCamera(*cam, *_renderers[0].get());
@@ -53,10 +54,9 @@ namespace Ailu
             return _targets[index];
         return nullptr;
     }
-    void RenderPipeline::RenderSingleCamera(Camera &cam, Renderer &renderer)
+    void RenderPipeline::RenderSingleCamera(const Camera &cam, Renderer &renderer)
     {
-        renderer.Render(cam, *g_pSceneMgr->_p_current);
-        cam.SetRenderer(&renderer);
+        renderer.Render(cam, *g_pSceneMgr->ActiveScene());
     }
     void RenderPipeline::FrameCleanUp()
     {

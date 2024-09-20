@@ -2,9 +2,9 @@
 #ifndef __WORLDOUTLINE_H__
 #define __WORLDOUTLINE_H__
 #include "ImGuiWidget.h"
+#include "Scene/Entity.hpp"
 namespace Ailu
 {
-	class SceneActor;
 	namespace Editor
 	{
 		class WorldOutline : public	ImGuiWidget
@@ -17,10 +17,12 @@ namespace Ailu
             void OnEvent(Event& e) final;
 		private:
 			void ShowImpl() final;
-			void DrawTreeNode(SceneActor* actor,bool is_root);
+            void DrawTreeNode(ECS::Entity entity);
 		private:
-			SceneActor* _selected_actor = nullptr;
-            void OnOutlineDoubleClicked(SceneActor* actor);
+            std::set<ECS::Entity> _drawed_entity;
+            ECS::Entity _selected_entity = ECS::kInvalidEntity;
+            void OnOutlineDoubleClicked(ECS::Entity entity);
+            ECS::Register *_scene_register = nullptr;
 		};
 	}
 }

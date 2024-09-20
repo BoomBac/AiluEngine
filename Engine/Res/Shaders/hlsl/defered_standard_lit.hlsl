@@ -8,23 +8,32 @@
 //Stencil: {Ref:127,Comp:Always,Pass:Replace}
 //multi_compile _ ALPHA_TEST
 //pass end::
+//pass begin::
+//name: ShadowCaster
+//vert: VSMain
+//pixel: PSMain
+//Cull: Back
+//Queue: Opaque
+//pass end::
 //Properties
 //{
-//   _AlphaCulloff("AlphaCulloff",Range(0,1)) = 0
+//	_AlphaCulloff("AlphaCulloff",Range(0,1)) = 0
 //	_AlbedoTex("Albedo",Texture2D) = "white"
 //	_NormalTex("Normal",Texture2D) = "white"
 //	_EmissionTex("Emission",Texture2D) = "white"
 //	_RoughnessMetallicTex("RoughnessMetallicTex",Texture2D) = "white"
 //	_SpecularTex("Specular",Texture2D) = "white"
 //	_AlbedoValue("BaseColor",Color) = (1,1,1,0)
-//	_EmissionValue("Emission",Color) = (0,0,0,0)
+//	[HDR]_EmissionValue("Emission",Color) = (0,0,0,0)
 //	_SpecularValue("Specular",Color) = (0,0,0,0)
 //	_RoughnessValue("Roughness",Range(0,1)) = 0
 //	_MetallicValue("Metallic",Range(0,1)) = 0
+//	_Anisotropy("Anisotropy",Range(0,1)) = 0
 //}
 //info end
 
 #include "standard_lit_common.hlsli"
+#include "shadow_caster.hlsli"
 
 struct GBuffer
 {
@@ -32,6 +41,7 @@ struct GBuffer
 	float4 color_roughness : SV_Target1;
 	float4 specular_metallic : SV_Target2;
 	float2 motion_vector : SV_Target3;
+	half4  emission : SV_Target4;
 };
 
 StandardPSInput GBufferVSMain(StandardVSInput v)
@@ -56,7 +66,15 @@ StandardPSInput GBufferVSMain(StandardVSInput v)
 GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
-	InitSurfaceData(input, surface_data.wnormal, surface_data.albedo, surface_data.roughness, surface_data.metallic, surface_data.emssive, surface_data.specular);
+	if (_MaterialID == 0 || _MaterialID == 1)// Defualt
+	{
+		InitSurfaceData(input, surface_data);
+	}
+	else if (_MaterialID == 2) // scheckboard
+	{
+		InitSurfaceDataCheckboard(input, surface_data);
+	}
+
 	input.clip_pos_cur_frame.xyz /= input.clip_pos_cur_frame.w;
 	input.clip_pos_pre_frame.xyz /= input.clip_pos_pre_frame.w;
 #ifdef ALPHA_TEST
@@ -65,7 +83,13 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 	GBuffer output;
 	output.packed_normal = PackNormal(surface_data.wnormal);
 	output.color_roughness = float4(surface_data.albedo.rgb, surface_data.roughness);
-	output.specular_metallic = float4(surface_data.specular, surface_data.metallic);
+	//output.specular_metallic = float4(surface_data.specular, surface_data.metallic);
+	output.specular_metallic = float4(0.0,0.0,surface_data.anisotropy,surface_data.metallic);
 	output.motion_vector = float2(input.clip_pos_cur_frame.xy - input.clip_pos_pre_frame.xy);
+	output.emission = half4(surface_data.emssive.rgb,1.0);
 	return output;
 }
+
+//---------------------shadow caster-------------------------
+PSInput VSMain(VSInput v);
+void PSMain(PSInput input);

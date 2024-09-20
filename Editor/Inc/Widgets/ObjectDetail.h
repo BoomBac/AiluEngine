@@ -2,6 +2,7 @@
 #ifndef __OBJECTDETAIL_H__
 #define __OBJECTDETAIL_H__
 #include "ImGuiWidget.h"
+#include "Scene/Entity.hpp"
 namespace Ailu
 {
 	class SceneActor;
@@ -18,7 +19,7 @@ namespace Ailu
 			void Close(i32 handle) final;
 		private:
 			void ShowImpl() final;
-			void ShowSceneActorPannel(SceneActor* cur_selected_actor);
+			void ShowSceneActorPannel(ECS::Entity entity);
 			void ShowShaderPannel(Shader* s);
 		private:
 			TextureSelector* _p_texture_selector = nullptr;

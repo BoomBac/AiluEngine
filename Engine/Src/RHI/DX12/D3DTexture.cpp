@@ -122,7 +122,7 @@ namespace Ailu
             }
             else
             {
-                AL_ASSERT(true);
+                AL_ASSERT(false);
             }
         }
     }
@@ -161,7 +161,7 @@ namespace Ailu
         }
         else
         {
-            AL_ASSERT(true);
+            AL_ASSERT(false);
         }
         view_info._gpu_handle = gpu_handle;
         view_info._gpu_alloc = std::move(alloc);
@@ -233,22 +233,46 @@ namespace Ailu
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
                                                         nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
         Vector<D3D12_SUBRESOURCE_DATA> cubemap_datas;
-        for (int i = 0; i < textureDesc.MipLevels; ++i)
+        for (int j = 0; j < 6; ++j)
         {
-            for (int j = 0; j < 6; ++j)
+            for (int i = 0; i < textureDesc.MipLevels; ++i)
             {
-                D3D12_SUBRESOURCE_DATA textureData = {};
-                textureData.pData = _pixel_data[i * 6 + j];
-                textureData.RowPitch = _pixel_size * _width;
-                textureData.SlicePitch = textureData.RowPitch * _width;
-                cubemap_datas.emplace_back(textureData);
+                u16 cur_mip_width = _width >> i;
+                u16 cur_mip_height = _height >> i;
+                D3D12_SUBRESOURCE_DATA subdata;
+                subdata.pData = _pixel_data[j * textureDesc.MipLevels + i];
+                subdata.RowPitch = _pixel_size * cur_mip_width;// pixel size/byte  * width
+                subdata.SlicePitch = subdata.RowPitch * cur_mip_height;
+                cubemap_datas.emplace_back(subdata);
             }
         }
+
         UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, cubemap_datas.data());
         _state_guard.MakesureResourceState(p_cmdlist, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         D3DContext::Get()->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
         D3DContext::Get()->TrackResource(pTextureUpload);
+        //Main srv
+        {
+            GPUVisibleDescriptorAllocation alloc = g_pGPUDescriptorAllocator->Allocate(1);
+            D3DTextureViewInfo view_info(ETextureViewType::kSRV, false);
+            auto [cpu_handle, gpu_handle] = alloc.At(0);
+            D3D12_SHADER_RESOURCE_VIEW_DESC view_desc{};
+            view_desc.Format = GetCompatibleSRVFormat(textureDesc.Format);
+            view_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            if (_dimension == ETextureDimension::kCube)
+            {
+                view_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+                view_desc.TextureCube.MipLevels = mipmap_level;
+                view_desc.TextureCube.MostDetailedMip = 0;
+            }
+            else
+                AL_ASSERT(false);
+            p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
+            view_info._gpu_handle = gpu_handle;
+            view_info._gpu_alloc = std::move(alloc);
+            _views[kMainSRVIndex] = std::move(view_info);
+        }
         for (u16 face = 1; face <= 6; face++)
         {
             if (_is_random_access)
@@ -298,7 +322,7 @@ namespace Ailu
         }
         else
         {
-            AL_ASSERT(true);
+            AL_ASSERT(false);
         }
         view_info._gpu_handle = gpu_handle;
         view_info._gpu_alloc = std::move(alloc);
@@ -343,7 +367,7 @@ namespace Ailu
             }
             else
             {
-                AL_ASSERT(true);
+                AL_ASSERT(false);
             }
         }
     }
@@ -456,7 +480,7 @@ namespace Ailu
                 view_desc.TextureCubeArray.NumCubes = _slice_num;
             }
             else
-                AL_ASSERT(true);
+                AL_ASSERT(false);
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
@@ -493,7 +517,7 @@ namespace Ailu
         }
         else
         {
-            AL_ASSERT(true);
+            AL_ASSERT(false);
         }
     }
 
@@ -529,12 +553,12 @@ namespace Ailu
             }
             else
             {
-                AL_ASSERT(true);
+                AL_ASSERT(false);
             }
         }
         else
         {
-            AL_ASSERT(true);
+            AL_ASSERT(false);
             LOG_WARNING("D3DRenderTexture({})::Bind: invalid view index", _name);
         }
     }
@@ -567,7 +591,7 @@ namespace Ailu
                 rtv_desc.Texture2DArray.MipSlice = mipmap;
                 rtv_desc.Texture2DArray.ArraySize = 1;
             }
-            else { AL_ASSERT(true); }
+            else { AL_ASSERT(false); }
             p_device->CreateRenderTargetView(_p_d3dres.Get(), &rtv_desc, cpu_handle);
             view_info._cpu_handle = cpu_handle;
             view_info._cpu_alloc = std::move(alloc);
@@ -590,7 +614,7 @@ namespace Ailu
                 view_desc.Texture2DArray.MipSlice = mipmap;
                 view_desc.Texture2DArray.ArraySize = 1;
             }
-            else { AL_ASSERT(true); }
+            else { AL_ASSERT(false); }
             p_device->CreateDepthStencilView(_p_d3dres.Get(), &view_desc, cpu_handle);
             view_info._cpu_handle = cpu_handle;
             view_info._cpu_alloc = std::move(alloc);
@@ -617,7 +641,7 @@ namespace Ailu
                 view_desc.Texture2DArray.MipLevels = 1;
                 view_desc.Texture2DArray.MostDetailedMip = mipmap;
             }
-            else { AL_ASSERT(true); }
+            else { AL_ASSERT(false); }
             p_device->CreateShaderResourceView(_p_d3dres.Get(), &view_desc, cpu_handle);
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
@@ -641,7 +665,7 @@ namespace Ailu
                 view_desc.Texture2DArray.ArraySize = 1;
                 view_desc.Texture2DArray.MipSlice = mipmap;
             }
-            else { AL_ASSERT(true); }
+            else { AL_ASSERT(false); }
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &view_desc, cpu_handle);
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
@@ -821,7 +845,7 @@ namespace Ailu
         else if (_dimension == ETextureDimension::kCube)
             subres_index = (face - 1) * (_mipmap_count + 1) + mipmap;
         else
-            AL_ASSERT(true);
+            AL_ASSERT(false);
         d3d_device->GetCopyableFootprints(&_tex_desc, subres_index, 1, 0, &bufferFootprint, &row_count, &aligned_row_pitch, &aligned_buffer_size);
         aligned_row_pitch = bufferFootprint.Footprint.RowPitch;
         bufferFootprint.Footprint.Format = ConvertToDXGIFormat(_pixel_format);
@@ -840,7 +864,7 @@ namespace Ailu
         // bufferFootprint.Footprint.RowPitch = static_cast<UINT>(_pixel_size * w);
         // bufferFootprint.Footprint.Format = ConvertToDXGIFormat(_pixel_format);
         const CD3DX12_TEXTURE_COPY_LOCATION copyDest(readback_buf.Get(), bufferFootprint);
-        AL_ASSERT(mipmap > _mipmap_count);
+        AL_ASSERT(mipmap <= _mipmap_count);
         const CD3DX12_TEXTURE_COPY_LOCATION copySrc(_p_d3dres.Get(), subres_index);
         d3d_cmd->CopyTextureRegion(&copyDest, 0, 0, 0, &copySrc, nullptr);
         //d3d_cmd->CopyResource(readback_buf.Get(), _p_d3dres.Get());
@@ -867,6 +891,21 @@ namespace Ailu
         }
         return aligned_out_data;
     }
+    void D3DRenderTexture::ReadBackAsync(std::function<void(void *)> callback,u16 mipmap, u16 array_slice, ECubemapFace::ECubemapFace face)
+    {
+        // 使用引用捕获，处理异常并确保回调有效
+        std::async(std::launch::async, [&, callback]()
+                   {
+        try {
+            void* result = ReadBack(mipmap, array_slice, face);
+            callback(result);
+        } catch (const std::exception& e) {
+            LOG_ERROR("Exception: {}", e.what());
+            std::cerr << "Exception: " << e.what() << std::endl;
+            callback(nullptr);
+        } });
+    }
+
     void D3DRenderTexture::Name(const String &value)
     {
         _name = value;

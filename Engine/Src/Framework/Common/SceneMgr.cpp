@@ -1,47 +1,21 @@
+/*
 #include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Path.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
-#include "Objects/CameraComponent.h"
+#include "Objects/CCamera.h"
 #include "Objects/CommonActor.h"
 #include "Objects/StaticMeshComponent.h"
 #include "Render/Camera.h"
 #include "Render/RenderQueue.h"
 #include "pch.h"
+#include "Scene.h"
 
 
 namespace Ailu
 {
-    int SceneMgr::Initialize()
-    {
-        return 0;
-    }
-    void SceneMgr::Finalize()
-    {
-    }
 
-    void SceneMgr::Tick(const float &delta_time)
-    {
-        if (_p_current)
-        {
-            while (!_pending_delete_actors.empty())
-            {
-                auto actor = _pending_delete_actors.front();
-                _pending_delete_actors.pop();
-                _p_current->RemoveObject(actor);
-            }
-            for (auto &actor: _p_current->GetAllActor())
-            {
-                actor->Tick(delta_time);
-            }
-            {
-                CPUProfileBlock b("CameraCull");
-                Camera *active_cam = Camera::sSelected ? Camera::sSelected : Camera::sCurrent;
-                active_cam->Cull(_p_current);
-            }
-        }
-    }
 
     Ref<Scene> SceneMgr::Create(const WString &name, bool empty)
     {
@@ -86,7 +60,7 @@ namespace Ailu
     SceneActor *SceneMgr::AddSceneActor(std::string_view name, const Camera &camera)
     {
         auto p_actor = Actor::Create<SceneActor>(name.data());
-        p_actor->AddComponent<CameraComponent>(camera);
+        p_actor->AddComponent<CCamera>(camera);
         _p_current->AddObject(p_actor);
         return p_actor;
     }
@@ -125,124 +99,125 @@ namespace Ailu
 
     //--------------------------------------------------------Scene begin-----------------------------------------------------------------------
 
-    Scene::Scene(const std::string &name)
-    {
-        //_p_root = Actor::Create<SceneActor>(name);
-        _name = name;
-        _all_static_renderalbes.reserve(RenderConstants::kMaxRenderObjectCount);
-        FillActorList = [this](SceneActor *actor)
-        {
-            _all_objects.emplace_back(actor);
-            if (!actor->IsActive())
-                return;
-            for (auto &comp: actor->GetAllComponent())
-            {
-                _all_comps.push_back(comp.get());
-            }
-            auto static_mesh = actor->GetComponent<StaticMeshComponent>();
-            if (static_mesh != nullptr && static_mesh->Active())
-            {
-                u16 submesh_count = static_mesh->GetMesh()->SubmeshCount();
-                if (_total_renderable_count + submesh_count <= RenderConstants::kMaxRenderObjectCount)
-                {
-                    _all_static_renderalbes.emplace_back(static_mesh);
-                    _total_renderable_count += submesh_count;
-                }
-                else
-                {
-                    g_pLogMgr->LogWarningFormat("Scene: {} has much render object than limit {}", _name, RenderConstants::kMaxRenderObjectCount);
-                }
-            }
-            if (auto light = actor->GetComponent<LightComponent>())
-            {
-                _all_lights.emplace_back(light);
-            }
-            if (auto camera = actor->GetComponent<CameraComponent>())
-            {
-                //_all_cameras.push_back(camera);
-            }
-        };
-    }
+    //Scene::Scene(const std::string &name)
+    //{
+    //    //_p_root = Actor::Create<SceneActor>(name);
+    //    _name = name;
+    //    _all_static_renderalbes.reserve(RenderConstants::kMaxRenderObjectCount);
+    //    FillActorList = [this](SceneActor *actor)
+    //    {
+    //        _all_objects.emplace_back(actor);
+    //        if (!actor->IsActive())
+    //            return;
+    //        for (auto &comp: actor->GetAllComponent())
+    //        {
+    //            _all_comps.push_back(comp.get());
+    //        }
+    //        auto static_mesh = actor->GetComponent<StaticMeshComponent>();
+    //        if (static_mesh != nullptr && static_mesh->Active())
+    //        {
+    //            u16 submesh_count = static_mesh->GetMesh()->SubmeshCount();
+    //            if (_total_renderable_count + submesh_count <= RenderConstants::kMaxRenderObjectCount)
+    //            {
+    //                _all_static_renderalbes.emplace_back(static_mesh);
+    //                _total_renderable_count += submesh_count;
+    //            }
+    //            else
+    //            {
+    //                g_pLogMgr->LogWarningFormat("Scene: {} has much render object than limit {}", _name, RenderConstants::kMaxRenderObjectCount);
+    //            }
+    //        }
+    //        if (auto light = actor->GetComponent<LightComponent>())
+    //        {
+    //            _all_lights.emplace_back(light);
+    //        }
+    //        if (auto camera = actor->GetComponent<CCamera>())
+    //        {
+    //            //_all_cameras.push_back(camera);
+    //        }
+    //    };
+    //}
 
-    void Scene::AddObject(SceneActor *actor)
-    {
-        auto p = static_cast<Actor *>(actor);
-        _p_root->AddChild(p);
-        _b_dirty = true;
-    }
+    //void Scene::AddObject(SceneActor *actor)
+    //{
+    //    auto p = static_cast<Actor *>(actor);
+    //    _p_root->AddChild(p);
+    //    _b_dirty = true;
+    //}
 
-    void Scene::RemoveObject(SceneActor *actor)
-    {
-        auto p = static_cast<Actor *>(actor);
-        _p_root->RemoveChild(p);
-        _b_dirty = true;
-    }
+    //void Scene::RemoveObject(SceneActor *actor)
+    //{
+    //    auto p = static_cast<Actor *>(actor);
+    //    _p_root->RemoveChild(p);
+    //    _b_dirty = true;
+    //}
 
 
-    std::list<SceneActor *> &Scene::GetAllActor()
-    {
-        if (_b_dirty)
-        {
-            Clear();
-            TravelAllActor(_p_root, FillActorList);
-            _b_dirty = false;
-        }
-        return _all_objects;
-    }
+    //std::list<SceneActor *> &Scene::GetAllActor()
+    //{
+    //    if (_b_dirty)
+    //    {
+    //        Clear();
+    //        TravelAllActor(_p_root, FillActorList);
+    //        _b_dirty = false;
+    //    }
+    //    return _all_objects;
+    //}
 
-    SceneActor *Scene::GetSceneActorByID(const u32 &id)
-    {
-        for (auto &actor: _all_objects)
-        {
-            if (actor->Id() == id) return actor;
-        }
-        LOG_WARNING("Can't find actor with id: {} in scene {},will return first actor", id, _name);
-        return _all_objects.front();
-    }
+    //SceneActor *Scene::GetSceneActorByID(const u32 &id)
+    //{
+    //    for (auto &actor: _all_objects)
+    //    {
+    //        if (actor->Id() == id) return actor;
+    //    }
+    //    LOG_WARNING("Can't find actor with id: {} in scene {},will return first actor", id, _name);
+    //    return _all_objects.front();
+    //}
 
-    SceneActor *Scene::GetSceneActorByIndex(const u32 &index)
-    {
-        if (index >= _all_objects.size())
-        {
-            return _all_objects.front();
-            LOG_WARNING("Can't find actor with index: {} in scene {},will return first actor", index, _name);
-        }
-        else
-        {
-            int cur_index = 0;
-            for (auto it = _all_objects.begin(); it != _all_objects.end(); it++)
-            {
-                if (cur_index == index) return *it;
-                else
-                    ++cur_index;
-            }
-        }
-        return _all_objects.front();
-    }
+    //SceneActor *Scene::GetSceneActorByIndex(const u32 &index)
+    //{
+    //    if (index >= _all_objects.size())
+    //    {
+    //        return _all_objects.front();
+    //        LOG_WARNING("Can't find actor with index: {} in scene {},will return first actor", index, _name);
+    //    }
+    //    else
+    //    {
+    //        int cur_index = 0;
+    //        for (auto it = _all_objects.begin(); it != _all_objects.end(); it++)
+    //        {
+    //            if (cur_index == index) return *it;
+    //            else
+    //                ++cur_index;
+    //        }
+    //    }
+    //    return _all_objects.front();
+    //}
 
-    void Scene::MarkDirty()
-    {
-        _b_dirty = true;
-    }
+    //void Scene::MarkDirty()
+    //{
+    //    _b_dirty = true;
+    //}
 
-    void Scene::TravelAllActor(SceneActor *actor, ActorEvent &e)
-    {
-        e(actor);
-        if (actor->GetChildNum() > 0)
-        {
-            for (auto &child: actor->GetAllChildren())
-            {
-                TravelAllActor(static_cast<SceneActor *>(child), e);
-            }
-        }
-    }
-    void Scene::Clear()
-    {
-        _all_objects.clear();
-        _all_lights.clear();
-        _all_comps.clear();
-        _all_cameras.clear();
-        _all_static_renderalbes.clear();
-        _total_renderable_count = 0;
-    }
+    //void Scene::TravelAllActor(SceneActor *actor, ActorEvent &e)
+    //{
+    //    e(actor);
+    //    if (actor->GetChildNum() > 0)
+    //    {
+    //        for (auto &child: actor->GetAllChildren())
+    //        {
+    //            TravelAllActor(static_cast<SceneActor *>(child), e);
+    //        }
+    //    }
+    //}
+    //void Scene::Clear()
+    //{
+    //    _all_objects.clear();
+    //    _all_lights.clear();
+    //    _all_comps.clear();
+    //    _all_cameras.clear();
+    //    _all_static_renderalbes.clear();
+    //    _total_renderable_count = 0;
+    //}
 }// namespace Ailu
+*/

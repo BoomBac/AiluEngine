@@ -76,28 +76,7 @@ namespace Ailu
             // 关闭不必要的管道句柄
             CloseHandle(hStdOutputWrite);
             CloseHandle(hStdInputRead);
-
-            // // 重定向标准输入、输出和错误流
-            // HANDLE hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-            // HANDLE hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-            // HANDLE hStdError = GetStdHandle(STD_ERROR_HANDLE);
-
-            // SetStdHandle(STD_OUTPUT_HANDLE, hStdOutput);
-            // SetStdHandle(STD_INPUT_HANDLE, hStdInput);
-            // SetStdHandle(STD_ERROR_HANDLE, hStdError);
-            // 等待控制台进程创建完成
-            WaitForInputIdle(pi.hProcess, INFINITE);
-
-            // // 将 C++ 标准流与控制台的文件流关联
-            // std::ios::sync_with_stdio();
-            // std::wcout.clear();
-            // std::cout.clear();
-            // std::wcerr.clear();
-            // std::cerr.clear();
-            // std::wcin.clear();
-            // std::cin.clear();
-
-            // 关闭进程和线程句柄
+            //::WaitForSingleObject(pi.hProcess, INFINITE);
             CloseHandle(pi.hProcess);
             CloseHandle(pi.hThread);
             cmd_id = pi.dwProcessId;
@@ -153,6 +132,7 @@ namespace Ailu
         else
         {
             // If attaching failed, allocate a new console
+            //CreateConsoleProcess();
             AllocConsole();
             RedirectIOToConsole();
             std::cout << "Hello from new console!" << std::endl;

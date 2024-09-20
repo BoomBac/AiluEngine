@@ -1,0 +1,6 @@
+guid: f891ec73-10c8-404b-91ac-5bac15cda5fb
+type: kShader
+name: water
+  file: Shaders/hlsl/water.hlsl
+  vs_entry: ForwardVSMain
+  ps_entry: ForwardPSMain

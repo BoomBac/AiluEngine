@@ -5,6 +5,7 @@
 #include "input.hlsli"
 
 #define DIELECTRIC_SPECULAR 0.04
+#define F0 float3(0.04,0.04,0.04)
 #define FROSTBITE_BRDF
 
 #ifndef MEDIUMP_FLT_MAX
@@ -41,6 +42,23 @@ float D_GTR2_aniso(float dotHX, float dotHY, float dotNH, float ax, float ay)
 	float deno = dotHX * dotHX / (ax * ax) + dotHY * dotHY / (ay * ay) + dotNH * dotNH;
 	return 1.0 / (PI * ax * ay * deno * deno);
 }
+// Anisotropic GGX
+// [Burley 2012, "Physically-Based Shading at Disney"]
+float D_GGXaniso( float ax, float ay, float NoH, float XoH, float YoH )
+{
+// The two formulations are mathematically equivalent
+#if 1
+	float a2 = ax * ay;
+	float3 V = float3(ay * XoH, ax * YoH, a2 * NoH);
+	float S = dot(V, V);
+
+	return (1.0f / PI) * a2 * pow(a2 / S,2);
+#else
+	float d = XoH*XoH / (ax*ax) + YoH*YoH / (ay*ay) + NoH*NoH;
+	return 1.0f / ( PI * ax*ay * d*d );
+#endif
+}
+
 // GGX / Trowbridge-Reitz
 // [Walter et al. 2007, "Microfacet models for refraction through rough surfaces"]
 float D_GGX( float a2, float NoH )
@@ -48,6 +66,22 @@ float D_GGX( float a2, float NoH )
 	float d = ( NoH * a2 - NoH ) * NoH + 1;	// 2 mad
 	return a2 / ( PI*d*d );					// 4 mul, 1 rcp
 }
+
+// Convert a roughness and an anisotropy factor into GGX alpha values respectively for the major and minor axis of the tangent frame
+void GetAnisotropicRoughness(float Alpha, float Anisotropy, out float ax, out float ay)
+{
+#if 1
+	// Anisotropic parameters: ax and ay are the roughness along the tangent and bitangent	
+	// Kulla 2017, "Revisiting Physically Based Shading at Imageworks"
+	ax = max(Alpha * (1.0 + Anisotropy), 0.001f);
+	ay = max(Alpha * (1.0 - Anisotropy), 0.001f);
+#else
+	float K = sqrt(1.0f - 0.95f * Anisotropy);
+	ax = max(Alpha / K, 0.001f);
+	ay = max(Alpha * K, 0.001f);
+#endif
+}
+
 //-----------------------------------------------------------------------------------------------------
 
 //-----------Specular F,Fresnel(菲涅尔)-----------------------------------------------------------------
@@ -71,9 +105,9 @@ float3 F_Schlick(float3 f0,float hov)
 	return f0 + ( 1 - f0 ) * Pow5(1.f - hov);
 }
 //for ibl diffuse
-float3 F_SchlickRoughness(float cosTheta, float3 F0, float roughness)
+float3 F_SchlickRoughness(float cosTheta, float3 f0, float roughness)
 {
-    return F0 + (max((1.0 - roughness).xxx, F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    return f0 + (max((1.0 - roughness).xxx, f0) - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
 // float3 F_Schlick( float3 SpecularColor, float VoH )
@@ -204,12 +238,25 @@ float Diffuse_Frostbite(float nov,float nol,float loh,float linear_roughness)
 	return light_scatter * view_scatter * energy_factor;
 }//-------------------------------------------------Diffsue------------------------------------------------------
 
+
+//--------------------------------------------------Env----------------------------------------------------------
+float3 EnvBRDF(float metallic, float3 base_color, float2 lut)
+{
+    float3 f0 = lerp(F0, base_color.rgb, metallic);
+    return f0 * lut.x + lut.y;
+}
+//--------------------------------------------------Env----------------------------------------------------------
+
 float3 CookTorranceBRDF(SurfaceData surface,ShadingData shading_data)
 {
 	float3 diffuse_color = surface.albedo.rgb * (1 - DIELECTRIC_SPECULAR) * (1.0 - surface.metallic);
 	float3 diffuse = Diffuse_Lambert(diffuse_color);
 	//float3 diffuse = Diffuse_Burley(surface.albedo.rgb,surface.roughness,shading_data.nv,shading_data.nl,shading_data.vh);
-	float D = D_GTR2(lerp(0.0002,1.0,surface.roughness),shading_data.nh);
+	float D1 = D_GTR2(lerp(0.0002,1.0,surface.roughness),shading_data.nh);
+	float ax,ay;
+	GetAnisotropicRoughness(surface.roughness,surface.anisotropy,ax,ay);
+	float D2 = saturate(D_GGXaniso(ax,ay,shading_data.nh,shading_data.th,shading_data.bh));
+	float D = lerp(D1,D2,surface.anisotropy);
 	//float G = Vis_Schlick(Pow2(0.5 + surface.roughness/2),shading_data.nv,shading_data.nl);
 	float G = V_SmithGGXCorrelated(shading_data.nv,shading_data.nl,surface.roughness);
 	float3 F = F_Schlick(lerp(DIELECTRIC_SPECULAR.xxx,surface.albedo.rgb,surface.metallic),shading_data.vh);

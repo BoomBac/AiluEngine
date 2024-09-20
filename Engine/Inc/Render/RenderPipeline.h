@@ -14,12 +14,12 @@ namespace Ailu
 		RenderPipeline();
 		void Init();
 		void Destory();
-		void Setup();
+		virtual void Setup();
 		void Render();
 		Renderer* GetRenderer(u16 index = 0) { return index < _renderers.size()? _renderers[index].get() : nullptr; };
 		RenderTexture* GetTarget(u16 index = 0);
 	private:
-		void RenderSingleCamera(Camera& cam, Renderer& renderer);
+		void RenderSingleCamera(const Camera& cam, Renderer& renderer);
 		void FrameCleanUp();
 	protected:
 		virtual void BeforeReslove() {};

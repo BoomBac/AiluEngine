@@ -1,123 +1,51 @@
 guid: 7ac5d887-551f-4363-b38f-299f318b23dc
 type: kScene
 name: palace
-SceneGraph: 
-  Name: root
-    Components: 
-      TransformComponent: 
-        Position: 0,0,0
-        Rotation: 0,6.75513e-08,0,1
-        Scale: 1,1,1
-    Children: 6
-      Name: directional_light
-        Components: 
-          TransformComponent: 
-            Position: -0.000619888,1071,-0.00136089
-            Rotation: -0.069096,-0.99755,0.001822,0.0107969
-            Scale: 0.999973,0.999973,0.999955
-          LightComponent: 
-            Type: Directional
-            Color: 1,1,1
-            Intensity: 1
-            CastShadow: true
-            ConstantBias: 0.203
-            SlopeBias: 0.4
-        Children: 0
-      Name: point_light
-        Components: 
-          TransformComponent: 
-            Position: 263.56,427,1104.35
-            Rotation: 0,6.75513e-08,0,1
-            Scale: 1,1,1
-          LightComponent: 
-            Type: Point
-            Color: 1,1,1
-            Intensity: 0.362
-            Radius: 1659
-            CastShadow: false
-            ConstantBias: 0
-            SlopeBias: 0
-        Children: 0
-      Name: spot_light
-        Components: 
-          TransformComponent: 
-            Position: 95.0501,416.996,-231.582
-            Rotation: -0.0845537,-0.0298755,0.331806,0.939076
-            Scale: 1,1,1
-          LightComponent: 
-            Type: Spot
-            Color: 0.138552,0.84354,0.911765
-            Intensity: 1
-            Radius: 617
-            Inner: 63.272
-            Outer: 74.612
-            CastShadow: false
-            ConstantBias: 0
-            SlopeBias: 0
-        Children: 0
-      Name: palace
-        Components: 
-          TransformComponent: 
-            Position: 0,0,0
-            Rotation: 0,0.700868,0,0.713291
-            Scale: 4,4,4
-          StaticMeshComponent: 
-            MeshPath: 32414c6f-47f1-47a1-883c-678fac6e47e8
-            MaterialPath0: 0b247b0b-22b8-47e4-b69b-21e2f73133af
-            MaterialPath1: af277291-1e6f-4732-89ba-d0dce1dc12af
-            MaterialPath2: 324335bf-8def-4583-911a-047863b48455
-            MaterialPath3: cf40ec2f-ceb8-4cc7-b21f-8ec31d0995ea
-            MaterialPath4: f891ec73-10c8-404b-91ac-5bac15cda5fb
-            MaterialPath5: 9740b31d-e345-409c-9535-2aa870a54d3d
-            MaterialPath6: 4428ffdf-97de-4732-b74b-240a0bce3872
-            MaterialPath7: 7182a502-ba5e-4de5-a517-ed226a6b7805
-            MaterialPath8: 17bcb528-d351-4054-9559-abaef2cd83f6
-            MaterialPath9: 96ddf81e-5cc0-4f50-8400-47a122a37cce
-            MaterialPath10: 7182a502-ba5e-4de5-a517-ed226a6b7805
-            MaterialPath11: 0c23d3c1-67bc-4fbe-a617-b96e82538e6c
-            MaterialPath12: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-            MaterialPath13: 266fceb5-389b-4a08-892c-1e9b2f58d83f
-            MaterialPath14: 777ae3e2-d1ef-4087-8838-10a063b0fdcd
-            MaterialPath15: 0cb0c79b-7c5d-4942-a23d-8df54448ca9b
-            MaterialPath16: 2800bee2-b69e-46af-8111-e454ff8a5660
-            MaterialPath17: caddc1fd-d0c7-401a-98f3-2eca7b25a59d
-            MaterialPath18: b7af84e2-5516-422b-a44e-29b1f5fe4ad4
-            MaterialPath19: b2d348c8-1642-4450-b32a-a67524c895d5
-            MaterialPath20: c8ead4f9-84a1-4ab5-b11b-f6f96c51e9a6
-            MaterialPath21: 92f5350a-f983-4448-93a3-ae0fd06ce1f3
-            MaterialPath22: ba72a052-73f7-46e9-88de-fda64250e8ea
-            MaterialPath23: db739e98-37be-487b-886b-498504ad2e6f
-            MaterialPath24: 999eb3c6-b57f-4bca-834a-bda77367a7a0
-        Children: 0
-      Name: point_light1
-        Components: 
-          TransformComponent: 
-            Position: -52.4886,642.04,-3381.04
-            Rotation: 0,6.75513e-08,0,1
-            Scale: 1,1,1
-          LightComponent: 
-            Type: Point
-            Color: 0.209919,0.823529,0.570866
-            Intensity: 0.994
-            Radius: 1380
-            CastShadow: false
-            ConstantBias: -4.31602e+08
-            SlopeBias: -4.31602e+08
-        Children: 0
-      Name: spot_light1
-        Components: 
-          TransformComponent: 
-            Position: 18.5325,1153.5,3665.39
-            Rotation: -0.351662,-0.238228,-0.0930313,0.900514
-            Scale: 0.999987,0.999982,0.999987
-          LightComponent: 
-            Type: Spot
-            Color: 0.79902,0.693613,0.082252
-            Intensity: 0.927
-            Radius: 1332
-            Inner: 44.544
-            Outer: 70.408
-            CastShadow: false
-            ConstantBias: 0
-            SlopeBias: 0
-        Children: 0
+Entity:1
+    _tag_component:
+        _name:empty
+    _transform_component:
+        _transform:
+            _position:0.00,0.00,0.00
+            _rotation:0.00,0.00,0.00,1.00
+            _scale:1.00,1.00,1.00
+Entity:2
+    _tag_component:
+        _name:new_object_2
+    _transform_component:
+        _transform:
+            _position:-0.00,0.00,0.00
+            _rotation:0.00,0.00,0.00,1.00
+            _scale:6.02,6.02,6.02
+    _static_mesh_component:
+        _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
+        _material_num:1
+        _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+Entity:3
+    _tag_component:
+        _name:directional_light
+    _transform_component:
+        _transform:
+            _position:0.00,0.00,0.00
+            _rotation:0.00,0.00,0.00,1.00
+            _scale:1.00,1.00,1.00
+    _light_component:
+        _light:
+            _light_color:1,1,1,1
+            _light_param:0,-0.1,0,0
+        _shadow:
+            _is_cast_shadow:0
+            _constant_bias:0
+            _slope_bias:0
+Entity:4
+    _tag_component:
+        _name:cube
+    _transform_component:
+        _transform:
+            _position:8.19,0.00,5.55
+            _rotation:0.00,0.00,0.00,1.00
+            _scale:1.00,1.00,1.00
+    _static_mesh_component:
+        _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
+        _material_num:1
+        _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50

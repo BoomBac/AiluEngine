@@ -16,10 +16,11 @@
 // #include "./Pass/PostprocessPass.h"
 // #include "./Pass/SSAOPass.h"
 #include "RenderingData.h"
-
+#include "Scene/Scene.h"
 
 namespace Ailu
 {
+    DECLARE_ENUM(EShadingMode, kLit = 1, kWireframe = 2, kLitWireframe = 3);
     class PostProcessPass;
     class SSAOPass;
     class Camera;
@@ -32,7 +33,7 @@ namespace Ailu
     public:
         Renderer();
         ~Renderer();
-        void Render(const Camera &cam, Scene &s);
+        void Render(const Camera &cam, const Scene &s);
         void BeginScene(const Camera &cam, const Scene &s);
         void EndScene(const Scene &s);
         float GetDeltaTime() const;
@@ -49,23 +50,28 @@ namespace Ailu
         const RenderingData &GetRenderingData() const { return _rendering_data; }
         RenderTexture *TargetTexture();
         void SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj);
-
+        void AddFeature(RenderFeature *feature) { _features.emplace_back(feature); };
+        void SetShadingMode(EShadingMode::EShadingMode mode) { _mode = mode; }
     private:
-        RTHandle _camera_color_handle;
-        RTHandle _gameview_rt_handle;
-        RTHandle _camera_depth_handle;
-        RTHandle _camera_depth_tex_handle;
+
         void PrepareScene(const Scene &s);
         void PrepareLight(const Scene &s);
         void PrepareCamera(const Camera &cam);
-        void DoRender(const Camera &cam, Scene &s);
+        void DoRender(const Camera &cam, const Scene &s);
+        void Cull(const Scene &s, const Camera cam);
         static void StableSort(Vector<RenderPass *> list);
 
     private:
         static inline List<RenderPass *> _p_task_render_passes{};
         GraphicsContext *_p_context = nullptr;
+        EShadingMode::EShadingMode _mode = EShadingMode::kLit;
+        RTHandle _camera_color_handle;
+        RTHandle _gameview_rt_handle;
+        RTHandle _camera_depth_handle;
+        RTHandle _camera_depth_tex_handle;
         Map<u64, Scope<IConstantBuffer>> _p_per_camera_cbuf;
         Map<u64, Scope<IConstantBuffer>> _p_per_scene_cbuf;
+        Map<u64, CullResult> _cull_results;
         CBufferPerSceneData _per_scene_cbuf_data;
         CBufferPerCameraData _per_cam_cbuf_data;
 
@@ -79,13 +85,15 @@ namespace Ailu
         Scope<CopyColorPass> _copycolor_pass;
         Scope<PostProcessPass> _postprocess_pass;
         Scope<GizmoPass> _gizmo_pass;
+        Scope<WireFramePass> _wireframe_pass;
         Vector<RenderPass *> _render_passes;
         u64 _active_camera_hash;
 
         RenderingData _rendering_data;
         IConstantBuffer *_p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
         CBufferPerObjectData _per_object_datas[RenderConstants::kMaxRenderObjectCount];
-        Vector<Scope<RenderFeature>> _features;
+        Vector<Scope<RenderFeature>> _owned_features;
+        Vector<RenderFeature *> _features;
         bool _b_init = false;
         TimeMgr *_p_timemgr = nullptr;
         Camera *_active_cam;

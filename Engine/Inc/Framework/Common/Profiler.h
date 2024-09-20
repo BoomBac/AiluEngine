@@ -67,7 +67,7 @@ namespace Ailu
 	};
 
 	//command must been execute out of prifile scope
-	class ProfileBlock
+    class AILU_API ProfileBlock
 	{
 	public:
 
@@ -80,17 +80,18 @@ namespace Ailu
 		u64 idx = u64(-1);
 	};
 
-	class CPUProfileBlock
+	class AILU_API CPUProfileBlock
 	{
 	public:
 
-		CPUProfileBlock(const String& name);
+		explicit CPUProfileBlock(const String& name);
 		~CPUProfileBlock();
 
 	protected:
 		u64 idx = u64(-1);
 	};
-
+#define PROFILE_BLOCK_GPU(cmd, block_name) ProfileBlock block_name(cmd, #block_name);
+#define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock block_name(#block_name);
 }
 
 

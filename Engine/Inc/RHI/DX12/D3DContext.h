@@ -37,6 +37,7 @@ namespace Ailu
         void TrackResource(FrameResource* resource) final;
         bool IsResourceReferencedByGPU(FrameResource* resource) final;
         void ResizeSwapChain(const u32 width, const u32 height) final;
+        virtual u64 GetFrameCount() const final { return _frame_count; };
         std::tuple<u32, u32> GetSwapChainSize() const final { return std::make_pair(_width, _height);};
         IGPUTimer* GetTimer() final { return _p_gpu_timer.get(); }
         const u32 CurBackbufIndex() const final {return m_frameIndex ;};
@@ -52,6 +53,7 @@ namespace Ailu
 
         u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         u64 ExecuteAndWaitCommandBuffer(Ref<CommandBuffer>& cmd) final;
+        void WaitForGpu() final;
         void BeginBackBuffer(CommandBuffer* cmd) final;
         void EndBackBuffer(CommandBuffer* cmd) final;
         void DrawOverlay(CommandBuffer* cmd) final;
@@ -65,7 +67,6 @@ namespace Ailu
         void Destroy();
         void LoadPipeline();
         void LoadAssets();
-        void WaitForGpu();
         void FlushCommandQueue(ID3D12CommandQueue* cmd_queue,ID3D12Fence* fence,u64& fence_value);
         void BeginCapture();
         void EndCapture();

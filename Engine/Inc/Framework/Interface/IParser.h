@@ -19,7 +19,7 @@ namespace Ailu
 	};
 	enum class EImageLoader : u8
 	{
-		kPNG = 0,kJPEG,kTGA,kHDR
+		kPNG = 0,kJPEG,kTGA,kHDR,kDDS
 	};
 	class IMeshParser
 	{

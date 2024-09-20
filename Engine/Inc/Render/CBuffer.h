@@ -4,6 +4,7 @@
 #define kMaxDirectionalLight 2
 #define kMaxPointLight 4
 #define kMaxSpotLight 4
+#define kMaxAreaLight 4
 #define kMaxCascadeShadowMapSplit 4
 
 
@@ -53,6 +54,16 @@ namespace Ailu
         float _constant_bias;
         float _slope_bias;
     };
+    struct ShaderArealLightData
+    {
+        float4 _points[4];
+        float3 _LightColor;
+        bool _is_twosided;
+        int _ShadowDataIndex;
+        float _ShadowDistance;
+        float _constant_bias;
+        float _slope_bias;
+    };
 
 #ifdef __cplusplus
     struct CBufferPerObjectData
@@ -62,7 +73,8 @@ cbuffer CBufferPerObjectData : register(b0)
     {
         float4x4 _MatrixWorld;
         float4x4 _MatrixWorldPreTick;
-        float padding0[32];// Padding so the constant buffer is 256-byte aligned.
+        int _ObjectID;
+        float padding0[31];// Padding so the constant buffer is 256-byte aligned.
     };
 
 #ifdef __cplusplus
@@ -77,9 +89,15 @@ cbuffer CBufferPerSceneData : register(b2)
         ShaderDirectionalAndPointLightData _DirectionalLights[kMaxDirectionalLight];
         ShaderDirectionalAndPointLightData _PointLights[kMaxPointLight];
         ShaderSpotlLightData _SpotLights[kMaxSpotLight];
+        ShaderArealLightData _AreaLights[kMaxAreaLight];
         float4x4 _ShadowMatrix[kMaxCascadeShadowMapSplit + kMaxSpotLight + kMaxPointLight * 6];
+        float4 _ActiveLightCount;
+        float4 _Time;// (t/20,t,t*2,t*3)
+        float4 _SinTime;// sin(t/8),sin(t/4),sin(t/2),sin(t)
+        float4 _CosTime;// cos(t/8),cos(t/4),cos(t/2),cos(t)
+        float4 _DeltaTime;//(dt,1/dt,smoothDt,1/smoothDt)
         float g_IndirectLightingIntensity;
-        float padding1[31];
+        float padding1[43];
         //float4x4 _JointMatrix[80];
     };
 

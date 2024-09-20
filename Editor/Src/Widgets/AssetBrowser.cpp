@@ -233,14 +233,14 @@ namespace Ailu
 
                 if (!name.empty())
                 {
-                    Shader *final_shader = selected_shader != nullptr ? selected_shader.get() : Shader::s_p_defered_standart_lit;
+                    Shader *final_shader = selected_shader != nullptr ? selected_shader.get() : Shader::s_p_defered_standart_lit.lock().get();
                     String sys_path = ToChar(FileManager::GetCurSysDirStr());
                     if (!sys_path.ends_with("\\") && !sys_path.ends_with("/"))
                         sys_path.append("/");
                     sys_path.append(name).append(".alasset");
                     auto asset_path = PathUtils::ExtractAssetPath(sys_path);
                     Ref<Material> new_mat = nullptr;
-                    if (final_shader == Shader::s_p_defered_standart_lit)
+                    if (final_shader == Shader::s_p_defered_standart_lit.lock().get())
                     {
                         new_mat = MakeRef<StandardMaterial>(name);
                     }
@@ -505,11 +505,15 @@ namespace Ailu
             {
                 if (asset->_p_obj == nullptr)
                 {
-                    if (asset->_asset_type == EAssetType::kMaterial)
+                    if (ImGui::MenuItem("Import"))
                     {
-                        if (ImGui::MenuItem("Import"))
+                        if (asset->_asset_type == EAssetType::kMaterial)
                         {
-                            g_pResourceMgr->Load<Material>(asset->_asset_path);
+                            g_pResourceMgr->LoadAsync<Material>(asset->_asset_path);
+                        }
+                        else if (asset->_asset_type == EAssetType::kMesh)
+                        {
+                            g_pResourceMgr->LoadAsync<Mesh>(asset->_asset_path);
                         }
                     }
                 }
@@ -517,13 +521,15 @@ namespace Ailu
                 {
                     if (ImGui::MenuItem("Reimport"))
                     {
-                        g_pLogMgr->LogWarning("Waiting for implement");
+                        if (asset->_asset_type == EAssetType::kMaterial)
+                        {
+                            g_pResourceMgr->LoadAsync<Material>(asset->_asset_path);
+                        }
+                        else if (asset->_asset_type == EAssetType::kMesh)
+                        {
+                            g_pResourceMgr->LoadAsync<Mesh>(asset->_asset_path);
+                        }
                     }
-                }
-
-                if (ImGui::MenuItem("Reimport"))
-                {
-                    g_pLogMgr->LogWarning("Waiting for implement");
                 }
                 if (ImGui::MenuItem("Rename"))
                 {
@@ -608,28 +614,31 @@ namespace Ailu
                     _is_search_active = false;
                 }
             }
-            fs::directory_iterator curdir_it{cur_path};
-            ImGui::Text("Current dir: %s,Selected id %d", ToChar(_selected_file_sys_path).data(), _selected_file_index);
-            int file_index = 0;
-            //绘制文件夹图标
-            for (auto &dir_it: curdir_it)
+            u16 file_index = 0;
+            if (fs::exists(cur_path))
             {
-                bool is_dir = dir_it.is_directory();
-                if (is_dir)
+                fs::directory_iterator curdir_it{cur_path};
+                ImGui::Text("Current dir: %s,Selected id %d", ToChar(_selected_file_sys_path).data(), _selected_file_index);
+                //绘制文件夹图标
+                for (auto &dir_it: curdir_it)
                 {
-                    bool should_draw = true;
-                    if (_is_search_active)
+                    bool is_dir = dir_it.is_directory();
+                    if (is_dir)
                     {
-                        should_draw = dir_it.path().filename().wstring().substr(0, _search_str.size()) == _search_str;
-                    }
-                    if (should_draw)
-                    {
-                        DrawFolder(dir_it.path(), file_index);
-                        if ((file_index + 1) % _icon_num_per_row != 0)
+                        bool should_draw = true;
+                        if (_is_search_active)
                         {
-                            ImGui::SameLine();
+                            should_draw = dir_it.path().filename().wstring().substr(0, _search_str.size()) == _search_str;
                         }
-                        ++file_index;
+                        if (should_draw)
+                        {
+                            DrawFolder(dir_it.path(), file_index);
+                            if ((file_index + 1) % _icon_num_per_row != 0)
+                            {
+                                ImGui::SameLine();
+                            }
+                            ++file_index;
+                        }
                     }
                 }
             }
@@ -663,10 +672,10 @@ namespace Ailu
                     }
                     if (ImGui::MenuItem("Scene"))
                     {
-                        auto scene = SceneMgr::Create(L"new_scene");
-                        g_pResourceMgr->CreateAsset(FileManager::GetCurAssetDirStr() + L"/new_scene.almap", scene);
-                        g_pResourceMgr->SaveAllUnsavedAssets();
-                        MarkDirty();
+                        //auto scene = g_pSceneMgr->Create(L"new_scene");
+                        //g_pResourceMgr->CreateAsset(FileManager::GetCurAssetDirStr() + L"/new_scene.almap", scene);
+                        //g_pResourceMgr->SaveAllUnsavedAssets();
+                        //MarkDirty();
                     }
                     ImGui::EndMenu();
                 }

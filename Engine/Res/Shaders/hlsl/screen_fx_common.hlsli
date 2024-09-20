@@ -4,8 +4,8 @@
 #include "common.hlsli"
 
 
-TEXTURE2D(_CameraDepthTexture,0)
-TEXTURE2D(_CameraNormalsTexture,1)
+TEXTURE2D(_CameraDepthTexture)
+TEXTURE2D(_CameraNormalsTexture)
 
 
 #define UNITY_REVERSED_Z 1

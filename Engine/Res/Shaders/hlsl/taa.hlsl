@@ -17,10 +17,10 @@ PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
 float4 PSMain(PSInput IN);
 
 
-TEXTURE2D(_HistoryFrameColor,0);
-TEXTURE2D(_CurFrameColor,1);
-TEXTURE2D(_CameraDepthTexture,2);
-TEXTURE2D(_MotionVectorTexture,3);
+TEXTURE2D(_HistoryFrameColor);
+TEXTURE2D(_CurFrameColor);
+TEXTURE2D(_CameraDepthTexture);
+TEXTURE2D(_MotionVectorTexture);
 
 PerMaterialCBufferBegin
     float4   _CameraDepthTexture_TexelSize;

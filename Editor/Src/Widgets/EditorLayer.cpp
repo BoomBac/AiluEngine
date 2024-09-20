@@ -1,4 +1,5 @@
 #include "Widgets/EditorLayer.h"
+#include "Common/Selection.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 
@@ -8,7 +9,6 @@
 
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
-#include "Objects/CameraComponent.h"
 
 #include "Framework/Common/Input.h"
 #include "Framework/Events/MouseEvent.h"
@@ -177,7 +177,37 @@ namespace Ailu
                 ImGui::EndMainMenuBar();
             }
 
+
             ImGui::Begin("Performace Statics");// Create a window called "Hello, world!" and append into it.
+            static u16 s_selected_chechbox = 0;
+            bool checkbox1 = (s_selected_chechbox == 0);
+            if (ImGui::Checkbox("Lit", &checkbox1))
+            {
+                if (checkbox1)
+                {
+                    g_pGfxContext->GetPipeline()->GetRenderer()->SetShadingMode(EShadingMode::kLit);
+                    s_selected_chechbox = 0;
+                }
+            }
+            bool checkbox2 = (s_selected_chechbox == 1);
+            if (ImGui::Checkbox("Wireframe", &checkbox2))
+            {
+            	if (checkbox2)
+            	{
+                    g_pGfxContext->GetPipeline()->GetRenderer()->SetShadingMode(EShadingMode::kWireframe);
+            		s_selected_chechbox = 1;
+            	}
+            }
+            bool checkbox3 = (s_selected_chechbox == 2);
+            if (ImGui::Checkbox("LitWireframe", &checkbox3))
+            {
+            	if (checkbox3)
+            	{
+                    g_pGfxContext->GetPipeline()->GetRenderer()->SetShadingMode(EShadingMode::kLitWireframe);
+            		s_selected_chechbox = 2;
+            	}
+            }
+
             ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
             ImGui::Text("FrameTime: %.2f ms", ModuleTimeStatics::RenderDeltatime);
             ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
@@ -189,6 +219,7 @@ namespace Ailu
                 ImGui::Checkbox(pass->GetName().c_str(), &active);
                 pass->SetActive(active);
             }
+
 
             String space = "";
             ImGui::Text("CPU Time:");
@@ -258,17 +289,22 @@ namespace Ailu
             ImGui::End();
             if (show)
                 ImGui::ShowDemoWindow(&show);
+            ECS::Entity e = Selection::FirstEntity();
+            if (e != ECS::kInvalidEntity)
+            {
+                if (g_pSceneMgr->ActiveScene()->GetRegister().HasComponent<CCamera>(e))
+                {
+                    static_cast<RenderView *>(_p_preview_cam_view)->SetSource(g_pGfxContext->GetPipeline()->GetTarget(1));
+                    _p_preview_cam_view->Open(_p_preview_cam_view->Handle());
+                }
+                else
+                {
+                    _p_preview_cam_view->Close(_p_preview_cam_view->Handle());
+                }
+            }
             auto scene_rt = g_pGfxContext->GetPipeline()->GetTarget(0);
             static_cast<SceneView *>(_p_scene_view)->SetSource(scene_rt);
-            if (g_pSceneMgr->_p_selected_actor != nullptr && g_pSceneMgr->_p_selected_actor->HasComponent<CameraComponent>())
-            {
-                static_cast<RenderView *>(_p_preview_cam_view)->SetSource(g_pGfxContext->GetPipeline()->GetTarget(1));
-                _p_preview_cam_view->Open(_p_preview_cam_view->Handle());
-            }
-            else
-            {
-                _p_preview_cam_view->Close(_p_preview_cam_view->Handle());
-            }
+
             for (auto &widget: _widgets)
             {
                 widget->Show();

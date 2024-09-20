@@ -1,4 +1,5 @@
 #include "Framework/Common/TimeMgr.h"
+#include "Framework/Math/ALMath.hpp"
 //#include "Framework/Common/Log.h"
 #include "pch.h"
 
@@ -17,10 +18,11 @@ namespace Ailu
     }
     void TimeMgr::Finalize() { _b_stop = true; }
 
-    void TimeMgr::Tick(const float &delta_time)
+    void TimeMgr::Tick(f32 delta_time)
     {
         _cur_stamp = std::chrono::high_resolution_clock::now();
         DeltaTime = ALMSecond(_cur_stamp - _pre_stamp).count();
+        s_smooth_delta_time = lerp(DeltaTime, s_smooth_delta_time, 0.95f);
         _pre_stamp = _cur_stamp;
         if (!_b_stop)
         {

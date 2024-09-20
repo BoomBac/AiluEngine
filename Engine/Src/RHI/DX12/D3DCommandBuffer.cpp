@@ -14,6 +14,15 @@ namespace Ailu
 {
     D3DCommandBuffer::D3DCommandBuffer(ECommandBufferType type) : _type(type)
     {
+        static bool s_is_init = false;
+        if (s_is_init == false)
+        {
+            s_is_init = true;
+            for (auto &p: s_obj_buffers)
+            {
+                p.reset(IConstantBuffer::Create(256));
+            }
+        }
         auto dev = D3DContext::Get()->GetDevice();
         ThrowIfFailed(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(_p_alloc.GetAddressOf())));
         ThrowIfFailed(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _p_alloc.Get(), nullptr, IID_PPV_ARGS(_p_cmd.GetAddressOf())));
@@ -36,6 +45,8 @@ namespace Ailu
         _cur_cbv_heap_id = 65535;
         _is_custom_viewport = false;
         _upload_buf->Reset();
+        s_global_buffer_offset -= _buffer_offset;
+        _buffer_offset = 0;
     }
     void D3DCommandBuffer::Close()
     {
@@ -239,7 +250,7 @@ namespace Ailu
     }
     void D3DCommandBuffer::DrawFullScreenQuad(Material *mat, u16 pass_index)
     {
-        Mesh::s_p_fullscreen_triangle->GetIndexBuffer()->Bind(this);
+        Mesh::s_p_fullscreen_triangle.lock()->GetIndexBuffer()->Bind(this);
         mat->Bind(pass_index);
         GraphicsPipelineStateMgr::EndConfigurePSO(this);
         auto d3dcmd = static_cast<D3DCommandBuffer *>(this)->GetCmdList();
@@ -317,6 +328,42 @@ namespace Ailu
         return 0;
     }
 
+
+    u16 D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 submesh_index, u16 pass_index, u32 instance_count)
+    {
+        CBufferPerObjectData per_obj_data;
+        per_obj_data._MatrixWorld = world_mat;
+        return DrawRenderer(mesh, material, per_obj_data, submesh_index, pass_index, instance_count);
+    }
+
+    u16 Ailu::D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 submesh_index, u16 pass_index, u32 instance_count)
+    {
+        if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
+        {
+            //LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
+            return 1;
+        }
+        material->Bind(pass_index);
+        GraphicsPipelineStateMgr::EndConfigurePSO(this);
+        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        {
+            IConstantBuffer *buf = s_obj_buffers[s_global_buffer_offset + _buffer_offset].get();
+            s_global_buffer_offset++;
+            _buffer_offset++;
+            memcpy(buf->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
+            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+            mesh->GetIndexBuffer(submesh_index)->Bind(this);
+            buf->Bind(this, 0);
+            ++RenderingStates::s_draw_call;
+            _p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
+        }
+        else
+        {
+            LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
+            return 2;
+        }
+        return 0;
+    }
     u16 D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, u32 instance_count)
     {
         return DrawRenderer(mesh, material, instance_count, 0);

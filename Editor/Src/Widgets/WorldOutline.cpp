@@ -9,157 +9,173 @@
 //----engine--------
 namespace Ailu
 {
-	namespace Editor
-	{
-		WorldOutline::WorldOutline() : ImGuiWidget("WorldOutline")
-		{
-			//_selected_actor = &g_pSceneMgr->_p_selected_actor;
-		}
-		WorldOutline::~WorldOutline()
-		{
-		}
-		void WorldOutline::Open(const i32& handle)
-		{
-			ImGuiWidget::Open(handle);
-		}
-		void WorldOutline::Close(i32 handle)
-		{
-			ImGuiWidget::Close(handle);
-		}
-		void WorldOutline::ShowImpl()
-		{
-			SceneActor* old_selected_actor = nullptr;
-			_selected_actor = Selection::First<SceneActor>();
-			old_selected_actor = _selected_actor;
-			//for (auto obj : Selection::Selections())
-			//{
-			//	auto scene_obj = dynamic_cast<SceneActor*>(obj);
-			//	if (scene_obj)
-			//	{
-			//		_selected_actor = scene_obj;
-			//		old_selected_actor = scene_obj;
-			//	}
-			//}
-			u32 index = 0;
-			if (ImGui::Button("Reflesh Scene"))
-			{
-				g_pSceneMgr->MarkCurSceneDirty();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Add empty"))
-			{
-				g_pSceneMgr->AddSceneActor();
-			}
-			ImGui::Text("Scene: %s", g_pSceneMgr->_p_current->Name().c_str());
-			DrawTreeNode(g_pSceneMgr->_p_current->GetSceneRoot(),true);
-			if (old_selected_actor != _selected_actor)
-			{
-				Selection::AddAndRemovePreSelection(_selected_actor);
-			}
-			g_pSceneMgr->_p_selected_actor = _selected_actor;
-		}
+    namespace Editor
+    {
+        WorldOutline::WorldOutline() : ImGuiWidget("WorldOutline")
+        {
+            //_selected_actor = &g_pSceneMgr->_p_selected_actor;
+        }
+        WorldOutline::~WorldOutline()
+        {
+        }
+        void WorldOutline::Open(const i32 &handle)
+        {
+            ImGuiWidget::Open(handle);
+        }
+        void WorldOutline::Close(i32 handle)
+        {
+            ImGuiWidget::Close(handle);
+        }
+        void WorldOutline::ShowImpl()
+        {
+            ECS::Entity old_selected_entity = ECS::kInvalidEntity;
+            _selected_entity = Selection::FirstEntity();
+            old_selected_entity = _selected_entity;
+            _scene_register = &g_pSceneMgr->ActiveScene()->GetRegister();
+            u32 index = 0;
+            if (ImGui::Button("Reflesh Scene"))
+            {
+                g_pSceneMgr->MarkCurSceneDirty();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Add empty"))
+            {
+                g_pSceneMgr->ActiveScene()->AddObject();
+            }
+            ImGui::Text("Scene: %s", g_pSceneMgr->ActiveScene()->Name().c_str());
+            _drawed_entity.clear();
+            for (auto entity: g_pSceneMgr->ActiveScene()->EntityView())
+                DrawTreeNode(entity);
+            if (old_selected_entity != _selected_entity)
+            {
+                Selection::AddAndRemovePreSelection(_selected_entity);
+            }
+            //g_pSceneMgr->_p_selected_actor = _selected_actor;
+        }
 
-		void WorldOutline::DrawTreeNode(SceneActor* actor, bool is_root)
-		{
-			if (actor == nullptr)
-				return;
-			static const ImGuiTreeNodeFlags s_base_node_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;;
-			ImGuiTreeNodeFlags node_flags = s_base_node_flags;
-			bool is_cur_node_selected = actor == _selected_actor;
-			ImGui::PushID(actor->ID());
-			if (is_cur_node_selected) 
-				node_flags |= ImGuiTreeNodeFlags_Selected;
-			if (is_root) //根节点默认打开
-				node_flags |= ImGuiTreeNodeFlags_DefaultOpen;
-			//绘制根节点
-			u32 cur_id = actor->ID();
-			const void* ptr_id = reinterpret_cast<void*>(&cur_id);
-			bool b_root_node_open = ImGui::TreeNodeEx(ptr_id, node_flags,"%s",actor->Name().c_str());
-			if (ImGui::IsItemClicked())
-			{
-				_selected_actor = actor;
-			}
+        void WorldOutline::DrawTreeNode(ECS::Entity entity)
+        {
+            if (entity == ECS::kInvalidEntity || _drawed_entity.contains(entity))
+                return;
+            _drawed_entity.insert(entity);
+            static const ImGuiTreeNodeFlags s_base_node_flags = ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+            ImGuiTreeNodeFlags node_flags = s_base_node_flags;
+            bool is_cur_node_selected = entity == _selected_entity;
+            ImGui::PushID(entity);
+            if (is_cur_node_selected)
+                node_flags |= ImGuiTreeNodeFlags_Selected;
+            auto hiera_comp = _scene_register->GetComponent<CHierarchy>(entity);
+            auto tag_comp = _scene_register->GetComponent<TagComponent>(entity);
+            if (hiera_comp->_children_num == 0)
+                node_flags |= ImGuiTreeNodeFlags_Leaf;
+            bool b_root_node_open = ImGui::TreeNodeEx(hiera_comp, node_flags, "%s", tag_comp->_name.c_str());
+            if (ImGui::IsItemClicked())
+            {
+                _selected_entity = entity;
+            }
             if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             {
-                OnOutlineDoubleClicked(actor);
+                OnOutlineDoubleClicked(entity);
             }
-			if (b_root_node_open)
-			{
-				//s_cur_frame_selected_actor_id = actor->Id();
-				for (auto child : actor->GetAllChildren())
-				{
-					if (child == nullptr)
-						continue;
-					if (child->GetChildNum() > 0)
-					{
-						auto scene_node = static_cast<SceneActor*>(child);
-						DrawTreeNode(scene_node,false);
-					}
-					else
-					{
-						is_cur_node_selected = child == _selected_actor;
-						node_flags = s_base_node_flags;
-						node_flags |= ImGuiTreeNodeFlags_Leaf;// | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-						if (is_cur_node_selected)
-							node_flags |= ImGuiTreeNodeFlags_Selected;
-						ImGui::PushID(child->ID()); // PushID 需要在进入子节点前
-						u32 cur_id = child->ID();
-						const void* ptr_id = reinterpret_cast<void*>(&cur_id);
-						if (ImGui::TreeNodeEx(ptr_id, node_flags, "%s", child->Name().c_str()))
-						{
-							if (ImGui::IsItemClicked())
-							{
-								_selected_actor = static_cast<SceneActor*>(child);
-							}
-                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                            {
-                                OnOutlineDoubleClicked(dynamic_cast<SceneActor *>(child));
-                            }
-							if (ImGui::BeginPopupContextItem()) // <-- use last item id as popup id
-							{
-								if (ImGui::MenuItem("Rename"))
-								{
-									//s_global_modal_window_info[cur_tree_node_index] = true;
-									MarkModalWindoShow((_selected_actor)->ID());
-								}
-
-								if (ImGui::MenuItem("Delete"))
-								{
-									g_pSceneMgr->DeleteSceneActor(dynamic_cast<SceneActor*>(child));
-								}
-								ImGui::EndPopup();
-							}
-							if (_selected_actor)
-							{
-								auto new_name = ShowModalDialog("Rename: " + child->Name(), (_selected_actor)->ID());
-								if (!new_name.empty())
-									child->Name(new_name);
-							}
-							ImGui::TreePop();
-						}
-						ImGui::PopID();
-					}
-				}
-				ImGui::TreePop();
-			}
-			ImGui::PopID();
-		}
-
-        void WorldOutline::OnOutlineDoubleClicked(SceneActor* actor)
-        {
-            auto target_pos = actor->GetTransformComponent()->GetPosition();
-            auto static_mesh = actor->GetComponent<StaticMeshComponent>();
-            f32 dis = 200.0f;
-            if(static_mesh)
+            if (b_root_node_open)
             {
-                dis = static_mesh->GetAABB()[0].Diagon() * 1.1f;
+                if (hiera_comp->_children_num > 0)
+                {
+                    auto child = _scene_register->GetComponent<CHierarchy>(hiera_comp->_first_child);
+                    ECS::Entity child_entity = hiera_comp->_first_child;
+                    do
+                    {
+                        if (child->_children_num > 0)
+                        {
+                            DrawTreeNode(child_entity);
+                        }
+                        else
+                        {
+                            _drawed_entity.insert(child_entity);
+                            is_cur_node_selected = child_entity == _selected_entity;
+                            node_flags = s_base_node_flags;
+                            node_flags |= ImGuiTreeNodeFlags_Leaf;// | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                            if (is_cur_node_selected)
+                                node_flags |= ImGuiTreeNodeFlags_Selected;
+                            ImGui::PushID(child_entity);// PushID 需要在进入子节点前
+                            auto hiera_comp = _scene_register->GetComponent<CHierarchy>(child_entity);
+                            auto tag_comp = _scene_register->GetComponent<TagComponent>(child_entity);
+                            if (ImGui::TreeNodeEx(hiera_comp, node_flags, "%s", tag_comp->_name.c_str()))
+                            {
+                                if (ImGui::IsItemClicked())
+                                {
+                                    _selected_entity = child_entity;
+                                }
+                                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                                {
+                                    OnOutlineDoubleClicked(_selected_entity);
+                                }
+                                if (ImGui::BeginPopupContextItem())// <-- use last item id as popup id
+                                {
+                                    static char s_rename_buf[128];
+                                    if (ImGui::MenuItem("Rename"))
+                                    {
+                                        if (ImGui::BeginPopup("Rename"))
+                                        {
+                                            ImGui::Text("Enter a new name:");
+                                            ImGui::InputText("##rename", s_rename_buf, 128);
+                                            if (ImGui::Button("OK"))
+                                            {
+                                                tag_comp->_name = s_rename_buf;
+                                                ImGui::CloseCurrentPopup();
+                                            }
+                                            ImGui::SameLine();
+                                            if (ImGui::Button("Cancel"))
+                                            {
+                                                ImGui::CloseCurrentPopup();
+                                            }
+                                            ImGui::EndPopup();
+                                        }
+                                    }
+                                    if (ImGui::MenuItem("Delete"))
+                                    {
+                                        g_pSceneMgr->ActiveScene()->RemoveObject(child_entity);
+                                    }
+                                    memset(s_rename_buf, 0, 128);
+                                    ImGui::EndPopup();
+                                }
+                                ImGui::TreePop();
+                            }
+                            ImGui::PopID();
+                        }
+                        child_entity = child->_next_sibling;
+                        child = _scene_register->GetComponent<CHierarchy>(child_entity);
+                    } while (child != nullptr);
+                }
+                ImGui::TreePop();
             }
             else
             {
-                dis = actor->BaseAABB().Diagon() * 1.1f;
+                if (hiera_comp->_children_num > 0)
+                {
+                    auto child = _scene_register->GetComponent<CHierarchy>(hiera_comp->_first_child);
+                    ECS::Entity child_entity = hiera_comp->_first_child;
+                    do
+                    {
+                        _drawed_entity.insert(child_entity);
+                        child_entity = child->_next_sibling;
+                        child = _scene_register->GetComponent<CHierarchy>(child_entity);
+                    } while (child != nullptr);
+                }
             }
+            ImGui::PopID();
+        }
+
+        void WorldOutline::OnOutlineDoubleClicked(ECS::Entity entity)
+        {
+            auto&r = g_pSceneMgr->ActiveScene()->GetRegister();
+            auto t = r.GetComponent<TransformComponent>(entity)->_transform;
+            auto target_pos = t._position;
+            f32 dis = 2.0f;
+            if (StaticMeshComponent *sm = r.GetComponent<StaticMeshComponent>(entity); sm != nullptr)
+                dis = sm->_transformed_aabbs[0].Diagon() * 1.1f;
             target_pos += -Camera::sCurrent->Forward() * dis;
-            FirstPersonCameraController::s_inst.SetTargetPosition(target_pos,true);
+            FirstPersonCameraController::s_inst.SetTargetPosition(target_pos, true);
         }
         void WorldOutline::OnEvent(Event &e)
         {
@@ -169,9 +185,9 @@ namespace Ailu
                 auto &key_e = static_cast<KeyPressedEvent &>(e);
                 if (key_e.GetKeyCode() == AL_KEY_DELETE)
                 {
-                    g_pSceneMgr->DeleteSceneActor(dynamic_cast<SceneActor*>(_selected_actor));
+                    g_pSceneMgr->ActiveScene()->RemoveObject(_selected_entity);
                 }
             }
         }
-    }
-}
+    }// namespace Editor
+}// namespace Ailu

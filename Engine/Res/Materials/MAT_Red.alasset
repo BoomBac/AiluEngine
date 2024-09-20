@@ -10,19 +10,22 @@ keywords:
     _material_id: 0
     _surface: 0
   prop_type: Float
+    _ObjectID: 0
     _SamplerMask: 0
-    g_IndirectLightingIntensity: 0
-    _MetallicValue: 0
+    g_IndirectLightingIntensity: -4.31602e+08
+    _MetallicValue: 1
     _MaterialID: 0
-    _RoughnessValue: 0.072
+    _Anisotropy: 0
+    _RoughnessValue: 0
     _AlphaCulloff: 0.602
   prop_type: Vector
-    _ZBufferParams: 0,0,0,0
-    _MainlightWorldPosition: 1,1,1,0.996078
+    _MainlightWorldPosition: 1,1,1,1
+    _ZBufferParams: 0,0,20,0
     _CascadeShadowParams: 0,0,0,0
-    _ScreenParams: 0,0,0,0
+    _ActiveLightCount: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
+    _ScreenParams: 0,20,0,0
     _EmissionValue: 0,0,0,0
-    _AlbedoValue: 1,1,1,0.996078
+    _AlbedoValue: 1,1,1,1
     _SpecularValue: 0,0,0,0
   prop_type: Texture2D
     _AlbedoTex: null guid

@@ -75,8 +75,7 @@ namespace Ailu
 	}
 	static const std::string log_str[]{ "Normal","Warning","Error" };
 	static const std::wstring log_strw[]{ L"Normal",L"Warning",L"Error" };
-	static const std::string format_control_block[] {"\u001b[1;37m","\u001b[1;33m","\u001b[1;31m"};
-	static const std::wstring format_control_blockw[] {L"\u001b[1;37m",L"\u001b[1;33m",L"\u001b[1;31m"};
+
 	using TraceLevle = uint8_t;
 	constexpr TraceLevle TRACE_ALL = 0;
 	constexpr TraceLevle TRACE_1 = 1 << 0;
@@ -94,16 +93,14 @@ namespace Ailu
 	template<typename... Targs>
 	static std::wstring BuildLogMsg(ELogLevel level, std::wstring_view str, Targs... args)
 	{
-		std::wstring s = format_control_blockw[level];
-		s.append(log_strw[level] + L": ");
+        std::wstring s = log_strw[level] + L": ";
 		s.append(format(str, args...));
 		return s;
 	}
 	template<typename... Targs>
 	static std::string BuildLogMsg(ELogLevel level, std::string_view str, Targs... args)
 	{
-		std::string s = format_control_block[level];
-		s.append(log_str[level] + ": ");
+        std::string s = log_str[level] + ": ";
 		s.append(format(str, args...));
 		return s;
 	}
@@ -134,12 +131,29 @@ namespace Ailu
     public:
         void Print(const String &str) override
         {
-            std::cout << str.c_str() << std::endl;
+            u16 block_index = 0;
+            if (str.data()[0] == *"W")
+                block_index = 1;
+            else if (str.data()[0] == *"E")
+                block_index = 2;
+            String s = format_control_block[block_index];
+            s.append(str);
+            std::cout << s.c_str() << std::endl;
         }
         void Print(const WString &str) override
         {
-            std::wcout << str.c_str() << std::endl;
+            u16 block_index = 0;
+            if (str.data()[0] == *L"W")
+                block_index = 1;
+            else if (str.data()[0] == *L"E")
+                block_index = 2;
+            WString s = format_control_blockw[block_index];
+            s.append(str);
+            std::wcout << s.c_str() << std::endl;
         }
+    private:
+        inline static const std::string format_control_block[]{"\u001b[1;37m", "\u001b[1;33m", "\u001b[1;31m"};
+        inline static const std::wstring format_control_blockw[]{L"\u001b[1;37m", L"\u001b[1;33m", L"\u001b[1;31m"};
     };
     class FileAppender : public IAppender
     {
@@ -151,7 +165,7 @@ namespace Ailu
             std::ofstream out(s_out_path, std::ios_base::app);
             if (out.is_open())
             {
-                out << str.substr(8, str.size() - 8) << std::endl;
+                out << str.substr(7, str.size() - 7) << std::endl;
                 out.close();
             }
         }
@@ -188,7 +202,7 @@ namespace Ailu
         LogMgr(std::string name, ELogLevel output_level = kLogLevel, TraceLevle output_mark = kTraceLevel);
         int Initialize() override;
         void Finalize() override;
-        void Tick(const float &delta_time) override;
+        void Tick(f32 delta_time) override;
         void AddAppender(IAppender *appender);
         void SetOutputLevel(ELogLevel level);
         void SetTraceLevel(TraceLevle trace);

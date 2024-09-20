@@ -2,8 +2,8 @@
 #include "Render/Gizmo.h"
 #include "pch.h"
 //#include "Render/RenderQueue.h"
-#include "Framework/Common/SceneMgr.h"
 #include "Render/Renderer.h"
+#include "Scene/Scene.h"
 
 namespace Ailu
 {
@@ -127,6 +127,8 @@ namespace Ailu
         vf_dir[1] = eye_cam._far_bottom_right - eye_cam._position;
         vf_dir[2] = eye_cam._far_top_left - eye_cam._position;
         vf_dir[3] = eye_cam._far_top_right - eye_cam._position;
+        for (u16 i = 0; i < 4; i++)
+            Normalize(vf_dir[i]);
         Vector<Vector3f> p(8);
         p[0] = eye_cam._position + (vf_dir[0]) * end_len;
         p[1] = eye_cam._position + (vf_dir[1]) * end_len;
@@ -151,54 +153,6 @@ namespace Ailu
         IMPLEMENT_REFLECT_FIELD(Camera);
         MarkDirty();
         RecalculateMarix();
-    }
-
-    void Camera::Cull(Scene *s)
-    {
-        _cull_results.clear();
-        u16 scene_render_obj_index = 0;
-        for (auto static_mesh: s->GetAllStaticRenderable())
-        {
-            if (static_mesh->GetMesh())
-            {
-                auto &aabbs = static_mesh->GetAABB();
-                Vector3f center;
-                u16 submesh_count = static_mesh->GetMesh()->SubmeshCount();
-                auto &materials = static_mesh->GetMaterials();
-                if (!_is_custom_vp && !ViewFrustum::Conatin(_vf, aabbs[0]))
-                {
-                    ++scene_render_obj_index;
-                    continue;
-                }
-                for (int i = 0; i < submesh_count; i++)
-                {
-                    if (ViewFrustum::Conatin(_vf, aabbs[i + 1]) || _is_custom_vp)
-                    {
-                        f32 dis = Distance(aabbs[i + 1].Center(), _position);
-                        u32 queue_id;
-                        Material *used_mat = nullptr;
-                        if (!materials.empty())
-                        {
-                            used_mat = i < materials.size() && materials[i] != nullptr ? materials[i].get() : materials[0].get();
-                            queue_id = used_mat->RenderQueue();
-                            if (!_cull_results.contains(queue_id))
-                            {
-                                _cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
-                            }
-                            _cull_results[queue_id].emplace_back(RenderableObjectData{scene_render_obj_index, dis,
-                                                                                      (u16) i, 1, static_mesh->GetMesh().get(), used_mat, &static_mesh->GetOwner()->GetComponent<TransformComponent>()->GetMatrix()});
-                        }
-                    }
-                    ++scene_render_obj_index;
-                }
-            }
-        }
-        for (auto &it: _cull_results)
-        {
-            auto &objs = it.second;
-            std::sort(objs.begin(), objs.end(), [this](const RenderableObjectData &a, const RenderableObjectData &b)
-                      { return a._distance_to_cam < b._distance_to_cam; });
-        }
     }
 
     void Camera::RecalculateMarix(bool force)
@@ -339,12 +293,12 @@ namespace Ailu
         BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0, base_cam._near_clip, base_cam._far_clip);
         const static Vector3f targets[] =
                 {
-                        {x + 1.f, y, z},//+x
-                        {x - 1.f, y, z},//-x
-                        {x, y + 1.f, z},//+y
-                        {x, y - 1.f, z},//-y
-                        {x, y, z + 1.f},//+z
-                        {x, y, z - 1.f} //-z
+                        {+1.f, 0.f, 0.5},//+x
+                        {-1.f, 0.f, 0.f},//-x
+                        {0.f, +1.f, 0.f},//+y
+                        {0.f, -1.f, 0.f},//-y
+                        {0.f, 0.f,+1.f},//+z
+                        {0.f, 0.f,-1.f} //-z
                 };
         const static Vector3f ups[] =
                 {
@@ -360,5 +314,36 @@ namespace Ailu
         out.SetLens(90.0, 1.0, base_cam._near_clip, base_cam._far_clip);
         out.LookTo(Normalize(targets[face - 1]), Normalize(ups[face - 1]));
         return out;
+    }
+    Archive &operator<<(Archive &ar, const Camera &c)
+    {
+        ar.IncreaseIndent();
+        ar << ar.GetIndent() << "_type:" << ECameraType::ToString(c._camera_type) << std::endl;
+        ar << ar.GetIndent() << "_aspect:" << c.Aspect() << std::endl;
+        ar << ar.GetIndent() << "_far:"    << c.Far() << std::endl;
+        ar << ar.GetIndent() << "_near:"   << c.Near() << std::endl;
+        ar << ar.GetIndent() << "_fovh:"   << c.FovH() << std::endl;
+        ar << ar.GetIndent() << "_size:"   << c.Size() << std::endl;
+        ar.DecreaseIndent();
+        ar.NewLine();
+        return ar;
+    }
+    Archive &operator>>(Archive &ar, Camera &c)
+    {
+        String buf;
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_type"));
+        c._camera_type = ECameraType::FromString(su::Split(buf, ":")[1]);
+        ar >> buf;
+        c._aspect = std::stof(su::Split(buf, ":")[1]);
+        ar >> buf;
+        c._far_clip = std::stof(su::Split(buf, ":")[1]);
+        ar >> buf;
+        c._near_clip = std::stof(su::Split(buf, ":")[1]);
+        ar >> buf;
+        c._fov_h = std::stof(su::Split(buf, ":")[1]);
+        ar >> buf;
+        c._size = std::stof(su::Split(buf, ":")[1]);
+        return ar;
     }
 }// namespace Ailu

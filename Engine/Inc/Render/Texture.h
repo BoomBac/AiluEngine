@@ -113,7 +113,7 @@ namespace Ailu
     DECLARE_ENUM(ETextureDimension, kUnknown, kTex2D, kTex3D, kCube, kTex2DArray, kCubeArray)
     DECLARE_ENUM(EFilterMode, kPoint, kBilinear, kTrilinear)
     DECLARE_ENUM(EWrapMode, kClamp, kRepeat, kMirror)
-    DECLARE_ENUM(ETextureFormat, kRGBA32, kRGBAFloat, kRGBFloat, kRGBAHalf, kRGFloat)
+    DECLARE_ENUM(ETextureFormat, kRGBA32, kRGBAFloat, kRGBFloat, kRGBAHalf, kRGFloat,kR11G11B10)
     DECLARE_ENUM(ECubemapFace, kUnknown, kPositiveX, kNegativeX, kPositiveY, kNegativeY, kPositiveZ, kNegativeZ)
     static EALGFormat::EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format)
     {
@@ -129,6 +129,8 @@ namespace Ailu
                 return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
             case ETextureFormat::kRGFloat:
                 return EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT;
+            case ETextureFormat::kR11G11B10:
+                return EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT;
             default:
                 break;
         }
@@ -173,6 +175,7 @@ namespace Ailu
 
     public:
         static u16 MaxMipmapCount(u16 w, u16 h);
+        static u64 TotalGPUMemerySize() { return s_gpu_mem_usage; }
         Texture();
         Texture(u16 width, u16 height);
         virtual ~Texture();
@@ -187,6 +190,7 @@ namespace Ailu
         virtual void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) {};
         //common
         virtual void CreateView() {};
+        u64 TotalByteSize() const { return _total_byte_size; }
 
         //slot传255的话，表示只设置一下描述符堆
         virtual void Bind(CommandBuffer *cmd, u16 view_index, u8 slot, bool is_target_compute_pipiline = false) {};
@@ -203,7 +207,9 @@ namespace Ailu
         Asset *_p_asset;
 
     protected:
+        inline static u64 s_gpu_mem_usage = 0u;
         u16 _pixel_size;
+        u64 _total_byte_size = 0u;
         bool _is_random_access;
         bool _is_have_total_view = false;
         bool _is_ready_for_rendering = false;
@@ -213,7 +219,6 @@ namespace Ailu
     class AILU_API Texture2D : public Texture
     {
     public:
-        static u64 TotalGPUMemerySize() { return s_gpu_memory_size; }
         static Ref<Texture2D> Create(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         Texture2D(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         virtual ~Texture2D();
@@ -232,7 +237,6 @@ namespace Ailu
         bool IsValidMipmap(u16 mipmap) const final { return mipmap < _pixel_data.size(); };
 
     protected:
-        inline static u64 s_gpu_memory_size = 0u;
         ETextureFormat::ETextureFormat _format;
         Vector<u8 *> _pixel_data;
     };
@@ -272,7 +276,7 @@ namespace Ailu
         kDepthTarget
     };
 
-    DECLARE_ENUM(ERenderTargetFormat, kUnknown, kDefault, kDefaultHDR, kDepth, kShadowMap, kRGFloat, kRGHalf, kRFloat, kRGBAHalf, kRGBAFloat)
+    DECLARE_ENUM(ERenderTargetFormat, kUnknown, kDefault, kDefaultHDR, kDepth, kShadowMap, kRGFloat, kRGHalf, kRFloat, kRGBAHalf, kRGBAFloat,kRUint,kRInt)
 
     static EALGFormat::EALGFormat ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::ERenderTargetFormat format)
     {
@@ -298,6 +302,10 @@ namespace Ailu
                 return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
             case ERenderTargetFormat::kRGBAFloat:
                 return EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT;
+            case ERenderTargetFormat::kRInt:
+                return EALGFormat::EALGFormat::kALGFormatR32_SINT;
+            case ERenderTargetFormat::kRUint:
+                return EALGFormat::EALGFormat::kALGFormatR32_UINT;
             default:
                 break;
         }
@@ -344,7 +352,7 @@ namespace Ailu
     {
         DECLARE_PROTECTED_PROPERTY(depth, Depth, u16)
     public:
-        static u64 TotalGPUMemerySize() { return s_gpu_memory_size; }
+        static u64 TotalGPUMemerySize() { return s_render_texture_gpu_mem_usage; }
         static RTHandle GetTempRT(u16 width, u16 height, String name = std::format("TempBuffer_{}", s_temp_rt_count++), ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
         static RTHandle GetTempRT(RenderTextureDesc desc, String name = std::format("TempBuffer_{}", s_temp_rt_count++));
         static void ReleaseTempRT(RTHandle handle);
@@ -376,6 +384,7 @@ namespace Ailu
         virtual void GenerateMipmap(CommandBuffer *cmd) {};
         //ret data need to be delete[] by client
         virtual void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) { return nullptr; };
+        virtual void ReadBackAsync(std::function<void(void *)> callback,u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown){};
 
     private:
         inline static RenderTexture *s_current_rt = nullptr;
@@ -392,7 +401,7 @@ namespace Ailu
         }
 
     protected:
-        inline static u64 s_gpu_memory_size = 0u;
+        inline static u64 s_render_texture_gpu_mem_usage = 0u;
         inline static u64 s_temp_rt_count = 0u;
         u16 _slice_num;
     };

@@ -15,7 +15,7 @@
 
 //Texture2D _SourceTex : register(t0);
 
-TEXTURE2D(_SourceTex,0)
+TEXTURE2D(_SourceTex)
 
 PSInput FullscreenVSMain(VSInput v);
 

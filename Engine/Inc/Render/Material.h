@@ -25,6 +25,9 @@ namespace Ailu
         };
 
     public:
+        inline static std::weak_ptr<Material> s_standard_lit;
+        inline static std::weak_ptr<Material> s_checker;
+
         Material(Shader *shader, String name);
         Material(const Material &other);
         Material(Material &&other) noexcept;
@@ -86,15 +89,16 @@ namespace Ailu
         kEmission,
         kRoughness,
         kMetallic,
-        kSpecular
+        kSpecular,
+        kAnisotropy,
+        kNone
     };
 
-    DECLARE_ENUM(EMaterialID, kStandard, kSubsurface)
+    DECLARE_ENUM(EMaterialID, kStandard, kSubsurface,kChecker)
     DECLARE_ENUM(ESurfaceType, kOpaque, kTransparent, kAlphaTest)
 
     class AILU_API StandardMaterial : public Material
     {
-        DECLARE_PRIVATE_PROPERTY(material_id, MaterialID, EMaterialID::EMaterialID)
     public:
         struct StandardPropertyName
         {
@@ -111,6 +115,7 @@ namespace Ailu
             inline static const StandardPropertyNameInfo kRoughness{"Roughness", "_RoughnessMetallicTex", "_RoughnessValue", 8};
             inline static const StandardPropertyNameInfo kMetallic{"Metallic", "_RoughnessMetallicTex", "_MetallicValue", 8};
             inline static const StandardPropertyNameInfo kSpecular{"Specular", "_SpecularTex", "_SpecularValue", 16};
+            inline static const StandardPropertyNameInfo kAnisotropy{"Anisotropy", "_AnisotropyTex", "_Anisotropy", 32};
             static const StandardPropertyNameInfo &GetInfoByUsage(ETextureUsage usage)
             {
                 switch (usage)
@@ -131,7 +136,10 @@ namespace Ailu
                         break;
                     case ETextureUsage::kSpecular:
                         return kSpecular;
-                        break;
+                    case ETextureUsage::kAnisotropy:
+                        return kAnisotropy;
+                    default:
+                    break;
                 }
             }
         };
@@ -148,9 +156,11 @@ namespace Ailu
         const SerializableProperty &MainProperty(ETextureUsage usage);
         const ESurfaceType::ESurfaceType &SurfaceType() const { return _surface; }
         void SurfaceType(const ESurfaceType::ESurfaceType &value);
-
+        const EMaterialID::EMaterialID &MaterialID() const{return _material_id;}
+        void MaterialID(const EMaterialID::EMaterialID &value);
     private:
         ESurfaceType::ESurfaceType _surface;
+        EMaterialID::EMaterialID _material_id;
         u16 _sampler_mask_offset = 0u;
         u16 _material_id_offset = 0u;
     };

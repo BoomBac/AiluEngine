@@ -94,8 +94,8 @@ float rayIntersectSphere(float3 ro, float3 rd, float rad) {
     return -b - sqrt(discr);
 }
 
-TEXTURE2D(_TexTransmittanceLUT,0)
-TEXTURE2D(_TexMultScatterLUT,1)
+TEXTURE2D(_TexTransmittanceLUT)
+TEXTURE2D(_TexMultScatterLUT)
 
 // Texture2D<float4> _TexTransmittanceLUT;
 // SamplerState sampler_TexTransmittanceLUT;
@@ -127,7 +127,7 @@ float3 getValFromMultiScattLUT(float2 bufferRes, float3 pos, float3 sunDir)
     return SAMPLE_TEXTURE2D_LOD(_TexMultScatterLUT,g_LinearClampSampler,uv,0).rgb;
 }
 
-TEXTURE2D(_TexSkyViewLUT,1)
+TEXTURE2D(_TexSkyViewLUT)
 float3 getValFromSkyLUT(float3 rayDir, float3 sunDir) 
 {
     float height = length(viewPos);

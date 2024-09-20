@@ -31,7 +31,7 @@ namespace Ailu
         GetModuleFileName(NULL, path, MAX_PATH);
         return PathUtils::FormatFilePath(WString(path));
 #else
-        AL_ASSERT(PLATFORM_WINDOWS != 1)
+        AL_ASSERT(PLATFORM_WINDOWS == 1)
 #endif// WINDOWS
     }
 
@@ -46,7 +46,7 @@ namespace Ailu
     }
     int Application::Initialize(ApplicationDesc desc)
     {
-        AL_ASSERT_MSG(sp_instance, "Application already init!");
+        AL_ASSERT_MSG(sp_instance == nullptr, "Application already init!");
         sp_instance = this;
         g_pLogMgr->Initialize();
         g_pLogMgr->AddAppender(new FileAppender());
@@ -111,7 +111,7 @@ namespace Ailu
         DESTORY_PTR(g_pLogMgr);
     }
 
-    void Application::Tick(const float &delta_time)
+    void Application::Tick(f32 delta_time)
     {
         g_pTimeMgr->Reset();
         while (_state != EApplicationState::EApplicationState_Exit)
@@ -131,8 +131,8 @@ namespace Ailu
                 else if (_state == EApplicationState::EApplicationState_Exit)
                     break;
                 else {};
-                g_pTimeMgr->Tick(0.0f);
                 auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
+                g_pTimeMgr->Tick(last_mark);
                 _render_lag += last_mark;
                 _update_lag += last_mark;
                 g_pTimeMgr->Mark();

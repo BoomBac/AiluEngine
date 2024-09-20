@@ -18,7 +18,7 @@ namespace Ailu
         public:
             int Initialize() final;
             void Finalize() final;
-            void Tick(const float &delta_time) final;
+            void Tick(f32 delta_time) final;
 
         private:
             EditorLayer *_p_editor_layer;

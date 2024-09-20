@@ -10,7 +10,7 @@ namespace Ailu
 {
     Material::Material(Shader *shader, String name) : _p_shader(shader)
     {
-        AL_ASSERT(s_total_material_num > RenderConstants::kMaxMaterialDataCount);
+        AL_ASSERT(s_total_material_num < RenderConstants::kMaxMaterialDataCount);
         _name = name;
         _p_active_shader = _p_shader;
         Construct(true);
@@ -84,6 +84,7 @@ namespace Ailu
     }
     void Material::Bind(u16 pass_index)
     {
+        AL_ASSERT(pass_index < _pass_variants.size());
         auto &cur_pass_variant_hash = _pass_variants[pass_index]._variant_hash;
         auto variant_state = _p_active_shader->GetVariantState(pass_index, cur_pass_variant_hash);
         if (variant_state != EShaderVariantState::kReady)
@@ -119,6 +120,8 @@ namespace Ailu
         _p_shader->RemoveMaterialRef(this);
         _p_shader = shader;
         _p_shader->AddMaterialRef(this);
+        _p_active_shader->RemoveMaterialRef(this);
+        _p_active_shader = shader;
         Construct(false);
     }
 
@@ -164,11 +167,12 @@ namespace Ailu
             if (it != res_info.end())
             {
                 memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(value));
-                //LOG_WARNING("uint value{}", *reinterpret_cast<u32*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second)));
+                auto offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                //LOG_WARNING("set uint {} value to {} at address {}", name, *reinterpret_cast<u32 *>(_p_cbufs[pass._index]->GetData() + offset), (u64)(_p_cbufs[pass._index]->GetData() + offset));
             }
             else
             {
-                LOG_WARNING("Material: {} set uint with name {} failed!", _name, name);
+                //LOG_WARNING("Material: {} set uint with name {} failed!", _name, name);
             }
             ++pass_index;
         }
@@ -229,12 +233,12 @@ namespace Ailu
 
     ShaderVariantHash Material::ActiveVariantHash(u16 pass_index) const
     {
-        AL_ASSERT(pass_index >= _pass_variants.size());
+        AL_ASSERT(pass_index < _pass_variants.size());
         return _pass_variants[pass_index]._variant_hash;
     }
     std::set<String> Material::ActiveKeywords(u16 pass_index) const
     {
-        AL_ASSERT(pass_index >= _pass_variants.size());
+        AL_ASSERT(pass_index < _pass_variants.size());
         return _pass_variants[pass_index]._keywords;
     };
 
@@ -246,7 +250,12 @@ namespace Ailu
             auto &res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
             auto it = res_info.find(name);
             if (it != res_info.end())
-                return *reinterpret_cast<u32 *>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
+            {
+                auto offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                u32 value = *reinterpret_cast<u32 *>(_p_cbufs[pass._index]->GetData() + offset);
+                //LOG_WARNING("get uint {} value {} at address {}", name, value, (u64) (_p_cbufs[pass._index]->GetData() + offset));
+                return value;
+            }
             ++pass_index;
         }
         if (_common_uint_property.contains(name))
@@ -421,7 +430,7 @@ namespace Ailu
 
     void Material::Construct(bool first_time)
     {
-        AL_ASSERT(_p_shader->PassCount() == 0);
+        AL_ASSERT(_p_shader->PassCount() != 0);
         ConstructKeywords(_p_shader);
         static u8 s_unused_shader_prop_buf[256]{0};
         u16 unused_shader_prop_buf_offset = 0u;
@@ -483,8 +492,10 @@ namespace Ailu
         for (int i = 0; i < pass_count; i++)
         {
             //处理cbuffer
+            if (cbuf_size_per_passes[i] == 0)
+                cbuf_size_per_passes[i] = 256;
             cbuf_size_per_passes[i] = ALIGN_TO_256(cbuf_size_per_passes[i]);
-            AL_ASSERT(cbuf_size_per_passes[i] > 256);
+            AL_ASSERT(cbuf_size_per_passes[i] <= 256);
             if (first_time)
             {
                 _mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];
@@ -611,7 +622,7 @@ namespace Ailu
                 break;
         }
     }
-    StandardMaterial::StandardMaterial(String name) : Material(Shader::s_p_defered_standart_lit, name)
+    StandardMaterial::StandardMaterial(String name) : Material(Shader::s_p_defered_standart_lit.lock().get(), name)
     {
         //只有首个pass支持默认着色
         for (int i = 0; i < _p_shader->PassCount(); i++)
@@ -631,10 +642,8 @@ namespace Ailu
             if (_standard_pass_index != -1)
                 break;
         }
-        _material_id = EMaterialID::kStandard;
-        _surface = ESurfaceType::kOpaque;
-        _common_uint_property["_SamplerMask"] = (u32) _material_id;
-        _common_uint_property["_MaterialID"] = (u32) _surface;
+        _material_id = (EMaterialID::EMaterialID)_common_uint_property["_MaterialID"];
+        _surface = (ESurfaceType::ESurfaceType)_common_uint_property["_surface"];
     }
     StandardMaterial::~StandardMaterial()
     {
@@ -675,13 +684,26 @@ namespace Ailu
         Material::Bind(pass_index);
         if (_material_id_offset != 0)
         {
-            memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, (u32) _material_id, sizeof(u32));
+            if (_material_id == EMaterialID::kChecker)
+            {
+                u32 id = (u32)_material_id;
+                memcpy(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, &id, sizeof(u32));
+            }
+                //memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, 2.0f, sizeof(u32));
+            else
+                memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, 0, sizeof(u32));
         }
+    }
+    void StandardMaterial::MaterialID(const EMaterialID::EMaterialID &value)
+    {
+        _material_id = value;
+        _common_uint_property["_MaterialID"] = (u32) _material_id;
     }
     void StandardMaterial::SurfaceType(const ESurfaceType::ESurfaceType &value)
     {
         if (_surface == value)
             return;
+        _p_active_shader->RemoveMaterialRef(this);
         if (value == ESurfaceType::kOpaque)
         {
             _p_active_shader = _p_shader;
@@ -701,6 +723,7 @@ namespace Ailu
             EnableKeyword("ALPHA_TEST");
             _render_queue = Shader::kRenderQueueAlphaTest;
         }
+        _p_active_shader->AddMaterialRef(this);
         _surface = value;
     }
     void StandardMaterial::SetTexture(const String &name, Texture *texture)
