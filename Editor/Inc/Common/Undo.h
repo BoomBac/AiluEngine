@@ -5,9 +5,9 @@
 #ifndef AILU_UNDO_H
 #define AILU_UNDO_H
 
-#include <stack>
 #include "Framework/Common/Log.h"
 #include "Scene/Component.h"
+#include <stack>
 
 namespace Ailu
 {
@@ -19,44 +19,67 @@ namespace Ailu
             virtual ~ICommand() {}
             virtual void Execute() = 0;
             virtual void Undo() = 0;
-            virtual const String& ToString() const = 0;
+            virtual const String &ToString() const = 0;
         };
-#define DECLARE_COMMAND(name) \
-public:\
-        [[nodiscard]] const String& ToString() const final {return s_name;} \
-        private:inline static String s_name = #name;
+#define DECLARE_COMMAND(name)                                             \
+public:                                                                   \
+    [[nodiscard]] const String &ToString() const final { return s_name; } \
+                                                                          \
+private:                                                                  \
+    inline static String s_name = #name;
 
         class TransformCommand : public ICommand
         {
             DECLARE_COMMAND(Transform)
         public:
-            TransformCommand(TransformComponent* comp, const Transform& old_transf)
-                : _comp(comp), _old_transf(old_transf), _new_transf(comp->_transform) {}
+            TransformCommand(Vector<String> &&obj_names, Vector<TransformComponent *> &&comps, Vector<Transform> &&old_transforms)
+                : _obj_names(obj_names), _comps(comps), _old_transforms(old_transforms)
+            {
+                for (auto *comp: _comps)
+                {
+                    _new_transforms.push_back(comp->_transform);
+                }
+            }
+            TransformCommand(const String &obj_name,TransformComponent *comp, const Transform &old_transf)
+            {
+                _obj_names.emplace_back(obj_name);
+                _comps.emplace_back(comp);
+                _old_transforms.emplace_back(old_transf);
+                _new_transforms.emplace_back(comp->_transform);
+            }
 
             void Execute() override
             {
-                _comp->_transform._position = _new_transf._position;
-                _comp->_transform._rotation = _new_transf._rotation;
-                _comp->_transform._scale = _new_transf._scale;
-                g_pLogMgr->LogFormat("Exe or redo {}",s_name);
+                for (size_t i = 0; i < _comps.size(); ++i)
+                {
+                    _comps[i]->_transform._position = _new_transforms[i]._position;
+                    _comps[i]->_transform._rotation = _new_transforms[i]._rotation;
+                    _comps[i]->_transform._scale = _new_transforms[i]._scale;
+                    g_pLogMgr->LogFormat("Exe or redo {} on obj {}", s_name, _obj_names[i]);
+                }
             }
 
             void Undo() override
             {
-                _comp->_transform._position = _old_transf._position;
-                _comp->_transform._rotation = _old_transf._rotation;
-                _comp->_transform._scale = _old_transf._scale;
-                g_pLogMgr->LogFormat("Undo {}",s_name);
+                for (size_t i = 0; i < _comps.size(); ++i)
+                {
+                    _comps[i]->_transform._position = _old_transforms[i]._position;
+                    _comps[i]->_transform._rotation = _old_transforms[i]._rotation;
+                    _comps[i]->_transform._scale = _old_transforms[i]._scale;
+                    g_pLogMgr->LogFormat("Undo {} on obj {}", s_name, _obj_names[i]);
+                }
             }
+
         private:
-            Transform _old_transf;
-            Transform _new_transf;
-            TransformComponent* _comp;
+            std::vector<String> _obj_names;
+            std::vector<TransformComponent *> _comps;
+            std::vector<Transform> _old_transforms;
+            std::vector<Transform> _new_transforms;
         };
+
 
         class Undo
         {
-
         };
         class CommandManager
         {
@@ -64,6 +87,7 @@ public:\
             void ExecuteCommand(std::unique_ptr<ICommand> command)
             {
                 command->Execute();
+                _undo_views.push_back(command.get());
                 m_UndoStack.push(std::move(command));
                 // Clear the redo stack
                 while (!m_RedoStack.empty())
@@ -76,6 +100,7 @@ public:\
                 {
                     auto command = std::move(m_UndoStack.top());
                     m_UndoStack.pop();
+                    _undo_views.pop_front();
                     command->Undo();
                     m_RedoStack.push(std::move(command));
                 }
@@ -88,18 +113,20 @@ public:\
                     auto command = std::move(m_RedoStack.top());
                     m_RedoStack.pop();
                     command->Execute();
+                    _undo_views.push_back(command.get());
                     m_UndoStack.push(std::move(command));
                 }
             }
-
+            const List<ICommand *> &UndoViews() const { return _undo_views; }
         private:
             std::stack<std::unique_ptr<ICommand>> m_UndoStack;
             std::stack<std::unique_ptr<ICommand>> m_RedoStack;
+            List<ICommand *> _undo_views;
         };
-        extern CommandManager* g_pCommandMgr;
+        extern CommandManager *g_pCommandMgr;
     }// namespace Editor
 
-}
+}// namespace Ailu
 
 
 #endif//AILU_UNDO_H

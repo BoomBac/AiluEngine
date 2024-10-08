@@ -20,6 +20,7 @@ namespace Ailu
         Vector3f _forward = Vector3f::kForward;
         Vector3f _right = Vector3f::kRight;
         Vector3f _up = Vector3f::kUp;
+        Matrix4x4f _world_matrix;
 
         static Matrix4x4f ToMatrix(const Transform &transform)
         {

@@ -8,7 +8,6 @@
 #include "Ext/ImGuizmo/ImGuizmo.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/TimeMgr.h"
-#include "Framework/Common/SceneMgr.h"
 
 
 namespace Ailu
@@ -59,6 +58,7 @@ namespace Ailu
 			style.FrameRounding = 0.0f;
 			style.Colors[ImGuiCol_WindowBg].w = 0.8f;
 		}
+        style.WindowMinSize.y = 16.0f;
         ImVec4* colors = ImGui::GetStyle().Colors;
         colors[ImGuiCol_WindowBg]               = ImVec4(0.06f, 0.06f, 0.06f, 0.99f);
         colors[ImGuiCol_FrameBg]                = ImVec4(0.25f, 0.25f, 0.25f, 0.54f);

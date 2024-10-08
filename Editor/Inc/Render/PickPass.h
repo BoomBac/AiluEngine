@@ -17,7 +17,7 @@ namespace Ailu
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
 
         private:
-            void DrawLightGizmo(Transform &transf, LightComponent *comp);
+            void DrawLightGizmo(const Transform &transf, LightComponent *comp);
 
         private:
             Scope<Material> _pick_gen;

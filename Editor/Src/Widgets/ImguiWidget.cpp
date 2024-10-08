@@ -10,6 +10,10 @@ namespace Ailu
 {
 	namespace Editor
 	{
+        static Vector2f ImVecToVector(const ImVec2 &v)
+        {
+            return {v.x, v.y};
+        }
 		void ImGuiWidget::MarkModalWindoShow(const int& handle)
 		{
 			s_global_modal_window_info[handle] = true;
@@ -107,18 +111,36 @@ namespace Ailu
 				ImGui::Begin(_title.c_str(), nullptr, ImGuiWindowFlags_NoCollapse);
 			_is_focus = ImGui::IsWindowFocused();
 			Input::BlockInput(Input::IsInputBlock() || _is_focus);
-			ImVec2 windowPos = ImGui::GetWindowPos();
+            ImVec2 windowPos = ImGui::GetWindowPos();
 			ImVec2 windowSize = ImGui::GetWindowSize();
-			_pos.x = windowPos.x;
-			_pos.y = windowPos.y;
-            _global_pos = _pos;
-			_size.x = windowSize.x;
-			_size.y = windowSize.y;
-			auto [wx, wy] = Application::GetInstance()->GetWindowPtr()->GetWindowPosition();
-			_pos -= Vector2f((f32)wx, (f32)wy);
+            _pos = ImVecToVector(windowPos);
+            _size = ImVecToVector(windowSize);
+            //_pos.y -= 30; //app_window_title_bar_height
+            //windowPos = ImGui::GetWindowPos();                                                      // 获取当前窗口左上角位置（包括标题栏）
+            ImVec2 contentMin = ImGui::GetWindowContentRegionMin();                                 // 获取内容区域的最小值（相对于窗口左上角）
+            ImVec2 contentMax = ImGui::GetWindowContentRegionMax();                                 // 获取内容区域的最小值（相对于窗口左上角）
+            //ImVec2 contentPos = ImVec2(windowPos.x + contentMin.x, windowPos.y + contentMin.y);     // 内容区域左上角的屏幕坐标
+            _content_size = Vector2f(contentMax.x - contentMin.x, contentMax.y - contentMin.y);
+            _content_pos = Vector2f(windowPos.x + contentMin.x, windowPos.y + contentMin.y);
+            _screen_pos = _pos;
+
+            //{
+            //    ImVec2 vMin = ImGui::GetWindowContentRegionMin();
+            //    ImVec2 vMax = ImGui::GetWindowContentRegionMax();
+
+            //    vMin.x += ImGui::GetWindowPos().x;
+            //    vMin.y += ImGui::GetWindowPos().y;
+            //    vMax.x += ImGui::GetWindowPos().x;
+            //    vMax.y += ImGui::GetWindowPos().y;
+            //    _content_size = Vector2f(vMax.x - vMin.x, vMax.y - vMin.y);
+            //    _content_pos = ImVecToVector(vMin) - app_window_pos;
+            //    ImGui::GetForegroundDrawList()->AddRect(vMin, vMax, IM_COL32(255, 255, 0, 255));
+            //}
 			if (!_is_hide_common_widget_info)
 			{
-				ImGui::Text("Handle %d,State: Local pos: (%.2f,%.2f),size: (%.2f,%.2f)", _handle, _pos.x, _pos.y, _size.x, _size.y);
+                String info = std::format("Handle {},pos: {},size: {},content pos: {},content size: {},screen pos: {},mouse pos {}",_handle,_pos.ToString(),_size.ToString(),_content_pos.ToString(),
+					_content_size.ToString(),_screen_pos.ToString(),Input::GetMousePos().ToString());
+                ImGui::Text(info.c_str());
 			}
             if (!ImGui::IsWindowCollapsed())
                 ShowImpl();
@@ -131,8 +153,7 @@ namespace Ailu
 		}
 		Vector2f ImGuiWidget::GlobalToLocal(const Vector2f& screen_pos) const
 		{
-			//auto [wx, wy] = Application::GetInstance()->GetWindowPtr()->GetWindowPosition();
-			return screen_pos - _pos;
+			return screen_pos - _content_pos;
 		}
 		void ImGuiWidget::ShowImpl()
 		{
@@ -155,7 +176,7 @@ namespace Ailu
             }
         }
 
-        void ImGuiWidget::OnObjectDropdown(const String &tag, std::function<void(Object*)> f)
+        void ImGuiWidget::OnObjectDropdown(const String &tag, std::function<void(Object *)> f)
         {
             if (ImGui::BeginDragDropTarget())
             {

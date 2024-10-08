@@ -4,7 +4,8 @@
 #include "ImGuiWidget.h"
 #include "PlaceActors.h"
 #include <Render/Texture.h>
-#include "Render/PickPass.h"
+#include <Framework/Math/Transform.h>
+
 namespace Ailu
 {
 	namespace Editor
@@ -48,7 +49,7 @@ namespace Ailu
             bool _is_transform_gizmo_world = true;
             bool _is_begin_gizmo_transform = false;
             bool _is_end_gizmo_transform = true;
-            PickFeature _pick;
+            Vector<Transform> _old_trans;
 		};
 	}
 }

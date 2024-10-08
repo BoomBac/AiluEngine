@@ -60,6 +60,7 @@ namespace Ailu
 	}
 	int ResourceMgr::Initialize()
 	{
+        TimerBlock b("-----------------------------------------------------------ResourceMgr::Initialize");
 		AL_ASSERT(!s_engine_res_root_pathw.empty());
 		FileManager::SetCurPath(s_engine_res_root_pathw);
 		for (int i = 0; i < EAssetType::COUNT; i++)
@@ -68,30 +69,63 @@ namespace Ailu
 		}
 		_project_root_path = s_engine_res_root_pathw.substr(0, s_engine_res_root_pathw.find_last_of(L"/"));
 		LoadAssetDB();
+        Vector<WString> shader_asset_pathes = {
+			L"Shaders/deferred_lighting.alasset",
+			L"Shaders/wireframe.alasset",
+			L"Shaders/gizmo.alasset",
+			L"Shaders/depth_only.alasset",
+			L"Shaders/cubemap_gen.alasset",
+			L"Shaders/filter_irradiance.alasset",
+			L"Shaders/blit.alasset",
+			L"Shaders/skybox.alasset",
+			L"Shaders/bloom.alasset",
+			L"Shaders/forwardlit.alasset",
+			L"Shaders/water.alasset"
+		};
+        Vector<WString> shader_pathes = {
+                L"Shaders/hlsl/debug.hlsl",
+                L"Shaders/hlsl/billboard.hlsl",
+                L"Shaders/hlsl/ssao.hlsl",
+                L"Shaders/hlsl/plane_grid.hlsl",
+                L"Shaders/hlsl/cubemap_debug.hlsl",
+                L"Shaders/hlsl/taa.hlsl",
+                L"Shaders/hlsl/pick_buffer.hlsl",
+                L"Shaders/hlsl/select_buffer.hlsl",
+                L"Shaders/hlsl/editor_outline.hlsl",
+        };
+        std::atomic<int> shader_load_count = shader_asset_pathes.size() + shader_pathes.size();
 		{
 			Shader::s_p_defered_standart_lit = Load<Shader>(L"Shaders/defered_standard_lit.alasset");
-			Load<Shader>(L"Shaders/deferred_lighting.alasset");
-			Load<Shader>(L"Shaders/wireframe.alasset");
-			Load<Shader>(L"Shaders/gizmo.alasset");
-			Load<Shader>(L"Shaders/depth_only.alasset");
-			Load<Shader>(L"Shaders/cubemap_gen.alasset");
-			Load<Shader>(L"Shaders/filter_irradiance.alasset");
-			Load<Shader>(L"Shaders/blit.alasset");
-			Load<Shader>(L"Shaders/skybox.alasset");
-			Load<Shader>(L"Shaders/bloom.alasset");
-			Load<Shader>(L"Shaders/forwardlit.alasset");
-			Load<Shader>(L"Shaders/water.alasset");
-			RegisterResource(L"Shaders/hlsl/debug.hlsl", LoadExternalShader(L"Shaders/hlsl/debug.hlsl"));
-			RegisterResource(L"Shaders/hlsl/billboard.hlsl", LoadExternalShader(L"Shaders/hlsl/billboard.hlsl"));
-			RegisterResource(L"Shaders/hlsl/ssao.hlsl", LoadExternalShader(L"Shaders/hlsl/ssao.hlsl"));
-			RegisterResource(L"Shaders/hlsl/plane_grid.hlsl", LoadExternalShader(L"Shaders/hlsl/plane_grid.hlsl"));
-			RegisterResource(L"Shaders/hlsl/cubemap_debug.hlsl", LoadExternalShader(L"Shaders/hlsl/cubemap_debug.hlsl"));
-			RegisterResource(L"Shaders/hlsl/taa.hlsl", LoadExternalShader(L"Shaders/hlsl/taa.hlsl"));
-			RegisterResource(L"Shaders/hlsl/pick_buffer.hlsl", LoadExternalShader(L"Shaders/hlsl/pick_buffer.hlsl"));
-			RegisterResource(L"Shaders/hlsl/select_buffer.hlsl", LoadExternalShader(L"Shaders/hlsl/select_buffer.hlsl"));
-			RegisterResource(L"Shaders/hlsl/editor_outline.hlsl", LoadExternalShader(L"Shaders/hlsl/editor_outline.hlsl"));
+            for (auto &p: shader_asset_pathes)
+                g_pThreadTool->Enqueue([&](WString p)
+                                       { Load<Shader>(p); --shader_load_count ; }, p);
+			//Load<Shader>(L"Shaders/deferred_lighting.alasset");
+			//Load<Shader>(L"Shaders/wireframe.alasset");
+			//Load<Shader>(L"Shaders/gizmo.alasset");
+			//Load<Shader>(L"Shaders/depth_only.alasset");
+			//Load<Shader>(L"Shaders/cubemap_gen.alasset");
+			//Load<Shader>(L"Shaders/filter_irradiance.alasset");
+			//Load<Shader>(L"Shaders/blit.alasset");
+			//Load<Shader>(L"Shaders/skybox.alasset");
+			//Load<Shader>(L"Shaders/bloom.alasset");
+			//Load<Shader>(L"Shaders/forwardlit.alasset");
+			//Load<Shader>(L"Shaders/water.alasset");
+
+			//RegisterResource(L"Shaders/hlsl/debug.hlsl", LoadExternalShader(L"Shaders/hlsl/debug.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/billboard.hlsl", LoadExternalShader(L"Shaders/hlsl/billboard.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/ssao.hlsl", LoadExternalShader(L"Shaders/hlsl/ssao.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/plane_grid.hlsl", LoadExternalShader(L"Shaders/hlsl/plane_grid.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/cubemap_debug.hlsl", LoadExternalShader(L"Shaders/hlsl/cubemap_debug.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/taa.hlsl", LoadExternalShader(L"Shaders/hlsl/taa.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/pick_buffer.hlsl", LoadExternalShader(L"Shaders/hlsl/pick_buffer.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/select_buffer.hlsl", LoadExternalShader(L"Shaders/hlsl/select_buffer.hlsl"));
+			//RegisterResource(L"Shaders/hlsl/editor_outline.hlsl", LoadExternalShader(L"Shaders/hlsl/editor_outline.hlsl"));
+
+            for (auto &p: shader_pathes)
+                g_pThreadTool->Enqueue([&](WString p)
+                                       { RegisterResource(p, LoadExternalShader(p)); --shader_load_count ; }, p);
 			//RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
-			GraphicsPipelineStateMgr::BuildPSOCache();
+
 			Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
 		}
 		{
@@ -156,40 +190,18 @@ namespace Ailu
 			RegisterResource(L"Runtime/ltc_lut1",lut1);
 			RegisterResource(L"Runtime/ltc_lut2",lut2);
 		}
-		{
-			Load<Material>(L"Materials/StandardPBR.alasset");
-			Material::s_standard_lit = GetRef<Material>(L"Materials/StandardPBR.alasset");
-			auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name)
-			{
-				RegisterResource(mat_path, MakeRef<Material>(Get<Shader>(shader_path), mat_name));
-			};
-			mat_creator(L"Shaders/wireframe.alasset", L"Runtime/Material/Wireframe", "Wireframe");
-			mat_creator(L"Shaders/skybox.alasset", L"Runtime/Material/Skybox", "Skybox");
-			mat_creator(L"Shaders/cubemap_gen.alasset", L"Runtime/Material/CubemapGen", "CubemapGen");
-			mat_creator(L"Shaders/filter_irradiance.alasset", L"Runtime/Material/EnvmapFilter", "EnvmapFilter");
-			mat_creator(L"Shaders/blit.alasset", L"Runtime/Material/Blit", "Blit");
-			mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/PointLightBillboard", "PointLightBillboard");
-			mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/DirectionalLightBillboard", "DirectionalLightBillboard");
-			mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/SpotLightBillboard", "SpotLightBillboard");
-			mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/CameraBillboard", "CameraBillboard");
-			mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/LightProbeBillboard", "LightProbeBillboard");
-			g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"point_light.alasset");
-			g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"directional_light.alasset");
-			g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"spot_light.alasset");
-			g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"camera.alasset");
-			g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
-			mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane");
-            Material::s_checker = Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
-		}
+
 
 		Load<Mesh>(L"Meshs/sphere.alasset");
 		Load<Mesh>(L"Meshs/plane.alasset");
 		Load<Mesh>(L"Meshs/cube.alasset");
 		Load<Mesh>(L"Meshs/monkey.alasset");
+		Load<Mesh>(L"Meshs/capsule.alasset");
 
 		Mesh::s_p_cube = std::static_pointer_cast<Mesh>(_global_resources[L"Meshs/cube.alasset"]);
 		Mesh::s_p_shpere = std::static_pointer_cast<Mesh>(_global_resources[L"Meshs/sphere.alasset"]);
 		Mesh::s_p_plane = std::static_pointer_cast<Mesh>(_global_resources[L"Meshs/plane.alasset"]);
+		Mesh::s_p_capsule = std::static_pointer_cast<Mesh>(_global_resources[L"Meshs/capsule.alasset"]);
 
 		auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
 		Vector3f *vertices = new Vector3f[4]{{-1.0f, 1.0f, 0.0f},
@@ -212,6 +224,37 @@ namespace Ailu
 		Mesh::s_p_quad = std::static_pointer_cast<Mesh>(_global_resources[L"Runtime/Mesh/FullScreenQuad"]);
 		Mesh::s_p_fullscreen_triangle = std::static_pointer_cast<Mesh>(_global_resources[L"Runtime/Mesh/FullScreenTriangle"]);
 		g_pThreadTool->Enqueue(&ResourceMgr::WatchDirectory, this);
+		//这里所有需要的shader应该加载完毕，此时再进行预热
+        {
+            while (shader_load_count.load() != 0)
+            {
+                Sleep(1);
+            }
+            GraphicsPipelineStateMgr::BuildPSOCache();
+            Load<Material>(L"Materials/StandardPBR.alasset");
+            Material::s_standard_lit = GetRef<Material>(L"Materials/StandardPBR.alasset");
+            auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name)
+            {
+                RegisterResource(mat_path, MakeRef<Material>(Get<Shader>(shader_path), mat_name));
+            };
+            mat_creator(L"Shaders/wireframe.alasset", L"Runtime/Material/Wireframe", "Wireframe");
+            mat_creator(L"Shaders/skybox.alasset", L"Runtime/Material/Skybox", "Skybox");
+            mat_creator(L"Shaders/cubemap_gen.alasset", L"Runtime/Material/CubemapGen", "CubemapGen");
+            mat_creator(L"Shaders/filter_irradiance.alasset", L"Runtime/Material/EnvmapFilter", "EnvmapFilter");
+            mat_creator(L"Shaders/blit.alasset", L"Runtime/Material/Blit", "Blit");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/PointLightBillboard", "PointLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/DirectionalLightBillboard", "DirectionalLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/SpotLightBillboard", "SpotLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/CameraBillboard", "CameraBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/LightProbeBillboard", "LightProbeBillboard");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"point_light.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"directional_light.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"spot_light.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"camera.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
+            mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane");
+            Material::s_checker = Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
+        }
 		return 0;
 	}
 
@@ -289,9 +332,9 @@ namespace Ailu
 		auto sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
 		std::wofstream out_asset_file(sys_path, std::ios::out | std::ios::trunc);
 		AL_ASSERT(out_asset_file.is_open());
-		out_asset_file << "guid: " << ToWChar(asset->GetGuid().ToString()) << endl;
+		out_asset_file << "guid: " << ToWStr(asset->GetGuid().ToString()) << endl;
 		out_asset_file << "type: " << EAssetType::ToString(asset->_asset_type) << endl;
-		out_asset_file << "name: " << ToWChar(asset->_p_obj->Name()) << endl;
+		out_asset_file << "name: " << ToWStr(asset->_p_obj->Name()) << endl;
 		out_asset_file.close();
 
 		switch (asset->_asset_type)
@@ -338,6 +381,7 @@ namespace Ailu
 			SaveAsset(s_pending_save_assets.front());
 			s_pending_save_assets.pop();
 		}
+        SaveAssetDB();
 	}
 
 	Asset *ResourceMgr::GetLinkedAsset(Object *obj)
@@ -357,11 +401,8 @@ namespace Ailu
 	{
 		auto sys_path = ResourceMgr::GetResSysPath(asset_path);
 		auto s_setting = dynamic_cast<const ShaderImportSetting *>(setting);
-		if (setting)
-		{
-			return Shader::Create(sys_path);
-		}
-		return Shader::Create(sys_path);
+		auto s = Shader::Create(sys_path);
+        return s;
 	}
 
 	Ref<ComputeShader> ResourceMgr::LoadExternalComputeShader(const WString &asset_path, const ImportSetting *setting)
@@ -537,10 +578,9 @@ namespace Ailu
 		using namespace std;
 		std::ostringstream ss;
 		TextOArchive ar(&ss);
-
 		try
 		{
-			g_pSceneMgr->ActiveScene()->Serialize(ar);
+            scene->Serialize(ar);
 		}
 		catch (const std::exception &)
 		{
@@ -688,8 +728,11 @@ namespace Ailu
 			else if (cur_type == ShaderPropertyType::Vector)
 			{
 				Vector4f vec{};
-				if (sscanf_s(v.c_str(), "%f,%f,%f,%f", &vec.r, &vec.g, &vec.b, &vec.a) == 4)
-					mat->SetVector(k, vec);
+                if (sscanf_s(v.c_str(), "%f,%f,%f,%f", &vec.r, &vec.g, &vec.b, &vec.a) == 4)
+                {
+                    mat->SetVector(k, vec);
+                    //LOG_INFO("Set {} value {},get value {}",k,vec.ToString(),mat->GetVector(k).ToString());
+                }
 				else
 					LOG_WARNING("Load material: {},property {} failed!", mat->_name, k);
 			}
@@ -781,7 +824,21 @@ namespace Ailu
 
 	Scope<Asset> ResourceMgr::LoadScene(const WString &asset_path)
 	{
-		auto loaded_scene = g_pSceneMgr->OpenScene(asset_path);
+        WString sys_path = ResourceMgr::GetResSysPath(asset_path);
+		String scene_data;
+		FileManager::ReadFile(sys_path, scene_data);
+		su::RemoveSpaces(scene_data);
+		std::stringstream ss(scene_data);
+		String line;
+		std::getline(ss, line);
+		Guid guid(su::Split(line, ":")[1]);
+		std::getline(ss, line);
+		std::getline(ss, line);
+		line = su::Split(line, ":")[1];
+		//这里到达场景根节点
+		TextIArchive arch(&ss);
+        Ref<Scene> loaded_scene = MakeRef<Scene>(line);
+		loaded_scene->Deserialize(arch);
 		auto asset = MakeScope<Asset>();
 		asset->_asset_path = asset_path;
 		asset->_asset_type = EAssetType::kScene;
@@ -835,7 +892,7 @@ namespace Ailu
 			obj->_guid = new_asset->GetGuid();
 		}
 		RegisterResource(asset_path, obj);
-		s_pending_save_assets.emplace(RegisterAsset(std::move(new_asset)));
+		s_pending_save_assets.push(RegisterAsset(std::move(new_asset)));
 		return s_pending_save_assets.back();
 	}
 
@@ -988,24 +1045,12 @@ namespace Ailu
 		for (auto &[guid, asset]: _asset_db)
 		{
 			if (cur_count != db_size)
-				file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
+				file << ToWStr(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
 			else
-				file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type);
+				file << ToWStr(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type);
 			++cur_count;
-			//if (asset->_p_obj)
-			//{
-			//	if (cur_count != db_size)
-			//		file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
-			//	else
-			//		file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type);
-			//	++cur_count;
-			//}
-			//else
-			//{
-			//	g_pLogMgr->LogWarningFormat(L"SaveAssetDB: skip save asset {},because linked obj is null!", asset->_asset_path);
-			//}
 		}
-		_asset_db.clear();
+		//_asset_db.clear();
 	}
 
 	Asset *ResourceMgr::RegisterAsset(Scope<Asset> &&asset, bool override)
@@ -1075,10 +1120,10 @@ namespace Ailu
 			_lut_global_resources[obj->ID()] = _global_resources.find(asset_path);
 			auto &v = _lut_global_resources_by_type[GetObjectAssetType(obj.get())];
 			auto it = std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter iter) -> bool
-								   { return iter->second->Name() == obj->Name(); });
+                                   { return iter->first == asset_path; });
 			if (it != v.end())
 				v.erase(it);
-			_lut_global_resources_by_type[GetObjectAssetType(obj.get())].push_back(_global_resources.find(asset_path));
+			v.push_back(_global_resources.find(asset_path));
 		}
 		else
 		{
@@ -1342,13 +1387,13 @@ namespace Ailu
 							auto mat = MakeRef<StandardMaterial>(it->_name);
 							if (!it->_textures[0].empty())
 							{
-								auto albedo = ImportResource(ToWChar(it->_textures[0]));
+								auto albedo = ImportResource(ToWStr(it->_textures[0]));
 								if (albedo != nullptr)
 									mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, std::static_pointer_cast<Texture>(albedo).get());
 							}
 							if (!it->_textures[1].empty())
 							{
-								auto normal = ImportResource(ToWChar(it->_textures[1]));
+								auto normal = ImportResource(ToWStr(it->_textures[1]));
 								if (normal != nullptr)
 									mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());
 							}

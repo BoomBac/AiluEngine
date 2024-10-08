@@ -18,14 +18,13 @@ namespace Ailu
     class AILU_API Scene : public Object, public IPersistentable
     {
         friend class SceneMgr;
-
     public:
         void Serialize(Archive &arch) final;
         void Deserialize(Archive &arch) final;
-
         Scene(const String &name);
         ECS::Entity AddObject(String name = "");
         ECS::Entity AddObject(Ref<Mesh> mesh, Ref<Material> mat);
+        ECS::Entity DuplicateEntity(ECS::Entity e);
         void RemoveObject(ECS::Entity entity);
         void Attach(ECS::Entity current, ECS::Entity parent);
         void Detach(ECS::Entity current);
@@ -42,7 +41,6 @@ namespace Ailu
 
     private:
         void DeletePendingEntities();
-
     private:
         bool _dirty = true;
         u16 _total_renderable_count = 0u;
@@ -66,11 +64,17 @@ namespace Ailu
         Ref<Scene> Create(String name);
         Ref<Scene> OpenScene(const WString &scene_path);
         Scene *ActiveScene() { return _p_current; }
-
+        void EnterPlayMode();
+        void ExitPlayMode();
+        void EnterSimulateMode();
+        void ExitSimulateMode();
     private:
-        List<Ref<Scene>> _all_scene;
+        Map<WString, Ref<Scene>> _all_scene;
         u16 _scene_index = 0u;
         Scene *_p_current = nullptr;
+        Scene *_runtime_scene = nullptr;
+        Scene *_runtime_scene_src = nullptr;
+        Vector<Transform> _transform_cache;
     };
     extern AILU_API SceneMgr *g_pSceneMgr;
 }// namespace Ailu

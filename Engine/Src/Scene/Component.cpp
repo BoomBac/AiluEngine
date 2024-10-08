@@ -1,5 +1,6 @@
 #include "Scene/Component.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/Gizmo.h"
 #include "pch.h"
 
 namespace Ailu
@@ -233,7 +234,8 @@ namespace Ailu
     {
         _cubemap = RenderTexture::Create(512, "light probe", ERenderTargetFormat::kDefaultHDR, true, true, true);
         _cubemap->CreateView();
-        _pass = MakeScope<CubeMapGenPass>(_cubemap.get());
+        _pass = MakeRef<CubeMapGenPass>(_cubemap.get());
+        _debug_material = nullptr;
     }
 
     Archive &Ailu::operator<<(Archive &ar, const CLightProbe &c)
@@ -256,5 +258,89 @@ namespace Ailu
         AL_ASSERT(su::BeginWith(bufs[0], "_is_update_every_tick"));
         c._is_dirty = true;
         return ar;
+    }
+
+    Archive &Ailu::operator<<(Archive &ar, const CRigidBody &c)
+    {
+        ar.IncreaseIndent();
+        ar << ar.GetIndent() << "_mass:" << c._mass << std::endl;
+        ar.DecreaseIndent();
+        return ar;
+    }
+
+    Archive &Ailu::operator>>(Archive &ar, CRigidBody &c)
+    {
+        String bufs[1];
+        ar >> bufs[0];
+        AL_ASSERT(su::BeginWith(bufs[0], "_mass"));
+        c._mass = std::stof(su::Split(bufs[0], ":")[1]);
+        return ar;
+    }
+    Archive &operator<<(Archive &ar, const CCollider &c)
+    {
+        ar.IncreaseIndent();
+        ar << ar.GetIndent() << "_type:" << EColliderType::ToString(c._type) << std::endl;
+        ar << ar.GetIndent() << "_is_trigger:" << c._is_trigger << std::endl;
+        ar << ar.GetIndent() << "_center:" << c._center.ToString() << std::endl;
+        ar << ar.GetIndent() << "_param:" << c._param.ToString() << std::endl;
+        ar.DecreaseIndent();
+        return ar;
+    }
+    Archive &operator>>(Archive &ar, CCollider &c)
+    {
+        String buf;
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_type"));
+        c._type = EColliderType::FromString(su::Split(buf, ":")[1]);
+        ar >> buf;
+        c._is_trigger = static_cast<bool>(std::stoi(su::Split(buf, ":")[1]));
+        ar >> buf;
+        c._center.FromString(su::Split(buf, ":")[1]);
+        ar >> buf;
+        c._param.FromString(su::Split(buf, ":")[1]);
+        return ar;
+    }
+    Sphere CCollider::AsShpere(const CCollider &c)
+    {
+        Sphere s;
+        s._center = c._center;
+        s._radius = c._param.x;
+        return s;
+    }
+    OBB CCollider::AsBox(const CCollider &c)
+    {
+        OBB box;
+        box._center = c._center;
+        box._half_axis_length = c._param;
+        return box;
+    }
+    Capsule CCollider::AsCapsule(const CCollider &c)
+    {
+        static const Vector3f dir[3] = {Vector3f::kRight, Vector3f::kUp, Vector3f::kForward};
+        Capsule s;
+        s._height = c._param.y;
+        s._top = c._center + dir[(u16) c._param.z] * s._height * 0.5f;
+        s._bottom = c._center - dir[(u16) c._param.z] * s._height * 0.5f;
+        s._radius = c._param.x;
+        return s;
+    }
+
+    namespace DebugDrawer
+    {
+        void DebugWireframe(const CCollider &c, const Transform &t,Color color)
+        {
+            if (c._type == EColliderType::kBox)
+            {
+                Gizmo::DrawOBB(CCollider::AsBox(c) * t._world_matrix, color);
+            }
+            else if (c._type == EColliderType::kSphere)
+            {
+                Gizmo::DrawSphere(CCollider::AsShpere(c) * t._world_matrix, color);
+            }
+            else if (c._type == EColliderType::kCapsule)
+            {
+                Gizmo::DrawCapsule(CCollider::AsCapsule(c) * t._world_matrix, color);
+            }
+        }
     }
 }// namespace Ailu

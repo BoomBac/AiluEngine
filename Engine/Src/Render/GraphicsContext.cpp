@@ -10,6 +10,7 @@ namespace Ailu
 	RenderTexturePool* g_pRenderTexturePool;
 	void GraphicsContext::InitGlobalContext()
 	{
+        TimerBlock b("----------------------------------------------------------- GraphicsContext::InitGlobalContext");
 		g_pGfxContext = new D3DContext(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
 		g_pGfxContext->Init();
 		g_pRenderTexturePool = new RenderTexturePool();

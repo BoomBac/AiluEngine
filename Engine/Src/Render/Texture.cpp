@@ -137,9 +137,9 @@ namespace Ailu
         }
     }
 
-    Color32 Texture2D::GetPixel32(u16 x, u16 y)
+    Color Texture2D::GetPixel32(u16 x, u16 y)
     {
-        return Color32();
+        return Color();
     }
 
     Color Texture2D::GetPixel(u16 x, u16 y)
@@ -168,13 +168,13 @@ namespace Ailu
         memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
     }
 
-    void Texture2D::SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap)
+    void Texture2D::SetPixel32(u16 x, u16 y, Color color, u16 mipmap)
     {
         if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
             return;
         _is_data_filled = true;
         u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
-        memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color32));
+        memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
     }
 
     void Texture2D::SetPixelData(u8 *data, u16 mipmap, u64 offset)
@@ -240,9 +240,9 @@ namespace Ailu
         s_gpu_mem_usage -= _gpu_memery_size;
     }
 
-    Color32 CubeMap::GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y)
+    Color CubeMap::GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y)
     {
-        return Color32();
+        return Color();
     }
 
     Color CubeMap::GetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y)
@@ -264,13 +264,13 @@ namespace Ailu
         memcpy(_pixel_data[face_index * (_mipmap_count + 1) + mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
     }
 
-    void CubeMap::SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap)
+    void CubeMap::SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color color, u16 mipmap)
     {
         if (!IsValidMipmap(mipmap) || !IsValidSize(x, y, mipmap))
             return;
         u16 row_pixel_size = std::get<0>(CurMipmapSize(mipmap)) * _pixel_size;
         u16 face_index = face - 1;
-        memcpy(_pixel_data[face_index * (_mipmap_count + 1) + mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color32));
+        memcpy(_pixel_data[face_index * (_mipmap_count + 1) + mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
     }
 
     void CubeMap::SetPixelData(ECubemapFace::ECubemapFace face, u8 *data, u16 mipmap, u64 offset)

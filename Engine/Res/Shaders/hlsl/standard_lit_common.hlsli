@@ -20,11 +20,6 @@ PerMaterialCBufferBegin
 	uint   _SamplerMask; //44
 	uint   _MaterialID;
 	float  _AlphaCulloff;
-	//for shadow
-	uint 	shadow_index;
-	float3 _point_light_wpos;
-	float   padding;
-	float4 _shadow_params;
 PerMaterialCBufferEnd
 
 

@@ -34,7 +34,7 @@ namespace Ailu
         inline static Camera *sCurrent = nullptr;
         inline static Camera *sSelected = nullptr;
         static Camera *GetDefaultCamera();
-        static void DrawGizmo(const Camera *p_camera, Color32 c);
+        static void DrawGizmo(const Camera *p_camera, Color c);
         static void CalcViewFrustumPlane(const Camera *cam, ViewFrustum &vf);
         //when the eye_camera turns, the AABB is recalculated, resulting in shadow jitter
         static AABB GetShadowCascadeAABB(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);

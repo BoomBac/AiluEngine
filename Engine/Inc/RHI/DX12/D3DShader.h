@@ -269,25 +269,6 @@ namespace Ailu
         }
     }// namespace D3DConvertUtils
 
-    class D3DShaderInclude : public ID3DInclude
-    {
-        HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) override;
-
-        HRESULT Close(LPCVOID pData) override;
-
-    public:
-        WString _cur_source_file_path;
-        std::set<WString> _include_files;
-
-    private:
-        List<WString> _addi_include_pathes = {
-                L"Shaders/",
-                L"Shaders/hlsl/",
-                L"Shaders/hlsl/Compute/",
-                L"Shaders/hlsl/PostProcess/"};
-        u8 *_data;
-    };
-
     class D3DShader : public Shader
     {
         struct D3DShaderElement

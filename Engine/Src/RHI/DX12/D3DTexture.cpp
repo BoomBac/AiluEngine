@@ -97,7 +97,7 @@ namespace Ailu
         CreateView(ETextureViewType::kSRV, 0);
         if (_is_random_access)
             CreateView(ETextureViewType::kUAV, 0);
-        _p_d3dres->SetName(ToWChar(_name));
+        _p_d3dres->SetName(ToWStr(_name).c_str());
         _is_ready_for_rendering = true;
     }
 
@@ -189,7 +189,7 @@ namespace Ailu
     {
         _name = new_name;
         if (_p_d3dres)
-            _p_d3dres->SetName(ToWChar(new_name));
+            _p_d3dres->SetName(ToWStr(new_name).c_str());
     }
     //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
 
@@ -280,7 +280,7 @@ namespace Ailu
             else
                 CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace) face, 0);
         }
-        _p_d3dres->SetName(ToWChar(_name));
+        _p_d3dres->SetName(ToWStr(_name).c_str());
     }
 
     void D3DCubeMap::CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
@@ -441,7 +441,7 @@ namespace Ailu
         _state_guard = D3DResourceStateGuard(is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &_tex_desc, _state_guard.CurState(),
                                                         &clear_value, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-        _p_d3dres->SetName(ToWChar(_name));
+        _p_d3dres->SetName(ToWStr(_name).c_str());
         u16 view_slice_count = std::max<u16>(1, _slice_num);
         //Main srv
         {
@@ -909,7 +909,7 @@ namespace Ailu
     void D3DRenderTexture::Name(const String &value)
     {
         _name = value;
-        _p_d3dres->SetName(ToWChar(value));
+        _p_d3dres->SetName(ToWStr(value).c_str());
     }
 
     TextureHandle D3DRenderTexture::ColorRenderTargetHandle(u16 view_index, CommandBuffer *cmd)

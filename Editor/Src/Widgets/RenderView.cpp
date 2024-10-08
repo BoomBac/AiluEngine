@@ -29,7 +29,7 @@ namespace Ailu
     {
         RenderView::RenderView(const String &name) : ImGuiWidget(name)
         {
-            _is_hide_common_widget_info = true;
+            //_is_hide_common_widget_info = false;
             _allow_close = false;
         }
         RenderView::~RenderView()
@@ -86,8 +86,6 @@ namespace Ailu
         {
             if (_src)
             {
-                static_cast<CommonRenderPipeline *>(g_pGfxContext->GetPipeline())->GetRenderer()->AddFeature(&_pick);
-
                 static const auto &cur_window = Application::GetInstance()->GetWindow();
                 ImVec2 vMin = ImGui::GetWindowContentRegionMin();
                 ImVec2 vMax = ImGui::GetWindowContentRegionMax();
@@ -96,8 +94,10 @@ namespace Ailu
                 vMax.x += ImGui::GetWindowPos().x;
                 vMax.y += ImGui::GetWindowPos().y;
                 ImVec2 gameview_size;
-                gameview_size.x = vMax.x - vMin.x;
-                gameview_size.y = vMax.y - vMin.y;
+                //gameview_size.x = vMax.x - vMin.x;
+                //gameview_size.y = vMax.y - vMin.y;
+                gameview_size.x = _content_size.x;
+                gameview_size.y = _content_size.y;
                 Vector2D<u32> window_size = Vector2D<u32>{static_cast<u32>(cur_window.GetWidth()), static_cast<u32>(cur_window.GetHeight())};
                 // 设置窗口背景颜色
                 ImGuiStyle &style = ImGui::GetStyle();
@@ -188,10 +188,6 @@ namespace Ailu
                 {
                     _transform_gizmo_type = (i16) ImGuizmo::OPERATION::SCALE;
                 }
-                //                else if(key_e.GetKeyCode() == AL_KEY_CONTROL)
-                //                {
-                //                    _is_transform_gizmo_snap = true;
-                //                }
                 else if (key_e.GetKeyCode() == AL_KEY_Q)
                 {
                     _is_transform_gizmo_world = !_is_transform_gizmo_world;
@@ -208,93 +204,141 @@ namespace Ailu
                 //                    _is_transform_gizmo_snap = false;
                 //                }
             }
-            if (e.GetEventType() == EEventType::kMouseButtonPressed)
-            {
-                Vector2f vp_size = GetViewportSize();
-                MouseButtonPressedEvent &event = static_cast<MouseButtonPressedEvent &>(e);
-                if (event.GetButton() == AL_KEY_LBUTTON)
-                {
-                    //LOG_INFO("Pick wait for impl");
-                    auto m_pos = Input::GetMousePos();
-                    if (Hover(m_pos))
-                    {
-                        auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
-                        auto mpos_l = GlobalToLocal(Input::GetMousePos());
-
-                        auto ray_dir = ScreenPosToWorldDir(mpos_l);
-                        Vector3f start = Camera::sCurrent->Position();
-                        Ray ray(start, ray_dir);
-                        ECS::Entity closest_entity = _pick.GetPickID(mpos_l.x, mpos_l.y);
-                        //;g_pSceneMgr->ActiveScene()->Pick(ray);
-                        if (Input::IsKeyPressed(AL_KEY_SHIFT))
-                            Selection::AddSelection(closest_entity);
-                        else
-                            Selection::AddAndRemovePreSelection(closest_entity);
-                        if (closest_entity == ECS::kInvalidEntity)
-                        {
-                            //Selection::RemoveSlection();
-                            LOG_INFO("Pick nothing...");
-                        }
-                    }
-                }
-            }
         }
+
         void SceneView::ProcessTransformGizmo()
         {
-            auto selected_entity = Selection::FirstEntity();
-            if (selected_entity != ECS::kInvalidEntity && _transform_gizmo_type != -1)
+            auto& selected_entities = Selection::SelectedEntities();
+            if (_transform_gizmo_type == -1 || selected_entities.empty())
+                return;
+            //snap
+            f32 snap_value = 0.5f;//50cm
+            if (_transform_gizmo_type == (i16) ImGuizmo::OPERATION::ROTATE)
             {
-                //snap
-                f32 snap_value = 50.f;//50cm
-                if (_transform_gizmo_type == (i16) ImGuizmo::OPERATION::ROTATE)
+                snap_value = 22.5f;//degree
+            }
+            else if (_transform_gizmo_type == (i16) ImGuizmo::OPERATION::SCALE)
+            {
+                snap_value = 0.25f;
+            }
+            else {}
+            Vector3f snap_values = Vector3f(snap_value);
+            ImGuizmo::SetOrthographic(false);
+            ImGuizmo::SetDrawlist();
+            ImGuizmo::SetRect(_content_pos.x, _content_pos.y, _content_size.x, _content_size.y);
+            const auto &view = Camera::sCurrent->GetView();
+            const auto &proj = Camera::sCurrent->GetProjection();
+            _is_transform_gizmo_snap = Input::IsKeyPressed(AL_KEY_CONTROL);
+            bool is_pivot_point_center = true;
+            bool is_single_mode = selected_entities.size() == 1;
+            Vector3f pivot_point;
+            
+            if (is_pivot_point_center)
+            {
+                auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                for (auto e : selected_entities)
                 {
-                    snap_value = 22.5f;//degree
+                    pivot_point += r.GetComponent<TransformComponent>(e)->_transform._position;
                 }
-                else if (_transform_gizmo_type == (i16) ImGuizmo::OPERATION::SCALE)
-                {
-                    snap_value = 0.25f;
-                }
-                else {}
-                Vector3f snap_values = Vector3f(snap_value);
-                ImGuizmo::SetOrthographic(false);
-                ImGuizmo::SetDrawlist();
-                ImGuizmo::SetRect(_global_pos.x, _global_pos.y, _size.x, _size.y + ImGui::GetFrameHeight());
-                //LOG_INFO("Rect: {},{},MousePos: {}",_global_pos.ToString(),_size.ToString(),Input::GetMousePos().ToString());
-                TransformComponent *transf_comp = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<TransformComponent>(selected_entity);
-                auto &world_mat = transf_comp->_world_matrix;
-                const auto &view = Camera::sCurrent->GetView();
-                const auto &proj = Camera::sCurrent->GetProjection();
-                _is_transform_gizmo_snap = Input::IsKeyPressed(AL_KEY_CONTROL);
+                pivot_point /= selected_entities.size();
+                Matrix4x4f world_mat = MatrixTranslation(pivot_point);
+                if (is_single_mode)
+                    world_mat = r.GetComponent<TransformComponent>(selected_entities.front())->_transform._world_matrix;
+                else
+                    _is_transform_gizmo_world = true;
                 ImGuizmo::Manipulate(view, proj, (ImGuizmo::OPERATION) _transform_gizmo_type, _is_transform_gizmo_world ? ImGuizmo::WORLD : ImGuizmo::LOCAL, world_mat, nullptr,
                                      _is_transform_gizmo_snap ? snap_values.data : nullptr);
-                Selection::Active(!ImGuizmo::IsOver());
-                static Transform old_transf;
+                static bool s_can_duplicate = true;
                 if (ImGuizmo::IsUsing())
                 {
                     if (!_is_begin_gizmo_transform)
                     {
                         _is_begin_gizmo_transform = true;
                         _is_end_gizmo_transform = false;
-                        old_transf = transf_comp->_transform;
+                        for (auto e: selected_entities)
+                        {
+                            _old_trans.push_back(r.GetComponent<TransformComponent>(e)->_transform);
+                        }
                     }
                     Vector3f new_pos;
                     Vector3f new_scale;
                     Quaternion new_rot;
                     DecomposeMatrix(world_mat, new_pos, new_rot, new_scale);
-                    transf_comp->_transform._position = new_pos;
-                    transf_comp->_transform._rotation = new_rot;
-                    transf_comp->_transform._scale = new_scale;
+                    static Vector3f s_pre_tick_new_scale = new_scale;
+                    if (is_single_mode)
+                    {
+                        auto& t = r.GetComponent<TransformComponent>(selected_entities.front())->_transform;
+                        t._position = new_pos;
+                        t._rotation = new_rot;
+                        t._scale = new_scale;
+                    }
+                    else
+                    {
+                        
+                        u16 index = 0;
+                        for (auto e: selected_entities)
+                        {
+                            auto &t = r.GetComponent<TransformComponent>(e)->_transform;
+                            Vector3f rela_pos = t._position - pivot_point;
+                            rela_pos = new_rot * rela_pos;
+                            Vector3f scaled_pos = rela_pos * (new_scale / s_pre_tick_new_scale);
+                            Vector3f pivot_offset = new_pos - pivot_point;
+                            t._position = pivot_point + scaled_pos + pivot_offset;
+                            //TODO
+                            t._scale = new_scale * _old_trans[index]._scale;
+                            t._rotation = new_rot * _old_trans[index++]._rotation;
+                        }
+                    }
+                    s_pre_tick_new_scale = new_scale;
+                    /*
+                    区分左侧和右侧的 Alt 键需要结合使用扫描码。在处理低级键盘输入时，可以通过 GetKeyState 或 GetAsyncKeyState 等函数来检测具体的按键位置。
+                    对于左侧 Alt 键，它的扫描码为：0x38(扫描码)
+                    右侧 Alt 键(也称 AltGr)：0xE038(扩展扫描码)
+                    */
+                    if (s_can_duplicate && Input::IsKeyPressed(AL_KEY_ALT) && _transform_gizmo_type == (i16) ImGuizmo::OPERATION::TRANSLATE)
+                    {
+                        s_can_duplicate = false;
+                        List<ECS::Entity> new_entities;
+                        for (auto e: selected_entities)
+                        {
+                            new_entities.push_back(g_pSceneMgr->ActiveScene()->DuplicateEntity(e));
+                        }
+                        Selection::RemoveSlection();
+                        for (auto &e: new_entities)
+                            Selection::AddSelection(e);
+                    }
                 }
                 else
                 {
                     if (_is_begin_gizmo_transform)
                     {
+                        s_can_duplicate = true;
                         _is_end_gizmo_transform = true;
                         _is_begin_gizmo_transform = false;
-                        std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(transf_comp, old_transf);
-                        g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
+                        if (is_single_mode)
+                        {
+                            auto e = selected_entities.front();
+                            auto t = r.GetComponent<TransformComponent>(e);
+                            std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(r.GetComponent<TagComponent>(e)->_name, t, _old_trans.front());
+                            g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
+                            _old_trans.clear();
+                        }
+                        else
+                        {
+                            Vector<String> obj_names;
+                            Vector<TransformComponent *> comps;
+                            u16 index = 0u;
+                            for (auto e: selected_entities)
+                            {
+                                obj_names.emplace_back(r.GetComponent<TagComponent>(e)->_name);
+                                comps.emplace_back(r.GetComponent<TransformComponent>(e));
+                            }
+                            std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(std::move(obj_names), std::move(comps), std::move(_old_trans));
+                            g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
+                        }
                     }
                 }
+                Selection::Active(!ImGuizmo::IsOver());
             }
         }
         void SceneView::OnActorPlaced(EPlaceActorsType::EPlaceActorsType type, bool dropped)
@@ -331,6 +375,8 @@ namespace Ailu
                     comp._p_mesh = Mesh::s_p_cube.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                    r.AddComponent<CCollider>(new_entity)._type = EColliderType::kBox;
+                    r.AddComponent<CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kSphere)
                 {
@@ -339,6 +385,20 @@ namespace Ailu
                     comp._p_mesh = Mesh::s_p_shpere.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                    r.AddComponent<CCollider>(new_entity)._type = EColliderType::kSphere;
+                    r.AddComponent<CRigidBody>(new_entity);
+                }
+                else if (type == EPlaceActorsType::kCapsule)
+                {
+                    tag->_name = std::format("capsule_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    comp._p_mesh = Mesh::s_p_capsule.lock();
+                    comp._p_mats.push_back(Material::s_checker.lock());
+                    comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                    auto &capsule = r.AddComponent<CCollider>(new_entity);
+                    capsule._type = EColliderType::kCapsule;
+                    capsule._param = {1.f, 2.f, 1.f};
+                    r.AddComponent<CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kPlane)
                 {
@@ -347,6 +407,9 @@ namespace Ailu
                     comp._p_mesh = Mesh::s_p_plane.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                    auto &box = r.AddComponent<CCollider>(new_entity);
+                    box._param.xyz = Vector3f(1.f, 0.01f, 1.f);
+                    r.AddComponent<CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kDirectionalLight)
                 {

@@ -23,10 +23,10 @@ namespace Ailu
             for (auto &e: _entities)
             {
                 auto comp = r.GetComponent<StaticMeshComponent>(e);
-                auto transf = r.GetComponent<TransformComponent>(e);
+                auto transf = r.GetComponent<TransformComponent>(e)->_transform;
                 for (int i = 0; i < comp->_p_mesh->_bound_boxs.size(); i++)
                 {
-                    comp->_transformed_aabbs[i] = AABB::CaclulateBoundBox(comp->_p_mesh->_bound_boxs[i], transf->_world_matrix);
+                    comp->_transformed_aabbs[i] = comp->_p_mesh->_bound_boxs[i] * transf._world_matrix;
                 }
             }
         }
@@ -42,32 +42,32 @@ namespace Ailu
         {
             _light_probe_debug_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/cubemap_debug.hlsl"), "lightprobe_debug");
 
-            auto [probe_data, data_size] = FileManager::ReadFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"));
-            LightProbeHeadInfo head;
-            memcpy(&head, probe_data, sizeof(LightProbeHeadInfo));
-            u16 w = head._prefilter_size;
-            _test_prefilter_map = CubeMap::Create(w,true,ETextureFormat::kR11G11B10);
-            _test_radiance_map = CubeMap::Create(head._radiance_size, false, ETextureFormat::kR11G11B10);
-            u64 offset = sizeof(LightProbeHeadInfo);
-            for (u16 face = 1; face <= 6; face++)
-            {
-                for (u16 i = 0; i < _test_prefilter_map->MipmapLevel() + 1; i++)
-                {
-                    auto [cur_w, cur_h] = _test_prefilter_map->CurMipmapSize(i);
-                    _test_prefilter_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, i);
-                    offset += cur_w * cur_h * GetPixelByteSize(_test_prefilter_map->PixelFormat());
-                }
-            }
-            for (u16 face = 1; face <= 6; face++)
-            {
-                _test_radiance_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, 0);
-                offset += head._radiance_size * head._radiance_size * GetPixelByteSize(_test_radiance_map->PixelFormat());
-            }
-            _test_prefilter_map->Name("_test_prefilter_map");
-            _test_prefilter_map->Apply();
-            _test_radiance_map->Name("_test_radiance_map");
-            _test_radiance_map->Apply();
-            delete[] probe_data;
+            //auto [probe_data, data_size] = FileManager::ReadFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"));
+            //LightProbeHeadInfo head;
+            //memcpy(&head, probe_data, sizeof(LightProbeHeadInfo));
+            //u16 w = head._prefilter_size;
+            //_test_prefilter_map = CubeMap::Create(w,true,ETextureFormat::kR11G11B10);
+            //_test_radiance_map = CubeMap::Create(head._radiance_size, false, ETextureFormat::kR11G11B10);
+            //u64 offset = sizeof(LightProbeHeadInfo);
+            //for (u16 face = 1; face <= 6; face++)
+            //{
+            //    for (u16 i = 0; i < _test_prefilter_map->MipmapLevel() + 1; i++)
+            //    {
+            //        auto [cur_w, cur_h] = _test_prefilter_map->CurMipmapSize(i);
+            //        _test_prefilter_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, i);
+            //        offset += cur_w * cur_h * GetPixelByteSize(_test_prefilter_map->PixelFormat());
+            //    }
+            //}
+            //for (u16 face = 1; face <= 6; face++)
+            //{
+            //    _test_radiance_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, 0);
+            //    offset += head._radiance_size * head._radiance_size * GetPixelByteSize(_test_radiance_map->PixelFormat());
+            //}
+            //_test_prefilter_map->Name("_test_prefilter_map");
+            //_test_prefilter_map->Apply();
+            //_test_radiance_map->Name("_test_radiance_map");
+            //_test_radiance_map->Apply();
+            //delete[] probe_data;
         }
 
         void LightingSystem::OnPushEntity(Entity e)
@@ -95,6 +95,7 @@ namespace Ailu
                         g_pGfxContext->GetPipeline()->GetRenderer()->SubmitTaskPass(comp._pass.get());
                         g_pGfxContext->GetPipeline()->GetRenderer()->Render(cam, *g_pSceneMgr->ActiveScene());
                         comp._is_dirty = false;
+                        /*
                         RenderTexture *out_tex = comp._pass->_prefilter_cubemap.get();
                         //RenderTexture *out_tex = comp._cubemap.get();
                         u64 light_probe_data_size = sizeof(LightProbeHeadInfo) + out_tex->TotalByteSize() + comp._pass->_radiance_map->TotalByteSize();
@@ -127,6 +128,7 @@ namespace Ailu
                         FileManager::CreateFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"));
                         FileManager::WriteFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"), false, (u8 *) probe_data,light_probe_data_size);
                         delete[] probe_data;
+                        */
                     }
                     if (comp._src_type == 0)
                     {
@@ -171,8 +173,6 @@ namespace Ailu
                 Vector3f light_forward = LightComponent::kDefaultDirectionalLightDir;
                 light_forward.xyz = transf._rotation * light_forward.xyz;
                 comp->_light._light_dir.xyz = Normalize(Vector3f{light_forward.xyz});
-                Clamp(comp->_light._light_param.z, 0.0f, 180.0f);
-                Clamp(comp->_light._light_param.y, 0.0f, comp->_light._light_param.z - 0.1f);
 
                 if (comp->_type == ELightType::kDirectional)
                 {
@@ -316,7 +316,7 @@ namespace Ailu
                 }
                 else if (comp->_type == ELightType::kSpot)
                 {
-                    comp->_shadow_cameras[0].SetLens(90, 1, 1, comp->_light._light_param.x * 1.5f);
+                    comp->_shadow_cameras[0].SetLens(90, 1, 0.01, comp->_light._light_param.x * 1.5f);
                     comp->_shadow_cameras[0].Position(comp->_light._light_pos.xyz);
                     comp->_shadow_cameras[0].LookTo(comp->_light._light_dir.xyz, Vector3f::kUp);
                     //Camera::DrawGizmo(&_shadow_cameras[0], Random::RandomColor32(0));
@@ -343,7 +343,7 @@ namespace Ailu
                             };
                     for (int i = 0; i < 6; i++)
                     {
-                        comp->_shadow_cameras[i].SetLens(90, 1, 1, comp->_light._light_param.x * 1.5f);
+                        comp->_shadow_cameras[i].SetLens(90, 1, 0.01, comp->_light._light_param.x * 1.5f);
                         comp->_shadow_cameras[i].Position(comp->_light._light_pos.xyz);
                         comp->_shadow_cameras[i].LookTo(targets[i], ups[i]);
                     }

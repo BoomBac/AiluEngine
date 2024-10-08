@@ -263,7 +263,7 @@ namespace Ailu
         void LogErrorFormat(const std::source_location &loc, std::wstring_view msg, Args &&...args)
         {
             WString new_msg = BuildLogMsg(ELogLevel::kError, msg, args...);
-            new_msg.append(std::format(L"\n  File: {},Line: {};\n    Function: {}", ToWChar(loc.file_name()), loc.line(), ToWChar(loc.function_name())));
+            new_msg.append(std::format(L"\n  File: {},Line: {};\n    Function: {}", ToWStr(loc.file_name()), loc.line(), ToWStr(loc.function_name())));
             LogErrorFormat(L"{}", new_msg);
         }
 

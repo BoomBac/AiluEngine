@@ -39,13 +39,16 @@ namespace Ailu
             _p_scene_layer = new SceneLayer();
             PushLayer(_p_scene_layer);
             g_pLogMgr->AddAppender(new ImGuiLogAppender());
-            _p_editor_layer = new EditorLayer();
-            PushLayer(_p_editor_layer);
             {
-                g_pResourceMgr->Load<Scene>(_opened_scene_path);
+                //g_pResourceMgr->Load<Scene>(_opened_scene_path);
+                g_pSceneMgr->OpenScene(_opened_scene_path);
             }
             _pipeline.reset(new CommonRenderPipeline());
             g_pGfxContext->RegisterPipeline(_pipeline.get());
+            _p_editor_layer = new EditorLayer();
+            PushLayer(_p_editor_layer);
+            _is_playing_mode = false;
+            _is_simulate_mode = false;
             return ret;
         }
         void EditorApp::Finalize()

@@ -3,6 +3,7 @@
 #define __EDITOR_LAYER_H__
 #include "Framework/Events/Layer.h"
 #include "ImGuiWidget.h"
+#include "Render/PickPass.h"
 
 struct ImFont;
 namespace Ailu
@@ -21,6 +22,7 @@ namespace Ailu
 			void OnAttach() override;
 			void OnDetach() override;
 			void OnEvent(Event& e) override;
+            void OnUpdate(f32 dt) override;
 			void OnImguiRender() override;
 
 			void Begin();
@@ -32,6 +34,7 @@ namespace Ailu
 			ImFont* _font = nullptr;
 			Vector<Scope<ImGuiWidget>> _widgets;
 			ImGuiWidget* _p_env_setting;
+            PickFeature _pick;
 		};
 	}
 }

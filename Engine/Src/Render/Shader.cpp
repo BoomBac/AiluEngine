@@ -13,6 +13,35 @@
 
 namespace Ailu
 {
+    static List<String> ReadFileToLines(const String &sys_path, u32 &line_count, String begin = "", String end = "")
+    {
+        std::ifstream file(sys_path);
+        List<String> lines{};
+        AL_ASSERT(file.is_open());
+        String line;
+        bool start = begin.empty(), stop = false;
+        while (std::getline(file, line))
+        {
+            line = StringUtils::Trim(line);
+            if (!start)
+            {
+                start = line == begin;
+                continue;
+            }
+            if (!stop && !end.empty())
+            {
+                stop = end == line;
+            }
+            if (start && !stop)
+            {
+                lines.emplace_back(line);
+            }
+        }
+        file.close();
+        line_count = static_cast<u32>(lines.size());
+        return lines;
+    }
+
     std::vector<std::vector<std::string>> ExtractPassBlocks(const std::list<std::string> &lines)
     {
         std::vector<std::vector<std::string>> passBlocks;
@@ -146,12 +175,16 @@ namespace Ailu
 
     bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash)
     {
-        g_pLogMgr->LogFormat(L"Begin compile shader: {},pass: {},variant: {}...", _src_file_path, pass_id, variant_hash);
+        g_pLogMgr->LogFormat(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWStr(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
         g_pTimeMgr->Mark();
         AL_ASSERT(pass_id < _passes.size());
         auto &pass = _passes[pass_id];
         AL_ASSERT(pass._variants.contains(variant_hash));
         _variant_state[pass_id][variant_hash] = EShaderVariantState::kCompiling;
+        if (pass._vert_src_file.empty())
+            pass._vert_src_file = _src_file_path;
+        if (pass._pixel_src_file.empty())
+            pass._pixel_src_file = _src_file_path;
         if (RHICompileImpl(pass_id, variant_hash))
         {
             pass._variants[variant_hash]._pipeline_input_layout.Hash(PipelineStateHash<VertexInputLayout>::GenHash(pass._variants[variant_hash]._pipeline_input_layout));
@@ -422,7 +455,8 @@ namespace Ailu
         List<String> lines{};
         String line{};
         u32 line_count = 0;
-        lines = ReadFileToLines(ToChar(_src_file_path), line_count, "//info bein", "//info end");
+        auto sys_path = ToChar(_src_file_path);
+        lines = ReadFileToLines(sys_path, line_count, "//info bein", "//info end");
         if (line_count > 0)
         {
             auto pass_blocks = ExtractPassBlocks(lines);
@@ -770,6 +804,10 @@ namespace Ailu
                 _passes[i] = cur_pass;
                 _variant_state.emplace_back(std::move(cur_pass_variant_state));
             }
+        }
+        else
+        {
+            AL_ASSERT_MSG(_passes.size() > 0, "parser failed, no pass found!");
         }
         _is_pass_elements_init.store(!is_process_succeed);
         return is_process_succeed;

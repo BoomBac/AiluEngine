@@ -142,9 +142,9 @@ namespace Ailu
     void D3DGPUBuffer::SetName(const String &name)
     {
         _name = name;
-        _p_d3d_res->SetName(ToWChar(name));
+        _p_d3d_res->SetName(ToWStr(name).c_str());
         if (_p_d3d_res_readback)
-            _p_d3d_res_readback->SetName(std::format(L"{}_readback", ToWChar(name)).c_str());
+            _p_d3d_res_readback->SetName(std::format(L"{}_readback", ToWStr(name)).c_str());
     }
     //----------------------------------------------------------------D3DGPUBuffer------------------------------------------------------------------------
     D3DVertexBuffer::D3DVertexBuffer(VertexBufferLayout layout)
@@ -296,7 +296,7 @@ namespace Ailu
     {
         for (auto &it: _buffer_layout_indexer)
         {
-            _vertex_buffers[it.second]->SetName(ToWChar(std::format("vb_{}_{}", name, it.second).c_str()));
+            _vertex_buffers[it.second]->SetName(ToWStr(std::format("vb_{}_{}", name, it.second).c_str()).c_str());
         }
     }
 
@@ -401,7 +401,7 @@ namespace Ailu
     }
     void D3DIndexBuffer::SetName(const String &name)
     {
-        _index_buf->SetName(ToWChar(std::format("ib_{}", name).c_str()));
+        _index_buf->SetName(ToWStr(std::format("ib_{}", name).c_str()).c_str());
     }
     //-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
 

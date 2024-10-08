@@ -90,8 +90,9 @@ namespace Ailu
                 ImGui::TableSetupColumn("Icon",ImGuiTableColumnFlags_WidthFixed,image_size + ImGui::GetStyle().CellPadding.x);
                 ImGui::TableSetupColumn("Text", ImGuiTableColumnFlags_WidthFixed,100);
                 placement_element_draw(EPlaceActorsType::kCube, image_size);
-                placement_element_draw(EPlaceActorsType::kSphere, image_size);
                 placement_element_draw(EPlaceActorsType::kPlane, image_size);
+                placement_element_draw(EPlaceActorsType::kSphere, image_size);
+                placement_element_draw(EPlaceActorsType::kCapsule, image_size);
                 placement_element_draw(EPlaceActorsType::kDirectionalLight, image_size);
                 placement_element_draw(EPlaceActorsType::kPointLight, image_size);
                 placement_element_draw(EPlaceActorsType::kSpotLight, image_size);

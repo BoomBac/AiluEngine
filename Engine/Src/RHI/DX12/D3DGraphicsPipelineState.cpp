@@ -79,7 +79,7 @@ namespace Ailu
             //}
             _defines = _state_desc._p_vertex_shader->ActiveKeywords(pass_index, variant_hash);
             _pass_name = _state_desc._p_vertex_shader->GetPassInfo(pass_index)._name;
-            WString debug_name = ToWChar(std::format("{}_{}_{}", d3dshader->Name(), pass_index, variant_hash));
+            WString debug_name = ToWStr(std::format("{}_{}_{}", d3dshader->Name(), pass_index, variant_hash));
             _p_plstate->SetName(debug_name.c_str());
             _p_sig->SetName(debug_name.c_str());
         }
@@ -158,7 +158,8 @@ namespace Ailu
             break;
             case Ailu::EBindResDescType::kConstBufferRaw:
             {
-                static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot,*static_cast<D3D12_GPU_VIRTUAL_ADDRESS*>(res));
+                D3D12_GPU_VIRTUAL_ADDRESS address = *static_cast<D3D12_GPU_VIRTUAL_ADDRESS *>(res);
+                static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot,address);
                 return;
             }
             break;

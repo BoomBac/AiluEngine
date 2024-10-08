@@ -23,7 +23,7 @@
 #endif
 namespace Ailu
 {
-    namespace MathInternal
+    namespace
     {
         template<typename T, size_t size_of_arr>
         constexpr u32 CountOf(T (&)[size_of_arr])
@@ -41,6 +41,15 @@ namespace Ailu
         {
             return (var == 0) ? 1.0f / sqrt(2.0f) : 1.0f;
         }
+
+    }
+
+#pragma warning(push)
+#pragma warning(disable : 4244)
+
+    namespace Math
+    {
+        constexpr float kEpsilon = 1.19209e-07f;
         constexpr float kPi = 3.1415926f;
         constexpr float kHalfPi = kPi / 2.0f;
         constexpr float kDPi = kPi * 2.f;
@@ -48,14 +57,6 @@ namespace Ailu
         constexpr float Pi_over_sixteen = kPi / 16.f;
         constexpr float kFloatEpsilon = 1e-6f;
 
-    }// namespace MathInternal
-    using namespace MathInternal;
-
-#pragma warning(push)
-#pragma warning(disable : 4244)
-
-    namespace Math
-    {
         static u64 AlignTo(u64 sizeInBytes, u64 alignment)
         {
             if (alignment == 0)
@@ -80,6 +81,7 @@ namespace Ailu
                 sum += pow(var[i], 2.f);
                 temp[i] = var[i];
             }
+            sum = sum == 0 ? 1.0 : sum;
             sum = sqrt(sum);
             for (u32 i = 0; i < len; i++)
             {
@@ -297,7 +299,7 @@ namespace Ailu
 
             bool operator==(const Vector3D<T> &other) const
             {
-                return memcmp(this, &other, sizeof(Vector3D<T>));
+                return other.x == x && other.y == y && other.z == z;
             }
 
             Vector3D<T> &operator=(const Vector3D<T> &other)
@@ -2127,17 +2129,30 @@ namespace Ailu
             }
             return out_mat;
         }
-        using Color32 = Vector4D<float>;
-        using Color = Vector4D<u8>;
+        using Color = Vector4D<float>;
+        using Color32 = Vector4D<u8>;
         namespace Colors
         {
-            static const Color32 kBlue = {0.f, 0.f, 1.f, 1.0f};
-            static const Color32 kRed = {1.f, 0.f, 0.f, 1.0f};
-            static const Color32 kGreen = {0.f, 1.f, 0.f, 1.0f};
-            static const Color32 kWhite = {1.f, 1.f, 1.f, 1.0f};
-            static const Color32 kBlack = {0.f, 0.f, 0.f, 1.0f};
-            static const Color32 kGray = {0.3f, 0.3f, 0.3f, 1.0f};
-            static const Color32 kYellow = {1.0f, 1.0f, 0.0f, 1.0f};
+            static const Color kBlue = {0.f, 0.f, 1.f, 1.0f};
+            static const Color kRed = {1.f, 0.f, 0.f, 1.0f};
+            static const Color kGreen = {0.f, 1.f, 0.f, 1.0f};
+            static const Color kWhite = {1.f, 1.f, 1.f, 1.0f};
+            static const Color kBlack = {0.f, 0.f, 0.f, 1.0f};
+            static const Color kGray = {0.3f, 0.3f, 0.3f, 1.0f};
+            static const Color kYellow = {1.0f, 1.0f, 0.0f, 1.0f};
+            static const Color kCyan = {0.f, 1.f, 1.f, 1.0f};
+            static const Color kMagenta = {1.f, 0.f, 1.f, 1.0f};
+            static const Color kOrange = {1.f, 0.5f, 0.f, 1.0f};
+            static const Color kPurple = {0.5f, 0.f, 0.5f, 1.0f};
+            static const Color kBrown = {0.6f, 0.3f, 0.0f, 1.0f};
+            static const Color kPink = {1.f, 0.75f, 0.8f, 1.0f};
+            static const Color kDarkBlue = {0.f, 0.f, 0.5f, 1.0f};
+            static const Color kLightGray = {0.75f, 0.75f, 0.75f, 1.0f};
+            static const Color kDarkGray = {0.2f, 0.2f, 0.2f, 1.0f};
+            static const Color kLightGreen = {0.5f, 1.f, 0.5f, 1.0f};
+            static const Color kDarkGreen = {0.f, 0.5f, 0.f, 1.0f};
+            static const Color kBeige = {0.96f, 0.96f, 0.86f, 1.0f};
+            static const Color kTurquoise = {0.25f, 0.88f, 0.82f, 1.0f};
         }// namespace Colors
 
         namespace ALHash

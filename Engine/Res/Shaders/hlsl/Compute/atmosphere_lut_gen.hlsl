@@ -1,4 +1,3 @@
-#pragma kernel 
 #include "cs_common.hlsli"
 
 #include "../atmosphere_common.hlsli"

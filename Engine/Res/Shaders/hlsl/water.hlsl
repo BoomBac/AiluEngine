@@ -14,6 +14,7 @@
 //pixel: PSMain
 //Cull: Back
 //Queue: Opaque
+//multi_compile _ CAST_POINT_SHADOW
 //pass end::
 //Properties
 //{
@@ -29,11 +30,6 @@
 PerMaterialCBufferBegin
 	float4 _DeepColor;
 	float4 _LightColor;
-	//for shadow
-	uint 	shadow_index;
-	float3 _point_light_wpos;
-	float   padding;
-	float4 _shadow_params;
 PerMaterialCBufferEnd
 
 StandardPSInput ForwardVSMain(StandardVSInput v)
@@ -72,10 +68,16 @@ StandardPSInput VSMain(StandardVSInput v)
 	result.normal = N;
 	result.world_pos = TransformToWorldSpace(v.position);
 	result.world_pos.y += sin(_Time.x * 0.1f + result.world_pos.x * 4) * 0.25;
-	result.position = TransformFromWorldToLightSpace(shadow_index,result.world_pos);
-	//result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
+	result.position = TransformFromWorldToClipSpace(result.world_pos);
 	return result;
 }
-void PSMain(StandardPSInput input)
+float PSMain(StandardPSInput input) : SV_Depth
 {
+#ifdef CAST_POINT_SHADOW
+	float dis = distance(input.world_pos,_CameraPos.xyz);
+	float linear_z = saturate((dis - _ZBufferParams.x) / (_ZBufferParams.y - _ZBufferParams.x));
+	return linear_z;
+#else
+	return input.position.z;
+#endif
 }

@@ -44,16 +44,16 @@ namespace Ailu
                 {
                     for (auto entity: selected)
                     {
-                        auto t = r.GetComponent<TransformComponent>(entity);
+                        const auto t = r.GetComponent<TransformComponent>(entity)->_transform;
                         if (auto comp = r.GetComponent<LightComponent>(entity); comp != nullptr)
                         {
-                            DrawLightGizmo(t->_transform, comp);
+                            DrawLightGizmo(t, comp);
                             continue;
                         }
                         if (auto comp = r.GetComponent<CLightProbe>(entity); comp != nullptr)
                         {
-                            Gizmo::DrawCube(t->_transform._position, comp->_size);
-                            cmd->DrawRenderer(Mesh::s_p_shpere.lock().get(), comp->_debug_material, t->_world_matrix, 0, 0, 1);
+                            Gizmo::DrawCube(t._position, comp->_size);
+                            cmd->DrawRenderer(Mesh::s_p_shpere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
                         }
                     }
                 }
@@ -110,33 +110,49 @@ namespace Ailu
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
                     cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
                 }
-                //write to select buffer
+                //write to select buffer and draw debug outline
                 if (auto &selected = Selection::SelectedEntities(); selected.size() > 0)
                 {
                     RTHandle select_buf = cmd->GetTempRT(_color->Width(), _color->Height(), "select_buffer", ERenderTargetFormat::kDefault, false, false, false);
+                    RTHandle select_buf_blur_temp = cmd->GetTempRT(_color->Width(), _color->Height(), "select_buf_blur_temp", ERenderTargetFormat::kDefault, false, false, false);
                     cmd->SetRenderTarget(select_buf, rendering_data._camera_depth_target_handle);
                     cmd->ClearRenderTarget(select_buf, Colors::kBlack);
+                    cmd->ClearRenderTarget(select_buf_blur_temp, Colors::kBlack);
                     for (auto entity: selected)
                     {
-                        auto t = r.GetComponent<TransformComponent>(entity);
+                        const auto &t = r.GetComponent<TransformComponent>(entity)->_transform;
                         if (auto comp = r.GetComponent<StaticMeshComponent>(entity); comp != nullptr)
                         {
-                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t->_world_matrix, 0, 0, 1);
-                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t->_world_matrix, 0, 1, 1);
-                            continue;
+                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
+                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                        }
+                        if (auto c = r.GetComponent<CCollider>(entity))
+                        {
+                            DebugDrawer::DebugWireframe(*c,t);
                         }
                     }
                     _editor_outline->SetTexture("_SelectBuffer", select_buf);
                     _editor_outline->SetVector("_SelectBuffer_TexelSize", Vector4f(1.0f / _color->Width(), 1.0f / _color->Height(), (f32) _color->Width(), (f32) _color->Height()));
-                    cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
+                    //generate outline
+                    cmd->SetRenderTarget(select_buf_blur_temp);
                     cmd->DrawFullScreenQuad(_editor_outline.get());
+                    //blur outline
+                    _editor_outline->SetTexture("_SelectBuffer", select_buf_blur_temp);
+                    cmd->SetRenderTarget(select_buf);
+                    cmd->DrawFullScreenQuad(_editor_outline.get(),1);
+                    //apply to color target
+                    _editor_outline->SetTexture("_SelectBuffer", select_buf);
+                    cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
+                    cmd->DrawFullScreenQuad(_editor_outline.get(),2);
+
                     cmd->ReleaseTempRT(select_buf);
+                    cmd->ReleaseTempRT(select_buf_blur_temp);
                 }
             }
             context->ExecuteCommandBuffer(cmd);
             CommandBufferPool::Release(cmd);
         }
-        void PickPass::DrawLightGizmo(Transform &transf, LightComponent *comp)
+        void PickPass::DrawLightGizmo(const Transform &transf, LightComponent *comp)
         {
             switch (comp->_type)
             {
@@ -285,25 +301,25 @@ namespace Ailu
         }
         u32 PickFeature::GetPickID(u16 x, u16 y) const
         {
-            auto cmd = CommandBufferPool::Get("ReadbackPickBuffer");
-            auto kernel = _read_pickbuf->FindKernel("cs_main");
-            _read_pickbuf->SetTexture("_PickBuffer", _pick_buf.get());
-            _read_pickbuf->SetBuffer("_PickResult", _readback_buf);
-            _read_pickbuf->SetVector("pixel_pos", Vector4f((f32) x, (f32) y, 0.0f, 0.0f));
-            cmd->Dispatch(_read_pickbuf.get(), kernel, 1, 1, 1);
-            g_pGfxContext->ExecuteAndWaitCommandBuffer(cmd);
-            CommandBufferPool::Release(cmd);
-            u8 data[256];
-            _readback_buf->ReadBack(data, 256);
-            return *reinterpret_cast<u32 *>(data);
-            //u32 selected_entity = *reinterpret_cast<u32 *>(data);
-            //if (u32 selected_entity = *reinterpret_cast<u32 *>(data); selected_entity != 0)
-            //{
-            //    LOG_INFO("Selected entity: {}", selected_entity);
-            //    return selected_entity;
-            //}
-            //else
-            //    return selected_entity;
+            if (_is_active)
+            {
+                auto cmd = CommandBufferPool::Get("ReadbackPickBuffer");
+                auto kernel = _read_pickbuf->FindKernel("cs_main");
+                _read_pickbuf->SetTexture("_PickBuffer", _pick_buf.get());
+                _read_pickbuf->SetBuffer("_PickResult", _readback_buf);
+                _read_pickbuf->SetVector("pixel_pos", Vector4f((f32) x, (f32) y, 0.0f, 0.0f));
+                cmd->Dispatch(_read_pickbuf.get(), kernel, 1, 1, 1);
+                g_pGfxContext->ExecuteAndWaitCommandBuffer(cmd);
+                CommandBufferPool::Release(cmd);
+                u8 data[256];
+                _readback_buf->ReadBack(data, 256);
+                return *reinterpret_cast<u32 *>(data);
+            }
+            else
+            {
+                LOG_WARNING("Pick feature not active!");
+                return -1;
+            }
         }
         //-----------------------------------------------------------------------PickFeature----------------------------------------------------------------------------
     };//namespace Editor

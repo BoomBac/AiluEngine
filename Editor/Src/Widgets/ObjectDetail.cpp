@@ -24,7 +24,7 @@ namespace Ailu
         {
             ImGui::PushID(label.c_str());
             ImGui::Columns(2);
-            ImGui::SetColumnWidth(0, column_width * 2.0f);
+            ImGui::SetColumnWidth(0, column_width * 1.25f);
             ImGui::Text("%s", label.c_str());
             ImGui::NextColumn();
 
@@ -168,9 +168,10 @@ namespace Ailu
                     ImGui::DragFloat3(prop._name.c_str(), static_cast<Vector3f *>(prop._value_ptr)->data);
                     break;
                 case Ailu::ESerializablePropertyType::kVector4f:
+                    ImGui::DragFloat4(prop._name.c_str(), static_cast<Vector3f *>(prop._value_ptr)->data);
                     break;
                 case Ailu::ESerializablePropertyType::kColor:
-                    ImGui::ColorEdit3(prop._name.c_str(), static_cast<Vector4f *>(prop._value_ptr)->data);
+                    ImGui::ColorEdit4(prop._name.c_str(), static_cast<Vector4f *>(prop._value_ptr)->data);
                     break;
                 case Ailu::ESerializablePropertyType::kRange:
                 {
@@ -403,6 +404,24 @@ namespace Ailu
             }
         }
 
+        static u16 DrawEnumProperty(const String& title,const String enum_str[],u16 arr_len,u16 default_index = 0u)
+        {
+            u16 selected_index = default_index;
+            if (ImGui::BeginCombo(title.c_str(), enum_str[default_index].c_str(), 0))
+            {
+                for (int n = 0; n < arr_len; n++)
+                {
+                    const bool is_selected = (default_index == n);
+                    if (ImGui::Selectable(enum_str[n].c_str(), is_selected))
+                        selected_index = n;
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            return selected_index;
+        }
+
         ObjectDetail::ObjectDetail() : ImGuiWidget("ObjectDetail")
         {
             _p_texture_selector = new TextureSelector();
@@ -448,12 +467,12 @@ namespace Ailu
             //}
             ImGui::SameLine();
             u16 selected_new_comp_index = (u16) (-1);
-            static String s_comp_tag[] = {
-                    "LightComponent", "CameraComponent", "StaticMeshComponent", "LightProbeComponent"
+            static Vector<String> s_comp_tag = {
+                    "LightComponent", "CameraComponent", "StaticMeshComponent", "LightProbeComponent", "RigidComponent", "ColliderComponent"
             };
             if (ImGui::BeginCombo(" ", "+ Add Component"))
             {
-                for (u16 i = 0; i < 4; i++)
+                for (u16 i = 0; i < s_comp_tag.size(); i++)
                 {
                     if (ImGui::Selectable(s_comp_tag[i].c_str(), i == selected_new_comp_index))
                         selected_new_comp_index = i;
@@ -474,6 +493,15 @@ namespace Ailu
                         else if (i == 3)
                         {
                             scene_register.AddComponent<CLightProbe>(entity);
+                        }
+                        else if (i == 4)
+                        {
+                            scene_register.AddComponent<CRigidBody>(entity);
+                        }
+                        else if (i == 5)
+                        {
+                            auto& c = scene_register.AddComponent<CCollider>(entity);
+                            c._type = EColliderType::kBox;
                         }
                         else {};
                     }
@@ -530,6 +558,8 @@ namespace Ailu
                                                               ImGui::DragFloat("Range", &light_data._light_param.x);
                                                               ImGui::SliderFloat("InnerAngle", &light_data._light_param.y, 0.0f, light_data._light_param.z);
                                                               ImGui::SliderFloat("OuterAngle", &light_data._light_param.z, 1.0f, 180.0f);
+                                                              Clamp(comp->_light._light_param.z, 0.0f, 180.0f);
+                                                              Clamp(comp->_light._light_param.y, 0.0f, comp->_light._light_param.z - 0.1f);
                                                           }
                                                           else if (comp->_type == ELightType::kArea)
                                                           {
@@ -554,6 +584,7 @@ namespace Ailu
                                                                   f32 w = light_data._light_param.y, h = light_data._light_param.z;
                                                                   ImGui::DragFloat("Width", &w, 1.0, 0.0, 500.0f);
                                                                   ImGui::DragFloat("Height", &h, 1.0, 0.0, 500.0f);
+                                                                  LOG_INFO("size: {},{}", w, h);
                                                                   light_data._light_param.y = w;
                                                                   light_data._light_param.z = h;
                                                               }
@@ -748,6 +779,76 @@ namespace Ailu
                                                            ImGui::SliderInt("ImgType", &comp->_src_type, 0, 4, "%d");
                                                            ImGui::SliderFloat("Mipmap",&comp->_mipmap,0.0f,10.0f,"%.0f"); });
             }
+            if (scene_register.HasComponent<CRigidBody>(entity))
+            {
+                auto comp = scene_register.GetComponent<CRigidBody>(entity);
+                DrawComponent<CRigidBody>("RigidComponent", comp, entity, [this](CRigidBody *comp)
+                                            { 
+                                                ImGui::SliderFloat("Mass", &comp->_mass, 0.0, 1000.0, "%.2f");
+                                                ImGui::Text("State:");
+                                                ImGui::Indent(10.f);
+                                                ImGui::SameLine();
+                                                ImGui::Text("Velocity %s", comp->_velocity.ToString().c_str());
+                                                ImGui::Text("AngularVelocity %s", comp->_angular_velocity.ToString().c_str());
+                                            });
+            };
+            if (scene_register.HasComponent<CCollider>(entity))
+            {
+                auto comp = scene_register.GetComponent<CCollider>(entity);
+                DrawComponent<CCollider>("ColiderComponent", comp, entity, [this](CCollider *comp)
+                                          { 
+                                                static const char* items[3] = 
+                                                {
+                                                    EColliderType::_Strings[0].c_str(),
+                                                    EColliderType::_Strings[1].c_str(),
+                                                    EColliderType::_Strings[2].c_str()
+                                                };
+                                                u16 type_index = comp->_type;
+                                                auto s = EColliderType::ToString(comp->_type);
+                                                comp->_type = (EColliderType::EColliderType) DrawEnumProperty("ColiderType", EColliderType::_Strings, EColliderType::COUNT, type_index);
+                                                //if (ImGui::BeginCombo("ColiderType", items[type_index], 0))
+                                                //{
+                                                //    for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+                                                //    {
+                                                //        const bool is_selected = (type_index == n);
+                                                //        if (ImGui::Selectable(items[n], is_selected))
+                                                //            comp->_type = (EColliderType::EColliderType) n;
+                                                //        if (is_selected)
+                                                //            ImGui::SetItemDefaultFocus();
+                                                //    }
+                                                //    ImGui::EndCombo();
+                                                //}
+                                                ImGui::DragFloat3("Center",comp->_center.data);
+                                                ImGui::Checkbox("Is Trigger", &comp->_is_trigger);
+                                                if (comp->_type == EColliderType::kBox)
+                                                {
+                                                    ImGui::DragFloat3("Size", comp->_param.data,1.0f,0.0f,100.0f);
+                                                }
+                                                else if (comp->_type == EColliderType::kSphere)
+                                                {
+                                                    ImGui::DragFloat("Radius", &comp->_param.x, 1.0f, 0.0f, 100.0f);
+                                                }
+                                                else if (comp->_type == EColliderType::kCapsule)
+                                                {
+                                                    ImGui::DragFloat("Radius", &comp->_param.x, 1.0f, 0.0f, 100.0f);
+                                                    ImGui::DragFloat("Height", &comp->_param.y, 1.0f, 0.0f, 100.0f);
+                                                    static const char* axis_items[3] ={"X-Axis","Y-Axis","Z-Axis"};
+                                                    int axis_index = (int)comp->_param.z;
+                                                    if (ImGui::BeginCombo("Axis", axis_items[axis_index], 0))
+                                                    {
+                                                        for (int n = 0; n < IM_ARRAYSIZE(axis_items); n++)
+                                                        {
+                                                            const bool is_selected = (axis_index == n);
+                                                            if (ImGui::Selectable(axis_items[n], is_selected))
+                                                                comp->_param.z = (f32) n;
+                                                            if (is_selected)
+                                                                ImGui::SetItemDefaultFocus();
+                                                        }
+                                                        ImGui::EndCombo();
+                                                    }
+                                                }
+                                          });
+            };
             _p_texture_selector->Show();
         }
 

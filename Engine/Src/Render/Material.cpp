@@ -125,16 +125,9 @@ namespace Ailu
         Construct(false);
     }
 
-    bool Material::IsReadyForDraw() const
+    bool Material::IsReadyForDraw(u16 pass_index) const
     {
-        u16 pass_index = 0;
-        for (auto &pass: _pass_variants)
-        {
-            if (_p_active_shader->GetVariantState(pass_index, pass._variant_hash) != EShaderVariantState::kReady)
-                return false;
-            ++pass_index;
-        }
-        return true;
+        return _p_active_shader->GetVariantState(pass_index, _pass_variants[pass_index]._variant_hash) == EShaderVariantState::kReady;
     }
 
     void Material::SetFloat(const String &name, const float &f)
@@ -151,7 +144,7 @@ namespace Ailu
             }
             else
             {
-                LOG_WARNING("Material: {} set float with name {} failed!", _name, name);
+                //LOG_WARNING("Material: {} set float with name {} failed!", _name, name);
             }
             ++pass_index;
         }
@@ -376,7 +369,8 @@ namespace Ailu
         {
             for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
-                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat && ShaderBindResourceInfo::GetVariableSize(bind_info) == 4)
+                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat && ShaderBindResourceInfo::GetVariableSize(bind_info) == 4
+                 && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
                     ret.emplace_back(std::make_tuple(name, *reinterpret_cast<float *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
                 }
@@ -395,7 +389,8 @@ namespace Ailu
         {
             for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
-                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat4 && ShaderBindResourceInfo::GetVariableSize(bind_info) == 16)
+                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat4 
+                    && ShaderBindResourceInfo::GetVariableSize(bind_info) == 16 &&bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
                     ret.emplace_back(std::make_tuple(name, *reinterpret_cast<Vector4f *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
                 }
@@ -414,7 +409,8 @@ namespace Ailu
         {
             for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
-                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUint)
+                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUint 
+                    && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
                     ret.emplace_back(std::make_tuple(name, *reinterpret_cast<u32 *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info))));
                 }

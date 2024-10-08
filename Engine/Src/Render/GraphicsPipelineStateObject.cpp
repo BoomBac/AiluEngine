@@ -87,7 +87,7 @@ namespace Ailu
         pso_desc._p_vertex_shader = shader;
         pso_desc._p_pixel_shader = shader;
         pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT, EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM,
-                                                EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM, EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT, 
+                                                EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM, EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT,
                                                 EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},
                                                EALGFormat::EALGFormat::kALGFormatD24S8_UINT};
         pso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
@@ -366,7 +366,10 @@ namespace Ailu
                 gpso_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
                 auto pso = GraphicsPipelineStateObject::Create(gpso_desc);
                 pso->Build(pass_id, variant_hash);
-                s_update_pso.emplace(std::move(pso));
+                {
+                    std::lock_guard<std::mutex> l(s_pso_lock);
+                    s_update_pso.emplace(std::move(pso));
+                }
             }
         }
         gpso_desc._blend_state = shader->PipelineBlendState(pass_id);
@@ -376,7 +379,10 @@ namespace Ailu
         gpso_desc._rt_state = RenderTargetState{};
         auto pso = GraphicsPipelineStateObject::Create(gpso_desc);
         pso->Build(pass_id, variant_hash);
-        s_update_pso.emplace(std::move(pso));
+        {
+            std::lock_guard<std::mutex> l(s_pso_lock);
+            s_update_pso.emplace(std::move(pso));
+        }
     }
 
     void GraphicsPipelineStateMgr::ConfigureShader(const u64 &shader_hash)

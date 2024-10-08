@@ -5,35 +5,9 @@ shader_guid: f891ec73-10c8-404b-91ac-5bac15cda5fb
 keywords: 
   prop_type: Uint
     shadow_index: 0
-    shadow_index: 0
-    shadow_index: 0
   prop_type: Float
-    _ObjectID: 0
-    g_IndirectLightingIntensity: -4.31602e+08
-    _ObjectID: 0
-    g_IndirectLightingIntensity: -4.31602e+08
   prop_type: Vector
-    _DeltaTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _MainlightWorldPosition: 0.326197,0.73874,0.887255,1
-    _ZBufferParams: 0,0,20,0
-    _CascadeShadowParams: 0,0,0,0
-    _ActiveLightCount: 0,0,0,0
-    _Time: 0,0,0,0
-    _SinTime: 0,0,0,0
-    _CosTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _ScreenParams: 0.279412,0.348616,0.75,1
-    _DeepColor: 0.326197,0.73874,0.887255,1
+    _DeepColor: 0.32549,0.737255,0.886275,0.317647
     _LightColor: 0.279412,0.348616,0.75,1
-    _shadow_params: 0,0,0,0
-    _DeltaTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _MainlightWorldPosition: 0.326197,0.73874,0.887255,1
-    _CascadeShadowParams: 0,0,0,0
-    _ActiveLightCount: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _Time: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _SinTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _CosTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _DeepColor: 0.326197,0.73874,0.887255,1
-    _LightColor: 0.279412,0.348616,0.75,1
-    _shadow_params: 0,0,0,0
   prop_type: Texture2D
     _NormalTex: null guid

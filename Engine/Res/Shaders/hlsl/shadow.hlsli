@@ -200,22 +200,20 @@ float ApplyShadowPointLight(float shadow_near,float shadow_far ,float nl, float3
 {
 	float dis = distance(light_pos,world_pos);
 	if(dis > shadow_far)
-		return 1.0;	
-	float z_bias = 0.0025 * tan(acos(nl));
-	z_bias = clamp(z_bias, 0, 0.5);
-	float3 shaodw_dir = world_pos - light_pos;
-	float linear_z = (dis - shadow_near) / (shadow_far - shadow_near);
+		return 1.0;
+	float z_bias = GetShadowDepthBias(nl,_PointLights[shadow_index]._constant_bias,_PointLights[shadow_index]._slope_bias);
+	//z_bias = clamp(z_bias, 0, 0.5);
+	float3 shaodw_dir = normalize(world_pos - light_pos);
+	float linear_z = saturate((dis - shadow_near) / (shadow_far - shadow_near));
 	// float2 shadow_uv;
 	// shadow_uv.x = shadow_coord.x * 0.5f + 0.5f;
 	// shadow_uv.y = shadow_coord.y * -0.5f + 0.5f;
-	float shadow_factor = 0.0;
-	for (int q = 0; q < 1; q++)
+	float shadow_factor = 0.0; 
+	for (int q = 0; q < 16; q++)
 	{
-		uint random_index = uint(16.0 * Random(float4(world_pos.xyy, q))) % 16;
-		//uint random_index = i;
-		// shadow_factor += lerp(0.0, 1.0, PointLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
-		// 	shaodw_dir, linear_z).r);
-		shadow_factor += PointLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float4(shaodw_dir,(float)shadow_index),linear_z - z_bias);
+		uint random_index = uint(16.0 * Random(float4(floor(world_pos.xyy), q))) % 16;
+		shaodw_dir.xz += poissonDisk[random_index] * 0.0009765625;
+		shadow_factor += PointLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float4(shaodw_dir,(float)shadow_index),linear_z - z_bias) * 0.0625;
 	}
 	//shadow_factor =  (1.0 - shadow_factor) * ShadowDistaanceAtten(dis,shadow_far);
 	return shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));

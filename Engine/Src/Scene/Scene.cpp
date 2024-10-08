@@ -1,6 +1,9 @@
+#include <regex>
 #include "Scene/Scene.h"
+#include "Framework/Common/Application.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Physics/PhysicsSystem.h"
 #include "Scene/RenderSystem.h"
 #include "pch.h"
 
@@ -67,9 +70,24 @@ namespace Ailu
                 arch.NewLine();
                 arch << (*c);
             }
+            if (auto c = _register.GetComponent<CRigidBody>(e); c != nullptr)
+            {
+                arch.InsertIndent();
+                arch << "_rigidbody_component:";
+                arch.NewLine();
+                arch << (*c);
+            }
+            if (auto c = _register.GetComponent<CCollider>(e); c != nullptr)
+            {
+                arch.InsertIndent();
+                arch << "_collider_component:";
+                arch.NewLine();
+                arch << (*c);
+            }
             arch.DecreaseIndent();
         }
     }
+
     void Scene::Deserialize(Archive &arch)
     {
         auto &is = arch.GetIStream();
@@ -118,12 +136,21 @@ namespace Ailu
             {
                 arch >> _register.AddComponent<CLightProbe>(e);
             }
-            else 
+            else if (su::BeginWith(line, "_rigidbody_component"))
+            {
+                arch >> _register.AddComponent<CRigidBody>(e);
+            }
+            else if (su::BeginWith(line, "_collider_component"))
+            {
+                arch >> _register.AddComponent<CCollider>(e);
+            }
+            else
             {
                 AL_ASSERT_MSG(true, "Unkown Component");
             };
         }
     }
+    
     Scene::Scene(const String &name) : Object(name)
     {
         _register.RegisterComponent<TagComponent>();
@@ -133,6 +160,8 @@ namespace Ailu
         _register.RegisterComponent<CCamera>();
         _register.RegisterComponent<CHierarchy>();
         _register.RegisterComponent<CLightProbe>();
+        _register.RegisterComponent<CRigidBody>();
+        _register.RegisterComponent<CCollider>();
         ECS::Signature rs_sig;
         rs_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
         rs_sig.set(_register.GetComponentTypeID<StaticMeshComponent>(), true);
@@ -141,10 +170,16 @@ namespace Ailu
         ls_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
         ls_sig.set(_register.GetComponentTypeID<LightComponent>(), true);
         _register.RegisterSystem<ECS::LightingSystem>(ls_sig);
+        ECS::Signature phy_sig;
+        phy_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
+        phy_sig.set(_register.GetComponentTypeID<CRigidBody>(), true);
+        _register.RegisterSystem<ECS::PhysicsSystem>(phy_sig);
     }
 
     void Scene::Attach(ECS::Entity current, ECS::Entity parent)
     {
+        if (parent == ECS::kInvalidEntity)
+            return;
         AL_ASSERT(_register.HasComponent<CHierarchy>(current) && _register.HasComponent<CHierarchy>(parent));
         auto parent_hierarchy = _register.GetComponent<CHierarchy>(parent);
         auto cur_hierarchy = _register.GetComponent<CHierarchy>(current);
@@ -166,7 +201,7 @@ namespace Ailu
         }
         if (auto parent_transf = _register.GetComponent<TransformComponent>(parent))
         {
-            cur_hierarchy->_inv_matrix_attach = Math::MatrixInverse(parent_transf->_world_matrix);
+            cur_hierarchy->_inv_matrix_attach = Math::MatrixInverse(parent_transf->_transform._world_matrix);
         }
         cur_hierarchy->_parent = parent;
         parent_hierarchy->_children_num++;
@@ -224,6 +259,45 @@ namespace Ailu
         _register.AddComponent<CHierarchy>(obj);
         return obj;
     }
+    ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
+    {
+        ECS::Entity new_one = _register.Create();
+        auto& tag_comp = _register.AddComponent<TagComponent>(new_one, *_register.GetComponent<TagComponent>(e));
+        if (tag_comp._name.find_first_of("(") != tag_comp._name.npos)
+        {
+            std::regex re("\\((\\d+)\\)");
+            std::smatch match;
+            if (std::regex_search(tag_comp._name, match, re))
+            {
+                int number = std::stoi(match[1]);
+                number += 1;
+                tag_comp._name.replace(match.position(0), match.length(0), "(" + std::to_string(number) + ")");
+            }
+        }
+        else
+            tag_comp._name += "(1)";
+        _register.AddComponent<TransformComponent>(new_one, *_register.GetComponent<TransformComponent>(e));
+        if (_register.HasComponent<StaticMeshComponent>(e))
+            _register.AddComponent<StaticMeshComponent>(new_one, *_register.GetComponent<StaticMeshComponent>(e));
+        if (_register.HasComponent<LightComponent>(e))
+            _register.AddComponent<LightComponent>(new_one, *_register.GetComponent<LightComponent>(e));
+        if (_register.HasComponent<CCamera>(e))
+            _register.AddComponent<CCamera>(new_one, *_register.GetComponent<CCamera>(e));
+        if (_register.HasComponent<CHierarchy>(e))
+        {
+            CHierarchy src_heri = *_register.GetComponent<CHierarchy>(e);
+            auto &new_heri = _register.AddComponent<CHierarchy>(new_one, src_heri);
+            Attach(new_one, src_heri._parent);
+        }
+        if (_register.HasComponent<CLightProbe>(e))
+            _register.AddComponent<CLightProbe>(new_one, *_register.GetComponent<CLightProbe>(e));
+        if (_register.HasComponent<CRigidBody>(e))
+            _register.AddComponent<CRigidBody>(new_one, *_register.GetComponent<CRigidBody>(e));
+        if (_register.HasComponent<CCollider>(e))
+            _register.AddComponent<CCollider>(new_one, *_register.GetComponent<CCollider>(e));
+        LOG_INFO("Duplicate entity {}", e);
+        return new_one;
+    }
     ECS::Entity Scene::Pick(const Ray &ray)
     {
         ECS::Entity closest_entity = ECS::kInvalidEntity;
@@ -264,10 +338,15 @@ namespace Ailu
         }
     }
 
+    void Scene::Clear()
+    {
+        LOG_WARNING("Scene::Clear: TODO");
+    }
+
     //-----------------------------------------------------------------------SceneMgr----------------------------------------------------------------------------
     int SceneMgr::Initialize()
     {
-
+        TIMER_BLOCK("-----------------------------------------------------------SceneMgr::Initialize")
         return 0;
     }
     void SceneMgr::Finalize()
@@ -280,8 +359,7 @@ namespace Ailu
     }
     Ref<Scene> Ailu::SceneMgr::Create(String name)
     {
-        _all_scene.emplace_back(MakeRef<Scene>(name));
-        return _all_scene.back();
+        return MakeRef<Scene>(name);
     }
     void SceneMgr::Tick(f32 delta_time)
     {
@@ -289,7 +367,7 @@ namespace Ailu
         {
             for (auto &comp: _p_current->_register.View<TransformComponent>())
             {
-                Transform::ToMatrix(comp._transform, comp._world_matrix);
+                Transform::ToMatrix(comp._transform, comp._transform._world_matrix);
             }
             for (auto &it: _p_current->GetRegister().SystemView())
             {
@@ -302,42 +380,76 @@ namespace Ailu
 
     Ref<Scene> SceneMgr::OpenScene(const WString &scene_path)
     {
-        bool test = false;
-        if (test)
+        AL_ASSERT(!scene_path.empty());
+        if (auto it = _all_scene.find(scene_path); it != _all_scene.end())
         {
-            Ref<Scene> default_scene = MakeRef<Scene>("DefaultScene");
-            auto p = default_scene->AddObject("empty");
-            auto child1 = default_scene->AddObject(g_pResourceMgr->GetRef<Mesh>(L"Meshs/plane.alasset"), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR.alasset"));
-            default_scene->Attach(child1, p);
-            {
-                auto &comp = default_scene->GetRegister().AddComponent<LightComponent>(default_scene->AddObject("directional_light"));
-                comp._type = ELightType::kDirectional;
-                comp._light._light_color = Colors::kWhite;
-            }
-            auto cube = default_scene->AddObject(Mesh::s_p_cube.lock(), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR.alasset"));
-            default_scene->GetRegister().GetComponent<TagComponent>(cube)->_name = "cube";
-            _all_scene.push_back(std::move(default_scene));
+            _p_current = it->second.get();
+            return it->second;
         }
-        else
+        auto s = g_pResourceMgr->Load<Scene>(scene_path);
+        _all_scene[scene_path] = s;
+        _p_current = s.get();
+        return s;
+        //bool test = false;
+        //if (test)
+        //{
+        //    Ref<Scene> default_scene = MakeRef<Scene>("DefaultScene");
+        //    auto p = default_scene->AddObject("empty");
+        //    auto child1 = default_scene->AddObject(g_pResourceMgr->GetRef<Mesh>(L"Meshs/plane.alasset"), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR.alasset"));
+        //    default_scene->Attach(child1, p);
+        //    {
+        //        auto &comp = default_scene->GetRegister().AddComponent<LightComponent>(default_scene->AddObject("directional_light"));
+        //        comp._type = ELightType::kDirectional;
+        //        comp._light._light_color = Colors::kWhite;
+        //    }
+        //    auto cube = default_scene->AddObject(Mesh::s_p_cube.lock(), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR.alasset"));
+        //    default_scene->GetRegister().GetComponent<TagComponent>(cube)->_name = "cube";
+        //    _all_scene.push_back(std::move(default_scene));
+        //    _all_scene
+        //}
+    }
+    void SceneMgr::EnterPlayMode()
+    {
+        Application::GetInstance()->_is_playing_mode = true;
+        _runtime_scene = new Scene(*_p_current);
+        auto name = _runtime_scene->Name();
+        name.append("_copy");
+        _runtime_scene->Name(name);
+        _runtime_scene_src = _p_current;
+        _p_current = _runtime_scene;
+    }
+
+    void SceneMgr::ExitPlayMode()
+    {
+        _p_current = _runtime_scene_src;
+        _runtime_scene_src = nullptr;
+        DESTORY_PTR(_runtime_scene);
+        Application::GetInstance()->_is_playing_mode = false;
+    }
+    void SceneMgr::EnterSimulateMode()
+    {
+        auto &r = _p_current->GetRegister();
+        for (auto &t: r.View<TransformComponent>())
         {
-            WString sys_path = ResourceMgr::GetResSysPath(scene_path);
-            String scene_data;
-            FileManager::ReadFile(sys_path, scene_data);
-            su::RemoveSpaces(scene_data);
-            std::stringstream ss(scene_data);
-            String line;
-            std::getline(ss, line);
-            Guid guid(su::Split(line, ":")[1]);
-            std::getline(ss, line);
-            std::getline(ss, line);
-            line = su::Split(line, ":")[1];
-            //这里到达场景根节点
-            TextIArchive arch(&ss);
-            auto loaded_scene = g_pSceneMgr->Create(line);
-            loaded_scene->Deserialize(arch);
+            _transform_cache.emplace_back(t._transform);
         }
-        _p_current = _all_scene.back().get();
-        return _all_scene.back();
+        Application::GetInstance()->_is_simulate_mode = true;
+    }
+    void SceneMgr::ExitSimulateMode()
+    {
+        auto &r = _p_current->GetRegister();
+        u32 index = 0;
+        for (auto &t: r.View<TransformComponent>())
+        {
+            t._transform = _transform_cache[index++];
+        }
+        for (auto &c: r.View<CRigidBody>())
+        {
+            c._velocity = Vector3f::kZero;
+            c._angular_velocity = Vector3f::kZero;
+        }
+        Application::GetInstance()->_is_simulate_mode = false;
+        _transform_cache.clear();
     }
     //-----------------------------------------------------------------------SceneMgr----------------------------------------------------------------------------
 }// namespace Ailu

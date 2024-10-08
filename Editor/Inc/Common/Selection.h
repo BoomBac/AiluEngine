@@ -57,6 +57,8 @@ namespace Ailu
             }
             static void RemoveSlection()
             {
+                if (!s_can_select)
+                    return;
                 s_selected_entities.clear();
                 s_selections.clear();
             }

@@ -12,7 +12,7 @@ namespace Ailu
     namespace Editor
     {
         DECLARE_ENUM(EPlaceActorsType, kObj, 
-        kCube, kPlane, kSphere, 
+        kCube, kPlane, kSphere,kCapsule ,
         kDirectionalLight, kPointLight, kSpotLight, kAreaLight, kLightProbe)
 
         class PlaceActors : public ImGuiWidget

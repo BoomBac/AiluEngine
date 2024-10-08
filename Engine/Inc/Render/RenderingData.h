@@ -60,7 +60,7 @@ namespace Ailu
 
     struct RenderingShadowData
     {
-        Matrix4x4f _shadow_matrix;
+        Matrix4x4f* _shadow_matrix;
         i16 _shadow_index = -1;
         float _shadow_bias = 0.001f;
         const CullResult *_cull_results;
@@ -68,6 +68,7 @@ namespace Ailu
     struct RenderingPointShadowData
     {
         i16 _shadow_indices[6];
+        Matrix4x4f _shadow_matrices[6];
         float _shadow_bias = 0.001f;
         Vector3f _light_world_pos;
         float _camera_near, _camera_far;

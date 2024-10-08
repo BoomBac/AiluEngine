@@ -8,7 +8,6 @@
 #include <unordered_map>
 #include "FileManager.h"
 #include "Framework/Common/Asset.h"
-#include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Path.h"
@@ -201,7 +200,7 @@ namespace Ailu
         Ref<void> ImportResource(const WString &sys_path, const ImportSetting &setting = ImportSetting::Default());
         //async editon always reutn nullptr
         Ref<void> ImportResourceAsync(const WString &sys_path, const ImportSetting &setting = ImportSetting::Default(), OnResourceTaskCompleted callback = [](Ref<void> asset) {});
-
+        const List<ImportInfo> &GetImportInfos() const { return _import_infos; }
 
         const WString &GetAssetPath(Object *obj) const;
         const Guid &GetAssetGuid(Object *obj) const;
@@ -267,9 +266,6 @@ namespace Ailu
         static Ref<T> IterToRefPtr(const Vector<ResourcePoolContainer::iterator>::iterator &iter);
 
     public:
-        List<ImportInfo> _import_infos;
-        std::mutex _import_infos_mutex;
-        std::mutex _asset_db_mutex;
 
     private:
         static void FormatLine(const String &line, String &key, String &value);
@@ -323,6 +319,9 @@ namespace Ailu
         inline static std::unordered_map<WString, fs::file_time_type> s_file_last_load_time;
         bool _is_watching_directory = true;
         WString _project_root_path;
+        List<ImportInfo> _import_infos;
+        std::mutex _import_infos_mutex;
+        std::mutex _asset_db_mutex;
         //<GUID,Asset>
         std::map<Guid, Scope<Asset>> _asset_db{};
         //AssetPath,GUID
@@ -356,7 +355,7 @@ namespace Ailu
         Guid guid;
         EAssetType::EAssetType type = EAssetType::kUndefined;
         ExtractCommonAssetInfo(asset_path, asset_name, guid, type);
-        AL_ASSERT(type != EAssetType::kUndefined);
+        //AL_ASSERT(type != EAssetType::kUndefined);
         if (type == EAssetType::kUndefined)
         {
             g_pLogMgr->LogErrorFormat(L"Load asset {} failed with invalid asset type after {}ms", asset_path,timer.GetElapsedSinceLastMark());
@@ -368,6 +367,19 @@ namespace Ailu
         {
             g_pLogMgr->LogWarningFormat(L"Load asset {} succeed with everything is new after {}ms", asset_path, timer.GetElapsedSinceLastMark());
             return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
+        }
+        List<ImportInfo>::iterator iter = _import_infos.begin();
+        {
+            ImportInfo info;
+            info._is_succeed = false;
+            //info._last_write_time = fs::last_write_time(p);
+            info._msg = ToChar(std::format(L"Import {}...", asset_path));
+            info._progress = 0.0f;
+            info._sys_path = sys_path;
+            std::lock_guard<std::mutex> lock(_import_infos_mutex);
+            _import_infos.push_back(info);
+            iter = _import_infos.end();
+            --iter;
         }
         if constexpr (std::is_same<T, Texture2D>::value)
         {
@@ -406,6 +418,10 @@ namespace Ailu
         }
         else
             g_pLogMgr->LogErrorFormat(L"Load asset {} failed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
+        {
+            std::lock_guard<std::mutex> lock(_import_infos_mutex);
+            _import_infos.erase(iter);
+        }
         return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
     }
     template<typename T>

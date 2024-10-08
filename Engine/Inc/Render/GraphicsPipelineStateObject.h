@@ -128,6 +128,7 @@ namespace Ailu
 
     private:
         inline static Queue<Scope<GraphicsPipelineStateObject>> s_update_pso{};
+        inline static std::mutex s_pso_lock;
         inline static std::map<PSOHash, Scope<GraphicsPipelineStateObject>> s_pso_library{};
         inline static u32 s_reserved_pso_id = 32u;
         inline static List<PipelineResourceInfo> s_bind_resource_list{};

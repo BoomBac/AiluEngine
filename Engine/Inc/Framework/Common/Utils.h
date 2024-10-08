@@ -16,23 +16,6 @@
 
 namespace Ailu
 {
-    /// <summary>
-    /// 返回的指针需要在使用后销毁
-    /// </summary>
-    /// <param name="multiByteStr"></param>
-    /// <returns></returns>
-    static wchar_t* ToWChar(const char* multiByteStr)
-    {
-        int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
-        if (size == 0 || size > 256) {
-            throw std::runtime_error("to wstring error!");
-            return nullptr;
-        }
-        static wchar_t wideStr[256];
-        MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, wideStr, size);
-        return wideStr;
-    }
-
     static WString ToWStr(const char* multiByteStr)
     {
         int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
@@ -40,46 +23,30 @@ namespace Ailu
             throw std::runtime_error("to wstring error!");
             return WString{};
         }
-        static wchar_t wideStr[256];
+        wchar_t wideStr[256];
         MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, wideStr, size);
         return WString{ wideStr };
     }
-
-    static wchar_t* ToWChar(const String& str)
+    static WString ToWStr(const String& multiByteStr)
     {
-        auto multiByteStr = str.c_str();
-        int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
-        if (size == 0 || size > 256) {
-            throw std::runtime_error("to wstring error!");
-            return nullptr;
-        }
-        static wchar_t wideStr[256];
-        MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, wideStr, size);
-        return wideStr;
+        return ToWStr(multiByteStr.c_str());
     }
 
-    static char* ToChar(const wchar_t* wideStr)
+    static String ToChar(const wchar_t* wideStr)
     {
         int size = WideCharToMultiByte(CP_UTF8, 0, wideStr, -1, nullptr, 0, nullptr, nullptr);
         if (size == 0 || size > 256) {
             throw std::runtime_error("to nstring error!");
             return nullptr;
         }
-        static char multiByteStr[256];
+        char multiByteStr[256];
         WideCharToMultiByte(CP_UTF8, 0, wideStr, -1, multiByteStr, size, nullptr, nullptr);
         return multiByteStr;
     }
 
     static String ToChar(const WString& wideStr)
     {
-        int size = WideCharToMultiByte(CP_UTF8, 0, wideStr.data(), -1, nullptr, 0, nullptr, nullptr);
-        if (size == 0 || size > 256) {
-            throw std::runtime_error("to nstring error!");
-            return "";
-        }
-        static char multiByteStr[256];
-        WideCharToMultiByte(CP_UTF8, 0, wideStr.data(), -1, multiByteStr, size, nullptr, nullptr);
-        return String{ multiByteStr };
+        return ToChar(wideStr.c_str());
     }
     static String GetIndentation(int level)
     {
@@ -253,40 +220,6 @@ namespace Ailu
         }
     }
     namespace su = StringUtils;
-
-
-    static List<String> ReadFileToLines(const String& sys_path, u32& line_count,String begin = "", String end = "")
-    {
-        std::ifstream file(sys_path);
-        List<String> lines{};
-        if (!file.is_open())
-        {
-            //LOG_ERROR("Load asset with path: {} failed!", sys_path);
-            return lines;
-        }
-        String line;
-        bool start = begin.empty(), stop = false;
-        while (std::getline(file, line))
-        {
-            line = StringUtils::Trim(line);
-            if (!start)
-            {
-                start = line == begin;
-                continue;
-            }
-            if (!stop && !end.empty())
-            {
-                stop = end == line;
-            }
-            if (start && !stop)
-            {
-                lines.emplace_back(line);
-            }
-        }
-        file.close();
-        line_count = static_cast<u32>(lines.size());
-        return lines;
-    }
 
     namespace Algorithm
     {

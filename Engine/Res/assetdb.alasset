@@ -1,5 +1,5 @@
 012efc02-825c-42e9-b512-35c19e7eb1db,Icons/light_probe.alasset,kTexture2D
-04f85376-b16b-43cc-b53e-e5c236755e53,NewScene/Palace/textures/sponza_curtain_baseColor.alasset,kTexture2D
+04f85376-b16b-43cc-b53e-e5c236755e53,Meshs/capsule.alasset,kMesh
 05027d6c-b9f3-4e05-aa86-e62a2067e69a,NewScene/Palace/textures/background_normal.alasset,kTexture2D
 05ee0670-c4c7-4b96-893e-c0a49cba1434,NewScene/Palace/textures/sponza_flagpole_baseColor.alasset,kTexture2D
 094a838b-c1fe-4d9b-a05b-a5df05378c96,Icons/scene.alasset,kTexture2D
@@ -41,6 +41,7 @@
 5879cd73-a132-423e-a89a-c15fbf33737e,NewScene/Palace/textures/lion_baseColor.alasset,kTexture2D
 60fb44b6-864f-4c6a-b49b-f4b26829b57d,Shaders/defered_standard_lit.alasset,kShader
 687dd7a6-c8d4-40f1-8a33-694707d9c423,Icons/directional_light.alasset,kTexture2D
+6abca545-d271-4c76-b214-913472735574,WaterTest/empty_scene.almap,kScene
 6b616d87-aefe-4b8d-9914-531b11a6efc5,NewScene/Palace/textures/sponza_column_a_baseColor.alasset,kTexture2D
 6d1148fb-00a4-4720-8ca0-7dd877b0da55,NewScene/Palace/textures/sponza_arch_baseColor.alasset,kTexture2D
 7182a502-ba5e-4de5-a517-ed226a6b7805,NewScene/Palace/MAT_column_a.alasset,kMaterial
@@ -68,7 +69,7 @@
 9b07c454-1831-4137-ac11-04deb4baeca3,NewScene/Palace/textures/sponza_flagpole_normal.alasset,kTexture2D
 9bb10f26-291a-4614-861e-2c667b6b4c63,NewScene/node_damagedHelmet_-6514.alasset,kMesh
 D390A432-7AD9-475D-B1A5-726EB91072FB,Shaders/forwardlit.alasset,kShader
-a40c454a-c967-4810-88c9-651706104062,NewScene/default_scene.almap,kScene
+a40c454a-c967-4810-88c9-651706104062,WaterTest/default_scene.almap,kScene
 a5e5ce06-3542-4eb0-8087-5b4034c4dcf6,NewScene/Default_albedo.alasset,kTexture2D
 aaf13c3a-39fa-4ca3-b221-d0f1671474f7,NewScene/Palace/textures/sponza_bricks_a_normal.alasset,kTexture2D
 abcb7c17-1767-4b43-9850-f7a36a428b96,WaterTest/M_Water.alasset,kMaterial

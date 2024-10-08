@@ -240,7 +240,7 @@ namespace Ailu
 	List<Ref<Mesh>> FbxParser::Parser(std::string_view sys_path)
 	{
 		// Convert string to wstring
-		return ParserImpl(ToWChar(sys_path.data()));
+		return ParserImpl(ToWStr(sys_path.data()));
 	}
 	List<Ref<Mesh>> FbxParser::Parser(const WString& sys_path)
 	{
@@ -318,11 +318,14 @@ namespace Ailu
 
 	bool FbxParser::ParserMesh(FbxNode* node, List<Ref<Mesh>>& loaded_meshes)
 	{
+
 		auto fbx_mesh = node->GetMesh();
 		if (!fbx_mesh->IsTriangleMesh())
 		{
+            _time_mgr.Mark();
 			fbxsdk::FbxGeometryConverter convert(fbx_manager_);
 			fbx_mesh = FbxCast<fbxsdk::FbxMesh>(convert.Triangulate(fbx_mesh, true));
+            LOG_INFO("Triangulate mesh cost {}ms", _time_mgr.GetElapsedSinceLastMark());
 		}
 		bool use_multi_thread = true;
 		bool is_skined = fbx_mesh->GetDeformerCount(FbxDeformer::eSkin) > 0;
@@ -455,7 +458,7 @@ namespace Ailu
 					clip->AddKeyFrame(joint_index, FbxMatToTransform(bone_matrix_l));
 				}
 			};
-		g_pTimeMgr->Mark();
+		//g_pTimeMgr->Mark();
 		FbxAnimStack* cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
 		if (deformers_num > 0 && cur_anim_stack)
 		{
@@ -512,9 +515,9 @@ namespace Ailu
 			}
 			//LOG_INFO("Fill animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
 			clip->CurSkeletion(sk);
-			g_pTimeMgr->Mark();
+			//g_pTimeMgr->Mark();
 			clip->Bake();
-			LOG_INFO("Bake animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
+			//LOG_INFO("Bake animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
 			LOG_INFO("Import animation {} end", clip->Name())
 				_loaded_anims.emplace_back(clip);
 		}

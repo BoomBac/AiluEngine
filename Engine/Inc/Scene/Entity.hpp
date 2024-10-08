@@ -25,12 +25,22 @@ namespace Ailu
         public:
             virtual ~IComponentManager() = default;
             virtual void EntityDestroyed(Entity entity) = 0;
+            virtual Ref<IComponentManager> Clone() = 0;
         };
         //sparse set
         template<typename T>
         class ComponentManager : public IComponentManager
         {
         public:
+            Ref<IComponentManager> Clone() final
+            {
+                auto copy = std::make_shared<ComponentManager<T>>();
+                copy->_comps = _comps;
+                copy->_entities = _entities;
+                copy->_lut = _lut;
+                return copy;
+            }
+
             template<typename... Args>
             T &Create(Entity entity, Args &&...args)
             {
@@ -70,6 +80,7 @@ namespace Ailu
             {
                 return _lut.contains(entity) ? &_comps[_lut[entity]] : nullptr;
             }
+
             T &operator[](u64 index) { return _comps[index]; }
             u64 Count() const { return _comps.size(); }
             Entity GetEntity(u64 index) const { return _entities[index]; }
@@ -87,8 +98,8 @@ namespace Ailu
             Vector<Entity> _entities;
             std::unordered_map<Entity, u64> _lut;
         };
-
-        using Signature = std::bitset<32>;
+        const static u16 kSignatureNum = 32u;
+        using Signature = std::bitset<kSignatureNum>;
         class System
         {
             friend class Register;
@@ -96,6 +107,11 @@ namespace Ailu
         public:
             virtual void Update(Register &r, f32 delta_time) {};
             virtual void OnPushEntity(Entity entity) {};
+            virtual Ref<System> Clone() 
+            { 
+                AL_ASSERT(true);
+                return nullptr; 
+            };
 
         protected:
             std::set<Entity> _entities;
@@ -104,6 +120,93 @@ namespace Ailu
         class Register
         {
         public:
+            Register() = default;
+            Register(const Register &other)
+                : _comp_types(other._comp_types),
+                  _sys_signatures(other._sys_signatures),
+                  _entity_num(other._entity_num),
+                  _entities(other._entities),
+                  _available_entities(other._available_entities),
+                  _is_init(other._is_init)
+            {
+                for (const auto &pair: other._mgrs)
+                {
+                    const auto &type_name = pair.first;
+                    const auto &manager = pair.second;
+                    _mgrs[type_name] = pair.second->Clone();
+                }
+                for (const auto &pair: other._systems)
+                {
+                    const auto &type_name = pair.first;
+                    const auto &manager = pair.second;
+                    _systems[type_name] = pair.second->Clone();
+                }
+            }
+            Register(Register &&other) noexcept
+                : _mgrs(std::move(other._mgrs)),
+                  _comp_types(std::move(other._comp_types)),
+                  _systems(std::move(other._systems)),
+                  _sys_signatures(std::move(other._sys_signatures)),
+                  _entity_num(other._entity_num),
+                  _entities(std::move(other._entities)),
+                  _available_entities(std::move(other._available_entities)),
+                  _is_init(other._is_init)
+            {
+                other._entity_num = -1;
+                other._is_init = false;
+            }
+            Register &operator=(const Register &other)
+            {
+                if (this != &other)
+                {
+                    for (const auto &pair: other._mgrs)
+                    {
+                        const auto &type_name = pair.first;
+                        const auto &manager = pair.second;
+                        _mgrs[type_name] = pair.second->Clone();
+                    }
+                    for (const auto &pair: other._systems)
+                    {
+                        const auto &type_name = pair.first;
+                        const auto &manager = pair.second;
+                        _systems[type_name] = pair.second->Clone();
+                    }
+                    _comp_types = other._comp_types;
+                    _sys_signatures = other._sys_signatures;
+                    _entity_num = other._entity_num;
+                    _entities = other._entities;
+                    _available_entities = other._available_entities;
+                    _is_init = other._is_init;
+                }
+                return *this;
+            }
+            Register &operator=(Register &&other) noexcept
+            {
+                if (this != &other)
+                {
+                    _mgrs = std::move(other._mgrs);
+                    _comp_types = std::move(other._comp_types);
+                    _systems = std::move(other._systems);
+                    _sys_signatures = std::move(other._sys_signatures);
+                    _entity_num = other._entity_num;
+                    _entities = std::move(other._entities);
+                    _available_entities = std::move(other._available_entities);
+                    _is_init = other._is_init;
+
+                    other._entity_num = -1;
+                    other._is_init = false;
+                }
+                return *this;
+            }
+            bool operator==(const Register &other) const
+            {
+                return _comp_types == other._comp_types &&
+                       _sys_signatures == other._sys_signatures &&
+                       _entity_num == other._entity_num &&
+                       _entities == other._entities &&
+                       _available_entities == other._available_entities &&
+                       _is_init == other._is_init;
+            }
             Entity Create()
             {
                 if (!_is_init)
@@ -137,6 +240,7 @@ namespace Ailu
             }
             void EntitySignatureChanged(Entity entity)
             {
+                AL_ASSERT(entity < kMaxEntityNum);
                 for (auto &it: _systems)
                 {
                     auto &[type_name, sys] = it;
@@ -150,9 +254,11 @@ namespace Ailu
                         sys->_entities.erase(entity);
                 }
             }
+
             template<typename T>
             bool HasComponent(Entity entity) const
             {
+                AL_ASSERT(entity < kMaxEntityNum);
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(_comp_types.contains(type_name));
                 return _entities[entity].test(_comp_types.at(type_name));
@@ -169,7 +275,7 @@ namespace Ailu
             {
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(!_mgrs.contains(type_name));
-                _mgrs[type_name] = MakeScope<ComponentManager<T>>();
+                _mgrs[type_name] = MakeRef<ComponentManager<T>>();
                 _comp_types[type_name] = _comp_types.size();
             }
             template<typename T>
@@ -188,6 +294,7 @@ namespace Ailu
             template<typename T, typename... Args>
             T &AddComponent(Entity entity, Args &&...args)
             {
+                AL_ASSERT(entity < kMaxEntityNum);
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(_mgrs.contains(type_name));
                 _entities[entity].set(_comp_types[type_name], true);
@@ -198,6 +305,7 @@ namespace Ailu
             template<typename T>
             void RemoveComponent(Entity entity)
             {
+                AL_ASSERT(entity < kMaxEntityNum);
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(_mgrs.contains(type_name));
                 static_cast<ComponentManager<T> *>(_mgrs[type_name].get())->Remove(entity);

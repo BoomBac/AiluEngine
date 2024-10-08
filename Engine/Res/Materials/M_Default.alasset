@@ -9,49 +9,16 @@ keywords:
     _surface: 0
     shadow_index: 0
   prop_type: Float
-    _ObjectID: 0
     _SamplerMask: 4.2039e-45
-    g_IndirectLightingIntensity: -4.31602e+08
     _MetallicValue: 0
     _MaterialID: 2.8026e-45
     _Anisotropy: 0
     _RoughnessValue: 0.068
     _AlphaCulloff: 0.602
-    shadow_index: 0
-    _ObjectID: 0
-    g_IndirectLightingIntensity: -4.31602e+08
-    _SamplerMask: 4.2039e-45
-    _Anisotropy: 0
-    _RoughnessValue: 0.068
-    _MetallicValue: 0
-    _MaterialID: 2.8026e-45
-    _AlphaCulloff: 0.602
-    shadow_index: 0
   prop_type: Vector
-    _DeltaTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _MainlightWorldPosition: 0.29902,0.29902,0.29902,0.258824
-    _ZBufferParams: 0,0,0,0
-    _CascadeShadowParams: 0,0,0,0
-    _ActiveLightCount: 0,0,0,0
-    _Time: 0,0,0,0
-    _SinTime: 0,0,0,0
     _SpecularValue: 0,0,0,0
-    _CosTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _ScreenParams: 0,0,0,-1
     _EmissionValue: 0,0,0,-1
     _AlbedoValue: 0.29902,0.29902,0.29902,0.258824
-    _shadow_params: 0,0,0,0
-    _DeltaTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _MainlightWorldPosition: 0.29902,0.29902,0.29902,0.258824
-    _CascadeShadowParams: 0,0,0,0
-    _ActiveLightCount: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _Time: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _SinTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _SpecularValue: 0,0,0,0
-    _CosTime: -4.31602e+08,-4.31602e+08,-4.31602e+08,-4.31602e+08
-    _AlbedoValue: 0.29902,0.29902,0.29902,0.258824
-    _EmissionValue: 0,0,0,-1
-    _shadow_params: 0,0,0,0
   prop_type: Texture2D
     _AlbedoTex: eb07fa74-875a-467e-bf40-6d14647da7b4
     _EmissionTex: null guid

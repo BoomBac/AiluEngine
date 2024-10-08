@@ -90,6 +90,7 @@ namespace Ailu
         Vector2f _jitter = Vector2f::kZero;
         Material *_taa_material;
         Matrix4x4f _cur_vp_matrix;
+        Scope<IConstantBuffer> _origin_camera_cbuf;
     };
 
     class TAAFeature : public RenderFeature

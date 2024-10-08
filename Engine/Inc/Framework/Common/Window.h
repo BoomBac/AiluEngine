@@ -31,7 +31,7 @@ namespace Ailu
 		virtual void OnUpdate() = 0;
 		virtual u32 GetWidth() const = 0;
 		virtual u32 GetHeight() const = 0;
-		virtual std::tuple<u32, u32> GetWindowPosition() const = 0;
+		virtual std::tuple<i32, i32> GetWindowPosition() const = 0;
 		virtual void SetEventHandler(const EventHandler& handler) = 0;
 		virtual void SetVSync(bool enabled) = 0;
 		virtual bool IsVSync() const = 0;

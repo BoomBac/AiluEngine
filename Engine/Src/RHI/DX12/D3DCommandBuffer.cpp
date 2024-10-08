@@ -44,6 +44,7 @@ namespace Ailu
         }
         _cur_cbv_heap_id = 65535;
         _is_custom_viewport = false;
+        _allocations.clear();
         _upload_buf->Reset();
         s_global_buffer_offset -= _buffer_offset;
         _buffer_offset = 0;
@@ -229,9 +230,9 @@ namespace Ailu
     }
     void D3DCommandBuffer::SetGlobalBuffer(const String &name, void *data, u64 data_size)
     {
-        auto alloc = _upload_buf->Allocate(data_size, 256);
-        alloc.SetData(data, data_size);
-        GraphicsPipelineStateMgr::SubmitBindResource(&alloc.GPU, EBindResDescType::kConstBufferRaw, name, PipelineResourceInfo::kPriporityCmd);
+        _allocations.emplace_back(_upload_buf->Allocate(data_size, 256));
+        _allocations.back().SetData(data, data_size);
+        GraphicsPipelineStateMgr::SubmitBindResource(&_allocations.back().GPU, EBindResDescType::kConstBufferRaw, name, PipelineResourceInfo::kPriporityCmd);
     }
 
     void D3DCommandBuffer::SetGlobalBuffer(const String &name, IConstantBuffer *buffer)
@@ -314,7 +315,7 @@ namespace Ailu
         GraphicsPipelineStateMgr::EndConfigurePSO(this);
         if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
         {
-            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout(pass_index));
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
             per_obj_cbuf->Bind(this, 0);
             ++RenderingStates::s_draw_call;
@@ -344,16 +345,18 @@ namespace Ailu
             return 1;
         }
         material->Bind(pass_index);
+        SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (void *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
         GraphicsPipelineStateMgr::EndConfigurePSO(this);
         if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
         {
-            IConstantBuffer *buf = s_obj_buffers[s_global_buffer_offset + _buffer_offset].get();
-            s_global_buffer_offset++;
-            _buffer_offset++;
-            memcpy(buf->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
-            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+            //AL_ASSERT(s_global_buffer_offset + _buffer_offset < 20);
+            //IConstantBuffer *buf = s_obj_buffers[s_global_buffer_offset + _buffer_offset].get();
+            //s_global_buffer_offset++;
+            //_buffer_offset++;
+            //memcpy(buf->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
+            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout(pass_index));
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
-            buf->Bind(this, 0);
+            //buf->Bind(this, 0);
             ++RenderingStates::s_draw_call;
             _p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
         }

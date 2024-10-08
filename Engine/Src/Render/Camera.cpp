@@ -17,7 +17,7 @@ namespace Ailu
         return &cam;
     }
 
-    void Camera::DrawGizmo(const Camera *p_camera, Color32 c)
+    void Camera::DrawGizmo(const Camera *p_camera, Color c)
     {
         // 绘制立方体的边框
         Gizmo::DrawLine(p_camera->_near_top_left, p_camera->_near_top_right, c);
@@ -42,7 +42,7 @@ namespace Ailu
         // {
         // 	auto& p = vf._planes[i];
         // 	float3 start = p_camera->Position();
-        // 	Gizmo::DrawLine(p._point, p._point + p._normal * 100,Color32(1.0f,0.0f,1.0f,1.0f));
+        // 	Gizmo::DrawLine(p._point, p._point + p._normal * 100,Color(1.0f,0.0f,1.0f,1.0f));
         // }
     }
 

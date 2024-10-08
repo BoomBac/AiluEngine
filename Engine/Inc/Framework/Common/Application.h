@@ -51,6 +51,8 @@ namespace Ailu
 
         static Application* GetInstance();
         inline static u64 s_frame_count = 0u;
+        bool _is_playing_mode   = false;
+        bool _is_simulate_mode = false;
     protected:
         virtual bool OnWindowClose(WindowCloseEvent& e);
         virtual bool OnGetFocus(WindowFocusEvent& e);

@@ -118,24 +118,27 @@ namespace Ailu
         {
             ProfileBlock profile(cmd.get(), _name);
             u32 obj_index = 0u;
+            CBufferPerCameraData camera_data;
             //方向光阴影，只有一个
             if (rendering_data._shadow_data[0]._shadow_index != -1)
             {
-                for (int i = 0; i < 1; i++)
-                //for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
+                for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
                 {
                     u16 dsv_rt_index = _p_mainlight_shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
                     cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get(), 0, dsv_rt_index);
                     cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(), dsv_rt_index, 1.0f);
-                    _shadowcast_materials[i]->SetUint("shadow_index", rendering_data._shadow_data[i]._shadow_index);
+                    camera_data._MatrixVP = *rendering_data._shadow_data[i]._shadow_matrix;
                     for (auto &it: *rendering_data._shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
                         for (auto &obj: objs)
                         {
-                            obj._material->SetUint("shadow_index", rendering_data._shadow_data[i]._shadow_index);
                             if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
+                            {
+                                obj._material->DisableKeyword("CAST_POINT_SHADOW");
+                                cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
                                 cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16)shadow_pass,obj._instance_count);
+                            }
                         }
                     }
                 }
@@ -151,13 +154,18 @@ namespace Ailu
                     u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
                     cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, dsv_rt_index);
                     cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), dsv_rt_index, 1.0f);
-                    _shadowcast_materials[i + RenderConstants::kMaxCascadeShadowMapSplitNum]->SetUint("shadow_index", rendering_data._shadow_data[shadow_data_index]._shadow_index);
+                    camera_data._MatrixVP = *rendering_data._shadow_data[shadow_data_index]._shadow_matrix;
                     for (auto &it: *rendering_data._shadow_data[shadow_data_index]._cull_results)
                     {
                         auto &[queue, objs] = it;
                         for (auto &obj: objs)
                         {
-                            cmd->DrawRenderer(obj._mesh, _shadowcast_materials[shadow_data_index].get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, obj._instance_count);
+                            if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
+                            {
+                                obj._material->DisableKeyword("CAST_POINT_SHADOW");
+                                cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                                cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                            }
                         }
                     }
                     obj_index = 0;
@@ -180,17 +188,24 @@ namespace Ailu
                         cmd->ClearRenderTarget(_p_point_light_shadow_maps.get(), dsv_rt_index, 1.0f);
                         Vector4f light_pos = rendering_data._point_shadow_data[i]._light_world_pos;
                         _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetVector("_point_light_wpos", light_pos);
+                        camera_data._CameraPos.xyz = light_pos.xyz;
                         light_pos.x = rendering_data._point_shadow_data[i]._camera_near;
                         light_pos.y = rendering_data._point_shadow_data[i]._camera_far;
                         _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetVector("_shadow_params", light_pos);
                         _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetUint("shadow_index", rendering_data._point_shadow_data[i]._shadow_indices[j]);
+                        camera_data._MatrixVP = rendering_data._point_shadow_data[i]._shadow_matrices[j];
+                        camera_data._ZBufferParams = light_pos;
                         for (auto &it: *rendering_data._point_shadow_data[i]._cull_results[j])
                         {
                             auto &[queue, objs] = it;
                             for (auto &obj: objs)
                             {
-                                cmd->DrawRenderer(obj._mesh, _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj._scene_id],
-                                                  obj._submesh_index, 1, obj._instance_count);
+                                if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
+                                {
+                                    obj._material->EnableKeyword("CAST_POINT_SHADOW");
+                                    cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                                    cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                }
                             }
                         }
                         //for (auto& obj : RenderQueue::GetOpaqueRenderables())
@@ -289,7 +304,7 @@ namespace Ailu
             _reflection_prefilter_mateirals.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/filter_irradiance.alasset"), "ReflectionPrefilter"));
             _reflection_prefilter_mateirals.back()->SetFloat("_roughness", i / mipmap_level);
             _reflection_prefilter_mateirals.back()->SetFloat("_width", cur_mipmap_size);
-            //_reflection_prefilter_mateirals.back()->SetTexture("SrcTex", ToWChar(src_texture_name));
+            //_reflection_prefilter_mateirals.back()->SetTexture("SrcTex", ToWStr(src_texture_name));
             _reflection_prefilter_mateirals.back()->SetTexture("EnvMap", _src_cubemap.get());
         }
     }
@@ -393,7 +408,7 @@ namespace Ailu
                 for (auto &obj: objs)
                 {
                     //memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj._world_matrix, sizeof(Matrix4x4f));
-                    auto ret = cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, obj._instance_count);
+                    auto ret = cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index,0,obj._instance_count);
                     ++obj_index;
                 }
             }
@@ -620,7 +635,7 @@ namespace Ailu
         // 	int gridSpacing = 100;
         // 	Vector3f cameraPosition = Camera::sCurrent->Position();
         // 	float grid_alpha = lerpf(0.0f, 1.0f, abs(cameraPosition.y) / 2000.0f);
-        // 	Color32 grid_color = Colors::kWhite;
+        // 	Color grid_color = Colors::kWhite;
         // 	grid_color.a = 1.0f - grid_alpha;
         // 	if (grid_color.a > 0)
         // 	{
@@ -746,6 +761,7 @@ namespace Ailu
                             wireframe_shader->SetVertexShader(0, pass._vert_src_file, pass._vert_entry);
                             wireframe_shader->Compile();
                             g_pResourceMgr->RegisterResource(shader_name_w, wireframe_shader);
+                            _wireframe_shaders.insert(shader_name_w);
                         }
                         auto mat = MakeRef<Material>(*obj._material);
                         mat->ChangeShader(g_pResourceMgr->Get<Shader>(shader_name_w));

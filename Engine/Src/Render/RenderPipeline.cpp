@@ -15,6 +15,7 @@ namespace Ailu
     }
     void RenderPipeline::Init()
     {
+        TIMER_BLOCK("RenderPipeline::Init()");
         _renderers.push_back(MakeScope<Renderer>());
         _cameras.emplace_back(Camera::sCurrent);
     }
@@ -46,7 +47,7 @@ namespace Ailu
 #endif
             _targets.push_back(_renderers[0]->TargetTexture());
         }
-        FrameCleanUp();
+        RenderTexture::ResetRenderTarget();
     }
     RenderTexture *RenderPipeline::GetTarget(u16 index)
     {
@@ -60,7 +61,8 @@ namespace Ailu
     }
     void RenderPipeline::FrameCleanUp()
     {
-        RenderTexture::ResetRenderTarget();
         g_pRenderTexturePool->RelesaeUnusedRT();
+        for (auto &r: _renderers)
+            r->FrameCleanup();
     }
 }// namespace Ailu

@@ -6,6 +6,7 @@
 namespace Ailu
 {
     f32 TimeMgr::s_time_scale = 1.0f;
+    static std::mutex s_mark_mutex;
     int TimeMgr::Initialize()
     {
         int ret = 0;
@@ -65,15 +66,15 @@ namespace Ailu
 
     void TimeMgr::Mark()
     {
+        std::lock_guard<std::mutex> lock(s_mark_mutex);
         _mark_stamps.push(std::move(std::chrono::high_resolution_clock::now()));
     }
     float TimeMgr::GetElapsedSinceLastMark()
     {
+        std::lock_guard<std::mutex> lock(s_mark_mutex);
         if (!_mark_stamps.empty())
         {
-            float count = ALMSecond(std::chrono::high_resolution_clock::now() -
-                                    _mark_stamps.top())
-                                  .count();
+            float count = ALMSecond(std::chrono::high_resolution_clock::now() -_mark_stamps.top()).count();
             count -= _last_pause_time;
             _last_pause_time = 0;
             _mark_stamps.pop();

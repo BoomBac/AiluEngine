@@ -54,7 +54,7 @@ namespace Ailu
         void DisableKeyword(const String &keyword);
         virtual void Bind(u16 pass_index = 0);
         Shader *GetShader() const { return _p_shader; };
-        bool IsReadyForDraw() const;
+        bool IsReadyForDraw(u16 pass_index = 0) const;
         List<std::tuple<String, float>> GetAllFloatValue();
         List<std::tuple<String, Vector4f>> GetAllVectorValue();
         List<std::tuple<String, u32>> GetAllUintValue();

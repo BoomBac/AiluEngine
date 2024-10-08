@@ -2,7 +2,6 @@
 #include "CompanyEnv.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
-#include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
@@ -47,6 +46,8 @@ namespace Ailu
     int Application::Initialize(ApplicationDesc desc)
     {
         AL_ASSERT_MSG(sp_instance == nullptr, "Application already init!");
+        g_pTimeMgr->Initialize();
+        g_pTimeMgr->Mark();
         sp_instance = this;
         g_pLogMgr->Initialize();
         g_pLogMgr->AddAppender(new FileAppender());
@@ -56,7 +57,6 @@ namespace Ailu
         window_props.Height = desc._window_height;
         _p_window = new Ailu::WinWindow(window_props);
         _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
-        g_pTimeMgr->Initialize();
         _layer_stack = new LayerStack();
 #ifdef DEAR_IMGUI
         //初始化imgui gfx时要求imgui window已经初始化
@@ -64,23 +64,12 @@ namespace Ailu
 #endif// DEAR_IMGUI
         GraphicsContext::InitGlobalContext();
         g_pGfxContext->ResizeSwapChain(desc._window_width, desc._window_height);
-        g_pLogMgr->Log("Begin init resource mgr...");
-        g_pTimeMgr->Mark();
         g_pResourceMgr->Initialize();
 #ifdef DEAR_IMGUI
         PushLayer(_p_imgui_layer);
-
 #endif// DEAR_IMGUI
-        g_pLogMgr->LogFormat("Resource mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
-        g_pLogMgr->Log("Begin init scene mgr...");
-        g_pTimeMgr->Mark();
         g_pSceneMgr->Initialize();
-        g_pLogMgr->LogFormat("Scene mgr init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
-        g_pLogMgr->Log("Begin init renderer...");
-        g_pTimeMgr->Mark();
-        g_pLogMgr->LogFormat("Renderer init finish after {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
         SetThreadDescription(GetCurrentThread(), L"ALEngineMainThread");
-        g_pLogMgr->Log("Application Init end");
         _state = EApplicationState::EApplicationState_Running;
         _render_lag = s_target_lag;
         _update_lag = s_target_lag;
@@ -92,6 +81,7 @@ namespace Ailu
         //	}
         //});
         //_p_event_handle_thread->detach();
+        LOG_INFO("Application Initialize Success with {} s",0.001f * g_pTimeMgr->GetElapsedSinceLastMark());
         return 0;
     }
 
@@ -167,6 +157,7 @@ namespace Ailu
                         _p_imgui_layer->End();
 #endif// DEAR_IMGUI
                         g_pGfxContext->Present();
+                        g_pGfxContext->GetPipeline()->FrameCleanUp();
                     }
                     _render_lag -= s_target_lag;
                 }

@@ -1,8 +1,28 @@
 //info bein
 //pass begin::
-//name: editor_outline
+//name: editor_outline_gen
 //vert: FullscreenVSMain
 //pixel: PSMainCopy
+//Cull: Back
+//Queue: Transparent
+//Blend: Src,OneMinusSrc
+//Fill: Solid
+//ZTest: Always
+//ZWrite: Off
+//pass end::
+//pass begin::
+//name: editor_outline_blur
+//vert: FullscreenVSMain
+//pixel: PSMainBlur
+//Cull: Back
+//Fill: Solid
+//ZTest: Always
+//ZWrite: Off
+//pass end::
+//pass begin::
+//name: editor_outline_add
+//vert: FullscreenVSMain
+//pixel: PSMainAdd
 //Cull: Back
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
@@ -21,8 +41,6 @@ PerMaterialCBufferBegin
     float4   _SelectBuffer_TexelSize;
 PerMaterialCBufferEnd
 
-PSInput FullscreenVSMain(VSInput v);
-
 static const half2 kOffsets[8] = {
                 half2(-1,-1),
                 half2(0,-1),
@@ -33,6 +51,22 @@ static const half2 kOffsets[8] = {
                 half2(0,1),
                 half2(1,1)
             };
+
+PSInput FullscreenVSMain(VSInput v);
+
+float4 PSMainBlur(PSInput input) : SV_TARGET
+{
+	half4 col = SAMPLE_TEXTURE2D(_SelectBuffer, g_LinearClampSampler, input.uv);
+	//遍历当前像素周边8个像素。
+	for (int tap = 0; tap < 8; ++tap)
+	{
+		col += SAMPLE_TEXTURE2D(_SelectBuffer, g_LinearClampSampler, input.uv + (kOffsets[tap] * _SelectBuffer_TexelSize.xy));
+	}
+	col /= 9.0;
+	return saturate(col * 2);
+}
+
+
 
 float4 PSMainCopy(PSInput input) : SV_TARGET
 {
@@ -59,4 +93,9 @@ float4 PSMainCopy(PSInput input) : SV_TARGET
 	//返回一个颜色，与原本的屏幕颜色进行alpha颜色混合
 	float4 UnityOutlineColor = float4(1, 0, 0, alpha);
 	return UnityOutlineColor;
+}
+float4 PSMainAdd(PSInput input) : SV_TARGET
+{
+	half4 currentTexel = SAMPLE_TEXTURE2D(_SelectBuffer, g_LinearClampSampler, input.uv);
+	return float4(1,0,0,currentTexel.a);
 }

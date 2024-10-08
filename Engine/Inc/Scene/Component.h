@@ -25,7 +25,6 @@ namespace Ailu
     {
         DECLARE_CLASS(TransformComponent)
         Transform _transform;
-        Matrix4x4f _world_matrix;
     };
 
     Archive &operator<<(Archive &ar, TransformComponent &c);
@@ -35,7 +34,7 @@ namespace Ailu
     {
         Vector4f _light_pos;
         Vector4f _light_dir;
-        Color32 _light_color;
+        Color _light_color;
         Vector4f _light_param;
         Vector3f _area_points[4];
         bool _is_two_side;
@@ -111,12 +110,50 @@ namespace Ailu
         i32 _src_type = 0;
         f32 _mipmap = 0.0f;
         Ref<RenderTexture> _cubemap;
-        Scope<CubeMapGenPass> _pass;
+        Ref<CubeMapGenPass> _pass;
         Material *_debug_material;
         CLightProbe();
     };
     Archive &operator<<(Archive &ar, const CLightProbe &c);
     Archive &operator>>(Archive &ar, CLightProbe &c);
 
+    struct CRigidBody
+    {
+        DECLARE_CLASS(CRigidBody)
+        f32 _mass = 1.f;
+        Vector3f _velocity;
+        Vector3f _force;
+        Vector3f _angular_velocity = Vector3f::kZero;// 角速度
+        Vector3f _torque = Vector3f::kZero;          // 力矩
+        f32 _inertia = 1.0f;                         // 转动惯量，假设为常量
+    };
+    Archive &operator<<(Archive &ar, const CRigidBody &c);
+    Archive &operator>>(Archive &ar, CRigidBody &c);
+
+    DECLARE_ENUM(EColliderType,kBox,kSphere,kCapsule)
+    struct CCollider
+    {
+        DECLARE_CLASS(CCollider)
+        EColliderType::EColliderType _type = EColliderType::kBox;
+        bool                     _is_trigger = true;
+        Vector3f                 _center = Vector3f::kZero;
+        /*
+        kBox : size
+        kSphere : radius,0,0
+        kCapsule: radius,height,direction(x-axis,y-axis,z-axis)
+        */
+        Vector3f _param = Vector3f{1.0f,1.0f,0.f};
+        static Sphere AsShpere(const CCollider& c);
+        static OBB AsBox(const CCollider &c);
+        static Capsule AsCapsule(const CCollider &c);
+    };
+    Archive &operator<<(Archive &ar, const CCollider &c);
+    Archive &operator>>(Archive &ar, CCollider &c);
+
+    namespace DebugDrawer
+    {
+        void AILU_API DebugWireframe(const CCollider &c, const Transform &t, Color color = Colors::kGreen);
+
+    }
 }// namespace Ailu
 #endif// __COMPONENT_H__

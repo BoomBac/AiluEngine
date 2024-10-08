@@ -196,7 +196,7 @@ namespace Ailu
 		auto d3dcmd = static_cast<D3DCommandBuffer*>(cmd.get());
 		ID3D12CommandList* ppCommandLists[] = { d3dcmd->GetCmdList() };
 #ifdef _PIX_DEBUG
-		PIXBeginEvent(m_commandQueue.Get(), cmd->GetID(), ToWChar(cmd->GetName()));
+        PIXBeginEvent(m_commandQueue.Get(), cmd->GetID(), ToWStr(cmd->GetName()).c_str());
 #endif // _PIX_DEBUG
 		m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 		++_fence_value;
@@ -524,7 +524,7 @@ namespace Ailu
         LOG_WARNING("Begin take capture...");
         static PIXCaptureParameters parms{};
         static u32 s_capture_count = 0u;
-        _cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWChar(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
+        _cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWStr(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
         parms.GpuCaptureParameters.FileName = _cur_capture_name.data();
         PIXBeginCapture(PIX_CAPTURE_GPU, &parms);
         _is_next_frame_capture = true;

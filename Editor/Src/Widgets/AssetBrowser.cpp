@@ -246,7 +246,7 @@ namespace Ailu
                     }
                     else
                         new_mat = MakeRef<Material>(selected_shader.get(), name);
-                    g_pResourceMgr->CreateAsset(ToWChar(asset_path), new_mat);
+                    g_pResourceMgr->CreateAsset(ToWStr(asset_path), new_mat);
                     g_pResourceMgr->SaveAllUnsavedAssets();
                 }
                 ImGui::CloseCurrentPopup();
@@ -312,7 +312,7 @@ namespace Ailu
                     {
                         WString path_str = dir_path.wstring();
                         PathUtils::FormatFilePathInPlace(path_str);
-                        WString new_dir = path_str.substr(0, path_str.find_last_of(L"/") + 1) + ToWChar(_rename_buffer);
+                        WString new_dir = path_str.substr(0, path_str.find_last_of(L"/") + 1) + ToWStr(_rename_buffer);
                         new_dir.append(L"/");
                         SearchFilterByDirectory filter({PathUtils::ExtractAssetPath(path_str)});
                         for (auto p: g_pResourceMgr->GetAssets(filter))
@@ -672,10 +672,10 @@ namespace Ailu
                     }
                     if (ImGui::MenuItem("Scene"))
                     {
-                        //auto scene = g_pSceneMgr->Create(L"new_scene");
-                        //g_pResourceMgr->CreateAsset(FileManager::GetCurAssetDirStr() + L"/new_scene.almap", scene);
-                        //g_pResourceMgr->SaveAllUnsavedAssets();
-                        //MarkDirty();
+                        auto scene = g_pSceneMgr->Create("empty_scene");
+                        g_pResourceMgr->CreateAsset(FileManager::GetCurAssetDirStr() + L"/empty_scene.almap", scene);
+                        g_pResourceMgr->SaveAllUnsavedAssets();
+                        MarkDirty();
                     }
                     ImGui::EndMenu();
                 }

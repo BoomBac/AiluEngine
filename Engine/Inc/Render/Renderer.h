@@ -6,7 +6,6 @@
 #define __RENDERER_H__
 
 #include "./Pass/RenderPass.h"
-#include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Interface/IRuntimeModule.h"
 #include "GlobalMarco.h"
@@ -31,16 +30,18 @@ namespace Ailu
         using AfterTickEvent = std::function<void()>;
         DISALLOW_COPY_AND_ASSIGN(Renderer)
     public:
+        inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
         Renderer();
         ~Renderer();
         void Render(const Camera &cam, const Scene &s);
         void BeginScene(const Camera &cam, const Scene &s);
         void EndScene(const Scene &s);
+        void FrameCleanup();
         float GetDeltaTime() const;
         void EnqueuePass(RenderPass *pass);
         void SubmitTaskPass(RenderPass *task);
         Vector<RenderPass *> &GetRenderPasses() { return _render_passes; };
-        inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
+        Vector<RenderFeature *> GetFeatures();
         void ResizeBuffer(u32 width, u32 height);
         void RegisterEventBeforeTick(BeforeTickEvent e);
         void RegisterEventAfterTick(AfterTickEvent e);

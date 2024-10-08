@@ -2,6 +2,7 @@
 #include <atlcomcli.h>
 #include <d3dcompiler.h>
 #include <dxcapi.h>
+#include <mutex>
 
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
@@ -18,6 +19,25 @@
 
 namespace Ailu
 {
+    class D3DShaderInclude : public ID3DInclude
+    {
+        HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) override;
+
+        HRESULT Close(LPCVOID pData) override;
+
+    public:
+        WString _cur_source_file_path;
+        std::set<WString> _include_files;
+
+    private:
+        List<WString> _addi_include_pathes = {
+                L"Shaders/",
+                L"Shaders/hlsl/",
+                L"Shaders/hlsl/Compute/",
+                L"Shaders/hlsl/PostProcess/"};
+        u8 *_data;
+        inline static std::mutex s_compile_lock;
+    };
     //shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
     static bool CreateFromFileDXC(const std::wstring &filename, const std::wstring &entryPoint, const std::wstring &pTarget, ComPtr<ID3DBlob> &p_blob,
                                   ComPtr<ID3D12ShaderReflection> &shader_reflection)
@@ -113,24 +133,26 @@ namespace Ailu
     static bool CreateFromFileFXC(const std::wstring &filename, const std::string &entryPoint, const std::string &pTarget, const Vector<D3D_SHADER_MACRO> &keywords, ComPtr<ID3DBlob> &p_blob,
                                   ComPtr<ID3D12ShaderReflection> &shader_reflection, std::set<WString> &include_files)
     {
+        LOG_INFO(L"[D3DShader compiler]: file : {},entry : {}", filename, ToWStr(entryPoint));
         ID3DBlob *pErrorBlob = nullptr;
         //D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
         UINT compileFlags = 0;
 #if defined(_DEBUG)
         if (pTarget == RenderConstants::kCSModel_5_0)
         {
-            compileFlags = D3DCOMPILE_DEBUG;// | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
+            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;// | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
         }
         else
         {
             // Enable better shader debugging with the graphics debugging tools.
-            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
         }
 #else
         compileFlags = 0;
 #endif
         D3DShaderInclude include;
         include._cur_source_file_path = filename;
+
         D3DCompileFromFile(filename.c_str(), keywords.data(), &include, entryPoint.c_str(), pTarget.c_str(), compileFlags, 0, &p_blob, &pErrorBlob);
         if (pErrorBlob)
         {
@@ -144,13 +166,44 @@ namespace Ailu
             {
                 if (line.find("ERROR") != line.npos || line.find("error") != line.npos)
                 {
-                    LOG_ERROR("{}", line)
+                    LOG_ERROR("{} when compile shader {}", line, ToChar(filename))
                 }
             }
             pErrorBlob->Release();
         }
         if (p_blob != nullptr)
         {
+            /*
+            ComPtr<ID3DBlob> pPDB;
+            D3DGetBlobPart(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), D3D_BLOB_PDB, 0, pPDB.GetAddressOf());
+            // Now retrieve the suggested name for the debug data file:
+            ComPtr<ID3DBlob> pPDBName;
+            D3DGetBlobPart(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), D3D_BLOB_DEBUG_NAME, 0, pPDBName.GetAddressOf());
+            // This struct represents the first four bytes of the name blob:
+            struct ShaderDebugName
+            {
+                uint16_t Flags;     // Reserved, must be set to zero.
+                uint16_t NameLength;// Length of the debug name, without null terminator.
+                                    // Followed by NameLength bytes of the UTF-8-encoded name.
+                                    // Followed by a null terminator.
+                                    // Followed by [0-3] zero bytes to align to a 4-byte boundary.
+            };
+
+            auto pDebugNameData = reinterpret_cast<const ShaderDebugName *>(pPDBName->GetBufferPointer());
+            auto pName = reinterpret_cast<const char *>(pDebugNameData + 1);
+            // Now write the contents of the blob pPDB to a file named the value of pName
+            // Not illustrated here
+            WString p = ResourceMgr::GetResSysPath(L"ShaderPDB/" + ToWStr(pName));
+            FileManager::CreateFile(p);
+            FileManager::WriteFile(p, false, (u8*)p_blob->GetBufferPointer(), p_blob->GetBufferSize());
+            // Now remove the debug info from the target shader, resulting in a smaller shader
+            // in your final application’s data:
+            //ComPtr<ID3DBlob> pStripped;
+            //D3DStripShader(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), D3DCOMPILER_STRIP_DEBUG_INFO, pStripped.GetAddressOf());
+            // Finally, write the contents of pStripped as your final shader file.
+            */
+
+
             ID3D12ShaderReflection *pReflection = NULL;
             D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void **) &shader_reflection);
             for (auto &p: include._include_files)
@@ -234,6 +287,7 @@ namespace Ailu
     {
         for (auto &include_path: _addi_include_pathes)
         {
+            std::lock_guard<std::mutex> l(s_compile_lock);
             WString p;
             if ((const char *) pFileName[0] == ".")
             {
@@ -254,6 +308,7 @@ namespace Ailu
             }
             //AL_ASSERT(true);
         }
+        AL_ASSERT(true);
         return E_FAIL;
     }
 
@@ -375,7 +430,6 @@ namespace Ailu
 
     bool D3DShader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash)
     {
-
         bool succeed = true;
         ComPtr<ID3DBlob> tmp_p_vblob;
         ComPtr<ID3DBlob> tmp_p_pblob;
@@ -392,9 +446,9 @@ namespace Ailu
             auto &pass = _passes[pass_index];
             keyword_defines = ConstructVariantMarcos(pass_index, variant_hash);
 #ifdef SHADER_DXC
-            CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
+            CreateFromFileDXC(ToWStr(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
-            CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
+            CreateFromFileDXC(ToWStr(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
 #else
             succeed &= CreateFromFileFXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_5_0, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files);
@@ -658,7 +712,7 @@ namespace Ailu
             }
         }
         //parser additon info
-        LoadAdditionalShaderReflection(_src_file_path,pass_index, variant_hash);
+        LoadAdditionalShaderReflection(_src_file_path, pass_index, variant_hash);
         //for (auto &p: pass._source_files)
         //    LoadAdditionalShaderReflection(p, pass_index, variant_hash);
     }
@@ -864,7 +918,7 @@ namespace Ailu
         try
         {
 #ifdef SHADER_DXC
-            CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
+            CreateFromFileDXC(ToWStr(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
 #else
             succeed &= CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_5_0, v, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes);

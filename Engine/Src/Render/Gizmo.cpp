@@ -1,0 +1,399 @@
+#include "pch.h"
+#include "Render/Gizmo.h"
+
+namespace Ailu
+{
+    void Gizmo::Init()
+    {
+        p_buf = IDynamicVertexBuffer::Create();
+        s_color.a = 0.75f;
+    }
+
+    void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, Color color)
+    {
+        if (Gizmo::s_color.a < 0.1f) return;
+        DrawLine(from, to, color, color);
+    }
+
+    void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, f32 duration_sec, Color color)
+    {
+        s_geometry_draw_list.emplace_back(std::make_tuple([=]()
+                                                          { DrawLine(from, to, color); }, std::chrono::system_clock::now(), (u32)duration_sec));
+    }
+
+    void Gizmo::DrawCircle(const Vector3f &center, float radius, u16 num_segments, Color color, Matrix4x4f mat)
+    {
+        if (Gizmo::s_color.a < 0.1f) return;
+        float angleIncrement = 360.0f / static_cast<float>(num_segments);
+
+        for (int i = 0; i < num_segments; ++i)
+        {
+            float angle1 = ToRadius(angleIncrement * static_cast<float>(i));
+            float angle2 = ToRadius(angleIncrement * static_cast<float>(i + 1));
+            Vector3f point1(center.x + radius * cos(angle1), center.y, center.z + radius * sin(angle1));
+            Vector3f point2(center.x + radius * cos(angle2), center.y, center.z + radius * sin(angle2));
+            point1 -= center;
+            point2 -= center;
+            TransformCoord(point1, mat);
+            TransformCoord(point2, mat);
+            point1 += center;
+            point2 += center;
+            DrawLine(point1, point2, color);
+        }
+    }
+    void Gizmo::DrawCircle(const Vector3f &center, float radius, u16 num_segments, f32 duration_sec, Color color, Matrix4x4f mat)
+    {
+        s_geometry_draw_list.emplace_back(std::make_tuple([=]()
+                                                          { DrawCircle(center, radius, num_segments, color, mat); }, std::chrono::system_clock::now(), (u32) duration_sec));
+    }
+    void Gizmo::DrawSphere(const Sphere &s, Color color)
+    {
+        Gizmo::DrawCircle(s._center, s._radius, 24, color, MatrixRotationX(ToRadius(90.0f)));
+        Gizmo::DrawCircle(s._center, s._radius, 24, color, MatrixRotationZ(ToRadius(90.0f)));
+        Gizmo::DrawCircle(s._center, s._radius, 24, color);
+    }
+    void Gizmo::DrawSphere(const Sphere &s, f32 duration_sec, Color color)
+    {
+        DrawCircle(s._center, s._radius, 24, duration_sec,color, MatrixRotationX(ToRadius(90.0f)));
+        DrawCircle(s._center, s._radius, 24, duration_sec,color, MatrixRotationZ(ToRadius(90.0f)));
+        DrawCircle(s._center, s._radius, 24, duration_sec,color);
+    }
+    void Gizmo::DrawAABB(const AABB &aabb, Color color)
+    {
+        DrawAABB(aabb._min, aabb._max, color);
+    }
+
+    void Gizmo::DrawAABB(const Vector3f &minPoint, const Vector3f &maxPoint, Color color)
+    {
+        if (Gizmo::s_color.a < 0.1f) return;
+        Vector3f vertices[8];
+        vertices[0] = minPoint;
+        vertices[1] = Vector3f(minPoint.x, minPoint.y, maxPoint.z);
+        vertices[2] = Vector3f(minPoint.x, maxPoint.y, minPoint.z);
+        vertices[3] = Vector3f(minPoint.x, maxPoint.y, maxPoint.z);
+        vertices[4] = Vector3f(maxPoint.x, minPoint.y, minPoint.z);
+        vertices[5] = Vector3f(maxPoint.x, minPoint.y, maxPoint.z);
+        vertices[6] = Vector3f(maxPoint.x, maxPoint.y, minPoint.z);
+        vertices[7] = maxPoint;
+
+        DrawLine(vertices[0], vertices[1], color);
+        DrawLine(vertices[0], vertices[2], color);
+        DrawLine(vertices[0], vertices[4], color);
+        DrawLine(vertices[1], vertices[3], color);
+        DrawLine(vertices[1], vertices[5], color);
+        DrawLine(vertices[2], vertices[3], color);
+        DrawLine(vertices[2], vertices[6], color);
+        DrawLine(vertices[3], vertices[7], color);
+        DrawLine(vertices[4], vertices[5], color);
+        DrawLine(vertices[4], vertices[6], color);
+        DrawLine(vertices[5], vertices[7], color);
+        DrawLine(vertices[6], vertices[7], color);
+    }
+
+    void Gizmo::DrawOBB(const OBB &obb, Color color)
+    {
+        Vector3f vertices[8];
+        const Vector3f &center = obb._center;
+        const Vector3f &half = obb._half_axis_length;
+        const Vector3f *axis = obb._local_axis;
+        vertices[0] = center + axis[0] * half.x + axis[1] * half.y + axis[2] * half.z;// +X +Y +Z
+        vertices[1] = center - axis[0] * half.x + axis[1] * half.y + axis[2] * half.z;// -X +Y +Z
+        vertices[2] = center + axis[0] * half.x - axis[1] * half.y + axis[2] * half.z;// +X -Y +Z
+        vertices[3] = center - axis[0] * half.x - axis[1] * half.y + axis[2] * half.z;// -X -Y +Z
+        vertices[4] = center + axis[0] * half.x + axis[1] * half.y - axis[2] * half.z;// +X +Y -Z
+        vertices[5] = center - axis[0] * half.x + axis[1] * half.y - axis[2] * half.z;// -X +Y -Z
+        vertices[6] = center + axis[0] * half.x - axis[1] * half.y - axis[2] * half.z;// +X -Y -Z
+        vertices[7] = center - axis[0] * half.x - axis[1] * half.y - axis[2] * half.z;// -X -Y -Z
+        DrawLine(vertices[0], vertices[1], color);
+        DrawLine(vertices[1], vertices[3], color);
+        DrawLine(vertices[3], vertices[2], color);
+        DrawLine(vertices[2], vertices[0], color);
+        DrawLine(vertices[4], vertices[5], color);
+        DrawLine(vertices[5], vertices[7], color);
+        DrawLine(vertices[7], vertices[6], color);
+        DrawLine(vertices[6], vertices[4], color);
+        DrawLine(vertices[0], vertices[4], color);
+        DrawLine(vertices[1], vertices[5], color);
+        DrawLine(vertices[2], vertices[6], color);
+        DrawLine(vertices[3], vertices[7], color);
+    }
+
+    void Gizmo::DrawCube(const Vector3f &center, const Vector3f &size, u32 sec_duration, Color color)
+    {
+        s_geometry_draw_list.emplace_back(std::make_tuple([=]()
+                                                          { DrawCube(center, size, color); }, std::chrono::system_clock::now(), std::chrono::seconds(sec_duration)));
+    }
+    void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, const Color &color_from, const Color &color_to)
+    {
+        if (Gizmo::s_color.a < 0.1f) return;
+        static float vbuf[6];
+        static float cbuf[8];
+        vbuf[0] = from.x;
+        vbuf[1] = from.y;
+        vbuf[2] = from.z;
+        vbuf[3] = to.x;
+        vbuf[4] = to.y;
+        vbuf[5] = to.z;
+        memcpy(cbuf, color_from.data, 16);
+        memcpy(cbuf + 4, color_to.data, 16);
+        cbuf[3] *= s_color.a;
+        cbuf[7] *= s_color.a;
+        p_buf->AppendData(vbuf, 6, cbuf, 8);
+        _vertex_num += 2;
+    }
+
+    void Gizmo::DrawGrid(const int &grid_size, const int &grid_spacing, const Vector3f &center, Color color)
+    {
+        if (Gizmo::s_color.a < 0.1f) return;
+        float halfWidth = static_cast<float>(grid_size * grid_spacing) * 0.5f;
+        float halfHeight = static_cast<float>(grid_size * grid_spacing) * 0.5f;
+        static Color lineColor = color;
+
+        for (int i = -grid_size / 2; i <= grid_size / 2; ++i)
+        {
+            float xPos = static_cast<float>(i * grid_spacing) + center.x;
+            lineColor.a = color.a * s_color.a;
+            lineColor.a *= lerpf(1.0f, 0.0f, abs(xPos - center.x) / halfWidth);
+            auto color_start = lineColor;
+            auto color_end = lineColor;
+            if (DotProduct(Camera::sCurrent->Forward(), {0, 0, 1}) > 0)
+            {
+                color_start.a *= 0.8f;
+                color_end.a *= 0.2f;
+            }
+            else
+            {
+                color_start.a *= 0.2f;
+                color_end.a *= 0.8f;
+            }
+            Gizmo::DrawLine(Vector3f(xPos, center.y, -halfHeight + center.z),
+                            Vector3f(xPos, center.y, halfHeight + center.z), color_start, color_end);
+
+            float zPos = static_cast<float>(i * grid_spacing) + center.z;
+            lineColor.a = color.a * s_color.a;
+            lineColor.a *= lerpf(1.0f, 0.0f, abs(zPos - center.z) / halfWidth);
+            color_start = lineColor;
+            color_end = lineColor;
+            auto right = Camera::sCurrent->Right();
+            if (DotProduct(Camera::sCurrent->Forward(), {1, 0, 0}) > 0)
+            {
+                color_start.a *= 0.8f;
+                color_end.a *= 0.2f;
+            }
+            else
+            {
+                color_start.a *= 0.2f;
+                color_end.a *= 0.8f;
+            }
+            Gizmo::DrawLine(Vector3f(-halfWidth + center.x, center.y, zPos),
+                            Vector3f(halfWidth + center.x, center.y, zPos), color_start, color_end);
+        }
+    }
+
+    void Gizmo::DrawCube(const Vector3f &center, const Vector3f &size, Vector4f color)
+    {
+        if (Gizmo::s_color.a < 0.1f) return;
+        static float vbuf[72];
+        static float cbuf[96];
+        float halfX = size.x * 0.5f;
+        float halfY = size.y * 0.5f;
+        float halfZ = size.z * 0.5f;
+        float verticesData[72] = {
+                center.x - halfX,
+                center.y - halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y - halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y - halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y - halfY,
+                center.z - halfZ,
+                center.x + halfX,
+                center.y - halfY,
+                center.z - halfZ,
+                center.x - halfX,
+                center.y - halfY,
+                center.z - halfZ,
+                center.x - halfX,
+                center.y - halfY,
+                center.z - halfZ,
+                center.x - halfX,
+                center.y - halfY,
+                center.z + halfZ,
+                center.x - halfX,
+                center.y + halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y + halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y + halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y + halfY,
+                center.z - halfZ,
+                center.x + halfX,
+                center.y + halfY,
+                center.z - halfZ,
+                center.x - halfX,
+                center.y + halfY,
+                center.z - halfZ,
+                center.x - halfX,
+                center.y + halfY,
+                center.z - halfZ,
+                center.x - halfX,
+                center.y + halfY,
+                center.z + halfZ,
+                center.x - halfX,
+                center.y - halfY,
+                center.z + halfZ,
+                center.x - halfX,
+                center.y + halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y - halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y + halfY,
+                center.z + halfZ,
+                center.x + halfX,
+                center.y - halfY,
+                center.z - halfZ,
+                center.x + halfX,
+                center.y + halfY,
+                center.z - halfZ,
+                center.x - halfX,
+                center.y - halfY,
+                center.z - halfZ,
+                center.x - halfX,
+                center.y + halfY,
+                center.z - halfZ,
+        };
+        float colorData[96];
+        for (int i = 0; i < 96; i += 4)
+        {
+            colorData[i] = color.x;
+            colorData[i + 1] = color.y;
+            colorData[i + 2] = color.z;
+            colorData[i + 3] = color.w;
+        }
+        memcpy(vbuf, verticesData, sizeof(verticesData));
+        memcpy(cbuf, colorData, sizeof(colorData));
+        p_buf->AppendData(vbuf, 72, cbuf, 96);
+        _vertex_num += 24;
+    }
+
+    void Gizmo::DrawCapsule(const Capsule &capsule, Color color)
+    {
+        DrawCylinder(capsule._top, capsule._bottom, capsule._radius,4u,color);
+        DrawHemisphere(capsule._top, capsule._bottom, capsule._radius, color);
+        DrawHemisphere(capsule._bottom, capsule._top, capsule._radius, color);
+    }
+    void Gizmo::DrawCylinder(const Vector3f &start, const Vector3f end, f32 radius, u16 segments,Color color)
+    {
+        //Vector3f forward = Vector3.Slerp(up, -up, 0.5f).normalized * radius;// 找到轴向垂直方向的一个向量
+        //Vector3f right = Vector3.Cross(up, forward).normalized * radius;    // 找到另一个垂直方向的向量
+        Vector3f up =  Normalize(end - start);
+        Vector3f forward_base = Vector3f::kForward;
+        if (forward_base == up || forward_base == (-up))
+            forward_base = Vector3f::kRight;
+        Vector3f forward = CrossProduct(forward_base, up);
+        Vector3f right = Normalize(CrossProduct(up, forward));
+        forward = Normalize(CrossProduct(right, up));
+        forward *= radius;
+        right *= radius;
+        up *= radius;
+
+        DrawCircle(start, forward, right, segments*4, color);
+        DrawCircle(end, forward, right, segments*4, color);
+
+        for (int i = 0; i < segments; i++)
+        {
+            float theta = (float) i / segments * kPi * 2;
+            float nextTheta = (float) (i + 1) / segments * kPi * 2;
+            Vector3f offset1 = right * std::cos(theta) +     forward * std::sin(theta);
+            Vector3f offset2 = right * std::cos(nextTheta) + forward * std::sin(nextTheta);
+            DrawLine(start + offset1, end + offset1, color);
+            DrawLine(start + offset2, end + offset2, color);
+        }
+    }
+    void Gizmo::DrawHemisphere(const Vector3f &center, const Vector3f &axis, f32 radius, Color color)
+    {
+        Vector3f up = Normalize(axis - center);
+        Vector3f forward_base = Vector3f::kForward;
+        if (forward_base == up || forward_base == (-up))
+            forward_base = Vector3f::kRight;
+        Vector3f forward = Normalize(CrossProduct(forward_base, up));
+        Vector3f right = Normalize(CrossProduct(up, forward));
+        Vector3f lastPoint;
+        radius *= -1;
+        for (int i = 0; i <= kSegments; i++)
+        {
+            float theta = (float) i / kSegments * kPi;// 从 0 到 π，表示半球的上半部分
+            Vector3f point = center + forward * radius * std::cos(theta) + up * radius * std::sin(theta);
+            if (i > 0)
+                DrawLine(lastPoint, point, color);
+            lastPoint = point;
+        }
+        lastPoint = center + right * radius;// 左右弧线的起始点
+        for (int i = 0; i <= kSegments; i++)
+        {
+            float theta = (float) i / kSegments * kPi;// 从 0 到 π
+            Vector3f point = center + right * radius * std::cos(theta) + up * radius * std::sin(theta);
+            if (i > 0)
+                DrawLine(lastPoint, point, color);
+            lastPoint = point;
+        }
+    }
+
+    void Gizmo::DrawCircle(const Vector3f &center, const Vector3f &forward, const Vector3f &right, u16 num_segments,Color color)
+    {
+        u16 sgem = num_segments;
+        Vector3f lastPoint = center + right * std::cos(0) + forward * std::sin(0);
+        for (int i = 1; i <= sgem; i++)
+        {
+            float theta = (float) i / sgem * kPi * 2;
+            Vector3f nextPoint = center + right * std::cos(theta) + forward * std::sin(theta);
+            DrawLine(lastPoint, nextPoint, color);
+            lastPoint = nextPoint;
+        }
+    }
+    void Gizmo::Submit(CommandBuffer *cmd)
+    {
+        if (_vertex_num > RenderConstants::KMaxDynamicVertexNum)
+        {
+            LOG_WARNING("[Gizmo] vertex num > KMaxDynamicVertexNum {},draw nothing", RenderConstants::KMaxDynamicVertexNum);
+            _vertex_num = 0;
+            return;
+        }
+        if (_vertex_num > 0)
+        {
+            auto cur_time = std::chrono::system_clock::now();
+            s_geometry_draw_list.erase(std::remove_if(s_geometry_draw_list.begin(), s_geometry_draw_list.end(),
+                                                      [&](const auto &it) -> bool
+                                                      {
+                                                          return cur_time - std::get<2>(it) > std::get<1>(it);
+                                                      }),
+                                       s_geometry_draw_list.end());
+            for (auto &it: s_geometry_draw_list)
+            {
+                auto &f = std::get<0>(it);
+                f();
+            }
+            p_buf->UploadData();
+            p_buf->Bind(cmd);
+            cmd->DrawInstanced(_vertex_num, 1);
+        }
+        _vertex_num = 0;
+    }
+    //当GizmoPass未激活时，实际可能还会有数据在填充，所以将顶点偏移置空。一定要调用
+    //当激活时，实际就不用调用
+    void Gizmo::EndFrame()
+    {
+        _vertex_num = 0;
+        p_buf->UploadData();
+    }
+}

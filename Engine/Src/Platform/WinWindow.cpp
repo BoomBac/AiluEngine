@@ -17,8 +17,8 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #endif// DEAR_IMGUI
 namespace Ailu
 {
-    // static const wchar_t *kAppTitleIconPath = ToWChar(kEngineResRootPath + "Icons/app_title_icon.ico");
-    // static const wchar_t *kAppIconPath = ToWChar(kEngineResRootPath + "Icons/app_icon.ico");
+    // static const wchar_t *kAppTitleIconPath = ToWStr(kEngineResRootPath + "Icons/app_title_icon.ico");
+    // static const wchar_t *kAppIconPath = ToWStr(kEngineResRootPath + "Icons/app_icon.ico");
 
     static void HideCursor()
     {
@@ -240,11 +240,20 @@ namespace Ailu
         return static_cast<void *>(_hwnd);
     }
 
-    std::tuple<u32, u32> WinWindow::GetWindowPosition() const
+    std::tuple<i32, i32> WinWindow::GetWindowPosition() const
     {
         RECT rect;
+        //GetClientRect(_hwnd, &rect);
         GetWindowRect(_hwnd, &rect);
-        return std::tuple<u32, u32>(rect.left, rect.top);
+        // 获取窗口所在的显示器
+        HMONITOR hMonitor = MonitorFromWindow(_hwnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO monitorInfo;
+        monitorInfo.cbSize = sizeof(MONITORINFO);
+        GetMonitorInfo(hMonitor, &monitorInfo);
+        // 获取显示器的工作区域
+        RECT monitorRect = monitorInfo.rcWork;
+        // 计算窗口相对于显示器的坐标
+        return std::tuple<u32, u32>(rect.left - monitorRect.left + 8, rect.top - monitorRect.top + 8);
     }
 
     void WinWindow::Shutdown()

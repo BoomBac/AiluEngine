@@ -22,9 +22,9 @@ namespace Ailu
         const String &GetName() const final { return _name; };
         void SetName(const String &name) final
         {
-            auto wname = ToWChar(name);
-            _p_cmd->SetName(wname);
-            _p_alloc->SetName(wname);
+            auto wname = ToWStr(name);
+            _p_cmd->SetName(wname.c_str());
+            _p_alloc->SetName(wname.c_str());
             _name = name;
         };
         ECommandBufferType GetType() const final { return _type; }
@@ -104,6 +104,7 @@ namespace Ailu
         ComPtr<ID3D12CommandAllocator> _p_alloc;
         Map<String, Texture *> _texture_used;
         Scope<UploadBuffer> _upload_buf;
+        List<UploadBuffer::Allocation> _allocations;
         ECommandBufferType _type;
     };
 }// namespace Ailu

@@ -15,6 +15,7 @@
 #define AL_KEY_SHIFT 0x10
 #define AL_KEY_CONTROL 0x11
 #define AL_KEY_MENU 0x12
+#define AL_KEY_ALT 0x12
 #define AL_KEY_PAUSE 0x13
 #define AL_KEY_CAPITAL 0x14
 #define AL_KEY_KANA 0x15

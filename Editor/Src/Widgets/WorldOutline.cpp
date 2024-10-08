@@ -4,7 +4,6 @@
 //----engine--------
 #include "Ext/imgui/imgui.h"
 #include "Framework/Common/KeyCode.h"
-#include "Framework/Common/SceneMgr.h"
 #include "Framework/Events/KeyEvent.h"
 //----engine--------
 namespace Ailu

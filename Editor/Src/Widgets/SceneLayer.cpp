@@ -1,7 +1,6 @@
 #include "Widgets/SceneLayer.h"
 #include "Framework/Events/MouseEvent.h"
 #include "Render/Gizmo.h"
-#include "Framework/Common/SceneMgr.h"
 #include "Framework/Common/Input.h"
 
 namespace Ailu

@@ -18,9 +18,9 @@ namespace Ailu
 		void Render();
 		Renderer* GetRenderer(u16 index = 0) { return index < _renderers.size()? _renderers[index].get() : nullptr; };
 		RenderTexture* GetTarget(u16 index = 0);
+		void FrameCleanUp();
 	private:
 		void RenderSingleCamera(const Camera& cam, Renderer& renderer);
-		void FrameCleanUp();
 	protected:
 		virtual void BeforeReslove() {};
 		Vector<Camera*> _cameras;

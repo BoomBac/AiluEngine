@@ -6,6 +6,7 @@
 #include <stack>
 #include <chrono>
 #include "Framework/Interface/IRuntimeModule.h"
+#include "Log.h"
 
 namespace Ailu
 {
@@ -26,7 +27,6 @@ namespace Ailu
 		static f32 s_time_scale;
 		static float GetScaledWorldTime(float scale = TimeMgr::s_time_scale,bool smooth_scale = true);
 		static String CurrentTime(String format = "%Y-%m-%d_%H:%M:%S");
-
 		int Initialize() final;
         void Finalize() final;
 		void Tick(f32 delta_time) final;
@@ -47,6 +47,32 @@ namespace Ailu
 		bool _b_stop = false;
 	};
 	extern TimeMgr* g_pTimeMgr;
+
+	struct TimerBlock
+    {
+        TimerBlock(const String &msg, TimeMgr *timer = g_pTimeMgr) : _timer(timer), _msg(msg)
+        {
+            _timer->Mark();
+        }
+        ~TimerBlock()
+        {
+			f32 cost = _timer->GetElapsedSinceLastMark();
+            if (cost > 1000.0f)
+            {
+                LOG_INFO("Time cost {}s : {}", cost * 0.001f, _msg);
+            }
+            else
+                LOG_INFO("Time cost {}ms : {}", cost, _msg);
+        }
+    private:
+        TimeMgr *_timer;
+		String _msg;
+    };
+#ifdef _DEBUG
+	#define TIMER_BLOCK(msg) TimerBlock tb(msg);
+#else
+	#define TIMER_BLOCK() 
+#endif// _DEBUG
 
     class CommandBuffer;
 	//GPUTimer create by GfxContext

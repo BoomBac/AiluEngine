@@ -5,6 +5,7 @@
 
 namespace Ailu
 {
+#undef max
 	struct Plane
 	{
 		Plane() : _normal(Vector3f::kForward), _distance(0.f) {}
@@ -37,7 +38,16 @@ namespace Ailu
         Vector2f _padding;
     };
 
-    class AABB
+    struct Capsule
+    {
+        Vector3f _top;
+        f32 _radius;
+        Vector3f _bottom;
+        f32 _height;
+        Capsule operator*(const Matrix4x4f &m) const;
+    };
+
+    struct AABB
     {
     public:
         static float DistanceFromRayToAABB(const Vector3f& rayOrigin, const Vector3f& rayDirection, const Vector3f& aabbMin, const Vector3f& aabbMax)
@@ -67,29 +77,7 @@ namespace Ailu
         {
             return Intersect(aabb,ray._start,ray._dir);
         }
-
-        static AABB CaclulateBoundBox(const AABB& aabb, const Matrix4x4f& mat)
-        {
-            Vector3f vertices[8];
-            vertices[0] = aabb._min;
-            vertices[1] = Vector3f(aabb._min.x, aabb._min.y, aabb._max.z);
-            vertices[2] = Vector3f(aabb._min.x, aabb._max.y, aabb._min.z);
-            vertices[3] = Vector3f(aabb._min.x, aabb._max.y, aabb._max.z);
-            vertices[4] = Vector3f(aabb._max.x, aabb._min.y, aabb._min.z);
-            vertices[5] = Vector3f(aabb._max.x, aabb._min.y, aabb._max.z);
-            vertices[6] = Vector3f(aabb._max.x, aabb._max.y, aabb._min.z);
-            vertices[7] = aabb._max;
-#undef max
-            Vector3f new_min = Vector3f(std::numeric_limits<float>::max());
-            Vector3f new_max = Vector3f(std::numeric_limits<float>::lowest());
-            for (int i = 1; i < 8; ++i)
-            {
-                Vector3f new_vert = MultipyVector(vertices[i], mat);
-                new_min = Min(new_min, new_vert);
-                new_max = Max(new_max, new_vert);
-            }
-            return AABB(new_min, new_max);
-        }
+        AABB operator*(const Matrix4x4f &mat) const;
 
         static Vector3f MaxAABB()
         {
@@ -154,11 +142,24 @@ namespace Ailu
         Array<Plane, 8> _planes;
     };
 
+    struct OBB
+    {
+        Vector3f _center = Vector3f::kZero;
+        Vector3f _half_axis_length = Vector3f::kOne;
+        Vector3f _local_axis[3] = {Vector3f::kRight, Vector3f::kUp, Vector3f::kForward};
+        OBB operator*(const Matrix4x4f &m) const;
+        static void ConstructVertices(const OBB &obb, Vector3f* vertices);
+        static void ConstructEdges(const OBB &obb, Vector3f vertices[8],Vector3f* start,Vector3f* end);
+    };
+
     struct Sphere
     {
         Vector3f _center;
         f32 _radius;
+        Sphere operator*(const Matrix4x4f &m) const;
     };
+
+
 }
 
 

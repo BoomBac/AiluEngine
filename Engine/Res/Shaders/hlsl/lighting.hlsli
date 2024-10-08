@@ -162,7 +162,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 		light_data.light_pos = _PointLights[j]._LightPosOrDir;
 		if(_PointLights[j]._ShadowDataIndex != -1)
 		{
-			shadow_factor = ApplyShadowPointLight(10,_PointLights[j]._LightParam0 * 1.5f,shading_data.nl,
+			shadow_factor = ApplyShadowPointLight(0.01,_PointLights[j]._LightParam0 * 1.5f,shading_data.nl,
 				world_pos,light_data.light_pos,j);
 		}
 		light_data.shadow_atten = shadow_factor;

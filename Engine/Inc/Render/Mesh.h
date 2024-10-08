@@ -29,6 +29,7 @@ namespace Ailu
         inline static std::weak_ptr<Mesh> s_p_shpere;
         inline static std::weak_ptr<Mesh> s_p_quad;
         inline static std::weak_ptr<Mesh> s_p_plane;
+        inline static std::weak_ptr<Mesh> s_p_capsule;
         inline static std::weak_ptr<Mesh> s_p_fullscreen_triangle;
 
     public:
@@ -64,7 +65,7 @@ namespace Ailu
         Vector<Ref<IIndexBuffer>> _p_ibufs;
         Vector3f *_vertices;
         Vector3f *_normals;
-        Color32 *_colors;
+        Color *_colors;
         Vector4f *_tangents;
         Vector2f **_uv;
         Vector<std::tuple<u32 *, u32>> _p_indices;

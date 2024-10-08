@@ -95,6 +95,7 @@ namespace Ailu
 
     TAAExecutePass::TAAExecutePass() : RenderPass("TAAExecutePass")
     {
+        _origin_camera_cbuf = std::unique_ptr<IConstantBuffer>(IConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
     }
     void Ailu::TAAExecutePass::Setup(Matrix4x4f pre_matrix, Matrix4x4f cur_matrix, Material *taa_mat, int camera_hash, Vector2f jitter)
     {
@@ -119,6 +120,14 @@ namespace Ailu
         auto cmd = CommandBufferPool::Get("Temporal AA");
         auto &cur_info = _infos[_cur_camera_hash];
         auto &camera_data = rendering_data._camera_data;
+        CBufferPerCameraData camera_cb;
+        camera_cb._MatrixV = rendering_data._camera->GetView();
+        camera_cb._MatrixP = rendering_data._camera->GetProjection();
+        camera_cb._MatrixVP = camera_cb._MatrixV * camera_cb._MatrixP;
+        camera_cb._MatrixIVP = MatrixInverse(camera_cb._MatrixVP);
+        camera_cb._CameraPos = rendering_data._camera->Position();
+        memcpy(_origin_camera_cbuf->GetData(), &camera_cb, RenderConstants::kPerCameraDataSize);
+        rendering_data._camera->GetProjection();
         {
             ProfileBlock b(cmd.get(), cmd->GetName());
             if (cur_info._first_tick || cur_info._pre_camera_color->Width() != camera_data._camera_color_target_desc._width || cur_info._pre_camera_color->Height() != camera_data._camera_color_target_desc._height)
@@ -154,6 +163,6 @@ namespace Ailu
     }
     void TAAExecutePass::EndPass(GraphicsContext *context)
     {
-        
+        Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,_origin_camera_cbuf.get());
     }
 }// namespace Ailu

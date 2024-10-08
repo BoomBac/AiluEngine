@@ -225,12 +225,12 @@ namespace Ailu
         virtual void Apply() {};
         TextureHandle GetNativeTextureHandle() const final { return GetView(ETextureViewType::kSRV, 0); };
         void CreateView() override;
-        Color32 GetPixel32(u16 x, u16 y);
+        Color GetPixel32(u16 x, u16 y);
         Color GetPixel(u16 x, u16 y);
         Color GetPixelBilinear(float u, float v);
         Ptr GetPixelData(u16 mipmap);
         void SetPixel(u16 x, u16 y, Color color, u16 mipmap);
-        void SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap);
+        void SetPixel32(u16 x, u16 y, Color color, u16 mipmap);
         void SetPixelData(u8 *data, u16 mipmap, u64 offset = 0u);
 
     protected:
@@ -252,11 +252,11 @@ namespace Ailu
         CubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         virtual ~CubeMap();
         virtual void Apply() {};
-        Color32 GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y);
+        Color GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y);
         Color GetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y);
         Ptr GetPixelData(ECubemapFace::ECubemapFace face, u16 mipmap);
         void SetPixel(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color color, u16 mipmap);
-        void SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap);
+        void SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color color, u16 mipmap);
         void SetPixelData(ECubemapFace::ECubemapFace face, u8 *data, u16 mipmap, u64 offset = 0u);
 
     protected:
