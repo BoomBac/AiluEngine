@@ -15,71 +15,10 @@
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
 #include "Scene/Scene.h"
+#include "Framework/Parser/AssetParser.h"
 
 namespace Ailu
 {
-    struct AILU_API ImportSetting
-    {
-    public:
-        static ImportSetting &Default()
-        {
-            static ImportSetting s_default;
-            return s_default;
-        }
-        String _name_id;
-        bool _is_copy = true;
-        ImportSetting() = default;
-        ImportSetting(String name_id, bool is_copy = true)
-        {
-            _name_id = name_id;
-            _is_copy = is_copy;
-        }
-        virtual ~ImportSetting() = default;
-        //virtual void* operator new(size_t size) = 0;
-        //virtual void* operator new[](size_t size) = 0;
-        //virtual void operator delete(void* ptr) = 0;
-        //virtual void operator delete[](void* ptr) = 0;)
-    };
-
-    struct AILU_API TextureImportSetting : public ImportSetting
-    {
-    public:
-        static TextureImportSetting &Default()
-        {
-            static TextureImportSetting s_default;
-            return s_default;
-        }
-        bool _is_srgb = false;
-        bool _generate_mipmap = true;
-    };
-    struct AILU_API MeshImportSetting : public ImportSetting
-    {
-    public:
-        static MeshImportSetting &Default()
-        {
-            static MeshImportSetting s_default;
-            return s_default;
-        }
-        MeshImportSetting() = default;
-        MeshImportSetting(String name_id, bool is_copy, bool is_import_material = true) : ImportSetting(name_id, is_copy)
-        {
-            _name_id = name_id;
-            _is_import_material = is_import_material;
-        }
-        bool _is_import_material = true;
-    };
-    struct AILU_API ShaderImportSetting : public ImportSetting
-    {
-    public:
-        static ShaderImportSetting &Default()
-        {
-            static ShaderImportSetting s_default;
-            return s_default;
-        }
-        String _vs_entry, _ps_entry;
-        String _cs_kernel;
-    };
-
     class AILU_API ISearchFilter
     {
     public:
@@ -224,14 +163,14 @@ namespace Ailu
         }
 
         template<typename T>
-        Ref<T> Load(const WString &asset_path);
+        Ref<T> Load(const WString &asset_path, ImportSetting *setting = nullptr);
         template<typename T>
-        Ref<T> Load(const Guid &guid);
+        Ref<T> Load(const Guid &guid, ImportSetting *setting = nullptr);
         template<typename T>
-        void LoadAsync(const WString &asset_path);
+        void LoadAsync(const WString &asset_path, ImportSetting *setting = nullptr);
         template<typename T>
-        void LoadAsync(const Guid &guid);
-
+        void LoadAsync(const Guid &guid, ImportSetting *setting = nullptr);
+        void WatchDirectory();
         template<typename T>
         T *Get(const WString &res_id);
         template<typename T>
@@ -289,11 +228,12 @@ namespace Ailu
         Scope<Asset> LoadMesh(const WString &asset_path);
         Scope<Asset> LoadComputeShader(const WString &asset_path);
         Scope<Asset> LoadScene(const WString &asset_path);
+        Scope<Asset> LoadAnimClip(const WString &asset_path);
         //加载原始资产
-        List<Ref<Mesh>> LoadExternalMesh(const WString &asset_path);
-        Ref<Texture2D> LoadExternalTexture(const WString &asset_path, const ImportSetting *setting = nullptr);
-        Ref<Shader> LoadExternalShader(const WString &asset_path, const ImportSetting *setting = nullptr);
-        Ref<ComputeShader> LoadExternalComputeShader(const WString &asset_path, const ImportSetting *setting = nullptr);
+        List<Ref<Mesh>> LoadExternalMesh(const WString &asset_path,const MeshImportSetting& setting,List<Ref<AnimationClip>>& clips);
+        Ref<Texture2D> LoadExternalTexture(const WString &asset_path);
+        Ref<Shader> LoadExternalShader(const WString &asset_path);
+        Ref<ComputeShader> LoadExternalComputeShader(const WString &asset_path);
 
         void SaveMaterial(const WString &asset_path, Material *mat);
         void SaveShader(const WString &asset_path, const Asset *asset);
@@ -301,8 +241,7 @@ namespace Ailu
         void SaveMesh(const WString &asset_path, const Asset *asset);
         void SaveTexture2D(const WString &asset_path, const Asset *asset);
         void SaveScene(const WString &asset_path, const Asset *asset);
-
-        void WatchDirectory();
+        void SaveAnimClip(const WString &asset_path, const Asset *asset);
         void SubmitResourceTask();
         //导入外部资源并创建对应的asset
         Ref<void> ImportResourceImpl(const WString &sys_path, const ImportSetting *setting);
@@ -340,12 +279,16 @@ namespace Ailu
     extern AILU_API ResourceMgr *g_pResourceMgr;
 
     template<typename T>
-    inline Ref<T> ResourceMgr::Load(const WString &asset_path)
+    inline Ref<T> ResourceMgr::Load(const WString &asset_path,ImportSetting* setting)
     {
+        if (asset_path.empty())
+        {
+            LOG_ERROR(L"ResourceMgr::Load: Asset path is empty");
+            return nullptr;
+        }
         LOG_WARNING(L"Begin load asset {}...",asset_path);
         TimeMgr timer;
         timer.Mark();
-        AL_ASSERT(!asset_path.empty());
         using Loader = std::function<Scope<Asset>(ResourceMgr *, const WString &)>;
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         auto ext = PathUtils::ExtractExt(sys_path);
@@ -389,6 +332,10 @@ namespace Ailu
         {
             asset_loader = &ResourceMgr::LoadMesh;
         }
+        else if constexpr (std::is_same<T, SkeletonMesh>::value)
+        {
+            asset_loader = &ResourceMgr::LoadMesh;
+        }
         else if constexpr (std::is_same<T, Shader>::value)
         {
             asset_loader = &ResourceMgr::LoadShader;
@@ -405,7 +352,12 @@ namespace Ailu
         {
             asset_loader = &ResourceMgr::LoadScene;
         }
-        Scope<Asset> out_asset = std::move(asset_loader(this, asset_path));
+        else if constexpr (std::is_same<T, AnimationClip>::value)
+        {
+            asset_loader = &ResourceMgr::LoadAnimClip;
+        }
+        Scope<Asset> out_asset;
+        out_asset = std::move(asset_loader(this, asset_path));
         if (out_asset != nullptr)
         {
             MarkFileTimeStamp(sys_path);
@@ -425,18 +377,18 @@ namespace Ailu
         return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
     }
     template<typename T>
-    inline Ref<T> ResourceMgr::Load(const Guid &guid)
+    inline Ref<T> ResourceMgr::Load(const Guid &guid, ImportSetting *setting)
     {
         return Load<T>(GuidToAssetPath(guid));
     }
 
     template<typename T>
-    inline void ResourceMgr::LoadAsync(const WString &asset_path)
+    inline void ResourceMgr::LoadAsync(const WString &asset_path, ImportSetting *setting)
     {
         g_pThreadTool->Enqueue([this, asset_path](){ this->Load<T>(asset_path); });
     }
     template<typename T>
-    inline void ResourceMgr::LoadAsync(const Guid &guid)
+    inline void ResourceMgr::LoadAsync(const Guid &guid, ImportSetting *setting)
     {
         g_pThreadTool->Enqueue([this, guid](){ this->Load<T>(guid); });
     }
@@ -516,6 +468,10 @@ namespace Ailu
         {
             return _lut_global_resources_by_type.at(EAssetType::kMesh).size();
         }
+        else if constexpr (std::is_same<T, SkeletonMesh>::value)
+        {
+            return _lut_global_resources_by_type.at(EAssetType::kSkeletonMesh).size();
+        }
         else if constexpr (std::is_same<T, Material>::value)
         {
             return _lut_global_resources_by_type.at(EAssetType::kMaterial).size();
@@ -523,6 +479,10 @@ namespace Ailu
         else if constexpr (std::is_same<T, Scene>::value)
         {
             return _lut_global_resources_by_type.at(EAssetType::kScene).size();
+        }
+        else if constexpr (std::is_same<T, AnimationClip>::value)
+        {
+            return _lut_global_resources_by_type.at(EAssetType::kAnimClip).size();
         }
         else
         {
@@ -549,6 +509,10 @@ namespace Ailu
         {
             return _lut_global_resources_by_type[EAssetType::kMesh].begin();
         }
+        else if constexpr (std::is_same<T, SkeletonMesh>::value)
+        {
+            return _lut_global_resources_by_type[EAssetType::kSkeletonMesh].begin();
+        }
         else if constexpr (std::is_same<T, Material>::value)
         {
             return _lut_global_resources_by_type[EAssetType::kMaterial].begin();
@@ -557,6 +521,8 @@ namespace Ailu
         {
             return _lut_global_resources_by_type[EAssetType::kScene].begin();
         }
+        else if constexpr (std::is_same<T, AnimationClip>::value)
+            return _lut_global_resources_by_type.at(EAssetType::kAnimClip).begin();
         else
         {
             AL_ASSERT(false);
@@ -581,6 +547,10 @@ namespace Ailu
         {
             return _lut_global_resources_by_type[EAssetType::kMesh].end();
         }
+        else if constexpr (std::is_same<T, SkeletonMesh>::value)
+        {
+            return _lut_global_resources_by_type[EAssetType::kSkeletonMesh].end();
+        }
         else if constexpr (std::is_same<T, Material>::value)
         {
             return _lut_global_resources_by_type[EAssetType::kMaterial].end();
@@ -589,6 +559,8 @@ namespace Ailu
         {
             return _lut_global_resources_by_type[EAssetType::kScene].end();
         }
+        else if constexpr (std::is_same<T, AnimationClip>::value)
+            return _lut_global_resources_by_type.at(EAssetType::kAnimClip).end();
         else
         {
             AL_ASSERT(false);

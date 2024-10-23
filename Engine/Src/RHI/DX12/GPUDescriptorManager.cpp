@@ -213,15 +213,16 @@ namespace Ailu
 			_pages[handle.PageID()].Free(handle.PageOffset(), handle.DescriptorNum(), Application::s_frame_count);
 	}
 
-	void GPUVisibleDescriptorAllocator::ReleaseSpace()
+	u32 GPUVisibleDescriptorAllocator::ReleaseSpace()
 	{
 		_page_free_space_lut.clear();
+        u32 release_num = 0u;
 		for (auto& page : _pages)
 		{
-			u16 release_num = page.ReleaseAllStaleBlock(Application::s_frame_count);
+            release_num += page.ReleaseAllStaleBlock(Application::s_frame_count);
 			_page_free_space_lut[page.PageType()].emplace(std::make_pair(page.AvailableDescriptorNum(), page.PageID()));
-			g_pLogMgr->LogFormat("Release GPUVisibleDescripto at page{} with num {}.", page.PageID(), release_num);
 		}
+        return release_num;
 	}
 
 	void GPUVisibleDescriptorAllocator::AllocationInfo(u32& total_num, u32& available_num) const

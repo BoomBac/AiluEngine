@@ -1,5 +1,5 @@
 guid: 7baa598b-7eb4-478d-91ae-bf758da25d3b
 type: kMesh
-name: Suzanne
-file: Meshs/monkey.fbx
-inner_file_name: Suzanne
+name: Monkey
+file: Meshs/src_res/monkey.fbx
+inner_file_name: Monkey

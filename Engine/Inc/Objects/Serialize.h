@@ -71,7 +71,15 @@ namespace Ailu
         std::istream *_is;
         u32 _version = 0;
     };
-
+    struct IndentBlock
+    {
+        IndentBlock(Archive &arch) : _arch(arch) 
+        { 
+            arch.IncreaseIndent();
+        }
+        ~IndentBlock() { _arch.DecreaseIndent(); }
+        Archive& _arch;
+    };
     class TextOArchive : public Archive
     {
     public:

@@ -5,7 +5,7 @@
 
 namespace Ailu
 {
-	const Guid Guid::kEmptyGuid = Guid("null guid");
+	const Guid Guid::kEmptyGuid = Guid("null");
     Guid Guid::Generate()
     {
         GUID guid;
@@ -48,4 +48,8 @@ namespace Ailu
 	{
 		return _guid == other._guid;
 	}
+    bool Guid::operator==(const String &other) const
+    {
+        return _guid == other;
+    }
 }

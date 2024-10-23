@@ -24,6 +24,8 @@ namespace Ailu
 			inline static const String kDragAssetMesh =		 "DRAG_ASSET_MESH";
 			inline static const String kDragAssetMaterial =		 "DRAG_ASSET_MATERIAL";
 			inline static const String kDragAssetTexture2D =		 "DRAG_ASSET_TEXTURE2D";
+			inline static const String kDragAssetSkeletonMesh =		 "DRAG_ASSET_SKELETON";
+			inline static const String kDragAssetAnimClip =		 "DRAG_ASSET_ANIM_CLIP";
 			inline static const WString kNull = L"null";
 
 			inline static bool s_global_modal_window_info[256]{ false };

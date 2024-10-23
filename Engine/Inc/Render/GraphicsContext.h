@@ -18,6 +18,7 @@ namespace Ailu
         virtual ~GraphicsContext() = default;
         virtual void Init() = 0;
         virtual void Present() = 0;
+        virtual void DoResourceTask() = 0;
         //It will move the cmd in cmd buffer
         virtual const u64 &GetFenceValue(const u32 &cmd_index) const = 0;
         virtual u64 GetCurFenceValue() const = 0;

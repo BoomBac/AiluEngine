@@ -349,6 +349,9 @@ ASALocalRun/
 # pix
 *.wpix
 
+# shader cache
+*.cso
+
 # MFractors (Xamarin productivity tool) working folder
 .mfractor/
 

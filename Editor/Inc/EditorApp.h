@@ -35,6 +35,7 @@ namespace Ailu
             bool OnLostFocus(WindowLostFocusEvent &e) final;
             void LoadEditorConfig(ApplicationDesc &desc);
             void SaveEditorConfig();
+            void LoadEditorResource();
         };
     }// namespace Editor
 }// namespace Ailu

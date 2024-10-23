@@ -5,6 +5,7 @@
 #include "Framework/Events/WindowEvent.h"
 #include "Platform/WinInput.h"
 #include "pch.h"
+#include <dwmapi.h> //dark theme
 
 #include "Ext/imgui/backends/imgui_impl_win32.h"
 #include "Ext/imgui/imgui.h"
@@ -15,6 +16,11 @@
 #ifdef DEAR_IMGUI
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif// DEAR_IMGUI
+
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+
 namespace Ailu
 {
     // static const wchar_t *kAppTitleIconPath = ToWStr(kEngineResRootPath + "Icons/app_title_icon.ico");
@@ -174,7 +180,8 @@ namespace Ailu
                 nullptr,// We aren't using menus.
                 hinstance,
                 this);
-
+        BOOL value = TRUE;
+        ::DwmSetWindowAttribute(_hwnd,DWMWA_USE_IMMERSIVE_DARK_MODE,&value,sizeof(value));
         //移除调整窗口大小的样式
         LONG_PTR style = GetWindowLongPtr(_hwnd, GWL_STYLE);
         //style = style & ~WS_THICKFRAME;

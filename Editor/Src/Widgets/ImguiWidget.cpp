@@ -173,6 +173,7 @@ namespace Ailu
                 {
                     ImGui::SetNextWindowFocus();
                 }
+
             }
         }
 

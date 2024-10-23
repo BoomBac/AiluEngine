@@ -145,8 +145,8 @@ namespace Ailu
 		fs::path p(sys_path);
 		if (!fs::exists(p))
 		{
-			g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist!", sys_path);
-			return false;
+            FileManager::CreateFile(sys_path,true);
+            g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist! create it", sys_path);
 		}
 		std::ofstream out_asset_file(sys_path, append ? std::ios::app : std::ios::trunc);
 		if (!out_asset_file.is_open()) {
@@ -169,8 +169,8 @@ namespace Ailu
 		fs::path p(sys_path);
 		if (!fs::exists(p))
 		{
-			g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist!", sys_path);
-			return false;
+            FileManager::CreateFile(sys_path,true);
+			g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist! create it", sys_path);
 		}
 		auto flag = std::ios::trunc | std::ios::binary;
 		std::ofstream out_asset_file(sys_path, append ? flag | std::ios::app : flag);
@@ -265,4 +265,18 @@ namespace Ailu
 		}
 		return std::tuple<u8*, u64>(read_data,file_byte_size);
 	}
+    bool FileManager::IsFileNewer(const WString &a, const WString &b)
+    {
+        try {
+            // 获取两个文件的最后修改时间
+            auto file1_time = fs::last_write_time(a);
+            auto file2_time = fs::last_write_time(b);
+
+            // 返回第一个文件是否比第二个文件更新
+            return file1_time > file2_time;
+        } catch (const fs::filesystem_error& e) {
+            std::cerr << "Error accessing file: " << e.what() << std::endl;
+            return false; // 如果有任何文件无法访问，返回false
+        }
+    }
 }

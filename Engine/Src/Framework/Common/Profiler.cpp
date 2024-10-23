@@ -17,6 +17,7 @@ namespace Ailu
 	}
 	u64 Profiler::StartProfile(CommandBuffer* cmdList, const String& name)
 	{
+        std::lock_guard<std::mutex> lock(_lock);
 		u64 profileIdx = u64(-1);
 		for (u64 i = 0; i < numProfiles; ++i)
 		{
@@ -44,6 +45,7 @@ namespace Ailu
 	}
 	void Profiler::EndProfile(CommandBuffer* cmdList, u64 idx)
 	{
+        std::lock_guard<std::mutex> lock(_lock);
 		AL_ASSERT(idx < numProfiles);
 		ProfileData& profile_data = profiles[idx];
 		AL_ASSERT(profile_data.QueryStarted != false);
@@ -55,6 +57,7 @@ namespace Ailu
 	}
 	u64 Profiler::StartCPUProfile(const String& name)
 	{
+        std::lock_guard<std::mutex> lock(_lock);
 		u64 profileIdx = u64(-1);
 		for (u64 i = 0; i < numCPUProfiles; ++i)
 		{
@@ -84,6 +87,7 @@ namespace Ailu
 	}
 	void Profiler::EndCPUProfile(u64 idx)
 	{
+        std::lock_guard<std::mutex> lock(_lock);
 		AL_ASSERT(idx < numCPUProfiles);
 		ProfileData& profile_data = cpuProfiles[idx];
 		AL_ASSERT(profile_data.QueryStarted != false);

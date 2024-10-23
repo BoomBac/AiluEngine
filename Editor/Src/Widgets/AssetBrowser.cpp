@@ -6,7 +6,9 @@
 #include "Render/Shader.h"
 #include "Render/Texture.h"
 #include <functional>
-
+#include <Framework/Events/WindowEvent.h>
+#include <Framework/Events/KeyEvent.h>
+#include <Framework/Common/Input.h>
 #include "Common/Selection.h"
 #include "Widgets/AssetBrowser.h"
 #include "Widgets/CommonTextureWidget.h"
@@ -38,6 +40,51 @@ namespace Ailu
             ret.x = vmax.x - vmin.x;
             ret.y = vmax.y - vmin.y;
             return ret;
+        }
+        static bool s_is_show_import_window = false;
+        static List<WString> s_drag_files;
+        static void ShowImportSettingWindow()
+        {
+            if (s_drag_files.empty())
+            {
+                s_is_show_import_window = false;
+                return;
+            }
+            s_is_show_import_window = ImGui::Begin("Import Setting", &s_is_show_import_window);
+            ImGui::Text("Import: %s", ToChar(s_drag_files.front()).c_str());
+            ImGui::Separator();// 分割线
+            ImportSetting *setting = nullptr;
+            if (su::EndWith(s_drag_files.front(), L"fbx") || su::EndWith(s_drag_files.front(), L"FBX"))
+            {
+                auto mesh_import_setting = new MeshImportSetting();
+                mesh_import_setting->_import_flag = 0u;
+                static bool s_is_import_material = true;
+                static bool s_is_import_anim = true;
+                static bool s_is_import_mesh = true;
+                ImGui::Checkbox("Import Material", &s_is_import_material);
+                ImGui::Checkbox("Import Mesh", &s_is_import_mesh);
+                ImGui::Checkbox("Import Animation", &s_is_import_anim);
+                mesh_import_setting->_is_import_material = s_is_import_material;
+                mesh_import_setting->_import_flag |= s_is_import_mesh ? MeshImportSetting::kImportFlagMesh : 0;
+                mesh_import_setting->_import_flag |= s_is_import_anim ? MeshImportSetting::kImportFlagAnimation : 0;
+                setting = mesh_import_setting;
+            }
+            else
+            {
+                LOG_WARNING("Unsupport import setting: {}", ToChar(s_drag_files.front()));
+            }
+            if (ImGui::Button("OK"))
+            {
+                g_pResourceMgr->ImportResource(s_drag_files.front(), setting ? *setting : ImportSetting::Default());
+                s_drag_files.pop_front();
+                DESTORY_PTR(setting)
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel"))
+            {
+                s_drag_files.pop_front();
+            }
+            ImGui::End();
         }
 
         static void DrawBorderFrame()
@@ -159,8 +206,10 @@ namespace Ailu
             _mesh_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset");
             _shader_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
             _image_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
-            _scene_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"scene.alasset");
+            _scene_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/scene.alasset");
             _material_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/material.alasset");
+            _animclip_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset");
+            _skeleton_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/skeleton.alasset");
             memset(_search_buf, 0, 256);
             MarkDirty();
         }
@@ -168,6 +217,24 @@ namespace Ailu
         void AssetBrowser::Close(i32 handle)
         {
             ImGuiWidget::Close(handle);
+        }
+
+        void AssetBrowser::OnEvent(Event &event)
+        {
+            if (!Hover(Input::GetMousePos()))
+                return;
+            if (event.GetEventType() == EEventType::kDragFile)
+            {
+                auto e = static_cast<DragFileEvent &>(event);
+                s_drag_files = e.GetDragedFilesPath();
+                s_is_show_import_window = true;
+            }
+            else if (event.GetEventType() == EEventType::kKeyReleased)
+            {
+                auto e = static_cast<KeyReleasedEvent &>(event);
+                if (e.GetKeyCode() == AL_KEY_F2)
+                    _selected_file_rename_index = _selected_file_index;
+            }
         }
 
         void AssetBrowser::OnUpdateAssetList(const ISearchFilter &filter)
@@ -204,6 +271,8 @@ namespace Ailu
             DrawMainPannel();
             ImGui::EndChild();
             ShowModalDialog("New Material", std::bind(&AssetBrowser::ShowNewMaterialWidget, this), _new_material_modal_window_handle);
+            if (s_is_show_import_window)
+                ShowImportSettingWindow();
         }
 
         void AssetBrowser::ShowNewMaterialWidget()
@@ -346,6 +415,7 @@ namespace Ailu
             }
             if (ImGui::BeginPopupContextItem(file_name_str.c_str()))// <-- use last item id as popup id
             {
+                _selected_file_index = cur_file_index;
                 if (ImGui::MenuItem("Rename"))
                 {
                     _selected_file_rename_index = cur_file_index;
@@ -396,6 +466,10 @@ namespace Ailu
             }
             else if (asset->_asset_type == EAssetType::kMaterial)
                 tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_material_icon->GetNativeTextureHandle());
+            else if (asset->_asset_type == EAssetType::kAnimClip)
+                tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_animclip_icon->GetNativeTextureHandle());
+            else if (asset->_asset_type == EAssetType::kSkeletonMesh)
+                tex_id = TEXTURE_HANDLE_TO_IMGUI_TEXID(_skeleton_icon->GetNativeTextureHandle());
             else {};
             ImGui::PushStyleColor(ImGuiCol_Button, kColorBgTransparent);
             ImGui::BeginGroup();
@@ -437,6 +511,11 @@ namespace Ailu
                     else if (s_draging_asset->_asset_type == EAssetType::kTexture2D)
                     {
                         ImGui::SetDragDropPayload(kDragAssetTexture2D.c_str(), &s_draging_asset, sizeof(Asset *));
+                        ImGui::Text("Dragging %s", s_draging_asset->_p_obj->Name().c_str());
+                    }
+                    else if (s_draging_asset->_asset_type == EAssetType::kAnimClip)
+                    {
+                        ImGui::SetDragDropPayload(kDragAssetAnimClip.c_str(), &s_draging_asset, sizeof(Asset *));
                         ImGui::Text("Dragging %s", s_draging_asset->_p_obj->Name().c_str());
                     }
                     else
@@ -515,6 +594,16 @@ namespace Ailu
                         {
                             g_pResourceMgr->LoadAsync<Mesh>(asset->_asset_path);
                         }
+                        else if (asset->_asset_type == EAssetType::kSkeletonMesh)
+                        {
+                            g_pResourceMgr->LoadAsync<SkeletonMesh>(asset->_asset_path);
+                        }
+                        else if (asset->_asset_type == EAssetType::kAnimClip)
+                        {
+                            g_pResourceMgr->LoadAsync<AnimationClip>(asset->_asset_path);
+                        }
+                        else
+                            LOG_WARNING("Import: Unsupported asset type");
                     }
                 }
                 else
@@ -529,6 +618,16 @@ namespace Ailu
                         {
                             g_pResourceMgr->LoadAsync<Mesh>(asset->_asset_path);
                         }
+                        else if (asset->_asset_type == EAssetType::kSkeletonMesh)
+                        {
+                            g_pResourceMgr->LoadAsync<SkeletonMesh>(asset->_asset_path);
+                        }
+                        else if (asset->_asset_type == EAssetType::kAnimClip)
+                        {
+                            g_pResourceMgr->LoadAsync<AnimationClip>(asset->_asset_path);
+                        }
+                        else
+                            LOG_WARNING("Import: Unsupported asset type");
                     }
                 }
                 if (ImGui::MenuItem("Rename"))

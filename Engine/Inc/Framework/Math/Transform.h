@@ -69,7 +69,7 @@ namespace Ailu
             out._scale = Vector3f(scaleSkewMat[0][0], scaleSkewMat[1][1], scaleSkewMat[2][2]);
             return out;
         }
-
+        //transform b then a
         static Transform Combine(const Transform &a, const Transform &b)
         {
             Transform out;
@@ -100,9 +100,9 @@ namespace Ailu
                 bRot = -bRot;
             }
             return Transform(
-                    lerp(a._position, b._position, t),
+                    Lerp(a._position, b._position, t),
                     Quaternion::NLerp(a._rotation, bRot, t),
-                    lerp(a._scale, b._scale, t));
+                    Lerp(a._scale, b._scale, t));
         }
 
         static Vector3f TransformPoint(const Transform &a, const Vector3f &b)
@@ -229,11 +229,11 @@ namespace Ailu
     {
         ar.IncreaseIndent();
         ar.InsertIndent();
-        ar << "_position:" << c._position.ToString() << std::endl;
+        ar << "_position:" << c._position.ToString(9) << std::endl;
         ar.InsertIndent();
-        ar << "_rotation:" << c._rotation.ToString() << std::endl;
+        ar << "_rotation:" << c._rotation.ToString(9) << std::endl;
         ar.InsertIndent();
-        ar << "_scale:" << c._scale.ToString();
+        ar << "_scale:" << c._scale.ToString(9);
         ar.DecreaseIndent();
         ar.NewLine();
         return ar;

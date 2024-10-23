@@ -130,7 +130,7 @@ namespace Ailu
 		inline static const u16 kMaxDescriptorNumPerPage = 1024;
 		GPUVisibleDescriptorAllocation&& Allocate(u16 num = 1u, D3D12_DESCRIPTOR_HEAP_TYPE type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		void Free(GPUVisibleDescriptorAllocation&& handle);
-		void ReleaseSpace();
+		u32 ReleaseSpace();
 		void AllocationInfo(u32& total_num, u32& available_num) const;
 	private:
 		HashMap<u16, u16>::iterator AddNewPage(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num = kMaxDescriptorNumPerPage);

@@ -1,0 +1,5 @@
+guid: a39101e3-586a-4b9d-ad20-e33970c21509
+type: kSkeletonMesh
+name: leg_mesh.alasset
+file: AnimClips/ik_test.fbx
+inner_file_name: leg_mesh

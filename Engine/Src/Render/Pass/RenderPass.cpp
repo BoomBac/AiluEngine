@@ -560,11 +560,37 @@ namespace Ailu
         static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
         static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
         static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
+        static auto mat_area_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard");
         static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
         static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
         static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
         cmd->Clear();
         {
+            auto& cam = rendering_data._camera;
+            // 获取相机参数
+            float nearPlane = cam->Near() + 0.05f;
+            float verticalFOV = cam->FovH() * k2Radius; // 单位为弧度
+            float aspectRatio = cam->Aspect();
+
+            // 计算半视野角度
+            float halfHeight = nearPlane * tan(verticalFOV / 2.0f);
+            float halfWidth = halfHeight * aspectRatio;
+
+            // 获取相机的方向向量
+            Vector3f cameraForward = cam->Forward();
+            Vector3f cameraRight = cam->Right();
+            Vector3f cameraUp = cam->Up();
+
+            // 计算近裁剪面的左下角
+            Vector3f nearCenter = cam->Position() + cameraForward * nearPlane;
+            Vector3f bottomLeft = nearCenter - cameraRight * halfWidth * 0.95f - cameraUp * halfHeight * 0.95f;
+
+
+            Vector3f camera_target = bottomLeft;//cam->Position() + cam->Forward() * (cam->Near() + 0.1f);
+            Gizmo::DrawLine(camera_target,camera_target + Vector3f::kForward * 0.01f,Colors::kBlue);
+            Gizmo::DrawLine(camera_target,camera_target + Vector3f::kRight * 0.01f,Colors::kRed);
+            Gizmo::DrawLine(camera_target,camera_target + Vector3f::kUp * 0.01f,Colors::kGreen);
+
             cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProjection());
             ProfileBlock profile(cmd.get(), _name);
             cmd->SetViewport(rendering_data._viewport);
@@ -602,6 +628,11 @@ namespace Ailu
                     case ELightType::kSpot:
                     {
                         cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_spot_light, m);
+                    }
+                    break;
+                    case ELightType::kArea:
+                    {
+                        cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_area_light, m);
                     }
                     break;
                 }

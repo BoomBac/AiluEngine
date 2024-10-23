@@ -27,9 +27,14 @@ namespace Ailu
     public:
         inline static std::weak_ptr<Mesh> s_p_cube;
         inline static std::weak_ptr<Mesh> s_p_shpere;
-        inline static std::weak_ptr<Mesh> s_p_quad;
         inline static std::weak_ptr<Mesh> s_p_plane;
         inline static std::weak_ptr<Mesh> s_p_capsule;
+        inline static std::weak_ptr<Mesh> s_p_cylinder;
+        inline static std::weak_ptr<Mesh> s_p_cone;
+        inline static std::weak_ptr<Mesh> s_p_torus;
+        inline static std::weak_ptr<Mesh> s_p_monkey;
+
+        inline static std::weak_ptr<Mesh> s_p_quad;
         inline static std::weak_ptr<Mesh> s_p_fullscreen_triangle;
 
     public:
@@ -72,23 +77,24 @@ namespace Ailu
         List<ImportedMaterialInfo> _imported_materials;
     };
 
-    class SkinedMesh : public Mesh
+    class AILU_API SkeletonMesh : public Mesh
     {
-        DECLARE_PRIVATE_PROPERTY(skeleton, CurSkeleton, Skeleton)
     public:
         inline static bool s_use_local_transf = false;
-        SkinedMesh();
-        SkinedMesh(const String &name);
-        ~SkinedMesh();
+        SkeletonMesh();
+        explicit SkeletonMesh(const String &name);
+        ~SkeletonMesh();
         void BuildRHIResource() final;
         void Clear() final;
         void SetBoneWeights(Vector4f *bone_weights);
         void SetBoneIndices(Vector4D<u32> *bone_indices);
         inline Vector4D<u32> *GetBoneIndices() { return _bone_indices; };
         inline Vector4f *GetBoneWeights() { return _bone_weights; };
-
+        void SetSkeleton(const Skeleton &skeleton);
+        [[nodiscard]] Skeleton &GetSkeleton();
     private:
     private:
+        Skeleton _skeleton;
         Vector4f *_bone_weights;
         Vector4D<u32> *_bone_indices;
     };

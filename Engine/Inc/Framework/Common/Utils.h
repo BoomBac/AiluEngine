@@ -162,6 +162,8 @@ namespace Ailu
 
         static String Join(const Vector<String>& strings, const String& delimiter)
         {
+            if (strings.empty())
+                return "";
             return std::accumulate(strings.begin() + 1, strings.end(), strings[0],
                 [&delimiter](const String& a, const String& b) {
                     return a + delimiter + b;
@@ -171,9 +173,7 @@ namespace Ailu
         static String Join(const std::set<String>& strings, const String& delimiter)
         {
             if (strings.empty()) 
-            {
                 return "";
-            }
             auto iter = strings.begin();
             String result = *iter;
             ++iter;

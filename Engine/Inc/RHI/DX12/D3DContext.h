@@ -29,6 +29,7 @@ namespace Ailu
         ~D3DContext();
         void Init() final;
         void Present() final;
+        void DoResourceTask() final;
         const u64& GetFenceValue(const u32& cmd_index) const final;
         u64 GetCurFenceValue() const final;
         bool IsCommandBufferReady(const u32 cmd_index) final;

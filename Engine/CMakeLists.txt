@@ -26,9 +26,18 @@ set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
 
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Src)
 aux_source_directory (${ENGINE_ROOT_PATH}/Ext/imgui IMGUI_ROOT)
+aux_source_directory (${ENGINE_ROOT_PATH}/Ext/implot IMPLOT_ROOT)
 set(IMGUI_BACKENDS ${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_dx12.cpp;${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_win32.cpp)
 set(IMGUIZMO_SRC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo/ImGuizmo.cpp)
 set(DDS_LOADER ${ENGINE_ROOT_PATH}/Ext/dds_loader/DDSTextureLoader12.cpp)
+set(ANIM_MODULE_SRC
+        Src/Animation/Curve.cpp
+        Inc/Animation/Track.hpp
+        Src/Animation/Track.cpp
+        Src/Animation/TransformTrack.cpp
+        Src/Animation/CrossFade.cpp
+        Src/Animation/Solver.cpp "Src/Animation/BlendSpace.cpp")
+# set(IMGUI_PLOT ${ENGINE_ROOT_PATH}/Ext/implot/implot.cpp ${ENGINE_ROOT_PATH}/Ext/implot/implot_items.cpp)
 # 禁用特定文件的预编译头
 # 使用 file(GLOB_RECURSE) 获取所有源文件
 file(GLOB_RECURSE NO_PCH_SOURCES "${ENGINE_ROOT_PATH}/Ext/imgui/*.cpp")
@@ -42,17 +51,21 @@ set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # aux_source_directory (Src engine_src_dir)
 # 为目标添加 include 目录
 
-add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${DDS_LOADER} Src/Render/Pass/SSAOPass.cpp 
+add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE_SRC} Src/Render/Pass/SSAOPass.cpp
 "Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp" "Inc/RHI/DX12/D3DUtils.h"
-"Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp" "Inc/Physics/PhysicsSystem.h" "Src/Physics/PhysicsSystem.cpp" "Src/Render/Gizmo.cpp" "Inc/Physics/Collision.h" "Src/Physics/Collision.cpp")
+"Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp" "Inc/Physics/PhysicsSystem.h" "Src/Physics/PhysicsSystem.cpp" "Src/Render/Gizmo.cpp" "Inc/Physics/Collision.h" "Src/Physics/Collision.cpp" "Inc/Animation/AnimationSystem.h" "Src/Animation/AnimationSystem.cpp"
+        Inc/Framework/Common/JobSystem.h
+        Src/Framework/Common/JobSystem.cpp
+        Ext/imnodes/imnodes.cpp)
 # 包含路径
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Inc)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext)
-target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/imgui)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
+target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
+target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 # 宏定义
 target_compile_definitions(Engine PUBLIC AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX)
 set_target_properties (Engine PROPERTIES

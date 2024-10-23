@@ -1,0 +1,5 @@
+guid: 0b247b0b-22b8-47e4-b69b-21e2f73133af
+type: kMesh
+name: Cylinder
+file: Meshs/src_res/cylinder.fbx
+inner_file_name: Cylinder

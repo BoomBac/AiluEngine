@@ -36,7 +36,7 @@ namespace Ailu
         _postprocess_pass = MakeScope<PostProcessPass>();
         _gizmo_pass = MakeScope<GizmoPass>();
         _wireframe_pass = MakeScope<WireFramePass>();
-        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TAAFeature())));
+        //_owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TAAFeature())));
 
         RegisterEventBeforeTick([]()
                                 { GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
@@ -225,6 +225,11 @@ namespace Ailu
         Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _p_per_camera_cbuf[cam.HashCode()].get());
         Shader::SetGlobalTexture("_LTC_Lut1", g_pResourceMgr->Get<Texture2D>(L"Runtime/ltc_lut1"));
         Shader::SetGlobalTexture("_LTC_Lut2", g_pResourceMgr->Get<Texture2D>(L"Runtime/ltc_lut2"));
+        {
+            PROFILE_BLOCK_CPU(WaitForSys)
+            for (auto &sys: s.GetRegister().SystemView())
+                sys.second->WaitFor();
+        }
     }
     void Renderer::EndScene(const Scene &s)
     {
@@ -313,6 +318,26 @@ namespace Ailu
             }
             ++entity_index;
         }
+        entity_index = 0u;
+        for (auto &static_mesh: s.GetRegister().View<CSkeletonMesh>())
+        {
+            if (static_mesh._p_mesh)
+            {
+                auto &aabbs = static_mesh._transformed_aabbs;
+                Vector3f center;
+                u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
+                auto &materials = static_mesh._p_mats;
+                for (int i = 0; i < submesh_count; i++)
+                {
+                    const auto &t = r.GetComponent<CSkeletonMesh, TransformComponent>(entity_index)->_transform;
+                    _per_object_datas[obj_index]._MatrixWorld = t._world_matrix;
+                    _per_object_datas[obj_index]._ObjectID = r.GetEntity<CSkeletonMesh>(entity_index);
+                    memcpy(_p_per_object_cbufs[obj_index]->GetData(), &_per_object_datas[obj_index], RenderConstants::kPerObjectDataSize);
+                    ++obj_index;
+                }
+            }
+            ++entity_index;
+        }
         _rendering_data._p_per_object_cbuf = _p_per_object_cbufs;
         f32 cascade_shaodw_max_dis = (f32) QuailtySetting::s_main_light_shaodw_distance * QuailtySetting::s_cascade_shadow_map_split[QuailtySetting::s_cascade_shadow_map_count - 1];
         _per_scene_cbuf_data._CascadeShadowParams = Vector4f((f32) QuailtySetting::s_cascade_shadow_map_count,
@@ -326,7 +351,7 @@ namespace Ailu
             _p_per_scene_cbuf.insert(std::make_pair(scene_hash, std::move(cbuf)));
         }
         _rendering_data._p_per_scene_cbuf = _p_per_scene_cbuf[scene_hash].get();
-        f32 t = g_pTimeMgr->TimeSinceLoad,dt = g_pTimeMgr->DeltaTime,sdt = g_pTimeMgr->s_smooth_delta_time;
+        f32 t = g_pTimeMgr->TimeSinceLoad, dt = g_pTimeMgr->DeltaTime, sdt = g_pTimeMgr->s_smooth_delta_time;
         _per_scene_cbuf_data._Time = Vector4f(t / 20, t, t * 2, t * 3);
         _per_scene_cbuf_data._SinTime = Vector4f(sin(t / 8), sin(t / 4), sin(t / 2), sin(t));
         _per_scene_cbuf_data._CosTime = Vector4f(cos(t / 8), cos(t / 4), cos(t / 2), cos(t));
@@ -338,7 +363,7 @@ namespace Ailu
     {
         const static f32 s_shadow_bias_factor = 0.01f;
         uint16_t updated_light_num = 0u;
-        uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0,area_light_index = 0;
+        uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0, area_light_index = 0;
         u16 shadowmap_matrix_index = RenderConstants::kMaxCascadeShadowMapSplitNum, shadowcubemap_matrix_index = 0u;
         //u16 total_shadow_matrix_count = RenderConstants::kMaxCascadeShadowMapSplitNum;//阴影绘制和采样时来索引虚拟摄像机的矩阵，对于点光源，其采样不需要该值，只用作标志位确认是否需要处理阴影
         //_per_scene_cbuf_data._MainlightWorldPosition = {-1.91522e-07f,-0.707107f,-0.707107f,0};//默认太阳位置给物理大气使用，防止
@@ -407,7 +432,7 @@ namespace Ailu
                         auto &shadow_cam = comp._shadow_cameras[i];
                         Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
                         //_per_scene_cbuf_data._ShadowMatrix[shadow_index + i] = shadow_cam.GetView() * shadow_cam.GetProjection();
-                        _rendering_data._point_shadow_data[point_light_index]._shadow_indices[i] = -1; // 废弃变量，现在生成shadowmp时不使用矩阵数组索引
+                        _rendering_data._point_shadow_data[point_light_index]._shadow_indices[i] = -1;// 废弃变量，现在生成shadowmp时不使用矩阵数组索引
                         _rendering_data._point_shadow_data[point_light_index]._shadow_matrices[i] = shadow_cam.GetView() * shadow_cam.GetProjection();
                         _rendering_data._point_shadow_data[point_light_index]._cull_results[i] = &_cull_results[shadow_cam.HashCode()];
                     }
@@ -454,7 +479,7 @@ namespace Ailu
                 _per_scene_cbuf_data._SpotLights[spot_light_index]._LightAngleOffset = -outer_cos * _per_scene_cbuf_data._SpotLights[spot_light_index]._LightAngleScale;
                 ++spot_light_index;
             }
-            else //area_light
+            else//area_light
             {
                 _per_scene_cbuf_data._AreaLights[area_light_index]._ShadowDataIndex = -1;
                 if (!is_cur_light_comp_active)
@@ -568,56 +593,66 @@ namespace Ailu
         EndScene(s);
     }
 
-
+    template<typename T>
+    void static CullObject(T &comp, const ViewFrustum &vf, CullResult &cur_cam_cull_results, u16 &scene_render_obj_index, const u64 &entity_index, const Camera &cam, const Scene &s)
+    {
+        if (comp._p_mesh)
+        {
+            auto &aabbs = comp._transformed_aabbs;
+            Vector3f center;
+            u16 submesh_count = comp._p_mesh->SubmeshCount();
+            auto &materials = comp._p_mats;
+            if (!cam.IsCustomVP() && !ViewFrustum::Conatin(vf, aabbs[0]))
+            {
+                ++scene_render_obj_index;
+                return;
+            }
+            for (int i = 0; i < submesh_count; i++)
+            {
+                if (ViewFrustum::Conatin(vf, aabbs[i + 1]) || cam.IsCustomVP())
+                {
+                    f32 dis = Distance(aabbs[i + 1].Center(), cam.Position());
+                    u32 queue_id;
+                    Material *used_mat = nullptr;
+                    if (!materials.empty())
+                    {
+                        used_mat = i < materials.size() && materials[i] != nullptr ? materials[i].get() : materials[0].get();
+                        if (used_mat)
+                        {
+                            queue_id = used_mat->RenderQueue();
+                            if (!cur_cam_cull_results.contains(queue_id))
+                            {
+                                cur_cam_cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
+                            }
+                        }
+                        auto e = s.GetRegister().GetEntity<StaticMeshComponent>(entity_index);
+                        cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{scene_render_obj_index, dis,
+                                                                                         (u16) i, 1, comp._p_mesh.get(), used_mat, &s.GetRegister().GetComponent<TransformComponent>(e)->_transform._world_matrix});
+                    }
+                }
+                ++scene_render_obj_index;
+            }
+        }
+    }
     void Renderer::Cull(const Scene &s, const Camera cam)
     {
         if (_cull_results.contains(cam.HashCode()))
             _cull_results[cam.HashCode()].clear();
         else
             _cull_results.insert(std::make_pair(cam.HashCode(), CullResult()));
-        u16 scene_render_obj_index = 0;
+        u16 scene_render_obj_index = 0u;
         u64 entity_index = 0u;
         auto &cur_cam_cull_results = _cull_results[cam.HashCode()];
         auto &vf = cam.GetViewFrustum();
-        for (auto &static_mesh: s.GetAllStaticRenderable())
+        for (auto &comp: s.GetAllStaticRenderable())
         {
-            if (static_mesh._p_mesh)
-            {
-                auto &aabbs = static_mesh._transformed_aabbs;
-                Vector3f center;
-                u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
-                auto &materials = static_mesh._p_mats;
-                if (!cam.IsCustomVP() && !ViewFrustum::Conatin(vf, aabbs[0]))
-                {
-                    ++scene_render_obj_index;
-                    continue;
-                }
-                for (int i = 0; i < submesh_count; i++)
-                {
-                    if (ViewFrustum::Conatin(vf, aabbs[i + 1]) || cam.IsCustomVP())
-                    {
-                        f32 dis = Distance(aabbs[i + 1].Center(), cam.Position());
-                        u32 queue_id;
-                        Material *used_mat = nullptr;
-                        if (!materials.empty())
-                        {
-                            used_mat = i < materials.size() && materials[i] != nullptr ? materials[i].get() : materials[0].get();
-                            if (used_mat)
-                            {
-                                queue_id = used_mat->RenderQueue();
-                                if (!cur_cam_cull_results.contains(queue_id))
-                                {
-                                    cur_cam_cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
-                                }
-                            }
-                            auto e = s.GetRegister().GetEntity<StaticMeshComponent>(entity_index);
-                            cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{scene_render_obj_index, dis,
-                                                                                             (u16) i, 1, static_mesh._p_mesh.get(), used_mat, &s.GetRegister().GetComponent<TransformComponent>(e)->_transform._world_matrix});
-                        }
-                    }
-                    ++scene_render_obj_index;
-                }
-            }
+            CullObject(comp, vf, cur_cam_cull_results, scene_render_obj_index, entity_index, cam, s);
+            ++entity_index;
+        }
+        entity_index = 0u;
+        for (auto &comp: s.GetAllSkinedRenderable())
+        {
+            CullObject(comp, vf, cur_cam_cull_results, scene_render_obj_index, entity_index, cam, s);
             ++entity_index;
         }
         for (auto &it: cur_cam_cull_results)

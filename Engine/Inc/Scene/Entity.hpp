@@ -107,6 +107,7 @@ namespace Ailu
         public:
             virtual void Update(Register &r, f32 delta_time) {};
             virtual void OnPushEntity(Entity entity) {};
+            virtual void WaitFor() const {};
             virtual Ref<System> Clone() 
             { 
                 AL_ASSERT(true);
@@ -288,6 +289,10 @@ namespace Ailu
                 return std::static_pointer_cast<T>(_systems[type_name]).get();
             }
             auto SystemView()
+            {
+                return std::views::all(_systems);
+            }
+            auto SystemView() const
             {
                 return std::views::all(_systems);
             }

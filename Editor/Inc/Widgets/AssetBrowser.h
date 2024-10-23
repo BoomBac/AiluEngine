@@ -20,6 +20,7 @@ namespace Ailu
 			~AssetBrowser();
 			void Open(const i32& handle) final;
 			void Close(i32 handle) final;
+			void OnEvent(Event& event) final;
 		private:
 			void OnUpdateAssetList(const ISearchFilter& filter);
 			void ShowImpl() final;
@@ -57,6 +58,8 @@ namespace Ailu
 			Texture* _image_icon;
 			Texture* _scene_icon;
 			Texture* _material_icon;
+			Texture* _animclip_icon;
+			Texture* _skeleton_icon;
             bool _is_search_active = false;
             char _search_buf[256];
             WString _search_str;

@@ -28,8 +28,8 @@ keywords:
     _AlbedoValue: 1,1,1,1
     _SpecularValue: 0,0,0,0
   prop_type: Texture2D
-    _AlbedoTex: null guid
-    _EmissionTex: null guid
-    _NormalTex: null guid
-    _RoughnessMetallicTex: null guid
-    _SpecularTex: null guid
+    _AlbedoTex: null
+    _EmissionTex: null
+    _NormalTex: null
+    _RoughnessMetallicTex: null
+    _SpecularTex: null

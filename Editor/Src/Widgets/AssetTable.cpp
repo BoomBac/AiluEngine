@@ -44,6 +44,8 @@ namespace Ailu
 //			ImGui::CheckboxFlags("ImGuiTableFlags_NoBordersInBodyUntilResize", &flags, ImGuiTableFlags_NoBordersInBodyUntilResize);
 //			PopStyleCompact();
 			ImGui::Spacing();
+            static bool s_is_show_null_asset = false;
+            ImGui::Checkbox("Show Null Asset", &s_is_show_null_asset);
 			if (ImGui::TreeNode("AssetTableInfo"))
 			{
 				ImGui::Text("Total Asset Num: %d", g_pResourceMgr->AssetNum());
@@ -51,7 +53,7 @@ namespace Ailu
 				{
 					// Submit columns name with TableSetupColumn() and call TableHeadersRow() to create a row with a header in each column.
 					// (Later we will show how TableSetupColumn() has other uses, optional flags, sizing weight etc.)
-					ImGui::TableSetupColumn("Name");
+					ImGui::TableSetupColumn("AssetName");
 					ImGui::TableSetupColumn("Path");
 					ImGui::TableSetupColumn("Type");
 					ImGui::TableSetupColumn("Object");
@@ -59,9 +61,11 @@ namespace Ailu
 					ImGui::TableHeadersRow();
 					for (auto it = g_pResourceMgr->Begin(); it != g_pResourceMgr->End(); it++)
 					{
+						auto p_asset = it->second.get();
+                        if (!s_is_show_null_asset && p_asset->_p_obj == nullptr)
+                            continue;
 						ImGui::TableNextRow();
 						ImGui::TableSetColumnIndex(0);
-						auto p_asset = it->second.get();
 						if (!p_asset)
 						{
 							ImGui::Text("?????????");
@@ -81,7 +85,9 @@ namespace Ailu
 						else
                             ImGui::Text("Null");
                         ImGui::TableSetColumnIndex(4);
-                        ImGui::Text("%d", std::max<u32>(p_asset->_p_obj.use_count() - 1,0));
+                        i32 use_count = p_asset->_p_obj.use_count() - 1;
+                        use_count = std::max(use_count, 0);
+                        ImGui::Text("%d", use_count);
 					}
 					ImGui::EndTable();
 				}

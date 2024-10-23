@@ -9,8 +9,9 @@
 #include <future>
 #include <mutex>
 #include <queue>
-#include <windows.h>
+#include <Windows.h>
 #include <format>
+#include <utility>
 
 #include "TimeMgr.h"
 #include "GlobalMarco.h"
@@ -25,135 +26,140 @@ using std::make_shared;
 
 namespace Ailu
 {
-	enum class EThreadStatus
-	{
-		kNotStarted,
-		kRunning,
-		kCompleted
-	};
+    template <typename T>
+    class LockFreeQueue
+    {
+    public:
+        explicit LockFreeQueue(size_t capacity)
+            : _buffer(capacity), _capacity(capacity), _head(0), _tail(0) {}
+
+        bool Enqueue(const T& value)
+        {
+            size_t current_tail = _tail.load(std::memory_order_relaxed);
+            size_t next_tail = Increment(current_tail);
+
+            if (next_tail == _head.load(std::memory_order_acquire)) {
+                // 队列已满
+                return false;
+            }
+
+            _buffer[current_tail] = value;  // 将数据存入缓冲区
+            _tail.store(next_tail, std::memory_order_release);
+            return true;
+        }
+
+        // 出队操作（多消费者）
+        bool Dequeue(T& result)
+        {
+            size_t current_head = _head.load(std::memory_order_relaxed);
+
+            // 先检查队列是否为空
+            if (current_head == _tail.load(std::memory_order_acquire)) {
+                // 队列为空
+                return false;
+            }
+
+            // 这里的 CAS 检查确保没有其他线程在修改 _head
+            if (_head.compare_exchange_strong(current_head, Increment(current_head), std::memory_order_acquire)) {
+                result = _buffer[current_head];  // 从缓冲区中取出数据
+                return true;
+            }
+
+            return false;  // 如果 CAS 失败，表示有其他线程已更新 _head
+        }
+
+        bool empty() const
+        {
+            return _head.load(std::memory_order_acquire) == _tail.load(std::memory_order_acquire);
+        }
+
+    private:
+        size_t Increment(size_t index) const
+        {
+            return (index + 1) % _capacity;  // 环形缓冲区中的下一个位置
+        }
+
+        std::vector<T> _buffer;
+        const size_t _capacity;
+        std::atomic<size_t> _head;  // 头指针
+        std::atomic<size_t> _tail;  // 尾指针
+    };
+
+    
+    DECLARE_ENUM(EThreadStatus, kNotStarted, kRunning, kIdle);
 	class AILU_API ThreadPool
 	{
 	public:
-		inline static u8 _s_cur_thread_num = 0;
-		using Task = std::function<void()>;
-		ThreadPool(std::string name = "ALThreadPool") : _pool_name(name)
+		DISALLOW_COPY_AND_ASSIGN(ThreadPool);
+        struct Task
+        {
+            String _name;
+			std::function<void()> _task;
+        };
+		explicit ThreadPool(u8 thread_num, std::string name = "ALThreadPool") : _initial_thread_count(thread_num), _pool_name(std::move(name)), _tasks(256)
 		{
-			u8 hd_cy = std::thread::hardware_concurrency();
-			_s_cur_thread_num += 4;
-			if (_s_cur_thread_num > 1.5 * hd_cy)
-			{			
-				LOG_WARNING("The number of threads currently running({}) is greater than the hardware recommendation, note the performance tradeoff", _s_cur_thread_num)
-			}
-			Start(4);
-		}
-		ThreadPool(u8 thread_num, std::string name = "ALThreadPool") : _initial_thread_count(thread_num), _pool_name(name)
-		{
-			_s_cur_thread_num += thread_num;
-			if (_s_cur_thread_num > 1.5 * std::thread::hardware_concurrency())
+			s_total_thread_num += thread_num;
+			if (s_total_thread_num > 1.5 * std::thread::hardware_concurrency())
 			{
-				LOG_WARNING("The number of threads currently running({}) is greater than the hardware recommendation, note the performance tradeoff", _s_cur_thread_num)
+				LOG_WARNING("The number of threads currently running({}) is greater than the hardware recommendation, note the performance tradeoff", s_total_thread_num)
 			}
 			Start(thread_num);
+            s_is_inited = true;
 		}
+        explicit ThreadPool(std::string name = "ALThreadPool") : ThreadPool(std::thread::hardware_concurrency(), std::move(name)) {};
 		~ThreadPool()
 		{
 			Release();
 		}
-		EThreadStatus GetThreadStatus(u8 thread_index) const
-		{
-			if (thread_index < _threads.size()) {
-				return _thread_status[thread_index];
-			}
-			return EThreadStatus::kNotStarted;
+        u16 ThreadNum() const { return _initial_thread_count; }
+		void ClearRecords() 
+		{ 
+			for (auto &record: _task_time_records)
+                record.clear();
 		}
-		u8 GetIdleThreadNum() const
+		const Vector<EThreadStatus::EThreadStatus>& StatusView() const{return _thread_status;}
+		EThreadStatus::EThreadStatus Status(u16 thread_id) const
 		{
-			u8 count = 0;
-			for (auto status : _thread_status)
-			{
-				if (status == EThreadStatus::kNotStarted) count++;
-			}
-			return count;
+			if (thread_id >= _thread_status.size())
+				return EThreadStatus::kNotStarted;
+			return _thread_status[thread_id];
 		}
+		//task_name:work_start_time(since_cur_tick):work_duration
+        const Vector<List<std::tuple<String,f32, f32>>> &TaskTimeRecordView() const { return _task_time_records; }
+        const List<std::tuple<String, f32, f32>>& TaskTimeRecord(u16 thread_id) const
+        {
+
+            if (thread_id >= _task_time_records.size())
+                return _task_time_records[0];
+            return _task_time_records[thread_id];
+        }
+        template<typename Callable, typename... Args>
+        auto Enqueue(const String& name,Callable &&task, Args &&...args) -> std::future<std::invoke_result_t<Callable, Args...>>
+        {
+            if (_b_stopping.load())
+                throw std::runtime_error(std::format("Thread pool: {0} already been released!!", _pool_name));
+            using return_type = typename std::invoke_result_t<Callable, Args...>;
+            auto wrapper = make_shared<packaged_task<return_type()>>(bind(forward<Callable>(task), std::forward<Args>(args)...));
+            std::future<return_type> ret = wrapper->get_future();
+            auto new_task = Task{name, [=](){ (*wrapper)(); }};
+            while(!_tasks.Enqueue(new_task))
+                std::this_thread::yield();
+            _task_cv.notify_one();
+            return ret;
+        }
 		template<typename Callable, typename...Args>
 		auto Enqueue(Callable&& task, Args&&... args) -> std::future<std::invoke_result_t<Callable, Args...>>
 		{
-			if (_b_stopping.load())
-				throw std::runtime_error(std::format("Thread pool: {0} already been released!!",_pool_name));
-			using return_type = typename std::invoke_result_t<Callable, Args...>;
-			auto wrapper = make_shared<packaged_task<return_type()>>(bind(forward<Callable>(task), std::forward<Args>(args)...));
-			std::future<return_type> ret = wrapper->get_future();
-			{
-				unique_lock<mutex> lock(_task_mutex);
-				_tasks.emplace([=]() {
-					//try
-					//{
-					//	(*wrapper)();
-					//}
-					//catch (const std::exception& e)
-					//{
-					//	LOG_ERROR("Thread pool {0}: Exception in Task: {1}",_pool_name,e.what())
-					//}
-					(*wrapper)();
-					});
-			}
-			_task_cv.notify_one();
-			return ret;
+            return Enqueue("no_name_task", std::forward<Callable>(task), std::forward<Args>(args)...);
 		}
-
-		//// Parallel 函数
-		//template <typename T, typename F>
-		//void Parallel(const std::vector<T>& v, F f, ThreadPool& threadPool) {
-		//	size_t size = v.size();
-		//	if (size == 0) {
-		//		return;
-		//	}
-
-		//	size_t numThreads = std::thread::hardware_concurrency();
-		//	size_t chunkSize = (size + numThreads - 1) / numThreads;
-
-		//	std::vector<std::future<void>> futures;
-
-		//	for (size_t i = 0; i < numThreads; ++i) 
-		//	{
-		//		size_t startIdx = i * chunkSize;
-		//		size_t endIdx = std::min((i + 1) * chunkSize, size);
-
-		//		futures.push_back(threadPool.Enqueue([&, startIdx, endIdx]() 
-		//		{
-		//			for (size_t j = startIdx; j < endIdx; ++j) {
-		//				f(v[j]);
-		//			}
-		//		}));
-		//	}
-
-		//	for (auto& future : futures) 
-		//	{
-		//		future.wait();
-		//	}
-		//}
-		//template<typename Callable, typename...Args>
-		//auto Enqueue(Callable&& task, Args&&... args) -> std::future<std::invoke_result_t<Callable, Args...>>
-		//{
-		//	using return_type = typename std::invoke_result_t<Callable, Args...>;
-		//	auto wrapper = [task = std::forward<Callable>(task), args = std::make_tuple(std::forward<Args>(args)...)]() {
-		//		std::apply(std::move(task), std::move(args));
-		//		};
-		//	std::future<return_type> ret;
-		//	{
-		//		std::unique_lock<std::mutex> lock(_task_mutex);
-		//		ret = wrapper.get_future();
-		//		_tasks.emplace(std::move(wrapper));
-		//	}
-		//	_task_cv.notify_one();
-		//	return ret;
-		//}
-
 		void Release()
 		{
 			Stop();
 			_threads.clear();
-			_s_cur_thread_num -= _initial_thread_count;
+            _timers.clear();
+            _thread_status.clear();
+            _task_time_records.clear();
+			s_total_thread_num -= _initial_thread_count;
 			_initial_thread_count = 0;
 		}
 	private:
@@ -162,52 +168,71 @@ namespace Ailu
 			LOG_INFO("Thread pool {} is starting...", _pool_name);
 			_timers.resize(num_threads, TimeMgr());
 			_thread_status.resize(num_threads, EThreadStatus::kNotStarted);
+            _task_time_records.resize(num_threads);
 			for (auto i = 0u; i < num_threads; ++i)
 			{
-				std::wstring thread_name = std::format(L"ALEngineWorkThread{0}", _s_global_thread_id++);
-				_threads.emplace_back([=]() {
+				std::wstring thread_name = std::format(L"Worker_{0}", _s_global_thread_id++);
+				_threads.emplace_back([=, this]() {
 					SetThreadDescription(GetCurrentThread(), thread_name.c_str());
 					while (true)
 					{
 						Task task;
-						{
-							std::unique_lock<std::mutex> lock(_task_mutex);
-							_task_cv.wait(lock, [=]() {return _b_stopping.load() || !_tasks.empty(); });
-							if (_b_stopping.load() && _tasks.empty())
-								break;
-							_thread_status[i] = EThreadStatus::kRunning;
-							task = std::move(_tasks.front());
-							_tasks.pop();
-						}
-						//_timers[i].Mark();
-						task();
-						//LOG_INFO(L"{} has finish task after {}ms!", thread_name.c_str(),_timers[i].GetElapsedSinceLastMark());
-						_thread_status[i] = EThreadStatus::kCompleted;
+                        if (_tasks.Dequeue(task))
+                        {
+                            _thread_status[i] = EThreadStatus::kRunning;
+#ifdef _DEBUG
+                            _timers[i].Mark();
+                            f32 ms_since_tick = TimeMgr::GetElapsedSinceCurrentTick();
+                            try
+                            {
+                                task._task();
+                            }
+                            catch (const std::exception& e)
+                            {
+                                LOG_ERROR("Exception caught in thread pool {}: {}", _pool_name, e.what());
+                            }
+                            _task_time_records[i].emplace_back(task._name,ms_since_tick, _timers[i].GetElapsedSinceLastMark());
+#else
+                            task();
+#endif// _DEBUG
+                            _thread_status[i] = EThreadStatus::kIdle;
+                        }
+                        else
+                        {
+                            std::unique_lock<std::mutex> lock(_wake_mutex);
+                            _task_cv.wait(lock, [this] { return _b_stopping.load() || !_tasks.empty(); });
+                            if (_b_stopping.load() && _tasks.empty()) {
+                                break;
+                            }
+                        }
 					}
 					});
 			}
 		}
 		void Stop() noexcept
 		{
-			{
-				std::unique_lock<std::mutex> lock(_task_mutex);
-				_b_stopping.store(true);
-			}
+            _b_stopping.store(true);
 			_task_cv.notify_all();
-			for (auto& t : _threads)
-				t.join();
+            for (auto& t : _threads)
+            {
+                if (t.joinable())
+                    t.join();
+            }
 		}
 	private:
 		u8 _initial_thread_count = 0;
 		inline static u8 _s_global_thread_id = 0u;
-		std::list<std::thread> _threads;
+        inline static u8 s_total_thread_num = 0u;
+		inline static bool s_is_inited = false;
+        List<std::thread> _threads;
 		std::condition_variable _task_cv;
-		std::mutex _task_mutex;
+		std::mutex _wake_mutex;
 		std::atomic<bool> _b_stopping;
-		std::queue<Task> _tasks;
-		std::vector<EThreadStatus> _thread_status;
+        LockFreeQueue<Task> _tasks;
+        Vector<EThreadStatus::EThreadStatus> _thread_status;
 		std::string _pool_name;
-		std::vector<TimeMgr> _timers;
+        Vector<TimeMgr> _timers;
+		Vector<List<std::tuple<String,f32,f32>>> _task_time_records;
 	};
 	extern AILU_API Scope<ThreadPool> g_pThreadTool;
 }

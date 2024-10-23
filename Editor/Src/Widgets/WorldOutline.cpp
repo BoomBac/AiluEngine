@@ -27,6 +27,12 @@ namespace Ailu
         }
         void WorldOutline::ShowImpl()
         {
+            while (!_pending_deleted_entities.empty())
+            {
+                Selection::RemoveSlection(_pending_deleted_entities.front());
+                g_pSceneMgr->ActiveScene()->RemoveObject(_pending_deleted_entities.front());
+                _pending_deleted_entities.pop();
+            }
             ECS::Entity old_selected_entity = ECS::kInvalidEntity;
             _selected_entity = Selection::FirstEntity();
             old_selected_entity = _selected_entity;
@@ -67,7 +73,32 @@ namespace Ailu
             auto tag_comp = _scene_register->GetComponent<TagComponent>(entity);
             if (hiera_comp->_children_num == 0)
                 node_flags |= ImGuiTreeNodeFlags_Leaf;
-            bool b_root_node_open = ImGui::TreeNodeEx(hiera_comp, node_flags, "%s", tag_comp->_name.c_str());
+            bool b_root_node_open = false;
+            if (_rename_entity == entity)
+            {
+                memset(_rename_buffer, 0, 256);
+                ImGui::OpenPopup("Rename");
+                ImGui::SetNextWindowSize(ImVec2(300, 100));
+                if (ImGui::BeginPopupModal("Rename", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+                {
+                    ImGui::InputText("##Rename", _rename_buffer, 256);
+                    if (ImGui::Button("OK", ImVec2(120, 0)))
+                    {
+                        tag_comp->_name = _rename_buffer;
+                        ImGui::CloseCurrentPopup();
+                        _rename_entity = ECS::kInvalidEntity;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Cancel", ImVec2(120, 0)))
+                    {
+                        ImGui::CloseCurrentPopup();
+                        _rename_entity = ECS::kInvalidEntity;
+                    }
+                    ImGui::EndPopup();
+                }
+            }
+            else
+                b_root_node_open = ImGui::TreeNodeEx(hiera_comp, node_flags, "%s", tag_comp->_name.c_str());
             if (ImGui::IsItemClicked())
             {
                 _selected_entity = entity;
@@ -111,31 +142,15 @@ namespace Ailu
                                 }
                                 if (ImGui::BeginPopupContextItem())// <-- use last item id as popup id
                                 {
-                                    static char s_rename_buf[128];
                                     if (ImGui::MenuItem("Rename"))
                                     {
-                                        if (ImGui::BeginPopup("Rename"))
-                                        {
-                                            ImGui::Text("Enter a new name:");
-                                            ImGui::InputText("##rename", s_rename_buf, 128);
-                                            if (ImGui::Button("OK"))
-                                            {
-                                                tag_comp->_name = s_rename_buf;
-                                                ImGui::CloseCurrentPopup();
-                                            }
-                                            ImGui::SameLine();
-                                            if (ImGui::Button("Cancel"))
-                                            {
-                                                ImGui::CloseCurrentPopup();
-                                            }
-                                            ImGui::EndPopup();
-                                        }
+                                        _rename_entity = entity;
                                     }
                                     if (ImGui::MenuItem("Delete"))
                                     {
-                                        g_pSceneMgr->ActiveScene()->RemoveObject(child_entity);
+                                        _pending_deleted_entities.push((child_entity));
                                     }
-                                    memset(s_rename_buf, 0, 128);
+                                    memset(_rename_buffer, 0, 256);
                                     ImGui::EndPopup();
                                 }
                                 ImGui::TreePop();
@@ -184,7 +199,11 @@ namespace Ailu
                 auto &key_e = static_cast<KeyPressedEvent &>(e);
                 if (key_e.GetKeyCode() == AL_KEY_DELETE)
                 {
-                    g_pSceneMgr->ActiveScene()->RemoveObject(_selected_entity);
+                    _pending_deleted_entities.push((_selected_entity));
+                }
+                else if (key_e.GetKeyCode() == AL_KEY_F2)
+                {
+                    _rename_entity = _selected_entity;
                 }
             }
         }

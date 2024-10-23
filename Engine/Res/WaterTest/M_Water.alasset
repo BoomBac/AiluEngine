@@ -10,4 +10,4 @@ keywords:
     _DeepColor: 0.32549,0.737255,0.886275,0.317647
     _LightColor: 0.279412,0.348616,0.75,1
   prop_type: Texture2D
-    _NormalTex: null guid
+    _NormalTex: null

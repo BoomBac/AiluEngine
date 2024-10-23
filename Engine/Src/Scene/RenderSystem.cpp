@@ -29,6 +29,17 @@ namespace Ailu
                     comp->_transformed_aabbs[i] = comp->_p_mesh->_bound_boxs[i] * transf._world_matrix;
                 }
             }
+            u32 index = 0u;
+            for (auto& comp: r.View<CSkeletonMesh>())
+            {
+                auto t = r.GetComponent<CSkeletonMesh, TransformComponent>(index);
+                if (!comp._p_mesh)
+                    continue;
+                for (int i = 0; i < comp._p_mesh->_bound_boxs.size(); i++)
+                {
+                    comp._transformed_aabbs[i] = comp._p_mesh->_bound_boxs[i] * t->_transform._world_matrix;
+                }
+            }
         }
 
         static Vector3f XMVecToVec3(const XMVECTOR &vec)

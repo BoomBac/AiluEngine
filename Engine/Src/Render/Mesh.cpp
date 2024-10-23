@@ -130,39 +130,39 @@ namespace Ailu
 	}
 
 	//----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------
-	SkinedMesh::SkinedMesh() : Mesh()
+	SkeletonMesh::SkeletonMesh() : Mesh()
 	{
 		_bone_indices = nullptr;
 		_bone_weights = nullptr;
 	}
 
-	SkinedMesh::SkinedMesh(const String& name) : SkinedMesh()
+	SkeletonMesh::SkeletonMesh(const String& name) : SkeletonMesh()
 	{
 		_name = name;
 	}
-	SkinedMesh::~SkinedMesh()
+	SkeletonMesh::~SkeletonMesh()
 	{
 		Clear();
 		DESTORY_PTRARR(_uv)
 	}
 
-	void SkinedMesh::SetBoneWeights(Vector4f* bone_weights)
+	void SkeletonMesh::SetBoneWeights(Vector4f* bone_weights)
 	{
 		_bone_weights = bone_weights;
 	}
-	void SkinedMesh::SetBoneIndices(Vector4D<u32>* bone_indices)
+	void SkeletonMesh::SetBoneIndices(Vector4D<u32>* bone_indices)
 	{
 		_bone_indices = bone_indices;
 	}
 
-	void SkinedMesh::Clear()
+	void SkeletonMesh::Clear()
 	{
 		Mesh::Clear();
 		DESTORY_PTRARR(_bone_weights);
 		DESTORY_PTRARR(_bone_indices);
 	}
 
-	void SkinedMesh::BuildRHIResource()
+	void SkeletonMesh::BuildRHIResource()
 	{
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
@@ -199,7 +199,7 @@ namespace Ailu
 		//}
 		_p_vbuf.reset(IVertexBuffer::Create(desc_list, _name));
 		if (_vertices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, true);
-		if (_normals) _p_vbuf->SetStream(reinterpret_cast<u8*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index);
+		if (_normals) _p_vbuf->SetStream(reinterpret_cast<u8*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index,true);
 		if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<u8*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
 		if (_tangents) _p_vbuf->SetStream(reinterpret_cast<u8*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
 		//if (_bone_indices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_indices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kInt4), bone_index_index);
@@ -211,5 +211,13 @@ namespace Ailu
 		}
 		_is_rhi_res_ready = true;
 	}
-	//----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------
+    void SkeletonMesh::SetSkeleton(const Skeleton &skeleton)
+    {
+        _skeleton = skeleton;
+    }
+    Skeleton &SkeletonMesh::GetSkeleton()
+    {
+        return _skeleton;
+    }
+    //----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------
 }

@@ -5,6 +5,7 @@
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
+#include "Framework/Common/JobSystem.h"
 #include "pch.h"
 
 #include "Framework/Common/Input.h"
@@ -22,6 +23,8 @@ namespace Ailu
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     LogMgr *g_pLogMgr = new LogMgr();
     Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
+    JobSystem* g_pJobSystem = new JobSystem(g_pThreadTool.get());
+
 
     WString Application::GetWorkingPath()
     {
@@ -99,11 +102,13 @@ namespace Ailu
         DESTORY_PTR(g_pTimeMgr);
         g_pLogMgr->Finalize();
         DESTORY_PTR(g_pLogMgr);
+        DESTORY_PTR(g_pJobSystem);
     }
 
     void Application::Tick(f32 delta_time)
     {
         g_pTimeMgr->Reset();
+        g_pGfxContext->DoResourceTask();
         while (_state != EApplicationState::EApplicationState_Exit)
         {
             if (_state == EApplicationState::EApplicationState_Pause)
@@ -161,6 +166,7 @@ namespace Ailu
                     }
                     _render_lag -= s_target_lag;
                 }
+                g_pThreadTool->ClearRecords();
             }
         }
         g_pLogMgr->Log("Exit");
@@ -227,11 +233,6 @@ namespace Ailu
     }
     bool Application::OnDragFile(DragFileEvent &e)
     {
-        auto &draged_files = e.GetDragedFilesPath();
-        for (auto &it: draged_files)
-        {
-            g_pResourceMgr->ImportResourceAsync(it);
-        }
         return false;
     }
 

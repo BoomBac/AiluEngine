@@ -11,7 +11,7 @@ namespace Ailu
     {
         int ret = 0;
         _init_stamp = std::chrono::high_resolution_clock::now();
-        _pre_stamp = _init_stamp;
+        s_pre_tick_stamp = _init_stamp;
         _total_time = 0.f;
         _total_pause_time = 0.f;
         _b_stop = false;
@@ -21,17 +21,12 @@ namespace Ailu
 
     void TimeMgr::Tick(f32 delta_time)
     {
-        _cur_stamp = std::chrono::high_resolution_clock::now();
-        DeltaTime = ALMSecond(_cur_stamp - _pre_stamp).count();
-        s_smooth_delta_time = lerp(DeltaTime, s_smooth_delta_time, 0.95f);
-        _pre_stamp = _cur_stamp;
+        s_cur_tick_stamp = std::chrono::high_resolution_clock::now();
+        DeltaTime = ALMSecond(s_cur_tick_stamp - s_pre_tick_stamp).count();
+        s_smooth_delta_time = Lerp(DeltaTime, s_smooth_delta_time, 0.95f);
+        s_pre_tick_stamp = s_cur_tick_stamp;
         if (!_b_stop)
-        {
             TimeSinceLoad += DeltaTime;
-        }
-        else
-        {
-        }
     }
     void TimeMgr::Pause()
     {
@@ -57,7 +52,7 @@ namespace Ailu
     }
     void TimeMgr::Reset()
     {
-        _pre_stamp = std::chrono::high_resolution_clock::now();
+        s_pre_tick_stamp = std::chrono::high_resolution_clock::now();
         while (!_mark_stamps.empty())
         {
             _mark_stamps.pop();

@@ -93,6 +93,11 @@ namespace Ailu
                 placement_element_draw(EPlaceActorsType::kPlane, image_size);
                 placement_element_draw(EPlaceActorsType::kSphere, image_size);
                 placement_element_draw(EPlaceActorsType::kCapsule, image_size);
+                placement_element_draw(EPlaceActorsType::kMonkey, image_size);
+                placement_element_draw(EPlaceActorsType::kCone, image_size);
+                placement_element_draw(EPlaceActorsType::kCylinder, image_size);
+                placement_element_draw(EPlaceActorsType::kTorus, image_size);
+
                 placement_element_draw(EPlaceActorsType::kDirectionalLight, image_size);
                 placement_element_draw(EPlaceActorsType::kPointLight, image_size);
                 placement_element_draw(EPlaceActorsType::kSpotLight, image_size);

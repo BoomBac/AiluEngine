@@ -12,15 +12,15 @@ keywords:
     _MetallicValue: 0
     _MaterialID: 0
     _Anisotropy: 0
-    _RoughnessValue: 0
+    _RoughnessValue: 0.011
     _AlphaCulloff: 0
   prop_type: Vector
     _SpecularValue: 0,0,0,0
     _EmissionValue: 0,0,0,-1
-    _AlbedoValue: 0.511628,0.511628,0.511628,0
+    _AlbedoValue: 1,1,1,0
   prop_type: Texture2D
-    _AlbedoTex: null guid
-    _EmissionTex: null guid
-    _NormalTex: null guid
-    _RoughnessMetallicTex: null guid
-    _SpecularTex: null guid
+    _AlbedoTex: null
+    _EmissionTex: null
+    _NormalTex: null
+    _RoughnessMetallicTex: null
+    _SpecularTex: null

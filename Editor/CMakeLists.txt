@@ -2,7 +2,7 @@
 cmake_minimum_required (VERSION 3.5)
 
 project (AiluEditor)
-set(EDITOR_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
+set(TEST_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/x64)
 
@@ -26,27 +26,27 @@ function(add_source_files_recursive dir)
     set(PROJECT_SOURCES ${PROJECT_SOURCES} PARENT_SCOPE)
 endfunction()
 
-
-
-add_source_files_recursive(${EDITOR_ROOT_PATH}/Src)
+add_source_files_recursive(${TEST_ROOT_PATH}/Src)
 #aux_source_directory (${CMAKE_SOURCE_DIR}/Ext/imgui IMGUI_ROOT)
 #set(IMGUI_BACKENDS ${CMAKE_SOURCE_DIR}/Ext/imgui/backends/imgui_impl_dx12.cpp;${CMAKE_SOURCE_DIR}/Ext/imgui/backends/imgui_impl_win32.cpp)
 # aux_source_directory (Src Editor_src_dir)
 # 为目标添加 include 目录
-
-add_executable(Editor WIN32 ${PROJECT_SOURCES} Src/Common/Undo.cpp Inc/Common/Undo.h Inc/Widgets/PlaceActors.h Src/Render/CommonRenderPipeline.cpp "Inc/Render/PickPass.h" "Src/Render/PickPass.cpp")
+# ${ENGINE_ROOT_PATH}/Ext/implot/implot_internal.h ${ENGINE_ROOT_PATH}/Ext/implot/implot.cpp ${ENGINE_ROOT_PATH}/Ext/implot/implot_demo.cpp ${ENGINE_ROOT_PATH}/Ext/implot/implot_items.cpp
+add_executable(Editor WIN32 ${PROJECT_SOURCES}
+        Src/Common/Undo.cpp Inc/Common/Undo.h Inc/Widgets/PlaceActors.h Src/Render/CommonRenderPipeline.cpp "Inc/Render/PickPass.h" "Src/Render/PickPass.cpp" "Inc/Widgets/AnimClipEditor.h" "Src/Widgets/AnimClipEditor.cpp" "Src/Widgets/BlendSpaceEditor.cpp")
 
 
 # 包含路径
-target_include_directories(Editor PUBLIC ${EDITOR_ROOT_PATH}/)
-target_include_directories(Editor PUBLIC ${EDITOR_ROOT_PATH}/Inc)
+target_include_directories(Editor PUBLIC ${TEST_ROOT_PATH}/)
+target_include_directories(Editor PUBLIC ${TEST_ROOT_PATH}/Inc)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH})
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Inc)
-#target_include_directories(Editor PUBLIC ${CMAKE_SOURCE_DIR}/Ext/fbxsdk/include)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/imgui)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
-#target_include_directories(Editor PUBLIC ${CMAKE_SOURCE_DIR}/Ext/fbxsdk)
+
+target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
+target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 # 宏定义
 target_compile_definitions(Editor PUBLIC _DEBUG;Editor_EXPORTS;_WINDOWS)
 set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
@@ -65,4 +65,4 @@ set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 add_dependencies(Editor Engine)
 target_link_libraries(Editor PRIVATE
         $<$<CONFIG:Debug>:${ENGINE_LIB_ROOT}/Debug/Engine_d.lib>
-        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release/Engine.lib>)
+        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release/Engine.lib> ${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib)

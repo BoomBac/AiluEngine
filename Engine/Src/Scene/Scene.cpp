@@ -5,6 +5,8 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Physics/PhysicsSystem.h"
 #include "Scene/RenderSystem.h"
+#include "Animation/AnimationSystem.h"
+#include "Scene/RenderSystem.h"
 #include "pch.h"
 
 namespace Ailu
@@ -84,6 +86,13 @@ namespace Ailu
                 arch.NewLine();
                 arch << (*c);
             }
+            if (auto c = _register.GetComponent<CSkeletonMesh>(e); c != nullptr)
+            {
+                arch.InsertIndent();
+                arch << "_skeleton_mesh_component:";
+                arch.NewLine();
+                arch << (*c);
+            }
             arch.DecreaseIndent();
         }
     }
@@ -143,6 +152,10 @@ namespace Ailu
             else if (su::BeginWith(line, "_collider_component"))
             {
                 arch >> _register.AddComponent<CCollider>(e);
+            }            
+            else if (su::BeginWith(line, "_skeleton_mesh_component"))
+            {
+                arch >> _register.AddComponent<CSkeletonMesh>(e);
             }
             else
             {
@@ -162,6 +175,7 @@ namespace Ailu
         _register.RegisterComponent<CLightProbe>();
         _register.RegisterComponent<CRigidBody>();
         _register.RegisterComponent<CCollider>();
+        _register.RegisterComponent<CSkeletonMesh>();
         ECS::Signature rs_sig;
         rs_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
         rs_sig.set(_register.GetComponentTypeID<StaticMeshComponent>(), true);
@@ -174,6 +188,9 @@ namespace Ailu
         phy_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
         phy_sig.set(_register.GetComponentTypeID<CRigidBody>(), true);
         _register.RegisterSystem<ECS::PhysicsSystem>(phy_sig);
+        ECS::Signature anim_sig;
+        anim_sig.set(_register.GetComponentTypeID<CSkeletonMesh>(), true);
+        _register.RegisterSystem<ECS::AnimationSystem>(anim_sig);
     }
 
     void Scene::Attach(ECS::Entity current, ECS::Entity parent)

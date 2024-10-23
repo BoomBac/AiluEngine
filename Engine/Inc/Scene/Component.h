@@ -10,6 +10,8 @@
 #include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/Pass/RenderPass.h"
+#include "Animation/Clip.h"
+#include "Animation/BlendSpace.h"
 
 namespace Ailu
 {
@@ -86,6 +88,24 @@ namespace Ailu
 
     Archive &operator<<(Archive &ar, const StaticMeshComponent &c);
     Archive &operator>>(Archive &ar, StaticMeshComponent &c);
+
+    struct AILU_API CSkeletonMesh
+    {
+        DECLARE_CLASS(CSkeletonMesh)
+        Ref<SkeletonMesh> _p_mesh;
+        Vector<Ref<Material>> _p_mats;
+        Vector<AABB> _transformed_aabbs;
+        Ref<AnimationClip> _anim_clip;
+        //temp
+        f32 _anim_time = 0.0f;
+        Ref<AnimationClip> _blend_anim_clip;
+        BlendSpace _blend_space;
+        //0 clip,1 blend space,2 anim graph
+        i16 _anim_type;
+    };
+
+    Archive &operator<<(Archive &ar, const CSkeletonMesh &c);
+    Archive &operator>>(Archive &ar, CSkeletonMesh &c);
 
     struct AILU_API CHierarchy
     {

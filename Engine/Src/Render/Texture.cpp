@@ -529,7 +529,7 @@ namespace Ailu
         info._rt->SetFenceValue(g_pGfxContext->GetCurFenceValue() + 1);
         auto it = _pool.emplace(std::make_pair(hash, std::move(info)));
         _lut_pool.emplace(std::make_pair(id, it));
-        g_pLogMgr->LogWarningFormat("Expand rt pool to {} with texture {}", _pool.size(), _lut_pool[id]->second._rt->Name());
+        g_pLogMgr->LogWarningFormat("Expand rt pool to {} with texture {} at frame {}", _pool.size(), _lut_pool[id]->second._rt->Name(),Application::s_frame_count);
         return id;
     }
     std::optional<u32> RenderTexturePool::GetByIDHash(RTHash hash)

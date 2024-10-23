@@ -45,6 +45,7 @@ namespace Ailu
             }
             _pipeline.reset(new CommonRenderPipeline());
             g_pGfxContext->RegisterPipeline(_pipeline.get());
+            LoadEditorResource();
             _p_editor_layer = new EditorLayer();
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;
@@ -79,6 +80,7 @@ namespace Ailu
         bool EditorApp::OnGetFocus(WindowFocusEvent &e)
         {
             Application::OnGetFocus(e);
+            g_pResourceMgr->WatchDirectory();
             return true;
         }
         bool EditorApp::OnLostFocus(WindowLostFocusEvent &e)
@@ -148,6 +150,45 @@ namespace Ailu
             ss << "[Scene]" << endl;
             ss << "Scene = " << ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->ActiveScene())) << endl;//;
             FileManager::WriteFile(s_editor_config_path, false, ss.str());
+        }
+        void EditorApp::LoadEditorResource()
+        {
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"folder.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"file.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"dark/material.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"dark/scene.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"point_light.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"directional_light.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"spot_light.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"area_light.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"camera.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"light_probe.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"dark/skeleton.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_N.alasset");
+            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_M.alasset");
+            auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name)
+            {
+                g_pResourceMgr->RegisterResource(mat_path, MakeRef<Material>(g_pResourceMgr->Get<Shader>(shader_path), mat_name));
+            };
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/PointLightBillboard", "PointLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/DirectionalLightBillboard", "DirectionalLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/SpotLightBillboard", "SpotLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/AreaLightBillboard", "AreaLightBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/CameraBillboard", "CameraBillboard");
+            mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/LightProbeBillboard", "LightProbeBillboard");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"point_light.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"directional_light.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"spot_light.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"area_light.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"camera.alasset");
+            g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
+            mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane");
+            Material::s_checker = g_pResourceMgr->Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
         }
     }// namespace Editor
 }// namespace Ailu

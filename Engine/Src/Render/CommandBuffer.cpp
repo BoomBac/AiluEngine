@@ -4,6 +4,7 @@
 #include "Render/GraphicsContext.h"
 #include "Render/Renderer.h"
 #include "pch.h"
+#include <Framework/Common/Application.h>
 
 namespace Ailu
 {
@@ -47,7 +48,7 @@ namespace Ailu
             auto cmd = std::make_shared<D3DCommandBuffer>(newId, type);
             s_cmd_buffers.emplace_back(std::make_tuple(false, cmd));
             ++s_cur_pool_size;
-            LOG_WARNING("Expand commandbuffer pool to {} with name {}", s_cur_pool_size,name);
+            LOG_WARNING("Expand commandbuffer pool to {} with name {} at frame {}", s_cur_pool_size,name,Application::s_frame_count);
             cmd->SetName(name);
             cmd->Clear();
             return cmd;

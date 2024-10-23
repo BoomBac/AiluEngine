@@ -26,7 +26,7 @@ keywords:
     _SpecularValue: 0,0,0,0
   prop_type: Texture2D
     _AlbedoTex: a5e5ce06-3542-4eb0-8087-5b4034c4dcf6
-    _EmissionTex: null guid
+    _EmissionTex: null
     _NormalTex: 880ca96c-98e3-4b02-904a-0146448b47e0
-    _RoughnessMetallicTex: null guid
-    _SpecularTex: null guid
+    _RoughnessMetallicTex: null
+    _SpecularTex: null

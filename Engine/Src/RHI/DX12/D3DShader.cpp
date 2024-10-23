@@ -133,44 +133,64 @@ namespace Ailu
     static bool CreateFromFileFXC(const std::wstring &filename, const std::string &entryPoint, const std::string &pTarget, const Vector<D3D_SHADER_MACRO> &keywords, ComPtr<ID3DBlob> &p_blob,
                                   ComPtr<ID3D12ShaderReflection> &shader_reflection, std::set<WString> &include_files)
     {
-        LOG_INFO(L"[D3DShader compiler]: file : {},entry : {}", filename, ToWStr(entryPoint));
-        ID3DBlob *pErrorBlob = nullptr;
-        //D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
-        UINT compileFlags = 0;
-#if defined(_DEBUG)
-        if (pTarget == RenderConstants::kCSModel_5_0)
+        D3DShaderInclude include;
+        include._cur_source_file_path = filename;
+        Vector<String> keyword_str;
+        for(auto& kw : keywords)
         {
-            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;// | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
+            if (kw.Name != nullptr)
+                keyword_str.emplace_back(kw.Name);
+        }
+        String unique_str = std::format("{}_{}_{}",ToChar(filename),entryPoint,su::Join(keyword_str,"_"));
+        std::hash<String> hash_fn;
+        u64 shader_hash = hash_fn(unique_str);
+        WString cached_blob_path = ResourceMgr::GetResSysPath(std::format(L"ShaderCache/hlsl/{}.cso",shader_hash));
+        if (FileManager::Exist(cached_blob_path) && FileManager::IsFileNewer(cached_blob_path,filename))
+        {
+            LOG_INFO(L"[D3DShader compiler]: load cache: {},entry : {}", filename, ToWStr(entryPoint));
+            ThrowIfFailed(D3DReadFileToBlob(cached_blob_path.c_str(),p_blob.GetAddressOf()));
         }
         else
         {
-            // Enable better shader debugging with the graphics debugging tools.
-            compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
-        }
-#else
-        compileFlags = 0;
-#endif
-        D3DShaderInclude include;
-        include._cur_source_file_path = filename;
-
-        D3DCompileFromFile(filename.c_str(), keywords.data(), &include, entryPoint.c_str(), pTarget.c_str(), compileFlags, 0, &p_blob, &pErrorBlob);
-        if (pErrorBlob)
-        {
-            //OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
-            String text(reinterpret_cast<const char *>(pErrorBlob->GetBufferPointer()));
-            // 使用 std::stringstream 分割文本并提取每一行
-            std::istringstream iss(text);
-            //std::vector<std::string> lines;
-            std::string line;
-            while (std::getline(iss, line))
+            LOG_INFO(L"[D3DShader compiler]: compile : {},entry : {}", filename, ToWStr(entryPoint));
+            ID3DBlob *pErrorBlob = nullptr;
+            //D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
+            UINT compileFlags = 0;
+#if defined(_DEBUG)
+            if (pTarget == RenderConstants::kCSModel_5_0)
             {
-                if (line.find("ERROR") != line.npos || line.find("error") != line.npos)
-                {
-                    LOG_ERROR("{} when compile shader {}", line, ToChar(filename))
-                }
+                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;// | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
             }
-            pErrorBlob->Release();
+            else
+            {
+                // Enable better shader debugging with the graphics debugging tools.
+                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
+            }
+#else
+            compileFlags = 0;
+#endif
+            D3DCompileFromFile(filename.c_str(), keywords.data(), &include, entryPoint.c_str(), pTarget.c_str(), compileFlags, 0, &p_blob, &pErrorBlob);
+            if (pErrorBlob)
+            {
+                //OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+                String text(reinterpret_cast<const char *>(pErrorBlob->GetBufferPointer()));
+                // 使用 std::stringstream 分割文本并提取每一行
+                std::istringstream iss(text);
+                //std::vector<std::string> lines;
+                std::string line;
+                while (std::getline(iss, line))
+                {
+                    if (line.find("ERROR") != line.npos || line.find("error") != line.npos)
+                    {
+                        LOG_ERROR("{} when compile shader {}", line, ToChar(filename))
+                    }
+                }
+                pErrorBlob->Release();
+            }
+            if (p_blob != nullptr)
+                FileManager::WriteFile(cached_blob_path,false,(u8 *)p_blob->GetBufferPointer(),p_blob->GetBufferSize());
         }
+
         if (p_blob != nullptr)
         {
             /*
@@ -202,7 +222,6 @@ namespace Ailu
             //D3DStripShader(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), D3DCOMPILER_STRIP_DEBUG_INFO, pStripped.GetAddressOf());
             // Finally, write the contents of pStripped as your final shader file.
             */
-
 
             ID3D12ShaderReflection *pReflection = NULL;
             D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void **) &shader_reflection);

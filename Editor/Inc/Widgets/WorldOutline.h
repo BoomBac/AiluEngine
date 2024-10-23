@@ -20,9 +20,12 @@ namespace Ailu
             void DrawTreeNode(ECS::Entity entity);
 		private:
             std::set<ECS::Entity> _drawed_entity;
-            ECS::Entity _selected_entity = ECS::kInvalidEntity;
             void OnOutlineDoubleClicked(ECS::Entity entity);
             ECS::Register *_scene_register = nullptr;
+            Queue<ECS::Entity> _pending_deleted_entities;
+            ECS::Entity _selected_entity = ECS::kInvalidEntity;
+            ECS::Entity  _rename_entity = ECS::kInvalidEntity;
+            char _rename_buffer[256] = { 0 };
 		};
 	}
 }

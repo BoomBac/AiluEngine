@@ -47,7 +47,7 @@ namespace Ailu
             auto new_quat_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
             _rot_object_x = Quaternion::NLerp(_rot_object_x, new_quat_x, speed);
             _rot_world_y = Quaternion::NLerp(_rot_world_y, new_quat_y, speed);
-            _p_camera->Position(lerp(_p_camera->Position(), _target_pos, speed));
+            _p_camera->Position(Lerp(_p_camera->Position(), _target_pos, speed));
             auto r = _rot_world_y * _rot_object_x;
             _p_camera->Rotation(r);
             _p_camera->RecalculateMarix(true);
@@ -124,26 +124,6 @@ namespace Ailu
                         }
                         return false;
                     });
-            static Vector2f target_rotation = {0.f, 0.f};
-            static Vector2f pre_mouse_pos;
-            dispater0.Dispatch<MouseMovedEvent>([this](MouseMovedEvent& e)->bool{
-                target_rotation = FirstPersonCameraController::s_inst._rotation;
-                auto cur_mouse_pos = Input::GetMousePos();
-                if (Input::IsKeyPressed(AL_KEY_RBUTTON))
-                {
-                    if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f &&
-                        abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
-                    {
-                        float angle_offset = FirstPersonCameraController::s_inst._camera_wander_speed * FirstPersonCameraController::s_inst._camera_wander_speed;
-                        target_rotation.y += (cur_mouse_pos.x - pre_mouse_pos.x) * angle_offset;
-                        target_rotation.x += (cur_mouse_pos.y - pre_mouse_pos.y) * angle_offset;
-                    }
-                }
-                pre_mouse_pos = cur_mouse_pos;
-                FirstPersonCameraController::s_inst.SetTargetRotation(target_rotation.x, target_rotation.y);
-                FirstPersonCameraController::s_inst.Accelerate(Input::IsKeyPressed(AL_KEY_SHIFT));
-                return false;
-            });
             dispater0.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e)->bool{
                 if (e.GetKeyCode() == AL_KEY_SHIFT)
                     FirstPersonCameraController::s_inst.Accelerate(true);
@@ -193,6 +173,23 @@ namespace Ailu
             Camera::sCurrent->Far(FirstPersonCameraController::s_inst._camera_far);
             if (Camera::sCurrent && !Input::IsInputBlock())
             {
+                static Vector2f target_rotation = {0.f, 0.f};
+                static Vector2f pre_mouse_pos;
+                target_rotation = FirstPersonCameraController::s_inst._rotation;
+                auto cur_mouse_pos = Input::GetMousePos();
+                if (Input::IsKeyPressed(AL_KEY_RBUTTON))
+                {
+                    if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f &&
+                        abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
+                    {
+                        float angle_offset = FirstPersonCameraController::s_inst._camera_wander_speed * FirstPersonCameraController::s_inst._camera_wander_speed;
+                        target_rotation.y += (cur_mouse_pos.x - pre_mouse_pos.x) * angle_offset;
+                        target_rotation.x += (cur_mouse_pos.y - pre_mouse_pos.y) * angle_offset;
+                    }
+                }
+                pre_mouse_pos = cur_mouse_pos;
+                FirstPersonCameraController::s_inst.SetTargetRotation(target_rotation.x, target_rotation.y);
+                FirstPersonCameraController::s_inst.Accelerate(Input::IsKeyPressed(AL_KEY_SHIFT));
                 static const f32 move_distance = 1.0f;// 1 m
                 f32 final_move_distance = move_distance * FirstPersonCameraController::s_inst._cur_move_speed * FirstPersonCameraController::s_inst._cur_move_speed;
                 Vector3f move_dis{0, 0, 0};

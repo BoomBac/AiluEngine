@@ -148,9 +148,9 @@ namespace Ailu
                         auto mesh = *(Asset **) (payload->Data);
                         g_pSceneMgr->ActiveScene()->AddObject(mesh->AsRef<Mesh>(), nullptr);
                     }
-                    OnActorPlaced(EPlaceActorsType::kObj);
                     if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(PlaceActors::kDragPlacementObj.c_str()))
                     {
+                        OnActorPlaced(EPlaceActorsType::kObj);
                         auto type_str = (const char *) (payload->Data);
                         OnActorPlaced(EPlaceActorsType::FromString(type_str), true);
                     }
@@ -375,7 +375,45 @@ namespace Ailu
                     comp._p_mesh = Mesh::s_p_cube.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-                    r.AddComponent<CCollider>(new_entity)._type = EColliderType::kBox;
+                    auto &c = r.AddComponent<CCollider>(new_entity);
+                    c._type = EColliderType::kBox;
+                    c._param = Vector3f::kOne;
+                    r.AddComponent<CRigidBody>(new_entity);
+                }
+                else if (type == EPlaceActorsType::kCylinder)
+                {
+                    tag->_name = std::format("cylinder_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    comp._p_mesh = Mesh::s_p_cylinder.lock();
+                    comp._p_mats.push_back(Material::s_checker.lock());
+                    comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                    auto &capsule = r.AddComponent<CCollider>(new_entity);
+                    capsule._type = EColliderType::kCapsule;
+                    capsule._param = {1.f, 2.f, 1.f};
+                    r.AddComponent<CRigidBody>(new_entity);
+                }
+                else if (type == EPlaceActorsType::kCone)
+                {
+                    tag->_name = std::format("cone_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    comp._p_mesh = Mesh::s_p_cone.lock();
+                    comp._p_mats.push_back(Material::s_checker.lock());
+                    comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                    auto &c = r.AddComponent<CCollider>(new_entity);
+                    c._type = EColliderType::kBox;
+                    c._param = Vector3f::kOne;
+                    r.AddComponent<CRigidBody>(new_entity);
+                }
+                else if (type == EPlaceActorsType::kTorus)
+                {
+                    tag->_name = std::format("torus_{}", r.EntityNum());
+                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    comp._p_mesh = Mesh::s_p_torus.lock();
+                    comp._p_mats.push_back(Material::s_checker.lock());
+                    comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+                    auto &c = r.AddComponent<CCollider>(new_entity);
+                    c._type = EColliderType::kBox;
+                    c._param = Vector3f::kOne;
                     r.AddComponent<CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kSphere)

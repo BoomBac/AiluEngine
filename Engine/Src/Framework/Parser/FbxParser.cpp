@@ -27,6 +27,7 @@ namespace Ailu
 		return out;
 	}
 
+    static Quaternion s_cached_quat;
 	static Transform FbxMatToTransform(FbxAMatrix src)
 	{
 		Transform t;
@@ -34,8 +35,12 @@ namespace Ailu
 		FbxVector4 s = src.GetS();
 		FbxQuaternion q = src.GetQ();
 		t._position = Vector3f{ (float)p[0],(float)p[1],(float)p[2] };
-		t._rotation = Quaternion{ (float)q[0],(float)q[1],(float)q[2],(float)q[3] };
 		t._scale = Vector3f{ (float)s[0],(float)s[1],(float)s[2] };
+		t._rotation = Quaternion{ (float)q[0],(float)q[1],(float)q[2],(float)q[3] };
+        //矫正相同效果四元数不在同一半球的问题,可能存在问题
+        if (Quaternion::Dot(t._rotation,s_cached_quat) < 0.0f)
+            t._rotation = -t._rotation;
+        s_cached_quat = t._rotation;
 		return t;
 	}
 
@@ -237,19 +242,27 @@ namespace Ailu
 	}
 
 	static Vector3f scale_factor{};
-	List<Ref<Mesh>> FbxParser::Parser(std::string_view sys_path)
-	{
-		// Convert string to wstring
-		return ParserImpl(ToWStr(sys_path.data()));
-	}
-	List<Ref<Mesh>> FbxParser::Parser(const WString& sys_path)
-	{
-		return ParserImpl(sys_path);
-	}
 
 	Ailu::FbxParser::~FbxParser()
 	{
-	}
+//        try
+//        {
+//            fbx_manager_->Destroy();
+//            fbx_importer_->Destroy();
+//            fbx_ios_->Destroy();
+//        }
+//        catch (const std::exception& e)
+//        {
+//            std::cout << e.what() << std::endl;
+//        }
+    }
+
+    void FbxParser::Parser(const WString &sys_path, const MeshImportSetting &import_setting)
+    {
+        _import_setting = import_setting;
+        std::unique_lock<std::mutex> lock(_parser_lock);
+		ParserImpl(sys_path);
+    }
 
 
 	void FbxParser::ParserFbxNode(FbxNode* node, Queue<FbxNode*>& mesh_node, Queue<FbxNode*>& skeleton_node)
@@ -318,18 +331,19 @@ namespace Ailu
 
 	bool FbxParser::ParserMesh(FbxNode* node, List<Ref<Mesh>>& loaded_meshes)
 	{
-
 		auto fbx_mesh = node->GetMesh();
-		if (!fbx_mesh->IsTriangleMesh())
-		{
-            _time_mgr.Mark();
-			fbxsdk::FbxGeometryConverter convert(fbx_manager_);
-			fbx_mesh = FbxCast<fbxsdk::FbxMesh>(convert.Triangulate(fbx_mesh, true));
-            LOG_INFO("Triangulate mesh cost {}ms", _time_mgr.GetElapsedSinceLastMark());
-		}
-		bool use_multi_thread = true;
+        if (_import_setting._import_flag & MeshImportSetting::kImportFlagMesh)
+        {
+            if (!fbx_mesh->IsTriangleMesh())
+            {
+                _time_mgr.Mark();
+                fbxsdk::FbxGeometryConverter convert(fbx_manager_);
+                fbx_mesh = FbxCast<fbxsdk::FbxMesh>(convert.Triangulate(fbx_mesh, true));
+                LOG_INFO("Triangulate mesh cost {}ms", _time_mgr.GetElapsedSinceLastMark());
+            }
+        }
 		bool is_skined = fbx_mesh->GetDeformerCount(FbxDeformer::eSkin) > 0;
-		auto mesh = is_skined ? MakeRef<SkinedMesh>(node->GetName()) : MakeRef<Mesh>(node->GetName());
+		auto mesh = is_skined ? MakeRef<SkeletonMesh>(node->GetName()) : MakeRef<Mesh>(node->GetName());
 		const int mat_count = node->GetMaterialCount();
 		static auto fill_tex = [&](const FbxProperty& prop)->String
 			{
@@ -360,62 +374,43 @@ namespace Ailu
 				}
 				return sys_path;
 			};
-		for (int i = 0; i < mat_count; ++i)
-		{
-			FbxSurfaceMaterial* mat = node->GetMaterial(i);
-			if (mat)
-			{
-				ImportedMaterialInfo mat_info(i, mat->GetName());
-				mat_info._textures[0] = fill_tex(mat->FindProperty(FbxSurfaceMaterial::sDiffuse));
-				mat_info._textures[1] = fill_tex(mat->FindProperty(FbxSurfaceMaterial::sNormalMap));
-				_imported_fbx_materials.emplace_back(mat_info);
-			}
-		}
-		if (use_multi_thread)
-		{
-			_time_mgr.Mark();
-			auto ret4 = g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, node, _cur_skeleton);
-			auto ret1 = g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, mesh.get());
-			auto ret2 = g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), mesh.get());
-			auto ret3 = g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), mesh.get());
-			if (ret1.get() && ret2.get() && ret3.get() && ret4.get())
-			{
-				LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-				_time_mgr.Mark();
-				GenerateIndexdMesh(mesh.get());
-				CalculateTangant(mesh.get());
-				LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-				//mesh->BuildRHIResource();
-				if (is_skined)
-				{
-					dynamic_cast<SkinedMesh*>(mesh.get())->CurSkeleton(_cur_skeleton);
-				}
-				loaded_meshes.emplace_back(mesh);
-				return true;
-			}
-			return false;
-		}
-		else
-		{
-			//_time_mgr.Mark();
-			ReadVertex(node, mesh.get());
-			ReadNormal(*fbx_mesh, mesh.get());
-			ReadUVs(*fbx_mesh, mesh.get());
-			ParserAnimation(node, _cur_skeleton);
-			//LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-			//_time_mgr.Mark();
-			GenerateIndexdMesh(mesh.get());
-			CalculateTangant(mesh.get());
-			//LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-			//mesh->Build();
-			if (is_skined)
-			{
-				dynamic_cast<SkinedMesh*>(mesh.get())->CurSkeleton(_cur_skeleton);
-			}
-			loaded_meshes.emplace_back(mesh);
-			return true;
-			return false;
-		}
+        if (_import_setting._is_import_material)
+        {
+            for (int i = 0; i < mat_count; ++i)
+            {
+                FbxSurfaceMaterial *mat = node->GetMaterial(i);
+                if (mat)
+                {
+                    ImportedMaterialInfo mat_info(i, mat->GetName());
+                    mat_info._textures[0] = fill_tex(mat->FindProperty(FbxSurfaceMaterial::sDiffuse));
+                    mat_info._textures[1] = fill_tex(mat->FindProperty(FbxSurfaceMaterial::sNormalMap));
+                    _loaded_materials.emplace_back(mat_info);
+                }
+            }
+        }
+        Vector<std::future<bool>> rets;
+        //_time_mgr.Mark();
+        if (_import_setting._import_flag & MeshImportSetting::kImportFlagMesh)
+        {
+            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, mesh.get()));
+            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), mesh.get()));
+            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), mesh.get()));
+            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, node, std::ref(_cur_skeleton)));
+            for (auto &ret: rets)
+                ret.get();
+            //LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+            //_time_mgr.Mark();
+            GenerateIndexdMesh(mesh.get());
+            CalculateTangant(mesh.get());
+            //LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
+            if (is_skined)
+            {
+                dynamic_cast<SkeletonMesh *>(mesh.get())->SetSkeleton(_cur_skeleton);
+            }
+            loaded_meshes.emplace_back(mesh);
+            return true;
+        }
+        return ParserAnimation(node,_cur_skeleton);
 	}
 
 	bool FbxParser::ParserAnimation(FbxNode* node, Skeleton& sk)
@@ -437,14 +432,18 @@ namespace Ailu
 				u16 joint_index = (u16)joint_i;
 				sk[joint_index]._inv_bind_pos = FbxMatToMat4x4f(global_bindpose_inv_matrix);
 				auto joint = cluster_link;
+				FbxTime cur_time;
+                cur_time.SetFrame(0, time_mode);
+                FbxAMatrix global_offpositon = node->EvaluateGlobalTransform(cur_time) * geometry_transform;
+				sk[joint_index]._node_inv_world_mat = FbxMatToMat4x4f(global_offpositon.Inverse());
+                if (clip == nullptr)
+                    return;
 				for (FbxLongLong i = 0; i < frame_count; i++)
 				{
-					FbxTime cur_time;
 					cur_time.SetFrame(i, time_mode);
-					FbxAMatrix global_offpositon = node->EvaluateGlobalTransform(cur_time) * geometry_transform;
+					global_offpositon = node->EvaluateGlobalTransform(cur_time) * geometry_transform;
 					FbxAMatrix bone_matrix_l;
 					ComputeClusterDeformation(true, global_offpositon, node, cluster, cluster_link, bone_matrix_l, cur_time, nullptr);
-					sk[joint_index]._node_inv_world_mat = FbxMatToMat4x4f(global_offpositon.Inverse());
 					if (!joint->GetParent()->GetSkeleton())
 					{
 						FbxNode* parent_node = joint->GetParent();
@@ -455,7 +454,20 @@ namespace Ailu
 						}
 						bone_matrix_l = none_joint_matrix * bone_matrix_l;
 					}
-					clip->AddKeyFrame(joint_index, FbxMatToTransform(bone_matrix_l));
+                    Transform local_transform = FbxMatToTransform(bone_matrix_l);
+					//clip->AddKeyFrame(joint_index, local_transform);
+                    auto& pos_track = (*clip)[joint_index].GetPositionTrack();
+                    pos_track.Resize(frame_count);
+                    memcpy(pos_track[i]._value,local_transform._position.data,sizeof(Vector3f));
+                    auto& rot_track = (*clip)[joint_index].GetRotationTrack();
+                    rot_track.Resize(frame_count);
+                    memcpy(rot_track[i]._value, local_transform._rotation._quat.data, sizeof(Quaternion));
+                    auto& scale_track = (*clip)[joint_index].GetScaleTrack();
+                    scale_track.Resize(frame_count);
+                    memcpy(scale_track[i]._value, local_transform._scale.data, sizeof(Vector3f));
+                    pos_track[i]._time = (f32 )cur_time.GetSecondDouble();
+                    rot_track[i]._time = pos_track[i]._time;
+                    scale_track[i]._time = pos_track[i]._time;
 				}
 			};
 		//g_pTimeMgr->Mark();
@@ -477,49 +489,42 @@ namespace Ailu
 			FbxTime::EMode TimeMode = FbxTime::GetGlobalTimeMode();
 			FbxLongLong FrameCount = Duration.GetFrameCount(TimeMode);
 			double FrameRate = FbxTime::GetFrameRate(TimeMode);
-			AnimationClip* clip = new AnimationClip(_cur_skeleton, FrameCount, static_cast<float>(Duration.GetSecondDouble()));
-			clip->Name(node->GetName());
-			if (b_use_mt)
-			{
-				Vector<std::future<void>> res{};
-				for (u32 i = 0; i < deformers_num; i++)
-				{
-					FbxSkin* skin = FbxCast<FbxSkin>(fbx_mesh->GetDeformer(i, FbxDeformer::eSkin));
-					if (!skin)
-					{
-						g_pLogMgr->LogWarningFormat("only support Skin deformer!");
-						continue;
-					}
-					u32 cluster_num = skin->GetClusterCount();
-					for (u32 j = 0; j < cluster_num; j++)
-					{
-						res.emplace_back(g_pThreadTool->Enqueue(parser_anim, std::ref(sk), node, fbx_mesh, skin->GetCluster(j), skin->GetCluster(j)->GetLink(), std::ref(geometry_transform), clip, FrameCount, TimeMode));
-					}
-				}
-				for (auto& ret : res)
-					ret.wait();
-			}
-			else
-			{
-				for (u32 i = 0; i < deformers_num; i++)
-				{
-					FbxSkin* skin = FbxCast<FbxSkin>(fbx_mesh->GetDeformer(i, FbxDeformer::eSkin));
-					if (!skin)
-						continue;
-					u32 cluster_num = skin->GetClusterCount();
-					for (u32 j = 0; j < cluster_num; j++)
-					{
-						parser_anim(sk, node, fbx_mesh, skin->GetCluster(j), skin->GetCluster(j)->GetLink(), geometry_transform, clip, FrameCount, TimeMode);
-					}
-				}
-			}
-			//LOG_INFO("Fill animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
-			clip->CurSkeletion(sk);
-			//g_pTimeMgr->Mark();
-			clip->Bake();
-			//LOG_INFO("Bake animation clip cost {} ms", g_pTimeMgr->GetElapsedSinceLastMark());
-			LOG_INFO("Import animation {} end", clip->Name())
-				_loaded_anims.emplace_back(clip);
+            if (_import_setting._import_flag & MeshImportSetting::kImportFlagAnimation)
+            {
+                Ref<AnimationClip> clip = MakeRef<AnimationClip>();
+                clip->Name(node->GetName());
+                clip->Duration(static_cast<float>(Duration.GetSecondDouble()));
+                clip->FrameCount(FrameCount);
+                clip->FrameRate(FrameRate);
+                for (u32 i = 0; i < deformers_num; i++)
+                {
+                    FbxSkin *skin = FbxCast<FbxSkin>(fbx_mesh->GetDeformer(i, FbxDeformer::eSkin));
+                    if (!skin)
+                        continue;
+                    u32 cluster_num = skin->GetClusterCount();
+                    for (u32 j = 0; j < cluster_num; j++)
+                    {
+                        parser_anim(sk, node, fbx_mesh, skin->GetCluster(j), skin->GetCluster(j)->GetLink(), geometry_transform, clip.get(), FrameCount, TimeMode);
+                    }
+                    clip->RecalculateDuration();
+                }
+                LOG_INFO("Import animation {} end", clip->Name());
+                _loaded_anims.emplace_back(clip);
+            }
+            else
+            {
+                for (u32 i = 0; i < deformers_num; i++)
+                {
+                    FbxSkin *skin = FbxCast<FbxSkin>(fbx_mesh->GetDeformer(i, FbxDeformer::eSkin));
+                    if (!skin)
+                        continue;
+                    u32 cluster_num = skin->GetClusterCount();
+                    for (u32 j = 0; j < cluster_num; j++)
+                    {
+                        parser_anim(sk, node, fbx_mesh, skin->GetCluster(j), skin->GetCluster(j)->GetLink(), geometry_transform, nullptr, FrameCount, TimeMode);
+                    }
+                }
+            }
 		}
 		return true;
 	}
@@ -712,6 +717,7 @@ namespace Ailu
 							cur_weight[weight_index] = cur_weight_info[weight_index].second;
 							cur_indices[weight_index] = cur_weight_info[weight_index].first;
 						}
+                        //AL_ASSERT((cur_weight.x >= cur_weight.y) && (cur_weight.y >= cur_weight.z) && (cur_weight.z >= cur_weight.w));
 						bone_weights_vec.emplace_back(cur_weight);
 						bone_indices_vec.emplace_back(cur_indices);
 					}
@@ -745,7 +751,7 @@ namespace Ailu
 			u32* bone_indices = new u32[vertex_count * 4];
 			memcpy(bone_weights, bone_weights_vec.data(), sizeof(Vector4f) * vertex_count);
 			memcpy(bone_indices, bone_indices_vec.data(), sizeof(Vector4D<u32>) * vertex_count);
-			auto sk_mesh = dynamic_cast<SkinedMesh*>(mesh);
+			auto sk_mesh = dynamic_cast<SkeletonMesh*>(mesh);
 			sk_mesh->SetBoneIndices(reinterpret_cast<Vector4D<u32>*>(bone_indices));
 			sk_mesh->SetBoneWeights(reinterpret_cast<Vector4D<float>*>(bone_weights));
 		}
@@ -913,49 +919,6 @@ namespace Ailu
 			tangents[i].w = (DotProduct(CrossProduct(n, t), b) < 0.0f) ? -1.0f : 1.0f;
 		}
 		delete[] bitangents;
-		//auto vertexCount = mesh->_vertex_count;
-		//Vector3f* tan1 = new Vector3f[vertexCount * 2];
-		//Vector3f* tan2 = tan1 + vertexCount;
-		//ZeroMemory(tan1, vertexCount * sizeof(Vector3f) * 2);
-		//for (size_t i = 0; i < mesh->GetIndicesCount(); i += 3)
-		//{
-		//	u32 i1 = indices[i], i2 = indices[i + 1], i3 = indices[i + 2];
-		//	const Vector3f& pos1 = pos[i1];
-		//	const Vector3f& pos2 = pos[i2];
-		//	const Vector3f& pos3 = pos[i3];
-		//	const Vector2f& uv1 = uv0[i1];
-		//	const Vector2f& uv2 = uv0[i2];
-		//	const Vector2f& uv3 = uv0[i3];
-		//	float x1 = pos2.x - pos1.x;
-		//	float x2 = pos3.x - pos1.x;
-		//	float y1 = pos2.y - pos1.y;
-		//	float y2 = pos3.y - pos1.y;
-		//	float z2 = pos3.z - pos1.z;
-		//	float z1 = pos2.z - pos1.z;
-		//	float s1 = uv2.x - uv1.x;
-		//	float s2 = uv3.x - uv1.x;
-		//	float t1 = uv2.y - uv1.y;
-		//	float t2 = uv3.y - uv1.y;
-		//	float r = 1.0f / (s1 * t2 - s2 * t1);
-		//	Vector3f sdir{ (t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r,(t2 * z1 - t1 * z2) * r };
-		//	Vector3f tdir{ (s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r,(s1 * z2 - s2 * z1) * r };
-		//	tan1[i1] += sdir;
-		//	tan1[i2] += sdir;
-		//	tan1[i3] += sdir;
-		//	tan2[i1] += tdir;
-		//	tan2[i2] += tdir;
-		//	tan2[i3] += tdir;
-		//	LOG_INFO("({},{},{})", tan1[i].x, tan1[i].y, tan1[i].z);
-		//}
-		//Vector3f* normal = mesh->GetNormals();
-		//for (size_t i = 0; i < mesh->_vertex_count; i++)
-		//{
-		//	const Vector3f& n = normal[i];
-		//	const Vector3f& t = tan1[i];
-		//	tangents[i].xyz = Normalize(t - n * DotProduct(n, t));
-		//	tangents[i].w = (DotProduct(CrossProduct(n, t), tan2[i]) < 0.0f) ? -1.0f : 1.0f;
-		//}
-		//delete[] tan1;
 		mesh->SetTangents(std::move(tangents));
 		return true;
 	}
@@ -967,7 +930,7 @@ namespace Ailu
 			g_pLogMgr->LogErrorFormat(std::source_location::current(), "mesh is null");
 			return;
 		}
-		SkinedMesh* skined_mesh = dynamic_cast<SkinedMesh*>(mesh);
+		SkeletonMesh* skined_mesh = dynamic_cast<SkeletonMesh*>(mesh);
 
 		u32 vertex_count = mesh->_vertex_count;
 		std::unordered_map<uint64_t, u32> vertex_map{};
@@ -1003,27 +966,42 @@ namespace Ailu
 		{
 			for (size_t i = 0; i < vertex_count; i++)
 			{
+                u32 submesh_index = _positon_material_index_mapper[i];
 				auto p = raw_pos[i];
 				auto n = raw_normals[_b_normal_by_controlpoint ? _positon_conrtol_index_mapper[i] : i];
 				auto uv = raw_uv0[i];
 				auto hash0 = v3hash(n), hash1 = v2hash(uv);
-				auto vertex_hash = Math::ALHash::CombineHashes(hash0, hash1);
+                auto vertex_hash = hash1;//Math::ALHash::CombineHashes(hash0, hash1);
 				auto bi = raw_bonei[i];
 				auto bw = raw_bonew[i];
 				auto it = vertex_map.find(vertex_hash);
 				if (it == vertex_map.end())
 				{
 					vertex_map[vertex_hash] = cur_index_count;
-					indices.emplace_back(cur_index_count++);
+                    submesh_indices[submesh_index].emplace_back(cur_index_count);
+					indices.emplace_back(cur_index_count);
 					normals.emplace_back(n);
 					positions.emplace_back(p);
 					uv0s.emplace_back(uv);
 					bone_indices.emplace_back(bi);
 					bone_weights.emplace_back(bw);
-					mesh_vmin = Min(mesh_vmin, p);
-					mesh_vmax = Max(mesh_vmax, p);
+                    if (subemesh_aabbs.contains(submesh_index))
+                    {
+                        auto &[exist_min, exist_max] = subemesh_aabbs[submesh_index];
+                        exist_min = Min(exist_min, p);
+                        exist_max = Max(exist_max, p);
+                    }
+                    else
+                    {
+                        subemesh_aabbs[submesh_index] = std::make_tuple(vertex_min, vertex_max);
+                    }
+                    ++cur_index_count;
 				}
-				else indices.emplace_back(it->second);
+                else
+                {
+                    indices.emplace_back(it->second);
+                    submesh_indices[submesh_index].emplace_back(it->second);
+                }
 			}
 		}
 		else
@@ -1034,7 +1012,7 @@ namespace Ailu
 				auto p = raw_pos[i], n = raw_normals[i];
 				auto uv = raw_uv0[i];
 				auto hash0 = v3hash(n), hash1 = v2hash(uv);
-				auto vertex_hash = Math::ALHash::CombineHashes(hash0, hash1);
+				auto vertex_hash = hash1;//Math::ALHash::CombineHashes(hash0, hash1);
 				auto it = vertex_map.find(vertex_hash);
 				if (it == vertex_map.end())
 				{
@@ -1115,162 +1093,97 @@ namespace Ailu
 		}
 	}
 
-	List<Ref<Mesh>> FbxParser::ParserImpl(WString sys_path)
+	void FbxParser::ParserImpl(WString sys_path)
 	{
 		//return ParserImpl(sys_path, false);
 		_cur_file_sys_path = sys_path;
 		scale_factor = Vector3f::kOne;
 		String path = ToChar(sys_path.data());
 		_p_cur_fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
-		List<Ref<Mesh>> loaded_meshs{};
 		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.c_str(), -1, fbx_manager_->GetIOSettings()))
 		{
 			g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load mesh failed whit invalid path {}", path);
-			return loaded_meshs;
 		}
-        _time_mgr.Mark();
-		fbx_importer_->Import(_p_cur_fbx_scene);
-		FbxNode* fbx_rt = _p_cur_fbx_scene->GetRootNode();
-		fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(_p_cur_fbx_scene);
-		if (_p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit() != fbxsdk::FbxSystemUnit::m)
-		{
-			const fbxsdk::FbxSystemUnit::ConversionOptions lConversionOptions = {
-			false, /* mConvertRrsNodes */
-			true, /* mConvertAllLimits */
-			true, /* mConvertClusters */
-			true, /* mConvertLightIntensity */
-			true, /* mConvertPhotometricLProperties */
-			true  /* mConvertCameraClipPlanes */
-			};
-			fbxsdk::FbxSystemUnit::m.ConvertScene(_p_cur_fbx_scene, lConversionOptions);
-		}
-		FillPoseArray(_p_cur_fbx_scene, _fbx_poses);
-		Queue<FbxNode*> mesh_node, skeleton_node;
-		ParserFbxNode(fbx_rt, mesh_node, skeleton_node);
-		_cur_skeleton.Clear();//当前仅支持一个骨骼，所以清空之前的数据
-		_loaded_anims.clear();
-		_imported_fbx_materials.clear();
-		auto skeleton_node_c = skeleton_node;
-        LOG_INFO("preprocess fbx scene cost {}ms",_time_mgr.GetElapsedSinceLastMark());
-		while (!skeleton_node.empty())
-		{
-            _time_mgr.Mark();
-			ParserSkeleton(skeleton_node.front(), _cur_skeleton);
-            LOG_INFO("parser skeleton {} cost {}ms", skeleton_node.front()->GetName(), _time_mgr.GetElapsedSinceLastMark());
-			skeleton_node.pop();
-		}
-		while (!mesh_node.empty())
-		{
-            _time_mgr.Mark();
-			ParserMesh(mesh_node.front(), loaded_meshs);
-            LOG_INFO("parser mesh {} cost {}ms", mesh_node.front()->GetName(), _time_mgr.GetElapsedSinceLastMark());
-			mesh_node.pop();
-		}
-		if (loaded_meshs.empty())
-		{
-			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);
-		}
-		return loaded_meshs;
-	}
-
-	List<Ref<Mesh>> FbxParser::ParserImpl(WString sys_path, bool ph)
-	{
-		String path = ToChar(sys_path.data());
-		_p_cur_fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
-		List<Ref<Mesh>> loaded_meshs{};
-		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.c_str(), -1, fbx_manager_->GetIOSettings()))
-		{
-			g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load mesh failed at path {}", path);
-			return loaded_meshs;
-		}
-		if (fbx_importer_->Import(_p_cur_fbx_scene))
-		{
-			// Check the scene integrity!
-			FbxStatus status;
-			FbxArray< FbxString*> details;
-			FbxSceneCheckUtility sceneCheck(FbxCast<FbxScene>(_p_cur_fbx_scene), &status, &details);
-			bool lNotify = (!sceneCheck.Validate(FbxSceneCheckUtility::eCkeckData) && details.GetCount() > 0) || (fbx_importer_->GetStatus().GetCode() != FbxStatus::eSuccess);
-			if (lNotify)
-			{
-				LOG_ERROR("\n");
-				LOG_ERROR("********************************************************************************\n");
-				if (details.GetCount())
-				{
-					LOG_ERROR("Scene integrity verification failed with the following errors:\n");
-					for (int i = 0; i < details.GetCount(); i++)
-						LOG_ERROR("   {}\n", details[i]->Buffer());
-					FbxArrayDelete<FbxString*>(details);
-				}
-				if (fbx_importer_->GetStatus().GetCode() != FbxStatus::eSuccess)
-				{
-					LOG_ERROR("\n");
-					LOG_ERROR("WARNING:\n");
-					LOG_ERROR("   The importer was able to read the file but with errors.\n");
-					LOG_ERROR("   Loaded scene may be incomplete.\n\n");
-					LOG_ERROR("   Last error message: {}\n", fbx_importer_->GetStatus().GetErrorString());
-				}
-				LOG_ERROR("********************************************************************************\n");
-				LOG_ERROR("\n");
-			}
-			//convert scene axis and unit
-			FbxAxisSystem scene_axis_system = _p_cur_fbx_scene->GetGlobalSettings().GetAxisSystem();
-			if (scene_axis_system != FbxAxisSystem::DirectX)
-				FbxAxisSystem::DirectX.DeepConvertScene(_p_cur_fbx_scene);
-			fbxsdk::FbxSystemUnit scene_sys_unit = _p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit();
-			if (scene_sys_unit.GetScaleFactor() != 1.0)
-				fbxsdk::FbxSystemUnit::cm.ConvertScene(_p_cur_fbx_scene);
-			_p_cur_fbx_scene->FillAnimStackNameArray(_fbx_anim_stack_names);
-			SetCurrentAnimStack(0);
-			//convert all geometry object to triangle mesh
-			FbxGeometryConverter converter(fbx_manager_);
-			try
-			{
-				converter.Triangulate(FbxCast<FbxScene>(_p_cur_fbx_scene), true);
-			}
-			catch (std::runtime_error)
-			{
-				LOG_ERROR("Scene integrity verification failed.\n");
-			}
-			ParserSceneNodeRecursive(_p_cur_fbx_scene->GetRootNode(), _p_fbx_anim_layer);
-			FillPoseArray(_p_cur_fbx_scene, _fbx_poses);
-		}
-		FbxNode* fbx_rt = _p_cur_fbx_scene->GetRootNode();
-
-		if (_p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit() != fbxsdk::FbxSystemUnit::cm)
-		{
-			const FbxSystemUnit::ConversionOptions lConversionOptions = {
-			false, /* mConvertRrsNodes */
-			true, /* mConvertAllLimits */
-			true, /* mConvertClusters */
-			true, /* mConvertLightIntensity */
-			true, /* mConvertPhotometricLProperties */
-			true  /* mConvertCameraClipPlanes */
-			};
-			fbxsdk::FbxSystemUnit::cm.ConvertScene(_p_cur_fbx_scene, lConversionOptions);
-		}
-		//ParserFbxNode(fbx_rt, loaded_meshs);
-		Queue<FbxNode*> mesh_node, skeleton_node;
-		ParserFbxNode(fbx_rt, mesh_node, skeleton_node);
-		_cur_skeleton.Clear();//当前仅支持一个骨骼，所以清空之前的数据
-		_loaded_anims.clear();
-		auto skeleton_node_c = skeleton_node;
-		while (!skeleton_node.empty())
-		{
-			ParserSkeleton(skeleton_node.front(), _cur_skeleton);
-			skeleton_node.pop();
-		}
-		while (!mesh_node.empty())
-		{
-			auto ret = g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, mesh_node.front(), _cur_skeleton);
-			ParserMesh(mesh_node.front(), loaded_meshs);
-			if (ret.get())
-				mesh_node.pop();
-		}
-		if (loaded_meshs.empty())
-		{
-			g_pLogMgr->LogErrorFormat(L"Load fbx from path {} failed!", sys_path);
-		}
-		return loaded_meshs;
+        //_time_mgr.Mark();
+        if (fbx_importer_->Import(_p_cur_fbx_scene))
+        {
+            FbxStatus status;
+            FbxArray<FbxString *> details;
+            FbxSceneCheckUtility sceneCheck(FbxCast<FbxScene>(_p_cur_fbx_scene), &status, &details);
+            bool lNotify = (!sceneCheck.Validate(FbxSceneCheckUtility::eCkeckData) && details.GetCount() > 0) || (fbx_importer_->GetStatus().GetCode() != FbxStatus::eSuccess);
+            if (lNotify)
+            {
+                //LOG_ERROR("********************************************************************************");
+                //if (details.GetCount())
+                //{
+                //    LOG_ERROR("Scene integrity verification failed with the following errors:");
+                //    for (int i = 0; i < details.GetCount(); i++)
+                //        LOG_ERROR("   {}", String(details[i]->Buffer()));
+                //    FbxArrayDelete<FbxString *>(details);
+                //}
+                //if (fbx_importer_->GetStatus().GetCode() != FbxStatus::eSuccess)
+                //{
+                //    LOG_ERROR("WARNING:");
+                //    LOG_ERROR("   The importer was able to read the file but with errors.");
+                //    LOG_ERROR("   Loaded scene may be incomplete.");
+                //    String str(fbx_importer_->GetStatus().GetErrorString());
+                //    LOG_ERROR("   Last error message: {}", str);
+                //}
+                //LOG_ERROR("********************************************************************************");
+            }
+            FbxNode *fbx_rt = _p_cur_fbx_scene->GetRootNode();
+            fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(_p_cur_fbx_scene);
+            if (_p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit() != fbxsdk::FbxSystemUnit::m)
+            {
+                const fbxsdk::FbxSystemUnit::ConversionOptions lConversionOptions = {
+                        false, /* mConvertRrsNodes */
+                        true,  /* mConvertAllLimits */
+                        true,  /* mConvertClusters */
+                        true,  /* mConvertLightIntensity */
+                        true,  /* mConvertPhotometricLProperties */
+                        true   /* mConvertCameraClipPlanes */
+                };
+                fbxsdk::FbxSystemUnit::m.ConvertScene(_p_cur_fbx_scene, lConversionOptions);
+            }
+            FillPoseArray(_p_cur_fbx_scene, _fbx_poses);
+            Queue<FbxNode *> mesh_node, skeleton_node;
+            ParserFbxNode(fbx_rt, mesh_node, skeleton_node);
+            _cur_skeleton.Clear();//当前仅支持一个骨骼，所以清空之前的数据
+            _loaded_anims.clear();
+            _loaded_meshes.clear();
+            _loaded_materials.clear();
+            auto skeleton_node_c = skeleton_node;
+            //LOG_INFO("preprocess fbx scene cost {}ms",_time_mgr.GetElapsedSinceLastMark());
+            while (!skeleton_node.empty())
+            {
+                //_time_mgr.Mark();
+                ParserSkeleton(skeleton_node.front(), _cur_skeleton);
+                //LOG_INFO("parser skeleton {} cost {}ms", skeleton_node.front()->GetName(), _time_mgr.GetElapsedSinceLastMark());
+                skeleton_node.pop();
+            }
+            while (!mesh_node.empty())
+            {
+                //_time_mgr.Mark();
+                ParserMesh(mesh_node.front(), _loaded_meshes);
+                //LOG_INFO("parser mesh {} cost {}ms", mesh_node.front()->GetName(), _time_mgr.GetElapsedSinceLastMark());
+                mesh_node.pop();
+            }
+            LOG_INFO(L"Fbx file {} parser done with {} mesh,{} skeleton,  {} animation", sys_path, _loaded_meshes.size(), _cur_skeleton.JointNum() > 0 ? 1 : 0, _loaded_anims.size());
+            for (auto &it: _loaded_anims)
+            {
+                auto file_name = ToChar(PathUtils::GetFileName(sys_path));
+                file_name.append("_").append(it->Name());
+                it->Name(file_name);
+                AnimationClipLibrary::AddClip(std::format("{}_raw", it->Name()), it);
+            }
+            _fbx_poses.Clear();
+            _fbx_cameras.Clear();
+            _fbx_anim_stack_names.Clear();
+        }
+        else
+        {
+            LOG_ERROR(L"Import file {} failed!",sys_path)
+        }
 	}
 
 	void FbxParser::FillCameraArray(FbxScene* pScene, FbxArray<FbxNode*>& pCameraArray)

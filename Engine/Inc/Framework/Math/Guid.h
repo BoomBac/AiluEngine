@@ -14,6 +14,7 @@ namespace Ailu
         explicit Guid(std::string guid);
         const std::string& ToString() const;
         bool operator ==(const Guid& other) const;
+        bool operator ==(const String& other) const;
         bool operator<(const Guid& other) const { return _guid < other._guid; }
         static const Guid& EmptyGuid() { return kEmptyGuid; }
 

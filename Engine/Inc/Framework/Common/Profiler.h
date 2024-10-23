@@ -50,10 +50,12 @@ namespace Ailu
 	private:
 		void AddCPUProfilerHierarchy(bool begin_profiler, u32 index)
 		{
+            std::lock_guard<std::mutex> lock(_lock);
 			_cpu_profiler_queue.push(std::make_tuple(begin_profiler, index));
 		}
 		void AddGPUProfilerHierarchy(bool begin_profiler, u32 index)
 		{
+            std::lock_guard<std::mutex> lock(_lock);
 			_gpu_profiler_queue.push(std::make_tuple(begin_profiler, index));
 		}
 	protected:
@@ -63,6 +65,7 @@ namespace Ailu
 		u64 numCPUProfiles = 0;
 		TimeMgr _cpu_timer;
 		IGPUTimer* _p_gpu_timer = nullptr;
+        std::mutex _lock;
 	private:
 	};
 

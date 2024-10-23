@@ -14,7 +14,7 @@ namespace Ailu
     namespace Editor
     {
         static u16 s_mini_tex_size = 64;
-
+        static const String kNullStr = "null";
         namespace TreeStats
         {
             static i16 s_cur_opened_texture_selector = -1;
@@ -104,6 +104,39 @@ namespace Ailu
                 g_pSceneMgr->MarkCurSceneDirty();
             }
             ImGui::Spacing();
+        }
+
+        template<typename Iter, typename T>
+        static bool DrawResourceDropdown(const String &label, Iter begin, Iter end, Ref<T>& out_ptr, String prev_str = kNullStr)
+        {
+            bool ret = false;
+            out_ptr = nullptr;
+            static int s_selected_index = -1;
+            u16 cur_index = 0u;
+            if (ImGui::BeginCombo(label.c_str(), prev_str.c_str()))
+            {
+                if (ImGui::Selectable(kNullStr.c_str(), s_selected_index == cur_index))
+                {
+                    s_selected_index = 0u;
+                    ret = true;
+                }
+                ++cur_index;
+                for (auto it = begin; it != end; ++it)
+                {
+                    bool is_selected = s_selected_index == cur_index;
+                    Ref<T> obj = ResourceMgr::IterToRefPtr<T>(it);
+                    is_selected = ImGui::Selectable(obj->Name().c_str(), &is_selected);
+                    if (is_selected)
+                    {
+                        s_selected_index = cur_index;
+                        ret = true;
+                        out_ptr = obj;
+                    }
+                    ++cur_index;
+                }
+                ImGui::EndCombo();
+            }
+            return ret;
         }
 
         static void DrawProperty(u32 &property_handle, SerializableProperty &prop, Object *obj)
@@ -231,10 +264,10 @@ namespace Ailu
         static void DrawMaterialDetailPanel(Material *mat)
         {
             u32 property_handle = 0;
-            for (auto& it: mat->GetAllProperties())
+            for (auto &it: mat->GetAllProperties())
             {
-                auto& [name, prop] = it;
-                DrawProperty(property_handle,prop,mat);
+                auto &[name, prop] = it;
+                DrawProperty(property_handle, prop, mat);
             }
         }
 
@@ -404,7 +437,7 @@ namespace Ailu
             }
         }
 
-        static u16 DrawEnumProperty(const String& title,const String enum_str[],u16 arr_len,u16 default_index = 0u)
+        static u16 DrawEnumProperty(const String &title, const String enum_str[], u16 arr_len, u16 default_index = 0u)
         {
             u16 selected_index = default_index;
             if (ImGui::BeginCombo(title.c_str(), enum_str[default_index].c_str(), 0))
@@ -420,6 +453,193 @@ namespace Ailu
                 ImGui::EndCombo();
             }
             return selected_index;
+        }
+
+        template<typename T>
+        static void MeshCompDrawer(T *comp)
+        {
+            constexpr bool is_skined_comp = std::is_same<T, CSkeletonMesh>::value;
+            const static ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
+            if (ImGui::BeginTable("##static_mesh_comp", 2, flags))
+            {
+                const static ImGuiComboFlags combo_flags = ImGuiComboFlags_NoArrowButton;
+                // Setup columns
+                ImGui::TableSetupColumn("##key");
+                ImGui::TableSetupColumn("##value");
+                //mesh scope
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text(is_skined_comp ? "SkeletionMesh" : "StaticMesh");
+                    ImGui::TableSetColumnIndex(1);
+                    u16 mesh_index = 0;
+                    static int s_mesh_selected_index = -1;
+                    const char *preview_str = comp->_p_mesh ? comp->_p_mesh->Name().c_str() : "null";
+                    if (ImGui::BeginCombo("##mesh", preview_str, combo_flags))
+                    {
+                        if constexpr (is_skined_comp)
+                        {
+                            for (auto it = g_pResourceMgr->ResourceBegin<SkeletonMesh>(); it != g_pResourceMgr->ResourceEnd<SkeletonMesh>(); it++)
+                            {
+                                auto mesh = ResourceMgr::IterToRefPtr<SkeletonMesh>(it);
+                                if (ImGui::Selectable(mesh->Name().c_str(), s_mesh_selected_index == mesh_index))
+                                    s_mesh_selected_index = mesh_index;
+                                if (s_mesh_selected_index == mesh_index)
+                                {
+                                    comp->_p_mesh = mesh;
+                                    comp->_transformed_aabbs.resize(comp->_p_mesh->SubmeshCount() + 1);
+                                    g_pSceneMgr->MarkCurSceneDirty();
+                                }
+                                ++mesh_index;
+                            }
+                        }
+                        else
+                        {
+                            for (auto it = g_pResourceMgr->ResourceBegin<Mesh>(); it != g_pResourceMgr->ResourceEnd<Mesh>(); it++)
+                            {
+                                auto mesh = ResourceMgr::IterToRefPtr<Mesh>(it);
+                                if (ImGui::Selectable(mesh->Name().c_str(), s_mesh_selected_index == mesh_index))
+                                    s_mesh_selected_index = mesh_index;
+                                if (s_mesh_selected_index == mesh_index)
+                                {
+                                    comp->_p_mesh = mesh;
+                                    comp->_transformed_aabbs.resize(comp->_p_mesh->SubmeshCount() + 1);
+                                    g_pSceneMgr->MarkCurSceneDirty();
+                                }
+                                ++mesh_index;
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    if constexpr (is_skined_comp)
+                    {
+                    }
+                    else
+                    {
+                        if (ImGui::BeginDragDropTarget())
+                        {
+                            const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(ImGuiWidget::kDragAssetMesh.c_str());
+                            if (payload)
+                            {
+                                auto new_mesn = (*(Asset **) (payload->Data))->AsRef<Mesh>();
+                                comp->_p_mesh = new_mesn;
+                            }
+                            ImGui::EndDragDropTarget();
+                        }
+                    }
+                }
+                ImGui::TableNextRow();
+                ImGui::Separator();
+                if constexpr (is_skined_comp)
+                {
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("AnimClip");
+                    ImGui::TableSetColumnIndex(1);
+                    Ref<AnimationClip> ptr;
+                    if (DrawResourceDropdown("##animclip", g_pResourceMgr->ResourceBegin<AnimationClip>(), g_pResourceMgr->ResourceEnd<AnimationClip>(), 
+                        ptr, comp->_anim_clip ? comp->_anim_clip->Name() : kNullStr))
+                    {
+                        comp->_anim_clip = ptr;
+                        g_pSceneMgr->MarkCurSceneDirty();
+                    }
+                    if (DrawResourceDropdown("##blend_animclip", g_pResourceMgr->ResourceBegin<AnimationClip>(), g_pResourceMgr->ResourceEnd<AnimationClip>(),
+                                             ptr, comp->_blend_anim_clip ? comp->_blend_anim_clip->Name() : kNullStr))
+                    {
+                        comp->_blend_anim_clip = ptr;
+                        g_pSceneMgr->MarkCurSceneDirty();
+                    }
+                    ImGui::TableNextRow();
+                    {
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::Text("AnimType: ");
+                        ImGui::TableSetColumnIndex(1);
+                        int type = comp->_anim_type;
+                        ImGui::SliderInt("##AnimType", &type, 0, 2);
+                        comp->_anim_type = type;
+                    }
+                    if (comp->_anim_clip)
+                    {
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::Text("AnimFrame");
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::SliderFloat("##AnimFrame", &comp->_anim_time, -1.0f, comp->_anim_clip ? comp->_anim_clip->Duration() : 1.0f, "%.2f");
+                        bool is_loop = comp->_anim_clip->IsLooping();
+                        ImGui::Checkbox("Loop", &is_loop);
+                        comp->_anim_clip->IsLooping(is_loop);
+                    }
+                    ImGui::TableNextRow();
+                    ImGui::Separator();
+                }
+
+                auto &materials = comp->_p_mats;
+                //material scope
+                {
+                    if (comp->_p_mesh)
+                    {
+                        for (int i = 0; i < comp->_p_mesh->SubmeshCount(); i++)
+                        {
+                            ImGui::TableSetColumnIndex(0);
+                            ImGui::Text("Material_%d", i);
+                            ImGui::TableSetColumnIndex(1);
+
+                            Ref<Material> mat = i < materials.size() && materials[i] != nullptr ? materials[i] : nullptr;
+                            u16 mesh_index = 0;
+                            static int s_mat_selected_index = -1;
+                            if (ImGui::BeginCombo("##Select Material: ", mat ? mat->Name().c_str() : "Missing", combo_flags))
+                            {
+                                for (auto it = g_pResourceMgr->ResourceBegin<Material>(); it != g_pResourceMgr->ResourceEnd<Material>(); it++)
+                                {
+                                    auto new_mat = ResourceMgr::IterToRefPtr<Material>(it);
+                                    if (ImGui::Selectable(new_mat->Name().c_str(), s_mat_selected_index == i))
+                                        s_mat_selected_index = i;
+                                    if (s_mat_selected_index == i)
+                                    {
+                                        //AL_ASSERT(i < comp->_p_mats.size());
+                                        comp->_p_mats.resize(i + 1);
+                                        comp->_p_mats[i] = new_mat;
+                                        g_pSceneMgr->MarkCurSceneDirty();
+                                        s_mat_selected_index = -1;
+                                    }
+                                }
+                                ImGui::EndCombo();
+                            }
+                            if (ImGui::BeginDragDropTarget())
+                            {
+                                const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(ImGuiWidget::kDragAssetMaterial.c_str());
+                                if (payload)
+                                {
+                                    auto material = *(Asset **) (payload->Data);
+                                    auto mat_ref = material->AsRef<Material>();
+                                    //AL_ASSERT(i < comp->_p_mats.size());
+                                    comp->_p_mats.resize(i + 1);
+                                    comp->_p_mats[i] = mat_ref;
+                                    g_pSceneMgr->MarkCurSceneDirty();
+                                    LOG_INFO("Set new material");
+                                }
+                                ImGui::EndDragDropTarget();
+                            }
+                            ImGui::TableNextRow();
+                        }
+                    }
+                }
+                ImGui::EndTable();
+                for (auto mat: materials)
+                {
+                    if (mat != nullptr)
+                    {
+                        bool is_open = ImGui::TreeNodeEx(mat->Name().c_str());
+                        if (is_open)
+                        {
+                            if (auto standard_mat = dynamic_cast<StandardMaterial *>(mat.get()); standard_mat != nullptr)
+                                DrawInternalStandardMaterial(standard_mat);
+                            else
+                                DrawMaterialDetailPanel(mat.get());
+                            ImGui::TreePop();
+                        }
+                    }
+                }
+            }
         }
 
         ObjectDetail::ObjectDetail() : ImGuiWidget("ObjectDetail")
@@ -468,8 +688,7 @@ namespace Ailu
             ImGui::SameLine();
             u16 selected_new_comp_index = (u16) (-1);
             static Vector<String> s_comp_tag = {
-                    "LightComponent", "CameraComponent", "StaticMeshComponent", "LightProbeComponent", "RigidComponent", "ColliderComponent"
-            };
+                    "LightComponent", "CameraComponent", "StaticMeshComponent", "LightProbeComponent", "RigidComponent", "ColliderComponent", "SkeletonComponent"};
             if (ImGui::BeginCombo(" ", "+ Add Component"))
             {
                 for (u16 i = 0; i < s_comp_tag.size(); i++)
@@ -500,9 +719,11 @@ namespace Ailu
                         }
                         else if (i == 5)
                         {
-                            auto& c = scene_register.AddComponent<CCollider>(entity);
+                            auto &c = scene_register.AddComponent<CCollider>(entity);
                             c._type = EColliderType::kBox;
                         }
+                        else if (i == 6)
+                            scene_register.AddComponent<CSkeletonMesh>(entity);
                         else {};
                     }
                 }
@@ -584,7 +805,6 @@ namespace Ailu
                                                                   f32 w = light_data._light_param.y, h = light_data._light_param.z;
                                                                   ImGui::DragFloat("Width", &w, 1.0, 0.0, 500.0f);
                                                                   ImGui::DragFloat("Height", &h, 1.0, 0.0, 500.0f);
-                                                                  LOG_INFO("size: {},{}", w, h);
                                                                   light_data._light_param.y = w;
                                                                   light_data._light_param.z = h;
                                                               }
@@ -609,116 +829,13 @@ namespace Ailu
             {
                 auto comp = scene_register.GetComponent<StaticMeshComponent>(entity);
                 DrawComponent<StaticMeshComponent>("StaticMeshComponent", comp, entity, [this](StaticMeshComponent *comp)
-                                                   {
-                                                           //bool is_skined_comp = comp->GetType() == SkinedMeshComponent::GetStaticType();
-                                                           const static ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
-                                                           if (ImGui::BeginTable("##static_mesh_comp", 2, flags))
-                                                           {
-                                                               const static ImGuiComboFlags combo_flags = ImGuiComboFlags_NoArrowButton;
-                                                               // Setup columns
-                                                               ImGui::TableSetupColumn("##key");
-                                                               ImGui::TableSetupColumn("##value");
-                                                               //mesh scope
-                                                               {
-                                                                   ImGui::TableNextRow();
-                                                                   ImGui::TableSetColumnIndex(0);
-                                                                   ImGui::Text("StaticMesh");
-                                                                   ImGui::TableSetColumnIndex(1);
-                                                                   u16 mesh_index = 0;
-                                                                   static int s_mesh_selected_index = -1;
-                                                                   if (ImGui::BeginCombo("##mesh", comp->_p_mesh->Name().c_str(), combo_flags))
-                                                                   {
-                                                                       for (auto it = g_pResourceMgr->ResourceBegin<Mesh>(); it != g_pResourceMgr->ResourceEnd<Mesh>(); it++)
-                                                                       {
-                                                                           auto mesh = ResourceMgr::IterToRefPtr<Mesh>(it);
-                                                                           if (ImGui::Selectable(mesh->Name().c_str(), s_mesh_selected_index == mesh_index))
-                                                                               s_mesh_selected_index = mesh_index;
-                                                                           if (s_mesh_selected_index == mesh_index)
-                                                                           {
-                                                                               comp->_p_mesh = mesh;
-                                                                               g_pSceneMgr->MarkCurSceneDirty();
-                                                                           }
-                                                                           ++mesh_index;
-                                                                       }
-                                                                       ImGui::EndCombo();
-                                                                   }
-                                                                   if (ImGui::BeginDragDropTarget())
-                                                                   {
-                                                                       const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(kDragAssetMesh.c_str());
-                                                                       if (payload)
-                                                                       {
-                                                                           auto new_mesn = (*(Asset **) (payload->Data))->AsRef<Mesh>();
-                                                                           comp->_p_mesh = new_mesn;
-                                                                       }
-                                                                       ImGui::EndDragDropTarget();
-                                                                   }
-                                                               }
-                                                               ImGui::TableNextRow();
-                                                               ImGui::Separator();
-                                                               auto &materials = comp->_p_mats;
-                                                               //material scope
-                                                               {
-                                                                   for (int i = 0; i < comp->_p_mesh->SubmeshCount(); i++)
-                                                                   {
-                                                                       ImGui::TableSetColumnIndex(0);
-                                                                       ImGui::Text("Material_%d", i);
-                                                                       ImGui::TableSetColumnIndex(1);
-
-                                                                       Ref<Material> mat = i < materials.size() && materials[i] != nullptr ? materials[i] : nullptr;
-                                                                       u16 mesh_index = 0;
-                                                                       static int s_mat_selected_index = -1;
-                                                                       if (ImGui::BeginCombo("##Select Material: ", mat ? mat->Name().c_str() : "Missing", combo_flags))
-                                                                       {
-                                                                           for (auto it = g_pResourceMgr->ResourceBegin<Material>(); it != g_pResourceMgr->ResourceEnd<Material>(); it++)
-                                                                           {
-                                                                               auto new_mat = ResourceMgr::IterToRefPtr<Material>(it);
-                                                                               if (ImGui::Selectable(new_mat->Name().c_str(), s_mat_selected_index == i))
-                                                                                   s_mat_selected_index = i;
-                                                                               if (s_mat_selected_index == i)
-                                                                               {
-                                                                                   AL_ASSERT(i < comp->_p_mats.size());
-                                                                                   comp->_p_mats[i] = new_mat;
-                                                                                   g_pSceneMgr->MarkCurSceneDirty();
-                                                                                   s_mat_selected_index = -1;
-                                                                               }
-                                                                           }
-                                                                           ImGui::EndCombo();
-                                                                       }
-                                                                       if (ImGui::BeginDragDropTarget())
-                                                                       {
-                                                                           const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(ImGuiWidget::kDragAssetMaterial.c_str());
-                                                                           if (payload)
-                                                                           {
-                                                                               auto material = *(Asset **) (payload->Data);
-                                                                               auto mat_ref = material->AsRef<Material>();
-                                                                               //AL_ASSERT(i < comp->_p_mats.size());
-                                                                               comp->_p_mats.resize(i + 1);
-                                                                               comp->_p_mats[i] = mat_ref;
-                                                                               g_pSceneMgr->MarkCurSceneDirty();
-                                                                               LOG_INFO("Set new material");
-                                                                           }
-                                                                           ImGui::EndDragDropTarget();
-                                                                       }
-                                                                       ImGui::TableNextRow();
-                                                                   }
-                                                               }
-                                                               ImGui::EndTable();
-                                                               for (auto mat: materials)
-                                                               {
-                                                                   if (mat != nullptr)
-                                                                   {
-                                                                       bool is_open = ImGui::TreeNodeEx(mat->Name().c_str());
-                                                                       if (is_open)
-                                                                       {
-                                                                           if (auto standard_mat = dynamic_cast<StandardMaterial *>(mat.get()) ;standard_mat != nullptr)
-                                                                               DrawInternalStandardMaterial(standard_mat);
-                                                                           else
-                                                                               DrawMaterialDetailPanel(mat.get());
-                                                                           ImGui::TreePop();
-                                                                       }
-                                                                   }
-                                                               }
-                                                           } });
+                                                   { MeshCompDrawer(comp); });
+            }
+            if (scene_register.HasComponent<CSkeletonMesh>(entity))
+            {
+                auto comp = scene_register.GetComponent<CSkeletonMesh>(entity);
+                DrawComponent<CSkeletonMesh>("SkeletonMeshComponent", comp, entity, [this](CSkeletonMesh *comp)
+                                             { MeshCompDrawer(comp); });
             }
             if (scene_register.HasComponent<CCamera>(entity))
             {
@@ -768,7 +885,7 @@ namespace Ailu
             if (scene_register.HasComponent<CLightProbe>(entity))
             {
                 auto comp = scene_register.GetComponent<CLightProbe>(entity);
-                DrawComponent<CLightProbe>("LightProbeComponent", comp,entity, [this](CLightProbe *comp)
+                DrawComponent<CLightProbe>("LightProbeComponent", comp, entity, [this](CLightProbe *comp)
                                            {
                                                            if(ImGui::Button("Bake"))
                                                            {
@@ -783,20 +900,19 @@ namespace Ailu
             {
                 auto comp = scene_register.GetComponent<CRigidBody>(entity);
                 DrawComponent<CRigidBody>("RigidComponent", comp, entity, [this](CRigidBody *comp)
-                                            { 
+                                          { 
                                                 ImGui::SliderFloat("Mass", &comp->_mass, 0.0, 1000.0, "%.2f");
                                                 ImGui::Text("State:");
                                                 ImGui::Indent(10.f);
                                                 ImGui::SameLine();
                                                 ImGui::Text("Velocity %s", comp->_velocity.ToString().c_str());
-                                                ImGui::Text("AngularVelocity %s", comp->_angular_velocity.ToString().c_str());
-                                            });
+                                                ImGui::Text("AngularVelocity %s", comp->_angular_velocity.ToString().c_str()); });
             };
             if (scene_register.HasComponent<CCollider>(entity))
             {
                 auto comp = scene_register.GetComponent<CCollider>(entity);
                 DrawComponent<CCollider>("ColiderComponent", comp, entity, [this](CCollider *comp)
-                                          { 
+                                         { 
                                                 static const char* items[3] = 
                                                 {
                                                     EColliderType::_Strings[0].c_str(),
@@ -846,8 +962,7 @@ namespace Ailu
                                                         }
                                                         ImGui::EndCombo();
                                                     }
-                                                }
-                                          });
+                                                } });
             };
             _p_texture_selector->Show();
         }

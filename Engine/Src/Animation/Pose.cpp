@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Animation/Pose.h"
+#include "Animation/Skeleton.h"
 
 namespace Ailu
 {
@@ -26,14 +27,8 @@ namespace Ailu
 		if (_joints.size() != p._joints.size()) {
 			_joints.resize(p._joints.size());
 		}
-		if (_parents.size() != 0) {
-			memcpy(&_parents[0], &p._parents[0],
-				sizeof(int) * _parents.size());
-		}
-		if (_joints.size() != 0) {
-			memcpy(&_joints[0], &p._joints[0],
-				sizeof(Transform) * _joints.size());
-		}
+		_parents = p._parents;
+		_joints = p._joints;
 		return *this;
 	}
 
@@ -45,16 +40,18 @@ namespace Ailu
 		return static_cast<int>(_joints.size());
 	}
 
-	Transform Pose::GetLocalTransform(unsigned int index) {
+	Transform Pose::GetLocalTransform(unsigned int index) const
+    {
 		return _joints[index];
 	}
 	void Pose::SetLocalTransform(unsigned int index, const Transform& transform) {
 		_joints[index] = transform;
 	}
 
-	Transform Pose::GetGlobalTransform(unsigned int i) {
+	Transform Pose::GetGlobalTransform(unsigned int i) const
+    {
 		Transform result = _joints[i];
-		for (int p = _parents[i]; p >= 0; p = _parents[p])
+		for (u16 p = _parents[i]; p != Joint::kInvalidJointIndex; p = _parents[p])
 		{
 			result = Transform::Combine(_joints[p], result);
 		}
@@ -64,7 +61,7 @@ namespace Ailu
 		return GetGlobalTransform(index);
 	}
 
-	void Pose::GetMatrixPalette(Vector<Matrix4x4f>& out)
+	void Pose::GetMatrixPalette(Vector<Matrix4x4f> &out)
 	{
 		unsigned int size = Size();
 		if (out.size() != size) {
@@ -72,7 +69,7 @@ namespace Ailu
 		}
 		for (unsigned int i = 0; i < size; ++i) {
 			Transform t = GetGlobalTransform(i);
-			out[i] = Transform::ToMatrix(t);
+            out[i] = Transform::ToMatrix(t);
 		}
 	}
 	int Pose::GetParent(unsigned int index)
@@ -113,4 +110,31 @@ namespace Ailu
 	{
 		return !(*this == other);
 	}
+    bool Pose::IsInHierarchy(Pose &pose, u16 root, u16 search)
+    {
+       if (search == root)
+       {
+           return true;
+       }
+       for (u16 p = pose.GetParent(search); p != Joint::kInvalidJointIndex; p = pose.GetParent(p))
+       {
+           if (p == root)
+           {
+               return true;
+           }
+       }
+       return false;
+    }
+    void Pose::Blend(Pose &out, const Pose &a, const Pose &b, f32 t,u16 root)
+    {
+        u16 joint_num = out.Size();
+        for(u16 i = 0; i < joint_num; ++i)
+        {
+            if (root != Joint::kInvalidJointIndex && !IsInHierarchy(out, root, i))
+            {
+                continue;
+            }
+            out.SetLocalTransform(i, Transform::Mix(a.GetLocalTransform(i), b.GetLocalTransform(i), t));
+        }
+    }
 }

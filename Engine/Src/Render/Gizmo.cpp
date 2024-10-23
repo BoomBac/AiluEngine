@@ -153,7 +153,7 @@ namespace Ailu
         {
             float xPos = static_cast<float>(i * grid_spacing) + center.x;
             lineColor.a = color.a * s_color.a;
-            lineColor.a *= lerpf(1.0f, 0.0f, abs(xPos - center.x) / halfWidth);
+            lineColor.a *= Lerp(1.0f, 0.0f, abs(xPos - center.x) / halfWidth);
             auto color_start = lineColor;
             auto color_end = lineColor;
             if (DotProduct(Camera::sCurrent->Forward(), {0, 0, 1}) > 0)
@@ -171,7 +171,7 @@ namespace Ailu
 
             float zPos = static_cast<float>(i * grid_spacing) + center.z;
             lineColor.a = color.a * s_color.a;
-            lineColor.a *= lerpf(1.0f, 0.0f, abs(zPos - center.z) / halfWidth);
+            lineColor.a *= Lerp(1.0f, 0.0f, abs(zPos - center.z) / halfWidth);
             color_start = lineColor;
             color_end = lineColor;
             auto right = Camera::sCurrent->Right();

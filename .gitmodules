@@ -4,3 +4,6 @@
 [submodule "Engine/Ext/ImGuizmo"]
 	path = Engine/Ext/ImGuizmo
 	url = https://github.com/BoomBac/ImGuizmo.git
+[submodule "Engine/Ext/implot"]
+	path = Engine/Ext/implot
+	url = https://github.com/BoomBac/implot.git

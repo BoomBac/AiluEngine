@@ -6,6 +6,8 @@
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "Ext/imgui/imgui_internal.h"
 #include "Ext/ImGuizmo/ImGuizmo.h"
+#include "Ext/implot/implot.h"
+#include "Ext/imnodes/imnodes.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/TimeMgr.h"
 
@@ -38,8 +40,9 @@ namespace Ailu
 	ImGUILayer::ImGUILayer(const String& name) : Layer(name)
 	{
 		IMGUI_CHECKVERSION();
-		auto context = ImGui::CreateContext();
-		ImGui::SetCurrentContext(context);
+		ImGui::SetCurrentContext(ImGui::CreateContext());
+        ImPlot::SetCurrentContext(ImPlot::CreateContext());
+        ImNodes::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		//io.MouseDrawCursor = true;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
@@ -95,6 +98,8 @@ namespace Ailu
 		// Cleanup
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
+        ImNodes::DestroyContext();
+        ImPlot::DestroyContext();
 		ImGui::DestroyContext();
 	}
 

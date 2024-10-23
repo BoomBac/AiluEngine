@@ -29,7 +29,8 @@ namespace Ailu
             return PathUtils::ExtractAssetPath(s_cur_path_str);
         }
         static void SetCurPath(const fs::path &path);
-
+        //return if a is newer than b
+        static bool IsFileNewer(const WString& a,const WString& b);
         static bool CreateFile(const WString &sys_path, bool override = true);
         static bool WriteFile(const WString &sys_path, bool append, const WString &data);
         static bool WriteFile(const WString &sys_path, bool append, const String &data);

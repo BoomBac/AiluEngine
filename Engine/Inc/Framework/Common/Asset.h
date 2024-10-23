@@ -7,7 +7,7 @@
 
 namespace Ailu
 {
-	DECLARE_ENUM(EAssetType,kUndefined, kMesh, kMaterial,kTexture2D,kShader,kComputeShader,kScene)
+	DECLARE_ENUM(EAssetType,kUndefined, kMesh, kMaterial,kTexture2D,kShader,kComputeShader,kScene,kSkeletonMesh,kAnimClip)
 	class AILU_API Asset : public Object
 	{
 	public:

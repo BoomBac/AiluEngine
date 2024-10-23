@@ -130,7 +130,7 @@ namespace Ailu
     {
         ar.IncreaseIndent();
         ar.InsertIndent();
-        ar << "_p_mesh:" << c._p_mesh->GetGuid().ToString();
+        ar << "_p_mesh:" << (c._p_mesh ? c._p_mesh->GetGuid().ToString() : Guid::EmptyGuid().ToString());
         ar.NewLine();
         ar.InsertIndent();
         ar << "_material_num:" << c._p_mats.size();
@@ -150,11 +150,19 @@ namespace Ailu
         ar >> bufs[0];
         AL_ASSERT(su::BeginWith(bufs[0], "_p_mesh"));
         Guid asset_guid = Guid(su::Split(bufs[0], ":")[1]);
-        g_pResourceMgr->Load<Mesh>(asset_guid);
-        c._p_mesh = g_pResourceMgr->GetRef<Mesh>(asset_guid);
+        if (asset_guid == Guid::EmptyGuid())
+        {
+            c._p_mesh = nullptr;
+        }
+        else
+        {
+            g_pResourceMgr->Load<Mesh>(asset_guid);
+            c._p_mesh = g_pResourceMgr->GetRef<Mesh>(asset_guid);
+            c._transformed_aabbs.resize(c._p_mesh->SubmeshCount() + 1);
+        }
         ar >> bufs[0];
         u16 material_num = std::stoi(su::Split(bufs[0], ":")[1]);
-        c._transformed_aabbs.resize(material_num + 1);
+
         for (u16 i = 0; i < material_num; i++)
         {
             ar >> bufs[0];
@@ -164,6 +172,70 @@ namespace Ailu
                 c._p_mats.push_back(mat);
             else
                 LOG_ERROR("Load material failed:{}", asset_guid.ToString());
+        }
+        return ar;
+    }
+
+    Archive &operator<<(Archive &ar, const CSkeletonMesh &c)
+    {
+        ar.IncreaseIndent();
+        ar.InsertIndent();
+        ar << "_p_mesh:" << (c._p_mesh ? c._p_mesh->GetGuid().ToString() : Guid::EmptyGuid().ToString());
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_material_num:" << c._p_mats.size();
+        for (u32 i = 0; i < c._p_mats.size(); i++)
+        {
+            ar.NewLine();
+            ar.InsertIndent();
+            ar << std::format("_p_mats[{}]:{}", i, c._p_mats[i]->GetGuid().ToString());
+        }
+        ar.NewLine();
+        ar.InsertIndent();
+        ar << "_anim_clip:" << (c._anim_clip ? c._anim_clip->GetGuid().ToString() : Guid::EmptyGuid().ToString());
+        ar.DecreaseIndent();
+        ar.NewLine();
+        return ar;
+    }
+    Archive &operator>>(Archive &ar, CSkeletonMesh &c)
+    {
+        String bufs[1];
+        ar >> bufs[0];
+        AL_ASSERT(su::BeginWith(bufs[0], "_p_mesh"));
+        Guid asset_guid = Guid(su::Split(bufs[0], ":")[1]);
+        if (asset_guid == Guid::EmptyGuid())
+        {
+            c._p_mesh = nullptr;
+        }
+        else
+        {
+            g_pResourceMgr->Load<SkeletonMesh>(asset_guid);
+            c._p_mesh = g_pResourceMgr->GetRef<SkeletonMesh>(asset_guid);
+            c._transformed_aabbs.resize(c._p_mesh->SubmeshCount() + 1);
+        }
+        ar >> bufs[0];
+        u16 material_num = std::stoi(su::Split(bufs[0], ":")[1]);
+        c._transformed_aabbs.resize(c._p_mesh->SubmeshCount() + 1);
+        for (u16 i = 0; i < material_num; i++)
+        {
+            ar >> bufs[0];
+            asset_guid = Guid(su::Split(bufs[0], ":")[1]);
+            g_pResourceMgr->Load<Material>(asset_guid);
+            if (auto mat = g_pResourceMgr->GetRef<Material>(asset_guid); mat != nullptr)
+                c._p_mats.push_back(mat);
+            else
+                LOG_ERROR("Load material failed:{}", asset_guid.ToString());
+        }
+        ar >> bufs[0];
+        asset_guid = Guid(su::Split(bufs[0], ":")[1]);
+        if (asset_guid == Guid::EmptyGuid())
+        {
+            c._anim_clip = nullptr;
+        }
+        else
+        {
+            g_pResourceMgr->Load<AnimationClip>(asset_guid);
+            c._anim_clip = g_pResourceMgr->GetRef<AnimationClip>(asset_guid);
         }
         return ar;
     }

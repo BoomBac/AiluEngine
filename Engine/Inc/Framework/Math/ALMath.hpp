@@ -587,7 +587,6 @@ namespace Ailu
             }
             return dis;
         }
-
         template<template<typename> class TT, typename T>
         static bool LoadVector(const char *vec_str, const TT<T> &out_v)
         {
@@ -760,6 +759,27 @@ namespace Ailu
                          first.data[2] * second.data[0] - first.data[0] * second.data[2],
                          first.data[0] * second.data[1] - first.data[1] * second.data[0]);
         }
+        /// <summary>
+        /// radians between two dir
+        /// </summary>
+        template<template<typename> class TT, typename T>
+        static f32 Radian(const TT<T>& a,const TT<T>& b)
+        {
+            T dot = DotProduct(a,b);
+            f32 l1 = Magnitude(a);
+            f32 l2 = Magnitude(b);
+            f32 cos_angle = dot / (l1*l2);
+            cos_angle = std::fmax(-1.f,std::fmin(1.f,cos_angle));
+            return std::acos(cos_angle);
+        }
+        /// <summary>
+        /// degrees between two dir
+        /// </summary>
+        template<template<typename> class TT, typename T>
+        static f32 Angle(const TT<T>& a,const TT<T>& b)
+        {
+            return Radian(a.b) * k2Angle;
+        }
 
         template<template<typename> typename TT, typename T>
         static TT<T> Max(const TT<T> &first, const TT<T> &second)
@@ -846,6 +866,17 @@ namespace Ailu
             {
                 return *this;
             }
+            Matrix<T, rows, cols> &operator*(float scale)
+            {
+                for (int i = 0; i < rows; ++i)
+                {
+                    for (int j = 0; j < cols; ++j)
+                    {
+                        data[i][j] *= scale;
+                    }
+                }
+                return *this;
+            }
             template<template<typename> typename TT, typename T>
             void SetRow(u16 row, const TT<T> &v)
             {
@@ -887,12 +918,12 @@ namespace Ailu
                         oss << data[i][j];
                         if (j < cols - 1)
                         {
-                            oss << ", ";
+                            oss << ",";
                         }
                     }
                     if (i < rows - 1)
                     {
-                        oss << "; ";
+                        oss << ";";
                     }
                 }
                 return oss.str();
@@ -1162,15 +1193,18 @@ namespace Ailu
         }
 
         //	//Transform for normal,w is 0.f
-        static Vector3f &TransformNormal(Vector3f &vector, const Matrix4x4f &matrix)
+        static void TransformNormal(Vector3f &vector, const Matrix4x4f &matrix)
         {
             Vector4f temp{vector, 0.f};
             TransformVector(temp, matrix);
-            vector[0] = temp[0];
-            vector[1] = temp[1];
-            vector[2] = temp[2];
-            return vector;
+            vector.xyz = temp.xyz;
         }
+        [[nodiscard]] static Vector3f TransformNormal(const Matrix4x4f &matrix, const Vector3f &vector)
+        {
+            Vector4f temp{vector, 0.f};
+            TransformVector(temp, matrix);
+            return temp.xyz;
+        };
 
         static Matrix4x4f BuildViewMatrixLookToLH(Matrix4x4f &result, Vector3f position, Vector3f lookTo, Vector3f up)
         {
@@ -1856,15 +1890,15 @@ namespace Ailu
             static Quaternion NormalizedQ(const Quaternion &q)
             {
                 float lenSq = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
-                if (lenSq < kQuatEpsilon)
-                    return Quaternion();
+                //if (lenSq < kQuatEpsilon)
+                //    return Quaternion();
                 float il = 1.0f / sqrtf(lenSq);// il: inverse length
                 return Quaternion(q.x * il, q.y * il, q.z * il, q.w * il);
             }
             //flip axis,replace inverse if quat's len sq is 1
             static Quaternion Conjugate(const Quaternion &q)
             {
-                return Quaternion(-q.x, -q.y, -q.z, q.w);
+                return Quaternion(-q.x, -q.y, -q.z, -q.w);
             }
 
             static Quaternion Inverse(const Quaternion &q)
@@ -1897,7 +1931,7 @@ namespace Ailu
                 return NormalizedQ(from + (to - from) * t);
             }
 
-            static Quaternion Slerp(const Quaternion &start, const Quaternion &end, float t)
+            static Quaternion SLerp(const Quaternion &start, const Quaternion &end, float t)
             {
                 if (fabsf(Dot(start, end)) > 1.0f - kQuatEpsilon)
                 {
@@ -2065,7 +2099,7 @@ namespace Ailu
         }
 
         template<typename V>
-        static V lerp(const V &src, const V &des, const float &weight)
+        static V Lerp(const V &src, const V &des, const float &weight)
         {
             V res{};
             for (u32 i = 0; i < CountOf(src.data); i++)
@@ -2075,14 +2109,14 @@ namespace Ailu
             return res;
         }
         template<>
-        static float lerp(const float &src, const float &des, const float &weight)
+        static float Lerp(const float &src, const float &des, const float &weight)
         {
             return (1.f - weight) * src + weight * des;
         }
-
-        static float lerpf(const float &src, const float &des, const float &weight)
+        template<>
+        static Quaternion Lerp(const Quaternion &src, const Quaternion &des, const float &weight)
         {
-            return (1.f - weight) * src + weight * des;
+            return Quaternion::NLerp(src, des, weight);
         }
 
         static Matrix<float, 8, 8> DCT8X8(const Matrix<int32_t, 8, 8> &in_mat)

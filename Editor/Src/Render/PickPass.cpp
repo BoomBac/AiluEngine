@@ -31,6 +31,7 @@ namespace Ailu
             static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
             static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
             static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
+            static auto mat_area_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard");
             static auto mat_camera_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
             static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
             static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
@@ -95,6 +96,11 @@ namespace Ailu
                             cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_spot_light, obj_data, 0, 1, 1);
                         }
                         break;
+                        case ELightType::kArea:
+                        {
+                            cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_area_light, obj_data, 0, 1, 1);
+                        }
+                        break;
                     }
                     ++entity_index;
                 }
@@ -125,6 +131,12 @@ namespace Ailu
                         {
                             cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
                             cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                        }
+                        else if (auto comp = r.GetComponent<CSkeletonMesh>(entity); comp != nullptr)
+                        {
+                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
+                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                            Gizmo::DrawAABB(comp->_transformed_aabbs[0],Colors::kGreen);
                         }
                         if (auto c = r.GetComponent<CCollider>(entity))
                         {
