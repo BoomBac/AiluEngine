@@ -221,6 +221,22 @@ namespace Ailu
         std::unordered_map<String, Ref<Material>> _wireframe_mats;
         std::set<WString> _wireframe_shaders;
     };
+
+    class GUIPass : public RenderPass
+    {
+    public:
+        GUIPass();
+        ~GUIPass();
+        void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
+        void BeginPass(GraphicsContext *context) final;
+        void EndPass(GraphicsContext *context) final;
+    private:
+        Ref<Shader> _ui_default_shader;
+        Ref<IVertexBuffer> _vbuf;
+        Ref<IIndexBuffer> _ibuf;
+        Ref<Material> _ui_default_mat;
+        Ref<IConstantBuffer> _obj_cb;
+    };
 }// namespace Ailu
 
 #endif// !RENDER_PASS__

@@ -89,6 +89,7 @@ namespace Ailu
         auto variant_state = _p_active_shader->GetVariantState(pass_index, cur_pass_variant_hash);
         if (variant_state != EShaderVariantState::kReady)
             return;
+        _p_active_shader->SetCullMode((ECullMode)_common_uint_property[kCullModeKey]);
         _p_active_shader->Bind(pass_index, cur_pass_variant_hash);
         i8 cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._per_mat_buf_bind_slot;
         if (cbuf_bind_slot != -1)
@@ -122,6 +123,7 @@ namespace Ailu
         _p_shader->AddMaterialRef(this);
         _p_active_shader->RemoveMaterialRef(this);
         _p_active_shader = shader;
+        _p_active_shader->AddMaterialRef(this);
         Construct(false);
     }
 
@@ -223,6 +225,14 @@ namespace Ailu
         }
         return 0.0f;
     }
+    void Material::SetCullMode(ECullMode mode)
+    {
+        _common_uint_property[kCullModeKey] = (u32) mode;
+    }
+    ECullMode Material::GetCullMode() const
+    {
+        return (ECullMode) _common_uint_property.at(kCullModeKey);
+    };
 
     ShaderVariantHash Material::ActiveVariantHash(u16 pass_index) const
     {
@@ -427,6 +437,7 @@ namespace Ailu
     void Material::Construct(bool first_time)
     {
         AL_ASSERT(_p_shader->PassCount() != 0);
+        _common_uint_property["_cull"] = (u32)_p_shader->GetCullMode();
         ConstructKeywords(_p_shader);
         static u8 s_unused_shader_prop_buf[256]{0};
         u16 unused_shader_prop_buf_offset = 0u;
@@ -443,6 +454,10 @@ namespace Ailu
             _mat_cbuf_per_pass_size.resize(pass_count);
             _p_cbufs.resize(pass_count);
         }
+        _properties.clear();
+        _textures_all_passes.resize(pass_count);
+        _mat_cbuf_per_pass_size.resize(pass_count);
+        _p_cbufs.resize(pass_count);
         Vector<Map<String, std::tuple<u8, Texture *>>> _tmp_textures_all_passes(pass_count);
         for (int i = 0; i < pass_count; i++)
         {
@@ -593,6 +608,11 @@ namespace Ailu
             }
         }
     }
+    u8 *Material::GetPropertyBuffer(u16 pass_index)
+    {
+        AL_ASSERT(pass_index < _p_cbufs.size());
+        return _p_cbufs[pass_index]->GetData();
+    }
     //-------------------------------------------StandardMaterial--------------------------------------------------------
     static void MarkTextureUsedHelper(u32 &mask, const ETextureUsage &usage, const bool &b_use)
     {
@@ -620,26 +640,7 @@ namespace Ailu
     }
     StandardMaterial::StandardMaterial(String name) : Material(Shader::s_p_defered_standart_lit.lock().get(), name)
     {
-        //只有首个pass支持默认着色
-        for (int i = 0; i < _p_shader->PassCount(); i++)
-        {
-            auto &cur_variant_bind_infos = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
-            auto it = cur_variant_bind_infos.find("_SamplerMask");
-            if (it != cur_variant_bind_infos.end())
-            {
-                _sampler_mask_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
-                _standard_pass_index = i;
-            }
-            it = cur_variant_bind_infos.find("_MaterialID");
-            if (it != cur_variant_bind_infos.end())
-            {
-                _material_id_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
-            }
-            if (_standard_pass_index != -1)
-                break;
-        }
-        _material_id = (EMaterialID::EMaterialID)_common_uint_property["_MaterialID"];
-        _surface = (ESurfaceType::ESurfaceType)_common_uint_property["_surface"];
+
     }
     StandardMaterial::~StandardMaterial()
     {
@@ -721,6 +722,7 @@ namespace Ailu
         }
         _p_active_shader->AddMaterialRef(this);
         _surface = value;
+        _common_uint_property[kSurfaceKey] = _surface;
     }
     void StandardMaterial::SetTexture(const String &name, Texture *texture)
     {
@@ -788,6 +790,30 @@ namespace Ailu
         MarkTextureUsed({usage}, tex == nullptr ? false : true);
         auto &info = StandardPropertyName::GetInfoByUsage(usage);
         SetTexture(info._tex_name, tex);
+    }
+    void StandardMaterial::Construct(bool first_time)
+    {
+        Material::Construct(first_time);
+        //只有首个pass支持默认着色
+        for (int i = 0; i < _p_shader->PassCount(); i++)
+        {
+            auto &cur_variant_bind_infos = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
+            auto it = cur_variant_bind_infos.find("_SamplerMask");
+            if (it != cur_variant_bind_infos.end())
+            {
+                _sampler_mask_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                _standard_pass_index = i;
+            }
+            it = cur_variant_bind_infos.find("_MaterialID");
+            if (it != cur_variant_bind_infos.end())
+            {
+                _material_id_offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+            }
+            if (_standard_pass_index != -1)
+                break;
+        }
+        _material_id = (EMaterialID::EMaterialID)_common_uint_property["_MaterialID"];
+        _surface = (ESurfaceType::ESurfaceType)_common_uint_property["_surface"];
     }
     //-------------------------------------------StandardMaterial--------------------------------------------------------
 }// namespace Ailu

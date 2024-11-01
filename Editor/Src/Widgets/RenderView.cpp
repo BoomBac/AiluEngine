@@ -240,7 +240,7 @@ namespace Ailu
                 {
                     pivot_point += r.GetComponent<TransformComponent>(e)->_transform._position;
                 }
-                pivot_point /= selected_entities.size();
+                pivot_point /= (f32)selected_entities.size();
                 Matrix4x4f world_mat = MatrixTranslation(pivot_point);
                 if (is_single_mode)
                     world_mat = r.GetComponent<TransformComponent>(selected_entities.front())->_transform._world_matrix;

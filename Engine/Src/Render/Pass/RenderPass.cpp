@@ -8,6 +8,7 @@
 #include "Render/RenderConstants.h"
 #include "Render/RenderQueue.h"
 #include "Render/RenderingData.h"
+#include "Render/TextRenderer.h"
 #include "pch.h"
 
 #include "Render/Renderer.h"
@@ -137,7 +138,7 @@ namespace Ailu
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
                                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                                cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16)shadow_pass,obj._instance_count);
+                                cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
                             }
                         }
                     }
@@ -408,7 +409,7 @@ namespace Ailu
                 for (auto &obj: objs)
                 {
                     //memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj._world_matrix, sizeof(Matrix4x4f));
-                    auto ret = cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index,0,obj._instance_count);
+                    auto ret = cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     ++obj_index;
                 }
             }
@@ -554,6 +555,23 @@ namespace Ailu
         memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));
         _event = ERenderPassEvent::kAfterPostprocess;
     }
+    static Vector2f ViewportTransform(const Vector4f& clipPos, const Vector2f& viewportSize) {
+        // 首先进行透视除法
+        Vector2f ndcPos = { clipPos.x / clipPos.w, clipPos.y / clipPos.w };
+
+        // 将 NDC 坐标从 [-1, 1] 映射到 [0, 1]
+        //ndcPos.x = std::clamp(ndcPos.x * 0.5f + 0.5f, 0.0f, 1.0f);
+        //ndcPos.y = std::clamp(ndcPos.y * 0.5f + 0.5f, 0.0f, 1.0f);
+
+        // 映射到视口尺寸
+        Vector2f screenPos;
+        screenPos.x = ndcPos.x * viewportSize.x * 0.5f;
+        screenPos.y = ndcPos.y * viewportSize.y * 0.5f;
+        screenPos.x += viewportSize.x * 0.5f;
+        screenPos.y += viewportSize.y * 0.5f;
+        return screenPos;
+    }
+
     void GizmoPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
         auto cmd = CommandBufferPool::Get("GizmoPass");
@@ -566,10 +584,10 @@ namespace Ailu
         static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
         cmd->Clear();
         {
-            auto& cam = rendering_data._camera;
+            auto &cam = rendering_data._camera;
             // 获取相机参数
             float nearPlane = cam->Near() + 0.05f;
-            float verticalFOV = cam->FovH() * k2Radius; // 单位为弧度
+            float verticalFOV = cam->FovH() * k2Radius;// 单位为弧度
             float aspectRatio = cam->Aspect();
 
             // 计算半视野角度
@@ -586,20 +604,42 @@ namespace Ailu
             Vector3f bottomLeft = nearCenter - cameraRight * halfWidth * 0.95f - cameraUp * halfHeight * 0.95f;
 
 
-            Vector3f camera_target = bottomLeft;//cam->Position() + cam->Forward() * (cam->Near() + 0.1f);
-            Gizmo::DrawLine(camera_target,camera_target + Vector3f::kForward * 0.01f,Colors::kBlue);
-            Gizmo::DrawLine(camera_target,camera_target + Vector3f::kRight * 0.01f,Colors::kRed);
-            Gizmo::DrawLine(camera_target,camera_target + Vector3f::kUp * 0.01f,Colors::kGreen);
+            const static f32 s_axis_length = 30.f;
+            Vector3f camera_target = cam->Position() + cam->Forward() * (cam->Near() + 50.f);
+            Matrix4x4f vp = rendering_data._camera->GetView() * rendering_data._camera->GetProjection();
+            Vector2f half_size((f32)(rendering_data._width >> 1), (f32)(rendering_data._height >> 1));
+            Vector2f viewport_size((f32)rendering_data._width, (f32)rendering_data._height);
+            half_size -= s_axis_length;
+            half_size = -half_size;
+            //camera_target = Vector3f::kZero;
+            Vector4f cpos_camera_target = {camera_target,1.0f};
+            Vector4f cpos_y_axis = {camera_target + Vector3f::kUp* s_axis_length,1.0f};
+            Vector4f cpos_x_axis = {camera_target + Vector3f::kRight* s_axis_length,1.0f};
+            Vector4f cpos_z_axis = {camera_target + Vector3f::kForward* s_axis_length,1.0f};
+            TransformVector(cpos_camera_target,vp);
+            TransformVector(cpos_x_axis, vp);
+            TransformVector(cpos_y_axis, vp);
+            TransformVector(cpos_z_axis, vp);
+            Vector2f screen_pos_x_axis= cpos_x_axis.xy;
+            Vector2f screen_pos_y_axis= cpos_y_axis.xy;
+            Vector2f screen_pos_z_axis= cpos_z_axis.xy;
+            //screen_pos_x_axis = screen_pos_x_axis / Magnitude(screen_pos_x_axis) * s_axis_length;// + half_size;
+            //screen_pos_y_axis = screen_pos_y_axis / Magnitude(screen_pos_y_axis) * s_axis_length;// + half_size;
+            //screen_pos_z_axis = screen_pos_z_axis / Magnitude(screen_pos_z_axis) * s_axis_length;// + half_size;
+            cpos_camera_target.xy +=  half_size;
+            screen_pos_x_axis += half_size;
+            screen_pos_y_axis += half_size;
+            screen_pos_z_axis += half_size;
+            Gizmo::DrawLine(Vector2f(cpos_camera_target.xy), screen_pos_y_axis, Colors::kGreen);
+            Gizmo::DrawLine(Vector2f(cpos_camera_target.xy), screen_pos_x_axis, Colors::kRed);
+            Gizmo::DrawLine(Vector2f(cpos_camera_target.xy), screen_pos_z_axis, Colors::kBlue);
 
             cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProjection());
             ProfileBlock profile(cmd.get(), _name);
             cmd->SetViewport(rendering_data._viewport);
             cmd->SetScissorRect(rendering_data._scissor_rect);
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
-            GraphicsPipelineStateMgr::s_gizmo_pso->Bind(cmd.get());
-            u8 camera_buf_slot = GraphicsPipelineStateMgr::s_gizmo_pso->NameToSlot(RenderConstants::kCBufNamePerCamera);
-            GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(cmd.get(), rendering_data._p_per_camera_cbuf, EBindResDescType::kConstBuffer, camera_buf_slot);
-            Gizmo::Submit(cmd.get());
+
             cmd->DrawRenderer(Mesh::s_p_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
             u16 index = 1;
             u16 entity_index = 0;
@@ -654,6 +694,10 @@ namespace Ailu
             {
                 cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_camera, _p_cbuffers[index++].get(), 0, 0, 1);
             }
+            GraphicsPipelineStateMgr::s_gizmo_pso->Bind(cmd.get());
+            u8 camera_buf_slot = GraphicsPipelineStateMgr::s_gizmo_pso->NameToSlot(RenderConstants::kCBufNamePerCamera);
+            GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(cmd.get(), rendering_data._p_per_camera_cbuf, EBindResDescType::kConstBuffer, camera_buf_slot);
+            Gizmo::Submit(cmd.get(), rendering_data);
         }
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
@@ -767,7 +811,6 @@ namespace Ailu
     }
     WireFramePass::~WireFramePass()
     {
-
     }
     void WireFramePass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
@@ -797,7 +840,6 @@ namespace Ailu
                         auto mat = MakeRef<Material>(*obj._material);
                         mat->ChangeShader(g_pResourceMgr->Get<Shader>(shader_name_w));
                         _wireframe_mats[obj._material->Name()] = mat;
-
                     }
                     cmd->DrawRenderer(obj._mesh, _wireframe_mats[obj._material->Name()].get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                 }
@@ -806,9 +848,78 @@ namespace Ailu
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
-    
+
     void WireFramePass::BeginPass(GraphicsContext *context) {};
     void WireFramePass::EndPass(GraphicsContext *context) {};
     //-------------------------------------------------------------WireFramePass-------------------------------------------------------------
 
+
+    //-------------------------------------------------------------GUIPass------------------------------------------------------------------
+    GUIPass::GUIPass() : RenderPass("GUIPass")
+    {
+        _event = ERenderPassEvent::kAfterPostprocess;
+        const u16 vertex_count = 1000u;
+        _ui_default_shader = g_pResourceMgr->GetRef<Shader>(L"Shaders/default_ui.alasset");
+        _ui_default_mat = MakeRef<Material>(_ui_default_shader.get(), "DefaultUIMaterial");
+        _ui_default_mat->SetTexture("_MainTex", Texture::s_p_default_white);
+        _ui_default_mat->SetVector("_Color", Colors::kWhite);
+        Vector<VertexBufferLayoutDesc> desc_list;
+        desc_list.push_back({"POSITION", EShaderDateType::kFloat3, 0});
+        desc_list.push_back({"TEXCOORD", EShaderDateType::kFloat2, 1});
+        _obj_cb.reset(IConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+        _vbuf.reset(IVertexBuffer::Create(desc_list, "ui_vbuf"));
+        _ibuf.reset(IIndexBuffer::Create(nullptr, vertex_count, "ui_ibuf", true));
+        f32 box_w = 180.f, box_h = 30.f;
+        Vector3f *vertices = new Vector3f[4]{{-box_w * 0.5f, box_h * 0.5f, 0.0f},
+                                             {box_w * 0.5f, box_h * 0.5f, 0.0f},
+                                             {-box_w * 0.5f, -box_h * 0.5f, 0.0f},
+                                             {box_w * 0.5f, -box_h * 0.5f, 0.0f}};
+        u32 *indices = new u32[6]{0, 1, 2, 1, 3, 2};
+        Vector2f *uv0 = new Vector2f[4]{{0.f, 0.f}, {1.f, 0.f}, {0.f, 1.f}, {1.f, 1.f}};
+        _vbuf->SetStream(nullptr, vertex_count * sizeof(Vector3f), 0, true);
+        _vbuf->SetStream(nullptr, vertex_count * sizeof(Vector2f), 1, true);
+        _ibuf->SetData((u8 *) indices, 6 * sizeof(u32));
+        delete[] vertices;
+        delete[] indices;
+        delete[] uv0;
+    }
+    GUIPass::~GUIPass()
+    {
+    }
+    void GUIPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
+    {
+        auto cmd = CommandBufferPool::Get(_name);
+        cmd->Clear();
+        {
+            //TextRenderer::Get()->Render(g_pRenderTexturePool->Get(rendering_data._camera_color_target_handle), cmd.get());
+            //f32 w = (f32) rendering_data._width;
+            //f32 h = (f32) rendering_data._height;
+            //ProfileBlock profile(cmd.get(), _name);
+            //Matrix4x4f view, proj;
+            //f32 aspect = w / h;
+            //f32 half_width = w * 0.5f, half_height = h * 0.5f;
+            //BuildViewMatrixLookToLH(view,Vector3f(0.f,0.f,-50.f),Vector3f::kForward,Vector3f::kUp);
+            //BuildOrthographicMatrix(proj,-half_width,half_width,half_height,-half_height,1.f,200.f);
+            //CBufferPerCameraData cb_per_cam;
+            //cb_per_cam._MatrixVP = view * proj;
+            //cb_per_cam._ScreenParams = Vector4f(w, h, 1 / w, 1 / h);
+            //CBufferPerObjectData per_obj_data;
+            //per_obj_data._MatrixWorld = BuildIdentityMatrix();
+            //memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
+            //cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,&cb_per_cam,RenderConstants::kPerCameraDataSize);
+            //cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
+            //cmd->DrawIndexed(_vbuf.get(), _ibuf.get(), _obj_cb.get(), _ui_default_mat.get());
+        }
+        context->ExecuteCommandBuffer(cmd);
+        CommandBufferPool::Release(cmd);
+    }
+    void GUIPass::BeginPass(GraphicsContext *context)
+    {
+        RenderPass::BeginPass(context);
+    }
+    void GUIPass::EndPass(GraphicsContext *context)
+    {
+        RenderPass::EndPass(context);
+    }
+    //-------------------------------------------------------------GUIPass------------------------------------------------------------------
 }// namespace Ailu

@@ -40,7 +40,6 @@ float4 DeferredLightingPSMain(PSInput input) : SV_TARGET
 	float2 motion_vector = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv,0).xy;
 	half4 emssion = SAMPLE_TEXTURE2D_LOD(_GBuffer4, g_LinearClampSampler, input.uv,0);
 	motion_vector = motion_vector * 0.5 + 0.5;
-  
 	float depth = _CameraDepthTexture.Sample(g_LinearWrapSampler,input.uv);
 	float3 world_pos = Unproject(input.uv,depth);
 
@@ -55,7 +54,7 @@ float4 DeferredLightingPSMain(PSInput input) : SV_TARGET
 	OrthonormalBasis(surface_data.wnormal,surface_data.tangent,surface_data.bitangent);
 	uint material_id = (uint)gbuf2.r;
 #ifdef DEBUG_NORMAL
-	return float4(surface_data.wnormal,1);
+	return float4(surface_data.wnormal,1); 
 #elif DEBUG_ALBEDO
 	return surface_data.albedo;
 #elif DEBUG_WORLDPOS

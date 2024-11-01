@@ -439,4 +439,8 @@ IMNODES_API void SaveEditorStateToIniFile(const ImNodesEditorContext* editor, co
 
 IMNODES_API void LoadCurrentEditorStateFromIniFile(const char* file_name);
 IMNODES_API void LoadEditorStateFromIniFile(ImNodesEditorContext* editor, const char* file_name);
+
+//custom
+IMNODES_API void SetZoomFactor(float zoom);
+IMNODES_API float GetZoomFactor();
 } // namespace IMNODES_NAMESPACE

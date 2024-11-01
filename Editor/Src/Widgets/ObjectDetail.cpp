@@ -273,7 +273,7 @@ namespace Ailu
 
         static void DrawInternalStandardMaterial(StandardMaterial *mat)
         {
-            u16 mat_prop_index = 0;
+            i32 mat_prop_index = 0;
             static auto func_show_prop = [&](StandardMaterial *mat, ETextureUsage tex_usage, f32 width)
             {
                 ImGui::PushID(mat_prop_index++);
@@ -413,7 +413,34 @@ namespace Ailu
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("%s", prop._name.c_str());
                     ImGui::TableSetColumnIndex(1);
-                    ImGui::SliderFloat(std::format("##{}", prop._name).c_str(), static_cast<float *>(prop._value_ptr), prop._param[0], prop._param[1]);
+                    f32 alpha_cull_off = prop.GetProppertyValue<f32>().value();// *static_cast<float *>(prop._value_ptr);
+                    ImGui::SliderFloat(std::format("##{}", prop._name).c_str(), &alpha_cull_off, prop._param[0], prop._param[1]);
+                    mat->SetFloat("_AlphaCulloff",alpha_cull_off);
+                }
+                //cull mode
+                ImGui::TableNextRow();
+                {
+                    const static String s_cullmode_str[] = {"Off", "Fornt", "Back"};
+                    ImGui::TableSetColumnIndex(0);
+                    auto cull = mat->GetCullMode();
+                    u16 cull_value = (u16)cull;
+                    ImGui::Text("Cull Mode");
+                    ImGui::TableSetColumnIndex(1);
+                    if (ImGui::BeginCombo("##CullMode", s_cullmode_str[(u16)cull].c_str()))
+                    {
+                        for (u32 i = 0; i < 3; i++)
+                        {
+                            const bool is_selected = (cull_value == i);
+                            if (ImGui::Selectable(s_cullmode_str[i].c_str(), is_selected))
+                            {
+                                cull_value = i;
+                            }
+                            if (is_selected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    mat->SetCullMode((ECullMode) cull_value);
                 }
                 //albedo scope
                 {

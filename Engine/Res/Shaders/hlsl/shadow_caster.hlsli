@@ -1,5 +1,6 @@
 #ifndef __SHADOW_CASTER_H__
 #define __SHADOW_CASTER_H__
+#include "standard_lit_common.hlsli"
 #include "common.hlsli"
 
 struct VSInput
@@ -48,8 +49,11 @@ PSInput VSMain(VSInput v)
 
 float PSMain(PSInput input) : SV_Depth
 {
-	// float4 c = SAMPLE_TEXTURE2D(_AlbedoTex,g_LinearWrapSampler,input.uv);
-	// clip(c.a - 0.5);
+#ifdef ALPHA_TEST
+	float4 c = SAMPLE_TEXTURE2D(_AlbedoTex,g_LinearWrapSampler,input.uv);
+	clip(c.a - _AlphaCulloff);
+#endif
+
 #ifdef CAST_POINT_SHADOW
 	float dis = distance(input.world_pos,_CameraPos.xyz);
 	float linear_z = saturate((dis - _ZBufferParams.x) / (_ZBufferParams.y - _ZBufferParams.x));

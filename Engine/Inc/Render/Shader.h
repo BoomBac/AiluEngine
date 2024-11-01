@@ -153,6 +153,7 @@ namespace Ailu
         static struct Topology
         {
             inline static const String kTriangle = "Triangle";
+            inline static const String kTriangleStrip = "TriangleStrip";
             inline static const String kLine = "Line";
         } kTopologyValue;
         static struct BlendFactor
@@ -304,8 +305,11 @@ namespace Ailu
         bool IsKeywordValid(u16 pass_index, const String &kw) const;
         std::set<String> KeywordsSameGroup(u16 pass_index, const String &kw) const;
         std::set<String> ActiveKeywords(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._active_keywords; };
-
+        void SetTopology(ETopology topology) { _topology = topology; }
+        ETopology GetTopology() const { return _topology; }
         Vector<class Material *> GetAllReferencedMaterials();
+        void SetCullMode(ECullMode mode);
+        ECullMode GetCullMode() const;
         void AddMaterialRef(class Material *mat);
         void RemoveMaterialRef(class Material *mat);
         std::tuple<String &, String &> GetShaderEntry(u16 pass_index = 0)
@@ -335,7 +339,7 @@ namespace Ailu
         std::set<Material *> _reference_mats;
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
         std::atomic<bool> _is_pass_elements_init = false;
-
+        ETopology _topology = ETopology::kTriangle;
     private:
         void ParserShaderProperty(String &line, List<ShaderPropertyInfo> &props);
         //void ExtractValidShaderProperty(u16 pass_index,ShaderVariantHash variant_hash);
@@ -359,7 +363,7 @@ namespace Ailu
 
     public:
         static Ref<ComputeShader> Create(const WString &sys_path);
-        static Ref<ComputeShader> Get(const WString &asset_path);
+        static ComputeShader* Get(const WString &asset_path);
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
         virtual void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
@@ -388,9 +392,6 @@ namespace Ailu
         bool IsDependencyFile(const WString &sys_path) const;
         bool Compile();
         std::atomic<bool> _is_compiling = false;
-        static auto begin() { return s_cs_library.begin(); }
-        static auto end() { return s_cs_library.end(); }
-
     protected:
         virtual bool RHICompileImpl(u16 kernel_index);
 
@@ -398,7 +399,6 @@ namespace Ailu
         void Preprocess();
 
     protected:
-        inline static std::unordered_map<WString, Ref<ComputeShader>> s_cs_library{};
         Vector<KernelElement> _kernels;
         WString _src_file_path;
         /*维护一个纹理集合，用于标记temp rt的围栏值，常规用于图形管线的rt在set / clear时会进行标记，

@@ -13,6 +13,8 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 
+//#define _USE_CONSOLE
+
 #ifdef DEAR_IMGUI
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif// DEAR_IMGUI
@@ -119,6 +121,7 @@ namespace Ailu
 
     void WinWindow::Init(const WindowProps &prop)
     {
+#ifdef _USE_CONSOLE
         //调用 alloc分配的console无法对字符进行着色，需要手动创建进程，但是
         //需要等待控制台创建完成 attach才能成功，复杂的等待机制以后再写
         // //https://stackoverflow.com/questions/5907917/how-to-use-win32-createprocess-function-to-wait-until-the-child-done-to-write-to
@@ -143,7 +146,7 @@ namespace Ailu
             RedirectIOToConsole();
             std::cout << "Hello from new console!" << std::endl;
         }
-
+#endif
         _data.Width = prop.Width;
         _data.Height = prop.Height;
         _data.Title = prop.Title;

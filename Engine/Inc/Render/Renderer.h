@@ -86,6 +86,7 @@ namespace Ailu
         Scope<CopyColorPass> _copycolor_pass;
         Scope<PostProcessPass> _postprocess_pass;
         Scope<GizmoPass> _gizmo_pass;
+        Scope<GUIPass> _gui_pass;
         Scope<WireFramePass> _wireframe_pass;
         Vector<RenderPass *> _render_passes;
         u64 _active_camera_hash;

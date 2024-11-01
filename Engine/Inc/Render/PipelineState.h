@@ -93,6 +93,7 @@ namespace Ailu
         kPoint = 0,
         kLine,
         kTriangle,
+        kTriangleStrip,
         kPatch
     };
 

@@ -6,6 +6,7 @@ keywords:
   prop_type: Uint
     _MaterialID: 2
     _SamplerMask: 0
+    _cull: 2
     _surface: 0
     shadow_index: 0
   prop_type: Float
@@ -21,7 +22,7 @@ keywords:
     _AlbedoValue: 0.29902,0.29902,0.29902,0.258824
   prop_type: Texture2D
     _AlbedoTex: eb07fa74-875a-467e-bf40-6d14647da7b4
-    _EmissionTex: null
     _NormalTex: ea68f293-f49a-45f7-a91d-7ac04bfd3433
+    _EmissionTex: null
     _RoughnessMetallicTex: null
     _SpecularTex: null

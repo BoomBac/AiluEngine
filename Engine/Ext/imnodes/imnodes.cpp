@@ -7,6 +7,8 @@
 // [SECTION] API implementation
 
 #include "imnodes_internal.h"
+#include "imnodes.h"
+
 
 // Check minimum ImGui version
 #define MINIMUM_COMPATIBLE_IMGUI_VERSION 17400
@@ -1314,7 +1316,7 @@ inline ImVec2 GetNodeContentOrigin(const ImNodeData& node)
 inline ImRect GetNodeTitleRect(const ImNodeData& node)
 {
     ImRect expanded_title_rect = node.TitleBarContentRect;
-    expanded_title_rect.Expand(node.LayoutStyle.Padding);
+    expanded_title_rect.Expand(node.LayoutStyle.Padding * GImNodes->zoomFactor);
 
     return ImRect(
         expanded_title_rect.Min,
@@ -1329,8 +1331,10 @@ void DrawGrid(ImNodesEditorContext& editor, const ImVec2& canvas_size)
     ImU32        line_color_prim = GImNodes->Style.Colors[ImNodesCol_GridLinePrimary];
     bool         draw_primary = GImNodes->Style.Flags & ImNodesStyleFlags_GridLinesPrimary;
 
-    for (float x = fmodf(offset.x, GImNodes->Style.GridSpacing); x < canvas_size.x;
-         x += GImNodes->Style.GridSpacing)
+    float spacing = GImNodes->Style.GridSpacing;
+    spacing *= GImNodes->zoomFactor;
+    for (float x = fmodf(offset.x, spacing); x < canvas_size.x;
+         x += spacing)
     {
         GImNodes->CanvasDrawList->AddLine(
             EditorSpaceToScreenSpace(ImVec2(x, 0.0f)),
@@ -1338,8 +1342,8 @@ void DrawGrid(ImNodesEditorContext& editor, const ImVec2& canvas_size)
             offset.x - x == 0.f && draw_primary ? line_color_prim : line_color);
     }
 
-    for (float y = fmodf(offset.y, GImNodes->Style.GridSpacing); y < canvas_size.y;
-         y += GImNodes->Style.GridSpacing)
+    for (float y = fmodf(offset.y, spacing); y < canvas_size.y;
+         y += spacing)
     {
         GImNodes->CanvasDrawList->AddLine(
             EditorSpaceToScreenSpace(ImVec2(0.0f, y)),
@@ -1491,9 +1495,21 @@ void DrawPin(ImNodesEditorContext& editor, const int pin_idx)
     DrawPinShape(pin.Pos, pin, pin_color);
 }
 
+
+static ImRect ZoomRect(const ImRect& originalRect, float scaleX, float scaleY)
+{
+    ImRect scaledRect;
+    scaledRect.Max.x = originalRect.Max.x * scaleX;
+    scaledRect.Max.y = originalRect.Max.y * scaleY;
+    scaledRect.Min.x = originalRect.Min.x + (originalRect.Max.x - scaledRect.Max.x) / 2; // 保持中心
+    scaledRect.Min.y = originalRect.Min.y + (originalRect.Max.y - scaledRect.Max.y) / 2; // 保持中心
+    return scaledRect;
+}
+
 void DrawNode(ImNodesEditorContext& editor, const int node_idx)
 {
-    const ImNodeData& node = editor.Nodes.Pool[node_idx];
+    ImNodeData& node = editor.Nodes.Pool[node_idx];
+    node.Rect = ZoomRect(node.Rect,GImNodes->zoomFactor,GImNodes->zoomFactor);
     ImGui::SetCursorPos(node.Origin + editor.Panning);
 
     const bool node_hovered =
@@ -3257,5 +3273,14 @@ void LoadEditorStateFromIniFile(ImNodesEditorContext* const editor, const char* 
 
     LoadEditorStateFromIniString(editor, file_data, data_size);
     ImGui::MemFree(file_data);
+}
+void SetZoomFactor(float zoom)
+{
+    auto ctx = GetCurrentContext();
+    ctx->zoomFactor = zoom > 0.f? zoom : 0.01f;
+}
+float GetZoomFactor()
+{
+    return GImNodes->zoomFactor;
 }
 } // namespace IMNODES_NAMESPACE

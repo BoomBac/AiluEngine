@@ -13,3 +13,4 @@ add_subdirectory(Engine)
 # 添加editor子目录
 add_subdirectory(Editor)
 add_subdirectory(Test)
+add_subdirectory("AiluHeadTool")

@@ -14,15 +14,6 @@ namespace Ailu
 {
     D3DCommandBuffer::D3DCommandBuffer(ECommandBufferType type) : _type(type)
     {
-        static bool s_is_init = false;
-        if (s_is_init == false)
-        {
-            s_is_init = true;
-            for (auto &p: s_obj_buffers)
-            {
-                p.reset(IConstantBuffer::Create(256));
-            }
-        }
         auto dev = D3DContext::Get()->GetDevice();
         ThrowIfFailed(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(_p_alloc.GetAddressOf())));
         ThrowIfFailed(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _p_alloc.Get(), nullptr, IID_PPV_ARGS(_p_cmd.GetAddressOf())));
@@ -46,8 +37,6 @@ namespace Ailu
         _is_custom_viewport = false;
         _allocations.clear();
         _upload_buf->Reset();
-        s_global_buffer_offset -= _buffer_offset;
-        _buffer_offset = 0;
     }
     void D3DCommandBuffer::Close()
     {
@@ -101,10 +90,18 @@ namespace Ailu
         _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this, index), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, 0, 0, nullptr);
     }
 
-    void D3DCommandBuffer::DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer> &index_buffer, const Matrix4x4f &transform, u32 instance_count)
+    void D3DCommandBuffer::DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index)
     {
-        ++RenderingStates::s_draw_call;
-        _p_cmd->DrawIndexedInstanced(index_buffer->GetCount(), instance_count, 0, 0, 0);
+        mat->Bind();
+        GraphicsPipelineStateMgr::EndConfigurePSO(this);
+        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        {
+            vb->Bind(this, mat->GetShader()->PipelineInputLayout());
+            ib->Bind(this);
+            cb_per_draw->Bind(this, 0);
+            ++RenderingStates::s_draw_call;
+            _p_cmd->DrawIndexedInstanced(ib->GetCount(), 1, 0, 0, 0);
+        }
     }
     void D3DCommandBuffer::DrawIndexedInstanced(u32 index_count, u32 instance_count)
     {
@@ -232,7 +229,7 @@ namespace Ailu
     {
         _allocations.emplace_back(_upload_buf->Allocate(data_size, 256));
         _allocations.back().SetData(data, data_size);
-        GraphicsPipelineStateMgr::SubmitBindResource(&_allocations.back().GPU, EBindResDescType::kConstBufferRaw, name, PipelineResourceInfo::kPriporityCmd);
+        GraphicsPipelineStateMgr::SubmitBindResource(&_allocations.back(), EBindResDescType::kConstBufferRaw, name, PipelineResourceInfo::kPriporityCmd);
     }
 
     void D3DCommandBuffer::SetGlobalBuffer(const String &name, IConstantBuffer *buffer)
@@ -308,7 +305,7 @@ namespace Ailu
     {
         if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
         {
-            //LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
+            LOG_WARNING("Mesh/Material is null or is not ready when draw renderer!");
             return 1;
         }
         material->Bind(pass_index);
@@ -568,5 +565,19 @@ namespace Ailu
         }
         cs->ClearBindTexture();
         cs->Bind(this, kernel, thread_group_x, thread_group_y, thread_group_z);
+    }
+    void D3DCommandBuffer::DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index, u16 instance_count)
+    {
+        mat->Bind(pass_index);
+        GraphicsPipelineStateMgr::EndConfigurePSO(this);
+        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        {
+            auto shader = mat->GetShader();
+            vb->Bind(this, shader->PipelineInputLayout());
+            if (cb_per_draw)
+                cb_per_draw->Bind(this, 0);
+            ++RenderingStates::s_draw_call;
+            _p_cmd->DrawInstanced(shader->GetTopology() == ETopology::kTriangleStrip ? vb->GetVertexCount() * 4 : vb->GetVertexCount(), instance_count, 0, 0);
+        }
     }
 }// namespace Ailu

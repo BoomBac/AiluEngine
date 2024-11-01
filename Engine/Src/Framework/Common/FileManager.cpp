@@ -216,6 +216,20 @@ namespace Ailu
 		in_file.close();
 		return true;
 	}
+    bool FileManager::ReadFile(const WString &sys_path, std::stringstream &ss)
+    {
+        fs::path p(sys_path);
+        if (!fs::exists(p))
+        {
+            g_pLogMgr->LogWarningFormat(L"ReadFile: File {} not exist!", sys_path);
+            return false;
+        }
+        std::ifstream in_file(sys_path, std::ios::in);
+        AL_ASSERT(in_file.is_open());
+        ss << in_file.rdbuf();
+        in_file.close();
+        return true;
+    }
 	bool FileManager::ReadFile(const WString& sys_path, u8* data, u64 data_start, u64 data_size)
 	{
 		fs::path p(sys_path);
@@ -279,4 +293,5 @@ namespace Ailu
             return false; // 如果有任何文件无法访问，返回false
         }
     }
+
 }

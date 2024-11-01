@@ -50,10 +50,11 @@ namespace Ailu
         RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access);
         void ReleaseTempRT(RTHandle handle);
 
-        void DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer> &index_buffer, const Matrix4x4f &transform, u32 instance_count) final;
+        void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) final;
         void DrawIndexedInstanced(u32 index_count, u32 instance_count) final;
         void DrawInstanced(const std::shared_ptr<IVertexBuffer> &vertex_buf, const Matrix4x4f &transform, u32 instance_count) final;
         void DrawInstanced(u32 vert_count, u32 instance_count) final;
+        void DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw,Material*mat,u16 pass_index = 0u,u16 instance_count = 1u) final;
 
         void SetViewport(const Rect &viewport) final;
         void SetScissorRect(const Rect &rect) final;
@@ -92,9 +93,9 @@ namespace Ailu
         void SetDescriptorHeapId(u16 id) { _cur_cbv_heap_id = id; };
 
     private:
-        inline static Array<Scope<IConstantBuffer>, 20> s_obj_buffers{};
-        inline static u16 s_global_buffer_offset = 0u;
-        u16 _buffer_offset = 0u;
+        //inline static Array<Scope<IConstantBuffer>, 20> s_obj_buffers{};
+        //inline static u16 s_global_buffer_offset = 0u;
+        //u16 _buffer_offset = 0u;
         String _name;
         u32 _id = 0u;
         bool _b_cmd_closed;

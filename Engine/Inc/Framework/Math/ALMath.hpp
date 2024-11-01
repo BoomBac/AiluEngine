@@ -118,12 +118,60 @@ namespace Ailu
                 }
                 return *(TT<T> *) this;
             }
+            TT<T> &operator/=(T scale)
+            {
+                int indexes[] = {Indexes...};
+                for (int i = 0; i < sizeof...(Indexes); i++)
+                {
+                    v[indexes[i]] /= scale;
+                }
+                return *(TT<T> *) this;
+            }
+            TT<T> operator+(T scale)
+            {
+                TT<T> ret = v;
+                int indexes[] = {Indexes...};
+                for (int i = 0; i < sizeof...(Indexes); i++)
+                {
+                    ret[indexes[i]] += scale;
+                }
+                return ret;
+            }
+            TT<T> operator-(T scale)
+            {
+                TT<T> ret = v;
+                int indexes[] = {Indexes...};
+                for (int i = 0; i < sizeof...(Indexes); i++)
+                {
+                    ret[indexes[i]] -= scale;
+                }
+                return ret;
+            }
             TT<T> &operator+=(T scale)
             {
                 int indexes[] = {Indexes...};
                 for (int i = 0; i < sizeof...(Indexes); i++)
                 {
                     v[indexes[i]] += scale;
+                }
+                return *(TT<T> *) this;
+            }
+            TT<T> &operator+=(TT<T> other)
+            {
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    v[indexes[i]] += other.data[i];
+                }
+                return *(TT<T> *) this;
+            }
+            TT<T> &operator-=(T scale)
+            {
+                int indexes[] = {Indexes...};
+                for (int i = 0; i < sizeof...(Indexes); i++)
+                {
+                    v[indexes[i]] -= scale;
                 }
                 return *(TT<T> *) this;
             }
@@ -188,6 +236,15 @@ namespace Ailu
             {
                 os << vec.x << "," << vec.y;
                 return os;
+            }
+            bool operator==(const Vector2D<T>& other)
+            {
+                return x == other.x && y == other.y;
+            }
+            bool operator<(const Vector2D<T>& other)
+            {
+                if (x != other.x) return x < other.x;
+                return y < other.y;
             }
 
             Vector2D<T> &operator+=(const Vector2D<T> &other)
@@ -289,8 +346,9 @@ namespace Ailu
             };
 
             Vector3D<T>() : x(0), y(0), z(0){};
-            Vector3D<T>(const T &_v) : x(_v), y(_v), z(_v){};
+            explicit Vector3D<T>(const T &_v) : x(_v), y(_v), z(_v){};
             Vector3D<T>(const T &_x, const T &_y, const T &_z) : x(_x), y(_y), z(_z){};
+            Vector3D<T>(Vector2D<T> v,const T &_z) : x(v.x), y(v.y), z(_z){};
             template<typename Archive>
             void serialize(Archive &ar, u32 version)
             {
@@ -300,6 +358,12 @@ namespace Ailu
             bool operator==(const Vector3D<T> &other) const
             {
                 return other.x == x && other.y == y && other.z == z;
+            }
+            bool operator<(const Vector3D<T>& other) const
+            {
+                if (x != other.x) return x < other.x;
+                if (y != other.y) return y < other.y;
+                return z < other.z;
             }
 
             Vector3D<T> &operator=(const Vector3D<T> &other)
@@ -442,6 +506,10 @@ namespace Ailu
                 {
                     T r, g, b, a;
                 };
+                Swizzle<Vector2D, T, 0, 1> xy;
+                Swizzle<Vector2D, T, 0, 2> xz;
+                Swizzle<Vector2D, T, 1, 2> yz;
+                Swizzle<Vector2D,T,2,3> zw;
                 Swizzle<Vector3D, T, 0, 1, 2> xyz;
                 Swizzle<Vector3D, T, 0, 2, 1> xzy;
                 Swizzle<Vector3D, T, 1, 0, 2> yxz;
@@ -454,6 +522,7 @@ namespace Ailu
             Vector4D<T>() : x(0), y(0), z(0), w(0){};
             Vector4D<T>(const T &_v) : x(_v), y(_v), z(_v), w(_v){};
             Vector4D<T>(const T &_x, const T &_y, const T &_z, const T &_w) : x(_x), y(_y), z(_z), w(_w){};
+            Vector4D<T>(const Vector2D<T> &v2,T _z,T _w) : x(v2.x),y(v2.y),z(_z),w(_w){};
             Vector4D<T>(const Vector3D<T> &v3) : x(v3.x), y(v3.y), z(v3.z), w(1.0f){};
             Vector4D<T>(const Vector3D<T> &v3, const T &_w) : x(v3.x), y(v3.y), z(v3.z), w(_w){};
 
@@ -471,6 +540,13 @@ namespace Ailu
             bool operator==(const Vector4D<T> &other) const
             {
                 return x == other.x && y == other.y && z == other.z && w == other.w;
+            }
+            bool operator<(const Vector4D<T>& other) const
+            {
+                if (x != other.x) return x < other.x;
+                if (y != other.y) return y < other.y;
+                if (z != other.z) return z < other.z;
+                return w < other.w;
             }
 
             Vector4D<T> &operator+=(const Vector4D<T> &other)
@@ -656,6 +732,62 @@ namespace Ailu
                 res.data[i] = v1.data[i] + v2.data[i];
             }
             return res;
+        }
+        template<template<typename> typename TT, typename T>
+        TT<T> operator+(T s,const TT<T> v1)
+        {
+            TT<T> res;
+            for (u32 i = 0; i < CountOf(v1.data); i++)
+            {
+                res.data[i] = v1.data[i] + s;
+            }
+            return res;
+        }
+        template<template<typename> typename TT, typename T>
+        TT<T> operator+(const TT<T> v1,T s)
+        {
+            TT<T> res;
+            for (u32 i = 0; i < CountOf(v1.data); i++)
+            {
+                res.data[i] = v1.data[i] + s;
+            }
+            return res;
+        }
+        template<template<typename> typename TT, typename T>
+        TT<T>& operator+=(TT<T>& v1,T s)
+        {
+            for (u32 i = 0; i < CountOf(v1.data); i++)
+            {
+                v1.data[i] += s;
+            }
+            return v1;
+        }
+        template<template<typename> typename TT, typename T>
+        TT<T>& operator-=(TT<T>& v1,T s)
+        {
+            for (u32 i = 0; i < CountOf(v1.data); i++)
+            {
+                v1.data[i] -= s;
+            }
+            return v1;
+        }
+        template<template<typename> typename TT, typename T>
+        TT<T>& operator/=(TT<T>& v1,T s)
+        {
+            for (u32 i = 0; i < CountOf(v1.data); i++)
+            {
+                v1.data[i] /= s;
+            }
+            return v1;
+        }
+        template<template<typename> typename TT, typename T>
+        TT<T>& operator*=(TT<T>& v1,T s)
+        {
+            for (u32 i = 0; i < CountOf(v1.data); i++)
+            {
+                v1.data[i] *= s;
+            }
+            return v1;
         }
 
         template<template<typename> typename TT, typename T>

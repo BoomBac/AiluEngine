@@ -1,8 +1,10 @@
-#include "pch.h"
 #include "Render/GraphicsContext.h"
-#include "RHI/DX12/D3DContext.h"
 #include "Framework/Common/Application.h"
+#include "RHI/DX12/D3DContext.h"
+#include "RHI/DX12/GPUResourceManager.h"
 #include "Render/Texture.h"
+#include "pch.h"
+#include <Render/CommandBuffer.h>
 
 namespace Ailu
 {
@@ -14,9 +16,13 @@ namespace Ailu
 		g_pGfxContext = new D3DContext(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
 		g_pGfxContext->Init();
 		g_pRenderTexturePool = new RenderTexturePool();
+        GpuResourceManager::Init();
+        CommandBufferPool::Init();
 	}
 	void GraphicsContext::FinalizeGlobalContext()
 	{
+        GpuResourceManager::Shutdown();
+        CommandBufferPool::Shutdown();
 		DESTORY_PTR(g_pRenderTexturePool);
 		DESTORY_PTR(g_pGfxContext);
 	}

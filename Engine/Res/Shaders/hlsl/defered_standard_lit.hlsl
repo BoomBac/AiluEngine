@@ -14,6 +14,7 @@
 //pixel: PSMain
 //Cull: Back
 //Queue: Opaque
+//multi_compile _ ALPHA_TEST
 //multi_compile _ CAST_POINT_SHADOW
 //pass end::
 //Properties

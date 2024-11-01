@@ -42,6 +42,15 @@ namespace Ailu
             return path.find("Res/") != path.npos || path.find("Res\\") != path.npos;
         }
 
+        static inline WString Parent(const WString& path)
+        {
+            return std::filesystem::path(path).parent_path().wstring().append(L"/");
+        }
+        static inline String Parent(const String& path)
+        {
+            return std::filesystem::path(path).parent_path().string().append("/");
+        }
+
         //begin from Res/  eg: Engien/Res/aa/b -> aa/b
         static inline String ExtractAssetPath(const String &path)
         {

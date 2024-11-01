@@ -4,6 +4,7 @@ name: M_Water
 shader_guid: f891ec73-10c8-404b-91ac-5bac15cda5fb
 keywords: 
   prop_type: Uint
+    _cull: 2
     shadow_index: 0
   prop_type: Float
   prop_type: Vector

@@ -5,6 +5,7 @@
 #include "RHI/DX12/dxhelper.h"
 #include "Render/RenderConstants.h"
 #include "Render/RenderingData.h"
+
 #include "pch.h"
 
 namespace Ailu
@@ -93,7 +94,7 @@ namespace Ailu
         _p_d3d_res_readback->Map(0, &readbackBufferRange, reinterpret_cast<void **>(&data));
         //use data here
         if (size != _desc._size)
-            LOG_WARNING("D3DGPUBuffer::ReadBack size not equal!");
+            LOG_WARNING("D3DGPUBuffer::ReadBack byte_size not equal!");
         memcpy(dst, data, std::min<u32>(_desc._size, size));
         //end use
         D3D12_RANGE emptyRange{0, 0};
@@ -123,7 +124,7 @@ namespace Ailu
 		
 		    // Ensure the buffer size matches
 		    if (size != _desc._size)
-			    LOG_WARNING("D3DGPUBuffer::ReadBack size not equal!");
+			    LOG_WARNING("D3DGPUBuffer::ReadBack byte_size not equal!");
 
 		    // Copy the data from GPU to the destination buffer
 		    memcpy(dst, data, std::min<u32>(_desc._size, size));
@@ -154,12 +155,7 @@ namespace Ailu
         _buffer_views.resize(stream_count);
         _vertex_buffers.resize(stream_count);
         _mapped_data.resize(RenderConstants::kMaxVertexAttrNum);
-    }
-    D3DVertexBuffer::D3DVertexBuffer(float *vertices, u32 size)//: _buf_num(1)
-    {
-        _vertex_buffers.emplace_back(ComPtr<ID3D12Resource>());
-        _buffer_views.emplace_back(D3D12_VERTEX_BUFFER_VIEW{});
-        SetStream(vertices, size, 0);
+        _stream_size.resize(RenderConstants::kMaxVertexAttrNum);
     }
     D3DVertexBuffer::~D3DVertexBuffer()
     {
@@ -235,6 +231,7 @@ namespace Ailu
         _buffer_views[stream_index].SizeInBytes = size;
         _buffer_layout_indexer.emplace(std::make_pair(_buffer_layout[stream_index].Name, stream_index));
         D3DContext::Get()->TrackResource(upload_heap);
+        _stream_size[stream_index] = size;
         //s_vertex_upload_bufs.emplace_back(upload_heap);
     }
 
@@ -277,14 +274,13 @@ namespace Ailu
         }
         else
         {
-            _mapped_data[stream_index] = data;
-            u32 cur_buffer_index = stream_index;
             _vertex_buffers[cur_buffer_index].Reset();
             ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(_vertex_buffers[cur_buffer_index].GetAddressOf())));
             _vertex_buffers[cur_buffer_index]->Map(0, nullptr, reinterpret_cast<void **>(&_mapped_data[stream_index]));
-            memcpy(_mapped_data[stream_index], data, size);
+            if (data)
+                memcpy(_mapped_data[stream_index], data, size);
         }
-
+        _stream_size[stream_index] = size;
         // Initialize the vertex buffer view.
         _buffer_views[cur_buffer_index].BufferLocation = _vertex_buffers[cur_buffer_index]->GetGPUVirtualAddress();
         _buffer_views[cur_buffer_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
@@ -303,6 +299,13 @@ namespace Ailu
     u32 D3DVertexBuffer::GetVertexCount() const
     {
         return _vertices_count;
+    }
+    void D3DVertexBuffer::SetData(u8 *data, u32 size, u8 stream_index,u32 offset)
+    {
+        AL_ASSERT(stream_index < _mapped_data.size());
+        AL_ASSERT(offset + size <= _stream_size[stream_index]);
+        memcpy(_mapped_data[stream_index], data + offset, size);
+        _vertices_count = size / _buffer_layout[stream_index].Size;
     }
 
     //-----------------------------------------------------------------D3DDynamicVertexBuffer----------------------------------------------------------
@@ -360,31 +363,39 @@ namespace Ailu
     //-----------------------------------------------------------------D3DDynamicVertexBuffer----------------------------------------------------------
 
     //-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
-    D3DIndexBuffer::D3DIndexBuffer(u32 *indices, u32 count) : _index_count(count)
+    D3DIndexBuffer::D3DIndexBuffer(u32 *indices, u32 count, bool is_dynamic) : _count(count), _capacity(count), _is_dynamic(is_dynamic)
     {
         auto d3d_conetxt = D3DContext::Get();
-        auto size = sizeof(u32) * count;
+        auto byte_size = sizeof(u32) * _count;
         auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-        auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-        ComPtr<ID3D12Resource> temp_buffer = nullptr;
-        ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(
-                &heap_prop,
-                D3D12_HEAP_FLAG_NONE,
-                &res_desc,
-                D3D12_RESOURCE_STATE_GENERIC_READ,
-                nullptr,
-                IID_PPV_ARGS(&_index_buf)));
+        auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(byte_size);
+        if (!_is_dynamic)
+        {
+            ComPtr<ID3D12Resource> temp_buffer = nullptr;
+            ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(
+                    &heap_prop,
+                    D3D12_HEAP_FLAG_NONE,
+                    &res_desc,
+                    D3D12_RESOURCE_STATE_GENERIC_READ,
+                    nullptr,
+                    IID_PPV_ARGS(&_index_buf)));
 
-        // Copy the triangle data to the vertex buffer.
-        u8 *pVertexDataBegin;
-        CD3DX12_RANGE readRange(0, 0);// We do not intend to read from this resource on the CPU.
-        ThrowIfFailed(_index_buf->Map(0, &readRange, reinterpret_cast<void **>(&pVertexDataBegin)));
-        memcpy(pVertexDataBegin, indices, size);
-        _index_buf->Unmap(0, nullptr);
+            // Copy the triangle data to the vertex buffer.
+            u8 *pVertexDataBegin;
+            CD3DX12_RANGE readRange(0, 0);// We do not intend to read from this resource on the CPU.
+            ThrowIfFailed(_index_buf->Map(0, &readRange, reinterpret_cast<void **>(&pVertexDataBegin)));
+            memcpy(pVertexDataBegin, indices, byte_size);
+            _index_buf->Unmap(0, nullptr);
+        }
+        else
+        {
+            ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(_index_buf.GetAddressOf())));
+            _index_buf->Map(0, nullptr, reinterpret_cast<void **>(&_p_data));
+        }
         // Initialize the vertex buffer view.
         _index_buf_view.BufferLocation = _index_buf->GetGPUVirtualAddress();
         _index_buf_view.Format = DXGI_FORMAT_R32_UINT;
-        _index_buf_view.SizeInBytes = static_cast<u32>(size);
+        _index_buf_view.SizeInBytes = static_cast<u32>(byte_size);
     }
     D3DIndexBuffer::~D3DIndexBuffer()
     {
@@ -392,16 +403,54 @@ namespace Ailu
 
     void D3DIndexBuffer::Bind(CommandBuffer *cmd) const
     {
-        RenderingStates::s_triangle_num += _index_count / 3;
+        RenderingStates::s_triangle_num += _count / 3;
         static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->IASetIndexBuffer(&_index_buf_view);
     }
     u32 D3DIndexBuffer::GetCount() const
     {
-        return _index_count;
+        return _count;
     }
     void D3DIndexBuffer::SetName(const String &name)
     {
         _index_buf->SetName(ToWStr(std::format("ib_{}", name).c_str()).c_str());
+    }
+    u8 *D3DIndexBuffer::GetData()
+    {
+        return _p_data;
+    }
+    void D3DIndexBuffer::SetData(u8 *data, u32 size)
+    {
+        if (_p_data == nullptr || data == nullptr)
+        {
+            LOG_WARNING("Try to set a null data to index buffer!");
+            return;
+        }
+        u32 max_size = _capacity * sizeof(u32);
+        if (size > max_size)
+        {
+            size = max_size;
+            LOG_WARNING("Try to set a larger data to index buffer! ({} > {})", size, max_size);
+        }
+        memcpy(_p_data, data, size * sizeof(u32));
+        _count = size / sizeof(u32);
+    }
+    void D3DIndexBuffer::Resize(u32 new_size)
+    {
+        if (_capacity == new_size || !_is_dynamic)
+            return;
+        _capacity = new_size;
+        _count = std::min<u32>(new_size, _count);
+        auto d3d_conetxt = D3DContext::Get();
+        auto byte_size = sizeof(u32) * _capacity;
+        auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+        auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(byte_size);
+        ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                                        nullptr, IID_PPV_ARGS(_index_buf.ReleaseAndGetAddressOf())));
+        _index_buf->Map(0, nullptr, reinterpret_cast<void **>(&_p_data));
+        // Initialize the vertex buffer view.
+        _index_buf_view.BufferLocation = _index_buf->GetGPUVirtualAddress();
+        _index_buf_view.Format = DXGI_FORMAT_R32_UINT;
+        _index_buf_view.SizeInBytes = static_cast<u32>(byte_size);
     }
     //-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
 
@@ -414,68 +463,19 @@ namespace Ailu
 
     D3DConstantBuffer::D3DConstantBuffer(u32 size, bool compute_buffer) : _is_compute_buffer(compute_buffer)
     {
-        static bool b_init = false;
-        if (!b_init)
-        {
-            s_global_index = 0u;
-            s_global_offset = 0u;
-            auto device = D3DContext::Get()->GetDevice();
-            //s_p_d3d_heap = D3DContext::Get()->GetDescriptorHeap();
-            //constbuffer
-            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-            s_total_size = RenderConstants::kPerFrameTotalSize * RenderConstants::kFrameCount + RenderConstants::kMaxMaterialDataCount * 256;
-            s_desc_size = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(s_total_size);
-            ThrowIfFailed(device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&s_p_d3d_res)));
-            s_p_d3d_res->SetName(L"GlobalConstBuffer");
-            // Map and initialize the constant buffer. We don't unmap this until the
-            // app closes. Keeping things mapped for the lifetime of the resource is okay.
-            CD3DX12_RANGE readRange(0, 0);// We do not intend to read from this resource on the CPU.
-            ThrowIfFailed(s_p_d3d_res->Map(0, &readRange, reinterpret_cast<void **>(&s_p_data)));
-            b_init = true;
-        }
-        _size = CalculateConstantBufferByteSize(size);
-        try
-        {
-            AL_ASSERT_MSG(s_global_offset + _size < s_total_size, "Constant buffer overflow");
-        }
-        catch (const std::runtime_error &e)
-        {
-            std::cerr << "Exception caught: " << e.what() << std::endl;
-            // 这里可以进行适当的处理，如日志记录、清理资源等
-            // 如果不希望程序继续执行，可以直接退出程序
-            // exit(EXIT_FAILURE);
-        }
-
-        _offset = s_global_offset;
-        _index = s_global_index;
-        _gpu_ptr = s_p_d3d_res->GetGPUVirtualAddress() + _offset;
-        // {
-        // 	_allocation = g_pGPUDescriptorAllocator->Allocate(1);
-        // 	//D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle;
-        // 	//cbvHandle.ptr = s_p_d3d_heap->GetCPUDescriptorHandleForHeapStart().ptr + _index * s_desc_size;
-        // 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc = {};
-        // 	cbv_desc.BufferLocation = s_p_d3d_res->GetGPUVirtualAddress() + _offset;
-        // 	cbv_desc.SizeInBytes = _size;
-        // 	D3DContext::Get()->GetDevice()->CreateConstantBufferView(&cbv_desc, std::get<0>(_allocation.At(0)));
-        // 	s_cbuf_views.emplace_back(cbv_desc);
-        // }
-        s_global_offset += _size;
-        s_global_index++;
+       _alloc = GpuResourceManager::Get()->Allocate(size);
     }
     D3DConstantBuffer::~D3DConstantBuffer()
     {
-        //好像会报错 unmaped，不知道为啥
-        //if (s_p_d3d_res)
-        //    s_p_d3d_res->Unmap(0, nullptr);
+        GpuResourceManager::Get()->Free(std::move(_alloc));
     }
 
     void D3DConstantBuffer::Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline) const
     {
         if (is_compute_pipeline)
-            static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetComputeRootConstantBufferView(bind_slot, _gpu_ptr);
+            static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetComputeRootConstantBufferView(bind_slot, _alloc._gpu_ptr);
         else
-            static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, _gpu_ptr);
+            static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, _alloc._gpu_ptr);
     }
     //-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
 

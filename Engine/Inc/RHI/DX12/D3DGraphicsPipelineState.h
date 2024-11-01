@@ -99,7 +99,7 @@ namespace Ailu
         const String &Name() const final { return _name; };
         const String &SlotToName(u8 slot) final;
         const u8 NameToSlot(const String &name) final;
-
+        void SetTopology(ETopology topology) final;
     private:
         void BindResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) final;
 
@@ -118,6 +118,7 @@ namespace Ailu
         std::unordered_multimap<u8, EBindResDescType> _bind_res_desc_type_lut;
         std::unordered_map<u8, const String &> _bind_res_name_lut;
         PSOHash _hash;
+        D3D_PRIMITIVE_TOPOLOGY _d3d_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     };
 }// namespace Ailu
 

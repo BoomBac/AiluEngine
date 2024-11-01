@@ -40,6 +40,9 @@ namespace Ailu
         void SetVector(const String &name, const Vector4f &vector);
         void SetMatrix(const String &name, const Matrix4x4f &matrix);
         float GetFloat(const String &name);
+        u8* GetPropertyBuffer(u16 pass_index);
+        void SetCullMode(ECullMode mode);
+        ECullMode GetCullMode() const;
         ShaderVariantHash ActiveVariantHash(u16 pass_index) const;
         std::set<String> ActiveKeywords(u16 pass_index) const;
         u16 RenderQueue() const { return _render_queue; };
@@ -59,14 +62,17 @@ namespace Ailu
         List<std::tuple<String, Vector4f>> GetAllVectorValue();
         List<std::tuple<String, u32>> GetAllUintValue();
 
+    protected:
+        virtual void Construct(bool first_time);
     private:
-        void Construct(bool first_time);
         void ConstructKeywords(Shader *shader);
         void UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash);
 
     protected:
         inline static u32 s_total_material_num = 0u;
         inline static u32 s_current_cbuf_offset = 0u;
+        inline const static String kCullModeKey = "_cull";
+        inline const static String kSurfaceKey = "_surface";
         u16 _standard_pass_index = -1;
         u16 _render_queue = 2000;
         Vector<u16> _mat_cbuf_per_pass_size;
@@ -144,6 +150,7 @@ namespace Ailu
             }
         };
         explicit StandardMaterial(String name);
+        void Construct(bool first_time) final;
         ~StandardMaterial();
         void MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use);
         bool IsTextureUsed(ETextureUsage use_info);

@@ -4,9 +4,11 @@
 //vert: VSMain
 //pixel: PSMain
 //Cull: Back
+//Topology: Line
 //Queue: Opaque
+//Blend: Src,OneMinusSrc
 //ZTest: LEqual
-//Fill: Solid
+//Fill: Wireframe
 //pass end::
 //info end
 

@@ -220,7 +220,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	float3 radiance = PrefilterEnvTex.SampleLevel(g_AnisotropicClampSampler, reflect(view_dir,surface.wnormal),lod);
 	float2 lut = IBLLut.Sample(g_LinearClampSampler,float2(shading_data.nv,surface.roughness)).xy;
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;// * g_IndirectLightingIntensity;
-	light += AmbientLighting(surface,shading_data,irradiance,radiance,lut,ao);
+	light += AmbientLighting(surface,shading_data,irradiance,radiance,lut,ao) * 0.75f;
 	return light;
 }
 #endif //__LIGHTING_H__

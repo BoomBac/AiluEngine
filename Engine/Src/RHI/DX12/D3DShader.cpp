@@ -38,6 +38,8 @@ namespace Ailu
         u8 *_data;
         inline static std::mutex s_compile_lock;
     };
+
+
     //shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
     static bool CreateFromFileDXC(const std::wstring &filename, const std::wstring &entryPoint, const std::wstring &pTarget, ComPtr<ID3DBlob> &p_blob,
                                   ComPtr<ID3D12ShaderReflection> &shader_reflection)
@@ -246,30 +248,32 @@ namespace Ailu
         return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     }
 
-    static EShaderDateType GetShaderDataType(const char *semantic)
-    {
-        if (!std::strcmp(semantic, RenderConstants::kSemanticPosition)) return EShaderDateType::kFloat3;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticNormal))
-            return EShaderDateType::kFloat3;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticTangent))
-            return EShaderDateType::kFloat4;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticColor))
-            return EShaderDateType::kFloat4;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticTexcoord))
-            return EShaderDateType::kFloat2;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneWeight))
-            return EShaderDateType::kFloat4;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneIndex))
-            return EShaderDateType::kuInt4;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticVertexIndex))
-            return EShaderDateType::kNone;
-        else
-        {
-            AL_ASSERT_MSG(false, "Unsupported DXGI_FORMAT to ShaderDataType!");
-            //LOG_ERROR("Unsupported DXGI_FORMAT to ShaderDataType!");
-            return EShaderDateType::kNone;
-        }
-    }
+//    static DXGI_FORMAT GetFormatBySemanticName(const char *semantic)
+//    {
+//        String set_str(semantic);
+//        if (su::Equal(set_str, RenderConstants::kSemanticPosition))
+//            return DXGI_FORMAT_R32G32B32_FLOAT;
+//        else if (su::Equal(set_str, RenderConstants::kSemanticNormal))
+//            return DXGI_FORMAT_R32G32B32_FLOAT;
+//        else if (su::Equal(set_str, RenderConstants::kSemanticTangent))
+//            return DXGI_FORMAT_R32G32B32A32_FLOAT;
+//        else if (su::Equal(set_str, RenderConstants::kSemanticColor))
+//            return DXGI_FORMAT_R32G32B32A32_FLOAT;
+//        else if (su::Equal(set_str, RenderConstants::kSemanticTexcoord))
+//            return DXGI_FORMAT_R32G32_FLOAT;
+//        else if (su::Equal(set_str, RenderConstants::kSemanticBoneWeight))
+//            return DXGI_FORMAT_R32G32B32A32_FLOAT;
+//        else if (su::Equal(set_str, RenderConstants::kSemanticBoneIndex))
+//            return DXGI_FORMAT_R32G32B32A32_UINT;
+//        else if (su::Equal(RenderConstants::kSemanticVertexIndex,set_str, false))
+//            return DXGI_FORMAT_R32_UINT;
+//        else
+//        {
+//            LOG_ERROR("Unsupported vertex shader semantic!");
+//            return DXGI_FORMAT_R32G32B32_FLOAT;
+//        }
+//    }
+
 
     static EShaderDateType GetShaderDataType(DXGI_FORMAT dx_format)
     {
@@ -618,11 +622,11 @@ namespace Ailu
             {
                 D3D12_SIGNATURE_PARAMETER_DESC input_desc{};
                 ref_vs->GetInputParameterDesc(i, &input_desc);
-                _pass_elements[pass_index]._variants[variant_hash]._vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{input_desc.SemanticName, 0, GetFormatBySemanticName(input_desc.SemanticName), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
+                EShaderDateType data_type = D3DConvertUtils::GetShaderDataType(input_desc.SemanticName,input_desc.Mask);
+                _pass_elements[pass_index]._variants[variant_hash]._vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{input_desc.SemanticName, 0, D3DConvertUtils::GetGXGIFormatByShaderDataType(data_type), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
                 //++pass_variant._vertex_input_num;
-                EShaderDateType data_type = GetShaderDataType(input_desc.SemanticName);
                 if (data_type != EShaderDateType::kNone)
-                    vb_input_desc.emplace_back(VertexBufferLayoutDesc(input_desc.SemanticName, data_type, input_desc.Register));
+                    vb_input_desc.emplace_back(input_desc.SemanticName, data_type, input_desc.Register);
                 else
                 {
                     g_pLogMgr->LogWarningFormat("LoadShaderReflection {} skip input element: {}", _name, input_desc.SemanticName);
@@ -865,7 +869,7 @@ namespace Ailu
             }
         }
     }
-
+    //https://rtarun9.github.io/blogs/shader_reflection/#reflecting-input-parameters
     void D3DComputeShader::LoadAdditionalShaderReflection(const WString &sys_path, u16 kernel_index, ShaderVariantHash variant_hash)
     {
         using namespace std;

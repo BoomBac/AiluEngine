@@ -24,8 +24,9 @@ namespace Ailu
 		IConstantBuffer* _p_obj_cb;
 		Rect _bloom_thread_rect;
 		u16 _bloom_iterator_count = 6;
-
+        Texture *_nose_tex;
 		Vector<Ref<Material>> _bloom_mats;
+        Vector4f _noise_texel_size;
 	};
 }
 

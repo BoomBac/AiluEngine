@@ -6,6 +6,8 @@
 #include <map>
 #include "D3DUtils.h"
 #include "GPUDescriptorManager.h"
+#include "GPUResourceManager.h"
+
 using Microsoft::WRL::ComPtr;
 
 namespace Ailu
@@ -37,13 +39,13 @@ namespace Ailu
 	{
 	public:
 		D3DVertexBuffer(VertexBufferLayout layout);
-		D3DVertexBuffer(float* vertices, u32 size);
 		~D3DVertexBuffer();
 		void Bind(CommandBuffer* cmd, const VertexBufferLayout& pipeline_input_layout) const final;
 		void SetLayout(VertexBufferLayout layout) override;
 		const VertexBufferLayout& GetLayout() const override;
 		void SetStream(float* vertices, u32 size,u8 stream_index) final;
 		void SetStream(u8* data, u32 size, u8 stream_index, bool dynamic = false) final;
+        void SetData(u8* data,u32 size,u8 stream_index,u32 offset = 0u) final;
 		void SetName(const String& name) final;
 		u8* GetStream(u8 index) final
 		{
@@ -55,6 +57,7 @@ namespace Ailu
 		u32 _vertices_count;
 		//just for dynamic buffer
 		Vector<u8*> _mapped_data;
+        Vector<u32> _stream_size;
 		std::map<String, u8> _buffer_layout_indexer;
 		Vector<ComPtr<ID3D12Resource>> _vertex_buffers;
 		Vector<D3D12_VERTEX_BUFFER_VIEW> _buffer_views;
@@ -88,32 +91,35 @@ namespace Ailu
 	class D3DIndexBuffer : public IIndexBuffer
 	{
 	public:
-		D3DIndexBuffer(u32* indices, u32 count);
-		~D3DIndexBuffer();
+		D3DIndexBuffer(u32* indices, u32 count,bool is_dynamic);
+		~D3DIndexBuffer() final;
 		void Bind(CommandBuffer* cmd) const final;
 		u32 GetCount() const override;
 		void SetName(const String& name) final;
+        u8 *GetData() final;
+        void SetData(u8 *data, u32 size) final;
+        void Resize(u32 new_size) final;
 	private:
-		u32 _index_count;
+		u32 _size;
+        u32 _capacity;
+		u32 _count;
 		ComPtr<ID3D12Resource> _index_buf;
 		D3D12_INDEX_BUFFER_VIEW _index_buf_view;
+        bool _is_dynamic;
+        u8* _p_data = nullptr;
 	};
 
 	class D3DConstantBuffer : public IConstantBuffer
 	{
 	public:
 		D3DConstantBuffer(u32 size,bool compute_buffer);
-		~D3DConstantBuffer();
+		~D3DConstantBuffer() override;
 		void Bind(CommandBuffer* cmd, u8 bind_slot, bool is_compute_pipeline) const final;
-		u8* GetData() final {return s_p_data + _offset;};
-		u32 GetBufferSize() const final { return _size; };
+		u8* GetData() final {return (u8*)_alloc._cpu_ptr;};
+		[[nodiscard]] u64 GetBufferSize() const final { return _alloc._size; };
 		void SetName(const String& name) final {};
 	private:
-		inline static ComPtr<ID3D12Resource> s_p_d3d_res;
-		inline static u32 s_desc_size, s_total_size,s_global_offset,s_global_index;
-		inline static u8* s_p_data;
-		u32 _offset,_index,_size;
-		D3D12_GPU_VIRTUAL_ADDRESS _gpu_ptr;
+        GpuResourceManager::Allocation _alloc;
 		bool _is_compute_buffer;
 	};
 }

@@ -8,15 +8,36 @@
 
 namespace Ailu
 {
+    static CommandBufferPool* s_pCommandBufferPool = nullptr;
+
+    void CommandBufferPool::Init()
+    {
+        s_pCommandBufferPool = new CommandBufferPool();
+        switch (Renderer::GetAPI())
+        {
+            case RendererAPI::ERenderAPI::kNone:
+                AL_ASSERT_MSG(false, "None render api used!");
+                return;
+            case RendererAPI::ERenderAPI::kDirectX12:
+            {
+                for (int i = 0; i < kInitialPoolSize; i++)
+                {
+                    auto cmd = std::make_shared<D3DCommandBuffer>(i);
+                    s_pCommandBufferPool->_cmd_buffers.emplace_back(true, cmd);
+                }
+                return;
+            }
+                AL_ASSERT_MSG(false, "Unsupport render api!");
+        }
+    }
+    void CommandBufferPool::Shutdown()
+    {
+        DESTORY_PTR(s_pCommandBufferPool);
+    }
+
     std::shared_ptr<CommandBuffer> CommandBufferPool::Get(const String &name, ECommandBufferType type)
     {
-        static bool s_b_init = false;
-        if (!s_b_init)
-        {
-            Init();
-            s_b_init = true;
-        }
-        for (auto &cmd: s_cmd_buffers)
+        for (auto &cmd: s_pCommandBufferPool->_cmd_buffers)
         {
             auto &[available, cmd_buf] = cmd;
 
@@ -41,14 +62,14 @@ namespace Ailu
             //	}
             //}
         }
-        std::unique_lock<std::mutex> lock(_mutex);
+        std::unique_lock<std::mutex> lock(s_pCommandBufferPool->_mutex);
         if (Renderer::GetAPI() == RendererAPI::ERenderAPI::kDirectX12)
         {
-            int newId = (u32) s_cmd_buffers.size();
+            u32 newId = (u32) s_pCommandBufferPool->_cmd_buffers.size();
             auto cmd = std::make_shared<D3DCommandBuffer>(newId, type);
-            s_cmd_buffers.emplace_back(std::make_tuple(false, cmd));
-            ++s_cur_pool_size;
-            LOG_WARNING("Expand commandbuffer pool to {} with name {} at frame {}", s_cur_pool_size,name,Application::s_frame_count);
+            s_pCommandBufferPool->_cmd_buffers.emplace_back(false, cmd);
+            ++s_pCommandBufferPool->_cur_pool_size;
+            LOG_WARNING("Expand commandbuffer pool to {} with name {} at frame {}", s_pCommandBufferPool->_cur_pool_size,name,Application::s_frame_count);
             cmd->SetName(name);
             cmd->Clear();
             return cmd;
@@ -59,15 +80,15 @@ namespace Ailu
 
     void CommandBufferPool::Release(std::shared_ptr<CommandBuffer> &cmd)
     {
-        std::unique_lock<std::mutex> lock(_mutex);
-        std::get<0>(s_cmd_buffers[cmd->GetID()]) = true;
+        std::unique_lock<std::mutex> lock(s_pCommandBufferPool->_mutex);
+        std::get<0>(s_pCommandBufferPool->_cmd_buffers[cmd->GetID()]) = true;
         //cmd->Clear();
     }
 
     void CommandBufferPool::ReleaseAll()
     {
-        std::unique_lock<std::mutex> lock(_mutex);
-        for (auto& it : s_cmd_buffers)
+        std::unique_lock<std::mutex> lock(s_pCommandBufferPool->_mutex);
+        for (auto& it : s_pCommandBufferPool->_cmd_buffers)
         {
             auto& [available, cmd] = it;
             available = true;
@@ -75,47 +96,5 @@ namespace Ailu
         }
     }
 
-    void CommandBufferPool::Init()
-    {
-        switch (Renderer::GetAPI())
-        {
-            case RendererAPI::ERenderAPI::kNone:
-                AL_ASSERT_MSG(false, "None render api used!");
-                return;
-            case RendererAPI::ERenderAPI::kDirectX12:
-            {
-                for (int i = 0; i < kInitialPoolSize; i++)
-                {
-                    auto cmd = std::make_shared<D3DCommandBuffer>(i);
-                    s_cmd_buffers.emplace_back(std::make_tuple(true, cmd));
-                }
-                return;
-            }
-            AL_ASSERT_MSG(false, "Unsupport render api!");
-        }
-        return;
-    }
-    void CommandBufferPool::WaitForAllCommand()
-    {
-        while (true)
-        {
-            u32 total_count = 0;
-            u32 completed_count = 0;
-            for (auto &cmd: s_cmd_buffers)
-            {
-                auto &[available, cmd_buf] = cmd;
-                if (available)
-                {
-                    ++total_count;
-                    if (g_pGfxContext->IsCommandBufferReady(cmd_buf->GetID()))
-                    {
-                        ++completed_count;
-                    }
-                }
-            }
-            if (total_count == completed_count)
-                return;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-    }
+
 }// namespace Ailu

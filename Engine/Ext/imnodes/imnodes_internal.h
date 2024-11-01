@@ -351,6 +351,9 @@ struct ImNodesContext
     bool  AltMouseDragging;
     float AltMouseScrollDelta;
     bool  MultipleSelectModifier;
+
+    //custom
+    float zoomFactor = 1.0f;
 };
 
 namespace IMNODES_NAMESPACE

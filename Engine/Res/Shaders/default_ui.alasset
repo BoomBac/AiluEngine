@@ -1,0 +1,6 @@
+guid: 26247411-5cb6-4bf7-a6c4-7c48b9f5caee
+type: kShader
+name: default_ui
+  file: Shaders/hlsl/default_ui.hlsl
+  vs_entry: VSMain
+  ps_entry: PSMain

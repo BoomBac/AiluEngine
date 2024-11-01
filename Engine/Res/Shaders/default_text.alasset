@@ -1,0 +1,6 @@
+guid: 266fceb5-389b-4a08-892c-1e9b2f58d83f
+type: kShader
+name: default_text
+  file: Shaders/hlsl/default_text.hlsl
+  vs_entry: VSMain
+  ps_entry: PSMain

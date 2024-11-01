@@ -6,13 +6,14 @@ keywords:
   prop_type: Uint
     _MaterialID: 0
     _SamplerMask: 0
+    _cull: 2
     _surface: 0
   prop_type: Float
     _SamplerMask: 0
     _MetallicValue: 0
     _MaterialID: 0
     _Anisotropy: 0
-    _RoughnessValue: 0.011
+    _RoughnessValue: 0
     _AlphaCulloff: 0
   prop_type: Vector
     _SpecularValue: 0,0,0,0
@@ -20,7 +21,7 @@ keywords:
     _AlbedoValue: 1,1,1,0
   prop_type: Texture2D
     _AlbedoTex: null
-    _EmissionTex: null
     _NormalTex: null
+    _EmissionTex: null
     _RoughnessMetallicTex: null
     _SpecularTex: null

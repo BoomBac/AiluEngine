@@ -36,6 +36,7 @@ namespace Ailu
         _postprocess_pass = MakeScope<PostProcessPass>();
         _gizmo_pass = MakeScope<GizmoPass>();
         _wireframe_pass = MakeScope<WireFramePass>();
+        _gui_pass = MakeScope<GUIPass>();
         //_owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TAAFeature())));
 
         RegisterEventBeforeTick([]()
@@ -204,6 +205,7 @@ namespace Ailu
                     feature->AddRenderPasses(this, _rendering_data);
             }
         }
+        _render_passes.emplace_back(_gui_pass.get());
         for (auto &feature: _features)
         {
             if (feature->IsActive())

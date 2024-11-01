@@ -38,14 +38,14 @@ namespace Ailu
         inline const static String kPSModel_6_1 = "ps_6_1";
         inline const static String kCSModel_5_0 = "cs_5_0";
 
-        inline const static char *kSemanticPosition = "POSITION";
-        inline const static char *kSemanticColor = "COLOR";
-        inline const static char *kSemanticTangent = "TANGENT";
-        inline const static char *kSemanticNormal = "NORMAL";
-        inline const static char *kSemanticTexcoord = "TEXCOORD";
-        inline const static char *kSemanticBoneWeight = "BONEWEIGHT";
-        inline const static char *kSemanticBoneIndex = "BONEINDEX";
-        inline const static char *kSemanticVertexIndex = "SV_VERTEXID";
+        inline const static String kSemanticPosition = "POSITION";
+        inline const static String kSemanticColor = "COLOR";
+        inline const static String kSemanticTangent = "TANGENT";
+        inline const static String kSemanticNormal = "NORMAL";
+        inline const static String kSemanticTexcoord = "TEXCOORD";
+        inline const static String kSemanticBoneWeight = "BONEWEIGHT";
+        inline const static String kSemanticBoneIndex = "BONEINDEX";
+        inline const static String kSemanticVertexIndex = "SV_VERTEXID";
 
         inline const static String kCBufNamePerObject = "CBufferPerObjectData";
         inline const static String kCBufNamePerMaterial = "CBufferPerMaterialData";

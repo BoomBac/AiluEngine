@@ -14,40 +14,74 @@ using Microsoft::WRL::ComPtr;
 
 namespace Ailu
 {
-    static DXGI_FORMAT GetFormatBySemanticName(const char *semantic)
-    {
-        if (!std::strcmp(semantic, RenderConstants::kSemanticPosition)) return DXGI_FORMAT_R32G32B32_FLOAT;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticNormal))
-            return DXGI_FORMAT_R32G32B32_FLOAT;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticTangent))
-            return DXGI_FORMAT_R32G32B32A32_FLOAT;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticColor))
-            return DXGI_FORMAT_R32G32B32A32_FLOAT;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticTexcoord))
-            return DXGI_FORMAT_R32G32_FLOAT;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneWeight))
-            return DXGI_FORMAT_R32G32B32A32_FLOAT;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticBoneIndex))
-            return DXGI_FORMAT_R32G32B32A32_UINT;
-        else if (!std::strcmp(semantic, RenderConstants::kSemanticVertexIndex))
-            return DXGI_FORMAT_R32_UINT;
-        else
-        {
-            LOG_ERROR("Unsupported vertex shader semantic!");
-            return DXGI_FORMAT_R32G32B32_FLOAT;
-        }
-    }
-
     namespace D3DConvertUtils
     {
+        static EShaderDateType GetShaderDataType(const char *semantic,u8 mask)
+        {
+            String set_str(semantic);
+            if (su::Equal(set_str, RenderConstants::kSemanticPosition) || su::Equal(set_str, RenderConstants::kSemanticNormal)
+                || su::Equal(set_str, RenderConstants::kSemanticTangent) || su::Equal(set_str, RenderConstants::kSemanticColor)
+                || su::Equal(set_str, RenderConstants::kSemanticTexcoord) || su::Equal(set_str, RenderConstants::kSemanticBoneWeight))
+            {
+                if (mask == 15) //1111b
+                    return EShaderDateType::kFloat4;
+                else if (mask == 7)//111b
+                    return EShaderDateType::kFloat3;
+                else if (mask == 3)
+                    return EShaderDateType::kFloat2;
+                else if (mask == 1)
+                    return EShaderDateType::kFloat;
+                else
+                    return EShaderDateType::kNone;
+            }
+            else if (su::Equal(set_str, RenderConstants::kSemanticBoneIndex))
+            {
+                if (mask == 15)
+                    return EShaderDateType::kuInt4;
+                else if (mask == 7)
+                    return EShaderDateType::kuInt3;
+                else if (mask == 3)
+                    return EShaderDateType::kuInt2;
+                else if (mask == 1)
+                    return EShaderDateType::kuInt;
+                else
+                    return EShaderDateType::kNone;
+            }
+            else if (su::Equal(set_str,RenderConstants::kSemanticVertexIndex))
+                return EShaderDateType::kuInt;
+            return EShaderDateType::kNone;
+        }
+        static DXGI_FORMAT GetGXGIFormatByShaderDataType(EShaderDateType data_type)
+        {
+            switch (data_type)
+            {
+                case EShaderDateType::kFloat4:
+                    return DXGI_FORMAT_R32G32B32A32_FLOAT;
+                case EShaderDateType::kFloat3:
+                    return DXGI_FORMAT_R32G32B32_FLOAT;
+                case EShaderDateType::kFloat2:
+                    return DXGI_FORMAT_R32G32_FLOAT;
+                case EShaderDateType::kuInt4:
+                    return DXGI_FORMAT_R32G32B32A32_UINT;
+                case EShaderDateType::kuInt3:
+                    return DXGI_FORMAT_R32G32B32_UINT;
+                case EShaderDateType::kuInt2:
+                    return DXGI_FORMAT_R32G32_UINT;
+                case EShaderDateType::kuInt:
+                    return DXGI_FORMAT_R32_UINT;
+                default:
+                    return DXGI_FORMAT_UNKNOWN;
+            }
+        }
         static std::tuple<D3D12_INPUT_ELEMENT_DESC *, u8> ConvertToD3D12InputLayout(const VertexInputLayout &layout)
         {
             static D3D12_INPUT_ELEMENT_DESC desc_arr[RenderConstants::kMaxVertexAttrNum];
             u8 layout_index = 0;
             for (auto &it: layout)
             {
+
                 desc_arr[layout_index++] = D3D12_INPUT_ELEMENT_DESC{it.Name.c_str(), 0,
-                                                                    GetFormatBySemanticName(it.Name.c_str()), it.Stream, it.Offset, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
+                                                                    GetGXGIFormatByShaderDataType(it.Type), it.Stream, it.Offset, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
             }
             return std::make_tuple(desc_arr, layout_index + 1);
         }
@@ -246,6 +280,8 @@ namespace Ailu
                     return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
                 case ETopology::kTriangle:
                     return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+                case ETopology::kTriangleStrip:
+                    return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
                 case ETopology::kPatch:
                     return D3D12_PRIMITIVE_TOPOLOGY_TYPE::D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
             }
@@ -262,6 +298,8 @@ namespace Ailu
                     return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_LINELIST;
                 case ETopology::kTriangle:
                     return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+                case ETopology::kTriangleStrip:
+                    return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
                 case ETopology::kPatch:
                     return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST;
             }

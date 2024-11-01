@@ -10,6 +10,7 @@
 #include "Framework/Common/TimeMgr.h"
 #include "Render/Gizmo.h"
 #include "Render/RenderingData.h"
+#include "Render/TextRenderer.h"
 #include <Framework/Common/Application.h>
 
 #include "Framework/Common/Input.h"
@@ -61,7 +62,6 @@ namespace Ailu
                 ImGui::EndDragDropTarget();
             }
             ImNodes::BeginNodeEditor();
-
             {
                 ImNodes::BeginNode(hardcoded_node_id);
                 ImNodes::BeginNodeTitleBar();
@@ -231,6 +231,16 @@ namespace Ailu
                     }
                 }
             }
+            else if (e.GetEventType() == EEventType::kMouseScrolled)
+            {
+                MouseScrollEvent event = static_cast<MouseScrollEvent &>(e);
+                f32 zoom = ImNodes::GetZoomFactor();
+                if (event.GetOffsetY() > 0)
+                    zoom += 0.01f;
+                else
+                    zoom -= 0.01f;
+                ImNodes::SetZoomFactor(zoom);
+            }
         }
         std::once_flag flag;
         void EditorLayer::OnUpdate(f32 dt)
@@ -359,7 +369,7 @@ namespace Ailu
                 }
                 if (ImGui::BeginMenu("Window"))
                 {
-                    if (ImGui::MenuItem("BlendSpace")) 
+                    if (ImGui::MenuItem("BlendSpace"))
                     {
                         g_blend_space_editor->Open(g_blend_space_editor->Handle());
                     }
@@ -582,6 +592,21 @@ namespace Ailu
                 anim_editor.Close(anim_editor.Handle());
             }
             ImGui::Begin("Solver");
+//            static char buf[256];
+//            static f32 text_scale = 1.0f;
+//            static bool s_show_text_grid = false;
+//            static Color s_tex_color = Colors::kWhite;
+//            ImGui::SliderFloat("TextScale",&text_scale,0.1f,5.0f);
+//            ImGui::Checkbox("TextGrid",&s_show_text_grid);
+//            ImGui::ColorPicker3("TextColor",s_tex_color.data);
+//            auto tr = TextRenderer::Get();
+//            tr->_is_draw_debug_line = s_show_text_grid;
+//            if (ImGui::InputText("TextRenderer Test",buf,256,ImGuiInputTextFlags_EnterReturnsTrue))
+//            {
+//                tr->DrawText(tr->GetDefaultFont(),buf,Vector2f::kZero,Vector2f(text_scale),Vector2f::kOne,s_tex_color);
+//            }
+//            if (ImGui::Button("Clear"))
+//                TextRenderer::Get()->ClearBuffer();
             ImGui::Checkbox("ApplyConstraint", &Solver::s_is_apply_constraint);
             //auto e = Selection::FirstEntity();
             static bool ccd_succeed = false, fab_succeed = false;

@@ -50,6 +50,15 @@ namespace Ailu
     {
         return (p1 + p2 + p3 + p4) * 0.25f;
     }
+    Matrix4x4f Camera::GetDefaultOrthogonalViewProj(f32 w, f32 h, f32 near, f32 far)
+    {
+        Matrix4x4f view, proj;
+        f32 aspect = w / h;
+        f32 half_width = w * 0.5f, half_height = h * 0.5f;
+        BuildViewMatrixLookToLH(view,Vector3f(0.f,0.f,-50.f),Vector3f::kForward,Vector3f::kUp);
+        BuildOrthographicMatrix(proj,-half_width,half_width,half_height,-half_height,1.f,200.f);
+        return view * proj;
+    }
 
     void Camera::CalcViewFrustumPlane(const Camera *cam, ViewFrustum &vf)
     {

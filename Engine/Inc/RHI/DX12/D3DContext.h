@@ -5,6 +5,15 @@
 #include <d3dx12.h>
 #include <dxgi1_6.h>
 
+
+#ifdef _DIRECT_WRITE
+#include <dwrite.h>
+#include <d2d1_3.h>
+#include <d3d11on12.h>
+#endif
+
+
+
 #include "Render/RenderConstants.h"
 #include "Render/GraphicsContext.h"
 #include "Platform/WinWindow.h"
@@ -71,6 +80,10 @@ namespace Ailu
         void FlushCommandQueue(ID3D12CommandQueue* cmd_queue,ID3D12Fence* fence,u64& fence_value);
         void BeginCapture();
         void EndCapture();
+        void ResizeSwapChainImpl(const u32 width, const u32 height);
+#ifdef _DIRECT_WRITE
+        void InitDirectWriteContext();
+#endif
 
     private:
         inline static const u32 kResourceCleanupIntervalTick = 2000u;
@@ -90,8 +103,23 @@ namespace Ailu
         DXGI_QUERY_VIDEO_MEMORY_INFO _local_video_memory_info;
         DXGI_QUERY_VIDEO_MEMORY_INFO _non_local_video_memory_info;
         Scope<IGPUTimer> _p_gpu_timer;
-        //ComPtr<ID3D12QueryHeap> m_queryHeap;
-        //ComPtr<ID3D12DescriptorHeap> m_cbvHeap;
+
+#ifdef _DIRECT_WRITE
+        IDWriteFactory * _dw_factory;
+        IDWriteTextFormat * _dw_textformat;
+        ComPtr<ID3D11DeviceContext> m_d3d11DeviceContext;
+        ComPtr<ID3D11On12Device> m_d3d11On12Device;
+        ComPtr<IDWriteFactory> m_dWriteFactory;
+        ComPtr<ID2D1Factory3> m_d2dFactory;
+        ComPtr<ID2D1Device2> m_d2dDevice;
+        ComPtr<ID2D1DeviceContext2> m_d2dDeviceContext;
+        ComPtr<ID3D11Resource> m_wrappedBackBuffers[RenderConstants::kFrameCount];
+        ComPtr<ID2D1Bitmap1> m_d2dRenderTargets[RenderConstants::kFrameCount];
+
+        ComPtr<ID2D1SolidColorBrush> m_textBrush;
+        ComPtr<IDWriteTextFormat> m_textFormat;
+#endif
+
         u64 _frame_count = 0u;
         CPUVisibleDescriptorAllocation _rtv_allocation;
         GPUVisibleDescriptorAllocation _imgui_allocation;
@@ -111,6 +139,7 @@ namespace Ailu
         bool _is_cur_frame_capturing = false;
         WString _cur_capture_name;
         RenderPipeline* _pipiline = nullptr;
+        std::stack<std::tuple<u32, u32>> _resize_msg;
     };
 }
 

@@ -44,7 +44,7 @@ namespace Ailu
         //--------------------Reflect
     public:
         Object();
-        Object(const String &name);
+        explicit Object(const String &name);
         Object(const Object &other);
         Object(Object &&other) noexcept;
         Object &operator=(const Object &other);
@@ -52,11 +52,11 @@ namespace Ailu
         bool operator==(const Object &other) const { return _id == other._id; };
         bool operator<(const Object &other) const { return _id < other._id; };
         virtual void Name(const String &value) { _name = value; }
-        const String &Name() const { return _name; }
+        [[nodiscard]] const String &Name() const { return _name; }
         void ID(const u32 &value) { _id = value; }
-        const u32 &ID() const { return _id; }
-        const u64 HashCode() const { return _hash; };
-        const Guid GetGuid() const { return _guid; };
+        [[nodiscard]] const u32 &ID() const { return _id; }
+        [[nodiscard]] const u64 HashCode() const { return _hash; };
+        [[nodiscard]] const Guid GetGuid() const { return _guid; };
 
     protected:
         String _name;

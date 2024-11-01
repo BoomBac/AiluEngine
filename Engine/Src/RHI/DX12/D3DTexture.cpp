@@ -191,6 +191,13 @@ namespace Ailu
         if (_p_d3dres)
             _p_d3dres->SetName(ToWStr(new_name).c_str());
     }
+    void D3DTexture2D::CreateView()
+    {
+        for (u16 j = 0; j < _mipmap_count + 1; j++)
+        {
+            CreateView(ETextureViewType::kSRV, j);
+        }
+    }
     //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
 
     //----------------------------------------------------------------------------D3DCubeMap----------------------------------------------------------------------------
@@ -956,7 +963,7 @@ namespace Ailu
 
     TextureHandle D3DRenderTexture::ColorTexture(u16 view_index, CommandBuffer *cmd)
     {
-        if (!CanAsShaderResource(this) || !_views.contains(view_index))
+        if (/*!CanAsShaderResource(this) || */!_views.contains(view_index))
             return 0;
         if (cmd)
         {

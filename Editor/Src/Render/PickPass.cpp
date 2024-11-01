@@ -53,7 +53,9 @@ namespace Ailu
                         }
                         if (auto comp = r.GetComponent<CLightProbe>(entity); comp != nullptr)
                         {
-                            Gizmo::DrawCube(t._position, comp->_size);
+                            //Gizmo::DrawCube(t._position, comp->_size);
+                            Vector3f ext = Vector3f(comp->_size) * 0.5f;
+                            Gizmo::DrawAABB(t._position - ext,t._position + ext);
                             cmd->DrawRenderer(Mesh::s_p_shpere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
                         }
                     }

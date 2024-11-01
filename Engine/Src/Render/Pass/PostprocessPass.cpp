@@ -19,6 +19,10 @@ namespace Ailu
             _bloom_mats.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/bloom.alasset"), std::format("bloom_mip_{}", i)));
         }
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforePostprocess + 25);
+        _nose_tex = g_pResourceMgr->Get<Texture2D>(L"Textures/noise_medium.png");
+        _noise_texel_size = {(f32) _nose_tex->Width(), (f32) _nose_tex->Height(), 0.0f, 0.0f};
+        _noise_texel_size.z = 1.0f / _noise_texel_size.x;
+        _noise_texel_size.w = 1.0f / _noise_texel_size.y;
     }
     PostProcessPass::~PostProcessPass()
     {
@@ -70,8 +74,21 @@ namespace Ailu
             //合成
             {
                 cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
+                Vector4f light_pos = -rendering_data._mainlight_world_position * 10000;
+                light_pos.w = 1.0f;
+                Matrix4x4f vp = rendering_data._camera->GetView() * rendering_data._camera->GetProjection();
+                TransformVector(light_pos, vp);
+                light_pos.xy /= light_pos.w;
+                light_pos.w = 1.0f;
+                light_pos.xy = light_pos.xy * 0.5f + 0.5f;
+                light_pos.y = 1.0 - light_pos.y;
+                //LOG_INFO("light_pos {}", light_pos.ToString());
+                _bloom_mats[0]->SetVector("_SunScreenPos", light_pos);
+
+                _bloom_mats[0]->SetVector("_NoiseTex_TexelSize", _noise_texel_size);
                 _bloom_mats[0]->SetTexture("_SourceTex", rendering_data._camera_opaque_tex_handle);
                 _bloom_mats[0]->SetTexture("_BloomTex", bloom_mips[0]);
+                _bloom_mats[0]->SetTexture("_NoiseTex", _nose_tex);
                 cmd->DrawFullScreenQuad(_bloom_mats[0].get(), 3);
                 //cmd->DrawRenderer(_p_quad_mesh, _bloom_mats[0].get(), 1, 3);
             }

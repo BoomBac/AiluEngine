@@ -334,6 +334,19 @@ namespace Ailu
             ret.emplace_back(*it);
         return ret;
     }
+    void Shader::SetCullMode(ECullMode mode)
+    {
+        for (auto &pass: _passes)
+        {
+            pass._pipeline_raster_state._cull_mode = mode;
+            pass._pipeline_raster_state.Hash(pass._pipeline_raster_state._s_hash_obj.GenHash(pass._pipeline_raster_state));
+        }
+    }
+    ECullMode Shader::GetCullMode() const
+    {
+        AL_ASSERT(!_passes.empty());
+        return _passes[0]._pipeline_raster_state._cull_mode;
+    }
     void Shader::AddMaterialRef(Material *mat)
     {
         _reference_mats.insert(mat);
@@ -515,6 +528,11 @@ namespace Ailu
                         {
                             pass_pipeline_topology = ETopology::kLine;
                         }
+                        else if (su::Equal(v, ShaderCommand::kTopologyValue.kTriangleStrip))
+                        {
+                            pass_pipeline_topology = ETopology::kTriangleStrip;
+                        }
+                        _topology = pass_pipeline_topology;
                     }
                     else if (su::Equal(k, ShaderCommand::kBlend, false))
                     {
@@ -824,21 +842,11 @@ namespace Ailu
             case RendererAPI::ERenderAPI::kDirectX12:
             {
                 auto shader = MakeRef<D3DComputeShader>(sys_path);
-                auto asset_path = PathUtils::ExtractAssetPath(sys_path);
-                s_cs_library.insert(std::make_pair(asset_path, shader));
                 return shader;
             }
         }
         AL_ASSERT_MSG(false, "Unsupported render api!");
         return nullptr;
-    }
-
-    Ref<ComputeShader> ComputeShader::Get(const WString &name)
-    {
-        if (s_cs_library.contains(name))
-            return s_cs_library[name];
-        else
-            return nullptr;
     }
 
     ComputeShader::ComputeShader(const WString &sys_path) : _src_file_path(sys_path)

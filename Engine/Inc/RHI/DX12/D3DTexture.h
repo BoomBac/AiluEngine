@@ -59,6 +59,7 @@ namespace Ailu
         void Apply() final;
         void Bind(CommandBuffer *cmd, u16 view_index, u8 slot, bool is_target_compute_pipiline = false) final;
         //for texture2d(s)
+        void CreateView() final;
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
@@ -119,9 +120,9 @@ namespace Ailu
 
     private:
         //gen mipmap for 1~4
-        inline static Ref<ComputeShader> _p_mipmapgen_cs0 = nullptr;
+        Ref<ComputeShader> _p_mipmapgen_cs0 = nullptr;
         //gen mipmap for 5~max
-        inline static Ref<ComputeShader> _p_mipmapgen_cs1 = nullptr;
+        Ref<ComputeShader> _p_mipmapgen_cs1 = nullptr;
         D3D12_RESOURCE_DESC _tex_desc{};
         ComPtr<ID3D12Resource> _p_d3dres;
         D3DResourceStateGuard _state_guard;

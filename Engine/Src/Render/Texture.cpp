@@ -124,17 +124,7 @@ namespace Ailu
 
     void Texture2D::CreateView()
     {
-        if (_dimension == ETextureDimension::kTex2D)
-        {
-            for (u16 j = 0; j < _mipmap_count + 1; j++)
-            {
-                Texture::CreateView(ETextureViewType::kSRV, j);
-            }
-        }
-        else
-        {
-            AL_ASSERT(false);
-        }
+
     }
 
     Color Texture2D::GetPixel32(u16 x, u16 y)

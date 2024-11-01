@@ -27,10 +27,28 @@ set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Src)
 aux_source_directory (${ENGINE_ROOT_PATH}/Ext/imgui IMGUI_ROOT)
 aux_source_directory (${ENGINE_ROOT_PATH}/Ext/implot IMPLOT_ROOT)
+set(RENDER_MODULE
+        Inc/Render/Gizmo.h
+        Src/Render/Gizmo.cpp
+        Src/Render/TextRenderer.cpp)
+set(RHI_DX12
+        Inc/RHI/DX12/GPUResourceManager.h
+        Src/RHI/DX12/GPUResourceManager.cpp
+        Inc/RHI/DX12/Page.h
+        Src/RHI/DX12/Page.cpp)
+set(UI_MODULE
+        Inc/UI/UIFramework.h
+        Src/UI/UIFramework.cpp
+        Src/UI/UIElement.cpp
+        Inc/UI/UIElement.h
+        Src/UI/Canvas.cpp
+        Inc/UI/Canvas.h
+        Src/UI/UIRenderer.cpp
+        Inc/UI/UIRenderer.h)
 set(IMGUI_BACKENDS ${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_dx12.cpp;${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_win32.cpp)
 set(IMGUIZMO_SRC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo/ImGuizmo.cpp)
 set(DDS_LOADER ${ENGINE_ROOT_PATH}/Ext/dds_loader/DDSTextureLoader12.cpp)
-set(ANIM_MODULE_SRC
+set(ANIM_MODULE
         Src/Animation/Curve.cpp
         Inc/Animation/Track.hpp
         Src/Animation/Track.cpp
@@ -51,12 +69,13 @@ set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # aux_source_directory (Src engine_src_dir)
 # 为目标添加 include 目录
 
-add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE_SRC} Src/Render/Pass/SSAOPass.cpp
+add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE} Src/Render/Pass/SSAOPass.cpp
 "Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp" "Inc/RHI/DX12/D3DUtils.h"
 "Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp" "Inc/Physics/PhysicsSystem.h" "Src/Physics/PhysicsSystem.cpp" "Src/Render/Gizmo.cpp" "Inc/Physics/Collision.h" "Src/Physics/Collision.cpp" "Inc/Animation/AnimationSystem.h" "Src/Animation/AnimationSystem.cpp"
         Inc/Framework/Common/JobSystem.h
         Src/Framework/Common/JobSystem.cpp
-        Ext/imnodes/imnodes.cpp)
+        Ext/imnodes/imnodes.cpp
+        Src/Render/Font.cpp)
 # 包含路径
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Inc)
@@ -82,7 +101,7 @@ set_target_properties (Engine PROPERTIES
 # endif()
 target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库
-target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;
+target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;d2d1.lib;dwrite.lib;d3d11.lib;
         ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib)
 
 # 添加自定义命令

@@ -15,6 +15,7 @@
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
 #include "Scene/Scene.h"
+#include "Render/Font.h"
 #include "Framework/Parser/AssetParser.h"
 
 namespace Ailu
@@ -205,7 +206,7 @@ namespace Ailu
         static Ref<T> IterToRefPtr(const Vector<ResourcePoolContainer::iterator>::iterator &iter);
 
     public:
-
+        Ref<Font> _default_font;
     private:
         static void FormatLine(const String &line, String &key, String &value);
         static void ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, EAssetType::EAssetType &type);

@@ -46,6 +46,10 @@ namespace Ailu
 		{
 			return GetCategoryFlags() & category;
 		}
+        bool operator==(const Event& other) const
+        {
+            return GetEventType() == other.GetEventType();
+        }
 	protected:
 		bool _handled = false;
 	};

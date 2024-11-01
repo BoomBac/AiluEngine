@@ -64,10 +64,12 @@ namespace Ailu
         virtual void SetRenderTarget(RTHandle color, RTHandle depth) = 0;
         virtual void SetRenderTarget(RTHandle color, u16 index = 0u) = 0;
 
-        virtual void DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer> &index_buffer, const Matrix4x4f &transform, u32 instance_count) = 0;
+        virtual void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) = 0;
+        //virtual void DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer> &index_buffer, const Matrix4x4f &transform, u32 instance_count) = 0;
         virtual void DrawIndexedInstanced(u32 index_count, u32 instance_count) = 0;
         virtual void DrawInstanced(const std::shared_ptr<IVertexBuffer> &vertex_buf, const Matrix4x4f &transform, u32 instance_count) = 0;
         virtual void DrawInstanced(u32 vert_count, u32 instance_count) = 0;
+        virtual void DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw,Material*mat,u16 pass_index,u16 instance_count) = 0;
 
         virtual void SetViewport(const Rect &viewport) = 0;
         virtual void SetScissorRect(const Rect &rect) = 0;
@@ -108,19 +110,17 @@ namespace Ailu
     class AILU_API CommandBufferPool
     {
     public:
+        static void Init();
+        static void Shutdown();
         static std::shared_ptr<CommandBuffer> Get(const String &name = "", ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect);
         static void Release(std::shared_ptr<CommandBuffer> &cmd);
         static void ReleaseAll();
-        static void WaitForAllCommand();
 
     private:
-        static void Init();
-        // static void WatchCommandBufferState();
-    private:
         inline static const u16 kInitialPoolSize = 10u;
-        inline static u16 s_cur_pool_size = kInitialPoolSize;
-        inline static std::vector<std::tuple<bool, std::shared_ptr<CommandBuffer>>> s_cmd_buffers{};
-        inline static std::mutex _mutex;
+        u16 _cur_pool_size = kInitialPoolSize;
+        std::vector<std::tuple<bool, std::shared_ptr<CommandBuffer>>> _cmd_buffers{};
+        std::mutex _mutex;
     };
 }// namespace Ailu
 

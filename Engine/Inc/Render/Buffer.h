@@ -38,10 +38,11 @@ namespace Ailu
         virtual void Bind(CommandBuffer *cmd, const VertexBufferLayout &pipeline_input_layout) const = 0;
         virtual void SetLayout(VertexBufferLayout layout) = 0;
         virtual void SetStream(float *vertices, u32 size, u8 stream_index) = 0;
-        virtual void SetStream(u8 *data, u32 size, u8 stream_index, bool dynamic = false) = 0;
+        virtual void SetStream(u8 *data, u32 size, u8 stream_index, bool dynamic) = 0;
+        virtual void SetData(u8* data,u32 size,u8 stream_index,u32 offset) = 0;
         virtual void SetName(const String &name) = 0;
         virtual u8 *GetStream(u8 index) = 0;
-        virtual const VertexBufferLayout &GetLayout() const = 0;
+        [[nodiscard]] virtual const VertexBufferLayout &GetLayout() const = 0;
         virtual u32 GetVertexCount() const = 0;
     };
 
@@ -59,11 +60,14 @@ namespace Ailu
     class AILU_API IIndexBuffer
     {
     public:
-        static IIndexBuffer *Create(u32 *indices, u32 count, const String &name = std::format("index_buffer_{}", s_global_buffer_index++));
+        static IIndexBuffer *Create(u32 *indices, u32 count, const String &name = std::format("index_buffer_{}", s_global_buffer_index++),bool is_dynamic = false);
         virtual ~IIndexBuffer() = default;
         virtual void SetName(const String &name) = 0;
         virtual void Bind(CommandBuffer *cmd) const = 0;
-        virtual u32 GetCount() const = 0;
+        [[nodiscard]] virtual u32 GetCount() const = 0;
+        virtual u8 *GetData() = 0;
+        virtual void SetData(u8 *data, u32 size) = 0;
+        virtual void Resize(u32 new_size) = 0;
     };
 
     class IConstantBuffer
@@ -75,7 +79,7 @@ namespace Ailu
         virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) const = 0;
         virtual void SetName(const String &name) = 0;
         virtual u8 *GetData() = 0;
-        virtual u32 GetBufferSize() const = 0;
+        virtual u64 GetBufferSize() const = 0;
     };
 }// namespace Ailu
 

@@ -4,6 +4,7 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/dxhelper.h"
+//#include "RHI/DX12/UploadBuffer.h"
 #include "pch.h"
 
 namespace Ailu
@@ -42,6 +43,7 @@ namespace Ailu
             _d3d_pso_desc.DepthStencilState = D3DConvertUtils::ConvertToD3D12DepthStencilDesc(_state_desc._depth_stencil_state);
             _d3d_pso_desc.SampleMask = UINT_MAX;
             _d3d_pso_desc.PrimitiveTopologyType = D3DConvertUtils::ConvertToDXTopologyType(_state_desc._topology);
+            _d3d_topology = D3DConvertUtils::ConvertToDXTopology(_state_desc._topology);
             Vector<D3D12_INPUT_ELEMENT_DESC> v;
             //d3dshader中存储的D3D12_INPUT_ELEMENT_DESC中的SemanticName似乎被析构了导致语义不对，所以这里使用shader层的string semantic来重新构建
             //但为什么之前没事不清楚。
@@ -97,7 +99,7 @@ namespace Ailu
             _p_cmd->OMSetStencilRef(_state_desc._depth_stencil_state._stencil_ref_value);
         _p_cmd->SetGraphicsRootSignature(_p_sig.Get());
         _p_cmd->SetPipelineState(_p_plstate.Get());
-        _p_cmd->IASetPrimitiveTopology(D3DConvertUtils::ConvertToDXTopology(_state_desc._topology));
+        _p_cmd->IASetPrimitiveTopology(_d3d_topology);
         //_p_cmd->SetDescriptorHeaps(1, D3DContext::Get()->GetDescriptorHeap().GetAddressOf());
     }
 
@@ -158,8 +160,9 @@ namespace Ailu
             break;
             case Ailu::EBindResDescType::kConstBufferRaw:
             {
-                D3D12_GPU_VIRTUAL_ADDRESS address = *static_cast<D3D12_GPU_VIRTUAL_ADDRESS *>(res);
-                static_cast<D3DCommandBuffer*>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot,address);
+                UploadBuffer::Allocation alloc = *static_cast<UploadBuffer::Allocation *>(res);
+                //D3D12_GPU_VIRTUAL_ADDRESS address = *static_cast<D3D12_GPU_VIRTUAL_ADDRESS *>(res);
+                static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, alloc.GPU);
                 return;
             }
             break;
@@ -173,5 +176,10 @@ namespace Ailu
             case Ailu::EBindResDescType::kCBufferAttribute:
                 break;
         }
+    }
+    void D3DGraphicsPipelineState::SetTopology(ETopology topology)
+    {
+        _state_desc._topology = topology;
+        _d3d_topology = D3DConvertUtils::ConvertToDXTopology(_state_desc._topology);
     }
 }// namespace Ailu

@@ -40,7 +40,7 @@ namespace Ailu
 		return nullptr;
 	}
 
-	IIndexBuffer* IIndexBuffer::Create(u32* indices, u32 count, const String& name)
+	IIndexBuffer* IIndexBuffer::Create(u32* indices, u32 count, const String& name,bool is_dynamic )
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -48,7 +48,7 @@ namespace Ailu
 			AL_ASSERT_MSG(false, "None render api used!");
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-			return new D3DIndexBuffer(indices, count);
+			return new D3DIndexBuffer(indices, count,is_dynamic);
 		}
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;

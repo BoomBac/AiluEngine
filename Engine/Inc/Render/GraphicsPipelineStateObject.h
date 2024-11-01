@@ -64,7 +64,7 @@ namespace Ailu
             };
             inline static const BitDesc kShader = {0, 46};
             inline static const BitDesc kInputlayout = {46, 4};
-            inline static const BitDesc kTopology = {50, 2};
+            //inline static const BitDesc kTopology = {50, 2};
             inline static const BitDesc kBlendState = {52, 3};
             inline static const BitDesc kRasterState = {55, 2};
             inline static const BitDesc kDepthStencilState = {57, 5};
@@ -73,10 +73,10 @@ namespace Ailu
 
     public:
         static Scope<GraphicsPipelineStateObject> Create(const GraphicsPipelineStateInitializer &initializer);
-        static PSOHash ConstructPSOHash(u8 input_layout, u64 shader, u8 topology, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state);
-        static void ConstructPSOHash(PSOHash &hash, u8 input_layout, u64 shader, u8 topology, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state);
+        static PSOHash ConstructPSOHash(u8 input_layout, u64 shader,u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state);
+        static void ConstructPSOHash(PSOHash &hash, u8 input_layout, u64 shader, u8 blend_state, u8 raster_state, u8 ds_state, u8 rt_state);
         static PSOHash ConstructPSOHash(const GraphicsPipelineStateInitializer &initializer, u16 pass_index = 0, ShaderVariantHash variant_hash = 0);
-        static void ExtractPSOHash(const PSOHash &pso_hash, u8 &input_layout, u64 &shader, u8 &topology, u8 &blend_state, u8 &raster_state, u8 &ds_state, u8 &rt_state);
+        static void ExtractPSOHash(const PSOHash &pso_hash, u8 &input_layout, u64 &shader,u8 &blend_state, u8 &raster_state, u8 &ds_state, u8 &rt_state);
         static void ExtractPSOHash(const PSOHash &pso_hash, u64 &shader);
 
         virtual ~GraphicsPipelineStateObject() = default;
@@ -88,7 +88,7 @@ namespace Ailu
         virtual const String &Name() const = 0;
         virtual const String &SlotToName(u8 slot) = 0;
         virtual const u8 NameToSlot(const String &name) = 0;
-
+        virtual void SetTopology(ETopology topology) = 0;
     protected:
         virtual void BindResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) = 0;
         struct BindResDescSlotOffset

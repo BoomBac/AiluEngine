@@ -77,6 +77,8 @@ namespace Ailu
                 L"Shaders/skybox.alasset",
                 L"Shaders/bloom.alasset",
                 L"Shaders/forwardlit.alasset",
+                L"Shaders/default_ui.alasset",
+                L"Shaders/default_text.alasset",
                 L"Shaders/water.alasset"};
         Vector<WString> shader_pathes = {
                 L"Shaders/hlsl/debug.hlsl",
@@ -164,6 +166,8 @@ namespace Ailu
             auto lut2 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_2.dds");
             RegisterResource(L"Runtime/ltc_lut1", lut1);
             RegisterResource(L"Runtime/ltc_lut2", lut2);
+            auto noise = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"rgba-noise-medium.png");
+            RegisterResource(L"Textures/noise_medium.png", noise);
         }
         WString mesh_path_cube = L"Meshs/cube.alasset";
         WString mesh_path_sphere = L"Meshs/sphere.alasset";
@@ -244,6 +248,14 @@ namespace Ailu
             mat_creator(L"Shaders/cubemap_gen.alasset", L"Runtime/Material/CubemapGen", "CubemapGen");
             mat_creator(L"Shaders/filter_irradiance.alasset", L"Runtime/Material/EnvmapFilter", "EnvmapFilter");
             mat_creator(L"Shaders/blit.alasset", L"Runtime/Material/Blit", "Blit");
+            mat_creator(L"Shaders/gizmo.alasset", L"Runtime/Material/Gizmo", "GizmoDrawer");
+        }
+        //_default_font = Font::Create(GetResSysPath(L"Fonts/Open_Sans/Arial.fnt"));
+        _default_font = Font::Create(GetResSysPath(L"Fonts/Open_Sans/open_sans_regular_65.fnt"));
+        for(auto& p : _default_font->_pages)
+        {
+            p._texture = LoadExternalTexture(p._file);
+            RegisterResource(PathUtils::ExtractAssetPath(p._file), p._texture);
         }
         //g_pThreadTool->Enqueue("ResourceMgr::WatchDirectory", &ResourceMgr::WatchDirectory, this);
         WatchDirectory();
@@ -307,22 +319,35 @@ namespace Ailu
             Shader *shader = _shader_waiting_for_compile.front();
             if (shader->PreProcessShader())
             {
-                AddResourceTask([=]() -> Ref<void>
-                                {
-					for (auto& mat : shader->GetAllReferencedMaterials())
-					{
-						mat->ConstructKeywords(shader);
-						bool is_all_succeed = true;
-						for (u16 i = 0; i < shader->PassCount(); i++)
-						{
-							is_all_succeed &= shader->Compile(i,mat->ActiveVariantHash(i));
-						}
-						if (is_all_succeed)
-						{
-							mat->ChangeShader(shader);
-						}
-					}
-					return nullptr; });
+                for (auto &mat: shader->GetAllReferencedMaterials())
+                {
+                    mat->ConstructKeywords(shader);
+                    bool is_all_succeed = true;
+                    for (u16 i = 0; i < shader->PassCount(); i++)
+                    {
+                        is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
+                    }
+                    if (is_all_succeed)
+                    {
+                        mat->ChangeShader(shader);
+                    }
+                }
+     //           AddResourceTask([=]() -> Ref<void>
+     //                           {
+					//for (auto& mat : shader->GetAllReferencedMaterials())
+					//{
+					//	mat->ConstructKeywords(shader);
+					//	bool is_all_succeed = true;
+					//	for (u16 i = 0; i < shader->PassCount(); i++)
+					//	{
+					//		is_all_succeed &= shader->Compile(i,mat->ActiveVariantHash(i));
+					//	}
+					//	if (is_all_succeed)
+					//	{
+					//		mat->ChangeShader(shader);
+					//	}
+					//}
+					//return nullptr; });
             }
             _shader_waiting_for_compile.pop();
         }
@@ -750,13 +775,12 @@ namespace Ailu
         {
             mat = MakeRef<Material>(shader, name);
         }
-        //mat->SurfaceType(ESurfaceType::FromString(surface_type));
         mat->_all_keywords.clear();
         for (auto &kw: su::Split(keywords, ","))
         {
             mat->_all_keywords.insert(kw);
         }
-        mat->ConstructKeywords(mat->_p_shader);
+        mat->Construct(true);
         std::string cur_type{" "};
         std::string prop_type{"prop_type"};
         u32 prop_begin_line = 5;
@@ -1330,7 +1354,6 @@ namespace Ailu
         namespace fs = std::filesystem;
         fs::path dir(s_engine_res_root_pathw + EnginePath::kEngineShaderPathW);
         //std::chrono::duration<int, std::milli> sleep_duration(1000);// 1秒
-        std::unordered_map<fs::path, fs::file_time_type> files;
         static auto reload_shader = [&](const fs::path &file)
         {
             const WString cur_path = PathUtils::FormatFilePath(file.wstring());
@@ -1357,35 +1380,43 @@ namespace Ailu
                     }
                 }
             }
-            for (auto it = ComputeShader::begin(); it != ComputeShader::end(); it++)
+            
+            for (auto it = ResourceBegin<ComputeShader>(); it != ResourceEnd<ComputeShader>(); it++)
             {
-                if (it->second->IsDependencyFile(cur_path))
-                    _compute_shader_waiting_for_compile.push(it->second.get());
+                auto cs = IterToRefPtr<ComputeShader>(it);
+                if (cs->IsDependencyFile(cur_path))
+                    _compute_shader_waiting_for_compile.push(cs.get());
             }
         };
-        bool is_first_execute = true;
+        static bool is_first_execute = true;
         static std::set<fs::path> path_set{};
-        static std::unordered_map<fs::path, fs::file_time_type> current_files;
-        //while (_is_watching_directory)
+        static std::unordered_map<fs::path, fs::file_time_type> s_cache_files_time;
+        std::unordered_map<fs::path, fs::file_time_type> cur_files_time;
+        TraverseDirectory(dir, path_set);
+        if (is_first_execute)
         {
-            TraverseDirectory(dir, path_set);
             for (auto &cur_path: path_set)
-            {
-                current_files[cur_path] = fs::last_write_time(cur_path);
-            }
-            for (const auto &[file, last_write_time]: current_files)
-            {
-                if (files.contains(file))
-                {
-                    if (files[file] != last_write_time)
-                        reload_shader(file);
-                }
-                else if (!is_first_execute)
-                    reload_shader(file);
-                files[file] = last_write_time;
-            }
-            //std::this_thread::sleep_for(sleep_duration);
+                s_cache_files_time[cur_path] = fs::last_write_time(cur_path);
             is_first_execute = false;
+        }
+        for (auto &cur_path: path_set)
+        {
+            if (!s_cache_files_time.contains(cur_path))
+                s_cache_files_time[cur_path] = fs::last_write_time(cur_path);
+            cur_files_time[cur_path] = fs::last_write_time(cur_path);
+        }
+        for (const auto &[file, last_write_time]: s_cache_files_time)
+        {
+            if (cur_files_time.contains(file))
+            {
+                if (cur_files_time[file] != last_write_time)
+                {
+                    reload_shader(file);
+                    s_cache_files_time[file] = cur_files_time[file];
+                }
+            }
+            //else if (!is_first_execute)
+            //    reload_shader(file);
         }
         u32 reload_count0 = _compute_shader_waiting_for_compile.size();
         u32 reload_count1 = _shader_waiting_for_compile.size();
@@ -1477,9 +1508,10 @@ namespace Ailu
                 loaded_objects.push(std::make_tuple(imported_asset_path, mesh));
                 if (mesh_import_setting->_is_import_material)
                 {
+
                     for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
                     {
-                        auto mat = MakeRef<StandardMaterial>(it->_name);
+                        auto mat = MakeRef<StandardMaterial>("MAT_"+ it->_name);
                         if (!it->_textures[0].empty())
                         {
                             auto albedo = ImportResource(ToWStr(it->_textures[0]));
@@ -1493,7 +1525,7 @@ namespace Ailu
                                 mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());
                         }
                         imported_asset_path = created_asset_dir;
-                        imported_asset_path.append(std::format(L"{}.alasset", ToWStr(it->_name.c_str())));
+                        imported_asset_path.append(std::format(L"{}.alasset", ToWStr(mat->_name.c_str())));
                         loaded_objects.push(std::make_tuple(imported_asset_path, mat));
                     }
                 }

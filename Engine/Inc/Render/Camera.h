@@ -36,6 +36,7 @@ namespace Ailu
         static Camera *GetDefaultCamera();
         static void DrawGizmo(const Camera *p_camera, Color c);
         static void CalcViewFrustumPlane(const Camera *cam, ViewFrustum &vf);
+        static Matrix4x4f GetDefaultOrthogonalViewProj(f32 w,f32 h,f32 near = 1.f,f32 far = 200.f);
         //when the eye_camera turns, the AABB is recalculated, resulting in shadow jitter
         static AABB GetShadowCascadeAABB(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);
         static Sphere GetShadowCascadeSphere(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);

@@ -1,4 +1,5 @@
 #include "RHI/DX12/D3DContext.h"
+#include "RHI/DX12/GPUResourceManager.h"
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "Framework/Common/Assert.h"
 #include "Framework/Common/Log.h"
@@ -13,6 +14,10 @@
 #include "pch.h"
 #include <dxgidebug.h>
 #include <limits>
+
+#include <d3d11.h>
+
+
 
 #ifdef _PIX_DEBUG
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
@@ -118,7 +123,6 @@ namespace Ailu
                                            _imgui_allocation.Page()->GetHeap().Get(), cpu_handle, gpu_handle);
         }
 #endif// DEAR_IMGUI
-        Gizmo::Init();
         m_commandList->Close();
         ID3D12CommandList *ppCommandLists[] = {m_commandList.Get()};
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
@@ -231,9 +235,11 @@ namespace Ailu
 
     void D3DContext::EndBackBuffer(CommandBuffer *cmd)
     {
+#ifndef _DIRECT_WRITE
         auto dxcmd = static_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
         auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
         dxcmd->ResourceBarrier(1, &bar_after);
+#endif// !_DIRECT_WRITE
     }
 
     void D3DContext::DrawOverlay(CommandBuffer *cmd)
@@ -317,20 +323,79 @@ namespace Ailu
 #endif
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
         _rtv_allocation = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RenderConstants::kFrameCount);
+
         // Create a RTV for each frame.
         for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
         {
             ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
             m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
-            //rtvHandle.Offset(1, _rtv_desc_size);
+            _color_buffer[n]->SetName(std::format(L"BackBuffer_{}",n).c_str());
             ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
         }
+#ifdef _DIRECT_WRITE
+        InitDirectWriteContext();
+        // Query the desktop's dpi settings, which will be used to create
+        // D2D's render targets.
+        float dpiX;
+        float dpiY;
+#pragma warning(push)
+#pragma warning(disable : 4996)// GetDesktopDpi is deprecated.
+        m_d2dFactory->GetDesktopDpi(&dpiX, &dpiY);
+#pragma warning(pop)
+        D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
+                D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+                D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
+                dpiX,
+                dpiY);
+        for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
+        {
+            // Create a wrapped 11On12 resource of this back buffer. Since we are
+            // rendering all D3D12 content first and then all D2D content, we specify
+            // the In resource state as RENDER_TARGET - because D3D12 will have last
+            // used it in this state - and the Out resource state as PRESENT. When
+            // ReleaseWrappedResources() is called on the 11On12 device, the resource
+            // will be transitioned to the PRESENT state.
+            D3D11_RESOURCE_FLAGS d3d11Flags = {D3D11_BIND_RENDER_TARGET};
+            ThrowIfFailed(m_d3d11On12Device->CreateWrappedResource(
+                    _color_buffer[n].Get(),
+                    &d3d11Flags,
+                    D3D12_RESOURCE_STATE_RENDER_TARGET,
+                    D3D12_RESOURCE_STATE_PRESENT,
+                    IID_PPV_ARGS(&m_wrappedBackBuffers[n])));
+
+            // Create a render target for D2D to draw directly to this back buffer.
+            ComPtr<IDXGISurface> surface;
+            ThrowIfFailed(m_wrappedBackBuffers[n].As(&surface));
+            ThrowIfFailed(m_d2dDeviceContext->CreateBitmapFromDxgiSurface(
+                    surface.Get(),
+                    &bitmapProperties,
+                    &m_d2dRenderTargets[n]));
+        }
+#endif
         ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
     }
 
 
     void D3DContext::LoadAssets()
     {
+#ifdef _DIRECT_WRITE
+        // Create D2D/DWrite objects for rendering text.
+        {
+            ThrowIfFailed(m_d2dDeviceContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::Black), &m_textBrush));
+            ThrowIfFailed(m_dWriteFactory->CreateTextFormat(
+                    L"Verdana",
+                    NULL,
+                    DWRITE_FONT_WEIGHT_NORMAL,
+                    DWRITE_FONT_STYLE_NORMAL,
+                    DWRITE_FONT_STRETCH_NORMAL,
+                    50,
+                    L"en-us",
+                    &m_textFormat));
+            ThrowIfFailed(m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER));
+            ThrowIfFailed(m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER));
+        }
+#endif
+
         // Create synchronization objects.
         {
             //ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
@@ -347,6 +412,15 @@ namespace Ailu
 
     void D3DContext::Present()
     {
+        //if (!_resize_msg.empty())
+        //{
+        //    auto& [w, h] = _resize_msg.top();
+        //    ResizeSwapChainImpl(w,h);
+        //    do
+        //    {
+        //        _resize_msg.pop();
+        //    } while (!_resize_msg.empty());
+        //}
         auto cmd = CommandBufferPool::Get("GUI Reslove");
         {
             ProfileBlock p(cmd.get(), "GUI Reslove");
@@ -356,7 +430,6 @@ namespace Ailu
         }
         g_pGfxContext->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
-        //g_pGfxContext->Present();
 
         DoResourceTask();
         //ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
@@ -373,6 +446,39 @@ namespace Ailu
             ImGui::RenderPlatformWindowsDefault(nullptr, (void *) m_commandList.Get());
         }
 #endif// DEAR_IMGUI \
+
+#ifdef _DIRECT_WRITE
+
+        //RenderUI
+        {
+            D2D1_SIZE_F rtSize = m_d2dRenderTargets[m_frameIndex]->GetSize();
+            D2D1_RECT_F textRect = D2D1::RectF(0, 0, rtSize.width, rtSize.height);
+            static const WCHAR text[] = L"11On12";
+
+            // Acquire our wrapped render target resource for the current back buffer.
+            m_d3d11On12Device->AcquireWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
+
+            // Render text directly to the back buffer.
+            m_d2dDeviceContext->SetTarget(m_d2dRenderTargets[m_frameIndex].Get());
+            m_d2dDeviceContext->BeginDraw();
+            m_d2dDeviceContext->SetTransform(D2D1::Matrix3x2F::Identity());
+            m_d2dDeviceContext->DrawText(
+                    text,
+                    _countof(text) - 1,
+                    m_textFormat.Get(),
+                    &textRect,
+                    m_textBrush.Get());
+            ThrowIfFailed(m_d2dDeviceContext->EndDraw());
+
+            // Release our wrapped render target resource. Releasing
+            // transitions the back buffer resource to the state specified
+            // as the OutState when the wrapped resource was created.
+            m_d3d11On12Device->ReleaseWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
+
+            // Flush to submit the 11 command list to the shared command queue.
+            m_d3d11DeviceContext->Flush();
+        }
+#endif//  _DIRECT_WRITE
         // Present the frame.
         ThrowIfFailed(m_swapChain->Present(1, 0));
         {
@@ -400,6 +506,10 @@ namespace Ailu
                     _global_tracked_resource.clear();
                 origin_res_num -= _global_tracked_resource.size();
                 g_pLogMgr->LogWarningFormat("D3DContext::Present: Resource cleanup, {} resources released.", origin_res_num);
+            }
+            if (u32 release_size = GpuResourceManager::Get()->ReleaseSpace(); release_size > 0)
+            {
+                LOG_INFO("D3DContext::Present: Resource cleanup, {} byte released.",release_size);
             }
             if (RenderTexture::TotalGPUMemerySize() > kMaxRenderTextureMemorySize)
             {
@@ -478,32 +588,8 @@ namespace Ailu
 
     void D3DContext::ResizeSwapChain(const u32 width, const u32 height)
     {
-        WaitForGpu();
-        // Release the resources holding references to the swap chain (requirement of
-        // IDXGISwapChain::ResizeBuffers) and reset the frame fence values to the
-        // current fence value.
-        for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
-        {
-            _color_buffer[n].Reset();
-            //m_fenceValues[n] = m_fenceValues[m_frameIndex];
-        }
-        // Resize the swap chain to the desired dimensions.
-        DXGI_SWAP_CHAIN_DESC desc = {};
-        m_swapChain->GetDesc(&desc);
-        ThrowIfFailed(m_swapChain->ResizeBuffers(RenderConstants::kFrameCount, width, height, desc.BufferDesc.Format, desc.Flags));
-        //BOOL fullscreenState;
-        //ThrowIfFailed(m_swapChain->GetFullscreenState(&fullscreenState, nullptr));
-        //m_windowedMode = !fullscreenState;
-        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-        _width = width;
-        _height = height;
-        for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
-        {
-            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
-            m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
-            //rtvHandle.Offset(1, _rtv_desc_size);
-            ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
-        }
+        ResizeSwapChainImpl(width, height);
+        //_resize_msg.push(std::make_tuple(width, height));
     }
 
 
@@ -545,4 +631,119 @@ namespace Ailu
         //ShellExecute(NULL, L"open", _cur_capture_name.data(), NULL, NULL, SW_SHOWNORMAL);
 #endif// _PIX_DEBUG
     }
+    void D3DContext::ResizeSwapChainImpl(const u32 width, const u32 height)
+    {
+        if (width == _width && height == _height)
+            return;
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+#ifdef _DIRECT_WRITE
+        m_d2dDeviceContext->SetTarget(nullptr);
+#endif
+        //m_d3d11On12Device->ReleaseWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
+        WaitForGpu();
+        // Release the resources holding references to the swap chain (requirement of
+        // IDXGISwapChain::ResizeBuffers) and reset the frame fence values to the
+        // current fence value.
+        for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
+        {
+            _color_buffer[n].Reset();
+#ifdef _DIRECT_WRITE
+            m_wrappedBackBuffers[n].Reset();
+            m_d2dRenderTargets[n].Reset();
+#endif
+        }
+#ifdef _DIRECT_WRITE
+        m_d3d11DeviceContext->Flush();
+#endif
+        // Resize the swap chain to the desired dimensions.
+        DXGI_SWAP_CHAIN_DESC desc = {};
+        m_swapChain->GetDesc(&desc);
+        ThrowIfFailed(m_swapChain->ResizeBuffers(RenderConstants::kFrameCount, width, height, desc.BufferDesc.Format, desc.Flags));
+        //BOOL fullscreenState;
+        //ThrowIfFailed(m_swapChain->GetFullscreenState(&fullscreenState, nullptr));
+        //m_windowedMode = !fullscreenState;
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+        _width = width;
+        _height = height;
+#ifdef _DIRECT_WRITE
+        // Query the desktop's dpi settings, which will be used to create
+        // D2D's render targets.
+        float dpiX;
+        float dpiY;
+#pragma warning(push)
+#pragma warning(disable : 4996)// GetDesktopDpi is deprecated.
+        m_d2dFactory->GetDesktopDpi(&dpiX, &dpiY);
+#pragma warning(pop)
+        D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
+                D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+                D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
+                dpiX,
+                dpiY);
+
+        for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
+        {
+            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
+            _color_buffer[n]->SetName(L"back_buffer");
+            m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
+            // Create a wrapped 11On12 resource of this back buffer. Since we are
+            // rendering all D3D12 content first and then all D2D content, we specify
+            // the In resource state as RENDER_TARGET - because D3D12 will have last
+            // used it in this state - and the Out resource state as PRESENT. When
+            // ReleaseWrappedResources() is called on the 11On12 device, the resource
+            // will be transitioned to the PRESENT state.
+            D3D11_RESOURCE_FLAGS d3d11Flags = {D3D11_BIND_RENDER_TARGET};
+            ThrowIfFailed(m_d3d11On12Device->CreateWrappedResource(
+                    _color_buffer[n].Get(),
+                    &d3d11Flags,
+                    D3D12_RESOURCE_STATE_RENDER_TARGET,
+                    D3D12_RESOURCE_STATE_PRESENT,
+                    IID_PPV_ARGS(&m_wrappedBackBuffers[n])));
+            // Create a render target for D2D to draw directly to this back buffer.
+            ComPtr<IDXGISurface> surface;
+            ThrowIfFailed(m_wrappedBackBuffers[n].As(&surface));
+            ThrowIfFailed(m_d2dDeviceContext->CreateBitmapFromDxgiSurface(
+                    surface.Get(),
+                    &bitmapProperties,
+                    &m_d2dRenderTargets[n]));
+            //rtvHandle.Offset(1, _rtv_desc_size);
+            //ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
+        }
+#else
+        for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
+        {
+            ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
+            _color_buffer[n]->SetName(std::format(L"BackBuffer_{}",n).c_str());
+            m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
+        }
+#endif//_DIRECT_WRITE
+    }
+#ifdef _DIRECT_WRITE
+    void D3DContext::InitDirectWriteContext()
+    {
+        //ThrowIfFailed(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown **>(&_dw_factory)));
+        ComPtr<ID3D11Device> d3d11_dev = nullptr;
+        UINT d3d11DeviceFlags = 0U;
+        D2D1_FACTORY_OPTIONS d2dFactoryOptions = {};
+#ifdef _DEBUG
+        d3d11DeviceFlags = D3D11_CREATE_DEVICE_DEBUG | D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+        d2dFactoryOptions.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+#else
+        d3d11DeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+#endif
+        ComPtr<ID3D11Device> d3d11Device;
+        ThrowIfFailed(D3D11On12CreateDevice(m_device.Get(), d3d11DeviceFlags, nullptr, 0U,
+                                            reinterpret_cast<IUnknown **>(m_commandQueue.GetAddressOf()), 1U, 0U, &d3d11Device, &m_d3d11DeviceContext, nullptr));
+        ThrowIfFailed(d3d11Device.As(&m_d3d11On12Device));
+        // Create D2D/DWrite components.
+        {
+            D2D1_DEVICE_CONTEXT_OPTIONS deviceOptions = D2D1_DEVICE_CONTEXT_OPTIONS_NONE;
+            ThrowIfFailed(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory3), &d2dFactoryOptions, &m_d2dFactory));
+            ComPtr<IDXGIDevice> dxgiDevice;
+            ThrowIfFailed(m_d3d11On12Device.As(&dxgiDevice));
+            ThrowIfFailed(m_d2dFactory->CreateDevice(dxgiDevice.Get(), &m_d2dDevice));
+            ThrowIfFailed(m_d2dDevice->CreateDeviceContext(deviceOptions, &m_d2dDeviceContext));
+            ThrowIfFailed(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), &m_dWriteFactory));
+        }
+    }
+#endif
 }// namespace Ailu

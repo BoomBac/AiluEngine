@@ -1,12 +1,27 @@
 #include "pch.h"
 #include "Render/Gizmo.h"
+#include "Framework/Common/ResourceMgr.h"
 
 namespace Ailu
 {
     void Gizmo::Init()
     {
-        p_buf = IDynamicVertexBuffer::Create();
+        VertexBufferLayout layout = {
+                {"POSITION",EShaderDateType::kFloat3,0},
+                {"COLOR",EShaderDateType::kFloat4,1},
+        };
+        s_world_vbuf.reset(IVertexBuffer::Create(layout));
+        s_screen_vbuf.reset(IVertexBuffer::Create(layout));
+        s_world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
+        s_world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector4f), 1, true);
+        s_screen_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
+        s_screen_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector4f), 1, true);
+        s_world_pos.resize(kMaxVertexNum);
+        s_world_color.resize(kMaxVertexNum);
+        s_screen_pos.resize(kMaxVertexNum);
+        s_screen_color.resize(kMaxVertexNum);
         s_color.a = 0.75f;
+        s_line_drawer = g_pResourceMgr->Get<Material>(L"Runtime/Material/Gizmo");
     }
 
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, Color color)
@@ -126,20 +141,11 @@ namespace Ailu
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, const Color &color_from, const Color &color_to)
     {
         if (Gizmo::s_color.a < 0.1f) return;
-        static float vbuf[6];
-        static float cbuf[8];
-        vbuf[0] = from.x;
-        vbuf[1] = from.y;
-        vbuf[2] = from.z;
-        vbuf[3] = to.x;
-        vbuf[4] = to.y;
-        vbuf[5] = to.z;
-        memcpy(cbuf, color_from.data, 16);
-        memcpy(cbuf + 4, color_to.data, 16);
-        cbuf[3] *= s_color.a;
-        cbuf[7] *= s_color.a;
-        p_buf->AppendData(vbuf, 6, cbuf, 8);
-        _vertex_num += 2;
+        s_world_pos[s_world_vertex_num] = from;
+        s_world_pos[s_world_vertex_num+1] = to;
+        s_world_color[s_world_vertex_num] = color_from * s_color.a;
+        s_world_color[s_world_vertex_num+1] = color_to * s_color.a;
+        s_world_vertex_num += 2;
     }
 
     void Gizmo::DrawGrid(const int &grid_size, const int &grid_spacing, const Vector3f &center, Color color)
@@ -193,97 +199,33 @@ namespace Ailu
     void Gizmo::DrawCube(const Vector3f &center, const Vector3f &size, Vector4f color)
     {
         if (Gizmo::s_color.a < 0.1f) return;
-        static float vbuf[72];
-        static float cbuf[96];
-        float halfX = size.x * 0.5f;
-        float halfY = size.y * 0.5f;
-        float halfZ = size.z * 0.5f;
-        float verticesData[72] = {
-                center.x - halfX,
-                center.y - halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y - halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y - halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y - halfY,
-                center.z - halfZ,
-                center.x + halfX,
-                center.y - halfY,
-                center.z - halfZ,
-                center.x - halfX,
-                center.y - halfY,
-                center.z - halfZ,
-                center.x - halfX,
-                center.y - halfY,
-                center.z - halfZ,
-                center.x - halfX,
-                center.y - halfY,
-                center.z + halfZ,
-                center.x - halfX,
-                center.y + halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y + halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y + halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y + halfY,
-                center.z - halfZ,
-                center.x + halfX,
-                center.y + halfY,
-                center.z - halfZ,
-                center.x - halfX,
-                center.y + halfY,
-                center.z - halfZ,
-                center.x - halfX,
-                center.y + halfY,
-                center.z - halfZ,
-                center.x - halfX,
-                center.y + halfY,
-                center.z + halfZ,
-                center.x - halfX,
-                center.y - halfY,
-                center.z + halfZ,
-                center.x - halfX,
-                center.y + halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y - halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y + halfY,
-                center.z + halfZ,
-                center.x + halfX,
-                center.y - halfY,
-                center.z - halfZ,
-                center.x + halfX,
-                center.y + halfY,
-                center.z - halfZ,
-                center.x - halfX,
-                center.y - halfY,
-                center.z - halfZ,
-                center.x - halfX,
-                center.y + halfY,
-                center.z - halfZ,
-        };
-        float colorData[96];
-        for (int i = 0; i < 96; i += 4)
-        {
-            colorData[i] = color.x;
-            colorData[i + 1] = color.y;
-            colorData[i + 2] = color.z;
-            colorData[i + 3] = color.w;
-        }
-        memcpy(vbuf, verticesData, sizeof(verticesData));
-        memcpy(cbuf, colorData, sizeof(colorData));
-        p_buf->AppendData(vbuf, 72, cbuf, 96);
-        _vertex_num += 24;
+        // 计算立方体的 8 个顶点
+        Vector3f v0 = center + Vector3f(-size.x, -size.y, -size.z);
+        Vector3f v1 = center + Vector3f(size.x, -size.y, -size.z);
+        Vector3f v2 = center + Vector3f(size.x, size.y, -size.z);
+        Vector3f v3 = center + Vector3f(-size.x, size.y, -size.z);
+        Vector3f v4 = center + Vector3f(-size.x, -size.y, size.z);
+        Vector3f v5 = center + Vector3f(size.x, -size.y, size.z);
+        Vector3f v6 = center + Vector3f(size.x, size.y, size.z);
+        Vector3f v7 = center + Vector3f(-size.x, size.y, size.z);
+
+        // 绘制底面四条边
+        DrawLine(v0, v1, color);
+        DrawLine(v1, v2, color);
+        DrawLine(v2, v3, color);
+        DrawLine(v3, v0, color);
+
+        // 绘制顶面四条边
+        DrawLine(v4, v5, color);
+        DrawLine(v5, v6, color);
+        DrawLine(v6, v7, color);
+        DrawLine(v7, v4, color);
+
+        // 绘制连接顶面和底面的四条边
+        DrawLine(v0, v4, color);
+        DrawLine(v1, v5, color);
+        DrawLine(v2, v6, color);
+        DrawLine(v3, v7, color);
     }
 
     void Gizmo::DrawCapsule(const Capsule &capsule, Color color)
@@ -361,15 +303,35 @@ namespace Ailu
             lastPoint = nextPoint;
         }
     }
-    void Gizmo::Submit(CommandBuffer *cmd)
+    void Gizmo::DrawLine(const Vector2f &from, const Vector2f &to, Color color)
     {
-        if (_vertex_num > RenderConstants::KMaxDynamicVertexNum)
+        if (Gizmo::s_color.a < 0.1f) return;
+        s_screen_pos[s_screen_vertex_num] = Vector3f{from,-48.5f}; //default camera pos at z is -50,near is 1
+        s_screen_pos[s_screen_vertex_num+1] = Vector3f{to,-48.5f};
+        s_screen_color[s_screen_vertex_num] = color * s_color.a;
+        s_screen_color[s_screen_vertex_num+1] = color * s_color.a;
+        s_screen_vertex_num += 2;
+    }
+    void Gizmo::DrawRect(const Vector2f &top_left, const Vector2f &bottom_right, Color color)
+    {
+        if (Gizmo::s_color.a < 0.1f) return;
+        Vector2f top_right = {bottom_right.x, top_left.y};
+        Vector2f bottom_left = {top_left.x, bottom_right.y};
+        DrawLine(top_left, top_right, color);
+        DrawLine(top_right, bottom_right, color);
+        DrawLine(bottom_right, bottom_left, color);
+        DrawLine(bottom_left, top_left, color);
+    }
+
+    void Gizmo::Submit(CommandBuffer *cmd, const RenderingData &data)
+    {
+        if (s_world_vertex_num > RenderConstants::KMaxDynamicVertexNum)
         {
             LOG_WARNING("[Gizmo] vertex num > KMaxDynamicVertexNum {},draw nothing", RenderConstants::KMaxDynamicVertexNum);
-            _vertex_num = 0;
+            s_world_vertex_num = 0;
             return;
         }
-        if (_vertex_num > 0)
+        if (s_world_vertex_num > 0)
         {
             auto cur_time = std::chrono::system_clock::now();
             s_geometry_draw_list.erase(std::remove_if(s_geometry_draw_list.begin(), s_geometry_draw_list.end(),
@@ -383,17 +345,22 @@ namespace Ailu
                 auto &f = std::get<0>(it);
                 f();
             }
-            p_buf->UploadData();
-            p_buf->Bind(cmd);
-            cmd->DrawInstanced(_vertex_num, 1);
+            s_world_vbuf->SetData((u8*)s_world_pos.data(), s_world_vertex_num * sizeof(Vector3f),0u,0);
+            s_world_vbuf->SetData((u8*)s_world_color.data(), s_world_vertex_num * sizeof(Color), 1u, 0);
+            s_screen_vbuf->SetData((u8*)s_screen_pos.data(), s_screen_vertex_num * sizeof(Vector3f), 0u, 0);
+            s_screen_vbuf->SetData((u8*)s_screen_color.data(), s_screen_vertex_num * sizeof(Color), 1u, 0);
+            cmd->DrawInstanced(s_world_vbuf.get(), nullptr,s_line_drawer,0,1);
+            _screen_camera_cb._MatrixVP = Camera::GetDefaultOrthogonalViewProj(data._width, data._height);
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,&_screen_camera_cb, RenderConstants::kPerCameraDataSize);
+            cmd->DrawInstanced(s_screen_vbuf.get(), nullptr,s_line_drawer,0,1);
         }
-        _vertex_num = 0;
+        s_world_vertex_num = 0u;
+        s_screen_vertex_num = 0u;
     }
     //当GizmoPass未激活时，实际可能还会有数据在填充，所以将顶点偏移置空。一定要调用
     //当激活时，实际就不用调用
     void Gizmo::EndFrame()
     {
-        _vertex_num = 0;
-        p_buf->UploadData();
+
     }
 }

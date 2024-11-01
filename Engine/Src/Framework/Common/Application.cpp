@@ -1,12 +1,15 @@
 #include "Framework/Common/Application.h"
 #include "CompanyEnv.h"
+#include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
-#include "Framework/Common/JobSystem.h"
 #include "pch.h"
+#include <Render/Gizmo.h>
+#include <Render/TextRenderer.h>
+#include "UI/UIRenderer.h"
 
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Profiler.h"
@@ -68,6 +71,9 @@ namespace Ailu
         GraphicsContext::InitGlobalContext();
         g_pGfxContext->ResizeSwapChain(desc._window_width, desc._window_height);
         g_pResourceMgr->Initialize();
+        Gizmo::Init();
+        TextRenderer::Init();
+        UI::UIRenderer::Init();
 #ifdef DEAR_IMGUI
         PushLayer(_p_imgui_layer);
 #endif// DEAR_IMGUI
@@ -93,6 +99,8 @@ namespace Ailu
         DESTORY_PTR(_layer_stack);
         //DESTORY_PTR(_p_event_handle_thread);
         DESTORY_PTR(_p_window);
+        TextRenderer::Shutdown();
+        UI::UIRenderer::Shutdown();
         g_pSceneMgr->Finalize();
         g_pResourceMgr->Finalize();
         DESTORY_PTR(g_pSceneMgr);

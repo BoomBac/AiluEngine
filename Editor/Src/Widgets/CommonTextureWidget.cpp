@@ -243,6 +243,7 @@ namespace Ailu
                 {
                     //_p_tex->CreateView(Texture::ETextureViewType::kSRV,_cur_mipmap_level);
                     _p_tex->CreateView();
+                    cur_tex_handle = _p_tex->GetView(Texture::ETextureViewType::kSRV, _cur_mipmap_level);
                 }
                 ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(cur_tex_handle), ImVec2(_size.x * 0.75f, _size.x * 0.75f));
                 //ImGui::Spacing();
