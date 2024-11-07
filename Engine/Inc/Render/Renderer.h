@@ -59,7 +59,7 @@ namespace Ailu
         void PrepareLight(const Scene &s);
         void PrepareCamera(const Camera &cam);
         void DoRender(const Camera &cam, const Scene &s);
-        void Cull(const Scene &s, const Camera cam);
+        void Cull(const Scene &s, const Camera& cam);
         static void StableSort(Vector<RenderPass *> list);
 
     private:

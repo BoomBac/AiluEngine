@@ -139,30 +139,23 @@ namespace Ailu
             return ret;
         }
 
-        static void DrawProperty(u32 &property_handle, SerializableProperty &prop, Object *obj)
+        static void DrawShaderProperty(u32 &property_handle, ShaderPropertyInfo &prop, Object *obj)
         {
             ++property_handle;
             switch (prop._type)
             {
-                case Ailu::ESerializablePropertyType::kString:
+                case Ailu::EShaderPropertyType::kFloat:
+                    ImGui::DragFloat(prop._prop_name.c_str(), static_cast<float *>(prop._value_ptr));
                     break;
-                case Ailu::ESerializablePropertyType::kFloat:
-                    ImGui::DragFloat(prop._name.c_str(), static_cast<float *>(prop._value_ptr));
-                    break;
-                case Ailu::ESerializablePropertyType::kBool:
+                case Ailu::EShaderPropertyType::kBool:
                 {
-                    auto prop_value = SerializableProperty::GetProppertyValue<float>(prop);
-                    if (prop_value.has_value())
-                    {
-                        bool checked = prop_value.value() == 1.0f;
-                        ImGui::Checkbox(prop._name.c_str(), &checked);
-                        prop.SetProppertyValue(checked ? 1.0f : 0.0f);
-                    }
-                    else
-                        ImGui::Text("Toogle %s value missing", prop._name.c_str());
+                    auto bool_value = (f32*)prop._value_ptr;
+                    bool checked = *bool_value == 1.0f;
+                    ImGui::Checkbox(prop._prop_name.c_str(), &checked);
+                    *bool_value = (f32)checked;
                 }
                 break;
-                case Ailu::ESerializablePropertyType::kEnum:
+                case Ailu::EShaderPropertyType::kEnum:
                 {
                     auto mat = dynamic_cast<Material *>(obj);
                     if (mat != nullptr)
@@ -194,32 +187,26 @@ namespace Ailu
                         //	ImGui::Text("Eunm %s value missing", prop._name.c_str());
                     }
                     else
-                        ImGui::Text("Non-Material Eunm %s value missing", prop._name.c_str());
+                        ImGui::Text("Non-Material Eunm %s value missing", prop._prop_name.c_str());
                 }
                 break;
-                case Ailu::ESerializablePropertyType::kVector3f:
-                    ImGui::DragFloat3(prop._name.c_str(), static_cast<Vector3f *>(prop._value_ptr)->data);
+                case Ailu::EShaderPropertyType::kVector:
+                    ImGui::DragFloat4(prop._prop_name.c_str(), static_cast<Vector3f *>(prop._value_ptr)->data);
                     break;
-                case Ailu::ESerializablePropertyType::kVector4f:
-                    ImGui::DragFloat4(prop._name.c_str(), static_cast<Vector3f *>(prop._value_ptr)->data);
+                case Ailu::EShaderPropertyType::kColor:
+                    ImGui::ColorEdit4(prop._prop_name.c_str(), static_cast<Vector4f *>(prop._value_ptr)->data);
                     break;
-                case Ailu::ESerializablePropertyType::kColor:
-                    ImGui::ColorEdit4(prop._name.c_str(), static_cast<Vector4f *>(prop._value_ptr)->data);
-                    break;
-                case Ailu::ESerializablePropertyType::kRange:
+                case Ailu::EShaderPropertyType::kRange:
                 {
-                    ImGui::Text(prop._name.c_str());
+                    ImGui::Text("%s", prop._prop_name.c_str());
                     ImGui::SameLine();
-                    ImGui::SliderFloat(std::format("##{}", prop._name).c_str(), static_cast<float *>(prop._value_ptr), prop._param[0], prop._param[1]);
+                    ImGui::SliderFloat(std::format("##{}", prop._prop_name).c_str(), static_cast<float *>(prop._value_ptr), prop._param[0], prop._param[1]);
                 }
                 break;
-                case Ailu::ESerializablePropertyType::kTransform:
-                    break;
-                case Ailu::ESerializablePropertyType::kTexture2D:
+                case Ailu::EShaderPropertyType::kTexture2D:
                 {
-                    ImGui::Text("Texture2D : %s", prop._name.c_str());
-                    auto tex_prop_value = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture *>>(prop);
-                    auto tex = tex_prop_value.has_value() ? std::get<1>(tex_prop_value.value()) : nullptr;
+                    ImGui::Text("Texture2D : %s", prop._prop_name.c_str());
+                    auto tex = (Texture*)prop._value_ptr;
                     u32 cur_tex_id = tex ? tex->ID() : Texture::s_p_default_white->ID();
                     //auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
                     ImVec2 vMin = ImGui::GetWindowContentRegionMin();
@@ -252,11 +239,8 @@ namespace Ailu
                     //}
                 }
                 break;
-                case Ailu::ESerializablePropertyType::kStaticMesh:
-                    break;
-
                 default:
-                    LOG_WARNING("prop: {} value type havn't be handle!", prop._name)
+                    LOG_WARNING("prop: {} value type havn't be handle!", prop._prop_name)
                     break;
             }
         }
@@ -264,10 +248,9 @@ namespace Ailu
         static void DrawMaterialDetailPanel(Material *mat)
         {
             u32 property_handle = 0;
-            for (auto &it: mat->GetAllProperties())
+            for (auto prop: mat->GetShaderProperty())
             {
-                auto &[name, prop] = it;
-                DrawProperty(property_handle, prop, mat);
+                DrawShaderProperty(property_handle, *prop, mat);
             }
         }
 
@@ -315,26 +298,26 @@ namespace Ailu
                 const ImVec2 preview_tex_size = ImVec2(s_mini_tex_size, s_mini_tex_size);
                 if (tex == nullptr)
                 {
-                    auto &prop = mat->GetProperty(standard_prop_info._value_name);
-                    switch (prop._type)
+                    auto prop = mat->GetShaderProperty(standard_prop_info._value_name);
+                    if (prop)
                     {
-                        case Ailu::ESerializablePropertyType::kVector3f:
-                            ImGui::DragFloat3("##f3", static_cast<Vector3f *>(prop._value_ptr)->data);
-                            break;
-                        case Ailu::ESerializablePropertyType::kVector4f:
-                            ImGui::DragFloat4("##f4", static_cast<Vector4f *>(prop._value_ptr)->data);
-                            break;
-                        case Ailu::ESerializablePropertyType::kColor:
+                        switch (prop->_type)
                         {
-                            ImGuiColorEditFlags_ flag = ImGuiColorEditFlags_None;
-                            if (prop._param[3] == -1.0)
-                                flag = ImGuiColorEditFlags_Float;
-                            ImGui::ColorEdit4("##c4", static_cast<Vector4f *>(prop._value_ptr)->data, flag);
-                            break;
+                            case Ailu::EShaderPropertyType::kVector:
+                                ImGui::DragFloat4("##f4", static_cast<Vector4f *>(prop->_value_ptr)->data);
+                                break;
+                            case Ailu::EShaderPropertyType::kColor:
+                            {
+                                ImGuiColorEditFlags_ flag = ImGuiColorEditFlags_None;
+                                if (prop->_param[3] == -1.0)
+                                    flag = ImGuiColorEditFlags_Float;
+                                ImGui::ColorEdit4("##c4", static_cast<Vector4f *>(prop->_value_ptr)->data, flag);
+                                break;
+                            }
+                            case Ailu::EShaderPropertyType::kRange:
+                                ImGui::SliderFloat("##r", static_cast<float *>(prop->_value_ptr), prop->_param[0], prop->_param[1]);
+                                break;
                         }
-                        case Ailu::ESerializablePropertyType::kRange:
-                            ImGui::SliderFloat("##r", static_cast<float *>(prop._value_ptr), prop._param[0], prop._param[1]);
-                            break;
                     }
                 }
                 else
@@ -409,13 +392,13 @@ namespace Ailu
                 if (mat->SurfaceType() == ESurfaceType::ESurfaceType::kAlphaTest)
                 {
                     ImGui::TableNextRow();
-                    auto prop = mat->GetProperty("_AlphaCulloff");
+                    auto prop = mat->GetShaderProperty("_AlphaCulloff");
                     ImGui::TableSetColumnIndex(0);
-                    ImGui::Text("%s", prop._name.c_str());
+                    ImGui::Text("%s", prop->_prop_name.c_str());
                     ImGui::TableSetColumnIndex(1);
-                    f32 alpha_cull_off = prop.GetProppertyValue<f32>().value();// *static_cast<float *>(prop._value_ptr);
-                    ImGui::SliderFloat(std::format("##{}", prop._name).c_str(), &alpha_cull_off, prop._param[0], prop._param[1]);
-                    mat->SetFloat("_AlphaCulloff",alpha_cull_off);
+                    auto alpha_cull_off = (f32*)prop->_value_ptr;
+                    ImGui::SliderFloat(std::format("##{}", prop->_prop_name).c_str(), alpha_cull_off, 0.f, 1.f);
+                    mat->SetFloat("_AlphaCulloff",*alpha_cull_off);
                 }
                 //cull mode
                 ImGui::TableNextRow();

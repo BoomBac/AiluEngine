@@ -53,32 +53,32 @@ namespace Ailu
         {
             _light_probe_debug_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/cubemap_debug.hlsl"), "lightprobe_debug");
 
-            //auto [probe_data, data_size] = FileManager::ReadFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"));
-            //LightProbeHeadInfo head;
-            //memcpy(&head, probe_data, sizeof(LightProbeHeadInfo));
-            //u16 w = head._prefilter_size;
-            //_test_prefilter_map = CubeMap::Create(w,true,ETextureFormat::kR11G11B10);
-            //_test_radiance_map = CubeMap::Create(head._radiance_size, false, ETextureFormat::kR11G11B10);
-            //u64 offset = sizeof(LightProbeHeadInfo);
-            //for (u16 face = 1; face <= 6; face++)
-            //{
-            //    for (u16 i = 0; i < _test_prefilter_map->MipmapLevel() + 1; i++)
-            //    {
-            //        auto [cur_w, cur_h] = _test_prefilter_map->CurMipmapSize(i);
-            //        _test_prefilter_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, i);
-            //        offset += cur_w * cur_h * GetPixelByteSize(_test_prefilter_map->PixelFormat());
-            //    }
-            //}
-            //for (u16 face = 1; face <= 6; face++)
-            //{
-            //    _test_radiance_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, 0);
-            //    offset += head._radiance_size * head._radiance_size * GetPixelByteSize(_test_radiance_map->PixelFormat());
-            //}
-            //_test_prefilter_map->Name("_test_prefilter_map");
-            //_test_prefilter_map->Apply();
-            //_test_radiance_map->Name("_test_radiance_map");
-            //_test_radiance_map->Apply();
-            //delete[] probe_data;
+            auto [probe_data, data_size] = FileManager::ReadFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"));
+            LightProbeHeadInfo head;
+            memcpy(&head, probe_data, sizeof(LightProbeHeadInfo));
+            u16 w = head._prefilter_size;
+            _test_prefilter_map = CubeMap::Create(w,true,ETextureFormat::kR11G11B10);
+            _test_radiance_map = CubeMap::Create(head._radiance_size, false, ETextureFormat::kR11G11B10);
+            u64 offset = sizeof(LightProbeHeadInfo);
+            for (u16 face = 1; face <= 6; face++)
+            {
+                for (u16 i = 0; i < _test_prefilter_map->MipmapLevel() + 1; i++)
+                {
+                    auto [cur_w, cur_h] = _test_prefilter_map->CurMipmapSize(i);
+                    _test_prefilter_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, i);
+                    offset += cur_w * cur_h * GetPixelByteSize(_test_prefilter_map->PixelFormat());
+                }
+            }
+            for (u16 face = 1; face <= 6; face++)
+            {
+                _test_radiance_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, 0);
+                offset += head._radiance_size * head._radiance_size * GetPixelByteSize(_test_radiance_map->PixelFormat());
+            }
+            _test_prefilter_map->Name("_test_prefilter_map");
+            _test_prefilter_map->Apply();
+            _test_radiance_map->Name("_test_radiance_map");
+            _test_radiance_map->Apply();
+            delete[] probe_data;
         }
 
         void LightingSystem::OnPushEntity(Entity e)

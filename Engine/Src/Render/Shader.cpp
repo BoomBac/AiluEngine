@@ -381,19 +381,19 @@ namespace Ailu
         cur_edge = line.find_first_of(",");
         String prop_name = line.substr(1, cur_edge - 2);
         String prop_type = line.substr(cur_edge + 1);
-        ESerializablePropertyType seri_type;
+        EShaderPropertyType seri_type;
         Vector4f prop_param;
-        if (prop_type == "Texture2D") seri_type = ESerializablePropertyType::kTexture2D;
+        if (prop_type == "Texture2D") seri_type = EShaderPropertyType::kTexture2D;
         else if (prop_type == "Color")
-            seri_type = ESerializablePropertyType::kColor;
+            seri_type = EShaderPropertyType::kColor;
         else if (*(prop_type.begin()) == *"R")
-            seri_type = ESerializablePropertyType::kRange;
-        else if (prop_type == GetSerializablePropertyTypeStr(ESerializablePropertyType::kFloat))
-            seri_type = ESerializablePropertyType::kFloat;
+            seri_type = EShaderPropertyType::kRange;
+        else if (prop_type == "Float")
+            seri_type = EShaderPropertyType::kFloat;
         else if (prop_type == "Vector")
-            seri_type = ESerializablePropertyType::kVector4f;
+            seri_type = EShaderPropertyType::kVector;
         else
-            seri_type = ESerializablePropertyType::kUndefined;
+            seri_type = EShaderPropertyType::kUndefined;
         if (!addi_info.empty())
         {
             if (addi_info.starts_with("Toggle"))
@@ -413,7 +413,7 @@ namespace Ailu
                 //}
             }
         }
-        if (seri_type == ESerializablePropertyType::kRange)
+        if (seri_type == EShaderPropertyType::kRange)
         {
             cur_edge = prop_type.find_first_of(",");
             size_t left_bracket = prop_type.find_first_of("(");
@@ -422,11 +422,11 @@ namespace Ailu
             prop_param.y = static_cast<float>(std::stod(su::SubStrRange(prop_type, cur_edge + 1, right_bracket - 1)));
             prop_param.z = static_cast<float>(std::stod(defalut_value));
         }
-        else if (seri_type == ESerializablePropertyType::kFloat || seri_type == ESerializablePropertyType::kBool)
+        else if (seri_type == EShaderPropertyType::kFloat || seri_type == EShaderPropertyType::kBool)
         {
             prop_param.z = static_cast<float>(std::stod(defalut_value));
         }
-        else if (seri_type == ESerializablePropertyType::kColor || seri_type == ESerializablePropertyType::kVector4f)
+        else if (seri_type == EShaderPropertyType::kColor || seri_type == EShaderPropertyType::kVector)
         {
             defalut_value = su::SubStrRange(defalut_value, 1, defalut_value.find_first_of(")") - 1);
             auto vec_str = su::Split(defalut_value, ",");
@@ -437,9 +437,9 @@ namespace Ailu
             if (addi_info.starts_with("HDR"))
                 prop_param.w = -1;
         }
-        if (seri_type != ESerializablePropertyType::kUndefined)
+        if (seri_type != EShaderPropertyType::kUndefined)
         {
-            props.emplace_back(ShaderPropertyInfo{value_name, prop_name, seri_type, prop_param});
+            props.emplace_back(value_name, prop_name, seri_type, prop_param);
         }
         else
         {

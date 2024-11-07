@@ -4,6 +4,7 @@
 
 #include "GlobalMarco.h"
 #include "PipelineState.h"
+#include <functional>
 
 namespace Ailu
 {

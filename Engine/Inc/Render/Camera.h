@@ -29,7 +29,6 @@ namespace Ailu
         DECLARE_PROTECTED_PROPERTY(fov_h, FovH, float)
         //Orthographic only
         DECLARE_PROTECTED_PROPERTY(size, Size, float)
-        DECLARE_REFLECT_FIELD(Camera)
     public:
         inline static Camera *sCurrent = nullptr;
         inline static Camera *sSelected = nullptr;
@@ -95,15 +94,6 @@ namespace Ailu
         Renderer *_renderer = nullptr;
         RenderTexture *_target_texture = nullptr;
     };
-    REFLECT_FILED_BEGIN(Camera)
-    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f, Position, _position)
-    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kVector3f, Rotation, _rotation)
-    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Aspect, _aspect)
-    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Near, _near_clip)
-    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Far, _far_clip)
-    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, Size, _size)
-    DECLARE_REFLECT_PROPERTY(ESerializablePropertyType::kFloat, FovH, _fov_h)
-    REFLECT_FILED_END
 
     Archive &operator<<(Archive &ar, const Camera &c);
     Archive &operator>>(Archive &ar, Camera &c);

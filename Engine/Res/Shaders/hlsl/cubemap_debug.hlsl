@@ -65,7 +65,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 #ifdef DEBUG_REFLECT
 	uvw = -uvw;//(input.wnormal,input.world_pos - GetCameraPositionWS());
 #endif
-	return float4( SAMPLE_TEXTURECUBE_LOD(_SrcCubeMap,g_LinearClampSampler,uvw,_mipmap).rgb, 1.0);
+	return float4( SAMPLE_TEXTURECUBE_LOD(_SrcCubeMap,g_LinearWrapSampler,uvw,_mipmap).rgb, 1.0);
 	//float2 uv = SampleSphericalMap(normalize(-input.wnormal)); 
 	//float3 sky_color = env.Sample(g_LinearSampler,uv).rgb * expo * color.rgb;
 	//return float4(sky_color,1.0);

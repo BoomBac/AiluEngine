@@ -117,12 +117,24 @@ namespace Ailu
         }
     };
 
+    enum class EShaderPropertyType
+    {
+        kUndefined,kBool,kFloat,kRange,kVector,kColor,kTexture2D,kEnum
+    };
+
     struct ShaderPropertyInfo
     {
         String _value_name;
         String _prop_name;
-        ESerializablePropertyType _prop_type;
-        Vector4f _prop_param;
+        u32 _offset = 0;
+        void* _value_ptr = nullptr;
+        EShaderPropertyType _type;
+        Vector4f _param;
+        ShaderPropertyInfo() = default;
+        ShaderPropertyInfo(const String &value_name, const String &prop_name, EShaderPropertyType prop_type, const Vector4f &param)
+            : _value_name(value_name), _prop_name(prop_name), _type(prop_type), _param(param)
+        {
+        }
     };
 
     struct ShaderCommand

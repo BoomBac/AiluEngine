@@ -1,5 +1,5 @@
 #include "pch.h"
-#include <atlcomcli.h>
+//#include <atlcomcli.h>
 #include <d3dcompiler.h>
 #include <dxcapi.h>
 #include <mutex>
@@ -44,12 +44,13 @@ namespace Ailu
     static bool CreateFromFileDXC(const std::wstring &filename, const std::wstring &entryPoint, const std::wstring &pTarget, ComPtr<ID3DBlob> &p_blob,
                                   ComPtr<ID3D12ShaderReflection> &shader_reflection)
     {
-        CComPtr<IDxcUtils> pUtils;
-        CComPtr<IDxcCompiler3> pCompiler;
+        //CComPtr
+        ComPtr<IDxcUtils> pUtils;
+        ComPtr<IDxcCompiler3> pCompiler;
         DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&pUtils));
         DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler));
 
-        CComPtr<IDxcIncludeHandler> pIncludeHandler;
+        ComPtr<IDxcIncludeHandler> pIncludeHandler;
         pUtils->CreateDefaultIncludeHandler(&pIncludeHandler);
 
         LOG_INFO(filename.c_str());
@@ -69,7 +70,7 @@ namespace Ailu
                 };
 
 
-        CComPtr<IDxcBlobEncoding> pSource = nullptr;
+        ComPtr<IDxcBlobEncoding> pSource = nullptr;
         pUtils->LoadFile(filename.c_str(), nullptr, &pSource);
         DxcBuffer Source;
         Source.Ptr = pSource->GetBufferPointer();
@@ -79,19 +80,19 @@ namespace Ailu
         //
         // Compile it with specified arguments.
         //
-        CComPtr<IDxcResult> pResults;
+        ComPtr<IDxcResult> pResults;
         pCompiler->Compile(
                 &Source,               // Source buffer.
                 pszArgs,               // Array of pointers to arguments.
                 _countof(pszArgs),     // Number of arguments.
-                pIncludeHandler,       // User-provided interface to handle #include directives (optional).
+                pIncludeHandler.Get(),       // User-provided interface to handle #include directives (optional).
                 IID_PPV_ARGS(&pResults)// Compiler output status, buffer, and errors.
         );
 
         //
         // Print errors if present.
         //
-        CComPtr<IDxcBlobUtf8> pErrors = nullptr;
+        ComPtr<IDxcBlobUtf8> pErrors = nullptr;
         pResults->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr);
         // Note that d3dcompiler would return null if no errors or warnings are present.
         // IDxcCompiler3::Compile will always return an error buffer, but its length will be zero if there are no warnings or errors.
@@ -112,11 +113,11 @@ namespace Ailu
         //
         // Save shader binary.
         //
-        CComPtr<IDxcBlob> pShader = nullptr;
-        CComPtr<IDxcBlobUtf16> pShaderName = nullptr;
+        ComPtr<IDxcBlob> pShader = nullptr;
+        ComPtr<IDxcBlobUtf16> pShaderName = nullptr;
         pResults->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&p_blob), &pShaderName);
 
-        CComPtr<IDxcBlob> pReflectionData;
+        ComPtr<IDxcBlob> pReflectionData;
         pResults->GetOutput(DXC_OUT_REFLECTION, IID_PPV_ARGS(&pReflectionData), nullptr);
         if (pReflectionData != nullptr)
         {

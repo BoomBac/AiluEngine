@@ -252,13 +252,13 @@ namespace Ailu
                 }
             }
         }
-
+        _render_passes.clear();
         _rendering_data.Reset();
         Gizmo::EndFrame();
     }
     void Renderer::FrameCleanup()
     {
-        _render_passes.clear();
+        //_render_passes.clear();
         //_features.clear();
     }
 
@@ -636,7 +636,7 @@ namespace Ailu
             }
         }
     }
-    void Renderer::Cull(const Scene &s, const Camera cam)
+    void Renderer::Cull(const Scene &s, const Camera& cam)
     {
         if (_cull_results.contains(cam.HashCode()))
             _cull_results[cam.HashCode()].clear();

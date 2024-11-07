@@ -35,7 +35,7 @@ namespace Ailu
     }
     Archive &operator>>(Archive &ar, TransformComponent &c)
     {
-        string str;
+        String str;
         ar >> str;
         AL_ASSERT(su::BeginWith(str, "_transform"));
         ar >> c._transform;
@@ -295,7 +295,7 @@ namespace Ailu
     }
     Archive &operator>>(Archive &ar, CCamera &c)
     {
-        string str;
+        String str;
         ar >> str;
         AL_ASSERT(su::BeginWith(str, "_camera"));
         ar >> c._camera;

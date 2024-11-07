@@ -2,7 +2,7 @@
 #ifndef __GFX_CONTEXT_H__
 #define __GFX_CONTEXT_H__
 #include "GlobalMarco.h"
-
+#include <functional>
 namespace Ailu
 {
     class CommandBuffer;

@@ -42,8 +42,8 @@ Entity:3
         _transform_component:
             _transform:
                 _position:-4.512108803,4.329999924,-9.931579590
-                _rotation:0.437915832,0.090111993,0.065759763,0.892067909
-                _scale:0.999921978,0.999943674,0.999935567
+                _rotation:0.365308732,0.000000168,-0.000000083,0.930886447
+                _scale:0.999920011,0.999940038,0.999937534
         _light_component:
             _type:kDirectional
             _light:
@@ -52,8 +52,8 @@ Entity:3
                 _is_two_side:0
             _shadow:
                 _is_cast_shadow:1
-                _constant_bias:0.114
-                _slope_bias:0.259
+                _constant_bias:0.116
+                _slope_bias:0.072
         _hierarchy_component:
             _first_child:0
             _prev_sibling:0
@@ -66,7 +66,7 @@ Entity:4
             _name:cube
         _transform_component:
             _transform:
-                _position:0.000000000,-0.010000000,0.000000000
+                _position:0.000000000,0.000000000,0.000000000
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:23.210960388,0.773696065,23.210880280
         _static_mesh_component:
@@ -90,7 +90,7 @@ Entity:5
             _name:LightProbe_4
         _transform_component:
             _transform:
-                _position:-1.409999967,15.159999847,-1.610000014
+                _position:-0.000003934,24.052509308,0.000000000
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:1.000000000,1.000000000,1.000000000
         _hierarchy_component:
@@ -108,7 +108,7 @@ Entity:6
             _name:Y_Bot
         _transform_component:
             _transform:
-                _position:0.000000000,-0.001028821,2.303332806
+                _position:0.348010540,-0.001029325,-0.296849847
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:0.021668984,0.021668984,0.021668984
         _hierarchy_component:
@@ -153,13 +153,13 @@ Entity:8
             _name:new_object_10
         _transform_component:
             _transform:
-                _position:-3.895991564,3.304460049,5.275391579
-                _rotation:-0.000991585,-0.001607643,0.525853097,0.850573301
-                _scale:0.999938309,0.999978185,0.999951959
+                _position:-8.462043762,3.304460049,4.117675304
+                _rotation:-0.000991597,-0.001607651,0.525853097,0.850573301
+                _scale:0.999895990,0.999978185,0.999918282
         _light_component:
             _type:kArea
             _light:
-                _light_color:1,0,0,5.348
+                _light_color:1,0,0,13.6
                 _light_param:8,2,2,0
                 _is_two_side:0
             _shadow:
@@ -178,9 +178,9 @@ Entity:9
             _name:cube_9
         _transform_component:
             _transform:
-                _position:0.951061666,2.016678572,6.187516689
+                _position:7.160755634,5.717015266,-8.189172745
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:0.389345407,0.389357328,0.389391780
+                _scale:0.784523427,0.784547567,0.784616768
         _static_mesh_component:
             _p_mesh:2ff30e48-6661-479b-a90c-863e606734f6
             _material_num:1
@@ -204,7 +204,7 @@ Entity:10
             _name:cube_10
         _transform_component:
             _transform:
-                _position:-12.463090897,1.028184891,8.772915840
+                _position:-14.060896873,2.518198729,10.148552895
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:1.000000000,1.000000000,1.000000000
         _static_mesh_component:
@@ -256,9 +256,9 @@ Entity:12
             _name:new_object_12
         _transform_component:
             _transform:
-                _position:-9.111248016,0.000000119,-1.135526657
-                _rotation:-0.706984818,0.000000096,-0.000000000,0.707228720
-                _scale:1.840002537,1.839999914,1.839999914
+                _position:-9.815854073,0.000000447,-4.782661915
+                _rotation:-0.706984818,-0.000121954,0.000122091,0.707228720
+                _scale:6.569998741,6.569998741,6.570000648
         _static_mesh_component:
             _p_mesh:38aeba40-8fc5-48c3-a785-739a107a9629
             _material_num:1

@@ -16,23 +16,23 @@ namespace Ailu
     class AILU_API Material : public Object
     {
         friend class ResourceMgr;
-        DECLARE_REFLECT_FIELD(Material)
         struct PassVariantInfo
         {
             String _pass_name;
             ShaderVariantHash _variant_hash;
             std::set<String> _keywords;
         };
-
     public:
         inline static std::weak_ptr<Material> s_standard_lit;
         inline static std::weak_ptr<Material> s_checker;
 
         Material(Shader *shader, String name);
+
         Material(const Material &other);
-        Material(Material &&other) noexcept;
         Material &operator=(const Material &other);
         Material &operator=(Material &&other) noexcept;
+        Material(Material &&other) noexcept;
+
         ~Material();
         void ChangeShader(Shader *shader);
         void SetFloat(const String &name, const float &f);
@@ -40,12 +40,11 @@ namespace Ailu
         void SetVector(const String &name, const Vector4f &vector);
         void SetMatrix(const String &name, const Matrix4x4f &matrix);
         float GetFloat(const String &name);
-        u8* GetPropertyBuffer(u16 pass_index);
         void SetCullMode(ECullMode mode);
-        ECullMode GetCullMode() const;
-        ShaderVariantHash ActiveVariantHash(u16 pass_index) const;
-        std::set<String> ActiveKeywords(u16 pass_index) const;
-        u16 RenderQueue() const { return _render_queue; };
+        [[nodiscard]] ECullMode GetCullMode() const;
+        [[nodiscard]] ShaderVariantHash ActiveVariantHash(u16 pass_index) const;
+        [[nodiscard]] std::set<String> ActiveKeywords(u16 pass_index) const;
+        [[nodiscard]] u16 RenderQueue() const { return _render_queue; };
         void RenderQueue(u16 new_queue) { _render_queue = new_queue; };
         u32 GetUint(const String &name);
         Vector4f GetVector(const String &name);
@@ -56,12 +55,13 @@ namespace Ailu
         void EnableKeyword(const String &keyword);
         void DisableKeyword(const String &keyword);
         virtual void Bind(u16 pass_index = 0);
-        Shader *GetShader() const { return _p_shader; };
+        [[nodiscard]] Shader *GetShader() const { return _p_shader; };
         bool IsReadyForDraw(u16 pass_index = 0) const;
         List<std::tuple<String, float>> GetAllFloatValue();
         List<std::tuple<String, Vector4f>> GetAllVectorValue();
         List<std::tuple<String, u32>> GetAllUintValue();
-
+        Vector<ShaderPropertyInfo*>& GetShaderProperty() {return _prop_views;};
+        ShaderPropertyInfo* GetShaderProperty(const String& name);
     protected:
         virtual void Construct(bool first_time);
     private:
@@ -82,6 +82,8 @@ namespace Ailu
         Vector<PassVariantInfo> _pass_variants;
         //跟随材质持久化的关键字
         std::set<String> _all_keywords;
+        Map<String,ShaderPropertyInfo> _properties;
+        Vector<ShaderPropertyInfo*> _prop_views;
         Vector<Scope<IConstantBuffer>> _p_cbufs;
         Vector<Map<String, std::tuple<u8, Texture *>>> _textures_all_passes{};
         //非shader使用的变量
@@ -160,7 +162,7 @@ namespace Ailu
         virtual void SetTexture(const String &name, RTHandle texture);
         void SetTexture(ETextureUsage usage, Texture *tex);
         const Texture *MainTex(ETextureUsage usage) const;
-        const SerializableProperty &MainProperty(ETextureUsage usage);
+        const ShaderPropertyInfo &MainProperty(ETextureUsage usage);
         const ESurfaceType::ESurfaceType &SurfaceType() const { return _surface; }
         void SurfaceType(const ESurfaceType::ESurfaceType &value);
         const EMaterialID::EMaterialID &MaterialID() const{return _material_id;}

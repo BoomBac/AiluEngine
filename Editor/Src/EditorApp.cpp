@@ -9,6 +9,7 @@
 #include "Render/Camera.h"
 #include "Render/CommonRenderPipeline.h"
 #include "Render/Renderer.h"
+#include "Objects/Type.h"
 
 using namespace Ailu;
 
@@ -50,6 +51,9 @@ namespace Ailu
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;
             _is_simulate_mode = false;
+            Object a("hello");
+            auto t = Object::StaticType();
+            LOG_INFO("Reflection: {}", t->Name());
             return ret;
         }
         void EditorApp::Finalize()

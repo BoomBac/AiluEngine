@@ -1,3 +1,4 @@
+/*
 #pragma once
 #ifndef __REFLECT_H__
 #define __REFLECT_H__
@@ -432,3 +433,4 @@ namespace Ailu
 
 
 #endif// !REFLECT_H__
+*/

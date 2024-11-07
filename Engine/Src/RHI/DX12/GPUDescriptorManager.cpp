@@ -236,6 +236,7 @@ namespace Ailu
 
 	HashMap<u16, u16>::iterator GPUVisibleDescriptorAllocator::AddNewPage(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num)
 	{
+        LOG_WARNING("GPUVisibleDescriptorAllocator add new page to {}",_pages.size());
 		GPUVisibleDescriptorPage new_page(static_cast<u16>(_pages.size()), type, num);
 		_pages.emplace_back(std::move(new_page));
 		return _page_free_space_lut[type].emplace(std::make_pair(num, static_cast<u16>(_pages.size() - 1)));

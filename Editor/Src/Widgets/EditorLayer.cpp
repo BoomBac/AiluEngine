@@ -11,7 +11,9 @@
 #include "Render/Gizmo.h"
 #include "Render/RenderingData.h"
 #include "Render/TextRenderer.h"
+#include "Render/Pass/PostprocessPass.h"
 #include <Framework/Common/Application.h>
+#include <Objects/Type.h>
 
 #include "Framework/Common/Input.h"
 #include "Framework/Events/MouseEvent.h"
@@ -476,11 +478,24 @@ namespace Ailu
             static bool s_show_pass = false;
             if (ImGui::CollapsingHeader("Passes"))
             {
-                for (auto &pass: g_pGfxContext->GetPipeline()->GetRenderer()->GetRenderPasses())
+                for (auto pass: g_pGfxContext->GetPipeline()->GetRenderer()->GetRenderPasses())
                 {
                     bool active = pass->IsActive();
                     ImGui::Checkbox(pass->GetName().c_str(), &active);
                     pass->SetActive(active);
+                    if (auto p = dynamic_cast<PostProcessPass*>(pass); p != nullptr)
+                    {
+                        Type* type = PostProcessPass::StaticType();
+                        for(auto& prop : type->GetProperties())
+                        {
+                            if (prop.DataType() == EDataType::kBool)
+                            {
+                                bool value = prop.GetValue<bool>(*pass);
+                                ImGui::Checkbox(prop.Name().c_str(),&value);
+                                prop.SetValue<bool>(*pass,value);
+                            }
+                        }
+                    }
                 }
             }
             static bool s_show_time_info = false;
@@ -592,6 +607,7 @@ namespace Ailu
                 anim_editor.Close(anim_editor.Handle());
             }
             ImGui::Begin("Solver");
+
 //            static char buf[256];
 //            static f32 text_scale = 1.0f;
 //            static bool s_show_text_grid = false;

@@ -537,14 +537,14 @@ namespace Ailu
     {
         using std::endl;
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
-        std::multimap<std::string, SerializableProperty *> props{};
+        std::multimap<std::string, ShaderPropertyInfo *> props{};
         //为了写入通用资产头信息，暂时使用追加方式打开
         std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
         out_mat << "shader_guid: " << GetAssetGuid(mat->_p_shader).ToString() << endl;
         out_mat << "keywords: " << su::Join(mat->_all_keywords, ",") << endl;
         for (auto &prop: mat->_properties)
         {
-            props.insert(std::make_pair(GetSerializablePropertyTypeStr(prop.second._type), &prop.second));
+            props.insert(std::make_pair(prop.second._value_name, &prop.second));
         }
         //out_mat << endl;
         auto float_props = mat->GetAllFloatValue();
@@ -573,13 +573,12 @@ namespace Ailu
                 << "Texture2D" << endl;
         for (auto &[prop_name, prop]: props)
         {
-            if (prop->_type == ESerializablePropertyType::kTexture2D)
+            if (prop->_type == EShaderPropertyType::kTexture2D)
             {
-                auto tex_opti = SerializableProperty::GetProppertyValue<std::tuple<u8, Texture *>>(*prop);
+                auto tex = reinterpret_cast<Texture*>(prop->_value_ptr);
                 Guid tex_guid;
-                if (tex_opti.has_value() && std::get<1>(tex_opti.value()))
+                if (tex)
                 {
-                    auto [bind_slot, tex] = tex_opti.value();
                     Asset *lined_asset = GetLinkedAsset(tex);
                     if (lined_asset)
                         tex_guid = lined_asset->GetGuid();

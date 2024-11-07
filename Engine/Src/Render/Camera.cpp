@@ -159,7 +159,6 @@ namespace Ailu
     Camera::Camera(float aspect, float near_clip, float far_clip, ECameraType::ECameraType camera_type) : _aspect(aspect), _near_clip(near_clip), _far_clip(far_clip), _camera_type(camera_type), _fov_h(60.0f),
                                                                                                           _forward(Vector3f::kForward), _right(Vector3f::kRight), _up(Vector3f::kUp)
     {
-        IMPLEMENT_REFLECT_FIELD(Camera);
         MarkDirty();
         RecalculateMarix();
     }
@@ -302,7 +301,7 @@ namespace Ailu
         BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0, base_cam._near_clip, base_cam._far_clip);
         const static Vector3f targets[] =
                 {
-                        {+1.f, 0.f, 0.5},//+x
+                        {+1.f, 0.f, 0.0f},//+x
                         {-1.f, 0.f, 0.f},//-x
                         {0.f, +1.f, 0.f},//+y
                         {0.f, -1.f, 0.f},//-y

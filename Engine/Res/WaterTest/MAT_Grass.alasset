@@ -8,28 +8,19 @@ keywords: ,ALPHA_TEST
     _cull: 0
     _surface: 2
   prop_type: Float
+    _AlphaCulloff: 0.467
+    _Anisotropy: 0
+    _MaterialID: 0
+    _MetallicValue: 0
+    _RoughnessValue: 0.18
     _SamplerMask: 4.2039e-45
-    _MetallicValue: 0
-    _MaterialID: 0
-    _Anisotropy: 0
-    _RoughnessValue: 1
-    _AlphaCulloff: 0.467
-    _MetallicValue: 0
-    _MaterialID: 0
-    _Anisotropy: 0
-    _RoughnessValue: 0
-    _SamplerMask: 0
-    _AlphaCulloff: 0.467
   prop_type: Vector
-    _SpecularValue: 0,0,0,0
-    _EmissionValue: 0,0,0,0
-    _AlbedoValue: 0,0,0,0
     _AlbedoValue: 0,0,0,0
     _EmissionValue: 0,0,0,0
     _SpecularValue: 0,0,0,0
   prop_type: Texture2D
     _AlbedoTex: a5e4a76d-c915-48a4-a940-5dba8a0c936e
-    _NormalTex: 6fd672ec-676e-41b4-9da8-b367d6ab6d2b
     _EmissionTex: null
+    _NormalTex: 6fd672ec-676e-41b4-9da8-b367d6ab6d2b
     _RoughnessMetallicTex: null
     _SpecularTex: null

@@ -8,6 +8,7 @@ namespace Ailu
 {
     PostProcessPass::PostProcessPass() : RenderPass("PostProcessPass")
     {
+        _cs_blur = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/blur.hlsl"));
         _p_bloom_thread_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/bloom.alasset"), "BloomThread");
         _p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
         _p_obj_cb = IConstantBuffer::Create(256);
@@ -31,7 +32,7 @@ namespace Ailu
     {
         _bloom_thread_rect.width = rendering_data._width >> 1;
         _bloom_thread_rect.height = rendering_data._height >> 1;
-        auto cmd = CommandBufferPool::Get("PostProcessPass");
+        auto cmd = CommandBufferPool::Get("PostProcess");
         RTHandle rt, blur_x, blur_y;
 
         u16 iterator_count = std::min<u16>(Texture::MaxMipmapCount(rendering_data._width, rendering_data._height), _bloom_iterator_count);
@@ -44,8 +45,25 @@ namespace Ailu
         }
         cmd->Clear();
         {
-            ProfileBlock p(cmd.get(), _name);
-            cmd->SetName("Bloom");
+            ProfileBlock p(cmd.get(), cmd->GetName());
+            if (_is_use_blur)
+            {
+                auto blur_x = cmd->GetTempRT(rendering_data._width, rendering_data._height, "blur_x", ERenderTargetFormat::kDefault, false, false, true);
+                auto blur_y = cmd->GetTempRT(rendering_data._width, rendering_data._height, "blur_y", ERenderTargetFormat::kDefault, false, false, true);
+                _cs_blur->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
+                _cs_blur->SetTexture("_OutTex", blur_x);
+                auto kernel = _cs_blur->FindKernel("blur_x");
+                u16 group_num_x = std::ceil((f32) rendering_data._width / 16.0f);
+                u16 group_num_y = std::ceil((f32) rendering_data._height / 16.0f);
+                cmd->Dispatch(_cs_blur.get(), kernel, group_num_x, group_num_y, 1);
+                _cs_blur->SetTexture("_SourceTex", blur_x);
+                _cs_blur->SetTexture("_OutTex", blur_y);
+                kernel = _cs_blur->FindKernel("blur_y");
+                cmd->Dispatch(_cs_blur.get(), kernel, group_num_x, group_num_y, 1);
+                cmd->Blit(blur_y, rendering_data._camera_opaque_tex_handle);
+                cmd->ReleaseTempRT(blur_x);
+                cmd->ReleaseTempRT(blur_y);
+            }
             //down sample
             for (u16 i = 0; i < iterator_count; i++)
             {

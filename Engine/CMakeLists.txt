@@ -25,8 +25,13 @@ endfunction()
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
 
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Src)
+add_source_files_recursive(${ENGINE_ROOT_PATH}/Inc)
 aux_source_directory (${ENGINE_ROOT_PATH}/Ext/imgui IMGUI_ROOT)
 aux_source_directory (${ENGINE_ROOT_PATH}/Ext/implot IMPLOT_ROOT)
+set(CORE_MODULE
+        Src/Objects/Type.cpp
+        Inc/Objects/Type.h
+)
 set(RENDER_MODULE
         Inc/Render/Gizmo.h
         Src/Render/Gizmo.cpp
@@ -68,6 +73,9 @@ set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # set_source_files_properties(IMGUI_BACKENDS PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # aux_source_directory (Src engine_src_dir)
 # 为目标添加 include 目录
+add_custom_target(pre_build_cmd ALL
+        COMMAND ${CMAKE_COMMAND} -E echo "Running pre-build script..."
+        COMMAND cmd /c "${PROJECT_SOURCE_DIR}/pre_build_script.bat")
 
 add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE} Src/Render/Pass/SSAOPass.cpp
 "Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp" "Inc/RHI/DX12/D3DUtils.h"
@@ -76,6 +84,7 @@ add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMG
         Src/Framework/Common/JobSystem.cpp
         Ext/imnodes/imnodes.cpp
         Src/Render/Font.cpp)
+add_dependencies(Engine pre_build_cmd)
 # 包含路径
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Inc)
@@ -104,6 +113,7 @@ target_precompile_headers(Engine PRIVATE Inc/pch.h)
 target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;d2d1.lib;dwrite.lib;d3d11.lib;
         ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib)
 
+
 # 添加自定义命令
 # 添加自定义命令来运行批处理脚本
 add_custom_command(TARGET Engine POST_BUILD
@@ -113,3 +123,10 @@ add_custom_command(TARGET Engine POST_BUILD
         COMMENT "Running post-build script..."
         VERBATIM
         )
+#add_custom_command(TARGET Engine PRE_BUILD
+#        COMMAND ${CMAKE_COMMAND} -E echo "Running pre-build script..."
+#        COMMAND cmd /c "${PROJECT_SOURCE_DIR}/pre_build_script.bat"
+#        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+#        COMMENT "Running pre-build script..."
+#        VERBATIM
+#)

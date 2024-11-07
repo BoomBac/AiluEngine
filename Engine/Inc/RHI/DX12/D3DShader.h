@@ -265,6 +265,8 @@ namespace Ailu
             {
                 ds_state.FrontFace.StencilFunc = ConvertToD3D12CompareFunc(state._stencil_test_func);
                 ds_state.FrontFace.StencilPassOp = ConvertToD3D12StencilOp(state._stencil_test_pass_op);
+                ds_state.BackFace.StencilFunc = ds_state.FrontFace.StencilFunc;
+                ds_state.BackFace.StencilPassOp = ds_state.FrontFace.StencilPassOp;
             }
             ds_state.DepthWriteMask = state._b_depth_write ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
             return ds_state;

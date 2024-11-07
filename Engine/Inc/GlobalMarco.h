@@ -23,6 +23,15 @@
 #define _PIX_DEBUG
 #define PLATFORM_WINDOWS 1
 
+#define ACLASS()
+#define APROPERTY(...)
+#define AFIELD(...)
+#define AFUNCTION(...)
+
+#define BODY_MACRO_COMBINE_INNER(A, B, C, D) A##B##C##D
+#define BODY_MACRO_COMBINE(A, B, C, D) BODY_MACRO_COMBINE_INNER(A, B, C, D)
+#define GENERATED_BODY(...) BODY_MACRO_COMBINE(CURRENT_FILE_ID, _, __LINE__, _GENERATED_BODY)
+
 using u8 = uint8_t;
 using u16 = uint16_t;
 using u32 = uint32_t;

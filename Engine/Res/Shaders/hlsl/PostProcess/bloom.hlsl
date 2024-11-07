@@ -246,30 +246,20 @@ float3 cc(float3 color, float factor, float factor2)
 float4 Composite(PSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
-    // float4 cpos = TransformFromWorldToClipSpace(_SunScreenPos.xyz * 100);
-    // cpos.xyz /= cpos.w;
-    // cpos.xy = cpos.xy * 0.5 + 0.5;
-    // cpos.y = 1.0 - cpos.y;
     float4 cpos = _SunScreenPos;
 	float3 bloom_color = _BloomTex.Sample(g_LinearClampSampler, input.uv).rgb;
-    if (cpos.z > 0)
-    {
-        float2 uv = input.uv;
-        float aspect = _ScreenParams.x / _ScreenParams.y;
-        uv -= 0.5f;
-        uv.x *= aspect;
-        cpos.xy -= 0.5f;
-        cpos.x *= aspect;
-        float3 lens_flare = float3(1.3, 1.2, 1.1) * Lensflare(uv,float2(cpos.x,cpos.y));
-        lens_flare -= Noise(input.uv)*0.015;
-        //return float4(lens_flare,1.0f);
-        color += lens_flare;
-    }
-
-    //cpos.y = 1.0 - cpos.y;
-
-    //lens_flare = cc(lens_flare,0.5,1.0);
-    //return float4(lens_flare,1.0f);
-
+    // if (cpos.z > 0)
+    // {
+    //     float2 uv = input.uv;
+    //     float aspect = _ScreenParams.x / _ScreenParams.y;
+    //     uv -= 0.5f;
+    //     uv.x *= aspect;
+    //     cpos.xy -= 0.5f;
+    //     cpos.x *= aspect;
+    //     float3 lens_flare = float3(1.3, 1.2, 1.1) * Lensflare(uv,float2(cpos.x,cpos.y));
+    //     lens_flare -= Noise(input.uv)*0.015;
+    //     //return float4(lens_flare,1.0f);
+    //     color += lens_flare;
+    // }
 	return float4(ACESFilm(lerp(color,bloom_color,_SampleParams.w)),1.0f);
 }

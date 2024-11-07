@@ -114,6 +114,7 @@ PerMaterialCBufferEnd
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
+    //return lerp(GROUND_COLOR,SKY_COLOR,lerp(0.9,1.0,input.wnormal.y)).xyzz * 2.0;
     float3 sunDir = -_MainlightWorldPosition;
     
     float3 rayDir =  normalize(input.wnormal);//normalize(camDir + camRight*xy.x*camWidthScale + camUp*xy.y*camHeightScale);
