@@ -40,12 +40,11 @@ namespace Ailu
         void Present() final;
         void DoResourceTask() final;
         const u64& GetFenceValue(const u32& cmd_index) const final;
-        u64 GetCurFenceValue() const final;
+        u64 GetFenceValueGPU() const final;
+        u64 GetFenceValueCPU() const final;
         bool IsCommandBufferReady(const u32 cmd_index) final;
         void SubmitRHIResourceBuildTask(RHIResourceTask task) final;
         void TakeCapture() final;
-        void TrackResource(FrameResource* resource) final;
-        bool IsResourceReferencedByGPU(FrameResource* resource) final;
         void ResizeSwapChain(const u32 width, const u32 height) final;
         virtual u64 GetFrameCount() const final { return _frame_count; };
         std::tuple<u32, u32> GetSwapChainSize() const final { return std::make_pair(_width, _height);};
@@ -64,14 +63,10 @@ namespace Ailu
         u64 ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         u64 ExecuteAndWaitCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void WaitForGpu() final;
+        void WaitForFence(u64 fence_value) final;
         void BeginBackBuffer(CommandBuffer* cmd) final;
         void EndBackBuffer(CommandBuffer* cmd) final;
         void DrawOverlay(CommandBuffer* cmd) final;
-        //ID3D12QueryHeap* GetQueryHeap() { return m_queryHeap.Get(); }
-        //ComPtr<ID3D12Resource> _p_query_buffer;
-        //unsigned int  Offset = 0;
-        //const unsigned int FRAME_COUNT = 4;
-        //const unsigned int QUERY_COUNT = 2;
 
     private:
         void Destroy();
@@ -81,6 +76,7 @@ namespace Ailu
         void BeginCapture();
         void EndCapture();
         void ResizeSwapChainImpl(const u32 width, const u32 height);
+        void MoveToNextFrame();
 #ifdef _DIRECT_WRITE
         void InitDirectWriteContext();
 #endif
@@ -126,7 +122,7 @@ namespace Ailu
         // Synchronization objects.
         u8 m_frameIndex;
         HANDLE m_fenceEvent;
-        u64 _fence_value = 0u;
+        u64 _fence_value[RenderConstants::kFrameCount];
         ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
         std::unordered_map<u32, u64> _cmd_target_fence_value;
         std::multimap<u64, ComPtr<ID3D12Resource>> _global_tracked_resource;

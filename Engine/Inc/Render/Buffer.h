@@ -15,19 +15,23 @@ namespace Ailu
     }
     struct GPUBufferDesc
     {
-        u32 _size;
-        bool _is_readable;
-        EALGFormat::EALGFormat _format;
+        u32 _size = 0u;
+        //for structured buffer
+        u32 _element_num = 1u;
+        bool _is_readable = false;
+        bool _is_random_write = false;
+        EALGFormat::EALGFormat _format = EALGFormat::kALGFormatUnknown;
     };
     class AILU_API IGPUBuffer
     {
     public:
         static IGPUBuffer *Create(GPUBufferDesc desc, const String &name = std::format("common_buffer_{}", s_global_buffer_index++));
         virtual ~IGPUBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) const = 0;
+        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) = 0;
         virtual void SetName(const String &name) = 0;
         virtual u8 *ReadBack() = 0;
         virtual void ReadBack(u8 *dst, u32 size) = 0;
+        virtual bool IsRandomAccess() const = 0;
         virtual void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete) = 0;
     };
 
@@ -36,11 +40,11 @@ namespace Ailu
     public:
         static IVertexBuffer *Create(VertexBufferLayout layout, const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
         virtual ~IVertexBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, const VertexBufferLayout &pipeline_input_layout) const = 0;
+        virtual void Bind(CommandBuffer *cmd, const VertexBufferLayout &pipeline_input_layout) = 0;
         virtual void SetLayout(VertexBufferLayout layout) = 0;
         virtual void SetStream(float *vertices, u32 size, u8 stream_index) = 0;
         virtual void SetStream(u8 *data, u32 size, u8 stream_index, bool dynamic) = 0;
-        virtual void SetData(u8* data,u32 size,u8 stream_index,u32 offset) = 0;
+        virtual void SetData(u8 *data, u32 size, u8 stream_index, u32 offset) = 0;
         virtual void SetName(const String &name) = 0;
         virtual u8 *GetStream(u8 index) = 0;
         [[nodiscard]] virtual const VertexBufferLayout &GetLayout() const = 0;
@@ -53,7 +57,7 @@ namespace Ailu
         static Ref<IDynamicVertexBuffer> Create(const VertexBufferLayout &layout, const String &name = std::format("dynamic_vertex_buffer_{}", s_global_buffer_index++));
         static Ref<IDynamicVertexBuffer> Create(const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
         virtual ~IDynamicVertexBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd) const = 0;
+        virtual void Bind(CommandBuffer *cmd) = 0;
         virtual void SetName(const String &name) = 0;
         virtual void UploadData() = 0;
         virtual void AppendData(float *data0, u32 num0, float *data1, u32 num1) = 0;
@@ -61,10 +65,10 @@ namespace Ailu
     class AILU_API IIndexBuffer
     {
     public:
-        static IIndexBuffer *Create(u32 *indices, u32 count, const String &name = std::format("index_buffer_{}", s_global_buffer_index++),bool is_dynamic = false);
+        static IIndexBuffer *Create(u32 *indices, u32 count, const String &name = std::format("index_buffer_{}", s_global_buffer_index++), bool is_dynamic = false);
         virtual ~IIndexBuffer() = default;
         virtual void SetName(const String &name) = 0;
-        virtual void Bind(CommandBuffer *cmd) const = 0;
+        virtual void Bind(CommandBuffer *cmd) = 0;
         [[nodiscard]] virtual u32 GetCount() const = 0;
         virtual u8 *GetData() = 0;
         virtual void SetData(u8 *data, u32 size) = 0;
@@ -77,11 +81,18 @@ namespace Ailu
         static IConstantBuffer *Create(u32 size, bool compute_buffer = false, const String &name = std::format("const_buffer_{}", s_global_buffer_index++));
         static void Release(u8 *ptr);
         virtual ~IConstantBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) const = 0;
+        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) = 0;
         virtual void SetName(const String &name) = 0;
         virtual u8 *GetData() = 0;
         virtual u64 GetBufferSize() const = 0;
+        virtual void Reset() = 0;
+        template<typename T>
+        static T *As(IConstantBuffer *buffer)
+        {
+            return reinterpret_cast<T *>(buffer->GetData());
+        }
     };
+
 }// namespace Ailu
 
 #endif// !BUFFER_H__

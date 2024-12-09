@@ -40,6 +40,7 @@ namespace Ailu
         kVoid,
         kPtr,
         kRef,
+        kEnum,
         kNone,
     };
     struct AILU_API MemberInfoInitializer
@@ -55,7 +56,6 @@ namespace Ailu
     class AILU_API MemberInfo
     {
         friend class Type;
-
     public:
         MemberInfo();
         explicit MemberInfo(const MemberInfoInitializer &initializer);
@@ -178,7 +178,7 @@ namespace Ailu
     public:
         Type();
         explicit Type(TypeInitializer initializer);
-        [[nodiscard]] Type* BaseType() const;
+        [[nodiscard]] Type *BaseType() const;
         [[nodiscard]] bool IsClass() const;
         [[nodiscard]] bool IsAbstract() const;
         //name without namespace
@@ -204,53 +204,37 @@ namespace Ailu
         Map<String, MemberInfo *> _members_lut;
     };
 
-    class AILU_API AEnum : public Type
+    struct AILU_API EnumInitializer
+    {
+        String _name;
+        Map<String,u32> _str_to_enum_lut;
+    };
+
+    class AILU_API Enum : public Object
     {
     public:
-        AEnum() = default;
-        AEnum(const std::string& name,std::map<std::string, u32> enums) : _name(name), _str_to_enum_lut(std::move(enums)) {};
-        template<typename E>
-        static AEnum *StaticType()
-        {
-            return nullptr;
-        }
-        i32 GetIndexByName(const std::string& name)
-        {
-            if (_str_to_enum_lut.contains(name))
-            {
-                return (i32)_str_to_enum_lut[name];
-            }
-            return -1;
-        }
+        static Enum * GetEnumByName(const String& name);
+        static void RegisterEnum(const String& name, Enum * enum_ptr);
+        Enum() = default;
+        explicit Enum(const EnumInitializer& initializer);
+        i32 GetIndexByName(const std::string &name);
+        const Vector<const String*> &GetEnumNames() const { return _enum_names; };
         template<class E>
-        static std::string GetNameByEnum(E enum_value)
+        String GetNameByEnum(E enum_value)
         {
-            AEnum* enum_type = StaticType<E>();
             u32 index = static_cast<u32>(enum_value);
-            for (const auto& pair : enum_type->_str_to_enum_lut)
+            if (_enum_to_str_lut.contains(index))
             {
-                if (pair.second == index)
-                {
-                    return pair.first;
-                }
+                return _enum_to_str_lut[index]->first;
             }
             return "";
         }
-    template<typename E>
-    static std::vector<std::string> Names()
-    {
-        static std::vector<std::string> v;
-        return v;
-    }
-    template<typename E>
-    static std::vector<u32> Values()
-    {
-        static std::vector<u32> v;
-        return v;
-    }
     private:
-        std::string _name;
-        std::map<std::string, u32> _str_to_enum_lut;
+        inline static Map<String, Enum *> s_global_enums;
+    private:
+        Map<std::string, u32> _str_to_enum_lut;
+        Map<u32,Map<std::string, u32>::iterator> _enum_to_str_lut;
+        Vector<const String*> _enum_names;
     };
 }// namespace Ailu
 

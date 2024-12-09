@@ -1,4 +1,5 @@
 #include "Objects/Object.h"
+#include "Framework/Common/Log.h"
 #include "pch.h"
 
 namespace Ailu
@@ -15,21 +16,27 @@ namespace Ailu
         _name = name;
     }
 
-//    Object &Object::operator=(const Object &other)
-//    {
-//        _name = other._name;
-//        _id = other._id;
-//        _hash = other._hash;
-//        return *this;
-//    }
-//
-//    Object &Object::operator=(Object &&other) noexcept
-//    {
-//        _name = other._name;
-//        _id = other._id;
-//        _hash = other._hash;
-//        other._name.clear();
-//        other._id = -1;
-//        return *this;
-//    }
+    //
+    Object::~Object()
+    {
+        // if (g_pLogMgr)
+        //     LOG_INFO("Object {} destroyed", _name);
+    }
+    //Object &Object::operator=(const Object &other)
+    //    {
+    //        _name = other._name;
+    //        _id = other._id;
+    //        _hash = other._hash;
+    //        return *this;
+    //    }
+    //
+    //    Object &Object::operator=(Object &&other) noexcept
+    //    {
+    //        _name = other._name;
+    //        _id = other._id;
+    //        _hash = other._hash;
+    //        other._name.clear();
+    //        other._id = -1;
+    //        return *this;
+    //    }
 }// namespace Ailu

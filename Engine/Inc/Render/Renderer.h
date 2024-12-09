@@ -23,6 +23,8 @@ namespace Ailu
     class PostProcessPass;
     class SSAOPass;
     class Camera;
+    class FrameResource;
+    class RenderPipeline;
     class AILU_API Renderer
     {
     public:
@@ -53,28 +55,29 @@ namespace Ailu
         void SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj);
         void AddFeature(RenderFeature *feature) { _features.emplace_back(feature); };
         void SetShadingMode(EShadingMode::EShadingMode mode) { _mode = mode; }
-    private:
+        void SetCurFrameResource(FrameResource *fr) { _cur_fs = fr; }
 
+    private:
         void PrepareScene(const Scene &s);
         void PrepareLight(const Scene &s);
         void PrepareCamera(const Camera &cam);
         void DoRender(const Camera &cam, const Scene &s);
-        void Cull(const Scene &s, const Camera& cam);
+        void Cull(const Scene &s, const Camera &cam);
         static void StableSort(Vector<RenderPass *> list);
 
     private:
         static inline List<RenderPass *> _p_task_render_passes{};
         GraphicsContext *_p_context = nullptr;
+        RenderPipeline *_p_cur_pipeline;
+        FrameResource *_cur_fs;
         EShadingMode::EShadingMode _mode = EShadingMode::kLit;
         RTHandle _camera_color_handle;
         RTHandle _gameview_rt_handle;
         RTHandle _camera_depth_handle;
         RTHandle _camera_depth_tex_handle;
-        Map<u64, Scope<IConstantBuffer>> _p_per_camera_cbuf;
-        Map<u64, Scope<IConstantBuffer>> _p_per_scene_cbuf;
         Map<u64, CullResult> _cull_results;
-        CBufferPerSceneData _per_scene_cbuf_data;
-        CBufferPerCameraData _per_cam_cbuf_data;
+        //CBufferPerSceneData _per_scene_cbuf_data;
+        //CBufferPerCameraData _per_cam_cbuf_data;
 
         Scope<ShadowCastPass> _shadowcast_pass;
         Scope<DeferredGeometryPass> _gbuffer_pass;
@@ -89,11 +92,11 @@ namespace Ailu
         Scope<GUIPass> _gui_pass;
         Scope<WireFramePass> _wireframe_pass;
         Vector<RenderPass *> _render_passes;
+        RenderFeature* _vxgi;
         u64 _active_camera_hash;
 
         RenderingData _rendering_data;
-        IConstantBuffer *_p_per_object_cbufs[RenderConstants::kMaxRenderObjectCount];
-        CBufferPerObjectData _per_object_datas[RenderConstants::kMaxRenderObjectCount];
+
         Vector<Scope<RenderFeature>> _owned_features;
         Vector<RenderFeature *> _features;
         bool _b_init = false;

@@ -107,7 +107,7 @@ namespace Ailu
         }
 
         template<typename Iter, typename T>
-        static bool DrawResourceDropdown(const String &label, Iter begin, Iter end, Ref<T>& out_ptr, String prev_str = kNullStr)
+        static bool DrawResourceDropdown(const String &label, Iter begin, Iter end, Ref<T> &out_ptr, String prev_str = kNullStr)
         {
             bool ret = false;
             out_ptr = nullptr;
@@ -149,10 +149,10 @@ namespace Ailu
                     break;
                 case Ailu::EShaderPropertyType::kBool:
                 {
-                    auto bool_value = (f32*)prop._value_ptr;
+                    auto bool_value = (f32 *) prop._value_ptr;
                     bool checked = *bool_value == 1.0f;
                     ImGui::Checkbox(prop._prop_name.c_str(), &checked);
-                    *bool_value = (f32)checked;
+                    *bool_value = (f32) checked;
                 }
                 break;
                 case Ailu::EShaderPropertyType::kEnum:
@@ -206,7 +206,7 @@ namespace Ailu
                 case Ailu::EShaderPropertyType::kTexture2D:
                 {
                     ImGui::Text("Texture2D : %s", prop._prop_name.c_str());
-                    auto tex = (Texture*)prop._value_ptr;
+                    auto tex = (Texture *) prop._value_ptr;
                     u32 cur_tex_id = tex ? tex->ID() : Texture::s_p_default_white->ID();
                     //auto& desc = std::static_pointer_cast<D3DTexture2D>(tex == nullptr ? TexturePool::GetDefaultWhite() : tex)->GetGPUHandle();
                     ImVec2 vMin = ImGui::GetWindowContentRegionMin();
@@ -304,19 +304,26 @@ namespace Ailu
                         switch (prop->_type)
                         {
                             case Ailu::EShaderPropertyType::kVector:
+                            {
                                 ImGui::DragFloat4("##f4", static_cast<Vector4f *>(prop->_value_ptr)->data);
-                                break;
+                                mat->SetVector(prop->_value_name, *static_cast<Vector4f *>(prop->_value_ptr));
+                            }
+                            break;
                             case Ailu::EShaderPropertyType::kColor:
                             {
                                 ImGuiColorEditFlags_ flag = ImGuiColorEditFlags_None;
                                 if (prop->_param[3] == -1.0)
                                     flag = ImGuiColorEditFlags_Float;
                                 ImGui::ColorEdit4("##c4", static_cast<Vector4f *>(prop->_value_ptr)->data, flag);
-                                break;
+                                mat->SetVector(prop->_value_name, *static_cast<Vector4f *>(prop->_value_ptr));
                             }
+                            break;
                             case Ailu::EShaderPropertyType::kRange:
+                            {
                                 ImGui::SliderFloat("##r", static_cast<float *>(prop->_value_ptr), prop->_param[0], prop->_param[1]);
-                                break;
+                                mat->SetFloat(prop->_value_name, *static_cast<f32 *>(prop->_value_ptr));
+                            }
+                            break;
                         }
                     }
                 }
@@ -396,9 +403,9 @@ namespace Ailu
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("%s", prop->_prop_name.c_str());
                     ImGui::TableSetColumnIndex(1);
-                    auto alpha_cull_off = (f32*)prop->_value_ptr;
+                    auto alpha_cull_off = (f32 *) prop->_value_ptr;
                     ImGui::SliderFloat(std::format("##{}", prop->_prop_name).c_str(), alpha_cull_off, 0.f, 1.f);
-                    mat->SetFloat("_AlphaCulloff",*alpha_cull_off);
+                    mat->SetFloat("_AlphaCulloff", *alpha_cull_off);
                 }
                 //cull mode
                 ImGui::TableNextRow();
@@ -406,10 +413,10 @@ namespace Ailu
                     const static String s_cullmode_str[] = {"Off", "Fornt", "Back"};
                     ImGui::TableSetColumnIndex(0);
                     auto cull = mat->GetCullMode();
-                    u16 cull_value = (u16)cull;
+                    u16 cull_value = (u16) cull;
                     ImGui::Text("Cull Mode");
                     ImGui::TableSetColumnIndex(1);
-                    if (ImGui::BeginCombo("##CullMode", s_cullmode_str[(u16)cull].c_str()))
+                    if (ImGui::BeginCombo("##CullMode", s_cullmode_str[(u16) cull].c_str()))
                     {
                         for (u32 i = 0; i < 3; i++)
                         {
@@ -546,8 +553,8 @@ namespace Ailu
                     ImGui::Text("AnimClip");
                     ImGui::TableSetColumnIndex(1);
                     Ref<AnimationClip> ptr;
-                    if (DrawResourceDropdown("##animclip", g_pResourceMgr->ResourceBegin<AnimationClip>(), g_pResourceMgr->ResourceEnd<AnimationClip>(), 
-                        ptr, comp->_anim_clip ? comp->_anim_clip->Name() : kNullStr))
+                    if (DrawResourceDropdown("##animclip", g_pResourceMgr->ResourceBegin<AnimationClip>(), g_pResourceMgr->ResourceEnd<AnimationClip>(),
+                                             ptr, comp->_anim_clip ? comp->_anim_clip->Name() : kNullStr))
                     {
                         comp->_anim_clip = ptr;
                         g_pSceneMgr->MarkCurSceneDirty();
@@ -698,7 +705,7 @@ namespace Ailu
             ImGui::SameLine();
             u16 selected_new_comp_index = (u16) (-1);
             static Vector<String> s_comp_tag = {
-                    "LightComponent", "CameraComponent", "StaticMeshComponent", "LightProbeComponent", "RigidComponent", "ColliderComponent", "SkeletonComponent"};
+                    "LightComponent", "CameraComponent", "StaticMeshComponent", "LightProbeComponent", "RigidComponent", "ColliderComponent", "SkeletonComponent", "VXGIComponent"};
             if (ImGui::BeginCombo(" ", "+ Add Component"))
             {
                 for (u16 i = 0; i < s_comp_tag.size(); i++)
@@ -734,6 +741,8 @@ namespace Ailu
                         }
                         else if (i == 6)
                             scene_register.AddComponent<CSkeletonMesh>(entity);
+                        else if (i == 7)
+                            scene_register.AddComponent<CVXGI>(entity);
                         else {};
                     }
                 }
@@ -850,9 +859,10 @@ namespace Ailu
             if (scene_register.HasComponent<CCamera>(entity))
             {
                 auto comp = scene_register.GetComponent<CCamera>(entity);
-                DrawComponent<CCamera>("CameraComponent", comp, entity, [this](CCamera *comp)
+                DrawComponent<CCamera>("CameraComponent", comp, entity, [&](CCamera *comp)
                                        {
                                                        auto &cam = comp->_camera;
+                                                       cam._is_enable = cur_actor_active;
                                                        const char *items[]{"Orthographic", "Perspective"};
                                                        int item_current_idx = 0;
                                                        if (cam.Type() == ECameraType::kPerspective) item_current_idx = 1;
@@ -974,6 +984,33 @@ namespace Ailu
                                                     }
                                                 } });
             };
+            if (scene_register.HasComponent<CVXGI>(entity))
+            {
+                auto comp = scene_register.GetComponent<CVXGI>(entity);
+                DrawComponent<CVXGI>("VXGIComponent", comp, entity, [this](CVXGI *comp)
+                                     {
+                                                ImGui::SliderFloat3("GridSize", comp->_grid_size.data, 1.f, 100.f);
+                                                ImGui::SliderInt3("GridNum", comp->_grid_num.data, 1, 128);
+                                                ImGui::SliderFloat("Distance",&comp->_distance, 1.f, 100.f);
+                                                ImGui::Checkbox("DrawVoxel", &comp->_is_draw_voxel);
+                                                u16 max_mip = Texture3D::MaxMipmapCount((u16) (comp->_grid_num.x), (u16) (comp->_grid_num.y), (u16) (comp->_grid_num.z));
+                                                i32 debug_mip = comp->_mipmap;
+                                                ImGui::SliderInt("DebugMip", &debug_mip, 0, max_mip-1);
+                                                comp->_mipmap = (u16) debug_mip;
+                                                ImGui::Checkbox("DrawDebugLine",&comp->_is_draw_grid);
+                                                ImGui::SliderFloat("MaxDist",&comp->_max_distance,0.f,1.732f);
+                                                ImGui::SliderFloat("MinDist",&comp->_min_distance,0.f,1.f);
+                                                ImGui::SliderFloat("ConeAngle",&comp->_diffuse_cone_angle,0.f,90.f);
+                                                if (ImGui::Button("GI Only"))
+                                                {
+                                                    Shader::EnableGlobalKeyword("DEBUG_GI");
+                                                }
+                                                ImGui::SameLine();
+                                                if (ImGui::Button("GI + Local"))
+                                                {
+                                                    Shader::DisableGlobalKeyword("DEBUG_GI");
+                                                } });
+            }
             _p_texture_selector->Show();
         }
 

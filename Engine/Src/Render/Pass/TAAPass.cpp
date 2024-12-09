@@ -20,7 +20,7 @@ namespace Ailu
     TAAFeature::~TAAFeature()
     {
     }
-    void TAAFeature::AddRenderPasses(Renderer *renderer, RenderingData &rendering_data)
+    void TAAFeature::AddRenderPasses(Renderer &renderer, RenderingData &rendering_data)
     {
         static bool first_time = false;
         auto camera = *rendering_data._camera;
@@ -57,11 +57,11 @@ namespace Ailu
         }
         //viewProj = matrix * view;
         _prepare_pass.Setup(matrix);
-        renderer->EnqueuePass(&_prepare_pass);
+        renderer.EnqueuePass(&_prepare_pass);
         jitter.x = (offsetX - 0.5f) / rendering_data._width;
         jitter.y = (offsetY - 0.5f) / rendering_data._height;
         _execute_pass.Setup(haltonSequence.prevViewProj, viewProj, _taa.get(), hash, jitter);
-        renderer->EnqueuePass(&_execute_pass);
+        renderer.EnqueuePass(&_execute_pass);
 
         haltonSequence.prevViewProj = viewProj;
         haltonSequence.frameCount = Application::s_frame_count;
@@ -163,6 +163,6 @@ namespace Ailu
     }
     void TAAExecutePass::EndPass(GraphicsContext *context)
     {
-        Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,_origin_camera_cbuf.get());
+        Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _origin_camera_cbuf.get());
     }
 }// namespace Ailu

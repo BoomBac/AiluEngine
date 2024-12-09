@@ -36,6 +36,13 @@ public:
         bool is_export;
         std::vector<MemberInfo> _members;
     };
+    struct EnumInfo
+    {
+        std::string _name;
+        std::string _underlying_type;
+        std::vector<std::tuple<std::string,uint32_t>> _members;
+        bool _is_enum_class;
+    };
 private:
     std::mutex _log_mutex;
     std::stringstream _log_ss;
@@ -50,4 +57,5 @@ private:
     inline static std::vector<std::string> s_common_src_dep_file;
 private:
     std::vector<ClassInfo> _classes;
+    std::vector<EnumInfo> _enums;
 };

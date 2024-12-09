@@ -2,16 +2,16 @@
 #include "Common/Selection.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
-#include "Ext/implot/implot.h"
 #include "Ext/imnodes/imnodes.h"
+#include "Ext/implot/implot.h"
 
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Render/Gizmo.h"
+#include "Render/Pass/PostprocessPass.h"
 #include "Render/RenderingData.h"
 #include "Render/TextRenderer.h"
-#include "Render/Pass/PostprocessPass.h"
 #include <Framework/Common/Application.h>
 #include <Objects/Type.h>
 
@@ -29,6 +29,7 @@
 #include "Widgets/AnimClipEditor.h"
 #include "Widgets/AssetBrowser.h"
 #include "Widgets/AssetTable.h"
+#include "Widgets/BlendSpaceEditor.h"
 #include "Widgets/CommonTextureWidget.h"
 #include "Widgets/EnvironmentSetting.h"
 #include "Widgets/ObjectDetail.h"
@@ -36,22 +37,21 @@
 #include "Widgets/PlaceActors.h"
 #include "Widgets/RenderView.h"
 #include "Widgets/WorldOutline.h"
-#include "Widgets/BlendSpaceEditor.h"
 
 namespace Ailu
 {
     namespace Editor
     {
         // User callback
-        static void mini_map_node_hovering_callback(int node_id, void* user_data)
+        static void mini_map_node_hovering_callback(int node_id, void *user_data)
         {
             ImGui::SetTooltip("This is node %d", node_id);
         }
 
-        static void ShowImNodeTest(bool* is_show)
+        static void ShowImNodeTest(bool *is_show)
         {
             const int hardcoded_node_id = 1;
-            ImGui::Begin("Node",is_show);
+            ImGui::Begin("Node", is_show);
             if (ImGui::BeginDragDropTarget())
             {
                 const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(ImGuiWidget::kDragAssetAnimClip.c_str());
@@ -59,7 +59,7 @@ namespace Ailu
                 {
                     auto clip = *(Asset **) (payload->Data);
                     auto clip_ref = clip->AsRef<AnimationClip>();
-                    LOG_INFO("{}",clip_ref->Name().c_str());
+                    LOG_INFO("{}", clip_ref->Name().c_str());
                 }
                 ImGui::EndDragDropTarget();
             }
@@ -247,7 +247,7 @@ namespace Ailu
         std::once_flag flag;
         void EditorLayer::OnUpdate(f32 dt)
         {
-            
+
             ccd_solver.Resize(3);
             ccd_solver[0]._position = Vector3f(0, 9, 0);
             ccd_solver[1]._position = Vector3f(0, -3, 0);
@@ -258,7 +258,6 @@ namespace Ailu
             fabrik_solver[1]._position = Vector3f(0, -3, 0);
             fabrik_solver[2]._position = Vector3f(0, -3, 0);
             //fabrik_solver[3]._position = Vector3f(0, 0, 1);
-            
 
 
             std::call_once(flag, []()
@@ -483,16 +482,16 @@ namespace Ailu
                     bool active = pass->IsActive();
                     ImGui::Checkbox(pass->GetName().c_str(), &active);
                     pass->SetActive(active);
-                    if (auto p = dynamic_cast<PostProcessPass*>(pass); p != nullptr)
+                    if (auto p = dynamic_cast<PostProcessPass *>(pass); p != nullptr)
                     {
-                        Type* type = PostProcessPass::StaticType();
-                        for(auto& prop : type->GetProperties())
+                        Type *type = PostProcessPass::StaticType();
+                        for (auto &prop: type->GetProperties())
                         {
                             if (prop.DataType() == EDataType::kBool)
                             {
                                 bool value = prop.GetValue<bool>(*pass);
-                                ImGui::Checkbox(prop.Name().c_str(),&value);
-                                prop.SetValue<bool>(*pass,value);
+                                ImGui::Checkbox(prop.Name().c_str(), &value);
+                                prop.SetValue<bool>(*pass, value);
                             }
                         }
                     }
@@ -547,24 +546,26 @@ namespace Ailu
             ImGui::Checkbox("ShowThreadPoolView", &s_show_threadpool_view);
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
 
-            for (auto &info: g_pResourceMgr->GetImportInfos())
-            {
-                float x = g_pTimeMgr->GetScaledWorldTime(0.25f);
-                ImGui::Text("%s", info._msg.c_str());
-                ImGui::SameLine();
-                ImGui::ProgressBar(x - static_cast<int>(x), ImVec2(0.f, 0.f));
-            }
+            // for (auto &info: g_pResourceMgr->GetImportInfos())
+            // {
+            //     float x = g_pTimeMgr->GetScaledWorldTime(0.25f);
+            //     ImGui::Text("%s", info._msg.c_str());
+            //     ImGui::SameLine();
+            //     ImGui::ProgressBar(x - static_cast<int>(x), ImVec2(0.f, 0.f));
+            // }
             ImGui::End();
             if (show)
                 ImGui::ShowDemoWindow(&show);
             if (s_show_plot_demo)
                 ImPlot::ShowDemoWindow((&s_show_plot_demo));
             ECS::Entity e = Selection::FirstEntity();
-            auto& r = g_pSceneMgr->ActiveScene()->GetRegister();
+            auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
             if (e != ECS::kInvalidEntity)
             {
                 if (r.HasComponent<CCamera>(e))
                 {
+                    auto &cam = r.GetComponent<CCamera>(e)->_camera;
+                    cam.SetPixelSize(300, 300 / cam.Aspect());
                     static_cast<RenderView *>(_p_preview_cam_view)->SetSource(g_pGfxContext->GetPipeline()->GetTarget(1));
                     _p_preview_cam_view->Open(_p_preview_cam_view->Handle());
                 }
@@ -608,21 +609,21 @@ namespace Ailu
             }
             ImGui::Begin("Solver");
 
-//            static char buf[256];
-//            static f32 text_scale = 1.0f;
-//            static bool s_show_text_grid = false;
-//            static Color s_tex_color = Colors::kWhite;
-//            ImGui::SliderFloat("TextScale",&text_scale,0.1f,5.0f);
-//            ImGui::Checkbox("TextGrid",&s_show_text_grid);
-//            ImGui::ColorPicker3("TextColor",s_tex_color.data);
-//            auto tr = TextRenderer::Get();
-//            tr->_is_draw_debug_line = s_show_text_grid;
-//            if (ImGui::InputText("TextRenderer Test",buf,256,ImGuiInputTextFlags_EnterReturnsTrue))
-//            {
-//                tr->DrawText(tr->GetDefaultFont(),buf,Vector2f::kZero,Vector2f(text_scale),Vector2f::kOne,s_tex_color);
-//            }
-//            if (ImGui::Button("Clear"))
-//                TextRenderer::Get()->ClearBuffer();
+            //            static char buf[256];
+            //            static f32 text_scale = 1.0f;
+            //            static bool s_show_text_grid = false;
+            //            static Color s_tex_color = Colors::kWhite;
+            //            ImGui::SliderFloat("TextScale",&text_scale,0.1f,5.0f);
+            //            ImGui::Checkbox("TextGrid",&s_show_text_grid);
+            //            ImGui::ColorPicker3("TextColor",s_tex_color.data);
+            //            auto tr = TextRenderer::Get();
+            //            tr->_is_draw_debug_line = s_show_text_grid;
+            //            if (ImGui::InputText("TextRenderer Test",buf,256,ImGuiInputTextFlags_EnterReturnsTrue))
+            //            {
+            //                tr->DrawText(tr->GetDefaultFont(),buf,Vector2f::kZero,Vector2f(text_scale),Vector2f::kOne,s_tex_color);
+            //            }
+            //            if (ImGui::Button("Clear"))
+            //                TextRenderer::Get()->ClearBuffer();
             ImGui::Checkbox("ApplyConstraint", &Solver::s_is_apply_constraint);
             //auto e = Selection::FirstEntity();
             static bool ccd_succeed = false, fab_succeed = false;
@@ -668,9 +669,9 @@ namespace Ailu
             ImGui::SliderInt("StepNum", &step, 0, 30);
             Solver::s_global_step_num = step;
             u32 index = 0u;
-            for (auto& sk_comp: r.View<CSkeletonMesh>())
+            for (auto &sk_comp: r.View<CSkeletonMesh>())
             {
-                auto tag = r.GetComponent<CSkeletonMesh,TagComponent>(index++);
+                auto tag = r.GetComponent<CSkeletonMesh, TagComponent>(index++);
                 for (auto &it: sk_comp._p_mesh->GetSkeleton().GetSolvers())
                 {
                     auto &[name, slover] = it;
@@ -701,7 +702,7 @@ namespace Ailu
                                 {
                                     if (auto p = dynamic_cast<IKConstraint *>(cons); p != nullptr)
                                     {
-                                        ImGui::Text("Index: %d",index);
+                                        ImGui::Text("Index: %d", index);
                                         ImGui::PushID(index++);
                                         Vector2f x, y, z;
                                         p->GetLimit(x, y, z);

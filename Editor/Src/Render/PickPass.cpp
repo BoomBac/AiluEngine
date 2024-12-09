@@ -32,7 +32,7 @@ namespace Ailu
             static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
             static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
             static auto mat_area_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard");
-            static auto mat_camera_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
+            static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
             static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
             static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
 
@@ -51,12 +51,16 @@ namespace Ailu
                             DrawLightGizmo(t, comp);
                             continue;
                         }
-                        if (auto comp = r.GetComponent<CLightProbe>(entity); comp != nullptr)
+                        else if (auto comp = r.GetComponent<CLightProbe>(entity); comp != nullptr)
                         {
                             //Gizmo::DrawCube(t._position, comp->_size);
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
                             Gizmo::DrawAABB(t._position - ext,t._position + ext);
                             cmd->DrawRenderer(Mesh::s_p_cube.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
+                        }
+                        else if (auto comp = r.GetComponent<CCamera>(entity); comp != nullptr)
+                        {
+                            Camera::DrawGizmo(&comp->_camera,Colors::kWhite);
                         }
                     }
                 }
@@ -68,7 +72,7 @@ namespace Ailu
                     auto &[queue, objs] = queue_data;
                     for (auto &obj: objs)
                     {
-                        cmd->DrawRenderer(obj._mesh, _pick_gen.get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                        cmd->DrawRenderer(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     }
                 }
                 u16 entity_index = 0;
@@ -117,6 +121,19 @@ namespace Ailu
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
                     cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
+                }
+                entity_index = 0;
+                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<CCamera>())
+                {
+                    const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<CCamera, TransformComponent>(entity_index);
+                    auto world_pos = t->_transform._position;
+                    CBufferPerObjectData obj_data;
+                    obj_data._ObjectID = r.GetEntity<CCamera>(entity_index);
+                    obj_data._MatrixWorld = MatrixTranslation(world_pos);
+                    f32 scale = 2.0f;
+                    obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
+                    cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_camera, obj_data, 0, 1, 1);
+                    ++entity_index;
                 }
                 //write to select buffer and draw debug outline
                 if (auto &selected = Selection::SelectedEntities(); selected.size() > 0)
@@ -294,23 +311,27 @@ namespace Ailu
             desc._size = 256;
             desc._is_readable = true;
             desc._format = EALGFormat::kALGFormatR32_UINT;
+            desc._is_random_write = true;
             _readback_buf = IGPUBuffer::Create(desc);
         }
         PickFeature::~PickFeature()
         {
             DESTORY_PTR(_readback_buf);
         }
-        void PickFeature::AddRenderPasses(Renderer *renderer, RenderingData &rendering_data)
+        void PickFeature::AddRenderPasses(Renderer &renderer, RenderingData &rendering_data)
         {
-            if (_pick_buf == nullptr || _pick_buf->Width() != rendering_data._width || _pick_buf->Height() != rendering_data._height)
+            if (rendering_data._camera->_is_scene_camera)
             {
-                _pick_buf = RenderTexture::Create(rendering_data._width, rendering_data._height, "pick_buffer", ERenderTargetFormat::kRUint, false, false, false);
-                _pick_buf_depth = RenderTexture::Create(rendering_data._width, rendering_data._height, "pick_buffer_depth", ERenderTargetFormat::kDepth, false, false, false);
-            }
-            if (_is_active)
-            {
-                _pick.Setup(_pick_buf.get(), _pick_buf_depth.get());
-                renderer->EnqueuePass(&_pick);
+                if (_pick_buf == nullptr || _pick_buf->Width() != rendering_data._width || _pick_buf->Height() != rendering_data._height)
+                {
+                    _pick_buf = RenderTexture::Create(rendering_data._width, rendering_data._height, "pick_buffer", ERenderTargetFormat::kRUint, false, false, false);
+                    _pick_buf_depth = RenderTexture::Create(rendering_data._width, rendering_data._height, "pick_buffer_depth", ERenderTargetFormat::kDepth, false, false, false);
+                }
+                if (_is_active)
+                {
+                    _pick.Setup(_pick_buf.get(), _pick_buf_depth.get());
+                    renderer.EnqueuePass(&_pick);
+                }
             }
         }
         u32 PickFeature::GetPickID(u16 x, u16 y) const

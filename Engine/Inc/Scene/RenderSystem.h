@@ -41,6 +41,8 @@ namespace Ailu
                 return copy;
             };
         private:
+            void ProcessVXGI(Register& r);
+        private:
             Ref<Material> _light_probe_debug_mat;
             Ref<CubeMap> _test_prefilter_map;
             Ref<CubeMap> _test_radiance_map;

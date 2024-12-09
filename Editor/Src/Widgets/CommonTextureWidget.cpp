@@ -236,7 +236,8 @@ namespace Ailu
 
         void TextureDetailView::ShowImpl()
         {
-            if (_p_tex)
+            auto tex2d = dynamic_cast<Texture2D *>(_p_tex);
+            if (tex2d)
             {
                 TextureHandle cur_tex_handle = _p_tex->GetView(Texture::ETextureViewType::kSRV, _cur_mipmap_level);
                 if (cur_tex_handle == 0)
@@ -257,15 +258,15 @@ namespace Ailu
                 //ImGui::SetNextItemWidth(_size.x * 0.20f);
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(_size.x * 0.20f - scrollbarWidth);
-                ImGui::SliderInt("##Mip", &_cur_mipmap_level, 0, _p_tex->MipmapLevel());
+                ImGui::SliderInt("##Mip", &_cur_mipmap_level, 0, _p_tex->MipmapLevel()-1);
 
                 ImGui::Text("Name: %s", _p_tex->Name().c_str());
-                ImGui::Text("Improted: %d x %d", _p_tex->Width(), _p_tex->Height());
-                auto [w, h] = _p_tex->CurMipmapSize(_cur_mipmap_level);
+                ImGui::Text("Improted: %d x %d", tex2d->Width(), tex2d->Height());
+                auto [w, h] = Texture::CalculateMipSize(tex2d->Width(), tex2d->Height(), _cur_mipmap_level);
                 ImGui::Text("Displayed: %d x %d", w, h);
-                ImGui::Text("Mipmap: %d", _p_tex->MipmapLevel() + 1);
+                ImGui::Text("Mipmap: %d", _p_tex->MipmapLevel());
                 ImGui::Text("Fomat: %s", EALGFormat::ToString(_p_tex->PixelFormat()));
-                ImGui::Text("Graphics Memory: %.2f mb", (f32) _p_tex->GetGpuMemerySize() * 9.5367431640625E-07);
+                ImGui::Text("Graphics Memory: %.2f mb", (f32) _p_tex->GetState().GetSize() * 9.5367431640625E-07);
                 //if (ImGui::CollapsingHeader("Common"))
                 //{
 

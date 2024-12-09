@@ -102,7 +102,7 @@ namespace Ailu
 				{
 					g_pGfxContext->TryReleaseUnusedResources();
 				}
-				if (ImGui::BeginTable("RenderTexture", 7, flags))
+				if (ImGui::BeginTable("RenderTexture", 6, flags))
 				{
 					// Submit columns name with TableSetupColumn() and call TableHeadersRow() to create a row with a header in each column.
 					// (Later we will show how TableSetupColumn() has other uses, optional flags, sizing weight etc.)
@@ -122,18 +122,17 @@ namespace Ailu
 						ImGui::TableSetColumnIndex(0);
 						ImGui::Text(rt_info._rt->Name().c_str());
 						ImGui::TableSetColumnIndex(1);
-						ImGui::Text("%d", rt_info._rt->MipmapLevel() + 1);
+						ImGui::Text("%d", rt_info._rt->MipmapLevel());
 						ImGui::TableSetColumnIndex(2);
 						ImGui::Text("%d x %d", rt_info._rt->Width(), rt_info._rt->Height());
 						ImGui::TableSetColumnIndex(3);
 						ImGui::Text(EALGFormat::ToString(rt_info._rt->PixelFormat()));
 						ImGui::TableSetColumnIndex(4);
 						//byte to mb
-						ImGui::Text("%.2f mb", (f32)rt_info._rt->GetGpuMemerySize() * 9.5367431640625E-07);
+                        const auto& res_state = rt_info._rt->GetState();
+						ImGui::Text("%.2f mb", res_state.GetSize() * 9.5367431640625E-07);
 						ImGui::TableSetColumnIndex(5);
-						ImGui::Text("%d", rt_info._rt->GetFenceValue());
-						ImGui::TableSetColumnIndex(6);
-						ImGui::Text("%d", rt_info._last_access_frame_count);
+						ImGui::Text("%d", (i32)res_state.GetFenceValue());
 						row++;
 					}
 					ImGui::EndTable();

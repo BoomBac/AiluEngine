@@ -397,6 +397,25 @@ namespace Ailu
         return s;
     }
 
+    Archive &operator<<(Archive &ar, const CVXGI &c)
+    {
+        ar.IncreaseIndent();
+        ar << ar.GetIndent() << "_grid_num:" << c._grid_num.ToString() << std::endl;
+        ar << ar.GetIndent() << "_distance:" << c._distance << std::endl;
+        ar.DecreaseIndent();
+        return ar;
+    }
+    Archive &operator>>(Archive &ar, CVXGI &c)
+    {
+        String buf;
+        ar >> buf;
+        AL_ASSERT(su::BeginWith(buf, "_grid_num"));
+        c._grid_num.FromString(su::Split(buf, ":")[1]);
+        ar >> buf;
+        c._distance = std::stof(su::Split(buf, ":")[1]);
+        return ar;
+    }
+
     namespace DebugDrawer
     {
         void DebugWireframe(const CCollider &c, const Transform &t,Color color)
@@ -412,6 +431,42 @@ namespace Ailu
             else if (c._type == EColliderType::kCapsule)
             {
                 Gizmo::DrawCapsule(CCollider::AsCapsule(c) * t._world_matrix, color);
+            }
+        }
+        void DebugWireframe(const CVXGI &c, const Transform &t, Color color)
+        {
+            // 计算每个方向上的步长
+            float widthX = c._grid_size.x;//(2.0f * c._grid_size.x) / c._grid_num.x;
+            float widthY = c._grid_size.y;//(2.0f * c._grid_size.y) / c._grid_num.y;
+            float widthZ = c._grid_size.z;//(2.0f * c._grid_size.z) / c._grid_num.z;
+
+            Vector3f start, end;
+
+            // 绘制 X 轴方向的线条（沿着 YZ 平面形成网格）
+            for (int y = 0; y <= c._grid_num.y; ++y) {
+                for (int z = 0; z <= c._grid_num.z; ++z) {
+                    start = c._center + Vector3f(-c._grid_size.x, y * widthY - c._grid_size.y, z * widthZ - c._grid_size.z);
+                    end = c._center + Vector3f(c._grid_size.x, y * widthY - c._grid_size.y, z * widthZ - c._grid_size.z);
+                    Gizmo::DrawLine(start, end);
+                }
+            }
+
+            // 绘制 Y 轴方向的线条（沿着 XZ 平面形成网格）
+            for (int x = 0; x <= c._grid_num.x; ++x) {
+                for (int z = 0; z <= c._grid_num.z; ++z) {
+                    start = c._center + Vector3f(x * widthX - c._grid_size.x, -c._grid_size.y, z * widthZ - c._grid_size.z);
+                    end = c._center + Vector3f(x * widthX - c._grid_size.x, c._grid_size.y, z * widthZ - c._grid_size.z);
+                    Gizmo::DrawLine(start, end);
+                }
+            }
+
+            // 绘制 Z 轴方向的线条（沿着 XY 平面形成网格）
+            for (int x = 0; x <= c._grid_num.x; ++x) {
+                for (int y = 0; y <= c._grid_num.y; ++y) {
+                    start = c._center + Vector3f(x * widthX - c._grid_size.x, y * widthY - c._grid_size.y, -c._grid_size.z);
+                    end = c._center + Vector3f(x * widthX - c._grid_size.x, y * widthY - c._grid_size.y, c._grid_size.z);
+                    Gizmo::DrawLine(start, end);
+                }
             }
         }
     }

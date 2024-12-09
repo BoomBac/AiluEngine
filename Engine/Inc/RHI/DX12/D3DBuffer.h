@@ -3,26 +3,27 @@
 #define __D3DBUFFER_H__
 #include "Render/Buffer.h"
 
-#include <map>
 #include "D3DUtils.h"
 #include "GPUDescriptorManager.h"
 #include "GPUResourceManager.h"
+#include <Render/GpuResource.h>
+#include <map>
 
 using Microsoft::WRL::ComPtr;
 
 namespace Ailu
 {
-    class D3DGPUBuffer : public IGPUBuffer
+    class D3DGPUBuffer : public IGPUBuffer, public GpuResource
     {
     public:
         D3DGPUBuffer(GPUBufferDesc desc);
         ~D3DGPUBuffer();
-        void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) const final;
+        void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) final;
         void SetName(const String &name) final;
         u8 *ReadBack() final;
         void ReadBack(u8 *dst, u32 size) final;
         void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete);
-
+        bool IsRandomAccess() const;
     private:
         String _name;
         GPUBufferDesc _desc;
@@ -35,12 +36,12 @@ namespace Ailu
         D3DResourceStateGuard _state_guard_readback;
     };
 
-	class D3DVertexBuffer : public IVertexBuffer
+	class D3DVertexBuffer : public IVertexBuffer, public GpuResource
 	{
 	public:
 		D3DVertexBuffer(VertexBufferLayout layout);
 		~D3DVertexBuffer();
-		void Bind(CommandBuffer* cmd, const VertexBufferLayout& pipeline_input_layout) const final;
+		void Bind(CommandBuffer* cmd, const VertexBufferLayout& pipeline_input_layout) final;
 		void SetLayout(VertexBufferLayout layout) override;
 		const VertexBufferLayout& GetLayout() const override;
 		void SetStream(float* vertices, u32 size,u8 stream_index) final;
@@ -61,9 +62,10 @@ namespace Ailu
 		std::map<String, u8> _buffer_layout_indexer;
 		Vector<ComPtr<ID3D12Resource>> _vertex_buffers;
 		Vector<D3D12_VERTEX_BUFFER_VIEW> _buffer_views;
+        u64 _size_all_stream;
 	};
 
-	class D3DDynamicVertexBuffer : public IDynamicVertexBuffer
+	class D3DDynamicVertexBuffer : public IDynamicVertexBuffer, public GpuResource
 	{
 	public:
 		D3DDynamicVertexBuffer(VertexBufferLayout layout = {
@@ -71,7 +73,7 @@ namespace Ailu
 				{"COLOR",EShaderDateType::kFloat4,1},
 			});
 		~D3DDynamicVertexBuffer();
-		void Bind(CommandBuffer* cmd) const final;
+		void Bind(CommandBuffer* cmd) final;
 		void SetName(const String& name) final {};
 		void UploadData() final;
 		void AppendData(float* data0, u32 num0, float* data1, u32 num1) final;
@@ -88,12 +90,12 @@ namespace Ailu
 		D3D12_VERTEX_BUFFER_VIEW _buf_views[2];
 	};
 
-	class D3DIndexBuffer : public IIndexBuffer
+	class D3DIndexBuffer : public IIndexBuffer, public GpuResource
 	{
 	public:
 		D3DIndexBuffer(u32* indices, u32 count,bool is_dynamic);
 		~D3DIndexBuffer() final;
-		void Bind(CommandBuffer* cmd) const final;
+		void Bind(CommandBuffer* cmd) final;
 		u32 GetCount() const override;
 		void SetName(const String& name) final;
         u8 *GetData() final;
@@ -109,15 +111,16 @@ namespace Ailu
         u8* _p_data = nullptr;
 	};
 
-	class D3DConstantBuffer : public IConstantBuffer
+	class D3DConstantBuffer : public IConstantBuffer, public GpuResource
 	{
 	public:
 		D3DConstantBuffer(u32 size,bool compute_buffer);
 		~D3DConstantBuffer() override;
-		void Bind(CommandBuffer* cmd, u8 bind_slot, bool is_compute_pipeline) const final;
+		void Bind(CommandBuffer* cmd, u8 bind_slot, bool is_compute_pipeline) final;
 		u8* GetData() final {return (u8*)_alloc._cpu_ptr;};
 		[[nodiscard]] u64 GetBufferSize() const final { return _alloc._size; };
 		void SetName(const String& name) final {};
+        void Reset() final;
 	private:
         GpuResourceManager::Allocation _alloc;
 		bool _is_compute_buffer;

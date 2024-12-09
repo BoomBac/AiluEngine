@@ -141,6 +141,11 @@ namespace Ailu
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, const Color &color_from, const Color &color_to)
     {
         if (Gizmo::s_color.a < 0.1f) return;
+        if (s_world_vertex_num + 2 >= RenderConstants::KMaxDynamicVertexNum)
+        {
+            LOG_WARNING("Gizmo vertex buffer is full, some lines may not be drawn. Please increase the size of the vertex buffer.")
+            return;
+        }
         s_world_pos[s_world_vertex_num] = from;
         s_world_pos[s_world_vertex_num+1] = to;
         s_world_color[s_world_vertex_num] = color_from * s_color.a;
@@ -306,6 +311,11 @@ namespace Ailu
     void Gizmo::DrawLine(const Vector2f &from, const Vector2f &to, Color color)
     {
         if (Gizmo::s_color.a < 0.1f) return;
+        if (s_screen_vertex_num + 2 >= RenderConstants::KMaxDynamicVertexNum)
+        {
+            LOG_WARNING("Gizmo vertex buffer is full, some lines may not be drawn. Please increase the size of the vertex buffer.")
+            return;
+        }
         s_screen_pos[s_screen_vertex_num] = Vector3f{from,-48.5f}; //default camera pos at z is -50,near is 1
         s_screen_pos[s_screen_vertex_num+1] = Vector3f{to,-48.5f};
         s_screen_color[s_screen_vertex_num] = color * s_color.a;

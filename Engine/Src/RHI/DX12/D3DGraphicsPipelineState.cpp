@@ -38,6 +38,8 @@ namespace Ailu
             _d3d_pso_desc.pRootSignature = d3dshader->GetSignature(pass_index, variant_hash);
             _d3d_pso_desc.VS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob *>(_state_desc._p_vertex_shader->GetByteCode(EShaderType::kVertex, pass_index, variant_hash)));
             _d3d_pso_desc.PS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob *>(_state_desc._p_pixel_shader->GetByteCode(EShaderType::kPixel, pass_index, variant_hash)));
+            if (auto gs_blob = _state_desc._p_pixel_shader->GetByteCode(EShaderType::kGeometry, pass_index, variant_hash); gs_blob != nullptr)
+                _d3d_pso_desc.GS = CD3DX12_SHADER_BYTECODE(reinterpret_cast<ID3DBlob *>(gs_blob));
             _d3d_pso_desc.RasterizerState = D3DConvertUtils::ConvertToD3D12RasterizerDesc(_state_desc._raster_state);
             _d3d_pso_desc.BlendState = D3DConvertUtils::ConvertToD3D12BlendDesc(_state_desc._blend_state, _state_desc._rt_state._color_rt_num);
             _d3d_pso_desc.DepthStencilState = D3DConvertUtils::ConvertToD3D12DepthStencilDesc(_state_desc._depth_stencil_state);
@@ -89,6 +91,7 @@ namespace Ailu
 
     void D3DGraphicsPipelineState::Bind(CommandBuffer *cmd)
     {
+        _state.Track();
         if (!_b_build)
         {
             LOG_ERROR("PipelineState must be build before it been bind!");
@@ -155,7 +158,6 @@ namespace Ailu
             case Ailu::EBindResDescType::kConstBuffer:
             {
                 static_cast<IConstantBuffer *>(res)->Bind(cmd, bind_slot);
-                return;
             }
             break;
             case Ailu::EBindResDescType::kConstBufferRaw:
@@ -163,12 +165,18 @@ namespace Ailu
                 UploadBuffer::Allocation alloc = *static_cast<UploadBuffer::Allocation *>(res);
                 //D3D12_GPU_VIRTUAL_ADDRESS address = *static_cast<D3D12_GPU_VIRTUAL_ADDRESS *>(res);
                 static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, alloc.GPU);
-                return;
+            }
+            break;
+            case EBindResDescType::kBuffer:
+            case EBindResDescType::kRWBuffer:
+            {
+                reinterpret_cast<IGPUBuffer *>(res)->Bind(cmd,slot);
             }
             break;
             case Ailu::EBindResDescType::kTexture2D:
             {
-                reinterpret_cast<Texture *>(res)->Bind(cmd, Texture::kMainSRVIndex, slot);
+                Texture2D* tex = reinterpret_cast<Texture2D *>(res);
+                tex->Bind(cmd, Texture::kMainSRVIndex, slot,D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, false);
             }
             break;
             case Ailu::EBindResDescType::kSampler:

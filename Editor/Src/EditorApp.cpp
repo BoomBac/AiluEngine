@@ -6,10 +6,10 @@
 
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Objects/Type.h"
 #include "Render/Camera.h"
 #include "Render/CommonRenderPipeline.h"
 #include "Render/Renderer.h"
-#include "Objects/Type.h"
 
 using namespace Ailu;
 
@@ -17,6 +17,24 @@ namespace Ailu
 {
     namespace Editor
     {
+        namespace fs = std::filesystem;
+
+        //填充监听路径下的所有文件
+        static void TraverseDirectory(const fs::path &directoryPath, std::set<fs::path> &path_set)
+        {
+            for (const auto &entry: fs::directory_iterator(directoryPath))
+            {
+                if (fs::is_directory(entry.status()))
+                {
+                    TraverseDirectory(entry.path(), path_set);
+                }
+                else if (fs::is_regular_file(entry.status()))
+                {
+                    path_set.insert(entry.path());
+                }
+            }
+        }
+
         CommandManager *g_pCommandMgr = new CommandManager;
         int EditorApp::Initialize()
         {
@@ -51,9 +69,6 @@ namespace Ailu
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;
             _is_simulate_mode = false;
-            Object a("hello");
-            auto t = Object::StaticType();
-            LOG_INFO("Reflection: {}", t->Name());
             return ret;
         }
         void EditorApp::Finalize()
@@ -84,7 +99,7 @@ namespace Ailu
         bool EditorApp::OnGetFocus(WindowFocusEvent &e)
         {
             Application::OnGetFocus(e);
-            g_pResourceMgr->WatchDirectory();
+            WatchDirectory();
             return true;
         }
         bool EditorApp::OnLostFocus(WindowLostFocusEvent &e)
@@ -193,6 +208,107 @@ namespace Ailu
             g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
             mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane");
             Material::s_checker = g_pResourceMgr->Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
+            WatchDirectory();
+        }
+
+        static void ReloadShader(const fs::path &file, u16 &update_shader_count, u16 &update_compute_count)
+        {
+            const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+            for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
+            {
+                auto shader = ResourceMgr::IterToRefPtr<Shader>(it);
+                if (shader)
+                {
+                    bool match_file = false;
+                    for (u32 i = 0; i < shader->PassCount(); i++)
+                    {
+                        if (match_file)
+                            break;
+                        const auto &pass = shader->GetPassInfo(i);
+                        for (auto &head_file: pass._source_files)
+                        {
+                            if (head_file == cur_path)
+                            {
+                                match_file = true;
+                                g_pResourceMgr->SubmitTaskSync([=]()
+                                                               {
+                                                                       
+                                    if (shader->PreProcessShader())
+                                    {
+                                        for (auto &mat: shader->GetAllReferencedMaterials())
+                                        {
+                                            mat->ConstructKeywords(shader.get());
+                                            bool is_all_succeed = true;
+                                            for (u16 i = 0; i < shader->PassCount(); i++)
+                                            {
+                                                is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
+                                            }
+                                            if (is_all_succeed)
+                                            {
+                                                mat->ChangeShader(shader.get());
+                                            }
+                                        }
+                                    } });
+                                ++update_shader_count;
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (auto it = g_pResourceMgr->ResourceBegin<ComputeShader>(); it != g_pResourceMgr->ResourceEnd<ComputeShader>(); it++)
+            {
+                auto cs = ResourceMgr::IterToRefPtr<ComputeShader>(it);
+                if (cs->IsDependencyFile(cur_path))
+                {
+                    g_pResourceMgr->SubmitTaskSync([=]()
+                                                   {
+                        ComputeShader *shader = cs.get();
+                        shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
+                        shader->Compile(); });
+                    ++update_compute_count;
+                }
+            }
+        }
+        void EditorApp::WatchDirectory()
+        {
+            namespace fs = std::filesystem;
+            fs::path dir(ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW);
+            u16 update_shader_count = 0u, update_compute_count = 0u;
+            static bool is_first_execute = true;
+            static std::set<fs::path> path_set{};
+            static std::unordered_map<fs::path, fs::file_time_type> s_cache_files_time;
+            std::unordered_map<fs::path, fs::file_time_type> cur_files_time;
+            TraverseDirectory(dir, path_set);
+            if (is_first_execute)
+            {
+                for (auto &cur_path: path_set)
+                    s_cache_files_time[cur_path] = fs::last_write_time(cur_path);
+                is_first_execute = false;
+            }
+            for (auto &cur_path: path_set)
+            {
+                if (!s_cache_files_time.contains(cur_path))
+                    s_cache_files_time[cur_path] = fs::last_write_time(cur_path);
+                cur_files_time[cur_path] = fs::last_write_time(cur_path);
+            }
+            for (const auto &[file, last_write_time]: s_cache_files_time)
+            {
+                if (cur_files_time.contains(file))
+                {
+                    if (cur_files_time[file] != last_write_time)
+                    {
+                        ReloadShader(file, update_shader_count, update_compute_count);
+                        s_cache_files_time[file] = cur_files_time[file];
+                    }
+                }
+                //else if (!is_first_execute)
+                //    reload_shader(file);
+            }
+            if (update_shader_count + update_compute_count > 0)
+            {
+                LOG_INFO("Reload {} compute shader, {} shader", update_shader_count, update_compute_count);
+            }
         }
     }// namespace Editor
 }// namespace Ailu

@@ -1176,6 +1176,11 @@ namespace Ailu
                 it->Name(file_name);
                 AnimationClipLibrary::AddClip(std::format("{}_raw", it->Name()), it);
             }
+			if (!_import_setting._import_flag & MeshImportSetting::kImportFlagMesh)
+			{
+				_loaded_materials.clear();
+				_loaded_meshes.clear();
+			}
             _fbx_poses.Clear();
             _fbx_cameras.Clear();
             _fbx_anim_stack_names.Clear();

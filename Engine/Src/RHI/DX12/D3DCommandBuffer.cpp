@@ -51,8 +51,8 @@ namespace Ailu
     {
         auto crt = static_cast<D3DRenderTexture *>(color);
         auto drt = static_cast<D3DRenderTexture *>(depth);
-        g_pGfxContext->TrackResource(color);
-        g_pGfxContext->TrackResource(depth);
+        color->GetState().Track();
+        depth->GetState().Track();
         _p_cmd->ClearRenderTargetView(*crt->TargetCPUHandle(this), clear_color, 0, nullptr);
         _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clear_depth, 0, 0, nullptr);
     }
@@ -63,30 +63,30 @@ namespace Ailu
             if (color == nullptr)
                 break;
             auto crt = static_cast<D3DRenderTexture *>(color);
-            g_pGfxContext->TrackResource(color);
+            color->GetState().Track();
             _p_cmd->ClearRenderTargetView(*crt->TargetCPUHandle(this), clear_color, 0, nullptr);
         }
         auto drt = static_cast<D3DRenderTexture *>(depth);
-        g_pGfxContext->TrackResource(depth);
+        depth->GetState().Track();
         _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clear_depth, 0, 0, nullptr);
     }
     void D3DCommandBuffer::ClearRenderTarget(RenderTexture *color, Vector4f clear_color, u16 index)
     {
         auto crt = static_cast<D3DRenderTexture *>(color);
-        g_pGfxContext->TrackResource(color);
+        color->GetState().Track();
         _p_cmd->ClearRenderTargetView(*crt->TargetCPUHandle(this, index), clear_color, 0, nullptr);
     }
     void D3DCommandBuffer::ClearRenderTarget(RenderTexture *depth, float depth_value, u8 stencil_value)
     {
         auto drt = static_cast<D3DRenderTexture *>(depth);
-        g_pGfxContext->TrackResource(depth);
+        depth->GetState().Track();
         _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, stencil_value, 0, nullptr);
     }
 
     void D3DCommandBuffer::ClearRenderTarget(RenderTexture *depth, u16 index, float depth_value)
     {
         auto drt = static_cast<D3DRenderTexture *>(depth);
-        g_pGfxContext->TrackResource(depth);
+        depth->GetState().Track();
         _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this, index), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, 0, 0, nullptr);
     }
 
@@ -100,23 +100,10 @@ namespace Ailu
             ib->Bind(this);
             cb_per_draw->Bind(this, 0);
             ++RenderingStates::s_draw_call;
+            RenderingStates::s_vertex_num += vb->GetVertexCount();
+            RenderingStates::s_triangle_num += ib->GetCount() / 3;
             _p_cmd->DrawIndexedInstanced(ib->GetCount(), 1, 0, 0, 0);
         }
-    }
-    void D3DCommandBuffer::DrawIndexedInstanced(u32 index_count, u32 instance_count)
-    {
-        ++RenderingStates::s_draw_call;
-        _p_cmd->DrawIndexedInstanced(index_count, instance_count, 0, 0, 0);
-    }
-    void D3DCommandBuffer::DrawInstanced(const std::shared_ptr<IVertexBuffer> &vertex_buf, const Matrix4x4f &transform, u32 instance_count)
-    {
-        ++RenderingStates::s_draw_call;
-        _p_cmd->DrawInstanced(vertex_buf->GetVertexCount(), instance_count, 0, 0);
-    }
-    void D3DCommandBuffer::DrawInstanced(u32 vert_count, u32 instance_count)
-    {
-        ++RenderingStates::s_draw_call;
-        _p_cmd->DrawInstanced(vert_count, instance_count, 0, 0);
     }
 
     void D3DCommandBuffer::SetViewports(const std::initializer_list<Rect> &viewports)
@@ -212,7 +199,10 @@ namespace Ailu
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
             _p_cmd->SetGraphicsRootConstantBufferView(0, alloc.GPU);
             ++RenderingStates::s_draw_call;
-            _p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
+            RenderingStates::s_vertex_num += mesh->GetVertexBuffer()->GetVertexCount();
+            u64 idx_num = mesh->GetIndicesCount(submesh_index);
+            RenderingStates::s_triangle_num += idx_num / 3;
+            _p_cmd->DrawIndexedInstanced(idx_num, instance_count, 0, 0, 0);
         }
         else
         {
@@ -236,7 +226,10 @@ namespace Ailu
     {
         GraphicsPipelineStateMgr::SubmitBindResource(buffer, EBindResDescType::kConstBuffer, name, PipelineResourceInfo::kPriporityCmd);
     }
-
+    void D3DCommandBuffer::SetGlobalBuffer(const String &name, IGPUBuffer *buffer)
+    {
+        GraphicsPipelineStateMgr::SubmitBindResource(buffer, buffer->IsRandomAccess()? EBindResDescType::kRWBuffer : EBindResDescType::kBuffer, name, PipelineResourceInfo::kPriporityCmd);
+    }
 
     void D3DCommandBuffer::SetGlobalTexture(const String &name, Texture *tex)
     {
@@ -254,7 +247,10 @@ namespace Ailu
         auto d3dcmd = static_cast<D3DCommandBuffer *>(this)->GetCmdList();
         if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
         {
-            DrawIndexedInstanced(3, 1);
+            ++RenderingStates::s_draw_call;
+            ++RenderingStates::s_triangle_num;
+            RenderingStates::s_vertex_num += 3;
+            _p_cmd->DrawIndexedInstanced(3,1,0,0,0);
         }
     }
     void D3DCommandBuffer::SetScissorRect(const Rect &rect)
@@ -287,11 +283,15 @@ namespace Ailu
         GraphicsPipelineStateMgr::EndConfigurePSO(this);
         if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
         {
-            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+            IVertexBuffer* vb = mesh->GetVertexBuffer().get();
+            vb->Bind(this, material->GetShader()->PipelineInputLayout());
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
             per_obj_cbuf->Bind(this, 0);
             ++RenderingStates::s_draw_call;
-            _p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
+            RenderingStates::s_vertex_num += vb->GetVertexCount();
+            u64 idx_count = mesh->GetIndicesCount(submesh_index);
+            RenderingStates::s_triangle_num += idx_count / 3;
+            _p_cmd->DrawIndexedInstanced(idx_count, instance_count, 0, 0, 0);
         }
         else
         {
@@ -312,11 +312,15 @@ namespace Ailu
         GraphicsPipelineStateMgr::EndConfigurePSO(this);
         if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
         {
-            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout(pass_index));
+            IVertexBuffer* vb = mesh->GetVertexBuffer().get();
+            vb->Bind(this, material->GetShader()->PipelineInputLayout(pass_index));
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
             per_obj_cbuf->Bind(this, 0);
             ++RenderingStates::s_draw_call;
-            _p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
+            RenderingStates::s_vertex_num += vb->GetVertexCount();
+            u64 idx_count = mesh->GetIndicesCount(submesh_index);
+            RenderingStates::s_triangle_num += idx_count / 3;
+            _p_cmd->DrawIndexedInstanced(idx_count, instance_count, 0, 0, 0);
         }
         else
         {
@@ -346,16 +350,14 @@ namespace Ailu
         GraphicsPipelineStateMgr::EndConfigurePSO(this);
         if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
         {
-            //AL_ASSERT(s_global_buffer_offset + _buffer_offset < 20);
-            //IConstantBuffer *buf = s_obj_buffers[s_global_buffer_offset + _buffer_offset].get();
-            //s_global_buffer_offset++;
-            //_buffer_offset++;
-            //memcpy(buf->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
-            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout(pass_index));
+            IVertexBuffer* vb = mesh->GetVertexBuffer().get();
+            vb->Bind(this, material->GetShader()->PipelineInputLayout(pass_index));
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
-            //buf->Bind(this, 0);
             ++RenderingStates::s_draw_call;
-            _p_cmd->DrawIndexedInstanced(mesh->GetIndicesCount(submesh_index), instance_count, 0, 0, 0);
+            RenderingStates::s_vertex_num += vb->GetVertexCount();
+            u64 idx_count = mesh->GetIndicesCount(submesh_index);
+            RenderingStates::s_triangle_num += idx_count / 3;
+            _p_cmd->DrawIndexedInstanced(idx_count, instance_count, 0, 0, 0);
         }
         else
         {
@@ -379,10 +381,14 @@ namespace Ailu
         GraphicsPipelineStateMgr::EndConfigurePSO(this);
         if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
         {
-            mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
+            IVertexBuffer* vb = mesh->GetVertexBuffer().get();
+            vb->Bind(this, material->GetShader()->PipelineInputLayout());
             mesh->GetIndexBuffer()->Bind(this);
             ++RenderingStates::s_draw_call;
-            _p_cmd->DrawIndexedInstanced(mesh->GetIndexBuffer()->GetCount(), instance_count, 0, 0, 0);
+            RenderingStates::s_vertex_num += vb->GetVertexCount();
+            u64 idx_count = mesh->GetIndicesCount();
+            RenderingStates::s_triangle_num += idx_count / 3;
+            _p_cmd->DrawIndexedInstanced(idx_count, instance_count, 0, 0, 0);
         }
         else
         {
@@ -413,10 +419,10 @@ namespace Ailu
             auto crt = static_cast<D3DRenderTexture *>(colors[i]);
             GraphicsPipelineStateMgr::SetRenderTargetState(colors[i]->PixelFormat(), depth->PixelFormat(), i);
             handles[i] = *crt->TargetCPUHandle(this);
-            g_pGfxContext->TrackResource(colors[i]);
+            colors[i]->GetState().Track();
             ++rt_num;
         }
-        g_pGfxContext->TrackResource(depth);
+        depth->GetState().Track();
         _p_cmd->OMSetRenderTargets(rt_num, handles, false, drt->TargetCPUHandle());
     }
 
@@ -430,7 +436,7 @@ namespace Ailu
         }
         _is_custom_viewport = false;
         auto crt = static_cast<D3DRenderTexture *>(color);
-        g_pGfxContext->TrackResource(color);
+        color->GetState().Track();
         GraphicsPipelineStateMgr::ResetRenderTargetState();
         GraphicsPipelineStateMgr::SetRenderTargetState(color->PixelFormat(), EALGFormat::EALGFormat::kALGFormatUnknown, 0);
         _p_cmd->OMSetRenderTargets(1, crt->TargetCPUHandle(this, index), 0,
@@ -452,8 +458,8 @@ namespace Ailu
         {
             auto crt = static_cast<D3DRenderTexture *>(color);
             auto drt = static_cast<D3DRenderTexture *>(depth);
-            g_pGfxContext->TrackResource(color);
-            g_pGfxContext->TrackResource(depth);
+            color->GetState().Track();
+            depth->GetState().Track();
             GraphicsPipelineStateMgr::SetRenderTargetState(color->PixelFormat(), depth->PixelFormat(), 0);
             _p_cmd->OMSetRenderTargets(1, crt->TargetCPUHandle(this, color_index), 0, drt->TargetCPUHandle(this, depth_index));
         }
@@ -463,7 +469,7 @@ namespace Ailu
             {
                 GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUnknown, depth->PixelFormat(), 0);
                 auto drt = static_cast<D3DRenderTexture *>(depth);
-                g_pGfxContext->TrackResource(depth);
+                depth->GetState().Track();
                 _p_cmd->OMSetRenderTargets(0, nullptr, 0, drt->TargetCPUHandle(this, depth_index));
             }
         }
@@ -540,8 +546,8 @@ namespace Ailu
         {
             auto crt = static_cast<D3DRenderTexture *>(color);
             auto drt = static_cast<D3DRenderTexture *>(depth);
-            g_pGfxContext->TrackResource(color);
-            g_pGfxContext->TrackResource(depth);
+            color->GetState().Track();
+            depth->GetState().Track();
             GraphicsPipelineStateMgr::SetRenderTargetState(color->PixelFormat(), depth->PixelFormat(), 0);
             _p_cmd->OMSetRenderTargets(1, crt->TargetCPUHandle(this), 0, drt->TargetCPUHandle(this));
         }
@@ -551,7 +557,7 @@ namespace Ailu
             {
                 GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUnknown, depth->PixelFormat(), 0);
                 auto drt = static_cast<D3DRenderTexture *>(depth);
-                g_pGfxContext->TrackResource(depth);
+                depth->GetState().Track();
                 _p_cmd->OMSetRenderTargets(0, nullptr, 0, drt->TargetCPUHandle(this));
             }
         }
@@ -561,10 +567,21 @@ namespace Ailu
     {
         for (auto it: cs->AllBindTexture())
         {
-            g_pGfxContext->TrackResource(it);
+            it->GetState().Track();
         }
         cs->ClearBindTexture();
+        thread_group_x = std::max<u16>(1u, thread_group_x);
+        thread_group_y = std::max<u16>(1u, thread_group_y);
+        thread_group_z = std::max<u16>(1u, thread_group_z);
         cs->Bind(this, kernel, thread_group_x, thread_group_y, thread_group_z);
+        for(auto& cb : _cs_cbuf)
+        {
+            u16 slot = cs->NameToSlot(cb._name,cb._kernel);
+            if (slot != UINT16_MAX)
+                _p_cmd->SetComputeRootConstantBufferView(slot,cb._ptr);
+        }
+        _cs_cbuf.clear();
+        _p_cmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
     }
     void D3DCommandBuffer::DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index, u16 instance_count)
     {
@@ -577,7 +594,16 @@ namespace Ailu
             if (cb_per_draw)
                 cb_per_draw->Bind(this, 0);
             ++RenderingStates::s_draw_call;
-            _p_cmd->DrawInstanced(shader->GetTopology() == ETopology::kTriangleStrip ? vb->GetVertexCount() * 4 : vb->GetVertexCount(), instance_count, 0, 0);
+            u64 vert_num = shader->GetTopology() == ETopology::kTriangleStrip ? vb->GetVertexCount() * 4 : vb->GetVertexCount();
+            RenderingStates::s_vertex_num += vert_num;
+            RenderingStates::s_triangle_num += vert_num / 3;
+            _p_cmd->DrawInstanced(vert_num, instance_count, 0, 0);
         }
+    }
+    void D3DCommandBuffer::SetComputeBuffer(const String &name, u16 kernel,void *data, u64 data_size)
+    {
+        _allocations.emplace_back(_upload_buf->Allocate(data_size, 256));
+        _allocations.back().SetData(data, data_size);
+        _cs_cbuf.emplace_back(name, kernel, _allocations.back().GPU);
     }
 }// namespace Ailu

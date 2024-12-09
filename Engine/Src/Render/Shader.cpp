@@ -42,6 +42,67 @@ namespace Ailu
         return lines;
     }
 
+    void ShaderVariantMgr::BuildIndex(Vector<std::set<String>> all_keywords)
+    {
+        _keyword_group_ids.clear();
+        u16 global_index = 0;
+        for (u16 i = 0; i < all_keywords.size(); ++i)
+        {
+            u16 inner_group_id = 0u;
+            for (auto &kw: all_keywords[i])
+            {
+                if (kw.empty() || kw == "_")
+                    continue;
+                _keyword_group_ids[kw] = KeywordInfo{i, inner_group_id++, global_index++};
+            }
+        }
+    }
+    ShaderVariantHash ShaderVariantMgr::GetVariantHash(const std::set<String> &keywords) const
+    {
+        std::set<String> active_kw_seq;
+        return GetVariantHash(keywords, active_kw_seq);
+    }
+    ShaderVariantHash ShaderVariantMgr::GetVariantHash(const std::set<String> &keywords, std::set<String> &active_kw_seq) const
+    {
+        ShaderVariantBits bits(_keyword_group_ids.size() / kBitNumPerGroup + 1);
+        std::set<u16> group_actived{};
+        for (auto &kw: keywords)
+        {
+            if (auto it = _keyword_group_ids.find(kw); it != _keyword_group_ids.end())
+            {
+                auto &info = it->second;
+                if (!group_actived.contains(info._group_id))
+                {
+                    u16 bit_group_id = info._global_id / kBitNumPerGroup;
+                    bits[bit_group_id] |= static_cast<unsigned long long>(1) << (info._global_id % kBitNumPerGroup);
+                    active_kw_seq.insert(it->first);
+                    group_actived.insert(info._group_id);
+                }
+            }
+        }
+        ShaderVariantHash hash = 0u;
+        for (u64 mask: bits)
+        {
+            hash ^= mask == 0 ? 0 : std::hash<u64>()(mask);
+        }
+        //取高37位的值作为hash，详情见u64 Shader::ConstructHash
+        return hash >> 27;
+    }
+    std::set<String> ShaderVariantMgr::KeywordsSameGroup(const String &kw) const
+    {
+        std::set<String> res{};
+        if (auto it = _keyword_group_ids.find(kw); it != _keyword_group_ids.end())
+        {
+            u16 group_id = it->second._group_id;
+            for (auto &it: _keyword_group_ids)
+            {
+                if (it.second._group_id == group_id)
+                    res.insert(it.first);
+            }
+        }
+        return res;
+    }
+    //------------------------------------------------------------------ShaderVariantMgr--------------------------------------------------------------------------------
     std::vector<std::vector<std::string>> ExtractPassBlocks(const std::list<std::string> &lines)
     {
         std::vector<std::vector<std::string>> passBlocks;
@@ -129,7 +190,9 @@ namespace Ailu
         {
             p._vert_src_file = _src_file_path;
             p._pixel_src_file = _src_file_path;
+            p._geom_src_file = _src_file_path;
         }
+        s_all_shaders.insert(this);
     }
 
     void Shader::Bind(u16 pass_index, ShaderVariantHash variant_hash)
@@ -185,6 +248,8 @@ namespace Ailu
             pass._vert_src_file = _src_file_path;
         if (pass._pixel_src_file.empty())
             pass._pixel_src_file = _src_file_path;
+        if (pass._geom_src_file.empty())
+            pass._geom_src_file = _src_file_path;
         if (RHICompileImpl(pass_id, variant_hash))
         {
             pass._variants[variant_hash]._pipeline_input_layout.Hash(PipelineStateHash<VertexInputLayout>::GenHash(pass._variants[variant_hash]._pipeline_input_layout));
@@ -250,6 +315,56 @@ namespace Ailu
             s_global_matrix_bind_info[name] = std::make_tuple(matrix, num);
     }
 
+
+    void Shader::EnableGlobalKeyword(const String &keyword)
+    {
+        for (auto s: s_all_shaders)
+        {
+            if (s)
+            {
+                bool vaild_kw = false;
+                for (auto &pass: s->_passes)
+                {
+                    if (ShaderPass::IsPassKeyword(pass, keyword))
+                    {
+                        vaild_kw = true;
+                        break;
+                    }
+                }
+                if (vaild_kw)
+                {
+                    for (auto mat: s->_reference_mats)
+                    {
+                        if (mat)
+                            mat->EnableKeyword(keyword);
+                    }
+                }
+            }
+        }
+    }
+    void Shader::DisableGlobalKeyword(const String &keyword)
+    {
+        for (auto s: s_all_shaders)
+        {
+            if (s)
+            {
+                bool vaild_kw = false;
+                for (auto &pass: s->_passes)
+                {
+                    if (ShaderPass::IsPassKeyword(pass, keyword))
+                    {
+                        vaild_kw = true;
+                        break;
+                    }
+                }
+                for (auto mat: s->_reference_mats)
+                {
+                    if (mat)
+                        mat->DisableKeyword(keyword);
+                }
+            }
+        }
+    }
     void Shader::SetGlobalBuffer(const String &name, IConstantBuffer *buffer)
     {
         if (!s_global_buffer_bind_info.contains(name))
@@ -292,21 +407,22 @@ namespace Ailu
     ShaderVariantHash Shader::ConstructVariantHash(u16 pass_index, const std::set<String> &kw_seq, std::set<String> &active_kw_seq) const
     {
         AL_ASSERT(pass_index < _passes.size());
+        return _passes[pass_index]._variant_mgr.GetVariantHash(kw_seq, active_kw_seq);
         //ShaderVariantHash hash{ 0 };
-        Math::ALHash::Hash<32> hash;
-        auto &kw_index_info = _passes[pass_index]._keywords_ids;
-        for (auto &kw: kw_seq)
-        {
-            auto it = kw_index_info.find(kw);
-            if (it != kw_index_info.end())
-            {
-                auto &[group_id, inner_id] = it->second;
-                hash.Set(group_id * 3, 3, inner_id);
-                active_kw_seq.insert(it->first);
-            }
-        }
-        ShaderVariantHash hash_value = hash.Get(0, 32);
-        return hash_value;
+        // Math::ALHash::Hash<32> hash;
+        // auto &kw_index_info = _passes[pass_index]._keywords_ids;
+        //for (auto &kw: kw_seq)
+        //{
+        //    auto it = kw_index_info.find(kw);
+        //    if (it != kw_index_info.end())
+        //    {
+        //        auto &[group_id, inner_id] = it->second;
+        //        hash.Set(group_id * 3, 3, inner_id);
+        //        active_kw_seq.insert(it->first);
+        //    }
+        //}
+        //ShaderVariantHash hash_value = hash.Get(0, 32);
+        //return hash_value;
     }
 
     bool Shader::IsKeywordValid(u16 pass_index, const String &kw) const
@@ -317,13 +433,8 @@ namespace Ailu
 
     std::set<String> Shader::KeywordsSameGroup(u16 pass_index, const String &kw) const
     {
-        auto it = _passes[pass_index]._keywords_ids.find(kw);
-        if (it != _passes[pass_index]._keywords_ids.end())
-        {
-            auto &[group_id, inner_group_id] = it->second;
-            return _passes[pass_index]._keywords[group_id];
-        }
-        return std::set<String>();
+        AL_ASSERT(pass_index < _passes.size());
+        return _passes[pass_index]._variant_mgr.KeywordsSameGroup(kw);
     }
 
     Vector<Material *> Shader::GetAllReferencedMaterials()
@@ -336,8 +447,11 @@ namespace Ailu
     }
     void Shader::SetCullMode(ECullMode mode)
     {
+        u16 pass_index = 0;
         for (auto &pass: _passes)
         {
+            if (pass_index++ > 1)//只影响前两个pass，一般为着色和阴影，特殊pass的cull由shader中指定
+                break;
             pass._pipeline_raster_state._cull_mode = mode;
             pass._pipeline_raster_state.Hash(pass._pipeline_raster_state._s_hash_obj.GenHash(pass._pipeline_raster_state));
         }
@@ -392,6 +506,8 @@ namespace Ailu
             seri_type = EShaderPropertyType::kFloat;
         else if (prop_type == "Vector")
             seri_type = EShaderPropertyType::kVector;
+        else if (prop_type == ShaderPropertyType::Texture3D)
+            seri_type = EShaderPropertyType::kTexture3D;
         else
             seri_type = EShaderPropertyType::kUndefined;
         if (!addi_info.empty())
@@ -507,6 +623,8 @@ namespace Ailu
                     {
                         cur_pass._pixel_entry = v;
                     }
+                    else if (su::Equal(k, ShaderCommand::kGSEntry, false))
+                        cur_pass._geometry_entry = v;
                     else if (su::Equal(k, ShaderCommand::kCull, false))
                     {
                         if (su::Equal(v, ShaderCommand::kCullValue.kBack, false))
@@ -537,6 +655,11 @@ namespace Ailu
                     else if (su::Equal(k, ShaderCommand::kBlend, false))
                     {
                         blend_info = v;
+                    }
+                    else if (su::Equal(k, ShaderCommand::kConservative, false))
+                    {
+                        if (su::Equal(v, ShaderCommand::kConservativeValue.kOn, false))
+                            pass_pipeline_raster_state._is_conservative = true;
                     }
                     else if (su::Equal(k, ShaderCommand::kQueue, false))
                     {
@@ -735,33 +858,12 @@ namespace Ailu
                 }
                 //construct keywords
                 Vector<Vector<String>> kw_permutation_in{};
-                u16 kw_group_id = 0u;
+                cur_pass._variant_mgr.BuildIndex(cur_pass._keywords);
                 for (auto &kw_group: cur_pass._keywords)
                 {
                     Vector<String> kw_cur_group;
-                    u16 kw_innear_group_id;
-                    if (kw_group.contains("_"))//set 会导致关键字声明顺序丢失，所以这里手动将“_”调至首位
-                    {
-                        u16 kw_innear_group_id = 1u;
-                        cur_pass._keywords_ids["_"] = std::make_tuple(kw_group_id, 0);
-                        for (auto &kw: kw_group)
-                        {
-                            if (kw != "_")
-                                cur_pass._keywords_ids[kw] = std::make_tuple(kw_group_id, kw_innear_group_id++);
-                            kw_cur_group.emplace_back(kw);
-                        }
-                    }
-                    else
-                    {
-                        kw_innear_group_id = 0u;
-                        for (auto &kw: kw_group)
-                        {
-                            cur_pass._keywords_ids[kw] = std::make_tuple(kw_group_id, kw_innear_group_id++);
-                            kw_cur_group.emplace_back(kw);
-                        }
-                    }
-
-                    ++kw_group_id;
+                    for (auto &kw: kw_group)
+                        kw_cur_group.emplace_back(kw);
                     kw_permutation_in.emplace_back(kw_cur_group);
                 }
                 if (!kw_permutation_in.empty())
@@ -769,17 +871,13 @@ namespace Ailu
                     auto all_kw_seq = Algorithm::Permutations(kw_permutation_in);
                     for (auto &kw_seq: all_kw_seq)
                     {
-                        Math::ALHash::Hash<32> kw_hash;
                         std::set<String> kw_set;
                         for (int i = 0; i < kw_seq.size(); i++)
-                        {
-                            auto &[group_id, inner_id] = cur_pass._keywords_ids[kw_seq[i]];
-                            kw_hash.Set(group_id * 3, 3, inner_id);//每个关键字组占三位，也就是每组内最多8个关键字
                             kw_set.insert(kw_seq[i]);
-                        }
+                        ShaderVariantHash kw_hash = cur_pass._variant_mgr.GetVariantHash(kw_set);
                         ShaderPass::PassVariant v;
                         v._active_keywords = kw_set;
-                        cur_pass._variants.insert(std::make_pair(kw_hash.Get(0, 32), v));
+                        cur_pass._variants.insert(std::make_pair(kw_hash, v));
                     }
                 }
                 else
@@ -866,7 +964,10 @@ namespace Ailu
             if (texture != nullptr && it != cs_ele._bind_res_infos.end())
             {
                 it->second._p_res = texture;
-                _texture_addi_bind_info[it->second._bind_slot] = std::make_pair(ECubemapFace::kUnknown, 0);
+                u16 depth_slice = -1;
+                if (texture->Dimension() == ETextureDimension::kTex3D)
+                    depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
+                _texture_addi_bind_info[it->second._bind_slot] = ViewInfo{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX};
                 _all_bind_textures.insert(texture);
             }
         }
@@ -889,7 +990,10 @@ namespace Ailu
                 if (rit != cs_ele._bind_res_infos.end())
                 {
                     rit->second._p_res = texture;
-                    _texture_addi_bind_info[rit->second._bind_slot] = std::make_pair(ECubemapFace::kUnknown, 0);
+                    u16 depth_slice = -1;
+                    if (texture->Dimension() == ETextureDimension::kTex3D)
+                        depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
+                    _texture_addi_bind_info[rit->second._bind_slot] = ViewInfo{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX};
                     _all_bind_textures.insert(texture);
                 }
             }
@@ -898,18 +1002,31 @@ namespace Ailu
 
     void ComputeShader::SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap)
     {
+        u32 sub_res = UINT32_MAX;
+        if (face == ECubemapFace::kUnknown)
+            sub_res = texture->CalculateSubResIndex(mipmap, 0);
+        else
+            sub_res = texture->CalculateSubResIndex(face, mipmap, 0);
         for (auto &cs_ele: _kernels)
         {
             auto it = cs_ele._bind_res_infos.find(name);
-            if (texture != nullptr && it != cs_ele._bind_res_infos.end())
+            if (texture && it != cs_ele._bind_res_infos.end())
             {
                 it->second._p_res = texture;
-                _texture_addi_bind_info[it->second._bind_slot] = std::make_pair(face, mipmap);
+                u16 depth_slice = -1;
+                if (texture->Dimension() == ETextureDimension::kTex3D)
+                    depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
+                _texture_addi_bind_info[it->second._bind_slot] = ViewInfo{face, mipmap, depth_slice, sub_res};
                 _all_bind_textures.insert(texture);
             }
         }
     }
 
+
+    void ComputeShader::SetTexture(const String &name, Texture *texture, u16 mipmap)
+    {
+        SetTexture(name, texture, ECubemapFace::kUnknown, mipmap);
+    }
     void ComputeShader::SetFloat(const String &name, f32 value)
     {
         for (auto &cs_ele: _kernels)
@@ -917,7 +1034,7 @@ namespace Ailu
             auto it = cs_ele._bind_res_infos.find(name);
             if (it != cs_ele._bind_res_infos.end())
             {
-                memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+                memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
             }
         }
     }
@@ -929,7 +1046,7 @@ namespace Ailu
             auto it = cs_ele._bind_res_infos.find(name);
             if (it != cs_ele._bind_res_infos.end())
             {
-                memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+                memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
             }
         }
     }
@@ -941,7 +1058,7 @@ namespace Ailu
             auto it = cs_ele._bind_res_infos.find(name);
             if (it != cs_ele._bind_res_infos.end())
             {
-                memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+                memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
             }
         }
     }
@@ -953,7 +1070,18 @@ namespace Ailu
             auto it = cs_ele._bind_res_infos.find(name);
             if (it != cs_ele._bind_res_infos.end())
             {
-                memcpy(_p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector, sizeof(Vector4f));
+                if (it->second._res_type & EBindResDescType::kCBufferInt4)
+                {
+                    Vector4Int v = Vector4Int(vector.x, vector.y, vector.z, vector.w);
+                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &v, sizeof(Vector4Int));
+                }
+                else if (it->second._res_type & EBindResDescType::kCBufferUint4)
+                {
+                    Vector4UInt v = Vector4UInt(vector.x, vector.y, vector.z, vector.w);
+                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &v, sizeof(Vector4UInt));
+                }
+                else
+                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector, sizeof(Vector4f));
             }
         }
     }
@@ -979,6 +1107,13 @@ namespace Ailu
                 it->second._p_res = buf;
             }
         }
+    }
+    void ComputeShader::GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const
+    {
+        AL_ASSERT(kernel < _kernels.size());
+        x = _kernels[kernel]._thread_num.x;
+        y = _kernels[kernel]._thread_num.y;
+        z = _kernels[kernel]._thread_num.z;
     }
 
     bool Ailu::ComputeShader::IsDependencyFile(const WString &sys_path) const
@@ -1025,12 +1160,29 @@ namespace Ailu
             if (su::BeginWith(line, "#pragma kernel"))
             {
                 auto kernel_line = su::Split(line, " ");
-                KernelElement kernel(_kernels.size(), kernel_line[2], std::set<WString>{});
+                KernelElement kernel(_kernels.size(), kernel_line[2], Vector3UInt(8, 8, 1), std::set<WString>{});
                 kernel._all_dep_file_pathes.insert(_src_file_path);
                 _kernels.emplace_back(kernel);
             }
+            //else if (su::BeginWith(line, "["))
+            //{
+            //    std::regex pattern(R"(\[numthreads\((\d+),(\d+),(\d+)\)\])");
+            //    std::smatch matches;
+            //    if (std::regex_search(line, matches, pattern))
+            //    {
+            //        _thread_num.x = std::stoi(matches[1].str());
+            //        _thread_num.y = std::stoi(matches[2].str());
+            //        _thread_num.z = std::stoi(matches[3].str());
+            //    }
+            //    else
+            //        LOG_ERROR(L"ComputeShader {} preprocess: invalid numthreads format!", _src_file_path);
+            //}
         }
         AL_ASSERT(!_kernels.empty());
+    }
+    u16 ComputeShader::NameToSlot(const String &name, u16 kernel) const
+    {
+        return UINT16_MAX;
     }
     //---------------------------------------------------------------------ComputeShader-------------------------------------------------------------------
 }// namespace Ailu

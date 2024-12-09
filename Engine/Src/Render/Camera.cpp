@@ -93,12 +93,11 @@ namespace Ailu
         vf._planes[5]._distance = -DotProduct(vf._planes[5]._normal, cam->_far_bottom_right);
     }
 
-    AABB Camera::GetShadowCascadeAABB(const Camera &eye_cam, f32 start, f32 end)
+    AABB Camera::GetBoundingAABB(const Camera &eye_cam, f32 start, f32 end)
     {
-        if (end < 0.0f)
-            end = QuailtySetting::s_main_light_shaodw_distance;
+        end = end <= 0.0f? 1.0f : end;
         f32 end_len = end / eye_cam.Far(), start_len = start / eye_cam.Far();
-        end_len = std::min<f32>(end_len, 1.0);
+        //end_len = std::min<f32>(end_len, 1.0);
         start_len = std::clamp(start_len, 0.0f, end_len);
         Vector3f vf_dir[4];
         vf_dir[0] = eye_cam._far_bottom_left - eye_cam._position;
@@ -333,7 +332,6 @@ namespace Ailu
         ar << ar.GetIndent() << "_fovh:"   << c.FovH() << std::endl;
         ar << ar.GetIndent() << "_size:"   << c.Size() << std::endl;
         ar.DecreaseIndent();
-        ar.NewLine();
         return ar;
     }
     Archive &operator>>(Archive &ar, Camera &c)
@@ -353,5 +351,17 @@ namespace Ailu
         ar >> buf;
         c._size = std::stof(su::Split(buf, ":")[1]);
         return ar;
+    }
+    void Camera::SetPixelSize(u16 w, u16 h)
+    {
+        _pixel_width = w;
+        _pixel_height = h;
+        f32 new_aspect = (f32)w / (f32)h;
+        if (new_aspect != _aspect)
+        {
+            _aspect = new_aspect;
+            MarkDirty();
+            RecalculateMarix();
+        }
     }
 }// namespace Ailu

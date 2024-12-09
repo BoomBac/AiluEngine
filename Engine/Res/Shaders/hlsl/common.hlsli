@@ -14,6 +14,7 @@ SamplerState g_AnisotropicClampSampler : register(s7);
 
 
 #define TEXTURE2D(name) Texture2D name;
+#define TEXTURE3D(name) Texture3D name;
 //#define TEXTURE2D(name,slot) Texture2D name : register(t##slot);
 #define TEXTURECUBE(name) TextureCube name;
 //#define TEXTURECUBE(name,slot) TextureCube name : register(t##slot);

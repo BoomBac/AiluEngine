@@ -65,7 +65,7 @@ namespace Ailu
 	{
 	}
 	RasterizerState::RasterizerState(ECullMode cullMode, EFillMode fillMode, bool cw)
-		: _cull_mode(cullMode), _fill_mode(fillMode), _b_cw(cw)
+        : _cull_mode(cullMode), _fill_mode(fillMode), _b_cw(cw), _is_conservative(false)
 	{
 		_hash = _s_hash_obj.GenHash(*this);
 	}

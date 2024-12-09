@@ -1,4 +1,5 @@
 #include "Render/RenderPipeline.h"
+#include "Framework/Common/Application.h"
 #include "Framework/Common/Profiler.h"
 #include "Render/CommandBuffer.h"
 #include "pch.h"
@@ -27,10 +28,14 @@ namespace Ailu
         _targets.clear();
         _cameras.clear();
         _cameras.emplace_back(Camera::sCurrent);
-        for (auto &cam: g_pSceneMgr->ActiveScene()->GetRegister().View<CCamera>())
-        {
-            _cameras.push_back(&cam._camera);
-        }
+        //for (auto &cam: g_pSceneMgr->ActiveScene()->GetRegister().View<CCamera>())
+        //{
+        //    if (cam._camera._is_enable)
+        //        _cameras.push_back(&cam._camera);
+        //}
+        _cur_frame_res = &_frame_res[Application::s_frame_count % _frame_res.size()];
+        for (auto &r: _renderers)
+            r->SetCurFrameResource(_cur_frame_res);
     }
     void RenderPipeline::Render()
     {
@@ -39,7 +44,7 @@ namespace Ailu
         {
             cam->SetRenderer(_renderers[0].get());
 #ifdef _PIX_DEBUG
-            PIXBeginEvent(cam->HashCode(),L"DeferedRenderer");
+            PIXBeginEvent(cam->HashCode(), L"DeferedRenderer");
             RenderSingleCamera(*cam, *_renderers[0].get());
             PIXEndEvent();
 #else

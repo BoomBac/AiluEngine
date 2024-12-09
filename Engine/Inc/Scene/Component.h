@@ -3,6 +3,8 @@
 #define __COMPONENT_H__
 #include "GlobalMarco.h"
 
+#include "Animation/BlendSpace.h"
+#include "Animation/Clip.h"
 #include "Entity.hpp"
 #include "Framework/Math/Transform.h"
 #include "Objects/Serialize.h"
@@ -10,8 +12,6 @@
 #include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/Pass/RenderPass.h"
-#include "Animation/Clip.h"
-#include "Animation/BlendSpace.h"
 
 namespace Ailu
 {
@@ -55,7 +55,7 @@ namespace Ailu
     Archive &operator<<(Archive &ar, const ShadowData &c);
     Archive &operator>>(Archive &ar, ShadowData &c);
 
-    DECLARE_ENUM(ELightType, kDirectional, kPoint, kSpot,kArea)
+    DECLARE_ENUM(ELightType, kDirectional, kPoint, kSpot, kArea)
     struct AILU_API LightComponent
     {
         DECLARE_CLASS(LightComponent)
@@ -150,30 +150,50 @@ namespace Ailu
     Archive &operator<<(Archive &ar, const CRigidBody &c);
     Archive &operator>>(Archive &ar, CRigidBody &c);
 
-    DECLARE_ENUM(EColliderType,kBox,kSphere,kCapsule)
+    DECLARE_ENUM(EColliderType, kBox, kSphere, kCapsule)
     struct CCollider
     {
         DECLARE_CLASS(CCollider)
         EColliderType::EColliderType _type = EColliderType::kBox;
-        bool                     _is_trigger = true;
-        Vector3f                 _center = Vector3f::kZero;
+        bool _is_trigger = true;
+        Vector3f _center = Vector3f::kZero;
         /*
         kBox : size
         kSphere : radius,0,0
         kCapsule: radius,height,direction(x-axis,y-axis,z-axis)
         */
-        Vector3f _param = Vector3f{1.0f,1.0f,0.f};
-        static Sphere AsShpere(const CCollider& c);
+        Vector3f _param = Vector3f{1.0f, 1.0f, 0.f};
+        static Sphere AsShpere(const CCollider &c);
         static OBB AsBox(const CCollider &c);
         static Capsule AsCapsule(const CCollider &c);
     };
     Archive &operator<<(Archive &ar, const CCollider &c);
     Archive &operator>>(Archive &ar, CCollider &c);
 
+    struct CVXGI
+    {
+        DECLARE_CLASS(CVXGI)
+        Vector3Int _grid_num = Vector3Int(64, 64, 64);
+        f32 _distance = 20.0f;
+        //runtime prop
+        Vector3f _grid_size = Vector3f{32.f, 32.f, 32.f};
+        Vector3f _center = Vector3f::kZero;
+        Vector3f _size = Vector3f::kOne;
+        bool _is_draw_grid = false;
+        bool _is_draw_voxel = false;
+        u16 _mipmap = 0u;
+        //texture space
+        f32 _max_distance = 0.6f;
+        f32 _min_distance = 0.12f;
+        f32 _diffuse_cone_angle = 60.0f;
+    };
+    Archive &operator<<(Archive &ar, const CVXGI &c);
+    Archive &operator>>(Archive &ar, CVXGI &c);
+
     namespace DebugDrawer
     {
         void AILU_API DebugWireframe(const CCollider &c, const Transform &t, Color color = Colors::kGreen);
-
-    }
+        void AILU_API DebugWireframe(const CVXGI &c, const Transform &t, Color color = Colors::kGreen);
+    }// namespace DebugDrawer
 }// namespace Ailu
 #endif// __COMPONENT_H__

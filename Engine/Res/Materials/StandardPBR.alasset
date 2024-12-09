@@ -13,12 +13,13 @@ keywords:
     _Anisotropy: 0
     _MaterialID: 0
     _MetallicValue: 0
-    _RoughnessValue: 0
+    _RoughnessValue: 1
     _SamplerMask: 0
   prop_type: Vector
     _AlbedoValue: 1,1,1,0
     _EmissionValue: 0,0,0,-1
     _SpecularValue: 0,0,0,0
+  prop_type: IntVector
   prop_type: Texture2D
     _AlbedoTex: null
     _EmissionTex: null

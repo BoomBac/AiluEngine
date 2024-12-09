@@ -1,14 +1,14 @@
 #include "RHI/DX12/D3DContext.h"
-#include "RHI/DX12/GPUResourceManager.h"
 #include "Ext/imgui/backends/imgui_impl_dx12.h"
 #include "Framework/Common/Assert.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Profiler.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DGPUTimer.h"
+#include "RHI/DX12/GPUResourceManager.h"
 #include "RHI/DX12/dxhelper.h"
-#include "Render/FrameResource.h"
 #include "Render/Gizmo.h"
+#include "Render/GpuResource.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/RenderingData.h"
 #include "pch.h"
@@ -21,6 +21,7 @@
 
 #ifdef _PIX_DEBUG
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
+#include "Ext/renderdoc_app.h" //1.35
 #endif// _PIX_DEBUG
 
 
@@ -88,6 +89,41 @@ namespace Ailu
         }
         *ppAdapter = pAdapter4;
     }
+    
+    static RENDERDOC_API_1_1_2 *g_rdc_api = nullptr;
+    static void RdcLoadLatestRdcGpuCapturerLibrary()
+    {
+        HKEY hKey = HKEY_LOCAL_MACHINE;                                                                        // 根键
+        LPCWSTR subKey = L"SOFTWARE\\Classes\\CLSID\\{5D6BF029-A6BA-417A-8523-120492B1DCE3}\\InprocServer32\\";// 子键路径
+        //LPCWSTR valueName = L"YourValue";     // 值名称
+        wchar_t value[256];              // 存储结果
+        DWORD bufferSize = sizeof(value);// 缓冲区大小
+        // 获取值
+        LONG result = RegGetValue(
+                hKey,
+                subKey,
+                nullptr,//default name
+                RRF_RT_REG_SZ,
+                nullptr,
+                value,
+                &bufferSize);
+
+        if (result == ERROR_SUCCESS)
+        {
+            if (HMODULE mod = LoadLibrary(value))
+            {
+                pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) GetProcAddress(mod, "RENDERDOC_GetAPI");
+                int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void **) &g_rdc_api);
+                AL_ASSERT(ret == 1);
+                g_rdc_api->SetCaptureFilePathTemplate("RenderDocCapture/Capture");
+                g_rdc_api->MaskOverlayBits(RENDERDOC_OverlayBits::eRENDERDOC_Overlay_None, RENDERDOC_OverlayBits::eRENDERDOC_Overlay_None);
+            }
+            else
+                LOG_ERROR("RenderDoc Lode Error: {}", GetLastError());
+        }
+        else
+            LOG_ERROR(L"Failed to get renderdoc dll path. Error: {}", result)
+    };
 
     CPUVisibleDescriptorAllocator *g_pCPUDescriptorAllocator;
     GPUVisibleDescriptorAllocator *g_pGPUDescriptorAllocator;
@@ -97,6 +133,7 @@ namespace Ailu
         m_aspectRatio = (float) _width / (float) _height;
 #ifdef _PIX_DEBUG
         PIXLoadLatestWinPixGpuCapturerLibrary();
+        //RdcLoadLatestRdcGpuCapturerLibrary();
 #endif// _PIX_DEBUG
     }
 
@@ -202,17 +239,17 @@ namespace Ailu
         PIXBeginEvent(m_commandQueue.Get(), cmd->GetID(), ToWStr(cmd->GetName()).c_str());
 #endif// _PIX_DEBUG
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-        ++_fence_value;
-        ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value));
+        ++_fence_value[m_frameIndex];
+        ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value[m_frameIndex]));
 #ifdef _PIX_DEBUG
         PIXEndEvent(m_commandQueue.Get());
 #endif// _PIX_DEBUG
 
         if (_cmd_target_fence_value.contains(cmd->GetID()))
-            _cmd_target_fence_value[cmd->GetID()] = _fence_value;
+            _cmd_target_fence_value[cmd->GetID()] = _fence_value[m_frameIndex];
         else
-            _cmd_target_fence_value.insert(std::make_pair(cmd->GetID(), _fence_value));
-        return _fence_value;
+            _cmd_target_fence_value.insert(std::make_pair(cmd->GetID(), _fence_value[m_frameIndex]));
+        return _fence_value[m_frameIndex];
     }
 
     u64 D3DContext::ExecuteAndWaitCommandBuffer(Ref<CommandBuffer> &cmd)
@@ -483,8 +520,9 @@ namespace Ailu
         ThrowIfFailed(m_swapChain->Present(1, 0));
         {
             CPUProfileBlock p("WaitForGPU");
-            WaitForGpu();
-            m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+            MoveToNextFrame();
+            //WaitForGpu();
+            //m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
         }
         if (_is_cur_frame_capturing)
         {
@@ -518,7 +556,7 @@ namespace Ailu
             }
         }
         _p_gpu_timer->EndFrame();
-        CommandBufferPool::ReleaseAll();
+        //CommandBufferPool::ReleaseAll();
         if (_is_next_frame_capture)
         {
             BeginCapture();
@@ -547,9 +585,14 @@ namespace Ailu
         return _cmd_target_fence_value.at(cmd_index);
     }
 
-    u64 D3DContext::GetCurFenceValue() const
+    u64 D3DContext::GetFenceValueGPU() const
     {
         return _p_cmd_buffer_fence->GetCompletedValue();
+    }
+
+    u64 D3DContext::GetFenceValueCPU() const
+    {
+        return _fence_value[m_frameIndex];
     }
 
     bool D3DContext::IsCommandBufferReady(const u32 cmd_index)
@@ -572,18 +615,10 @@ namespace Ailu
 
     void D3DContext::TakeCapture()
     {
+        //g_rdc_api->TriggerCapture();
+        //if (!g_rdc_api->IsTargetControlConnected())
+        //    g_rdc_api->LaunchReplayUI(1, nullptr);
         _is_next_frame_capture = true;
-    }
-
-    void D3DContext::TrackResource(FrameResource *resource)
-    {
-        //该函数在cmd记录执行过程中调用，所有该资源的围栏值为当前cmd执行在执行cmd fence value+1时
-        resource->SetFenceValue(_fence_value + 1);
-    }
-
-    bool D3DContext::IsResourceReferencedByGPU(FrameResource *resource)
-    {
-        return _p_cmd_buffer_fence->GetCompletedValue() <= resource->GetFenceValue();
     }
 
     void D3DContext::ResizeSwapChain(const u32 width, const u32 height)
@@ -595,7 +630,12 @@ namespace Ailu
 
     void D3DContext::WaitForGpu()
     {
-        FlushCommandQueue(m_commandQueue.Get(), _p_cmd_buffer_fence.Get(), _fence_value);
+        FlushCommandQueue(m_commandQueue.Get(), _p_cmd_buffer_fence.Get(), _fence_value[m_frameIndex]);
+    }
+
+    void D3DContext::WaitForFence(u64 fence_value)
+    {
+        FlushCommandQueue(m_commandQueue.Get(), _p_cmd_buffer_fence.Get(), fence_value);
     }
 
     void D3DContext::FlushCommandQueue(ID3D12CommandQueue *cmd_queue, ID3D12Fence *fence, u64 &fence_value)
@@ -607,6 +647,25 @@ namespace Ailu
             ThrowIfFailed(fence->SetEventOnCompletion(fence_value, m_fenceEvent));
             WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
         }
+    }
+    void D3DContext::MoveToNextFrame()
+    {
+        // Schedule a Signal command in the queue.
+        const UINT64 currentFenceValue = _fence_value[m_frameIndex];
+        ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), currentFenceValue));
+
+        // Update the frame index.
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+        // If the next frame is not ready to be rendered yet, wait until it is ready.
+        if (_p_cmd_buffer_fence->GetCompletedValue() < _fence_value[m_frameIndex])
+        {
+            ThrowIfFailed(_p_cmd_buffer_fence->SetEventOnCompletion(_fence_value[m_frameIndex], m_fenceEvent));
+            WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
+        }
+
+        // Set the fence value for the next frame.
+        _fence_value[m_frameIndex] = currentFenceValue + 1;
     }
     void D3DContext::BeginCapture()
     {
@@ -717,6 +776,7 @@ namespace Ailu
         }
 #endif//_DIRECT_WRITE
     }
+
 #ifdef _DIRECT_WRITE
     void D3DContext::InitDirectWriteContext()
     {

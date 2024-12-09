@@ -52,7 +52,8 @@ namespace Ailu
                 auto origin_color = style.Colors[ImGuiCol_WindowBg];
                 style.Colors[ImGuiCol_WindowBg] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);// 设置窗口背景颜色为灰色
                 auto w = std::min<f32>(_size.x, _size.y);
-                ImVec2 img_size = ImVec2(w, w);
+                f32 aspect = (f32) _src->Width() / (f32) _src->Height();
+                ImVec2 img_size = ImVec2(w, w / aspect);
                 ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(_src->ColorTexture()), img_size);
                 style.Colors[ImGuiCol_WindowBg] = origin_color;
             }
@@ -208,7 +209,7 @@ namespace Ailu
 
         void SceneView::ProcessTransformGizmo()
         {
-            auto& selected_entities = Selection::SelectedEntities();
+            auto &selected_entities = Selection::SelectedEntities();
             if (_transform_gizmo_type == -1 || selected_entities.empty())
                 return;
             //snap
@@ -232,15 +233,15 @@ namespace Ailu
             bool is_pivot_point_center = true;
             bool is_single_mode = selected_entities.size() == 1;
             Vector3f pivot_point;
-            
+
             if (is_pivot_point_center)
             {
                 auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
-                for (auto e : selected_entities)
+                for (auto e: selected_entities)
                 {
                     pivot_point += r.GetComponent<TransformComponent>(e)->_transform._position;
                 }
-                pivot_point /= (f32)selected_entities.size();
+                pivot_point /= (f32) selected_entities.size();
                 Matrix4x4f world_mat = MatrixTranslation(pivot_point);
                 if (is_single_mode)
                     world_mat = r.GetComponent<TransformComponent>(selected_entities.front())->_transform._world_matrix;
@@ -267,14 +268,14 @@ namespace Ailu
                     static Vector3f s_pre_tick_new_scale = new_scale;
                     if (is_single_mode)
                     {
-                        auto& t = r.GetComponent<TransformComponent>(selected_entities.front())->_transform;
+                        auto &t = r.GetComponent<TransformComponent>(selected_entities.front())->_transform;
                         t._position = new_pos;
                         t._rotation = new_rot;
                         t._scale = new_scale;
                     }
                     else
                     {
-                        
+
                         u16 index = 0;
                         for (auto e: selected_entities)
                         {

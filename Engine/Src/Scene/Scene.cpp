@@ -1,13 +1,12 @@
-#include <regex>
 #include "Scene/Scene.h"
+#include "Animation/AnimationSystem.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Physics/PhysicsSystem.h"
 #include "Scene/RenderSystem.h"
-#include "Animation/AnimationSystem.h"
-#include "Scene/RenderSystem.h"
 #include "pch.h"
+#include <regex>
 
 namespace Ailu
 {
@@ -93,6 +92,13 @@ namespace Ailu
                 arch.NewLine();
                 arch << (*c);
             }
+            if (auto c = _register.GetComponent<CVXGI>(e); c != nullptr)
+            {
+                arch.InsertIndent();
+                arch << "_vxgi_component:";
+                arch.NewLine();
+                arch << (*c);
+            }
             arch.DecreaseIndent();
         }
     }
@@ -152,10 +158,14 @@ namespace Ailu
             else if (su::BeginWith(line, "_collider_component"))
             {
                 arch >> _register.AddComponent<CCollider>(e);
-            }            
+            }
             else if (su::BeginWith(line, "_skeleton_mesh_component"))
             {
                 arch >> _register.AddComponent<CSkeletonMesh>(e);
+            }
+            else if (su::BeginWith(line, "_vxgi_component"))
+            {
+                arch >> _register.AddComponent<CVXGI>(e);
             }
             else
             {
@@ -163,7 +173,7 @@ namespace Ailu
             };
         }
     }
-    
+
     Scene::Scene(const String &name) : Object(name)
     {
         _register.RegisterComponent<TagComponent>();
@@ -176,6 +186,7 @@ namespace Ailu
         _register.RegisterComponent<CRigidBody>();
         _register.RegisterComponent<CCollider>();
         _register.RegisterComponent<CSkeletonMesh>();
+        _register.RegisterComponent<CVXGI>();
         ECS::Signature rs_sig;
         rs_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
         rs_sig.set(_register.GetComponentTypeID<StaticMeshComponent>(), true);
@@ -279,20 +290,20 @@ namespace Ailu
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
     {
         ECS::Entity new_one = _register.Create();
-        auto& tag_comp = _register.AddComponent<TagComponent>(new_one, *_register.GetComponent<TagComponent>(e));
-        if (tag_comp._name.find_first_of("(") != tag_comp._name.npos)
+        auto &tag_comp = _register.AddComponent<TagComponent>(new_one, *_register.GetComponent<TagComponent>(e));
+        String base_name = tag_comp._name.substr(0, tag_comp._name.find_first_of('(') - 1);
+        i32 max_index = 0;
+        std::regex name_pattern(base_name + R"(\((\d+)\))");// 匹配 A(*) 的正则表达式
+        for (const auto &tag: _register.View<TagComponent>())
         {
-            std::regex re("\\((\\d+)\\)");
             std::smatch match;
-            if (std::regex_search(tag_comp._name, match, re))
+            if (std::regex_match(tag._name, match, name_pattern))
             {
-                int number = std::stoi(match[1]);
-                number += 1;
-                tag_comp._name.replace(match.position(0), match.length(0), "(" + std::to_string(number) + ")");
+                int index = std::stoi(match[1].str());
+                max_index = std::max(max_index, index);
             }
         }
-        else
-            tag_comp._name += "(1)";
+        tag_comp._name += "(" + std::to_string(max_index + 1) + ")";
         _register.AddComponent<TransformComponent>(new_one, *_register.GetComponent<TransformComponent>(e));
         if (_register.HasComponent<StaticMeshComponent>(e))
             _register.AddComponent<StaticMeshComponent>(new_one, *_register.GetComponent<StaticMeshComponent>(e));

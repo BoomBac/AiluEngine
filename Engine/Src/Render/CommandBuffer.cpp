@@ -8,7 +8,7 @@
 
 namespace Ailu
 {
-    static CommandBufferPool* s_pCommandBufferPool = nullptr;
+    static CommandBufferPool *s_pCommandBufferPool = nullptr;
 
     void CommandBufferPool::Init()
     {
@@ -69,7 +69,7 @@ namespace Ailu
             auto cmd = std::make_shared<D3DCommandBuffer>(newId, type);
             s_pCommandBufferPool->_cmd_buffers.emplace_back(false, cmd);
             ++s_pCommandBufferPool->_cur_pool_size;
-            LOG_WARNING("Expand commandbuffer pool to {} with name {} at frame {}", s_pCommandBufferPool->_cur_pool_size,name,Application::s_frame_count);
+            LOG_WARNING("Expand commandbuffer pool to {} with name {} at frame {}", s_pCommandBufferPool->_cur_pool_size, name, Application::s_frame_count);
             cmd->SetName(name);
             cmd->Clear();
             return cmd;
@@ -88,9 +88,9 @@ namespace Ailu
     void CommandBufferPool::ReleaseAll()
     {
         std::unique_lock<std::mutex> lock(s_pCommandBufferPool->_mutex);
-        for (auto& it : s_pCommandBufferPool->_cmd_buffers)
+        for (auto &it: s_pCommandBufferPool->_cmd_buffers)
         {
-            auto& [available, cmd] = it;
+            auto &[available, cmd] = it;
             available = true;
             cmd->Clear();
         }

@@ -66,9 +66,9 @@ namespace Ailu
             inline static const BitDesc kInputlayout = {46, 4};
             //inline static const BitDesc kTopology = {50, 2};
             inline static const BitDesc kBlendState = {52, 3};
-            inline static const BitDesc kRasterState = {55, 2};
-            inline static const BitDesc kDepthStencilState = {57, 5};
-            inline static const BitDesc kRenderTargetState = {62, 4};
+            inline static const BitDesc kRasterState = {55, 3};
+            inline static const BitDesc kDepthStencilState = {58, 5};
+            inline static const BitDesc kRenderTargetState = {63, 4};
         };
 
     public:

@@ -7,7 +7,7 @@
 //Cull: Back
 //Stencil: {Ref:127,Comp:Equal,Pass:Keep}
 //Queue: Opaque
-//multi_compile _ DEBUG_NORMAL DEBUG_ALBEDO DEBUG_WORLDPOS
+//multi_compile _ DEBUG_NORMAL DEBUG_ALBEDO DEBUG_WORLDPOS DEBUG_GI
 //pass end::
 //Properties
 //{

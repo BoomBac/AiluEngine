@@ -22,6 +22,7 @@ namespace Ailu
             ShaderVariantHash _variant_hash;
             std::set<String> _keywords;
         };
+
     public:
         inline static std::weak_ptr<Material> s_standard_lit;
         inline static std::weak_ptr<Material> s_checker;
@@ -38,6 +39,7 @@ namespace Ailu
         void SetFloat(const String &name, const float &f);
         void SetUint(const String &name, const u32 &value);
         void SetVector(const String &name, const Vector4f &vector);
+        void SetVector(const String &name, const Vector4Int &vector);
         void SetMatrix(const String &name, const Matrix4x4f &matrix);
         float GetFloat(const String &name);
         void SetCullMode(ECullMode mode);
@@ -59,13 +61,17 @@ namespace Ailu
         bool IsReadyForDraw(u16 pass_index = 0) const;
         List<std::tuple<String, float>> GetAllFloatValue();
         List<std::tuple<String, Vector4f>> GetAllVectorValue();
+        List<std::tuple<String, Vector4Int>> GetAllIntVectorValue();
         List<std::tuple<String, u32>> GetAllUintValue();
-        Vector<ShaderPropertyInfo*>& GetShaderProperty() {return _prop_views;};
-        ShaderPropertyInfo* GetShaderProperty(const String& name);
+        Vector<ShaderPropertyInfo *> &GetShaderProperty() { return _prop_views; };
+        ShaderPropertyInfo *GetShaderProperty(const String &name);
+        //根据材质存储的关键字和传入shader的关键字，为每个Pass构建合法的关键字序列
+        void ConstructKeywords(Shader *shader);
+
     protected:
         virtual void Construct(bool first_time);
+
     private:
-        void ConstructKeywords(Shader *shader);
         void UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash);
 
     protected:
@@ -82,8 +88,8 @@ namespace Ailu
         Vector<PassVariantInfo> _pass_variants;
         //跟随材质持久化的关键字
         std::set<String> _all_keywords;
-        Map<String,ShaderPropertyInfo> _properties;
-        Vector<ShaderPropertyInfo*> _prop_views;
+        Map<String, ShaderPropertyInfo> _properties;
+        Vector<ShaderPropertyInfo *> _prop_views;
         Vector<Scope<IConstantBuffer>> _p_cbufs;
         Vector<Map<String, std::tuple<u8, Texture *>>> _textures_all_passes{};
         //非shader使用的变量
@@ -102,7 +108,7 @@ namespace Ailu
         kNone
     };
 
-    DECLARE_ENUM(EMaterialID, kStandard, kSubsurface,kChecker)
+    DECLARE_ENUM(EMaterialID, kStandard, kSubsurface, kChecker)
     DECLARE_ENUM(ESurfaceType, kOpaque, kTransparent, kAlphaTest)
 
     class AILU_API StandardMaterial : public Material
@@ -147,7 +153,7 @@ namespace Ailu
                     case ETextureUsage::kAnisotropy:
                         return kAnisotropy;
                     default:
-                    break;
+                        break;
                 }
             }
         };
@@ -165,11 +171,12 @@ namespace Ailu
         const ShaderPropertyInfo &MainProperty(ETextureUsage usage);
         const ESurfaceType::ESurfaceType &SurfaceType() const { return _surface; }
         void SurfaceType(const ESurfaceType::ESurfaceType &value);
-        const EMaterialID::EMaterialID &MaterialID() const{return _material_id;}
+        const EMaterialID::EMaterialID &MaterialID() const { return _material_id; }
         void MaterialID(const EMaterialID::EMaterialID &value);
+
     private:
-        ESurfaceType::ESurfaceType _surface;
-        EMaterialID::EMaterialID _material_id;
+        ESurfaceType::ESurfaceType _surface = ESurfaceType::kOpaque;
+        EMaterialID::EMaterialID _material_id = EMaterialID::kStandard;
         u16 _sampler_mask_offset = 0u;
         u16 _material_id_offset = 0u;
     };

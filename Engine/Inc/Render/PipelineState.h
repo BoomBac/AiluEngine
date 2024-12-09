@@ -309,6 +309,7 @@ namespace Ailu
         ECullMode _cull_mode;
         EFillMode _fill_mode;
         bool _b_cw;
+        bool _is_conservative;
         inline static PipelineStateHash<RasterizerState> _s_hash_obj{};
 
     public:
@@ -318,6 +319,7 @@ namespace Ailu
         {
             return (_cull_mode == other._cull_mode &&
                     _fill_mode == other._fill_mode &&
+                    _is_conservative == other._is_conservative &&
                     _b_cw == other._b_cw);
         }
         RasterizerState &operator=(const RasterizerState &other)
@@ -325,6 +327,7 @@ namespace Ailu
             _hash = other._hash;
             _cull_mode = other._cull_mode;
             _fill_mode = other._fill_mode;
+            _is_conservative = other._is_conservative;
             _b_cw = other._b_cw;
             return *this;
         }
@@ -594,12 +597,17 @@ namespace Ailu
         kCBufferMatrix4 = 0x40,
         kCBufferBool = 0x80,
         kTexture2D = 0x100,
-        kCubeMap = 0x200,
         kTexture2DArray = 0x400,
+        kCubeMap = 0x200,
         kSampler = 0x800,
         kUAVTexture2D = 0x1000,
         kConstBufferRaw = 0x2000,//为了兼容uploadbuffer直接绑定gpu address而不改变现有接口
-        kRWBuffer = 0x3000,
+        kBuffer = 0x4000,
+        kRWBuffer = 0x8000,
+        kTexture3D = 0x10000,
+        kRWTexture3D = 0x20000,
+        kCBufferInt = 0x40000,
+        kCBufferInt4 = 0x80000,
         kUnknown
     };
 

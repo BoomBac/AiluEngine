@@ -1,27 +1,33 @@
 #pragma once
 #ifndef __IPARSER_H__
 #define __IPARSER_H__
-#include <string>
-#include <list>
+#include "Animation/Clip.h"
+#include "GlobalMarco.h"
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
-#include "GlobalMarco.h"
-#include "Animation/Clip.h"
+#include <list>
+#include <string>
 
 namespace Ailu
 {
-	enum class EResourceType : u8
-	{
-		kStaticMesh = 0,kImage
-	};
-	enum class EMeshLoader : u8
-	{
-		kFbx = 0,kObj
-	};
-	enum class EImageLoader : u8
-	{
-		kPNG = 0,kJPEG,kTGA,kHDR,kDDS
-	};
+    enum class EResourceType : u8
+    {
+        kStaticMesh = 0,
+        kImage
+    };
+    enum class EMeshLoader : u8
+    {
+        kFbx = 0,
+        kObj
+    };
+    enum class EImageLoader : u8
+    {
+        kPNG = 0,
+        kJPEG,
+        kTGA,
+        kHDR,
+        kDDS
+    };
     struct AILU_API ImportSetting
     {
     public:
@@ -87,25 +93,24 @@ namespace Ailu
         String _vs_entry, _ps_entry;
         String _cs_kernel;
     };
-	class IMeshParser
-	{
-	public:
-		virtual ~IMeshParser() = default;
-        virtual void Parser(const WString &sys_path, const MeshImportSetting& import_setting) = 0;
-		virtual const List<ImportedMaterialInfo>& GetImportedMaterialInfos() const = 0;
+    class IMeshParser
+    {
+    public:
+        virtual ~IMeshParser() = default;
+        virtual void Parser(const WString &sys_path, const MeshImportSetting &import_setting) = 0;
+        virtual const List<ImportedMaterialInfo> &GetImportedMaterialInfos() const = 0;
         virtual const List<Ref<AnimationClip>> &GetAnimationClips() const = 0;
-        virtual const List<Ref<Mesh>> &GetMeshes() const = 0;
-	};
+        virtual void GetMeshes(List<Ref<Mesh>> &out_mesh) = 0;
+    };
 
-	class ITextureParser
-	{
-	public:
-		virtual ~ITextureParser() = default;
-		virtual Ref<CubeMap> Parser(Vector<String>& paths) = 0;
-		virtual Ref<Texture2D> Parser(const WString& sys_path) = 0;
-	};
-}
+    class ITextureParser
+    {
+    public:
+        virtual ~ITextureParser() = default;
+        virtual Ref<CubeMap> Parser(Vector<String> &paths) = 0;
+        virtual Ref<Texture2D> Parser(const WString &sys_path) = 0;
+    };
+}// namespace Ailu
 
 
-#endif // !IPARSER_H__
-
+#endif// !IPARSER_H__

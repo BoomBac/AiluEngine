@@ -65,10 +65,6 @@ namespace Ailu
         virtual void SetRenderTarget(RTHandle color, u16 index = 0u) = 0;
 
         virtual void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) = 0;
-        //virtual void DrawIndexedInstanced(const std::shared_ptr<IIndexBuffer> &index_buffer, const Matrix4x4f &transform, u32 instance_count) = 0;
-        virtual void DrawIndexedInstanced(u32 index_count, u32 instance_count) = 0;
-        virtual void DrawInstanced(const std::shared_ptr<IVertexBuffer> &vertex_buf, const Matrix4x4f &transform, u32 instance_count) = 0;
-        virtual void DrawInstanced(u32 vert_count, u32 instance_count) = 0;
         virtual void DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw,Material*mat,u16 pass_index,u16 instance_count) = 0;
 
         virtual void SetViewport(const Rect &viewport) = 0;
@@ -91,6 +87,8 @@ namespace Ailu
         virtual void SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj) = 0;
         virtual void SetGlobalBuffer(const String &name, void *data, u64 data_size) = 0;
         virtual void SetGlobalBuffer(const String &name, IConstantBuffer *buffer) = 0;
+        virtual void SetGlobalBuffer(const String &name, IGPUBuffer *buffer) = 0;
+        virtual void SetComputeBuffer(const String &name, u16 kernel,void *data, u64 data_size) = 0;
         virtual void SetGlobalTexture(const String &name, Texture *tex) = 0;
         virtual void SetGlobalTexture(const String &name, RTHandle handle) = 0;
 

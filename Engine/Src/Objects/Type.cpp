@@ -6,6 +6,12 @@
 #include <Framework/Common/Utils.h>
 namespace Ailu
 {
+    static bool IsEnumType(const String &type_name)
+    {
+        bool is_enum = su::BeginWith(type_name,"E");
+        is_enum &= isupper(type_name[1]);
+        return is_enum;
+    }
     static EDataType GetDataTypeFromName(const String &name)
     {
         if (name == "bool")
@@ -36,9 +42,12 @@ namespace Ailu
             return EDataType::kString;
         else if (su::EndWith(name,"*"))
             return EDataType::kPtr;
+        else if (IsEnumType(name))
+            return EDataType::kEnum;
         else
             return EDataType::kNone;
     }
+
     MemberInfo::MemberInfo(const MemberInfoInitializer &initializer)
     {
         _name = initializer._name;
@@ -133,5 +142,35 @@ namespace Ailu
         if (_members_lut.contains(name))
             return dynamic_cast<FunctionInfo*>(_members_lut[name]);
         return nullptr;
+    }
+    //---------------------------------------------------------------------------------------Enum------------------------------------------------------------------------------
+    Enum::Enum(const EnumInitializer &initializer): Object(initializer._name)
+    {
+        _str_to_enum_lut = initializer._str_to_enum_lut;
+        for (auto &pair: _str_to_enum_lut)
+        {
+            _enum_to_str_lut[pair.second] = _str_to_enum_lut.find(pair.first);
+            _enum_names.push_back(&pair.first);
+        }
+    }
+    Enum *Enum::GetEnumByName(const String &name)
+    {
+        if (s_global_enums.contains(name))
+        {
+            return s_global_enums[name];
+        }
+        return nullptr;
+    }
+    void Enum::RegisterEnum(const String &name, Enum *enum_ptr)
+    {
+        s_global_enums[name] = enum_ptr;
+    }
+    i32 Enum::GetIndexByName(const std::string &name)
+    {
+        if (_str_to_enum_lut.contains(name))
+        {
+            return (i32) _str_to_enum_lut[name];
+        }
+        return -1;
     }
 }

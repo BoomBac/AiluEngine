@@ -18,8 +18,8 @@ namespace Ailu
         void Clear() final;
         //close before execute
         void Close() final;
-        virtual u32 GetID() final { return _id; };
-        const String &GetName() const final { return _name; };
+        u32 GetID() final { return _id; };
+        [[nodiscard]] const String &GetName() const final { return _name; };
         void SetName(const String &name) final
         {
             auto wname = ToWStr(name);
@@ -51,9 +51,6 @@ namespace Ailu
         void ReleaseTempRT(RTHandle handle);
 
         void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) final;
-        void DrawIndexedInstanced(u32 index_count, u32 instance_count) final;
-        void DrawInstanced(const std::shared_ptr<IVertexBuffer> &vertex_buf, const Matrix4x4f &transform, u32 instance_count) final;
-        void DrawInstanced(u32 vert_count, u32 instance_count) final;
         void DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw,Material*mat,u16 pass_index = 0u,u16 instance_count = 1u) final;
 
         void SetViewport(const Rect &viewport) final;
@@ -74,6 +71,8 @@ namespace Ailu
         void SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj);
         void SetGlobalBuffer(const String &name, void *data, u64 data_size) final;
         void SetGlobalBuffer(const String &name, IConstantBuffer *buffer) final;
+        void SetGlobalBuffer(const String &name, IGPUBuffer *buffer) final;
+        void SetComputeBuffer(const String &name, u16 kernel,void *data, u64 data_size) final;
         void SetGlobalTexture(const String &name, Texture *tex) final;
         void SetGlobalTexture(const String &name, RTHandle handle) final;
 
@@ -107,6 +106,13 @@ namespace Ailu
         Scope<UploadBuffer> _upload_buf;
         List<UploadBuffer::Allocation> _allocations;
         ECommandBufferType _type;
+        struct ComputeConstBufferInfo
+        {
+            String _name;
+            u16 _kernel;
+            D3D12_GPU_VIRTUAL_ADDRESS _ptr;
+        };
+        Vector<ComputeConstBufferInfo> _cs_cbuf;
     };
 }// namespace Ailu
 

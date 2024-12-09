@@ -31,6 +31,7 @@
 #include <functional>
 #include <filesystem>
 #include <source_location>
+#include <regex>
 #define _CRT_SECURE_NO_WARNINGS
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif //PCH_H

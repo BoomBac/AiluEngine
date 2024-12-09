@@ -44,6 +44,7 @@ Texture2D _BloomTex : register(t1);
 
 #include "../common.hlsli"
 #include "../fullscreen_quad.hlsli"
+#include "../color_space_utils.hlsli"
 
 PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
 
@@ -184,15 +185,6 @@ float4 BlurY(PSInput input) : SV_TARGET
 //----------------------------------------------------Composite Pass-----------------------------------------------------
 TEXTURE2D(_NoiseTex)
 
-float3 ACESFilm(float3 x)
-{
-	float a = 2.51f;
-	float b = 0.03f;
-	float c = 2.43f;
-	float d = 0.59f;
-	float e = 0.14f;
-	return saturate((x*(a*x+b))/(x*(c*x+d)+e));
-}
 float Noise(float t)
 {
     return SAMPLE_TEXTURE2D(_NoiseTex,g_LinearWrapSampler,float2(t,0) * _NoiseTex_TexelSize.zw).r;

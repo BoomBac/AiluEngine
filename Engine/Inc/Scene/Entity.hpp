@@ -83,7 +83,11 @@ namespace Ailu
 
             T &operator[](u64 index) { return _comps[index]; }
             u64 Count() const { return _comps.size(); }
-            Entity GetEntity(u64 index) const { return _entities[index]; }
+            Entity GetEntity(u64 index) const 
+            {
+                AL_ASSERT(index < _entities.size());
+                return _entities[index];
+            }
             auto &begin() { return _comps.begin(); }
             auto &end() { return _comps.end(); }
             //auto View() { return std::views::all(_comps); }
@@ -330,6 +334,12 @@ namespace Ailu
                 return static_cast<ComponentManager<T> *>(_mgrs.at(type_name).get())->GetComponent(entity);
             }
 
+            template<typename SrcT, typename DstT>
+            DstT *GetComponent(u64 index)
+            {
+                Entity e = GetEntity<SrcT>(index);
+                return GetComponent<DstT>(e);
+            }
             template<typename SrcT, typename DstT>
             const DstT *GetComponent(u64 index) const
             {

@@ -1,0 +1,6 @@
+guid: 324335bf-8def-4583-911a-047863b48455
+type: kShader
+name: voxel_drawer
+  file: Shaders/hlsl/voxel_drawer.hlsl
+  vs_entry: ForwardVSMain
+  ps_entry: ForwardPSMain

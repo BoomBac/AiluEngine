@@ -34,9 +34,12 @@ namespace Ailu
                                                   kPerObjectDataSize * kMaxRenderObjectCount;
         inline const static String kVSModel_5_0 = "vs_5_0";
         inline const static String kPSModel_5_0 = "ps_5_0";
+        inline const static String kGSModel_5_0 = "gs_5_0";
+        inline const static String kCSModel_5_0 = "cs_5_0";
         inline const static String kVSModel_6_1 = "vs_6_1";
         inline const static String kPSModel_6_1 = "ps_6_1";
-        inline const static String kCSModel_5_0 = "cs_5_0";
+        inline const static String kCSModel_6_1 = "cs_6_1";
+        inline const static String kGSModel_6_1 = "gs_6_1";
 
         inline const static String kSemanticPosition = "POSITION";
         inline const static String kSemanticColor = "COLOR";
@@ -46,6 +49,7 @@ namespace Ailu
         inline const static String kSemanticBoneWeight = "BONEWEIGHT";
         inline const static String kSemanticBoneIndex = "BONEINDEX";
         inline const static String kSemanticVertexIndex = "SV_VERTEXID";
+        inline const static String kSemanticInstanceID = "SV_INSTANCEID";
 
         inline const static String kCBufNamePerObject = "CBufferPerObjectData";
         inline const static String kCBufNamePerMaterial = "CBufferPerMaterialData";

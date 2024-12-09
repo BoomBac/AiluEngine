@@ -42,7 +42,7 @@ namespace Ailu
 
     public:
         inline static Color s_color = Colors::kGray;
-        inline static u32 kMaxVertexNum = 1024u;
+        inline static u32 kMaxVertexNum = 4096u;
     private:
         static void DrawHemisphere(const Vector3f &center, const Vector3f &axis, f32 radius, Color color = Gizmo::s_color);
     private:

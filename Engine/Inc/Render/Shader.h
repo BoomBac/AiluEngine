@@ -20,16 +20,22 @@ namespace Ailu
     enum class EShaderType : u8
     {
         kVertex,
-        kPixel
+        kPixel,
+        kGeometry,
+        kHull,
+        kDomain,
+        kComputry
     };
 
     struct ShaderPropertyType
     {
         inline static String Vector = "Vector";
+        inline static String IntVector = "IntVector";
         inline static String Float = "Float";
         inline static String Uint = "Uint";
         inline static String Color = "Color";
         inline static String Texture2D = "Texture2D";
+        inline static String Texture3D = "Texture3D";
         inline static String CubeMap = "CubeMap";
     };
 
@@ -39,6 +45,7 @@ namespace Ailu
         inline static const u8 kBindFlagPerMaterial = 0x02;
         inline static const u8 kBindFlagPerCamera = 0x04;
         inline static const u8 kBindFlagPerScene = 0x08;
+        inline static const u8 kBindFlagDefault = 0x10;
         static u8 GetBindResourceFlag(const char *name)
         {
             String name_str(name);
@@ -52,7 +59,7 @@ namespace Ailu
                 return kBindFlagPerScene;
             else
             {
-                AL_ASSERT(false);
+                return kBindFlagDefault;
             }
         }
         inline const static std::set<String> s_reversed_res_name{
@@ -97,6 +104,7 @@ namespace Ailu
         ShaderBindResourceInfo *_p_root_cbuf;
         //1 for per obj,2for per mat,4 for per pass,8 for per frame
         u8 _bind_flag = 0u;
+        u16 _register_space = 0u;
     };
 
     // Hash function for ShaderBindResourceInfo
@@ -119,7 +127,15 @@ namespace Ailu
 
     enum class EShaderPropertyType
     {
-        kUndefined,kBool,kFloat,kRange,kVector,kColor,kTexture2D,kEnum
+        kUndefined,
+        kBool,
+        kFloat,
+        kRange,
+        kVector,
+        kColor,
+        kTexture2D,
+        kTexture3D,
+        kEnum
     };
 
     struct ShaderPropertyInfo
@@ -127,7 +143,7 @@ namespace Ailu
         String _value_name;
         String _prop_name;
         u32 _offset = 0;
-        void* _value_ptr = nullptr;
+        void *_value_ptr = nullptr;
         EShaderPropertyType _type;
         Vector4f _param;
         ShaderPropertyInfo() = default;
@@ -142,6 +158,7 @@ namespace Ailu
         inline static const String kName = "name";
         inline static const String kVSEntry = "Vert";
         inline static const String kPSEntry = "Pixel";
+        inline static const String kGSEntry = "Geometry";
         inline static const String kCull = "Cull";
         inline static const String kQueue = "Queue";
         inline static const String kTopology = "Topology";
@@ -151,6 +168,7 @@ namespace Ailu
         inline static const String kZWrite = "ZWrite";
         inline static const String kStencil = "Stencil";
         inline static const String kColorMask = "ColorMask";
+        inline static const String kConservative = "Conservative";
         static struct Queue
         {
             inline static const String kGeometry = "Geometry";
@@ -209,12 +227,52 @@ namespace Ailu
                 inline static const String kDecr = "Decr";
             } StencilPassValue;
         } kStencilStateValue;
+        static struct Conservative
+        {
+            inline static const String kOff = "Off";
+            inline static const String kOn = "On";
+        } kConservativeValue;
     };
 
     using ShaderVariantHash = u64;
 
-    struct ShaderPass
+    class ShaderVariantMgr
     {
+    public:
+        void BuildIndex(Vector<std::set<String>> all_keywords);
+        ShaderVariantHash GetVariantHash(const std::set<String> &keywords) const;
+        ShaderVariantHash GetVariantHash(const std::set<String> &keywords, std::set<String> &active_kw_seq) const;
+        std::set<String> KeywordsSameGroup(const String &kw) const;
+
+    private:
+        inline static const u16 kBitNumPerGroup = 64u;
+        using ShaderVariantBits = Vector<u64>;
+
+        struct KeywordInfo
+        {
+            u16 _group_id;
+            u16 _inner_group_id;
+            u16 _global_id;
+        };
+        //关键字-组id-组内id
+        Map<String, KeywordInfo> _keyword_group_ids;
+    };
+
+    struct AILU_API ShaderPass
+    {
+        static bool IsPassKeyword(const ShaderPass &pass, const String &kw)
+        {
+            bool is_pass_kw = false;
+            for (auto &kw_group: pass._keywords)
+            {
+                if (kw_group.find(kw) != kw_group.end())
+                {
+                    is_pass_kw = true;
+                    break;
+                }
+            }
+            return is_pass_kw;
+        }
         struct PassVariant
         {
             u8 _vertex_input_num = 0u;
@@ -230,8 +288,8 @@ namespace Ailu
         String _name;
         String _tag;
         //shader info
-        String _vert_entry, _pixel_entry;
-        WString _vert_src_file,_pixel_src_file;
+        String _vert_entry, _pixel_entry, _geometry_entry;
+        WString _vert_src_file, _pixel_src_file, _geom_src_file;
         RasterizerState _pipeline_raster_state;
         DepthStencilState _pipeline_ds_state;
         ETopology _pipeline_topology;
@@ -239,8 +297,7 @@ namespace Ailu
         u32 _render_queue;
         std::set<WString> _source_files;
         Vector<std::set<String>> _keywords;
-        //reocrd per keyword's group_id and inner_group_id
-        std::map<String, std::tuple<u8, u8>> _keywords_ids;
+        ShaderVariantMgr _variant_mgr;
         List<ShaderPropertyInfo> _shader_prop_infos;
         Map<ShaderVariantHash, PassVariant> _variants;
     };
@@ -274,6 +331,8 @@ namespace Ailu
         static void SetGlobalBuffer(const String &name, IConstantBuffer *buffer);
         static void SetGlobalMatrix(const String &name, Matrix4x4f *matrix);
         static void SetGlobalMatrixArray(const String &name, Matrix4x4f *matrix, u32 num);
+        static void EnableGlobalKeyword(const String &keyword);
+        static void DisableGlobalKeyword(const String &keyword);
 
         //0 is normal, 4001 is compiling, 4000 is error,same with render queue id
         static u32 GetShaderState(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash);
@@ -288,7 +347,7 @@ namespace Ailu
         virtual bool Compile();
         virtual void *GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash);
         const WString &GetMainSourceFile() { return _src_file_path; }
-        void SetVertexShader(u16 pass_index,const WString& sys_path,const String& entry);
+        void SetVertexShader(u16 pass_index, const WString &sys_path, const String &entry);
         void SetPixelShader(u16 pass_index, const WString &sys_path, const String &entry);
 
         const ShaderPass &GetPassInfo(u16 pass_index) const
@@ -352,6 +411,7 @@ namespace Ailu
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
         std::atomic<bool> _is_pass_elements_init = false;
         ETopology _topology = ETopology::kTriangle;
+
     private:
         void ParserShaderProperty(String &line, List<ShaderPropertyInfo> &props);
         //void ExtractValidShaderProperty(u16 pass_index,ShaderVariantHash variant_hash);
@@ -360,6 +420,7 @@ namespace Ailu
         inline static std::map<String, Texture *> s_global_textures_bind_info{};
         inline static std::map<String, std::tuple<Matrix4x4f *, u32>> s_global_matrix_bind_info{};
         inline static Map<String, IConstantBuffer *> s_global_buffer_bind_info{};
+        inline static std::set<Shader *> s_all_shaders{};
     };
 
     class AILU_API ComputeShader : public Object
@@ -368,6 +429,7 @@ namespace Ailu
         {
             u16 _id;
             String _name;
+            Vector3UInt _thread_num;
             std::set<WString> _all_dep_file_pathes;
             std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
             std::unordered_map<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
@@ -375,7 +437,7 @@ namespace Ailu
 
     public:
         static Ref<ComputeShader> Create(const WString &sys_path);
-        static ComputeShader* Get(const WString &asset_path);
+        static ComputeShader *Get(const WString &asset_path);
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
         virtual void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
@@ -383,12 +445,15 @@ namespace Ailu
         virtual void SetTexture(u8 bind_slot, Texture *texture);
         virtual void SetTexture(const String &name, RTHandle handle);
         virtual void SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap);
+        virtual void SetTexture(const String &name, Texture *texture, u16 mipmap);
         virtual void SetFloat(const String &name, f32 value);
         virtual void SetBool(const String &name, bool value);
         virtual void SetInt(const String &name, i32 value);
         virtual void SetVector(const String &name, Vector4f vector);
         virtual void SetBuffer(const String &name, IConstantBuffer *buf);
         virtual void SetBuffer(const String &name, IGPUBuffer *buf);
+        virtual void GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const;
+        virtual u16 NameToSlot(const String &name, u16 kernel) const;
         const std::set<Texture *> &AllBindTexture() const { return _all_bind_textures; }
         //防止同一个资源被当前帧重复追踪使得其无法被复用
         void ClearBindTexture() { _all_bind_textures.clear(); }
@@ -404,6 +469,7 @@ namespace Ailu
         bool IsDependencyFile(const WString &sys_path) const;
         bool Compile();
         std::atomic<bool> _is_compiling = false;
+
     protected:
         virtual bool RHICompileImpl(u16 kernel_index);
 
@@ -417,10 +483,20 @@ namespace Ailu
 		* 计算管线不用这两个接口，所以在commandbuffer dispatch时调用该接口标记
 		*/
         std::set<Texture *> _all_bind_textures;
+        struct ViewInfo
+        {
+            ECubemapFace::ECubemapFace _face;
+            u16 _mipmap;
+            //depth or array
+            u16 _slice;
+            u32 _sub_res;
+        };
         //bind_slot:cubemapface,mipmap
-        std::unordered_map<u16, std::tuple<ECubemapFace::ECubemapFace, u16>> _texture_addi_bind_info{};
+        std::unordered_map<u16, ViewInfo> _texture_addi_bind_info{};
         bool _is_valid;
-        Scope<IConstantBuffer> _p_cbuffer;
+        //废弃
+        [[deprecated]] Scope<IConstantBuffer> _p_cbuffer;
+        u8 _cbuf_data[256];
     };
 }// namespace Ailu
 

@@ -2,25 +2,26 @@ guid: 58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5
 type: kMaterial
 name: MAT_Grass
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
-keywords: ,ALPHA_TEST
+keywords: 
   prop_type: Uint
     _MaterialID: 0
-    _cull: 0
-    _surface: 2
+    _cull: 2
+    _surface: 0
   prop_type: Float
     _AlphaCulloff: 0.467
     _Anisotropy: 0
     _MaterialID: 0
     _MetallicValue: 0
-    _RoughnessValue: 0.18
-    _SamplerMask: 4.2039e-45
+    _RoughnessValue: 0
+    _SamplerMask: 0
   prop_type: Vector
-    _AlbedoValue: 0,0,0,0
-    _EmissionValue: 0,0,0,0
+    _AlbedoValue: 1,1,1,1
+    _EmissionValue: 0,9,10,-1
     _SpecularValue: 0,0,0,0
+  prop_type: IntVector
   prop_type: Texture2D
-    _AlbedoTex: a5e4a76d-c915-48a4-a940-5dba8a0c936e
+    _AlbedoTex: null
     _EmissionTex: null
-    _NormalTex: 6fd672ec-676e-41b4-9da8-b367d6ab6d2b
+    _NormalTex: null
     _RoughnessMetallicTex: null
     _SpecularTex: null

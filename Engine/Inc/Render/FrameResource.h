@@ -1,27 +1,35 @@
-#pragma once
-#ifndef __FRAME_RESOURCE_H__
-#define __FRAME_RESOURCE_H__
+//
+// Created by 22292 on 2024/11/7.
+//
+
+#ifndef AILU_FRAMERESOURCE_H
+#define AILU_FRAMERESOURCE_H
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
+#include "Buffer.h"
+
 namespace Ailu
 {
-	class FrameResource : public Object
-	{
-	public:
-		FrameResource();
-		~FrameResource();
-		void SetFenceValue(u64 fence) { _fence_value = fence; };
-		u64 GetFenceValue() const { return _fence_value; };
-		void SetLastAccessFrameCount(u64 frame_count) { _last_access_frame_count = frame_count; };
-		u64 GetLastAccessFrameCount() const { return _last_access_frame_count; };
-		u64 GetGpuMemerySize() const { return _gpu_memery_size; };
-		bool _is_referenced_by_gpu;
-	protected:
-		u64 _fence_value;
-		u64 _last_access_frame_count;
-		u64 _gpu_memery_size = 0u;
-	};
-}
+    class FrameResource : public Object
+    {
+        DISALLOW_COPY_AND_ASSIGN(FrameResource)
+    public:
+        FrameResource();
+        ~FrameResource() override;
+        Vector<IConstantBuffer*>* GetObjCB();
+        IConstantBuffer* GetObjCB(u32 index);
+        IConstantBuffer* GetMatCB(u32 index);
+        IConstantBuffer* GetCameraCB(u64 hash);
+        IConstantBuffer* GetSceneCB(u64 hash);
+    private:
+        Vector<IConstantBuffer*> _obj_cbs;
+        Vector<IConstantBuffer*> _mat_cbs;
+        Vector<IConstantBuffer*> _camera_cbs;
+        Vector<IConstantBuffer*> _scene_cbs;
+        Map<u64,u64> _camera_cb_lut;
+        Map<u64,u64> _scene_cb_lut;
+    };
 
-#endif // !FRAME_RESOURCE_H__
+}// namespace Ailu
 
+#endif//AILU_FRAMERESOURCE_H

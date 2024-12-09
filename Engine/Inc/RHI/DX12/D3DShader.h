@@ -1,8 +1,8 @@
 #pragma once
 #ifndef __D3DSHADER_H__
 #define __D3DSHADER_H__
+#include <../Ext/d3dx12.h>
 #include <d3d12shader.h>
-#include <d3dx12.h>
 #include <map>
 #include <unordered_map>
 
@@ -16,14 +16,12 @@ namespace Ailu
 {
     namespace D3DConvertUtils
     {
-        static EShaderDateType GetShaderDataType(const char *semantic,u8 mask)
+        static EShaderDateType GetShaderDataType(const char *semantic, u8 mask)
         {
             String set_str(semantic);
-            if (su::Equal(set_str, RenderConstants::kSemanticPosition) || su::Equal(set_str, RenderConstants::kSemanticNormal)
-                || su::Equal(set_str, RenderConstants::kSemanticTangent) || su::Equal(set_str, RenderConstants::kSemanticColor)
-                || su::Equal(set_str, RenderConstants::kSemanticTexcoord) || su::Equal(set_str, RenderConstants::kSemanticBoneWeight))
+            if (su::Equal(set_str, RenderConstants::kSemanticPosition) || su::Equal(set_str, RenderConstants::kSemanticNormal) || su::Equal(set_str, RenderConstants::kSemanticTangent) || su::Equal(set_str, RenderConstants::kSemanticColor) || su::Equal(set_str, RenderConstants::kSemanticTexcoord) || su::Equal(set_str, RenderConstants::kSemanticBoneWeight))
             {
-                if (mask == 15) //1111b
+                if (mask == 15)//1111b
                     return EShaderDateType::kFloat4;
                 else if (mask == 7)//111b
                     return EShaderDateType::kFloat3;
@@ -47,8 +45,8 @@ namespace Ailu
                 else
                     return EShaderDateType::kNone;
             }
-            else if (su::Equal(set_str,RenderConstants::kSemanticVertexIndex))
-                return EShaderDateType::kuInt;
+            else if (su::Equal(set_str, RenderConstants::kSemanticVertexIndex) || su::Equal(set_str, RenderConstants::kSemanticInstanceID))
+                return EShaderDateType::kNone;
             return EShaderDateType::kNone;
         }
         static DXGI_FORMAT GetGXGIFormatByShaderDataType(EShaderDateType data_type)
@@ -97,6 +95,7 @@ namespace Ailu
             if (state._fill_mode == EFillMode::kWireframe) raster_state.FillMode = D3D12_FILL_MODE_WIREFRAME;
             else
                 raster_state.FillMode = D3D12_FILL_MODE_SOLID;
+            raster_state.ConservativeRaster = state._is_conservative ? D3D12_CONSERVATIVE_RASTERIZATION_MODE::D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
             return raster_state;
         }
 
@@ -319,8 +318,10 @@ namespace Ailu
                 ComPtr<ID3D12RootSignature> _p_sig;
                 ComPtr<ID3DBlob> _p_vblob = nullptr;
                 ComPtr<ID3DBlob> _p_pblob = nullptr;
+                ComPtr<ID3DBlob> _p_gblob = nullptr;
                 ComPtr<ID3D12ShaderReflection> _p_v_reflection;
                 ComPtr<ID3D12ShaderReflection> _p_p_reflection;
+                ComPtr<ID3D12ShaderReflection> _p_g_reflection;
                 D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
             };
             Map<ShaderVariantHash, D3DVariantElement> _variants;
@@ -345,6 +346,7 @@ namespace Ailu
 
     private:
         Vector<D3DShaderElement> _pass_elements;
+        bool _is_first_compile = true;
     };
 
     class D3DComputeShader : public ComputeShader
@@ -392,7 +394,7 @@ namespace Ailu
         D3DComputeShader(const WString &sys_path);
         //void Dispatch(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
         void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
-
+        u16 NameToSlot(const String& name,u16 kernel) const final;
     private:
         bool RHICompileImpl(u16 kernel_index) final;
         void GenerateInternalPSO(u16 kernel_index);

@@ -12,6 +12,7 @@ namespace Ailu
     {
         WorldOutline::WorldOutline() : ImGuiWidget("WorldOutline")
         {
+            memset(_rename_buffer, 0, 256);
             //_selected_actor = &g_pSceneMgr->_p_selected_actor;
         }
         WorldOutline::~WorldOutline()
@@ -63,7 +64,7 @@ namespace Ailu
             if (entity == ECS::kInvalidEntity || _drawed_entity.contains(entity))
                 return;
             _drawed_entity.insert(entity);
-            static const ImGuiTreeNodeFlags s_base_node_flags = ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+            static const ImGuiTreeNodeFlags s_base_node_flags = ImGuiTreeNodeFlags_SpanAvailWidth;
             ImGuiTreeNodeFlags node_flags = s_base_node_flags;
             bool is_cur_node_selected = entity == _selected_entity;
             ImGui::PushID(entity);
@@ -76,25 +77,13 @@ namespace Ailu
             bool b_root_node_open = false;
             if (_rename_entity == entity)
             {
-                memset(_rename_buffer, 0, 256);
-                ImGui::OpenPopup("Rename");
-                ImGui::SetNextWindowSize(ImVec2(300, 100));
-                if (ImGui::BeginPopupModal("Rename", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+                ImGui::Spacing();
+                ImGui::SameLine();
+                if (ImGui::InputText("##Rename", _rename_buffer, 256,ImGuiInputTextFlags_EnterReturnsTrue))
                 {
-                    ImGui::InputText("##Rename", _rename_buffer, 256);
-                    if (ImGui::Button("OK", ImVec2(120, 0)))
-                    {
-                        tag_comp->_name = _rename_buffer;
-                        ImGui::CloseCurrentPopup();
-                        _rename_entity = ECS::kInvalidEntity;
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Cancel", ImVec2(120, 0)))
-                    {
-                        ImGui::CloseCurrentPopup();
-                        _rename_entity = ECS::kInvalidEntity;
-                    }
-                    ImGui::EndPopup();
+                    tag_comp->_name = _rename_buffer;
+                    _rename_entity = ECS::kInvalidEntity;
+                    memset(_rename_buffer, 0, 256);
                 }
             }
             else

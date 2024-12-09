@@ -37,7 +37,7 @@ namespace Ailu
         static void CalcViewFrustumPlane(const Camera *cam, ViewFrustum &vf);
         static Matrix4x4f GetDefaultOrthogonalViewProj(f32 w,f32 h,f32 near = 1.f,f32 far = 200.f);
         //when the eye_camera turns, the AABB is recalculated, resulting in shadow jitter
-        static AABB GetShadowCascadeAABB(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);
+        static AABB GetBoundingAABB(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);
         static Sphere GetShadowCascadeSphere(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);
         static Camera &GetCubemapGenCamera(const Camera &base_cam, ECubemapFace::ECubemapFace face);
         Camera();
@@ -61,6 +61,7 @@ namespace Ailu
         RenderTexture *TargetTexture() const { return _target_texture; }
         void TargetTexture(RenderTexture *output) { _target_texture = output; }
         void SetViewAndProj(const Matrix4x4f &view, const Matrix4x4f &proj);
+        void SetPixelSize(u16 w, u16 h);
         //temp
         bool IsCustomVP() const { return _is_custom_vp; }
         friend Archive &operator<<(Archive &ar, const Camera &c);
@@ -71,7 +72,8 @@ namespace Ailu
         bool _is_render_shadow = true;
         bool _is_render_sky_box = true;
         bool _is_enable_postprocess = true;
-
+        bool _is_gen_voxel = false;
+        bool _is_enable = false;
     private:
         void CalculateFrustum();
 

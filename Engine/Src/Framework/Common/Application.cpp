@@ -6,10 +6,10 @@
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
+#include "UI/UIRenderer.h"
 #include "pch.h"
 #include <Render/Gizmo.h>
 #include <Render/TextRenderer.h>
-#include "UI/UIRenderer.h"
 
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Profiler.h"
@@ -26,7 +26,7 @@ namespace Ailu
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     LogMgr *g_pLogMgr = new LogMgr();
     Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
-    JobSystem* g_pJobSystem = new JobSystem(g_pThreadTool.get());
+    JobSystem *g_pJobSystem = new JobSystem(g_pThreadTool.get());
 
 
     WString Application::GetWorkingPath()
@@ -57,7 +57,7 @@ namespace Ailu
         sp_instance = this;
         g_pLogMgr->Initialize();
         g_pLogMgr->AddAppender(new FileAppender());
-        g_pLogMgr->AddAppender(new ConsoleAppender());
+        //g_pLogMgr->AddAppender(new ConsoleAppender());
         auto window_props = Ailu::WindowProps();
         window_props.Width = desc._window_width;
         window_props.Height = desc._window_height;
@@ -90,7 +90,7 @@ namespace Ailu
         //	}
         //});
         //_p_event_handle_thread->detach();
-        LOG_INFO("Application Initialize Success with {} s",0.001f * g_pTimeMgr->GetElapsedSinceLastMark());
+        LOG_INFO("Application Initialize Success with {} s", 0.001f * g_pTimeMgr->GetElapsedSinceLastMark());
         return 0;
     }
 

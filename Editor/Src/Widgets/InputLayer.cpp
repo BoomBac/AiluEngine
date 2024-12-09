@@ -72,6 +72,8 @@ namespace Ailu
             FirstPersonCameraController::s_inst._camera_near = Camera::sCurrent->Near();
             FirstPersonCameraController::s_inst._camera_far = Camera::sCurrent->Far();
             Camera::sCurrent->_is_scene_camera = true;
+            Camera::sCurrent->_is_gen_voxel = true;
+            Camera::sCurrent->_is_enable = true;
         }
         InputLayer::InputLayer(const String &name) : InputLayer()
         {

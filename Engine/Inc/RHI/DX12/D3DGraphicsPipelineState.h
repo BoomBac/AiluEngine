@@ -86,7 +86,7 @@ namespace Ailu
     }// namespace Math::ALHash
 
 
-    class D3DGraphicsPipelineState : public GraphicsPipelineStateObject
+    class D3DGraphicsPipelineState : public GraphicsPipelineStateObject, public GpuResource
     {
     public:
         D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer);

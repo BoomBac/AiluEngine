@@ -30,7 +30,7 @@ namespace Ailu
                 }
             }
             u32 index = 0u;
-            for (auto& comp: r.View<CSkeletonMesh>())
+            for (auto &comp: r.View<CSkeletonMesh>())
             {
                 auto t = r.GetComponent<CSkeletonMesh, TransformComponent>(index);
                 if (!comp._p_mesh)
@@ -39,6 +39,14 @@ namespace Ailu
                 {
                     comp._transformed_aabbs[i] = comp._p_mesh->_bound_boxs[i] * t->_transform._world_matrix;
                 }
+            }
+            index = 0u;
+            for (auto &comp: r.View<CCamera>())
+            {
+                auto t = r.GetComponent<CCamera, TransformComponent>(index);
+                comp._camera.Position(t->_transform._position);
+                comp._camera.Rotation(t->_transform._rotation);
+                comp._camera.RecalculateMarix();
             }
         }
 
@@ -57,14 +65,14 @@ namespace Ailu
             LightProbeHeadInfo head;
             memcpy(&head, probe_data, sizeof(LightProbeHeadInfo));
             u16 w = head._prefilter_size;
-            _test_prefilter_map = CubeMap::Create(w,true,ETextureFormat::kR11G11B10);
+            _test_prefilter_map = CubeMap::Create(w, true, ETextureFormat::kR11G11B10);
             _test_radiance_map = CubeMap::Create(head._radiance_size, false, ETextureFormat::kR11G11B10);
             u64 offset = sizeof(LightProbeHeadInfo);
             for (u16 face = 1; face <= 6; face++)
             {
-                for (u16 i = 0; i < _test_prefilter_map->MipmapLevel() + 1; i++)
+                for (u16 i = 0; i < _test_prefilter_map->MipmapLevel(); i++)
                 {
-                    auto [cur_w, cur_h] = _test_prefilter_map->CurMipmapSize(i);
+                    auto [cur_w, cur_h] = Texture::CalculateMipSize(_test_prefilter_map->Width(), _test_prefilter_map->Width(), i);
                     _test_prefilter_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, i);
                     offset += cur_w * cur_h * GetPixelByteSize(_test_prefilter_map->PixelFormat());
                 }
@@ -84,7 +92,8 @@ namespace Ailu
         void LightingSystem::OnPushEntity(Entity e)
         {
         }
-        void Ailu::ECS::LightingSystem::Update(Register &r, f32 delta_time)
+
+        void LightingSystem::Update(Register &r, f32 delta_time)
         {
 
             PROFILE_BLOCK_CPU(LightingSystem_Update)
@@ -174,7 +183,7 @@ namespace Ailu
                     comp._debug_material = _light_probe_debug_mat.get();
                 }
             }
-
+            ProcessVXGI(r);
             index = 0;
             for (auto &e: _entities)
             {
@@ -217,7 +226,7 @@ namespace Ailu
                             const XMMATRIX lightViewInv = XMMatrixInverse(nullptr, lightView);
                             const float farPlane = selected_cam.Far();
                             // Unproject main frustum corners into world space (notice the reversed Z projection!):
-                            auto unproj_mat = MatrixInverse(selected_cam.GetView() * selected_cam.GetProjection()); //这里如果near-clip过小的话，也会造成抖动的情况
+                            auto unproj_mat = MatrixInverse(selected_cam.GetView() * selected_cam.GetProjection());//这里如果near-clip过小的话，也会造成抖动的情况
                             XMMATRIX unproj;
                             memcpy(unproj.r, unproj_mat, sizeof(XMMATRIX));
                             XMVECTOR frustum_corners[] =
@@ -302,7 +311,8 @@ namespace Ailu
                             //}
                             // Extrude bounds to avoid early shadow clipping:
                             float ext = abs(_center.z - _min.z);
-                            ext = std::max(ext, std::min(1500.0f, farPlane) * 0.5f);
+                            //ext = std::max(ext, std::min(1500.0f, farPlane) * 0.5f);
+                            ext = std::max(ext, 75.f);
                             _min.z = _center.z - ext;
                             _max.z = _center.z + ext;
                             const XMMATRIX lightProjection = XMMatrixOrthographicOffCenterLH(_min.x, _max.x, _min.y, _max.y, _min.z, _max.z);// notice reversed Z!
@@ -380,6 +390,41 @@ namespace Ailu
             }
         }
 
+        void LightingSystem::ProcessVXGI(Register &r)
+        {
+            for (auto &vxgi: r.View<CVXGI>())
+            {
+                auto t = r.GetComponent<CVXGI, TransformComponent>(0);
+                if (auto cam_comp = r.GetComponent<CVXGI, CCamera>(0); cam_comp != nullptr)
+                {
+                    auto &cam = cam_comp->_camera;
+                    if (cam.Type() == ECameraType::kOrthographic)
+                    {
+                        LOG_WARNING("VXGI only support perspective camera!");
+                    }
+                    else
+                    {
+                        auto aabb = Camera::GetBoundingAABB(cam, 0.f, vxgi._distance);
+                        auto box_size = aabb.Size();
+                        f32 voxel_size = box_size.x > box_size.y ? box_size.x : box_size.y;
+                        voxel_size = box_size.z > voxel_size ? box_size.z : voxel_size;
+                        //cam._is_gen_voxel = true;
+                        vxgi._center = aabb.Center();
+                        vxgi._size = Vector3f(voxel_size);
+                        vxgi._grid_size = vxgi._size / Vector3f(vxgi._grid_num.x, vxgi._grid_num.y, vxgi._grid_num.z);
+                        aabb._min = vxgi._center - vxgi._size * 0.5f;
+                        aabb._max = vxgi._center + vxgi._size * 0.5f;
+                        Gizmo::DrawAABB(aabb, Colors::kYellow);
+                    }
+                    if (vxgi._is_draw_grid)
+                    {
+                        DebugDrawer::DebugWireframe(vxgi, t->_transform, Colors::kGreen);
+                    }
+                    Camera::sCurrent->_is_gen_voxel = true;
+                }
+                break;
+            }
+        }
     }// namespace ECS
     //namespace ECS
 }// namespace Ailu

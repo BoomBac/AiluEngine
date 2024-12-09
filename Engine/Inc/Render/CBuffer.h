@@ -14,6 +14,7 @@
 #define float3 Vector3f
 #define float4 Vector4f
 #define float4x4 Matrix4x4f
+#define int4 Vector4Int
 #endif//__cplusplus
 // C++
 #ifdef __cplusplus
@@ -92,12 +93,19 @@ cbuffer CBufferPerSceneData : register(b2)
         ShaderArealLightData _AreaLights[kMaxAreaLight];
         float4x4 _ShadowMatrix[kMaxCascadeShadowMapSplit + kMaxSpotLight + kMaxPointLight * 6];
         float4 _ActiveLightCount;
-        float4 _Time;// (t/20,t,t*2,t*3)
-        float4 _SinTime;// sin(t/8),sin(t/4),sin(t/2),sin(t)
-        float4 _CosTime;// cos(t/8),cos(t/4),cos(t/2),cos(t)
+        float4 _Time;     // (t/20,t,t*2,t*3)
+        float4 _SinTime;  // sin(t/8),sin(t/4),sin(t/2),sin(t)
+        float4 _CosTime;  // cos(t/8),cos(t/4),cos(t/2),cos(t)
         float4 _DeltaTime;//(dt,1/dt,smoothDt,1/smoothDt)
+        // x,y,z
+        int4 g_VXGI_GridNum;
+        //XYZ:center,w:max distance
+        float4 g_VXGI_Center;
+        //XYZ:cell size,w:min distance
+        float4 g_VXGI_GridSize;
+        float4 g_VXGI_Size;
         float g_IndirectLightingIntensity;
-        float padding1[43];
+        float padding1[27];
         //float4x4 _JointMatrix[80];
     };
 

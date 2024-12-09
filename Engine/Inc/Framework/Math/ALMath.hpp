@@ -42,7 +42,7 @@ namespace Ailu
             return (var == 0) ? 1.0f / sqrt(2.0f) : 1.0f;
         }
 
-    }
+    }// namespace
 
 #pragma warning(push)
 #pragma warning(disable : 4244)
@@ -227,9 +227,16 @@ namespace Ailu
             T &operator[](u32 index) { return data[index]; }
             const T &operator[](u32 index) const { return data[index]; }
 
-            std::string ToString(int precision = 2)
+            std::string ToString(int precision = 2) const
             {
-                return std::format("{:.{}f},{:.{}f}", data[0], precision, data[1], precision);
+                if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value)
+                {
+                    return std::format("{:.{}f},{:.{}f}", data[0], precision, data[1], precision);
+                }
+                else
+                {
+                    return std::format("{},{}", x, y);
+                }
             }
 
             friend std::ostream &operator<<(std::ostream &os, const Vector2D<T> &vec)
@@ -237,11 +244,11 @@ namespace Ailu
                 os << vec.x << "," << vec.y;
                 return os;
             }
-            bool operator==(const Vector2D<T>& other)
+            bool operator==(const Vector2D<T> &other)
             {
                 return x == other.x && y == other.y;
             }
-            bool operator<(const Vector2D<T>& other)
+            bool operator<(const Vector2D<T> &other)
             {
                 if (x != other.x) return x < other.x;
                 return y < other.y;
@@ -348,7 +355,7 @@ namespace Ailu
             Vector3D<T>() : x(0), y(0), z(0){};
             explicit Vector3D<T>(const T &_v) : x(_v), y(_v), z(_v){};
             Vector3D<T>(const T &_x, const T &_y, const T &_z) : x(_x), y(_y), z(_z){};
-            Vector3D<T>(Vector2D<T> v,const T &_z) : x(v.x), y(v.y), z(_z){};
+            Vector3D<T>(Vector2D<T> v, const T &_z) : x(v.x), y(v.y), z(_z){};
             template<typename Archive>
             void serialize(Archive &ar, u32 version)
             {
@@ -359,7 +366,7 @@ namespace Ailu
             {
                 return other.x == x && other.y == y && other.z == z;
             }
-            bool operator<(const Vector3D<T>& other) const
+            bool operator<(const Vector3D<T> &other) const
             {
                 if (x != other.x) return x < other.x;
                 if (y != other.y) return y < other.y;
@@ -459,7 +466,14 @@ namespace Ailu
 
             std::string ToString(int precision = 2) const
             {
-                return std::format("{:.{}f},{:.{}f},{:.{}f}", data[0], precision, data[1], precision, data[2], precision);
+                if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value)
+                {
+                    return std::format("{:.{}f},{:.{}f},{:.{}f}", data[0], precision, data[1], precision, data[2], precision);
+                }
+                else
+                {
+                    return std::format("{},{},{}", x, y, z);
+                }
             }
             bool FromString(const std::string &str)
             {
@@ -488,6 +502,8 @@ namespace Ailu
         const Vector3D<T> Vector3D<T>::kVector3Epsilon(kFloatEpsilon, kFloatEpsilon, kFloatEpsilon);
 
         using Vector3f = Vector3D<float>;
+        using Vector3Int = Vector3D<i32>;
+        using Vector3UInt = Vector3D<u32>;
 
         template<typename T>
         struct Vector4D
@@ -509,7 +525,7 @@ namespace Ailu
                 Swizzle<Vector2D, T, 0, 1> xy;
                 Swizzle<Vector2D, T, 0, 2> xz;
                 Swizzle<Vector2D, T, 1, 2> yz;
-                Swizzle<Vector2D,T,2,3> zw;
+                Swizzle<Vector2D, T, 2, 3> zw;
                 Swizzle<Vector3D, T, 0, 1, 2> xyz;
                 Swizzle<Vector3D, T, 0, 2, 1> xzy;
                 Swizzle<Vector3D, T, 1, 0, 2> yxz;
@@ -522,7 +538,7 @@ namespace Ailu
             Vector4D<T>() : x(0), y(0), z(0), w(0){};
             Vector4D<T>(const T &_v) : x(_v), y(_v), z(_v), w(_v){};
             Vector4D<T>(const T &_x, const T &_y, const T &_z, const T &_w) : x(_x), y(_y), z(_z), w(_w){};
-            Vector4D<T>(const Vector2D<T> &v2,T _z,T _w) : x(v2.x),y(v2.y),z(_z),w(_w){};
+            Vector4D<T>(const Vector2D<T> &v2, T _z, T _w) : x(v2.x), y(v2.y), z(_z), w(_w){};
             Vector4D<T>(const Vector3D<T> &v3) : x(v3.x), y(v3.y), z(v3.z), w(1.0f){};
             Vector4D<T>(const Vector3D<T> &v3, const T &_w) : x(v3.x), y(v3.y), z(v3.z), w(_w){};
 
@@ -541,7 +557,7 @@ namespace Ailu
             {
                 return x == other.x && y == other.y && z == other.z && w == other.w;
             }
-            bool operator<(const Vector4D<T>& other) const
+            bool operator<(const Vector4D<T> &other) const
             {
                 if (x != other.x) return x < other.x;
                 if (y != other.y) return y < other.y;
@@ -608,7 +624,14 @@ namespace Ailu
             }
             std::string ToString(int precision = 2) const
             {
-                return std::format("{:.{}f},{:.{}f},{:.{}f},{:.{}f}", data[0], precision, data[1], precision, data[2], precision, data[3], precision);
+                if constexpr (std::is_same<T, float>::value || std::is_same<T, double>::value)
+                {
+                    return std::format("{:.{}f},{:.{}f},{:.{}f},{:.{}f}", data[0], precision, data[1], precision, data[2], precision, data[3], precision);
+                }
+                else
+                {
+                    return std::format("{},{},{},{}", x, y, z, w);
+                }
             }
             bool FromString(const std::string &str)
             {
@@ -630,11 +653,12 @@ namespace Ailu
         const Vector4D<T> Vector4D<T>::kOne(1, 1, 1, 1);
 
         using Vector4f = Vector4D<float>;
+        using Vector4Int = Vector4D<i32>;
+        using Vector4UInt = Vector4D<u32>;
         using R8G8B8A8Unorm = Vector4D<u8>;
         using R8G8B8Unorm = Vector3D<u8>;
         using R32G32B32Float = Vector3D<float>;
         using R32G32B32A32Float = Vector3D<float>;
-        using Vector4i = Vector4D<u8>;
 
         template<template<typename> class TT, typename T>
         static float Distance(const TT<T> &from, const TT<T> &to)
@@ -734,7 +758,7 @@ namespace Ailu
             return res;
         }
         template<template<typename> typename TT, typename T>
-        TT<T> operator+(T s,const TT<T> v1)
+        TT<T> operator+(T s, const TT<T> v1)
         {
             TT<T> res;
             for (u32 i = 0; i < CountOf(v1.data); i++)
@@ -744,7 +768,7 @@ namespace Ailu
             return res;
         }
         template<template<typename> typename TT, typename T>
-        TT<T> operator+(const TT<T> v1,T s)
+        TT<T> operator+(const TT<T> v1, T s)
         {
             TT<T> res;
             for (u32 i = 0; i < CountOf(v1.data); i++)
@@ -754,7 +778,7 @@ namespace Ailu
             return res;
         }
         template<template<typename> typename TT, typename T>
-        TT<T>& operator+=(TT<T>& v1,T s)
+        TT<T> &operator+=(TT<T> &v1, T s)
         {
             for (u32 i = 0; i < CountOf(v1.data); i++)
             {
@@ -763,7 +787,7 @@ namespace Ailu
             return v1;
         }
         template<template<typename> typename TT, typename T>
-        TT<T>& operator-=(TT<T>& v1,T s)
+        TT<T> &operator-=(TT<T> &v1, T s)
         {
             for (u32 i = 0; i < CountOf(v1.data); i++)
             {
@@ -772,7 +796,7 @@ namespace Ailu
             return v1;
         }
         template<template<typename> typename TT, typename T>
-        TT<T>& operator/=(TT<T>& v1,T s)
+        TT<T> &operator/=(TT<T> &v1, T s)
         {
             for (u32 i = 0; i < CountOf(v1.data); i++)
             {
@@ -781,7 +805,7 @@ namespace Ailu
             return v1;
         }
         template<template<typename> typename TT, typename T>
-        TT<T>& operator*=(TT<T>& v1,T s)
+        TT<T> &operator*=(TT<T> &v1, T s)
         {
             for (u32 i = 0; i < CountOf(v1.data); i++)
             {
@@ -895,20 +919,20 @@ namespace Ailu
         /// radians between two dir
         /// </summary>
         template<template<typename> class TT, typename T>
-        static f32 Radian(const TT<T>& a,const TT<T>& b)
+        static f32 Radian(const TT<T> &a, const TT<T> &b)
         {
-            T dot = DotProduct(a,b);
+            T dot = DotProduct(a, b);
             f32 l1 = Magnitude(a);
             f32 l2 = Magnitude(b);
-            f32 cos_angle = dot / (l1*l2);
-            cos_angle = std::fmax(-1.f,std::fmin(1.f,cos_angle));
+            f32 cos_angle = dot / (l1 * l2);
+            cos_angle = std::fmax(-1.f, std::fmin(1.f, cos_angle));
             return std::acos(cos_angle);
         }
         /// <summary>
         /// degrees between two dir
         /// </summary>
         template<template<typename> class TT, typename T>
-        static f32 Angle(const TT<T>& a,const TT<T>& b)
+        static f32 Angle(const TT<T> &a, const TT<T> &b)
         {
             return Radian(a.b) * k2Angle;
         }
@@ -2479,7 +2503,7 @@ namespace Ailu
                     {
                         result.set(i, _hash.test(pos + i));
                     }
-                    return static_cast<u64>(result.to_ulong());
+                    return static_cast<u64>(result.to_ullong());
                 }
 
                 bool operator==(const Hash<Size> &other) const

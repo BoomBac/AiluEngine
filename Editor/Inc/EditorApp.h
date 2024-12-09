@@ -36,6 +36,7 @@ namespace Ailu
             void LoadEditorConfig(ApplicationDesc &desc);
             void SaveEditorConfig();
             void LoadEditorResource();
+            void WatchDirectory();
         };
     }// namespace Editor
 }// namespace Ailu

@@ -41,6 +41,71 @@ static void ParserClassInfo(const std::string &line, AiluHeadTool::ClassInfo &in
         aht.Log(std::format("ParserClassInfo failed with line: {}", line));
     }
 }
+static void ParserEnumInfo(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
+{
+    // 正则表达式解释：
+    // - `enum\s+`：匹配 "enum " 或 "enum class "
+    // - `(?:class\s+)?`：可选的 "class" 关键字
+    // - `(\w+)`：匹配枚举的名称
+    // - `(?:\s*:\s*(\w+))?`：匹配可选的继承类型，如 `: uint32_t`
+    std::regex pattern(R"(enum\s+(class\s+)?(\w+)(?:\s*:\s*(\w+))?)");
+    std::smatch matches;
+
+    if (std::regex_search(line, matches, pattern))
+    {
+        info._is_enum_class = matches[1].matched; // 是否为 enum class
+        info._name = matches[2].str();           // 枚举名称
+
+        if (matches[3].matched)
+        {
+            info._underlying_type = matches[3].str(); // 枚举的底层类型
+        }
+        else
+        {
+            info._underlying_type = ""; // 如果没有底层类型，设置为空字符串
+        }
+    }
+    else
+    {
+        aht.Log(std::format("ParserEnumInfo failed with line: {}", line));
+    }
+}
+static void ParserEnumValues(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
+{
+    // 正则表达式解释：
+    // - `(\w+)`：匹配枚举项的名称
+    // - `(?:\s*=\s*(-?\d+))?`：可选的赋值操作，如 `= 1`，支持负数
+    // - `(?:\s*,\s*)?`：可选的逗号和空格，用于分隔多个枚举项
+    std::regex pattern(R"((\w+)(?:\s*=\s*(-?\d+))?(?:\s*,\s*)?)");
+    std::smatch matches;
+
+    auto begin = line.cbegin();
+    auto end = line.cend();
+    int parser_num = 0;
+    // 逐个解析枚举项
+    while (std::regex_search(begin, end, matches, pattern))
+    {
+        std::pair<std::string,uint32_t> value;
+        auto&[name,id] = value;
+        name = matches[1].str(); // 获取枚举项名称
+
+        if (matches[2].matched)
+        {
+            id= std::stoi(matches[2].str()); // 解析赋值
+        }
+        else
+        {
+            id = info._members.size();
+        }
+        info._members.emplace_back(value);
+        begin = matches.suffix().first;
+        ++parser_num;
+    }
+    if (parser_num == 0)
+    {
+        aht.Log(std::format("ParserEnumValues failed with line: {}", line));
+    }
+}
 
 
 static void ParserPropertyInfo(const std::string &line, AiluHeadTool::MemberInfo &info,AiluHeadTool& aht)
@@ -144,7 +209,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir,std::string work
             std::transform(cur_file_id.begin(), cur_file_id.end(), cur_file_id.begin(), ::toupper);
             std::string line, last_line;
             bool is_include_start = false, is_include_end = false;
-            bool has_class_marked = false, has_property_marked = false, has_function_marked = false;
+            bool has_class_marked = false, has_property_marked = false, has_function_marked = false,has_enum_marked = false;
             bool is_cur_access_scope_public = false;
             int line_count = 0;
             while (std::getline(file, line))
@@ -179,6 +244,28 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir,std::string work
                     continue;
                 }
                 else {};
+                if (has_enum_marked)
+                {
+                    if (line.find("enum") != std::string ::npos)
+                    {
+                        EnumInfo enum_info;
+                        if (line.find('}') != std::string::npos)
+                        {
+                            ParserEnumValues(line,enum_info,*this);
+                        }
+                        else
+                        {
+                            while (line.find('}') == std::string::npos)
+                            {
+                                std::getline(file, line);
+                                ParserEnumValues(line,enum_info,*this);
+                            }
+                        }
+                        if (!enum_info._members.empty())
+                            _enums.emplace_back(enum_info);
+                        has_enum_marked = false;
+                    }
+                }
                 //提取信息
                 if (has_class_marked)
                 {
@@ -195,6 +282,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir,std::string work
                 if (line.find(kClassMacro) != std::string::npos)
                 {
                     has_class_marked = true;
+                    continue;
+                }
+                if (line.find(kEnumMacro) != std::string::npos)
+                {
+                    has_enum_marked = true;
                     continue;
                 }
                 if (!_classes.empty())
@@ -277,6 +369,16 @@ public:\
                     out_file <<"//Class " << class_info._name <<" end..........................."<< std::endl;
                     out_file << std::endl;
                 }
+                for(auto& enum_info : _enums)
+                {
+                    out_file <<"//Enum " << enum_info._name <<" begin..........................."<< std::endl;
+                    out_file << "namespace " << enum_info._name <<std::endl;
+                    out_file << "{" << std::endl;
+                    out_file << "static class Ailu::Enum* StaticType();" << endl;
+                    out_file << "};" << std::endl;
+                    out_file <<"//Enum " << enum_info._name <<" end..........................."<< std::endl;
+                    out_file << std::endl;
+                }
                 out_file << "#undef CURRENT_FILE_ID" << std::endl;
                 out_file << "#define CURRENT_FILE_ID " << cur_file_id << std::endl;
                 out_file.close();
@@ -339,10 +441,36 @@ public:\
                     cpp_file << "}" << std::endl;
                     cpp_file << std::endl;
                 }
+                for (auto &enum_info: _enums)
+                {
+                    out_file <<"//Enum " << enum_info._name <<" begin..........................."<< std::endl;
+                    out_file << "namespace " << enum_info._name <<std::endl;
+                    out_file << "{" << std::endl;
+                    out_file << "class Ailu::Enum* StaticType()" << endl;
+                    out_file << "{" << std::endl;
+                    out_file << std::format("static std::unique_ptr<Ailu::Enum> cur_type = nullptr;") << std::endl;
+                    out_file << std::format("if(cur_type == nullptr)") << std::endl;
+                    out_file << "{" << std::endl;
+                    out_file << "EnumInitializer initializer;" << endl;
+                    out_file << std::format("initializer._name = \"{}\"", enum_info._name) << ";"<<endl;
+                    for(auto& mem : enum_info._members)
+                    {
+                        auto&[name,id] = mem;
+                        out_file << std::format("initializer._members.emplace_back(\"{}\", {});", name, id) << std::endl;
+                    }
+                    out_file << "cur_type = std::make_unique<Ailu::Enum>(initializer);" << std::endl;
+                    out_file << std::format("Ailu::Enum::RegisterEnum({},cur_type.get());",enum_info._name);
+                    out_file << "}" << std::endl;
+                    out_file << "return cur_type.get();" << std::endl;
+                    out_file << "}" << std::endl;
+                    out_file << "}" << std::endl;
+                    out_file <<"//Enum " << enum_info._name <<" end..........................."<< std::endl;
+                    out_file << std::endl;
+                }
                 cpp_file.close();
                 Log(std::format("AiluHeadTool::Parser create file {} succeed!", cpp_path.string()));
                 g_Timer.stop();
-                Log(std::format("AiluHeadTool::Parser file {} success with {} class after {}ms", path.string(),_classes.size(), g_Timer.ElapsedMilliseconds()));
+                Log(std::format("AiluHeadTool::Parser file {} success with {} class and {} enum after {}ms", path.string(),_classes.size(), _enums.size(),g_Timer.ElapsedMilliseconds()));
                 g_Timer.reset();
                 return;
             }

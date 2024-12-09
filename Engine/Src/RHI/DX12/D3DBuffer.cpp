@@ -16,8 +16,9 @@ namespace Ailu
         auto d3d_conetxt = D3DContext::Get();
         _desc._size = Math::AlignTo(_desc._size, 256);
         auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(_desc._size);
-        res_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         res_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        if (desc._is_random_write)
+            res_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
         _state_guard = D3DResourceStateGuard(D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
@@ -32,25 +33,35 @@ namespace Ailu
         }
         auto p_device = dynamic_cast<D3DContext *>(g_pGfxContext)->GetDevice();
         _alloc = g_pGPUDescriptorAllocator->Allocate(1);
-        auto [cpu_handle, gpu_handle] = _alloc.At(0);
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
-        uav_desc.Format = ConvertToDXGIFormat(desc._format);
-        uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        uav_desc.Buffer.FirstElement = 0;
-        uav_desc.Buffer.NumElements = 1;
-        p_device->CreateUnorderedAccessView(_p_d3d_res.Get(), nullptr, &uav_desc, cpu_handle);
+        if (desc._is_random_write)
+        {
+            auto [cpu_handle, gpu_handle] = _alloc.At(0);
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
+            uav_desc.Format = ConvertToDXGIFormat(desc._format);
+            uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            uav_desc.Buffer.FirstElement = 0;
+            uav_desc.Buffer.NumElements = desc._element_num;
+            p_device->CreateUnorderedAccessView(_p_d3d_res.Get(), nullptr, &uav_desc, cpu_handle);
+        }
+        _state.SetSize(desc._size);
     }
     D3DGPUBuffer::~D3DGPUBuffer()
     {
         g_pGPUDescriptorAllocator->Free(std::move(_alloc));
+        g_pGfxContext->WaitForFence(_state.GetFenceValue());
     }
-    void D3DGPUBuffer::Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline) const
+    void D3DGPUBuffer::Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline)
     {
+        GpuResource::Bind();
         auto [ch, gh] = _alloc.At(0);
         if (is_compute_pipeline)
-            static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetComputeRootDescriptorTable(bind_slot, gh);
+        {
+            _alloc.CommitDescriptorsForDispatch(static_cast<D3DCommandBuffer *>(cmd), bind_slot);
+            //static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetComputeRootDescriptorTable(bind_slot, gh);
+            //_alloc.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer *>(cmd),bind_slot);
+        }
         else
-            static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootDescriptorTable(bind_slot, gh);
+            _alloc.CommitDescriptorsForDraw(static_cast<D3DCommandBuffer *>(cmd), bind_slot);
     }
     u8 *D3DGPUBuffer::ReadBack()
     {
@@ -115,8 +126,8 @@ namespace Ailu
         _state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         g_pGfxContext->ExecuteCommandBuffer(cmd);
 
-        std::async(std::launch::async, [=]() 
-        {
+        std::async(std::launch::async, [=]()
+                   {
 		    g_pGfxContext->WaitForGpu();
 		    D3D12_RANGE readbackBufferRange{0, _desc._size};
 		    u8* data;
@@ -136,9 +147,12 @@ namespace Ailu
 		    if (on_complete)
 		    {
 			    on_complete();
-		    } 
-        });
+		    } });
         CommandBufferPool::Release(cmd);
+    }
+    bool D3DGPUBuffer::IsRandomAccess() const
+    {
+        return _desc._is_random_write;
     }
     void D3DGPUBuffer::SetName(const String &name)
     {
@@ -156,13 +170,17 @@ namespace Ailu
         _vertex_buffers.resize(stream_count);
         _mapped_data.resize(RenderConstants::kMaxVertexAttrNum);
         _stream_size.resize(RenderConstants::kMaxVertexAttrNum);
+        _size_all_stream = 0u;
     }
     D3DVertexBuffer::~D3DVertexBuffer()
     {
+        _size_all_stream = 0u;
+        g_pGfxContext->WaitForFence(_state.GetFenceValue());
     }
 
-    void D3DVertexBuffer::Bind(CommandBuffer *cmd, const VertexBufferLayout &pipeline_input_layout) const
+    void D3DVertexBuffer::Bind(CommandBuffer *cmd, const VertexBufferLayout &pipeline_input_layout)
     {
+        GpuResource::Bind();
         auto cmdlist = static_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
         RenderingStates::s_vertex_num += _vertices_count;
         for (auto &layout_ele: pipeline_input_layout)
@@ -233,6 +251,8 @@ namespace Ailu
         D3DContext::Get()->TrackResource(upload_heap);
         _stream_size[stream_index] = size;
         //s_vertex_upload_bufs.emplace_back(upload_heap);
+        _size_all_stream += size;
+        _state.SetSize(_size_all_stream);
     }
 
     void D3DVertexBuffer::SetStream(u8 *data, u32 size, u8 stream_index, bool dynamic)
@@ -286,6 +306,8 @@ namespace Ailu
         _buffer_views[cur_buffer_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
         _buffer_views[cur_buffer_index].SizeInBytes = size;
         _buffer_layout_indexer.emplace(std::make_pair(_buffer_layout[stream_index].Name, stream_index));
+        _size_all_stream += size;
+        _state.SetSize(_size_all_stream);
     }
 
     void D3DVertexBuffer::SetName(const String &name)
@@ -300,7 +322,7 @@ namespace Ailu
     {
         return _vertices_count;
     }
-    void D3DVertexBuffer::SetData(u8 *data, u32 size, u8 stream_index,u32 offset)
+    void D3DVertexBuffer::SetData(u8 *data, u32 size, u8 stream_index, u32 offset)
     {
         AL_ASSERT(stream_index < _mapped_data.size());
         AL_ASSERT(offset + size <= _stream_size[stream_index]);
@@ -333,15 +355,18 @@ namespace Ailu
         buf_view.StrideInBytes = sizeof(Vector4f);
         buf_view.SizeInBytes = _size_color_buf;
         _buf_views[1] = buf_view;
+        _state.SetSize(_size_pos_buf + _size_color_buf);
     }
     D3DDynamicVertexBuffer::~D3DDynamicVertexBuffer()
     {
         delete[] _p_ime_vertex_data;
         delete[] _p_ime_color_data;
+        g_pGfxContext->WaitForFence(_state.GetFenceValue());
     }
 
-    void D3DDynamicVertexBuffer::Bind(CommandBuffer *cmd) const
+    void D3DDynamicVertexBuffer::Bind(CommandBuffer *cmd)
     {
+        GpuResource::Bind();
         RenderingStates::s_vertex_num += _vertex_num;
         static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->IASetVertexBuffers(0, 2, _buf_views);
     }
@@ -396,13 +421,16 @@ namespace Ailu
         _index_buf_view.BufferLocation = _index_buf->GetGPUVirtualAddress();
         _index_buf_view.Format = DXGI_FORMAT_R32_UINT;
         _index_buf_view.SizeInBytes = static_cast<u32>(byte_size);
+        _state.SetSize(byte_size);
     }
     D3DIndexBuffer::~D3DIndexBuffer()
     {
+        g_pGfxContext->WaitForFence(_state.GetFenceValue());
     }
 
-    void D3DIndexBuffer::Bind(CommandBuffer *cmd) const
+    void D3DIndexBuffer::Bind(CommandBuffer *cmd)
     {
+        GpuResource::Bind();
         RenderingStates::s_triangle_num += _count / 3;
         static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->IASetIndexBuffer(&_index_buf_view);
     }
@@ -451,6 +479,7 @@ namespace Ailu
         _index_buf_view.BufferLocation = _index_buf->GetGPUVirtualAddress();
         _index_buf_view.Format = DXGI_FORMAT_R32_UINT;
         _index_buf_view.SizeInBytes = static_cast<u32>(byte_size);
+        _state.SetSize(new_size);
     }
     //-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
 
@@ -463,19 +492,25 @@ namespace Ailu
 
     D3DConstantBuffer::D3DConstantBuffer(u32 size, bool compute_buffer) : _is_compute_buffer(compute_buffer)
     {
-       _alloc = GpuResourceManager::Get()->Allocate(size);
+        _alloc = GpuResourceManager::Get()->Allocate(size);
+        _state.SetSize(size);
     }
     D3DConstantBuffer::~D3DConstantBuffer()
     {
         GpuResourceManager::Get()->Free(std::move(_alloc));
     }
 
-    void D3DConstantBuffer::Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline) const
+    void D3DConstantBuffer::Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline)
     {
+        GpuResource::Bind();
         if (is_compute_pipeline)
             static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetComputeRootConstantBufferView(bind_slot, _alloc._gpu_ptr);
         else
             static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, _alloc._gpu_ptr);
+    }
+    void D3DConstantBuffer::Reset()
+    {
+        memset(_alloc._cpu_ptr, 0, _alloc._size);
     }
     //-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
 

@@ -234,7 +234,7 @@ static void SplitEnumArgs(const char *szArgs, std::string Array[], int nMax)
 #define DECLARE_ENUM(ename, ...)                                                       \
     namespace ename                                                                    \
     {                                                                                  \
-        enum ename : uint16_t                                                           \
+        enum ename : uint16_t                                                          \
         {                                                                              \
             __VA_ARGS__,                                                               \
             COUNT                                                                      \

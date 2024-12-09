@@ -132,7 +132,9 @@ static const float2 poissonDisk[64] =
 // 	return 1.0 - shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
 // }
 
-#define _ShadowMapTexelSize 0.001953125f
+#define _ShadowMapTexelSize 0.001953125f// 1/512
+#define _SOFT_SAMPLE_COUNT 1
+
 
 float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 {
@@ -159,12 +161,15 @@ float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 			shadow_uv.x = shadow_coord.x * 0.5f + 0.5f;
 			shadow_uv.y = shadow_coord.y * -0.5f + 0.5f;
 			float shadow_factor = 0.0;
-			for (int i = 0; i < 8; i++)
+			for (int i = 0; i < _SOFT_SAMPLE_COUNT; i++)
 			{
-				uint random_index = uint(8.0 * Random(float4(world_pos.xyy, i))) % 8;
-				shadow_factor += lerp(0.0, 0.125, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
-					float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth - z_bias).r);
+				//uint random_index = uint(8.0 * Random(float4(world_pos.xyy, i))) % 8;
+				// shadow_factor += lerp(0.0, 0.125, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
+				// 	float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth - z_bias).r);
+				shadow_factor += MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
+					float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth - z_bias).r;
 			}
+			shadow_factor /= _SOFT_SAMPLE_COUNT;
 			shadow_factor =  (1.0 - shadow_factor);
 			return 1.0 - shadow_factor * atten;
 		}

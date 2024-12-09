@@ -60,7 +60,7 @@ namespace Ailu
 
     struct RenderingShadowData
     {
-        Matrix4x4f* _shadow_matrix;
+        Matrix4x4f *_shadow_matrix;
         i16 _shadow_index = -1;
         float _shadow_bias = 0.001f;
         const CullResult *_cull_results;
@@ -80,6 +80,13 @@ namespace Ailu
     {
         RenderTextureDesc _camera_color_target_desc;
     };
+    struct VoxelGIData
+    {
+        Vector3f _center;
+        Vector3f _size;
+        Vector3Int _grid_num;
+        Vector3f _grid_size;
+    };
 
     class CommandBuffer;
     class Camera;
@@ -93,7 +100,7 @@ namespace Ailu
         u8 _addi_shadow_num = 0, _addi_point_shadow_num = 0;
         IConstantBuffer *_p_per_scene_cbuf;
         IConstantBuffer *_p_per_camera_cbuf;
-        IConstantBuffer **_p_per_object_cbuf;
+        Vector<IConstantBuffer *> *_p_per_object_cbuf;
         RTHandle _camera_color_target_handle;
         RTHandle _camera_depth_target_handle;
         RTHandle _final_rt_handle;
@@ -106,6 +113,9 @@ namespace Ailu
         const CullResult *_cull_results;
         const Camera *_camera;
         CameraData _camera_data;
+        VoxelGIData _vxgi_data;
+        bool _is_debug_voxel = false;
+        u16 _vxgi_debug_mipmap = 0u;
         //temp
         Vector4f _mainlight_world_position;
         void Reset()

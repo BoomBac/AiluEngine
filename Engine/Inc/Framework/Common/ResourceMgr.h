@@ -4,19 +4,19 @@
 #pragma once
 #ifndef __RESOURCE_MGR_H__
 #define __RESOURCE_MGR_H__
-#include <optional>
-#include <unordered_map>
 #include "FileManager.h"
 #include "Framework/Common/Asset.h"
 #include "Framework/Common/Utils.h"
 #include "Framework/Interface/IRuntimeModule.h"
+#include "Framework/Parser/AssetParser.h"
 #include "Path.h"
+#include "Render/Font.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/Texture.h"
 #include "Scene/Scene.h"
-#include "Render/Font.h"
-#include "Framework/Parser/AssetParser.h"
+#include <optional>
+#include <unordered_map>
 
 namespace Ailu
 {
@@ -89,21 +89,12 @@ namespace Ailu
 
     class AILU_API ResourceMgr : public IRuntimeModule
     {
+    public:
         using ResourcePoolContainer = Map<WString, Ref<Object>>;
         using ResourcePoolContainerIter = ResourcePoolContainer::iterator;
         using ResourcePoolLut = Map<u32, ResourcePoolContainer::iterator>;
         using ResourceTask = std::function<void()>;
         using OnResourceTaskCompleted = std::function<void(Ref<void> asset)>;
-        struct ImportInfo
-        {
-            String _msg;
-            WString _sys_path;
-            float _progress;
-            std::filesystem::file_time_type _last_write_time;
-            bool _is_succeed;
-        };
-
-    public:
         inline const static std::set<String> kLDRImageExt = {".png", ".PNG", ".tga", ".TGA", ".jpg", ".JPG", ".jpg", ".JPEG"};
         inline const static std::set<String> kHDRImageExt = {".exr", ".EXR", ".hdr", ".HDR"};
         inline const static std::set<String> kMeshExt = {".obj", ".OBJ", ".fbx", ".FBX"};
@@ -135,12 +126,12 @@ namespace Ailu
         {
             return _project_root_path;
         }
-
+        //提交一个任务，该任务会在ResourceMgr tick时在主线程执行
+        void SubmitTaskSync(ResourceTask task);
         //static Material* LoadAsset(const String& asset_path);
         Ref<void> ImportResource(const WString &sys_path, const ImportSetting &setting = ImportSetting::Default());
         //async editon always reutn nullptr
         Ref<void> ImportResourceAsync(const WString &sys_path, const ImportSetting &setting = ImportSetting::Default(), OnResourceTaskCompleted callback = [](Ref<void> asset) {});
-        const List<ImportInfo> &GetImportInfos() const { return _import_infos; }
 
         const WString &GetAssetPath(Object *obj) const;
         const Guid &GetAssetGuid(Object *obj) const;
@@ -171,7 +162,6 @@ namespace Ailu
         void LoadAsync(const WString &asset_path, ImportSetting *setting = nullptr);
         template<typename T>
         void LoadAsync(const Guid &guid, ImportSetting *setting = nullptr);
-        void WatchDirectory();
         template<typename T>
         T *Get(const WString &res_id);
         template<typename T>
@@ -207,6 +197,7 @@ namespace Ailu
 
     public:
         Ref<Font> _default_font;
+
     private:
         static void FormatLine(const String &line, String &key, String &value);
         static void ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, EAssetType::EAssetType &type);
@@ -231,7 +222,7 @@ namespace Ailu
         Scope<Asset> LoadScene(const WString &asset_path);
         Scope<Asset> LoadAnimClip(const WString &asset_path);
         //加载原始资产
-        List<Ref<Mesh>> LoadExternalMesh(const WString &asset_path,const MeshImportSetting& setting,List<Ref<AnimationClip>>& clips);
+        List<Ref<Mesh>> LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting, List<Ref<AnimationClip>> &clips);
         Ref<Texture2D> LoadExternalTexture(const WString &asset_path);
         Ref<Shader> LoadExternalShader(const WString &asset_path);
         Ref<ComputeShader> LoadExternalComputeShader(const WString &asset_path);
@@ -251,16 +242,12 @@ namespace Ailu
     private:
         inline static String kAssetDatabasePath;
         inline static WString s_engine_res_root_pathw;
-
-        inline static ImportInfo *s_p_current_import_info;
         inline static Map<u32, WString> s_object_sys_path_map;
         inline static List<ResourceTask> s_task_queue;
         inline static Queue<Asset *> s_pending_save_assets;
         inline static std::unordered_map<WString, fs::file_time_type> s_file_last_load_time;
         bool _is_watching_directory = true;
         WString _project_root_path;
-        List<ImportInfo> _import_infos;
-        std::mutex _import_infos_mutex;
         std::mutex _asset_db_mutex;
         //<GUID,Asset>
         std::map<Guid, Scope<Asset>> _asset_db{};
@@ -273,21 +260,20 @@ namespace Ailu
         ResourcePoolLut _lut_global_resources;
         Map<EAssetType::EAssetType, Vector<ResourcePoolContainerIter>> _lut_global_resources_by_type;
         Vector<std::function<void()>> _asset_changed_callbacks;
+        Queue<ResourceTask> _tasks;
         Queue<Asset *> _pending_delete_assets;
-        Queue<Shader *> _shader_waiting_for_compile;
-        Queue<ComputeShader *> _compute_shader_waiting_for_compile;
     };
     extern AILU_API ResourceMgr *g_pResourceMgr;
 
     template<typename T>
-    inline Ref<T> ResourceMgr::Load(const WString &asset_path,ImportSetting* setting)
+    inline Ref<T> ResourceMgr::Load(const WString &asset_path, ImportSetting *setting)
     {
         if (asset_path.empty())
         {
             LOG_ERROR(L"ResourceMgr::Load: Asset path is empty");
             return nullptr;
         }
-        LOG_WARNING(L"Begin load asset {}...",asset_path);
+        LOG_WARNING(L"Begin load asset {}...", asset_path);
         TimeMgr timer;
         timer.Mark();
         using Loader = std::function<Scope<Asset>(ResourceMgr *, const WString &)>;
@@ -302,7 +288,7 @@ namespace Ailu
         //AL_ASSERT(type != EAssetType::kUndefined);
         if (type == EAssetType::kUndefined)
         {
-            g_pLogMgr->LogErrorFormat(L"Load asset {} failed with invalid asset type after {}ms", asset_path,timer.GetElapsedSinceLastMark());
+            g_pLogMgr->LogErrorFormat(L"Load asset {} failed with invalid asset type after {}ms", asset_path, timer.GetElapsedSinceLastMark());
             return nullptr;
         }
         bool is_skip_load = false;
@@ -311,19 +297,6 @@ namespace Ailu
         {
             g_pLogMgr->LogWarningFormat(L"Load asset {} succeed with everything is new after {}ms", asset_path, timer.GetElapsedSinceLastMark());
             return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
-        }
-        List<ImportInfo>::iterator iter = _import_infos.begin();
-        {
-            ImportInfo info;
-            info._is_succeed = false;
-            //info._last_write_time = fs::last_write_time(p);
-            info._msg = ToChar(std::format(L"Import {}...", asset_path));
-            info._progress = 0.0f;
-            info._sys_path = sys_path;
-            std::lock_guard<std::mutex> lock(_import_infos_mutex);
-            _import_infos.push_back(info);
-            iter = _import_infos.end();
-            --iter;
         }
         if constexpr (std::is_same<T, Texture2D>::value)
         {
@@ -371,10 +344,6 @@ namespace Ailu
         }
         else
             g_pLogMgr->LogErrorFormat(L"Load asset {} failed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
-        {
-            std::lock_guard<std::mutex> lock(_import_infos_mutex);
-            _import_infos.erase(iter);
-        }
         return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
     }
     template<typename T>
@@ -386,12 +355,14 @@ namespace Ailu
     template<typename T>
     inline void ResourceMgr::LoadAsync(const WString &asset_path, ImportSetting *setting)
     {
-        g_pThreadTool->Enqueue([this, asset_path](){ this->Load<T>(asset_path); });
+        g_pThreadTool->Enqueue([this, asset_path]()
+                               { this->Load<T>(asset_path); });
     }
     template<typename T>
     inline void ResourceMgr::LoadAsync(const Guid &guid, ImportSetting *setting)
     {
-        g_pThreadTool->Enqueue([this, guid](){ this->Load<T>(guid); });
+        g_pThreadTool->Enqueue([this, guid]()
+                               { this->Load<T>(guid); });
     }
     template<typename T>
     inline T *ResourceMgr::Get(const WString &res_id)

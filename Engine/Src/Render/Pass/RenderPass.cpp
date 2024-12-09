@@ -79,9 +79,9 @@ namespace Ailu
                     for (auto &obj: objs)
                     {
                         if (obj._material == nullptr)
-                            cmd->DrawRenderer(obj._mesh, shader_state_mat.get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, _error_shader_pass_id, obj._instance_count);
+                            cmd->DrawRenderer(obj._mesh, shader_state_mat.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, _error_shader_pass_id, obj._instance_count);
                         else
-                            cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                            cmd->DrawRenderer(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     }
                 }
             }
@@ -138,7 +138,7 @@ namespace Ailu
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
                                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                                cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                cmd->DrawRenderer(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
                             }
                         }
                     }
@@ -165,7 +165,7 @@ namespace Ailu
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
                                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                                cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                cmd->DrawRenderer(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
                             }
                         }
                     }
@@ -205,18 +205,18 @@ namespace Ailu
                                 {
                                     obj._material->EnableKeyword("CAST_POINT_SHADOW");
                                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
-                                    cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                    cmd->DrawRenderer(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
                                 }
                             }
                         }
                         //for (auto& obj : RenderQueue::GetOpaqueRenderables())
                         //{
-                        //	cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj_index++],
+                        //	cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), (*rendering_data._p_per_object_cbuf)[obj_index++],
                         //		obj._submesh_index, 1, obj._instance_count);
                         //}
                         //for (auto& obj : RenderQueue::GetTransparentRenderables())
                         //{
-                        //	cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), rendering_data._p_per_object_cbuf[obj_index++],
+                        //	cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), (*rendering_data._p_per_object_cbuf)[obj_index++],
                         //		obj._submesh_index, 1, obj._instance_count);
                         //}
                         obj_index = 0;
@@ -298,7 +298,7 @@ namespace Ailu
             _per_camera_cb[i].reset(IConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
             memcpy(_per_camera_cb[i]->GetData(), &_camera_data[i], RenderConstants::kPerCameraDataSize);
         }
-        f32 mipmap_level = _prefilter_cubemap->MipmapLevel() + 1;
+        f32 mipmap_level = _prefilter_cubemap->MipmapLevel();
         for (f32 i = 0.0f; i < mipmap_level; i++)
         {
             u16 cur_mipmap_size = size >> (u16) i;
@@ -312,10 +312,10 @@ namespace Ailu
 
     void CubeMapGenPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
-        auto cmd = CommandBufferPool::Get();
+        auto cmd = CommandBufferPool::Get("LightProbeGen");
         cmd->Clear();
         Texture *src_tex = _input_src ? _input_src : _src_cubemap.get();
-        u16 mipmap_level = src_tex->MipmapLevel() + 1;
+        u16 mipmap_level = src_tex->MipmapLevel();
         if (!_is_src_cubemap)
         {
             //image tp cubemap
@@ -330,11 +330,11 @@ namespace Ailu
             context->ExecuteAndWaitCommandBuffer(cmd);
             cmd->Clear();
             //实际上mipmap生成不使用传入的cmd，但是需要等待原始cubemap生成完毕
-            _src_cubemap->GenerateMipmap(cmd.get());
+            _src_cubemap->GenerateMipmap();
         }
         else
         {
-            dynamic_cast<RenderTexture *>(_input_src)->GenerateMipmap(cmd.get());
+            dynamic_cast<RenderTexture *>(_input_src)->GenerateMipmap();
         }
 
         //gen radiance map
@@ -348,14 +348,14 @@ namespace Ailu
             cmd->DrawRenderer(Mesh::s_p_cube.lock().get(), _p_filter_material, _per_obj_cb.get());
         }
         //filter envmap
-        mipmap_level = _prefilter_cubemap->MipmapLevel() + 1;
+        mipmap_level = _prefilter_cubemap->MipmapLevel();
         for (u16 i = 0; i < 6; i++)
         {
             Rect r(0, 0, _prefilter_cubemap->Width(), _prefilter_cubemap->Height());
             for (u16 j = 0; j < mipmap_level; j++)
             {
                 _reflection_prefilter_mateirals[j]->SetTexture("EnvMap", src_tex);
-                auto [w, h] = _prefilter_cubemap->CurMipmapSize(j);
+                auto [w, h] = Texture::CalculateMipSize(_prefilter_cubemap->Width(), _prefilter_cubemap->Height(), j);
                 r.width = w;
                 r.height = h;
                 u16 rt_index = _prefilter_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), j, 0);
@@ -408,15 +408,15 @@ namespace Ailu
                 auto &[queue, objs] = it;
                 for (auto &obj: objs)
                 {
-                    //memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj._world_matrix, sizeof(Matrix4x4f));
-                    auto ret = cmd->DrawRenderer(obj._mesh, obj._material, rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                    //memcpy((*rendering_data._p_per_object_cbuf)[obj_index]->GetData(), obj._world_matrix, sizeof(Matrix4x4f));
+                    auto ret = cmd->DrawRenderer(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     ++obj_index;
                 }
             }
             //for (auto& obj : RenderQueue::GetOpaqueRenderables())
             //{
-            //	memcpy(rendering_data._p_per_object_cbuf[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-            //	auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), rendering_data._p_per_object_cbuf[obj_index], obj._submesh_index, obj._instance_count);
+            //	memcpy((*rendering_data._p_per_object_cbuf)[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
+            //	auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), (*rendering_data._p_per_object_cbuf)[obj_index], obj._submesh_index, obj._instance_count);
             //	++obj_index;
             //}
         }
@@ -690,8 +690,15 @@ namespace Ailu
                 memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                 cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_lightprobe, m);
             }
+            entity_index = 0;
             for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<CCamera>())
             {
+                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<CCamera, TransformComponent>(entity_index++);
+                auto world_pos = t->_transform._position;
+                auto m = MatrixTranslation(world_pos);
+                f32 scale = 2.0f;
+                m = MatrixScale(scale, scale, scale) * m;
+                memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                 cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_camera, _p_cbuffers[index++].get(), 0, 0, 1);
             }
             GraphicsPipelineStateMgr::s_gizmo_pso->Bind(cmd.get());
@@ -841,7 +848,7 @@ namespace Ailu
                         mat->ChangeShader(g_pResourceMgr->Get<Shader>(shader_name_w));
                         _wireframe_mats[obj._material->Name()] = mat;
                     }
-                    cmd->DrawRenderer(obj._mesh, _wireframe_mats[obj._material->Name()].get(), rendering_data._p_per_object_cbuf[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                    cmd->DrawRenderer(obj._mesh, _wireframe_mats[obj._material->Name()].get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                 }
             }
         }

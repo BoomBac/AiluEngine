@@ -35,7 +35,11 @@ set(CORE_MODULE
 set(RENDER_MODULE
         Inc/Render/Gizmo.h
         Src/Render/Gizmo.cpp
-        Src/Render/TextRenderer.cpp)
+        Src/Render/TextRenderer.cpp
+        Src/Render/FrameResource.cpp
+        Inc/Render/FrameResource.h
+        Src/Render/Pass/VoxelGI.cpp
+        Inc/Render/Pass/VoxelGI.h)
 set(RHI_DX12
         Inc/RHI/DX12/GPUResourceManager.h
         Src/RHI/DX12/GPUResourceManager.cpp

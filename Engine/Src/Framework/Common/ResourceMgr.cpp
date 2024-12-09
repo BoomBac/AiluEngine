@@ -15,24 +15,6 @@
 
 namespace Ailu
 {
-    namespace fs = std::filesystem;
-
-    //填充监听路径下的所有文件
-    static void TraverseDirectory(const fs::path &directoryPath, std::set<fs::path> &path_set)
-    {
-        for (const auto &entry: fs::directory_iterator(directoryPath))
-        {
-            if (fs::is_directory(entry.status()))
-            {
-                TraverseDirectory(entry.path(), path_set);
-            }
-            else if (fs::is_regular_file(entry.status()))
-            {
-                path_set.insert(entry.path());
-            }
-        }
-    }
-
     String ResourceMgr::GetResSysPath(const String &sub_path)
     {
         String path = sub_path;
@@ -79,6 +61,7 @@ namespace Ailu
                 L"Shaders/forwardlit.alasset",
                 L"Shaders/default_ui.alasset",
                 L"Shaders/default_text.alasset",
+                L"Shaders/voxel_drawer.alasset",
                 L"Shaders/water.alasset"};
         Vector<WString> shader_pathes = {
                 L"Shaders/hlsl/debug.hlsl",
@@ -111,6 +94,9 @@ namespace Ailu
                                this);
         g_pJobSystem->Dispatch([](ResourceMgr *mgr)
                                { mgr->Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset"); },
+                               this);
+        g_pJobSystem->Dispatch([](ResourceMgr *mgr)
+                               { mgr->Load<ComputeShader>(L"Shaders/voxelize.alasset"); },
                                this);
         for (auto &p: shader_asset_pathes)
             g_pJobSystem->Dispatch([&](WString p)
@@ -252,13 +238,12 @@ namespace Ailu
         }
         //_default_font = Font::Create(GetResSysPath(L"Fonts/Open_Sans/Arial.fnt"));
         _default_font = Font::Create(GetResSysPath(L"Fonts/Open_Sans/open_sans_regular_65.fnt"));
-        for(auto& p : _default_font->_pages)
+        for (auto &p: _default_font->_pages)
         {
             p._texture = LoadExternalTexture(p._file);
             RegisterResource(PathUtils::ExtractAssetPath(p._file), p._texture);
         }
         //g_pThreadTool->Enqueue("ResourceMgr::WatchDirectory", &ResourceMgr::WatchDirectory, this);
-        WatchDirectory();
         //        std::ifstream is(GetResSysPath(L"AnimClips/a.clip"));
         //        TextIArchive ar(&is);
         //        auto clip = MakeRef<AnimationClip>();
@@ -314,52 +299,10 @@ namespace Ailu
             UnRegisterAsset(asset);
             _pending_delete_assets.pop();
         }
-        while (!_shader_waiting_for_compile.empty())
+        while (!_tasks.empty())
         {
-            Shader *shader = _shader_waiting_for_compile.front();
-            if (shader->PreProcessShader())
-            {
-                for (auto &mat: shader->GetAllReferencedMaterials())
-                {
-                    mat->ConstructKeywords(shader);
-                    bool is_all_succeed = true;
-                    for (u16 i = 0; i < shader->PassCount(); i++)
-                    {
-                        is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
-                    }
-                    if (is_all_succeed)
-                    {
-                        mat->ChangeShader(shader);
-                    }
-                }
-     //           AddResourceTask([=]() -> Ref<void>
-     //                           {
-					//for (auto& mat : shader->GetAllReferencedMaterials())
-					//{
-					//	mat->ConstructKeywords(shader);
-					//	bool is_all_succeed = true;
-					//	for (u16 i = 0; i < shader->PassCount(); i++)
-					//	{
-					//		is_all_succeed &= shader->Compile(i,mat->ActiveVariantHash(i));
-					//	}
-					//	if (is_all_succeed)
-					//	{
-					//		mat->ChangeShader(shader);
-					//	}
-					//}
-					//return nullptr; });
-            }
-            _shader_waiting_for_compile.pop();
-        }
-        while (!_compute_shader_waiting_for_compile.empty())
-        {
-            ComputeShader *shader = _compute_shader_waiting_for_compile.front();
-            shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
-            AddResourceTask([=]() -> void *
-                            {
-				shader->Compile();
-				return nullptr; });
-            _compute_shader_waiting_for_compile.pop();
+            _tasks.front()();
+            _tasks.pop();
         }
         SubmitResourceTask();
     }
@@ -549,23 +492,30 @@ namespace Ailu
         //out_mat << endl;
         auto float_props = mat->GetAllFloatValue();
         auto vector_props = mat->GetAllVectorValue();
+        auto int_vector_props = mat->GetAllIntVectorValue();
         auto uint_props = mat->GetAllUintValue();
         //auto tex_props = mat->GetAllTexture();
         out_mat << "  prop_type: "
-                << "Uint" << endl;
+                << ShaderPropertyType::Uint << endl;
         for (auto &[name, value]: uint_props)
         {
             out_mat << "    " << name << ": " << value << endl;
         }
         out_mat << "  prop_type: "
-                << "Float" << endl;
+                << ShaderPropertyType::Float << endl;
         for (auto &[name, value]: float_props)
         {
             out_mat << "    " << name << ": " << value << endl;
         }
         out_mat << "  prop_type: "
-                << "Vector" << endl;
+                << ShaderPropertyType::Vector << endl;
         for (auto &[name, value]: vector_props)
+        {
+            out_mat << "    " << name << ": " << value << endl;
+        }
+        out_mat << "  prop_type: "
+                << ShaderPropertyType::IntVector << endl;
+        for (auto &[name, value]: int_vector_props)
         {
             out_mat << "    " << name << ": " << value << endl;
         }
@@ -575,13 +525,19 @@ namespace Ailu
         {
             if (prop->_type == EShaderPropertyType::kTexture2D)
             {
-                auto tex = reinterpret_cast<Texture*>(prop->_value_ptr);
+                auto tex = reinterpret_cast<Texture *>(prop->_value_ptr);
                 Guid tex_guid;
                 if (tex)
                 {
                     Asset *lined_asset = GetLinkedAsset(tex);
-                    if (lined_asset)
+                    if (lined_asset && lined_asset->_asset_type == EAssetType::kTexture2D)
                         tex_guid = lined_asset->GetGuid();
+                    else
+                    {
+                        AL_ASSERT(true);
+                        LOG_ERROR("Texture2D {} hasn't a linked asset or asset type error!", tex->Name());
+                        tex_guid = Guid::EmptyGuid();
+                    }
                 }
                 else
                     tex_guid = Guid::EmptyGuid();
@@ -634,9 +590,9 @@ namespace Ailu
         {
             scene->Serialize(ar);
         }
-        catch (const std::exception &)
+        catch (const std::exception &e)
         {
-            g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {}!", scene->Name());
+            g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {} with exce {}", scene->Name(), e.what());
             return;
         }
         WString sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
@@ -676,7 +632,8 @@ namespace Ailu
         static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         parser->Parser(sys_path, setting);
-        auto mesh_list = parser->GetMeshes();
+        List<Ref<Mesh>> mesh_list{};
+        parser->GetMeshes(mesh_list);
         auto &imported_mat_infos = parser->GetImportedMaterialInfos();
         for (auto &mesh: mesh_list)
         {
@@ -816,6 +773,16 @@ namespace Ailu
                 uint32_t u;
                 if (sscanf_s(v.c_str(), "%u", &u) == 1)
                     mat->SetUint(k, u);
+                else
+                    LOG_WARNING("Load material: {}, property {} failed!", mat->_name, k);
+            }
+            else if (cur_type == ShaderPropertyType::IntVector)
+            {
+                Vector4Int vec{};
+                if (sscanf_s(v.c_str(), "%d, %d, %d, %d", &vec.r, &vec.g, &vec.b, &vec.a) == 4)
+                {
+                    mat->SetVector(k, vec);
+                }
                 else
                     LOG_WARNING("Load material: {}, property {} failed!", mat->_name, k);
             }
@@ -1333,6 +1300,10 @@ namespace Ailu
     {
         return ImportResourceImpl(sys_path, &setting);
     }
+    void ResourceMgr::SubmitTaskSync(ResourceTask task)
+    {
+        _tasks.push(task);
+    }
 
     Ref<void> ResourceMgr::ImportResourceAsync(const WString &sys_path, const ImportSetting &setting, OnResourceTaskCompleted callback)
     {
@@ -1346,83 +1317,6 @@ namespace Ailu
     void ResourceMgr::AddResourceTask(ResourceTask task)
     {
         s_task_queue.emplace_back(task);
-    }
-
-    void ResourceMgr::WatchDirectory()
-    {
-        namespace fs = std::filesystem;
-        fs::path dir(s_engine_res_root_pathw + EnginePath::kEngineShaderPathW);
-        //std::chrono::duration<int, std::milli> sleep_duration(1000);// 1秒
-        static auto reload_shader = [&](const fs::path &file)
-        {
-            const WString cur_path = PathUtils::FormatFilePath(file.wstring());
-            for (auto it = ResourceBegin<Shader>(); it != ResourceEnd<Shader>(); it++)
-            {
-                auto shader = IterToRefPtr<Shader>(it);
-                if (shader)
-                {
-                    bool match_file = false;
-                    for (u32 i = 0; i < shader->PassCount(); i++)
-                    {
-                        if (match_file)
-                            break;
-                        const auto &pass = shader->GetPassInfo(i);
-                        for (auto &head_file: pass._source_files)
-                        {
-                            if (head_file == cur_path)
-                            {
-                                match_file = true;
-                                _shader_waiting_for_compile.push(shader.get());
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            for (auto it = ResourceBegin<ComputeShader>(); it != ResourceEnd<ComputeShader>(); it++)
-            {
-                auto cs = IterToRefPtr<ComputeShader>(it);
-                if (cs->IsDependencyFile(cur_path))
-                    _compute_shader_waiting_for_compile.push(cs.get());
-            }
-        };
-        static bool is_first_execute = true;
-        static std::set<fs::path> path_set{};
-        static std::unordered_map<fs::path, fs::file_time_type> s_cache_files_time;
-        std::unordered_map<fs::path, fs::file_time_type> cur_files_time;
-        TraverseDirectory(dir, path_set);
-        if (is_first_execute)
-        {
-            for (auto &cur_path: path_set)
-                s_cache_files_time[cur_path] = fs::last_write_time(cur_path);
-            is_first_execute = false;
-        }
-        for (auto &cur_path: path_set)
-        {
-            if (!s_cache_files_time.contains(cur_path))
-                s_cache_files_time[cur_path] = fs::last_write_time(cur_path);
-            cur_files_time[cur_path] = fs::last_write_time(cur_path);
-        }
-        for (const auto &[file, last_write_time]: s_cache_files_time)
-        {
-            if (cur_files_time.contains(file))
-            {
-                if (cur_files_time[file] != last_write_time)
-                {
-                    reload_shader(file);
-                    s_cache_files_time[file] = cur_files_time[file];
-                }
-            }
-            //else if (!is_first_execute)
-            //    reload_shader(file);
-        }
-        u32 reload_count0 = _compute_shader_waiting_for_compile.size();
-        u32 reload_count1 = _shader_waiting_for_compile.size();
-        if (reload_count0 + reload_count1 > 0)
-        {
-            LOG_INFO("Reload {} compute shader, {} shader", reload_count0, reload_count1);
-        }
     }
 
     void ResourceMgr::SubmitResourceTask()
@@ -1473,16 +1367,6 @@ namespace Ailu
         {
             return nullptr;
         }
-        ImportInfo info;
-        info._is_succeed = false;
-        info._last_write_time = fs::last_write_time(p);
-        info._msg = std::format("Import {}...", p.filename().string());
-        info._progress = 0.0f;
-        info._sys_path = new_sys_path;
-        {
-            std::lock_guard<std::mutex> lock(_import_infos_mutex);
-            _import_infos.push_back(info);
-        }
         PathUtils::FormatFilePathInPlace(new_sys_path);
         WString external_asset_path = PathUtils::ExtractAssetPath(new_sys_path);
         TimeMgr time_mgr;
@@ -1507,10 +1391,9 @@ namespace Ailu
                 loaded_objects.push(std::make_tuple(imported_asset_path, mesh));
                 if (mesh_import_setting->_is_import_material)
                 {
-
                     for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
                     {
-                        auto mat = MakeRef<StandardMaterial>("MAT_"+ it->_name);
+                        auto mat = MakeRef<StandardMaterial>("MAT_" + it->_name);
                         if (!it->_textures[0].empty())
                         {
                             auto albedo = ImportResource(ToWStr(it->_textures[0]));
@@ -1546,13 +1429,6 @@ namespace Ailu
             loaded_objects.push(std::make_tuple(imported_asset_path, tex));
         }
         else {}
-        g_pLogMgr->LogFormat(L"Import asset: {} succeed,cost {}ms", new_sys_path, time_mgr.GetElapsedSinceLastMark());
-        {
-            std::lock_guard<std::mutex> lock(_import_infos_mutex);
-            _import_infos.erase(std::remove_if(_import_infos.begin(), _import_infos.end(), [&](auto it)
-                                               { return it._msg == info._msg; }),
-                                _import_infos.end());
-        }
         while (!loaded_objects.empty())
         {
             auto &[path, obj] = loaded_objects.front();

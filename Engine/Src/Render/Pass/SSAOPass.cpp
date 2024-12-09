@@ -1,4 +1,5 @@
 #include "Render/Pass/SSAOPass.h"
+#include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
 #include "pch.h"
@@ -19,6 +20,7 @@ namespace Ailu
         auto cmd = CommandBufferPool::Get("SSAOCompute");
         cmd->Clear();
         {
+            PROFILE_BLOCK_GPU(cmd.get(), SSAOCompute);
             //Vector4f params = {(f32)rendering_data._width,(f32)rendering_data._height,1.0f,1.0f};
             //params.z /= params.x;
             //params.w /= params.y;
@@ -34,7 +36,12 @@ namespace Ailu
             //cmd->Dispatch(_ssao_computer.get(), group_num_x, group_num_y, 1);
             //cmd->Blit(ao_result, rendering_data._camera_color_target_handle);
             //RenderTexture::ReleaseTempRT(ao_result);
-            Vector4f params = {(f32) (rendering_data._width >> 1), (f32) (rendering_data._height >> 1), 1.0f, 1.0f};
+            bool is_half_res = true;
+            Vector4f params;
+            if (is_half_res)
+                params = {(f32) (rendering_data._width >> 1), (f32) (rendering_data._height >> 1), 1.0f, 1.0f};
+            else
+                params = {(f32) (rendering_data._width), (f32) (rendering_data._height), 1.0f, 1.0f};
             params.z /= params.x;
             params.w /= params.y;
             u16 group_num_x = std::ceilf(params.x / 16.0f), group_num_y = std::ceilf(params.y / 16.0f);

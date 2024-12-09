@@ -98,7 +98,7 @@ namespace Ailu
     public:
         TAAFeature();
         ~TAAFeature();
-        void AddRenderPasses(Renderer *renderer, RenderingData &rendering_data) override;
+        void AddRenderPasses(Renderer &renderer, RenderingData &rendering_data) override;
 
     private:
         TAAExecutePass _execute_pass;

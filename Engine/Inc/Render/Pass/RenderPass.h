@@ -50,7 +50,7 @@ namespace Ailu
     public:
         RenderFeature(const String &name);
         ~RenderFeature();
-        virtual void AddRenderPasses(Renderer *renderer, RenderingData &rendering_data) {};
+        virtual void AddRenderPasses(Renderer &renderer, RenderingData &rendering_data) {};
         bool IsActive() const { return _is_active; };
         void SetActive(bool is_active) { _is_active = is_active; };
     protected:

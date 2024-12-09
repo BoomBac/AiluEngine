@@ -1,7 +1,8 @@
 #ifndef __MIPMAP_GEN_H__
 #define __MIPMAP_GEN_H__
 
-#pragma kernel cs_main
+#pragma kernel MipmapGen2D
+#pragma kernel MipmapGen3D
 
 #include "cs_common.hlsli"
 #define BLOCK_SIZE 8
@@ -11,6 +12,10 @@
 #define WIDTH_EVEN_HEIGHT_ODD 2 // The texture width is even and the height is odd.
 #define WIDTH_HEIGHT_ODD 3      // Both the width and height of the texture are odd.
 
+
+#define ALPHA_TYPE_NORMAL 0
+#define ALPHA_TYPE_INGORE 1
+#define ALPHA_TYPE_MAX    2
 cbuffer GenerateMipsCB : register(b0)
 {
     uint SrcMipLevel;	// Texture level of source mip
@@ -18,16 +23,17 @@ cbuffer GenerateMipsCB : register(b0)
     uint SrcDimension;  // Width and height of the source texture are even or odd.
     bool IsSRGB;        // Must apply gamma correction to sRGB textures.
     float4 TexelSize;	// 1.0 / OutMip1.Dimensions
+    uint AlphaType;     //控制如何处理alpha，用于3d纹理
 }
 
 // Source mip map.
-Texture2D<float4> SrcMip : register( t0 );
+Texture2D<float4> SrcMip;// : register( t0 ,space0);
 
 // Write up to 4 mip map levels.
-RWTexture2D<float4> OutMip1 : register( u0 );
-RWTexture2D<float4> OutMip2 : register( u1 );
-RWTexture2D<float4> OutMip3 : register( u2 );
-RWTexture2D<float4> OutMip4 : register( u3 );
+RWTexture2D<float4> OutMip1;// : register( u0 ,space0);
+RWTexture2D<float4> OutMip2;// : register( u1 ,space0);
+RWTexture2D<float4> OutMip3;// : register( u2 ,space0);
+RWTexture2D<float4> OutMip4;// : register( u3 ,space0);
 
 // The reason for separating channels is to reduce bank conflicts in the
 // local data memory controller.  A large stride will cause more threads
@@ -36,6 +42,11 @@ groupshared float gs_R[64];
 groupshared float gs_G[64];
 groupshared float gs_B[64];
 groupshared float gs_A[64];
+
+groupshared float gs3d_R[512];
+groupshared float gs3d_G[512];
+groupshared float gs3d_B[512];
+groupshared float gs3d_A[512];
 
 void StoreColor( uint Index, float4 Color ) 
 {
@@ -48,6 +59,18 @@ float4 LoadColor( uint Index )
 {
     return float4( gs_R[Index], gs_G[Index], gs_B[Index], gs_A[Index] );
 }
+void StoreColor3D( uint Index, float4 Color ) 
+{
+    gs3d_R[Index] = Color.r;
+    gs3d_G[Index] = Color.g;
+    gs3d_B[Index] = Color.b;
+    gs3d_A[Index] = Color.a;
+}
+float4 LoadColor3D( uint Index )
+{
+    return float4( gs3d_R[Index], gs3d_G[Index], gs3d_B[Index], gs3d_A[Index] );
+}
+
 // Source: https://en.wikipedia.org/wiki/SRGB#The_reverse_transformation
 float3 ConvertToLinear(float3 x)
 {
@@ -73,7 +96,7 @@ float4 PackColor(float4 x)
 }
 
 [numthreads( BLOCK_SIZE, BLOCK_SIZE, 1 )]
-void cs_main(CSInput IN )
+void MipmapGen2D(CSInput IN )
 {
     float4 Src1 = (float4)0;
     // One bilinear sample is insufficient when scaling down by more than 2x.
@@ -195,4 +218,130 @@ void cs_main(CSInput IN )
         OutMip4[IN.DispatchThreadID.xy / 8] = PackColor( Src1 );
     }
 }
+
+#define WIDTH_HEIGHT_DEPTH_EVEN 0     // Both the width and the height of the texture are even.
+#define WIDTH_ODD_HEIGHT_DEPTH_EVEN 1 // The texture width is odd and the height is even.
+#define WIDTH_EVEN_HEIGHT_DEPTH_ODD 2 // The texture width is even and the height is odd.
+#define WIDTH_HEIGHT_DEPTH_ODD 3      // Both the width and height of the texture are odd.
+// Source mip map.
+Texture3D<float4> _SrcMip;// : register( t0 ,space1);
+// Write up to 4 mip map levels.
+RWTexture3D<float4> _OutMip1;// : register( u0 ,space1);
+RWTexture3D<float4> _OutMip2;// : register( u1 ,space1);
+RWTexture3D<float4> _OutMip3;// : register( u2 ,space1);
+RWTexture3D<float4> _OutMip4;// : register( u3 ,space1);
+
+//#define _INGORE_ALPHA
+
+[numthreads( 8, 8, 8)]
+void MipmapGen3D(CSInput IN)
+{
+    float4 Src1 = (float4)0;
+    switch (SrcDimension)
+    {
+        case WIDTH_HEIGHT_DEPTH_EVEN:
+        {
+            float3 UV = TexelSize.xyz * (IN.DispatchThreadID.xyz + 0.5);
+            Src1 = _SrcMip.SampleLevel(g_LinearClampSampler, UV, SrcMipLevel);
+        }
+        break;
+        case WIDTH_ODD_HEIGHT_DEPTH_EVEN:
+        {
+            float3 UV1 = TexelSize.xyz * (IN.DispatchThreadID.xyz + float3(0.25, 0.5, 0.5));
+            float3 Off = TexelSize.xyz * float3(0.5, 0.0, 0.0);
+            Src1 = 0.5 * (_SrcMip.SampleLevel(g_LinearClampSampler, UV1, SrcMipLevel) +
+                          _SrcMip.SampleLevel(g_LinearClampSampler, UV1 + Off, SrcMipLevel));
+        }
+        break;
+        case WIDTH_EVEN_HEIGHT_DEPTH_ODD:
+        {
+            float3 UV1 = TexelSize.xyz * (IN.DispatchThreadID.xyz + float3(0.5, 0.25, 0.5));
+            float3 Off = TexelSize.xyz * float3(0.0, 0.5, 0.0);
+            Src1 = 0.5 * (_SrcMip.SampleLevel(g_LinearClampSampler, UV1, SrcMipLevel) +
+                          _SrcMip.SampleLevel(g_LinearClampSampler, UV1 + Off, SrcMipLevel));
+        }
+        break;
+        case WIDTH_HEIGHT_DEPTH_ODD:
+        {
+            float3 UV1 = TexelSize.xyz * (IN.DispatchThreadID.xyz + float3(0.25, 0.25, 0.25));
+            float3 Off = TexelSize.xyz * 0.5;
+            Src1 =  _SrcMip.SampleLevel(g_LinearClampSampler, UV1, SrcMipLevel);
+            Src1 += _SrcMip.SampleLevel(g_LinearClampSampler, UV1 + float3(Off.x, 0.0, 0.0), SrcMipLevel);
+            Src1 += _SrcMip.SampleLevel(g_LinearClampSampler, UV1 + float3(0.0, Off.y, 0.0), SrcMipLevel);
+            Src1 += _SrcMip.SampleLevel(g_LinearClampSampler, UV1 + float3(0.0, 0.0, Off.z), SrcMipLevel);
+            Src1 *= 0.25;
+        }
+        break;
+    }
+    #if defined(_INGORE_ALPHA)
+        Src1.a  = Src1.a > 0? 1.0 : 0.0;
+    #endif
+    _OutMip1[IN.DispatchThreadID.xyz] = PackColor(Src1);
+    if (NumMipLevels == 1)
+        return;
+
+    StoreColor3D(IN.GroupIndex, Src1);
+    GroupMemoryBarrierWithGroupSync();
+    // With low three bits for X and high three bits for Y, this bit mask
+    // (binary: 01001001) checks that X and Y are even.
+    if ((IN.GroupIndex & 0x49) == 0)
+    {
+        float4 Src2 = LoadColor3D(IN.GroupIndex + 0x01);
+        float4 Src3 = LoadColor3D(IN.GroupIndex + 0x08);
+        float4 Src4 = LoadColor3D(IN.GroupIndex + 0x09);
+        float4 Src5 = LoadColor3D(IN.GroupIndex + 0x40);
+        float4 Src6 = LoadColor3D(IN.GroupIndex + 0x41);
+        float4 Src7 = LoadColor3D(IN.GroupIndex + 0x48);
+        float4 Src8 = LoadColor3D(IN.GroupIndex + 0x49);
+        Src1 = 0.125 * (Src1 + Src2 + Src3 + Src4 + Src5 + Src6 + Src7 + Src8);
+    #if defined(_INGORE_ALPHA)
+        Src1.a  = Src1.a > 0? 1.0 : 0.0;
+    #endif
+        _OutMip2[IN.DispatchThreadID.xyz / 2] = PackColor(Src1);
+        StoreColor3D(IN.GroupIndex, Src1);
+    }
+    if (NumMipLevels == 2)
+        return;
+
+    GroupMemoryBarrierWithGroupSync();
+        // This bit mask (binary: 11011011) checks that X and Y are multiples of four.
+    if ((IN.GroupIndex & 0xDB) == 0)
+    {
+        float4 Src2 = LoadColor3D(IN.GroupIndex + 0x02);
+        float4 Src3 = LoadColor3D(IN.GroupIndex + 0x10);
+        float4 Src4 = LoadColor3D(IN.GroupIndex + 0x12);
+        float4 Src5 = LoadColor3D(IN.GroupIndex + 0x40);
+        float4 Src6 = LoadColor3D(IN.GroupIndex + 0x42);
+        float4 Src7 = LoadColor3D(IN.GroupIndex + 0x4A);
+        float4 Src8 = LoadColor3D(IN.GroupIndex + 0x4C);
+        Src1 = 0.125 * (Src1 + Src2 + Src3 + Src4 + Src5 + Src6 + Src7 + Src8);
+    #if defined(_INGORE_ALPHA)
+        Src1.a  = Src1.a > 0? 1.0 : 0.0;
+    #endif
+        _OutMip3[IN.DispatchThreadID.xyz / 4] = PackColor(Src1);
+        StoreColor3D(IN.GroupIndex, Src1);
+    }
+    if (NumMipLevels == 3)
+        return;
+
+    GroupMemoryBarrierWithGroupSync();
+        // This bit mask would be 111111 (X & Y multiples of 8), but only one
+    // thread fits that criteria.
+    if (IN.GroupIndex == 0)
+    {
+        float4 Src2 = LoadColor3D(IN.GroupIndex + 0x04);
+        float4 Src3 = LoadColor3D(IN.GroupIndex + 0x20);
+        float4 Src4 = LoadColor3D(IN.GroupIndex + 0x24);
+        float4 Src5 = LoadColor3D(IN.GroupIndex + 0x40);
+        float4 Src6 = LoadColor3D(IN.GroupIndex + 0x44);
+        float4 Src7 = LoadColor3D(IN.GroupIndex + 0x60);
+        float4 Src8 = LoadColor3D(IN.GroupIndex + 0x64);
+        Src1 = 0.125 * (Src1 + Src2 + Src3 + Src4 + Src5 + Src6 + Src7 + Src8);
+    #if defined(_INGORE_ALPHA)
+        Src1.a  = Src1.a > 0? 1.0 : 0.0;
+    #endif
+        _OutMip4[IN.DispatchThreadID.xyz / 8] = PackColor(Src1);
+    }
+}
+
 #endif

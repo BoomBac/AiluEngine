@@ -304,7 +304,7 @@ namespace Ailu
         }
         else
         {
-            LOG_WARNING("Pos used currently not ready with Input Layout: {}, Shader: {},Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}",
+            LOG_WARNING("Pos used currently not ready with Input Layout: {}, Shader: {},Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
                         (u32) input_layout,
                         shader_hash,(u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
             {
@@ -328,12 +328,12 @@ namespace Ailu
                         GraphicsPipelineStateObject::ExtractPSOHash(hash, input_layout, similar_shader_hash, blend_state, raster_state, ds_state, rt_state);
                         if (similar_shader_hash == shader_hash)
                         {
-                            LOG_INFO("Similar pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}",
+                            LOG_INFO("Similar pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
                                      pso->Name(), (u32) input_layout, shader_hash, (u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
                         }
                     }
                     GraphicsPipelineStateObject::ExtractPSOHash(pso->Hash(), input_layout, shader_hash, blend_state, raster_state, ds_state, rt_state);
-                    LOG_WARNING("New Pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, Depth Stencil State: {}, Render Target State: {}",
+                    LOG_WARNING("New Pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
                                 pso->Name(), (u32) input_layout, shader_hash, (u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
                     GraphicsPipelineStateMgr::AddPSO(std::move(pso));
                 }
