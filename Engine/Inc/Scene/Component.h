@@ -12,9 +12,19 @@
 #include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/Pass/RenderPass.h"
+#include "Objects/Type.h"
+
+#include "generated/Component.gen.h"
 
 namespace Ailu
 {
+    AENUM()
+    enum class EMotionVectorType
+    {
+        kCameraOnly,
+        kPerObject,
+        kForceZero
+    };
     struct AILU_API TagComponent
     {
         DECLARE_CLASS(TagComponent)
@@ -84,6 +94,7 @@ namespace Ailu
         Ref<Mesh> _p_mesh;
         Vector<Ref<Material>> _p_mats;
         Vector<AABB> _transformed_aabbs;
+        EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
     };
 
     Archive &operator<<(Archive &ar, const StaticMeshComponent &c);
@@ -102,6 +113,7 @@ namespace Ailu
         BlendSpace _blend_space;
         //0 clip,1 blend space,2 anim graph
         i16 _anim_type;
+        EMotionVectorType _motion_vector_type = EMotionVectorType::kCameraOnly;
     };
 
     Archive &operator<<(Archive &ar, const CSkeletonMesh &c);

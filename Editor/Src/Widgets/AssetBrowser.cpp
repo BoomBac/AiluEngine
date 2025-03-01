@@ -652,7 +652,7 @@ namespace Ailu
         void AssetBrowser::DrawTreePannel()
         {
             String indent = "";
-            DrawTreePannelHelper(g_pResourceMgr->GetProjectRootSysPath(), indent);
+            DrawTreePannelHelper(g_pResourceMgr->GetEngineRootSysPath(), indent);
         }
 
         void AssetBrowser::DrawMainPannel()

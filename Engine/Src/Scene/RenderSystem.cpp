@@ -92,10 +92,8 @@ namespace Ailu
         void LightingSystem::OnPushEntity(Entity e)
         {
         }
-
         void LightingSystem::Update(Register &r, f32 delta_time)
         {
-
             PROFILE_BLOCK_CPU(LightingSystem_Update)
             u32 index = 0;
             if (g_pGfxContext->GetFrameCount() > 5)
@@ -112,8 +110,11 @@ namespace Ailu
                         cam._layer_mask = 0;
                         cam._layer_mask |= ERenderLayer::kDefault;
                         cam.TargetTexture(comp._cubemap.get());
-                        g_pGfxContext->GetPipeline()->GetRenderer()->SubmitTaskPass(comp._pass.get());
-                        g_pGfxContext->GetPipeline()->GetRenderer()->Render(cam, *g_pSceneMgr->ActiveScene());
+                        auto renderer = g_pGfxContext->GetPipeline()->GetRenderer();
+                        renderer->_is_render_light_probe = true;
+                        renderer->SubmitTaskPass(comp._pass.get());
+                        renderer->Render(cam, *g_pSceneMgr->ActiveScene());
+                        renderer->_is_render_light_probe = false;
                         comp._is_dirty = false;
                         /*
                         RenderTexture *out_tex = comp._pass->_prefilter_cubemap.get();
@@ -225,8 +226,13 @@ namespace Ailu
                             const XMMATRIX lightView = XMMatrixLookToLH(XMVectorZero(), to, up);// important to not move (zero out eye vector) the light view matrix itself because texel snapping must be done on projection matrix!
                             const XMMATRIX lightViewInv = XMMatrixInverse(nullptr, lightView);
                             const float farPlane = selected_cam.Far();
+                            f32 origin_near = selected_cam.Near();
+                            selected_cam.Near(1.0f);
+                            selected_cam.RecalculateMarix(true);
                             // Unproject main frustum corners into world space (notice the reversed Z projection!):
-                            auto unproj_mat = MatrixInverse(selected_cam.GetView() * selected_cam.GetProjection());//这里如果near-clip过小的话，也会造成抖动的情况
+                            auto unproj_mat = MatrixInverse(selected_cam.GetView() * MatrixReverseZ(selected_cam.GetProjection()));//这里如果near-clip过小的话，也会造成抖动的情况
+                            selected_cam.Near(origin_near);
+                            selected_cam.RecalculateMarix(true);
                             XMMATRIX unproj;
                             memcpy(unproj.r, unproj_mat, sizeof(XMMATRIX));
                             XMVECTOR frustum_corners[] =
@@ -315,7 +321,10 @@ namespace Ailu
                             ext = std::max(ext, 75.f);
                             _min.z = _center.z - ext;
                             _max.z = _center.z + ext;
-                            const XMMATRIX lightProjection = XMMatrixOrthographicOffCenterLH(_min.x, _max.x, _min.y, _max.y, _min.z, _max.z);// notice reversed Z!
+                        #if defined(_REVERSED_Z)
+                            std::swap(_min.z,_max.z);
+                        #endif
+                            const XMMATRIX lightProjection = XMMatrixOrthographicOffCenterLH(_min.x, _max.x, _min.y, _max.y,_min.z,_max.z);// notice reversed Z!
                             Matrix4x4f view, proj;
                             memcpy(view, lightView.r, sizeof(XMMATRIX));
                             memcpy(proj, lightProjection.r, sizeof(XMMATRIX));

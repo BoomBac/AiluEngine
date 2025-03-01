@@ -5,8 +5,9 @@
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/Pass/PostprocessPass.h"
-#include "Render/Pass/SSAOPass.h"
-#include "Render/Pass/TAAPass.h"
+#include "Render/Pass/SSAO.h"
+#include "Render/Pass/TemporalAA.h"
+#include "Render/Pass/VolumetricClouds.h"
 #include "Render/Pass/VoxelGI.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
@@ -22,22 +23,31 @@ namespace Ailu
         Profiler::g_Profiler.Initialize();
         _p_timemgr = new TimeMgr();
         _p_timemgr->Initialize();
-        _rendering_data._gbuffers.resize(5);
+        _rendering_data._gbuffers.resize(4);
         _shadowcast_pass = MakeScope<ShadowCastPass>();
         _gbuffer_pass = MakeScope<DeferredGeometryPass>();
         _coptdepth_pass = MakeScope<CopyDepthPass>();
         _lighting_pass = MakeScope<DeferredLightingPass>();
         _skybox_pass = MakeScope<SkyboxPass>();
+        _motion_vector_pass = MakeScope<MotionVectorPass>();
         _forward_pass = MakeScope<ForwardPass>();
-        _ssao_pass = MakeScope<SSAOPass>();
         _copycolor_pass = MakeScope<CopyColorPass>();
         _postprocess_pass = MakeScope<PostProcessPass>();
         _gizmo_pass = MakeScope<GizmoPass>();
         _wireframe_pass = MakeScope<WireFramePass>();
         _gui_pass = MakeScope<GUIPass>();
-        //_owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TAAFeature())));
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TemporalAA())));
+        _taa = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VoxelGI())));
         _vxgi = _owned_features.back().get();
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VolumetricClouds())));
+        _cloud = _owned_features.back().get();
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new SSAO())));
+        _ssao = _owned_features.back().get();
+        //_features.push_back(_vxgi);
+        _features.push_back(_cloud);
+        _features.push_back(_taa);
+        _features.push_back(_ssao);
         RegisterEventBeforeTick([]()
                                 { GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
         RegisterEventAfterTick([]()
@@ -124,20 +134,15 @@ namespace Ailu
 
     Vector<RenderFeature *> Renderer::GetFeatures()
     {
-        Vector<RenderFeature *> ret;
-        for (auto &f: _features)
-            ret.push_back(f);
-        for (auto &f: _owned_features)
-            ret.push_back(f.get());
-        return ret;
+        return _features;
     }
     void Renderer::BeginScene(const Camera &cam, const Scene &s)
     {
         _active_camera_hash = cam.HashCode();
         IConstantBuffer *scene_cb = _cur_fs->GetSceneCB(s.HashCode());
         IConstantBuffer *cam_cb = _cur_fs->GetCameraCB(_active_camera_hash);
-        cam_cb->Reset();
-        scene_cb->Reset();
+        //cam_cb->Reset();
+        //scene_cb->Reset();
         auto scene_cb_data = IConstantBuffer::As<CBufferPerSceneData>(scene_cb);
         _rendering_data._shadow_data[0]._shadow_index = -1;
         for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
@@ -162,7 +167,6 @@ namespace Ailu
                 RenderTexture::ReleaseTempRT(_rendering_data._gbuffers[i]);
             }
             _rendering_data._camera_data._camera_color_target_desc = RenderTextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
-            //_rendering_data._camera_data._camera_color_target_desc._width = pixel_width;
             _camera_color_handle = RenderTexture::GetTempRT(_rendering_data._camera_data._camera_color_target_desc, "CameraColorAttachment");
             _camera_depth_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
             _camera_depth_tex_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraDepthTexture", ERenderTargetFormat::kRFloat);
@@ -170,13 +174,22 @@ namespace Ailu
             _rendering_data._gbuffers[0] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer0", ERenderTargetFormat::kRGHalf);
             _rendering_data._gbuffers[1] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer1", ERenderTargetFormat::kDefault);
             _rendering_data._gbuffers[2] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer2", ERenderTargetFormat::kDefault);
-            _rendering_data._gbuffers[3] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer3", ERenderTargetFormat::kRGHalf);
-            _rendering_data._gbuffers[4] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer4", ERenderTargetFormat::kRGBAHalf);
+            _rendering_data._gbuffers[3] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer3", ERenderTargetFormat::kRGBAHalf);
         }
         Cull(*g_pSceneMgr->ActiveScene(), cam);
         PrepareCamera(cam);
         PrepareScene(*g_pSceneMgr->ActiveScene());
         PrepareLight(*g_pSceneMgr->ActiveScene());
+        if (_rendering_data._pre_width != pixel_width || _rendering_data._pre_height != pixel_height)
+        {
+            _rendering_data._is_res_changed = true;
+            _rendering_data._pre_width = pixel_width;
+            _rendering_data._pre_height = pixel_height;
+        }
+        else
+        {
+            _rendering_data._is_res_changed = false;
+        }
         _rendering_data._width = pixel_width;
         _rendering_data._height = pixel_height;
         _rendering_data._viewport = Rect{0, 0, (uint16_t) pixel_width, (uint16_t) pixel_height};
@@ -185,7 +198,7 @@ namespace Ailu
         _rendering_data._camera_depth_target_handle = _camera_depth_handle;
         _rendering_data._camera_depth_tex_handle = _camera_depth_tex_handle;
         _rendering_data._final_rt_handle = _gameview_rt_handle;
-        _vxgi->SetActive(cam._is_gen_voxel);
+        _vxgi->SetActive(cam._is_gen_voxel || _vxgi->IsActive());
         if (_mode & EShadingMode::kLit)
         {
             _skybox_pass->Setup(false);
@@ -195,20 +208,15 @@ namespace Ailu
             {
                 _render_passes.emplace_back(_gbuffer_pass.get());
                 _render_passes.emplace_back(_lighting_pass.get());
+                _render_passes.emplace_back(_motion_vector_pass.get());
                 _render_passes.emplace_back(_forward_pass.get());
                 _render_passes.emplace_back(_coptdepth_pass.get());
-                _render_passes.emplace_back(_ssao_pass.get());
                 _render_passes.emplace_back(_copycolor_pass.get());
                 if (cam._is_enable_postprocess)
                     _render_passes.emplace_back(_postprocess_pass.get());
             }
             else
                 _skybox_pass->Setup(true);
-            for (auto &feature: _owned_features)
-            {
-                if (feature->IsActive())
-                    feature->AddRenderPasses(*this, _rendering_data);
-            }
         }
         _render_passes.emplace_back(_gui_pass.get());
         for (auto &feature: _features)
@@ -232,6 +240,8 @@ namespace Ailu
         Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cur_fs->GetCameraCB(cam.HashCode()));
         Shader::SetGlobalTexture("_LTC_Lut1", g_pResourceMgr->Get<Texture2D>(L"Runtime/ltc_lut1"));
         Shader::SetGlobalTexture("_LTC_Lut2", g_pResourceMgr->Get<Texture2D>(L"Runtime/ltc_lut2"));
+        ComputeShader::SetGlobalBuffer(RenderConstants::kCBufNamePerScene, _cur_fs->GetSceneCB(s.HashCode()));
+        ComputeShader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cur_fs->GetCameraCB(cam.HashCode()));
         {
             PROFILE_BLOCK_CPU(WaitForSys)
             for (auto &sys: s.GetRegister().SystemView())
@@ -252,7 +262,7 @@ namespace Ailu
                 auto *obj_cb = IConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
                 for (int i = 0; i < submesh_count; i++)
                 {
-                    obj_cb->_MatrixWorldPreTick = obj_cb->_MatrixWorld;
+                    obj_cb->_MatrixWorld_Pre = obj_cb->_MatrixWorld;
                     ++obj_index;
                 }
             }
@@ -319,7 +329,10 @@ namespace Ailu
                     auto *obj_cb = IConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
                     const auto &t = r.GetComponent<StaticMeshComponent, TransformComponent>(entity_index)->_transform;
                     obj_cb->_MatrixWorld = t._world_matrix;
+                    obj_cb->_MatrixInvWorld = MatrixInverse(t._world_matrix);
                     obj_cb->_ObjectID = r.GetEntity<StaticMeshComponent>(entity_index);
+                    obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == EMotionVectorType::kPerObject? 1.0f : 0.0; //dynamic object
+                    obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == EMotionVectorType::kForceZero? 1.0f : 0.0; //force off
                     ++obj_index;
                 }
             }
@@ -354,10 +367,12 @@ namespace Ailu
         scene_data->g_IndirectLightingIntensity = s._light_data._indirect_lighting_intensity;
         PrepareLight(s);
         f32 t = g_pTimeMgr->TimeSinceLoad, dt = g_pTimeMgr->DeltaTime, sdt = g_pTimeMgr->s_smooth_delta_time;
-        scene_data->_Time = Vector4f(t / 20, t, t * 2, t * 3);
+        t*= 0.001f;
+        scene_data->_Time = Vector4f(t / 20, t, t * 2, (f32) g_pGfxContext->GetFrameCount());
         scene_data->_SinTime = Vector4f(sin(t / 8), sin(t / 4), sin(t / 2), sin(t));
         scene_data->_CosTime = Vector4f(cos(t / 8), cos(t / 4), cos(t / 2), cos(t));
         scene_data->_DeltaTime = Vector4f(dt, 1 / dt, sdt, 1 / sdt);
+        scene_data->_FrameIndex = (u32)g_pGfxContext->GetFrameCount();
     }
 
     void Renderer::PrepareLight(const Scene &s)
@@ -408,7 +423,8 @@ namespace Ailu
                 }
                 per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = color.xyz;
                 per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = light_data._light_dir.xyz;
-                per_scene_cbuf_data->_MainlightWorldPosition = light_data._light_dir;//Normalize(light_data._light_dir);
+                per_scene_cbuf_data->_MainlightWorldPosition = light_data._light_dir.xyz;
+                per_scene_cbuf_data->_MainlightColor = color.xyz;
                 _rendering_data._mainlight_world_position = per_scene_cbuf_data->_MainlightWorldPosition;
                 ++direction_light_index;
             }
@@ -439,7 +455,7 @@ namespace Ailu
                         _rendering_data._point_shadow_data[point_light_index]._cull_results[i] = &_cull_results[shadow_cam.HashCode()];
                     }
                     _rendering_data._point_shadow_data[point_light_index]._light_world_pos = light_data._light_pos.xyz;
-                    _rendering_data._point_shadow_data[point_light_index]._camera_near = 0.01;//1 cm
+                    _rendering_data._point_shadow_data[point_light_index]._camera_near = 0.01f;//1 cm
                     _rendering_data._point_shadow_data[point_light_index]._camera_far = light_data._light_param.x * 1.5f;
                     ++_rendering_data._addi_point_shadow_num;
                 }
@@ -548,16 +564,20 @@ namespace Ailu
     {
         //auto cam_hash = cam.HashCode();
         auto cam_cb_data = IConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(cam.HashCode()));
+        f32 f = cam.Far(), n = cam.Near();
         u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
-        cam_cb_data->_ScreenParams.x = (f32) pixel_width;
-        cam_cb_data->_ScreenParams.y = (f32) pixel_height;
-        cam_cb_data->_ScreenParams.z = 1.0f / (f32) pixel_width;
-        cam_cb_data->_ScreenParams.w = 1.0f / (f32) pixel_height;
+        cam_cb_data->_ScreenParams = Vector4f(1.0f / (f32) pixel_width,1.0f / (f32) pixel_height,pixel_width,pixel_height);
+        Camera::CalculateZBUfferAndProjParams(cam,cam_cb_data->_ZBufferParams,cam_cb_data->_ProjectionParams);
         cam_cb_data->_CameraPos = cam.Position();
         cam_cb_data->_MatrixV = cam.GetView();
         cam_cb_data->_MatrixP = cam.GetProjection();
         cam_cb_data->_MatrixVP = cam_cb_data->_MatrixV * cam_cb_data->_MatrixP;
+        cam_cb_data->_MatrixVP_NoJitter = cam_cb_data->_MatrixVP;
         cam_cb_data->_MatrixIVP = MatrixInverse(cam_cb_data->_MatrixVP);
+        auto prev_cam_cb_data = IConstantBuffer::As<CBufferPerCameraData>(_prev_fs->GetCameraCB(_active_camera_hash));
+        cam_cb_data->_MatrixVP_Pre = prev_cam_cb_data->_MatrixVP;
+
+        cam.GetCornerInWorld(cam_cb_data->_LT, cam_cb_data->_LB, cam_cb_data->_RT, cam_cb_data->_RB);
         _rendering_data._cull_results = &_cull_results[cam.HashCode()];
         _rendering_data._camera = &cam;
         _rendering_data._p_per_camera_cbuf = _cur_fs->GetCameraCB(cam.HashCode());

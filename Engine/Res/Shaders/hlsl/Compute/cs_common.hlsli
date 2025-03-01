@@ -12,5 +12,6 @@ struct CSInput
     uint3 DispatchThreadID  : SV_DispatchThreadID;  // 3D index of global thread ID in the dispatch.
     uint  GroupIndex        : SV_GroupIndex;        // Flattened local index of the thread within a thread group.
 };
-
+#define VALID_INDEX(size)  if (input.DispatchThreadID.x >= (uint)size.x || input.DispatchThreadID.y >= (uint)size.y)\
+        return;
 #endif //_CS_COMMON_H

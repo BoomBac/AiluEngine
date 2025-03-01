@@ -50,14 +50,16 @@ namespace Ailu
             //d3dshader中存储的D3D12_INPUT_ELEMENT_DESC中的SemanticName似乎被析构了导致语义不对，所以这里使用shader层的string semantic来重新构建
             //但为什么之前没事不清楚。
             auto &layout_descs = _state_desc._p_vertex_shader->PipelineInputLayout(pass_index, variant_hash).GetBufferDesc();
-            for (int i = 0; i < _d3d_pso_desc.InputLayout.NumElements; i++)
+            for (u32 i = 0; i < _d3d_pso_desc.InputLayout.NumElements; i++)
             {
                 D3D12_INPUT_ELEMENT_DESC desc = *(_d3d_pso_desc.InputLayout.pInputElementDescs + i);
                 desc.SemanticName = layout_descs[i].Name.data();
+                desc.SemanticIndex = (u32)layout_descs[i]._semantic_index;
                 v.push_back(desc);
             }
             _d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::EALGFormat::kALGFormatUnknown ? 0 : _state_desc._rt_state._color_rt_num;
-            if (_state_desc._depth_stencil_state._b_depth_write || _state_desc._depth_stencil_state._depth_test_func != ECompareFunc::kAlways)
+            if (_state_desc._depth_stencil_state._b_depth_write || _state_desc._depth_stencil_state._depth_test_func != ECompareFunc::kAlways ||
+             _state_desc._depth_stencil_state._b_front_stencil)
                 _d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._rt_state._depth_rt);
             for (u16 i = 0; i < _d3d_pso_desc.NumRenderTargets; i++)
             {
@@ -189,5 +191,10 @@ namespace Ailu
     {
         _state_desc._topology = topology;
         _d3d_topology = D3DConvertUtils::ConvertToDXTopology(_state_desc._topology);
+    }
+
+    void D3DGraphicsPipelineState::SetStencilRef(u8 ref) 
+    {
+        _state_desc._depth_stencil_state._stencil_ref_value;
     }
 }// namespace Ailu

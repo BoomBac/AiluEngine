@@ -5,7 +5,7 @@
 //pixel: GBufferPSMain
 //Cull: Back
 //Queue: Opaque
-//Stencil: {Ref:127,Comp:Always,Pass:Replace}
+//Stencil: {Ref:1,Comp:Always,Pass:Replace}
 //multi_compile _ ALPHA_TEST
 //pass end::
 //pass begin::
@@ -27,6 +27,18 @@
 //Conservative: On
 //Queue: Opaque
 //multi_compile _ ALPHA_TEST
+//pass end::
+//pass begin::
+//name: MotionVector
+//vert: MotionVectorVSMain
+//pixel: MotionVectorPSMain
+//Cull: Back
+//Queue: Opaque
+//Fill: Solid
+//ZTest: LEqual
+//ZWrite: On
+//multi_compile _ ALPHA_TEST
+//multi_compile _ CPU_DEFORM
 //pass end::
 //Properties
 //{
@@ -55,8 +67,7 @@ struct GBuffer
 	float2 packed_normal : SV_Target0;
 	float4 color_roughness : SV_Target1;
 	float4 specular_metallic : SV_Target2;
-	float2 motion_vector : SV_Target3;
-	half4  emission : SV_Target4;
+	half4  emission : SV_Target3;
 };
 
 StandardPSInput GBufferVSMain(StandardVSInput v)
@@ -71,10 +82,8 @@ StandardPSInput GBufferVSMain(StandardVSInput v)
 	float3 N = TransformNormal(v.normal);
 	result.btn = float3x3(T, B, N);
 	result.normal = N;
-	result.world_pos = TransformToWorldSpace(v.position);
+	result.world_pos = TransformObjectToWorld(v.position);
 	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
-	result.clip_pos_cur_frame = mul(_MatrixWorld,float4(v.position,1.0f));
-	result.clip_pos_pre_frame = mul(_MatrixWorldPreTick,float4(v.position,1.0f));
 	return result;
 }
 
@@ -89,9 +98,7 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 	{
 		InitSurfaceDataCheckboard(input, surface_data);
 	}
-
-	input.clip_pos_cur_frame.xyz /= input.clip_pos_cur_frame.w;
-	input.clip_pos_pre_frame.xyz /= input.clip_pos_pre_frame.w;
+	else {};
 #ifdef ALPHA_TEST
 	clip(surface_data.albedo.a - _AlphaCulloff);
 #endif
@@ -100,7 +107,6 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 	output.color_roughness = float4(surface_data.albedo.rgb, surface_data.roughness);
 	//output.specular_metallic = float4(surface_data.specular, surface_data.metallic);
 	output.specular_metallic = float4(0.0,0.0,surface_data.anisotropy,surface_data.metallic);
-	output.motion_vector = float2(input.clip_pos_cur_frame.xy - input.clip_pos_pre_frame.xy);
 	output.emission = half4(surface_data.emssive.rgb,1.0);
 	return output;
 }
@@ -136,7 +142,7 @@ VoxelGSInput VoxelVSMain(StandardVSInput v)
 	v.tangent.xyz *= v.tangent.w;
 	float3 N = TransformNormal(v.normal);
 	result.normal = TransformNormal(v.normal);
-	result.world_pos = TransformToWorldSpace(v.position);
+	result.world_pos = TransformObjectToWorld(v.position);
 	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
 	return result;
 }
@@ -161,8 +167,6 @@ void VoxelGSMain(triangle VoxelGSInput g[3],inout TriangleStream<StandardPSInput
 		result.btn = float3x3(float3(1,0,0),float3(0,1,0),float3(0,0,3));
 		result.world_pos = g[i].world_pos;
 		result.shadow_pos = float4(g[i].shadow_pos,1.0);
-		result.clip_pos_cur_frame = 0.0.xxxx;
-		result.clip_pos_pre_frame = 0.0.xxxx;
 		results.Append(result);
 	}
 }
@@ -195,3 +199,10 @@ void VoxelPSMain(StandardPSInput input)
 	uint index = CalculateGridIndex(input.world_pos);
 	InterlockedMax(g_voxel_data_block[index],EncodeRGBE(light,1));
 }
+
+
+//---------------------motion vector--------------------------------------------------
+#include "motion_vector.hlsl"
+VertOutput MotionVectorVSMain(VertInput v);
+float2 MotionVectorPSMain(VertOutput input);
+//---------------------motion vector---------------------------------------------------

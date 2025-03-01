@@ -21,12 +21,14 @@ namespace Ailu
         inline static u32 s_vertex_num = 0u;
         inline static u32 s_triangle_num = 0u;
         inline static u32 s_draw_call = 0u;
+        inline static u32 s_dispatch_call = 0u;
         inline static f32 s_gpu_latency = 0.0f;
         static void Reset()
         {
             s_vertex_num = 0u;
             s_triangle_num = 0u;
             s_draw_call = 0u;
+            s_dispatch_call = 0u;
             s_gpu_latency = 0.0f;
         }
     };
@@ -106,8 +108,16 @@ namespace Ailu
         RTHandle _final_rt_handle;
         RTHandle _camera_opaque_tex_handle;
         RTHandle _camera_depth_tex_handle;
+        RenderTexture* _postprocess_input;
         Rect _viewport, _scissor_rect;
         u32 _width, _height;
+        u32 _pre_width, _pre_height;
+        bool _is_res_changed = false;
+        /*
+          GBuffer0 (RG, 2通道) - 存储法线 (Packed)
+          GBuffer1 (RGBA, 4通道) - 存储颜色 (RGB) 和 粗糙度 (A)
+          GBuffer2 (RGBA, 4通道) - 存储高光颜色 (RGB) 和 金属度 (A)
+          GBuffer3 (RGBA, 4通道) - 存储自发光颜色 (RGB) 和 可能的附加信息 (A)*/
         Vector<RTHandle> _gbuffers;
         CommandBuffer *cmd;
         const CullResult *_cull_results;
@@ -122,6 +132,7 @@ namespace Ailu
         {
             _addi_shadow_num = 0;
             _addi_point_shadow_num = 0;
+            _postprocess_input = nullptr;
         }
     };
 }// namespace Ailu

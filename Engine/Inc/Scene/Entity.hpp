@@ -2,7 +2,7 @@
 #ifndef __ENTITY__
 #define __ENTITY__
 
-#include "FrameWork/Math/Random.h"
+#include "FrameWork/Math/Random.hpp"
 #include "GlobalMarco.h"
 #include <bitset>
 #include <ranges>

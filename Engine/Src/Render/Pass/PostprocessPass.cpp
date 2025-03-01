@@ -21,9 +21,9 @@ namespace Ailu
         }
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforePostprocess + 25);
         _nose_tex = g_pResourceMgr->Get<Texture2D>(L"Textures/noise_medium.png");
-        _noise_texel_size = {(f32) _nose_tex->Width(), (f32) _nose_tex->Height(), 0.0f, 0.0f};
-        _noise_texel_size.z = 1.0f / _noise_texel_size.x;
-        _noise_texel_size.w = 1.0f / _noise_texel_size.y;
+        _noise_texel_size = {0.0f, 0.0f,(f32) _nose_tex->Width(), (f32) _nose_tex->Height()};
+        _noise_texel_size.x = 1.0f / _noise_texel_size.z;
+        _noise_texel_size.y = 1.0f / _noise_texel_size.w;
     }
     PostProcessPass::~PostProcessPass()
     {
@@ -44,13 +44,15 @@ namespace Ailu
             bloom_mips.emplace_back(RenderTexture::GetTempRT(cur_mip_width, cur_mip_height, std::format("bloom_mip_{}", i), ERenderTargetFormat::kDefaultHDR));
         }
         cmd->Clear();
+        RenderTexture* scene_color = rendering_data._postprocess_input? rendering_data._postprocess_input : 
+            g_pRenderTexturePool->Get(rendering_data._camera_color_target_handle);
         {
             ProfileBlock p(cmd.get(), cmd->GetName());
             if (_is_use_blur)
             {
                 auto blur_x = cmd->GetTempRT(rendering_data._width, rendering_data._height, "blur_x", ERenderTargetFormat::kDefault, false, false, true);
                 auto blur_y = cmd->GetTempRT(rendering_data._width, rendering_data._height, "blur_y", ERenderTargetFormat::kDefault, false, false, true);
-                _cs_blur->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
+                _cs_blur->SetTexture("_SourceTex", scene_color);
                 _cs_blur->SetTexture("_OutTex", blur_x);
                 auto kernel = _cs_blur->FindKernel("blur_x");
                 u16 group_num_x = std::ceil((f32) rendering_data._width / 16.0f);
@@ -73,7 +75,7 @@ namespace Ailu
                 _bloom_mats[i]->SetVector("_SampleParams", v);
                 if (i == 0)
                 {
-                    _bloom_mats[i]->SetTexture("_SourceTex", rendering_data._camera_color_target_handle);
+                    _bloom_mats[i]->SetTexture("_SourceTex", scene_color);
                 }
                 else
                 {
@@ -104,7 +106,10 @@ namespace Ailu
                 _bloom_mats[0]->SetVector("_SunScreenPos", light_pos);
 
                 _bloom_mats[0]->SetVector("_NoiseTex_TexelSize", _noise_texel_size);
-                _bloom_mats[0]->SetTexture("_SourceTex", rendering_data._camera_opaque_tex_handle);
+                if (rendering_data._postprocess_input)
+                    _bloom_mats[0]->SetTexture("_SourceTex", rendering_data._postprocess_input);
+                else
+                    _bloom_mats[0]->SetTexture("_SourceTex", rendering_data._camera_opaque_tex_handle);
                 _bloom_mats[0]->SetTexture("_BloomTex", bloom_mips[0]);
                 _bloom_mats[0]->SetTexture("_NoiseTex", _nose_tex);
                 cmd->DrawFullScreenQuad(_bloom_mats[0].get(), 3);

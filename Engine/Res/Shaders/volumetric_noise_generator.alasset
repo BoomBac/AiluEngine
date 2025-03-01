@@ -1,0 +1,5 @@
+guid: 10806073-d5d1-45c9-b7c4-bd55d68184e9
+type: kComputeShader
+name: volumetric_noise_generator
+  file: Shaders/hlsl/Compute/volumetric_noise_generator.hlsl
+  kernel: Noname

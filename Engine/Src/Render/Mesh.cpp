@@ -160,13 +160,14 @@ namespace Ailu
 		Mesh::Clear();
 		DESTORY_PTRARR(_bone_weights);
 		DESTORY_PTRARR(_bone_indices);
+		DESTORY_PTRARR(_previous_vertices);
 	}
 
 	void SkeletonMesh::BuildRHIResource()
 	{
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
-		u8 vert_index, normal_index, uv_index, tangent_index;
+		u8 vert_index, normal_index, uv_index, tangent_index,prev_vert_index;
 		if (_vertices)
 		{
 			desc_list.push_back({ "POSITION",EShaderDateType::kFloat3,count });
@@ -197,13 +198,23 @@ namespace Ailu
 		//	desc_list.push_back({ "BONEWEIGHT",EShaderDateType::kFloat4,count });
 		//	bone_weight_index = count++;
 		//}
+		{
+			desc_list.push_back({ "TEXCOORD",EShaderDateType::kFloat3,count ,1});
+			prev_vert_index = count++;
+		}
 		_p_vbuf.reset(IVertexBuffer::Create(desc_list, _name));
-		if (_vertices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, true);
+		if (_vertices) 
+		{
+			_p_vbuf->SetStream(reinterpret_cast<u8*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, true);
+			_previous_vertices = new Vector3f[_vertex_count];
+			memcpy(_previous_vertices, _vertices, _vertex_count * sizeof(Vector3f));
+		}
 		if (_normals) _p_vbuf->SetStream(reinterpret_cast<u8*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index,true);
 		if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<u8*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index,false);
 		if (_tangents) _p_vbuf->SetStream(reinterpret_cast<u8*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index,false);
 		//if (_bone_indices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_indices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kInt4), bone_index_index);
 		//if (_bone_weights) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_weights), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), bone_weight_index);
+		_p_vbuf->SetStream(reinterpret_cast<u8*>(_previous_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), tangent_index,true);
 		_p_ibufs.resize(_p_indices.size());
 		for (int i = 0; i < _p_indices.size(); i++)
 		{

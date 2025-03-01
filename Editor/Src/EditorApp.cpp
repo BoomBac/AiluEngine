@@ -39,9 +39,10 @@ namespace Ailu
         int EditorApp::Initialize()
         {
             auto work_path = GetWorkingPath();
+            work_path = Application::GetUseHomePath();
             LOG_INFO(L"WorkPath: {}", work_path);
             //AlluEngine/
-            WString prex_w = work_path.substr(0, work_path.find(L"bin"));
+            WString prex_w = work_path + L"OneDrive/AiluEngine/";
             ResourceMgr::ConfigRootPath(prex_w);
             s_editor_root_path = prex_w + L"Editor/";
             s_editor_config_path = prex_w + L"Editor/EditorConfig.ini";
@@ -210,17 +211,28 @@ namespace Ailu
             Material::s_checker = g_pResourceMgr->Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
             WatchDirectory();
         }
+        struct ReloadReocrd
+        {
+            u16 _reload_shader_count;
+            u16 _reload_compute_count;
+            u16 _reload_tex2d_count;
+            bool Empty() const
+            {
+                return !(_reload_shader_count+_reload_compute_count+_reload_tex2d_count);
+            }
+        };
 
-        static void ReloadShader(const fs::path &file, u16 &update_shader_count, u16 &update_compute_count)
+        static void ReloadAsset(const fs::path &file, ReloadReocrd& record)
         {
             const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+            WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
             for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
             {
                 auto shader = ResourceMgr::IterToRefPtr<Shader>(it);
                 if (shader)
                 {
                     bool match_file = false;
-                    for (u32 i = 0; i < shader->PassCount(); i++)
+                    for (i16 i = 0; i < shader->PassCount(); i++)
                     {
                         if (match_file)
                             break;
@@ -230,26 +242,30 @@ namespace Ailu
                             if (head_file == cur_path)
                             {
                                 match_file = true;
-                                g_pResourceMgr->SubmitTaskSync([=]()
+                                g_pResourceMgr->SubmitTaskSync([=]()->bool
                                                                {
-                                                                       
+                                    auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload shader: {}...",shader->Name()).c_str(),0.5f);
                                     if (shader->PreProcessShader())
                                     {
                                         for (auto &mat: shader->GetAllReferencedMaterials())
                                         {
                                             mat->ConstructKeywords(shader.get());
                                             bool is_all_succeed = true;
-                                            for (u16 i = 0; i < shader->PassCount(); i++)
-                                            {
-                                                is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
-                                            }
+                                            is_all_succeed = shader->Compile(); //暂时重编所有变体，避免材质切换变体后使用的是旧的shader
+                                            // for (u16 i = 0; i < shader->PassCount(); i++)
+                                            // {
+                                            //     is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
+                                            // }
                                             if (is_all_succeed)
                                             {
                                                 mat->ChangeShader(shader.get());
                                             }
                                         }
-                                    } });
-                                ++update_shader_count;
+                                    }
+                                    ImGuiWidget::RemoveProgressBar(handle);
+                                    return true;
+                                });
+                                ++record._reload_shader_count;
                             }
                         }
                     }
@@ -261,25 +277,57 @@ namespace Ailu
                 auto cs = ResourceMgr::IterToRefPtr<ComputeShader>(it);
                 if (cs->IsDependencyFile(cur_path))
                 {
-                    g_pResourceMgr->SubmitTaskSync([=]()
+                    g_pResourceMgr->SubmitTaskSync([=]()->bool
                                                    {
+                        auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload compute shader: {}...",cs->Name()).c_str(),0.5f);
                         ComputeShader *shader = cs.get();
-                        shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
-                        shader->Compile(); });
-                    ++update_compute_count;
+                        if (shader->Preprocess())
+                        {
+                            shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
+                            shader->Compile(); 
+                        }
+                        ImGuiWidget::RemoveProgressBar(handle);
+                        return true;
+                    });
+                    ++record._reload_compute_count;
+                }
+            }
+            for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
+            {
+                auto tex = ResourceMgr::IterToRefPtr<Texture2D>(it);
+                auto linked_asset = g_pResourceMgr->GetLinkedAsset(tex.get());
+                if (linked_asset && !linked_asset->_external_asset_path.empty())
+                {
+                    if (cur_asset_path == linked_asset->_external_asset_path)
+                    {
+                        g_pResourceMgr->SubmitTaskSync([=]()->bool
+                        {
+                           auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload texture2d: {}...",tex->Name()).c_str(),0.5f);
+                           TextureImportSetting setting = TextureImportSetting::Default();
+                           setting._is_reimport = true;
+                           g_pResourceMgr->Load<Texture2D>(linked_asset->_asset_path,&setting);
+                           ImGuiWidget::RemoveProgressBar(handle);
+                           return true;
+                        });
+                        ++record._reload_tex2d_count;
+                        LOG_INFO(L"Reloaded texture {}", linked_asset->_asset_path);
+                    }
                 }
             }
         }
         void EditorApp::WatchDirectory()
         {
             namespace fs = std::filesystem;
-            fs::path dir(ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW);
-            u16 update_shader_count = 0u, update_compute_count = 0u;
+            static Vector<fs::path> s_watching_paths{
+                ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW,
+                ResourceMgr::EngineResRootPath() + EnginePath::kEngineTexturePathW
+            };
             static bool is_first_execute = true;
             static std::set<fs::path> path_set{};
             static std::unordered_map<fs::path, fs::file_time_type> s_cache_files_time;
             std::unordered_map<fs::path, fs::file_time_type> cur_files_time;
-            TraverseDirectory(dir, path_set);
+            for(auto& dir : s_watching_paths)
+                TraverseDirectory(dir, path_set);
             if (is_first_execute)
             {
                 for (auto &cur_path: path_set)
@@ -292,22 +340,23 @@ namespace Ailu
                     s_cache_files_time[cur_path] = fs::last_write_time(cur_path);
                 cur_files_time[cur_path] = fs::last_write_time(cur_path);
             }
+            ReloadReocrd record{};
             for (const auto &[file, last_write_time]: s_cache_files_time)
             {
                 if (cur_files_time.contains(file))
                 {
                     if (cur_files_time[file] != last_write_time)
                     {
-                        ReloadShader(file, update_shader_count, update_compute_count);
+                        ReloadAsset(file,record);
                         s_cache_files_time[file] = cur_files_time[file];
                     }
                 }
                 //else if (!is_first_execute)
                 //    reload_shader(file);
             }
-            if (update_shader_count + update_compute_count > 0)
+            if (!record.Empty())
             {
-                LOG_INFO("Reload {} compute shader, {} shader", update_shader_count, update_compute_count);
+                LOG_INFO("Reload {} shader, {} compute shader,{} texture2d", record._reload_shader_count, record._reload_compute_count,record._reload_tex2d_count);
             }
         }
     }// namespace Editor

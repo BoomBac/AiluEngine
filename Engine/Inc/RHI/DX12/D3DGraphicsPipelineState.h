@@ -100,6 +100,8 @@ namespace Ailu
         const String &SlotToName(u8 slot) final;
         const u8 NameToSlot(const String &name) final;
         void SetTopology(ETopology topology) final;
+        void SetStencilRef(u8 ref) final;
+        const GraphicsPipelineStateInitializer& StateDescriptor() const final {return _state_desc;};
     private:
         void BindResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) final;
 
@@ -119,6 +121,7 @@ namespace Ailu
         std::unordered_map<u8, const String &> _bind_res_name_lut;
         PSOHash _hash;
         D3D_PRIMITIVE_TOPOLOGY _d3d_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+        u8 _stencil_ref = 0u;
     };
 }// namespace Ailu
 

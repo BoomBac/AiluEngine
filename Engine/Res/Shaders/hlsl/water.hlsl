@@ -43,9 +43,9 @@ StandardPSInput ForwardVSMain(StandardVSInput v)
 	float3 N = TransformNormal(v.normal);
 	result.btn = float3x3(T, B, N);
 	result.normal = N;
-	result.world_pos = TransformToWorldSpace(v.position);
-	result.world_pos.y += sin(_Time.x * 0.1f + result.world_pos.x * 4) * 0.25;
-	result.position = TransformFromWorldToClipSpace(result.world_pos);
+	result.world_pos = TransformObjectToWorld(v.position);
+	result.world_pos.y += sin(_Time.x*100 + result.world_pos.x * 4) * 0.25;
+	result.position = TransformWorldToHClip(result.world_pos);
 	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
 	return result;
 }
@@ -66,9 +66,9 @@ StandardPSInput VSMain(StandardVSInput v)
 	float3 N = TransformNormal(v.normal);
 	result.btn = float3x3(T, B, N);
 	result.normal = N;
-	result.world_pos = TransformToWorldSpace(v.position);
-	result.world_pos.y += sin(_Time.x * 0.1f + result.world_pos.x * 4) * 0.25;
-	result.position = TransformFromWorldToClipSpace(result.world_pos);
+	result.world_pos = TransformObjectToWorld(v.position);
+	result.world_pos.y += sin(_Time.x*100 + result.world_pos.x * 4) * 0.25;
+	result.position = TransformWorldToHClip(result.world_pos);
 	return result;
 }
 float PSMain(StandardPSInput input) : SV_Depth

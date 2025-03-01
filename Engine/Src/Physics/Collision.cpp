@@ -1,5 +1,5 @@
 #include "Physics/Collision.h"
-#include "Framework/Math/Random.h"
+#include "Framework/Math/Random.hpp"
 #include "Render/Gizmo.h"
 #include "pch.h"
 

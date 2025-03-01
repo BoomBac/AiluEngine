@@ -4,12 +4,12 @@ cmake_minimum_required (VERSION 3.5)
 project (AiluEditor)
 set(TEST_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/x64)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AiluBuildPath}/out/editor/bin/x64)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/x64/debug)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/bin/x64/release)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${AiluBuildPath}/out/editor/bin/x64/debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${AiluBuildPath}/out/editor/bin/x64/release)
 
-set(ENGINE_LIB_ROOT ${ENGINE_ROOT_PATH}/lib/x64)
+set(ENGINE_LIB_ROOT ${AiluBuildPath}/out/engine/lib/x64)
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -48,7 +48,7 @@ target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 # 宏定义
-target_compile_definitions(Editor PUBLIC _DEBUG;Editor_EXPORTS;_WINDOWS)
+target_compile_definitions(Editor PUBLIC _DEBUG;Editor_EXPORTS;_WINDOWS;_REVERSED_Z)
 set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 # 编译器参数
 # if(MSVC)
@@ -65,4 +65,4 @@ set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 add_dependencies(Editor Engine)
 target_link_libraries(Editor PRIVATE
         $<$<CONFIG:Debug>:${ENGINE_LIB_ROOT}/Debug/Engine_d.lib>
-        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release/Engine.lib> ${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib)
+        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release/Engine.lib> ${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib) # msvcrtd.lib

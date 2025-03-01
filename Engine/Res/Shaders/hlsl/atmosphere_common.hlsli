@@ -128,6 +128,7 @@ float3 getValFromMultiScattLUT(float2 bufferRes, float3 pos, float3 sunDir)
 }
 
 TEXTURE2D(_TexSkyViewLUT)
+//返回最终的大气散射颜色
 float3 getValFromSkyLUT(float3 rayDir, float3 sunDir) 
 {
     float height = length(viewPos);

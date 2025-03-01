@@ -1,9 +1,9 @@
 #include "Render/Camera.h"
 #include "Render/Gizmo.h"
-#include "pch.h"
-//#include "Render/RenderQueue.h"
 #include "Render/Renderer.h"
 #include "Scene/Scene.h"
+#include "Framework/Common/SystemInfo.h"
+#include "pch.h"
 
 namespace Ailu
 {
@@ -55,8 +55,8 @@ namespace Ailu
         Matrix4x4f view, proj;
         f32 aspect = w / h;
         f32 half_width = w * 0.5f, half_height = h * 0.5f;
-        BuildViewMatrixLookToLH(view,Vector3f(0.f,0.f,-50.f),Vector3f::kForward,Vector3f::kUp);
-        BuildOrthographicMatrix(proj,-half_width,half_width,half_height,-half_height,1.f,200.f);
+        BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
+        BuildOrthographicMatrix(proj, -half_width, half_width, half_height, -half_height, 1.f, 200.f);
         return view * proj;
     }
 
@@ -95,7 +95,7 @@ namespace Ailu
 
     AABB Camera::GetBoundingAABB(const Camera &eye_cam, f32 start, f32 end)
     {
-        end = end <= 0.0f? 1.0f : end;
+        end = end <= 0.0f ? 1.0f : end;
         f32 end_len = end / eye_cam.Far(), start_len = start / eye_cam.Far();
         //end_len = std::min<f32>(end_len, 1.0);
         start_len = std::clamp(start_len, 0.0f, end_len);
@@ -251,10 +251,11 @@ namespace Ailu
         Vector3f far_top_left, far_top_right, far_bottom_left, far_bottom_right;
         if (_camera_type == ECameraType::kPerspective)
         {
-            far_top_left = near_top_left * (_far_clip / _near_clip);
-            far_top_right = near_top_right * (_far_clip / _near_clip);
-            far_bottom_left = near_bottom_left * (_far_clip / _near_clip);
-            far_bottom_right = near_bottom_right * (_far_clip / _near_clip);
+            f32 scale = _far_clip / _near_clip;
+            far_top_left = near_top_left * scale;
+            far_top_right = near_top_right * scale;
+            far_bottom_left = near_bottom_left * scale;
+            far_bottom_right = near_bottom_right * scale;
         }
         else
         {
@@ -301,11 +302,11 @@ namespace Ailu
         const static Vector3f targets[] =
                 {
                         {+1.f, 0.f, 0.0f},//+x
-                        {-1.f, 0.f, 0.f},//-x
-                        {0.f, +1.f, 0.f},//+y
-                        {0.f, -1.f, 0.f},//-y
-                        {0.f, 0.f,+1.f},//+z
-                        {0.f, 0.f,-1.f} //-z
+                        {-1.f, 0.f, 0.f}, //-x
+                        {0.f, +1.f, 0.f}, //+y
+                        {0.f, -1.f, 0.f}, //-y
+                        {0.f, 0.f, +1.f}, //+z
+                        {0.f, 0.f, -1.f}  //-z
                 };
         const static Vector3f ups[] =
                 {
@@ -322,15 +323,29 @@ namespace Ailu
         out.LookTo(Normalize(targets[face - 1]), Normalize(ups[face - 1]));
         return out;
     }
+    
+    void Camera::CalculateZBUfferAndProjParams(const Camera &cam, Vector4f &zb, Vector4f &proj_params)
+    {
+        f32 f = cam.Far(), n = cam.Near();
+        u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
+        proj_params = Vector4f(1.0f,n,f,1.f / f);
+        if (SystemInfo::kReverseZ)
+        zb = Vector4f(-1.f + f/n,1.f,(-1.f + f/n) / f,1 / f);
+        else
+        {
+            zb = Vector4f(1.f - f/n,f/n,0.f,0.f);
+            zb.zw = {zb.x / f,zb.y / f};
+        }
+    }
     Archive &operator<<(Archive &ar, const Camera &c)
     {
         ar.IncreaseIndent();
         ar << ar.GetIndent() << "_type:" << ECameraType::ToString(c._camera_type) << std::endl;
         ar << ar.GetIndent() << "_aspect:" << c.Aspect() << std::endl;
-        ar << ar.GetIndent() << "_far:"    << c.Far() << std::endl;
-        ar << ar.GetIndent() << "_near:"   << c.Near() << std::endl;
-        ar << ar.GetIndent() << "_fovh:"   << c.FovH() << std::endl;
-        ar << ar.GetIndent() << "_size:"   << c.Size() << std::endl;
+        ar << ar.GetIndent() << "_far:" << c.Far() << std::endl;
+        ar << ar.GetIndent() << "_near:" << c.Near() << std::endl;
+        ar << ar.GetIndent() << "_fovh:" << c.FovH() << std::endl;
+        ar << ar.GetIndent() << "_size:" << c.Size() << std::endl;
         ar.DecreaseIndent();
         return ar;
     }
@@ -356,12 +371,23 @@ namespace Ailu
     {
         _pixel_width = w;
         _pixel_height = h;
-        f32 new_aspect = (f32)w / (f32)h;
+        f32 new_aspect = (f32) w / (f32) h;
         if (new_aspect != _aspect)
         {
             _aspect = new_aspect;
             MarkDirty();
             RecalculateMarix();
         }
+    }
+    void Camera::GetCornerInWorld(Vector3f &lt, Vector3f &lb, Vector3f &rt, Vector3f &rb) const
+    {
+        // lt = Normalize(_far_top_left - _near_top_left);
+        // lb = Normalize(_far_bottom_left - _near_bottom_left);
+        // rt = Normalize(_far_top_right - _near_top_right);
+        // rb = Normalize(_far_bottom_right - _near_bottom_right);
+        lt = _far_top_left;
+        lb = _far_bottom_left;
+        rt = _far_top_right;
+        rb = _far_bottom_right;
     }
 }// namespace Ailu

@@ -93,7 +93,7 @@ namespace Ailu
         using ResourcePoolContainer = Map<WString, Ref<Object>>;
         using ResourcePoolContainerIter = ResourcePoolContainer::iterator;
         using ResourcePoolLut = Map<u32, ResourcePoolContainer::iterator>;
-        using ResourceTask = std::function<void()>;
+        using ResourceTask = std::function<bool()>;
         using OnResourceTaskCompleted = std::function<void(Ref<void> asset)>;
         inline const static std::set<String> kLDRImageExt = {".png", ".PNG", ".tga", ".TGA", ".jpg", ".JPG", ".jpg", ".JPEG"};
         inline const static std::set<String> kHDRImageExt = {".exr", ".EXR", ".hdr", ".HDR"};
@@ -103,7 +103,6 @@ namespace Ailu
         static const WString &EngineResRootPath() { return s_engine_res_root_pathw; };
         static String GetResSysPath(const String &sub_path);
         static WString GetResSysPath(const WString &sub_path);
-
         DISALLOW_COPY_AND_ASSIGN(ResourceMgr)
         ResourceMgr() = default;
         int Initialize() final;
@@ -122,12 +121,13 @@ namespace Ailu
         Asset *GetLinkedAsset(Object *obj);
         static void ConfigRootPath(const WString &prex);
         //.../Res，最后不带斜杠
-        const WString &GetProjectRootSysPath() const
+        const WString &GetEngineRootSysPath() const
         {
             return _project_root_path;
         }
         //提交一个任务，该任务会在ResourceMgr tick时在主线程执行
         void SubmitTaskSync(ResourceTask task);
+        void SubmitTaskSync(ResourceTask task,std::function<void(bool)> callback);
         //static Material* LoadAsset(const String& asset_path);
         Ref<void> ImportResource(const WString &sys_path, const ImportSetting &setting = ImportSetting::Default());
         //async editon always reutn nullptr
@@ -155,13 +155,13 @@ namespace Ailu
         }
 
         template<typename T>
-        Ref<T> Load(const WString &asset_path, ImportSetting *setting = nullptr);
+        Ref<T> Load(const WString &asset_path, const ImportSetting *setting = nullptr);
         template<typename T>
-        Ref<T> Load(const Guid &guid, ImportSetting *setting = nullptr);
+        Ref<T> Load(const Guid &guid, const ImportSetting *setting = nullptr);
         template<typename T>
-        void LoadAsync(const WString &asset_path, ImportSetting *setting = nullptr);
+        void LoadAsync(const WString &asset_path, const ImportSetting *setting = nullptr);
         template<typename T>
-        void LoadAsync(const Guid &guid, ImportSetting *setting = nullptr);
+        void LoadAsync(const Guid &guid, const ImportSetting *setting = nullptr);
         template<typename T>
         T *Get(const WString &res_id);
         template<typename T>
@@ -202,28 +202,30 @@ namespace Ailu
         static void FormatLine(const String &line, String &key, String &value);
         static void ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, EAssetType::EAssetType &type);
         static EAssetType::EAssetType GetObjectAssetType(Object *obj);
-        static bool IsFileOnDiskUpdated(const WString &sys_path);
-        static void MarkFileTimeStamp(const WString &sys_path);
 
-        void AddResourceTask(ResourceTask task);
-        bool ExistInAssetDB(const Asset *asset);
-        bool ExistInAssetDB(const WString &asset_path);
+        bool IsFileOnDiskUpdated(const WString &sys_path);
+        void MarkFileTimeStamp(const WString &sys_path);
+
+        bool ExistInAssetDB(const Asset *asset) const;
+        bool ExistInAssetDB(const WString &asset_path) const;
         void RemoveFromAssetDB(const Asset *asset);
+        bool IsAssetLoaded(const WString &asset_path) const;
 
         void LoadAssetDB();
         void SaveAssetDB();
 
         //加载引擎处理后的资产
-        Scope<Asset> LoadMaterial(const WString &asset_path);
-        Scope<Asset> LoadShader(const WString &asset_path);
-        Scope<Asset> LoadTexture(const WString &asset_path);
-        Scope<Asset> LoadMesh(const WString &asset_path);
-        Scope<Asset> LoadComputeShader(const WString &asset_path);
-        Scope<Asset> LoadScene(const WString &asset_path);
-        Scope<Asset> LoadAnimClip(const WString &asset_path);
+        Scope<Asset> LoadMaterial(const WString &asset_path,const ImportSetting& settings);
+        Scope<Asset> LoadShader(const WString &asset_path,const ImportSetting& settings);
+        Scope<Asset> LoadTexture(const WString &asset_path,const ImportSetting& settings);
+        Scope<Asset> LoadMesh(const WString &asset_path,const ImportSetting& settings);
+        Scope<Asset> LoadComputeShader(const WString &asset_path,const ImportSetting& settings);
+        Scope<Asset> LoadScene(const WString &asset_path,const ImportSetting& settings);
+        Scope<Asset> LoadAnimClip(const WString &asset_path,const ImportSetting& settings);
         //加载原始资产
         List<Ref<Mesh>> LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting, List<Ref<AnimationClip>> &clips);
-        Ref<Texture2D> LoadExternalTexture(const WString &asset_path);
+        Ref<Texture2D> LoadExternalTexture(const WString &asset_path,const ImportSetting& settings);
+        bool LoadExternalTexture(const WString &asset_path,Ref<Texture2D>& tex,const ImportSetting& settings);
         Ref<Shader> LoadExternalShader(const WString &asset_path);
         Ref<ComputeShader> LoadExternalComputeShader(const WString &asset_path);
 
@@ -234,7 +236,7 @@ namespace Ailu
         void SaveTexture2D(const WString &asset_path, const Asset *asset);
         void SaveScene(const WString &asset_path, const Asset *asset);
         void SaveAnimClip(const WString &asset_path, const Asset *asset);
-        void SubmitResourceTask();
+
         //导入外部资源并创建对应的asset
         Ref<void> ImportResourceImpl(const WString &sys_path, const ImportSetting *setting);
         void OnAssetDataBaseChanged();
@@ -243,9 +245,8 @@ namespace Ailu
         inline static String kAssetDatabasePath;
         inline static WString s_engine_res_root_pathw;
         inline static Map<u32, WString> s_object_sys_path_map;
-        inline static List<ResourceTask> s_task_queue;
         inline static Queue<Asset *> s_pending_save_assets;
-        inline static std::unordered_map<WString, fs::file_time_type> s_file_last_load_time;
+        HashMap<WString, fs::file_time_type> _file_last_load_time;
         bool _is_watching_directory = true;
         WString _project_root_path;
         std::mutex _asset_db_mutex;
@@ -260,13 +261,14 @@ namespace Ailu
         ResourcePoolLut _lut_global_resources;
         Map<EAssetType::EAssetType, Vector<ResourcePoolContainerIter>> _lut_global_resources_by_type;
         Vector<std::function<void()>> _asset_changed_callbacks;
-        Queue<ResourceTask> _tasks;
+        Queue<std::function<void()>> _sync_tasks;
+        Queue<std::function<void()>> _async_tasks;
         Queue<Asset *> _pending_delete_assets;
     };
     extern AILU_API ResourceMgr *g_pResourceMgr;
 
     template<typename T>
-    inline Ref<T> ResourceMgr::Load(const WString &asset_path, ImportSetting *setting)
+    inline Ref<T> ResourceMgr::Load(const WString &asset_path, const ImportSetting *setting)
     {
         if (asset_path.empty())
         {
@@ -276,7 +278,7 @@ namespace Ailu
         LOG_WARNING(L"Begin load asset {}...", asset_path);
         TimeMgr timer;
         timer.Mark();
-        using Loader = std::function<Scope<Asset>(ResourceMgr *, const WString &)>;
+        using Loader = std::function<Scope<Asset>(ResourceMgr *, const WString &,const ImportSetting&)>;
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         auto ext = PathUtils::ExtractExt(sys_path);
         bool is_engine_asset = ext == L".alasset" || L".almap";
@@ -291,16 +293,18 @@ namespace Ailu
             g_pLogMgr->LogErrorFormat(L"Load asset {} failed with invalid asset type after {}ms", asset_path, timer.GetElapsedSinceLastMark());
             return nullptr;
         }
-        bool is_skip_load = false;
         Loader asset_loader = nullptr;
-        if (!IsFileOnDiskUpdated(sys_path))
-        {
-            g_pLogMgr->LogWarningFormat(L"Load asset {} succeed with everything is new after {}ms", asset_path, timer.GetElapsedSinceLastMark());
-            return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
-        }
+        // bool is_skip_load = false;
+        // if (!IsFileOnDiskUpdated(sys_path))
+        // {
+        //     g_pLogMgr->LogWarningFormat(L"Load asset {} succeed with everything is new after {}ms", asset_path, timer.GetElapsedSinceLastMark());
+        //     return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
+        // }
+        ImportSetting *cur_setting = setting ? const_cast<ImportSetting *>(setting) : &ImportSetting::Default();
         if constexpr (std::is_same<T, Texture2D>::value)
         {
             asset_loader = &ResourceMgr::LoadTexture;
+            cur_setting = setting? cur_setting : &TextureImportSetting::Default();
         }
         else if constexpr (std::is_same<T, Mesh>::value)
         {
@@ -330,39 +334,51 @@ namespace Ailu
         {
             asset_loader = &ResourceMgr::LoadAnimClip;
         }
-        Scope<Asset> out_asset;
-        out_asset = std::move(asset_loader(this, asset_path));
-        if (out_asset != nullptr)
+        if (!IsAssetLoaded(asset_path))
         {
-            MarkFileTimeStamp(sys_path);
-            out_asset->_name = asset_name;
-            out_asset->AssignGuid(guid);
-            RegisterResource(asset_path, out_asset->_p_obj);
-            RegisterAsset(std::move(out_asset));
-            s_file_last_load_time[sys_path] = std::filesystem::last_write_time(sys_path);
-            g_pLogMgr->LogWarningFormat(L"Load asset {} succeed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
+            Scope<Asset> out_asset;
+            out_asset = std::move(asset_loader(this, asset_path,*cur_setting));
+            if (out_asset != nullptr)
+            {
+                out_asset->_name = asset_name;
+                out_asset->AssignGuid(guid);
+                RegisterResource(asset_path, out_asset->_p_obj);
+                RegisterAsset(std::move(out_asset));
+                MarkFileTimeStamp(sys_path);
+                g_pLogMgr->LogWarningFormat(L"Load asset {} succeed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
+            }
+            else
+                g_pLogMgr->LogErrorFormat(L"Load asset {} failed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
         }
         else
-            g_pLogMgr->LogErrorFormat(L"Load asset {} failed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
+        {
+            if (cur_setting->_is_reimport)
+            {
+                asset_loader(this, asset_path,*cur_setting);
+                MarkFileTimeStamp(sys_path);
+                g_pLogMgr->LogWarningFormat(L"Reload asset {} after {} ms", asset_path, timer.GetElapsedSinceLastMark());
+            }
+        }
+
         return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
     }
     template<typename T>
-    inline Ref<T> ResourceMgr::Load(const Guid &guid, ImportSetting *setting)
+    inline Ref<T> ResourceMgr::Load(const Guid &guid, const ImportSetting *setting)
     {
-        return Load<T>(GuidToAssetPath(guid));
+        return Load<T>(GuidToAssetPath(guid),setting);
     }
 
     template<typename T>
-    inline void ResourceMgr::LoadAsync(const WString &asset_path, ImportSetting *setting)
+    inline void ResourceMgr::LoadAsync(const WString &asset_path, const ImportSetting *setting)
     {
-        g_pThreadTool->Enqueue([this, asset_path]()
-                               { this->Load<T>(asset_path); });
+        g_pThreadTool->Enqueue([&]()
+                               { this->Load<T>(asset_path,setting); });
     }
     template<typename T>
-    inline void ResourceMgr::LoadAsync(const Guid &guid, ImportSetting *setting)
+    inline void ResourceMgr::LoadAsync(const Guid &guid, const ImportSetting *setting)
     {
-        g_pThreadTool->Enqueue([this, guid]()
-                               { this->Load<T>(guid); });
+        g_pThreadTool->Enqueue([&]()
+                               { this->Load<T>(guid,setting); });
     }
     template<typename T>
     inline T *ResourceMgr::Get(const WString &res_id)
@@ -426,35 +442,39 @@ namespace Ailu
     {
         if constexpr (std::is_same<T, Texture2D>::value)
         {
-            return _lut_global_resources_by_type.at(EAssetType::kTexture2D).size();
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kTexture2D).size();
         }
         else if constexpr (std::is_same<T, Shader>::value)
         {
-            return _lut_global_resources_by_type.at(EAssetType::kShader).size();
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kShader).size();
         }
         else if constexpr (std::is_same<T, ComputeShader>::value)
         {
-            return _lut_global_resources_by_type.at(EAssetType::kComputeShader).size();
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kComputeShader).size();
         }
         else if constexpr (std::is_same<T, Mesh>::value)
         {
-            return _lut_global_resources_by_type.at(EAssetType::kMesh).size();
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kMesh).size();
         }
         else if constexpr (std::is_same<T, SkeletonMesh>::value)
         {
-            return _lut_global_resources_by_type.at(EAssetType::kSkeletonMesh).size();
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kSkeletonMesh).size();
         }
         else if constexpr (std::is_same<T, Material>::value)
         {
-            return _lut_global_resources_by_type.at(EAssetType::kMaterial).size();
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kMaterial).size();
         }
         else if constexpr (std::is_same<T, Scene>::value)
         {
-            return _lut_global_resources_by_type.at(EAssetType::kScene).size();
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kScene).size();
         }
         else if constexpr (std::is_same<T, AnimationClip>::value)
         {
-            return _lut_global_resources_by_type.at(EAssetType::kAnimClip).size();
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kAnimClip).size();
+        }
+        else if constexpr (std::is_same<T, Texture3D>::value)
+        {
+            return (u32)_lut_global_resources_by_type.at(EAssetType::kTexture3D).size();
         }
         else
         {
@@ -495,6 +515,8 @@ namespace Ailu
         }
         else if constexpr (std::is_same<T, AnimationClip>::value)
             return _lut_global_resources_by_type.at(EAssetType::kAnimClip).begin();
+        else if constexpr (std::is_same<T, Texture3D>::value)
+            return _lut_global_resources_by_type.at(EAssetType::kTexture3D).begin();
         else
         {
             AL_ASSERT(false);
@@ -533,6 +555,8 @@ namespace Ailu
         }
         else if constexpr (std::is_same<T, AnimationClip>::value)
             return _lut_global_resources_by_type.at(EAssetType::kAnimClip).end();
+        else if constexpr (std::is_same<T, Texture3D>::value)
+            return _lut_global_resources_by_type.at(EAssetType::kTexture3D).end();
         else
         {
             AL_ASSERT(false);

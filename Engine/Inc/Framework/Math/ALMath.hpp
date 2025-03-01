@@ -316,6 +316,7 @@ namespace Ailu
         const Vector2D<T> Vector2D<T>::kOne(1, 1);
         using Vector2f = Vector2D<float>;
         using Vector2Int = Vector2D<i32>;
+        using Vector2UInt = Vector2D<u32>;
 
         template<typename T>
         struct Vector3D
@@ -538,6 +539,7 @@ namespace Ailu
             Vector4D<T>() : x(0), y(0), z(0), w(0){};
             Vector4D<T>(const T &_v) : x(_v), y(_v), z(_v), w(_v){};
             Vector4D<T>(const T &_x, const T &_y, const T &_z, const T &_w) : x(_x), y(_y), z(_z), w(_w){};
+            Vector4D<T>(const Vector2D<T> &v2) : x(v2.x), y(v2.y), z(0), w(0){};
             Vector4D<T>(const Vector2D<T> &v2, T _z, T _w) : x(v2.x), y(v2.y), z(_z), w(_w){};
             Vector4D<T>(const Vector3D<T> &v3) : x(v3.x), y(v3.y), z(v3.z), w(1.0f){};
             Vector4D<T>(const Vector3D<T> &v3, const T &_w) : x(v3.x), y(v3.y), z(v3.z), w(_w){};
@@ -688,6 +690,107 @@ namespace Ailu
             return dis;
         }
         template<template<typename> class TT, typename T>
+        static TT<T> Fract(const TT<T> &v)
+        {
+            TT<T> ret = v;
+            for (u32 i = 0; i < CountOf(v.data); i++)
+                ret.data[i] = v.data[i] - std::floor(v.data[i]);
+            return ret;
+        }
+        template<double>
+        static double Fract(double x)
+        {
+            return x - std::floor(x);
+        }
+        template<float>
+        static float Fract(float x)
+        {
+            return x - std::floorf(x);
+        }
+        template<template<typename> class TT, typename T>
+        static TT<T> Floor(const TT<T> &v)
+        {
+            TT<T> ret = v;
+            for (u32 i = 0; i < CountOf(v.data); i++)
+                ret.data[i] = std::floor(v.data[i]);
+            return ret;
+        }
+        template<double>
+        static double Floor(double x)
+        {
+            return std::floor(x);
+        }
+        template<float>
+        static float Floor(float x)
+        {
+            return std::floorf(x);
+        }
+        template<template<typename> class TT, typename T>
+        static TT<T> Ceil(const TT<T> &v)
+        {
+            TT<T> ret = v;
+            for (u32 i = 0; i < CountOf(v.data); i++)
+                ret.data[i] = std::ceil(v.data[i]);
+            return ret;
+        }
+        template<double>
+        static double Ceil(double x)
+        {
+            return std::ceil(x);
+        }
+        template<float>
+        static float Ceil(float x)
+        {
+            return std::ceilf(x);
+        }
+        template<template<typename> class TT, typename T>
+        static TT<T> Round(const TT<T> &v)
+        {
+            TT<T> ret = v;
+            for (u32 i = 0; i < CountOf(v.data); i++)
+                ret.data[i] = std::round(v.data[i]);
+            return ret;
+        }
+        template<double>
+        static double Round(double x)
+        {
+            return std::round(x);
+        }
+        template<float>
+        static float Round(float x)
+        {
+            return std::roundf(x);
+        }
+        template<template<typename> class TT, typename T>
+        TT<T> operator%(TT<T> lhs, TT<T> rhs)
+        {
+            u32 ele_num = CountOf(lhs.data);
+            TT<T> ret;
+            if constexpr (std::is_same<T, float>::value)
+            {
+                for (u32 i = 0; i < ele_num; i++)
+                    ret.data[i] = std::fmodf(lhs.data[i], rhs.data[i]);
+            }
+            else if constexpr (std::is_same<T, double>::value)
+            {
+                for (u32 i = 0; i < ele_num; i++)
+                    ret.data[i] = std::fmod(lhs.data[i], rhs.data[i]);
+            }
+            else
+            {
+                for (u32 i = 0; i < ele_num; i++)
+                    ret.data[i] = lhs.data[i] % rhs.data[i];
+            }
+            return ret;
+        }
+        template<template<typename> class TT, typename T>
+        TT<T> Smoothstep(const TT<T> &edge0, const TT<T> &edge1, const TT<T> &x)
+        {
+            TT<T> t = Clamp((x - edge0) / (edge1 - edge0), TT<T>::kZero, TT<T>::kOne);
+            return t * t * (TT<T>::kOne - t);
+        }
+
+        template<template<typename> class TT, typename T>
         static bool LoadVector(const char *vec_str, const TT<T> &out_v)
         {
 #pragma warning(push)
@@ -745,6 +848,17 @@ namespace Ailu
         {
             value = (value > max) ? max : (value < min) ? min
                                                         : value;
+        }
+        template<template<typename> typename TT, typename T>
+        TT<T> Clamp(const TT<T> &value, const T &min, const T &max)
+        {
+            TT<T> ret = value;
+            for (u32 i = 0; i < CountOf(value.data); i++)
+            {
+                ret.data[i] = (value.data[i] > max) ? max : (value.data[i] < min) ? min
+                                                                                  : value.data[i];
+            }
+            return ret;
         }
 
         template<template<typename> typename TT, typename T>
@@ -1021,6 +1135,20 @@ namespace Ailu
             T &operator=(const T &other)
             {
                 return *this;
+            }
+            bool operator==(const Matrix<T, rows, cols> &other) const
+            {
+                for (int i = 0; i < rows; ++i)
+                {
+                    for (int j = 0; j < cols; ++j)
+                    {
+                        if (data[i][j] != other.data[i][j])
+                        {
+                            return false;
+                        }
+                    }
+                }
+                return true;
             }
             Matrix<T, rows, cols> &operator*(float scale)
             {
@@ -1569,8 +1697,11 @@ namespace Ailu
             return MatrixTranspose(inver);
         }
         // directx: left f > n > 0		NDC 0~1
-        static void BuildOrthographicMatrix(Matrix4x4f &matrix, const float left, const float right, const float top, const float bottom, const float near_plane, const float far_plane)
+        static void BuildOrthographicMatrix(Matrix4x4f &matrix, f32 left, f32 right, f32 top, f32 bottom, f32 near_plane, f32 far_plane)
         {
+        #if defined(_REVERSED_Z)
+            std::swap(near_plane, far_plane);
+        #endif
             const float width = right - left;
             const float height = top - bottom;
             const float depth = far_plane - near_plane;
@@ -1580,24 +1711,43 @@ namespace Ailu
                         {-(right + left) / width, -(top + bottom) / height, -near_plane / depth, 1.0f}}}};
             return;
         }
-        static void BuildPerspectiveFovLHMatrix(Matrix4x4f &matrix, const float fieldOfView, const float screenAspect, const float screenNear, const float screenDepth)
+        static void BuildPerspectiveFovLHMatrix(Matrix4x4f &matrix, f32 fieldOfView, f32 screenAspect, f32 near_plane, f32 far_plane)
         {
+        #if defined(_REVERSED_Z)
+            std::swap(near_plane, far_plane);
+        #endif
             Matrix4x4f perspective = {{{{1.0f / (screenAspect * tanf(fieldOfView * 0.5f)), 0.0f, 0.0f, 0.0f},
                                         {0.0f, 1.0f / tanf(fieldOfView * 0.5f), 0.0f, 0.0f},
-                                        {0.0f, 0.0f, screenDepth / (screenDepth - screenNear), 1.0f},
-                                        {0.0f, 0.0f, (-screenNear * screenDepth) / (screenDepth - screenNear), 0.0f}}}};
+                                        {0.0f, 0.0f, far_plane / (far_plane - near_plane), 1.0f},
+                                        {0.0f, 0.0f, (-near_plane * far_plane) / (far_plane - near_plane), 0.0f}}}};
             matrix = perspective;
             return;
         }
-        static void BuildPerspectiveFovRHMatrix(Matrix4x4f &matrix, const float fieldOfView, const float screenAspect, const float screenNear, const float screenDepth)
+        static void BuildPerspectiveFovRHMatrix(Matrix4x4f &matrix, f32 fieldOfView, f32 screenAspect, f32 near_plane, f32 far_plane)
         {
+        #if defined(_REVERSED_Z)
+            std::swap(near_plane, far_plane);
+        #endif
             Matrix4x4f perspective = {{{{1.0f / (screenAspect * tanf(fieldOfView * 0.5f)), 0.0f, 0.0f, 0.0f},
                                         {0.0f, 1.0f / tanf(fieldOfView * 0.5f), 0.0f, 0.0f},
-                                        {0.0f, 0.0f, screenDepth / (screenNear - screenDepth), -1.0f},
-                                        {0.0f, 0.0f, (-screenNear * screenDepth) / (screenDepth - screenNear), 0.0f}}}};
+                                        {0.0f, 0.0f, far_plane / (near_plane - far_plane), -1.0f},
+                                        {0.0f, 0.0f, (-near_plane * far_plane) / (far_plane - near_plane), 0.0f}}}};
 
             matrix = perspective;
             return;
+        }
+
+        static Matrix4x4f MatrixReverseZ(const Matrix4x4f proj)
+        {
+        #if defined(_REVERSED_Z)
+            const Matrix4x4f reverse_z {1.0f, 0.0f,  0.0f, 0.0f,
+                0.0f, 1.0f,  0.0f, 0.0f,
+                0.0f, 0.0f, -1.0f, 0.0f,
+                0.0f, 0.0f,  1.0f, 1.0f};
+            return proj * reverse_z;
+        #else
+            return proj;
+        #endif
         }
         static void MatrixTranslation(Matrix4x4f &matrix, const float x, const float y, const float z)
         {

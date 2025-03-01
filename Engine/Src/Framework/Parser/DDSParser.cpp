@@ -37,13 +37,37 @@ namespace
 
 namespace Ailu
 {
-    Ref<CubeMap> DDSParser::Parser(Vector<String> &paths)
+    Ref<CubeMap> DDSParser::Parser(Vector<String> &paths,const TextureImportSetting& import_settings)
     {
         return nullptr;
     }
-    Ref<Texture2D> DDSParser::Parser(const WString &sys_path)
+    Ref<Texture2D> DDSParser::Parser(const WString &sys_path,const TextureImportSetting& import_settings)
     {
-        AL_ASSERT(FileManager::Exist(sys_path));
+        TextureLoadData load_data;
+        if (!LoadTextureData(sys_path, load_data))
+        {
+            return nullptr;
+        }
+        Texture2DInitializer desc;
+        desc._width = load_data._width;
+        desc._height = load_data._height;
+        desc._is_linear = import_settings._is_srgb;
+        desc._is_mipmap_chain = import_settings._generate_mipmap;
+        desc._is_readble = import_settings._is_readble;
+        desc._format = load_data._format;
+        auto tex = Texture2D::Create(desc);
+        tex->SetPixelData(load_data._data[0],0);
+        auto sys_path_n = ToChar(sys_path);
+        tex->Name(PathUtils::GetFileName(sys_path_n));
+        return tex;
+    }
+    bool DDSParser::LoadTextureData(const WString &sys_path,TextureLoadData& data)
+    {
+        if (!FileManager::Exist(sys_path))
+        {
+            LOG_ERROR("DDSParser::LoadTextureData: File not exist: {}", ToChar(sys_path));
+            return false;
+        }
         std::unique_ptr<uint8_t[]> ddsData;
         const DirectX::DDS_HEADER *header = nullptr;
         const uint8_t *bitData = nullptr;
@@ -54,6 +78,8 @@ namespace Ailu
         const UINT width = header->width;
         UINT height = header->height;
         UINT depth = header->depth;
+        data._width = width;
+        data._height = height;
 
         D3D12_RESOURCE_DIMENSION resDim = D3D12_RESOURCE_DIMENSION_UNKNOWN;
         UINT arraySize = 1;
@@ -179,7 +205,7 @@ namespace Ailu
             if (format == DXGI_FORMAT_UNKNOWN)
             {
                 error_code = HRESULT_E_NOT_SUPPORTED;
-                return nullptr;
+                return false;
             }
 
             if (header->flags & DDS_HEADER_FLAGS_VOLUME)
@@ -194,7 +220,7 @@ namespace Ailu
                     if ((header->caps2 & DDS_CUBEMAP_ALLFACES) != DDS_CUBEMAP_ALLFACES)
                     {
                         error_code =  HRESULT_E_NOT_SUPPORTED;
-                        return nullptr;
+                        return false;
                     }
 
                     arraySize = 6;
@@ -209,10 +235,35 @@ namespace Ailu
 
             assert(BitsPerPixel(format) != 0);
         }
-        auto tex = Texture2D::Create(header->width, header->height, header->mipMapCount > 1,DXGIToETextureFormat(format));
-        tex->SetPixelData(const_cast<u8 *>(bitData),0);
-        auto sys_path_n = ToChar(sys_path);
-        tex->Name(PathUtils::GetFileName(sys_path_n));
-        return tex;
+        data._format = DXGIToETextureFormat(format);
+        u8* raw_data = new u8[bitSize];
+        memcpy(raw_data, bitData, bitSize);
+        data._data.emplace_back(raw_data);
+        return true;
+    }
+
+    bool DDSParser::Parser(const WString &sys_path,Ref<Texture2D>& texture,const TextureImportSetting& import_settings)
+    {
+        TextureLoadData load_data;
+        if (!LoadTextureData(sys_path, load_data))
+        {
+            return false;
+        }
+        else
+        {
+            Texture2DInitializer desc;
+            desc._width = load_data._width;
+            desc._height = load_data._height;
+            desc._is_linear = import_settings._is_srgb;
+            desc._is_mipmap_chain = import_settings._generate_mipmap;
+            desc._is_readble = import_settings._is_readble;
+            desc._format = load_data._format;
+            texture->ReCreate(desc);
+            for(u16 i = 0; i < load_data._data.size(); ++i)
+            {
+                texture->SetPixelData(load_data._data[i], i);
+            }
+            return true;
+        }
     }
 }// namespace Ailu

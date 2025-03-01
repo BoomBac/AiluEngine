@@ -1,28 +1,42 @@
-#pragma kernel cs_main
+#pragma kernel SSAOGen
+#pragma kernel SSAOBlurX
+#pragma kernel SSAOBlurY
+#pragma multi_compile SSAOGen _ CBR
 
 #include "../screen_fx_common.hlsli"
 #include "cs_common.hlsli"
 
-RWTexture2D<float4> _AO_Result;
+#ifndef __SSAO_H__
+#define __SSAO_H__
 
-cbuffer AOComputeCB : register(b0)
-{
-    float4 _AOScreenParams;
+#define QUALITY_HIGH
+#define BLOCK_WIDTH 2
+#define THREAD_NUM 8
+
+CBUFFER_START(ComputeCB)
     float4 _HBAOParams;
-}
+    float4 _AOScreenParams;
+    float _KernelSize;
+    float _Space_Sigma;
+    float _Range_Sigma;
+CBUFFER_END
 
-#define INTENSITY      _HBAOParams.x
-#define RADIUS         _HBAOParams.y
+static const uint4 kCheckBoardOffset[2] = 
+{
+    uint4(0,0,1,1),
+    uint4(1,0,0,1)
+};
+
+#define INTENSITY _HBAOParams.x
+#define RADIUS _HBAOParams.y
 #define MAXRADIUSPIXEL _HBAOParams.z
-#define ANGLEBIAS      _HBAOParams.w
+#define ANGLEBIAS _HBAOParams.w
 
-static const float R = 0.6;
+static const float R = 1;
 static const float R2 = R * R;
 static const float NegInvR2 = - 1.0 / (R*R);
 static const float TanBias = tan(30.0 * PI / 180.0);
 static const float MaxRadiusPixels = 50.0;
-
-#define QUALITY_HIGH 1
 
 #if defined(QUALITY_HIGH)
 #define DIRECTION_COUNT 8
@@ -111,38 +125,31 @@ float Falloff(float d2)
 	return d2 * NegInvR2 + 1.0f;
 }
 
-[numthreads(16,16,1)]
-//void hbao_compute_cs(CSInput input)
-void cs_main(CSInput input)
+half ComputeAO(float2 uv,float4 texel_size)
 {
-    float2 AORes = _AOScreenParams.xy;
-    float2 InvAORes = _AOScreenParams.zw;
-    uint2 pixel_index = input.DispatchThreadID.xy;
-    float2 uv = (float2)pixel_index;
-    uv *= InvAORes;
-    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearClampSampler,uv,0).r;
-    float3 n = UnpackNormal(SAMPLE_TEXTURE2D_LOD(_CameraNormalsTexture, g_LinearClampSampler, uv,0).xy);
-    float3 vpos = GetPosViewSpace(uv,depth); 
-    float3 vnormal = GetNormalViewSpace(uv,n);
+    float3 vpos = GetPosViewSpace(uv);
+    float3 vnormal = GetNormalViewSpace(uv);
+    //vnormal.z *= -1;
     float2x2 rot = BuildRotationMatrix(uv);
     float2 noise = float2(Random(uv.xy),Random(uv.yx));
-        float stride = (RADIUS / -vpos.z) / (STEP_COUNT + 1.0);
+    //float stride = min(RADIUS / -vpos.z, MAXRADIUSPIXEL) / (STEP_COUNT + 1.0);
+    float stride = (0.1f * RADIUS / -vpos.z) / (STEP_COUNT + 1.0);
    // if (stride < 1) return 1.0;
     half ao = 0.0;
-    float3 pr = GetPosViewSpace(uv + float2(InvAORes.x,0.0));
-    float3 pl = GetPosViewSpace(uv + float2(-InvAORes.x,0.0));
-    float3 pt = GetPosViewSpace(uv + float2(0.0,InvAORes.y));
-    float3 pb = GetPosViewSpace(uv + float2(0.0,-InvAORes.y));
+    float3 pr = GetPosViewSpace(uv + float2(texel_size.x,0.0));
+    float3 pl = GetPosViewSpace(uv + float2(-texel_size.x,0.0));
+    float3 pt = GetPosViewSpace(uv + float2(0.0,texel_size.y));
+    float3 pb = GetPosViewSpace(uv + float2(0.0,-texel_size.y));
     float3 dPdu = MinDiff(vpos, pr, pl);
-    float3 dPdv = MinDiff(vpos, pt, pb) * (AORes.y * InvAORes.x);
+    float3 dPdv = MinDiff(vpos, pt, pb) * (texel_size.w * texel_size.x);
     for (int d = 0; d < DIRECTION_COUNT; d++) 
     {
         float2 ray_dir = mul(rot,kDirections[d]);
         float ray_length = frac(noise.y) * stride + 1.0;
-        float2 deltaUV = ray_dir * ray_length * InvAORes;
+        float2 deltaUV = ray_dir * ray_length * texel_size.xy;
         // Offset the first coord with some noise
         float2 cur_uv = uv;
-        deltaUV = SnapUVOffset(deltaUV,AORes);
+        deltaUV = SnapUVOffset(deltaUV,texel_size.zw);
         float3 T = deltaUV.x * dPdu + deltaUV.y * dPdv;
         float tanH = BiasedTangent(T);
         float sinH = TanToSin(tanH);
@@ -165,6 +172,117 @@ void cs_main(CSInput input)
             }
         }
     }
-    ao = 1.0 - ao / DIRECTION_COUNT * INTENSITY;
-    _AO_Result[pixel_index] = ao.xxxx;
+    ao = saturate(1.0 - ao / DIRECTION_COUNT * INTENSITY);
+    return ao;
 }
+
+RWTEXTURE2D(_AOResult,float)
+
+[numthreads(THREAD_NUM,THREAD_NUM,1)]
+void SSAOGen(CSInput input)
+{
+    uint2 pixel_index = input.DispatchThreadID.xy;
+#if defined(CBR)
+    pixel_index.x = pixel_index.x * BLOCK_WIDTH;
+    pixel_index.y = pixel_index.y * BLOCK_WIDTH;
+    uint4 offset = kCheckBoardOffset[_FrameIndex % BLOCK_WIDTH];
+    uint2 index_a = pixel_index + offset.xy;
+    uint2 index_b = pixel_index + offset.zw;
+    _AOResult[index_a] = ComputeAO((index_a + 0.5) * _AOScreenParams.xy,_AOScreenParams);
+    _AOResult[index_b] = ComputeAO((index_b + 0.5) * _AOScreenParams.xy,_AOScreenParams);
+#else
+    _AOResult[pixel_index] = ComputeAO((pixel_index + 0.5) * _AOScreenParams.xy,_AOScreenParams);
+#endif
+}
+
+TEXTURE2D(_SourceTex)
+half3 BilateralBlur(float2 uv,float2 offset,float space_sigma, float range_sigma)
+{
+    float weight_sum = 0;
+    float3 color_sum = 0;
+    float3 normal_origin = SAMPLE_TEXTURE2D_LOD(_CameraNormalsTexture, g_LinearClampSampler, uv,0);
+    half3 color = 0;
+    for(int i = -_KernelSize; i < _KernelSize; i++)
+    {
+        //空域高斯
+        float2 varible = uv + float2(i * _AOScreenParams.x * offset.x, i * _AOScreenParams.y * offset.y);
+        float space_factor = i * i;
+        space_factor = (-space_factor) / (2 * space_sigma * space_sigma);
+        float space_weight = 1/(space_sigma * space_sigma * 2 * PI) * exp(space_factor);
+
+        //值域高斯
+        float3 normal_neighbor = SAMPLE_TEXTURE2D_LOD(_CameraNormalsTexture, g_LinearClampSampler, varible,0);
+        float3 normal_distance = (normal_neighbor - normal_origin);
+        float value_factor = normal_distance.r * normal_distance.r ;
+        value_factor = (-value_factor) / (2 * range_sigma * range_sigma);
+        float value_weight = saturate(1 / (2 * PI * range_sigma)) * exp(value_factor);
+
+        weight_sum += space_weight * value_weight;
+        color_sum += SAMPLE_TEXTURE2D_LOD(_SourceTex, g_LinearClampSampler, varible,0) * space_weight * value_weight;
+    }
+    if(weight_sum > 0)
+    {
+        color = color_sum / weight_sum;
+    }
+    return color;
+}
+
+RWTEXTURE2D(_DenoiseResult,float)
+[numthreads(THREAD_NUM,THREAD_NUM,1)]
+void SSAOBlurY(CSInput input)
+{
+    float2 uv = (input.DispatchThreadID.xy+0.5) * _AOScreenParams.xy;
+    half3 c = BilateralBlur(uv,float2(0.0,1.0),_Space_Sigma,_Range_Sigma);
+    _DenoiseResult[uint2(input.DispatchThreadID.xy)] = c.r;
+}
+
+[numthreads(THREAD_NUM,THREAD_NUM,1)]
+void SSAOBlurX(CSInput input)
+{
+    float2 uv = (input.DispatchThreadID.xy+0.5) * _AOScreenParams.xy;
+    half3 c = BilateralBlur(uv,float2(1.0,0.0),_Space_Sigma,_Range_Sigma);
+    _DenoiseResult[uint2(input.DispatchThreadID.xy)] = c.r;
+}
+// half3 BilateralBlur(float2 uv,float space_sigma, float range_sigma)
+// {
+//     float3 v = BilateralBlur(uv,float2(0.0,1.0),space_sigma,range_sigma);
+//     float3 h = BilateralBlur(uv,float2(1.0,0.0),space_sigma,range_sigma);
+//     return (v + h) / 2;
+// }
+
+// 
+
+// static const half kGeometryCoeff = half(0.8);
+// half CompareNormal(half3 d1, half3 d2)
+// {
+//     return smoothstep(kGeometryCoeff, half(1.0), dot(d1, d2));
+// }
+
+// // Geometry-aware separable bilateral filter
+// half4 Blur(float2 uv, float2 delta)
+// {
+//     half3 p0 =  GetNormal(uv                 );
+//     half3 p1a = GetNormal(uv - delta * 1.3846153846);
+//     half3 p1b = GetNormal(uv + delta * 1.3846153846);
+//     half3 p2a = GetNormal(uv - delta * 3.2307692308);
+//     half3 p2b = GetNormal(uv + delta * 3.2307692308);
+
+//     half3 n0 = GetNormal(uv);
+
+//     half w0  =                              half(0.2270270270);
+//     half w1a = CompareNormal(n0, p1a.xyz) * half(0.3162162162);
+//     half w1b = CompareNormal(n0, p1b.xyz) * half(0.3162162162);
+//     half w2a = CompareNormal(n0, p2a.xyz) * half(0.0702702703);
+//     half w2b = CompareNormal(n0, p2b.xyz) * half(0.0702702703);
+
+//     half s = half(0.0);
+//     s += SAMPLE_TEXTURE2D(_MainTex, g_LinearClampSampler, uv)  * w0;
+//     s += SAMPLE_TEXTURE2D(_MainTex, g_LinearClampSampler, uv - delta * 1.3846153846) * w1a;
+//     s += SAMPLE_TEXTURE2D(_MainTex, g_LinearClampSampler, uv + delta * 1.3846153846) * w1b;
+//     s += SAMPLE_TEXTURE2D(_MainTex, g_LinearClampSampler, uv - delta * 3.2307692308) * w2a;
+//     s += SAMPLE_TEXTURE2D(_MainTex, g_LinearClampSampler, uv + delta * 3.2307692308) * w2b;
+//     s *= rcp(float(w0 + w1a + w1b + w2a + w2b));
+//     return s.xxxx;
+// }
+
+#endif//__SSAO_H__

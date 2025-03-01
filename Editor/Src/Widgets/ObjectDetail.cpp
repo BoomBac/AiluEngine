@@ -139,7 +139,7 @@ namespace Ailu
             return ret;
         }
 
-        static void DrawShaderProperty(u32 &property_handle, ShaderPropertyInfo &prop, Object *obj)
+        static void DrawShaderProperty(u32 &property_handle, ShaderPropertyInfo &prop, Material *obj)
         {
             ++property_handle;
             switch (prop._type)
@@ -150,9 +150,22 @@ namespace Ailu
                 case Ailu::EShaderPropertyType::kBool:
                 {
                     auto bool_value = (f32 *) prop._value_ptr;
-                    bool checked = *bool_value == 1.0f;
-                    ImGui::Checkbox(prop._prop_name.c_str(), &checked);
-                    *bool_value = (f32) checked;
+                    bool old_value = *bool_value == 1.0f;
+                    bool new_value = old_value;
+                    ImGui::Checkbox(prop._prop_name.c_str(), &new_value);
+                    if (new_value != old_value)
+                    {
+                        *bool_value = (f32) new_value;
+                        auto mat = dynamic_cast<Material *>(obj);
+                        auto keywords = mat->GetShader()->GetKeywordsProps();
+                        if (auto it = keywords.find(prop._value_name); it != keywords.end())
+                        {
+                            i32 cur_kw_idx = (i32) new_value;
+                            i32 other_kw_idx = (cur_kw_idx + 1) % 2;
+                            obj->EnableKeyword(it->second[cur_kw_idx]);
+                            //obj->DisableKeyword(it->second[other_kw_idx]);
+                        }
+                    }
                 }
                 break;
                 case Ailu::EShaderPropertyType::kEnum:
@@ -160,31 +173,31 @@ namespace Ailu
                     auto mat = dynamic_cast<Material *>(obj);
                     if (mat != nullptr)
                     {
-                        //auto keywords = mat->GetShader()->GetKeywordGroups();
-                        //auto it = keywords.find(prop._value_name);
-                        //if (it != keywords.end())
-                        //{
-                        //	auto prop_value = static_cast<int>(prop.GetProppertyValue<float>().value_or(0.0));
-                        //	if (ImGui::BeginCombo(prop._name.c_str(), it->second[prop_value].substr(it->second[prop_value].rfind("_") + 1).c_str()))
-                        //	{
-                        //		static int s_selected_index = -1;
-                        //		for (int i = 0; i < it->second.size(); i++)
-                        //		{
-                        //			auto x = it->second[i].rfind("_");
-                        //			auto enum_str = it->second[i].substr(x + 1);
-                        //			if (ImGui::Selectable(enum_str.c_str(), i == s_selected_index))
-                        //				s_selected_index = i;
-                        //			if (s_selected_index == i)
-                        //			{
-                        //				mat->EnableKeyword(it->second[i]);
-                        //				prop.SetProppertyValue(static_cast<float>(i));
-                        //			}
-                        //		}
-                        //		ImGui::EndCombo();
-                        //	}
-                        //}
-                        //else
-                        //	ImGui::Text("Eunm %s value missing", prop._name.c_str());
+                        auto keywords = mat->GetShader()->GetKeywordsProps();
+                        auto it = keywords.find(prop._value_name);
+                        if (it != keywords.end())
+                        {
+                            f32 prop_value = prop._default_value.x;
+                            if (ImGui::BeginCombo(prop._prop_name.c_str(), it->second[prop_value].substr(it->second[prop_value].rfind("_") + 1).c_str()))
+                            {
+                                static int s_selected_index = -1;
+                                for (int i = 0; i < it->second.size(); i++)
+                                {
+                                    auto x = it->second[i].rfind("_");
+                                    auto enum_str = it->second[i].substr(x + 1);
+                                    if (ImGui::Selectable(enum_str.c_str(), i == s_selected_index))
+                                        s_selected_index = i;
+                                    if (s_selected_index == i)
+                                    {
+                                        mat->EnableKeyword(it->second[i]);
+                                        prop._default_value.x = (f32) i;
+                                    }
+                                }
+                                ImGui::EndCombo();
+                            }
+                        }
+                        else
+                            ImGui::Text("Eunm %s value missing", prop._value_name.c_str());
                     }
                     else
                         ImGui::Text("Non-Material Eunm %s value missing", prop._prop_name.c_str());
@@ -194,13 +207,28 @@ namespace Ailu
                     ImGui::DragFloat4(prop._prop_name.c_str(), static_cast<Vector3f *>(prop._value_ptr)->data);
                     break;
                 case Ailu::EShaderPropertyType::kColor:
-                    ImGui::ColorEdit4(prop._prop_name.c_str(), static_cast<Vector4f *>(prop._value_ptr)->data);
-                    break;
+                {
+                    ImGuiColorEditFlags_ flag = ImGuiColorEditFlags_None;
+                    if (prop.IsHDRProperty())
+                    {
+                        flag = (ImGuiColorEditFlags_) (ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+                        // f32 intensity = prop.GetHDRIntensity();
+                        // ImGui::HDRColorEdit4(prop._prop_name.c_str(), static_cast<Vector4f *>(prop._value_ptr)->data, &intensity,flag);
+                        // prop.SetHDRIntensity(intensity);
+                    }
+                    ImGui::ColorEdit4(prop._prop_name.c_str(), static_cast<Vector4f *>(prop._value_ptr)->data,flag);
+                }
+                break;
                 case Ailu::EShaderPropertyType::kRange:
                 {
                     ImGui::Text("%s", prop._prop_name.c_str());
                     ImGui::SameLine();
-                    ImGui::SliderFloat(std::format("##{}", prop._prop_name).c_str(), static_cast<float *>(prop._value_ptr), prop._param[0], prop._param[1]);
+                    f32 old_value = prop.GetValue<f32>();
+                    f32 new_value = old_value;
+                    ImGui::SliderFloat(std::format("##{}", prop._prop_name).c_str(), &new_value, prop._default_value[0], prop._default_value[1]);
+                    new_value = std::clamp(new_value, prop._default_value[0], prop._default_value[1]);
+                    if (new_value != old_value)
+                        prop.SetValue(new_value);
                 }
                 break;
                 case Ailu::EShaderPropertyType::kTexture2D:
@@ -214,29 +242,22 @@ namespace Ailu
                     float contentWidth = (vMax.x - vMin.x);
                     float centerX = (contentWidth - s_mini_tex_size) * 0.5f;
                     ImGui::SetCursorPosX(centerX);
-                    //if (selector_window.IsCaller(property_handle))
-                    //{
-                    //    u32 new_tex_id = selector_window.GetSelectedTexture(property_handle);
-                    //    if (TextureSelector::IsValidTextureID(new_tex_id) && new_tex_id != cur_tex_id)
-                    //    {
-                    //        auto mat = dynamic_cast<Material *>(obj);
-                    //        if (mat)
-                    //            mat->SetTexture(prop._value_name, g_pResourceMgr->Get<Texture2D>(new_tex_id));
-                    //    }
-                    //}
                     if (ImGui::ImageButton(TEXTURE_HANDLE_TO_IMGUI_TEXID(g_pResourceMgr->Get<Texture2D>(cur_tex_id)->GetNativeTextureHandle()), ImVec2(s_mini_tex_size, s_mini_tex_size)))
                     {
                         //selector_window.Open(property_handle);
                     }
-                    //if (selector_window.IsCaller(property_handle))
-                    //{
-                    //    ImGuiContext *context = ImGui::GetCurrentContext();
-                    //    auto drawList = context->CurrentWindow->DrawList;
-                    //    ImVec2 cur_img_pos = ImGui::GetCursorPos();
-                    //    ImVec2 imgMin = ImGui::GetItemRectMin();
-                    //    ImVec2 imgMax = ImGui::GetItemRectMax();
-                    //    drawList->AddRect(imgMin, imgMax, IM_COL32(255, 255, 0, 255), 0.0f, 0, 2.0f);
-                    //}
+                }
+                break;
+                case Ailu::EShaderPropertyType::kTexture3D:
+                {
+                    ImGui::Text("Texture3D : %s", prop._prop_name.c_str());
+                    auto tex = (Texture *) prop._value_ptr;
+                    Ref<Texture3D> ptr;
+                    if (DrawResourceDropdown("##animclip", g_pResourceMgr->ResourceBegin<Texture3D>(), g_pResourceMgr->ResourceEnd<Texture3D>(),
+                                             ptr, tex ? tex->Name() : kNullStr))
+                    {
+                        obj->SetTexture(prop._value_name, ptr.get());
+                    }
                 }
                 break;
                 default:
@@ -312,15 +333,20 @@ namespace Ailu
                             case Ailu::EShaderPropertyType::kColor:
                             {
                                 ImGuiColorEditFlags_ flag = ImGuiColorEditFlags_None;
-                                if (prop->_param[3] == -1.0)
-                                    flag = ImGuiColorEditFlags_Float;
-                                ImGui::ColorEdit4("##c4", static_cast<Vector4f *>(prop->_value_ptr)->data, flag);
+                                if (prop->IsHDRProperty())
+                                {
+                                    flag = (ImGuiColorEditFlags_) (ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+                                    //f32 intensity = prop->GetHDRIntensity();
+                                    //ImGui::HDRColorEdit4("##c4", static_cast<Vector4f *>(prop->_value_ptr)->data, &intensity,flag);
+                                    //prop->SetHDRIntensity(intensity);
+                                }
+                                ImGui::ColorEdit4("##c4", static_cast<Vector4f *>(prop->_value_ptr)->data);
                                 mat->SetVector(prop->_value_name, *static_cast<Vector4f *>(prop->_value_ptr));
                             }
                             break;
                             case Ailu::EShaderPropertyType::kRange:
                             {
-                                ImGui::SliderFloat("##r", static_cast<float *>(prop->_value_ptr), prop->_param[0], prop->_param[1]);
+                                ImGui::SliderFloat("##r", static_cast<float *>(prop->_value_ptr), prop->_default_value[0], prop->_default_value[1]);
                                 mat->SetFloat(prop->_value_name, *static_cast<f32 *>(prop->_value_ptr));
                             }
                             break;
@@ -588,7 +614,6 @@ namespace Ailu
                     ImGui::TableNextRow();
                     ImGui::Separator();
                 }
-
                 auto &materials = comp->_p_mats;
                 //material scope
                 {
@@ -641,6 +666,9 @@ namespace Ailu
                     }
                 }
                 ImGui::EndTable();
+                //addition
+                Enum* enum_type = Enum::GetEnumByName("EMotionVectorType");
+                comp->_motion_vector_type = (EMotionVectorType)DrawEnum(enum_type,(u32)comp->_motion_vector_type);
                 for (auto mat: materials)
                 {
                     if (mat != nullptr)
@@ -848,7 +876,9 @@ namespace Ailu
             {
                 auto comp = scene_register.GetComponent<StaticMeshComponent>(entity);
                 DrawComponent<StaticMeshComponent>("StaticMeshComponent", comp, entity, [this](StaticMeshComponent *comp)
-                                                   { MeshCompDrawer(comp); });
+                                                   { 
+                                                    MeshCompDrawer(comp);
+                                                });
             }
             if (scene_register.HasComponent<CSkeletonMesh>(entity))
             {
@@ -1018,7 +1048,7 @@ namespace Ailu
         {
             f32 indent = 10.0f;
             ImGui::Text("Name: %s", s->Name().c_str());
-            for (u16 i = 0; i < s->PassCount(); i++)
+            for (i16 i = 0; i < s->PassCount(); i++)
             {
                 auto &pass = s->GetPassInfo(i);
                 ImGui::Indent(indent);

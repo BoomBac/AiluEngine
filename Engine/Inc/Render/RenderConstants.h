@@ -2,7 +2,7 @@
 #ifndef __D3DCONSTANTS__
 #define __D3DCONSTANTS__
 #include "AlgFormat.h"
-#include "CBuffer.h"
+#include "ShaderInterop.h"
 #include <cstdint>
 
 namespace Ailu

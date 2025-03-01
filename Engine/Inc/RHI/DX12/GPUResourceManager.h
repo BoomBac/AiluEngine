@@ -50,10 +50,10 @@ namespace Ailu
         void Free(Allocation&& handle);
         u32 ReleaseSpace();
     private:
-        HashMap<u32,u32>::iterator AddNewPage(D3D12_HEAP_TYPE type,u32 size = kPerPageSize);
+        std::multimap<u32,u32>::iterator AddNewPage(D3D12_HEAP_TYPE type,u32 size = kPerPageSize);
     private:
         Vector<GPUResourcePage> _pages;
-        Map<D3D12_HEAP_TYPE ,HashMap<u32,u32>> _page_free_space_lut;
+        Map<D3D12_HEAP_TYPE ,std::multimap<u32,u32>> _page_free_space_lut;
 
     };
 }

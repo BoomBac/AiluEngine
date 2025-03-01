@@ -93,8 +93,8 @@ namespace Ailu
 	protected:
 		u64 idx = u64(-1);
 	};
-#define PROFILE_BLOCK_GPU(cmd, block_name) ProfileBlock block_name(cmd, #block_name);
-#define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock block_name(#block_name);
+#define PROFILE_BLOCK_GPU(cmd, block_name) ProfileBlock block_name##_GPU(cmd, #block_name);
+#define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock block_name##_CPU(#block_name);
 }
 
 

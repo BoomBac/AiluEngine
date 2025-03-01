@@ -11,6 +11,7 @@
 namespace Ailu
 {
     //----------------------------------------------------------------D3DGPUBuffer------------------------------------------------------------------------
+    #pragma region D3DGPUBuffer
     D3DGPUBuffer::D3DGPUBuffer(GPUBufferDesc desc) : _desc(desc)
     {
         auto d3d_conetxt = D3DContext::Get();
@@ -161,7 +162,9 @@ namespace Ailu
         if (_p_d3d_res_readback)
             _p_d3d_res_readback->SetName(std::format(L"{}_readback", ToWStr(name)).c_str());
     }
+    #pragma endregion
     //----------------------------------------------------------------D3DGPUBuffer------------------------------------------------------------------------
+    #pragma region D3DVertexBuffer
     D3DVertexBuffer::D3DVertexBuffer(VertexBufferLayout layout)
     {
         _buffer_layout = std::move(layout);
@@ -175,7 +178,8 @@ namespace Ailu
     D3DVertexBuffer::~D3DVertexBuffer()
     {
         _size_all_stream = 0u;
-        g_pGfxContext->WaitForFence(_state.GetFenceValue());
+        if (g_pGfxContext)
+            g_pGfxContext->WaitForFence(_state.GetFenceValue());
     }
 
     void D3DVertexBuffer::Bind(CommandBuffer *cmd, const VertexBufferLayout &pipeline_input_layout)
@@ -329,7 +333,9 @@ namespace Ailu
         memcpy(_mapped_data[stream_index], data + offset, size);
         _vertices_count = size / _buffer_layout[stream_index].Size;
     }
+    #pragma endregion
 
+    #pragma region D3DDynamicVertexBuffer
     //-----------------------------------------------------------------D3DDynamicVertexBuffer----------------------------------------------------------
     D3DDynamicVertexBuffer::D3DDynamicVertexBuffer(VertexBufferLayout layout)
     {
@@ -385,8 +391,10 @@ namespace Ailu
         _ime_vertex_data_offset += num0 * 4;
         _ime_color_data_offset += num1 * 4;
     }
+    #pragma endregion
     //-----------------------------------------------------------------D3DDynamicVertexBuffer----------------------------------------------------------
 
+    #pragma region D3DIndexBuffer
     //-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
     D3DIndexBuffer::D3DIndexBuffer(u32 *indices, u32 count, bool is_dynamic) : _count(count), _capacity(count), _is_dynamic(is_dynamic)
     {
@@ -482,9 +490,11 @@ namespace Ailu
         _state.SetSize(new_size);
     }
     //-----------------------------------------------------------------IndexBuffer---------------------------------------------------------------------
-
+    #pragma endregion
 
     //-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
+    //https://maraneshi.github.io/HLSL-ConstantBufferLayoutVisualizer/
+    #pragma region D3DConstantBuffer
     static u32 CalcConstantBufferByteSize(u32 byte_size)
     {
         return (byte_size + 255) & ~255;
@@ -512,6 +522,7 @@ namespace Ailu
     {
         memset(_alloc._cpu_ptr, 0, _alloc._size);
     }
+    #pragma endregion
     //-----------------------------------------------------------------ConstBuffer---------------------------------------------------------------------
 
 }// namespace Ailu

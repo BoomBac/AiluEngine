@@ -13,8 +13,8 @@
 #include "common.hlsli"
 #include "fullscreen_quad.hlsli"
 
-PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
-float4 PSMain(PSInput IN);
+FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
+float4 PSMain(FullScreenPSInput IN);
 
 
 TEXTURE2D(_HistoryFrameColor);
@@ -31,16 +31,15 @@ PerMaterialCBufferBegin
 PerMaterialCBufferEnd
 
 #define _TAAJitter          _TAAParams.xy
-#define _CurrentColorFactor _TAAParams.z
+#define _HistoryColorFactor 0.95
 #define _SharpFactor        _TAAParams.w
 
 #define _USE_YCGCO 1
+#define _USE_MV 1
 
 float2 reprojection(float depth, float2 uv)
 {
-    //depth = 1.0 - depth;
     uv.y = 1 - uv.y;
-    //depth = 2.0 * depth - 1.0;
     float3 world_pos = Unproject(uv,depth);
     float4 prevClipPos = mul(_MatrixVP_PreFrame, float4(world_pos,1.0f));
     float2 prevPosCS = prevClipPos.xy / prevClipPos.w;
@@ -84,7 +83,7 @@ float2 GetClosestFragment(float2 uv)
         SAMPLE_TEXTURE2D(_CameraDepthTexture, g_PointClampSampler, saturate(uv + k)).r
     );
     // 获取离相机最近的点
-    #if defined(UNITY_REVERSED_Z)
+    #if defined(_REVERSED_Z)
         #define COMPARE_DEPTH(a, b) step(b, a)
     #else
         #define COMPARE_DEPTH(a, b) step(a, b)
@@ -216,36 +215,37 @@ float3 ClipColor(float3 min_color, float3 max_color, float3 color)
 #endif
 }
 
-float4 PSMain(PSInput IN) : SV_TARGET
+float4 PSMain(FullScreenPSInput IN) : SV_TARGET
 {
     float2 uv = IN.uv;
 #ifdef _USE_MV
-    uv -= _TAAJitter;
     #ifdef _USE_DILATION
         float2 mv = SAMPLE_TEXTURE2D(_MotionVectorTexture, g_LinearClampSampler, GetClosestFragment(uv)).xy;
     #else
         float2 mv = SAMPLE_TEXTURE2D(_MotionVectorTexture, g_LinearClampSampler, uv).xy;
     #endif//_USE_DILATION
     float2 prev_uv = uv - mv;
-    mv = uv - prev_uv;
-    uv += _TAAJitter;
 #else
-    float depth = SAMPLE_TEXTURE2D(_CameraDepthTexture, g_PointClampSampler, uv).x;
+    float depth = SAMPLE_TEXTURE2D(_CameraDepthTexture, g_LinearClampSampler, uv).x;
     float2 prev_uv = reprojection(depth, uv);
     float2 mv = uv - prev_uv;
+    mv.y *= -1;
+    prev_uv = uv - mv;
 #endif//_USE_MV
-    float4 history_color = SAMPLE_TEXTURE2D(_HistoryFrameColor, g_PointClampSampler, prev_uv);
-    float3 samples[9];
-    float3 aabb_min,aabb_max;
-    GetCurColorSamples(uv,samples);
-    minmax(samples,aabb_min,aabb_max);
-#ifdef _USE_YCGCO
-    history_color.rgb = YCoCgToRGB(ClipColor(aabb_min, aabb_max, RGBToYCoCg(history_color.rgb)));
-#else
-    history_color.rgb = ClipColor(aabb_min, aabb_max,history_color.rgb);
-#endif//_USE_YCGCO
+    float4 history_color = SAMPLE_TEXTURE2D(_HistoryFrameColor, g_LinearClampSampler, prev_uv);
+    float4 current_color = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv);
+//     float3 samples[9];
+//     float3 aabb_min,aabb_max;
+//     GetCurColorSamples(uv,samples);
+//     minmax(samples,aabb_min,aabb_max);
+// #ifdef _USE_YCGCO
+//     history_color.rgb = YCoCgToRGB(ClipColor(aabb_min, aabb_max, RGBToYCoCg(history_color.rgb)));
+// #else
+//     history_color.rgb = ClipColor(aabb_min, aabb_max,history_color.rgb);
+// #endif//_USE_YCGCO
+    return lerp(current_color,history_color,_HistoryColorFactor);
 
-    float4 current_color = SAMPLE_TEXTURE2D(_CurFrameColor, g_PointClampSampler, uv);
-    float final_current_color_factor = saturate(0.05f + length(mv) * 100);
-    return lerp(history_color,current_color,0.05f);
+//     float4 current_color = SAMPLE_TEXTURE2D(_CurFrameColor, g_PointClampSampler, uv);
+//     float final_current_color_factor = saturate(0.05f + length(mv) * 100);
+//     return lerp(current_color,history_color,_HistoryColorFactor);
 }

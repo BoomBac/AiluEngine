@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "Framework/Common/SystemInfo.h"
 #include "Render/PipelineState.h"
 
 namespace Ailu
@@ -42,7 +43,7 @@ namespace Ailu
 
 
 	//------------------------------------------------------------------------------------DepthStencilState--------------------------------------------------------------------------------------------------
-	DepthStencilState::DepthStencilState() : DepthStencilState(true, ECompareFunc::kLessEqual)
+	DepthStencilState::DepthStencilState() : DepthStencilState(true, SystemInfo::kReverseZ? ECompareFunc::kGreaterEqual : ECompareFunc::kLessEqual)
 	{
 	}
 

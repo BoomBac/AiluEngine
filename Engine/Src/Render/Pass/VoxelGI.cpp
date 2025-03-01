@@ -11,7 +11,7 @@
 namespace Ailu
 {
     //---------------------------------------------------------------------------VoxelizePass-----------------------------------------------------------------------------
-    VoxelizePass::VoxelizePass()
+    VoxelizePass::VoxelizePass() : RenderPass("VoxelizePass")
     {
         _standard_lit_forward = Shader::s_p_defered_standart_lit.lock();
         _voxel_pass_index = _standard_lit_forward->FindPass("VoxelLit");
@@ -117,7 +117,7 @@ namespace Ailu
 
     //---------------------------------------------------------------------------VoxelizePass-------------------------------------------------------------------------------
     //---------------------------------------------------------------------------VoxelDebugPass-----------------------------------------------------------------------------
-    VoxelDebugPass::VoxelDebugPass()
+    VoxelDebugPass::VoxelDebugPass() : RenderPass("VoxelDebugPass")
     {
         _voxel_debug = g_pResourceMgr->GetRef<Shader>(L"Shaders/voxel_drawer.alasset");
         _voxel_debug_mat = MakeRef<Material>(_voxel_debug.get(), "Runtime/VoxelDrawer");

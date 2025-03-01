@@ -129,7 +129,7 @@ namespace Ailu
         f32 h = (f32) target->Height();
         CBufferPerCameraData cb_per_cam;
         cb_per_cam._MatrixVP = Camera::GetDefaultOrthogonalViewProj(w, h);
-        cb_per_cam._ScreenParams = Vector4f(w, h, 1 / w, 1 / h);
+        cb_per_cam._ScreenParams = Vector4f( 1.0f / w, 1.0f / h,w, h);
         CBufferPerObjectData per_obj_data;
         per_obj_data._MatrixWorld = MatrixTranslation(-w*0.5f,h*0.5f,0);
         memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);

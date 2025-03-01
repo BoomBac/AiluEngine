@@ -10,6 +10,7 @@
 #include "Framework/Common/TimeMgr.h"
 #include "Render/Gizmo.h"
 #include "Render/Pass/PostprocessPass.h"
+#include "Render/Pass/VolumetricClouds.h"
 #include "Render/RenderingData.h"
 #include "Render/TextRenderer.h"
 #include <Framework/Common/Application.h>
@@ -425,20 +426,30 @@ namespace Ailu
             }
             ImGui::End();
 
-
             ImGui::Begin("Common");// Create a window called "Hello, world!" and append into it.
             ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
             ImGui::Text("FrameTime: %.2f ms", ModuleTimeStatics::RenderDeltatime);
             ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
+            ImGui::Text("Dispatch Call: %d", RenderingStates::s_dispatch_call);
             ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
             ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
             if (ImGui::CollapsingHeader("Features"))
             {
-                for (auto &feature: g_pGfxContext->GetPipeline()->GetRenderer()->GetFeatures())
+                for (auto feature: g_pGfxContext->GetPipeline()->GetRenderer()->GetFeatures())
                 {
                     bool active = feature->IsActive();
                     ImGui::Checkbox(feature->Name().c_str(), &active);
                     feature->SetActive(active);
+                    auto *cur_type = feature->GetType();
+                    ImGui::Text("Type: %s", cur_type->Name().c_str());
+                    ImGui::Text("Members: ");
+                    if (cur_type->BaseType() && cur_type->BaseType() != cur_type)//除去Object
+                    {
+                        for (auto prop: cur_type->GetProperties())
+                        {
+                            DrawMemberProperty(prop, *feature);
+                        }
+                    }
                 }
             }
 
@@ -474,29 +485,16 @@ namespace Ailu
                     }
                 }
             }
-            static bool s_show_pass = false;
-            if (ImGui::CollapsingHeader("Passes"))
-            {
-                for (auto pass: g_pGfxContext->GetPipeline()->GetRenderer()->GetRenderPasses())
-                {
-                    bool active = pass->IsActive();
-                    ImGui::Checkbox(pass->GetName().c_str(), &active);
-                    pass->SetActive(active);
-                    if (auto p = dynamic_cast<PostProcessPass *>(pass); p != nullptr)
-                    {
-                        Type *type = PostProcessPass::StaticType();
-                        for (auto &prop: type->GetProperties())
-                        {
-                            if (prop.DataType() == EDataType::kBool)
-                            {
-                                bool value = prop.GetValue<bool>(*pass);
-                                ImGui::Checkbox(prop.Name().c_str(), &value);
-                                prop.SetValue<bool>(*pass, value);
-                            }
-                        }
-                    }
-                }
-            }
+            // static bool s_show_pass = false;
+            // if (ImGui::CollapsingHeader("Features"))
+            // {
+            //     for (auto feature: g_pGfxContext->GetPipeline()->GetRenderer()->GetFeatures())
+            //     {
+            //         bool active = feature->IsActive();
+            //         ImGui::Checkbox(feature->Name().c_str(), &active);
+            //         feature->SetActive(active);
+            //     }
+            // }
             static bool s_show_time_info = false;
             if (ImGui::CollapsingHeader("Performace Statics"))
             {
@@ -565,7 +563,7 @@ namespace Ailu
                 if (r.HasComponent<CCamera>(e))
                 {
                     auto &cam = r.GetComponent<CCamera>(e)->_camera;
-                    cam.SetPixelSize(300, 300 / cam.Aspect());
+                    cam.SetPixelSize(300, (u16) (300.0f / cam.Aspect()));
                     static_cast<RenderView *>(_p_preview_cam_view)->SetSource(g_pGfxContext->GetPipeline()->GetTarget(1));
                     _p_preview_cam_view->Open(_p_preview_cam_view->Handle());
                 }
@@ -607,6 +605,7 @@ namespace Ailu
             {
                 anim_editor.Close(anim_editor.Handle());
             }
+            /*
             ImGui::Begin("Solver");
 
             //            static char buf[256];
@@ -722,7 +721,7 @@ namespace Ailu
             }
 
 
-            /*
+            
             ImGui::Text("CCD:");
             {
                 ImGui::Indent();
@@ -755,8 +754,9 @@ namespace Ailu
                 }
                 ImGui::Unindent();
             }
-            */
             ImGui::End();
+            */
+
             if (s_show_imguinode)
                 ShowImNodeTest(&s_show_imguinode);
         }

@@ -1,0 +1,5 @@
+guid: fc17adc1-f67a-4a15-a756-09c672438b53
+type: kComputeShader
+name: volumetric_cloud
+  file: Shaders/hlsl/Compute/volumetric_cloud.hlsl
+  kernel: Noname

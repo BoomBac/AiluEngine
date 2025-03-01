@@ -9,50 +9,72 @@
 
 namespace Ailu
 {
-	Ref<CubeMap> HDRParser::Parser(Vector<String>& paths)
+	Ref<CubeMap> HDRParser::Parser(Vector<String>& paths,const TextureImportSetting& import_settings)
 	{
 		return Ref<CubeMap>();
 	}
-	Ref<Texture2D> HDRParser::Parser(const WString& sys_path)
+	Ref<Texture2D> HDRParser::Parser(const WString& sys_path,const TextureImportSetting& import_settings)
+	{
+		TextureLoadData load_data;
+		if (LoadTextureData(sys_path, load_data))
+		{
+			Texture2DInitializer desc;
+            desc._width = load_data._width;
+            desc._height = load_data._height;
+            desc._is_linear = import_settings._is_srgb;
+            desc._is_mipmap_chain = import_settings._generate_mipmap;
+            desc._is_readble = import_settings._is_readble;
+            desc._format = load_data._format;
+			Ref<Texture2D> texture = Texture2D::Create(desc);
+			texture->SetPixelData(load_data._data[0],0);
+			return texture;
+		}
+		return nullptr;
+	}
+    bool HDRParser::Parser(const WString &sys_path, Ref<Texture2D> &texture,const TextureImportSetting& import_settings)
+	{
+		TextureLoadData load_data;
+		if (LoadTextureData(sys_path, load_data))
+		{
+			Texture2DInitializer desc;
+            desc._width = load_data._width;
+            desc._height = load_data._height;
+            desc._is_linear = import_settings._is_srgb;
+            desc._is_mipmap_chain = import_settings._generate_mipmap;
+            desc._is_readble = import_settings._is_readble;
+            desc._format = load_data._format;
+			texture->ReCreate(desc);
+			texture->SetPixelData(load_data._data[0],0);
+			return true;
+		}
+		return false;
+	}
+	bool HDRParser::LoadTextureData(const WString &sys_path,TextureLoadData& data)
 	{
 		//stbi_set_flip_vertically_on_load(true);
-		int w, h, n;
+		i32 w,h,n;
 		auto sys_path_n = ToChar(sys_path);
-		float* data = stbi_loadf(sys_path_n.data(), &w, &h, &n, 0);
-		if (data == nullptr)
+		float* raw_data = stbi_loadf(sys_path_n.data(), &w, &h, &n, 0);
+		if (raw_data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", sys_path_n, stbi_failure_reason());
-			return Texture2D::Create(4, 4,false,ETextureFormat::kRGBAFloat);
+			return false;
 		}
 		else
 		{
 			if (n == 3)
 			{
-				auto tex = Texture2D::Create(w, h, false, ETextureFormat::kRGBFloat);
-				//Vector<float*> mipmaps{ data };
-				//mip_level = 1;
-				//int size = x;
-				//while (size)
-				//{
-				//	size >>= 1;
-				//	mip_level++;
-				//}
-				//mip_level = mip_level > 9 ? 9 : mip_level;
-				//for (int i = 0; i < mip_level - 1; i++)
-				//{
-				//	mipmaps.emplace_back(TextureUtils::DownSample(mipmaps.back(), x >> i, y >> i, 4));
-				//	if (x >> i == 1)
-				//		break;
-				//}
-				tex->SetPixelData(reinterpret_cast<u8*>(data),0);
-				tex->Name(PathUtils::GetFileName(sys_path_n));
-				return tex;
+				data._width = w;
+				data._height = h;
+				data._format = ETextureFormat::kRGBFloat;
+				data._data.emplace_back(reinterpret_cast<u8*>(raw_data));
 			}
 			else
 			{
 				LOG_WARNING("Unsupported HDR format: {} with 4 channel", sys_path_n);
+				return false;
 			}
 		}
-		return nullptr;
+		return true;
 	}
 }

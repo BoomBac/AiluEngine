@@ -8,7 +8,7 @@ namespace Ailu
 {
     static bool IsEnumType(const String &type_name)
     {
-        bool is_enum = su::BeginWith(type_name,"E");
+        bool is_enum = su::BeginWith(type_name, "E");
         is_enum &= isupper(type_name[1]);
         return is_enum;
     }
@@ -38,9 +38,21 @@ namespace Ailu
             return EDataType::kFloat;
         else if (name == "double" || name == "f64")
             return EDataType::kDouble;
+        else if (name == "Vector2f")
+            return EDataType::kVec2;
+        else if (name == "Vector3f")
+            return EDataType::kVec3;
+        else if (name == "Vector4f" || name == "Color")
+            return EDataType::kVec4;
+        else if (name == "Vector2Int")
+            return EDataType::kVec2Int;
+        else if (name == "Vector3Int")
+            return EDataType::kVec3Int;
+        else if (name == "Vector4Int")
+            return EDataType::kVec4Int;
         else if (name == "String" || name == "string")
             return EDataType::kString;
-        else if (su::EndWith(name,"*"))
+        else if (su::EndWith(name, "*"))
             return EDataType::kPtr;
         else if (IsEnumType(name))
             return EDataType::kEnum;
@@ -57,6 +69,8 @@ namespace Ailu
         _is_static = initializer._is_static;
         _offset = initializer._offset;
         _member_ptr = initializer._member_ptr;
+        _meta = initializer._meta;
+        _is_const = initializer._is_const;
     }
     MemberInfo::MemberInfo() : MemberInfo(MemberInfoInitializer())
     {
@@ -65,7 +79,42 @@ namespace Ailu
     {
         _data_type = GetDataTypeFromName(initializer._type_name);
     }
-//------------------------------------------------------------------------------------------------------------
+    //------------------------------------------------------------------------------------------------------------
+    void Type::RegisterType(Type *type)
+    {
+        std::once_flag once;
+        std::call_once(once, [&]()
+                       {
+            if (type->Name() == "Object")
+                {
+                    type->_base = type;
+                    type->_base_name = type->FullName();
+                } });
+        if (!s_global_types.contains(type->FullName()))
+        {
+            for (auto &it: s_global_types)
+            {
+                auto &[full_name, cur_type] = it;
+                if (cur_type->_base_name == type->FullName())
+                {
+                    cur_type->_base = type;
+                    type->_derived_types.insert(cur_type);
+                }
+            }
+            s_global_types[type->FullName()] = type;
+            if (!type->_base_name.empty() && s_global_types.contains(type->_base_name))
+            {
+                Type *base_type = s_global_types[type->_base_name];
+                if (base_type != type->_base)
+                {
+                    type->_base = base_type;
+                    base_type->_derived_types.insert(type);
+                }
+            }
+        }
+    }
+
+
     Type::Type()
     {
         _base = nullptr;
@@ -75,10 +124,11 @@ namespace Ailu
         _is_class = true;
         _is_abstract = false;
         _size = 0u;
+        _base_name = "";
     }
-    Type* Type::BaseType() const
+    Type *Type::BaseType() const
     {
-        return nullptr;
+        return _base;
     }
     bool Type::IsClass() const
     {
@@ -104,14 +154,13 @@ namespace Ailu
     {
         return _functions;
     }
-    const Vector<MemberInfo*> &Type::GetMembers() const
+    const Vector<MemberInfo *> &Type::GetMembers() const
     {
         return _members;
     }
 
     Type::Type(TypeInitializer initializer)
     {
-        _base = initializer._base;
         _name = initializer._name;
         _full_name = initializer._full_name;
         _namespace = initializer._namespace;
@@ -120,31 +169,36 @@ namespace Ailu
         _properties = initializer._properties;
         _functions = initializer._functions;
         _size = initializer._size;
-        for(auto& prop : _properties)
+        _base_name = initializer._base_name;
+        for (auto &prop: _properties)
             _members.emplace_back(&prop);
-        for(auto& func : _functions)
+        for (auto &func: _functions)
             _members.emplace_back(&func);
-        for (auto& member : _members)
+        for (auto &member: _members)
             _members_lut[member->_name] = member;
     }
     u32 Type::Size() const
     {
         return _size;
     }
-    PropertyInfo* Type::FindPropertyByName(const String &name)
+    PropertyInfo *Type::FindPropertyByName(const String &name)
     {
         if (_members_lut.contains(name))
-            return dynamic_cast<PropertyInfo*>(_members_lut[name]);
+            return dynamic_cast<PropertyInfo *>(_members_lut[name]);
         return nullptr;
     }
     FunctionInfo *Type::FindFunctionByName(const String &name)
     {
         if (_members_lut.contains(name))
-            return dynamic_cast<FunctionInfo*>(_members_lut[name]);
+            return dynamic_cast<FunctionInfo *>(_members_lut[name]);
         return nullptr;
     }
+    const std::set<Type *> &Type::DerivedTypes() const
+    {
+        return _derived_types;
+    }
     //---------------------------------------------------------------------------------------Enum------------------------------------------------------------------------------
-    Enum::Enum(const EnumInitializer &initializer): Object(initializer._name)
+    Enum::Enum(const EnumInitializer &initializer) : Object(initializer._name)
     {
         _str_to_enum_lut = initializer._str_to_enum_lut;
         for (auto &pair: _str_to_enum_lut)
@@ -161,16 +215,24 @@ namespace Ailu
         }
         return nullptr;
     }
-    void Enum::RegisterEnum(const String &name, Enum *enum_ptr)
+    void Enum::InitTypeInfo()
     {
-        s_global_enums[name] = enum_ptr;
+        while (!s_registers.empty())
+        {
+            s_registers.front()();
+            s_registers.pop();
+        }
     }
-    i32 Enum::GetIndexByName(const std::string &name)
+    void Enum::RegisterEnum(Enum *enum_ptr)
+    {
+        s_global_enums[enum_ptr->Name()] = enum_ptr;
+    }
+    i32 Enum::GetIndexByName(const std::string &name) const
     {
         if (_str_to_enum_lut.contains(name))
         {
-            return (i32) _str_to_enum_lut[name];
+            return (i32) _str_to_enum_lut.at(name);
         }
         return -1;
     }
-}
+}// namespace Ailu

@@ -2,10 +2,9 @@
 #pragma once
 #ifndef __OBJECT_H__
 #define __OBJECT_H__
-#include "Framework/Common/Reflect.h"
+#include <set>
 #include "Framework/Math/Guid.h"
 #include "generated/Object.gen.h"
-#include <ranges>
 
 namespace Ailu
 {
@@ -42,6 +41,27 @@ namespace Ailu
     private:
         //0~64 reserve for shader, shader id hash only hash 6bit
         inline static u32 s_global_object_id = 65u;
+    };
+
+    class AILU_API ObjectRegister
+    {
+    public:
+        static void Initialize();
+        static void Shutdown();
+        static ObjectRegister& Get();
+    public:
+        ObjectRegister() = default;
+        void Register(Object* object);
+        void Unregister(Object* object);
+        Object* Find(const u32 &id);
+        void AddReference(Object* parent, Object* child);
+        void RemoveReference(Object* parent, Object* child);
+        const std::set<Object*>& GetReferences(Object* object) const;
+        const std::set<Object*>& GetReferencesBy(Object* object) const;
+    private:
+        HashMap<u32,Object*> _global_register;
+        HashMap<u32,std::set<Object*>> _global_references;
+        HashMap<u32,std::set<Object*>> _global_references_by;
     };
 }// namespace Ailu
 

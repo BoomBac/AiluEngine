@@ -1,10 +1,10 @@
 ﻿project (Test)
 set(TEST_ROOT_PATH ${CMAKE_SOURCE_DIR}/Test)
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/x64)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AiluBuildPath}/out/test/bin/x64)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_SOURCE_DIR}/bin/x64/debug)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_SOURCE_DIR}/bin/x64/release)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${AiluBuildPath}/out/test/bin/x64/debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${AiluBuildPath}/out/test/bin/x64/release)
 
 set(ENGINE_LIB_ROOT ${ENGINE_ROOT_PATH}/lib/x64)
 # 设置 C++ 标准
@@ -56,6 +56,7 @@ set_target_properties (Test PROPERTIES OUTPUT_NAME "Test")
 #        $<$<CONFIG:Debug>:${ENGINE_LIB_ROOT}/Debug>
 #        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release>
 #        )
+
 target_link_libraries(Test PRIVATE
-        $<$<CONFIG:Debug>:${ENGINE_LIB_ROOT}/Debug/Engine_d.lib>
-        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release/Engine.lib> ${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib)
+        $<$<CONFIG:Debug>:${AiluBuildPath}/out/engine/lib/x64/Debug/Engine_d.lib>
+        $<$<CONFIG:Release>:${AiluBuildPath}/out/engine/lib/x64/Release/Engine_d.lib> ${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib)

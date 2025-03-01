@@ -12,10 +12,15 @@
 #include "pch.h"
 
 #include "Render/Renderer.h"
-
+/* 模版说明
+0 = 天空，大气和体积云绘制时会与其进行相等判断
+1 = 静态物体
+2 = 动态物体，Camera MotionVector绘制时会与其进行小于判断
+*/
 
 namespace Ailu
 {
+    #pragma region RenderFeature
     //-------------------------------------------------------------RenderFeature-------------------------------------------------------------
     RenderFeature::RenderFeature(const String &name) : Object(name)
     {
@@ -25,9 +30,18 @@ namespace Ailu
     RenderFeature::~RenderFeature()
     {
     }
+    #pragma endregion
     //-------------------------------------------------------------RenderFeature-------------------------------------------------------------
 
 
+    #pragma region RenderPass
+    //-------------------------------------------------------------RenderPass-------------------------------------------------------------
+    void RenderPass::EndPass(GraphicsContext *context)
+    {
+        RenderTexture::ResetRenderTarget();
+    }
+    #pragma endregion
+    #pragma region ForwardPass
     //-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
     ForwardPass::ForwardPass() : RenderPass("TransparentPass")
     {
@@ -91,7 +105,11 @@ namespace Ailu
     }
     void ForwardPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
     }
+    #pragma endregion
+
+    #pragma region ShadowCastPass
     //-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
 
     //-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
@@ -127,7 +145,7 @@ namespace Ailu
                 {
                     u16 dsv_rt_index = _p_mainlight_shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
                     cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get(), 0, dsv_rt_index);
-                    cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(), dsv_rt_index, 1.0f);
+                    cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(), dsv_rt_index, kZFar);
                     camera_data._MatrixVP = *rendering_data._shadow_data[i]._shadow_matrix;
                     for (auto &it: *rendering_data._shadow_data[i]._cull_results)
                     {
@@ -154,7 +172,7 @@ namespace Ailu
                         continue;
                     u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
                     cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, dsv_rt_index);
-                    cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), dsv_rt_index, 1.0f);
+                    cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), dsv_rt_index, kZFar);
                     camera_data._MatrixVP = *rendering_data._shadow_data[shadow_data_index]._shadow_matrix;
                     for (auto &it: *rendering_data._shadow_data[shadow_data_index]._cull_results)
                     {
@@ -186,7 +204,7 @@ namespace Ailu
                         u16 per_cube_slice_index = j + i * 6;
                         u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace::ECubemapFace)(j + 1), 0, i);
                         cmd->SetRenderTarget(nullptr, _p_point_light_shadow_maps.get(), 0, dsv_rt_index);
-                        cmd->ClearRenderTarget(_p_point_light_shadow_maps.get(), dsv_rt_index, 1.0f);
+                        cmd->ClearRenderTarget(_p_point_light_shadow_maps.get(), dsv_rt_index, kZFar);
                         Vector4f light_pos = rendering_data._point_shadow_data[i]._light_world_pos;
                         _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetVector("_point_light_wpos", light_pos);
                         camera_data._CameraPos.xyz = light_pos.xyz;
@@ -237,10 +255,14 @@ namespace Ailu
 
     void ShadowCastPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
     }
+    #pragma endregion
+
     //-------------------------------------------------------------ShadowCastPass-------------------------------------------------------------
-
-
+    
+    
+    #pragma region CubeMapGenPass
     //-------------------------------------------------------------CubeMapGenPass-------------------------------------------------------------
 
     CubeMapGenPass::CubeMapGenPass(Texture *src_tex, u16 size) : RenderPass("CubeMapGenPass"),
@@ -378,7 +400,11 @@ namespace Ailu
 
     void CubeMapGenPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
     }
+    #pragma endregion
+
+    #pragma region DeferredGeometryPass
     //-------------------------------------------------------------CubeMapGenPass-------------------------------------------------------------
 
     //-------------------------------------------------------------DeferedGeometryPass-------------------------------------------------------------
@@ -398,9 +424,9 @@ namespace Ailu
         {
             ProfileBlock profile(cmd.get(), _name);
             cmd->SetRenderTargets(rendering_data._gbuffers, rendering_data._camera_depth_target_handle);
-            cmd->ClearRenderTarget(rendering_data._gbuffers, rendering_data._camera_depth_target_handle, Colors::kBlack, 1.0f);
-            cmd->SetViewports({_rects[0], _rects[1], _rects[2], _rects[3], _rects[4]});
-            cmd->SetScissorRects({_rects[0], _rects[1], _rects[2], _rects[3], _rects[4]});
+            cmd->ClearRenderTarget(rendering_data._gbuffers, rendering_data._camera_depth_target_handle, Colors::kBlack, kZFar);
+            cmd->SetViewports({_rects[0], _rects[1], _rects[2], _rects[3]});
+            cmd->SetScissorRects({_rects[0], _rects[1], _rects[2], _rects[3]});
 
             u32 obj_index = 0;
             for (auto &it: *rendering_data._cull_results)
@@ -408,17 +434,12 @@ namespace Ailu
                 auto &[queue, objs] = it;
                 for (auto &obj: objs)
                 {
-                    //memcpy((*rendering_data._p_per_object_cbuf)[obj_index]->GetData(), obj._world_matrix, sizeof(Matrix4x4f));
-                    auto ret = cmd->DrawRenderer(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                    auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
+                    obj._material->GetShader()->_stencil_ref = IConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x? 1 : 0;
+                    auto ret = cmd->DrawRenderer(obj._mesh, obj._material, obj_cb, obj._submesh_index, 0, obj._instance_count);
                     ++obj_index;
                 }
             }
-            //for (auto& obj : RenderQueue::GetOpaqueRenderables())
-            //{
-            //	memcpy((*rendering_data._p_per_object_cbuf)[obj_index]->GetData(), obj.GetTransform(), sizeof(Matrix4x4f));
-            //	auto ret = cmd->DrawRenderer(obj.GetMesh(), obj.GetMaterial(), (*rendering_data._p_per_object_cbuf)[obj_index], obj._submesh_index, obj._instance_count);
-            //	++obj_index;
-            //}
         }
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
@@ -428,21 +449,26 @@ namespace Ailu
     }
     void DeferredGeometryPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
     }
+    #pragma endregion
+
+    #pragma region DeferedLightingPass
     //-------------------------------------------------------------DeferedGeometryPass-------------------------------------------------------------
 
     //-------------------------------------------------------------DeferedLightingPass-------------------------------------------------------------
     DeferredLightingPass::DeferredLightingPass() : RenderPass("DeferredLightingPass")
     {
         _p_lighting_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/deferred_lighting.alasset"), "DeferedGbufferLighting");
-        _brdf_lut = Texture2D::Create(128, 128, false, ETextureFormat::kRGFloat, false, true);
-        _brdf_lut->Apply();
-        _brdf_lut->Name("brdf_lut_tex");
-        _brdflut_gen = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/brdflut_gen.alcp"));
-        _brdflut_gen->SetTexture("_brdf_lut", _brdf_lut.get());
-        auto cmd = CommandBufferPool::Get();
-        cmd->Dispatch(_brdflut_gen.get(), _brdflut_gen->FindKernel("cs_main"), 8, 8, 1);
-        g_pGfxContext->ExecuteCommandBuffer(cmd);
+
+        _brdf_lut = g_pResourceMgr->Load<Texture2D>(L"Textures/ibl_brdf_lut.alasset");
+        // _brdf_lut->Apply();
+        // _brdf_lut->Name("brdf_lut_tex");
+        // _brdflut_gen = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/brdflut_gen.alcp"));
+        // _brdflut_gen->SetTexture("_brdf_lut", _brdf_lut.get());
+        // auto cmd = CommandBufferPool::Get();
+        // cmd->Dispatch(_brdflut_gen.get(), _brdflut_gen->FindKernel("cs_main"), 8, 8, 1);
+        // g_pGfxContext->ExecuteCommandBuffer(cmd);
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeDeferedLighting + 25u);
     }
     void DeferredLightingPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
@@ -451,7 +477,6 @@ namespace Ailu
         _p_lighting_material->SetTexture("_GBuffer1", rendering_data._gbuffers[1]);
         _p_lighting_material->SetTexture("_GBuffer2", rendering_data._gbuffers[2]);
         _p_lighting_material->SetTexture("_GBuffer3", rendering_data._gbuffers[3]);
-        _p_lighting_material->SetTexture("_GBuffer4", rendering_data._gbuffers[4]);
         _p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
         Shader::SetGlobalTexture("IBLLut", _brdf_lut.get());
         auto cmd = CommandBufferPool::Get("DeferredLightingPass");
@@ -469,10 +494,12 @@ namespace Ailu
     }
     void DeferredLightingPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
     }
+    #pragma endregion
     //-------------------------------------------------------------DeferedLightingPass-------------------------------------------------------------
 
-
+    #pragma region SkyboxPass
     //-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
     SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
     {
@@ -480,7 +507,7 @@ namespace Ailu
         //_p_skybox_material = MaterialLibrary::CreateMaterial(ShaderLibrary::Load("Shaders/skybox._pp.alasset"), "SkyboxPP");
         _p_skybox_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
         Matrix4x4f world_mat;
-        MatrixScale(world_mat, 1000.f, 1000.f, 1000.f);
+        MatrixScale(world_mat, 1000000.f, 1000000.f, 1000000.f);
         _p_cbuffer.reset(IConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
         memcpy(_p_cbuffer->GetData(), &world_mat, RenderConstants::kPerObjectDataSize);
         _tlut = RenderTexture::Create(_transmittance_lut_size.x, _transmittance_lut_size.y, "_TransmittanceLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
@@ -509,7 +536,7 @@ namespace Ailu
             if (_is_clear)
             {
                 cmd->ClearRenderTarget(rendering_data._camera_color_target_handle, Colors::kBlack);
-                cmd->ClearRenderTarget(rendering_data._camera_depth_target_handle, 1.0f);
+                cmd->ClearRenderTarget(rendering_data._camera_depth_target_handle, kZFar);
             }
             //auto t_lut = cmd->GetTempRT(_transmittance_lut_size.x, _transmittance_lut_size.y, "_TransmittanceLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
             //auto ms_lut = cmd->GetTempRT(_mult_scatter_lut_size.x, _mult_scatter_lut_size.y, "_MultScatterLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
@@ -527,7 +554,7 @@ namespace Ailu
             _p_skybox_material->SetTexture("_TexTransmittanceLUT", _tlut.get());
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
             cmd->DrawRenderer(Mesh::s_p_shpere.lock().get(), _p_skybox_material.get(), _p_cbuffer.get(), 0, 1);
-
+            ComputeShader::SetGlobalTexture("_TexSkyViewLUT",sv_lut);
             //cmd->ReleaseTempRT(t_lut);
             //cmd->ReleaseTempRT(ms_lut);
             cmd->ReleaseTempRT(sv_lut);
@@ -540,10 +567,12 @@ namespace Ailu
     }
     void SkyboxPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
     }
+    #pragma endregion
     //-------------------------------------------------------------SkyboxPass-------------------------------------------------------------
 
-
+    #pragma region GizmoPass
     //-------------------------------------------------------------GizmoPass-------------------------------------------------------------
     GizmoPass::GizmoPass() : RenderPass("GizmoPass")
     {
@@ -701,9 +730,6 @@ namespace Ailu
                 memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                 cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_camera, _p_cbuffers[index++].get(), 0, 0, 1);
             }
-            GraphicsPipelineStateMgr::s_gizmo_pso->Bind(cmd.get());
-            u8 camera_buf_slot = GraphicsPipelineStateMgr::s_gizmo_pso->NameToSlot(RenderConstants::kCBufNamePerCamera);
-            GraphicsPipelineStateMgr::s_gizmo_pso->SetPipelineResource(cmd.get(), rendering_data._p_per_camera_cbuf, EBindResDescType::kConstBuffer, camera_buf_slot);
             Gizmo::Submit(cmd.get(), rendering_data);
         }
         context->ExecuteCommandBuffer(cmd);
@@ -711,44 +737,17 @@ namespace Ailu
     }
     void GizmoPass::BeginPass(GraphicsContext *context)
     {
-        // if (Gizmo::s_color.a > 0.0f)
-        // {
-        // 	int gridSize = 100;
-        // 	int gridSpacing = 100;
-        // 	Vector3f cameraPosition = Camera::sCurrent->Position();
-        // 	float grid_alpha = lerpf(0.0f, 1.0f, abs(cameraPosition.y) / 2000.0f);
-        // 	Color grid_color = Colors::kWhite;
-        // 	grid_color.a = 1.0f - grid_alpha;
-        // 	if (grid_color.a > 0)
-        // 	{
-        // 		Vector3f grid_center_mid(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
-        // 			0.0f,
-        // 			static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
-        // 		Gizmo::DrawGrid(100, 100, grid_center_mid, grid_color);
-        // 	}
-        // 	grid_color.a = grid_alpha;
-        // 	if (grid_color.a > 0.7f)
-        // 	{
-        // 		gridSize = 10;
-        // 		gridSpacing = 1000;
-        // 		Vector3f grid_center_large(static_cast<float>(static_cast<int>(cameraPosition.x / gridSpacing) * gridSpacing),
-        // 			0.0f,
-        // 			static_cast<float>(static_cast<int>(cameraPosition.z / gridSpacing) * gridSpacing));
-        // 		//grid_color = Colors::kGreen;
-        // 		Gizmo::DrawGrid(10, 1000, grid_center_large, grid_color);
-        // 	}
-        // 	static const f32 s_axis_length = 50000.0f;
-        // 	Gizmo::DrawLine(Vector3f::kZero, Vector3f{ s_axis_length,0.0f,0.0f }, Colors::kRed);
-        // 	Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,s_axis_length,0.0f }, Colors::kGreen);
-        // 	Gizmo::DrawLine(Vector3f::kZero, Vector3f{ 0.f,0.0f,s_axis_length }, Colors::kBlue);
-        // }
+
     }
     void GizmoPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
     }
+    #pragma endregion
     //-------------------------------------------------------------GizmoPass-------------------------------------------------------------
 
     //-------------------------------------------------------------CopyColorPass-------------------------------------------------------------
+    #pragma region CopyColorPass
     CopyColorPass::CopyColorPass() : RenderPass("CopyColor")
     {
         _p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
@@ -776,8 +775,12 @@ namespace Ailu
     }
     void CopyColorPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
         _p_blit_mat->SetTexture("_SourceTex", nullptr);
     }
+    #pragma endregion
+
+    #pragma region CopyColorPass
     //-------------------------------------------------------------CopyColorPass-------------------------------------------------------------
 
     //-------------------------------------------------------------CopyDepthPass-------------------------------------------------------------
@@ -791,6 +794,7 @@ namespace Ailu
     }
     void CopyDepthPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
+        _depth_tex_handle = rendering_data._camera_depth_tex_handle;
         auto cmd = CommandBufferPool::Get("CopyDepth");
         cmd->Clear();
         {
@@ -805,11 +809,16 @@ namespace Ailu
     }
     void CopyDepthPass::EndPass(GraphicsContext *context)
     {
+        RenderPass::EndPass(context);
         _p_blit_mat->SetTexture("_SourceTex", nullptr);
+        Shader::SetGlobalTexture("_CameraDepthTexture",_depth_tex_handle);
+        ComputeShader::SetGlobalTexture("_CameraDepthTexture",_depth_tex_handle);
     }
+    #pragma endregion
     //-------------------------------------------------------------CopyDepthPass-------------------------------------------------------------
 
     //-------------------------------------------------------------WireFramePass-------------------------------------------------------------
+    #pragma region WireFramePass
     WireFramePass::WireFramePass() : RenderPass("WireFramePass")
     {
 
@@ -857,10 +866,14 @@ namespace Ailu
     }
 
     void WireFramePass::BeginPass(GraphicsContext *context) {};
-    void WireFramePass::EndPass(GraphicsContext *context) {};
+    void WireFramePass::EndPass(GraphicsContext *context) 
+    {
+        RenderPass::EndPass(context);
+    };
+    #pragma endregion
     //-------------------------------------------------------------WireFramePass-------------------------------------------------------------
 
-
+    #pragma region GUIPass
     //-------------------------------------------------------------GUIPass------------------------------------------------------------------
     GUIPass::GUIPass() : RenderPass("GUIPass")
     {
@@ -909,7 +922,7 @@ namespace Ailu
             //BuildOrthographicMatrix(proj,-half_width,half_width,half_height,-half_height,1.f,200.f);
             //CBufferPerCameraData cb_per_cam;
             //cb_per_cam._MatrixVP = view * proj;
-            //cb_per_cam._ScreenParams = Vector4f(w, h, 1 / w, 1 / h);
+            //cb_per_cam._ScreenParams = Vector4f( 1.0f / w, 1.0f / h,w, h);
             //CBufferPerObjectData per_obj_data;
             //per_obj_data._MatrixWorld = BuildIdentityMatrix();
             //memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
@@ -928,5 +941,67 @@ namespace Ailu
     {
         RenderPass::EndPass(context);
     }
+    #pragma endregion
     //-------------------------------------------------------------GUIPass------------------------------------------------------------------
+
+    #pragma region MotionVectorPass
+    MotionVectorPass::MotionVectorPass() : RenderPass("MotionVectorPass")
+    {
+        _event = ERenderPassEvent::kBeforeTransparent;
+        _motion_vector_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/motion_vector.alasset"),"Runtime/MotionVector");
+    }
+
+    MotionVectorPass::~MotionVectorPass()
+    {
+    
+    }
+
+    void MotionVectorPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
+    {
+        auto cmd = CommandBufferPool::Get(_name);
+        RTHandle motion_vector_rt = cmd->GetTempRT(rendering_data._width,rendering_data._height, "_MotionVectorTexture", ERenderTargetFormat::kRGHalf,false,false,false);
+        RTHandle motion_vector_depth = cmd->GetTempRT(rendering_data._width,rendering_data._height, "_MotionVectorDepth", ERenderTargetFormat::kDepth,false,false,false);
+        cmd->Clear();
+        {
+            PROFILE_BLOCK_GPU(cmd.get(), CameraMotionVector)
+            //camera motion vector
+            cmd->SetRenderTarget(motion_vector_rt, motion_vector_depth);
+            cmd->ClearRenderTarget(motion_vector_rt, motion_vector_depth,Colors::kBlack,kZFar);
+            _motion_vector_mat->SetTexture("_CameraDepthTexture",rendering_data._camera_depth_tex_handle);
+            cmd->DrawFullScreenQuad(_motion_vector_mat.get(),0);
+            //object motion vector
+            for (auto &it: *rendering_data._cull_results)
+            {
+                auto &[queue, objs] = it;
+                for (auto &obj: objs)
+                {
+                    auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
+                    if (IConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x < 1)
+                        continue;
+                    //obj._material->GetShader()->_stencil_ref = IConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x? 1 : 0;
+                    i16 mv_pass = obj._material->GetShader()->FindPass("MotionVector");
+                    if (mv_pass != -1)
+                        cmd->DrawRenderer(obj._mesh, obj._material, obj_cb, obj._submesh_index, mv_pass, obj._instance_count);
+                }
+            }
+        }
+        cmd->ReleaseTempRT(motion_vector_depth);
+        cmd->ReleaseTempRT(motion_vector_rt);
+        context->ExecuteCommandBuffer(cmd);
+        CommandBufferPool::Release(cmd);
+        Shader::SetGlobalTexture("_MotionVectorTexture", motion_vector_rt);
+        ComputeShader::SetGlobalTexture("_MotionVectorTexture", motion_vector_rt);
+        f32 aspect = (f32)rendering_data._width / (f32)rendering_data._height;
+        Gizmo::DrawTexture(Rect(0,0,256,256 / aspect),g_pRenderTexturePool->Get(motion_vector_rt));
+    }
+
+    void MotionVectorPass::BeginPass(GraphicsContext *context)
+    {
+    }
+
+    void MotionVectorPass::EndPass(GraphicsContext *context)
+    {
+        RenderPass::EndPass(context);
+    }
+#pragma endregion
 }// namespace Ailu

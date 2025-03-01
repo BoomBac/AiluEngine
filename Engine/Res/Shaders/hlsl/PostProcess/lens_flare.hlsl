@@ -21,11 +21,11 @@ PerMaterialCBufferBegin
     float4 _NoiseTex_TexelSize;
 PerMaterialCBufferEnd
 
-PSInput FullscreenVSMain(VSInput v);
+FullScreenPSInput FullscreenVSMain(FullScreenVSInput v);
 
 float Noise(float2 t)
 {
-    return SAMPLE_TEXTURE2D(_NoiseTex,g_LinearClampSampler,t * _NoiseTex_TexelSize.zw).r;
+    return SAMPLE_TEXTURE2D(_NoiseTex,g_LinearClampSampler,t * _NoiseTex_TexelSize.xy).r;
 }
 
 float3 Lensflare(float2 uv, float2 pos)
@@ -63,7 +63,7 @@ float3 Lensflare(float2 uv, float2 pos)
     return c;
 }
 
-float4 PSMain(PSInput input) : SV_TARGET
+float4 PSMain(FullScreenPSInput input) : SV_TARGET
 {
     return float4(Lensflare(input.uv,0.5.xx),1.0);
 }

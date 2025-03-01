@@ -8,7 +8,7 @@ keywords:
     shadow_index: 0
   prop_type: Float
   prop_type: Vector
-    _DeepColor: 0.123223,0.377443,0.413953,0.631373
+    _DeepColor: 0.211765,0.352941,0.372549,0.8
     _LightColor: 0.0186043,0,1,0.905882
   prop_type: IntVector
   prop_type: Texture2D

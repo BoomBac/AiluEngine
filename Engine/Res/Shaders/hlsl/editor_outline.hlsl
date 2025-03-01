@@ -52,9 +52,9 @@ static const half2 kOffsets[8] = {
                 half2(1,1)
             };
 
-PSInput FullscreenVSMain(VSInput v);
+FullScreenPSInput FullscreenVSMain(FullScreenVSInput v);
 
-float4 PSMainBlur(PSInput input) : SV_TARGET
+float4 PSMainBlur(FullScreenPSInput input) : SV_TARGET
 {
 	half4 col = SAMPLE_TEXTURE2D(_SelectBuffer, g_LinearClampSampler, input.uv);
 	//遍历当前像素周边8个像素。
@@ -68,7 +68,7 @@ float4 PSMainBlur(PSInput input) : SV_TARGET
 
 
 
-float4 PSMainCopy(PSInput input) : SV_TARGET
+float4 PSMainCopy(FullScreenPSInput input) : SV_TARGET
 {
 	half4 currentTexel = SAMPLE_TEXTURE2D(_SelectBuffer, g_LinearClampSampler, input.uv);
 	float alpha = 0;
@@ -94,7 +94,7 @@ float4 PSMainCopy(PSInput input) : SV_TARGET
 	float4 UnityOutlineColor = float4(1, 0, 0, alpha);
 	return UnityOutlineColor;
 }
-float4 PSMainAdd(PSInput input) : SV_TARGET
+float4 PSMainAdd(FullScreenPSInput input) : SV_TARGET
 {
 	half4 currentTexel = SAMPLE_TEXTURE2D(_SelectBuffer, g_LinearClampSampler, input.uv);
 	return float4(1,0,0,currentTexel.a);

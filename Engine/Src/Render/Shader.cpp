@@ -3,6 +3,7 @@
 
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
+#include "Framework/Common/SystemInfo.h"
 #include "RHI/DX12/D3DShader.h"
 #include "Render/GraphicsContext.h"
 #include "Render/GraphicsPipelineStateObject.h"
@@ -10,9 +11,9 @@
 #include "Render/Renderer.h"
 #include "Render/Shader.h"
 
-
 namespace Ailu
 {
+#pragma region Utils
     static List<String> ReadFileToLines(const String &sys_path, u32 &line_count, String begin = "", String end = "")
     {
         std::ifstream file(sys_path);
@@ -41,8 +42,51 @@ namespace Ailu
         line_count = static_cast<u32>(lines.size());
         return lines;
     }
+    static ECompareFunc StringToCompareFunc(const String &str,bool is_z_test)
+    {
+        if (su::Equal(str, ShaderCommand::Comparison::kNevel, false))
+            return ECompareFunc::kNever;
+        if (su::Equal(str, ShaderCommand::Comparison::kLess, false))
+        {
+            if (is_z_test)
+                return SystemInfo::kReverseZ? ECompareFunc::kGreater : ECompareFunc::kLess;
+            else
+                return ECompareFunc::kLess;
+        }
+        if (su::Equal(str, ShaderCommand::Comparison::kEqual, false))
+            return ECompareFunc::kEqual;
+        if (su::Equal(str, ShaderCommand::Comparison::kLEqual, false))
+        {
+            if (is_z_test)
+                return SystemInfo::kReverseZ? ECompareFunc::kGreaterEqual : ECompareFunc::kLessEqual;
+            else
+                return ECompareFunc::kLessEqual;
+        }
+        if (su::Equal(str, ShaderCommand::Comparison::kGreater, false))
+        {
+            if (is_z_test)
+                return SystemInfo::kReverseZ? ECompareFunc::kLess : ECompareFunc::kGreater;
+            else
+                return ECompareFunc::kGreater;
+        }
+        if (su::Equal(str, ShaderCommand::Comparison::kNotEqual, false))
+            return ECompareFunc::kNotEqual;
+        if (su::Equal(str, ShaderCommand::Comparison::kGEqual, false))
+        {
+            if (is_z_test)
+                return SystemInfo::kReverseZ? ECompareFunc::kLessEqual : ECompareFunc::kGreaterEqual;
+            else
+                return ECompareFunc::kGreaterEqual;
+        }
+        if (su::Equal(str, ShaderCommand::Comparison::kAlways, false) || su::Equal(str, ShaderCommand::Comparison::kOff, false))
+            return ECompareFunc::kAlways;
+        AL_ASSERT(false);
+        return ECompareFunc::kNever;
+    }
+#pragma endregion
 
-    void ShaderVariantMgr::BuildIndex(Vector<std::set<String>> all_keywords)
+#pragma region ShaderVariantMgr
+    void ShaderVariantMgr::BuildIndex(const Vector<std::set<String>> &all_keywords)
     {
         _keyword_group_ids.clear();
         u16 global_index = 0;
@@ -81,12 +125,11 @@ namespace Ailu
             }
         }
         ShaderVariantHash hash = 0u;
-        for (u64 mask: bits)
+        for (u32 mask: bits)
         {
-            hash ^= mask == 0 ? 0 : std::hash<u64>()(mask);
+            hash ^= mask == 0 ? 0 : std::hash<u32>()(mask);
         }
-        //取高37位的值作为hash，详情见u64 Shader::ConstructHash
-        return hash >> 27;
+        return hash;
     }
     std::set<String> ShaderVariantMgr::KeywordsSameGroup(const String &kw) const
     {
@@ -102,6 +145,7 @@ namespace Ailu
         }
         return res;
     }
+#pragma endregion
     //------------------------------------------------------------------ShaderVariantMgr--------------------------------------------------------------------------------
     std::vector<std::vector<std::string>> ExtractPassBlocks(const std::list<std::string> &lines)
     {
@@ -129,7 +173,14 @@ namespace Ailu
 
         return passBlocks;
     }
+#pragma region Shader
 
+    std::set<String> Shader::s_predefined_macros = 
+    {
+#if defined(_REVERSED_Z)
+        "_REVERSED_Z",
+#endif
+    };
     Ref<Shader> Shader::Create(const WString &sys_path)
     {
         switch (Renderer::GetAPI())
@@ -140,28 +191,33 @@ namespace Ailu
             case RendererAPI::ERenderAPI::kDirectX12:
             {
                 auto shader = MakeRef<D3DShader>(sys_path);
-                shader->ID(s_global_shader_unique_id++);
                 return shader;
             }
         }
         AL_ASSERT_MSG(false, "Unsupported render api!");
         return nullptr;
     }
-    //46bit hash,0~5 shader_id,6~8 pass_index 9~45 variant_hash
-    u64 Shader::ConstructHash(const u32 &shader_id, const u16 &pass_hash, ShaderVariantHash variant_hash)
+
+    ShaderHash Shader::ConstructHash(const u32 &shader_id, const u16 &pass_hash, ShaderVariantHash variant_hash)
     {
+        const static u32 kMaxShaderID = 1u << ShaderHashStruct::kShader._size;
+        const static u32 kMaxPassHash = 1u << ShaderHashStruct::kPass._size;
+        const static u32 kMaxVariantHash = UINT32_MAX;
         ALHash::Hash<64> shader_hash;
-        shader_hash.Set(0, 6, shader_id);
-        shader_hash.Set(6, 3, pass_hash);
-        shader_hash.Set(9, 37, variant_hash);
-        return shader_hash.Get(0, 46);
+        AL_ASSERT(shader_id < kMaxShaderID);
+        AL_ASSERT(pass_hash < kMaxPassHash);
+        AL_ASSERT(variant_hash < kMaxVariantHash);
+        shader_hash.Set(ShaderHashStruct::kShader._pos,ShaderHashStruct::kShader._size,shader_id);
+        shader_hash.Set(ShaderHashStruct::kPass._pos, ShaderHashStruct::kPass._size, pass_hash);
+        shader_hash.Set(ShaderHashStruct::kVariant._pos, ShaderHashStruct::kVariant._size, variant_hash);
+        return shader_hash.Get(0, 64);
     }
-    void Shader::ExtractInfoFromHash(const u64 &shader_hash, u32 &shader_id, u16 &pass_hash, ShaderVariantHash &variant_hash)
+    void Shader::ExtractInfoFromHash(const ShaderHash &shader_hash, u32 &shader_id, u16 &pass_hash, ShaderVariantHash &variant_hash)
     {
         ALHash::Hash<64> hash(shader_hash);
-        shader_id = (u32) hash.Get(0, 6);
-        pass_hash = (u16) hash.Get(6, 3);
-        variant_hash = hash.Get(9, 37);
+        shader_id = (u32) hash.Get(ShaderHashStruct::kShader._pos,ShaderHashStruct::kShader._size);
+        pass_hash = (u16) hash.Get(ShaderHashStruct::kPass._pos, ShaderHashStruct::kPass._size);
+        variant_hash = (u32)hash.Get(ShaderHashStruct::kVariant._pos, ShaderHashStruct::kVariant._size);
     }
 
     u32 Shader::GetShaderState(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash)
@@ -183,6 +239,7 @@ namespace Ailu
 
     Shader::Shader(const WString &sys_path)
     {
+        
         _src_file_path = sys_path;
         _name = ToChar(PathUtils::GetFileName(sys_path));
         PreProcessShader();
@@ -192,6 +249,7 @@ namespace Ailu
             p._pixel_src_file = _src_file_path;
             p._geom_src_file = _src_file_path;
         }
+        _id = s_global_shader_unique_id++;
         s_all_shaders.insert(this);
     }
 
@@ -203,6 +261,7 @@ namespace Ailu
         GraphicsPipelineStateMgr::ConfigureTopology(static_cast<u8>(ALHash::Hasher(_passes[pass_index]._pipeline_topology)));
         GraphicsPipelineStateMgr::ConfigureBlendState(_passes[pass_index]._pipeline_blend_state.Hash());
         GraphicsPipelineStateMgr::ConfigureShader(ConstructHash(_id, pass_index, variant_hash));
+        _topology = _passes[pass_index]._pipeline_topology;
         for (auto &it: s_global_textures_bind_info)
         {
             auto &pass_bind_res_info = _passes[pass_index]._variants[variant_hash]._bind_res_infos;
@@ -496,7 +555,7 @@ namespace Ailu
         String prop_name = line.substr(1, cur_edge - 2);
         String prop_type = line.substr(cur_edge + 1);
         EShaderPropertyType seri_type;
-        Vector4f prop_param;
+        Vector4f prop_default_value{}, prop_params{};
         if (prop_type == "Texture2D") seri_type = EShaderPropertyType::kTexture2D;
         else if (prop_type == "Color")
             seri_type = EShaderPropertyType::kColor;
@@ -514,19 +573,23 @@ namespace Ailu
         {
             if (addi_info.starts_with("Toggle"))
             {
-                //seri_type = ESerializablePropertyType::kBool;
-                //_passshared_keywords[_value_name].emplace_back(_value_name + "_ON");
-                //_passshared_keywords[_value_name].emplace_back(_value_name + "_OFF");
+                seri_type = EShaderPropertyType::kBool;
+                _keywords_props[value_name].emplace_back(value_name + "_OFF");
+                _keywords_props[value_name].emplace_back(value_name + "_ON");
             }
             else if (addi_info.starts_with("Enum"))
             {
-                //seri_type = ESerializablePropertyType::kEnum;
-                //auto enum_strs = su::Split(su::SubStrRange(addi_info, addi_info.find("(") + 1, addi_info.find(")") - 1), ",");
-                //_passshared_keywords[_value_name].resize(enum_strs.size() / 2);
-                //for (size_t i = 0; i < enum_strs.size(); i += 2)
-                //{
-                //	_passshared_keywords[_value_name][std::stoi(enum_strs[i + 1])] = _value_name + "_" + enum_strs[i];
-                //}
+                seri_type = EShaderPropertyType::kEnum;
+                auto enum_strs = su::Split(su::SubStrRange(addi_info, addi_info.find("(") + 1, addi_info.find(")") - 1), ",");
+                for (size_t i = 0; i < enum_strs.size(); i += 2)
+                {
+                    _keywords_props[value_name].emplace_back(value_name + "_" + enum_strs[i]);
+                }
+                // _passshared_keywords[_value_name].resize(enum_strs.size() / 2);
+                // for (size_t i = 0; i < enum_strs.size(); i += 2)
+                // {
+                // 	_passshared_keywords[_value_name][std::stoi(enum_strs[i + 1])] = _value_name + "_" + enum_strs[i];
+                // }
             }
         }
         if (seri_type == EShaderPropertyType::kRange)
@@ -534,28 +597,32 @@ namespace Ailu
             cur_edge = prop_type.find_first_of(",");
             size_t left_bracket = prop_type.find_first_of("(");
             size_t right_bracket = prop_type.find_first_of(")");
-            prop_param.x = static_cast<float>(std::stod(su::SubStrRange(prop_type, left_bracket + 1, cur_edge - 1)));
-            prop_param.y = static_cast<float>(std::stod(su::SubStrRange(prop_type, cur_edge + 1, right_bracket - 1)));
-            prop_param.z = static_cast<float>(std::stod(defalut_value));
+            prop_default_value.x = static_cast<float>(std::stod(su::SubStrRange(prop_type, left_bracket + 1, cur_edge - 1)));
+            prop_default_value.y = static_cast<float>(std::stod(su::SubStrRange(prop_type, cur_edge + 1, right_bracket - 1)));
+            prop_default_value.z = static_cast<float>(std::stod(defalut_value));
         }
         else if (seri_type == EShaderPropertyType::kFloat || seri_type == EShaderPropertyType::kBool)
         {
-            prop_param.z = static_cast<float>(std::stod(defalut_value));
+            prop_default_value.z = static_cast<float>(std::stod(defalut_value));
         }
         else if (seri_type == EShaderPropertyType::kColor || seri_type == EShaderPropertyType::kVector)
         {
             defalut_value = su::SubStrRange(defalut_value, 1, defalut_value.find_first_of(")") - 1);
             auto vec_str = su::Split(defalut_value, ",");
-            prop_param.x = static_cast<float>(std::stod(vec_str[0]));
-            prop_param.y = static_cast<float>(std::stod(vec_str[1]));
-            prop_param.z = static_cast<float>(std::stod(vec_str[2]));
-            prop_param.w = static_cast<float>(std::stod(vec_str[3]));
+            prop_default_value.x = static_cast<float>(std::stod(vec_str[0]));
+            prop_default_value.y = static_cast<float>(std::stod(vec_str[1]));
+            prop_default_value.z = static_cast<float>(std::stod(vec_str[2]));
+            prop_default_value.w = static_cast<float>(std::stod(vec_str[3]));
             if (addi_info.starts_with("HDR"))
-                prop_param.w = -1;
+            {
+                prop_params.x = 1;
+                prop_params.y = 1;
+            }
         }
         if (seri_type != EShaderPropertyType::kUndefined)
         {
-            props.emplace_back(value_name, prop_name, seri_type, prop_param);
+            props.emplace_back(value_name, prop_name, seri_type, prop_default_value);
+            props.back()._params = prop_params;
         }
         else
         {
@@ -590,6 +657,7 @@ namespace Ailu
         {
             auto pass_blocks = ExtractPassBlocks(lines);
             _passes.resize(pass_blocks.size());
+            _keywords_props.clear();
             for (auto &pass: _passes)
                 pass._shader_prop_infos.clear();
             for (int i = 0; i < pass_blocks.size(); i++)
@@ -678,19 +746,9 @@ namespace Ailu
                     }
                     else if (su::Equal(k, ShaderCommand::kZTest, false))
                     {
-                        if (su::Equal(v, ShaderCommand::kZTestValue.kAlways, false))
-                        {
+                        pass_pipeline_ds_state._depth_test_func = StringToCompareFunc(v,true);
+                        if (pass_pipeline_ds_state._depth_test_func == ECompareFunc::kAlways)
                             need_zbuf_count--;
-                            pass_pipeline_ds_state._depth_test_func = ECompareFunc::kAlways;
-                        }
-                        else if (su::Equal(v, ShaderCommand::kZTestValue.kEqual, false))
-                            pass_pipeline_ds_state._depth_test_func = ECompareFunc::kEqual;
-                        else if (su::Equal(v, ShaderCommand::kZTestValue.kLEqual, false))
-                            pass_pipeline_ds_state._depth_test_func = ECompareFunc::kLessEqual;
-                        else if (su::Equal(v, ShaderCommand::kZTestValue.kGreater, false))
-                            pass_pipeline_ds_state._depth_test_func = ECompareFunc::kGreater;
-                        else if (su::Equal(v, ShaderCommand::kZTestValue.kGEqual, false))
-                            pass_pipeline_ds_state._depth_test_func = ECompareFunc::kGreaterEqual;
                     }
                     else if (su::Equal(k, ShaderCommand::kZWrite, false))
                     {
@@ -729,34 +787,7 @@ namespace Ailu
                                 if (stencil_values.contains(ShaderCommand::kStencilStateValue.kStencilComp))
                                 {
                                     auto &comp_str = stencil_values[ShaderCommand::kStencilStateValue.kStencilComp];
-                                    if (su::Equal(comp_str, ShaderCommand::Comparison::kAlways, false))
-                                    {
-                                        pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kAlways;
-                                    }
-                                    else if (su::Equal(comp_str, ShaderCommand::Comparison::kEqual, false))
-                                    {
-                                        pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kEqual;
-                                    }
-                                    else if (su::Equal(comp_str, ShaderCommand::Comparison::kNotEqual, false))
-                                    {
-                                        pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kNotEqual;
-                                    }
-                                    else if (su::Equal(comp_str, ShaderCommand::Comparison::kLEqual, false))
-                                    {
-                                        pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kLessEqual;
-                                    }
-                                    else if (su::Equal(comp_str, ShaderCommand::Comparison::kGreater, false))
-                                    {
-                                        pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kGreater;
-                                    }
-                                    else if (su::Equal(comp_str, ShaderCommand::Comparison::kGEqual, false))
-                                    {
-                                        pass_pipeline_ds_state._stencil_test_func = ECompareFunc::kGreaterEqual;
-                                    }
-                                    else
-                                    {
-                                        AL_ASSERT(false);
-                                    }
+                                    pass_pipeline_ds_state._stencil_test_func = StringToCompareFunc(comp_str,false);
                                 }
                                 if (stencil_values.contains(ShaderCommand::kStencilStateValue.kStencilPass))
                                 {
@@ -880,7 +911,7 @@ namespace Ailu
                         cur_pass._variants.insert(std::make_pair(kw_hash, v));
                     }
                 }
-                else
+                if (!cur_pass._variants.contains(0))
                 {
                     ShaderPass::PassVariant v;
                     cur_pass._variants.insert(std::make_pair(0, v));
@@ -889,7 +920,7 @@ namespace Ailu
                 for (auto &it: cur_pass._variants)
                 {
                     auto &[vhash, variant] = it;
-                    cur_pass_variant_state[vhash] = EShaderVariantState::kNone;
+                    cur_pass_variant_state[vhash] = EShaderVariantState::kNotReady;
                 }
 
                 auto pass_it = std::find_if(_passes.begin(), _passes.end(), [&](const ShaderPass &p)
@@ -917,6 +948,7 @@ namespace Ailu
                 cur_pass._pipeline_topology = pass_pipeline_topology;
                 cur_pass._pipeline_blend_state = pass_pipeline_blend_state;
                 cur_pass._render_queue = pass_render_queue;
+                _stencil_ref = pass_pipeline_ds_state._stencil_ref_value;
                 _passes[i] = cur_pass;
                 _variant_state.emplace_back(std::move(cur_pass_variant_state));
             }
@@ -928,7 +960,9 @@ namespace Ailu
         _is_pass_elements_init.store(!is_process_succeed);
         return is_process_succeed;
     }
+#pragma endregion
 
+#pragma region ComputeShader
     //---------------------------------------------------------------------ComputeShader-------------------------------------------------------------------
     Ref<ComputeShader> ComputeShader::Create(const WString &sys_path)
     {
@@ -940,6 +974,7 @@ namespace Ailu
             case RendererAPI::ERenderAPI::kDirectX12:
             {
                 auto shader = MakeRef<D3DComputeShader>(sys_path);
+                s_global_variant_update_map[shader->ID()] = true;
                 return shader;
             }
         }
@@ -950,24 +985,60 @@ namespace Ailu
     ComputeShader::ComputeShader(const WString &sys_path) : _src_file_path(sys_path)
     {
         _name = ToChar(PathUtils::GetFileName(sys_path));
+        Preprocess();
     }
-
+    void ComputeShader::SetGlobalTexture(const String &name, RTHandle texture)
+    {
+        s_global_textures_bind_info[name] = g_pRenderTexturePool->Get(texture);
+    }
     void ComputeShader::Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
     {
+        if (s_global_variant_update_map[_id])
+        {
+            auto &ele = _kernels[kernel];
+            ele._active_keywords.clear();
+            for (auto &kw: _local_active_keywords)
+            {
+                if (KernelElement::IsKernelKeyword(ele, kw))
+                    ele._active_keywords.insert(kw);
+            }
+            for (auto &kw: s_global_active_keywords)
+            {
+                if (KernelElement::IsKernelKeyword(ele, kw))
+                    ele._active_keywords.insert(kw);
+            }
+            ele._active_variant = ele._variant_mgr.GetVariantHash(ele._active_keywords);
+        }
+        auto &variant = _kernels[kernel]._variants[_kernels[kernel]._active_variant];
+        for (auto &it: s_global_buffer_bind_info)
+        {
+            if (variant._bind_res_infos.find(it.first) != variant._bind_res_infos.end())
+            {
+                SetBuffer(it.first, it.second);
+            }
+        }
+        for (auto &it: s_global_textures_bind_info)
+        {
+            if (variant._bind_res_infos.find(it.first) != variant._bind_res_infos.end())
+            {
+                SetTexture(it.first, it.second);
+            }
+        }
     }
 
     void ComputeShader::SetTexture(const String &name, Texture *texture)
     {
         for (auto &cs_ele: _kernels)
         {
-            auto it = cs_ele._bind_res_infos.find(name);
-            if (texture != nullptr && it != cs_ele._bind_res_infos.end())
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (texture != nullptr && it != variant._bind_res_infos.end())
             {
                 it->second._p_res = texture;
                 u16 depth_slice = -1;
                 if (texture->Dimension() == ETextureDimension::kTex3D)
                     depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
-                _texture_addi_bind_info[it->second._bind_slot] = ViewInfo{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX};
+                _texture_addi_bind_info[it->second._bind_slot] = ViewInfo{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
                 _all_bind_textures.insert(texture);
             }
         }
@@ -985,15 +1056,16 @@ namespace Ailu
         {
             for (auto &cs_ele: _kernels)
             {
-                auto rit = std::find_if(cs_ele._bind_res_infos.begin(), cs_ele._bind_res_infos.end(), [=](const auto &it)
+                auto &variant = cs_ele._variants[cs_ele._active_variant];
+                auto rit = std::find_if(variant._bind_res_infos.begin(), variant._bind_res_infos.end(), [=](const auto &it)
                                         { return it.second._bind_slot == bind_slot; });
-                if (rit != cs_ele._bind_res_infos.end())
+                if (rit != variant._bind_res_infos.end())
                 {
                     rit->second._p_res = texture;
                     u16 depth_slice = -1;
                     if (texture->Dimension() == ETextureDimension::kTex3D)
                         depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
-                    _texture_addi_bind_info[rit->second._bind_slot] = ViewInfo{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX};
+                    _texture_addi_bind_info[rit->second._bind_slot] = ViewInfo{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
                     _all_bind_textures.insert(texture);
                 }
             }
@@ -1009,8 +1081,9 @@ namespace Ailu
             sub_res = texture->CalculateSubResIndex(face, mipmap, 0);
         for (auto &cs_ele: _kernels)
         {
-            auto it = cs_ele._bind_res_infos.find(name);
-            if (texture && it != cs_ele._bind_res_infos.end())
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (texture && it != variant._bind_res_infos.end())
             {
                 it->second._p_res = texture;
                 u16 depth_slice = -1;
@@ -1031,10 +1104,38 @@ namespace Ailu
     {
         for (auto &cs_ele: _kernels)
         {
-            auto it = cs_ele._bind_res_infos.find(name);
-            if (it != cs_ele._bind_res_infos.end())
-            {
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end() && it->second._res_type & EBindResDescType::kCBufferFloat)
                 memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+        }
+    }
+    void ComputeShader::SetFloats(const String& name,Vector<f32> values)
+    {
+        for (auto &cs_ele: _kernels)
+        {
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end())
+            {
+                auto& bind_info = it->second;
+                if (bind_info._res_type & EBindResDescType::kCBufferFloats)
+                {
+                    if (bind_info._array_size > 0)
+                    {
+                        u16 offset = ShaderBindResourceInfo::GetVariableOffset(bind_info);
+                        u8 ele_num = std::min(bind_info._array_size, (u8)values.size());
+                        for(u8 i = 0; i < ele_num; i++)
+                            memcpy(_cbuf_data + offset + i * 16, &values[i], 4); //16字节对齐
+                    }
+                    else//(bind_info._res_type & EBindResDescType::kCBufferFloats)
+                    {
+                        u16 offset = ShaderBindResourceInfo::GetVariableOffset(bind_info);
+                        u16 size = ShaderBindResourceInfo::GetVariableSize(bind_info);
+                        size = std::min(size, (u16)(values.size() * sizeof(f32)));
+                        memcpy(_cbuf_data + offset, values.data(), size);
+                    }
+                }
             }
         }
     }
@@ -1043,11 +1144,10 @@ namespace Ailu
     {
         for (auto &cs_ele: _kernels)
         {
-            auto it = cs_ele._bind_res_infos.find(name);
-            if (it != cs_ele._bind_res_infos.end())
-            {
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end() && it->second._res_type & EBindResDescType::kCBufferBool)
                 memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
-            }
         }
     }
 
@@ -1055,10 +1155,71 @@ namespace Ailu
     {
         for (auto &cs_ele: _kernels)
         {
-            auto it = cs_ele._bind_res_infos.find(name);
-            if (it != cs_ele._bind_res_infos.end())
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end())
             {
-                memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+                if (it->second._res_type & EBindResDescType::kCBufferInt)
+                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(i32));
+                else if (it->second._res_type & EBindResDescType::kCBufferUInt)
+                {
+                    u32 v = (u32)value;
+                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &v, sizeof(i32));
+                }
+                else {}
+            }
+        }
+    }
+    void ComputeShader::SetInts(const String &name, Vector<i32> values)
+    {
+        for (auto &cs_ele: _kernels)
+        {
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end())
+            {
+                auto& bind_info = it->second;
+                if (bind_info._res_type & EBindResDescType::kCBufferInts)
+                {
+                    if (bind_info._array_size > 0)
+                    {
+                        u16 offset = ShaderBindResourceInfo::GetVariableOffset(bind_info);
+                        u8 ele_num = std::min(bind_info._array_size, (u8)values.size());
+                        for(u8 i = 0; i < ele_num; i++)
+                            memcpy(_cbuf_data + offset + i * 16, &values[i], 4); //16字节对齐
+                    }
+                    else//(bind_info._res_type & EBindResDescType::kCBufferFloats)
+                    {
+                        u16 offset = ShaderBindResourceInfo::GetVariableOffset(bind_info);
+                        u16 size = ShaderBindResourceInfo::GetVariableSize(bind_info);
+                        size = std::min(size, (u16)(values.size() * sizeof(i32)));
+                        memcpy(_cbuf_data + offset, values.data(), size);
+                    }
+                }
+                else if (bind_info._res_type & EBindResDescType::kCBufferUInts)
+                {
+                    if (bind_info._array_size > 0)
+                    {
+                        u16 offset = ShaderBindResourceInfo::GetVariableOffset(bind_info);
+                        u8 ele_num = std::min(bind_info._array_size, (u8)values.size());
+                        for(u8 i = 0; i < ele_num; i++)
+                        {
+                            u32 v = (u32)values[i];
+                            memcpy(_cbuf_data + offset + i * 16, &v, 4); //16字节对齐
+                        }
+                    }
+                    else
+                    {
+                        u16 offset = ShaderBindResourceInfo::GetVariableOffset(bind_info);
+                        u16 size = ShaderBindResourceInfo::GetVariableSize(bind_info);
+                        size = std::min(size, (u16)(values.size() * sizeof(i32)));
+                        u32 buf[256];
+                        for(u32 i = 0; i < values.size(); i++)
+                            buf[i] = (u32)values[i];
+                        memcpy(_cbuf_data + offset, buf, size);
+                    }
+                }
+                else {};
             }
         }
     }
@@ -1067,21 +1228,24 @@ namespace Ailu
     {
         for (auto &cs_ele: _kernels)
         {
-            auto it = cs_ele._bind_res_infos.find(name);
-            if (it != cs_ele._bind_res_infos.end())
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end())
             {
-                if (it->second._res_type & EBindResDescType::kCBufferInt4)
+                u16 offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                u16 size = ShaderBindResourceInfo::GetVariableSize(it->second);
+                if (it->second._res_type & EBindResDescType::kCBufferInts)
                 {
-                    Vector4Int v = Vector4Int(vector.x, vector.y, vector.z, vector.w);
-                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &v, sizeof(Vector4Int));
+                    Vector4Int v = Vector4Int((i32) vector.x, (i32) vector.y, (i32) vector.z, (i32) vector.w);
+                    memcpy(_cbuf_data + offset, &v, size);
                 }
-                else if (it->second._res_type & EBindResDescType::kCBufferUint4)
+                else if (it->second._res_type & EBindResDescType::kCBufferUInts)
                 {
-                    Vector4UInt v = Vector4UInt(vector.x, vector.y, vector.z, vector.w);
-                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &v, sizeof(Vector4UInt));
+                    Vector4UInt v = Vector4UInt((u32) vector.x, (u32) vector.y, (u32) vector.z, (u32) vector.w);
+                    memcpy(_cbuf_data + offset, &v, size);
                 }
                 else
-                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector, sizeof(Vector4f));
+                    memcpy(_cbuf_data + offset, &vector, size);
             }
         }
     }
@@ -1090,8 +1254,9 @@ namespace Ailu
     {
         for (auto &cs_ele: _kernels)
         {
-            auto it = cs_ele._bind_res_infos.find(name);
-            if (buf != nullptr && it != cs_ele._bind_res_infos.end())
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (buf != nullptr && it != variant._bind_res_infos.end())
             {
                 it->second._p_res = buf;
             }
@@ -1101,13 +1266,39 @@ namespace Ailu
     {
         for (auto &cs_ele: _kernels)
         {
-            auto it = cs_ele._bind_res_infos.find(name);
-            if (buf != nullptr && it != cs_ele._bind_res_infos.end())
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (buf != nullptr && it != variant._bind_res_infos.end())
             {
                 it->second._p_res = buf;
             }
         }
     }
+    void ComputeShader::SetMatrix(const String& name,Matrix4x4f mat)
+    {
+        for (auto &cs_ele: _kernels)
+        {
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end() && it->second._res_type & EBindResDescType::kCBufferMatrix)
+                memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &mat, sizeof(Matrix4x4f));
+        }
+    }
+
+    void ComputeShader::SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr)
+    {
+        for (auto &cs_ele: _kernels)
+        {
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end() && it->second._res_type & EBindResDescType::kCBufferMatrix && it->second._array_size > 0)
+            {
+                u8 matrix_num = std::min(it->second._array_size, (u8)matrix_arr.size());
+                memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), matrix_arr.data(), sizeof(Matrix4x4f) * matrix_num);
+            }
+        }
+    }
+
     void ComputeShader::GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const
     {
         AL_ASSERT(kernel < _kernels.size());
@@ -1120,8 +1311,12 @@ namespace Ailu
     {
         for (const auto &k: _kernels)
         {
-            if (k._all_dep_file_pathes.contains(sys_path))
-                return true;
+            for (const auto &it: k._variants)
+            {
+                auto &variant = it.second;
+                if (variant._all_dep_file_pathes.contains(sys_path))
+                    return true;
+            }
         }
         return false;
     }
@@ -1138,51 +1333,145 @@ namespace Ailu
         bool is_succeed = true;
         for (auto k: _kernels)
         {
-            is_succeed &= RHICompileImpl(k._id);
+            for (auto &v: k._variants)
+                is_succeed &= Compile(k._id, v.first);
         }
         _is_compiling.store(false);
         return is_succeed;
     }
 
-    bool ComputeShader::RHICompileImpl(u16 kernel_index)
+
+    bool ComputeShader::Compile(u16 kernel_index, ShaderVariantHash variant_hash)
+    {
+        _is_compiling.store(true);
+        bool is_succeed = RHICompileImpl(kernel_index, variant_hash);
+        _variant_state[kernel_index][variant_hash] = is_succeed ? EShaderVariantState::kReady : EShaderVariantState::kError;
+        _is_compiling.store(false);
+        return is_succeed;
+    }
+    bool ComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash)
     {
         return false;
     }
 
 
-    void ComputeShader::Preprocess()
+    bool ComputeShader::Preprocess()
     {
         String data;
         FileManager::ReadFile(_src_file_path, data);
         auto lines = su::Split(data, "\n");
+        HashMap<String, Vector<std::set<String>>> kernels;
+        _kernels.clear();
         for (auto &line: lines)
         {
             if (su::BeginWith(line, "#pragma kernel"))
             {
                 auto kernel_line = su::Split(line, " ");
-                KernelElement kernel(_kernels.size(), kernel_line[2], Vector3UInt(8, 8, 1), std::set<WString>{});
-                kernel._all_dep_file_pathes.insert(_src_file_path);
-                _kernels.emplace_back(kernel);
+                kernels[kernel_line[2]] = Vector<std::set<String>>();
             }
-            //else if (su::BeginWith(line, "["))
-            //{
-            //    std::regex pattern(R"(\[numthreads\((\d+),(\d+),(\d+)\)\])");
-            //    std::smatch matches;
-            //    if (std::regex_search(line, matches, pattern))
-            //    {
-            //        _thread_num.x = std::stoi(matches[1].str());
-            //        _thread_num.y = std::stoi(matches[2].str());
-            //        _thread_num.z = std::stoi(matches[3].str());
-            //    }
-            //    else
-            //        LOG_ERROR(L"ComputeShader {} preprocess: invalid numthreads format!", _src_file_path);
-            //}
+            else if (su::BeginWith(line, "#pragma multi_compile"))
+            {
+                auto kernel_line = su::Split(line, " ");
+                auto &kernel_name = kernel_line[2];
+                if (kernels.contains(kernel_name) && kernel_line.size() > 3)
+                {
+                    auto &kw_set = kernels[kernel_name].emplace_back();
+                    for (u16 i = 3; i < kernel_line.size(); ++i)
+                    {
+                        kw_set.insert(kernel_line[i]);
+                    }
+                }
+                else
+                {
+                    LOG_ERROR("ComputeShader::Preprocess: pragma multi_compile:{} not exist!", kernel_name);
+                }
+            }
+        }
+        u16 id = 0u;
+        for (auto &it: kernels)
+        {
+            auto &[kernel_name, keywords] = it;
+            KernelElement cur_kernel{};
+            cur_kernel._id = id++;
+            cur_kernel._name = kernel_name;
+            cur_kernel._thread_num = Vector3UInt(8u, 8u, 1u);
+            cur_kernel._keywords = keywords;
+            //construct keywords
+            Vector<Vector<String>> kw_permutation_in{};
+            cur_kernel._variant_mgr.BuildIndex(cur_kernel._keywords);
+            for (auto &kw_group: cur_kernel._keywords)
+            {
+                Vector<String> kw_cur_group;
+                for (auto &kw: kw_group)
+                    kw_cur_group.emplace_back(kw);
+                kw_permutation_in.emplace_back(kw_cur_group);
+            }
+            if (!kw_permutation_in.empty())
+            {
+                auto all_kw_seq = Algorithm::Permutations(kw_permutation_in);
+                for (auto &kw_seq: all_kw_seq)
+                {
+                    std::set<String> kw_set;
+                    for (int i = 0; i < kw_seq.size(); i++)
+                        kw_set.insert(kw_seq[i]);
+                    ShaderVariantHash kw_hash = cur_kernel._variant_mgr.GetVariantHash(kw_set);
+                    KernelElement::KernelVariant v;
+                    v._active_keywords = kw_set;
+                    v._all_dep_file_pathes.insert(_src_file_path);
+                    cur_kernel._variants.insert(std::make_pair(kw_hash, v));
+                }
+            }
+            if (!cur_kernel._variants.contains(0))
+            {
+                KernelElement::KernelVariant v;
+                v._all_dep_file_pathes.insert(_src_file_path);
+                cur_kernel._variants.insert(std::make_pair(0, v));
+            }
+            Map<ShaderVariantHash, EShaderVariantState> cur_kernel_variant_state;
+            for (auto &it: cur_kernel._variants)
+            {
+                auto &[vhash, variant] = it;
+                cur_kernel_variant_state[vhash] = EShaderVariantState::kNotReady;
+            }
+            _variant_state.emplace_back(std::move(cur_kernel_variant_state));
+            _kernels.emplace_back(std::move(cur_kernel));
         }
         AL_ASSERT(!_kernels.empty());
+        return !_kernels.empty();
     }
-    u16 ComputeShader::NameToSlot(const String &name, u16 kernel) const
+    u16 ComputeShader::NameToSlot(const String &name, u16 kernel, ShaderVariantHash variant_hash) const
     {
         return UINT16_MAX;
     }
+
+    void ComputeShader::EnableKeyword(const String &kw)
+    {
+        if (_local_active_keywords.contains(kw))
+            return;
+        for (auto &kernel: _kernels)
+        {
+            for (auto &group_kw: kernel._variant_mgr.KeywordsSameGroup(kw))
+                _local_active_keywords.erase(group_kw);
+            _local_active_keywords.insert(kw);
+        }
+        s_global_variant_update_map[_id] = true;
+    }
+    void ComputeShader::DisableKeyword(const String &kw)
+    {
+        if (!_local_active_keywords.contains(kw))
+            return;
+        _local_active_keywords.erase(kw);
+        s_global_variant_update_map[_id] = true;
+    }
+
+    std::tuple<u16, u16, u16> ComputeShader::CalculateDispatchNum(u16 kernel, u16 task_num_x, u16 task_num_y, u16 task_num_z) const
+    {
+        AL_ASSERT(kernel < _kernels.size());
+        f32 x = static_cast<f32>(_kernels[kernel]._thread_num.x);
+        f32 y = static_cast<f32>(_kernels[kernel]._thread_num.y);
+        f32 z = static_cast<f32>(_kernels[kernel]._thread_num.z);
+        return std::make_tuple((u16) std::ceilf(task_num_x / x), (u16) std::ceilf(task_num_y / y), (u16) std::ceilf(task_num_z / z));
+    }
+#pragma endregion
     //---------------------------------------------------------------------ComputeShader-------------------------------------------------------------------
 }// namespace Ailu

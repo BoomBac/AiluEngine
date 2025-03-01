@@ -9,6 +9,7 @@
 
 namespace Ailu
 {
+    #pragma region GraphicsPipelineStateObject
     //------------------------------------------------------------------------------GraphicsPipelineStateObject---------------------------------------------------------------------------------
     Scope<GraphicsPipelineStateObject> GraphicsPipelineStateObject::Create(const GraphicsPipelineStateInitializer &initializer)
     {
@@ -70,11 +71,25 @@ namespace Ailu
         shader = pso_hash.Get(StateHashStruct::kShader._pos, StateHashStruct::kShader._size);
     }
     //------------------------------------------------------------------------------GraphicsPipelineStateObject---------------------------------------------------------------------------------
-
+    #pragma endregion
 
     //------------------------------------------------------------------------------GraphicsPipelineStateMgr---------------------------------------------------------------------------------
+    #pragma region GraphicsPipelineStateMgr
+    GraphicsPipelineStateMgr* g_pPSOMgr = nullptr;
+    void GraphicsPipelineStateMgr::Init()
+    {
+        if (!g_pPSOMgr)
+            g_pPSOMgr = new GraphicsPipelineStateMgr();
+    }
+    void GraphicsPipelineStateMgr::Shutdown()
+    {
+        DESTORY_PTR(g_pPSOMgr);
+    }
 
-    RenderTargetState GraphicsPipelineStateMgr::_s_render_target_state;
+    GraphicsPipelineStateMgr& GraphicsPipelineStateMgr::Get()
+    {
+        return *g_pPSOMgr;
+    }
 
     void GraphicsPipelineStateMgr::BuildPSOCache()
     {
@@ -89,7 +104,7 @@ namespace Ailu
         pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT, EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM,
                                                 EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM, EALGFormat::EALGFormat::kALGFormatR16G16_FLOAT,
                                                 EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT},
-                                               EALGFormat::EALGFormat::kALGFormatD24S8_UINT};
+                                               EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
         pso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
         auto stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
         stand_pso->Build();
@@ -101,7 +116,7 @@ namespace Ailu
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
         pso_desc._p_pixel_shader = shader;
-        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD24S8_UINT};
+        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
         pso_desc._depth_stencil_state = shader->PipelineDepthStencilState();
         stand_pso = GraphicsPipelineStateObject::Create(pso_desc);
         stand_pso->Build();
@@ -109,7 +124,7 @@ namespace Ailu
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
         shader = g_pResourceMgr->Get<Shader>(L"Shaders/blit.alasset");
-        for (int i = 0; i < shader->PassCount(); i++)
+        for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
             pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
@@ -130,11 +145,11 @@ namespace Ailu
         pso_desc._p_pixel_shader = shader;
         pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
         pso_desc._raster_state = TStaticRasterizerState<ECullMode::kBack, EFillMode::kWireframe>::GetRHI();
-        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD24S8_UINT};
+        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
         auto wireframe_pso = GraphicsPipelineStateObject::Create(pso_desc);
         wireframe_pso->Build();
         AddPSO(std::move(wireframe_pso));
-
+        /*
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
         shader = g_pResourceMgr->Get<Shader>(L"Shaders/gizmo.alasset");
         pso_desc = GraphicsPipelineStateInitializer::GetNormalTransparentPSODesc();
@@ -147,7 +162,8 @@ namespace Ailu
         pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD24S8_UINT};
         auto gizmo_pso = GraphicsPipelineStateObject::Create(pso_desc);
         gizmo_pso->Build();
-        s_gizmo_pso = std::move(gizmo_pso);
+        */
+        //Get()._gizmo_line_pso = std::move(gizmo_pso);
         //AddPSO(std::move(gizmo_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
@@ -159,7 +175,7 @@ namespace Ailu
         pso_desc._topology = shader->PipelineTopology();
         pso_desc._p_pixel_shader = shader;
         pso_desc._p_vertex_shader = shader;
-        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatUnknown}, EALGFormat::EALGFormat::kALGFormatD24S8_UINT};
+        pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatUnknown}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
         auto pso = GraphicsPipelineStateObject::Create(pso_desc);
         pso->Build();
         GraphicsPipelineStateMgr::AddPSO(std::move(pso));
@@ -180,7 +196,7 @@ namespace Ailu
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
         shader = g_pResourceMgr->Get<Shader>(L"Shaders/filter_irradiance.alasset");
-        for (int i = 0; i < shader->PassCount(); i++)
+        for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
             pso_desc._input_layout = shader->PipelineInputLayout(i);
@@ -198,7 +214,7 @@ namespace Ailu
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
         shader = g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/debug.hlsl");
-        for (int i = 0; i < shader->PassCount(); i++)
+        for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
             pso_desc._input_layout = shader->PipelineInputLayout(i);
@@ -208,14 +224,14 @@ namespace Ailu
             pso_desc._topology = shader->PipelineTopology(i);
             pso_desc._p_pixel_shader = shader;
             pso_desc._p_vertex_shader = shader;
-            pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD24S8_UINT};
+            pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
             pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
             pso->Build(i);
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
         shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
-        for (int i = 0; i < shader->PassCount(); i++)
+        for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
             pso_desc._input_layout = shader->PipelineInputLayout(i);
@@ -225,7 +241,7 @@ namespace Ailu
             pso_desc._topology = shader->PipelineTopology(i);
             pso_desc._p_pixel_shader = shader;
             pso_desc._p_vertex_shader = shader;
-            pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD24S8_UINT};
+            pso_desc._rt_state = RenderTargetState{{EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT}, EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT};
             pso = std::move(GraphicsPipelineStateObject::Create(pso_desc));
             pso->Build(i);
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
@@ -236,41 +252,43 @@ namespace Ailu
 
     void GraphicsPipelineStateMgr::AddPSO(Scope<GraphicsPipelineStateObject> p_gpso)
     {
-        auto it = s_pso_library.find(p_gpso->Hash());
-        if (it != s_pso_library.end())
+        auto it = g_pPSOMgr->_pso_library.find(p_gpso->Hash());
+        if (it != g_pPSOMgr->_pso_library.end())
         {
-            //LOG_WARNING("Pso id: {} already exist!", p_gpso->Name());
-            s_pso_library[p_gpso->Hash()] = std::move(p_gpso);
+            g_pPSOMgr->_pso_library[p_gpso->Hash()] = std::move(p_gpso);
         }
         else
         {
-            LOG_WARNING("Add Pso id: {} to library!", p_gpso->Name());
-            s_pso_library.insert(std::make_pair(p_gpso->Hash(), std::move(p_gpso)));
+            LOG_INFO("Add Pso id: {} to library!", p_gpso->Name());
+            g_pPSOMgr->_pso_library.insert(std::make_pair(p_gpso->Hash(), std::move(p_gpso)));
         }
     }
 
     void GraphicsPipelineStateMgr::EndConfigurePSO(CommandBuffer *cmd)
     {
-        s_is_ready = false;
-        _s_render_target_state.Hash(RenderTargetState::_s_hash_obj.GenHash(_s_render_target_state));
-        ConfigureRenderTarget(_s_render_target_state.Hash());
-        GraphicsPipelineStateObject::ConstructPSOHash(s_cur_pos_hash, s_hash_input_layout, s_hash_shader, s_hash_blend_state, s_hash_raster_state, s_hash_depth_stencil_state, s_hash_rt_state);
-        auto it = s_pso_library.find(s_cur_pos_hash);
+        g_pPSOMgr->_is_ready = false;
+        g_pPSOMgr->_render_target_state.Hash(RenderTargetState::_s_hash_obj.GenHash(g_pPSOMgr->_render_target_state));
+        ConfigureRenderTarget(g_pPSOMgr->_render_target_state.Hash());
+        GraphicsPipelineStateObject::ConstructPSOHash(g_pPSOMgr->_cur_pos_hash, g_pPSOMgr->_hash_input_layout, 
+            g_pPSOMgr->_hash_shader, g_pPSOMgr->_hash_blend_state, g_pPSOMgr->_hash_raster_state, g_pPSOMgr->_hash_depth_stencil_state, g_pPSOMgr->_hash_rt_state);
+        auto it = g_pPSOMgr->_pso_library.find(g_pPSOMgr->_cur_pos_hash);
         u8 input_layout, blend_state, raster_state, ds_state, rt_state;
         u64 shader_hash;
-        GraphicsPipelineStateObject::ExtractPSOHash(s_cur_pos_hash, input_layout, shader_hash, blend_state, raster_state, ds_state, rt_state);
+        GraphicsPipelineStateObject::ExtractPSOHash(g_pPSOMgr->_cur_pos_hash, input_layout, shader_hash, blend_state, raster_state, ds_state, rt_state);
         u32 shader_id;
         u16 pass_index = 0;
         ShaderVariantHash variant_hash = 0;
         Shader::ExtractInfoFromHash(shader_hash, shader_id, pass_index, variant_hash);
         auto new_shader = g_pResourceMgr->Get<Shader>(shader_id);
-        if (it != s_pso_library.end())
+        if (it != g_pPSOMgr->_pso_library.end())
         {
             auto& pso = it->second;
+            AL_ASSERT(pso->StateDescriptor()._p_vertex_shader == new_shader);
             pso->SetTopology(new_shader->GetTopology());
+            pso->SetStencilRef(new_shader->_stencil_ref);
             pso->Bind(cmd);
             std::map<u8, std::set<PipelineResourceInfo>> c;
-            for (auto res_it = s_bind_resource_list.begin(); res_it != s_bind_resource_list.end();)
+            for (auto res_it = g_pPSOMgr->_bind_resource_list.begin(); res_it != g_pPSOMgr->_bind_resource_list.end();)
             {
                 if (!res_it->_name.empty())
                 {
@@ -279,7 +297,7 @@ namespace Ailu
 
                 if (res_it->_slot == -1)
                 {
-                    res_it = s_bind_resource_list.erase(res_it);// 删除元素并更新迭代器
+                    res_it = g_pPSOMgr->_bind_resource_list.erase(res_it);// 删除元素并更新迭代器
                 }
                 else
                 {
@@ -300,13 +318,13 @@ namespace Ailu
                 it->second->SetPipelineResource(cmd, res_info._p_resource, res_info._res_type, slot);
             }
 
-            s_is_ready = true;
+            g_pPSOMgr->_is_ready = true;
         }
         else
         {
-            LOG_WARNING("Pos used currently not ready with Input Layout: {}, Shader: {},Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
-                        (u32) input_layout,
-                        shader_hash,(u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
+            // LOG_WARNING("Pos used currently not ready with Input Layout: {}, Shader: {},Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
+            //             (u32) input_layout,
+            //             shader_hash,(u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
             {
                 auto variant_state = new_shader->GetVariantState(pass_index, variant_hash);
                 if (variant_state == EShaderVariantState::kReady)
@@ -322,24 +340,24 @@ namespace Ailu
                     new_desc._rt_state = RenderTargetState::_s_hash_obj.Get(rt_state);
                     auto pso = std::move(GraphicsPipelineStateObject::Create(new_desc));
                     pso->Build(pass_index, variant_hash);
-                    for (auto &[hash, pso]: s_pso_library)
+                    for (auto &[hash, pso]: g_pPSOMgr->_pso_library)
                     {
                         u64 similar_shader_hash;
                         GraphicsPipelineStateObject::ExtractPSOHash(hash, input_layout, similar_shader_hash, blend_state, raster_state, ds_state, rt_state);
                         if (similar_shader_hash == shader_hash)
                         {
-                            LOG_INFO("Similar pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
-                                     pso->Name(), (u32) input_layout, shader_hash, (u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
+                            // LOG_INFO("Similar pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
+                            //          pso->Name(), (u32) input_layout, shader_hash, (u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
                         }
                     }
                     GraphicsPipelineStateObject::ExtractPSOHash(pso->Hash(), input_layout, shader_hash, blend_state, raster_state, ds_state, rt_state);
-                    LOG_WARNING("New Pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
-                                pso->Name(), (u32) input_layout, shader_hash, (u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
+                    // LOG_WARNING("New Pso name:[{}], Input Layout: {}, Shader: {}, Blend State: {}, Raster State: {}, DepthBit Stencil State: {}, Render Target State: {}",
+                    //             pso->Name(), (u32) input_layout, shader_hash, (u32) blend_state, (u32) raster_state, (u32) ds_state, (u32) rt_state);
                     GraphicsPipelineStateMgr::AddPSO(std::move(pso));
                 }
             }
         }
-        s_bind_resource_list.clear();
+        g_pPSOMgr->_bind_resource_list.clear();
     }
 
     void GraphicsPipelineStateMgr::OnShaderRecompiled(Shader *shader, u16 pass_id, ShaderVariantHash variant_hash)
@@ -354,7 +372,7 @@ namespace Ailu
         u64 new_pso_shader_hash = Shader::ConstructHash(shader->ID(), pass_id, variant_hash);
         //更新库中pso的筛选条件：
         //- pass_name一致即可
-        for (auto &pso: s_pso_library)
+        for (auto &pso: g_pPSOMgr->_pso_library)
         {
             GraphicsPipelineStateObject::ExtractPSOHash(pso.first, input_layout, shader_hash, blend_state, raster_state, ds_state, rt_state);
             //这里还需要处理关键字组的增删导致的hash相同但实际关键字序列不同的情况，暂时没做
@@ -368,8 +386,8 @@ namespace Ailu
                 auto pso = GraphicsPipelineStateObject::Create(gpso_desc);
                 pso->Build(pass_id, variant_hash);
                 {
-                    std::lock_guard<std::mutex> l(s_pso_lock);
-                    s_update_pso.emplace(std::move(pso));
+                    std::lock_guard<std::mutex> l(g_pPSOMgr->_pso_lock);
+                    g_pPSOMgr->_update_pso.emplace(std::move(pso));
                 }
             }
         }
@@ -381,77 +399,83 @@ namespace Ailu
         auto pso = GraphicsPipelineStateObject::Create(gpso_desc);
         pso->Build(pass_id, variant_hash);
         {
-            std::lock_guard<std::mutex> l(s_pso_lock);
-            s_update_pso.emplace(std::move(pso));
+            std::lock_guard<std::mutex> l(g_pPSOMgr->_pso_lock);
+            g_pPSOMgr->_update_pso.emplace(std::move(pso));
         }
     }
 
     void GraphicsPipelineStateMgr::ConfigureShader(const u64 &shader_hash)
     {
-        s_hash_shader = shader_hash;
+        g_pPSOMgr->_hash_shader = shader_hash;
     }
 
     void GraphicsPipelineStateMgr::ConfigureVertexInputLayout(const u8 &hash)
     {
-        s_hash_input_layout = hash;
+        g_pPSOMgr->_hash_input_layout = hash;
     }
     void GraphicsPipelineStateMgr::ConfigureTopology(const u8 &hash)
     {
-        s_hash_topology = hash;
+        g_pPSOMgr->_hash_topology = hash;
     }
     void GraphicsPipelineStateMgr::ConfigureBlendState(const u8 &hash)
     {
-        s_hash_blend_state = hash;
+        g_pPSOMgr->_hash_blend_state = hash;
     }
     void GraphicsPipelineStateMgr::ConfigureRasterizerState(const u8 &hash)
     {
-        s_hash_raster_state = hash;
+        g_pPSOMgr->_hash_raster_state = hash;
     }
     void GraphicsPipelineStateMgr::ConfigureDepthStencilState(const u8 &hash)
     {
-        s_hash_depth_stencil_state = hash;
+        g_pPSOMgr->_hash_depth_stencil_state = hash;
     }
 
     void GraphicsPipelineStateMgr::ConfigureRenderTarget(const u8 &hash)
     {
-        s_hash_rt_state = hash;
+        g_pPSOMgr->_hash_rt_state = hash;
     }
     void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat color_format, EALGFormat::EALGFormat depth_format, u8 color_rt_id)
     {
-        _s_render_target_state._color_rt[color_rt_id] = color_format;
-        _s_render_target_state._color_rt_num = color_format == EALGFormat::EALGFormat::kALGFormatUnknown ? 0 : static_cast<u8>(color_rt_id + 1u);
-        _s_render_target_state._depth_rt = depth_format;
+        g_pPSOMgr->_render_target_state._color_rt[color_rt_id] = color_format;
+        g_pPSOMgr->_render_target_state._color_rt_num = color_format == EALGFormat::EALGFormat::kALGFormatUnknown ? 0 : static_cast<u8>(color_rt_id + 1u);
+        g_pPSOMgr->_render_target_state._depth_rt = depth_format;
     }
     void GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat color_format, u8 color_rt_id)
     {
-        _s_render_target_state._color_rt[color_rt_id] = color_format;
-        _s_render_target_state._color_rt_num = color_format == EALGFormat::EALGFormat::kALGFormatUnknown ? 0 : static_cast<u8>(color_rt_id + 1u);
+        g_pPSOMgr->_render_target_state._color_rt[color_rt_id] = color_format;
+        g_pPSOMgr->_render_target_state._color_rt_num = color_format == EALGFormat::EALGFormat::kALGFormatUnknown ? 0 : static_cast<u8>(color_rt_id + 1u);
     }
     void GraphicsPipelineStateMgr::ResetRenderTargetState()
     {
-        _s_render_target_state._color_rt_num = 0;
+        g_pPSOMgr->_render_target_state._color_rt_num = 0;
         for (int i = 0; i < 8; i++)
-            _s_render_target_state._color_rt[i] = EALGFormat::EALGFormat::kALGFormatUnknown;
-        _s_render_target_state._depth_rt = EALGFormat::EALGFormat::kALGFormatUnknown;
+            g_pPSOMgr->_render_target_state._color_rt[i] = EALGFormat::EALGFormat::kALGFormatUnknown;
+        g_pPSOMgr->_render_target_state._depth_rt = EALGFormat::EALGFormat::kALGFormatUnknown;
+    }
+
+    bool GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall()
+    {
+        return g_pPSOMgr->_is_ready;
     }
 
     void GraphicsPipelineStateMgr::SubmitBindResource(void *res, const EBindResDescType &res_type, u8 slot, u16 priority)
     {
-        s_bind_resource_list.emplace_back(PipelineResourceInfo{res, res_type, slot, {}, priority});
+        g_pPSOMgr->_bind_resource_list.emplace_back(PipelineResourceInfo{res, res_type, slot, {}, priority});
     }
     void Ailu::GraphicsPipelineStateMgr::SubmitBindResource(void *res, const EBindResDescType &res_type, const String &name, u16 priority)
     {
-        s_bind_resource_list.emplace_back(PipelineResourceInfo{res, res_type, (u8) -1, name, priority});
+        g_pPSOMgr->_bind_resource_list.emplace_back(PipelineResourceInfo{res, res_type, (u8) -1, name, priority});
     }
 
     void GraphicsPipelineStateMgr::UpdateAllPSOObject()
     {
-        while (!s_update_pso.empty())
+        while (!g_pPSOMgr->_update_pso.empty())
         {
-            AddPSO(std::move(s_update_pso.front()));
-            s_update_pso.pop();
+            AddPSO(std::move(g_pPSOMgr->_update_pso.front()));
+            g_pPSOMgr->_update_pso.pop();
         }
     }
+    #pragma endregion
 
     //------------------------------------------------------------------------------GraphicsPipelineStateMgr---------------------------------------------------------------------------------
 }// namespace Ailu

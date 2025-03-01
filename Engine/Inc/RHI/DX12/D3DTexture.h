@@ -56,17 +56,18 @@ namespace Ailu
         friend class DDSParser;
 
     public:
-        D3DTexture2D(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+        D3DTexture2D(const Texture2DInitializer& initializer);
         ~D3DTexture2D();
         void Apply() final;
+        void Release() final;
         void Bind(CommandBuffer *cmd, u16 view_index, u8 slot,u32 sub_res,bool is_target_compute_pipeline) final;
         //for texture2d(s)
-        void CreateView() final;
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         void Name(const String &new_name) final;
         D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _views.at(0)._gpu_handle; };
+        void GenerateMipmap() final;
 
     private:
         D3DResourceStateGuard _state_guard;

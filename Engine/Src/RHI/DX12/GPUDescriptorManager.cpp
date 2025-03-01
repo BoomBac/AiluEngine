@@ -190,7 +190,7 @@ namespace Ailu
 		AL_ASSERT_MSG(num < kMaxDescriptorNumPerPage, "GPUVisibleDescriptorAllocator bad alloc: num to large!");
 		if (!_page_free_space_lut.contains(type))
 		{
-			_page_free_space_lut[type] = HashMap<u16, u16>{};
+			_page_free_space_lut[type] = std::multimap<u16, u16>{};
 		}
 		auto page_it = _page_free_space_lut[type].lower_bound(num);
 		if (page_it == _page_free_space_lut[type].end())
@@ -237,7 +237,7 @@ namespace Ailu
 		total_num = static_cast<u32>(_pages.size()) * kMaxDescriptorNumPerPage;
 	}
 
-	HashMap<u16, u16>::iterator GPUVisibleDescriptorAllocator::AddNewPage(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num)
+	std::multimap<u16, u16>::iterator GPUVisibleDescriptorAllocator::AddNewPage(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num)
 	{
         LOG_WARNING("GPUVisibleDescriptorAllocator add new page to {}",_pages.size());
 		GPUVisibleDescriptorPage new_page(static_cast<u16>(_pages.size()), type, num);

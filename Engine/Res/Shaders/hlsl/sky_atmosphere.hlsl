@@ -5,7 +5,7 @@
 //pixel: PSMain
 //Cull: Front
 //Queue: Opaque
-//Stencil: {Ref:127,Comp:NotEqual,Pass:Keep}
+//Stencil: {Ref:0,Comp:Equal,Pass:Keep}
 //pass end::
 //Properties
 //{
@@ -50,7 +50,7 @@ float3 sunWithBloom(float3 rayDir, float3 sunDir)
     float offset = minSunCosTheta - cosTheta;
     float gaussianBloom = exp(-offset*50000.0)*0.5;
     float invBloom = 1.0/(0.02 + offset*300.0)*0.01;
-    return (gaussianBloom+invBloom).xxx * 4;
+    return (gaussianBloom+invBloom).xxx * (smoothstep(0,20,_MainlightColor)+0.2.xxx)*4;
 }
 
 const static int numScatteringSteps = 16;
@@ -100,6 +100,7 @@ PSInput VSMain(VSInput v)
 	PSInput result;
 	result.position = TransformToClipSpace(v.position);
 	result.position.z = result.position.w;
+    result.position.z = kZFar;
 	//result.wnormal = normalize(mul(_MatrixWorld, float4(v.normal, 0.0f)).xyz);
 	result.wnormal = v.position;
 	return result;
@@ -120,6 +121,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     float3 rayDir =  normalize(input.wnormal);//normalize(camDir + camRight*xy.x*camWidthScale + camUp*xy.y*camHeightScale);
     
     float3 lum = getValFromSkyLUT(rayDir, sunDir);
+    //return lum.rgbb;
 
     // Bloom should be added at the end, but this is subtle and works well.
     float3 sunLum = sunWithBloom(rayDir, sunDir);

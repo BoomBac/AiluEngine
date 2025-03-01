@@ -18,11 +18,10 @@
 #include <d3d11.h>
 
 
-
 #ifdef _PIX_DEBUG
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
-#include "Ext/renderdoc_app.h" //1.35
-#endif// _PIX_DEBUG
+#include "Ext/renderdoc_app.h"//1.35
+#endif                        // _PIX_DEBUG
 
 
 namespace Ailu
@@ -89,7 +88,7 @@ namespace Ailu
         }
         *ppAdapter = pAdapter4;
     }
-    
+
     static RENDERDOC_API_1_1_2 *g_rdc_api = nullptr;
     static void RdcLoadLatestRdcGpuCapturerLibrary()
     {
@@ -366,8 +365,9 @@ namespace Ailu
         {
             ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
             m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
-            _color_buffer[n]->SetName(std::format(L"BackBuffer_{}",n).c_str());
+            _color_buffer[n]->SetName(std::format(L"BackBuffer_{}", n).c_str());
             ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
+            _fence_value[n] = 0;
         }
 #ifdef _DIRECT_WRITE
         InitDirectWriteContext();
@@ -515,7 +515,7 @@ namespace Ailu
             // Flush to submit the 11 command list to the shared command queue.
             m_d3d11DeviceContext->Flush();
         }
-#endif//  _DIRECT_WRITE
+#endif//  _DIRECT_WRITE \
         // Present the frame.
         ThrowIfFailed(m_swapChain->Present(1, 0));
         {
@@ -547,7 +547,7 @@ namespace Ailu
             }
             if (u32 release_size = GpuResourceManager::Get()->ReleaseSpace(); release_size > 0)
             {
-                LOG_INFO("D3DContext::Present: Resource cleanup, {} byte released.",release_size);
+                LOG_INFO("D3DContext::Present: Resource cleanup, {} byte released.", release_size);
             }
             if (RenderTexture::TotalGPUMemerySize() > kMaxRenderTextureMemorySize)
             {
@@ -771,7 +771,7 @@ namespace Ailu
         for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
         {
             ThrowIfFailed(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&_color_buffer[n])));
-            _color_buffer[n]->SetName(std::format(L"BackBuffer_{}",n).c_str());
+            _color_buffer[n]->SetName(std::format(L"BackBuffer_{}", n).c_str());
             m_device->CreateRenderTargetView(_color_buffer[n].Get(), nullptr, _rtv_allocation.At(n));
         }
 #endif//_DIRECT_WRITE

@@ -38,6 +38,7 @@ namespace Ailu
         }
         String _name_id;
         bool _is_copy = true;
+        bool _is_reimport = false;
         ImportSetting() = default;
         ImportSetting(String name_id, bool is_copy = true)
         {
@@ -61,6 +62,7 @@ namespace Ailu
         }
         bool _is_srgb = false;
         bool _generate_mipmap = true;
+        bool _is_readble = true;
     };
     struct AILU_API MeshImportSetting : public ImportSetting
     {
@@ -103,12 +105,29 @@ namespace Ailu
         virtual void GetMeshes(List<Ref<Mesh>> &out_mesh) = 0;
     };
 
+    struct TextureLoadData
+    {
+        u16 _width;
+        u16 _height;
+        Vector<u8*> _data;
+        ETextureFormat::ETextureFormat _format;
+        ~TextureLoadData()
+        {
+            for (auto &d : _data)
+            {
+                delete[] d;
+            }
+        }
+    };
     class ITextureParser
     {
     public:
         virtual ~ITextureParser() = default;
-        virtual Ref<CubeMap> Parser(Vector<String> &paths) = 0;
-        virtual Ref<Texture2D> Parser(const WString &sys_path) = 0;
+        virtual Ref<CubeMap> Parser(Vector<String> &paths,const TextureImportSetting& import_settings) = 0;
+        virtual Ref<Texture2D> Parser(const WString &sys_path,const TextureImportSetting& import_settings) = 0;
+        virtual bool Parser(const WString &sys_path,Ref<Texture2D>& texture,const TextureImportSetting& import_settings) = 0;
+    protected:
+        virtual bool LoadTextureData(const WString &sys_path,TextureLoadData& data) = 0;
     };
 }// namespace Ailu
 

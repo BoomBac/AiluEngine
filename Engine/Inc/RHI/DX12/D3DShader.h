@@ -19,7 +19,10 @@ namespace Ailu
         static EShaderDateType GetShaderDataType(const char *semantic, u8 mask)
         {
             String set_str(semantic);
-            if (su::Equal(set_str, RenderConstants::kSemanticPosition) || su::Equal(set_str, RenderConstants::kSemanticNormal) || su::Equal(set_str, RenderConstants::kSemanticTangent) || su::Equal(set_str, RenderConstants::kSemanticColor) || su::Equal(set_str, RenderConstants::kSemanticTexcoord) || su::Equal(set_str, RenderConstants::kSemanticBoneWeight))
+            if (su::Equal(set_str, RenderConstants::kSemanticPosition) || su::Equal(set_str, RenderConstants::kSemanticNormal) || 
+            su::Equal(set_str, RenderConstants::kSemanticTangent) || su::Equal(set_str, RenderConstants::kSemanticColor) || 
+            su::Equal(set_str, RenderConstants::kSemanticTexcoord) || su::Equal(set_str, RenderConstants::kSemanticBoneWeight) || 
+            su::BeginWith(set_str, RenderConstants::kSemanticTexcoord))
             {
                 if (mask == 15)//1111b
                     return EShaderDateType::kFloat4;
@@ -342,8 +345,6 @@ namespace Ailu
         void LoadShaderReflection(u16 pass_index, ShaderVariantHash variant_hash, ID3D12ShaderReflection *ref_vs, ID3D12ShaderReflection *ref_ps);
         void LoadAdditionalShaderReflection(const WString &sys_path, u16 pass_index, ShaderVariantHash variant_hash);
         void GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash);
-        Vector<D3D_SHADER_MACRO> ConstructVariantMarcos(u16 pass_index, ShaderVariantHash variant_hash);
-
     private:
         Vector<D3DShaderElement> _pass_elements;
         bool _is_first_compile = true;
@@ -351,55 +352,28 @@ namespace Ailu
 
     class D3DComputeShader : public ComputeShader
     {
-        struct PSOSystem
+        struct D3DVariantElement
         {
-            FORCEINLINE std::tuple<ComPtr<ID3D12RootSignature> &, ComPtr<ID3D12PipelineState> &> Front()
-            {
-                return _b_current_is_a ? std::tie(_p_sig_a, _p_pso_a) : std::tie(_p_sig_b, _p_pso_b);
-            }
-
-            inline std::tuple<ComPtr<ID3D12RootSignature> &, ComPtr<ID3D12PipelineState> &> Back()
-            {
-                auto &sig = !_b_current_is_a ? _p_sig_a : _p_sig_b;
-                auto &pso = !_b_current_is_a ? _p_pso_a : _p_pso_b;
-                sig.Reset();
-                pso.Reset();
-                return std::tie(sig, pso);
-            }
-            void Bind(ID3D12GraphicsCommandList *cmd)
-            {
-                auto [sig, pso] = Front();
-                cmd->SetPipelineState(pso.Get());
-                cmd->SetComputeRootSignature(sig.Get());
-            }
-            inline void Swap()
-            {
-                _b_current_is_a = !_b_current_is_a;
-            }
-
-        private:
-            bool _b_current_is_a = true;
-            ComPtr<ID3D12RootSignature> _p_sig_a;
-            ComPtr<ID3D12PipelineState> _p_pso_a;
-            ComPtr<ID3D12RootSignature> _p_sig_b;
-            ComPtr<ID3D12PipelineState> _p_pso_b;
+            Vector<D3D_SHADER_MACRO> _keyword_defines;
+            ComPtr<ID3DBlob> _p_blob = nullptr;
+            ComPtr<ID3D12ShaderReflection> _p_c_reflection = nullptr;
+            ComPtr<ID3D12RootSignature> _p_sig = nullptr;
+            ComPtr<ID3D12PipelineState> _pso = nullptr;
         };
         struct D3DKernelElement
         {
-            ComPtr<ID3DBlob> _p_blob;
-            PSOSystem _pso_sys;
+            HashMap<ShaderVariantHash,D3DVariantElement> _variants;
         };
-
     public:
         D3DComputeShader(const WString &sys_path);
         //void Dispatch(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
         void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
-        u16 NameToSlot(const String& name,u16 kernel) const final;
+        u16 NameToSlot(const String& name,u16 kernel,ShaderVariantHash variant_hash) const final;
     private:
-        bool RHICompileImpl(u16 kernel_index) final;
-        void GenerateInternalPSO(u16 kernel_index);
-        void LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index);
-        void LoadAdditionalShaderReflection(const WString &sys_path, u16 kernel_index, ShaderVariantHash variant_hash = 0);
+        bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash) final;
+        void GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash);
+        void LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index,ShaderVariantHash variant_hash);
+        void LoadAdditionalShaderReflection(const WString &sys_path, u16 kernel_index, ShaderVariantHash variant_hash);
 
     private:
         Vector<D3DKernelElement> _elements;

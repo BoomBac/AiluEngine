@@ -16,32 +16,10 @@ struct PSInput
 	float3 world_pos : TEXCOORD1;
 };
 
-// Values used to linearize the Z buffer (http://www.humus.name/temp/Linearize%20depth.txt)
-// x = 1-far/near
-// y = far/near
-// z = x/far
-// w = y/far
-// or in case of a reversed depth buffer (UNITY_REVERSED_Z is 1)
-// x = -1+far/near
-// y = 1
-// z = x/far
-// w = 1/far
-//float4 _ZBufferParams;
-
-// PerMaterialCBufferBegin
-// 	uint 	shadow_index;
-// 	float3 _point_light_wpos;
-// 	float   padding;
-// 	float4 _shadow_params;
-// PerMaterialCBufferEnd
-
-//TEXTURE2D(_AlbedoTex);
-
-
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	result.world_pos = TransformToWorldSpace(v.position).xyz;
+	result.world_pos = TransformObjectToWorld(v.position).xyz;
 	result.position = TransformToClipSpace(v.position);
 	result.uv = v.uv;
 	return result;
@@ -57,6 +35,9 @@ float PSMain(PSInput input) : SV_Depth
 #ifdef CAST_POINT_SHADOW
 	float dis = distance(input.world_pos,_CameraPos.xyz);
 	float linear_z = saturate((dis - _ZBufferParams.x) / (_ZBufferParams.y - _ZBufferParams.x));
+	#if defined(_REVERSED_Z)
+		linear_z = 1 - linear_z;
+	#endif
 	return linear_z;
 #else
 	return input.position.z;

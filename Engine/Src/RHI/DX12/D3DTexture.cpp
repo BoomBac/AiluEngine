@@ -12,6 +12,8 @@ namespace Ailu
     {
         if (dx_format == DXGI_FORMAT_D24_UNORM_S8_UINT)
             return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        else if (dx_format == DXGI_FORMAT_D32_FLOAT_S8X24_UINT)
+            return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
         else if (dx_format == DXGI_FORMAT_D32_FLOAT)
             return DXGI_FORMAT_R32_FLOAT;
         else if (dx_format == DXGI_FORMAT_R16_FLOAT)
@@ -19,15 +21,27 @@ namespace Ailu
         else
             return dx_format;
     }
-
+    static u16 GetTextureSizePower2Info(const std::tuple<u16,u16>& size)
+    {
+        auto [w, h] = size;
+        if (w % 2 == 0 && h % 2 == 0)
+            return 0;
+        else if ( w % 2 != 0 && h % 2 == 0)
+            return 1;
+        else if (w % 2 == 0 && h % 2 != 0)
+            return 2;
+        else
+            return 3;
+    }
+    #pragma region D3DTexture2D
     //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
-    D3DTexture2D::D3DTexture2D(u16 width, u16 height, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access) : Texture2D(width, height, mipmap_chain, format, linear, random_access)
+    D3DTexture2D::D3DTexture2D(const Texture2DInitializer& initializer) : Texture2D(initializer)
     {
     }
 
     D3DTexture2D::~D3DTexture2D()
     {
-        g_pGfxContext->WaitForFence(_state.GetFenceValue());
+        Release();
     }
 
     void D3DTexture2D::Apply()
@@ -47,14 +61,23 @@ namespace Ailu
         textureDesc.SampleDesc.Count = 1;
         textureDesc.SampleDesc.Quality = 0;
         textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        bool is_data_filed = false;
+        for (const auto &fill: _is_data_filled)
+        {
+            if (fill)
+            {
+                is_data_filed = true;
+                break;
+            }
+        }
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        _state_guard = D3DResourceStateGuard(_is_data_filled ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON);
+        _state_guard = D3DResourceStateGuard(is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON);
         //_state_guard = D3DResourceStateGuard(D3D12_RESOURCE_STATE_COPY_DEST);
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _state_guard.CurState(), nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-        if (_is_data_filled)
+        if (is_data_filed)
         {
             ComPtr<ID3D12Resource> pTextureUpload;
-            const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
+            const u32 subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
             const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
             heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
             auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
@@ -101,6 +124,15 @@ namespace Ailu
         _is_ready_for_rendering = true;
     }
 
+    void D3DTexture2D::Release()
+    {
+        Texture2D::Release();
+        if (g_pGfxContext)
+            g_pGfxContext->WaitForFence(_state.GetFenceValue());
+        _p_d3dres.Reset();
+        _views.clear();
+    }
+
     void D3DTexture2D::Bind(CommandBuffer *cmd, u16 view_index, u8 slot, u32 sub_res, bool is_target_compute_pipeline)
     {
         Texture::Bind(cmd, view_index, slot, sub_res, is_target_compute_pipeline);
@@ -130,6 +162,11 @@ namespace Ailu
 
     void D3DTexture2D::CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
     {
+        if (!_p_d3dres)
+        {
+            LOG_ERROR("Can't create view before it been applied![Texture2d: {}]", _name);
+            return;
+        }
         if (view_type == kDSV || view_type == kRTV)
         {
             g_pLogMgr->LogWarningFormat("Try to create dsv/rtv on a raw texture2d,call is on render texture instead!");
@@ -192,15 +229,66 @@ namespace Ailu
         if (_p_d3dres)
             _p_d3dres->SetName(ToWStr(new_name).c_str());
     }
-    void D3DTexture2D::CreateView()
-    {
-        for (u16 j = 0; j < _mipmap_count; j++)
-        {
-            CreateView(ETextureViewType::kSRV, j);
-        }
-    }
-    //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
 
+    void D3DTexture2D::GenerateMipmap()
+    {
+        auto mipmap_gen = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
+        auto kernel = mipmap_gen->FindKernel("MipmapGen2D");
+        auto cmd = CommandBufferPool::Get("MipmapGen2D");
+        auto d3dcmd = dynamic_cast<D3DCommandBuffer*>(cmd.get())->GetCmdList();
+
+        mipmap_gen->SetInt("SrcMipLevel", 0);
+        mipmap_gen->SetInt("NumMipLevels", 4);
+        mipmap_gen->SetBool("IsSRGB", false);
+        auto [mip1w, mip1h] = CalculateMipSize(_width, _height, 1);
+        mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 0)));
+        mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip1w, 1.0f / (float) mip1h, 0.0f, 0.0f));
+        mipmap_gen->SetTexture("SrcMip", this,  ECubemapFace::kUnknown, 0);
+        mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 1);
+        mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 2);
+        mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 3);
+        mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 4);
+        //static_cast<D3DComputeShader*>(_p_mipmapgen_cs0.get())->Bind(cmd, 32, 32, 1);
+        //保证线程数和第一级输出的mipmap像素数一一对应
+        cmd->Dispatch(mipmap_gen.get(), kernel, mip1w / 8, mip1h / 8, 1);
+        if (_mipmap_count > 5)
+        {
+            auto [mip5w, mip5h] = CalculateMipSize(_width, _height, 5);
+            mipmap_gen->SetInt("SrcMipLevel", 4);
+            mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 5, 4));
+            mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 4)));
+            mipmap_gen->SetBool("IsSRGB", false);
+            mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip5w, 1.0f / (float) mip5h, 0.0f, 0.0f));
+            mipmap_gen->SetTexture("SrcMip", this,  ECubemapFace::kUnknown, 4);
+            mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 5);
+            mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 6);
+            mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 7);
+            mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 8);
+            cmd->Dispatch(mipmap_gen.get(), kernel, std::max(mip5w / 8,1), std::max(mip5h / 8,1), 1);
+        }
+        if (_mipmap_count > 9)
+        {
+            auto [mip9w, mip9h] = CalculateMipSize(_width, _height, 9);
+            mipmap_gen->SetInt("SrcMipLevel", 8);
+            mipmap_gen->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 9, 4));
+            mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 8)));
+            mipmap_gen->SetBool("IsSRGB", false);
+            mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip9w, 1.0f / (float) mip9h, 0.0f, 0.0f));
+            mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 8);
+            mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 9);
+            mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 10);
+            mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 11);
+            mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 12);
+            cmd->Dispatch(mipmap_gen.get(), kernel, std::max(mip9w / 8,1), std::max(mip9h / 8,1) ,1);
+        }
+        _state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        g_pGfxContext->ExecuteCommandBuffer(cmd);
+        CommandBufferPool::Release(cmd);
+    }
+    #pragma endregion
+    //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
+    
+    #pragma region D3DCubeMap
     //----------------------------------------------------------------------------D3DCubeMap----------------------------------------------------------------------------
     D3DCubeMap::D3DCubeMap(u16 width, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
         : CubeMap(width, mipmap_chain, format, linear, random_access)
@@ -234,7 +322,7 @@ namespace Ailu
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _state_guard.CurState(),
                                                         nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
 
-        const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
+        const u32 subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
         const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
         heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
         auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
@@ -292,6 +380,11 @@ namespace Ailu
 
     void D3DCubeMap::CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
     {
+        if (!_p_d3dres)
+        {
+            LOG_ERROR("Can't create view before it been applied![Cubemap: {}]", _name);
+            return;
+        }
         if (view_type == kDSV || view_type == kRTV)
         {
             g_pLogMgr->LogWarningFormat("Try to create dsv/rtv on a raw cubemap,call is on render texture instead!");
@@ -379,8 +472,10 @@ namespace Ailu
             }
         }
     }
+    #pragma endregion
     //----------------------------------------------------------------------------D3DCubeMap-----------------------------------------------------------------------------
 
+    #pragma region D3DTexture3D
     //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
     D3DTexture3D::D3DTexture3D(const Texture3DInitializer &initializer) : Texture3D(initializer)
     {
@@ -412,37 +507,106 @@ namespace Ailu
         textureDesc.SampleDesc.Count = 1;
         textureDesc.SampleDesc.Quality = 0;
         textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+        bool is_data_filed = false;
+        if (_is_data_filled[0])
+        {
+            for (u16 i = 1; i < _mipmap_count; i++)
+            {
+                if (!_is_data_filled[i])
+                {
+                    // auto [x, y, z] = Texture::CalculateMipSize(_width, _height, _depth, i);
+                    // u32 size = x * y * z * _pixel_size;
+                    // _pixel_data[i] = new u8[size];
+                    // memset(_pixel_data[i], 0, size);
+                    is_data_filed = true;
+                    _is_data_filled[i] = true;
+                }
+            }
+        }
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        _state_guard = D3DResourceStateGuard(_is_data_filled ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON);
+        _state_guard = D3DResourceStateGuard(is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON);
         //_state_guard = D3DResourceStateGuard(D3D12_RESOURCE_STATE_COPY_DEST);
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _state_guard.CurState(), nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-        if (_is_data_filled)
+        if (is_data_filed)
         {
-            ComPtr<ID3D12Resource> pTextureUpload;
-            const UINT subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
-            const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
-            heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
-            auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
-            ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                            nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
-            //void* mapped_data;
-            //ThrowIfFailed(pTextureUpload->Map(0, nullptr, &mapped_data));
-            //memcpy(mapped_data, _pixel_data[0], uploadBufferSize);
-            Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
-            for (size_t i = 0; i < _mipmap_count; i++)
+            // 2. 创建上传缓冲区
+            UINT64 uploadBufferSize;
+            p_device->GetCopyableFootprints(&textureDesc, 0, _mipmap_count, 0, nullptr, nullptr, nullptr, &uploadBufferSize);
+
+            ComPtr<ID3D12Resource> uploadBuffer;
+            heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+            CD3DX12_RESOURCE_DESC uploadBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+
+            if (FAILED(p_device->CreateCommittedResource(
+                        &heap_prop,
+                        D3D12_HEAP_FLAG_NONE,
+                        &uploadBufferDesc,
+                        D3D12_RESOURCE_STATE_GENERIC_READ,
+                        nullptr,
+                        IID_PPV_ARGS(&uploadBuffer))))
             {
-                u16 cur_mip_width = _width >> i;
-                u16 cur_mip_height = _height >> i;
-                u16 cur_mip_depth = _depth >> i;
-                D3D12_SUBRESOURCE_DATA subdata;
-                subdata.pData = _pixel_data[i];
-                subdata.RowPitch = _pixel_size * cur_mip_width * cur_mip_height;
-                subdata.SlicePitch = subdata.RowPitch * cur_mip_depth;
-                subres_datas.emplace_back(subdata);
+                throw std::runtime_error("Failed to create upload buffer");
             }
-            UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
+            // 3. 填充上传缓冲区并复制每个 Mipmap 级别
+            UINT8 *mappedData;
+            D3D12_RANGE readRange = {};// 不需要读取回数据
+            uploadBuffer->Map(0, &readRange, reinterpret_cast<void **>(&mappedData));
+
+            u8 *dst = mappedData;// 上传缓冲区的写入指针
+            u32 currentWidth = _width;
+            u32 currentHeight = _height;
+            u32 currentDepth = _depth;
+            u32 offset = 0u;
+            for (u32 mip = 0; mip < _mipmap_count; ++mip)
+            {
+                // 计算当前 Mipmap 的尺寸
+                u64 row_pitch = currentWidth * _pixel_size;
+                u64 slice_pitch = row_pitch * currentHeight;
+                u32 aligned_row_pitch = ALIGN_TO_256(row_pitch);// 行对齐到 256 字节
+                u32 aligned_slice_pitch = aligned_row_pitch * currentHeight;
+                //Color32 color[16];
+                u32 index = 0;
+                // 填充上传缓冲区
+                for (u32 z = 0; z < currentDepth; ++z)
+                {
+                    for (u32 y = 0; y < currentHeight; ++y)
+                    {
+                        u32 cur_offset = z * aligned_slice_pitch + y * aligned_row_pitch;
+                        memcpy(dst + cur_offset,
+                               _pixel_data[mip] + z * slice_pitch + y * row_pitch,
+                               row_pitch);
+                    }
+                }
+                // 更新 D3D12_PLACED_SUBRESOURCE_FOOTPRINT
+                D3D12_TEXTURE_COPY_LOCATION destLocation = {};
+                destLocation.pResource = _p_d3dres.Get();
+                destLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                destLocation.SubresourceIndex = mip;
+
+                D3D12_TEXTURE_COPY_LOCATION srcLocation = {};
+                srcLocation.pResource = uploadBuffer.Get();
+                srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+
+                D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
+                footprint.Footprint.Width = currentWidth;
+                footprint.Footprint.Height = currentHeight;
+                footprint.Footprint.Depth = currentDepth;
+                footprint.Footprint.RowPitch = aligned_row_pitch;
+                footprint.Footprint.Format = textureDesc.Format;
+                srcLocation.PlacedFootprint = footprint;
+
+                p_cmdlist->CopyTextureRegion(&destLocation, 0, 0, 0, &srcLocation, nullptr);
+                dst += aligned_slice_pitch * currentDepth;// 移动到上传缓冲区的下一部分
+
+                // 缩小尺寸以计算下一 Mipmap 级别
+                currentWidth = std::max(1u, currentWidth / 2);
+                currentHeight = std::max(1u, currentHeight / 2);
+                currentDepth = std::max(1u, currentDepth / 2);
+            }
+            uploadBuffer->Unmap(0, nullptr);
             _state_guard.MakesureResourceState(p_cmdlist, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-            D3DContext::Get()->TrackResource(pTextureUpload);
+            D3DContext::Get()->TrackResource(uploadBuffer);
         }
         D3DContext::Get()->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
@@ -496,6 +660,11 @@ namespace Ailu
     }
     void D3DTexture3D::CreateView(Texture::ETextureViewType view_type, u16 mipmap, u16 dpeth_slice)
     {
+        if (!_p_d3dres)
+        {
+            LOG_ERROR("Can't create view before it been applied![Texture3d: {}]", _name);
+            return;
+        }
         dpeth_slice = dpeth_slice == UINT16_MAX ? _depth : dpeth_slice;
         Texture::CreateView(view_type, mipmap, dpeth_slice);
         if (view_type == kDSV || view_type == kRTV)
@@ -554,7 +723,6 @@ namespace Ailu
     {
         auto cmd0 = CommandBufferPool::Get("MipmapGen0");
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(cmd0.get())->GetCmdList();
-        //_state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         u16 kernel = _p_mipmapgen_cs0->FindKernel("MipmapGen3D");
         u16 thread_num_x, thread_num_y, thread_num_z;
         _p_mipmapgen_cs0->GetThreadNum(kernel, thread_num_x, thread_num_y, thread_num_z);
@@ -573,13 +741,12 @@ namespace Ailu
         //保证线程数和第一级输出的mipmap像素数一一对应
         cmd0->Dispatch(_p_mipmapgen_cs0.get(), kernel, mip1w / thread_num_x, mip1h / thread_num_y, mip1d / thread_num_z);
         _state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
-        //g_pGfxContext->ExecuteAndWaitCommandBuffer(cmd0);
         if (_mipmap_count > 4)
         {
             //auto cmd1 = CommandBufferPool::Get("MipmapGen1");
             auto [mip5w, mip5h, mip5d] = CalculateMipSize(_width, _height, _depth, 5);
             _p_mipmapgen_cs1->SetInt("SrcMipLevel", 4);
-            _p_mipmapgen_cs1->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 4, 4));
+            _p_mipmapgen_cs1->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 5, 4));
             _p_mipmapgen_cs1->SetInt("SrcDimension", 0);
             _p_mipmapgen_cs1->SetBool("IsSRGB", false);
             _p_mipmapgen_cs1->SetVector("TexelSize", Vector4f(1.0f / (float) mip5w, 1.0f / (float) mip5h, 1.0f / (f32) mip5d, 0.0f));
@@ -587,8 +754,7 @@ namespace Ailu
             _p_mipmapgen_cs1->SetTexture("_OutMip1", this, 5);
             _p_mipmapgen_cs1->SetTexture("_OutMip2", this, 6);
             _p_mipmapgen_cs1->SetTexture("_OutMip3", this, 7);
-            if (_mipmap_count > 6)
-                _p_mipmapgen_cs1->SetTexture("_OutMip4", this, 8);
+            _p_mipmapgen_cs1->SetTexture("_OutMip4", this, 8);
             cmd0->Dispatch(_p_mipmapgen_cs1.get(), kernel, mip5w / thread_num_x, mip5h / thread_num_y, mip5d / thread_num_z);
             //_state_guard.MakesureResourceState(dynamic_cast<D3DCommandBuffer *>(cmd0.get())->GetCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 4);
             _state_guard.MakesureResourceState(d3dcmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 4);
@@ -612,7 +778,9 @@ namespace Ailu
             return 0;
     }
     //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
+    #pragma endregion
 
+    #pragma region D3DRenderTexture
     //--------------------------------------------------------------------------D3DRenderTexture---------------------------------------------------------------------------
     static D3D12_RESOURCE_STATES ConvertToD3DResourceState(ETextureResState state)
     {
@@ -673,7 +841,7 @@ namespace Ailu
         D3D12_CLEAR_VALUE clear_value{};
         clear_value.Format = _tex_desc.Format;
         if (is_for_depth)
-            clear_value.DepthStencil = {1.0f, 0};
+            clear_value.DepthStencil = {kZFar, 0};
         else
             memcpy(clear_value.Color, kClearColor, sizeof(kClearColor));
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
@@ -806,6 +974,11 @@ namespace Ailu
 
     void D3DRenderTexture::CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
     {
+        if (!_p_d3dres)
+        {
+            LOG_ERROR("Can't create view before it been applied![RenderTexture: {}]", _name);
+            return;
+        }
         if (_dimension == ETextureDimension::kCube || _dimension == ETextureDimension::kCubeArray)
             return;
         u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
@@ -1052,7 +1225,7 @@ namespace Ailu
             tcmd->Clear();
             auto [mip5w, mip5h] = CalculateMipSize(_width, _height, 5);
             _p_mipmapgen_cs1->SetInt("SrcMipLevel", 4);
-            _p_mipmapgen_cs1->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 4, 4));
+            _p_mipmapgen_cs1->SetInt("NumMipLevels", std::min<u16>(_mipmap_count - 5, 4));
             _p_mipmapgen_cs1->SetInt("SrcDimension", 0);
             _p_mipmapgen_cs1->SetBool("IsSRGB", false);
             _p_mipmapgen_cs1->SetVector("TexelSize", Vector4f(1.0f / (float) mip5w, 1.0f / (float) mip5h, 0.0f, 0.0f));
@@ -1081,7 +1254,7 @@ namespace Ailu
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT bufferFootprint = {};
         u32 row_count;
         u64 aligned_row_pitch, aligned_buffer_size;//pitch size must 256 align
-        UINT subres_index = 0;
+        u32 subres_index = 0;
         if (_dimension == ETextureDimension::kTex2D)
             subres_index = mipmap;
         else if (_dimension == ETextureDimension::kCube)
@@ -1103,7 +1276,7 @@ namespace Ailu
         auto cmd = CommandBufferPool::Get("Readback", ECommandBufferType::kCommandBufTypeCopy);
         auto d3d_cmd = static_cast<D3DCommandBuffer *>(cmd.get())->GetCmdList();
         _state_guard.MakesureResourceState(d3d_cmd, _p_d3dres.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE);
-        // bufferFootprint.Footprint.RowPitch = static_cast<UINT>(_pixel_size * w);
+        // bufferFootprint.Footprint.RowPitch = static_cast<u32>(_pixel_size * w);
         // bufferFootprint.Footprint.Format = ConvertToDXGIFormat(_pixel_format);
         const CD3DX12_TEXTURE_COPY_LOCATION copyDest(readback_buf.Get(), bufferFootprint);
         AL_ASSERT(mipmap <= _mipmap_count);
@@ -1136,7 +1309,7 @@ namespace Ailu
     void D3DRenderTexture::ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice, ECubemapFace::ECubemapFace face)
     {
         // 使用引用捕获，处理异常并确保回调有效
-        std::async(std::launch::async, [&, callback]()
+        auto ret = std::async(std::launch::async, [&, callback]()
                    {
         try {
             void* result = ReadBack(mipmap, array_slice, face);
@@ -1260,5 +1433,6 @@ namespace Ailu
         RenderTexture::ResetRenderTarget(this);
         return &_views[index]._cpu_handle;
     }
+    #pragma endregion
     //----------------------------------------------------------D3DRenderTexture----------------------------------------------------------------------
 }// namespace Ailu

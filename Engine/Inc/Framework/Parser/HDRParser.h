@@ -8,8 +8,11 @@ namespace Ailu
 	class HDRParser : public ITextureParser
 	{
 	public:
-		Ref<CubeMap> Parser(Vector<String>& paths) final;
-		Ref<Texture2D> Parser(const WString& sys_path) final;
+		Ref<CubeMap> Parser(Vector<String>& paths,const TextureImportSetting& import_settings) final;
+		Ref<Texture2D> Parser(const WString& sys_path,const TextureImportSetting& import_settings) final;
+		bool Parser(const WString &sys_path,Ref<Texture2D>& texture,const TextureImportSetting& import_settings) final;
+	protected:
+		bool LoadTextureData(const WString &sys_path,TextureLoadData& data) final;
 	};
 }
 

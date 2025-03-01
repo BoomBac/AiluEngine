@@ -15,11 +15,41 @@ initializer._full_name = "Ailu::Object";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu";
-initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"_name","String", false, false,0,&Object::_name));
-initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"_id","u32", false, false,0,&Object::_id));
-initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"_hash","u64", false, false,0,&Object::_hash));
-initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"_guid","Guid", false, false,0,&Object::_guid));
+initializer._base_name = "";
+Meta meta_name;
+meta_name._category="";
+meta_name._min=(float)0;
+meta_name._max=(float)1;
+meta_name._is_range=false;
+meta_name._is_float_range=true;
+meta_name._is_color=false;
+initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"_name","String", false, false,offsetof(Object,_name),&Object::_name,meta_name,false));
+Meta meta_id;
+meta_id._category="";
+meta_id._min=(float)0;
+meta_id._max=(float)1;
+meta_id._is_range=false;
+meta_id._is_float_range=true;
+meta_id._is_color=false;
+initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"_id","u32", false, false,offsetof(Object,_id),&Object::_id,meta_id,false));
+Meta meta_hash;
+meta_hash._category="";
+meta_hash._min=(float)0;
+meta_hash._max=(float)1;
+meta_hash._is_range=false;
+meta_hash._is_float_range=true;
+meta_hash._is_color=false;
+initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"_hash","u64", false, false,offsetof(Object,_hash),&Object::_hash,meta_hash,false));
+Meta meta_guid;
+meta_guid._category="";
+meta_guid._min=(float)0;
+meta_guid._max=(float)1;
+meta_guid._is_range=false;
+meta_guid._is_float_range=true;
+meta_guid._is_color=false;
+initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"_guid","Guid", false, false,offsetof(Object,_guid),&Object::_guid,meta_guid,false));
 cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
@@ -30,3 +60,7 @@ Ailu::Type* Object::GetPrivateStaticClass()
 	return type;
 }
 
+    const Type *Object::GetType() const
+{
+return Object::GetPrivateStaticClass();
+}

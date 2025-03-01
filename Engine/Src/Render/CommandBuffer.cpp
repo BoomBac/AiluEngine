@@ -69,7 +69,8 @@ namespace Ailu
             auto cmd = std::make_shared<D3DCommandBuffer>(newId, type);
             s_pCommandBufferPool->_cmd_buffers.emplace_back(false, cmd);
             ++s_pCommandBufferPool->_cur_pool_size;
-            LOG_WARNING("Expand commandbuffer pool to {} with name {} at frame {}", s_pCommandBufferPool->_cur_pool_size, name, Application::s_frame_count);
+            if (s_pCommandBufferPool->_cur_pool_size > 100)
+                LOG_WARNING("Expand commandbuffer pool to {} with name {} at frame {}", s_pCommandBufferPool->_cur_pool_size, name, Application::s_frame_count);
             cmd->SetName(name);
             cmd->Clear();
             return cmd;

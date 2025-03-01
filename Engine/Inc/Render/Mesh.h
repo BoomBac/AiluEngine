@@ -97,6 +97,7 @@ namespace Ailu
         Skeleton _skeleton;
         Vector4f *_bone_weights;
         Vector4D<u32> *_bone_indices;
+        Vector3f * _previous_vertices;
     };
 }// namespace Ailu
 

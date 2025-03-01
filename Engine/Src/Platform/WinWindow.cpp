@@ -191,6 +191,7 @@ namespace Ailu
         SetWindowLongPtr(_hwnd, GWL_STYLE, style);
         ShowWindow(_hwnd, SW_SHOW);
         UpdateWindow(_hwnd);
+        SetWindowTextA(_hwnd,"Ailu Engine");
         HANDLE hTitleIcon = LoadImage(0, ResourceMgr::GetResSysPath(L"Icons/app_title_icon.ico").c_str(), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         HANDLE hIcon = LoadImage(0, ResourceMgr::GetResSysPath(L"Icons/app_icon.ico").c_str(), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         if (hTitleIcon && hIcon)
@@ -371,7 +372,6 @@ namespace Ailu
                     u32 w = static_cast<u32>(lParam & 0XFFFF), h = static_cast<u32>(lParam >> 16);
                     _data.Width = w;
                     _data.Height = h;
-                    SetWindowText(_hwnd, std::format(L"{} {}x{}", _data.Title, _data.Width, _data.Height).c_str());
                     WindowResizeEvent e(w, h);
                     _data.Handler(e);
                 }

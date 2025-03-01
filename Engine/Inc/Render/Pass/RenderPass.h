@@ -6,6 +6,7 @@
 #include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/RenderingData.h"
+#include "generated/RenderPass.gen.h"
 
 namespace Ailu
 {
@@ -23,16 +24,16 @@ namespace Ailu
         virtual const bool IsActive() const = 0;
         virtual const void SetActive(bool is_active) = 0;
     };
-
+    ACLASS()
     class AILU_API RenderPass : public IRenderPass, public Object
     {
+        GENERATED_BODY();
         DISALLOW_COPY_AND_ASSIGN(RenderPass)
     public:
-        RenderPass() : Object(), _is_active(true) {};
         RenderPass(const String &name) : Object(name), _is_active(true) {};
         virtual void Execute(GraphicsContext *context, RenderingData &rendering_data) override {};
         virtual void BeginPass(GraphicsContext *context) override {};
-        virtual void EndPass(GraphicsContext *context) override {};
+        virtual void EndPass(GraphicsContext *context);
         virtual const String &GetName() const final { return _name; };
         virtual const bool IsActive() const final { return _is_active; };
         virtual const void SetActive(bool is_active) final { _is_active = is_active; };
@@ -53,6 +54,7 @@ namespace Ailu
         virtual void AddRenderPasses(Renderer &renderer, RenderingData &rendering_data) {};
         bool IsActive() const { return _is_active; };
         void SetActive(bool is_active) { _is_active = is_active; };
+
     protected:
         bool _is_active;
     };
@@ -101,6 +103,7 @@ namespace Ailu
     private:
         Material *_p_blit_mat;
         IConstantBuffer *_p_obj_cb;
+        RTHandle _depth_tex_handle;
     };
 
     class ShadowCastPass : public RenderPass
@@ -157,7 +160,7 @@ namespace Ailu
         void EndPass(GraphicsContext *context) final;
 
     private:
-        Array<Rect, 5> _rects;
+        Array<Rect, 4> _rects;
     };
 
     class DeferredLightingPass : public RenderPass
@@ -178,7 +181,7 @@ namespace Ailu
     {
     public:
         SkyboxPass();
-        void Setup(bool clear_first) {_is_clear = clear_first;}
+        void Setup(bool clear_first) { _is_clear = clear_first; }
         void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
         void BeginPass(GraphicsContext *context) final;
         void EndPass(GraphicsContext *context) final;
@@ -215,6 +218,7 @@ namespace Ailu
         void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
         void BeginPass(GraphicsContext *context) final;
         void EndPass(GraphicsContext *context) final;
+
     private:
         Ref<Shader> _wireframe_shader;
         Ref<Material> _wireframe_mat;
@@ -230,12 +234,25 @@ namespace Ailu
         void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
         void BeginPass(GraphicsContext *context) final;
         void EndPass(GraphicsContext *context) final;
+
     private:
         Ref<Shader> _ui_default_shader;
         Ref<IVertexBuffer> _vbuf;
         Ref<IIndexBuffer> _ibuf;
         Ref<Material> _ui_default_mat;
         Ref<IConstantBuffer> _obj_cb;
+    };
+
+    class MotionVectorPass : public RenderPass
+    {
+    public:
+        MotionVectorPass();
+        ~MotionVectorPass();
+        void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
+        void BeginPass(GraphicsContext *context) final;
+        void EndPass(GraphicsContext *context) final;
+    private:
+        Ref<Material> _motion_vector_mat;
     };
 }// namespace Ailu
 

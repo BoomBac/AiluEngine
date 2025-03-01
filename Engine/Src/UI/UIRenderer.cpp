@@ -85,10 +85,10 @@ namespace Ailu
         {
             f32 w = (f32) color->Width();
             f32 h = (f32) color->Height();
-            cmd->ClearRenderTarget(color,depth,Colors::kBlack,1.0f);
+            cmd->ClearRenderTarget(color,depth,Colors::kBlack,kZFar);
             CBufferPerCameraData cb_per_cam;
             cb_per_cam._MatrixVP = Camera::GetDefaultOrthogonalViewProj(w, h);
-            cb_per_cam._ScreenParams = Vector4f(w, h, 1 / w, 1 / h);
+            cb_per_cam._ScreenParams = Vector4f( 1.0f / w, 1.0f / h,w, h);
             CBufferPerObjectData per_obj_data;
             per_obj_data._MatrixWorld = MatrixTranslation(-w*0.5f,h*0.5f,0.f);
             memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);

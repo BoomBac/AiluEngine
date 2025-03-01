@@ -8,7 +8,7 @@
 
 DECLARE_ENUM(EALGFormat, kALGFormatUnknown,
     kALGFormatR8G8B8A8_UNORM, kALGFormatR8G8B8A8_UNORM_SRGB,
-    kALGFormatR24G8_TYPELESS, kALGFormatR32_FLOAT, kALGFormatD32_FLOAT, kALGFormatD16_FLOAT,kALGFormatD24S8_UINT,
+    kALGFormatR24G8_TYPELESS, kALGFormatR32_FLOAT, kALGFormatD32_FLOAT, kALGFormatD16_FLOAT,kALGFormatD24S8_UINT,kALGFormatD32_FLOAT_S8X24_UINT,
     kALGFormatR32G32B32A32_FLOAT, kALGFormatR32G32B32_FLOAT, kALGFormatR16G16B16A16_FLOAT, kALGFormatR11G11B10_FLOAT,
     kALGFormatR16G16_FLOAT, kALGFormatR32G32_FLOAT, kALGFormatR32_UINT, kALGFormatR32_SINT)
 
@@ -22,6 +22,7 @@ static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     case EALGFormat::kALGFormatR24G8_TYPELESS: return DXGI_FORMAT_R24G8_TYPELESS;
     case EALGFormat::kALGFormatD24S8_UINT: return DXGI_FORMAT_D24_UNORM_S8_UINT;
+    case EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT: return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
     case EALGFormat::kALGFormatR32_FLOAT: return DXGI_FORMAT_R32_FLOAT;
     case EALGFormat::kALGFormatD32_FLOAT: return DXGI_FORMAT_D32_FLOAT;
     case EALGFormat::kALGFormatD16_FLOAT: return DXGI_FORMAT_R16_FLOAT;
@@ -45,6 +46,7 @@ static i8 GetFormatChannel(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatR8G8B8A8_UNORM: return 4;
     case EALGFormat::kALGFormatR24G8_TYPELESS: return -1;
     case EALGFormat::kALGFormatD24S8_UINT: return -1;
+    case EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT: return -1;
     case EALGFormat::kALGFormatR32_FLOAT: return 1;
     case EALGFormat::kALGFormatD32_FLOAT: return 1;
     case EALGFormat::kALGFormatR32G32B32A32_FLOAT: return 4;
@@ -62,6 +64,7 @@ static bool IsShadowMapFormat(const EALGFormat::EALGFormat& format)
     {
     case EALGFormat::kALGFormatR8G8B8A8_UNORM: return false;
     case EALGFormat::kALGFormatD24S8_UINT: return true;
+    case EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT: return true;
     case EALGFormat::kALGFormatR24G8_TYPELESS: return true;
     case EALGFormat::kALGFormatR32_FLOAT: return true;
     case EALGFormat::kALGFormatD32_FLOAT: return true;
@@ -75,7 +78,9 @@ static u16 GetPixelByteSize(const EALGFormat::EALGFormat& format)
     {
     case EALGFormat::kALGFormatUnknown: return 65535;
         break;
-    case EALGFormat::kALGFormatR8G8B8A8_UNORM: return 4;
+    case EALGFormat::kALGFormatR8G8B8A8_UNORM: 
+    case EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB : 
+        return 4;
         break;
     case EALGFormat::kALGFormatR24G8_TYPELESS: return 4;
         break;
@@ -100,7 +105,9 @@ static u16 GetPixelByteSize(const EALGFormat::EALGFormat& format)
     case EALGFormat::kALGFormatR32_SINT: return 4;
         break;
     case EALGFormat::kALGFormatR16G16_FLOAT: return 4;
-    case EALGFormat::kALGFormatR32G32_FLOAT: return 8;
+    case EALGFormat::kALGFormatR32G32_FLOAT:
+    case EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT:
+        return 8;
     default:
         break;
     }

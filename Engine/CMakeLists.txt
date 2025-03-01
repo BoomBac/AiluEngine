@@ -4,8 +4,7 @@ cmake_minimum_required (VERSION 3.5)
 project (AiluEngine)
 message("AiluEngine generator is set to ${CMAKE_GENERATOR}")
 # 设置输出目录的根目录
-set(OUTPUT_ROOT "${PROJECT_SOURCE_DIR}/lib/x64")
-# set (LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib/x64/${CONFIG})
+set(OUTPUT_ROOT "${AiluBuildPath}/out/engine/lib/x64")
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -81,7 +80,7 @@ add_custom_target(pre_build_cmd ALL
         COMMAND ${CMAKE_COMMAND} -E echo "Running pre-build script..."
         COMMAND cmd /c "${PROJECT_SOURCE_DIR}/pre_build_script.bat")
 
-add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE} Src/Render/Pass/SSAOPass.cpp
+add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
 "Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp" "Inc/RHI/DX12/D3DUtils.h"
 "Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp" "Inc/Physics/PhysicsSystem.h" "Src/Physics/PhysicsSystem.cpp" "Src/Render/Gizmo.cpp" "Inc/Physics/Collision.h" "Src/Physics/Collision.cpp" "Inc/Animation/AnimationSystem.h" "Src/Animation/AnimationSystem.cpp"
         Inc/Framework/Common/JobSystem.h
@@ -99,7 +98,7 @@ target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 # 宏定义
-target_compile_definitions(Engine PUBLIC AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX)
+target_compile_definitions(Engine PUBLIC AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX;_REVERSED_Z)
 set_target_properties (Engine PROPERTIES
         OUTPUT_NAME_DEBUG Engine_d
         OUTPUT_NAME_RELEASE Engine
@@ -115,7 +114,7 @@ set_target_properties (Engine PROPERTIES
 target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库
 target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;d2d1.lib;dwrite.lib;d3d11.lib;
-        ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib)
+        ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib) # ;msvcrtd.lib
 
 
 # 添加自定义命令

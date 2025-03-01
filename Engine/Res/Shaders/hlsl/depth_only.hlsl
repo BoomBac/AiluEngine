@@ -75,11 +75,11 @@ LinearZPSInput VSMainLinearZ(VSInput v)
 	LinearZPSInput result;
 	result.position = TransformToLightSpace(shadow_index,v.position);
 	//result.position.xyz /= result.position.w;
-	//float dis = distance(TransformToWorldSpace(v.position).xyz,_point_light_wpos);
+	//float dis = distance(TransformObjectToWorld(v.position).xyz,_point_light_wpos);
 	// result.position.z = (dis - ZBufferNear) / (ZBufferFar - ZBufferNear);
 	// result.position.z = saturate(result.position.z);
 	// result.position.z *= result.position.w;
-	result.world_pos = TransformToWorldSpace(v.position).xyz;
+	result.world_pos = TransformObjectToWorld(v.position).xyz;
 	return result;
 }
 

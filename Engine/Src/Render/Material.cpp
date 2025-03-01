@@ -182,7 +182,9 @@ namespace Ailu
             auto it = res_info.find(name);
             if (it != res_info.end())
             {
-                memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector, sizeof(vector));
+                u16 offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                u16 size = ShaderBindResourceInfo::GetVariableSize(it->second);
+                memcpy(_p_cbufs[pass._index]->GetData() + offset, &vector, size);
             }
             else
             {
@@ -200,13 +202,15 @@ namespace Ailu
             auto it = res_info.find(name);
             if (it != res_info.end())
             {
-                if (it->second._res_type & EBindResDescType::kCBufferUint4)
+                u16 offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                u16 size = ShaderBindResourceInfo::GetVariableSize(it->second);
+                if (it->second._res_type & EBindResDescType::kCBufferUInts)
                 {
                     Vector4UInt vector_uint = {(u32) vector.x, (u32) vector.y, (u32) vector.z, (u32) vector.w};
-                    memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector_uint, sizeof(vector));
+                    memcpy(_p_cbufs[pass._index]->GetData() + offset, &vector_uint, size);
                 }
                 else
-                    memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &vector, sizeof(vector));
+                    memcpy(_p_cbufs[pass._index]->GetData() + offset, &vector, size);
             }
             else
             {
@@ -354,6 +358,7 @@ namespace Ailu
                 for (auto &kw: group_kws)
                 {
                     _pass_variants[pass_index]._keywords.erase(kw);
+                    _all_keywords.erase(kw);
                 }
                 _pass_variants[pass_index]._keywords.insert(keyword);
                 _pass_variants[pass_index]._variant_hash = _p_active_shader->ConstructVariantHash(pass_index, _pass_variants[pass_index]._keywords);
@@ -430,10 +435,21 @@ namespace Ailu
         {
             for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
-                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat4 && ShaderBindResourceInfo::GetVariableSize(bind_info) == 16 && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
+                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloats && (ShaderBindResourceInfo::GetVariableSize(bind_info) == 16 || ShaderBindResourceInfo::GetVariableSize(bind_info) == 12) && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
+                    bool three_dim = ShaderBindResourceInfo::GetVariableSize(bind_info) == 12;
+                    Vector4f buf{};
+                    if (three_dim)
+                    {
+                        auto value = *reinterpret_cast<Vector3f *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                        buf = Vector4f(value.x, value.y, value.z, 1.0f);
+                    }
+                    else
+                    {
+                        buf = *reinterpret_cast<Vector4f *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                    }
                     if (!value_map.contains((name)))
-                        value_map[name] = *reinterpret_cast<Vector4f *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                        value_map[name] = buf;
                 }
             }
             ++pass_index;
@@ -459,7 +475,7 @@ namespace Ailu
                     if (!value_map.contains((name)))
                     {
                         Vector4Int v;
-                        if (bind_info._res_type & EBindResDescType::kCBufferUint4)
+                        if (bind_info._res_type & EBindResDescType::kCBufferUInts)
                         {
                             auto value = *reinterpret_cast<Vector4UInt *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
                             v.x = (i32) value.x;
@@ -468,7 +484,7 @@ namespace Ailu
                             v.w = (i32) value.w;
                             value_map[name] = v;
                         }
-                        else if (bind_info._res_type & EBindResDescType::kCBufferInt4)
+                        else if (bind_info._res_type & EBindResDescType::kCBufferInts)
                         {
                             v = *reinterpret_cast<Vector4Int *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
                             value_map[name] = v;
@@ -494,7 +510,7 @@ namespace Ailu
         {
             for (auto &[name, bind_info]: _p_shader->GetBindResInfo(pass_index, _pass_variants[pass_index]._variant_hash))
             {
-                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUint && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
+                if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUInt && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
                     if (!value_map.contains((name)))
                         value_map[name] = *reinterpret_cast<u32 *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
@@ -632,22 +648,27 @@ namespace Ailu
                     }
                     else
                     {
-                        cur_prop._value_ptr = (void *) (s_unused_shader_prop_buf + unused_shader_prop_buf_offset);
-                        //unused_shader_prop_buf_offset += SerializableProperty::GetValueSize(prop_info._type);
-                        g_pLogMgr->LogWarningFormat("Unused shader prop {} been added;", prop_info._prop_name);
+                        _common_float_property[prop_info._value_name] = prop_info._default_value.z;
+                        cur_prop._value_ptr = (void *) (&_common_float_property[prop_info._value_name]);
                     }
                     //memcpy(prop._param, prop_info._param, sizeof(Vector4f));
                     if (cur_prop._type == EShaderPropertyType::kFloat || cur_prop._type == EShaderPropertyType::kRange)
                     {
                         f32 *value = (f32 *) cur_prop._value_ptr;
                         if (*value == 0.0f)
-                            *value = prop_info._param[0];
+                            *value = prop_info._default_value[0];
                     }
                     else if (cur_prop._type == EShaderPropertyType::kColor || cur_prop._type == EShaderPropertyType::kVector)
                     {
                         auto *value = (Vector4f *) cur_prop._value_ptr;
                         if (*value == Vector4f::kZero)
-                            *value = prop_info._param;
+                            *value = prop_info._default_value;
+                    }
+                    else if (cur_prop._type == EShaderPropertyType::kBool || cur_prop._type == EShaderPropertyType::kEnum)
+                    {
+                        // f32 *value = (f32 *) cur_prop._value_ptr;
+                        // if (*value == 0.0f)
+                        //     *value = prop_info._param.z;
                     }
                     _properties.insert(std::make_pair(prop_info._value_name, cur_prop));
                 }
@@ -883,7 +904,7 @@ namespace Ailu
     {
         Material::Construct(first_time);
         //只有首个pass支持默认着色
-        for (int i = 0; i < _p_shader->PassCount(); i++)
+        for (i16 i = 0; i < _p_shader->PassCount(); i++)
         {
             auto &cur_variant_bind_infos = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
             auto it = cur_variant_bind_infos.find("_SamplerMask");

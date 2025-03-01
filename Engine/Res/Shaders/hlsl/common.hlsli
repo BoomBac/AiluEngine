@@ -3,6 +3,9 @@
 #include "cbuffer.hlsli"
 #include "constants.hlsli"
 
+//directx
+#define UNITY_UV_STARTS_AT_TOP 1
+
 SamplerState g_LinearWrapSampler : register(s0);
 SamplerState g_LinearClampSampler : register(s1);
 SamplerState g_LinearBorderSampler : register(s2);
@@ -12,11 +15,22 @@ SamplerState g_PointBorderSampler : register(s5);
 SamplerComparisonState g_ShadowSampler : register(s6);
 SamplerState g_AnisotropicClampSampler : register(s7);
 
+//convert z to 0(near)->1(far)
+float DeviceDepthToLogic(float d)
+{
+#if defined(_REVERSED_Z)
+	return 1.0 - d;
+#else
+	return d;
+#endif
+}
 
 #define TEXTURE2D(name) Texture2D name;
 #define TEXTURE3D(name) Texture3D name;
 //#define TEXTURE2D(name,slot) Texture2D name : register(t##slot);
 #define TEXTURECUBE(name) TextureCube name;
+#define RWTEXTURE2D(name,type) RWTexture2D<type> name;
+#define RWTEXTURE3D(name,type) RWTexture3D<type> name;
 //#define TEXTURECUBE(name,slot) TextureCube name : register(t##slot);
 
 //Ref:https://github.com/Unity-Technologies/Graphics/blob/master/Packages/com.unity.render-pipelines.core/ShaderLibrary/SpaceTransforms.hlsl
@@ -36,6 +50,8 @@ SamplerState g_AnisotropicClampSampler : register(s7);
 #define SAMPLE_TEXTURECUBE_ARRAY_BIAS(textureName, samplerName, coord3, index, bias)     textureName.SampleBias(samplerName, float4(coord3, index), bias)
 #define SAMPLE_TEXTURE3D(textureName, samplerName, coord3)                               textureName.Sample(samplerName, coord3)
 #define SAMPLE_TEXTURE3D_LOD(textureName, samplerName, coord3, lod)                      textureName.SampleLevel(samplerName, coord3, lod)
+#define SAMPLE_TEXTURE2D_DEPTH(textureName, samplerName, coord2)                         DeviceDepthToLogic(textureName.Sample(samplerName, coord2).x)
+#define SAMPLE_TEXTURE2D_DEPTH_LOD(textureName, samplerName, coord2,lod)                 DeviceDepthToLogic(textureName.SampleLevel(samplerName, coord2,lod).x)
 
 #define LOAD_TEXTURE2D(textureName, unCoord2)                                   textureName.Load(int3(unCoord2, 0))
 #define LOAD_TEXTURE2D_LOD(textureName, unCoord2, lod)                          textureName.Load(int3(unCoord2, lod))
@@ -45,6 +61,10 @@ SamplerState g_AnisotropicClampSampler : register(s7);
 #define LOAD_TEXTURE2D_ARRAY_LOD(textureName, unCoord2, index, lod)             textureName.Load(int4(unCoord2, index, lod))
 #define LOAD_TEXTURE3D(textureName, unCoord3)                                   textureName.Load(int4(unCoord3, 0))
 #define LOAD_TEXTURE3D_LOD(textureName, unCoord3, lod)                          textureName.Load(int4(unCoord3, lod))
+
+
+#define CBUFFER_START(name) cbuffer name : register(b0) {
+#define CBUFFER_END }
 
 float Pow2(float x)
 {
@@ -67,7 +87,23 @@ float3 GetCameraPositionWS()
 {
 	return _CameraPos.xyz;
 }
+// Z buffer to linear depth.
+// Does NOT correctly handle oblique view frustums.
+// Does NOT work with orthographic projection.
+// zBufferParam = { (f-n)/n, 1, (f-n)/n*f, 1/f }
+float LinearEyeDepth(float depth, float4 zBufferParam)
+{
+    return 1.0 / (zBufferParam.z * depth + zBufferParam.w);
+}
 
+// Z buffer to linear 0..1 depth (0 at camera position, 1 at far plane).
+// Does NOT work with orthographic projections.
+// Does NOT correctly handle oblique view frustums.
+// zBufferParam = { (f-n)/n, 1, (f-n)/n*f, 1/f }
+float Linear01Depth(float depth, float4 zBufferParam)
+{
+    return 1.0 / (zBufferParam.x * depth + zBufferParam.y);
+}
 // float4x4 GetViewToWorldMatrix()
 // {
 //     return _Matrix_I_V;
@@ -88,14 +124,22 @@ float4 TransformToClipSpace(float3 object_pos)
 	float4x4 mvp = mul(_MatrixVP, _MatrixWorld);
 	return mul(mvp, float4(object_pos, 1.0f));
 }
-float4 TransformFromWorldToClipSpace(float3 world_pos)
+float4 TransformWorldToHClip(float3 world_pos)
 {
 	return mul(_MatrixVP, float4(world_pos, 1.0f));
 }
+float4 TransformPreviousWorldToHClip(float3 world_pos)
+{
+	return mul(_MatrixVP_Pre, float4(world_pos, 1.0f));
+}
 
-float4 TransformToWorldSpace(float3 object_pos)
+float4 TransformObjectToWorld(float3 object_pos)
 {
 	return mul(_MatrixWorld, float4(object_pos, 1.0f));
+}
+float4 TransformPreviousObjectToWorld(float3 object_pos)
+{
+	return mul(_MatrixWorld_Pre, float4(object_pos, 1.0f));
 }
 
 float3 TransformNormal(float3 object_normal)
@@ -153,7 +197,23 @@ float3 UnpackNormal(float2 f)
 	return normalize(n);
 }
 
-//reconstruct world pos
+float4 ComputeClipSpacePosition(float2 ndc_pos, float depth)
+{
+    float4 positionCS = float4(ndc_pos * 2.0 - 1.0, depth, 1.0);
+
+#if UNITY_UV_STARTS_AT_TOP
+    positionCS.y = -positionCS.y;
+#endif
+    return positionCS;
+}
+float3 ComputeWorldSpacePosition(float2 ndc_pos, float depth, float4x4 inv_vp)
+{
+    float4 positionCS  = ComputeClipSpacePosition(ndc_pos, depth);
+    float4 hpositionWS = mul(inv_vp, positionCS);
+    return hpositionWS.xyz / hpositionWS.w;
+}
+
+//reconstruct world pos from screen pos and depth
 float3 Unproject(float2 screen_pos,float depth)
 {
 	screen_pos.y = 1.0 - screen_pos.y;
@@ -162,6 +222,16 @@ float3 Unproject(float2 screen_pos,float depth)
 	world_pos /= world_pos.w;
 	return world_pos.xyz;
 }
+//reconstruct world pos from camera corners
+float3 UnprojectByCameraRay(float2 screen_pos,float depth)
+{
+	float linear_z = Linear01Depth(depth, _ZBufferParams);
+    float3 top = lerp(_LT, _RT, screen_pos.x);
+    float3 bottom = lerp(_LB, _RB, screen_pos.x);
+	float3 dir = lerp(top, bottom, screen_pos.y);
+	return dir * linear_z;
+}
+
 //-----------------------------------------------------------------------------
 //-- Orthonormal Basis Function -----------------------------------------------
 //-- @nimitz's "Cheap orthonormal basis" on Shadertoy

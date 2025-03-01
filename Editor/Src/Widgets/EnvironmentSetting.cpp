@@ -3,7 +3,6 @@
 #include "Ext/imgui/imgui.h"
 #include "Render/Renderer.h"
 #include "Render/Pass/PostprocessPass.h"
-#include "Render/Pass/SSAOPass.h"
 
 namespace Ailu
 {

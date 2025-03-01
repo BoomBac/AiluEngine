@@ -54,6 +54,7 @@ namespace Ailu
         virtual void SetTexture(const String &name, Texture *texture);
         virtual void SetTexture(const String &name, const WString &texture_path);
         virtual void SetTexture(const String &name, RTHandle texture);
+        //开启一个关键字并关闭同组的其他关键字
         void EnableKeyword(const String &keyword);
         void DisableKeyword(const String &keyword);
         virtual void Bind(u16 pass_index = 0);
@@ -94,6 +95,7 @@ namespace Ailu
         Vector<Map<String, std::tuple<u8, Texture *>>> _textures_all_passes{};
         //非shader使用的变量
         Map<String, u32> _common_uint_property;
+        Map<String, f32> _common_float_property;
     };
 
     enum class ETextureUsage : u8

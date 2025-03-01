@@ -35,7 +35,7 @@ namespace Ailu
         //}
         _cur_frame_res = &_frame_res[Application::s_frame_count % _frame_res.size()];
         for (auto &r: _renderers)
-            r->SetCurFrameResource(_cur_frame_res);
+            r->SetupFrameResource(&_frame_res[(Application::s_frame_count-1) % _frame_res.size()],_cur_frame_res);
     }
     void RenderPipeline::Render()
     {

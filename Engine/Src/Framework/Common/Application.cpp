@@ -10,12 +10,20 @@
 #include "pch.h"
 #include <Render/Gizmo.h>
 #include <Render/TextRenderer.h>
+#ifdef PLATFORM_WINDOWS
+//WINDOWS marco CSIDL_PROFILE
+#include <Shlobj.h>
+#endif
 
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ThreadPool.h"
+#include "Objects/Type.h"
 #include "Render/GraphicsContext.h"
+#include "Render/Pass/VolumetricClouds.h"
 #include "Render/RenderPipeline.h"
+
+#include "Objects/ReflectData.h"
 
 namespace Ailu
 {
@@ -34,10 +42,27 @@ namespace Ailu
 #ifdef PLATFORM_WINDOWS
         TCHAR path[MAX_PATH];
         GetModuleFileName(NULL, path, MAX_PATH);
-        return PathUtils::FormatFilePath(WString(path));
+        return PathUtils::ExtarctDirectory(WString(path));
 #else
         AL_ASSERT(PLATFORM_WINDOWS == 1)
 #endif// WINDOWS
+    }
+    WString Application::GetAppCachePath()
+    {
+        return GetWorkingPath() + L"cache/";
+    }
+    WString Application::GetUseHomePath()
+    {
+        wchar_t userProfile[MAX_PATH];
+        if (SUCCEEDED(SHGetFolderPath(NULL, CSIDL_PROFILE, NULL, 0, userProfile)))
+        {
+            return PathUtils::FormatFilePath(WString(userProfile)) + L"/";
+        }
+        else
+        {
+            LOG_ERROR("Application::GetUseHomePath: Get User Profile Path Failed");
+            return L"";
+        }
     }
 
     int Application::Initialize()
@@ -52,6 +77,8 @@ namespace Ailu
     int Application::Initialize(ApplicationDesc desc)
     {
         AL_ASSERT_MSG(sp_instance == nullptr, "Application already init!");
+        ObjectRegister::Initialize();
+        Enum::InitTypeInfo();
         g_pTimeMgr->Initialize();
         g_pTimeMgr->Mark();
         sp_instance = this;
@@ -71,7 +98,7 @@ namespace Ailu
         GraphicsContext::InitGlobalContext();
         g_pGfxContext->ResizeSwapChain(desc._window_width, desc._window_height);
         g_pResourceMgr->Initialize();
-        Gizmo::Init();
+        Gizmo::Initialize();
         TextRenderer::Init();
         UI::UIRenderer::Init();
 #ifdef DEAR_IMGUI
@@ -101,6 +128,7 @@ namespace Ailu
         DESTORY_PTR(_p_window);
         TextRenderer::Shutdown();
         UI::UIRenderer::Shutdown();
+        Gizmo::Shutdown();
         g_pSceneMgr->Finalize();
         g_pResourceMgr->Finalize();
         DESTORY_PTR(g_pSceneMgr);
@@ -111,6 +139,7 @@ namespace Ailu
         g_pLogMgr->Finalize();
         DESTORY_PTR(g_pLogMgr);
         DESTORY_PTR(g_pJobSystem);
+        ObjectRegister::Shutdown();
     }
 
     void Application::Tick(f32 delta_time)
@@ -201,13 +230,11 @@ namespace Ailu
     }
     bool Application::OnLostFocus(WindowLostFocusEvent &e)
     {
-        g_pLogMgr->Log("OnLostFoucus");
-        s_target_lag = 1000.0f / 15.0f;
+        s_target_lag = 1000.0f / 5.0f;
         return true;
     }
     bool Application::OnGetFocus(WindowFocusEvent &e)
     {
-        g_pLogMgr->Log("OnGetFocus");
         s_target_lag = kMsPerRender;
         _state = EApplicationState::EApplicationState_Running;
         return true;

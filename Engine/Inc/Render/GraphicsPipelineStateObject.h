@@ -89,6 +89,8 @@ namespace Ailu
         virtual const String &SlotToName(u8 slot) = 0;
         virtual const u8 NameToSlot(const String &name) = 0;
         virtual void SetTopology(ETopology topology) = 0;
+        virtual void SetStencilRef(u8 ref) = 0;
+        virtual const GraphicsPipelineStateInitializer& StateDescriptor() const = 0;
     protected:
         virtual void BindResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) = 0;
         struct BindResDescSlotOffset
@@ -103,7 +105,9 @@ namespace Ailu
     class GraphicsPipelineStateMgr
     {
     public:
-        inline static Scope<GraphicsPipelineStateObject> s_gizmo_pso = nullptr;
+        static void Init();
+        static void Shutdown();
+        static GraphicsPipelineStateMgr& Get();
         static void BuildPSOCache();
         static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
         static void EndConfigurePSO(CommandBuffer *cmd);
@@ -120,29 +124,31 @@ namespace Ailu
         //call before cmd->SetRenderTarget
         static void ResetRenderTargetState();
 
-        static bool IsReadyForCurrentDrawCall() { return s_is_ready; }
+        static bool IsReadyForCurrentDrawCall();
 
         static void SubmitBindResource(void *res, const EBindResDescType &res_type, u8 slot, u16 priority);
         static void SubmitBindResource(void *res, const EBindResDescType &res_type, const String &name, u16 priority);
         static void UpdateAllPSOObject();
-
+        
     private:
-        inline static Queue<Scope<GraphicsPipelineStateObject>> s_update_pso{};
-        inline static std::mutex s_pso_lock;
-        inline static std::map<PSOHash, Scope<GraphicsPipelineStateObject>> s_pso_library{};
-        inline static u32 s_reserved_pso_id = 32u;
-        inline static List<PipelineResourceInfo> s_bind_resource_list{};
-        inline static bool s_is_ready = false;
-        static RenderTargetState _s_render_target_state;
+        Scope<GraphicsPipelineStateObject> _gizmo_line_pso;
+        Scope<GraphicsPipelineStateObject> _gizmo_tex_pso;
+        Queue<Scope<GraphicsPipelineStateObject>> _update_pso{};
+        std::mutex _pso_lock;
+        std::map<PSOHash, Scope<GraphicsPipelineStateObject>> _pso_library{};
+        u32 s_reserved_pso_id = 32u;
+        List<PipelineResourceInfo> _bind_resource_list{};
+        bool _is_ready = false;
+        RenderTargetState _render_target_state;
 
-        inline static PSOHash s_cur_pos_hash{};
-        inline static u64 s_hash_shader;            // 4~35 32
-        inline static u8 s_hash_input_layout;       //0~3 4
-        inline static u8 s_hash_topology;           //36~37 2
-        inline static u8 s_hash_blend_state;        // 38~40 3
-        inline static u8 s_hash_raster_state;       // 41 ~ 43 3
-        inline static u8 s_hash_depth_stencil_state;// 44~46 3
-        inline static u8 s_hash_rt_state;           // 44~46 3
+        PSOHash _cur_pos_hash{};
+        u64 _hash_shader;            // 4~35 32
+        u8 _hash_input_layout;       //0~3 4
+        u8 _hash_topology;           //36~37 2
+        u8 _hash_blend_state;        // 38~40 3
+        u8 _hash_raster_state;       // 41 ~ 43 3
+        u8 _hash_depth_stencil_state;// 44~46 3
+        u8 _hash_rt_state;           // 44~46 3
     };
 }// namespace Ailu
 

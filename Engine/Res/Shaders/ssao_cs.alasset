@@ -1,0 +1,5 @@
+guid: de5c5eb2-4c96-4eca-a05c-c11443b70c87
+type: kComputeShader
+name: SSAO_Compute
+  file: Shaders/hlsl/Compute/ssao.hlsl
+  kernel: Noname

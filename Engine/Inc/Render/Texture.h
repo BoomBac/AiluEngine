@@ -115,12 +115,12 @@ namespace Ailu
     DECLARE_ENUM(EWrapMode, kClamp, kRepeat, kMirror)
     DECLARE_ENUM(ETextureFormat, kRGBA32, kRGBAFloat, kRGBFloat, kRGBAHalf, kRGFloat, kR11G11B10)
     DECLARE_ENUM(ECubemapFace, kUnknown, kPositiveX, kNegativeX, kPositiveY, kNegativeY, kPositiveZ, kNegativeZ)
-    static EALGFormat::EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format)
+    static EALGFormat::EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format,bool is_sRGB = true)
     {
         switch (format)
         {
             case ETextureFormat::kRGBA32:
-                return EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
+                return is_sRGB? EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB : EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
             case ETextureFormat::kRGBAFloat:
                 return EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT;
             case ETextureFormat::kRGBFloat:
@@ -180,6 +180,7 @@ namespace Ailu
         static bool IsValidSize(u16 w, u16 h, u16 d, u16 mip, u16 in_w, u16 in_h, u16 in_d);
         static u64 TotalGPUMemerySize() { return s_gpu_mem_usage; }
         Texture();
+        virtual void Release();
         virtual ~Texture();
         virtual TextureHandle GetNativeTextureHandle() const { return 0; };
         //for texture2d/3d(s)
@@ -195,19 +196,17 @@ namespace Ailu
         virtual void GenerateMipmap() {};
         u64 TotalByteSize() const { return _total_byte_size; }
         //slot传255的话，表示只设置一下描述符堆
-        virtual void Bind(CommandBuffer *cmd, u16 view_index, u8 slot,u32 sub_res,bool is_target_compute_pipeline);
+        virtual void Bind(CommandBuffer *cmd, u16 view_index, u8 slot, u32 sub_res, bool is_target_compute_pipeline);
         [[nodiscard]] u16 CalculateViewIndex(ETextureViewType view_type, u16 mipmap, u16 array_slice) const;
         [[nodiscard]] u16 CalculateViewIndex(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const;
         //for 2d/2d array/3d
         [[nodiscard]] u16 CalculateSubResIndex(u16 mipmap, u16 depth_slice) const;
         //for cubemap / cubemap array
         [[nodiscard]] u16 CalculateSubResIndex(ECubemapFace::ECubemapFace face, u16 mipmap, u16 depth_slice) const;
-        Asset *GetAsset() { return _p_asset; };
         bool IsRenderTex() const { return _is_render_tex; }
         virtual bool IsValidMipmap(u16 mipmap) const { return mipmap < _pixel_data.size(); };
 
     protected:
-        Asset *_p_asset;
 
     protected:
         inline static u64 s_gpu_mem_usage = 0u;
@@ -217,22 +216,37 @@ namespace Ailu
         bool _is_random_access;
         bool _is_have_total_view = false;
         bool _is_ready_for_rendering = false;
-        bool _is_data_filled = false;
+        Vector<bool> _is_data_filled;
         bool _is_render_tex = false;
         Vector<u8 *> _pixel_data;
     };
-
+    struct Texture2DInitializer
+    {
+        u16 _width;
+        u16 _height;
+        ETextureFormat::ETextureFormat _format = ETextureFormat::kRGBA32;
+        bool _is_linear = false;
+        bool _is_mipmap_chain = false;
+        bool _is_random_access = false;
+        bool _is_readble = true;
+        Texture2DInitializer() {}
+        Texture2DInitializer(u16 w,u16 h,ETextureFormat::ETextureFormat format,bool is_linear = true,bool is_mipmap_chain = false,bool is_random_access = false,bool is_readble = true):
+            _width(w),_height(h),_format(format),_is_mipmap_chain(is_mipmap_chain),_is_linear(is_linear),_is_random_access(is_random_access),_is_readble(is_readble) {}
+    };
     class AILU_API Texture2D : public Texture
     {
         DECLARE_PROTECTED_PROPERTY_RO(width, Width, u16)
         DECLARE_PROTECTED_PROPERTY_RO(height, Height, u16)
     public:
-        static Ref<Texture2D> Create(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
-        Texture2D(u16 width, u16 height, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+        static Ref<Texture2D> Create(const Texture2DInitializer& initializer);
+        Texture2D(const Texture2DInitializer& initializer);
         virtual ~Texture2D();
+        virtual void ReCreate(const Texture2DInitializer& initializer);
         virtual void Apply() {};
+        virtual void Release();
         TextureHandle GetNativeTextureHandle() const final { return GetView(ETextureViewType::kSRV, 0); };
         void CreateView() override;
+        void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) override {};
         virtual void GenerateMipmap() override;
         Color GetPixel32(u16 x, u16 y);
         Color GetPixel(u16 x, u16 y);
@@ -241,6 +255,12 @@ namespace Ailu
         void SetPixel(u16 x, u16 y, Color color, u16 mipmap);
         void SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap);
         void SetPixelData(u8 *data, u16 mipmap, u64 offset = 0u);
+        void EncodeToPng(const Path &path);
+        Vector4f TexelSize() const { return _texel_size; }
+    private:
+        Vector4f _texel_size;
+    private:
+        void Construct(const Texture2DInitializer& initializer);
     };
 
     struct Texture3DInitializer
@@ -264,8 +284,9 @@ namespace Ailu
         Texture3D(const Texture3DInitializer &initializer);
         virtual ~Texture3D();
         virtual void Apply() {};
-        virtual void Bind(CommandBuffer *cmd, u16 view_index, u8 slot,u32 sub_res,bool is_target_compute_pipeline) override{};
+        virtual void Bind(CommandBuffer *cmd, u16 view_index, u8 slot, u32 sub_res, bool is_target_compute_pipeline) override {};
         virtual void GenerateMipmap() override;
+        /// @brief 为3D纹理的每一级mipmap创建SRV和UAV（如果支持随机写入），只能在Apply之后调用
         void CreateView() override;
         virtual void CreateView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) override {};
         virtual TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) const override { return 0; };
@@ -329,7 +350,7 @@ namespace Ailu
             case ERenderTargetFormat::kDefaultHDR:
                 return EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT;
             case ERenderTargetFormat::kDepth:
-                return EALGFormat::EALGFormat::kALGFormatD24S8_UINT;
+                return EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT;
             case ERenderTargetFormat::kShadowMap:
                 return EALGFormat::EALGFormat::kALGFormatD32_FLOAT;
             case ERenderTargetFormat::kRGFloat:
@@ -360,16 +381,16 @@ namespace Ailu
         u16 _depth_bit;
         ERenderTargetFormat::ERenderTargetFormat _color_format;
         ERenderTargetFormat::ERenderTargetFormat _depth_format;
-        u16 _mipmap_count;
-        bool _random_access;
         ETextureDimension::ETextureDimension _dimension;
+        u16 _mipmap_count;
         u16 _slice_num;
+        bool _random_access;
         bool _is_srgb;
         RenderTextureDesc() : _width(0), _height(0), _depth_bit(0), _color_format(ERenderTargetFormat::kUnknown), _depth_format(ERenderTargetFormat::kUnknown), _mipmap_count(0), _random_access(false), _dimension(ETextureDimension::kUnknown), _slice_num(0), _is_srgb(false)
         {
         }
         RenderTextureDesc(u16 w, u16 h, ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefaultHDR)
-            : _width(w), _height(h), _depth_bit(0), _color_format(format), _depth_format(ERenderTargetFormat::kUnknown), _mipmap_count(0), _random_access(false), _dimension(ETextureDimension::kTex2D), _slice_num(0)
+            : _width(w), _height(h), _depth_bit(0), _color_format(format), _depth_format(ERenderTargetFormat::kUnknown), _mipmap_count(1), _random_access(false), _dimension(ETextureDimension::kTex2D), _slice_num(0)
         {
             _depth = 1;
             if (format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap)
@@ -427,6 +448,7 @@ namespace Ailu
         void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) override {};
         void CreateView() override;
         u16 ArraySlice() const { return _slice_num; }
+        Vector4f TexelSize() const { return _texel_size; }
         //return rtv handle
         virtual TextureHandle ColorRenderTargetHandle(u16 view_index, CommandBuffer *cmd = nullptr) { return 0; };
         virtual TextureHandle DepthRenderTargetHandle(u16 view_index, CommandBuffer *cmd = nullptr) { return 0; };
@@ -455,6 +477,7 @@ namespace Ailu
         inline static u64 s_render_texture_gpu_mem_usage = 0u;
         inline static u64 s_temp_rt_count = 0u;
         u16 _slice_num;
+        Vector4f _texel_size;
     };
 
     class AILU_API RenderTexturePool

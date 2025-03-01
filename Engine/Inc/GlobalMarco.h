@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <list>
 #include <map>
+#include <unordered_map>
 #include <memory>
 #include <queue>
 #include <vector>
@@ -24,6 +25,7 @@
 #define PLATFORM_WINDOWS 1
 
 #define ACLASS()
+#define AENUM()
 #define APROPERTY(...)
 #define AFIELD(...)
 #define AFUNCTION(...)
@@ -43,6 +45,7 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double;
 using Ptr = void *;
+using Path = std::filesystem::path;
 
 using String = std::string;
 using WString = std::wstring;
@@ -64,7 +67,7 @@ template<typename Key, typename Value>
 using Map = std::map<Key, Value>;
 
 template<typename Key, typename Value>
-using HashMap = std::multimap<Key, Value>;
+using HashMap = std::unordered_map<Key, Value>;
 
 template<typename T>
 using Scope = std::unique_ptr<T>;

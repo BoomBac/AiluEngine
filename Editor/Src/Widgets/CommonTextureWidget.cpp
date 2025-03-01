@@ -158,22 +158,18 @@ namespace Ailu
                 }
                 else if (tex->Dimension() == ETextureDimension::kCube)
                 {
-                    //static const char* s_faces[] = { "+Y", "-X", "+Z", "+X","-Z","-Y" };
-                    //static int s_face_index = 0;
-                    //if (ImGui::BeginCombo("select mipmap face", s_faces[s_face_index]))
-                    //{
-                    //	for (int n = 0; n < IM_ARRAYSIZE(s_faces); n++)
-                    //	{
-                    //		const bool is_selected = (s_face_index == n);
-                    //		if (ImGui::Selectable(s_faces[n], is_selected))
-                    //			s_face_index = n;
-                    //		if (is_selected)
-                    //			ImGui::SetItemDefaultFocus();
-                    //	}
-                    //	ImGui::EndCombo();
-                    //}
-                    //ImGui::ImageButton(reinterpret_cast<void*>(g_pResourceMgr->_test_cubemap->GetView((ECubemapFace::ECubemapFace)s_face_index, s_mipmap_index)),
-                    //	ImVec2(preview_tex_size, preview_tex_size), uv0, uv1, 0);
+                    for(u16 i = 0; i < 6; i++)
+                    {
+                        TextureHandle cur_tex_handle = tex->GetView(Texture::ETextureViewType::kSRV,(ECubemapFace::ECubemapFace)(i+1), i);
+                        if (cur_tex_handle == 0)
+                            continue;
+                        AL_ASSERT(cur_tex_handle != 0);
+                        ImGui::BeginGroup();
+                        ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(cur_tex_handle), ImVec2(preview_tex_size, preview_tex_size), uv0, uv1);
+                        ImGui::EndGroup();
+                        ImGui::SameLine();
+                        ++tex_count;
+                    }
                 }
                 else if (tex->Dimension() == ETextureDimension::kTex2DArray)
                 {
@@ -199,6 +195,7 @@ namespace Ailu
         TextureDetailView::TextureDetailView() : ImGuiWidget("TextureDetailView")
         {
             _is_hide_common_widget_info = true;
+            _allow_close = true;
             OnWidgetClose([this]()
                           {
 				g_pLogMgr->LogWarning("TextureDetailView close");

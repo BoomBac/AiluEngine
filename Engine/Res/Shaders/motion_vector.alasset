@@ -1,0 +1,6 @@
+guid: da893f79-e318-4de1-8a73-68c4a51b6892
+type: kShader
+name: Internal/MotionVector
+  file: Shaders/hlsl/motion_vector.hlsl
+  vs_entry: FullscreenVSMain
+  ps_entry: CameraMotionVectorPSMain

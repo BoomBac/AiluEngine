@@ -147,12 +147,12 @@ float Falloff(float d2)
 }
 
 
-PSInput FullscreenVSMain(VSInput v);
+FullScreenPSInput FullscreenVSMain(FullScreenVSInput v);
 
-float4 SSAOGenPSMain(PSInput i) : SV_TARGET
+float4 SSAOGenPSMain(FullScreenPSInput i) : SV_TARGET
 {
-    float2 AORes = _AOScreenParams.xy;
-    float2 InvAORes = _AOScreenParams.zw;
+    float2 AORes = _AOScreenParams.zw;
+    float2 InvAORes = _AOScreenParams.xy;
     float2 uv = i.uv;//float2(i.uv.x,1-i.uv.y);
 
     float3 vpos = GetPosViewSpace(uv);
@@ -217,7 +217,7 @@ half3 BilateralBlur(float2 uv,float2 offset,float space_sigma, float range_sigma
     for(int i = -_KernelSize; i < _KernelSize; i++)
     {
         //空域高斯
-        float2 varible = uv + float2(i * _AOScreenParams.z * offset.x, i * _AOScreenParams.w * offset.y);
+        float2 varible = uv + float2(i * _AOScreenParams.x * offset.x, i * _AOScreenParams.y * offset.y);
         float space_factor = i * i;
         space_factor = (-space_factor) / (2 * space_sigma * space_sigma);
         float space_weight = 1/(space_sigma * space_sigma * 2 * PI) * exp(space_factor);
@@ -239,12 +239,12 @@ half3 BilateralBlur(float2 uv,float2 offset,float space_sigma, float range_sigma
     return color;
 }
 
-float4 SSAOBlurYPSMain(PSInput i): SV_TARGET
+float4 SSAOBlurYPSMain(FullScreenPSInput i): SV_TARGET
 {
     half3 c = BilateralBlur(i.uv,float2(0.0,1.0),_Space_Sigma,_Range_Sigma);
     return float4(c,1.0);
 }
-float4 SSAOBlurXPSMain(PSInput i): SV_TARGET
+float4 SSAOBlurXPSMain(FullScreenPSInput i): SV_TARGET
 {
     half3 c = BilateralBlur(i.uv,float2(1.0,0.0),_Space_Sigma,_Range_Sigma);
     return float4(c,1.0);

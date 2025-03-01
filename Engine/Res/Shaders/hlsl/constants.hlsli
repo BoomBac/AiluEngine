@@ -14,4 +14,6 @@
 #define ToRadius 0.01745f
 #define ToAngle  57.29582f
 
+#define FLOAT_EPSILON 1e-6
+
 #endif //__CONSTANTS_H__

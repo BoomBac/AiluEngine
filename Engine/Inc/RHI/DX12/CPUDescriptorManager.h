@@ -132,11 +132,11 @@ namespace Ailu
 		void Free(CPUVisibleDescriptorAllocation&& handle);
 		void ReleaseSpace();
 	private:
-		HashMap<u16, u16>::iterator AddNewPage(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num = kMaxDescriptorNumPerPage);
+		std::multimap<u16, u16>::iterator AddNewPage(D3D12_DESCRIPTOR_HEAP_TYPE type, u16 num = kMaxDescriptorNumPerPage);
 	private:
 		Vector<CPUVisibleDescriptorPage> _pages;
 		//page_available_desc_num,_page_id
-		Map<D3D12_DESCRIPTOR_HEAP_TYPE, HashMap<u16, u16>> _page_free_space_lut;
+		Map<D3D12_DESCRIPTOR_HEAP_TYPE, std::multimap<u16, u16>> _page_free_space_lut;
 	};
 	extern CPUVisibleDescriptorAllocator* g_pCPUDescriptorAllocator;
 }

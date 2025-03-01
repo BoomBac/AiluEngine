@@ -5,6 +5,7 @@
 #include "Render/Texture.h"
 #include "pch.h"
 #include <Render/CommandBuffer.h>
+#include "Render/GraphicsPipelineStateObject.h"
 
 namespace Ailu
 {
@@ -18,11 +19,13 @@ namespace Ailu
 		g_pRenderTexturePool = new RenderTexturePool();
         GpuResourceManager::Init();
         CommandBufferPool::Init();
+		GraphicsPipelineStateMgr::Init();
 	}
 	void GraphicsContext::FinalizeGlobalContext()
 	{
         GpuResourceManager::Shutdown();
         CommandBufferPool::Shutdown();
+		GraphicsPipelineStateMgr::Shutdown();
 		DESTORY_PTR(g_pRenderTexturePool);
 		DESTORY_PTR(g_pGfxContext);
 	}

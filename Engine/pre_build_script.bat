@@ -7,4 +7,4 @@ set parentDir=%currentDir:~0,-1%
 set parentDir=%parentDir%\..
 
 :: 强制用 cmd 运行 exe
-cmd /c "%parentDir%\bin\x64\debug\AiluHeadTool.exe"
+cmd /c "%parentDir%\AiluHeadTool\bin\x64\debug\AiluHeadTool.exe"

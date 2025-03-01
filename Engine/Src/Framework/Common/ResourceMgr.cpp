@@ -62,6 +62,9 @@ namespace Ailu
                 L"Shaders/default_ui.alasset",
                 L"Shaders/default_text.alasset",
                 L"Shaders/voxel_drawer.alasset",
+                L"Shaders/texture3d_drawer.alasset",
+                L"Shaders/standard_volume.alasset",
+                L"Shaders/motion_vector.alasset",
                 L"Shaders/water.alasset"};
         Vector<WString> shader_pathes = {
                 L"Shaders/hlsl/debug.hlsl",
@@ -92,12 +95,12 @@ namespace Ailu
         g_pJobSystem->Dispatch([](ResourceMgr *mgr)
                                { Shader::s_p_defered_standart_lit = mgr->Load<Shader>(L"Shaders/defered_standard_lit.alasset"); },
                                this);
-        g_pJobSystem->Dispatch([](ResourceMgr *mgr)
-                               { mgr->Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset"); },
-                               this);
-        g_pJobSystem->Dispatch([](ResourceMgr *mgr)
-                               { mgr->Load<ComputeShader>(L"Shaders/voxelize.alasset"); },
-                               this);
+        Vector<WString> compute_shader_pathes = {
+                    L"Shaders/cs_mipmap_gen.alasset",
+                    L"Shaders/voxelize.alasset",
+                    L"Shaders/ssao_cs.alasset",
+                    L"Shaders/taa.alasset",
+        };
         for (auto &p: shader_asset_pathes)
             g_pJobSystem->Dispatch([&](WString p)
                                    { Load<Shader>(p); },
@@ -106,10 +109,14 @@ namespace Ailu
             g_pJobSystem->Dispatch([&](WString p)
                                    { RegisterResource(p, LoadExternalShader(p)); },
                                    p);
+        for (auto &p: compute_shader_pathes)
+            g_pJobSystem->Dispatch([&](WString p){
+                Load<ComputeShader>(p);
+            },p);
         {
             u8 *default_data = new u8[4 * 4 * 4];
             memset(default_data, 255, 64);
-            auto default_white = Texture2D::Create(4, 4, false);
+            auto default_white = Texture2D::Create(Texture2DInitializer(4, 4,ETextureFormat::kRGBA32));
             default_white->SetPixelData(default_data, 0);
             default_white->Name("default_white");
             default_white->Apply();
@@ -118,7 +125,7 @@ namespace Ailu
             memset(default_data, 0, 64);
             for (int i = 3; i < 64; i += 4)
                 default_data[i] = 255;
-            auto default_black = Texture2D::Create(4, 4, false);
+            auto default_black = Texture2D::Create(Texture2DInitializer(4, 4,ETextureFormat::kRGBA32));
             default_black->SetPixelData(default_data, 0);
             default_black->Name("default_black");
             default_black->Apply();
@@ -126,7 +133,7 @@ namespace Ailu
             memset(default_data, 128, 64);
             for (int i = 3; i < 64; i += 4)
                 default_data[i] = 255;
-            auto default_gray = Texture2D::Create(4, 4, false);
+            auto default_gray = Texture2D::Create(Texture2DInitializer(4, 4,ETextureFormat::kRGBA32));
             default_gray->SetPixelData(default_data, 0);
             default_gray->Name("default_gray");
             default_gray->Apply();
@@ -137,7 +144,7 @@ namespace Ailu
                 default_data[i] = 128;
                 default_data[i + 1] = 128;
             }
-            auto default_normal = Texture2D::Create(4, 4, false);
+            auto default_normal = Texture2D::Create(Texture2DInitializer(4, 4,ETextureFormat::kRGBA32));
             default_normal->SetPixelData(default_data, 0);
             default_normal->Name("default_normal");
             default_normal->Apply();
@@ -148,12 +155,17 @@ namespace Ailu
             Texture::s_p_default_gray = default_gray.get();
             Texture::s_p_default_normal = default_normal.get();
             //Load<Texture2D>(EnginePath::kEngineTexturePathW + L"small_cave_1k.alasset");
-            auto lut1 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_1.dds");
-            auto lut2 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_2.dds");
+            TextureImportSetting setting;
+            setting._generate_mipmap = false;
+            auto lut1 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_1.dds",setting);
+            auto lut2 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_2.dds",setting);
             RegisterResource(L"Runtime/ltc_lut1", lut1);
             RegisterResource(L"Runtime/ltc_lut2", lut2);
-            auto noise = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"rgba-noise-medium.png");
+            auto noise = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"rgba-noise-medium.png",setting);
             RegisterResource(L"Textures/noise_medium.png", noise);
+            g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+                                   { mgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset",&TextureImportSetting::Default()); },
+                                   this);
         }
         WString mesh_path_cube = L"Meshs/cube.alasset";
         WString mesh_path_sphere = L"Meshs/sphere.alasset";
@@ -240,7 +252,7 @@ namespace Ailu
         _default_font = Font::Create(GetResSysPath(L"Fonts/Open_Sans/open_sans_regular_65.fnt"));
         for (auto &p: _default_font->_pages)
         {
-            p._texture = LoadExternalTexture(p._file);
+            p._texture = LoadExternalTexture(p._file,TextureImportSetting::Default());
             RegisterResource(PathUtils::ExtractAssetPath(p._file), p._texture);
         }
         //g_pThreadTool->Enqueue("ResourceMgr::WatchDirectory", &ResourceMgr::WatchDirectory, this);
@@ -291,20 +303,24 @@ namespace Ailu
         {
             Asset *asset = _pending_delete_assets.front();
             auto asset_sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
-            if (s_file_last_load_time.contains(asset_sys_path))
+            if (_file_last_load_time.contains(asset_sys_path))
             {
-                s_file_last_load_time.erase(asset_sys_path);
+                _file_last_load_time.erase(asset_sys_path);
             }
             UnRegisterResource(asset->_asset_path);
             UnRegisterAsset(asset);
             _pending_delete_assets.pop();
         }
-        while (!_tasks.empty())
+        while (!_sync_tasks.empty())
         {
-            _tasks.front()();
-            _tasks.pop();
+            _sync_tasks.front()();
+            _sync_tasks.pop();
         }
-        SubmitResourceTask();
+        while (!_async_tasks.empty())
+        {
+            g_pThreadTool->Enqueue(std::move(_async_tasks.front()));
+            _async_tasks.pop();
+        }
     }
 
     void ResourceMgr::SaveAsset(const Asset *asset)
@@ -451,7 +467,7 @@ namespace Ailu
         g_pLogMgr->LogErrorFormat(L"Save compute shader to {} failed!", sys_path);
     }
 
-    Scope<Asset> ResourceMgr::LoadShader(const WString &asset_path)
+    Scope<Asset> ResourceMgr::LoadShader(const WString &asset_path,const ImportSetting& settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -649,7 +665,7 @@ namespace Ailu
         return mesh_list;
     }
 
-    Ref<Texture2D> ResourceMgr::LoadExternalTexture(const WString &asset_path)
+    Ref<Texture2D> ResourceMgr::LoadExternalTexture(const WString &asset_path,const ImportSetting& settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         String ext = fs::path(ToChar(asset_path.c_str())).extension().string();
@@ -669,33 +685,72 @@ namespace Ailu
         else {};
         AL_ASSERT(tex_parser != nullptr);
         g_pLogMgr->LogFormat(L"Start load image file {}...", sys_path);
-        auto tex = tex_parser->Parser(sys_path);
+        auto tex = tex_parser->Parser(sys_path,dynamic_cast<const TextureImportSetting&>(settings));
         g_pGfxContext->SubmitRHIResourceBuildTask([=]()
                                                   { tex->Apply(); });
         return tex;
     }
+    bool ResourceMgr::LoadExternalTexture(const WString &asset_path,Ref<Texture2D>& tex,const ImportSetting& settings)
+    {
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
+        String ext = fs::path(ToChar(asset_path.c_str())).extension().string();
+        Scope<ITextureParser> tex_parser = nullptr;
+        if (kLDRImageExt.contains(ext))
+        {
+            tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kPNG));
+        }
+        else if (kHDRImageExt.contains(ext))
+        {
+            tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kHDR));
+        }
+        else if (ext == ".DDS" || ext == ".dds")
+        {
+            tex_parser = std::move(TStaticAssetLoader<EResourceType::kImage, EImageLoader>::GetParser(EImageLoader::kDDS));
+        }
+        else {};
+        AL_ASSERT(tex_parser != nullptr);
+        g_pLogMgr->LogFormat(L"Start load image file {}...", sys_path);
+        bool ret = tex_parser->Parser(sys_path,tex,dynamic_cast<const TextureImportSetting&>(settings));
+        g_pGfxContext->SubmitRHIResourceBuildTask([=]()
+                                                  { tex->Apply(); });
+        return ret;
+    }
 
-    Scope<Asset> ResourceMgr::LoadTexture(const WString &asset_path)
+    Scope<Asset> ResourceMgr::LoadTexture(const WString &asset_path,const ImportSetting& settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
-        Ref<Texture2D> shader;
         if (FileManager::ReadFile(sys_path, data))
         {
             auto c = StringUtils::Split(data, L"\n");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
-            auto tex = LoadExternalTexture(file);
-            auto asset = MakeScope<Asset>();
-            asset->_asset_path = asset_path;
-            asset->_asset_type = EAssetType::kTexture2D;
-            asset->_external_asset_path = file;
-            asset->_p_obj = tex;
-            return asset;
+            if (!IsAssetLoaded(asset_path))
+            {
+                auto tex = LoadExternalTexture(file,dynamic_cast<const TextureImportSetting&>(settings));
+                auto asset = MakeScope<Asset>();
+                asset->_asset_path = asset_path;
+                asset->_asset_type = EAssetType::kTexture2D;
+                asset->_external_asset_path = file;
+                asset->_p_obj = tex;
+                return asset;
+            }
+            else
+            {
+                auto exist_asset = GetAsset(asset_path);
+                auto tex = exist_asset->AsRef<Texture2D>();
+                LoadExternalTexture(file,tex,dynamic_cast<const TextureImportSetting&>(settings));
+                auto asset = MakeScope<Asset>();
+                asset->_asset_path = asset_path;
+                asset->_asset_type = EAssetType::kTexture2D;
+                asset->_external_asset_path = file;
+                asset->_p_obj = tex;
+                return asset;
+            }
         }
         return nullptr;
     }
 
-    Scope<Asset> ResourceMgr::LoadMaterial(const WString &asset_path)
+    Scope<Asset> ResourceMgr::LoadMaterial(const WString &asset_path,const ImportSetting& settings)
     {
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         std::ifstream file(sys_path);
@@ -815,7 +870,7 @@ namespace Ailu
         return asset;
     }
 
-    Scope<Asset> ResourceMgr::LoadMesh(const WString &asset_path)
+    Scope<Asset> ResourceMgr::LoadMesh(const WString &asset_path,const ImportSetting& settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -852,7 +907,7 @@ namespace Ailu
         return nullptr;
     }
 
-    Scope<Asset> ResourceMgr::LoadComputeShader(const WString &asset_path)
+    Scope<Asset> ResourceMgr::LoadComputeShader(const WString &asset_path,const ImportSetting& settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -872,7 +927,7 @@ namespace Ailu
         return nullptr;
     }
 
-    Scope<Asset> ResourceMgr::LoadScene(const WString &asset_path)
+    Scope<Asset> ResourceMgr::LoadScene(const WString &asset_path,const ImportSetting& settings)
     {
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         String scene_data;
@@ -895,7 +950,7 @@ namespace Ailu
         asset->_p_obj = loaded_scene;
         return asset;
     }
-    Scope<Asset> ResourceMgr::LoadAnimClip(const WString &asset_path)
+    Scope<Asset> ResourceMgr::LoadAnimClip(const WString &asset_path,const ImportSetting& settings)
     {
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
         String clip_data;
@@ -968,12 +1023,12 @@ namespace Ailu
             _pending_delete_assets.push(asset);
     }
 
-    bool ResourceMgr::ExistInAssetDB(const Asset *asset)
+    bool ResourceMgr::ExistInAssetDB(const Asset *asset) const
     {
         return _asset_db.contains(asset->GetGuid());
     }
 
-    bool ResourceMgr::ExistInAssetDB(const WString &asset_path)
+    bool ResourceMgr::ExistInAssetDB(const WString &asset_path) const
     {
         return _asset_looktable.contains(asset_path);
     }
@@ -1070,6 +1125,15 @@ namespace Ailu
             _asset_db.erase(asset->GetGuid());
             _asset_looktable.erase(asset->_asset_path);
         }
+    }
+
+    bool ResourceMgr::IsAssetLoaded(const WString &asset_path) const
+    {
+        if (ExistInAssetDB(asset_path))
+        {
+            return _global_resources.contains(asset_path);
+        }
+        return false;
     }
 
     void ResourceMgr::LoadAssetDB()
@@ -1217,6 +1281,7 @@ namespace Ailu
             auto &v = _lut_global_resources_by_type[GetObjectAssetType(obj.get())];
             v.erase(std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter it) -> bool
                                  { return it->second.get() == obj.get(); }));
+            _object_to_asset.erase(obj->ID());
             _lut_global_resources.erase(obj->ID());
             _global_resources.erase(asset_path);
             g_pLogMgr->LogWarningFormat(L"UnRegisterResource: {} ref count is {}", asset_path, ref_count - 1);
@@ -1258,6 +1323,10 @@ namespace Ailu
         {
             return EAssetType::kTexture2D;
         }
+        else if (dynamic_cast<Texture3D *>(obj))
+        {
+            return EAssetType::kTexture3D;
+        }
         else if (dynamic_cast<Mesh *>(obj))
         {
             if (dynamic_cast<SkeletonMesh *>(obj))
@@ -1283,9 +1352,9 @@ namespace Ailu
         fs::file_time_type last_load_time;
         fs::file_time_type last_write_time = std::filesystem::last_write_time(p);
         bool newer = true;
-        if (s_file_last_load_time.contains(sys_path))
+        if (_file_last_load_time.contains(sys_path))
         {
-            last_load_time = s_file_last_load_time[sys_path];
+            last_load_time = _file_last_load_time[sys_path];
             //前者大于后者就表示其表示的时间点晚于后者
             newer = last_write_time > last_load_time;
         }
@@ -1293,7 +1362,7 @@ namespace Ailu
     }
     void ResourceMgr::MarkFileTimeStamp(const WString &sys_path)
     {
-        s_file_last_load_time[sys_path] = fs::file_time_type::clock::now();
+        _file_last_load_time[sys_path] = fs::file_time_type::clock::now();
     }
 
     Ref<void> ResourceMgr::ImportResource(const WString &sys_path, const ImportSetting &setting)
@@ -1302,30 +1371,25 @@ namespace Ailu
     }
     void ResourceMgr::SubmitTaskSync(ResourceTask task)
     {
-        _tasks.push(task);
+        _sync_tasks.push([=](){
+            task();
+        });
+    }
+
+    void ResourceMgr::SubmitTaskSync(ResourceTask task,std::function<void(bool)> callback)
+    {
+        _sync_tasks.push([=](){
+            callback(task());
+        });
     }
 
     Ref<void> ResourceMgr::ImportResourceAsync(const WString &sys_path, const ImportSetting &setting, OnResourceTaskCompleted callback)
     {
-        s_task_queue.emplace_back([=]()
+        _async_tasks.push([=]()
                                   {
 			callback(ImportResourceImpl(sys_path, &setting));
 			return nullptr; });
         return nullptr;
-    }
-
-    void ResourceMgr::AddResourceTask(ResourceTask task)
-    {
-        s_task_queue.emplace_back(task);
-    }
-
-    void ResourceMgr::SubmitResourceTask()
-    {
-        for (auto &task: s_task_queue)
-        {
-            g_pThreadTool->Enqueue(std::move(task));
-        }
-        s_task_queue.clear();
     }
 
     Ref<void> ResourceMgr::ImportResourceImpl(const WString &sys_path, const ImportSetting *setting)
@@ -1423,7 +1487,7 @@ namespace Ailu
         else if (kHDRImageExt.contains(ext) || kLDRImageExt.contains(ext))
         {
             asset_type = EAssetType::kTexture2D;
-            auto tex = LoadExternalTexture(external_asset_path);
+            auto tex = LoadExternalTexture(external_asset_path,dynamic_cast<const TextureImportSetting&>(*setting));
             WString imported_asset_path = created_asset_dir;
             imported_asset_path.append(std::format(L"{}.alasset", ToWStr(tex->Name().c_str())));
             loaded_objects.push(std::make_tuple(imported_asset_path, tex));

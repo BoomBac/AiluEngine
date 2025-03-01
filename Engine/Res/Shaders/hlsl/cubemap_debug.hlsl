@@ -53,7 +53,7 @@ PSInput VSMain(VSInput v)
 	result.position = TransformToClipSpace(v.position);
 	//result.position.z = result.position.w;
 	result.wnormal = v.position;
-	result.world_pos = TransformToWorldSpace(v.position);
+	result.world_pos = TransformObjectToWorld(v.position);
 	return result;
 }
 

@@ -18,7 +18,7 @@ namespace Ailu
 			explicit FirstPersonCameraController(Camera* camera);
 			void Attach(Camera* camera);
             void SetTargetPosition(const Vector3f& position,bool is_force = false);
-            void SetTargetRotation(f32 x,f32 y);
+            void SetTargetRotation(f32 x,f32 y,bool is_force = false);
 			void Move(const Vector3f& d);
 			void Interpolate(float speed);
 			void Accelerate(bool faster) {_cur_move_speed = faster? _fast_camera_move_speed : _base_camera_move_speed;};

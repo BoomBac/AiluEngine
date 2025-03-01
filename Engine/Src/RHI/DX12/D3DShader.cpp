@@ -4,6 +4,7 @@
 #include <dxcapi.h>
 #include <mutex>
 
+#include "Framework/Common/Application.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -38,7 +39,6 @@ namespace Ailu
         u8 *_data;
         inline static std::mutex s_compile_lock;
     };
-
 
     //shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
     static bool CreateFromFileDXC(const std::wstring &filename, const std::wstring &entryPoint, const std::wstring &pTarget, ComPtr<ID3DBlob> &p_blob,
@@ -147,7 +147,8 @@ namespace Ailu
         String unique_str = std::format("{}_{}_{}", ToChar(filename), entryPoint, su::Join(keyword_str, "_"));
         std::hash<String> hash_fn;
         u64 shader_hash = hash_fn(unique_str);
-        WString cached_blob_path = ResourceMgr::GetResSysPath(std::format(L"ShaderCache/hlsl/{}.cso", shader_hash));
+        auto working_path = Application::GetWorkingPath();
+        WString cached_blob_path = working_path + std::format(L"cache/shader_cache/hlsl/{}.cso", shader_hash);
         if (is_load_cache && FileManager::Exist(cached_blob_path) && FileManager::IsFileNewer(cached_blob_path, filename))
         {
             LOG_INFO(L"[D3DShader compiler]: load cache: {},entry : {}", filename, ToWStr(entryPoint));
@@ -162,7 +163,7 @@ namespace Ailu
 #if defined(_DEBUG)
             if (pTarget == RenderConstants::kCSModel_5_0)
             {
-                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;// | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
+                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
             }
             else
             {
@@ -249,33 +250,6 @@ namespace Ailu
         return D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     }
 
-    //    static DXGI_FORMAT GetFormatBySemanticName(const char *semantic)
-    //    {
-    //        String set_str(semantic);
-    //        if (su::Equal(set_str, RenderConstants::kSemanticPosition))
-    //            return DXGI_FORMAT_R32G32B32_FLOAT;
-    //        else if (su::Equal(set_str, RenderConstants::kSemanticNormal))
-    //            return DXGI_FORMAT_R32G32B32_FLOAT;
-    //        else if (su::Equal(set_str, RenderConstants::kSemanticTangent))
-    //            return DXGI_FORMAT_R32G32B32A32_FLOAT;
-    //        else if (su::Equal(set_str, RenderConstants::kSemanticColor))
-    //            return DXGI_FORMAT_R32G32B32A32_FLOAT;
-    //        else if (su::Equal(set_str, RenderConstants::kSemanticTexcoord))
-    //            return DXGI_FORMAT_R32G32_FLOAT;
-    //        else if (su::Equal(set_str, RenderConstants::kSemanticBoneWeight))
-    //            return DXGI_FORMAT_R32G32B32A32_FLOAT;
-    //        else if (su::Equal(set_str, RenderConstants::kSemanticBoneIndex))
-    //            return DXGI_FORMAT_R32G32B32A32_UINT;
-    //        else if (su::Equal(RenderConstants::kSemanticVertexIndex,set_str, false))
-    //            return DXGI_FORMAT_R32_UINT;
-    //        else
-    //        {
-    //            LOG_ERROR("Unsupported vertex shader semantic!");
-    //            return DXGI_FORMAT_R32G32B32_FLOAT;
-    //        }
-    //    }
-
-
     static EShaderDateType GetShaderDataType(DXGI_FORMAT dx_format)
     {
         switch (dx_format)
@@ -307,6 +281,265 @@ namespace Ailu
         return samplers;
     }
 
+    static std::pair<String, ShaderBindResourceInfo> ParserBindResource(D3D12_SHADER_INPUT_BIND_DESC bind_desc)
+    {
+        std::pair<String, ShaderBindResourceInfo> ret;
+        auto res_type = bind_desc.Type;
+        if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
+        {
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kConstBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+        }
+        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
+        {
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+        }
+        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
+        {
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kSampler, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+        }
+        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED)
+        {
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+        }
+        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED)
+        {
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+        }
+        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED)
+        {
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kUAVTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+        }
+        else
+        {
+            AL_ASSERT(true);
+        }
+        ret.second._register_space = bind_desc.Space;
+        return ret;
+    }
+
+    static void ParserBindResourceAddiInfo(HashMap<String,ShaderBindResourceInfo>& bind_res_infos,String line)
+    {
+        line = line.find(";") != line.npos ? line.substr(0, line.find_first_of(";")+1) : line;
+        if (su::BeginWith(line, "Texture2D"))
+        {
+            size_t name_begin = line.find_first_of("D") + 1;
+            size_t name_end = line.find_first_of(":") - 1;
+            String tex_name = line.substr(name_begin, name_end - name_begin);
+        }
+        else if (su::BeginWith(line, "TextureCube"))
+        {
+            size_t name_begin = line.find_last_of("e") + 1;
+            size_t name_end = line.find_first_of(":") - 1;
+            String tex_name = line.substr(name_begin, name_end - name_begin);
+            auto it = bind_res_infos.find(tex_name);
+            if (it != bind_res_infos.end())
+            {
+                it->second._res_type = EBindResDescType::kCubeMap;
+            }
+        }
+        else if (su::BeginWith(line, "TEXTURECUBE"))
+        {
+            size_t name_begin = line.find_first_of("(") + 1;
+            size_t name_end = line.find_last_of(",");
+            String tex_name = line.substr(name_begin, name_end - name_begin);
+            auto it = bind_res_infos.find(tex_name);
+            if (it != bind_res_infos.end())
+            {
+                it->second._res_type = EBindResDescType::kCubeMap;
+            }
+        }
+        else if (su::BeginWith(line, "Texture3D"))
+        {
+            auto eol = line.find_first_of("<") == line.length() ? "D" : ">";
+            size_t name_begin = line.find_first_of(eol) + 1;
+            size_t name_end = line.find_first_of(";");
+            String tex_name = line.substr(name_begin, name_end - name_begin);
+            su::RemoveSpaces(tex_name);
+            auto it = bind_res_infos.find(tex_name);
+            if (it != bind_res_infos.end())
+            {
+                it->second._res_type = EBindResDescType::kTexture3D;
+            }
+        }
+        else if (su::BeginWith(line, "TEXTURE3D"))
+        {
+            size_t name_begin = line.find_first_of("(") + 1;
+            size_t name_end = line.find_first_of(")");
+            String tex_name = line.substr(name_begin, name_end - name_begin);
+            auto it = bind_res_infos.find(tex_name);
+            if (it != bind_res_infos.end())
+            {
+                it->second._res_type = EBindResDescType::kTexture3D;
+            }
+        }
+        else if (su::BeginWith(line, "RWTexture3D"))
+        {
+            auto eol = line.find_first_of("<") == line.length() ? "D" : ">";
+            size_t name_begin = line.find_first_of(eol) + 1;
+            size_t name_end = line.find_first_of(";");
+            String tex_name = line.substr(name_begin, name_end - name_begin);
+            su::RemoveSpaces(tex_name);
+            auto it = bind_res_infos.find(tex_name);
+            if (it != bind_res_infos.end())
+            {
+                it->second._res_type = EBindResDescType::kRWTexture3D;
+            }
+        }
+        else if (su::BeginWith(line, "RWTEXTURE3D"))//RWTEXTURE3D(_OutNoise3D,float4)
+        {
+            size_t name_begin = line.find_first_of('(') + 1;
+            size_t name_end = line.find_first_of(",");
+            String tex_name = line.substr(name_begin, name_end - name_begin);
+            su::RemoveSpaces(tex_name);
+            auto it = bind_res_infos.find(tex_name);
+            if (it != bind_res_infos.end())
+            {
+                it->second._res_type = EBindResDescType::kRWTexture3D;
+            }
+        }
+        else if (su::BeginWith(line, "RWBuffer"))
+        {
+            auto eol = line.find_first_of("<") == line.length() ? "r" : ">";
+            size_t name_begin = line.find_first_of(eol) + 1;
+            size_t name_end = line.find_first_of(";");
+            String tex_name = line.substr(name_begin, name_end - name_begin);
+            su::RemoveSpaces(tex_name);
+            auto it = bind_res_infos.find(tex_name);
+            if (it != bind_res_infos.end())
+            {
+                it->second._res_type = EBindResDescType::kRWBuffer;
+            }
+        }
+        else if (su::BeginWith(line, "uint"))
+        {
+            std::regex pattern(R"(^(\w+)\s+(\w+)\s*(\[\d*\])?\s*;)");
+            std::smatch matches;
+            if (std::regex_match(line, matches, pattern))
+            {
+                const auto &type_name = matches[1].str();
+                const auto &value_name = matches[2].str();
+                u8 array_size = matches[3].str().empty()? 0u : (u8)std::stoi(matches[3].str().substr(1,matches[3].str().size()-2));
+                auto it = bind_res_infos.find(value_name);
+                if (it != bind_res_infos.end())
+                {
+                    auto &c = it->second;
+                    c._array_size = array_size;
+                    if (type_name == "uint4" || type_name == "uint3" || type_name == "uint2")
+                        c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferUInts);
+                    else
+                        c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferUInt);
+                }
+            }
+        }
+        else if (su::BeginWith(line, "int"))
+        {
+            std::regex pattern(R"(^(\w+)\s+(\w+)\s*(\[\d*\])?\s*;)");
+            std::smatch matches;
+            if (std::regex_match(line, matches, pattern))
+            {
+                const auto &type_name = matches[1].str();
+                const auto &value_name = matches[2].str();
+                u8 array_size = matches[3].str().empty()? 0u : (u8)std::stoi(matches[3].str().substr(1,matches[3].str().size()-2));
+                auto it = bind_res_infos.find(value_name);
+                if (it != bind_res_infos.end())
+                {
+                    auto &c = it->second;
+                    c._array_size = array_size;
+                    if (type_name == "int4" || type_name == "int3" || type_name == "int2")
+                        c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferInts);
+                    else
+                        c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferInt);
+                }
+            }
+        }
+        else if (su::BeginWith(line, "float"))//默认所有4字节大小的均为float，所以这里不需要调整其类型
+        {
+            std::regex pattern(R"(^(\w+)\s+(\w+)\s*(\[\d*\])?\s*;)");
+            std::smatch matches;
+            if (std::regex_match(line, matches, pattern))
+            {
+                const auto &type_name = matches[1].str();
+                const auto &value_name = matches[2].str();
+                u8 array_size = matches[3].str().empty()? 0u : (u8)std::stoi(matches[3].str().substr(1,matches[3].str().size()-2));
+                auto it = bind_res_infos.find(value_name);
+                if (it != bind_res_infos.end())
+                {
+                    auto &c = it->second;
+                    c._array_size = array_size;
+                }
+            }
+        }
+        else if (su::BeginWith(line, "bool"))
+        {
+            std::regex pattern(R"(^(\w+)\s+(\w+)\s*(\[\d*\])?\s*;)");
+            std::smatch matches;
+            if (std::regex_match(line, matches, pattern))
+            {
+                const auto &type_name = matches[1].str();
+                const auto &value_name = matches[2].str();
+                auto it = bind_res_infos.find(value_name);
+                if (it != bind_res_infos.end())
+                {
+                    auto &c = it->second;
+                    c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferBool);
+                }
+            }
+        }
+        else if (su::BeginWith(line, "float4x4"))
+        {
+            std::regex pattern(R"(^(\w+)\s+(\w+)\s*(\[\d*\])?\s*;)");
+            std::smatch matches;
+            if (std::regex_match(line, matches, pattern))
+            {
+                const auto &type_name = matches[1].str();
+                const auto &value_name = matches[2].str();
+                u8 array_size = matches[3].str().empty()? 0u : (u8)std::stoi(matches[3].str().substr(1,matches[3].str().size()-2));
+                auto it = bind_res_infos.find(value_name);
+                if (it != bind_res_infos.end())
+                {
+                    auto &c = it->second;
+                    c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferMatrix);
+                    c._array_size = array_size;
+                }
+            }
+        }
+        else {};
+    }
+
+    static ShaderBindResourceInfo ParserBindVariable(const D3D12_SHADER_VARIABLE_DESC &desc)
+    {
+        u16 offset = (u16) desc.StartOffset;
+        u16 size = (u16) desc.Size;
+        u32 variable_info = 0u;
+        variable_info |= offset;
+        variable_info <<= 16;
+        variable_info |= size;
+        auto value_type = EBindResDescType::kCBufferAttribute;
+        if (size == 4) value_type = (EBindResDescType) (EBindResDescType::kCBufferFloat | value_type);
+        else if (size == 16 || size == 12 || size == 8)
+            value_type = (EBindResDescType) (EBindResDescType::kCBufferFloats | value_type);
+        else if (size == 64)
+            value_type = (EBindResDescType) (EBindResDescType::kCBufferMatrix | value_type);
+        else {}
+        auto info = ShaderBindResourceInfo{value_type, variable_info, 0u, desc.Name};
+        return info;
+    }
+    
+    static Vector<D3D_SHADER_MACRO> ConstructVariantMarcos(const std::set<String>& kw_seqs)
+    {
+        Vector<D3D_SHADER_MACRO> v;
+        for (const auto& kw : Shader::GetPreDefinedMacros())
+            v.emplace_back(D3D_SHADER_MACRO{kw.c_str(), "1"});
+        for (auto &kw: kw_seqs)
+        {
+            if (kw != "_")
+            {
+                v.emplace_back(D3D_SHADER_MACRO{kw.c_str(), "1"});
+            }
+        }
+        v.emplace_back(D3D_SHADER_MACRO{NULL, NULL});
+        return v;
+    }
     //-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
     HRESULT D3DShaderInclude::Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes)
     {
@@ -343,6 +576,15 @@ namespace Ailu
         return S_OK;
     }
     //-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
+
+#pragma region D3DShader
+    D3DShader::D3DShader(const WString &sys_path) : Shader(sys_path)
+    {
+        Compile();
+    }
+    D3DShader::~D3DShader()
+    {
+    }
 
     void D3DShader::GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash)
     {
@@ -414,7 +656,6 @@ namespace Ailu
                 {
                     ++texture_count;
                     ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot);
-                    LOG_INFO("Name: {},Slot: {}", desc._name, desc._res_slot);
                     rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                     desc._bind_slot = root_param_index;
                     ++root_param_index;
@@ -424,7 +665,6 @@ namespace Ailu
                 case EBindResDescType::kBuffer:
                 {
                     ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot);
-                    LOG_INFO("Name: {},Slot: {}", desc._name, desc._res_slot);
                     rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                     desc._bind_slot = root_param_index;
                     ++root_param_index;
@@ -455,22 +695,6 @@ namespace Ailu
         ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_pass_elements[pass_index]._variants[variant_hash]._p_sig)));
     }
 
-    Vector<D3D_SHADER_MACRO> D3DShader::ConstructVariantMarcos(u16 pass_index, ShaderVariantHash variant_hash)
-    {
-        AL_ASSERT(pass_index < _passes.size());
-        auto &kw_seqs = _passes[pass_index]._variants[variant_hash]._active_keywords;
-        Vector<D3D_SHADER_MACRO> v;
-        for (auto &kw: kw_seqs)
-        {
-            if (kw != "_")
-            {
-                v.emplace_back(D3D_SHADER_MACRO{kw.c_str(), "1"});
-            }
-        }
-        v.emplace_back(D3D_SHADER_MACRO{NULL, NULL});
-        return v;
-    }
-
     bool D3DShader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash)
     {
         bool succeed = true;
@@ -488,7 +712,7 @@ namespace Ailu
                 _is_pass_elements_init.store(true);
             }
             auto &pass = _passes[pass_index];
-            keyword_defines = ConstructVariantMarcos(pass_index, variant_hash);
+            keyword_defines = ConstructVariantMarcos(pass._variants[variant_hash]._active_keywords);
 #ifdef SHADER_DXC
             CreateFromFileDXC(ToWStr(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
@@ -533,62 +757,12 @@ namespace Ailu
         while (getline(src, line))
         {
             line = su::Trim(line);
-            if (su::BeginWith(line, "#include"))
+            if (su::BeginWith(line,"//"))
             {
-                //头文件解析转移到创还能字节码时
-                //size_t path_start = line.find_first_of("\"");
-                //size_t path_end = line.find_last_of("\"");
-                //WString head_file = ToWStr(su::SubStrRange(line, path_start + 1, path_end - 1).c_str());
-                //_passes[pass_index]._source_files.insert(parent_path + head_file);
-                //cur_file_head_files.emplace_back(head_file);
+                lines.emplace_back(line);
+                continue;
             }
-            else if (su::BeginWith(line, "Texture2D"))
-            {
-                size_t name_begin = line.find_first_of("D") + 1;
-                size_t name_end = line.find_first_of(":") - 1;
-                String tex_name = line.substr(name_begin, name_end - name_begin);
-            }
-            else if (su::BeginWith(line, "TextureCube"))
-            {
-                size_t name_begin = line.find_last_of("e") + 1;
-                size_t name_end = line.find_first_of(":") - 1;
-                String tex_name = line.substr(name_begin, name_end - name_begin);
-                auto it = _passes[pass_index]._variants[variant_hash]._bind_res_infos.find(tex_name);
-                if (it != _passes[pass_index]._variants[variant_hash]._bind_res_infos.end())
-                {
-                    it->second._res_type = EBindResDescType::kCubeMap;
-                }
-            }
-            else if (su::BeginWith(line, "TEXTURECUBE"))
-            {
-                size_t name_begin = line.find_first_of("(") + 1;
-                size_t name_end = line.find_last_of(",");
-                String tex_name = line.substr(name_begin, name_end - name_begin);
-                auto it = _passes[pass_index]._variants[variant_hash]._bind_res_infos.find(tex_name);
-                if (it != _passes[pass_index]._variants[variant_hash]._bind_res_infos.end())
-                {
-                    it->second._res_type = EBindResDescType::kCubeMap;
-                }
-            }
-            else if (su::BeginWith(line, "uint"))
-            {
-                std::regex pattern(R"(^(\w+)\s+(\w+)\s*;)");
-                std::smatch matches;
-                if (std::regex_match(line, matches, pattern))
-                {
-                    const auto &type_name = matches[1].str();
-                    const auto &value_name = matches[2].str();
-                    auto it = _passes[pass_index]._variants[variant_hash]._bind_res_infos.find(value_name);
-                    if (it != _passes[pass_index]._variants[variant_hash]._bind_res_infos.end())
-                    {
-                        auto &c = it->second;
-                        if (type_name == "uint4")
-                            it->second._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferUint4);
-                        else
-                            it->second._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferUint);
-                    }
-                }
-            }
+            ParserBindResourceAddiInfo(_passes[pass_index]._variants[variant_hash]._bind_res_infos,line);
             lines.emplace_back(line);
         }
         src.close();
@@ -600,15 +774,6 @@ namespace Ailu
             temp.append(head_file);
             LoadAdditionalShaderReflection(temp.wstring(), pass_index, variant_hash);
         }
-    }
-
-    D3DShader::D3DShader(const WString &sys_path) : Shader(sys_path)
-    {
-        Compile();
-    }
-
-    D3DShader::~D3DShader()
-    {
     }
 
     std::pair<D3D12_INPUT_ELEMENT_DESC *, u8> D3DShader::GetVertexInputLayout(u16 pass_index, ShaderVariantHash variant_hash)
@@ -632,42 +797,6 @@ namespace Ailu
         //	_passes[i]._pipeline_topology = ETopology::kTriangle;
         //}
     }
-
-    static std::pair<String, ShaderBindResourceInfo> ParserBindResource(D3D12_SHADER_INPUT_BIND_DESC bind_desc)
-    {
-        std::pair<String, ShaderBindResourceInfo> ret;
-        auto res_type = bind_desc.Type;
-        if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kConstBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kSampler, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kUAVTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
-        }
-        else
-        {
-            AL_ASSERT(true);
-        }
-        ret.second._register_space = bind_desc.Space;
-        return ret;
-    }
     void D3DShader::LoadShaderReflection(u16 pass_index, ShaderVariantHash variant_hash, ID3D12ShaderReflection *ref_vs, ID3D12ShaderReflection *ref_ps)
     {
         AL_ASSERT(pass_index < _passes.size());
@@ -690,9 +819,10 @@ namespace Ailu
                 ref_vs->GetInputParameterDesc(i, &input_desc);
                 EShaderDateType data_type = D3DConvertUtils::GetShaderDataType(input_desc.SemanticName, input_desc.Mask);
                 _pass_elements[pass_index]._variants[variant_hash]._vertex_input_layout[i] = D3D12_INPUT_ELEMENT_DESC{input_desc.SemanticName, 0, D3DConvertUtils::GetGXGIFormatByShaderDataType(data_type), i, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0};
-                //++pass_variant._vertex_input_num;
                 if (data_type != EShaderDateType::kNone)
-                    vb_input_desc.emplace_back(input_desc.SemanticName, data_type, input_desc.Register);
+                {
+                    vb_input_desc.emplace_back(input_desc.SemanticName, data_type, input_desc.Register,input_desc.SemanticIndex);
+                }
                 else
                 {
                     g_pLogMgr->LogWarningFormat("LoadShaderReflection {} skip input element: {}", _name, input_desc.SemanticName);
@@ -718,20 +848,7 @@ namespace Ailu
                     auto variable = cbuf->GetVariableByIndex(j);
                     D3D12_SHADER_VARIABLE_DESC vdesc{};
                     variable->GetDesc(&vdesc);
-                    u16 offset = (u16) vdesc.StartOffset;
-                    u16 size = (u16) vdesc.Size;
-                    u32 variable_info = 0u;
-                    variable_info |= offset;
-                    variable_info <<= 16;
-                    variable_info |= size;
-                    auto value_type = EBindResDescType::kCBufferAttribute;
-                    if (size == 4) value_type = (EBindResDescType) (EBindResDescType::kCBufferFloat | value_type);
-                    else if (size == 16)
-                        value_type = (EBindResDescType) (EBindResDescType::kCBufferFloat4 | value_type);
-                    else if (size == 64)
-                        value_type = (EBindResDescType) (EBindResDescType::kCBufferMatrix4 | value_type);
-                    else {}
-                    auto info = ShaderBindResourceInfo{value_type, variable_info, 0u, vdesc.Name};
+                    auto info = ParserBindVariable(vdesc);
                     info._bind_flag = flag;
                     info._p_root_cbuf = &pass_variant._bind_res_infos.find(desc.Name)->second;
                     pass_variant._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
@@ -745,7 +862,7 @@ namespace Ailu
             {
                 D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
                 ref_ps->GetResourceBindingDesc(i, &bind_desc);
-                LOG_INFO("Name:{},Slot{},Space{}", bind_desc.Name, bind_desc.BindPoint, bind_desc.Space);
+                //LOG_INFO("Name:{},Slot{},Space{}", bind_desc.Name, bind_desc.BindPoint, bind_desc.Space);
                 pass_variant._bind_res_infos.insert(ParserBindResource(bind_desc));
             }
             for (u32 i = 0u; i < desc.ConstantBuffers; i++)
@@ -759,20 +876,7 @@ namespace Ailu
                     auto variable = cbuf->GetVariableByIndex(j);
                     D3D12_SHADER_VARIABLE_DESC vdesc{};
                     variable->GetDesc(&vdesc);
-                    u16 offset = (u16) vdesc.StartOffset;
-                    u16 size = (u16) vdesc.Size;
-                    u32 variable_info = 0u;
-                    variable_info |= offset;
-                    variable_info <<= 16;
-                    variable_info |= size;
-                    auto value_type = EBindResDescType::kCBufferAttribute;
-                    if (size == 4) value_type = (EBindResDescType) (EBindResDescType::kCBufferFloat | value_type);
-                    else if (size == 16)
-                        value_type = (EBindResDescType) (EBindResDescType::kCBufferFloat4 | value_type);
-                    else if (size == 64)
-                        value_type = (EBindResDescType) (EBindResDescType::kCBufferMatrix4 | value_type);
-                    else {}
-                    auto info = ShaderBindResourceInfo{value_type, variable_info, 0u, vdesc.Name};
+                    auto info = ParserBindVariable(vdesc);
                     info._bind_flag = flag;
                     pass_variant._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
                 }
@@ -808,7 +912,9 @@ namespace Ailu
         return _pass_elements[pass_index]._variants[variant_hash]._p_sig.Get();
     }
 
+#pragma endregion
 
+#pragma region D3DComputeShader
     //-------------------------------------------------------------------------------D3DComputeShader---------------------------------------------------------------------------
     D3DComputeShader::D3DComputeShader(const WString &sys_path) : ComputeShader(sys_path)
     {
@@ -822,37 +928,41 @@ namespace Ailu
             LOG_WARNING("ComputeShader or kernel id is not valid!");
             return;
         }
+        ComputeShader::Bind(cmd, kernel, thread_group_x, thread_group_y, thread_group_z);
+        ShaderVariantHash cur_hash = _kernels[kernel]._active_variant;
+        if (_variant_state[kernel][cur_hash] != EShaderVariantState::kReady)
+            return;
         auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
-        auto &d3d_ele = _elements[kernel];
-        auto &cs_ele = _kernels[kernel];
-        d3d_ele._pso_sys.Bind(d3dcmd);
+        auto &d3d_ele = _elements[kernel]._variants[cur_hash];
+        auto &cs_ele = _kernels[kernel]._variants[cur_hash];
+        d3dcmd->SetPipelineState(d3d_ele._pso.Get());
+        d3dcmd->SetComputeRootSignature(d3d_ele._p_sig.Get());
         for (auto &info: cs_ele._bind_res_infos)
         {
             auto &bind_info = info.second;
             if (bind_info._p_res != nullptr)
             {
+                auto &view_info = _texture_addi_bind_info[bind_info._bind_slot];
                 if (bind_info._res_type == EBindResDescType::kTexture2D)
                 {
                     auto tex = static_cast<Texture2D *>(bind_info._p_res);
-                    auto &view_info = _texture_addi_bind_info[bind_info._bind_slot];
-                    tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, 0), bind_info._bind_slot, view_info._sub_res, true);
+                    u16 view_index = view_info._view_index == (u16)-1? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, 0) : view_info._view_index;
+                    tex->Bind(cmd, view_index, bind_info._bind_slot, view_info._sub_res, true);
                 }
                 else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
                 {
                     auto tex = static_cast<Texture *>(bind_info._p_res);
-                    auto &view_info = _texture_addi_bind_info[bind_info._bind_slot];
                     tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, 0), bind_info._bind_slot, view_info._sub_res, true);
                 }
                 if (bind_info._res_type == EBindResDescType::kTexture3D)
                 {
                     auto tex = static_cast<Texture3D *>(bind_info._p_res);
-                    auto &view_info = _texture_addi_bind_info[bind_info._bind_slot];
-                    tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, view_info._slice), bind_info._bind_slot, view_info._sub_res, true);
+                    u16 view_index = view_info._view_index == (u16)-1? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, view_info._slice): view_info._view_index;
+                    tex->Bind(cmd, view_index, bind_info._bind_slot, view_info._sub_res, true);
                 }
                 else if (bind_info._res_type == EBindResDescType::kRWTexture3D)
                 {
                     auto tex = static_cast<Texture3D *>(bind_info._p_res);
-                    auto &view_info = _texture_addi_bind_info[bind_info._bind_slot];
                     tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, view_info._slice), bind_info._bind_slot, view_info._sub_res, true);
                 }
                 else if (bind_info._res_type == EBindResDescType::kRWBuffer)
@@ -877,9 +987,9 @@ namespace Ailu
         //d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
     }
 
-    void D3DComputeShader::LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index)
+    void D3DComputeShader::LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index,ShaderVariantHash variant_hash)
     {
-        auto &cs_ele = _kernels[kernel_index];
+        auto &cs_ele = _kernels[kernel_index]._variants[variant_hash];
         D3D12_SHADER_DESC desc{};
         cs_ele._temp_bind_res_infos.clear();
         //parser vs reflecton
@@ -901,20 +1011,7 @@ namespace Ailu
                 auto variable = cbuf->GetVariableByIndex(j);
                 D3D12_SHADER_VARIABLE_DESC vdesc{};
                 variable->GetDesc(&vdesc);
-                u16 offset = (u16) vdesc.StartOffset;
-                u16 size = (u16) vdesc.Size;
-                u32 variable_info = 0u;
-                variable_info |= offset;
-                variable_info <<= 16;
-                variable_info |= size;
-                auto value_type = EBindResDescType::kCBufferAttribute;
-                if (size == 4) value_type = (EBindResDescType) (EBindResDescType::kCBufferFloat | value_type);
-                else if (size == 16)
-                    value_type = (EBindResDescType) (EBindResDescType::kCBufferFloat4 | value_type);
-                else if (size == 64)
-                    value_type = (EBindResDescType) (EBindResDescType::kCBufferMatrix4 | value_type);
-                else {}
-                auto info = ShaderBindResourceInfo{value_type, variable_info, 0u, vdesc.Name};
+                auto info = ParserBindVariable(vdesc);
                 info._p_root_cbuf = &cs_ele._temp_bind_res_infos.find(desc.Name)->second;
                 cs_ele._temp_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
             }
@@ -931,112 +1028,16 @@ namespace Ailu
         vector<string> lines;
         List<WString> cur_file_head_files{};
         WString parent_path = su::SubStrRange(_src_file_path, 0, _src_file_path.find_last_of(L"/"));
+        auto& cur_kernel = _kernels[kernel_index]._variants[variant_hash];
         while (getline(src, line))
         {
             line = su::Trim(line);
-            if (su::BeginWith(line, "#include"))
+            if (su::BeginWith(line,"//"))
             {
-                //头文件解析转移到创还能字节码时
-                //size_t path_start = line.find_first_of("\"");
-                //size_t path_end = line.find_last_of("\"");
-                //WString head_file = ToWStr(su::SubStrRange(line, path_start + 1, path_end - 1).c_str());
-                //_passes[pass_index]._source_files.insert(parent_path + head_file);
-                //cur_file_head_files.emplace_back(head_file);
+                lines.emplace_back(line);
+                continue;
             }
-            else if (su::BeginWith(line, "Texture2D"))
-            {
-                size_t name_begin = line.find_first_of("D") + 1;
-                size_t name_end = line.find_first_of(":") - 1;
-                String tex_name = line.substr(name_begin, name_end - name_begin);
-            }
-            else if (su::BeginWith(line, "RWBuffer"))
-            {
-                auto eol = line.find_first_of("<") == line.length() ? "r" : ">";
-                size_t name_begin = line.find_first_of(eol) + 1;
-                size_t name_end = line.find_first_of(";");
-                String tex_name = line.substr(name_begin, name_end - name_begin);
-                su::RemoveSpaces(tex_name);
-                auto it = _kernels[kernel_index]._temp_bind_res_infos.find(tex_name);
-                if (it != _kernels[kernel_index]._temp_bind_res_infos.end())
-                {
-                    it->second._res_type = EBindResDescType::kRWBuffer;
-                }
-            }
-            else if (su::BeginWith(line, "Texture3D"))
-            {
-                auto eol = line.find_first_of("<") == line.length() ? "D" : ">";
-                size_t name_begin = line.find_first_of(eol) + 1;
-                size_t name_end = line.find_first_of(";");
-                String tex_name = line.substr(name_begin, name_end - name_begin);
-                su::RemoveSpaces(tex_name);
-                auto it = _kernels[kernel_index]._temp_bind_res_infos.find(tex_name);
-                if (it != _kernels[kernel_index]._temp_bind_res_infos.end())
-                {
-                    it->second._res_type = EBindResDescType::kTexture3D;
-                }
-            }
-            else if (su::BeginWith(line, "TEXTURE3D"))
-            {
-                size_t name_begin = line.find_first_of("(") + 1;
-                size_t name_end = line.find_first_of(")") - 1;
-                String tex_name = line.substr(name_begin, name_end - name_begin);
-                auto it = _kernels[kernel_index]._temp_bind_res_infos.find(tex_name);
-                if (it != _kernels[kernel_index]._temp_bind_res_infos.end())
-                {
-                    it->second._res_type = EBindResDescType::kTexture3D;
-                }
-            }
-            else if (su::BeginWith(line, "RWTexture3D"))
-            {
-                auto eol = line.find_first_of("<") == line.length() ? "D" : ">";
-                size_t name_begin = line.find_first_of(eol) + 1;
-                size_t name_end = line.find_first_of(";");
-                String tex_name = line.substr(name_begin, name_end - name_begin);
-                su::RemoveSpaces(tex_name);
-                auto it = _kernels[kernel_index]._temp_bind_res_infos.find(tex_name);
-                if (it != _kernels[kernel_index]._temp_bind_res_infos.end())
-                {
-                    it->second._res_type = EBindResDescType::kRWTexture3D;
-                }
-            }
-            else if (su::BeginWith(line, "uint"))
-            {
-                std::regex pattern(R"(^(\w+)\s+(\w+)\s*;)");
-                std::smatch matches;
-                if (std::regex_match(line, matches, pattern))
-                {
-                    const auto &type_name = matches[1].str();
-                    const auto &value_name = matches[2].str();
-                    auto it = _kernels[kernel_index]._temp_bind_res_infos.find(value_name);
-                    if (it != _kernels[kernel_index]._temp_bind_res_infos.end())
-                    {
-                        auto &c = it->second;
-                        if (type_name == "uint4")
-                            it->second._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferUint4);
-                        else
-                            it->second._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferUint);
-                    }
-                }
-            }
-            else if (su::BeginWith(line, "int"))
-            {
-                std::regex pattern(R"(^(\w+)\s+(\w+)\s*;)");
-                std::smatch matches;
-                if (std::regex_match(line, matches, pattern))
-                {
-                    const auto &type_name = matches[1].str();
-                    const auto &value_name = matches[2].str();
-                    auto it = _kernels[kernel_index]._temp_bind_res_infos.find(value_name);
-                    if (it != _kernels[kernel_index]._temp_bind_res_infos.end())
-                    {
-                        auto &c = it->second;
-                        if (type_name == "int4")
-                            it->second._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferInt4);
-                        else
-                            it->second._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferInt);
-                    }
-                }
-            }
+            ParserBindResourceAddiInfo(_kernels[kernel_index]._variants[variant_hash]._temp_bind_res_infos,line);
             lines.emplace_back(line);
         }
         src.close();
@@ -1050,10 +1051,10 @@ namespace Ailu
         }
     }
 
-    bool D3DComputeShader::RHICompileImpl(u16 kernel_index)
+    bool D3DComputeShader::RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash)
     {
         if (kernel_index >= _kernels.size())
-            return true;
+            return false;
         {
             std::lock_guard<std::mutex> lock(_ele_lock);
             if (kernel_index >= _elements.size())
@@ -1063,14 +1064,16 @@ namespace Ailu
         ComPtr<ID3DBlob> tmp_blob = nullptr;
         ComPtr<ID3D12ShaderReflection> tmp_reflection{nullptr};
         std::set<WString> tmp_all_dep_file_pathes;
-        Vector<D3D_SHADER_MACRO> v = {{"COMPUTE", "1"}, {NULL, NULL}};
+        //Vector<D3D_SHADER_MACRO> v = {{"COMPUTE", "1"}, {NULL, NULL}};
+        auto& cur_variant = _kernels[kernel_index]._variants[variant_hash];
+        Vector<D3D_SHADER_MACRO> marcos = ConstructVariantMarcos(cur_variant._active_keywords);
         try
         {
 #ifdef SHADER_DXC
             CreateFromFileDXC(ToWStr(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
 #else
-            succeed &= CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_5_0, v, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes);
+            succeed &= CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_5_0, marcos, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes);
 #endif// SHADER_DXC
         }
         catch (const std::exception &)
@@ -1081,17 +1084,19 @@ namespace Ailu
         }
         if (succeed)
         {
-            _elements[kernel_index]._p_blob = tmp_blob;
-            LoadReflectionInfo(tmp_reflection.Get(), kernel_index);
-            LoadAdditionalShaderReflection(_src_file_path, kernel_index);
-            GenerateInternalPSO(kernel_index);
+            for(auto& p : tmp_all_dep_file_pathes)
+                cur_variant._all_dep_file_pathes.insert(p);
+            _elements[kernel_index]._variants[variant_hash]._p_blob = tmp_blob;
+            LoadReflectionInfo(tmp_reflection.Get(), kernel_index,variant_hash);
+            LoadAdditionalShaderReflection(_src_file_path, kernel_index,variant_hash);
+            GenerateInternalPSO(kernel_index,variant_hash);
             succeed = _is_valid;
             g_pLogMgr->LogFormat(L"Compile shader with src {0} succeed!", _src_file_path);
         }
         return succeed;
     }
 
-    void D3DComputeShader::GenerateInternalPSO(u16 kernel_index)
+    void D3DComputeShader::GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash)
     {
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -1104,21 +1109,7 @@ namespace Ailu
         CD3DX12_ROOT_PARAMETER1 rootParameters[32]{};
         int cbuf_mask = 0, texture_count = 0;
         u8 root_param_index = 0;
-        //for (auto it = _temp_bind_res_infos.begin(); it != _temp_bind_res_infos.end(); it++)
-        //{
-        //	auto& desc = it->second;
-        //	//if (desc._res_type == EBindResDescType::kCBufferAttribute) continue;
-        //	if (desc._res_type == EBindResDescType::kConstBuffer)
-        //	{
-        //		//if (desc._name == RenderConstants::kCBufNamePerObject) cbuf_mask |= 0x01;
-        //		if (desc._name == RenderConstants::kCBufNamePerCamera) cbuf_mask |= 0x01;
-        //	}
-        //}
-        //if (cbuf_mask & 0x01)
-        //{
-        //	rootParameters[root_param_index++].InitAsConstantBufferView(1u);
-        //}
-        auto &cs_ele = _kernels[kernel_index];
+        auto &cs_ele = _kernels[kernel_index]._variants[variant_hash];
         for (auto it = cs_ele._temp_bind_res_infos.begin(); it != cs_ele._temp_bind_res_infos.end(); it++)
         {
             auto &desc = it->second;
@@ -1159,13 +1150,11 @@ namespace Ailu
                 ++root_param_index;
             }
         }
-        auto &d3d_ele = _elements[kernel_index];
-        auto [sig, pso] = d3d_ele._pso_sys.Back();
-        static Vector<CD3DX12_STATIC_SAMPLER_DESC> samplers{
-                CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_WRAP),
-                CD3DX12_STATIC_SAMPLER_DESC(1, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP),
-                CD3DX12_STATIC_SAMPLER_DESC(2, D3D12_FILTER_MIN_MAG_MIP_LINEAR, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER)};
+        auto &d3d_ele = _elements[kernel_index]._variants[variant_hash];
+        auto &sig = d3d_ele._p_sig;
+        auto &pso = d3d_ele._pso;
 
+        auto& samplers = CreateStaticSampler();
         D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(root_param_index, rootParameters, static_cast<u32>(samplers.size()), samplers.data(), rootSignatureFlags);
@@ -1181,7 +1170,6 @@ namespace Ailu
             pso_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
             if (SUCCEEDED(device->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&pso))))
             {
-                d3d_ele._pso_sys.Swap();
                 std::unordered_map<String, ShaderBindResourceInfo> cbuffer_bind_info;
                 u32 cbuffer_size = 0;
                 u16 cbuffer_count = 0;
@@ -1249,12 +1237,13 @@ namespace Ailu
             LOG_ERROR(L"Create compute shader {} failed when generate internal pso!", _src_file_path);
         }
     }
-    u16 D3DComputeShader::NameToSlot(const String &name, u16 kernel) const
+    u16 D3DComputeShader::NameToSlot(const String &name, u16 kernel,ShaderVariantHash variant_hash) const
     {
         AL_ASSERT(kernel < _kernels.size());
-        if (auto it = _kernels[kernel]._bind_res_infos.find(name); it != _kernels[kernel]._bind_res_infos.end())
+        if (auto it = _kernels[kernel]._variants.at(variant_hash)._bind_res_infos.find(name); it != _kernels[kernel]._variants.at(variant_hash)._bind_res_infos.end())
             return it->second._bind_slot;
         return INT16_MAX;
     }
+#pragma endregion
     //-------------------------------------------------------------------------------D3DComputeShader---------------------------------------------------------------------------
 }// namespace Ailu

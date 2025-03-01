@@ -4,13 +4,14 @@
 #endif 
 #define __POSTPROCESSPASS_GEN_H__
 //Class PostProcessPass begin...........................
-#define POSTPROCESSPASS_GEN_H_15_GENERATED_BODY \
-private: \
-    friend Ailu::Type* Z_Construct_PostProcessPass_Type();\
-    static Ailu::Type* GetPrivateStaticClass();\
-public:\
-    static class Ailu::Type *StaticType() {return GetPrivateStaticClass();};
-//Class PostProcessPass end...........................
+#define POSTPROCESSPASS_GEN_H_14_GENERATED_BODY \
+                            private: \
+                                friend Ailu::Type* Z_Construct_PostProcessPass_Type();\
+                                static Ailu::Type* GetPrivateStaticClass();\
+                            public:\
+                                static class Ailu::Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Ailu::Type  *GetType() const override;
+                            //Class PostProcessPass end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID POSTPROCESSPASS_GEN_H

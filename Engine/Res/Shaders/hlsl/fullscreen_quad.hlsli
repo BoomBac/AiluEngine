@@ -1,13 +1,13 @@
 #ifndef __FULLSCREEN_QUAD__
 #define __FULLSCREEN_QUAD__
 
-struct VSInput
+struct FullScreenVSInput
 {
 	float3 position : POSITION;
 	float2 uv : TEXCOORD;
 };
 
-struct PSInput
+struct FullScreenPSInput
 {
 	float4 position : SV_POSITION;
 	float2 uv : TEXCOORD0;
@@ -24,9 +24,9 @@ const static float2 uvs[3] = {
 	float2(2,1)
 };
 
-PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID)
+FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID)
 {
-	PSInput result;
+	FullScreenPSInput result;
 	result.position = fullscreen_triangle[vertex_id];
 	result.uv = uvs[vertex_id];
 	return result;

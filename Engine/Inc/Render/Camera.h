@@ -5,8 +5,8 @@
 #include "Framework/Math/Geometry.h"
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
-#include "Render/RenderingData.h"
 #include "Objects/Serialize.h"
+#include "Render/RenderingData.h"
 
 namespace Ailu
 {
@@ -35,11 +35,13 @@ namespace Ailu
         static Camera *GetDefaultCamera();
         static void DrawGizmo(const Camera *p_camera, Color c);
         static void CalcViewFrustumPlane(const Camera *cam, ViewFrustum &vf);
-        static Matrix4x4f GetDefaultOrthogonalViewProj(f32 w,f32 h,f32 near = 1.f,f32 far = 200.f);
+        static Matrix4x4f GetDefaultOrthogonalViewProj(f32 w, f32 h, f32 near = 1.f, f32 far = 200.f);
         //when the eye_camera turns, the AABB is recalculated, resulting in shadow jitter
         static AABB GetBoundingAABB(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);
         static Sphere GetShadowCascadeSphere(const Camera &eye_cam, f32 start = 0.0f, f32 end = -1.0f);
         static Camera &GetCubemapGenCamera(const Camera &base_cam, ECubemapFace::ECubemapFace face);
+    public:
+        static void CalculateZBUfferAndProjParams(const Camera &cam, Vector4f &zb, Vector4f &proj_params);
         Camera();
         Camera(float aspect, float near_clip = 10.0f, float far_clip = 10000.0f, ECameraType::ECameraType camera_type = ECameraType::kPerspective);
         void RecalculateMarix(bool force = false);
@@ -62,10 +64,18 @@ namespace Ailu
         void TargetTexture(RenderTexture *output) { _target_texture = output; }
         void SetViewAndProj(const Matrix4x4f &view, const Matrix4x4f &proj);
         void SetPixelSize(u16 w, u16 h);
+        /// @brief 获取视椎体世界坐标系的四个边指向远平面方向（归一化）
+        /// @param lt 左上
+        /// @param lb 左下
+        /// @param rt 右上
+        /// @param rb 右下
+        void GetCornerInWorld(Vector3f &lt, Vector3f &lb, Vector3f &rt, Vector3f &rb) const;
         //temp
         bool IsCustomVP() const { return _is_custom_vp; }
         friend Archive &operator<<(Archive &ar, const Camera &c);
         friend Archive &operator>>(Archive &ar, Camera &c);
+        Vector4f GetZBufferParams() const { return _zbuffer_params; }
+        Vector4f GetProjParams() const { return _proj_params; }
     public:
         u32 _layer_mask = (u32) -1;
         bool _is_scene_camera = false;
@@ -74,6 +84,7 @@ namespace Ailu
         bool _is_enable_postprocess = true;
         bool _is_gen_voxel = false;
         bool _is_enable = false;
+
     private:
         void CalculateFrustum();
 
@@ -83,7 +94,8 @@ namespace Ailu
         bool _is_dirty = true;
         Matrix4x4f _view_matrix{};
         Matrix4x4f _proj_matrix{};
-
+        Vector4f _zbuffer_params;
+        Vector4f _proj_params;
         Vector3f _near_top_left;
         Vector3f _near_top_right;
         Vector3f _near_bottom_left;

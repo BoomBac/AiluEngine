@@ -228,7 +228,7 @@ namespace Ailu
             ImGuizmo::SetDrawlist();
             ImGuizmo::SetRect(_content_pos.x, _content_pos.y, _content_size.x, _content_size.y);
             const auto &view = Camera::sCurrent->GetView();
-            const auto &proj = Camera::sCurrent->GetProjection();
+            const auto proj = MatrixReverseZ(Camera::sCurrent->GetProjection());
             _is_transform_gizmo_snap = Input::IsKeyPressed(AL_KEY_CONTROL);
             bool is_pivot_point_center = true;
             bool is_single_mode = selected_entities.size() == 1;

@@ -32,8 +32,8 @@ namespace Ailu
         void ClearRenderTarget(RenderTexture *color, RenderTexture *depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(Vector<RenderTexture *> &colors, RenderTexture *depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(RenderTexture *color, Vector4f clear_color, u16 index = 0u) final;
-        void ClearRenderTarget(RenderTexture *depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
-        void ClearRenderTarget(RenderTexture *depth, u16 index, float depth_value = 1.0f) final;
+        void ClearRenderTarget(RenderTexture *depth, float depth_value = kZFar, u8 stencil_value = 0u) final;
+        void ClearRenderTarget(RenderTexture *depth, u16 index, float depth_value = kZFar) final;
         void SetRenderTarget(RenderTexture *color, RenderTexture *depth) final;
         void SetRenderTargets(Vector<RenderTexture *> &colors, RenderTexture *depth) final;
         void SetRenderTarget(RenderTexture *color, u16 index = 0u) final;
@@ -44,7 +44,7 @@ namespace Ailu
         void ClearRenderTarget(RTHandle color, RTHandle depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(Vector<RTHandle> &colors, RTHandle depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(RTHandle color, Vector4f clear_color, u16 index = 0u) final;
-        void ClearRenderTarget(RTHandle depth, float depth_value = 1.0f, u8 stencil_value = 0u) final;
+        void ClearRenderTarget(RTHandle depth, float depth_value = kZFar, u8 stencil_value = 0u) final;
         void SetRenderTargets(Vector<RTHandle> &colors, RTHandle depth) final;
 
         RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access);
@@ -85,6 +85,7 @@ namespace Ailu
         u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count = 1u) final;
         u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count, u16 pass_index) final;
 
+        void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y) final;
         void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
 
         ID3D12GraphicsCommandList *GetCmdList() { return _p_cmd.Get(); }

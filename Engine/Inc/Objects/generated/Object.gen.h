@@ -4,13 +4,14 @@
 #endif 
 #define __OBJECT_GEN_H__
 //Class Object begin...........................
-#define OBJECT_GEN_H_16_GENERATED_BODY \
-private: \
-    friend Ailu::Type* Z_Construct_Object_Type();\
-    static Ailu::Type* GetPrivateStaticClass();\
-public:\
-    static class Ailu::Type *StaticType() {return GetPrivateStaticClass();};
-//Class Object end...........................
+#define OBJECT_GEN_H_15_GENERATED_BODY \
+                            private: \
+                                friend Ailu::Type* Z_Construct_Object_Type();\
+                                static Ailu::Type* GetPrivateStaticClass();\
+                            public:\
+                                static class Ailu::Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Ailu::Type  *GetType() const;
+                            //Class Object end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID OBJECT_GEN_H

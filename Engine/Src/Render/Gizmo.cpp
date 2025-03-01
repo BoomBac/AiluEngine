@@ -1,27 +1,47 @@
-#include "pch.h"
 #include "Render/Gizmo.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Render/GraphicsPipelineStateObject.h"
+#include "pch.h"
 
 namespace Ailu
 {
-    void Gizmo::Init()
+    static Gizmo *s_pInstance = nullptr;
+    Gizmo::Gizmo()
     {
         VertexBufferLayout layout = {
-                {"POSITION",EShaderDateType::kFloat3,0},
-                {"COLOR",EShaderDateType::kFloat4,1},
+                {"POSITION", EShaderDateType::kFloat3, 0},
+                {"COLOR", EShaderDateType::kFloat4, 1},
         };
-        s_world_vbuf.reset(IVertexBuffer::Create(layout));
-        s_screen_vbuf.reset(IVertexBuffer::Create(layout));
-        s_world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
-        s_world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector4f), 1, true);
-        s_screen_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
-        s_screen_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector4f), 1, true);
-        s_world_pos.resize(kMaxVertexNum);
-        s_world_color.resize(kMaxVertexNum);
-        s_screen_pos.resize(kMaxVertexNum);
-        s_screen_color.resize(kMaxVertexNum);
+        _world_vbuf.reset(IVertexBuffer::Create(layout));
+        _screen_vbuf.reset(IVertexBuffer::Create(layout));
+        _world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
+        _world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector4f), 1, true);
+        _screen_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
+        _screen_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector4f), 1, true);
+        _world_pos.resize(kMaxVertexNum);
+        _world_color.resize(kMaxVertexNum);
+        _screen_pos.resize(kMaxVertexNum);
+        _screen_color.resize(kMaxVertexNum);
+        _tex_screen_vbufs.resize(kMaxDrawTextureNum);
+        for(u32 i = 0; i < kMaxDrawTextureNum;i++)
+        {
+            _tex_screen_vbufs[i].reset(IVertexBuffer::Create({
+                {"POSITION", EShaderDateType::kFloat2, 0},
+            }));
+            _tex_screen_vbufs[i]->SetStream(nullptr, 6 * sizeof(Vector2f), 0, true);
+        }
+
+        _draw_tex_items.resize(kMaxDrawTextureNum);
         s_color.a = 0.75f;
-        s_line_drawer = g_pResourceMgr->Get<Material>(L"Runtime/Material/Gizmo");
+        _line_drawer = g_pResourceMgr->Get<Material>(L"Runtime/Material/Gizmo");
+    }
+    void Gizmo::Initialize()
+    {
+        s_pInstance = new Gizmo();
+    }
+    void Gizmo::Shutdown()
+    {
+        DESTORY_PTR(s_pInstance);
     }
 
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, Color color)
@@ -33,7 +53,7 @@ namespace Ailu
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, f32 duration_sec, Color color)
     {
         s_geometry_draw_list.emplace_back(std::make_tuple([=]()
-                                                          { DrawLine(from, to, color); }, std::chrono::system_clock::now(), (u32)duration_sec));
+                                                          { DrawLine(from, to, color); }, std::chrono::system_clock::now(), (u32) duration_sec));
     }
 
     void Gizmo::DrawCircle(const Vector3f &center, float radius, u16 num_segments, Color color, Matrix4x4f mat)
@@ -69,9 +89,9 @@ namespace Ailu
     }
     void Gizmo::DrawSphere(const Sphere &s, f32 duration_sec, Color color)
     {
-        DrawCircle(s._center, s._radius, 24, duration_sec,color, MatrixRotationX(ToRadius(90.0f)));
-        DrawCircle(s._center, s._radius, 24, duration_sec,color, MatrixRotationZ(ToRadius(90.0f)));
-        DrawCircle(s._center, s._radius, 24, duration_sec,color);
+        DrawCircle(s._center, s._radius, 24, duration_sec, color, MatrixRotationX(ToRadius(90.0f)));
+        DrawCircle(s._center, s._radius, 24, duration_sec, color, MatrixRotationZ(ToRadius(90.0f)));
+        DrawCircle(s._center, s._radius, 24, duration_sec, color);
     }
     void Gizmo::DrawAABB(const AABB &aabb, Color color)
     {
@@ -141,16 +161,16 @@ namespace Ailu
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, const Color &color_from, const Color &color_to)
     {
         if (Gizmo::s_color.a < 0.1f) return;
-        if (s_world_vertex_num + 2 >= RenderConstants::KMaxDynamicVertexNum)
+        if (s_pInstance->_world_vertex_num + 2 >= RenderConstants::KMaxDynamicVertexNum)
         {
             LOG_WARNING("Gizmo vertex buffer is full, some lines may not be drawn. Please increase the size of the vertex buffer.")
             return;
         }
-        s_world_pos[s_world_vertex_num] = from;
-        s_world_pos[s_world_vertex_num+1] = to;
-        s_world_color[s_world_vertex_num] = color_from * s_color.a;
-        s_world_color[s_world_vertex_num+1] = color_to * s_color.a;
-        s_world_vertex_num += 2;
+        s_pInstance->_world_pos[s_pInstance->_world_vertex_num] = from;
+        s_pInstance->_world_pos[s_pInstance->_world_vertex_num + 1] = to;
+        s_pInstance->_world_color[s_pInstance->_world_vertex_num] = color_from * s_color.a;
+        s_pInstance->_world_color[s_pInstance->_world_vertex_num + 1] = color_to * s_color.a;
+        s_pInstance->_world_vertex_num += 2;
     }
 
     void Gizmo::DrawGrid(const int &grid_size, const int &grid_spacing, const Vector3f &center, Color color)
@@ -235,15 +255,15 @@ namespace Ailu
 
     void Gizmo::DrawCapsule(const Capsule &capsule, Color color)
     {
-        DrawCylinder(capsule._top, capsule._bottom, capsule._radius,4u,color);
+        DrawCylinder(capsule._top, capsule._bottom, capsule._radius, 4u, color);
         DrawHemisphere(capsule._top, capsule._bottom, capsule._radius, color);
         DrawHemisphere(capsule._bottom, capsule._top, capsule._radius, color);
     }
-    void Gizmo::DrawCylinder(const Vector3f &start, const Vector3f end, f32 radius, u16 segments,Color color)
+    void Gizmo::DrawCylinder(const Vector3f &start, const Vector3f end, f32 radius, u16 segments, Color color)
     {
         //Vector3f forward = Vector3.Slerp(up, -up, 0.5f).normalized * radius;// 找到轴向垂直方向的一个向量
         //Vector3f right = Vector3.Cross(up, forward).normalized * radius;    // 找到另一个垂直方向的向量
-        Vector3f up =  Normalize(end - start);
+        Vector3f up = Normalize(end - start);
         Vector3f forward_base = Vector3f::kForward;
         if (forward_base == up || forward_base == (-up))
             forward_base = Vector3f::kRight;
@@ -254,14 +274,14 @@ namespace Ailu
         right *= radius;
         up *= radius;
 
-        DrawCircle(start, forward, right, segments*4, color);
-        DrawCircle(end, forward, right, segments*4, color);
+        DrawCircle(start, forward, right, segments * 4, color);
+        DrawCircle(end, forward, right, segments * 4, color);
 
         for (int i = 0; i < segments; i++)
         {
             float theta = (float) i / segments * kPi * 2;
             float nextTheta = (float) (i + 1) / segments * kPi * 2;
-            Vector3f offset1 = right * std::cos(theta) +     forward * std::sin(theta);
+            Vector3f offset1 = right * std::cos(theta) + forward * std::sin(theta);
             Vector3f offset2 = right * std::cos(nextTheta) + forward * std::sin(nextTheta);
             DrawLine(start + offset1, end + offset1, color);
             DrawLine(start + offset2, end + offset2, color);
@@ -296,7 +316,7 @@ namespace Ailu
         }
     }
 
-    void Gizmo::DrawCircle(const Vector3f &center, const Vector3f &forward, const Vector3f &right, u16 num_segments,Color color)
+    void Gizmo::DrawCircle(const Vector3f &center, const Vector3f &forward, const Vector3f &right, u16 num_segments, Color color)
     {
         u16 sgem = num_segments;
         Vector3f lastPoint = center + right * std::cos(0) + forward * std::sin(0);
@@ -311,16 +331,16 @@ namespace Ailu
     void Gizmo::DrawLine(const Vector2f &from, const Vector2f &to, Color color)
     {
         if (Gizmo::s_color.a < 0.1f) return;
-        if (s_screen_vertex_num + 2 >= RenderConstants::KMaxDynamicVertexNum)
+        if (s_pInstance->_screen_vertex_num + 2 >= RenderConstants::KMaxDynamicVertexNum)
         {
             LOG_WARNING("Gizmo vertex buffer is full, some lines may not be drawn. Please increase the size of the vertex buffer.")
             return;
         }
-        s_screen_pos[s_screen_vertex_num] = Vector3f{from,-48.5f}; //default camera pos at z is -50,near is 1
-        s_screen_pos[s_screen_vertex_num+1] = Vector3f{to,-48.5f};
-        s_screen_color[s_screen_vertex_num] = color * s_color.a;
-        s_screen_color[s_screen_vertex_num+1] = color * s_color.a;
-        s_screen_vertex_num += 2;
+        s_pInstance->_screen_pos[s_pInstance->_screen_vertex_num] = Vector3f{from, -48.5f};//default camera pos at z is -50,near is 1
+        s_pInstance->_screen_pos[s_pInstance->_screen_vertex_num + 1] = Vector3f{to, -48.5f};
+        s_pInstance->_screen_color[s_pInstance->_screen_vertex_num] = color * s_color.a;
+        s_pInstance->_screen_color[s_pInstance->_screen_vertex_num + 1] = color * s_color.a;
+        s_pInstance->_screen_vertex_num += 2;
     }
     void Gizmo::DrawRect(const Vector2f &top_left, const Vector2f &bottom_right, Color color)
     {
@@ -333,15 +353,25 @@ namespace Ailu
         DrawLine(bottom_left, top_left, color);
     }
 
+    void Gizmo::DrawTexture(const Rect &rect, Texture *tex)
+    {
+        s_pInstance->_draw_tex_items[s_pInstance->_tex_screen_item_num++] = {rect, tex};
+    }
+
     void Gizmo::Submit(CommandBuffer *cmd, const RenderingData &data)
     {
-        if (s_world_vertex_num > RenderConstants::KMaxDynamicVertexNum)
+        //auto line_pso = GraphicsPipelineStateMgr::Get().GetLineGizmoPSO();
+        //line_pso->Bind(cmd);
+        //u8 camera_buf_slot = line_pso->NameToSlot(RenderConstants::kCBufNamePerCamera);
+        //line_pso->SetPipelineResource(cmd, data._p_per_camera_cbuf, EBindResDescType::kConstBuffer, camera_buf_slot);
+        if (s_pInstance->_world_vertex_num > RenderConstants::KMaxDynamicVertexNum)
         {
             LOG_WARNING("[Gizmo] vertex num > KMaxDynamicVertexNum {},draw nothing", RenderConstants::KMaxDynamicVertexNum);
-            s_world_vertex_num = 0;
+            s_pInstance->_world_vertex_num = 0;
             return;
         }
-        if (s_world_vertex_num > 0)
+
+        if (s_pInstance->_world_vertex_num > 0)
         {
             auto cur_time = std::chrono::system_clock::now();
             s_geometry_draw_list.erase(std::remove_if(s_geometry_draw_list.begin(), s_geometry_draw_list.end(),
@@ -355,22 +385,57 @@ namespace Ailu
                 auto &f = std::get<0>(it);
                 f();
             }
-            s_world_vbuf->SetData((u8*)s_world_pos.data(), s_world_vertex_num * sizeof(Vector3f),0u,0);
-            s_world_vbuf->SetData((u8*)s_world_color.data(), s_world_vertex_num * sizeof(Color), 1u, 0);
-            s_screen_vbuf->SetData((u8*)s_screen_pos.data(), s_screen_vertex_num * sizeof(Vector3f), 0u, 0);
-            s_screen_vbuf->SetData((u8*)s_screen_color.data(), s_screen_vertex_num * sizeof(Color), 1u, 0);
-            cmd->DrawInstanced(s_world_vbuf.get(), nullptr,s_line_drawer,0,1);
-            _screen_camera_cb._MatrixVP = Camera::GetDefaultOrthogonalViewProj(data._width, data._height);
-            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,&_screen_camera_cb, RenderConstants::kPerCameraDataSize);
-            cmd->DrawInstanced(s_screen_vbuf.get(), nullptr,s_line_drawer,0,1);
+            s_pInstance->_world_vbuf->SetData((u8 *) s_pInstance->_world_pos.data(), s_pInstance->_world_vertex_num * sizeof(Vector3f), 0u, 0);
+            s_pInstance->_world_vbuf->SetData((u8 *) s_pInstance->_world_color.data(), s_pInstance->_world_vertex_num * sizeof(Color), 1u, 0);
+            cmd->DrawInstanced(s_pInstance->_world_vbuf.get(), nullptr, s_pInstance->_line_drawer, 0, 1);
+            s_pInstance->_world_vertex_num = 0u;
         }
-        s_world_vertex_num = 0u;
-        s_screen_vertex_num = 0u;
+        if (s_pInstance->_screen_vertex_num > 0)
+        {
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &s_pInstance->_screen_camera_cb, RenderConstants::kPerCameraDataSize);
+            s_pInstance->_screen_vbuf->SetData((u8 *) s_pInstance->_screen_pos.data(), s_pInstance->_screen_vertex_num * sizeof(Vector3f), 0u, 0);
+            s_pInstance->_screen_vbuf->SetData((u8 *) s_pInstance->_screen_color.data(), s_pInstance->_screen_vertex_num * sizeof(Color), 1u, 0);
+            s_pInstance->_screen_camera_cb._MatrixVP = Camera::GetDefaultOrthogonalViewProj((f32)data._width, (f32)data._height);
+            cmd->DrawInstanced(s_pInstance->_screen_vbuf.get(), nullptr, s_pInstance->_line_drawer, 0, 1);
+            s_pInstance->_screen_vertex_num = 0u;
+        }
+        if (s_pInstance->_tex_screen_item_num > 0)
+        {
+            for(u32 i = 0; i < s_pInstance->_tex_screen_item_num; ++i)
+            {
+                auto &item = s_pInstance->_draw_tex_items[i];
+                static auto screen_pos_to_ndc = [](u16 x,u16 y,u16 vp_w,u16 vp_h)->Vector2f
+                {
+                    Vector2f ret;
+                    ret.x = (f32)x / (f32)vp_w * 2.0f - 1.0f;
+                    ret.y = 1.0f - (f32)y / (f32)vp_h * 2.0f;
+                    return ret;
+                };
+                Vector2f lt = screen_pos_to_ndc(item._rect.left, item._rect.top, data._width, data._height);
+                Vector2f rb = screen_pos_to_ndc(item._rect.left + item._rect.width, item._rect.top + item._rect.height, data._width, data._height);
+                Vector2f rt = Vector2f{rb.x, lt.y};
+                Vector2f lb = Vector2f{lt.x, rb.y};
+                Vector2f buf[6];
+                buf[0] = lt;
+                buf[1] = rt;
+                buf[2] = lb;
+                buf[3] = rt;
+                buf[4] = rb;
+                buf[5] = lb;
+                s_pInstance->_tex_screen_vbufs[i]->SetData((u8 *) buf, sizeof(buf), 0u, 0);
+                s_pInstance->_line_drawer->SetTexture("_MainTex",item._tex);
+                cmd->DrawInstanced(s_pInstance->_tex_screen_vbufs[i].get(), nullptr, s_pInstance->_line_drawer, 1, 1);
+            }
+        }
     }
     //当GizmoPass未激活时，实际可能还会有数据在填充，所以将顶点偏移置空。一定要调用
     //当激活时，实际就不用调用
     void Gizmo::EndFrame()
     {
-
+        for(u32 i = 0; i < s_pInstance->_tex_screen_item_num; ++i)
+        {
+            s_pInstance->_draw_tex_items[i]._tex = nullptr;
+        }
+        s_pInstance->_tex_screen_item_num = 0u;
     }
-}
+}// namespace Ailu

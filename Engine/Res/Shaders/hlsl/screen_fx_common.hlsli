@@ -32,18 +32,19 @@ float Random(float2 p)
 float3 GetPosViewSpace(float2 screen_pos)
 {
     float2 uv = screen_pos;
-    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, g_LinearWrapSampler, uv,0).x;
-#if !UNITY_REVERSED_Z
-    depth = depth * 2 - 1;
-#endif
+    float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, g_LinearWrapSampler, uv,0);
+    float3 world_pos = ComputeWorldSpacePosition(screen_pos,depth,_MatrixIVP);
+// #if !UNITY_REVERSED_Z
+//     depth = depth * 2 - 1;
+// #endif
 
-#if UNITY_REVERSED_Z
-    uv.y = 1 - uv.y;
-#endif
-    float4 clipPos = float4(2.0f * uv - 1.0f, depth, 1.0);//
-    float4 worldSpacePos = mul(_MatrixIVP, clipPos);
-    worldSpacePos /= worldSpacePos.w;
-    float4 hviewPos = mul(_MatrixV,worldSpacePos);
+// #if UNITY_REVERSED_Z
+//     uv.y = 1 - uv.y;
+// #endif
+//     float4 clipPos = float4(2.0f * uv - 1.0f, depth, 1.0);//
+//     float4 worldSpacePos = mul(_MatrixIVP, clipPos);
+//    worldSpacePos /= worldSpacePos.w;
+    float4 hviewPos = mul(_MatrixV,float4(world_pos,1.0));
     hviewPos.z *= -1.0;
     float3 viewPos = hviewPos.xyz / hviewPos.w;
     //return worldSpacePos.xyz;
@@ -73,10 +74,10 @@ float3 GetPosViewSpace(float2 screen_pos,float depth)
 float3 GetNormalViewSpace(float2 screen_pos)
 {
 #ifdef DEFERED_RENDERING
-    float2 packed_n = SAMPLE_TEXTURE2D(_CameraNormalsTexture, g_LinearClampSampler, screen_pos).xy;
+    float2 packed_n = SAMPLE_TEXTURE2D_LOD(_CameraNormalsTexture, g_LinearClampSampler, screen_pos,0).xy;
     float3 n = UnpackNormal(packed_n);
 #else
-    float3 n = SAMPLE_TEXTURE2D(_CameraNormalsTexture, g_LinearClampSampler, screen_pos).xyz;
+    float3 n = SAMPLE_TEXTURE2D_LOD(_CameraNormalsTexture, g_LinearClampSampler, screen_pos,0).xyz;
     n = n * 2 - 1;
 #endif
     n = TransformWorldToViewDir(n);
@@ -93,10 +94,10 @@ float3 GetNormalViewSpace(float2 screen_pos,float3 n)
 float3 GetNormal(float2 screen_pos)
 {
 #ifdef DEFERED_RENDERING 
-    float2 packed_n = SAMPLE_TEXTURE2D(_CameraNormalsTexture, g_LinearClampSampler, screen_pos).xy;
+    float2 packed_n = SAMPLE_TEXTURE2D_LOD(_CameraNormalsTexture, g_LinearClampSampler, screen_pos,0).xy;
     float3 n = UnpackNormal(packed_n);
 #else
-    float3 n = SAMPLE_TEXTURE2D(_CameraNormalsTexture, g_LinearClampSampler, screen_pos).xyz;
+    float3 n = SAMPLE_TEXTURE2D_LOD(_CameraNormalsTexture, g_LinearClampSampler, screen_pos,0).xyz;
     n = n * 2 - 1;
 #endif
     return n;
@@ -104,7 +105,7 @@ float3 GetNormal(float2 screen_pos)
 
 float GetRawDepth(float2 screen_pos)
 {
-    return SAMPLE_TEXTURE2D(_CameraDepthTexture, g_LinearClampSampler, screen_pos).x;
+    return SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture, g_LinearClampSampler, screen_pos,0);
 }
 
 // half3 GaussianBlur(float2 uv, float sigma)

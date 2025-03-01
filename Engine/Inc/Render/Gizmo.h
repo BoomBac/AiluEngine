@@ -13,7 +13,9 @@ namespace Ailu
     private:
         inline static List<std::tuple<std::function<void()>, std::chrono::system_clock::time_point, std::chrono::seconds>> s_geometry_draw_list;
     public:
-        static void Init();
+        static void Initialize();
+        static void Shutdown();
+
         static void DrawLine(const Vector3f &from, const Vector3f &to, Color color = Gizmo::s_color);
         static void DrawLine(const Vector3f &from, const Vector3f &to, f32 duration_sec, Color color = Gizmo::s_color);
         static void DrawCircle(const Vector3f &center, float radius, u16 num_segments, Color color = Gizmo::s_color, Matrix4x4f mat = BuildIdentityMatrix());
@@ -34,29 +36,41 @@ namespace Ailu
         static void DrawLine(const Vector2f &from, const Vector2f &to, Color color = Gizmo::s_color);
         static void DrawRect(const Vector2f& top_left,const Vector2f& bottom_right,Color color = Gizmo::s_color);
 
+        static void DrawTexture(const Rect& rect,Texture* tex);
+
         static void Submit(CommandBuffer *cmd,const RenderingData& data);
 
         //当GizmoPass未激活时，实际可能还会有数据在填充，所以将顶点偏移置空。一定要调用
         //当激活时，实际就不用调用
         static void EndFrame();
 
+        explicit Gizmo();
     public:
         inline static Color s_color = Colors::kGray;
         inline static u32 kMaxVertexNum = 4096u;
+        inline static u32 kMaxDrawTextureNum = 32u;
+        inline static const int kSegments = 24;
     private:
         static void DrawHemisphere(const Vector3f &center, const Vector3f &axis, f32 radius, Color color = Gizmo::s_color);
     private:
-        inline static u32 s_world_vertex_num = 0u;
-        inline static u32 s_screen_vertex_num = 0u;
-        inline static const int kSegments = 24;
-        inline static Ref<IVertexBuffer> s_world_vbuf = nullptr;
-        inline static Ref<IVertexBuffer> s_screen_vbuf = nullptr;
-        inline static CBufferPerCameraData _screen_camera_cb;
-        inline static Material* s_line_drawer;
-        inline static Vector<Vector3f> s_world_pos;
-        inline static Vector<Vector4f> s_world_color;
-        inline static Vector<Vector3f> s_screen_pos;
-        inline static Vector<Vector4f> s_screen_color;
+        u32 _world_vertex_num = 0u;
+        u32 _screen_vertex_num = 0u;
+        u32 _tex_screen_item_num = 0u;
+        Ref<IVertexBuffer> _world_vbuf = nullptr;
+        Ref<IVertexBuffer> _screen_vbuf = nullptr;
+        Vector<Ref<IVertexBuffer>> _tex_screen_vbufs;
+        CBufferPerCameraData _screen_camera_cb;
+        Material* _line_drawer;
+        Vector<Vector3f> _world_pos;
+        Vector<Vector4f> _world_color;
+        Vector<Vector3f> _screen_pos;
+        Vector<Vector4f> _screen_color;
+        struct DrawTextureItem
+        {
+            Rect _rect;
+            Texture* _tex;
+        };
+        Vector<DrawTextureItem> _draw_tex_items;
     };
 };// namespace Ailu
 

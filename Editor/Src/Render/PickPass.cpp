@@ -56,7 +56,7 @@ namespace Ailu
                             //Gizmo::DrawCube(t._position, comp->_size);
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
                             Gizmo::DrawAABB(t._position - ext,t._position + ext);
-                            cmd->DrawRenderer(Mesh::s_p_cube.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
+                            cmd->DrawRenderer(Mesh::s_p_shpere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
                         }
                         else if (auto comp = r.GetComponent<CCamera>(entity); comp != nullptr)
                         {
@@ -66,7 +66,7 @@ namespace Ailu
                 }
                 //write to pick buffer
                 cmd->SetRenderTarget(_color, _depth);
-                cmd->ClearRenderTarget(_color, _depth, Colors::kBlack, 1.0f);
+                cmd->ClearRenderTarget(_color, _depth, Colors::kBlack, kZFar);
                 for (const auto &queue_data: *rendering_data._cull_results)
                 {
                     auto &[queue, objs] = queue_data;

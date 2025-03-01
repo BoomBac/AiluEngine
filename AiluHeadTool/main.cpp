@@ -92,14 +92,28 @@ std::chrono::system_clock::time_point StringToTimePoint(const std::string &timeS
 
 int main(int argc, char **argv)
 {
+    bool is_debug = false, is_rebuild_all = false;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (string(argv[i]) == "-debug")
+        {
+            is_debug = true;
+        }
+        else if (string(argv[i]) == "-force")
+        {
+            is_rebuild_all = true;
+        }
+        else if (string(argv[i]) == "-help")
+        {
+            std::cout << "AiluHeadTool -debug" << std::endl;
+            std::cout << "AiluHeadTool -help" << std::endl;
+            std::cout << "AiluHeadTool -force:  re-generate all reflect info" << std::endl;
+            return 0;
+        }
+    }
     Timer timer;
     timer.start();
     std::cout << "AiluHeadTool start..." << std::endl;
-    bool is_debug = false;
-    if (argc > 1 && string(argv[1]) == "-debug")
-    {
-        is_debug = true;
-    }
     string work_path_str = argv[0];
     fs::path work_path;
     if (work_path_str.empty())
@@ -142,7 +156,7 @@ int main(int argc, char **argv)
         fs::create_directories(cache_dir.parent_path());
     }
     //..../AiluEngine/
-    fs::path proj_dir = tool_dir.parent_path().parent_path().parent_path().parent_path().parent_path();
+    fs::path proj_dir = tool_dir.parent_path().parent_path().parent_path().parent_path().parent_path().parent_path();
     if (is_debug)
     {
         std::cout << "tool_dir: " << tool_dir.string() << std::endl;
@@ -168,24 +182,32 @@ int main(int argc, char **argv)
         current_file_times[all_inc_rela_path.back().string()] = fs::last_write_time(inc_file).time_since_epoch().count();
     }
     set<fs::path> work_files;
-    for (auto &p: all_inc_rela_path)
+    if (is_rebuild_all)
     {
-        auto sys_path = proj_dir / p;
-        auto cur_time = fs::last_write_time(sys_path).time_since_epoch().count();
-        if (cache_file_times.contains(p.string()))
+        std::cout << "force rebuild all..." << std::endl;
+        work_files = all_inc_sys_path;
+    }
+    else
+    {
+        for (auto &p: all_inc_rela_path)
         {
-            if (cur_time > cache_file_times[p.string()])
+            auto sys_path = proj_dir / p;
+            auto cur_time = fs::last_write_time(sys_path).time_since_epoch().count();
+            if (cache_file_times.contains(p.string()))
             {
-                cout << "File changed: " << p.string() << endl;
-                work_files.insert(sys_path);
+                if (cur_time > cache_file_times[p.string()])
+                {
+                    cout << "File changed: " << p.string() << endl;
+                    work_files.insert(sys_path);
+                }
             }
+            else
+            {
+                work_files.insert(sys_path);
+                cout << "New file: " << p.string() << endl;
+            }
+            cache_file_times[p.string()] = cur_time;
         }
-        else
-        {
-            work_files.insert(sys_path);
-            cout << "New file: " << p.string() << endl;
-        }
-        cache_file_times[p.string()] = cur_time;
     }
     ofstream cache_file(cache_dir.string());
     for (auto &p: cache_file_times)

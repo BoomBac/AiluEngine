@@ -65,7 +65,7 @@ namespace Ailu
         }
         if (!_page_free_space_lut.contains(type))
         {
-            _page_free_space_lut[type] = HashMap<u32, u32>{};
+            _page_free_space_lut[type] = std::multimap<u32, u32>{};
         }
         auto page_it = _page_free_space_lut[type].lower_bound(size);
         if (page_it == _page_free_space_lut[type].end())
@@ -108,7 +108,7 @@ namespace Ailu
         }
         return release_num;
     }
-    HashMap<u32, u32>::iterator GpuResourceManager::AddNewPage(D3D12_HEAP_TYPE type, u32 size)
+    std::multimap<u32, u32>::iterator GpuResourceManager::AddNewPage(D3D12_HEAP_TYPE type, u32 size)
     {
         GPUResourcePage new_page(static_cast<u16>(_pages.size()), type, size);
         _pages.emplace_back(std::move(new_page));

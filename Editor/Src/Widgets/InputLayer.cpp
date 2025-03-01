@@ -32,9 +32,9 @@ namespace Ailu
                 return ;
             _p_camera->Position(d);
         }
-        void FirstPersonCameraController::SetTargetRotation(f32 x, f32 y)
+        void FirstPersonCameraController::SetTargetRotation(f32 x, f32 y,bool is_force)
         {
-            if(!_is_receive_input)
+            if(!_is_receive_input && !is_force)
                 return ;
             _rotation.x = x;
             _rotation.y = y;
@@ -156,9 +156,10 @@ namespace Ailu
                 ImGui::SliderFloat("NearClip", &FirstPersonCameraController::s_inst._camera_near, 0.00001f, 100.0f, "%.2f");
                 ImGui::SliderFloat("FarClip", &FirstPersonCameraController::s_inst._camera_far, 100.0f, 5000.0f, "%.2f");
                 ImGui::InputFloat3("Position: ",camera_pos.data);
-                ImGui::InputFloat2("Rotation: ", camera_rotation.data);
-                FirstPersonCameraController::s_inst.SetTargetPosition(camera_pos);
-                FirstPersonCameraController::s_inst.SetTargetRotation(camera_rotation.x, camera_rotation.y);
+                //ImGui::InputFloat2("Rotation: ", camera_rotation.data);
+                FirstPersonCameraController::s_inst.SetTargetPosition(camera_pos,true);
+                ImGui::SliderFloat2("Rotation: ", camera_rotation.data, -180.0f, 180.0f, "%.2f");
+                FirstPersonCameraController::s_inst.SetTargetRotation(camera_rotation.x, camera_rotation.y,true);
                 //ImGui::Text("Position:");
                 //ImGui::SameLine();
                 //ImGui::Text(camera_pos.ToString().c_str());
@@ -221,6 +222,7 @@ namespace Ailu
                 }
                 auto target_pos = FirstPersonCameraController::s_inst._target_pos;
                 target_pos += move_dis * final_move_distance;
+                //LOG_INFO("{}", target_pos.ToString());
                 FirstPersonCameraController::s_inst.SetTargetPosition(target_pos);
             }
             f32 lerp_factor = std::clamp(delta_time * FirstPersonCameraController::s_inst._lerp_speed_multifactor, 0.0f, 1.0f);

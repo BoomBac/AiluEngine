@@ -132,8 +132,8 @@ static const float2 poissonDisk[64] =
 // 	return 1.0 - shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
 // }
 
-#define _ShadowMapTexelSize 0.001953125f// 1/512
-#define _SOFT_SAMPLE_COUNT 1
+#define _ShadowMapTexelSize 0.0009765625// 1/1024
+#define _SOFT_SAMPLE_COUNT 16
 
 
 float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
@@ -157,6 +157,11 @@ float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 				return 1.0f;
 			shadow_coord.xyz /= shadow_coord.w;
 			float depth = saturate(shadow_coord.z);
+		#if defined(_REVERSED_Z)
+			depth += z_bias;
+		#else
+			depth -= z_bias;
+		#endif
 			float2 shadow_uv;
 			shadow_uv.x = shadow_coord.x * 0.5f + 0.5f;
 			shadow_uv.y = shadow_coord.y * -0.5f + 0.5f;
@@ -166,8 +171,8 @@ float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 				//uint random_index = uint(8.0 * Random(float4(world_pos.xyy, i))) % 8;
 				// shadow_factor += lerp(0.0, 0.125, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
 				// 	float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth - z_bias).r);
-				shadow_factor += MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
-					float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth - z_bias).r;
+				shadow_factor += 1 - MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
+					float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth).r;
 			}
 			shadow_factor /= _SOFT_SAMPLE_COUNT;
 			shadow_factor =  (1.0 - shadow_factor);
@@ -189,12 +194,17 @@ float ApplyShadowAddLight(float4 shadow_coord, float nl, float3 world_pos,int li
 	shadow_uv.x = shadow_coord.x * 0.5f + 0.5f;
 	shadow_uv.y = shadow_coord.y * -0.5f + 0.5f;
 	float shadow_factor = 0.0; 
+#if defined(_REVERSED_Z)
+	depth += z_bias;
+#else
+	depth -= z_bias;
+#endif
 	for (int i = 0; i < 16; i++)
 	{
 		uint random_index = uint(16.0 * Random(float4(world_pos.xyy, i))) % 16;
 		//uint random_index = i;
-		shadow_factor += lerp(0.0, 0.0625, AddLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float3(shadow_uv.xy + 
-			poissonDisk[random_index] * 0.0009765625,light_index), depth - z_bias).r);
+		shadow_factor += lerp(0.0, 0.0625, 1 - AddLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float3(shadow_uv.xy + 
+			poissonDisk[random_index] * 0.0009765625,light_index), depth).r);
 	}
 	shadow_factor =  (1.0 - shadow_factor);// * ShadowDistaanceAtten(dis,shadow_distance);
 	return 1.0 - shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
@@ -209,16 +219,23 @@ float ApplyShadowPointLight(float shadow_near,float shadow_far ,float nl, float3
 	float z_bias = GetShadowDepthBias(nl,_PointLights[shadow_index]._constant_bias,_PointLights[shadow_index]._slope_bias);
 	//z_bias = clamp(z_bias, 0, 0.5);
 	float3 shaodw_dir = normalize(world_pos - light_pos);
+#if defined(_REVERSED_Z)
+	float linear_z = 1 - saturate((dis - shadow_near) / (shadow_far - shadow_near));
+	linear_z += z_bias;
+#else
 	float linear_z = saturate((dis - shadow_near) / (shadow_far - shadow_near));
-	// float2 shadow_uv;
-	// shadow_uv.x = shadow_coord.x * 0.5f + 0.5f;
-	// shadow_uv.y = shadow_coord.y * -0.5f + 0.5f;
-	float shadow_factor = 0.0; 
+	linear_z -= z_bias;
+#endif
+	float shadow_factor = 0.0;
 	for (int q = 0; q < 16; q++)
 	{
 		uint random_index = uint(16.0 * Random(float4(floor(world_pos.xyy), q))) % 16;
 		shaodw_dir.xz += poissonDisk[random_index] * 0.0009765625;
-		shadow_factor += PointLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float4(shaodw_dir,(float)shadow_index),linear_z - z_bias) * 0.0625;
+		float cur_sample = PointLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float4(shaodw_dir,(float)shadow_index),linear_z);
+	#if defined(_REVERSED_Z)
+		cur_sample = 1 - cur_sample;
+	#endif
+		shadow_factor += cur_sample * 0.0625;
 	}
 	//shadow_factor =  (1.0 - shadow_factor) * ShadowDistaanceAtten(dis,shadow_far);
 	return shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));

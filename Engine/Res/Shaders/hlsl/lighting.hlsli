@@ -38,10 +38,7 @@ Texture2D _OcclusionTex : register(t9);
 //#define _MULTI_SCATTER 1
 #define PREFILTER_CUBEMAP_NUM 7
 
-#define ACTIVE_DIRECTION_LIGHT_NUM  min((uint)(_ActiveLightCount.x),MAX_DIRECTIONAL_LIGHT)
-#define ACTIVE_POINT_LIGHT_NUM      min((uint)(_ActiveLightCount.y),MAX_POINT_LIGHT)
-#define ACTIVE_SPOT_LIGHT_NUM       min((uint)(_ActiveLightCount.z),MAX_SPOT_LIGHT)
-#define ACTIVE_AREA_LIGHT_NUM       min((uint)(_ActiveLightCount.w),MAX_AREA_LIGHT)
+
 
 float GetDistanceAtt(float distance,float atten_radius)
 {
@@ -105,44 +102,80 @@ float3 AmbientLighting(SurfaceData surface,ShadingData data,float3 irradiance, f
 	return (diffuse + specular) * ao;
 #endif//_MULTI_SCATTER
 }
+uint GetGlobalDirectionalLightCount()
+{
+	return min((uint)(_ActiveLightCount.x),MAX_DIRECTIONAL_LIGHT);
+}
+uint GetGlobalPointLightCount()
+{
+	return min((uint)(_ActiveLightCount.y),MAX_POINT_LIGHT);
+}
+uint GetGlobalSpotLightCount()
+{
+	return min((uint)(_ActiveLightCount.z),MAX_SPOT_LIGHT);
+}
+uint GetGlobalAreaLightCount()
+{
+	return min((uint)(_ActiveLightCount.w),MAX_AREA_LIGHT);
+}
+LightData GetDirectionalLight(uint index)
+{
+	LightData light;
+	light.light_pos = -_DirectionalLights[index]._LightPosOrDir;
+	light.light_color = _DirectionalLights[index]._LightColor;
+	light.light_dir = light.light_pos;
+	light.shadow_atten = 1.0;
+	return light;
+}
+LightData GetPointLight(uint index,float3 world_pos)
+{
+	LightData light = (LightData)0;
+	light.light_pos = _PointLights[index]._LightPosOrDir;
+	light.light_dir = -normalize(world_pos - _PointLights[index]._LightPosOrDir);
+	light.light_color = _PointLights[index]._LightColor * GetPointLightIrridance(index, world_pos);
+	light.shadow_atten = 1.0;
+	return light;
+}
+LightData GetSpotLight(uint index,float3 world_pos)
+{
+	LightData light = (LightData)0;
+	light.light_pos = _SpotLights[index]._LightPos;
+	light.light_dir = -normalize(_SpotLights[index]._LightDir);
+	light.light_color = _SpotLights[index]._LightColor * GetSpotLightIrridance(index, world_pos);
+	light.shadow_atten = 1.0;
+	return light;
+}
+
+void InitShadingData(LightData light,SurfaceData surface,inout ShadingData data)
+{
+	float3 hv = normalize(data.view_dir + light.light_dir);
+	data.nl = max(saturate(dot(light.light_dir, surface.wnormal)), 0.000001);
+	data.vh = max(saturate(dot(data.view_dir, hv)), 0.000001);
+	data.lh = max(saturate(dot(light.light_dir, hv)), 0.000001);
+	data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
+	data.th = dot(surface.tangent, hv);
+	data.bh = dot(surface.bitangent, hv);
+}
+
 
 float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 {
-
 #if defined(DEBUG_GI)
 	return VoxelGI(world_pos,surface.wnormal);
 #endif//DEBUG_GI
-
 	float3 light = float3(0.0, 0.0, 0.0);
-	float3 view_dir = normalize(_CameraPos.xyz - world_pos);
 	ShadingData shading_data;
+	shading_data.view_dir = normalize(_CameraPos.xyz - world_pos);
+	shading_data.nv = saturate(dot(shading_data.view_dir,surface.wnormal));
 	LightData light_data;
 	light_data.shadow_atten = 1.0;
 	float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface.wnormal));
 	float shadow_factor = 1.0;
 	light_data.shadow_atten = shadow_factor;
-	shading_data.nv = saturate(dot(view_dir,surface.wnormal));//max(saturate(dot(view_dir,surface.wnormal)),0.000001);
-	for (uint i = 0; i < ACTIVE_DIRECTION_LIGHT_NUM; i++)
+	for (uint i = 0; i < GetGlobalDirectionalLightCount(); i++)
 	{
-		float3 light_dir = -_DirectionalLights[i]._LightPosOrDir;
-		float3 hv = normalize(view_dir + light_dir);
-
-		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
-		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
-		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
-		shading_data.th = dot(surface.tangent, hv);
-		shading_data.bh = dot(surface.bitangent, hv);
-		light_data.light_dir = light_dir;
-		light_data.light_color = _DirectionalLights[i]._LightColor;
-		light_data.light_pos = _DirectionalLights[i]._LightPosOrDir;
-		//return surface.wnormal.xyzz;
-		// float alpha = surface.roughness;
-		// float anisotropy = surface.anisotropy * 2 - 1;
-		// float alpha_x = max(alpha * alpha * (1.0 + anisotropy), 0.001);
-        // float alpha_y = max(alpha * alpha * (1.0 - anisotropy), 0.001);
-
-		// return D_GGXaniso(alpha_x,alpha_y,shading_data.nh,shading_data.th,shading_data.bh).xxxx;
+		light_data = GetDirectionalLight(i);
+		InitShadingData(light_data,surface,shading_data);
 		if(_DirectionalLights[i]._ShadowDataIndex != -1)
 		{
 			shadow_factor = ApplyCascadeShadow(nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
@@ -152,41 +185,23 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	}
 
 	shadow_factor = 1.0;
-	for (uint j = 0; j < ACTIVE_POINT_LIGHT_NUM; j++)
+	for (uint j = 0; j < GetGlobalPointLightCount(); j++)
 	{
-		float3 light_dir = -normalize(world_pos - _PointLights[j]._LightPosOrDir);
-		float3 hv = normalize(view_dir + light_dir);
-		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
-		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
-		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
-		shading_data.th = dot(surface.tangent, hv);
-		shading_data.bh = dot(surface.bitangent, hv);
-		light_data.light_dir = light_dir;
-		light_data.light_color = _PointLights[j]._LightColor;
-		light_data.light_pos = _PointLights[j]._LightPosOrDir;
+		light_data = GetPointLight(j,world_pos);
+		InitShadingData(light_data,surface,shading_data);
 		if(_PointLights[j]._ShadowDataIndex != -1)
 		{
 			shadow_factor = ApplyShadowPointLight(0.01,_PointLights[j]._LightParam0 * 1.5f,shading_data.nl,
 				world_pos,light_data.light_pos,j);
 		}
 		light_data.shadow_atten = shadow_factor;
-		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
+		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * light_data.light_color;
 	}
 	shadow_factor = 1.0;
-	for (uint k = 0; k < ACTIVE_SPOT_LIGHT_NUM; k++)
+	for (uint k = 0; k < GetGlobalSpotLightCount(); k++)
 	{
-		float3 light_dir = -normalize(_SpotLights[k]._LightDir);
-		float3 hv = normalize(view_dir + light_dir);
-		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
-		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
-		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
-		shading_data.th = dot(surface.tangent, hv);
-		shading_data.bh = dot(surface.bitangent, hv);
-		light_data.light_dir = light_dir;
-		light_data.light_color = _SpotLights[k]._LightColor;
-		light_data.light_pos = _SpotLights[k]._LightPos;
+		light_data = GetSpotLight(k,world_pos);
+		InitShadingData(light_data,surface,shading_data);
 		if(_SpotLights[k]._ShadowDataIndex != -1)
 		{ 
 			uint shadow_index = _SpotLights[k]._ShadowDataIndex;
@@ -194,10 +209,10 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos.xyz,k);
 		}
 		light_data.shadow_atten = shadow_factor;
-		light += (light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos));
+		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * light_data.light_color;
 	}
 	shadow_factor = 1.0;
-	for (uint z = 0; z < ACTIVE_AREA_LIGHT_NUM; z++)
+	for (uint z = 0; z < GetGlobalAreaLightCount(); z++)
 	{
 		float2 uv = LTC_UV(shading_data.nv,surface.roughness);
 		float4 t1 = LTC_LUT1Value(uv);
@@ -212,49 +227,42 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 		rect[1] = _AreaLights[z]._points[1].xyz;
 		rect[2] = _AreaLights[z]._points[2].xyz;
 		rect[3] = _AreaLights[z]._points[3].xyz;
-		float3 diffuse = LTC_Evaluate(surface.wnormal, view_dir, world_pos, Identity(), rect, _AreaLights[z]._is_twosided);
-		float3 specular = LTC_Evaluate(surface.wnormal, view_dir, world_pos, Minv, rect, _AreaLights[z]._is_twosided);
+		float3 diffuse = LTC_Evaluate(surface.wnormal,  shading_data.view_dir, world_pos, Identity(), rect, _AreaLights[z]._is_twosided);
+		float3 specular = LTC_Evaluate(surface.wnormal, shading_data.view_dir, world_pos, Minv, rect, _AreaLights[z]._is_twosided);
 		specular *= (F0 * t2.x + (1.0f - F0) * t2.y);
 		diffuse *= (1.0 - surface.metallic) * surface.albedo.rgb;
-		light += (diffuse + specular) * _AreaLights[z]._LightColor;// + specular;
+		light += (diffuse + specular) * _AreaLights[z]._LightColor;
 	}
 	//indirect light
 
 	float lod = surface.roughness * PREFILTER_CUBEMAP_NUM;
 	float3 irradiance = RadianceTex.Sample(g_LinearWrapSampler, surface.wnormal);
-	float3 radiance = PrefilterEnvTex.SampleLevel(g_AnisotropicClampSampler, reflect(view_dir,surface.wnormal),lod);
+	float3 radiance = PrefilterEnvTex.SampleLevel(g_AnisotropicClampSampler, reflect(shading_data.view_dir,surface.wnormal),lod);
 	float2 lut = IBLLut.Sample(g_LinearClampSampler,float2(shading_data.nv,surface.roughness)).xy;
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;// * g_IndirectLightingIntensity;
 	float voxel_shadow = 1.0;//ConeTraceShadow(world_pos + surface.wnormal * 0.05,-_DirectionalLights[0]._LightPosOrDir);
-	light += voxel_shadow * AmbientLighting(surface,shading_data,irradiance,radiance,lut,ao) * 0.5f;
+	light += voxel_shadow * AmbientLighting(surface,shading_data,irradiance,radiance,lut,ao);
+#ifdef _VOXEL_GI_ON
 	light *= voxel_shadow;
 	light += VoxelGI(world_pos,surface.wnormal) * surface.albedo.rgb;
+#endif
 	return light * ao;
 }
 float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_uv)
 {
 	float3 light = float3(0.0, 0.0, 0.0);
 	float3 view_dir = normalize(_CameraPos.xyz - world_pos);
-	ShadingData shading_data;
+	ShadingData shading_data = (ShadingData)0;
 	LightData light_data;
 	light_data.shadow_atten = 1.0;
 	float nl = saturate(dot(_DirectionalLights[0]._LightPosOrDir, surface.wnormal));
 	float shadow_factor = 1.0;
 	light_data.shadow_atten = shadow_factor;
 	shading_data.nv = saturate(dot(view_dir,surface.wnormal));//max(saturate(dot(view_dir,surface.wnormal)),0.000001);
-	for (uint i = 0; i < ACTIVE_DIRECTION_LIGHT_NUM; i++)
+	for (uint i = 0; i < GetGlobalDirectionalLightCount(); i++)
 	{
-		float3 light_dir = -_DirectionalLights[i]._LightPosOrDir;
-		float3 hv = normalize(view_dir + light_dir);
-		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
-		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
-		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
-		shading_data.th = dot(surface.tangent, hv);
-		shading_data.bh = dot(surface.bitangent, hv);
-		light_data.light_dir = light_dir;
-		light_data.light_color = _DirectionalLights[i]._LightColor;
-		light_data.light_pos = _DirectionalLights[i]._LightPosOrDir;
+		light_data = GetDirectionalLight(i);
+		InitShadingData(light_data,surface,shading_data);
 		if(_DirectionalLights[i]._ShadowDataIndex != -1)
 		{
 			//shadow_factor = ApplyCascadeShadow(nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
@@ -264,19 +272,10 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 	}
 
 	shadow_factor = 1.0;
-	for (uint j = 0; j < ACTIVE_POINT_LIGHT_NUM; j++)
+	for (uint j = 0; j < GetGlobalPointLightCount(); j++)
 	{
-		float3 light_dir = -normalize(world_pos - _PointLights[j]._LightPosOrDir);
-		float3 hv = normalize(view_dir + light_dir);
-		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
-		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
-		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
-		shading_data.th = dot(surface.tangent, hv);
-		shading_data.bh = dot(surface.bitangent, hv);
-		light_data.light_dir = light_dir;
-		light_data.light_color = _PointLights[j]._LightColor;
-		light_data.light_pos = _PointLights[j]._LightPosOrDir;
+		light_data = GetPointLight(j,world_pos);
+		InitShadingData(light_data,surface,shading_data);
 		if(_PointLights[j]._ShadowDataIndex != -1)
 		{
 			shadow_factor = ApplyShadowPointLight(0.01,_PointLights[j]._LightParam0 * 1.5f,shading_data.nl,
@@ -286,19 +285,10 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 		light += light_data.shadow_atten * surface.albedo.rgb * shading_data.nl * _PointLights[j]._LightColor * GetPointLightIrridance(j, world_pos);
 	}
 	shadow_factor = 1.0;
-	for (uint k = 0; k < ACTIVE_SPOT_LIGHT_NUM; k++)
+	for (uint k = 0; k < GetGlobalSpotLightCount(); k++)
 	{
-		float3 light_dir = -normalize(_SpotLights[k]._LightDir);
-		float3 hv = normalize(view_dir + light_dir);
-		shading_data.nl = max(saturate(dot(light_dir, surface.wnormal)), 0.000001);
-		shading_data.vh = max(saturate(dot(view_dir, hv)), 0.000001);
-		shading_data.lh = max(saturate(dot(light_dir, hv)), 0.000001);
-		shading_data.nh = max(saturate(dot(surface.wnormal, hv)), 0.000001);
-		shading_data.th = dot(surface.tangent, hv);
-		shading_data.bh = dot(surface.bitangent, hv);
-		light_data.light_dir = light_dir;
-		light_data.light_color = _SpotLights[k]._LightColor;
-		light_data.light_pos = _SpotLights[k]._LightPos;
+		light_data = GetSpotLight(k,world_pos);
+		InitShadingData(light_data,surface,shading_data);
 		if(_SpotLights[k]._ShadowDataIndex != -1)
 		{ 
 			uint shadow_index = _SpotLights[k]._ShadowDataIndex;
@@ -309,7 +299,7 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 		light += (light_data.shadow_atten * surface.albedo.rgb * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos));
 	}
 	shadow_factor = 1.0;
-	for (uint z = 0; z < ACTIVE_AREA_LIGHT_NUM; z++)
+	for (uint z = 0; z < GetGlobalAreaLightCount(); z++)
 	{
 		float2 uv = LTC_UV(shading_data.nv,surface.roughness);
 		float4 t1 = LTC_LUT1Value(uv);

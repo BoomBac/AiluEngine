@@ -54,7 +54,7 @@ namespace Ailu
         color->GetState().Track();
         depth->GetState().Track();
         _p_cmd->ClearRenderTargetView(*crt->TargetCPUHandle(this), clear_color, 0, nullptr);
-        _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clear_depth, 0, 0, nullptr);
+        _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clear_depth, 0u, 0, nullptr);
     }
     void D3DCommandBuffer::ClearRenderTarget(Vector<RenderTexture *> &colors, RenderTexture *depth, Vector4f clear_color, float clear_depth)
     {
@@ -68,7 +68,7 @@ namespace Ailu
         }
         auto drt = static_cast<D3DRenderTexture *>(depth);
         depth->GetState().Track();
-        _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clear_depth, 0, 0, nullptr);
+        _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, clear_depth, 0u, 0, nullptr);
     }
     void D3DCommandBuffer::ClearRenderTarget(RenderTexture *color, Vector4f clear_color, u16 index)
     {
@@ -87,7 +87,7 @@ namespace Ailu
     {
         auto drt = static_cast<D3DRenderTexture *>(depth);
         depth->GetState().Track();
-        _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this, index), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, 0, 0, nullptr);
+        _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this, index), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, 0u, 0, nullptr);
     }
 
     void D3DCommandBuffer::DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index)
@@ -562,9 +562,13 @@ namespace Ailu
             }
         }
     }
-
+    void D3DCommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y)
+    {
+        Dispatch(cs,kernel,thread_group_x,thread_group_y,1);
+    }
     void D3DCommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
     {
+        RenderingStates::s_dispatch_call++;
         for (auto it: cs->AllBindTexture())
         {
             it->GetState().Track();
@@ -576,7 +580,7 @@ namespace Ailu
         cs->Bind(this, kernel, thread_group_x, thread_group_y, thread_group_z);
         for(auto& cb : _cs_cbuf)
         {
-            u16 slot = cs->NameToSlot(cb._name,cb._kernel);
+            u16 slot = cs->NameToSlot(cb._name,cb._kernel,cs->ActiveVariant(kernel));
             if (slot != UINT16_MAX)
                 _p_cmd->SetComputeRootConstantBufferView(slot,cb._ptr);
         }
@@ -590,7 +594,7 @@ namespace Ailu
         if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
         {
             auto shader = mat->GetShader();
-            vb->Bind(this, shader->PipelineInputLayout());
+            vb->Bind(this, shader->PipelineInputLayout(pass_index));
             if (cb_per_draw)
                 cb_per_draw->Bind(this, 0);
             ++RenderingStates::s_draw_call;

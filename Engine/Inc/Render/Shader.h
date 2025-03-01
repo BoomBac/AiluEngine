@@ -105,6 +105,7 @@ namespace Ailu
         //1 for per obj,2for per mat,4 for per pass,8 for per frame
         u8 _bind_flag = 0u;
         u16 _register_space = 0u;
+        u8 _array_size = 0u;
     };
 
     // Hash function for ShaderBindResourceInfo
@@ -140,16 +141,42 @@ namespace Ailu
 
     struct ShaderPropertyInfo
     {
+        bool IsHDRProperty() const
+        {
+            return _params.x == 1;
+        }
+        void SetHDRIntensity(f32 intensity)
+        {
+            if (IsHDRProperty())
+                _params.y = intensity;
+        };
+        f32 GetHDRIntensity() const
+        {
+            if (IsHDRProperty())
+                return _params.y;
+        };
         String _value_name;
         String _prop_name;
         u32 _offset = 0;
         void *_value_ptr = nullptr;
         EShaderPropertyType _type;
-        Vector4f _param;
+        Vector4f _default_value;
+        //目前用于标识hdr属性，x为1表示hdr，y为强度
+        Vector4f _params;
         ShaderPropertyInfo() = default;
-        ShaderPropertyInfo(const String &value_name, const String &prop_name, EShaderPropertyType prop_type, const Vector4f &param)
-            : _value_name(value_name), _prop_name(prop_name), _type(prop_type), _param(param)
+        ShaderPropertyInfo(const String &value_name, const String &prop_name, EShaderPropertyType prop_type, const Vector4f &default_value)
+            : _value_name(value_name), _prop_name(prop_name), _type(prop_type), _default_value(default_value),_params(Vector4f::kZero)
         {
+        }
+        template<typename T>
+        T GetValue() const
+        {
+            return *static_cast<T *>(_value_ptr);
+        }
+        template<typename T>
+        void SetValue(T value)
+        {
+            *static_cast<T *>(_value_ptr) = value;
         }
     };
 
@@ -201,12 +228,14 @@ namespace Ailu
         static struct Comparison
         {
             inline static const String kOff = "Off";
+            inline static const String kLess = "Less";
             inline static const String kLEqual = "LEqual";
             inline static const String kEqual = "Equal";
-            inline static const String kAlways = "Always";
             inline static const String kGreater = "Greater";
-            inline static const String kNotEqual = "NotEqual";
             inline static const String kGEqual = "GEqual";
+            inline static const String kNotEqual = "NotEqual";
+            inline static const String kAlways = "Always";
+            inline static const String kNevel = "Nevel";
         } kZTestValue;
         static struct ZWrite
         {
@@ -234,19 +263,20 @@ namespace Ailu
         } kConservativeValue;
     };
 
-    using ShaderVariantHash = u64;
+    using ShaderHash = u64;
+    using ShaderVariantHash = u32;
 
     class ShaderVariantMgr
     {
     public:
-        void BuildIndex(Vector<std::set<String>> all_keywords);
+        void BuildIndex(const Vector<std::set<String>>& all_keywords);
         ShaderVariantHash GetVariantHash(const std::set<String> &keywords) const;
         ShaderVariantHash GetVariantHash(const std::set<String> &keywords, std::set<String> &active_kw_seq) const;
         std::set<String> KeywordsSameGroup(const String &kw) const;
 
     private:
-        inline static const u16 kBitNumPerGroup = 64u;
-        using ShaderVariantBits = Vector<u64>;
+        inline static const u16 kBitNumPerGroup = 32u;
+        using ShaderVariantBits = Vector<u32>;
 
         struct KeywordInfo
         {
@@ -304,15 +334,27 @@ namespace Ailu
 
     enum class EShaderVariantState
     {
-        kNone,
+        kNotReady,
         kCompiling,
         kError,
         kReady
     };
+
     class AILU_API Shader : public Object
     {
         friend class Material;
-
+        struct ShaderHashStruct
+        {
+            struct BitDesc
+            {
+                u8 _pos;
+                u8 _size;
+            };
+            inline static const BitDesc kShader = {0, 6};
+            inline static const BitDesc kPass = {6, 3};
+            inline static const BitDesc kVariant = {9, 32};
+        };
+        
     public:
         inline static Weak<Shader> s_p_defered_standart_lit;
         inline static const u16 kRenderQueueOpaque = 2000;
@@ -322,9 +364,13 @@ namespace Ailu
 
     public:
         static Ref<Shader> Create(const WString &sys_path);
-        static u64 ConstructHash(const u32 &shader_id, const u16 &pass_hash, ShaderVariantHash variant_hash = 0u);
-        //inline static const BitDesc kShader = {0,46}; 46bit hash
-        static void ExtractInfoFromHash(const u64 &shader_hash, u32 &shader_id, u16 &pass_hash, ShaderVariantHash &variant_hash);
+        /// @brief 构造一个64位的shader哈希
+        /// @param shader_id 0~5 6位
+        /// @param pass_hash 6~8 3位
+        /// @param variant_hash 9~41 32位
+        /// @return 64位哈希，后23位暂时没用
+        static ShaderHash ConstructHash(const u32 &shader_id, const u16 &pass_hash, ShaderVariantHash variant_hash = 0u);
+        static void ExtractInfoFromHash(const ShaderHash &shader_hash, u32 &shader_id, u16 &pass_hash, ShaderVariantHash &variant_hash);
 
         static void SetGlobalTexture(const String &name, Texture *texture);
         static void SetGlobalTexture(const String &name, RTHandle handle);
@@ -333,6 +379,7 @@ namespace Ailu
         static void SetGlobalMatrixArray(const String &name, Matrix4x4f *matrix, u32 num);
         static void EnableGlobalKeyword(const String &keyword);
         static void DisableGlobalKeyword(const String &keyword);
+        static const std::set<String>& GetPreDefinedMacros() {return s_predefined_macros;};
 
         //0 is normal, 4001 is compiling, 4000 is error,same with render queue id
         static u32 GetShaderState(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash);
@@ -355,7 +402,7 @@ namespace Ailu
             AL_ASSERT(pass_index < _passes.size());
             return _passes[pass_index];
         }
-        const u32 PassCount() const { return static_cast<u32>(_passes.size()); }
+        const i16 PassCount() const { return static_cast<i16>(_passes.size()); }
         i16 FindPass(String pass_name);
         //根据任意字符序列构建变体hash，并返回合法的序列
         ShaderVariantHash ConstructVariantHash(u16 pass_index, const std::set<String> &kw_seq, std::set<String> &active_kw_seq) const;
@@ -378,6 +425,8 @@ namespace Ailu
         std::set<String> ActiveKeywords(u16 pass_index, ShaderVariantHash variant_hash) const { return _passes[pass_index]._variants.at(variant_hash)._active_keywords; };
         void SetTopology(ETopology topology) { _topology = topology; }
         ETopology GetTopology() const { return _topology; }
+        const Map<String, Vector<String>> &GetKeywordsProps() const { return _keywords_props; }
+
         Vector<class Material *> GetAllReferencedMaterials();
         void SetCullMode(ECullMode mode);
         ECullMode GetCullMode() const;
@@ -398,8 +447,10 @@ namespace Ailu
             {
                 AL_ASSERT(false);
             }
-            return EShaderVariantState::kNone;
+            return EShaderVariantState::kNotReady;
         }
+    public:
+        u8 _stencil_ref = 0u;
 
     protected:
         virtual bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash);
@@ -411,49 +462,101 @@ namespace Ailu
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
         std::atomic<bool> _is_pass_elements_init = false;
         ETopology _topology = ETopology::kTriangle;
+        Map<String, Vector<String>> _keywords_props;
 
     private:
         void ParserShaderProperty(String &line, List<ShaderPropertyInfo> &props);
         //void ExtractValidShaderProperty(u16 pass_index,ShaderVariantHash variant_hash);
     private:
-        inline static u16 s_global_shader_unique_id = 0u;
+        inline static std::atomic<u16> s_global_shader_unique_id = 0u;
         inline static std::map<String, Texture *> s_global_textures_bind_info{};
         inline static std::map<String, std::tuple<Matrix4x4f *, u32>> s_global_matrix_bind_info{};
         inline static Map<String, IConstantBuffer *> s_global_buffer_bind_info{};
         inline static std::set<Shader *> s_all_shaders{};
+        static std::set<String> s_predefined_macros;
     };
 
     class AILU_API ComputeShader : public Object
     {
         struct KernelElement
         {
+            static bool IsKernelKeyword(const KernelElement &ker, const String &kw)
+            {
+                bool is_pass_kw = false;
+                for (auto &kw_group: ker._keywords)
+                {
+                    if (kw_group.find(kw) != kw_group.end())
+                    {
+                        is_pass_kw = true;
+                        break;
+                    }
+                }
+                return is_pass_kw;
+            }
+            struct KernelVariant
+            {
+                std::set<WString> _all_dep_file_pathes;
+                HashMap<String, ShaderBindResourceInfo> _bind_res_infos{};
+                HashMap<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
+                std::set<String> _active_keywords;
+            };
             u16 _id;
             String _name;
             Vector3UInt _thread_num;
-            std::set<WString> _all_dep_file_pathes;
-            std::unordered_map<String, ShaderBindResourceInfo> _bind_res_infos{};
-            std::unordered_map<String, ShaderBindResourceInfo> _temp_bind_res_infos{};
+            Vector<std::set<String>> _keywords;
+            ShaderVariantMgr _variant_mgr;
+            HashMap<ShaderVariantHash,KernelVariant> _variants;
+            std::set<String> _active_keywords;
+            ShaderVariantHash _active_variant;
         };
 
     public:
+        inline static void EnableGlobalKeywords(const String& kw) 
+        {
+            s_global_active_keywords.insert(kw);
+            for(auto& it : s_global_variant_update_map)
+                it.second = true;
+        };
+        inline static void DisableGlobalKeywords(const String& kw) 
+        {
+            s_global_active_keywords.erase(kw);
+            for(auto& it : s_global_variant_update_map)
+                it.second = true;
+        };
+        inline static void SetGlobalBuffer(const String &name, IConstantBuffer* buf) 
+        {
+            s_global_buffer_bind_info[name] = buf;
+        };
+        inline static void SetGlobalTexture(const String &name, Texture* texture)
+        {
+            s_global_textures_bind_info[name] = texture;
+        };
+        static void SetGlobalTexture(const String &name, RTHandle texture);
+    public:
         static Ref<ComputeShader> Create(const WString &sys_path);
-        static ComputeShader *Get(const WString &asset_path);
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
         virtual void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
-        virtual void SetTexture(const String &name, Texture *texture);
-        virtual void SetTexture(u8 bind_slot, Texture *texture);
-        virtual void SetTexture(const String &name, RTHandle handle);
-        virtual void SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap);
-        virtual void SetTexture(const String &name, Texture *texture, u16 mipmap);
-        virtual void SetFloat(const String &name, f32 value);
-        virtual void SetBool(const String &name, bool value);
-        virtual void SetInt(const String &name, i32 value);
-        virtual void SetVector(const String &name, Vector4f vector);
-        virtual void SetBuffer(const String &name, IConstantBuffer *buf);
-        virtual void SetBuffer(const String &name, IGPUBuffer *buf);
-        virtual void GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const;
-        virtual u16 NameToSlot(const String &name, u16 kernel) const;
+        void SetTexture(const String &name, Texture *texture);
+        void SetTexture(u8 bind_slot, Texture *texture);
+        void SetTexture(const String &name, RTHandle handle);
+        void SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap);
+        void SetTexture(const String &name, Texture *texture, u16 mipmap);
+        void SetFloat(const String &name, f32 value);
+        void SetFloats(const String& name,Vector<f32> values);
+        void SetBool(const String &name, bool value);
+        void SetInt(const String &name, i32 value);
+        void SetInts(const String &name, Vector<i32> values);
+        void SetVector(const String &name, Vector4f vector);
+        void SetBuffer(const String &name, IConstantBuffer *buf);
+        void SetBuffer(const String &name, IGPUBuffer *buf);
+        void SetMatrix(const String& name,Matrix4x4f mat);
+        void SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr);
+        void GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const;
+        virtual u16 NameToSlot(const String &name, u16 kernel,ShaderVariantHash variant_hash) const;
+        void EnableKeyword(const String &kw);
+        void DisableKeyword(const String &kw);
+        std::tuple<u16, u16, u16> CalculateDispatchNum(u16 kernel, u16 task_num_x, u16 task_num_y, u16 task_num_z) const;
         const std::set<Texture *> &AllBindTexture() const { return _all_bind_textures; }
         //防止同一个资源被当前帧重复追踪使得其无法被复用
         void ClearBindTexture() { _all_bind_textures.clear(); }
@@ -466,19 +569,32 @@ namespace Ailu
             else
                 return (u16) -1;
         }
+        /// @brief 检查所有核的所有变体是否依赖该文件
+        /// @param sys_path 系统路径
+        /// @return 
         bool IsDependencyFile(const WString &sys_path) const;
+        /// @brief 预处理shader，必须在compile之前调用！
+        bool Preprocess();
         bool Compile();
+        bool Compile(u16 kernel_index, ShaderVariantHash variant_hash);
+        ShaderVariantHash ActiveVariant(u16 kernel_index) const { return _kernels[kernel_index]._active_variant; }
+    public:
         std::atomic<bool> _is_compiling = false;
-
     protected:
-        virtual bool RHICompileImpl(u16 kernel_index);
+        virtual bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash);
 
     private:
-        void Preprocess();
 
     protected:
+        inline static std::set<String> s_global_active_keywords;
+        inline static HashMap<u32,bool> s_global_variant_update_map{};
+        inline static Map<String, IConstantBuffer *> s_global_buffer_bind_info{};
+        inline static Map<String, Texture *> s_global_textures_bind_info{};
         Vector<KernelElement> _kernels;
+        std::set<String> _local_active_keywords;
         WString _src_file_path;
+        Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
+        std::mutex _lock;
         /*维护一个纹理集合，用于标记temp rt的围栏值，常规用于图形管线的rt在set / clear时会进行标记，
 		* 计算管线不用这两个接口，所以在commandbuffer dispatch时调用该接口标记
 		*/
@@ -490,12 +606,11 @@ namespace Ailu
             //depth or array
             u16 _slice;
             u32 _sub_res;
+            u16 _view_index = (u16)-1;
         };
         //bind_slot:cubemapface,mipmap
         std::unordered_map<u16, ViewInfo> _texture_addi_bind_info{};
         bool _is_valid;
-        //废弃
-        [[deprecated]] Scope<IConstantBuffer> _p_cbuffer;
         u8 _cbuf_data[256];
     };
 }// namespace Ailu

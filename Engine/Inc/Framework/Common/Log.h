@@ -126,34 +126,48 @@ namespace Ailu
         virtual void Print(const String &str) = 0;
         virtual void Print(const WString &str) = 0;
     };
+
+    //https://talyian.github.io/ansicolors/
+    class ANSIColorful
+    {
+    public:
+        static WString Colorful(const WString& msg)
+        {
+            u16 block_index = 0;
+            if (msg.data()[0] == *L"W")
+                block_index = 1;
+            else if (msg.data()[0] == *L"E")
+                block_index = 2;
+            WString s = format_control_blockw[block_index];
+            s.append(msg);
+            return s;
+        }
+        static String Colorful(const String& msg)
+        {
+            u16 block_index = 0;
+            if (msg.data()[0] == *"W")
+                block_index = 1;
+            else if (msg.data()[0] == *"E")
+                block_index = 2;
+            String s = format_control_block[block_index];
+            s.append(msg);
+            return s;
+        }
+    private:
+        inline static const std::string format_control_block[]{"\u001b[1;37m", "\x1b[38;5;220m", "\u001b[1;31m"};
+        inline static const std::wstring format_control_blockw[]{L"\u001b[1;37m", L"\x1b[38;5;220m", L"\u001b[1;31m"};
+    };
     class ConsoleAppender : public IAppender
     {
     public:
         void Print(const String &str) override
         {
-            u16 block_index = 0;
-            if (str.data()[0] == *"W")
-                block_index = 1;
-            else if (str.data()[0] == *"E")
-                block_index = 2;
-            String s = format_control_block[block_index];
-            s.append(str);
-            std::cout << s.c_str() << std::endl;
+            std::cout << ANSIColorful::Colorful(str) << std::endl;
         }
         void Print(const WString &str) override
         {
-            u16 block_index = 0;
-            if (str.data()[0] == *L"W")
-                block_index = 1;
-            else if (str.data()[0] == *L"E")
-                block_index = 2;
-            WString s = format_control_blockw[block_index];
-            s.append(str);
-            std::wcout << s.c_str() << std::endl;
+            std::wcout << ANSIColorful::Colorful(str) << std::endl;
         }
-    private:
-        inline static const std::string format_control_block[]{"\u001b[1;37m", "\u001b[1;33m", "\u001b[1;31m"};
-        inline static const std::wstring format_control_blockw[]{L"\u001b[1;37m", L"\u001b[1;33m", L"\u001b[1;31m"};
     };
     class FileAppender : public IAppender
     {
@@ -179,11 +193,11 @@ namespace Ailu
         OutputAppender() = default;
         void Print(const String &str) override
         {
-            OutputDebugStringA((str + "\r\n").c_str());
+            OutputDebugStringA((ANSIColorful::Colorful(str) + "\r\n").c_str());
         }
         void Print(const WString &str)
         {
-            OutputDebugString((str + L"\r\n").c_str());
+            OutputDebugString((ANSIColorful::Colorful(str) + L"\r\n").c_str());
         }
     };
 

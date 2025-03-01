@@ -5,12 +5,30 @@
 #include "Ailu.h"
 #include "Framework/Common/Application.h"
 #include "Widgets/EditorLayer.h"
+//#include "generated/EditorApp.gen.h"
 
 namespace Ailu
 {
     class Camera;
     namespace Editor
     {
+        ACLASS()
+        struct EditorConfig
+        {
+            //GENERATED_BODY()
+        public:
+            Vector2UInt _window_size;
+            Vector2UInt _viewport_size;
+            Vector3f _position;
+            Vector4f _rotation;
+            f32 _fov;
+            f32 _aspect;
+            f32 _near;
+            f32 _far;
+            Vector2f _controller_rot;
+            String _scene_path;
+        };
+
         class InputLayer;
         class SceneLayer;
         class EditorApp : public Ailu::Application

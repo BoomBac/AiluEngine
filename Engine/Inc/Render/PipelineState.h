@@ -175,12 +175,15 @@ namespace Ailu
         u8 Size;
         u8 Offset;
         u8 Stream;
-        VertexBufferLayoutDesc(std::string name, EShaderDateType type, u8 stream) : Name(name), Type(type), Size(ShaderDateTypeSize(Type)), Stream(stream), Offset(0u)
+        u8 _semantic_index;
+        VertexBufferLayoutDesc(std::string name, EShaderDateType type, u8 stream,u8 index = 0u) : 
+            Name(name), Type(type), Size(ShaderDateTypeSize(Type)), Stream(stream), Offset(0u),_semantic_index(index)
         {
         }
         bool operator==(const VertexBufferLayoutDesc &other) const
         {
-            return (Name == other.Name && Type == other.Type && Size == other.Size && Offset == other.Offset && Stream == other.Stream);
+            return (Name == other.Name && Type == other.Type && Size == other.Size && Offset == other.Offset && Stream == other.Stream) && 
+                   (_semantic_index == other._semantic_index);
         }
         VertexBufferLayoutDesc &operator=(const VertexBufferLayoutDesc &other)
         {
@@ -189,6 +192,7 @@ namespace Ailu
             Size = other.Size;
             Offset = other.Offset;
             Stream = other.Stream;
+            _semantic_index = other._semantic_index;
             return *this;
         }
     };
@@ -449,7 +453,7 @@ namespace Ailu
         DECLARE_PRIVATE_PROPERTY(hash, Hash, u8)
     public:
         static constexpr EALGFormat::EALGFormat kDefaultColorRTFormat = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
-        static constexpr EALGFormat::EALGFormat kDefaultDepthRTFormat = EALGFormat::EALGFormat::kALGFormatD24S8_UINT;
+        static constexpr EALGFormat::EALGFormat kDefaultDepthRTFormat = EALGFormat::EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT;
         EALGFormat::EALGFormat _color_rt[8];
         u8 _color_rt_num = 0;
         EALGFormat::EALGFormat _depth_rt;
@@ -591,10 +595,10 @@ namespace Ailu
         kConstBuffer = 0x01,
         kCBufferAttribute = 0x02,
         kCBufferFloat = 0x04,
-        kCBufferFloat4 = 0x08,
-        kCBufferUint = 0x10,
-        kCBufferUint4 = 0x20,
-        kCBufferMatrix4 = 0x40,
+        kCBufferFloats = 0x08,
+        kCBufferUInt = 0x10,
+        kCBufferUInts = 0x20,
+        kCBufferMatrix = 0x40,
         kCBufferBool = 0x80,
         kTexture2D = 0x100,
         kTexture2DArray = 0x400,
@@ -607,7 +611,7 @@ namespace Ailu
         kTexture3D = 0x10000,
         kRWTexture3D = 0x20000,
         kCBufferInt = 0x40000,
-        kCBufferInt4 = 0x80000,
+        kCBufferInts = 0x80000,
         kUnknown
     };
 

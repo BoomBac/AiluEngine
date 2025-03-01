@@ -1,0 +1,5 @@
+guid: cf40ec2f-ceb8-4cc7-b21f-8ec31d0995ea
+type: kComputeShader
+name: TemporalAA
+  file: Shaders/hlsl/Compute/taa.hlsl
+  kernel: Noname

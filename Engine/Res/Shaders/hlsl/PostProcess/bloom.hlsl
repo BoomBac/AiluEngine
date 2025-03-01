@@ -46,9 +46,9 @@ Texture2D _BloomTex : register(t1);
 #include "../fullscreen_quad.hlsli"
 #include "../color_space_utils.hlsli"
 
-PSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
+FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
 
-float4 PSMain(PSInput input) : SV_TARGET
+float4 PSMain(FullScreenPSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
 	float brightness = dot(color, float3(0.2126, 0.7152, 0.0722));
@@ -145,39 +145,39 @@ PerMaterialCBufferBegin
     float4 _NoiseTex_TexelSize;
 PerMaterialCBufferEnd
 
-float4 DownSamplePS(PSInput input) : SV_TARGET
+float4 DownSamplePS(FullScreenPSInput input) : SV_TARGET
 {
 	float3 c = DownSample(input.uv,_SampleParams.xy);
     return float4(c,0.5);
 }
-float4 UpSamplePS(PSInput input) : SV_TARGET
+float4 UpSamplePS(FullScreenPSInput input) : SV_TARGET
 {
     float aspect = _SampleParams.x / _SampleParams.y;
 	float3 c = UpSample(input.uv,float2(_SampleParams.z * aspect,_SampleParams.z));
 	return float4(c,0.5);
 }
 
-float4 BlurX(PSInput input) : SV_TARGET
+float4 BlurX(FullScreenPSInput input) : SV_TARGET
 {	 
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
 	float3 sum = 0.0.xxx;
 	for (int i = -RADIUS; i<=RADIUS; i++)
 	{
 		float2 uv = input.uv;
-		uv.x += i * _ScreenParams.z * RADIUS_SCALE;
+		uv.x += i * _ScreenParams.x * RADIUS_SCALE;
 		sum += weights[i + RADIUS] * _SourceTex.Sample(g_LinearClampSampler, uv).rgb;
 	}
 	return sum.xyzz;
 }
 
-float4 BlurY(PSInput input) : SV_TARGET
+float4 BlurY(FullScreenPSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
 	float3 sum = 0.0.xxx;
 	for (int i = -RADIUS; i<=RADIUS; i++)
 	{
 		float2 uv = input.uv;
-		uv.y += i * _ScreenParams.w * RADIUS_SCALE;
+		uv.y += i * _ScreenParams.y * RADIUS_SCALE;
 		sum += weights[i + RADIUS] * _SourceTex.Sample(g_LinearClampSampler, uv).rgb;
 	}
 	return sum.xyzz;
@@ -187,12 +187,12 @@ TEXTURE2D(_NoiseTex)
 
 float Noise(float t)
 {
-    return SAMPLE_TEXTURE2D(_NoiseTex,g_LinearWrapSampler,float2(t,0) * _NoiseTex_TexelSize.zw).r;
+    return SAMPLE_TEXTURE2D(_NoiseTex,g_LinearWrapSampler,float2(t,0) * _NoiseTex_TexelSize.xy).r;
 }
 
 float Noise(float2 t)
 {
-    return SAMPLE_TEXTURE2D(_NoiseTex,g_LinearWrapSampler,t * _NoiseTex_TexelSize.zw).r;
+    return SAMPLE_TEXTURE2D(_NoiseTex,g_LinearWrapSampler,t * _NoiseTex_TexelSize.xy).r;
 }
 
 float3 Lensflare(float2 uv, float2 pos)
@@ -235,7 +235,7 @@ float3 cc(float3 color, float factor, float factor2)
     return lerp(color, ((float3)w)*factor, w*factor2);
 }
 
-float4 Composite(PSInput input) : SV_TARGET
+float4 Composite(FullScreenPSInput input) : SV_TARGET
 {
 	float3 color = _SourceTex.Sample(g_LinearClampSampler, input.uv).rgb;
     float4 cpos = _SunScreenPos;

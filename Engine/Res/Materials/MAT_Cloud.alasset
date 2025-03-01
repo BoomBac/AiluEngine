@@ -1,0 +1,24 @@
+guid: a5ad5353-4bed-47b7-a4c2-aa26036f7ac2
+type: kMaterial
+name: MAT_Cloud
+shader_guid: 0cd86d2c-e28b-4816-a032-0ef7fb1843f5
+keywords: 
+  prop_type: Uint
+    _cull: 2
+  prop_type: Float
+    _DensityMultply: 0.057
+    _Exposure: 0.5
+    _Fade: 1
+    _G: -0.272
+    _StepSize: 0.129
+    _Threshold: 0
+    _padding0: 1
+    _padding1: 0.365
+  prop_type: Vector
+    _AABBMax: 1.01,1.01,1.01,1
+    _AABBMin: -1.01,-1.01,-1.01,1
+    _AABBScale: 1,1,1,1
+    _Absorption: 0,0,0,1
+    _Scattering: 100,100,100,1
+  prop_type: IntVector
+  prop_type: Texture2D
