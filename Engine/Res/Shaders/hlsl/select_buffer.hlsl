@@ -35,7 +35,7 @@ struct PSInput
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	result.position = TransformToClipSpace(v.position);
+	result.position = TransformToClipSpaceNoJitter(v.position);
 	return result;
 }
 

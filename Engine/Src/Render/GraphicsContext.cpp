@@ -2,10 +2,10 @@
 #include "Framework/Common/Application.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/GPUResourceManager.h"
+#include "Render/GraphicsPipelineStateObject.h"
 #include "Render/Texture.h"
 #include "pch.h"
 #include <Render/CommandBuffer.h>
-#include "Render/GraphicsPipelineStateObject.h"
 
 namespace Ailu
 {
@@ -14,7 +14,7 @@ namespace Ailu
 	void GraphicsContext::InitGlobalContext()
 	{
         TimerBlock b("----------------------------------------------------------- GraphicsContext::InitGlobalContext");
-		g_pGfxContext = new D3DContext(dynamic_cast<WinWindow*>(Application::GetInstance()->GetWindowPtr()));
+		g_pGfxContext = new D3DContext(dynamic_cast<WinWindow*>(Application::Get()->GetWindowPtr()));
 		g_pGfxContext->Init();
 		g_pRenderTexturePool = new RenderTexturePool();
         GpuResourceManager::Init();

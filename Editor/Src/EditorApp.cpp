@@ -59,12 +59,12 @@ namespace Ailu
             _p_scene_layer = new SceneLayer();
             PushLayer(_p_scene_layer);
             g_pLogMgr->AddAppender(new ImGuiLogAppender());
+            _pipeline.reset(new CommonRenderPipeline());
+            g_pGfxContext->RegisterPipeline(_pipeline.get());
             {
                 //g_pResourceMgr->Load<Scene>(_opened_scene_path);
                 g_pSceneMgr->OpenScene(_opened_scene_path);
             }
-            _pipeline.reset(new CommonRenderPipeline());
-            g_pGfxContext->RegisterPipeline(_pipeline.get());
             LoadEditorResource();
             _p_editor_layer = new EditorLayer();
             PushLayer(_p_editor_layer);
@@ -125,6 +125,7 @@ namespace Ailu
                 config_pairs[v[0]] = v[1];
             }
             _p_scene_camera = new Camera();
+            _p_scene_camera->_anti_aliasing = EAntiAliasing::kTAA;
             _p_scene_camera->Name("SceneCamera");
             Camera::sCurrent = _p_scene_camera;
             Vector2f v2;
@@ -140,7 +141,7 @@ namespace Ailu
             _p_scene_camera->Far(LoadFloat(config_pairs["Far"].c_str()));
             LoadVector(config_pairs["ControllerRotation"].c_str(), v2);
             FirstPersonCameraController::s_inst._rotation = v2;
-            _p_scene_camera->RecalculateMarix(true);
+            _p_scene_camera->RecalculateMatrix(true);
             _opened_scene_path = ToWStr(config_pairs["Scene"].c_str());
 
             LoadVector(config_pairs["WindowSize"].c_str(), v2);

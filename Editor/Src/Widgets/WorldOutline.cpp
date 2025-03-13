@@ -70,8 +70,8 @@ namespace Ailu
             ImGui::PushID(entity);
             if (is_cur_node_selected)
                 node_flags |= ImGuiTreeNodeFlags_Selected;
-            auto hiera_comp = _scene_register->GetComponent<CHierarchy>(entity);
-            auto tag_comp = _scene_register->GetComponent<TagComponent>(entity);
+            auto hiera_comp = _scene_register->GetComponent<ECS::CHierarchy>(entity);
+            auto tag_comp = _scene_register->GetComponent<ECS::TagComponent>(entity);
             if (hiera_comp->_children_num == 0)
                 node_flags |= ImGuiTreeNodeFlags_Leaf;
             bool b_root_node_open = false;
@@ -100,7 +100,7 @@ namespace Ailu
             {
                 if (hiera_comp->_children_num > 0)
                 {
-                    auto child = _scene_register->GetComponent<CHierarchy>(hiera_comp->_first_child);
+                    auto child = _scene_register->GetComponent<ECS::CHierarchy>(hiera_comp->_first_child);
                     ECS::Entity child_entity = hiera_comp->_first_child;
                     do
                     {
@@ -117,8 +117,8 @@ namespace Ailu
                             if (is_cur_node_selected)
                                 node_flags |= ImGuiTreeNodeFlags_Selected;
                             ImGui::PushID(child_entity);// PushID 需要在进入子节点前
-                            auto hiera_comp = _scene_register->GetComponent<CHierarchy>(child_entity);
-                            auto tag_comp = _scene_register->GetComponent<TagComponent>(child_entity);
+                            auto hiera_comp = _scene_register->GetComponent<ECS::CHierarchy>(child_entity);
+                            auto tag_comp = _scene_register->GetComponent<ECS::TagComponent>(child_entity);
                             if (ImGui::TreeNodeEx(hiera_comp, node_flags, "%s", tag_comp->_name.c_str()))
                             {
                                 if (ImGui::IsItemClicked())
@@ -147,7 +147,7 @@ namespace Ailu
                             ImGui::PopID();
                         }
                         child_entity = child->_next_sibling;
-                        child = _scene_register->GetComponent<CHierarchy>(child_entity);
+                        child = _scene_register->GetComponent<ECS::CHierarchy>(child_entity);
                     } while (child != nullptr);
                 }
                 ImGui::TreePop();
@@ -156,13 +156,13 @@ namespace Ailu
             {
                 if (hiera_comp->_children_num > 0)
                 {
-                    auto child = _scene_register->GetComponent<CHierarchy>(hiera_comp->_first_child);
+                    auto child = _scene_register->GetComponent<ECS::CHierarchy>(hiera_comp->_first_child);
                     ECS::Entity child_entity = hiera_comp->_first_child;
                     do
                     {
                         _drawed_entity.insert(child_entity);
                         child_entity = child->_next_sibling;
-                        child = _scene_register->GetComponent<CHierarchy>(child_entity);
+                        child = _scene_register->GetComponent<ECS::CHierarchy>(child_entity);
                     } while (child != nullptr);
                 }
             }
@@ -172,10 +172,10 @@ namespace Ailu
         void WorldOutline::OnOutlineDoubleClicked(ECS::Entity entity)
         {
             auto&r = g_pSceneMgr->ActiveScene()->GetRegister();
-            auto t = r.GetComponent<TransformComponent>(entity)->_transform;
+            auto t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
             auto target_pos = t._position;
             f32 dis = 2.0f;
-            if (StaticMeshComponent *sm = r.GetComponent<StaticMeshComponent>(entity); sm != nullptr)
+            if (ECS::StaticMeshComponent *sm = r.GetComponent<ECS::StaticMeshComponent>(entity); sm != nullptr)
                 dis = sm->_transformed_aabbs[0].Diagon() * 1.1f;
             target_pos += -Camera::sCurrent->Forward() * dis;
             FirstPersonCameraController::s_inst.SetTargetPosition(target_pos, true);

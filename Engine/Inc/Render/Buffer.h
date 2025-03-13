@@ -4,6 +4,7 @@
 
 #include "GlobalMarco.h"
 #include "PipelineState.h"
+#include "GpuResource.h"
 #include <functional>
 
 namespace Ailu
@@ -25,14 +26,25 @@ namespace Ailu
     class AILU_API IGPUBuffer
     {
     public:
-        static IGPUBuffer *Create(GPUBufferDesc desc, const String &name = std::format("common_buffer_{}", s_global_buffer_index++));
         virtual ~IGPUBuffer() = default;
         virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) = 0;
-        virtual void SetName(const String &name) = 0;
         virtual u8 *ReadBack() = 0;
         virtual void ReadBack(u8 *dst, u32 size) = 0;
-        virtual bool IsRandomAccess() const = 0;
         virtual void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete) = 0;
+    };
+    class AILU_API GPUBuffer : public IGPUBuffer, public GpuResource
+    {
+    public:
+        static GPUBuffer *Create(GPUBufferDesc desc, const String &name = std::format("common_buffer_{}", s_global_buffer_index++));
+        GPUBuffer(GPUBufferDesc desc) : _desc(desc) {}
+        virtual ~GPUBuffer() = default;
+        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false){};
+        virtual u8 *ReadBack() {return nullptr;};
+        virtual void ReadBack(u8 *dst, u32 size) {};
+        virtual void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete) {};
+        [[nodiscard]] bool IsRandomAccess() const {return _desc._is_random_write;};
+    protected:
+        GPUBufferDesc _desc;
     };
 
     class AILU_API IVertexBuffer
@@ -51,17 +63,6 @@ namespace Ailu
         virtual u32 GetVertexCount() const = 0;
     };
 
-    class IDynamicVertexBuffer
-    {
-    public:
-        static Ref<IDynamicVertexBuffer> Create(const VertexBufferLayout &layout, const String &name = std::format("dynamic_vertex_buffer_{}", s_global_buffer_index++));
-        static Ref<IDynamicVertexBuffer> Create(const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
-        virtual ~IDynamicVertexBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd) = 0;
-        virtual void SetName(const String &name) = 0;
-        virtual void UploadData() = 0;
-        virtual void AppendData(float *data0, u32 num0, float *data1, u32 num1) = 0;
-    };
     class AILU_API IIndexBuffer
     {
     public:
@@ -78,19 +79,31 @@ namespace Ailu
     class IConstantBuffer
     {
     public:
-        static IConstantBuffer *Create(u32 size, bool compute_buffer = false, const String &name = std::format("const_buffer_{}", s_global_buffer_index++));
-        static void Release(u8 *ptr);
         virtual ~IConstantBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) = 0;
-        virtual void SetName(const String &name) = 0;
+        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline) = 0;
         virtual u8 *GetData() = 0;
-        virtual u64 GetBufferSize() const = 0;
+        [[nodiscard]] virtual u64 GetBufferSize() const = 0;
         virtual void Reset() = 0;
+    };
+
+    class ConstantBuffer : public IConstantBuffer,public GpuResource
+    {
+    public:
+        static ConstantBuffer *Create(u32 size, bool compute_buffer = false, const String &name = std::format("const_buffer_{}", s_global_buffer_index++));
+        static void Release(u8 *ptr);
+        virtual ~ConstantBuffer() = default;
+        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) override{};
+        virtual u8 *GetData() override {return _data;};
+        [[nodiscard]]virtual u64 GetBufferSize() const override {return _size;};
+        virtual void Reset() override{};
         template<typename T>
-        static T *As(IConstantBuffer *buffer)
+        static T *As(ConstantBuffer *buffer)
         {
             return reinterpret_cast<T *>(buffer->GetData());
         }
+    protected:
+        u8* _data = nullptr;
+        u64 _size = 0u;
     };
 
 }// namespace Ailu

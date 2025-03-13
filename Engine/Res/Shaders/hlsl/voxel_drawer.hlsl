@@ -42,7 +42,7 @@ PSInput ForwardVSMain(VSInput v)
 	float3 obj_pos = v.position + origin;
 	float3 pos = (float3)FromLinearIndex(v.inst_id,_GridNum.xyz);
 	obj_pos += pos * _GridSize.xyz;
-	result.position = TransformToClipSpace(obj_pos);
+	result.position = TransformToClipSpaceNoJitter(obj_pos);
 	result.uvw = pos;
 	return result;
 }

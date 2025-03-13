@@ -27,8 +27,9 @@ namespace Ailu
 		static f32 s_time_scale;
 		static float GetScaledWorldTime(float scale = TimeMgr::s_time_scale,bool smooth_scale = true);
 		static String CurrentTime(String format = "%Y-%m-%d_%H:%M:%S");
-		//return elapsed time since current tick in ms
-        static f32 GetElapsedSinceCurrentTick() { return ALMSecond(std::chrono::high_resolution_clock::now() - s_cur_tick_stamp).count(); };
+		/// @brief 返回距当前帧开始的时间ms
+		/// @return 
+		f32 GetElapsedSinceCurrentTick() const { return ALMSecond(std::chrono::high_resolution_clock::now() - _cur_tick_stamp).count(); };
 		int Initialize() final;
         void Finalize() final;
 		void Tick(f32 delta_time) final;
@@ -39,7 +40,7 @@ namespace Ailu
 		void Reset();
 	private:
 		inline static ALTimeStamp s_pre_tick_stamp;
-		inline static ALTimeStamp s_cur_tick_stamp;
+		ALTimeStamp _cur_tick_stamp;
 		ALTimeStamp _init_stamp;
 		ALTimeStamp _pause_stamp;
 		std::stack<ALTimeStamp> _mark_stamps{};
@@ -91,11 +92,11 @@ namespace Ailu
         IGPUTimer& operator=(IGPUTimer&&) = default;
 
         // Indicate beginning & end of frame
-        virtual void BeginFrame(CommandBuffer* cmd) = 0;
+        virtual void BeginFrame(CommandBuffer * cmd) = 0;
         virtual void EndFrame() = 0;
         // Start/stop a particular performance timer (don't start same index more than once in a single frame)
-        virtual void Start(CommandBuffer* commandList, u32 timerid = 0) = 0;
-        virtual void Stop(CommandBuffer* commandList, u32 timerid = 0) = 0;
+        virtual void Start(CommandBuffer * commandList, u32 timerid = 0) = 0;
+        virtual void Stop(CommandBuffer * commandList, u32 timerid = 0) = 0;
         // Reset running average
         virtual void Reset() = 0;
         // Returns delta time in milliseconds

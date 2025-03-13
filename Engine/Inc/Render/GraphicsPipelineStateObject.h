@@ -2,6 +2,8 @@
 #ifndef __GFX_PIPELINE_STATE_H__
 #define __GFX_PIPELINE_STATE_H__
 
+#include <utility>
+
 #include "AlgFormat.h"
 #include "Framework/Math/ALMath.hpp"
 #include "GlobalMarco.h"
@@ -50,7 +52,47 @@ namespace Ailu
             return pso_desc;
         }
     };
-
+    struct PipelineResource
+    {
+        inline static const u16 kPriorityLocal = 0x0u;
+        inline static const u16 kPriorityCmd = 0x1u;
+        inline static const u16 kPriorityGlobal = 0x2u;
+        struct AddiInfo
+        {
+            //目前给upload buffer使用
+            u64 _gpu_handle = 0u;
+            //texture
+            void* _native_res_ptr = nullptr;
+            u16 _view_index = 0u;
+            u32 _sub_res = 0;
+            bool operator==(const AddiInfo &other) const
+            {
+                return _gpu_handle == other._gpu_handle && _native_res_ptr == other._native_res_ptr && _view_index == other._view_index && _sub_res == other._sub_res;
+            }
+        };
+        EBindResDescType _res_type = EBindResDescType::kUnknown;
+        i16 _slot = 0;
+        u16 _register_space = 0u;
+        String _name;
+        u16 _priority;
+        bool _is_compute = false;
+        PipelineResource() = default;
+        PipelineResource(GpuResource* _res, EBindResDescType resType,String name, u16 priority,bool is_compute = false,u16 register_space = 0u)
+            : _p_resource(_res), _res_type(resType), _slot(-1), _name(std::move(name)), _priority(priority) ,_is_compute(is_compute) ,_register_space(register_space) {}
+        PipelineResource(GpuResource* _res, EBindResDescType resType, i16 slot,u16 priority,bool is_compute = false,u16 register_space = 0u)
+            : _p_resource(_res), _res_type(resType), _slot(slot), _name(""), _priority(priority) ,_is_compute(is_compute) ,_register_space(register_space) {}
+        bool operator<(const PipelineResource &other) const
+        {
+            return _priority < other._priority;
+        }
+        bool operator==(const PipelineResource &other) const
+        {
+            return _slot == other._slot && _res_type == other._res_type && _priority == other._priority && _register_space == other._priority && _is_compute == other._is_compute
+                   && _p_resource == other._p_resource && _addi_info == other._addi_info;
+        }
+        GpuResource* _p_resource;
+        AddiInfo _addi_info;
+    };
     using PSOHash = ALHash::Hash<128>;
     class CommandBuffer;
     class GraphicsPipelineStateObject
@@ -63,7 +105,7 @@ namespace Ailu
                 u8 _size;
             };
             inline static const BitDesc kShader = {0, 46};
-            inline static const BitDesc kInputlayout = {46, 4};
+            inline static const BitDesc kInputLayout = {46, 4};
             //inline static const BitDesc kTopology = {50, 2};
             inline static const BitDesc kBlendState = {52, 3};
             inline static const BitDesc kRasterState = {55, 3};
@@ -82,7 +124,8 @@ namespace Ailu
         virtual ~GraphicsPipelineStateObject() = default;
         virtual void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) = 0;
         virtual void Bind(CommandBuffer *cmd) = 0;
-        virtual void SetPipelineResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) = 0;
+        /// 填充已经验证的管线资源
+        virtual void SetPipelineResource(const PipelineResource& pipeline_res) = 0;
         virtual bool IsValidPipelineResource(const EBindResDescType &res_type, u8 slot) const = 0;
         virtual const PSOHash &Hash() = 0;
         virtual const String &Name() const = 0;
@@ -91,15 +134,8 @@ namespace Ailu
         virtual void SetTopology(ETopology topology) = 0;
         virtual void SetStencilRef(u8 ref) = 0;
         virtual const GraphicsPipelineStateInitializer& StateDescriptor() const = 0;
-    protected:
-        virtual void BindResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) = 0;
-        struct BindResDescSlotOffset
-        {
-            u8 kConstBuffer = 32;
-            u8 kTexture2D = 64;
-            u8 kTextureCube = 96;
-            u8 kSampler = 128;
-        };
+        virtual u32 GetBindResourceSignature() const = 0;
+        virtual const Array<PipelineResource,32>& GetBindResource(u16 index) const=  0;
     };
 
     class GraphicsPipelineStateMgr
@@ -110,7 +146,7 @@ namespace Ailu
         static GraphicsPipelineStateMgr& Get();
         static void BuildPSOCache();
         static void AddPSO(Scope<GraphicsPipelineStateObject> p_gpso);
-        static void EndConfigurePSO(CommandBuffer *cmd);
+        static GraphicsPipelineStateObject* FindMatchPSO();
         static void OnShaderRecompiled(Shader *shader, u16 pass_id, ShaderVariantHash variant_hash);
         static void ConfigureShader(const u64 &shader_hash);
         static void ConfigureVertexInputLayout(const u8 &hash);//0~3 4
@@ -124,10 +160,9 @@ namespace Ailu
         //call before cmd->SetRenderTarget
         static void ResetRenderTargetState();
 
-        static bool IsReadyForCurrentDrawCall();
-
-        static void SubmitBindResource(void *res, const EBindResDescType &res_type, u8 slot, u16 priority);
-        static void SubmitBindResource(void *res, const EBindResDescType &res_type, const String &name, u16 priority);
+        //static void SubmitBindResource(GpuResource *res, const EBindResDescType &res_type, u8 slot, u16 priority);
+        //static void SubmitBindResource(GpuResource *res, const EBindResDescType &res_type, const String &name, u16 priority);
+        static void SubmitBindResource(PipelineResource resource);
         static void UpdateAllPSOObject();
         
     private:
@@ -137,8 +172,7 @@ namespace Ailu
         std::mutex _pso_lock;
         std::map<PSOHash, Scope<GraphicsPipelineStateObject>> _pso_library{};
         u32 s_reserved_pso_id = 32u;
-        List<PipelineResourceInfo> _bind_resource_list{};
-        bool _is_ready = false;
+        List<PipelineResource> _bind_resource_list{};
         RenderTargetState _render_target_state;
 
         PSOHash _cur_pos_hash{};

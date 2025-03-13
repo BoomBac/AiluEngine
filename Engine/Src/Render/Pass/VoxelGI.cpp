@@ -15,7 +15,7 @@ namespace Ailu
     {
         _standard_lit_forward = Shader::s_p_defered_standart_lit.lock();
         _voxel_pass_index = _standard_lit_forward->FindPass("VoxelLit");
-        _cam_cbuf = IConstantBuffer::Create(sizeof(CBufferPerCameraData), false, "VoxelCbuf");
+        _cam_cbuf = ConstantBuffer::Create(sizeof(CBufferPerCameraData), false, "VoxelCbuf");
         _voxelize_cs = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/voxelize.alasset");
     }
     VoxelizePass::~VoxelizePass()
@@ -27,7 +27,7 @@ namespace Ailu
     {
         auto cmd = CommandBufferPool::Get("Voxelize");
         {
-            auto *cbuf_cam = IConstantBuffer::As<CBufferPerCameraData>(_cam_cbuf);
+            auto *cbuf_cam = ConstantBuffer::As<CBufferPerCameraData>(_cam_cbuf);
             Vector3f cam_pos = rendering_data._vxgi_data._center;
             cam_pos.z -= rendering_data._vxgi_data._size.z * 0.5f;
             BuildOrthographicMatrix(cbuf_cam->_MatrixP, -rendering_data._vxgi_data._size.x * 0.5f, rendering_data._vxgi_data._size.x * 0.5f,
@@ -87,7 +87,7 @@ namespace Ailu
             desc._format = EALGFormat::kALGFormatR32_UINT;
             desc._element_num = _data._grid_num.x * _data._grid_num.y * _data._grid_num.z;
             desc._size = sizeof(Vector4f) * desc._element_num;
-            _voxel_buf = IGPUBuffer::Create(desc, "VoexlBuffer");
+            _voxel_buf = GPUBuffer::Create(desc, "VoexlBuffer");
             if (_voxel_tex)
                 _voxel_tex.reset();
             Texture3DInitializer initializer;

@@ -24,9 +24,9 @@ namespace Ailu
 			//	static std::chrono::seconds duration(5);
 			//	if (event.GetButton() == 1)
 			//	{			
-			//		auto inv_vp = Camera::sCurrent->GetView() * Camera::sCurrent->GetProjection();
+			//		auto inv_vp = Camera::sCurrent->GetView() * Camera::sCurrent->GetProj();
 			//		MatrixInverse(inv_vp);
-			//		auto p = Camera::sCurrent->GetProjection();
+			//		auto p = Camera::sCurrent->GetProj();
 			//		auto m_pos = Input::GetMousePos();
 			//		float vx = (2.0f * m_pos.x / 1600 - 1.0f) / p[0][0];
 			//		float vy = (-2.0f * m_pos.y / 900 + 1.0f) / p[1][1];

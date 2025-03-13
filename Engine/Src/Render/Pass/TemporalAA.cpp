@@ -25,7 +25,7 @@ namespace Ailu
         static bool first_time = false;
         auto camera = *rendering_data._camera;
         auto hash = camera.HashCode();
-        auto proj = camera.GetProjection();
+        auto proj = camera.GetProj();
         auto view = camera.GetView();
         //auto viewProj = proj * view;
         auto viewProj = view * proj;
@@ -57,7 +57,7 @@ namespace Ailu
         }
         //viewProj = matrix * view;
         _prepare_pass.Setup(matrix);
-        renderer.EnqueuePass(&_prepare_pass);
+        //renderer.EnqueuePass(&_prepare_pass);
         jitter.x = (offsetX - 0.5f) / rendering_data._width;
         jitter.y = (offsetY - 0.5f) / rendering_data._height;
         jitter *= _jitter_scale;
@@ -101,7 +101,7 @@ namespace Ailu
 
     TAAExecutePass::TAAExecutePass() : RenderPass("TAAExecutePass")
     {
-        _origin_camera_cbuf = std::unique_ptr<IConstantBuffer>(IConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
+        _origin_camera_cbuf = std::unique_ptr<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
         _taa_gen = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/taa.alasset");
     }
     void Ailu::TAAExecutePass::Setup(Matrix4x4f pre_matrix, Matrix4x4f cur_matrix, Material *taa_mat, int camera_hash, Vector2f jitter,Vector4f params,Vector4f quality)
@@ -132,12 +132,12 @@ namespace Ailu
         auto &camera_data = rendering_data._camera_data;
         CBufferPerCameraData camera_cb;
         camera_cb._MatrixV = rendering_data._camera->GetView();
-        camera_cb._MatrixP = rendering_data._camera->GetProjection();
+        camera_cb._MatrixP = rendering_data._camera->GetProj();
         camera_cb._MatrixVP = camera_cb._MatrixV * camera_cb._MatrixP;
         camera_cb._MatrixIVP = MatrixInverse(camera_cb._MatrixVP);
         camera_cb._CameraPos = rendering_data._camera->Position();
         memcpy(_origin_camera_cbuf->GetData(), &camera_cb, RenderConstants::kPerCameraDataSize);
-        rendering_data._camera->GetProjection();
+        rendering_data._camera->GetProj();
         bool is_compute = true;
         {
             PROFILE_BLOCK_GPU(cmd.get(),TemporaAA)
@@ -168,7 +168,7 @@ namespace Ailu
                 _taa_gen->SetFloat("_ClampQuality",_quality.x);
                 _taa_gen->SetFloat("_HistoryQuality",_quality.y);
                 _taa_gen->SetFloat("_MotionQuality",_quality.z);
-                _taa_gen->SetFloat("_VarianceClipScale", _params.x);
+                _taa_gen->SetFloat("_VarianceClampScale", _params.x);
                 _taa_gen->SetFloat("_Sharpness", _params.y);
                 _taa_gen->SetFloat("_HistoryFactor", _params.z);
                 auto kernel = _taa_gen->FindKernel("CSMain");
@@ -192,7 +192,7 @@ namespace Ailu
                 cmd->DrawFullScreenQuad(_taa_material);
                 cmd->Blit(rendering_data._camera_color_target_handle, history_target);
                 cmd->Blit(rendering_data._camera_color_target_handle, rendering_data._camera_opaque_tex_handle);
-                //cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProjection());
+                //cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProj());
             }
             //cmd->Blit(cur_target, rendering_data._camera_color_target_handle);
             //rendering_data._postprocess_input = cur_target;
@@ -206,7 +206,6 @@ namespace Ailu
     }
     void TAAExecutePass::EndPass(GraphicsContext *context)
     {
-        Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _origin_camera_cbuf.get());
         auto &cur_info = _infos[_cur_camera_hash];
         cur_info._is_cur_a = !cur_info._is_cur_a;
     }

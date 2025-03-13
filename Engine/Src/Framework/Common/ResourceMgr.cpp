@@ -52,7 +52,6 @@ namespace Ailu
                 L"Shaders/deferred_lighting.alasset",
                 L"Shaders/wireframe.alasset",
                 L"Shaders/gizmo.alasset",
-                L"Shaders/depth_only.alasset",
                 L"Shaders/cubemap_gen.alasset",
                 L"Shaders/filter_irradiance.alasset",
                 L"Shaders/blit.alasset",

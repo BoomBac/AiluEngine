@@ -99,18 +99,25 @@ namespace Ailu
             LOG_ERROR("PipelineState must be build before it been bind!");
             return;
         }
-        _p_cmd = static_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
+        _p_cmd = dynamic_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
         if (_state_desc._depth_stencil_state._b_front_stencil)
             _p_cmd->OMSetStencilRef(_state_desc._depth_stencil_state._stencil_ref_value);
         _p_cmd->SetGraphicsRootSignature(_p_sig.Get());
         _p_cmd->SetPipelineState(_p_plstate.Get());
         _p_cmd->IASetPrimitiveTopology(_d3d_topology);
-        //_p_cmd->SetDescriptorHeaps(1, D3DContext::Get()->GetDescriptorHeap().GetAddressOf());
+        for(u16 i = 0; i < _bind_res.size(); i++)
+        {
+            if (_bind_res_signature & (1 << i))
+                BindResource(cmd, _bind_res[i]);
+        }
     }
 
-    void D3DGraphicsPipelineState::SetPipelineResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot)
+    void D3DGraphicsPipelineState::SetPipelineResource(const PipelineResource& pipeline_res)
     {
-        BindResource(cmd, res, res_type, slot);
+        if (pipeline_res._slot < 0)
+            return;
+        _bind_res_signature |=  (1 << pipeline_res._slot);
+        _bind_res[pipeline_res._slot] = pipeline_res;
     }
 
     bool D3DGraphicsPipelineState::IsValidPipelineResource(const EBindResDescType &res_type, u8 slot) const
@@ -144,46 +151,47 @@ namespace Ailu
         return (u8)-1;
     }
 
-    void D3DGraphicsPipelineState::BindResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot)
+    void D3DGraphicsPipelineState::BindResource(CommandBuffer * cmd,const PipelineResource& res)
     {
-        if (res == nullptr)
+        if (res._p_resource == nullptr)
             return;
-        u8 bind_slot = slot == 255 ? _per_frame_cbuf_bind_slot : slot;
-        if (!IsValidPipelineResource(res_type, bind_slot))
+        u8 bind_slot = res._slot == 255 ? _per_frame_cbuf_bind_slot : res._slot;
+        if (!IsValidPipelineResource(res._res_type, bind_slot))
         {
             //LOG_WARNING("PSO:{} submitBindResource: bind slot {} not found!", _name, (u16) bind_slot);
             return;
         }
-        static auto context = D3DContext::Get();
-        switch (res_type)
+        i16 slot = res._slot;
+        switch (res._res_type)
         {
             case Ailu::EBindResDescType::kConstBuffer:
             {
-                static_cast<IConstantBuffer *>(res)->Bind(cmd, bind_slot);
+                dynamic_cast<ConstantBuffer *>(res._p_resource)->Bind(cmd, bind_slot);
             }
             break;
             case Ailu::EBindResDescType::kConstBufferRaw:
             {
-                UploadBuffer::Allocation alloc = *static_cast<UploadBuffer::Allocation *>(res);
-                //D3D12_GPU_VIRTUAL_ADDRESS address = *static_cast<D3D12_GPU_VIRTUAL_ADDRESS *>(res);
-                static_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, alloc.GPU);
+                D3D12_GPU_VIRTUAL_ADDRESS address = static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(res._addi_info._gpu_handle);
+                dynamic_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, address);
             }
             break;
             case EBindResDescType::kBuffer:
             case EBindResDescType::kRWBuffer:
             {
-                reinterpret_cast<IGPUBuffer *>(res)->Bind(cmd,slot);
+                dynamic_cast<GPUBuffer *>(res._p_resource)->Bind(cmd,slot);
             }
             break;
             case Ailu::EBindResDescType::kTexture2D:
             {
-                Texture2D* tex = reinterpret_cast<Texture2D *>(res);
+                Texture* tex = dynamic_cast<Texture*>(res._p_resource);
                 tex->Bind(cmd, Texture::kMainSRVIndex, slot,D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, false);
             }
             break;
             case Ailu::EBindResDescType::kSampler:
                 break;
             case Ailu::EBindResDescType::kCBufferAttribute:
+                break;
+            default:
                 break;
         }
     }

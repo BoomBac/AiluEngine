@@ -46,7 +46,6 @@ StandardPSInput ForwardVSMain(StandardVSInput v)
 	result.world_pos = TransformObjectToWorld(v.position);
 	result.world_pos.y += sin(_Time.x*100 + result.world_pos.x * 4) * 0.25;
 	result.position = TransformWorldToHClip(result.world_pos);
-	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
 	return result;
 }
 

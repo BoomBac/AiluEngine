@@ -614,24 +614,6 @@ namespace Ailu
         kCBufferInts = 0x80000,
         kUnknown
     };
-
-    struct PipelineResourceInfo
-    {
-        inline static const u16 kPriporityLocal = 0x0u;
-        inline static const u16 kPriporityCmd = 0x1u;
-        inline static const u16 kPriporityGlobal = 0x2u;
-        void *_p_resource = nullptr;
-        EBindResDescType _res_type = EBindResDescType::kUnknown;
-        u8 _slot = 0;
-        String _name;
-        u16 _priority;
-        PipelineResourceInfo(void *pResource, EBindResDescType resType, u8 slot, const String &name, u16 priority)
-            : _p_resource(pResource), _res_type(resType), _slot(slot), _name(name), _priority(priority) {}
-        bool operator<(const PipelineResourceInfo &other) const
-        {
-            return _priority < other._priority;
-        }
-    };
 }// namespace Ailu
 
 

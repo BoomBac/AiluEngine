@@ -5,4 +5,5 @@
 #include "../Scene/Component.h"
 inline static Ailu::EnumTypeRegister g_register_EDataType(Z_Construct_Enum_EDataType_Type);
 inline static Ailu::EnumTypeRegister g_register_EMotionVectorType(Z_Construct_Enum_EMotionVectorType_Type);
+inline static Ailu::EnumTypeRegister g_register_EAntiAliasing(Z_Construct_Enum_EAntiAliasing_Type);
 #endif

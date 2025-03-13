@@ -6,7 +6,6 @@
 #include <Render/Gizmo.h>
 #include <Render/Renderer.h>
 
-
 namespace Ailu
 {
     namespace Editor
@@ -45,20 +44,20 @@ namespace Ailu
                 {
                     for (auto entity: selected)
                     {
-                        const auto t = r.GetComponent<TransformComponent>(entity)->_transform;
-                        if (auto comp = r.GetComponent<LightComponent>(entity); comp != nullptr)
+                        const auto t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
+                        if (auto comp = r.GetComponent<ECS::LightComponent>(entity); comp != nullptr)
                         {
                             DrawLightGizmo(t, comp);
                             continue;
                         }
-                        else if (auto comp = r.GetComponent<CLightProbe>(entity); comp != nullptr)
+                        else if (auto comp = r.GetComponent<ECS::CLightProbe>(entity); comp != nullptr)
                         {
                             //Gizmo::DrawCube(t._position, comp->_size);
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
                             Gizmo::DrawAABB(t._position - ext,t._position + ext);
                             cmd->DrawRenderer(Mesh::s_p_shpere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
                         }
-                        else if (auto comp = r.GetComponent<CCamera>(entity); comp != nullptr)
+                        else if (auto comp = r.GetComponent<ECS::CCamera>(entity); comp != nullptr)
                         {
                             Camera::DrawGizmo(&comp->_camera,Colors::kWhite);
                         }
@@ -76,33 +75,33 @@ namespace Ailu
                     }
                 }
                 u16 entity_index = 0;
-                for (auto &light_comp: r.View<LightComponent>())
+                for (auto &light_comp: r.View<ECS::LightComponent>())
                 {
-                    const auto &t = r.GetComponent<LightComponent, TransformComponent>(entity_index);
+                    const auto &t = r.GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
                     CBufferPerObjectData obj_data;
-                    obj_data._ObjectID = r.GetEntity<LightComponent>(entity_index);
+                    obj_data._ObjectID = r.GetEntity<ECS::LightComponent>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
                     switch (light_comp._type)
                     {
-                        case ELightType::kDirectional:
+                        case ECS::ELightType::kDirectional:
                         {
                             cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_directional_light, obj_data, 0, 1, 1);
                         }
                         break;
-                        case ELightType::kPoint:
+                        case ECS::ELightType::kPoint:
                         {
                             cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_point_light, obj_data, 0, 1, 1);
                         }
                         break;
-                        case ELightType::kSpot:
+                        case ECS::ELightType::kSpot:
                         {
                             cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_spot_light, obj_data, 0, 1, 1);
                         }
                         break;
-                        case ELightType::kArea:
+                        case ECS::ELightType::kArea:
                         {
                             cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_area_light, obj_data, 0, 1, 1);
                         }
@@ -111,24 +110,24 @@ namespace Ailu
                     ++entity_index;
                 }
                 entity_index = 0;
-                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<CLightProbe>())
+                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CLightProbe>())
                 {
-                    const auto &t = r.GetComponent<CLightProbe, TransformComponent>(entity_index);
+                    const auto &t = r.GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
                     CBufferPerObjectData obj_data;
-                    obj_data._ObjectID = r.GetEntity<CLightProbe>(entity_index);
+                    obj_data._ObjectID = r.GetEntity<ECS::CLightProbe>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
                     cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
                 }
                 entity_index = 0;
-                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<CCamera>())
+                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
                 {
-                    const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<CCamera, TransformComponent>(entity_index);
+                    const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
                     CBufferPerObjectData obj_data;
-                    obj_data._ObjectID = r.GetEntity<CCamera>(entity_index);
+                    obj_data._ObjectID = r.GetEntity<ECS::CCamera>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
@@ -145,19 +144,19 @@ namespace Ailu
                     cmd->ClearRenderTarget(select_buf_blur_temp, Colors::kBlack);
                     for (auto entity: selected)
                     {
-                        const auto &t = r.GetComponent<TransformComponent>(entity)->_transform;
-                        if (auto comp = r.GetComponent<StaticMeshComponent>(entity); comp != nullptr)
+                        const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
+                        if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
                         {
                             cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
                             cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
                         }
-                        else if (auto comp = r.GetComponent<CSkeletonMesh>(entity); comp != nullptr)
+                        else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
                         {
                             cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
                             cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
                             Gizmo::DrawAABB(comp->_transformed_aabbs[0],Colors::kGreen);
                         }
-                        if (auto c = r.GetComponent<CCollider>(entity))
+                        if (auto c = r.GetComponent<ECS::CCollider>(entity))
                         {
                             DebugDrawer::DebugWireframe(*c,t);
                         }
@@ -183,11 +182,11 @@ namespace Ailu
             context->ExecuteCommandBuffer(cmd);
             CommandBufferPool::Release(cmd);
         }
-        void PickPass::DrawLightGizmo(const Transform &transf, LightComponent *comp)
+        void PickPass::DrawLightGizmo(const Transform &transf, ECS::LightComponent *comp)
         {
             switch (comp->_type)
             {
-                case Ailu::ELightType::kDirectional:
+                case Ailu::ECS::ELightType::kDirectional:
                 {
                     Vector3f light_to = comp->_light._light_dir.xyz;
                     light_to.x *= 2.0f;
@@ -210,14 +209,14 @@ namespace Ailu
                     Gizmo::DrawCircle(transf._position, 0.5f, 24, comp->_light._light_color, Quaternion::ToMat4f(transf._rotation));
                     return;
                 }
-                case Ailu::ELightType::kPoint:
+                case Ailu::ECS::ELightType::kPoint:
                 {
                     Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color, MatrixRotationX(ToRadius(90.0f)));
                     Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color, MatrixRotationZ(ToRadius(90.0f)));
                     Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color);
                     return;
                 }
-                case Ailu::ELightType::kSpot:
+                case Ailu::ECS::ELightType::kSpot:
                 {
                     float angleIncrement = 90.0;
                     auto rot_mat = Quaternion::ToMat4f(transf._rotation);
@@ -267,7 +266,7 @@ namespace Ailu
                     }
                     return;
                 }
-                case ELightType::kArea:
+                case ECS::ELightType::kArea:
                 {
                     Vector3f light_to = comp->_light._light_dir.xyz;
                     light_to.x *= comp->_light._light_param.x;
@@ -312,7 +311,7 @@ namespace Ailu
             desc._is_readable = true;
             desc._format = EALGFormat::kALGFormatR32_UINT;
             desc._is_random_write = true;
-            _readback_buf = IGPUBuffer::Create(desc);
+            _readback_buf = GPUBuffer::Create(desc);
         }
         PickFeature::~PickFeature()
         {

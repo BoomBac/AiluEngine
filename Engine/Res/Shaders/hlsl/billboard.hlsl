@@ -44,7 +44,10 @@ PSInput VSMain(VSInput v)
     float3 view_pos = TransformToViewSpace(GetObjectWorldPos());
     float3 scaleRotatePos = mul((float3x3)_MatrixWorld, v.position);
     view_pos += float3(scaleRotatePos.xy, -scaleRotatePos.z);
-    result.position = mul(_MatrixP,float4(view_pos,1));
+    float4x4 proj = _MatrixP;
+    proj[0][2] -= _matrix_jitter_x;
+    proj[1][2] -= _matrix_jitter_y;
+    result.position = mul(proj,float4(view_pos,1));
     result.uv = v.uv;
     result.world_pos = GetObjectWorldPos();
 	return result;

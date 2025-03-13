@@ -396,6 +396,7 @@ namespace Ailu
             s_pInstance->_screen_vbuf->SetData((u8 *) s_pInstance->_screen_pos.data(), s_pInstance->_screen_vertex_num * sizeof(Vector3f), 0u, 0);
             s_pInstance->_screen_vbuf->SetData((u8 *) s_pInstance->_screen_color.data(), s_pInstance->_screen_vertex_num * sizeof(Color), 1u, 0);
             s_pInstance->_screen_camera_cb._MatrixVP = Camera::GetDefaultOrthogonalViewProj((f32)data._width, (f32)data._height);
+            s_pInstance->_screen_camera_cb._MatrixVP_NoJitter = s_pInstance->_screen_camera_cb._MatrixVP;
             cmd->DrawInstanced(s_pInstance->_screen_vbuf.get(), nullptr, s_pInstance->_line_drawer, 0, 1);
             s_pInstance->_screen_vertex_num = 0u;
         }

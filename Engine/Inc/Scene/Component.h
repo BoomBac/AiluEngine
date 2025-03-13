@@ -16,7 +16,7 @@
 
 #include "generated/Component.gen.h"
 
-namespace Ailu
+namespace Ailu::ECS
 {
     AENUM()
     enum class EMotionVectorType
@@ -29,6 +29,7 @@ namespace Ailu
     {
         DECLARE_CLASS(TagComponent)
         String _name;
+        u32 _layer_mask;
     };
     Archive &operator<<(Archive &ar, const TagComponent &c);
     Archive &operator>>(Archive &ar, TagComponent &c);
@@ -60,6 +61,7 @@ namespace Ailu
         float _constant_bias;
         float _slope_bias;
         float _padding;
+        u16 _shaodwcam_num;
     };
 
     Archive &operator<<(Archive &ar, const ShadowData &c);
@@ -113,7 +115,7 @@ namespace Ailu
         BlendSpace _blend_space;
         //0 clip,1 blend space,2 anim graph
         i16 _anim_type;
-        EMotionVectorType _motion_vector_type = EMotionVectorType::kCameraOnly;
+        EMotionVectorType _motion_vector_type = EMotionVectorType::kPerObject;
     };
 
     Archive &operator<<(Archive &ar, const CSkeletonMesh &c);
@@ -132,7 +134,7 @@ namespace Ailu
     Archive &operator<<(Archive &ar, const CHierarchy &c);
     Archive &operator>>(Archive &ar, CHierarchy &c);
 
-    class CubeMapGenPass;
+    class Ailu::CubeMapGenPass;
     struct AILU_API CLightProbe
     {
         DECLARE_CLASS(CLightProbe)
@@ -201,11 +203,11 @@ namespace Ailu
     };
     Archive &operator<<(Archive &ar, const CVXGI &c);
     Archive &operator>>(Archive &ar, CVXGI &c);
+};// namespace Ailu
 
-    namespace DebugDrawer
-    {
-        void AILU_API DebugWireframe(const CCollider &c, const Transform &t, Color color = Colors::kGreen);
-        void AILU_API DebugWireframe(const CVXGI &c, const Transform &t, Color color = Colors::kGreen);
-    }// namespace DebugDrawer
-}// namespace Ailu
+namespace Ailu::DebugDrawer
+{
+    void AILU_API DebugWireframe(const ECS::CCollider &c, const Transform &t, Color color = Colors::kGreen);
+    void AILU_API DebugWireframe(const ECS::CVXGI &c, const Transform &t, Color color = Colors::kGreen);
+};// namespace DebugDrawer
 #endif// __COMPONENT_H__

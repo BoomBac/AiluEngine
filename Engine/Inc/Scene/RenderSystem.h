@@ -7,18 +7,6 @@ namespace Ailu
 {
     namespace ECS
     {
-        class RenderSystem : public System
-        {
-            DECLARE_CLASS(RenderSystem)
-        public:
-            void Update(Register &r, f32 delta_time) final;
-            virtual Ref<System> Clone() final
-            {
-                auto copy = MakeRef<RenderSystem>();
-                copy->_entities = _entities;
-                return copy;
-            };
-        };
         struct LightProbeHeadInfo
         {
 

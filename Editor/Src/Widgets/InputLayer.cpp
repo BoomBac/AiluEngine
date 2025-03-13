@@ -50,7 +50,7 @@ namespace Ailu
             _p_camera->Position(Lerp(_p_camera->Position(), _target_pos, speed));
             auto r = _rot_world_y * _rot_object_x;
             _p_camera->Rotation(r);
-            _p_camera->RecalculateMarix(true);
+            _p_camera->RecalculateMatrix(true);
         }
         void FirstPersonCameraController::SetTargetPosition(const Vector3f &position,bool is_force)
         {
@@ -66,6 +66,7 @@ namespace Ailu
             {
                 LOG_WARNING("Current Camera is null");
                 Camera::GetDefaultCamera();
+                Camera::sCurrent->_anti_aliasing = EAntiAliasing::kTAA;
             }
             FirstPersonCameraController::s_inst.Attach(Camera::sCurrent);
             FirstPersonCameraController::s_inst._is_receive_input = true;

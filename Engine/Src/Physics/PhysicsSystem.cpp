@@ -32,7 +32,7 @@ namespace Ailu
         }
         void PhysicsSystem::Update(Register &r, f32 delta_time)
         {
-            if (Application::GetInstance()->_is_playing_mode || Application::GetInstance()->_is_simulate_mode)
+            if (Application::Get()->_is_playing_mode || Application::Get()->_is_simulate_mode)
             {
                 PROFILE_BLOCK_CPU(PhysicsSystem_Update)
                 _collisions.clear();

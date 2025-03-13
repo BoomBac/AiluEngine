@@ -28,9 +28,9 @@ namespace Ailu
         Ref<Shader> _standard_lit_forward;
         VoxelGIData _data;
         Vector3Int _pre_grid_num;
-        IConstantBuffer *_cam_cbuf;
+        ConstantBuffer *_cam_cbuf;
         Ref<ComputeShader> _voxelize_cs;
-        IGPUBuffer *_voxel_buf = nullptr;
+        GPUBuffer *_voxel_buf = nullptr;
     };
 
     class VoxelDebugPass : public RenderPass

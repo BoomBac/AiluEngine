@@ -152,7 +152,7 @@ float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 	{
 		if(SqrDistance(world_pos,_CascadeShadowSplit[cascade_index].xyz) <= _CascadeShadowSplit[cascade_index].w)
 		{
-			float4 shadow_coord = TransformFromWorldToLightSpace(cascade_index,world_pos);
+			float4 shadow_coord = mul(_CascadeShadowMatrix[cascade_index],float4(world_pos,1.0));
 			if (shadow_coord.x < -1 || shadow_coord.x > 1 || shadow_coord.y < -1 || shadow_coord.y > 1)
 				return 1.0f;
 			shadow_coord.xyz /= shadow_coord.w;
@@ -182,12 +182,12 @@ float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 	return 1.0;
 }
 
-float ApplyShadowAddLight(float4 shadow_coord, float nl, float3 world_pos,int light_index)
+float ApplyShadowAddLight(float4 shadow_coord,float nl, float3 world_pos,int shadowmap_index,float const_bias,float slope_bias)
 {
 	float dis = distance(_CameraPos.xyz,world_pos);
 	// if(dis > shadow_distance)
 	// 	return 1.0;	
-	float z_bias = GetShadowDepthBias(nl,_SpotLights[light_index]._constant_bias,_SpotLights[light_index]._slope_bias);
+	float z_bias = GetShadowDepthBias(nl,const_bias,slope_bias);
 	shadow_coord.xyz /= shadow_coord.w;
 	float depth = saturate(shadow_coord.z);
 	float2 shadow_uv;
@@ -204,7 +204,7 @@ float ApplyShadowAddLight(float4 shadow_coord, float nl, float3 world_pos,int li
 		uint random_index = uint(16.0 * Random(float4(world_pos.xyy, i))) % 16;
 		//uint random_index = i;
 		shadow_factor += lerp(0.0, 0.0625, 1 - AddLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float3(shadow_uv.xy + 
-			poissonDisk[random_index] * 0.0009765625,light_index), depth).r);
+			poissonDisk[random_index] * 0.0009765625,shadowmap_index), depth).r);
 	}
 	shadow_factor =  (1.0 - shadow_factor);// * ShadowDistaanceAtten(dis,shadow_distance);
 	return 1.0 - shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));

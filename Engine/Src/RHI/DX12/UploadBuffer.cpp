@@ -7,8 +7,9 @@
 
 namespace Ailu
 {
-    UploadBuffer::UploadBuffer(u64 page_size) : m_PageSize(page_size)
+    UploadBuffer::UploadBuffer(const String& name,u64 page_size) : m_PageSize(page_size)
     {
+        _name = name;
     }
 
     UploadBuffer::Allocation UploadBuffer::Allocate(size_t sizeInBytes, size_t alignment)
@@ -38,7 +39,7 @@ namespace Ailu
         }
         else
         {
-            page = std::make_shared<Page>(m_PageSize);
+            page = std::make_shared<Page>(_name,m_PageSize);
             m_PagePool.push_back(page);
         }
 
@@ -56,7 +57,7 @@ namespace Ailu
             page->Reset();
         }
     }
-    UploadBuffer::Page::Page(size_t sizeInBytes)
+    UploadBuffer::Page::Page(const String& name,size_t sizeInBytes)
         : m_PageSize(sizeInBytes), m_Offset(0), m_CPUPtr(nullptr), m_GPUPtr(D3D12_GPU_VIRTUAL_ADDRESS(0))
     {
 
@@ -73,6 +74,7 @@ namespace Ailu
 
         m_GPUPtr = m_d3d12Resource->GetGPUVirtualAddress();
         m_d3d12Resource->Map(0, nullptr, &m_CPUPtr);
+        m_d3d12Resource->SetName(ToWStr(name).c_str());
     }
     UploadBuffer::Page::~Page()
     {

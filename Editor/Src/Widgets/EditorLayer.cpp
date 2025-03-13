@@ -38,6 +38,7 @@
 #include "Widgets/PlaceActors.h"
 #include "Widgets/RenderView.h"
 #include "Widgets/WorldOutline.h"
+#include "Widgets/ProfileWindow.h"
 
 namespace Ailu
 {
@@ -130,6 +131,8 @@ namespace Ailu
             _p_env_setting = _widgets.back().get();
             _widgets.emplace_back(std::move(MakeScope<BlendSpaceEditor>()));
             g_blend_space_editor = static_cast<BlendSpaceEditor *>(_widgets.back().get());
+            _widgets.emplace_back(std::move(MakeScope<ProfileWindow>()));
+            _p_profiler_window = _widgets.back().get();
             for (auto &widget: _widgets)
             {
                 widget->Open(ImGuiWidget::GetGlobalWidgetHandle());
@@ -138,6 +141,7 @@ namespace Ailu
             tex_detail_view->Close(tex_detail_view->Handle());
             g_blend_space_editor->Close(g_blend_space_editor->Handle());
             _p_preview_cam_view->Close(_p_preview_cam_view->Handle());
+            _p_profiler_window->Close(_p_profiler_window->Handle());
             ImGuiWidget::SetFocus("AssetBrowser");
             auto r = static_cast<CommonRenderPipeline *>(g_pGfxContext->GetPipeline())->GetRenderer();
             r->AddFeature(&_pick);
@@ -381,7 +385,7 @@ namespace Ailu
             }
             ImGui::SetNextWindowSizeConstraints(ImVec2(100, 0), ImVec2(FLT_MAX, ImGui::GetTextLineHeight()));
             ImGui::Begin("ToolBar", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
-            auto app = Application::GetInstance();
+            auto app = Application::Get();
             float window_width = ImGui::GetContentRegionAvail().x;// 获取当前窗口的可用宽度
             float button_width = 100.0f;                          // 假设每个按钮宽度为100，实际可用ImGui::CalcTextSize计算
 
@@ -499,30 +503,30 @@ namespace Ailu
             if (ImGui::CollapsingHeader("Performace Statics"))
             {
                 String space = "";
-                ImGui::Text("CPU Time:");
-                while (!Profiler::g_Profiler._cpu_profiler_queue.empty())
-                {
-                    auto [is_start, profiler_id] = Profiler::g_Profiler._cpu_profiler_queue.front();
-                    Profiler::g_Profiler._cpu_profiler_queue.pop();
-                    if (is_start)
-                    {
-                        space.append("-");
-                        const auto &profiler = Profiler::g_Profiler.GetCPUProfileData(profiler_id);
-                        ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
-                    }
-                    else
-                        space = space.substr(0, space.size() - 1);
-                }
-                space = "";
+                // ImGui::Text("CPU Time:");
+                // while (!Profiler::Get()._cpu_profiler_queue.empty())
+                // {
+                //     auto [is_start, profiler_id] = Profiler::Get()._cpu_profiler_queue.front();
+                //     Profiler::Get()._cpu_profiler_queue.pop();
+                //     if (is_start)
+                //     {
+                //         space.append("-");
+                //         const auto &profiler = Profiler::Get().GetCPUProfileData(profiler_id);
+                //         ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
+                //     }
+                //     else
+                //         space = space.substr(0, space.size() - 1);
+                // }
+                // space = "";
                 ImGui::Text("GPU Time:");
-                while (!Profiler::g_Profiler._gpu_profiler_queue.empty())
+                while (!Profiler::Get()._gpu_profiler_queue.empty())
                 {
-                    auto [is_start, profiler_id] = Profiler::g_Profiler._gpu_profiler_queue.front();
-                    Profiler::g_Profiler._gpu_profiler_queue.pop();
+                    auto [is_start, profiler_id] = Profiler::Get()._gpu_profiler_queue.front();
+                    Profiler::Get()._gpu_profiler_queue.pop();
                     if (is_start)
                     {
                         space.append("-");
-                        const auto &profiler = Profiler::g_Profiler.GetProfileData(profiler_id);
+                        const auto &profiler = Profiler::Get().GetProfileData(profiler_id);
                         ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
                     }
                     else
@@ -543,6 +547,8 @@ namespace Ailu
             ImGui::Checkbox("ShowAnimClip", &s_show_anim_clip);
             ImGui::Checkbox("ShowThreadPoolView", &s_show_threadpool_view);
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
+            if (ImGui::Button("Profile"))
+                _p_profiler_window->Open(_p_profiler_window->Handle());
 
             // for (auto &info: g_pResourceMgr->GetImportInfos())
             // {
@@ -560,18 +566,20 @@ namespace Ailu
             auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
             if (e != ECS::kInvalidEntity)
             {
-                if (r.HasComponent<CCamera>(e))
+                if (r.HasComponent<ECS::CCamera>(e))
                 {
-                    auto &cam = r.GetComponent<CCamera>(e)->_camera;
+                    auto &cam = r.GetComponent<ECS::CCamera>(e)->_camera;
                     cam.SetPixelSize(300, (u16) (300.0f / cam.Aspect()));
                     static_cast<RenderView *>(_p_preview_cam_view)->SetSource(g_pGfxContext->GetPipeline()->GetTarget(1));
                     _p_preview_cam_view->Open(_p_preview_cam_view->Handle());
+                    Camera::sSelected = &cam;
                 }
                 else
                 {
+                    Camera::sSelected = nullptr;
                     _p_preview_cam_view->Close(_p_preview_cam_view->Handle());
                 }
-                if (auto sk_comp = r.GetComponent<CSkeletonMesh>(e); sk_comp != nullptr)
+                if (auto sk_comp = r.GetComponent<ECS::CSkeletonMesh>(e); sk_comp != nullptr)
                 {
                     g_blend_space_editor->SetTarget(&sk_comp->_blend_space);
                 }

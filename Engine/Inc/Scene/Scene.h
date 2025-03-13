@@ -32,8 +32,8 @@ namespace Ailu
         const Vector<ECS::Entity> &EntityView() const;
         ECS::Entity Pick(const Ray &ray);
         LightingData _light_data;
-        auto GetAllStaticRenderable() const { return _register.View<StaticMeshComponent>(); };
-        auto GetAllSkinedRenderable() const { return _register.View<CSkeletonMesh>(); };
+        auto GetAllStaticRenderable() const { return _register.View<ECS::StaticMeshComponent>(); };
+        auto GetAllSkinedRenderable() const { return _register.View<ECS::CSkeletonMesh>(); };
         const ECS::Register &GetRegister() const { return _register; }
         ECS::Register &GetRegister() { return _register; }
         u32 EntityNum() const { return _register.EntityNum(); }

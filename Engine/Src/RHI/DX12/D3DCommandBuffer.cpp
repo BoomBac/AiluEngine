@@ -18,7 +18,7 @@ namespace Ailu
         ThrowIfFailed(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(_p_alloc.GetAddressOf())));
         ThrowIfFailed(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _p_alloc.Get(), nullptr, IID_PPV_ARGS(_p_cmd.GetAddressOf())));
         _b_cmd_closed = false;
-        _upload_buf = MakeScope<UploadBuffer>();
+        _upload_buf = MakeScope<UploadBuffer>(std::format("CmdUploadBuffer_{}", _id));
     }
     D3DCommandBuffer::D3DCommandBuffer(u32 id, ECommandBufferType type) : D3DCommandBuffer(type)
     {
@@ -90,11 +90,10 @@ namespace Ailu
         _p_cmd->ClearDepthStencilView(*drt->TargetCPUHandle(this, index), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, depth_value, 0u, 0, nullptr);
     }
 
-    void D3DCommandBuffer::DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index)
+    void D3DCommandBuffer::DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, ConstantBuffer *cb_per_draw, Material *mat, u16 pass_index)
     {
         mat->Bind();
-        GraphicsPipelineStateMgr::EndConfigurePSO(this);
-        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        if (auto pso = GraphicsPipelineStateMgr::FindMatchPSO(); pso != nullptr)
         {
             vb->Bind(this, mat->GetShader()->PipelineInputLayout());
             ib->Bind(this);
@@ -192,16 +191,19 @@ namespace Ailu
         CBufferPerObjectData per_obj_data;
         per_obj_data._MatrixWorld = world_matrix;
         memcpy(alloc.CPU, &per_obj_data, RenderConstants::kPerObjectDataSize);
-        GraphicsPipelineStateMgr::EndConfigurePSO(this);
-        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        if (auto pso = GraphicsPipelineStateMgr::FindMatchPSO(); pso != nullptr)
         {
+            auto res = PipelineResource(_upload_buf.get(),EBindResDescType::kConstBufferRaw,0,PipelineResource::kPriorityCmd);
+            res._addi_info._gpu_handle = alloc.GPU;
+            pso->SetPipelineResource(res);
             mesh->GetVertexBuffer()->Bind(this, material->GetShader()->PipelineInputLayout());
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
-            _p_cmd->SetGraphicsRootConstantBufferView(0, alloc.GPU);
+            //_p_cmd->SetGraphicsRootConstantBufferView(0, alloc.GPU);
             ++RenderingStates::s_draw_call;
             RenderingStates::s_vertex_num += mesh->GetVertexBuffer()->GetVertexCount();
             u64 idx_num = mesh->GetIndicesCount(submesh_index);
             RenderingStates::s_triangle_num += idx_num / 3;
+            pso->Bind(this);
             _p_cmd->DrawIndexedInstanced(idx_num, instance_count, 0, 0, 0);
         }
         else
@@ -209,7 +211,6 @@ namespace Ailu
             LOG_WARNING("GraphicsPipelineStateMgr is not ready for current draw call! with material: {}", material != nullptr ? material->Name() : "null");
             return;
         }
-        return;
     }
     void D3DCommandBuffer::SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj)
     {
@@ -219,37 +220,40 @@ namespace Ailu
     {
         _allocations.emplace_back(_upload_buf->Allocate(data_size, 256));
         _allocations.back().SetData(data, data_size);
-        GraphicsPipelineStateMgr::SubmitBindResource(&_allocations.back(), EBindResDescType::kConstBufferRaw, name, PipelineResourceInfo::kPriporityCmd);
+        PipelineResource resource = PipelineResource(_upload_buf.get(),EBindResDescType::kConstBufferRaw,name, PipelineResource::kPriorityCmd);
+        resource._addi_info._gpu_handle = _allocations.back().GPU;
+        GraphicsPipelineStateMgr::SubmitBindResource(resource);
     }
 
-    void D3DCommandBuffer::SetGlobalBuffer(const String &name, IConstantBuffer *buffer)
+    void D3DCommandBuffer::SetGlobalBuffer(const String &name, ConstantBuffer *buffer)
     {
-        GraphicsPipelineStateMgr::SubmitBindResource(buffer, EBindResDescType::kConstBuffer, name, PipelineResourceInfo::kPriporityCmd);
+        PipelineResource resource = PipelineResource(buffer,EBindResDescType::kConstBuffer,name, PipelineResource::kPriorityCmd);
+        GraphicsPipelineStateMgr::SubmitBindResource(resource);
     }
-    void D3DCommandBuffer::SetGlobalBuffer(const String &name, IGPUBuffer *buffer)
+    void D3DCommandBuffer::SetGlobalBuffer(const String &name, GPUBuffer *buffer)
     {
-        GraphicsPipelineStateMgr::SubmitBindResource(buffer, buffer->IsRandomAccess()? EBindResDescType::kRWBuffer : EBindResDescType::kBuffer, name, PipelineResourceInfo::kPriporityCmd);
+        GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(buffer, buffer->IsRandomAccess()? EBindResDescType::kRWBuffer : EBindResDescType::kBuffer, name, PipelineResource::kPriorityCmd));
     }
 
     void D3DCommandBuffer::SetGlobalTexture(const String &name, Texture *tex)
     {
-        GraphicsPipelineStateMgr::SubmitBindResource(tex, EBindResDescType::kTexture2D, name, PipelineResourceInfo::kPriporityCmd);
+        GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(tex, EBindResDescType::kTexture2D, name, PipelineResource::kPriorityCmd));
     }
     void D3DCommandBuffer::SetGlobalTexture(const String &name, RTHandle handle)
     {
-        GraphicsPipelineStateMgr::SubmitBindResource(g_pRenderTexturePool->Get(handle), EBindResDescType::kTexture2D, name, PipelineResourceInfo::kPriporityCmd);
+        GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(g_pRenderTexturePool->Get(handle), EBindResDescType::kTexture2D, name, PipelineResource::kPriorityCmd));
     }
     void D3DCommandBuffer::DrawFullScreenQuad(Material *mat, u16 pass_index)
     {
         Mesh::s_p_fullscreen_triangle.lock()->GetIndexBuffer()->Bind(this);
         mat->Bind(pass_index);
-        GraphicsPipelineStateMgr::EndConfigurePSO(this);
         auto d3dcmd = static_cast<D3DCommandBuffer *>(this)->GetCmdList();
-        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        if (auto pso = GraphicsPipelineStateMgr::FindMatchPSO(); pso != nullptr)
         {
             ++RenderingStates::s_draw_call;
             ++RenderingStates::s_triangle_num;
             RenderingStates::s_vertex_num += 3;
+            pso->Bind(this);
             _p_cmd->DrawIndexedInstanced(3,1,0,0,0);
         }
     }
@@ -260,7 +264,7 @@ namespace Ailu
         _p_cmd->RSSetScissorRects(1, &d3d_rect);
     }
 
-    u16 D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u32 instance_count)
+    u16 D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u32 instance_count)
     {
         if (mesh)
         {
@@ -272,7 +276,7 @@ namespace Ailu
         return 0;
     }
 
-    u16 D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count)
+    u16 D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count)
     {
         if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
         {
@@ -280,17 +284,18 @@ namespace Ailu
             return 1;
         }
         material->Bind();
-        GraphicsPipelineStateMgr::EndConfigurePSO(this);
-        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        if (auto pso = GraphicsPipelineStateMgr::FindMatchPSO(); pso != nullptr)
         {
             IVertexBuffer* vb = mesh->GetVertexBuffer().get();
             vb->Bind(this, material->GetShader()->PipelineInputLayout());
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
-            per_obj_cbuf->Bind(this, 0);
+            //per_obj_cbuf->Bind(this, 0);
+            pso->SetPipelineResource(PipelineResource(per_obj_cbuf,EBindResDescType::kConstBuffer,0,PipelineResource::kPriorityCmd));
             ++RenderingStates::s_draw_call;
             RenderingStates::s_vertex_num += vb->GetVertexCount();
             u64 idx_count = mesh->GetIndicesCount(submesh_index);
             RenderingStates::s_triangle_num += idx_count / 3;
+            pso->Bind(this);
             _p_cmd->DrawIndexedInstanced(idx_count, instance_count, 0, 0, 0);
         }
         else
@@ -301,7 +306,7 @@ namespace Ailu
         return 0;
     }
 
-    u16 D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count)
+    u16 D3DCommandBuffer::DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count)
     {
         if (mesh == nullptr || !mesh->_is_rhi_res_ready || material == nullptr || !material->IsReadyForDraw())
         {
@@ -309,17 +314,18 @@ namespace Ailu
             return 1;
         }
         material->Bind(pass_index);
-        GraphicsPipelineStateMgr::EndConfigurePSO(this);
-        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        if (auto pso = GraphicsPipelineStateMgr::FindMatchPSO(); pso != nullptr)
         {
             IVertexBuffer* vb = mesh->GetVertexBuffer().get();
             vb->Bind(this, material->GetShader()->PipelineInputLayout(pass_index));
             mesh->GetIndexBuffer(submesh_index)->Bind(this);
-            per_obj_cbuf->Bind(this, 0);
+            pso->SetPipelineResource(PipelineResource(per_obj_cbuf,EBindResDescType::kConstBuffer,0,PipelineResource::kPriorityCmd));
+            //per_obj_cbuf->Bind(this, 0);
             ++RenderingStates::s_draw_call;
             RenderingStates::s_vertex_num += vb->GetVertexCount();
             u64 idx_count = mesh->GetIndicesCount(submesh_index);
             RenderingStates::s_triangle_num += idx_count / 3;
+            pso->Bind(this);
             _p_cmd->DrawIndexedInstanced(idx_count, instance_count, 0, 0, 0);
         }
         else
@@ -347,8 +353,7 @@ namespace Ailu
         }
         material->Bind(pass_index);
         SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (void *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
-        GraphicsPipelineStateMgr::EndConfigurePSO(this);
-        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        if (auto pso = GraphicsPipelineStateMgr::FindMatchPSO(); pso != nullptr)
         {
             IVertexBuffer* vb = mesh->GetVertexBuffer().get();
             vb->Bind(this, material->GetShader()->PipelineInputLayout(pass_index));
@@ -357,6 +362,7 @@ namespace Ailu
             RenderingStates::s_vertex_num += vb->GetVertexCount();
             u64 idx_count = mesh->GetIndicesCount(submesh_index);
             RenderingStates::s_triangle_num += idx_count / 3;
+            pso->Bind(this);
             _p_cmd->DrawIndexedInstanced(idx_count, instance_count, 0, 0, 0);
         }
         else
@@ -378,8 +384,7 @@ namespace Ailu
             return 1;
         }
         material->Bind(pass_index);
-        GraphicsPipelineStateMgr::EndConfigurePSO(this);
-        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        if (auto pso = GraphicsPipelineStateMgr::FindMatchPSO(); pso != nullptr)
         {
             IVertexBuffer* vb = mesh->GetVertexBuffer().get();
             vb->Bind(this, material->GetShader()->PipelineInputLayout());
@@ -388,6 +393,7 @@ namespace Ailu
             RenderingStates::s_vertex_num += vb->GetVertexCount();
             u64 idx_count = mesh->GetIndicesCount();
             RenderingStates::s_triangle_num += idx_count / 3;
+            pso->Bind(this);
             _p_cmd->DrawIndexedInstanced(idx_count, instance_count, 0, 0, 0);
         }
         else
@@ -587,11 +593,10 @@ namespace Ailu
         _cs_cbuf.clear();
         _p_cmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
     }
-    void D3DCommandBuffer::DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index, u16 instance_count)
+    void D3DCommandBuffer::DrawInstanced(IVertexBuffer *vb, ConstantBuffer *cb_per_draw, Material *mat, u16 pass_index, u16 instance_count)
     {
         mat->Bind(pass_index);
-        GraphicsPipelineStateMgr::EndConfigurePSO(this);
-        if (GraphicsPipelineStateMgr::IsReadyForCurrentDrawCall())
+        if (auto pso = GraphicsPipelineStateMgr::FindMatchPSO(); pso != nullptr)
         {
             auto shader = mat->GetShader();
             vb->Bind(this, shader->PipelineInputLayout(pass_index));
@@ -601,6 +606,7 @@ namespace Ailu
             u64 vert_num = shader->GetTopology() == ETopology::kTriangleStrip ? vb->GetVertexCount() * 4 : vb->GetVertexCount();
             RenderingStates::s_vertex_num += vert_num;
             RenderingStates::s_triangle_num += vert_num / 3;
+            pso->Bind(this);
             _p_cmd->DrawInstanced(vert_num, instance_count, 0, 0);
         }
     }

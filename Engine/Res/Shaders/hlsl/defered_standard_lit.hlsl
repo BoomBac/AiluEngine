@@ -83,7 +83,6 @@ StandardPSInput GBufferVSMain(StandardVSInput v)
 	result.btn = float3x3(T, B, N);
 	result.normal = N;
 	result.world_pos = TransformObjectToWorld(v.position);
-	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
 	return result;
 }
 
@@ -122,7 +121,6 @@ struct VoxelGSInput
 	float2 uv0 : TEXCOORD0;
 	float3 normal : TEXCOORD1;
 	float3 world_pos : TEXCOORD2;
-	float3 shadow_pos : TEXCOORD3;
 };
 struct VoxelPSInput
 {
@@ -130,7 +128,6 @@ struct VoxelPSInput
 	float2 uv0 : TEXCOORD0;
 	float3 normal : TEXCOORD1;
 	float3 world_pos : TEXCOORD2;
-	float3 shadow_pos : TEXCOORD3;
 };
 
 VoxelGSInput VoxelVSMain(StandardVSInput v)
@@ -143,7 +140,6 @@ VoxelGSInput VoxelVSMain(StandardVSInput v)
 	float3 N = TransformNormal(v.normal);
 	result.normal = TransformNormal(v.normal);
 	result.world_pos = TransformObjectToWorld(v.position);
-	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
 	return result;
 }
 [maxvertexcount(6)]
@@ -166,7 +162,6 @@ void VoxelGSMain(triangle VoxelGSInput g[3],inout TriangleStream<StandardPSInput
 		result.uv0 = g[i].uv0;
 		result.btn = float3x3(float3(1,0,0),float3(0,1,0),float3(0,0,3));
 		result.world_pos = g[i].world_pos;
-		result.shadow_pos = float4(g[i].shadow_pos,1.0);
 		results.Append(result);
 	}
 }

@@ -62,14 +62,14 @@ namespace Ailu
 
     struct RenderingShadowData
     {
-        Matrix4x4f *_shadow_matrix;
-        i16 _shadow_index = -1;
+        i16 _shadowmap_index = -1;
+        Matrix4x4f _shadow_matrix;
         float _shadow_bias = 0.001f;
         const CullResult *_cull_results;
     };
     struct RenderingPointShadowData
     {
-        i16 _shadow_indices[6];
+        i16 _shadowmap_index = -1;
         Matrix4x4f _shadow_matrices[6];
         float _shadow_bias = 0.001f;
         Vector3f _light_world_pos;
@@ -97,12 +97,14 @@ namespace Ailu
     public:
         RenderingData() {};
         //index 0 for directional shadow
-        RenderingShadowData _shadow_data[RenderConstants::kMaxCascadeShadowMapSplitNum + RenderConstants::kMaxSpotLightNum];
+        RenderingShadowData _cascade_shadow_data[RenderConstants::kMaxCascadeShadowMapSplitNum];
+        RenderingShadowData _spot_shadow_data[RenderConstants::kMaxSpotLightNum];
+        RenderingShadowData _area_shadow_data[RenderConstants::kMaxAreaLightNum];
         RenderingPointShadowData _point_shadow_data[RenderConstants::kMaxPointLightNum];
         u8 _addi_shadow_num = 0, _addi_point_shadow_num = 0;
-        IConstantBuffer *_p_per_scene_cbuf;
-        IConstantBuffer *_p_per_camera_cbuf;
-        Vector<IConstantBuffer *> *_p_per_object_cbuf;
+        ConstantBuffer *_p_per_scene_cbuf;
+        ConstantBuffer *_p_per_camera_cbuf;
+        Vector<ConstantBuffer *> *_p_per_object_cbuf;
         RTHandle _camera_color_target_handle;
         RTHandle _camera_depth_target_handle;
         RTHandle _final_rt_handle;

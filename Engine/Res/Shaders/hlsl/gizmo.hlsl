@@ -39,7 +39,7 @@ struct PSInput
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
-	result.position = TransformWorldToHClip(v.position);
+	result.position = TransformWorldToHClipNoJitter(v.position);
 	result.color = v.color;
 	return result;
 }

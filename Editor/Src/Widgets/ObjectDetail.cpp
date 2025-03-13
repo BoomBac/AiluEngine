@@ -501,7 +501,7 @@ namespace Ailu
         template<typename T>
         static void MeshCompDrawer(T *comp)
         {
-            constexpr bool is_skined_comp = std::is_same<T, CSkeletonMesh>::value;
+            constexpr bool is_skined_comp = std::is_same<T, ECS::CSkeletonMesh>::value;
             const static ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
             if (ImGui::BeginTable("##static_mesh_comp", 2, flags))
             {
@@ -668,7 +668,7 @@ namespace Ailu
                 ImGui::EndTable();
                 //addition
                 Enum* enum_type = Enum::GetEnumByName("EMotionVectorType");
-                comp->_motion_vector_type = (EMotionVectorType)DrawEnum(enum_type,(u32)comp->_motion_vector_type);
+                comp->_motion_vector_type = (ECS::EMotionVectorType)DrawEnum(enum_type,(u32)comp->_motion_vector_type);
                 for (auto mat: materials)
                 {
                     if (mat != nullptr)
@@ -717,7 +717,7 @@ namespace Ailu
             if (entity == ECS::kInvalidEntity)
                 return;
             auto &scene_register = g_pSceneMgr->ActiveScene()->GetRegister();
-            auto tag_comp = scene_register.GetComponent<TagComponent>(entity);
+            auto tag_comp = scene_register.GetComponent<ECS::TagComponent>(entity);
             if (tag_comp == nullptr)
             {
                 Selection::RemoveSlection();
@@ -744,33 +744,33 @@ namespace Ailu
                     {
                         if (i == 0)
                         {
-                            scene_register.AddComponent<LightComponent>(entity);
+                            scene_register.AddComponent<ECS::LightComponent>(entity);
                         }
                         else if (i == 1)
                         {
-                            scene_register.AddComponent<CCamera>(entity);
+                            scene_register.AddComponent<ECS::CCamera>(entity);
                         }
                         else if (i == 2)
                         {
-                            scene_register.AddComponent<StaticMeshComponent>(entity);
+                            scene_register.AddComponent<ECS::StaticMeshComponent>(entity);
                         }
                         else if (i == 3)
                         {
-                            scene_register.AddComponent<CLightProbe>(entity);
+                            scene_register.AddComponent<ECS::CLightProbe>(entity);
                         }
                         else if (i == 4)
                         {
-                            scene_register.AddComponent<CRigidBody>(entity);
+                            scene_register.AddComponent<ECS::CRigidBody>(entity);
                         }
                         else if (i == 5)
                         {
-                            auto &c = scene_register.AddComponent<CCollider>(entity);
-                            c._type = EColliderType::kBox;
+                            auto &c = scene_register.AddComponent<ECS::CCollider>(entity);
+                            c._type = ECS::EColliderType::kBox;
                         }
                         else if (i == 6)
-                            scene_register.AddComponent<CSkeletonMesh>(entity);
+                            scene_register.AddComponent<ECS::CSkeletonMesh>(entity);
                         else if (i == 7)
-                            scene_register.AddComponent<CVXGI>(entity);
+                            scene_register.AddComponent<ECS::CVXGI>(entity);
                         else {};
                     }
                 }
@@ -778,10 +778,10 @@ namespace Ailu
             }
             u32 comp_index = 0;
 
-            if (scene_register.HasComponent<TransformComponent>(entity))
+            if (scene_register.HasComponent<ECS::TransformComponent>(entity))
             {
-                auto comp = scene_register.GetComponent<TransformComponent>(entity);
-                DrawComponent<TransformComponent>("TransformComponent", comp, entity, [this](TransformComponent *comp)
+                auto comp = scene_register.GetComponent<ECS::TransformComponent>(entity);
+                DrawComponent<ECS::TransformComponent>("TransformComponent", comp, entity, [this](ECS::TransformComponent *comp)
                                                   {
                                                               auto& pos = comp->_transform._position;
                                                               Vector3f eulur = Quaternion::EulerAngles(comp->_transform._rotation);
@@ -792,10 +792,10 @@ namespace Ailu
                                                               DrawVec3Control("Scale", scale, 1.f, column_widget);
                                                               comp->_transform._rotation = Quaternion::EulerAngles(eulur); });
             }
-            if (scene_register.HasComponent<LightComponent>(entity))
+            if (scene_register.HasComponent<ECS::LightComponent>(entity))
             {
-                auto comp = scene_register.GetComponent<LightComponent>(entity);
-                DrawComponent<LightComponent>("LightComponent", comp, entity, [this](LightComponent *comp)
+                auto comp = scene_register.GetComponent<ECS::LightComponent>(entity);
+                DrawComponent<ECS::LightComponent>("LightComponent", comp, entity, [this](ECS::LightComponent *comp)
                                               {
                                                           static const char *items[] = {"Directional", "Point", "Spot","Area"};
                                                           int light_type_idx = (i32)comp->_type;
@@ -806,7 +806,7 @@ namespace Ailu
                                                                   const bool is_selected = (light_type_idx == n);
                                                                   if (ImGui::Selectable(items[n], is_selected))
                                                                   {
-                                                                      comp->_type = (ELightType::ELightType)n;
+                                                                      comp->_type = (ECS::ELightType::ELightType)n;
                                                                   }
                                                                   if (is_selected)
                                                                       ImGui::SetItemDefaultFocus();
@@ -815,12 +815,12 @@ namespace Ailu
                                                           }
                                                           ImGui::SliderFloat("Intensity", &comp->_light._light_color.a, 0.0f, 100.0f);
                                                           ImGui::ColorEdit3("Color", static_cast<float *>(comp->_light._light_color.data));
-                                                          if (comp->_type == ELightType::kPoint)
+                                                          if (comp->_type == ECS::ELightType::kPoint)
                                                           {
                                                               auto &light_data = comp->_light;
                                                               ImGui::DragFloat("Range", &light_data._light_param.x, 1.0, 0.0, 500.0f);
                                                           }
-                                                          else if (comp->_type == ELightType::kSpot)
+                                                          else if (comp->_type == ECS::ELightType::kSpot)
                                                           {
                                                               auto &light_data = comp->_light;
                                                               ImGui::DragFloat("Range", &light_data._light_param.x);
@@ -829,7 +829,7 @@ namespace Ailu
                                                               Clamp(comp->_light._light_param.z, 0.0f, 180.0f);
                                                               Clamp(comp->_light._light_param.y, 0.0f, comp->_light._light_param.z - 0.1f);
                                                           }
-                                                          else if (comp->_type == ELightType::kArea)
+                                                          else if (comp->_type == ECS::ELightType::kArea)
                                                           {
                                                               static const char *shapes[] = {"Rectangle", "Disc"};
                                                               auto &light_data = comp->_light;
@@ -872,24 +872,24 @@ namespace Ailu
                                                               ImGui::SliderFloat("SlopeBias", &shadow_data._slope_bias, 0.0f, 2.0f);
                                                           } });
             }
-            if (scene_register.HasComponent<StaticMeshComponent>(entity))
+            if (scene_register.HasComponent<ECS::StaticMeshComponent>(entity))
             {
-                auto comp = scene_register.GetComponent<StaticMeshComponent>(entity);
-                DrawComponent<StaticMeshComponent>("StaticMeshComponent", comp, entity, [this](StaticMeshComponent *comp)
+                auto comp = scene_register.GetComponent<ECS::StaticMeshComponent>(entity);
+                DrawComponent<ECS::StaticMeshComponent>("StaticMeshComponent", comp, entity, [this](ECS::StaticMeshComponent *comp)
                                                    { 
                                                     MeshCompDrawer(comp);
                                                 });
             }
-            if (scene_register.HasComponent<CSkeletonMesh>(entity))
+            if (scene_register.HasComponent<ECS::CSkeletonMesh>(entity))
             {
-                auto comp = scene_register.GetComponent<CSkeletonMesh>(entity);
-                DrawComponent<CSkeletonMesh>("SkeletonMeshComponent", comp, entity, [this](CSkeletonMesh *comp)
+                auto comp = scene_register.GetComponent<ECS::CSkeletonMesh>(entity);
+                DrawComponent<ECS::CSkeletonMesh>("SkeletonMeshComponent", comp, entity, [this](ECS::CSkeletonMesh *comp)
                                              { MeshCompDrawer(comp); });
             }
-            if (scene_register.HasComponent<CCamera>(entity))
+            if (scene_register.HasComponent<ECS::CCamera>(entity))
             {
-                auto comp = scene_register.GetComponent<CCamera>(entity);
-                DrawComponent<CCamera>("CameraComponent", comp, entity, [&](CCamera *comp)
+                auto comp = scene_register.GetComponent<ECS::CCamera>(entity);
+                DrawComponent<ECS::CCamera>("CameraComponent", comp, entity, [&](ECS::CCamera *comp)
                                        {
                                                        auto &cam = comp->_camera;
                                                        cam._is_enable = cur_actor_active;
@@ -908,6 +908,16 @@ namespace Ailu
                                                                    ImGui::SetItemDefaultFocus();
                                                            }
                                                            ImGui::EndCombo();
+                                                       }
+                                                       //抗锯齿
+                                                       {
+                                                           Enum* aa_enum = Enum::GetEnumByName("EAntiAliasing");
+                                                           u32 new_value = DrawEnum(aa_enum,(u32)cam._anti_aliasing);
+                                                           cam._anti_aliasing = (EAntiAliasing)new_value;
+                                                           if (cam._anti_aliasing == EAntiAliasing::kTAA)
+                                                           {
+                                                               ImGui::SliderFloat("JitterScale", &cam._jitter_scale, 0.0f, 1.0f);
+                                                           }
                                                        }
                                                        float cam_near = cam.Near(), cam_far = cam.Far(), aspect = cam.Aspect();
                                                        if (item_current_idx == 0) cam.Type(ECameraType::kOrthographic);
@@ -932,10 +942,10 @@ namespace Ailu
                                                        cam.Far(cam_far);
                                                        cam.Aspect(aspect); });
             }
-            if (scene_register.HasComponent<CLightProbe>(entity))
+            if (scene_register.HasComponent<ECS::CLightProbe>(entity))
             {
-                auto comp = scene_register.GetComponent<CLightProbe>(entity);
-                DrawComponent<CLightProbe>("LightProbeComponent", comp, entity, [this](CLightProbe *comp)
+                auto comp = scene_register.GetComponent<ECS::CLightProbe>(entity);
+                DrawComponent<ECS::CLightProbe>("LightProbeComponent", comp, entity, [this](ECS::CLightProbe *comp)
                                            {
                                                            if(ImGui::Button("Bake"))
                                                            {
@@ -946,10 +956,10 @@ namespace Ailu
                                                            ImGui::SliderInt("ImgType", &comp->_src_type, 0, 4, "%d");
                                                            ImGui::SliderFloat("Mipmap",&comp->_mipmap,0.0f,10.0f,"%.0f"); });
             }
-            if (scene_register.HasComponent<CRigidBody>(entity))
+            if (scene_register.HasComponent<ECS::CRigidBody>(entity))
             {
-                auto comp = scene_register.GetComponent<CRigidBody>(entity);
-                DrawComponent<CRigidBody>("RigidComponent", comp, entity, [this](CRigidBody *comp)
+                auto comp = scene_register.GetComponent<ECS::CRigidBody>(entity);
+                DrawComponent<ECS::CRigidBody>("RigidComponent", comp, entity, [this](ECS::CRigidBody *comp)
                                           { 
                                                 ImGui::SliderFloat("Mass", &comp->_mass, 0.0, 1000.0, "%.2f");
                                                 ImGui::Text("State:");
@@ -958,20 +968,20 @@ namespace Ailu
                                                 ImGui::Text("Velocity %s", comp->_velocity.ToString().c_str());
                                                 ImGui::Text("AngularVelocity %s", comp->_angular_velocity.ToString().c_str()); });
             };
-            if (scene_register.HasComponent<CCollider>(entity))
+            if (scene_register.HasComponent<ECS::CCollider>(entity))
             {
-                auto comp = scene_register.GetComponent<CCollider>(entity);
-                DrawComponent<CCollider>("ColiderComponent", comp, entity, [this](CCollider *comp)
+                auto comp = scene_register.GetComponent<ECS::CCollider>(entity);
+                DrawComponent<ECS::CCollider>("ColiderComponent", comp, entity, [this](ECS::CCollider *comp)
                                          { 
                                                 static const char* items[3] = 
                                                 {
-                                                    EColliderType::_Strings[0].c_str(),
-                                                    EColliderType::_Strings[1].c_str(),
-                                                    EColliderType::_Strings[2].c_str()
+                                                    ECS::EColliderType::_Strings[0].c_str(),
+                                                    ECS::EColliderType::_Strings[1].c_str(),
+                                                    ECS::EColliderType::_Strings[2].c_str()
                                                 };
                                                 u16 type_index = comp->_type;
-                                                auto s = EColliderType::ToString(comp->_type);
-                                                comp->_type = (EColliderType::EColliderType) DrawEnumProperty("ColiderType", EColliderType::_Strings, EColliderType::COUNT, type_index);
+                                                auto s = ECS::EColliderType::ToString(comp->_type);
+                                                comp->_type = (ECS::EColliderType::EColliderType) DrawEnumProperty("ColiderType", ECS::EColliderType::_Strings, ECS::EColliderType::COUNT, type_index);
                                                 //if (ImGui::BeginCombo("ColiderType", items[type_index], 0))
                                                 //{
                                                 //    for (int n = 0; n < IM_ARRAYSIZE(items); n++)
@@ -986,15 +996,15 @@ namespace Ailu
                                                 //}
                                                 ImGui::DragFloat3("Center",comp->_center.data);
                                                 ImGui::Checkbox("Is Trigger", &comp->_is_trigger);
-                                                if (comp->_type == EColliderType::kBox)
+                                                if (comp->_type == ECS::EColliderType::kBox)
                                                 {
                                                     ImGui::DragFloat3("Size", comp->_param.data,1.0f,0.0f,100.0f);
                                                 }
-                                                else if (comp->_type == EColliderType::kSphere)
+                                                else if (comp->_type == ECS::EColliderType::kSphere)
                                                 {
                                                     ImGui::DragFloat("Radius", &comp->_param.x, 1.0f, 0.0f, 100.0f);
                                                 }
-                                                else if (comp->_type == EColliderType::kCapsule)
+                                                else if (comp->_type == ECS::EColliderType::kCapsule)
                                                 {
                                                     ImGui::DragFloat("Radius", &comp->_param.x, 1.0f, 0.0f, 100.0f);
                                                     ImGui::DragFloat("Height", &comp->_param.y, 1.0f, 0.0f, 100.0f);
@@ -1014,10 +1024,10 @@ namespace Ailu
                                                     }
                                                 } });
             };
-            if (scene_register.HasComponent<CVXGI>(entity))
+            if (scene_register.HasComponent<ECS::CVXGI>(entity))
             {
-                auto comp = scene_register.GetComponent<CVXGI>(entity);
-                DrawComponent<CVXGI>("VXGIComponent", comp, entity, [this](CVXGI *comp)
+                auto comp = scene_register.GetComponent<ECS::CVXGI>(entity);
+                DrawComponent<ECS::CVXGI>("VXGIComponent", comp, entity, [this](ECS::CVXGI *comp)
                                      {
                                                 ImGui::SliderFloat3("GridSize", comp->_grid_size.data, 1.f, 100.f);
                                                 ImGui::SliderInt3("GridNum", comp->_grid_num.data, 1, 128);

@@ -23,6 +23,7 @@ namespace Ailu
         constexpr static u16 kMaxDirectionalLightNum = kMaxDirectionalLight;
         constexpr static u16 kMaxPointLightNum = kMaxPointLight;
         constexpr static u16 kMaxSpotLightNum = kMaxSpotLight;
+        constexpr static u16 kMaxAreaLightNum = kMaxAreaLight;
         constexpr static u16 kMaxCascadeShadowMapSplitNum = kMaxCascadeShadowMapSplit;
 
         constexpr static u32 kPerMaterialDataSize = 256;//sizeof(ScenePerMaterialData);

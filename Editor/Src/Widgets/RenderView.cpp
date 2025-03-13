@@ -68,7 +68,7 @@ namespace Ailu
         Vector3f RenderView::ScreenPosToWorldDir(Vector2f pos)
         {
             auto vp_size = GetViewportSize();
-            auto p = Camera::sCurrent->GetProjection();
+            auto p = Camera::sCurrent->GetProj();
             float vx = (2.0f * pos.x / vp_size.x - 1.0f) / p[0][0];
             float vy = (-2.0f * pos.y / vp_size.y + 1.0f) / p[1][1];
             auto inv_view = MatrixInverse(Camera::sCurrent->GetView());
@@ -87,7 +87,7 @@ namespace Ailu
         {
             if (_src)
             {
-                static const auto &cur_window = Application::GetInstance()->GetWindow();
+                static const auto &cur_window = Application::Get()->GetWindow();
                 ImVec2 vMin = ImGui::GetWindowContentRegionMin();
                 ImVec2 vMax = ImGui::GetWindowContentRegionMax();
                 vMin.x += ImGui::GetWindowPos().x;
@@ -228,7 +228,7 @@ namespace Ailu
             ImGuizmo::SetDrawlist();
             ImGuizmo::SetRect(_content_pos.x, _content_pos.y, _content_size.x, _content_size.y);
             const auto &view = Camera::sCurrent->GetView();
-            const auto proj = MatrixReverseZ(Camera::sCurrent->GetProjection());
+            auto proj = MatrixReverseZ(Camera::sCurrent->GetProjNoJitter());
             _is_transform_gizmo_snap = Input::IsKeyPressed(AL_KEY_CONTROL);
             bool is_pivot_point_center = true;
             bool is_single_mode = selected_entities.size() == 1;
@@ -239,12 +239,12 @@ namespace Ailu
                 auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
                 for (auto e: selected_entities)
                 {
-                    pivot_point += r.GetComponent<TransformComponent>(e)->_transform._position;
+                    pivot_point += r.GetComponent<ECS::TransformComponent>(e)->_transform._position;
                 }
                 pivot_point /= (f32) selected_entities.size();
                 Matrix4x4f world_mat = MatrixTranslation(pivot_point);
                 if (is_single_mode)
-                    world_mat = r.GetComponent<TransformComponent>(selected_entities.front())->_transform._world_matrix;
+                    world_mat = r.GetComponent<ECS::TransformComponent>(selected_entities.front())->_transform._world_matrix;
                 else
                     _is_transform_gizmo_world = true;
                 ImGuizmo::Manipulate(view, proj, (ImGuizmo::OPERATION) _transform_gizmo_type, _is_transform_gizmo_world ? ImGuizmo::WORLD : ImGuizmo::LOCAL, world_mat, nullptr,
@@ -258,7 +258,7 @@ namespace Ailu
                         _is_end_gizmo_transform = false;
                         for (auto e: selected_entities)
                         {
-                            _old_trans.push_back(r.GetComponent<TransformComponent>(e)->_transform);
+                            _old_trans.push_back(r.GetComponent<ECS::TransformComponent>(e)->_transform);
                         }
                     }
                     Vector3f new_pos;
@@ -268,7 +268,7 @@ namespace Ailu
                     static Vector3f s_pre_tick_new_scale = new_scale;
                     if (is_single_mode)
                     {
-                        auto &t = r.GetComponent<TransformComponent>(selected_entities.front())->_transform;
+                        auto &t = r.GetComponent<ECS::TransformComponent>(selected_entities.front())->_transform;
                         t._position = new_pos;
                         t._rotation = new_rot;
                         t._scale = new_scale;
@@ -279,7 +279,7 @@ namespace Ailu
                         u16 index = 0;
                         for (auto e: selected_entities)
                         {
-                            auto &t = r.GetComponent<TransformComponent>(e)->_transform;
+                            auto &t = r.GetComponent<ECS::TransformComponent>(e)->_transform;
                             Vector3f rela_pos = t._position - pivot_point;
                             rela_pos = new_rot * rela_pos;
                             Vector3f scaled_pos = rela_pos * (new_scale / s_pre_tick_new_scale);
@@ -319,20 +319,20 @@ namespace Ailu
                         if (is_single_mode)
                         {
                             auto e = selected_entities.front();
-                            auto t = r.GetComponent<TransformComponent>(e);
-                            std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(r.GetComponent<TagComponent>(e)->_name, t, _old_trans.front());
+                            auto t = r.GetComponent<ECS::TransformComponent>(e);
+                            std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(r.GetComponent<ECS::TagComponent>(e)->_name, t, _old_trans.front());
                             g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
                             _old_trans.clear();
                         }
                         else
                         {
                             Vector<String> obj_names;
-                            Vector<TransformComponent *> comps;
+                            Vector<ECS::TransformComponent *> comps;
                             u16 index = 0u;
                             for (auto e: selected_entities)
                             {
-                                obj_names.emplace_back(r.GetComponent<TagComponent>(e)->_name);
-                                comps.emplace_back(r.GetComponent<TransformComponent>(e));
+                                obj_names.emplace_back(r.GetComponent<ECS::TagComponent>(e)->_name);
+                                comps.emplace_back(r.GetComponent<ECS::TransformComponent>(e));
                             }
                             std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(std::move(obj_names), std::move(comps), std::move(_old_trans));
                             g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
@@ -351,9 +351,9 @@ namespace Ailu
             Vector3f start = Camera::sCurrent->Position();
             Vector3f place_pos;
             ECS::Entity closest_entity = g_pSceneMgr->ActiveScene()->Pick(Ray(start, ray_dir));
-            if (closest_entity != ECS::kInvalidEntity && r.HasComponent<StaticMeshComponent>(closest_entity))
+            if (closest_entity != ECS::kInvalidEntity && r.HasComponent<ECS::StaticMeshComponent>(closest_entity))
             {
-                const auto &box = r.GetComponent<StaticMeshComponent>(closest_entity)->_transformed_aabbs[0];
+                const auto &box = r.GetComponent<ECS::StaticMeshComponent>(closest_entity)->_transformed_aabbs[0];
                 place_pos = box.Center();
                 place_pos.y += box.Size().y * 0.5f + 2.0f;
                 Plane p(Vector3f::kUp, place_pos.y);
@@ -363,119 +363,119 @@ namespace Ailu
             if (dropped)
             {
                 auto new_entity = g_pSceneMgr->ActiveScene()->AddObject();
-                auto tag = r.GetComponent<TagComponent>(new_entity);
+                auto tag = r.GetComponent<ECS::TagComponent>(new_entity);
                 if (type == EPlaceActorsType::kLightProbe)
                 {
                     tag->_name = std::format("light_probe_{}", r.EntityNum());
-                    r.AddComponent<CLightProbe>(new_entity);
+                    r.AddComponent<ECS::CLightProbe>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kCube)
                 {
                     tag->_name = std::format("cube_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    auto &comp = r.AddComponent<ECS::StaticMeshComponent>(new_entity);
                     comp._p_mesh = Mesh::s_p_cube.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-                    auto &c = r.AddComponent<CCollider>(new_entity);
-                    c._type = EColliderType::kBox;
+                    auto &c = r.AddComponent<ECS::CCollider>(new_entity);
+                    c._type = ECS::EColliderType::kBox;
                     c._param = Vector3f::kOne;
-                    r.AddComponent<CRigidBody>(new_entity);
+                    r.AddComponent<ECS::CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kCylinder)
                 {
                     tag->_name = std::format("cylinder_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    auto &comp = r.AddComponent<ECS::StaticMeshComponent>(new_entity);
                     comp._p_mesh = Mesh::s_p_cylinder.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-                    auto &capsule = r.AddComponent<CCollider>(new_entity);
-                    capsule._type = EColliderType::kCapsule;
+                    auto &capsule = r.AddComponent<ECS::CCollider>(new_entity);
+                    capsule._type = ECS::EColliderType::kCapsule;
                     capsule._param = {1.f, 2.f, 1.f};
-                    r.AddComponent<CRigidBody>(new_entity);
+                    r.AddComponent<ECS::CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kCone)
                 {
                     tag->_name = std::format("cone_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    auto &comp = r.AddComponent<ECS::StaticMeshComponent>(new_entity);
                     comp._p_mesh = Mesh::s_p_cone.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-                    auto &c = r.AddComponent<CCollider>(new_entity);
-                    c._type = EColliderType::kBox;
+                    auto &c = r.AddComponent<ECS::CCollider>(new_entity);
+                    c._type = ECS::EColliderType::kBox;
                     c._param = Vector3f::kOne;
-                    r.AddComponent<CRigidBody>(new_entity);
+                    r.AddComponent<ECS::CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kTorus)
                 {
                     tag->_name = std::format("torus_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    auto &comp = r.AddComponent<ECS::StaticMeshComponent>(new_entity);
                     comp._p_mesh = Mesh::s_p_torus.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-                    auto &c = r.AddComponent<CCollider>(new_entity);
-                    c._type = EColliderType::kBox;
+                    auto &c = r.AddComponent<ECS::CCollider>(new_entity);
+                    c._type = ECS::EColliderType::kBox;
                     c._param = Vector3f::kOne;
-                    r.AddComponent<CRigidBody>(new_entity);
+                    r.AddComponent<ECS::CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kSphere)
                 {
                     tag->_name = std::format("sphere_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    auto &comp = r.AddComponent<ECS::StaticMeshComponent>(new_entity);
                     comp._p_mesh = Mesh::s_p_shpere.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-                    r.AddComponent<CCollider>(new_entity)._type = EColliderType::kSphere;
-                    r.AddComponent<CRigidBody>(new_entity);
+                    r.AddComponent<ECS::CCollider>(new_entity)._type = ECS::EColliderType::kSphere;
+                    r.AddComponent<ECS::CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kCapsule)
                 {
                     tag->_name = std::format("capsule_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    auto &comp = r.AddComponent<ECS::StaticMeshComponent>(new_entity);
                     comp._p_mesh = Mesh::s_p_capsule.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-                    auto &capsule = r.AddComponent<CCollider>(new_entity);
-                    capsule._type = EColliderType::kCapsule;
+                    auto &capsule = r.AddComponent<ECS::CCollider>(new_entity);
+                    capsule._type = ECS::EColliderType::kCapsule;
                     capsule._param = {1.f, 2.f, 1.f};
-                    r.AddComponent<CRigidBody>(new_entity);
+                    r.AddComponent<ECS::CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kPlane)
                 {
                     tag->_name = std::format("plane_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<StaticMeshComponent>(new_entity);
+                    auto &comp = r.AddComponent<ECS::StaticMeshComponent>(new_entity);
                     comp._p_mesh = Mesh::s_p_plane.lock();
                     comp._p_mats.push_back(Material::s_checker.lock());
                     comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-                    auto &box = r.AddComponent<CCollider>(new_entity);
+                    auto &box = r.AddComponent<ECS::CCollider>(new_entity);
                     box._param.xyz = Vector3f(1.f, 0.01f, 1.f);
-                    r.AddComponent<CRigidBody>(new_entity);
+                    r.AddComponent<ECS::CRigidBody>(new_entity);
                 }
                 else if (type == EPlaceActorsType::kDirectionalLight)
                 {
                     tag->_name = std::format("directional_light_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<LightComponent>(new_entity);
-                    comp._type = ELightType::kDirectional;
+                    auto &comp = r.AddComponent<ECS::LightComponent>(new_entity);
+                    comp._type = ECS::ELightType::kDirectional;
                 }
                 else if (type == EPlaceActorsType::kPointLight)
                 {
                     tag->_name = std::format("point_light_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<LightComponent>(new_entity);
-                    comp._type = ELightType::kPoint;
+                    auto &comp = r.AddComponent<ECS::LightComponent>(new_entity);
+                    comp._type = ECS::ELightType::kPoint;
                 }
                 else if (type == EPlaceActorsType::kSpotLight)
                 {
                     tag->_name = std::format("spot_light_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<LightComponent>(new_entity);
-                    comp._type = ELightType::kSpot;
+                    auto &comp = r.AddComponent<ECS::LightComponent>(new_entity);
+                    comp._type = ECS::ELightType::kSpot;
                 }
                 else if (type == EPlaceActorsType::kAreaLight)
                 {
                     tag->_name = std::format("area_light_{}", r.EntityNum());
-                    auto &comp = r.AddComponent<LightComponent>(new_entity);
-                    comp._type = ELightType::kArea;
+                    auto &comp = r.AddComponent<ECS::LightComponent>(new_entity);
+                    comp._type = ECS::ELightType::kArea;
                 }
                 else {};
-                r.GetComponent<TransformComponent>(new_entity)->_transform._position = place_pos;
+                r.GetComponent<ECS::TransformComponent>(new_entity)->_transform._position = place_pos;
                 LOG_INFO("Place new LightProbe");
             }
         }

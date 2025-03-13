@@ -269,7 +269,7 @@ namespace Ailu
             if (tex_it != pass_bind_res_info.end())
             {
                 if (tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray || tex_it->second._res_type == EBindResDescType::kTexture2D)
-                    GraphicsPipelineStateMgr::SubmitBindResource(it.second, EBindResDescType::kTexture2D, tex_it->second._bind_slot, PipelineResourceInfo::kPriporityGlobal);
+                    GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(it.second, EBindResDescType::kTexture2D, tex_it->second._bind_slot, PipelineResource::kPriorityGlobal));
             }
         }
         for (auto &it: s_global_matrix_bind_info)
@@ -290,7 +290,7 @@ namespace Ailu
             auto buf_it = pass_bind_res_info.find(it.first);
             if (buf_it != pass_bind_res_info.end())
             {
-                GraphicsPipelineStateMgr::SubmitBindResource(reinterpret_cast<void *>(it.second), EBindResDescType::kConstBuffer, buf_it->second._bind_slot, PipelineResourceInfo::kPriporityGlobal);
+                GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(it.second, EBindResDescType::kConstBuffer, buf_it->second._bind_slot, PipelineResource::kPriorityGlobal));
             }
         }
     }
@@ -424,7 +424,7 @@ namespace Ailu
             }
         }
     }
-    void Shader::SetGlobalBuffer(const String &name, IConstantBuffer *buffer)
+    void Shader::SetGlobalBuffer(const String &name, ConstantBuffer *buffer)
     {
         if (!s_global_buffer_bind_info.contains(name))
             s_global_buffer_bind_info.insert(std::make_pair(name, buffer));
@@ -1250,7 +1250,7 @@ namespace Ailu
         }
     }
 
-    void ComputeShader::SetBuffer(const String &name, IConstantBuffer *buf)
+    void ComputeShader::SetBuffer(const String &name, ConstantBuffer *buf)
     {
         for (auto &cs_ele: _kernels)
         {
@@ -1262,7 +1262,7 @@ namespace Ailu
             }
         }
     }
-    void ComputeShader::SetBuffer(const String &name, IGPUBuffer *buf)
+    void ComputeShader::SetBuffer(const String &name, GPUBuffer *buf)
     {
         for (auto &cs_ele: _kernels)
         {

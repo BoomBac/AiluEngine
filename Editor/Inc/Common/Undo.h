@@ -32,7 +32,7 @@ private:                                                                  \
         {
             DECLARE_COMMAND(Transform)
         public:
-            TransformCommand(Vector<String> &&obj_names, Vector<TransformComponent *> &&comps, Vector<Transform> &&old_transforms)
+            TransformCommand(Vector<String> &&obj_names, Vector<ECS::TransformComponent *> &&comps, Vector<Transform> &&old_transforms)
                 : _obj_names(obj_names), _comps(comps), _old_transforms(old_transforms)
             {
                 for (auto *comp: _comps)
@@ -40,7 +40,7 @@ private:                                                                  \
                     _new_transforms.push_back(comp->_transform);
                 }
             }
-            TransformCommand(const String &obj_name,TransformComponent *comp, const Transform &old_transf)
+            TransformCommand(const String &obj_name,ECS::TransformComponent *comp, const Transform &old_transf)
             {
                 _obj_names.emplace_back(obj_name);
                 _comps.emplace_back(comp);
@@ -72,7 +72,7 @@ private:                                                                  \
 
         private:
             std::vector<String> _obj_names;
-            std::vector<TransformComponent *> _comps;
+            std::vector<ECS::TransformComponent *> _comps;
             std::vector<Transform> _old_transforms;
             std::vector<Transform> _new_transforms;
         };

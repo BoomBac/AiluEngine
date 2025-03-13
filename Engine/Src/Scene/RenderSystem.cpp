@@ -6,7 +6,7 @@
 #include <Render/Gizmo.h>
 #include <Render/GraphicsContext.h>
 #include <Render/RenderPipeline.h>
-
+#include "Framework/Common/Application.h"
 #include "DirectXMath.h"
 #include "DirectXPackedVector.h"
 
@@ -17,39 +17,7 @@ namespace Ailu
 {
     namespace ECS
     {
-        void RenderSystem::Update(Register &r, f32 delta_time)
-        {
-            PROFILE_BLOCK_CPU(RenderSystem_Update)
-            for (auto &e: _entities)
-            {
-                auto comp = r.GetComponent<StaticMeshComponent>(e);
-                auto transf = r.GetComponent<TransformComponent>(e)->_transform;
-                for (int i = 0; i < comp->_p_mesh->_bound_boxs.size(); i++)
-                {
-                    comp->_transformed_aabbs[i] = comp->_p_mesh->_bound_boxs[i] * transf._world_matrix;
-                }
-            }
-            u32 index = 0u;
-            for (auto &comp: r.View<CSkeletonMesh>())
-            {
-                auto t = r.GetComponent<CSkeletonMesh, TransformComponent>(index);
-                if (!comp._p_mesh)
-                    continue;
-                for (int i = 0; i < comp._p_mesh->_bound_boxs.size(); i++)
-                {
-                    comp._transformed_aabbs[i] = comp._p_mesh->_bound_boxs[i] * t->_transform._world_matrix;
-                }
-            }
-            index = 0u;
-            for (auto &comp: r.View<CCamera>())
-            {
-                auto t = r.GetComponent<CCamera, TransformComponent>(index);
-                comp._camera.Position(t->_transform._position);
-                comp._camera.Rotation(t->_transform._rotation);
-                comp._camera.RecalculateMarix();
-            }
-        }
-
+        #pragma region LightingSystem
         static Vector3f XMVecToVec3(const XMVECTOR &vec)
         {
             Vector3f ret;
@@ -91,6 +59,7 @@ namespace Ailu
 
         void LightingSystem::OnPushEntity(Entity e)
         {
+
         }
         void LightingSystem::Update(Register &r, f32 delta_time)
         {
@@ -186,6 +155,7 @@ namespace Ailu
             }
             ProcessVXGI(r);
             index = 0;
+            static ObjectLayer shadow_cast_layer = Application::Get()->NameToLayer("ShadowCaster");
             for (auto &e: _entities)
             {
                 auto transf = r.GetComponent<TransformComponent>(e)->_transform;
@@ -197,8 +167,13 @@ namespace Ailu
 
                 if (comp->_type == ELightType::kDirectional)
                 {
+                    if (!comp->_shadow._is_cast_shadow)
+                    {
+                        comp->_shadow._shaodwcam_num = 0u;
+                        continue;
+                    }
+                    comp->_shadow._shaodwcam_num = QuailtySetting::s_cascade_shadow_map_count;
                     Camera &selected_cam = Camera::sSelected ? *Camera::sSelected : *Camera::sCurrent;
-                    //Camera& selected_cam = *Camera::sCurrent;//Camera::sSelected ? *Camera::sSelected : *Camera::sCurrent;
                     f32 cur_level_start = 0, cur_level_end = QuailtySetting::s_main_light_shaodw_distance;
                     for (u16 i = 0; i < QuailtySetting::s_cascade_shadow_map_count; ++i)
                     {
@@ -228,11 +203,11 @@ namespace Ailu
                             const float farPlane = selected_cam.Far();
                             f32 origin_near = selected_cam.Near();
                             selected_cam.Near(1.0f);
-                            selected_cam.RecalculateMarix(true);
+                            selected_cam.RecalculateMatrix(true);
                             // Unproject main frustum corners into world space (notice the reversed Z projection!):
-                            auto unproj_mat = MatrixInverse(selected_cam.GetView() * MatrixReverseZ(selected_cam.GetProjection()));//这里如果near-clip过小的话，也会造成抖动的情况
+                            auto unproj_mat = MatrixInverse(selected_cam.GetView() * MatrixReverseZ(selected_cam.GetProj()));//这里如果near-clip过小的话，也会造成抖动的情况
                             selected_cam.Near(origin_near);
-                            selected_cam.RecalculateMarix(true);
+                            selected_cam.RecalculateMatrix(true);
                             XMMATRIX unproj;
                             memcpy(unproj.r, unproj_mat, sizeof(XMMATRIX));
                             XMVECTOR frustum_corners[] =
@@ -329,26 +304,29 @@ namespace Ailu
                             memcpy(view, lightView.r, sizeof(XMMATRIX));
                             memcpy(proj, lightProjection.r, sizeof(XMMATRIX));
                             comp->_shadow_cameras[i].SetViewAndProj(view, proj);
+                            comp->_shadow_cameras[i]._layer_mask &= shadow_cast_layer._value;
                         }
                         else
                         {
                         }
                         //https://alextardif.com/shadowmapping.html
-                        //shadow_cam_pos.y = 50.0f;
-                        comp->_shadow_cameras[i].Type(ECameraType::kOrthographic);
-                        comp->_shadow_cameras[i].SetLens(90, 1, 0.1f, height * 4.0f);
-                        comp->_shadow_cameras[i].Size(cascade_sphere._radius * 2.0f);
-                        comp->_shadow_cameras[i].Position(shadow_cam_pos);
-                        //_shadow_cameras[i].LookTo(_light._light_dir.xyz, Vector3f::kUp);
                         comp->_cascade_shadow_data[i].xyz = cascade_sphere._center;
                         comp->_cascade_shadow_data[i].w = cascade_sphere._radius * cascade_sphere._radius;
                     }
                 }
                 else if (comp->_type == ELightType::kSpot)
                 {
-                    comp->_shadow_cameras[0].SetLens(90, 1, 0.01, comp->_light._light_param.x * 1.5f);
+                    if (!comp->_shadow._is_cast_shadow)
+                    {
+                        comp->_shadow._shaodwcam_num = 0u;
+                        continue;
+                    }
+                    comp->_shadow._shaodwcam_num = 1u;
+                    f32 n = 0.01f, f = comp->_light._light_param.x * 1.5f;
+                    comp->_shadow_cameras[0].SetLens(90, 1, n, f);
                     comp->_shadow_cameras[0].Position(comp->_light._light_pos.xyz);
                     comp->_shadow_cameras[0].LookTo(comp->_light._light_dir.xyz, Vector3f::kUp);
+                    comp->_shadow_cameras[0]._layer_mask &= shadow_cast_layer._value;
                     //Camera::DrawGizmo(&_shadow_cameras[0], Random::RandomColor32(0));
                 }
                 else if (comp->_type == ELightType::kPoint)
@@ -371,15 +349,29 @@ namespace Ailu
                                     {0.f, 1.f, 0.f}, //+z
                                     {0.f, 1.f, 0.f}  //-z
                             };
+                    if (!comp->_shadow._is_cast_shadow)
+                    {
+                        comp->_shadow._shaodwcam_num = 0u;
+                        continue;
+                    }
+                    comp->_shadow._shaodwcam_num = 6;
+                    f32 n = 0.01f, f = comp->_light._light_param.x * 1.5f;
                     for (int i = 0; i < 6; i++)
                     {
-                        comp->_shadow_cameras[i].SetLens(90, 1, 0.01, comp->_light._light_param.x * 1.5f);
+                        comp->_shadow_cameras[i].SetLens(90, 1, n,f);
                         comp->_shadow_cameras[i].Position(comp->_light._light_pos.xyz);
                         comp->_shadow_cameras[i].LookTo(targets[i], ups[i]);
+                        comp->_shadow_cameras[i]._layer_mask &= shadow_cast_layer._value;
                     }
                 }
-                else
+                else //Area light
                 {
+                    if (!comp->_shadow._is_cast_shadow)
+                    {
+                        comp->_shadow._shaodwcam_num = 0u;
+                        continue;
+                    }
+                    comp->_shadow._shaodwcam_num = 1u;
                     memset(comp->_light._area_points, 0, sizeof(comp->_light._area_points));
                     f32 w = comp->_light._light_param.y * 0.5f, h = comp->_light._light_param.z * 0.5f;
                     comp->_light._area_points[0].x = -w;
@@ -395,6 +387,11 @@ namespace Ailu
                     TransformCoord(comp->_light._area_points[1], mat);
                     TransformCoord(comp->_light._area_points[2], mat);
                     TransformCoord(comp->_light._area_points[3], mat);
+                    f32 n = 0.01f, f = comp->_light._light_param.x * 1.5f;
+                    comp->_shadow_cameras[0].SetLens(90, 1, n, f);
+                    comp->_shadow_cameras[0].Position(comp->_light._light_pos.xyz);
+                    comp->_shadow_cameras[0].LookTo(comp->_light._light_dir.xyz, Vector3f::kUp);
+                    comp->_shadow_cameras[0]._layer_mask &= shadow_cast_layer._value;
                 }
             }
         }
@@ -434,6 +431,7 @@ namespace Ailu
                 break;
             }
         }
+        #pragma endregion
     }// namespace ECS
     //namespace ECS
 }// namespace Ailu

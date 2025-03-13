@@ -967,12 +967,12 @@ namespace Ailu
                 }
                 else if (bind_info._res_type == EBindResDescType::kRWBuffer)
                 {
-                    auto buf = static_cast<IGPUBuffer *>(bind_info._p_res);
+                    auto buf = static_cast<GPUBuffer *>(bind_info._p_res);
                     buf->Bind(cmd, bind_info._bind_slot, true);
                 }
                 else if (bind_info._res_type == EBindResDescType::kConstBuffer)
                 {
-                    reinterpret_cast<IConstantBuffer *>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot, true);
+                    reinterpret_cast<ConstantBuffer *>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot, true);
                 }
             }
             else
@@ -1205,7 +1205,7 @@ namespace Ailu
                     }
                     // if (_p_cbuffer == nullptr)
                     // {
-                    //     //_p_cbuffer.reset(IConstantBuffer::Create(cbuffer_size, true));
+                    //     //_p_cbuffer.reset(ConstantBuffer::Create(cbuffer_size, true));
                     // }
                     // else
                     // {

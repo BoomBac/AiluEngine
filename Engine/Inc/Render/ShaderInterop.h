@@ -44,7 +44,7 @@ namespace Ailu
         float _LightParam0;
         float3 _LightColor;
         float _LightParam1;
-        int _ShadowDataIndex;
+        int _shadowmap_index;
         float _ShadowDistance;
         float _constant_bias;
         float _slope_bias;
@@ -58,20 +58,22 @@ namespace Ailu
         float _LightAngleScale;
         float3 _LightColor;
         float _LightAngleOffset;
-        int _ShadowDataIndex;
+        int _shadowmap_index;
         float _ShadowDistance;
         float _constant_bias;
         float _slope_bias;
+        float4x4 _shadow_matrix;
     };
     struct ShaderArealLightData
     {
         float4 _points[4];
         float3 _LightColor;
-        bool _is_twosided;
-        int _ShadowDataIndex;
+        int _is_twosided;
+        int _shadowmap_index;
         float _ShadowDistance;
         float _constant_bias;
         float _slope_bias;
+        float4x4 _shadow_matrix;
     };
 
 #ifdef __cplusplus
@@ -105,7 +107,7 @@ cbuffer CBufferPerSceneData : register(b2)
         ShaderDirectionalAndPointLightData _PointLights[kMaxPointLight];
         ShaderSpotlLightData _SpotLights[kMaxSpotLight];
         ShaderArealLightData _AreaLights[kMaxAreaLight];
-        float4x4 _ShadowMatrix[kMaxCascadeShadowMapSplit + kMaxSpotLight + kMaxPointLight * 6];
+        float4x4 _CascadeShadowMatrix[kMaxCascadeShadowMapSplit];
         float4 _ActiveLightCount;
         float4 _Time;     // (t/20,t,t*2,t*3)
         float4 _SinTime;  // sin(t/8),sin(t/4),sin(t/2),sin(t)
@@ -154,13 +156,13 @@ cbuffer CBufferPerCameraData : register(b3)
         // w = 1/far plane
         float4 _ProjectionParams;
         float3 _LT;
-        float _cbc_padding0;
+        float  _matrix_jitter_x;
         float3 _RT;
-        float _cbc_padding1;
+        float _matrix_jitter_y;
         float3 _LB;
-        float _cbc_padding2;
+        float _uv_jitter_x;
         float3 _RB;
-        float _cbc_padding3;
+        float _uv_jitter_y;
     };
 
 #ifdef __cplusplus

@@ -21,6 +21,13 @@
 #define LIKELY(x) (x)
 #define UNLIKELY(x) (x)
 #endif
+
+#if defined(FLT_EPSILON)
+    #undef FLT_EPSILON
+#endif
+
+#define FLT_EPSILON 1e-6f
+
 namespace Ailu
 {
     namespace
@@ -182,6 +189,16 @@ namespace Ailu
                 for (int i = 0; i < sizeof...(Indexes); i++)
                 {
                     r[indexes[i]] *= s;
+                }
+                return r;
+            }
+            TT<T> operator/(T s) const
+            {
+                TT<T> r = *this;
+                int indexes[] = {Indexes...};
+                for (int i = 0; i < sizeof...(Indexes); i++)
+                {
+                    r[indexes[i]] /= (s + FLT_EPSILON);
                 }
                 return r;
             }
@@ -1119,6 +1136,18 @@ namespace Ailu
         template<typename T, int rows, int cols>
         struct Matrix
         {
+            static Matrix<T,rows,cols> Identity()
+            {
+                Matrix<T,rows,cols> m;
+                for (int i = 0; i < rows; ++i)
+                {
+                    for (int j = 0; j < cols; ++j)
+                    {
+                        m.data[i][j] = (i == j) ? 1.0 : 0.0;
+                    }
+                }
+                return m;
+            }
             union
             {
                 T data[rows][cols];
@@ -1452,6 +1481,13 @@ namespace Ailu
             vector = temp;
             return;
 #endif// !_SIMD
+        }
+
+        static Vector4f TransformVector(const Matrix4x4f &matrix, const Vector4f &v)
+        {
+            Vector4f temp = v;
+            TransformVector(temp, matrix);
+            return temp;
         }
 
         static Vector3f MultipyVector(const Vector3f &v, const Matrix4x4f &mat)

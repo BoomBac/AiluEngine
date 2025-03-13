@@ -117,13 +117,8 @@ namespace Ailu
     {
         auto shadow_map_size = QuailtySetting::s_cascade_shaodw_map_resolution;
         _p_mainlight_shadow_map = RenderTexture::Create(shadow_map_size, shadow_map_size, RenderConstants::kMaxCascadeShadowMapSplitNum, "MainLightShadowMap", ERenderTargetFormat::kShadowMap);
-        _p_addlight_shadow_maps = RenderTexture::Create(shadow_map_size >> 1, shadow_map_size >> 1, RenderConstants::kMaxSpotLightNum, "AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
+        _p_addlight_shadow_maps = RenderTexture::Create(shadow_map_size >> 1, shadow_map_size >> 1, RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxAreaLightNum, "AddLightShadowMaps", ERenderTargetFormat::kShadowMap);
         _p_point_light_shadow_maps = RenderTexture::Create(shadow_map_size >> 1, "PointLightShadowMap", ERenderTargetFormat::kShadowMap, RenderConstants::kMaxPointLightNum);
-        for (int i = 0; i < RenderConstants::kMaxCascadeShadowMapSplitNum + RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxPointLightNum * 6; i++)
-        {
-            _shadowcast_materials.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/depth_only.alasset"), "ShadowCast"));
-            _shadowcast_materials[i]->SetUint("shadow_index", 0);
-        }
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeShaodwMap + 25u);
     }
 
@@ -139,15 +134,15 @@ namespace Ailu
             u32 obj_index = 0u;
             CBufferPerCameraData camera_data;
             //方向光阴影，只有一个
-            if (rendering_data._shadow_data[0]._shadow_index != -1)
+            if (rendering_data._cascade_shadow_data[0]._shadowmap_index >= 0)
             {
                 for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
                 {
                     u16 dsv_rt_index = _p_mainlight_shadow_map->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
                     cmd->SetRenderTarget(nullptr, _p_mainlight_shadow_map.get(), 0, dsv_rt_index);
                     cmd->ClearRenderTarget(_p_mainlight_shadow_map.get(), dsv_rt_index, kZFar);
-                    camera_data._MatrixVP = *rendering_data._shadow_data[i]._shadow_matrix;
-                    for (auto &it: *rendering_data._shadow_data[i]._cull_results)
+                    camera_data._MatrixVP = rendering_data._cascade_shadow_data[i]._shadow_matrix;
+                    for (auto &it: *rendering_data._cascade_shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
                         for (auto &obj: objs)
@@ -167,14 +162,38 @@ namespace Ailu
             {
                 for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
                 {
-                    int shadow_data_index = i + RenderConstants::kMaxCascadeShadowMapSplitNum;
-                    if (rendering_data._shadow_data[shadow_data_index]._shadow_index == -1)
+                    auto &shadow_data = rendering_data._spot_shadow_data[i];
+                    if (shadow_data._shadowmap_index < 0)
                         continue;
-                    u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, i);
+                    u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
                     cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, dsv_rt_index);
                     cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), dsv_rt_index, kZFar);
-                    camera_data._MatrixVP = *rendering_data._shadow_data[shadow_data_index]._shadow_matrix;
-                    for (auto &it: *rendering_data._shadow_data[shadow_data_index]._cull_results)
+                    camera_data._MatrixVP = rendering_data._spot_shadow_data[i]._shadow_matrix;
+                    for (auto &it: *rendering_data._spot_shadow_data[i]._cull_results)
+                    {
+                        auto &[queue, objs] = it;
+                        for (auto &obj: objs)
+                        {
+                            if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
+                            {
+                                obj._material->DisableKeyword("CAST_POINT_SHADOW");
+                                cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                                cmd->DrawRenderer(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                            }
+                        }
+                    }
+                    obj_index = 0;
+                }
+                for (int i = 0; i < RenderConstants::kMaxAreaLightNum; i++)
+                {
+                    auto &shadow_data = rendering_data._area_shadow_data[i];
+                    if (shadow_data._shadowmap_index < 0)
+                        continue;
+                    u16 dsv_rt_index = _p_addlight_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, 0, shadow_data._shadowmap_index);
+                    cmd->SetRenderTarget(nullptr, _p_addlight_shadow_maps.get(), 0, dsv_rt_index);
+                    cmd->ClearRenderTarget(_p_addlight_shadow_maps.get(), dsv_rt_index, kZFar);
+                    camera_data._MatrixVP = rendering_data._area_shadow_data[i]._shadow_matrix;
+                    for (auto &it: *rendering_data._area_shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
                         for (auto &obj: objs)
@@ -196,25 +215,23 @@ namespace Ailu
                 static const u32 pointshadow_mat_start = RenderConstants::kMaxCascadeShadowMapSplitNum + RenderConstants::kMaxSpotLightNum;
                 for (int i = 0; i < RenderConstants::kMaxPointLightNum; i++)
                 {
-                    if (rendering_data._point_shadow_data[i]._camera_far == 0)
+                    auto &shadow_data = rendering_data._point_shadow_data[i];
+                    if (shadow_data._shadowmap_index < 0)
                         continue;
                     for (int j = 0; j < 6; j++)
                     {
                         //j + i * 6 定位到cubearray
-                        u16 per_cube_slice_index = j + i * 6;
-                        u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace::ECubemapFace)(j + 1), 0, i);
+                        u16 per_cube_slice_index = j + shadow_data._shadowmap_index * 6;
+                        u16 dsv_rt_index = _p_point_light_shadow_maps->CalculateViewIndex(Texture::ETextureViewType::kDSV, (ECubemapFace::ECubemapFace)(j + 1), 0, shadow_data._shadowmap_index);
                         cmd->SetRenderTarget(nullptr, _p_point_light_shadow_maps.get(), 0, dsv_rt_index);
                         cmd->ClearRenderTarget(_p_point_light_shadow_maps.get(), dsv_rt_index, kZFar);
-                        Vector4f light_pos = rendering_data._point_shadow_data[i]._light_world_pos;
-                        _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetVector("_point_light_wpos", light_pos);
+                        Vector4f light_pos = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._light_world_pos;
                         camera_data._CameraPos.xyz = light_pos.xyz;
-                        light_pos.x = rendering_data._point_shadow_data[i]._camera_near;
-                        light_pos.y = rendering_data._point_shadow_data[i]._camera_far;
-                        _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetVector("_shadow_params", light_pos);
-                        _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index]->SetUint("shadow_index", rendering_data._point_shadow_data[i]._shadow_indices[j]);
-                        camera_data._MatrixVP = rendering_data._point_shadow_data[i]._shadow_matrices[j];
+                        light_pos.x = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._camera_near;
+                        light_pos.y = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._camera_far;
+                        camera_data._MatrixVP = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._shadow_matrices[j];
                         camera_data._ZBufferParams = light_pos;
-                        for (auto &it: *rendering_data._point_shadow_data[i]._cull_results[j])
+                        for (auto &it: *rendering_data._point_shadow_data[shadow_data._shadowmap_index]._cull_results[j])
                         {
                             auto &[queue, objs] = it;
                             for (auto &obj: objs)
@@ -227,23 +244,9 @@ namespace Ailu
                                 }
                             }
                         }
-                        //for (auto& obj : RenderQueue::GetOpaqueRenderables())
-                        //{
-                        //	cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), (*rendering_data._p_per_object_cbuf)[obj_index++],
-                        //		obj._submesh_index, 1, obj._instance_count);
-                        //}
-                        //for (auto& obj : RenderQueue::GetTransparentRenderables())
-                        //{
-                        //	cmd->DrawRenderer(obj.GetMesh(), _shadowcast_materials[pointshadow_mat_start + per_cube_slice_index].get(), (*rendering_data._p_per_object_cbuf)[obj_index++],
-                        //		obj._submesh_index, 1, obj._instance_count);
-                        //}
                         obj_index = 0;
                     }
                 }
-                //for (int i = 0; i < shaow_count; i++)
-                //{
-
-                //}
             }
         }
         Shader::SetGlobalTexture("MainLightShadowMap", _p_mainlight_shadow_map.get());
@@ -292,7 +295,7 @@ namespace Ailu
         //BuildPerspectiveFovLHMatrix(proj, 2.0 * atan((f32)size / ((f32)size - 0.5)), 1.0, 1.0, 100000);
         float scale = 20.0f;
         MatrixScale(_world_mat, scale, scale, scale);
-        _per_obj_cb.reset(IConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+        _per_obj_cb.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
         memcpy(_per_obj_cb->GetData(), &_world_mat, RenderConstants::kPerObjectDataSize);
         Vector3f targets[] =
                 {
@@ -317,7 +320,7 @@ namespace Ailu
             BuildViewMatrixLookToLH(view, center, targets[i], ups[i]);
             _camera_data[i]._MatrixVP = view * proj;
             _camera_data[i]._CameraPos = {0.0f, 0.f, 0.f, 0.f};
-            _per_camera_cb[i].reset(IConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
+            _per_camera_cb[i].reset(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
             memcpy(_per_camera_cb[i]->GetData(), &_camera_data[i], RenderConstants::kPerCameraDataSize);
         }
         f32 mipmap_level = _prefilter_cubemap->MipmapLevel();
@@ -435,7 +438,7 @@ namespace Ailu
                 for (auto &obj: objs)
                 {
                     auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
-                    obj._material->GetShader()->_stencil_ref = IConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x? 1 : 0;
+                    obj._material->GetShader()->_stencil_ref = ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x? 1 : 0;
                     auto ret = cmd->DrawRenderer(obj._mesh, obj._material, obj_cb, obj._submesh_index, 0, obj._instance_count);
                     ++obj_index;
                 }
@@ -508,7 +511,7 @@ namespace Ailu
         _p_skybox_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
         Matrix4x4f world_mat;
         MatrixScale(world_mat, 1000000.f, 1000000.f, 1000000.f);
-        _p_cbuffer.reset(IConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+        _p_cbuffer.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
         memcpy(_p_cbuffer->GetData(), &world_mat, RenderConstants::kPerObjectDataSize);
         _tlut = RenderTexture::Create(_transmittance_lut_size.x, _transmittance_lut_size.y, "_TransmittanceLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
         _ms_lut = RenderTexture::Create(_mult_scatter_lut_size.x, _mult_scatter_lut_size.y, "_MultScatterLUT", ERenderTargetFormat::kRGBAHalf, false, false, true);
@@ -578,7 +581,7 @@ namespace Ailu
     {
         for (int i = 0; i < 20; i++)
         {
-            _p_cbuffers.push_back(std::unique_ptr<IConstantBuffer>(IConstantBuffer::Create(256)));
+            _p_cbuffers.push_back(std::unique_ptr<ConstantBuffer>(ConstantBuffer::Create(256)));
         }
         auto grid_plane_pos = MatrixScale(1000.0f, 1000.f, 1000.f);
         memcpy(_p_cbuffers[0]->GetData(), &grid_plane_pos, sizeof(Matrix4x4f));
@@ -635,7 +638,7 @@ namespace Ailu
 
             const static f32 s_axis_length = 30.f;
             Vector3f camera_target = cam->Position() + cam->Forward() * (cam->Near() + 50.f);
-            Matrix4x4f vp = rendering_data._camera->GetView() * rendering_data._camera->GetProjection();
+            Matrix4x4f vp = rendering_data._camera->GetView() * rendering_data._camera->GetProj();
             Vector2f half_size((f32)(rendering_data._width >> 1), (f32)(rendering_data._height >> 1));
             Vector2f viewport_size((f32)rendering_data._width, (f32)rendering_data._height);
             half_size -= s_axis_length;
@@ -663,7 +666,7 @@ namespace Ailu
             Gizmo::DrawLine(Vector2f(cpos_camera_target.xy), screen_pos_x_axis, Colors::kRed);
             Gizmo::DrawLine(Vector2f(cpos_camera_target.xy), screen_pos_z_axis, Colors::kBlue);
 
-            cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProjection());
+            //cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), rendering_data._camera->GetProj());
             ProfileBlock profile(cmd.get(), _name);
             cmd->SetViewport(rendering_data._viewport);
             cmd->SetScissorRect(rendering_data._scissor_rect);
@@ -672,11 +675,11 @@ namespace Ailu
             cmd->DrawRenderer(Mesh::s_p_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
             u16 index = 1;
             u16 entity_index = 0;
-            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<LightComponent>())
+            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::LightComponent>())
             {
                 if (index >= 20)
                     break;
-                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<LightComponent, TransformComponent>(entity_index++);
+                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
                 auto world_pos = t->_transform._position;
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
@@ -684,22 +687,22 @@ namespace Ailu
                 memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                 switch (light_comp._type)
                 {
-                    case ELightType::kDirectional:
+                    case ECS::ELightType::kDirectional:
                     {
                         cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_directional_light, m);
                     }
                     break;
-                    case ELightType::kPoint:
+                    case ECS::ELightType::kPoint:
                     {
                         cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_point_light, m);
                     }
                     break;
-                    case ELightType::kSpot:
+                    case ECS::ELightType::kSpot:
                     {
                         cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_spot_light, m);
                     }
                     break;
-                    case ELightType::kArea:
+                    case ECS::ELightType::kArea:
                     {
                         cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_area_light, m);
                     }
@@ -707,11 +710,11 @@ namespace Ailu
                 }
             }
             entity_index = 0;
-            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<CLightProbe>())
+            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CLightProbe>())
             {
                 if (index >= 20)
                     break;
-                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<CLightProbe, TransformComponent>(entity_index++);
+                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
                 auto world_pos = t->_transform._position;
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
@@ -720,9 +723,9 @@ namespace Ailu
                 cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_lightprobe, m);
             }
             entity_index = 0;
-            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<CCamera>())
+            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
             {
-                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<CCamera, TransformComponent>(entity_index++);
+                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index++);
                 auto world_pos = t->_transform._position;
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
@@ -751,7 +754,7 @@ namespace Ailu
     CopyColorPass::CopyColorPass() : RenderPass("CopyColor")
     {
         _p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
-        _p_obj_cb = IConstantBuffer::Create(256);
+        _p_obj_cb = ConstantBuffer::Create(256);
         memcpy(_p_obj_cb->GetData(), &BuildIdentityMatrix(), sizeof(Matrix4x4f));
         _p_quad_mesh = g_pResourceMgr->Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
         _event = ERenderPassEvent::kAfterTransparent;
@@ -886,7 +889,7 @@ namespace Ailu
         Vector<VertexBufferLayoutDesc> desc_list;
         desc_list.push_back({"POSITION", EShaderDateType::kFloat3, 0});
         desc_list.push_back({"TEXCOORD", EShaderDateType::kFloat2, 1});
-        _obj_cb.reset(IConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+        _obj_cb.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
         _vbuf.reset(IVertexBuffer::Create(desc_list, "ui_vbuf"));
         _ibuf.reset(IIndexBuffer::Create(nullptr, vertex_count, "ui_ibuf", true));
         f32 box_w = 180.f, box_h = 30.f;
@@ -976,9 +979,9 @@ namespace Ailu
                 for (auto &obj: objs)
                 {
                     auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
-                    if (IConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x < 1)
+                    if (ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x < 1)
                         continue;
-                    //obj._material->GetShader()->_stencil_ref = IConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x? 1 : 0;
+                    //obj._material->GetShader()->_stencil_ref = ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x? 1 : 0;
                     i16 mv_pass = obj._material->GetShader()->FindPass("MotionVector");
                     if (mv_pass != -1)
                         cmd->DrawRenderer(obj._mesh, obj._material, obj_cb, obj._submesh_index, mv_pass, obj._instance_count);

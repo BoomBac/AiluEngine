@@ -11,7 +11,7 @@ namespace Ailu
         _cs_blur = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/blur.hlsl"));
         _p_bloom_thread_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/bloom.alasset"), "BloomThread");
         _p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
-        _p_obj_cb = IConstantBuffer::Create(256);
+        _p_obj_cb = ConstantBuffer::Create(256);
         memcpy(_p_obj_cb->GetData(), &BuildIdentityMatrix(), sizeof(Matrix4x4f));
         _bloom_thread_rect = Rect(0, 0, 800, 450);
         _p_quad_mesh = g_pResourceMgr->Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
@@ -96,7 +96,7 @@ namespace Ailu
                 cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
                 Vector4f light_pos = -rendering_data._mainlight_world_position * 10000;
                 light_pos.w = 1.0f;
-                Matrix4x4f vp = rendering_data._camera->GetView() * rendering_data._camera->GetProjection();
+                Matrix4x4f vp = rendering_data._camera->GetView() * rendering_data._camera->GetProj();
                 TransformVector(light_pos, vp);
                 light_pos.xy /= light_pos.w;
                 light_pos.w = 1.0f;

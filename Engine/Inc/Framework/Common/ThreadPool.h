@@ -16,6 +16,7 @@
 #include "TimeMgr.h"
 #include "GlobalMarco.h"
 #include "Framework/Common/Log.h"
+#include "Container.hpp"
 
 using std::unique_lock;
 using std::packaged_task;
@@ -26,66 +27,6 @@ using std::make_shared;
 
 namespace Ailu
 {
-    template <typename T>
-    class LockFreeQueue
-    {
-    public:
-        explicit LockFreeQueue(size_t capacity)
-            : _buffer(capacity), _capacity(capacity), _head(0), _tail(0) {}
-
-        bool Enqueue(const T& value)
-        {
-            size_t current_tail = _tail.load(std::memory_order_relaxed);
-            size_t next_tail = Increment(current_tail);
-
-            if (next_tail == _head.load(std::memory_order_acquire)) {
-                // 队列已满
-                return false;
-            }
-
-            _buffer[current_tail] = value;  // 将数据存入缓冲区
-            _tail.store(next_tail, std::memory_order_release);
-            return true;
-        }
-
-        // 出队操作（多消费者）
-        bool Dequeue(T& result)
-        {
-            size_t current_head = _head.load(std::memory_order_relaxed);
-
-            // 先检查队列是否为空
-            if (current_head == _tail.load(std::memory_order_acquire)) {
-                // 队列为空
-                return false;
-            }
-
-            // 这里的 CAS 检查确保没有其他线程在修改 _head
-            if (_head.compare_exchange_strong(current_head, Increment(current_head), std::memory_order_acquire)) {
-                result = _buffer[current_head];  // 从缓冲区中取出数据
-                return true;
-            }
-
-            return false;  // 如果 CAS 失败，表示有其他线程已更新 _head
-        }
-
-        bool empty() const
-        {
-            return _head.load(std::memory_order_acquire) == _tail.load(std::memory_order_acquire);
-        }
-
-    private:
-        size_t Increment(size_t index) const
-        {
-            return (index + 1) % _capacity;  // 环形缓冲区中的下一个位置
-        }
-
-        std::vector<T> _buffer;
-        const size_t _capacity;
-        std::atomic<size_t> _head;  // 头指针
-        std::atomic<size_t> _tail;  // 尾指针
-    };
-
-    
     DECLARE_ENUM(EThreadStatus, kNotStarted, kRunning, kIdle);
 	class AILU_API ThreadPool
 	{
@@ -180,28 +121,14 @@ namespace Ailu
                         if (_tasks.Dequeue(task))
                         {
                             _thread_status[i] = EThreadStatus::kRunning;
-#ifdef _DEBUG
-                            _timers[i].Mark();
-                            f32 ms_since_tick = TimeMgr::GetElapsedSinceCurrentTick();
-                            try
-                            {
-                                task._task();
-                            }
-                            catch (const std::exception& e)
-                            {
-                                LOG_ERROR("Exception caught in thread pool {}: {}", _pool_name, e.what());
-                            }
-                            _task_time_records[i].emplace_back(task._name,ms_since_tick, _timers[i].GetElapsedSinceLastMark());
-#else
-                            task();
-#endif// _DEBUG
+                            task._task();
                             _thread_status[i] = EThreadStatus::kIdle;
                         }
                         else
                         {
                             std::unique_lock<std::mutex> lock(_wake_mutex);
-                            _task_cv.wait(lock, [this] { return _b_stopping.load() || !_tasks.empty(); });
-                            if (_b_stopping.load() && _tasks.empty()) {
+                            _task_cv.wait(lock, [this] { return _b_stopping.load() || !_tasks.Empty(); });
+                            if (_b_stopping.load() && _tasks.Empty()) {
                                 break;
                             }
                         }

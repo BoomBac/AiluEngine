@@ -4,11 +4,12 @@
 #include <wrl.h>
 
 #include "Ext/d3dx12.h"
+#include "Render/GpuResource.h"
 
 namespace Ailu
 {
 #define _2MB 2097152u
-    class UploadBuffer
+    class UploadBuffer : public GpuResource
     {
     public:
         // Use to upload data to the GPU
@@ -21,7 +22,7 @@ namespace Ailu
                 memcpy(CPU,data,data_size);
             }
         };
-        explicit UploadBuffer(u64 page_size = _2MB);
+        explicit UploadBuffer(const String& name,u64 page_size = _2MB);
         u64 GetPageSize() const { return m_PageSize; }
         Allocation Allocate(size_t sizeInBytes, size_t alignment);
         void Reset();
@@ -30,7 +31,7 @@ namespace Ailu
         struct Page
         {
         public:
-            Page(u64 byte_size);
+            Page(const String& name,u64 byte_size);
             ~Page();
             bool HasSpace(u64 byte_size, u64 alignment) const;
             Allocation Allocate(size_t sizeInBytes, size_t alignment);

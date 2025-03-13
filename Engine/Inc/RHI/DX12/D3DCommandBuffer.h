@@ -18,8 +18,6 @@ namespace Ailu
         void Clear() final;
         //close before execute
         void Close() final;
-        u32 GetID() final { return _id; };
-        [[nodiscard]] const String &GetName() const final { return _name; };
         void SetName(const String &name) final
         {
             auto wname = ToWStr(name);
@@ -27,7 +25,9 @@ namespace Ailu
             _p_alloc->SetName(wname.c_str());
             _name = name;
         };
-        ECommandBufferType GetType() const final { return _type; }
+        const String &GetName() const final {return _name;}
+        ECommandBufferType GetType() const final {return _type;}
+        u32 GetID() const final {return _id;}
 
         void ClearRenderTarget(RenderTexture *color, RenderTexture *depth, Vector4f clear_color, float clear_depth) final;
         void ClearRenderTarget(Vector<RenderTexture *> &colors, RenderTexture *depth, Vector4f clear_color, float clear_depth) final;
@@ -50,8 +50,8 @@ namespace Ailu
         RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access);
         void ReleaseTempRT(RTHandle handle);
 
-        void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) final;
-        void DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw,Material*mat,u16 pass_index = 0u,u16 instance_count = 1u) final;
+        void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, ConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) final;
+        void DrawInstanced(IVertexBuffer *vb, ConstantBuffer *cb_per_draw,Material*mat,u16 pass_index = 0u,u16 instance_count = 1u) final;
 
         void SetViewport(const Rect &viewport) final;
         void SetScissorRect(const Rect &rect) final;
@@ -70,16 +70,16 @@ namespace Ailu
 
         void SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj);
         void SetGlobalBuffer(const String &name, void *data, u64 data_size) final;
-        void SetGlobalBuffer(const String &name, IConstantBuffer *buffer) final;
-        void SetGlobalBuffer(const String &name, IGPUBuffer *buffer) final;
+        void SetGlobalBuffer(const String &name, ConstantBuffer *buffer) final;
+        void SetGlobalBuffer(const String &name, GPUBuffer *buffer) final;
         void SetComputeBuffer(const String &name, u16 kernel,void *data, u64 data_size) final;
         void SetGlobalTexture(const String &name, Texture *tex) final;
         void SetGlobalTexture(const String &name, RTHandle handle) final;
 
         void DrawFullScreenQuad(Material *mat, u16 pass_index = 0u);
-        u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u32 instance_count = 1u) final;
-        u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
-        u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) final;
+        u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) final;
+        u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) final;
         u16 DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 submesh_index, u16 pass_index, u32 instance_count) final;
         u16 DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 submesh_index, u16 pass_index, u32 instance_count) final;
         u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count = 1u) final;
@@ -93,11 +93,8 @@ namespace Ailu
         void SetDescriptorHeapId(u16 id) { _cur_cbv_heap_id = id; };
 
     private:
-        //inline static Array<Scope<IConstantBuffer>, 20> s_obj_buffers{};
-        //inline static u16 s_global_buffer_offset = 0u;
-        //u16 _buffer_offset = 0u;
         String _name;
-        u32 _id = 0u;
+        u32 _id;
         bool _b_cmd_closed;
         u16 _cur_cbv_heap_id = 65535u;
         bool _is_custom_viewport = false;

@@ -13,7 +13,6 @@ struct StandardPSInput
 {
 	float4 position : SV_POSITION;
 	float3 world_pos : POSITION;
-	float4 shadow_pos : SHADOW_COORD;
 	float3 normal : NORMAL;
 	float2 uv0 : TEXCOORD0;
 	float3x3 btn : BTN;

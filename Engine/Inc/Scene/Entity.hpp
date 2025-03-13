@@ -115,13 +115,14 @@ namespace Ailu
             virtual Ref<System> Clone() 
             { 
                 AL_ASSERT(true);
-                return nullptr; 
+                return nullptr;
             };
-
         protected:
             std::set<Entity> _entities;
         };
 
+        using CompAddCallback = std::function<void(ECS::Entity)>;
+        using CompRemoveCallback = std::function<void(ECS::Entity)>;
         class Register
         {
         public:
@@ -146,6 +147,8 @@ namespace Ailu
                     const auto &manager = pair.second;
                     _systems[type_name] = pair.second->Clone();
                 }
+                _on_comp_add_callback = other._on_comp_add_callback;
+                _on_comp_remove_callback = other._on_comp_remove_callback;
             }
             Register(Register &&other) noexcept
                 : _mgrs(std::move(other._mgrs)),
@@ -155,7 +158,9 @@ namespace Ailu
                   _entity_num(other._entity_num),
                   _entities(std::move(other._entities)),
                   _available_entities(std::move(other._available_entities)),
-                  _is_init(other._is_init)
+                  _is_init(other._is_init),
+                  _on_comp_remove_callback(std::move(other._on_comp_remove_callback)),
+                  _on_comp_add_callback(std::move(other._on_comp_add_callback))
             {
                 other._entity_num = -1;
                 other._is_init = false;
@@ -182,6 +187,8 @@ namespace Ailu
                     _entities = other._entities;
                     _available_entities = other._available_entities;
                     _is_init = other._is_init;
+                    _on_comp_add_callback = other._on_comp_add_callback;
+                    _on_comp_remove_callback = other._on_comp_remove_callback;
                 }
                 return *this;
             }
@@ -197,7 +204,8 @@ namespace Ailu
                     _entities = std::move(other._entities);
                     _available_entities = std::move(other._available_entities);
                     _is_init = other._is_init;
-
+                    _on_comp_add_callback = std::move(other._on_comp_add_callback);
+                    _on_comp_remove_callback = std::move(other._on_comp_remove_callback);
                     other._entity_num = -1;
                     other._is_init = false;
                 }
@@ -282,6 +290,8 @@ namespace Ailu
                 AL_ASSERT(!_mgrs.contains(type_name));
                 _mgrs[type_name] = MakeRef<ComponentManager<T>>();
                 _comp_types[type_name] = _comp_types.size();
+                _on_comp_add_callback[type_name] = List<CompAddCallback>();
+                _on_comp_remove_callback[type_name] = List<CompRemoveCallback>();
             }
             template<typename T>
             T *RegisterSystem(Signature sig)
@@ -308,6 +318,8 @@ namespace Ailu
                 AL_ASSERT(_mgrs.contains(type_name));
                 _entities[entity].set(_comp_types[type_name], true);
                 EntitySignatureChanged(entity);
+                for(auto& f : _on_comp_add_callback[type_name])
+                    f(entity);
                 return static_cast<ComponentManager<T> *>(_mgrs[type_name].get())->Create(entity, std::forward<Args>(args)...);
             }
 
@@ -319,6 +331,8 @@ namespace Ailu
                 AL_ASSERT(_mgrs.contains(type_name));
                 static_cast<ComponentManager<T> *>(_mgrs[type_name].get())->Remove(entity);
                 _entities[entity].set(_comp_types[type_name], false);
+                for(auto& f : _on_comp_remove_callback[type_name])
+                    f(entity);
                 EntitySignatureChanged(entity);
             }
             template<typename T>
@@ -376,6 +390,20 @@ namespace Ailu
                 AL_ASSERT(_mgrs.contains(type_name));
                 return static_cast<const ComponentManager<T> *>(_mgrs.at(type_name).get())->ViewEntity();
             }
+            template<typename T>
+            void RegisterOnComponentAdd(CompAddCallback callback)
+            {
+                const auto &type_name = T::TypeName();
+                AL_ASSERT(_on_comp_add_callback.contains(type_name));
+                _on_comp_add_callback[type_name].emplace_back(callback);
+            }
+            template<typename T>
+            void RegisterOnComponentRemove(CompRemoveCallback callback)
+            {
+                const auto &type_name = T::TypeName();
+                AL_ASSERT(_on_comp_remove_callback.contains(type_name));
+                _on_comp_remove_callback[type_name].emplace_back(callback);
+            }
             u32 EntityNum() const { return _entity_num; }
 
         private:
@@ -383,6 +411,8 @@ namespace Ailu
             std::unordered_map<String, u16> _comp_types;
             std::unordered_map<String, Ref<System>> _systems;
             std::unordered_map<String, Signature> _sys_signatures;
+            HashMap<String,List<CompAddCallback>> _on_comp_add_callback;
+            HashMap<String,List<CompRemoveCallback >> _on_comp_remove_callback;
             u32 _entity_num = 0u;
             Array<Signature, kMaxEntityNum> _entities;
             Queue<Entity> _available_entities;

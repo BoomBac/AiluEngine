@@ -29,14 +29,15 @@ namespace Ailu
     };
     class IVertexBuffer;
     class IIndexBuffer;
-    class IConstantBuffer;
+    class ConstantBuffer;
+
     class CommandBuffer
     {
     public:
         virtual ~CommandBuffer() = default;
         virtual void Clear() = 0;
         virtual void Close() = 0;
-        virtual u32 GetID() = 0;
+        virtual u32 GetID() const = 0;
         virtual const String &GetName() const = 0;
         virtual void SetName(const String &name) = 0;
         virtual ECommandBufferType GetType() const = 0;
@@ -64,8 +65,8 @@ namespace Ailu
         virtual void SetRenderTarget(RTHandle color, RTHandle depth) = 0;
         virtual void SetRenderTarget(RTHandle color, u16 index = 0u) = 0;
 
-        virtual void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, IConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) = 0;
-        virtual void DrawInstanced(IVertexBuffer *vb, IConstantBuffer *cb_per_draw,Material*mat,u16 pass_index,u16 instance_count) = 0;
+        virtual void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, ConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) = 0;
+        virtual void DrawInstanced(IVertexBuffer *vb, ConstantBuffer *cb_per_draw,Material*mat,u16 pass_index,u16 instance_count) = 0;
 
         virtual void SetViewport(const Rect &viewport) = 0;
         virtual void SetScissorRect(const Rect &rect) = 0;
@@ -86,17 +87,17 @@ namespace Ailu
         virtual void DrawFullScreenQuad(Material *mat, u16 pass_index = 0u) = 0;
         virtual void SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj) = 0;
         virtual void SetGlobalBuffer(const String &name, void *data, u64 data_size) = 0;
-        virtual void SetGlobalBuffer(const String &name, IConstantBuffer *buffer) = 0;
-        virtual void SetGlobalBuffer(const String &name, IGPUBuffer *buffer) = 0;
+        virtual void SetGlobalBuffer(const String &name, ConstantBuffer *buffer) = 0;
+        virtual void SetGlobalBuffer(const String &name, GPUBuffer *buffer) = 0;
         virtual void SetComputeBuffer(const String &name, u16 kernel,void *data, u64 data_size) = 0;
         virtual void SetGlobalTexture(const String &name, Texture *tex) = 0;
         virtual void SetGlobalTexture(const String &name, RTHandle handle) = 0;
 
         virtual void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_matrix, u16 submesh_index = 0u, u32 instance_count = 1u) = 0;
 
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u32 instance_count = 1u) = 0;
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) = 0;
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, IConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
+        virtual u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u32 instance_count = 1u) = 0;
+        virtual u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) = 0;
+        virtual u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
         virtual u16 DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
         virtual u16 DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
         virtual u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count = 1u) = 0;

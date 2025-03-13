@@ -64,9 +64,9 @@ namespace Ailu
         u64 ExecuteAndWaitCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void WaitForGpu() final;
         void WaitForFence(u64 fence_value) final;
-        void BeginBackBuffer(CommandBuffer* cmd) final;
-        void EndBackBuffer(CommandBuffer* cmd) final;
-        void DrawOverlay(CommandBuffer* cmd) final;
+        void BeginBackBuffer(CommandBuffer * cmd) final;
+        void EndBackBuffer(CommandBuffer * cmd) final;
+        void DrawOverlay(CommandBuffer * cmd) final;
 
     private:
         void Destroy();

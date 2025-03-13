@@ -374,7 +374,7 @@ namespace Ailu
 
         static void SetGlobalTexture(const String &name, Texture *texture);
         static void SetGlobalTexture(const String &name, RTHandle handle);
-        static void SetGlobalBuffer(const String &name, IConstantBuffer *buffer);
+        static void SetGlobalBuffer(const String &name, ConstantBuffer *buffer);
         static void SetGlobalMatrix(const String &name, Matrix4x4f *matrix);
         static void SetGlobalMatrixArray(const String &name, Matrix4x4f *matrix, u32 num);
         static void EnableGlobalKeyword(const String &keyword);
@@ -471,7 +471,7 @@ namespace Ailu
         inline static std::atomic<u16> s_global_shader_unique_id = 0u;
         inline static std::map<String, Texture *> s_global_textures_bind_info{};
         inline static std::map<String, std::tuple<Matrix4x4f *, u32>> s_global_matrix_bind_info{};
-        inline static Map<String, IConstantBuffer *> s_global_buffer_bind_info{};
+        inline static Map<String, ConstantBuffer *> s_global_buffer_bind_info{};
         inline static std::set<Shader *> s_all_shaders{};
         static std::set<String> s_predefined_macros;
     };
@@ -523,7 +523,7 @@ namespace Ailu
             for(auto& it : s_global_variant_update_map)
                 it.second = true;
         };
-        inline static void SetGlobalBuffer(const String &name, IConstantBuffer* buf) 
+        inline static void SetGlobalBuffer(const String &name, ConstantBuffer * buf)
         {
             s_global_buffer_bind_info[name] = buf;
         };
@@ -548,8 +548,8 @@ namespace Ailu
         void SetInt(const String &name, i32 value);
         void SetInts(const String &name, Vector<i32> values);
         void SetVector(const String &name, Vector4f vector);
-        void SetBuffer(const String &name, IConstantBuffer *buf);
-        void SetBuffer(const String &name, IGPUBuffer *buf);
+        void SetBuffer(const String &name, ConstantBuffer *buf);
+        void SetBuffer(const String &name, GPUBuffer *buf);
         void SetMatrix(const String& name,Matrix4x4f mat);
         void SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr);
         void GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const;
@@ -588,7 +588,7 @@ namespace Ailu
     protected:
         inline static std::set<String> s_global_active_keywords;
         inline static HashMap<u32,bool> s_global_variant_update_map{};
-        inline static Map<String, IConstantBuffer *> s_global_buffer_bind_info{};
+        inline static Map<String, ConstantBuffer *> s_global_buffer_bind_info{};
         inline static Map<String, Texture *> s_global_textures_bind_info{};
         Vector<KernelElement> _kernels;
         std::set<String> _local_active_keywords;

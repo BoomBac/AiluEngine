@@ -16,16 +16,16 @@ namespace Ailu
     public:
         FrameResource();
         ~FrameResource() override;
-        Vector<IConstantBuffer*>* GetObjCB();
-        IConstantBuffer* GetObjCB(u32 index);
-        IConstantBuffer* GetMatCB(u32 index);
-        IConstantBuffer* GetCameraCB(u64 hash);
-        IConstantBuffer* GetSceneCB(u64 hash);
+        Vector<ConstantBuffer *>* GetObjCB();
+        ConstantBuffer * GetObjCB(u32 index);
+        ConstantBuffer * GetMatCB(u32 index);
+        ConstantBuffer * GetCameraCB(u64 hash);
+        ConstantBuffer * GetSceneCB(u64 hash);
     private:
-        Vector<IConstantBuffer*> _obj_cbs;
-        Vector<IConstantBuffer*> _mat_cbs;
-        Vector<IConstantBuffer*> _camera_cbs;
-        Vector<IConstantBuffer*> _scene_cbs;
+        Vector<ConstantBuffer *> _obj_cbs;
+        Vector<ConstantBuffer *> _mat_cbs;
+        Vector<ConstantBuffer *> _camera_cbs;
+        Vector<ConstantBuffer *> _scene_cbs;
         Map<u64,u64> _camera_cb_lut;
         Map<u64,u64> _scene_cb_lut;
     };

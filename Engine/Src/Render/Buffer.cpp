@@ -6,7 +6,7 @@
 
 namespace Ailu
 {
-    IGPUBuffer *IGPUBuffer::Create(GPUBufferDesc desc, const String &name)
+    GPUBuffer *GPUBuffer::Create(GPUBufferDesc desc, const String &name)
     {
         switch (Renderer::GetAPI())
         {
@@ -16,7 +16,7 @@ namespace Ailu
             case RendererAPI::ERenderAPI::kDirectX12:
             {
                 auto buf = new D3DGPUBuffer(desc);
-                buf->SetName(name);
+                buf->Name(name);
                 return buf;
             }
         }
@@ -54,34 +54,7 @@ namespace Ailu
 		return nullptr;
 	}
 
-	Ref<IDynamicVertexBuffer> IDynamicVertexBuffer::Create(const VertexBufferLayout& layout, const String& name)
-	{
-		switch (Renderer::GetAPI())
-		{
-		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT_MSG(false, "None render api used!");
-			return nullptr;
-		case RendererAPI::ERenderAPI::kDirectX12:
-			return std::static_pointer_cast<IDynamicVertexBuffer>(MakeRef<D3DDynamicVertexBuffer>(layout));
-		}
-		AL_ASSERT_MSG(false, "Unsupported render api!");
-		return nullptr;
-	}
-	Ref<IDynamicVertexBuffer> IDynamicVertexBuffer::Create(const String& name)
-	{
-		switch (Renderer::GetAPI())
-		{
-		case RendererAPI::ERenderAPI::kNone:
-			AL_ASSERT_MSG(false, "None render api used!");
-			return nullptr;
-		case RendererAPI::ERenderAPI::kDirectX12:
-			return std::static_pointer_cast<IDynamicVertexBuffer>(MakeRef<D3DDynamicVertexBuffer>());
-		}
-		AL_ASSERT_MSG(false, "Unsupported render api!");
-		return nullptr;
-	}
-
-	IConstantBuffer* IConstantBuffer::Create(u32 size, bool compute_buffer, const String& name)
+    ConstantBuffer *ConstantBuffer::Create(u32 size, bool compute_buffer, const String& name)
 	{
 		switch (Renderer::GetAPI())
 		{
@@ -94,7 +67,7 @@ namespace Ailu
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;
 	}
-	void IConstantBuffer::Release(u8* ptr)
+	void ConstantBuffer::Release(u8* ptr)
 	{
 		DESTORY_PTRARR(ptr);
 	}

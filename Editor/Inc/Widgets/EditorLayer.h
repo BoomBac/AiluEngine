@@ -30,6 +30,7 @@ namespace Ailu
 			Vector2f     _viewport_size;
 			ImGuiWidget* _p_scene_view;
 			ImGuiWidget* _p_preview_cam_view;
+			ImGuiWidget* _p_profiler_window;
 		private:
 			ImFont* _font = nullptr;
 			Vector<Scope<ImGuiWidget>> _widgets;

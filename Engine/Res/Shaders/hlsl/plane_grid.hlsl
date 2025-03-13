@@ -31,7 +31,7 @@ PSInput VSMain(VSInput v)
     float3 wpos = TransformObjectToWorld(v.position);
     wpos.x += ((int)_CameraPos.x / 10) * 10;
     wpos.z += ((int)_CameraPos.z / 10) * 10;
-	result.position = TransformWorldToHClip(wpos);
+	result.position = TransformWorldToHClipNoJitter(wpos);
 	result.world_pos = wpos;
 	return result;
 }

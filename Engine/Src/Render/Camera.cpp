@@ -7,6 +7,59 @@
 
 namespace Ailu
 {
+    struct HaltonSequence
+    {
+        int count;
+        int index;
+        std::vector<float> arrX;
+        std::vector<float> arrY;
+
+        u64 frameCount;
+        HaltonSequence() = default;
+        HaltonSequence(int count) : count(count), index(0), arrX(count), arrY(count), frameCount(0)
+        {
+            for (int i = 0; i < count; ++i)
+            {
+                arrX[i] = get(i, 2);
+            }
+
+            for (int i = 0; i < count; ++i)
+            {
+                arrY[i] = get(i, 3);
+            }
+        }
+
+        float get(int index, int base_)
+        {
+            float fraction = 1.0f;
+            float result = 0.0f;
+
+            while (index > 0)
+            {
+                fraction /= base_;
+                result += fraction * (index % base_);
+                index /= base_;
+            }
+
+            return result;
+        }
+
+        void Get(float &x, float &y)
+        {
+            if (++index == count) index = 1;
+            x = arrX[index];
+            y = arrY[index];
+        }
+        void Get(f32 &x, f32 &y,u64 seed)
+        {
+            seed = seed % count;
+            x = arrX[seed];
+            y = arrY[seed];
+        }
+    };
+
+    HaltonSequence g_halton_seq(1024);
+
     Camera *Camera::GetDefaultCamera()
     {
         static Camera cam(16.0F / 9.0F);
@@ -42,7 +95,7 @@ namespace Ailu
         // {
         // 	auto& p = vf._planes[i];
         // 	float3 start = p_camera->Position();
-        // 	Gizmo::DrawLine(p._point, p._point + p._normal * 100,Color(1.0f,0.0f,1.0f,1.0f));
+        // 	Gizmo::DrawLine(p._point, p._point + p._normal,Color(1.0f,0.0f,1.0f,1.0f));
         // }
     }
 
@@ -58,39 +111,6 @@ namespace Ailu
         BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
         BuildOrthographicMatrix(proj, -half_width, half_width, half_height, -half_height, 1.f, 200.f);
         return view * proj;
-    }
-
-    void Camera::CalcViewFrustumPlane(const Camera *cam, ViewFrustum &vf)
-    {
-        // 计算各个平面的中心位置
-        Vector3f nearPlaneCenter = calculateCenter(cam->_near_top_left, cam->_near_top_right, cam->_near_bottom_left, cam->_near_bottom_right);
-        Vector3f farPlaneCenter = calculateCenter(cam->_far_top_left, cam->_far_top_right, cam->_far_bottom_left, cam->_far_bottom_right);
-        Vector3f leftPlaneCenter = calculateCenter(cam->_near_top_left, cam->_far_top_left, cam->_near_bottom_left, cam->_far_bottom_left);
-        Vector3f rightPlaneCenter = calculateCenter(cam->_near_top_right, cam->_far_top_right, cam->_near_bottom_right, cam->_far_bottom_right);
-        Vector3f topPlaneCenter = calculateCenter(cam->_near_top_left, cam->_far_top_left, cam->_near_top_right, cam->_far_top_right);
-        Vector3f bottomPlaneCenter = calculateCenter(cam->_near_bottom_left, cam->_far_bottom_left, cam->_near_bottom_right, cam->_far_bottom_right);
-        vf._planes[0]._normal = CrossProduct(cam->_near_top_left - cam->_near_bottom_left, cam->_near_bottom_right - cam->_near_bottom_left);
-        vf._planes[1]._normal = -vf._planes[0]._normal;
-        vf._planes[2]._normal = CrossProduct(cam->_far_top_left - cam->_near_top_left, cam->_near_top_right - cam->_near_top_left);             //top
-        vf._planes[3]._normal = -CrossProduct(cam->_far_bottom_left - cam->_near_bottom_left, cam->_near_bottom_right - cam->_near_bottom_left);//bottom
-        vf._planes[4]._normal = CrossProduct(cam->_far_bottom_left - cam->_near_bottom_left, cam->_near_top_left - cam->_near_bottom_left);     //left
-        vf._planes[5]._normal = -CrossProduct(cam->_far_bottom_right - cam->_near_bottom_right, cam->_near_top_right - cam->_near_bottom_right);//right
-        vf._planes[0]._point = nearPlaneCenter;
-        vf._planes[1]._point = farPlaneCenter;
-        vf._planes[2]._point = topPlaneCenter;
-        vf._planes[3]._point = bottomPlaneCenter;
-        vf._planes[4]._point = leftPlaneCenter;
-        vf._planes[5]._point = rightPlaneCenter;
-        for (int i = 0; i < 6; ++i)
-        {
-            vf._planes[i]._normal = Normalize(vf._planes[i]._normal);
-        }
-        vf._planes[0]._distance = -DotProduct(vf._planes[0]._normal, cam->_near_top_left);
-        vf._planes[1]._distance = -DotProduct(vf._planes[1]._normal, cam->_far_top_left);
-        vf._planes[2]._distance = -DotProduct(vf._planes[2]._normal, cam->_far_top_left);
-        vf._planes[3]._distance = -DotProduct(vf._planes[3]._normal, cam->_near_bottom_left);
-        vf._planes[4]._distance = -DotProduct(vf._planes[4]._normal, cam->_far_bottom_left);
-        vf._planes[5]._distance = -DotProduct(vf._planes[5]._normal, cam->_far_bottom_right);
     }
 
     AABB Camera::GetBoundingAABB(const Camera &eye_cam, f32 start, f32 end)
@@ -159,26 +179,39 @@ namespace Ailu
                                                                                                           _forward(Vector3f::kForward), _right(Vector3f::kRight), _up(Vector3f::kUp)
     {
         MarkDirty();
-        RecalculateMarix();
+        RecalculateMatrix();
     }
 
-    void Camera::RecalculateMarix(bool force)
+    void Camera::RecalculateMatrix(bool force)
     {
-        if (!force && !_is_dirty) return;
+        if (!force && !_is_dirty)
+            return;
+        if (g_pGfxContext)
+        {
+            u32 cur_frame = g_pGfxContext->GetFrameCount();
+            if (cur_frame != _prev_vp_matrix_update_frame)
+            {
+                _prev_view_proj_matrix = _no_jitter_view_proj_matrix;
+                _prev_vp_matrix_update_frame = cur_frame;
+            }
+        }
         if (_camera_type == ECameraType::kPerspective)
             BuildPerspectiveFovLHMatrix(_proj_matrix, _fov_h * k2Radius, _aspect, _near_clip, _far_clip);
         else
         {
             float left = -_size * 0.5f;
-            float right = -left;
-            float top = right / _aspect;
-            float bottom = -top;
-            BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom, _near_clip, _far_clip);
+            float right = _size * 0.5f;
+            float top = (_size * 0.5f) / _aspect;
+            float bottom = -(_size * 0.5f) / _aspect;
+            BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom,_near_clip, _far_clip);
         }
+        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix;
         _forward = _rotation * Vector3f::kForward;
         _up = _rotation * Vector3f::kUp;
         _right = CrossProduct(_up, _forward);
         BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
+        if (_anti_aliasing == EAntiAliasing::kTAA)
+            ProcessJitter();
         CalculateFrustum();
     }
 
@@ -192,6 +225,15 @@ namespace Ailu
 
     void Camera::LookTo(const Vector3f &direction, const Vector3f &up)
     {
+        if (g_pGfxContext)
+        {
+            u32 cur_frame = g_pGfxContext->GetFrameCount();
+            if (cur_frame != _prev_vp_matrix_update_frame)
+            {
+                _prev_view_proj_matrix = _no_jitter_view_proj_matrix;
+                _prev_vp_matrix_update_frame = cur_frame;
+            }
+        }
         _forward = direction;
         _right = CrossProduct(up, _forward);
         _up = CrossProduct(_forward, _right);
@@ -203,12 +245,15 @@ namespace Ailu
         else
         {
             float left = -_size * 0.5f;
-            float right = -left;
-            float top = right / _aspect;
-            float bottom = -top;
-            BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom, _near_clip, _far_clip);
+            float right = _size * 0.5f;
+            float top = (_size * 0.5f) / _aspect;
+            float bottom = -(_size * 0.5f) / _aspect;
+            BuildOrthographicMatrix(_proj_matrix, left, right, top, bottom,_near_clip,_far_clip);
         }
+        _no_jitter_view_proj_matrix = _view_matrix * _proj_matrix;
         BuildViewMatrixLookToLH(_view_matrix, _position, _forward, _up);
+        if (_anti_aliasing == EAntiAliasing::kTAA)
+            ProcessJitter();
         CalculateFrustum();
     }
 
@@ -228,66 +273,58 @@ namespace Ailu
     {
         _view_matrix = view;
         _proj_matrix = proj;
-        _is_custom_vp = true;
+        CalculateFrustum();
     }
     void Camera::CalculateFrustum()
     {
-        float half_width{0.f}, half_height{0.f};
-        if (_camera_type == ECameraType::kPerspective)
+        Matrix4x4f ivp = _view_matrix * _proj_matrix;
+        ivp = MatrixInverse(ivp);
+        Vector4f temp = TransformVector(ivp,Vector4f(-1.0,-1.0,kZNear,1.0));
+        _near_bottom_left = temp.xyz / temp.w;
+        temp = TransformVector(ivp, Vector4f(1.0, -1.0, kZNear, 1.0));
+        _near_bottom_right = temp.xyz / temp.w;
+        temp = TransformVector(ivp, Vector4f(-1.0, 1.0, kZNear, 1.0));
+        _near_top_left = temp.xyz / temp.w;
+        temp = TransformVector(ivp, Vector4f(1.0, 1.0, kZNear, 1.0));
+        _near_top_right = temp.xyz / temp.w;
+        temp = TransformVector(ivp, Vector4f(-1.0, -1.0, kZFar, 1.0));
+        _far_bottom_left = temp.xyz / temp.w;
+        temp = TransformVector(ivp, Vector4f(1.0, -1.0, kZFar, 1.0));
+        _far_bottom_right = temp.xyz / temp.w;
+        temp = TransformVector(ivp, Vector4f(-1.0, 1.0, kZFar, 1.0));
+        _far_top_left = temp.xyz / temp.w;
+        temp = TransformVector(ivp, Vector4f(1.0, 1.0, kZFar, 1.0));
+        _far_top_right = temp.xyz / temp.w;
+
+        // 计算各个平面的中心位置
+        Vector3f nearPlaneCenter = calculateCenter(_near_top_left, _near_top_right, _near_bottom_left, _near_bottom_right);
+        Vector3f farPlaneCenter = calculateCenter(_far_top_left, _far_top_right, _far_bottom_left, _far_bottom_right);
+        Vector3f leftPlaneCenter = calculateCenter(_near_top_left, _far_top_left, _near_bottom_left, _far_bottom_left);
+        Vector3f rightPlaneCenter = calculateCenter(_near_top_right, _far_top_right, _near_bottom_right, _far_bottom_right);
+        Vector3f topPlaneCenter = calculateCenter(_near_top_left, _far_top_left, _near_top_right, _far_top_right);
+        Vector3f bottomPlaneCenter = calculateCenter(_near_bottom_left, _far_bottom_left, _near_bottom_right, _far_bottom_right);
+        _vf._planes[0]._normal = CrossProduct(_near_top_left - _near_bottom_left, _near_bottom_right - _near_bottom_left);
+        _vf._planes[1]._normal = -_vf._planes[0]._normal;
+        _vf._planes[2]._normal = CrossProduct(_far_top_left - _near_top_left, _near_top_right - _near_top_left);             //top
+        _vf._planes[3]._normal = -CrossProduct(_far_bottom_left - _near_bottom_left, _near_bottom_right - _near_bottom_left);//bottom
+        _vf._planes[4]._normal = CrossProduct(_far_bottom_left - _near_bottom_left, _near_top_left - _near_bottom_left);     //left
+        _vf._planes[5]._normal = -CrossProduct(_far_bottom_right - _near_bottom_right, _near_top_right - _near_bottom_right);//right
+        _vf._planes[0]._point = nearPlaneCenter;
+        _vf._planes[1]._point = farPlaneCenter;
+        _vf._planes[2]._point = topPlaneCenter;
+        _vf._planes[3]._point = bottomPlaneCenter;
+        _vf._planes[4]._point = leftPlaneCenter;
+        _vf._planes[5]._point = rightPlaneCenter;
+        for (int i = 0; i < 6; ++i)
         {
-            float tanHalfFov = tan(ToRadius(_fov_h) * 0.5f);
-            half_height = _near_clip * tanHalfFov;
-            half_width = half_height * _aspect;
+            _vf._planes[i]._normal = Normalize(_vf._planes[i]._normal);
         }
-        else
-        {
-            half_width = _size * 0.5f;
-            half_height = half_width / _aspect;
-        }
-        Vector3f near_top_left(-half_width, half_height, _near_clip);
-        Vector3f near_top_right(half_width, half_height, _near_clip);
-        Vector3f near_bottom_left(-half_width, -half_height, _near_clip);
-        Vector3f near_bottom_right(half_width, -half_height, _near_clip);
-        Vector3f far_top_left, far_top_right, far_bottom_left, far_bottom_right;
-        if (_camera_type == ECameraType::kPerspective)
-        {
-            f32 scale = _far_clip / _near_clip;
-            far_top_left = near_top_left * scale;
-            far_top_right = near_top_right * scale;
-            far_bottom_left = near_bottom_left * scale;
-            far_bottom_right = near_bottom_right * scale;
-        }
-        else
-        {
-            far_top_left = near_top_left;
-            far_top_right = near_top_right;
-            far_bottom_left = near_bottom_left;
-            far_bottom_right = near_bottom_right;
-            float distance = _far_clip - _near_clip;
-            far_top_left.z += distance;
-            far_top_right.z += distance;
-            far_bottom_left.z += distance;
-            far_bottom_right.z += distance;
-        }
-        Matrix4x4f camera_to_world = _view_matrix;
-        camera_to_world = Math::MatrixInverse(camera_to_world);
-        Math::TransformCoord(near_top_left, camera_to_world);
-        Math::TransformCoord(near_top_right, camera_to_world);
-        Math::TransformCoord(near_bottom_left, camera_to_world);
-        Math::TransformCoord(near_bottom_right, camera_to_world);
-        Math::TransformCoord(far_top_left, camera_to_world);
-        Math::TransformCoord(far_top_right, camera_to_world);
-        Math::TransformCoord(far_bottom_left, camera_to_world);
-        Math::TransformCoord(far_bottom_right, camera_to_world);
-        _near_bottom_left = near_bottom_left;
-        _near_bottom_right = near_bottom_right;
-        _near_top_left = near_top_left;
-        _near_top_right = near_top_right;
-        _far_bottom_left = far_bottom_left;
-        _far_bottom_right = far_bottom_right;
-        _far_top_left = far_top_left;
-        _far_top_right = far_top_right;
-        CalcViewFrustumPlane(this, _vf);
+        _vf._planes[0]._distance = -DotProduct(_vf._planes[0]._normal, _near_top_left);
+        _vf._planes[1]._distance = -DotProduct(_vf._planes[1]._normal, _far_top_left);
+        _vf._planes[2]._distance = -DotProduct(_vf._planes[2]._normal, _far_top_left);
+        _vf._planes[3]._distance = -DotProduct(_vf._planes[3]._normal, _near_bottom_left);
+        _vf._planes[4]._distance = -DotProduct(_vf._planes[4]._normal, _far_bottom_left);
+        _vf._planes[5]._distance = -DotProduct(_vf._planes[5]._normal, _far_bottom_right);
     }
     Camera &Camera::GetCubemapGenCamera(const Camera &base_cam, ECubemapFace::ECubemapFace face)
     {
@@ -376,7 +413,7 @@ namespace Ailu
         {
             _aspect = new_aspect;
             MarkDirty();
-            RecalculateMarix();
+            RecalculateMatrix();
         }
     }
     void Camera::GetCornerInWorld(Vector3f &lt, Vector3f &lb, Vector3f &rt, Vector3f &rb) const
@@ -389,5 +426,24 @@ namespace Ailu
         lb = _far_bottom_left;
         rt = _far_top_right;
         rb = _far_bottom_right;
+    }
+    void Camera::ProcessJitter()
+    {
+        f32 offset_x, offset_y;
+        g_halton_seq.Get(offset_x, offset_y,g_pGfxContext? g_pGfxContext->GetFrameCount():0u);
+        if (_camera_type == ECameraType::kOrthographic)
+        {
+            _proj_matrix[0][3] -= (offset_x * 2 - 1) / (f32)_pixel_width;
+            _proj_matrix[1][3] -= (offset_y * 2 - 1) / (f32)_pixel_height;
+        }
+        else
+        {
+            _jitter.x = (offset_x * 2 - 1) / (f32)_pixel_width  * _jitter_scale;
+            _jitter.y = (offset_y * 2 - 1) / (f32)_pixel_height * _jitter_scale;
+            _proj_matrix[2][0] += _jitter.x;
+            _proj_matrix[2][1] += _jitter.y;
+        }
+        _jitter.z = (offset_x - 0.5f) / (f32)_pixel_width  * _jitter_scale;
+        _jitter.w = (offset_y - 0.5f) / (f32)_pixel_height * _jitter_scale;
     }
 }// namespace Ailu

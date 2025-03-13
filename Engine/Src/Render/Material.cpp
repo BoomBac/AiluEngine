@@ -28,7 +28,7 @@ namespace Ailu
         for (auto &cbuf: other._p_cbufs)
         {
             u32 buffer_size = cbuf->GetBufferSize();
-            _p_cbufs.emplace_back(IConstantBuffer::Create(buffer_size));
+            _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
             memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
         }
         _textures_all_passes = other._textures_all_passes;
@@ -60,7 +60,7 @@ namespace Ailu
         for (auto &cbuf: other._p_cbufs)
         {
             u32 buffer_size = cbuf->GetBufferSize();
-            _p_cbufs.emplace_back(IConstantBuffer::Create(buffer_size));
+            _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
             memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
         }
         _textures_all_passes = other._textures_all_passes;
@@ -93,7 +93,7 @@ namespace Ailu
         i8 cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._per_mat_buf_bind_slot;
         if (cbuf_bind_slot != -1)
         {
-            GraphicsPipelineStateMgr::SubmitBindResource(_p_cbufs[pass_index].get(), EBindResDescType::kConstBuffer, (u8) cbuf_bind_slot, PipelineResourceInfo::kPriporityLocal);
+            GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(_p_cbufs[pass_index].get(), EBindResDescType::kConstBuffer, cbuf_bind_slot, PipelineResource::kPriorityLocal));
         }
         auto &bind_textures = _textures_all_passes[pass_index];
         auto &bind_infos = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._bind_res_infos;
@@ -105,7 +105,7 @@ namespace Ailu
                 auto &[slot, texture] = it->second;
                 if (texture != nullptr)
                 {
-                    GraphicsPipelineStateMgr::SubmitBindResource(texture, EBindResDescType::kTexture2D, bind_it->second._bind_slot, PipelineResourceInfo::kPriporityLocal);
+                    GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(texture, EBindResDescType::kTexture2D, bind_it->second._bind_slot, PipelineResource::kPriorityLocal));
                 }
             }
             //else
@@ -608,7 +608,7 @@ namespace Ailu
             if (first_time)
             {
                 _mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];
-                _p_cbufs[i].reset(IConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
+                _p_cbufs[i].reset(ConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
                 memset(_p_cbufs[i]->GetData(), 0, _mat_cbuf_per_pass_size[i]);
             }
             else if (_mat_cbuf_per_pass_size[i] != cbuf_size_per_passes[i])

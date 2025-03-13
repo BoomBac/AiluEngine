@@ -92,7 +92,7 @@ namespace Ailu
         D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer);
         void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) final;
         void Bind(CommandBuffer *cmd) final;
-        void SetPipelineResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) final;
+        void SetPipelineResource(const PipelineResource& pipeline_res) final;
         //just compare res type is same by slot,maybe cause some error
         bool IsValidPipelineResource(const EBindResDescType &res_type, u8 slot) const final;
         const PSOHash &Hash() final { return _hash; };
@@ -102,9 +102,11 @@ namespace Ailu
         void SetTopology(ETopology topology) final;
         void SetStencilRef(u8 ref) final;
         const GraphicsPipelineStateInitializer& StateDescriptor() const final {return _state_desc;};
-    private:
-        void BindResource(CommandBuffer *cmd, void *res, const EBindResDescType &res_type, u8 slot = 255) final;
+        u32 GetBindResourceSignature() const {return _bind_res_signature;};
+        const Array<PipelineResource,32>& GetBindResource(u16 index = 0) const {return _bind_res;};
 
+    private:
+        void BindResource(CommandBuffer * cmd,const PipelineResource& res);
     private:
         String _name;
         u8 _per_frame_cbuf_bind_slot = 255u;
@@ -122,6 +124,8 @@ namespace Ailu
         PSOHash _hash;
         D3D_PRIMITIVE_TOPOLOGY _d3d_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         u8 _stencil_ref = 0u;
+        u32 _bind_res_signature = 0u;
+        Array<PipelineResource,32> _bind_res;
     };
 }// namespace Ailu
 

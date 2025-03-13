@@ -17,7 +17,7 @@ namespace Ailu
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
 
         private:
-            void DrawLightGizmo(const Transform &transf, LightComponent *comp);
+            void DrawLightGizmo(const Transform &transf, ECS::LightComponent *comp);
 
         private:
             Scope<Material> _pick_gen;
@@ -40,7 +40,7 @@ namespace Ailu
             Ref<RenderTexture> _pick_buf = nullptr;
             Ref<RenderTexture> _pick_buf_depth = nullptr;
             Ref<ComputeShader> _read_pickbuf;
-            IGPUBuffer *_readback_buf;
+            GPUBuffer *_readback_buf;
             Vector4f _params;
         };
     };// namespace Editor

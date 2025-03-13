@@ -49,6 +49,7 @@ namespace Ailu
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
+		io.ConfigWindowsMoveFromTitleBarOnly = true;
 		ImGuiStyle& style = ImGui::GetStyle();
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark(&style);
@@ -90,7 +91,7 @@ namespace Ailu
         colors[ImGuiCol_TabDimmedSelected]      = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
         colors[ImGuiCol_TabDimmed]              = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
         colors[ImGuiCol_DockingPreview]         = ImVec4(0.26f, 0.98f, 0.71f, 0.70f);
-        ImGui_ImplWin32_Init(Application::GetInstance()->GetWindow().GetNativeWindowPtr());
+        ImGui_ImplWin32_Init(Application::Get()->GetWindow().GetNativeWindowPtr());
 	}
 
 	Ailu::ImGUILayer::~ImGUILayer()
@@ -138,7 +139,7 @@ namespace Ailu
 
 	void Ailu::ImGUILayer::End()
 	{
-		const Window& window = Application::GetInstance()->GetWindow();
+		const Window& window = Application::Get()->GetWindow();
 		ImGuiIO& io = ImGui::GetIO();
 		io.DisplaySize = ImVec2(static_cast<float>(window.GetWidth()), static_cast<float>(window.GetHeight()));
 		//ImGuiWidget::EndFrame();

@@ -47,7 +47,7 @@ namespace Ailu
         }
     };
 
-    void D3DGPUTimer::BeginFrame(CommandBuffer* cmd)
+    void D3DGPUTimer::BeginFrame(CommandBuffer * cmd)
     {
         auto commandList = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
         UNREFERENCED_PARAMETER(commandList);
@@ -93,7 +93,7 @@ namespace Ailu
         //resolveToFrameID = readBackFrameID;
     }
 
-    void D3DGPUTimer::Start(CommandBuffer* cmd, u32 timerid)
+    void D3DGPUTimer::Start(CommandBuffer * cmd, u32 timerid)
     {
         auto commandList = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
         if (timerid >= kMaxGpuTimerNum)
@@ -102,7 +102,7 @@ namespace Ailu
         commandList->EndQuery(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, timerid * 2);
     }
 
-    void D3DGPUTimer::Stop(CommandBuffer* cmd, u32 timerid)
+    void D3DGPUTimer::Stop(CommandBuffer * cmd, u32 timerid)
     {
         auto commandList = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
         if (timerid >= kMaxGpuTimerNum)

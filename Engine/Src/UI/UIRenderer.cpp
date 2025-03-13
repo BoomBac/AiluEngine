@@ -3,9 +3,9 @@
 //
 
 #include "Inc/UI/UIRenderer.h"
-#include <Framework/Common/ResourceMgr.h>
-#include "Render/CommandBuffer.h"
 #include "Framework/Common/Profiler.h"
+#include "Render/CommandBuffer.h"
+#include <Framework/Common/ResourceMgr.h>
 
 namespace Ailu
 {
@@ -49,7 +49,7 @@ namespace Ailu
         }
         UIRenderer::UIRenderer()
         {
-            _obj_cb.reset(IConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+            _obj_cb.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
         }
         UIRenderer::~UIRenderer()
         {

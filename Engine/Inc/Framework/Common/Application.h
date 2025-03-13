@@ -9,6 +9,7 @@
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Render/RenderPipeline.h"
 #include <thread>
+#include "Framework/Common/Container.hpp"
 
 namespace Ailu
 {
@@ -21,6 +22,13 @@ namespace Ailu
     {
         u32 _window_width, _window_height;
         u32 _gameview_width, _gameview_height;
+    };
+
+    struct ObjectLayer
+    {
+        String _name;
+        u32    _value;
+        u32    _bit_pos;
     };
 
     class AILU_API Application : public IRuntimeModule
@@ -44,6 +52,7 @@ namespace Ailu
         /// @brief 获取用户目录，c:/UserName/
         /// @return 用户目录
         static WString GetUseHomePath();
+        static Application *Get();
         int Initialize() override;
         int Initialize(ApplicationDesc desc);
         void Finalize() override;
@@ -55,10 +64,12 @@ namespace Ailu
         [[nodiscard]] const Window &GetWindow() const { return *_p_window; }
         Window *GetWindowPtr() { return _p_window; }
 
-        static Application *GetInstance();
         inline static u64 s_frame_count = 0u;
         bool _is_playing_mode = false;
         bool _is_simulate_mode = false;
+
+        const Array<ObjectLayer,32>& GetObjectLayers() const {return _object_layers;}
+        const ObjectLayer& NameToLayer(const String& name);
 
     protected:
         virtual bool OnWindowClose(WindowCloseEvent &e);
@@ -71,6 +82,7 @@ namespace Ailu
         virtual void OnEvent(Event &e);
 
     protected:
+        inline static Application *sp_instance = nullptr;
         LayerStack *_layer_stack;
         ImGUILayer *_p_imgui_layer;
         Window *_p_window = nullptr;
@@ -78,9 +90,10 @@ namespace Ailu
         std::thread *_p_event_handle_thread;
         Scope<RenderPipeline> _pipeline;
         EApplicationState::EApplicationState _state = EApplicationState::EApplicationState_None;
-        inline static Application *sp_instance = nullptr;
         double _render_lag = 0.0;
         double _update_lag = 0.0;
+        WString _engin_config_path;
+        Array<ObjectLayer,32> _object_layers;
     };
 }// namespace Ailu
 

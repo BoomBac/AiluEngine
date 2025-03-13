@@ -176,7 +176,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	{
 		light_data = GetDirectionalLight(i);
 		InitShadingData(light_data,surface,shading_data);
-		if(_DirectionalLights[i]._ShadowDataIndex != -1)
+		if(_DirectionalLights[i]._shadowmap_index != -1)
 		{
 			shadow_factor = ApplyCascadeShadow(nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
 		}
@@ -189,7 +189,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	{
 		light_data = GetPointLight(j,world_pos);
 		InitShadingData(light_data,surface,shading_data);
-		if(_PointLights[j]._ShadowDataIndex != -1)
+		if(_PointLights[j]._shadowmap_index != -1)
 		{
 			shadow_factor = ApplyShadowPointLight(0.01,_PointLights[j]._LightParam0 * 1.5f,shading_data.nl,
 				world_pos,light_data.light_pos,j);
@@ -202,11 +202,11 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	{
 		light_data = GetSpotLight(k,world_pos);
 		InitShadingData(light_data,surface,shading_data);
-		if(_SpotLights[k]._ShadowDataIndex != -1)
+		if(_SpotLights[k]._shadowmap_index != -1)
 		{ 
-			uint shadow_index = _SpotLights[k]._ShadowDataIndex;
-			float4 shadow_pos = TransformFromWorldToLightSpace(shadow_index,world_pos.xyz);
-			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos.xyz,k);
+			float4 shadow_pos = mul(_SpotLights[k]._shadow_matrix,float4(world_pos,1.0));
+			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos,_SpotLights[k]._shadowmap_index,
+				_SpotLights[k]._constant_bias,_SpotLights[k]._slope_bias);
 		}
 		light_data.shadow_atten = shadow_factor;
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * light_data.light_color;
@@ -231,7 +231,13 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 		float3 specular = LTC_Evaluate(surface.wnormal, shading_data.view_dir, world_pos, Minv, rect, _AreaLights[z]._is_twosided);
 		specular *= (F0 * t2.x + (1.0f - F0) * t2.y);
 		diffuse *= (1.0 - surface.metallic) * surface.albedo.rgb;
-		light += (diffuse + specular) * _AreaLights[z]._LightColor;
+		if(_AreaLights[z]._shadowmap_index != -1)
+		{ 
+			float4 shadow_pos = mul(_AreaLights[z]._shadow_matrix,float4(world_pos,1.0));
+			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos,_AreaLights[z]._shadowmap_index,
+				_AreaLights[z]._constant_bias,_AreaLights[z]._slope_bias);
+		}
+		light += (diffuse + specular) * _AreaLights[z]._LightColor * shadow_factor;
 	}
 	//indirect light
 
@@ -263,7 +269,7 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 	{
 		light_data = GetDirectionalLight(i);
 		InitShadingData(light_data,surface,shading_data);
-		if(_DirectionalLights[i]._ShadowDataIndex != -1)
+		if(_DirectionalLights[i]._shadowmap_index != -1)
 		{
 			//shadow_factor = ApplyCascadeShadow(nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
 		}
@@ -276,7 +282,7 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 	{
 		light_data = GetPointLight(j,world_pos);
 		InitShadingData(light_data,surface,shading_data);
-		if(_PointLights[j]._ShadowDataIndex != -1)
+		if(_PointLights[j]._shadowmap_index != -1)
 		{
 			shadow_factor = ApplyShadowPointLight(0.01,_PointLights[j]._LightParam0 * 1.5f,shading_data.nl,
 				world_pos,light_data.light_pos,j);
@@ -289,11 +295,11 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 	{
 		light_data = GetSpotLight(k,world_pos);
 		InitShadingData(light_data,surface,shading_data);
-		if(_SpotLights[k]._ShadowDataIndex != -1)
+		if(_SpotLights[k]._shadowmap_index != -1)
 		{ 
-			uint shadow_index = _SpotLights[k]._ShadowDataIndex;
-			float4 shadow_pos = TransformFromWorldToLightSpace(shadow_index,world_pos.xyz);
-			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos.xyz,k);
+			float4 shadow_pos = mul(_SpotLights[k]._shadow_matrix,float4(world_pos,1.0));
+			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos,_SpotLights[k]._shadowmap_index,
+				_SpotLights[k]._constant_bias,_SpotLights[k]._slope_bias);
 		}
 		light_data.shadow_atten = shadow_factor;
 		light += (light_data.shadow_atten * surface.albedo.rgb * shading_data.nl * _SpotLights[k]._LightColor * GetSpotLightIrridance(k, world_pos));
@@ -316,7 +322,13 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 		rect[3] = _AreaLights[z]._points[3].xyz;
 		float3 diffuse = LTC_Evaluate(surface.wnormal, view_dir, world_pos, Identity(), rect, _AreaLights[z]._is_twosided);
 		diffuse *= (1.0 - surface.metallic) * surface.albedo;
-		light += diffuse * _AreaLights[z]._LightColor;// + specular;
+		if(_AreaLights[z]._shadowmap_index != -1)
+		{ 
+			float4 shadow_pos = mul(_AreaLights[z]._shadow_matrix,float4(world_pos,1.0));
+			shadow_factor = ApplyShadowAddLight(shadow_pos, nl, world_pos,_AreaLights[z]._shadowmap_index,
+				_AreaLights[z]._constant_bias,_AreaLights[z]._slope_bias);
+		}
+		light += shadow_factor * diffuse * _AreaLights[z]._LightColor;// + specular;
 	}
 	//indirect light
 

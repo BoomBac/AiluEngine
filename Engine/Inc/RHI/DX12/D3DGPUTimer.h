@@ -35,12 +35,12 @@ namespace Ailu
         ~D3DGPUTimer() { ReleaseDevice(); }
 
         // Indicate beginning & end of frame
-        void BeginFrame(CommandBuffer* cmd) final;
+        void BeginFrame(CommandBuffer * cmd) final;
         void EndFrame() final;
 
         // Start/stop a particular performance timer (don't start same index more than once in a single frame)
-        void Start(CommandBuffer* cmd, u32 timerid = 0) final;
-        void Stop(CommandBuffer* cmd, u32 timerid = 0) final;
+        void Start(CommandBuffer * cmd, u32 timerid = 0) final;
+        void Stop(CommandBuffer * cmd, u32 timerid = 0) final;
 
         // Reset running average
         void Reset() final;

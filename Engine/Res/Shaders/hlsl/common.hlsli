@@ -119,14 +119,23 @@ float3 GetObjectWorldPos()
 	return float3(_MatrixWorld[0][3],_MatrixWorld[1][3],_MatrixWorld[2][3]);
 }
 
-float4 TransformToClipSpace(float3 object_pos)
+float4 TransformToClipSpace(float3 obj_pos)
 {
 	float4x4 mvp = mul(_MatrixVP, _MatrixWorld);
-	return mul(mvp, float4(object_pos, 1.0f));
+	return mul(mvp, float4(obj_pos, 1.0f));
+}
+float4 TransformToClipSpaceNoJitter(float3 obj_pos)
+{
+	float4x4 mvp = mul(_MatrixVP_NoJitter, _MatrixWorld);
+	return mul(mvp, float4(obj_pos, 1.0f));
 }
 float4 TransformWorldToHClip(float3 world_pos)
 {
 	return mul(_MatrixVP, float4(world_pos, 1.0f));
+}
+float4 TransformWorldToHClipNoJitter(float3 world_pos)
+{
+	return mul(_MatrixVP_NoJitter, float4(world_pos, 1.0f));
 }
 float4 TransformPreviousWorldToHClip(float3 world_pos)
 {
@@ -154,18 +163,6 @@ float3 TransformWorldToViewDir(float3 dir_ws, bool doNormalize = false)
     if (doNormalize)
         return normalize(dirVS);
     return dirVS;
-}
-
-float4 TransformToLightSpace(uint shadow_index, float3 object_pos)
-{
-	
-	float4x4 mvp = mul(_ShadowMatrix[shadow_index], _MatrixWorld);
-	return mul(mvp, float4(object_pos, 1.0f));
-}
-
-float4 TransformFromWorldToLightSpace(uint shadow_index, float3 world_pos)
-{
-	return mul(_ShadowMatrix[shadow_index], float4(world_pos, 1.0f));
 }
 
 inline void GammaCorrect(inout float3 color, float gamma)

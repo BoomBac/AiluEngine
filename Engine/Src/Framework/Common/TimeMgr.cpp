@@ -21,10 +21,10 @@ namespace Ailu
 
     void TimeMgr::Tick(f32 delta_time)
     {
-        s_cur_tick_stamp = std::chrono::high_resolution_clock::now();
-        DeltaTime = ALMSecond(s_cur_tick_stamp - s_pre_tick_stamp).count();
+        _cur_tick_stamp = std::chrono::high_resolution_clock::now();
+        DeltaTime = ALMSecond(_cur_tick_stamp - s_pre_tick_stamp).count();
         s_smooth_delta_time = Lerp(DeltaTime, s_smooth_delta_time, 0.95f);
-        s_pre_tick_stamp = s_cur_tick_stamp;
+        s_pre_tick_stamp = _cur_tick_stamp;
         if (!_b_stop)
             TimeSinceLoad += DeltaTime;
     }

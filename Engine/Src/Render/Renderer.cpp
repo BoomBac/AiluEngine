@@ -20,7 +20,7 @@ namespace Ailu
     {
         _p_context = g_pGfxContext;
         _b_init = true;
-        Profiler::g_Profiler.Initialize();
+        Profiler::Initialize();
         _p_timemgr = new TimeMgr();
         _p_timemgr->Initialize();
         _rendering_data._gbuffers.resize(4);
@@ -50,13 +50,14 @@ namespace Ailu
         _features.push_back(_ssao);
         RegisterEventBeforeTick([]()
                                 { GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
-        RegisterEventAfterTick([]()
-                               { Profiler::g_Profiler.EndFrame(); });
+        // RegisterEventAfterTick([]()
+        //                        { Profiler::Get().EndFrame(); });
     }
 
     Renderer::~Renderer()
     {
         _p_timemgr->Finalize();
+        Profiler::Shutdown();
         DESTORY_PTR(_p_timemgr);
     }
 
@@ -139,21 +140,29 @@ namespace Ailu
     void Renderer::BeginScene(const Camera &cam, const Scene &s)
     {
         _active_camera_hash = cam.HashCode();
-        IConstantBuffer *scene_cb = _cur_fs->GetSceneCB(s.HashCode());
-        IConstantBuffer *cam_cb = _cur_fs->GetCameraCB(_active_camera_hash);
+        ConstantBuffer *scene_cb = _cur_fs->GetSceneCB(s.HashCode());
+        ConstantBuffer *cam_cb = _cur_fs->GetCameraCB(_active_camera_hash);
         //cam_cb->Reset();
         //scene_cb->Reset();
-        auto scene_cb_data = IConstantBuffer::As<CBufferPerSceneData>(scene_cb);
-        _rendering_data._shadow_data[0]._shadow_index = -1;
-        for (int i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
+        auto scene_cb_data = ConstantBuffer::As<CBufferPerSceneData>(scene_cb);
+        for (u16 i = 0; i < RenderConstants::kMaxCascadeShadowMapSplitNum; i++)
         {
-            scene_cb_data->_SpotLights[i]._ShadowDataIndex = -1;
-            _rendering_data._shadow_data[i + RenderConstants::kMaxCascadeShadowMapSplitNum]._shadow_index = -1;
+            _rendering_data._cascade_shadow_data[i]._shadowmap_index = -1;
         }
-        for (int i = 0; i < RenderConstants::kMaxPointLightNum; i++)
+        for (u16 i = 0; i < RenderConstants::kMaxSpotLightNum; i++)
         {
-            scene_cb_data->_PointLights[i]._ShadowDataIndex = -1;
-            _rendering_data._point_shadow_data[i]._camera_far = 0;//标记不投影
+            scene_cb_data->_SpotLights[i]._shadowmap_index = -1;
+            _rendering_data._spot_shadow_data[i]._shadowmap_index = -1;
+        }
+        for (u16 i = 0; i < RenderConstants::kMaxPointLightNum; i++)
+        {
+            scene_cb_data->_PointLights[i]._shadowmap_index = -1;
+            _rendering_data._point_shadow_data[i]._shadowmap_index = -1;
+        }
+        for (u16 i = 0; i < RenderConstants::kMaxAreaLightNum; i++)
+        {
+            scene_cb_data->_AreaLights[i]._shadowmap_index = -1;
+            _rendering_data._area_shadow_data[i]._shadowmap_index = -1;
         }
         u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
         {
@@ -251,7 +260,7 @@ namespace Ailu
     void Renderer::EndScene(const Scene &s)
     {
         u16 obj_index = 0;
-        for (auto &static_mesh: s.GetRegister().View<StaticMeshComponent>())
+        for (auto &static_mesh: s.GetRegister().View<ECS::StaticMeshComponent>())
         {
             if (static_mesh._p_mesh)
             {
@@ -259,7 +268,7 @@ namespace Ailu
                 Vector3f center;
                 u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
                 auto &materials = static_mesh._p_mats;
-                auto *obj_cb = IConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
+                auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
                 for (int i = 0; i < submesh_count; i++)
                 {
                     obj_cb->_MatrixWorld_Pre = obj_cb->_MatrixWorld;
@@ -316,7 +325,7 @@ namespace Ailu
         u16 obj_index = 0;
         u64 entity_index = 0;
         auto &r = s.GetRegister();
-        for (auto &static_mesh: s.GetRegister().View<StaticMeshComponent>())
+        for (auto &static_mesh: s.GetRegister().View<ECS::StaticMeshComponent>())
         {
             if (static_mesh._p_mesh)
             {
@@ -326,20 +335,20 @@ namespace Ailu
                 auto &materials = static_mesh._p_mats;
                 for (int i = 0; i < submesh_count; i++)
                 {
-                    auto *obj_cb = IConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
-                    const auto &t = r.GetComponent<StaticMeshComponent, TransformComponent>(entity_index)->_transform;
+                    auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
+                    const auto &t = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index)->_transform;
                     obj_cb->_MatrixWorld = t._world_matrix;
                     obj_cb->_MatrixInvWorld = MatrixInverse(t._world_matrix);
-                    obj_cb->_ObjectID = r.GetEntity<StaticMeshComponent>(entity_index);
-                    obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == EMotionVectorType::kPerObject? 1.0f : 0.0; //dynamic object
-                    obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == EMotionVectorType::kForceZero? 1.0f : 0.0; //force off
+                    obj_cb->_ObjectID = r.GetEntity<ECS::StaticMeshComponent>(entity_index);
+                    obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == ECS::EMotionVectorType::kPerObject? 1.0f : 0.0; //dynamic object
+                    obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == ECS::EMotionVectorType::kForceZero? 1.0f : 0.0; //force off
                     ++obj_index;
                 }
             }
             ++entity_index;
         }
         entity_index = 0u;
-        for (auto &static_mesh: s.GetRegister().View<CSkeletonMesh>())
+        for (auto &static_mesh: s.GetRegister().View<ECS::CSkeletonMesh>())
         {
             if (static_mesh._p_mesh)
             {
@@ -349,10 +358,10 @@ namespace Ailu
                 auto &materials = static_mesh._p_mats;
                 for (int i = 0; i < submesh_count; i++)
                 {
-                    const auto &t = r.GetComponent<CSkeletonMesh, TransformComponent>(entity_index)->_transform;
-                    auto *obj_cb = IConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
+                    const auto &t = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(entity_index)->_transform;
+                    auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
                     obj_cb->_MatrixWorld = t._world_matrix;
-                    obj_cb->_ObjectID = r.GetEntity<CSkeletonMesh>(entity_index);
+                    obj_cb->_ObjectID = r.GetEntity<ECS::CSkeletonMesh>(entity_index);
                     ++obj_index;
                 }
             }
@@ -360,7 +369,7 @@ namespace Ailu
         };
         _rendering_data._p_per_object_cbuf = _cur_fs->GetObjCB();
         _rendering_data._p_per_scene_cbuf = _cur_fs->GetSceneCB(s.HashCode());
-        auto scene_data = IConstantBuffer::As<CBufferPerSceneData>(_rendering_data._p_per_scene_cbuf);
+        auto scene_data = ConstantBuffer::As<CBufferPerSceneData>(_rendering_data._p_per_scene_cbuf);
         f32 cascade_shaodw_max_dis = (f32) QuailtySetting::s_main_light_shaodw_distance * QuailtySetting::s_cascade_shadow_map_split[QuailtySetting::s_cascade_shadow_map_count - 1];
         scene_data->_CascadeShadowParams = Vector4f((f32) QuailtySetting::s_cascade_shadow_map_count,
                                                     1.0f / QuailtySetting::s_shadow_fade_out_factor, 1.0f / cascade_shaodw_max_dis, 0.f);
@@ -380,11 +389,9 @@ namespace Ailu
         const static f32 s_shadow_bias_factor = 0.01f;
         uint16_t updated_light_num = 0u;
         uint16_t direction_light_index = 0, point_light_index = 0, spot_light_index = 0, area_light_index = 0;
-        u16 shadowmap_matrix_index = RenderConstants::kMaxCascadeShadowMapSplitNum, shadowcubemap_matrix_index = 0u;
-        auto per_scene_cbuf_data = IConstantBuffer::As<CBufferPerSceneData>(_cur_fs->GetSceneCB(s.HashCode()));
-        //u16 total_shadow_matrix_count = RenderConstants::kMaxCascadeShadowMapSplitNum;//阴影绘制和采样时来索引虚拟摄像机的矩阵，对于点光源，其采样不需要该值，只用作标志位确认是否需要处理阴影
-        //per_scene_cbuf_data->_MainlightWorldPosition = {-1.91522e-07f,-0.707107f,-0.707107f,0};//默认太阳位置给物理大气使用，防止
-        for (const auto &comp: s.GetRegister().View<LightComponent>())
+        u16 addi_shadow_map_index = 0u;
+        auto per_scene_cbuf_data = ConstantBuffer::As<CBufferPerSceneData>(_cur_fs->GetSceneCB(s.HashCode()));
+        for (const auto &comp: s.GetRegister().View<ECS::LightComponent>())
         {
             auto &light_data = comp._light;
             Color color = light_data._light_color;
@@ -393,9 +400,9 @@ namespace Ailu
             color.b *= color.a;
             bool is_exist_directional_shaodw = false;
             bool is_cur_light_comp_active = true;
-            if (comp._type == ELightType::kDirectional)
+            if (comp._type == ECS::ELightType::kDirectional)
             {
-                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._ShadowDataIndex = -1;
+                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._shadowmap_index = -1;
                 if (!is_cur_light_comp_active)
                 {
                     per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = Vector3f::kZero;
@@ -404,20 +411,19 @@ namespace Ailu
                 }
                 if (comp._shadow._is_cast_shadow && !is_exist_directional_shaodw)
                 {
-                    for (int i = 0; i < QuailtySetting::s_cascade_shadow_map_count; i++)
+                    for (int cascade_index = 0; cascade_index < QuailtySetting::s_cascade_shadow_map_count; cascade_index++)
                     {
-                        auto &shadow_cam = comp._shadow_cameras[i];
+                        auto &shadow_cam = comp._shadow_cameras[cascade_index];
                         Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
-                        u16 shadow_index = i;
-                        per_scene_cbuf_data->_DirectionalLights[direction_light_index]._ShadowDataIndex = shadow_index;
+                        per_scene_cbuf_data->_DirectionalLights[direction_light_index]._shadowmap_index = 0;
                         per_scene_cbuf_data->_DirectionalLights[direction_light_index]._ShadowDistance = QuailtySetting::s_main_light_shaodw_distance;
-                        per_scene_cbuf_data->_ShadowMatrix[shadow_index] = shadow_cam.GetView() * shadow_cam.GetProjection();
-                        per_scene_cbuf_data->_CascadeShadowSplit[i] = comp._cascade_shadow_data[i];
+                        per_scene_cbuf_data->_CascadeShadowMatrix[cascade_index] = shadow_cam.GetView() * shadow_cam.GetProj();
+                        per_scene_cbuf_data->_CascadeShadowSplit[cascade_index] = comp._cascade_shadow_data[cascade_index];
                         per_scene_cbuf_data->_DirectionalLights[direction_light_index]._constant_bias = comp._shadow._constant_bias * comp._shadow._constant_bias * s_shadow_bias_factor;
                         per_scene_cbuf_data->_DirectionalLights[direction_light_index]._slope_bias = comp._shadow._slope_bias * comp._shadow._slope_bias * s_shadow_bias_factor;
-                        _rendering_data._shadow_data[shadow_index]._shadow_index = shadow_index;
-                        _rendering_data._shadow_data[shadow_index]._shadow_matrix = &per_scene_cbuf_data->_ShadowMatrix[shadow_index];
-                        _rendering_data._shadow_data[shadow_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
+                        _rendering_data._cascade_shadow_data[cascade_index]._shadowmap_index = 0;
+                        _rendering_data._cascade_shadow_data[cascade_index]._shadow_matrix = per_scene_cbuf_data->_CascadeShadowMatrix[cascade_index];
+                        _rendering_data._cascade_shadow_data[cascade_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
                     }
                     is_exist_directional_shaodw = true;
                 }
@@ -428,9 +434,9 @@ namespace Ailu
                 _rendering_data._mainlight_world_position = per_scene_cbuf_data->_MainlightWorldPosition;
                 ++direction_light_index;
             }
-            else if (comp._type == ELightType::kPoint)
+            else if (comp._type == ECS::ELightType::kPoint)
             {
-                per_scene_cbuf_data->_PointLights[point_light_index]._ShadowDataIndex = -1;
+                per_scene_cbuf_data->_PointLights[point_light_index]._shadowmap_index = -1;
                 if (!is_cur_light_comp_active)
                 {
                     per_scene_cbuf_data->_PointLights[point_light_index]._LightParam0 = 0.0;
@@ -439,19 +445,16 @@ namespace Ailu
                 }
                 if (comp._shadow._is_cast_shadow)
                 {
-                    //u32 shadow_index = total_shadow_matrix_count;
-                    per_scene_cbuf_data->_PointLights[point_light_index]._ShadowDataIndex = point_light_index;//点光源使用这个值来索引cubearray
+                    per_scene_cbuf_data->_PointLights[point_light_index]._shadowmap_index = point_light_index;//点光源使用这个值来索引cubearray
                     per_scene_cbuf_data->_PointLights[point_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
                     per_scene_cbuf_data->_PointLights[point_light_index]._constant_bias = comp._shadow._constant_bias;
                     per_scene_cbuf_data->_PointLights[point_light_index]._slope_bias = comp._shadow._slope_bias;
-                    //_per_frame_cbuf_data._PointLights[point_light_index]._ShadowNear = 10;
                     for (int i = 0; i < 6; i++)
                     {
                         auto &shadow_cam = comp._shadow_cameras[i];
                         Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
-                        //per_scene_cbuf_data->_ShadowMatrix[shadow_index + i] = shadow_cam.GetView() * shadow_cam.GetProjection();
-                        _rendering_data._point_shadow_data[point_light_index]._shadow_indices[i] = -1;// 废弃变量，现在生成shadowmp时不使用矩阵数组索引
-                        _rendering_data._point_shadow_data[point_light_index]._shadow_matrices[i] = shadow_cam.GetView() * shadow_cam.GetProjection();
+                        _rendering_data._point_shadow_data[point_light_index]._shadowmap_index = point_light_index;
+                        _rendering_data._point_shadow_data[point_light_index]._shadow_matrices[i] = shadow_cam.GetView() * shadow_cam.GetProj();
                         _rendering_data._point_shadow_data[point_light_index]._cull_results[i] = &_cull_results[shadow_cam.HashCode()];
                     }
                     _rendering_data._point_shadow_data[point_light_index]._light_world_pos = light_data._light_pos.xyz;
@@ -464,9 +467,9 @@ namespace Ailu
                 per_scene_cbuf_data->_PointLights[point_light_index]._LightParam0 = light_data._light_param.x;
                 per_scene_cbuf_data->_PointLights[point_light_index++]._LightParam1 = light_data._light_param.y;
             }
-            else if (comp._type == ELightType::kSpot)
+            else if (comp._type == ECS::ELightType::kSpot)
             {
-                per_scene_cbuf_data->_SpotLights[spot_light_index]._ShadowDataIndex = -1;
+                per_scene_cbuf_data->_SpotLights[spot_light_index]._shadowmap_index = -1;
                 if (!is_cur_light_comp_active)
                 {
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._LightColor = Colors::kBlack.xyz;
@@ -474,17 +477,17 @@ namespace Ailu
                 }
                 if (comp._shadow._is_cast_shadow)
                 {
-                    u32 shadow_index = shadowmap_matrix_index++;
-                    per_scene_cbuf_data->_SpotLights[spot_light_index]._ShadowDataIndex = shadow_index;
+                    auto &shadow_cam = comp._shadow_cameras[0];
+                    Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                    per_scene_cbuf_data->_SpotLights[spot_light_index]._shadowmap_index = _rendering_data._addi_shadow_num;
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._constant_bias = comp._shadow._constant_bias * comp._shadow._constant_bias * s_shadow_bias_factor;
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._slope_bias = comp._shadow._slope_bias * comp._shadow._slope_bias * s_shadow_bias_factor;
-                    auto &shadow_cam = comp._shadow_cameras[0];
-                    Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
-                    per_scene_cbuf_data->_ShadowMatrix[shadow_index] = shadow_cam.GetView() * shadow_cam.GetProjection();
-                    _rendering_data._shadow_data[shadow_index]._shadow_index = shadow_index;
-                    _rendering_data._shadow_data[shadow_index]._shadow_matrix = &per_scene_cbuf_data->_ShadowMatrix[shadow_index];
-                    _rendering_data._shadow_data[shadow_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
+                    Matrix4x4f shaodw_matrix = shadow_cam.GetView() * shadow_cam.GetProj();
+                    per_scene_cbuf_data->_SpotLights[spot_light_index]._shadow_matrix = shaodw_matrix;
+                    _rendering_data._spot_shadow_data[spot_light_index]._shadowmap_index = _rendering_data._addi_shadow_num;
+                    _rendering_data._spot_shadow_data[spot_light_index]._shadow_matrix = shaodw_matrix;
+                    _rendering_data._spot_shadow_data[spot_light_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
                     ++_rendering_data._addi_shadow_num;
                 }
                 per_scene_cbuf_data->_SpotLights[spot_light_index]._LightColor = color.xyz;
@@ -499,7 +502,7 @@ namespace Ailu
             }
             else//area_light
             {
-                per_scene_cbuf_data->_AreaLights[area_light_index]._ShadowDataIndex = -1;
+                per_scene_cbuf_data->_AreaLights[area_light_index]._shadowmap_index = -1;
                 if (!is_cur_light_comp_active)
                 {
                     per_scene_cbuf_data->_AreaLights[area_light_index]._LightColor = Colors::kBlack.xyz;
@@ -507,17 +510,17 @@ namespace Ailu
                 }
                 if (comp._shadow._is_cast_shadow)
                 {
-                    u32 shadow_index = shadowmap_matrix_index++;
-                    per_scene_cbuf_data->_AreaLights[area_light_index]._ShadowDataIndex = shadow_index;
+                    auto &shadow_cam = comp._shadow_cameras[0];
+                    Matrix4x4f shaodw_matrix = shadow_cam.GetView() * shadow_cam.GetProj();
+                    Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                    per_scene_cbuf_data->_AreaLights[area_light_index]._shadowmap_index = _rendering_data._addi_shadow_num;
                     per_scene_cbuf_data->_AreaLights[area_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
                     per_scene_cbuf_data->_AreaLights[area_light_index]._constant_bias = comp._shadow._constant_bias * comp._shadow._constant_bias * s_shadow_bias_factor;
                     per_scene_cbuf_data->_AreaLights[area_light_index]._slope_bias = comp._shadow._slope_bias * comp._shadow._slope_bias * s_shadow_bias_factor;
-                    auto &shadow_cam = comp._shadow_cameras[0];
-                    per_scene_cbuf_data->_ShadowMatrix[shadow_index] = shadow_cam.GetView() * shadow_cam.GetProjection();
-                    _rendering_data._shadow_data[shadow_index]._shadow_index = shadow_index;
-                    _rendering_data._shadow_data[shadow_index]._shadow_matrix = &per_scene_cbuf_data->_ShadowMatrix[shadow_index];
-                    Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
-                    _rendering_data._shadow_data[shadow_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
+                    per_scene_cbuf_data->_AreaLights[area_light_index]._shadow_matrix = shaodw_matrix;
+                    _rendering_data._area_shadow_data[area_light_index]._shadowmap_index = _rendering_data._addi_shadow_num;
+                    _rendering_data._area_shadow_data[area_light_index]._shadow_matrix = shaodw_matrix;
+                    _rendering_data._area_shadow_data[area_light_index]._cull_results = &_cull_results[shadow_cam.HashCode()];
                     ++_rendering_data._addi_shadow_num;
                 }
                 per_scene_cbuf_data->_AreaLights[area_light_index]._LightColor = color.xyz;
@@ -540,7 +543,7 @@ namespace Ailu
             per_scene_cbuf_data->_DirectionalLights[0]._LightColor = Colors::kBlack.xyz;
             per_scene_cbuf_data->_DirectionalLights[0]._LightDir = {0.0f, 0.0f, 0.0f};
         }
-        for (const auto &vxgi: s.GetRegister().View<CVXGI>())
+        for (const auto &vxgi: s.GetRegister().View<ECS::CVXGI>())
         {
             _rendering_data._vxgi_data._center = vxgi._center;
             _rendering_data._vxgi_data._grid_num = vxgi._grid_num;
@@ -563,20 +566,24 @@ namespace Ailu
     void Renderer::PrepareCamera(const Camera &cam)
     {
         //auto cam_hash = cam.HashCode();
-        auto cam_cb_data = IConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(cam.HashCode()));
+        auto cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(cam.HashCode()));
         f32 f = cam.Far(), n = cam.Near();
         u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
         cam_cb_data->_ScreenParams = Vector4f(1.0f / (f32) pixel_width,1.0f / (f32) pixel_height,pixel_width,pixel_height);
         Camera::CalculateZBUfferAndProjParams(cam,cam_cb_data->_ZBufferParams,cam_cb_data->_ProjectionParams);
         cam_cb_data->_CameraPos = cam.Position();
         cam_cb_data->_MatrixV = cam.GetView();
-        cam_cb_data->_MatrixP = cam.GetProjection();
+        cam_cb_data->_MatrixP = cam.GetProj();
         cam_cb_data->_MatrixVP = cam_cb_data->_MatrixV * cam_cb_data->_MatrixP;
-        cam_cb_data->_MatrixVP_NoJitter = cam_cb_data->_MatrixVP;
+        cam_cb_data->_MatrixVP_NoJitter = cam.GetViewProj();
         cam_cb_data->_MatrixIVP = MatrixInverse(cam_cb_data->_MatrixVP);
-        auto prev_cam_cb_data = IConstantBuffer::As<CBufferPerCameraData>(_prev_fs->GetCameraCB(_active_camera_hash));
-        cam_cb_data->_MatrixVP_Pre = prev_cam_cb_data->_MatrixVP;
-
+        auto prev_cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_prev_fs->GetCameraCB(_active_camera_hash));
+        cam_cb_data->_MatrixVP_Pre = prev_cam_cb_data->_MatrixVP_NoJitter;
+        auto& jitter = cam.GetJitter();
+        cam_cb_data->_matrix_jitter_x = jitter.x;
+        cam_cb_data->_matrix_jitter_y = jitter.y;
+        cam_cb_data->_uv_jitter_x = jitter.z;
+        cam_cb_data->_uv_jitter_y = jitter.w;
         cam.GetCornerInWorld(cam_cb_data->_LT, cam_cb_data->_LB, cam_cb_data->_RT, cam_cb_data->_RB);
         _rendering_data._cull_results = &_cull_results[cam.HashCode()];
         _rendering_data._camera = &cam;
@@ -588,7 +595,7 @@ namespace Ailu
     }
     void Renderer::SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj)
     {
-        auto cam_cb_data = IConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(_active_camera_hash));
+        auto cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(_active_camera_hash));
         cam_cb_data->_MatrixV = view;
         cam_cb_data->_MatrixP = proj;
         cam_cb_data->_MatrixVP = cam_cb_data->_MatrixV * cam_cb_data->_MatrixP;
@@ -655,9 +662,9 @@ namespace Ailu
                                 cur_cam_cull_results.insert(std::make_pair(queue_id, Vector<RenderableObjectData>()));
                             }
                         }
-                        auto e = s.GetRegister().GetEntity<StaticMeshComponent>(entity_index);
+                        auto e = s.GetRegister().GetEntity<ECS::StaticMeshComponent>(entity_index);
                         cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{scene_render_obj_index, dis,
-                                                                                         (u16) i, 1, comp._p_mesh.get(), used_mat, &s.GetRegister().GetComponent<TransformComponent>(e)->_transform._world_matrix});
+                                                                                         (u16) i, 1, comp._p_mesh.get(), used_mat, &s.GetRegister().GetComponent<ECS::TransformComponent>(e)->_transform._world_matrix});
                     }
                 }
                 ++scene_render_obj_index;

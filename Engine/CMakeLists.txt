@@ -30,6 +30,8 @@ aux_source_directory (${ENGINE_ROOT_PATH}/Ext/implot IMPLOT_ROOT)
 set(CORE_MODULE
         Src/Objects/Type.cpp
         Inc/Objects/Type.h
+        Inc/Framework/Common/Container.hpp
+        Inc/Framework/Common/EngineConfig.h
 )
 set(RENDER_MODULE
         Inc/Render/Gizmo.h

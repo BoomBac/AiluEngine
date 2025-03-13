@@ -9,6 +9,7 @@
 namespace Ailu
 {
     static CommandBufferPool *s_pCommandBufferPool = nullptr;
+    //-----------------------------------------------------
 
     void CommandBufferPool::Init()
     {
@@ -96,6 +97,4 @@ namespace Ailu
             cmd->Clear();
         }
     }
-
-
 }// namespace Ailu

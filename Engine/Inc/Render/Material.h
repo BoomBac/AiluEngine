@@ -91,7 +91,7 @@ namespace Ailu
         std::set<String> _all_keywords;
         Map<String, ShaderPropertyInfo> _properties;
         Vector<ShaderPropertyInfo *> _prop_views;
-        Vector<Scope<IConstantBuffer>> _p_cbufs;
+        Vector<Scope<ConstantBuffer>> _p_cbufs;
         Vector<Map<String, std::tuple<u8, Texture *>>> _textures_all_passes{};
         //非shader使用的变量
         Map<String, u32> _common_uint_property;

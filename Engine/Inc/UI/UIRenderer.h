@@ -49,7 +49,7 @@ namespace Ailu
                 u32 _index_offset = 0u;
             };
             u16 _frame_index = 0u;
-            Ref<IConstantBuffer> _obj_cb;
+            Ref<ConstantBuffer> _obj_cb;
             using FrameDrawerBlock = Map<Color, DrawerBlock*>;
             Array<FrameDrawerBlock, RenderConstants::kFrameCount> _drawer_blocks;
         };

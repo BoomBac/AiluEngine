@@ -17,9 +17,9 @@ namespace Ailu
         arch << "scene_register:";
         arch.NewLine();
         arch.IncreaseIndent();
-        for (auto &tag_comp: _register.View<TagComponent>())
+        for (auto &tag_comp: _register.View<ECS::TagComponent>())
         {
-            ECS::Entity e = _register.GetEntity<TagComponent>(index++);
+            ECS::Entity e = _register.GetEntity<ECS::TagComponent>(index++);
             arch << std::format("Entity:{}", e);
             arch.IncreaseIndent();
             arch.NewLine();
@@ -29,70 +29,70 @@ namespace Ailu
                 arch.NewLine();
                 arch << tag_comp;
             }
-            if (auto c = _register.GetComponent<TransformComponent>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::TransformComponent>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_transform_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<StaticMeshComponent>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::StaticMeshComponent>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_static_mesh_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<LightComponent>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::LightComponent>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_light_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<CHierarchy>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::CHierarchy>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_hierarchy_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<CCamera>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::CCamera>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_camera_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<CLightProbe>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::CLightProbe>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_lightprobe_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<CRigidBody>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::CRigidBody>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_rigidbody_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<CCollider>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::CCollider>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_collider_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<CSkeletonMesh>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::CSkeletonMesh>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_skeleton_mesh_component:";
                 arch.NewLine();
                 arch << (*c);
             }
-            if (auto c = _register.GetComponent<CVXGI>(e); c != nullptr)
+            if (auto c = _register.GetComponent<ECS::CVXGI>(e); c != nullptr)
             {
                 arch.InsertIndent();
                 arch << "_vxgi_component:";
@@ -125,47 +125,47 @@ namespace Ailu
             }
             if (su::BeginWith(line, "_tag_component"))
             {
-                arch >> _register.AddComponent<TagComponent>(e);
+                arch >> _register.AddComponent<ECS::TagComponent>(e);
             }
             else if (su::BeginWith(line, "_transform_component"))
             {
-                arch >> _register.AddComponent<TransformComponent>(e);
+                arch >> _register.AddComponent<ECS::TransformComponent>(e);
             }
             else if (su::BeginWith(line, "_static_mesh_component"))
             {
-                arch >> _register.AddComponent<StaticMeshComponent>(e);
+                arch >> _register.AddComponent<ECS::StaticMeshComponent>(e);
             }
             else if (su::BeginWith(line, "_light_component"))
             {
-                arch >> _register.AddComponent<LightComponent>(e);
+                arch >> _register.AddComponent<ECS::LightComponent>(e);
             }
             else if (su::BeginWith(line, "_hierarchy_component"))
             {
-                arch >> _register.AddComponent<CHierarchy>(e);
+                arch >> _register.AddComponent<ECS::CHierarchy>(e);
             }
             else if (su::BeginWith(line, "_camera_component"))
             {
-                arch >> _register.AddComponent<CCamera>(e);
+                arch >> _register.AddComponent<ECS::CCamera>(e);
             }
             else if (su::BeginWith(line, "_lightprobe_component"))
             {
-                arch >> _register.AddComponent<CLightProbe>(e);
+                arch >> _register.AddComponent<ECS::CLightProbe>(e);
             }
             else if (su::BeginWith(line, "_rigidbody_component"))
             {
-                arch >> _register.AddComponent<CRigidBody>(e);
+                arch >> _register.AddComponent<ECS::CRigidBody>(e);
             }
             else if (su::BeginWith(line, "_collider_component"))
             {
-                arch >> _register.AddComponent<CCollider>(e);
+                arch >> _register.AddComponent<ECS::CCollider>(e);
             }
             else if (su::BeginWith(line, "_skeleton_mesh_component"))
             {
-                arch >> _register.AddComponent<CSkeletonMesh>(e);
+                arch >> _register.AddComponent<ECS::CSkeletonMesh>(e);
             }
             else if (su::BeginWith(line, "_vxgi_component"))
             {
-                arch >> _register.AddComponent<CVXGI>(e);
+                arch >> _register.AddComponent<ECS::CVXGI>(e);
             }
             else
             {
@@ -176,58 +176,60 @@ namespace Ailu
 
     Scene::Scene(const String &name) : Object(name)
     {
-        _register.RegisterComponent<TagComponent>();
-        _register.RegisterComponent<TransformComponent>();
-        _register.RegisterComponent<StaticMeshComponent>();
-        _register.RegisterComponent<LightComponent>();
-        _register.RegisterComponent<CCamera>();
-        _register.RegisterComponent<CHierarchy>();
-        _register.RegisterComponent<CLightProbe>();
-        _register.RegisterComponent<CRigidBody>();
-        _register.RegisterComponent<CCollider>();
-        _register.RegisterComponent<CSkeletonMesh>();
-        _register.RegisterComponent<CVXGI>();
-        ECS::Signature rs_sig;
-        rs_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
-        rs_sig.set(_register.GetComponentTypeID<StaticMeshComponent>(), true);
-        _register.RegisterSystem<ECS::RenderSystem>(rs_sig);
+        _register.RegisterComponent<ECS::TagComponent>();
+        _register.RegisterComponent<ECS::TransformComponent>();
+        _register.RegisterComponent<ECS::StaticMeshComponent>();
+        _register.RegisterComponent<ECS::LightComponent>();
+        _register.RegisterComponent<ECS::CCamera>();
+        _register.RegisterComponent<ECS::CHierarchy>();
+        _register.RegisterComponent<ECS::CLightProbe>();
+        _register.RegisterComponent<ECS::CRigidBody>();
+        _register.RegisterComponent<ECS::CCollider>();
+        _register.RegisterComponent<ECS::CSkeletonMesh>();
+        _register.RegisterComponent<ECS::CVXGI>();
         ECS::Signature ls_sig;
-        ls_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
-        ls_sig.set(_register.GetComponentTypeID<LightComponent>(), true);
+        ls_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
+        ls_sig.set(_register.GetComponentTypeID<ECS::LightComponent>(), true);
         _register.RegisterSystem<ECS::LightingSystem>(ls_sig);
         ECS::Signature phy_sig;
-        phy_sig.set(_register.GetComponentTypeID<TransformComponent>(), true);
-        phy_sig.set(_register.GetComponentTypeID<CRigidBody>(), true);
+        phy_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
+        phy_sig.set(_register.GetComponentTypeID<ECS::CRigidBody>(), true);
         _register.RegisterSystem<ECS::PhysicsSystem>(phy_sig);
         ECS::Signature anim_sig;
-        anim_sig.set(_register.GetComponentTypeID<CSkeletonMesh>(), true);
+        anim_sig.set(_register.GetComponentTypeID<ECS::CSkeletonMesh>(), true);
         _register.RegisterSystem<ECS::AnimationSystem>(anim_sig);
+        _register.RegisterOnComponentAdd<ECS::StaticMeshComponent>([](ECS::Entity entity){
+                                                          g_pGfxContext->GetPipeline()->OnAddRenderObject(entity);
+        });
+        _register.RegisterOnComponentAdd<ECS::CSkeletonMesh>([](ECS::Entity entity){
+                                                          g_pGfxContext->GetPipeline()->OnAddRenderObject(entity);
+                                                      });
     }
 
     void Scene::Attach(ECS::Entity current, ECS::Entity parent)
     {
         if (parent == ECS::kInvalidEntity)
             return;
-        AL_ASSERT(_register.HasComponent<CHierarchy>(current) && _register.HasComponent<CHierarchy>(parent));
-        auto parent_hierarchy = _register.GetComponent<CHierarchy>(parent);
-        auto cur_hierarchy = _register.GetComponent<CHierarchy>(current);
+        AL_ASSERT(_register.HasComponent<ECS::CHierarchy>(current) && _register.HasComponent<ECS::CHierarchy>(parent));
+        auto parent_hierarchy = _register.GetComponent<ECS::CHierarchy>(parent);
+        auto cur_hierarchy = _register.GetComponent<ECS::CHierarchy>(current);
         if (parent_hierarchy->_children_num == 0)
         {
             parent_hierarchy->_first_child = current;
         }
         else
         {
-            auto last_child = _register.GetComponent<CHierarchy>(parent_hierarchy->_first_child);
+            auto last_child = _register.GetComponent<ECS::CHierarchy>(parent_hierarchy->_first_child);
             ECS::Entity last_child_entity = parent_hierarchy->_first_child;
             while (last_child->_next_sibling != ECS::kInvalidEntity)
             {
                 last_child_entity = last_child->_next_sibling;
-                last_child = _register.GetComponent<CHierarchy>(last_child_entity);
+                last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
             }
             last_child->_next_sibling = current;
             cur_hierarchy->_prev_sibling = last_child_entity;
         }
-        if (auto parent_transf = _register.GetComponent<TransformComponent>(parent))
+        if (auto parent_transf = _register.GetComponent<ECS::TransformComponent>(parent))
         {
             cur_hierarchy->_inv_matrix_attach = Math::MatrixInverse(parent_transf->_transform._world_matrix);
         }
@@ -236,23 +238,23 @@ namespace Ailu
     }
     void Scene::Detach(ECS::Entity current)
     {
-        auto cur_hierarchy = _register.GetComponent<CHierarchy>(current);
+        auto cur_hierarchy = _register.GetComponent<ECS::CHierarchy>(current);
         if (cur_hierarchy->_parent == ECS::kInvalidEntity)
             return;
-        auto parent_hierarchy = _register.GetComponent<CHierarchy>(cur_hierarchy->_parent);
+        auto parent_hierarchy = _register.GetComponent<ECS::CHierarchy>(cur_hierarchy->_parent);
         if (parent_hierarchy->_children_num == 1)
         {
             parent_hierarchy->_first_child = ECS::kInvalidEntity;
         }
         else
         {
-            auto child = _register.GetComponent<CHierarchy>(parent_hierarchy->_first_child);
+            auto child = _register.GetComponent<ECS::CHierarchy>(parent_hierarchy->_first_child);
             while (child != cur_hierarchy)
             {
-                child = _register.GetComponent<CHierarchy>(child->_next_sibling);
+                child = _register.GetComponent<ECS::CHierarchy>(child->_next_sibling);
             }
-            auto prev_child = _register.GetComponent<CHierarchy>(child->_prev_sibling);
-            auto next_child = _register.GetComponent<CHierarchy>(child->_next_sibling);
+            auto prev_child = _register.GetComponent<ECS::CHierarchy>(child->_prev_sibling);
+            auto next_child = _register.GetComponent<ECS::CHierarchy>(child->_next_sibling);
             prev_child->_next_sibling = child->_next_sibling;
             next_child->_prev_sibling = child->_prev_sibling;
         }
@@ -263,16 +265,16 @@ namespace Ailu
     }
     const Vector<ECS::Entity> &Scene::EntityView() const
     {
-        return _register.EntityView<CHierarchy>();
+        return _register.EntityView<ECS::CHierarchy>();
     }
 
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, Ref<Material> mat)
     {
         ECS::Entity obj = _register.Create();
-        _register.AddComponent<TagComponent>(obj, AcquireName());
-        _register.AddComponent<TransformComponent>(obj);
-        _register.AddComponent<CHierarchy>(obj);
-        auto &comp = _register.AddComponent<StaticMeshComponent>(obj);
+        _register.AddComponent<ECS::TagComponent>(obj, AcquireName());
+        _register.AddComponent<ECS::TransformComponent>(obj);
+        _register.AddComponent<ECS::CHierarchy>(obj);
+        auto &comp = _register.AddComponent<ECS::StaticMeshComponent>(obj);
         comp._p_mesh = mesh ? mesh : Mesh::s_p_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
         comp._p_mats.emplace_back(mat ? mat : Material::s_standard_lit.lock());
@@ -282,19 +284,19 @@ namespace Ailu
     {
         ECS::Entity obj = _register.Create();
         name = name.empty() ? AcquireName() : name;
-        _register.AddComponent<TagComponent>(obj, name);
-        _register.AddComponent<TransformComponent>(obj);
-        _register.AddComponent<CHierarchy>(obj);
+        _register.AddComponent<ECS::TagComponent>(obj, name);
+        _register.AddComponent<ECS::TransformComponent>(obj);
+        _register.AddComponent<ECS::CHierarchy>(obj);
         return obj;
     }
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
     {
         ECS::Entity new_one = _register.Create();
-        auto &tag_comp = _register.AddComponent<TagComponent>(new_one, *_register.GetComponent<TagComponent>(e));
+        auto &tag_comp = _register.AddComponent<ECS::TagComponent>(new_one, *_register.GetComponent<ECS::TagComponent>(e));
         String base_name = tag_comp._name.substr(0, tag_comp._name.find_first_of('(') - 1);
         i32 max_index = 0;
         std::regex name_pattern(base_name + R"(\((\d+)\))");// 匹配 A(*) 的正则表达式
-        for (const auto &tag: _register.View<TagComponent>())
+        for (const auto &tag: _register.View<ECS::TagComponent>())
         {
             std::smatch match;
             if (std::regex_match(tag._name, match, name_pattern))
@@ -304,25 +306,25 @@ namespace Ailu
             }
         }
         tag_comp._name += "(" + std::to_string(max_index + 1) + ")";
-        _register.AddComponent<TransformComponent>(new_one, *_register.GetComponent<TransformComponent>(e));
-        if (_register.HasComponent<StaticMeshComponent>(e))
-            _register.AddComponent<StaticMeshComponent>(new_one, *_register.GetComponent<StaticMeshComponent>(e));
-        if (_register.HasComponent<LightComponent>(e))
-            _register.AddComponent<LightComponent>(new_one, *_register.GetComponent<LightComponent>(e));
-        if (_register.HasComponent<CCamera>(e))
-            _register.AddComponent<CCamera>(new_one, *_register.GetComponent<CCamera>(e));
-        if (_register.HasComponent<CHierarchy>(e))
+        _register.AddComponent<ECS::TransformComponent>(new_one, *_register.GetComponent<ECS::TransformComponent>(e));
+        if (_register.HasComponent<ECS::StaticMeshComponent>(e))
+            _register.AddComponent<ECS::StaticMeshComponent>(new_one, *_register.GetComponent<ECS::StaticMeshComponent>(e));
+        if (_register.HasComponent<ECS::LightComponent>(e))
+            _register.AddComponent<ECS::LightComponent>(new_one, *_register.GetComponent<ECS::LightComponent>(e));
+        if (_register.HasComponent<ECS::CCamera>(e))
+            _register.AddComponent<ECS::CCamera>(new_one, *_register.GetComponent<ECS::CCamera>(e));
+        if (_register.HasComponent<ECS::CHierarchy>(e))
         {
-            CHierarchy src_heri = *_register.GetComponent<CHierarchy>(e);
-            auto &new_heri = _register.AddComponent<CHierarchy>(new_one, src_heri);
+            ECS::CHierarchy src_heri = *_register.GetComponent<ECS::CHierarchy>(e);
+            auto &new_heri = _register.AddComponent<ECS::CHierarchy>(new_one, src_heri);
             Attach(new_one, src_heri._parent);
         }
-        if (_register.HasComponent<CLightProbe>(e))
-            _register.AddComponent<CLightProbe>(new_one, *_register.GetComponent<CLightProbe>(e));
-        if (_register.HasComponent<CRigidBody>(e))
-            _register.AddComponent<CRigidBody>(new_one, *_register.GetComponent<CRigidBody>(e));
-        if (_register.HasComponent<CCollider>(e))
-            _register.AddComponent<CCollider>(new_one, *_register.GetComponent<CCollider>(e));
+        if (_register.HasComponent<ECS::CLightProbe>(e))
+            _register.AddComponent<ECS::CLightProbe>(new_one, *_register.GetComponent<ECS::CLightProbe>(e));
+        if (_register.HasComponent<ECS::CRigidBody>(e))
+            _register.AddComponent<ECS::CRigidBody>(new_one, *_register.GetComponent<ECS::CRigidBody>(e));
+        if (_register.HasComponent<ECS::CCollider>(e))
+            _register.AddComponent<ECS::CCollider>(new_one, *_register.GetComponent<ECS::CCollider>(e));
         LOG_INFO("Duplicate entity {}", e);
         return new_one;
     }
@@ -330,7 +332,7 @@ namespace Ailu
     {
         ECS::Entity closest_entity = ECS::kInvalidEntity;
         u32 comp_index = 0;
-        for (auto &comp: _register.View<Ailu::StaticMeshComponent>())
+        for (auto &comp: _register.View<Ailu::ECS::StaticMeshComponent>())
         {
             if (closest_entity != ECS::kInvalidEntity)
                 break;
@@ -344,8 +346,8 @@ namespace Ailu
             {
                 if (AABB::Intersect(aabbs[i], ray))
                 {
-                    closest_entity = _register.GetEntity<Ailu::StaticMeshComponent>(comp_index);
-                    LOG_INFO("Pick entity {} with name {}", closest_entity, _register.GetComponent<TagComponent>(closest_entity)->_name);
+                    closest_entity = _register.GetEntity<Ailu::ECS::StaticMeshComponent>(comp_index);
+                    LOG_INFO("Pick entity {} with name {}", closest_entity, _register.GetComponent<ECS::TagComponent>(closest_entity)->_name);
                 }
             }
             ++comp_index;
@@ -393,9 +395,46 @@ namespace Ailu
     {
         if (_p_current)
         {
-            for (auto &comp: _p_current->_register.View<TransformComponent>())
+            auto& r = _p_current->_register;
+            for (auto &comp: r.View<ECS::TransformComponent>())
             {
                 Transform::ToMatrix(comp._transform, comp._transform._world_matrix);
+            }
+            u32 index = 0;
+            for (auto& comp : r.View<ECS::StaticMeshComponent>())
+            {
+                if (comp._p_mesh)
+                {
+                    const auto& transf = r.GetComponent<ECS::StaticMeshComponent,ECS::TransformComponent>(index)->_transform;
+                    auto& bound_box = comp._p_mesh->BoundBox();
+                    for (int i = 0; i < bound_box.size(); i++)
+                    {
+                        comp._transformed_aabbs[i] = bound_box[i] * transf._world_matrix;
+                    }
+                }
+                ++index;
+            }
+            index = 0;
+            for (auto& comp : r.View<ECS::CSkeletonMesh>())
+            {
+                if (comp._p_mesh)
+                {
+                    const auto& transf = r.GetComponent<ECS::CSkeletonMesh,ECS::TransformComponent>(index)->_transform;
+                    auto& bound_box = comp._p_mesh->BoundBox();
+                    for (int i = 0; i < bound_box.size(); i++)
+                    {
+                        comp._transformed_aabbs[i] = bound_box[i] * transf._world_matrix;
+                    }
+                }
+                ++index;
+            }
+            index = 0;
+            for (auto &comp: r.View<ECS::CCamera>())
+            {
+                auto t = r.GetComponent<ECS::CCamera, ECS::TransformComponent>(index);
+                comp._camera.Position(t->_transform._position);
+                comp._camera.Rotation(t->_transform._rotation);
+                comp._camera.RecalculateMatrix();
             }
             for (auto &it: _p_current->GetRegister().SystemView())
             {
@@ -438,7 +477,7 @@ namespace Ailu
     }
     void SceneMgr::EnterPlayMode()
     {
-        Application::GetInstance()->_is_playing_mode = true;
+        Application::Get()->_is_playing_mode = true;
         _runtime_scene = new Scene(*_p_current);
         auto name = _runtime_scene->Name();
         name.append("_copy");
@@ -452,31 +491,31 @@ namespace Ailu
         _p_current = _runtime_scene_src;
         _runtime_scene_src = nullptr;
         DESTORY_PTR(_runtime_scene);
-        Application::GetInstance()->_is_playing_mode = false;
+        Application::Get()->_is_playing_mode = false;
     }
     void SceneMgr::EnterSimulateMode()
     {
         auto &r = _p_current->GetRegister();
-        for (auto &t: r.View<TransformComponent>())
+        for (auto &t: r.View<ECS::TransformComponent>())
         {
             _transform_cache.emplace_back(t._transform);
         }
-        Application::GetInstance()->_is_simulate_mode = true;
+        Application::Get()->_is_simulate_mode = true;
     }
     void SceneMgr::ExitSimulateMode()
     {
         auto &r = _p_current->GetRegister();
         u32 index = 0;
-        for (auto &t: r.View<TransformComponent>())
+        for (auto &t: r.View<ECS::TransformComponent>())
         {
             t._transform = _transform_cache[index++];
         }
-        for (auto &c: r.View<CRigidBody>())
+        for (auto &c: r.View<ECS::CRigidBody>())
         {
             c._velocity = Vector3f::kZero;
             c._angular_velocity = Vector3f::kZero;
         }
-        Application::GetInstance()->_is_simulate_mode = false;
+        Application::Get()->_is_simulate_mode = false;
         _transform_cache.clear();
     }
     //-----------------------------------------------------------------------SceneMgr----------------------------------------------------------------------------

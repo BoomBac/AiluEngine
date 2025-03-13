@@ -37,7 +37,7 @@ namespace Ailu
         //push a text
         static void DrawText(const String &text, Vector2f pos,u16 font_size = 14u,Vector2f scale = 1.0f,Color color = Colors::kWhite,Font *font = Get()->GetDefaultFont());
         static Vector2f CalculateTextSize(const String &text, Font *font = Get()->GetDefaultFont(),u16 font_size = 14u, Vector2f scale = 1.0f);
-        void Render(RenderTexture* target,CommandBuffer* cmd);
+        void Render(RenderTexture* target, CommandBuffer * cmd);
         void Render(RenderTexture* target);
         bool _is_draw_debug_line = true;
         [[nodiscard]] Font* GetDefaultFont() const;
@@ -50,7 +50,7 @@ namespace Ailu
             Ref<Material> _default_mat;
             IVertexBuffer* _vbuf;
             IIndexBuffer* _ibuf;
-            IConstantBuffer* _obj_cb;
+            ConstantBuffer * _obj_cb;
             Vector<Vector3f> _pos_stream;
             Vector<Vector2f> _uv_stream;
             Vector<Vector4f> _color_stream;

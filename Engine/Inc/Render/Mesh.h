@@ -24,6 +24,7 @@ namespace Ailu
 
     class AILU_API Mesh : public Object
     {
+        friend class FbxParser;
     public:
         inline static std::weak_ptr<Mesh> s_p_cube;
         inline static std::weak_ptr<Mesh> s_p_shpere;
@@ -60,12 +61,14 @@ namespace Ailu
         const u16 SubmeshCount() const { return static_cast<u16>(_p_indices.size()); };
         void AddCacheMaterial(ImportedMaterialInfo material) { _imported_materials.emplace_back(material); };
         const List<ImportedMaterialInfo> &GetCacheMaterials() const { return _imported_materials; };
-
+        /// @brief 返回边界盒子，0为所有子网格的并集，子网格从1开始
+        /// @return 对象空间包围盒
+        const Vector<AABB>& BoundBox() const {return _bound_boxs;};
     public:
         u32 _vertex_count;
-        Vector<AABB> _bound_boxs;
-
+        
     protected:
+        Vector<AABB> _bound_boxs;
         Ref<IVertexBuffer> _p_vbuf;
         Vector<Ref<IIndexBuffer>> _p_ibufs;
         Vector3f *_vertices;

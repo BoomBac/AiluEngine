@@ -4,8 +4,8 @@
 #include "Render/TextRenderer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Gizmo.h"
-#include <Framework/Common/ResourceMgr.h>
 #include <Framework/Common/Profiler.h>
+#include <Framework/Common/ResourceMgr.h>
 
 namespace Ailu
 {
@@ -17,7 +17,7 @@ namespace Ailu
         desc_list.emplace_back("COLOR", EShaderDateType::kFloat4, 2);
         _vbuf = IVertexBuffer::Create(desc_list, "text_vbuf");
         _ibuf = IIndexBuffer::Create(nullptr, kMaxCharacters * 6, "text_ibuf", true);
-        _obj_cb = IConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
+        _obj_cb = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
         _vbuf->SetStream(nullptr, kMaxCharacters * sizeof(Vector3f), 0, true);
         _vbuf->SetStream(nullptr, kMaxCharacters * sizeof(Vector2f), 1, true);
         _vbuf->SetStream(nullptr, kMaxCharacters * sizeof(Vector4f), 2, true);

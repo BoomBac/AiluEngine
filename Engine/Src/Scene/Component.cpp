@@ -3,23 +3,28 @@
 #include "Render/Gizmo.h"
 #include "pch.h"
 
-namespace Ailu
+namespace Ailu::ECS
 {
     Archive &operator<<(Archive &ar, const TagComponent &c)
     {
         ar.IncreaseIndent();
         ar.InsertIndent();
         ar << "_name:" << c._name;
+        ar.NewLine();
+        ar << "_layer_mask:" << c._layer_mask;
         ar.DecreaseIndent();
         ar.NewLine();
         return ar;
     }
     Archive &operator>>(Archive &ar, TagComponent &c)
     {
-        String bufs[1];
-        ar >> bufs[0];
+        Vector<String> bufs(2);
+        for(u16 i = 0; i < bufs.size();i++)
+            ar >> bufs[i];
         AL_ASSERT(su::BeginWith(bufs[0], "_name"));
         c._name = su::Split(bufs[0], ":")[1];
+        AL_ASSERT(su::BeginWith(bufs[1], "_layer_mask"));
+        c._layer_mask = (u32)std::stoul(su::Split(bufs[1], ":")[1]);
         return ar;
     }
 
@@ -240,7 +245,7 @@ namespace Ailu
         return ar;
     }
     
-    Archive &Ailu::operator<<(Archive &ar, const CHierarchy &c)
+    Archive &operator<<(Archive &ar, const CHierarchy &c)
     {
         ar.IncreaseIndent();
         ar.InsertIndent();
@@ -264,7 +269,7 @@ namespace Ailu
         ar.NewLine();
         return ar;
     }
-    Archive &Ailu::operator>>(Archive &ar, CHierarchy &c)
+    Archive &operator>>(Archive &ar, CHierarchy &c)
     {
         String bufs[1];
         ar >> bufs[0];
@@ -310,7 +315,7 @@ namespace Ailu
         _debug_material = nullptr;
     }
 
-    Archive &Ailu::operator<<(Archive &ar, const CLightProbe &c)
+    Archive &operator<<(Archive &ar, const CLightProbe &c)
     {
         ar.IncreaseIndent();
         ar << ar.GetIndent() << "_size:" << c._size << std::endl;
@@ -320,19 +325,19 @@ namespace Ailu
         return ar;
     }
 
-    Archive &Ailu::operator>>(Archive &ar, CLightProbe &c)
+    Archive &operator>>(Archive &ar, CLightProbe &c)
     {
         String bufs[1];
         ar >> bufs[0];
         AL_ASSERT(su::BeginWith(bufs[0], "_size"));
-        c._size = std::stoi(su::Split(bufs[0], ":")[1]);
+        c._size = (f32)std::stoi(su::Split(bufs[0], ":")[1]);
         ar >> bufs[0];
         AL_ASSERT(su::BeginWith(bufs[0], "_is_update_every_tick"));
         c._is_dirty = true;
         return ar;
     }
 
-    Archive &Ailu::operator<<(Archive &ar, const CRigidBody &c)
+    Archive &operator<<(Archive &ar, const CRigidBody &c)
     {
         ar.IncreaseIndent();
         ar << ar.GetIndent() << "_mass:" << c._mass << std::endl;
@@ -340,7 +345,7 @@ namespace Ailu
         return ar;
     }
 
-    Archive &Ailu::operator>>(Archive &ar, CRigidBody &c)
+    Archive &operator>>(Archive &ar, CRigidBody &c)
     {
         String bufs[1];
         ar >> bufs[0];
@@ -415,25 +420,28 @@ namespace Ailu
         c._distance = std::stof(su::Split(buf, ":")[1]);
         return ar;
     }
+}// namespace Ailu
 
+namespace Ailu
+{
     namespace DebugDrawer
     {
-        void DebugWireframe(const CCollider &c, const Transform &t,Color color)
+        void DebugWireframe(const ECS::CCollider &c, const Transform &t,Color color)
         {
-            if (c._type == EColliderType::kBox)
+            if (c._type == ECS::EColliderType::kBox)
             {
-                Gizmo::DrawOBB(CCollider::AsBox(c) * t._world_matrix, color);
+                Gizmo::DrawOBB(ECS::CCollider::AsBox(c) * t._world_matrix, color);
             }
-            else if (c._type == EColliderType::kSphere)
+            else if (c._type == ECS::EColliderType::kSphere)
             {
-                Gizmo::DrawSphere(CCollider::AsShpere(c) * t._world_matrix, color);
+                Gizmo::DrawSphere(ECS::CCollider::AsShpere(c) * t._world_matrix, color);
             }
-            else if (c._type == EColliderType::kCapsule)
+            else if (c._type == ECS::EColliderType::kCapsule)
             {
-                Gizmo::DrawCapsule(CCollider::AsCapsule(c) * t._world_matrix, color);
+                Gizmo::DrawCapsule(ECS::CCollider::AsCapsule(c) * t._world_matrix, color);
             }
         }
-        void DebugWireframe(const CVXGI &c, const Transform &t, Color color)
+        void DebugWireframe(const ECS::CVXGI &c, const Transform &t, Color color)
         {
             // 计算每个方向上的步长
             float widthX = c._grid_size.x;//(2.0f * c._grid_size.x) / c._grid_num.x;
@@ -470,4 +478,4 @@ namespace Ailu
             }
         }
     }
-}// namespace Ailu
+}

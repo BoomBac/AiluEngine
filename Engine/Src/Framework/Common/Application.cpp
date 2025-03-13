@@ -10,6 +10,7 @@
 #include "pch.h"
 #include <Render/Gizmo.h>
 #include <Render/TextRenderer.h>
+#include "Framework/Common/EngineConfig.h"
 #ifdef PLATFORM_WINDOWS
 //WINDOWS marco CSIDL_PROFILE
 #include <Shlobj.h>
@@ -22,6 +23,7 @@
 #include "Render/GraphicsContext.h"
 #include "Render/Pass/VolumetricClouds.h"
 #include "Render/RenderPipeline.h"
+#include "Framework/Parser/TextParser.h"
 
 #include "Objects/ReflectData.h"
 
@@ -34,7 +36,7 @@ namespace Ailu
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     LogMgr *g_pLogMgr = new LogMgr();
     Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
-    JobSystem *g_pJobSystem = new JobSystem(g_pThreadTool.get());
+    JobSystem *g_pJobSystem = new JobSystem(4u);
 
 
     WString Application::GetWorkingPath()
@@ -110,19 +112,51 @@ namespace Ailu
         _render_lag = s_target_lag;
         _update_lag = s_target_lag;
         _is_handling_event.store(true);
-        //_p_event_handle_thread = new std::thread([this]() {
-        //	while (_is_handling_event)
-        //	{
-        //		_p_window->OnUpdate();
-        //	}
-        //});
-        //_p_event_handle_thread->detach();
+        //Load ini
+        {
+            auto work_path = GetWorkingPath();
+            work_path = Application::GetUseHomePath();
+            LOG_INFO(L"WorkPath: {}", work_path);
+            //AlluEngine/
+            WString prex_w = work_path + L"OneDrive/AiluEngine/";
+            ResourceMgr::ConfigRootPath(prex_w);
+            _engin_config_path = prex_w + L"Editor/EngineConfig.ini";
+            INIParser ini_parser;
+            if (ini_parser.Load(_engin_config_path))
+            {
+                Type* type = EngineConfig::StaticType();
+                for(auto& it : ini_parser.GetValues("Layer"))
+                {
+                    auto&[k,v] = it;
+                    {
+                        ObjectLayer cur_layer;
+                        cur_layer._name = k;
+                        cur_layer._value = std::stoul(v);
+                        cur_layer._bit_pos = (u32)sqrt((f32)cur_layer._value);
+                        type->FindPropertyByName(cur_layer._name)->SetValue<u32>(s_engine_config,cur_layer._value);
+                    }
+                }
+            }
+        }
         LOG_INFO("Application Initialize Success with {} s", 0.001f * g_pTimeMgr->GetElapsedSinceLastMark());
         return 0;
     }
 
     void Application::Finalize()
     {
+        INIParser ini_parser;
+        Type* type = EngineConfig::StaticType();
+        for(const auto& it : type->GetProperties())
+        {
+            if (it.DataType() == EDataType::kUInt32)
+            {
+                ini_parser.SetValue(it.MetaInfo()._category,it.Name(),std::format("{}",it.GetValue<u32>(s_engine_config)));
+            }
+        }
+        if (ini_parser.Save(_engin_config_path))
+        {
+            LOG_INFO("Application::Finalize: write engine config...");
+        }
         DESTORY_PTR(_layer_stack);
         //DESTORY_PTR(_p_event_handle_thread);
         DESTORY_PTR(_p_window);
@@ -202,6 +236,7 @@ namespace Ailu
                         g_pGfxContext->GetPipeline()->FrameCleanUp();
                     }
                     _render_lag -= s_target_lag;
+                    Profiler::Get().EndFrame();
                 }
                 g_pThreadTool->ClearRecords();
             }
@@ -218,7 +253,7 @@ namespace Ailu
         _layer_stack->PushOverLayer(layer);
         layer->OnAttach();
     }
-    Application *Application::GetInstance()
+    Application *Application::Get()
     {
         return sp_instance;
     }
@@ -227,6 +262,13 @@ namespace Ailu
         _state = EApplicationState::EApplicationState_Exit;
         _is_handling_event.store(false);
         return false;
+    }
+    const ObjectLayer &Application::NameToLayer(const String &name)
+    {
+        auto it = std::find_if(_object_layers.begin(),_object_layers.end(),[&](const ObjectLayer& cur_layer)->bool{
+            return name == cur_layer._name;
+        });
+        return it==_object_layers.end()? _object_layers[1] : *it;
     }
     bool Application::OnLostFocus(WindowLostFocusEvent &e)
     {

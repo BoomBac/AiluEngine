@@ -87,7 +87,7 @@ namespace Ailu
     private:
         Material *_p_blit_mat;
         Mesh *_p_quad_mesh;
-        IConstantBuffer *_p_obj_cb;
+        ConstantBuffer *_p_obj_cb;
         Rect _half_sceen_rect;
     };
 
@@ -102,7 +102,7 @@ namespace Ailu
 
     private:
         Material *_p_blit_mat;
-        IConstantBuffer *_p_obj_cb;
+        ConstantBuffer *_p_obj_cb;
         RTHandle _depth_tex_handle;
     };
 
@@ -118,7 +118,6 @@ namespace Ailu
         Scope<RenderTexture> _p_mainlight_shadow_map;
         Scope<RenderTexture> _p_addlight_shadow_maps;
         Scope<RenderTexture> _p_point_light_shadow_maps;
-        Vector<Ref<Material>> _shadowcast_materials;
     };
 
     class AILU_API CubeMapGenPass : public RenderPass
@@ -136,8 +135,8 @@ namespace Ailu
         bool _is_src_cubemap = false;
         Texture *_input_src = nullptr;
         CBufferPerCameraData _camera_data[6];
-        Scope<IConstantBuffer> _per_camera_cb[6];
-        Scope<IConstantBuffer> _per_obj_cb;
+        Scope<ConstantBuffer> _per_camera_cb[6];
+        Scope<ConstantBuffer> _per_obj_cb;
         Matrix4x4f _world_mat;
         Rect _cubemap_rect;
         Rect _ibl_rect;
@@ -188,7 +187,7 @@ namespace Ailu
 
     private:
         Ref<Material> _p_skybox_material;
-        Scope<IConstantBuffer> _p_cbuffer;
+        Scope<ConstantBuffer> _p_cbuffer;
         Ref<ComputeShader> _p_lut_gen;
         bool _is_clear = false;
         Vector2Int _transmittance_lut_size = Vector2Int(256, 64);
@@ -207,7 +206,7 @@ namespace Ailu
         void EndPass(GraphicsContext *context) final;
 
     private:
-        Vector<Scope<IConstantBuffer>> _p_cbuffers;
+        Vector<Scope<ConstantBuffer>> _p_cbuffers;
     };
 
     class WireFramePass : public RenderPass
@@ -240,7 +239,7 @@ namespace Ailu
         Ref<IVertexBuffer> _vbuf;
         Ref<IIndexBuffer> _ibuf;
         Ref<Material> _ui_default_mat;
-        Ref<IConstantBuffer> _obj_cb;
+        Ref<ConstantBuffer> _obj_cb;
     };
 
     class MotionVectorPass : public RenderPass

@@ -34,7 +34,6 @@
 3a47674b-7028-4f49-a308-92c9fd4e9917,Icons/file.alasset,kTexture2D
 3bc80454-31f8-4ad0-a5ab-0d85ca43ca15,Icons/dark/anim_clip.alasset,kTexture2D
 4428ffdf-97de-4732-b74b-240a0bce3872,Icons/dark/skeleton.alasset,kTexture2D
-4628176c-30e5-4a79-84a6-8d5700326cc7,Shaders/depth_only.alasset,kShader
 46601513-96ea-4cc4-86db-0400c8824ec1,Materials/MAT_Red.alasset,kMaterial
 4c66b646-9e1a-489c-8344-133b5036bf17,NewScene/Default_emissive.alasset,kTexture2D
 4eac1bdc-8122-4414-809e-80d7fd4b8fbf,NewScene/Palace/textures/sponza_column_b_baseColor.alasset,kTexture2D

@@ -40,7 +40,6 @@ StandardPSInput ForwardVSMain(StandardVSInput v)
 	result.btn = float3x3(T, B, N);
 	result.normal = N;
 	result.world_pos = TransformObjectToWorld(v.position);
-	result.shadow_pos = TransformFromWorldToLightSpace(0, result.world_pos);
 	return result;
 }
 
