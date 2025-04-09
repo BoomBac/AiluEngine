@@ -15,8 +15,8 @@ namespace Ailu
         desc_list.emplace_back("POSITION", EShaderDateType::kFloat3, 0);
         desc_list.emplace_back("TEXCOORD", EShaderDateType::kFloat2, 1);
         desc_list.emplace_back("COLOR", EShaderDateType::kFloat4, 2);
-        _vbuf = IVertexBuffer::Create(desc_list, "text_vbuf");
-        _ibuf = IIndexBuffer::Create(nullptr, kMaxCharacters * 6, "text_ibuf", true);
+        _vbuf = VertexBuffer::Create(desc_list, "text_vbuf");
+        _ibuf = IndexBuffer::Create(nullptr, kMaxCharacters * 6, "text_ibuf", true);
         _obj_cb = ConstantBuffer::Create(RenderConstants::kPerObjectDataSize);
         _vbuf->SetStream(nullptr, kMaxCharacters * sizeof(Vector3f), 0, true);
         _vbuf->SetStream(nullptr, kMaxCharacters * sizeof(Vector2f), 1, true);
@@ -133,7 +133,7 @@ namespace Ailu
         CBufferPerObjectData per_obj_data;
         per_obj_data._MatrixWorld = MatrixTranslation(-w*0.5f,h*0.5f,0);
         memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
-        cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &cb_per_cam, RenderConstants::kPerCameraDataSize);
+        cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,&cb_per_cam, RenderConstants::kPerCameraDataSize);
         cmd->SetRenderTarget(target);
         cmd->DrawIndexed(_vbuf, _ibuf, _obj_cb, _default_mat.get());
     }

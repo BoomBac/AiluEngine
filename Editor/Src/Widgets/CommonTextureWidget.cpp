@@ -263,7 +263,7 @@ namespace Ailu
                 ImGui::Text("Displayed: %d x %d", w, h);
                 ImGui::Text("Mipmap: %d", _p_tex->MipmapLevel());
                 ImGui::Text("Fomat: %s", EALGFormat::ToString(_p_tex->PixelFormat()));
-                ImGui::Text("Graphics Memory: %.2f mb", (f32) _p_tex->GetState().GetSize() * 9.5367431640625E-07);
+                ImGui::Text("Graphics Memory: %.2f mb", (f32) _p_tex->GetSize() * 9.5367431640625E-07);
                 //if (ImGui::CollapsingHeader("Common"))
                 //{
 

@@ -26,6 +26,9 @@ namespace Ailu
         constexpr static u16 kMaxAreaLightNum = kMaxAreaLight;
         constexpr static u16 kMaxCascadeShadowMapSplitNum = kMaxCascadeShadowMapSplit;
 
+        constexpr static u16 kMaxMRTNum = 8u;
+        
+
         constexpr static u32 kPerMaterialDataSize = 256;//sizeof(ScenePerMaterialData);
         constexpr static u32 kPerObjectDataSize = sizeof(CBufferPerObjectData);
         constexpr static u32 kPerCameraDataSize = sizeof(CBufferPerCameraData);

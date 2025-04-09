@@ -49,7 +49,6 @@ namespace Ailu
         _shape_noise = Texture3D::Create(desc);
         _shape_noise->Name("VolumetricCloudsShapeNoise");
         _shape_noise->Apply();
-        _shape_noise->CreateView();
         _noise_gen->SetVector("_Size", Vector4f((f32) w, (f32) w, (f32) w, 0.f));
         _noise_gen->SetTexture("_OutNoise3D", _shape_noise.get());
         u16 thread_size_x, thread_size_y, thread_size_z;
@@ -64,7 +63,6 @@ namespace Ailu
         _detail_noise = Texture3D::Create(desc);
         _detail_noise->Name("VolumetricCloudsDetailNoise");
         _detail_noise->Apply();
-        _detail_noise->CreateView();
         _noise_gen->SetVector("_Size", Vector4f((f32) w, (f32) w, (f32) w, 0.f));
         _noise_gen->SetTexture("_OutNoise3D", _detail_noise.get());
         shape_kernel = _noise_gen->FindKernel("DetailNoiseMain");
@@ -79,7 +77,6 @@ namespace Ailu
         _curl_noise = Texture2D::Create(curl_desc);
         _curl_noise->Apply();
         _curl_noise->Name("CurlNoise");
-        _curl_noise->CreateView();
         _noise_gen->SetVector("_Size", Vector4f(128.0f, 128.0f, 1.0f / 128.0f, 1.0f / 128.0f));
         _noise_gen->SetTexture("_CurlOut", _curl_noise.get());
         auto curl_kernel = _noise_gen->FindKernel("CurlNoiseMain");
@@ -158,6 +155,7 @@ namespace Ailu
                     cmd->Dispatch(_cloud_gen.get(), kernel, x, y, 1);
                 }
             }
+            cmd->SetRenderTargetLoadAction(rendering_data._camera_color_target_handle,ELoadStoreAction::kNotCare);
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
             _global_cloud->SetTexture("_CloudTex", _cloud_rt_a.get());
             cmd->DrawFullScreenQuad(_global_cloud.get(), 1);

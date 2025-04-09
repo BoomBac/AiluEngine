@@ -14,19 +14,27 @@ namespace Ailu
 	void GraphicsContext::InitGlobalContext()
 	{
         TimerBlock b("----------------------------------------------------------- GraphicsContext::InitGlobalContext");
-		g_pGfxContext = new D3DContext(dynamic_cast<WinWindow*>(Application::Get()->GetWindowPtr()));
+		g_pGfxContext = new D3DContext(dynamic_cast<WinWindow*>(Application::Get().GetWindowPtr()));
 		g_pGfxContext->Init();
 		g_pRenderTexturePool = new RenderTexturePool();
+		CommandPool::Init();
         GpuResourceManager::Init();
         CommandBufferPool::Init();
+        RHICommandBufferPool::Init();
 		GraphicsPipelineStateMgr::Init();
 	}
 	void GraphicsContext::FinalizeGlobalContext()
 	{
-        GpuResourceManager::Shutdown();
-        CommandBufferPool::Shutdown();
 		GraphicsPipelineStateMgr::Shutdown();
+        RHICommandBufferPool::Shutdown();
+        CommandBufferPool::Shutdown();
+        GpuResourceManager::Shutdown();
+		CommandPool::Shutdown();
 		DESTORY_PTR(g_pRenderTexturePool);
 		DESTORY_PTR(g_pGfxContext);
 	}
+    GraphicsContext &GraphicsContext::Get()
+    {
+        return *g_pGfxContext;
+    }
 }

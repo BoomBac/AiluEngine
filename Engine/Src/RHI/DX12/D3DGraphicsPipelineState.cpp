@@ -9,17 +9,30 @@
 
 namespace Ailu
 {
-    D3DGraphicsPipelineState::D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer) : _state_desc(initializer)
+    D3DGraphicsPipelineState::D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer) : GraphicsPipelineStateObject(initializer)
     {
-        _hash = GraphicsPipelineStateObject::ConstructPSOHash(initializer);
-        _name = initializer._p_vertex_shader->Name();
         memset(&_d3d_pso_desc, 0, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));//置空，否则编译不加 /sdl时创建pso时会有空指针
     }
-
-    void D3DGraphicsPipelineState::Build(u16 pass_index, ShaderVariantHash variant_hash)
+    D3DGraphicsPipelineState::~D3DGraphicsPipelineState()
     {
-        if (!_b_build)
+        LOG_INFO("Destory gpso {}",_name);
+    }
+
+    void D3DGraphicsPipelineState::UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
+    {
+        if (!_is_ready_for_rendering)
         {
+            GpuResource::UploadImpl(ctx,rhi_cmd,params);
+            u16 pass_index = 0u;
+            ShaderVariantHash variant_hash = 0u;
+            if (params)
+            {
+                if (auto param = dynamic_cast<UploadParamsGPSO*>(params); param != nullptr)
+                {
+                    pass_index = param->_pass_index;
+                    variant_hash = param->_variant_hash;
+                }
+            }
             auto d3dshader = static_cast<D3DShader *>(_state_desc._p_vertex_shader);
             _p_bind_res_desc_infos = const_cast<std::unordered_map<std::string, ShaderBindResourceInfo> *>(&d3dshader->GetBindResInfo(pass_index, variant_hash));
             _bind_res_desc_type_lut.clear();
@@ -73,8 +86,8 @@ namespace Ailu
             inputLayoutDesc.pInputElementDescs = v.data();
             inputLayoutDesc.NumElements = (UINT)v.size();
             _d3d_pso_desc.InputLayout = inputLayoutDesc;
-            ThrowIfFailed(D3DContext::Get()->GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
-            _b_build = true;
+            ThrowIfFailed(static_cast<D3DContext&>(GraphicsContext::Get()).GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
+            _is_ready_for_rendering = true;
             _hash = ConstructPSOHash(_state_desc, pass_index, variant_hash);
             //u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
             //u64 shader_hash;
@@ -91,100 +104,67 @@ namespace Ailu
         }
     }
 
-    void D3DGraphicsPipelineState::Bind(CommandBuffer *cmd)
+    void D3DGraphicsPipelineState::BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params)
     {
-        _state.Track();
-        if (!_b_build)
+        if (!_is_ready_for_rendering)
         {
             LOG_ERROR("PipelineState must be build before it been bind!");
             return;
         }
-        _p_cmd = dynamic_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
+        _p_cmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
         if (_state_desc._depth_stencil_state._b_front_stencil)
             _p_cmd->OMSetStencilRef(_state_desc._depth_stencil_state._stencil_ref_value);
         _p_cmd->SetGraphicsRootSignature(_p_sig.Get());
         _p_cmd->SetPipelineState(_p_plstate.Get());
         _p_cmd->IASetPrimitiveTopology(_d3d_topology);
-        for(u16 i = 0; i < _bind_res.size(); i++)
+        for(u16 i = 0; i <= _max_slot; i++)
         {
             if (_bind_res_signature & (1 << i))
-                BindResource(cmd, _bind_res[i]);
+                BindResource(rhi_cmd, _bind_res[i]);
         }
     }
 
-    void D3DGraphicsPipelineState::SetPipelineResource(const PipelineResource& pipeline_res)
-    {
-        if (pipeline_res._slot < 0)
-            return;
-        _bind_res_signature |=  (1 << pipeline_res._slot);
-        _bind_res[pipeline_res._slot] = pipeline_res;
-    }
-
-    bool D3DGraphicsPipelineState::IsValidPipelineResource(const EBindResDescType &res_type, u8 slot) const
-    {
-        EBindResDescType aka_type = res_type == EBindResDescType::kConstBufferRaw ? EBindResDescType::kConstBuffer : res_type;
-        if (_bind_res_desc_type_lut.contains(slot))
-        {
-            auto range = _bind_res_desc_type_lut.equal_range(slot);
-            for (auto it = range.first; it != range.second; ++it)
-            {
-                if (it->second == aka_type)
-                    return true;
-            }
-        }
-        return false;
-    }
-
-
-    const String &D3DGraphicsPipelineState::SlotToName(u8 slot)
-    {
-        const static String empty_str = {};
-        if (_bind_res_name_lut.contains(slot))
-            return _bind_res_name_lut.at(slot);
-        return empty_str;
-    }
-
-    const u8 D3DGraphicsPipelineState::NameToSlot(const String &name)
-    {
-        if (_p_bind_res_desc_infos->contains(name))
-            return _p_bind_res_desc_infos->at(name)._bind_slot;
-        return (u8)-1;
-    }
-
-    void D3DGraphicsPipelineState::BindResource(CommandBuffer * cmd,const PipelineResource& res)
+    void D3DGraphicsPipelineState::BindResource(RHICommandBuffer * cmd,const PipelineResource& res)
     {
         if (res._p_resource == nullptr)
             return;
-        u8 bind_slot = res._slot == 255 ? _per_frame_cbuf_bind_slot : res._slot;
-        if (!IsValidPipelineResource(res._res_type, bind_slot))
-        {
-            //LOG_WARNING("PSO:{} submitBindResource: bind slot {} not found!", _name, (u16) bind_slot);
-            return;
-        }
-        i16 slot = res._slot;
+        static_cast<D3DCommandBuffer*>(cmd)->MarkUsedResource(res._p_resource);
         switch (res._res_type)
         {
             case Ailu::EBindResDescType::kConstBuffer:
             {
-                dynamic_cast<ConstantBuffer *>(res._p_resource)->Bind(cmd, bind_slot);
+                BindParams params;
+                params._is_compute_pipeline = false;
+                params._slot = res._slot;
+                res._p_resource->Bind(cmd, &params);
             }
             break;
             case Ailu::EBindResDescType::kConstBufferRaw:
             {
-                D3D12_GPU_VIRTUAL_ADDRESS address = static_cast<D3D12_GPU_VIRTUAL_ADDRESS>(res._addi_info._gpu_handle);
-                dynamic_cast<D3DCommandBuffer *>(cmd)->GetCmdList()->SetGraphicsRootConstantBufferView(bind_slot, address);
+                BindParamsUB params;
+                params._gpu_ptr = res._addi_info._gpu_handle;
+                params._is_compute_pipeline = false;
+                params._slot = res._slot;
+                res._p_resource->Bind(cmd, &params);
             }
             break;
             case EBindResDescType::kBuffer:
             case EBindResDescType::kRWBuffer:
             {
-                dynamic_cast<GPUBuffer *>(res._p_resource)->Bind(cmd,slot);
+                BindParams params;
+                params._is_compute_pipeline = false;
+                params._slot = res._slot;
+                res._p_resource->Bind(cmd, &params);
             }
             break;
             case Ailu::EBindResDescType::kTexture2D:
             {
-                Texture* tex = dynamic_cast<Texture*>(res._p_resource);
-                tex->Bind(cmd, Texture::kMainSRVIndex, slot,D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, false);
+                BindParamsTexture params;
+                params._is_compute_pipeline = false;
+                params._slot = res._slot;
+                params._sub_res = res._addi_info._sub_res;
+                params._view_idx = res._addi_info._view_index;
+                res._p_resource->Bind(cmd, &params);
             }
             break;
             case Ailu::EBindResDescType::kSampler:
@@ -197,12 +177,7 @@ namespace Ailu
     }
     void D3DGraphicsPipelineState::SetTopology(ETopology topology)
     {
-        _state_desc._topology = topology;
+        GraphicsPipelineStateObject::SetTopology(topology);
         _d3d_topology = D3DConvertUtils::ConvertToDXTopology(_state_desc._topology);
-    }
-
-    void D3DGraphicsPipelineState::SetStencilRef(u8 ref) 
-    {
-        _state_desc._depth_stencil_state._stencil_ref_value;
     }
 }// namespace Ailu

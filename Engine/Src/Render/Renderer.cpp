@@ -2,6 +2,7 @@
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/TimeMgr.h"
+#include "Framework/Common/Application.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/Pass/PostprocessPass.h"
@@ -21,8 +22,6 @@ namespace Ailu
         _p_context = g_pGfxContext;
         _b_init = true;
         Profiler::Initialize();
-        _p_timemgr = new TimeMgr();
-        _p_timemgr->Initialize();
         _rendering_data._gbuffers.resize(4);
         _shadowcast_pass = MakeScope<ShadowCastPass>();
         _gbuffer_pass = MakeScope<DeferredGeometryPass>();
@@ -56,17 +55,12 @@ namespace Ailu
 
     Renderer::~Renderer()
     {
-        _p_timemgr->Finalize();
         Profiler::Shutdown();
-        DESTORY_PTR(_p_timemgr);
     }
 
     void Renderer::Render(const Camera &cam, const Scene &s)
     {
         bool is_output_to_camera_tex = cam.TargetTexture() != nullptr;
-        RenderingStates::Reset();
-        ModuleTimeStatics::RenderDeltatime = _p_timemgr->GetElapsedSinceLastMark();
-        _p_timemgr->Mark();
         for (auto &e: _events_before_tick)
         {
             e();
@@ -78,7 +72,7 @@ namespace Ailu
                 DoRender(cam, s);
                 auto cmd = CommandBufferPool::Get("FinalBlit");
                 {
-                    ProfileBlock b(cmd.get(), cmd->GetName());
+                    GpuProfileBlock b(cmd.get(), cmd->Name());
                     cmd->Blit(_rendering_data._camera_color_target_handle, cam.TargetTexture());
                 }
                 _p_context->ExecuteCommandBuffer(cmd);
@@ -97,7 +91,7 @@ namespace Ailu
                     DoRender(tmp_cam, s);
                     auto cmd = CommandBufferPool::Get("FinalBlit");
                     {
-                        ProfileBlock b(cmd.get(), cmd->GetName());
+                        GpuProfileBlock b(cmd.get(), cmd->Name());
                         cmd->Blit(g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle), cam.TargetTexture(), 0,
                                   cam.TargetTexture()->CalculateViewIndex(Texture::ETextureViewType::kRTV, face, 0, 0), nullptr);
                     }
@@ -176,10 +170,11 @@ namespace Ailu
                 RenderTexture::ReleaseTempRT(_rendering_data._gbuffers[i]);
             }
             _rendering_data._camera_data._camera_color_target_desc = RenderTextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
+            _rendering_data._camera_data._camera_color_target_desc._load_action = ELoadStoreAction::kNotCare;
             _camera_color_handle = RenderTexture::GetTempRT(_rendering_data._camera_data._camera_color_target_desc, "CameraColorAttachment");
             _camera_depth_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
-            _camera_depth_tex_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraDepthTexture", ERenderTargetFormat::kRFloat);
-            _rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraColorOpaqueTex", ERenderTargetFormat::kDefaultHDR);
+            _camera_depth_tex_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraDepthTexture", ERenderTargetFormat::kRFloat,ELoadStoreAction::kNotCare);
+            _rendering_data._camera_opaque_tex_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraColorOpaqueTex", ERenderTargetFormat::kDefaultHDR,ELoadStoreAction::kNotCare);
             _rendering_data._gbuffers[0] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer0", ERenderTargetFormat::kRGHalf);
             _rendering_data._gbuffers[1] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer1", ERenderTargetFormat::kDefault);
             _rendering_data._gbuffers[2] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer2", ERenderTargetFormat::kDefault);
@@ -286,11 +281,6 @@ namespace Ailu
         //_features.clear();
     }
 
-    float Renderer::GetDeltaTime() const
-    {
-        return _p_timemgr->GetElapsedSinceLastMark();
-    }
-
     void Renderer::SubmitTaskPass(RenderPass *task)
     {
         _p_task_render_passes.emplace_back(task);
@@ -375,7 +365,7 @@ namespace Ailu
                                                     1.0f / QuailtySetting::s_shadow_fade_out_factor, 1.0f / cascade_shaodw_max_dis, 0.f);
         scene_data->g_IndirectLightingIntensity = s._light_data._indirect_lighting_intensity;
         PrepareLight(s);
-        f32 t = g_pTimeMgr->TimeSinceLoad, dt = g_pTimeMgr->DeltaTime, sdt = g_pTimeMgr->s_smooth_delta_time;
+        f32 t = g_pTimeMgr->TickTimeSinceLoad, dt = g_pTimeMgr->DeltaTime, sdt = g_pTimeMgr->s_smooth_delta_time;
         t*= 0.001f;
         scene_data->_Time = Vector4f(t / 20, t, t * 2, (f32) g_pGfxContext->GetFrameCount());
         scene_data->_SinTime = Vector4f(sin(t / 8), sin(t / 4), sin(t / 2), sin(t));
@@ -593,39 +583,37 @@ namespace Ailu
     {
         return _target_tex;
     }
-    void Renderer::SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj)
-    {
-        auto cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(_active_camera_hash));
-        cam_cb_data->_MatrixV = view;
-        cam_cb_data->_MatrixP = proj;
-        cam_cb_data->_MatrixVP = cam_cb_data->_MatrixV * cam_cb_data->_MatrixP;
-        cam_cb_data->_MatrixIVP = MatrixInverse(cam_cb_data->_MatrixVP);
-        _rendering_data._p_per_camera_cbuf = _cur_fs->GetCameraCB(_active_camera_hash);
-    }
     void Renderer::DoRender(const Camera &cam, const Scene &s)
     {
-        BeginScene(cam, s);
+        if (Application::Get()._is_multi_thread_rendering && _p_cur_pipeline->_is_need_wait_for_render_thread)
         {
-            if (cam._layer_mask & ERenderLayer::kDefault)
+            Application::Get().NotifyRender();
+            Application::Get().WaitForRender();
+            _p_cur_pipeline->_is_need_wait_for_render_thread = false;
+        }
+        {
+            PROFILE_BLOCK_CPU(BeginScene)
+            BeginScene(cam, s);
+        }
+        if (cam._layer_mask & ERenderLayer::kDefault)
+        {
+            for (auto &pass: _render_passes)
             {
-                for (auto &pass: _render_passes)
+                if (pass->IsActive())
                 {
-                    if (pass->IsActive())
-                    {
-                        CPUProfileBlock cblock(pass->GetName());
-                        pass->BeginPass(_p_context);
-                        pass->Execute(_p_context, _rendering_data);
-                        pass->EndPass(_p_context);
-                    }
+                    CPUProfileBlock cblock(pass->GetName());
+                    pass->BeginPass(_p_context);
+                    pass->Execute(_p_context, _rendering_data);
+                    pass->EndPass(_p_context);
                 }
             }
-            else if (cam._layer_mask & ERenderLayer::kSkyBox)
-            {
-                CPUProfileBlock cblock(_skybox_pass->GetName());
-                _skybox_pass->BeginPass(_p_context);
-                _skybox_pass->Execute(_p_context, _rendering_data);
-                _skybox_pass->EndPass(_p_context);
-            }
+        }
+        else if (cam._layer_mask & ERenderLayer::kSkyBox)
+        {
+            CPUProfileBlock cblock(_skybox_pass->GetName());
+            _skybox_pass->BeginPass(_p_context);
+            _skybox_pass->Execute(_p_context, _rendering_data);
+            _skybox_pass->EndPass(_p_context);
         }
         EndScene(s);
     }

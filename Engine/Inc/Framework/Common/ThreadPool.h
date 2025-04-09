@@ -83,7 +83,7 @@ namespace Ailu
             auto wrapper = make_shared<packaged_task<return_type()>>(bind(forward<Callable>(task), std::forward<Args>(args)...));
             std::future<return_type> ret = wrapper->get_future();
             auto new_task = Task{name, [=](){ (*wrapper)(); }};
-            while(!_tasks.Enqueue(new_task))
+            while(!_tasks.Push(new_task))
                 std::this_thread::yield();
             _task_cv.notify_one();
             return ret;
@@ -112,16 +112,15 @@ namespace Ailu
             _task_time_records.resize(num_threads);
 			for (auto i = 0u; i < num_threads; ++i)
 			{
-				std::wstring thread_name = std::format(L"Worker_{0}", _s_global_thread_id++);
+				std::string thread_name = std::format("Worker_{0}", _s_global_thread_id++);
 				_threads.emplace_back([=, this]() {
-					SetThreadDescription(GetCurrentThread(), thread_name.c_str());
+					SetThreadName(thread_name);
 					while (true)
 					{
-						Task task;
-                        if (_tasks.Dequeue(task))
+                        if (auto task = _tasks.Pop(); task.has_value() == true)
                         {
                             _thread_status[i] = EThreadStatus::kRunning;
-                            task._task();
+                            task.value()._task();
                             _thread_status[i] = EThreadStatus::kIdle;
                         }
                         else

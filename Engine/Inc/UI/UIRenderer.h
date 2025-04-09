@@ -39,8 +39,8 @@ namespace Ailu
                 ~DrawerBlock();
             public:
                 Ref<Material> _mat;
-                IVertexBuffer* _vbuf;
-                IIndexBuffer* _ibuf;
+                VertexBuffer* _vbuf;
+                IndexBuffer* _ibuf;
                 Vector<Vector3f> _pos_buf;
                 Vector<Vector2f> _uv_buf;
                 Vector<u32> _index_buf;

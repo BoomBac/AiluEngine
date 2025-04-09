@@ -4,26 +4,46 @@
 #include "GlobalMarco.h"
 #include "TimeMgr.h"
 #include "Container.hpp"
+#include <queue>
+#include <optional>
 
 namespace Ailu
 {
 	struct ProfileData
 	{
-		static const u64 FilterSize = 64;
+		static const u32 kFilterSize = 64u;
 		String Name;
 
-		bool QueryStarted = false;
-		bool QueryFinished = true;
-		bool Active = false;
+		bool _is_start = false;
+		bool _is_finished = true;
+		bool _is_active = false;
 
-		bool CPUProfile = false;
-		f64 _time = 0.0;
-		f64 _max_time = 0.0;
-		f64 _avg_time = 0.0;
-		f64 _start_time_since_cur_frame = 0.0;
+		bool _is_cpu_profile = false;
+		f32 _time = 0.0f;
+		f32 _max_time = 0.0f;
+		f32 _avg_time = 0.0f;
+		f32 _start_time = 0.0f;//since launch
 
-		f64 TimeSamples[FilterSize] = { };
-		u64 CurrSample = 0;
+		f32 _time_samples[kFilterSize] = { };
+		u32 _index = 0u;
+		struct Record
+		{
+			f32 _start;
+			f32 _duration;
+			u64 _frame;
+		};
+		void PushRecord(u64 frame) {
+			_record.emplace(_start_time,_time,frame);
+		};
+		std::optional<Record> PopRecord()
+		{
+			if (_record.empty())
+				return std::nullopt;
+			auto ret = std::make_optional(_record.front());
+			_record.pop();
+			return ret;
+		}
+		std::queue<Record> _record;
 	};
 
 	struct ProfileFrameData
@@ -31,78 +51,86 @@ namespace Ailu
 		struct ProfileEditorData
 		{
 			String _name;
-			f32 _start_time;
+			f32 _start_time;//自当前帧
 			f32 _duration;
 			u16 _call_depth;
 			ProfileEditorData(const String& name, f32 start_time, f32 duration, u16 call_depth) : _name(name), _start_time(start_time), _duration(duration), _call_depth(call_depth) {}
 		};
 		u64 _frame_index;
-		f32 _start_time;
-		f32 _end_time;
-		Map<std::thread::id,List<ProfileEditorData>> _profile_data_list;
+		f32 _start_time;//自程序启动
+		f32 _end_time;//自程序启动
+		Map<std::thread::id,List<ProfileEditorData>> _data_threads;
 	};
-	class CommandBuffer;
+	class RHICommandBuffer;
 	class AILU_API Profiler
 	{
-		friend class ProfileBlock;
+		friend class GpuProfileBlock;
 		friend class CPUProfileBlock;
 	public:
-		inline static constexpr u64 kMaxProfileNum = IGPUTimer::kMaxGpuTimerNum;
+		inline static constexpr u32 kMaxProfileNum = IGPUTimer::kMaxGpuTimerNum;
 		inline static constexpr u32 kMaxCacheDataNum = 300;
-		
+	
 		static Profiler& Get();
 		static void Initialize();
 		static void Shutdown();
+		
+		u32 StartGpuProfile(RHICommandBuffer * cmdList, const String& name);
+		void EndGpuProfile(RHICommandBuffer * cmdList, u32 idx);
+		
+		u32 StartCPUProfile(const String& name);
+		void EndCPUProfile(u32 idx);
 
-		u64 StartProfile(CommandBuffer * cmdList, const String& name);
-		void EndProfile(CommandBuffer * cmdList, u64 idx);
+		ProfileData* GetCPUProfileData(u32 idx) {return &_cpu_profiles[idx];};
+		ProfileData*GetGpuProfileData(u32 idx) {return &_gpu_profiles[idx];};
 
-		u64 StartCPUProfile(const String& name);
-		void EndCPUProfile(u64 idx);
-
-		ProfileData* GetCPUProfileData(u64 idx) {return &cpuProfiles[idx];};
-		ProfileData* GetProfileData(u64 idx) {return &profiles[idx];};
-		ProfileFrameData GetLastFrameData()
-		{
-			return _cache_data.back();
+		const List<ProfileFrameData>& GetFrameData() {
+			_is_clear_cache = true;
+			return _cache_data;
 		}
+		void BeginFrame();
 		void EndFrame();
+		void AddCPUProfilerHierarchy(bool begin_profiler, u32 index);
+		void AddGPUProfilerHierarchy(bool begin_profiler, u32 index);
+		struct BlockMark
+		{
+			bool _is_start;
+			u32 _profiler_index;
+			std::thread::id _tid;
+			String _name;
+			u64 _frame;
+		};
+		void StartRecord() {_is_start_record = true;};
+		void StopRecord() {_is_start_record = false;};
+	
+		Queue<BlockMark> _gpu_profiler_queue;
+	public:
 
-		List<std::tuple<bool, u32,std::thread::id>> _cpu_profiler_queue;
-		std::queue<std::tuple<bool, u32>> _gpu_profiler_queue;
 	private:
-		void AddCPUProfilerHierarchy(bool begin_profiler, u32 index)
-		{
-            std::lock_guard<std::mutex> lock(_lock);
-			_cpu_profiler_queue.push_back(std::make_tuple(begin_profiler, index,std::this_thread::get_id()));
-		}
-		void AddGPUProfilerHierarchy(bool begin_profiler, u32 index)
-		{
-            std::lock_guard<std::mutex> lock(_lock);
-			_gpu_profiler_queue.push(std::make_tuple(begin_profiler, index));
-		}
 	private:
-		Array<ProfileData,kMaxProfileNum> profiles;
-		Array<ProfileData,kMaxProfileNum> cpuProfiles;
-		u64 numProfiles = 0;
-		u64 numCPUProfiles = 0;
+		Array<ProfileData,kMaxProfileNum> _gpu_profiles;
+		Array<ProfileData,kMaxProfileNum> _cpu_profiles;
+		u32 numProfiles = 0;
+		u32 numCPUProfiles = 0;
 		TimeMgr _cpu_timer;
 		IGPUTimer* _p_gpu_timer = nullptr;
         std::mutex _lock;
-		std::deque<ProfileFrameData> _cache_data;
+		List<ProfileFrameData> _cache_data;
+		bool _is_clear_cache = true;
+		bool _is_record_mode = false;
+		bool _is_start_record = false;
+		HashMap<std::thread::id, List<BlockMark>> _cpu_profiler_queue;
+		u64 _cur_frame;
 	};
-
+    class CommandBuffer;
 	//command must been execute out of prifile scope
-    class AILU_API ProfileBlock
-	{
+    class AILU_API GpuProfileBlock
+    {
 	public:
-
-		ProfileBlock(CommandBuffer * cmdList, const String& name);
-		~ProfileBlock();
-
-	protected:
-        CommandBuffer * cmdList = nullptr;
-		u64 idx = u64(-1);
+        GpuProfileBlock(CommandBuffer * cmdList, const String& name);
+		~GpuProfileBlock();
+    private:
+        CommandBuffer* _cmdList = nullptr;
+        String _name;
 	};
 
 	class AILU_API CPUProfileBlock
@@ -112,10 +140,11 @@ namespace Ailu
 		explicit CPUProfileBlock(const String& name);
 		~CPUProfileBlock();
 
-	protected:
-		u64 idx = u64(-1);
+	private:
+		u32 idx = u32(-1);
+		inline static std::mutex _mutex;
 	};
-#define PROFILE_BLOCK_GPU(cmd, block_name) ProfileBlock block_name##_GPU(cmd, #block_name);
+#define PROFILE_BLOCK_GPU(cmd, block_name) GpuProfileBlock block_name##_GPU(cmd, #block_name);
 #define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock block_name##_CPU(#block_name);
 }
 

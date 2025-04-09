@@ -27,7 +27,7 @@ namespace Ailu
         _p_active_shader = other._p_active_shader;
         for (auto &cbuf: other._p_cbufs)
         {
-            u32 buffer_size = cbuf->GetBufferSize();
+            u32 buffer_size = cbuf->GetSize();
             _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
             memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
         }
@@ -59,7 +59,7 @@ namespace Ailu
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
         for (auto &cbuf: other._p_cbufs)
         {
-            u32 buffer_size = cbuf->GetBufferSize();
+            u32 buffer_size = cbuf->GetSize();
             _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
             memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
         }
@@ -84,34 +84,38 @@ namespace Ailu
     void Material::Bind(u16 pass_index)
     {
         AL_ASSERT(pass_index < _pass_variants.size());
-        auto &cur_pass_variant_hash = _pass_variants[pass_index]._variant_hash;
-        auto variant_state = _p_active_shader->GetVariantState(pass_index, cur_pass_variant_hash);
-        if (variant_state != EShaderVariantState::kReady)
-            return;
-        _p_active_shader->SetCullMode((ECullMode) _common_uint_property[kCullModeKey]);
-        _p_active_shader->Bind(pass_index, cur_pass_variant_hash);
-        i8 cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._per_mat_buf_bind_slot;
-        if (cbuf_bind_slot != -1)
+        AL_ASSERT(!_states.empty());
         {
-            GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(_p_cbufs[pass_index].get(), EBindResDescType::kConstBuffer, cbuf_bind_slot, PipelineResource::kPriorityLocal));
-        }
-        auto &bind_textures = _textures_all_passes[pass_index];
-        auto &bind_infos = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._bind_res_infos;
-        for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
-        {
-            auto bind_it = bind_infos.find(it->first);
-            if (bind_it != bind_infos.end())
+            std::unique_lock lock(_state_mutex);
+            auto& cur_state = _states.front();
+            auto variant_state = _p_active_shader->GetVariantState(pass_index, cur_state._variant_hash);
+            if (variant_state != EShaderVariantState::kReady)
+                return;
+            _p_active_shader->SetCullMode((ECullMode) _common_uint_property[kCullModeKey]);
+            _p_active_shader->Bind(pass_index, cur_state._variant_hash);
+            if (cur_state._cbuf_bind_slot != -1)
             {
-                auto &[slot, texture] = it->second;
-                if (texture != nullptr)
+                GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(_p_cbufs[pass_index].get(), EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerMaterial, PipelineResource::kPriorityLocal));
+            }
+            for (u16 i = 0; i <= cur_state._max_bind_slot; i++)
+            {
+                if (GpuResource* res = cur_state._bind_res[i];res != nullptr)
                 {
-                    GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(texture, EBindResDescType::kTexture2D, bind_it->second._bind_slot, PipelineResource::kPriorityLocal));
+                    if (res->GetResourceType() == EGpuResType::kTexture || res->GetResourceType() == EGpuResType::kRenderTexture)
+                    {
+                        GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(res, EBindResDescType::kTexture2D, i, cur_state._bind_res_priority[i]));
+                    }
+                    else if (res->GetResourceType() == EGpuResType::kConstBuffer)
+                    {
+                        GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(res, EBindResDescType::kConstBuffer, i, cur_state._bind_res_priority[i]));
+                    }
+                    else if (res->GetResourceType() == EGpuResType::kBuffer)
+                    {
+                        GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(res, EBindResDescType::kBuffer, i, cur_state._bind_res_priority[i]));
+                    }
                 }
             }
-            //else
-            //{
-            //	LOG_WARNING("Material: {} haven't set texture on bind slot {}",_name,(short)slot);
-            //}
+            _states.pop();
         }
     }
 
@@ -590,12 +594,14 @@ namespace Ailu
                 auto &textures = _textures_all_passes[i];
                 for (auto it = tmp_textures.begin(); it != tmp_textures.end(); it++)
                 {
-                    if (!textures.contains(it->first))
+                    if (textures.contains(it->first))
                     {
-                        _textures_all_passes[i].insert(*it);
+                        const auto& [old_slot, old_tex] = textures[it->first];
+                        auto& [new_slot, new_tex] = it->second;
+                        it->second = std::make_tuple(new_slot,old_tex);
                     }
                 }
-                //_textures_all_passes[i] = std::move(_tmp_textures_all_passes[i]);
+                textures = std::move(tmp_textures);
             }
         }
         for (int i = 0; i < pass_count; i++)
@@ -722,6 +728,67 @@ namespace Ailu
         return nullptr;
     }
 
+    void Material::PushState(u16 pass_index)
+    {
+        BindState cur_state;
+        cur_state._pass_index = pass_index;
+        cur_state._max_bind_slot = 0u;
+        cur_state._variant_hash = _pass_variants[pass_index]._variant_hash;
+        memset(cur_state._bind_res.data(),0,sizeof(GpuResource*) * 32);
+        memset(cur_state._bind_res_priority.data(),0u,sizeof(u16) * 32);
+        auto &cur_pass_variant_hash = _pass_variants[pass_index]._variant_hash;
+        auto &bind_textures = _textures_all_passes[pass_index];
+        auto &bind_infos = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._bind_res_infos;
+        for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
+        {
+            const auto& bind_it = bind_infos.find(it->first);
+            if (bind_it != bind_infos.end())
+            {
+                auto &[slot, texture] = it->second;
+                AL_ASSERT(slot < 32);
+                if (texture)
+                {
+                    cur_state._bind_res[slot] = texture;
+                    cur_state._bind_res_priority[bind_it->second._bind_slot] = PipelineResource::kPriorityLocal;
+                    cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, slot);
+                }
+            }
+        }
+        for (const auto &it: Shader::s_global_textures_bind_info)
+        {
+            const auto& bind_it = bind_infos.find(it.first);
+            if (bind_it != bind_infos.end())
+            {
+                if (bind_it->second._res_type == EBindResDescType::kCubeMap || bind_it->second._res_type == EBindResDescType::kTexture2DArray || bind_it->second._res_type == EBindResDescType::kTexture2D)
+                {
+                    AL_ASSERT(bind_it->second._bind_slot < 32);
+                    if (cur_state._bind_res_priority[bind_it->second._bind_slot] <= PipelineResource::kPriorityGlobal)
+                    {
+                        cur_state._bind_res[bind_it->second._bind_slot] = it.second;
+                        cur_state._bind_res_priority[bind_it->second._bind_slot] = PipelineResource::kPriorityGlobal;
+                        cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, bind_it->second._bind_slot);
+                    }
+                }
+            }
+        }
+        for (const auto &it: Shader::s_global_buffer_bind_info)
+        {
+            const auto& bind_it = bind_infos.find(it.first);
+            if (bind_it != bind_infos.end())
+            {
+                AL_ASSERT(bind_it->second._bind_slot < 32);
+                if (cur_state._bind_res_priority[bind_it->second._bind_slot] <= PipelineResource::kPriorityGlobal)
+                {
+                    cur_state._bind_res[bind_it->second._bind_slot] = it.second;
+                    cur_state._bind_res_priority[bind_it->second._bind_slot] = PipelineResource::kPriorityGlobal;
+                    cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, bind_it->second._bind_slot);
+                }
+            }
+        }
+        cur_state._cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[cur_state._variant_hash]._per_mat_buf_bind_slot;
+        std::unique_lock lock(_state_mutex);
+        _states.push(cur_state);
+    }
 
     //-------------------------------------------StandardMaterial--------------------------------------------------------
     static void MarkTextureUsedHelper(u32 &mask, const ETextureUsage &usage, const bool &b_use)

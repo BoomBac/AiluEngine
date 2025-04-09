@@ -6,22 +6,6 @@
 #include "Framework/Math/ALMath.hpp"
 namespace Ailu
 {
-
-	struct Rect
-	{
-		uint16_t left;
-		uint16_t top;
-		uint16_t width;
-		uint16_t height;
-		Rect(uint16_t l, uint16_t t, uint16_t w, uint16_t h)
-			: left(l), top(t), width(w), height(h)
-		{
-		}
-		Rect() : Rect(0, 0, 0, 0) {};
-	};
-
-	using ScissorRect = Rect;
-
 	class RendererAPI
 	{
 	public:

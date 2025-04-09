@@ -6,9 +6,8 @@
 #include <map>
 
 #include "Framework/Math/ALMath.hpp"
-#include "RHI/DX12/CPUDescriptorManager.h"
-#include "RHI/DX12/D3DUtils.h"
-#include "RHI/DX12/GPUDescriptorManager.h"
+#include "RHI/DX12/D3DResourceBase.h"
+#include "RHI/DX12/DescriptorManager.h"
 #include "Render/Texture.h"
 using Microsoft::WRL::ComPtr;
 
@@ -32,9 +31,9 @@ namespace Ailu
         ~D3DTextureViewInfo()
         {
             if (_is_cpu_view)
-                g_pCPUDescriptorAllocator->Free(std::move(_cpu_alloc));
+                D3DDescriptorMgr::Get().Free(std::move(_cpu_alloc));
             else
-                g_pGPUDescriptorAllocator->Free(std::move(_gpu_alloc));
+                D3DDescriptorMgr::Get().Free(std::move(_gpu_alloc));
         }
         union
         {
@@ -58,9 +57,7 @@ namespace Ailu
     public:
         D3DTexture2D(const Texture2DInitializer& initializer);
         ~D3DTexture2D();
-        void Apply() final;
         void Release() final;
-        void Bind(CommandBuffer *cmd, u16 view_index, u8 slot,u32 sub_res,bool is_target_compute_pipeline) final;
         //for texture2d(s)
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
@@ -68,7 +65,10 @@ namespace Ailu
         void Name(const String &new_name) final;
         D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _views.at(0)._gpu_handle; };
         void GenerateMipmap() final;
-
+        
+        private:
+        void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
     private:
         D3DResourceStateGuard _state_guard;
         ComPtr<ID3D12Resource> _p_d3dres;
@@ -80,13 +80,14 @@ namespace Ailu
     public:
         D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         ~D3DCubeMap();
-        void Apply() final;
-        void Bind(CommandBuffer *cmd, u16 view_index, u8 slot,u32 sub_res,bool is_target_compute_pipeline) final;
-
+        
         void CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
 
+        private:
+        void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
     private:
         ComPtr<ID3D12Resource> _p_d3dres;
         D3DResourceStateGuard _state_guard;
@@ -98,13 +99,15 @@ namespace Ailu
     public:
         explicit D3DTexture3D(const Texture3DInitializer &initializer);
         ~D3DTexture3D() override;
-        void Apply() final;
-        void Bind(CommandBuffer *cmd, u16 view_index, u8 slot,u32 sub_res,bool is_target_compute_pipeline) final;
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) final;
         [[nodiscard]] TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) const final;
         void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) final;
         void Name(const String &new_name) final;
         void GenerateMipmap() final;
+        void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
+    private:
+        void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
     private:
         ComPtr<ID3D12Resource> _p_d3dres;
         D3DResourceStateGuard _state_guard;
@@ -122,7 +125,7 @@ namespace Ailu
     public:
         D3DRenderTexture(const RenderTextureDesc &desc);
         ~D3DRenderTexture() final;
-        void Bind(CommandBuffer *cmd, u16 view_index, u8 slot,u32 sub_res,bool is_target_compute_pipeline) final;
+        void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
         //for texture2d(s)
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
@@ -132,21 +135,17 @@ namespace Ailu
         TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
         void Name(const String &value) final;
-        TextureHandle ColorRenderTargetHandle(u16 view_index = kMainRTVIndex, CommandBuffer *cmd = nullptr) final;
-        TextureHandle DepthRenderTargetHandle(u16 view_index = kMainDSVIndex, CommandBuffer *cmd = nullptr) final;
-        TextureHandle ColorTexture(u16 view_index = kMainSRVIndex, CommandBuffer *cmd = nullptr) final;
-        TextureHandle DepthTexture(u16 view_index = kMainSRVIndex, CommandBuffer *cmd = nullptr) final;
+        TextureHandle ColorTexture(u16 view_index = kMainSRVIndex) final;
+        TextureHandle DepthTexture(u16 view_index = kMainSRVIndex) final;
         void GenerateMipmap() final;
         void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
         void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
-        D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(u16 index = 0);
-        D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(CommandBuffer *cmd, u16 index = 0);
-
+        D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(RHICommandBuffer *cmd, u16 index);
+        
+        private:
+        void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
     private:
-        //gen mipmap for 1~4
-        Ref<ComputeShader> _p_mipmapgen_cs0 = nullptr;
-        //gen mipmap for 5~max
-        Ref<ComputeShader> _p_mipmapgen_cs1 = nullptr;
         D3D12_RESOURCE_DESC _tex_desc{};
         ComPtr<ID3D12Resource> _p_d3dres;
         D3DResourceStateGuard _state_guard;

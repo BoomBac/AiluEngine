@@ -45,7 +45,7 @@ namespace Ailu
         inline static const u8 kBindFlagPerMaterial = 0x02;
         inline static const u8 kBindFlagPerCamera = 0x04;
         inline static const u8 kBindFlagPerScene = 0x08;
-        inline static const u8 kBindFlagDefault = 0x10;
+        inline static const u8 kBindFlagInternal = 0x10;
         static u8 GetBindResourceFlag(const char *name)
         {
             String name_str(name);
@@ -59,7 +59,7 @@ namespace Ailu
                 return kBindFlagPerScene;
             else
             {
-                return kBindFlagDefault;
+                return kBindFlagInternal;
             }
         }
         inline const static std::set<String> s_reversed_res_name{
@@ -100,12 +100,13 @@ namespace Ailu
         };
         u8 _bind_slot;
         String _name;
-        void *_p_res = nullptr;
+        GpuResource *_p_res = nullptr;
         ShaderBindResourceInfo *_p_root_cbuf;
         //1 for per obj,2for per mat,4 for per pass,8 for per frame
         u8 _bind_flag = 0u;
         u16 _register_space = 0u;
         u8 _array_size = 0u;
+        u16 _cbuf_size = 0u;
     };
 
     // Hash function for ShaderBindResourceInfo
@@ -536,7 +537,7 @@ namespace Ailu
         static Ref<ComputeShader> Create(const WString &sys_path);
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
-        virtual void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+        virtual void Bind(RHICommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
         void SetTexture(const String &name, Texture *texture);
         void SetTexture(u8 bind_slot, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
@@ -553,13 +554,10 @@ namespace Ailu
         void SetMatrix(const String& name,Matrix4x4f mat);
         void SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr);
         void GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const;
-        virtual u16 NameToSlot(const String &name, u16 kernel,ShaderVariantHash variant_hash) const;
+        i16 NameToSlot(const String &name, u16 kernel,ShaderVariantHash variant_hash) const;
         void EnableKeyword(const String &kw);
         void DisableKeyword(const String &kw);
         std::tuple<u16, u16, u16> CalculateDispatchNum(u16 kernel, u16 task_num_x, u16 task_num_y, u16 task_num_z) const;
-        const std::set<Texture *> &AllBindTexture() const { return _all_bind_textures; }
-        //防止同一个资源被当前帧重复追踪使得其无法被复用
-        void ClearBindTexture() { _all_bind_textures.clear(); }
         u16 FindKernel(const String &kernel)
         {
             auto it = std::find_if(_kernels.begin(), _kernels.end(), [&](auto e) -> bool
@@ -578,6 +576,7 @@ namespace Ailu
         bool Compile();
         bool Compile(u16 kernel_index, ShaderVariantHash variant_hash);
         ShaderVariantHash ActiveVariant(u16 kernel_index) const { return _kernels[kernel_index]._active_variant; }
+        void PushState(u16 kernel = 0u);
     public:
         std::atomic<bool> _is_compiling = false;
     protected:
@@ -586,6 +585,36 @@ namespace Ailu
     private:
 
     protected:
+        struct ComputeBindParams
+        {
+            ECubemapFace::ECubemapFace _face;
+            u16 _mipmap;
+            //depth or array
+            u16 _slice;
+            u32 _sub_res;
+            u16 _view_index = (u16)-1;
+            bool _is_internal_cbuf = false;
+        };
+        struct BindState
+        {
+            u16 _kernel;
+            u16 _max_bind_slot;
+            ShaderVariantHash _variant_hash;
+            Array<GpuResource*,32> _bind_res;
+            Array<u16,32> _bind_res_priority;
+            Array<ComputeBindParams,32> _bind_params;
+            void Release()
+            {
+                for(u16 i = 0; i < _max_bind_slot; i++)
+                {
+                    if (_bind_res[i] && _bind_res[i]->GetResourceType() == EGpuResType::kConstBuffer)
+                    {
+                        if (_bind_params[i]._is_internal_cbuf)
+                            ConstantBuffer::Release(static_cast<ConstantBuffer*>(_bind_res[i]));
+                    }
+                }
+            }
+        };
         inline static std::set<String> s_global_active_keywords;
         inline static HashMap<u32,bool> s_global_variant_update_map{};
         inline static Map<String, ConstantBuffer *> s_global_buffer_bind_info{};
@@ -595,23 +624,14 @@ namespace Ailu
         WString _src_file_path;
         Vector<Map<ShaderVariantHash, EShaderVariantState>> _variant_state;
         std::mutex _lock;
-        /*维护一个纹理集合，用于标记temp rt的围栏值，常规用于图形管线的rt在set / clear时会进行标记，
-		* 计算管线不用这两个接口，所以在commandbuffer dispatch时调用该接口标记
-		*/
-        std::set<Texture *> _all_bind_textures;
-        struct ViewInfo
-        {
-            ECubemapFace::ECubemapFace _face;
-            u16 _mipmap;
-            //depth or array
-            u16 _slice;
-            u32 _sub_res;
-            u16 _view_index = (u16)-1;
-        };
+        ShaderVariantHash _active_variant = 0u;
         //bind_slot:cubemapface,mipmap
-        std::unordered_map<u16, ViewInfo> _texture_addi_bind_info{};
+        std::unordered_map<u16, ComputeBindParams> _bind_params{};
         bool _is_valid;
         u8 _cbuf_data[256];
+        String _internal_cbuf_name="";
+        Queue<BindState> _bind_state;
+        std::mutex _state_mutex;
     };
 }// namespace Ailu
 

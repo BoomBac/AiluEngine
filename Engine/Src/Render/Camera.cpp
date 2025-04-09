@@ -328,13 +328,24 @@ namespace Ailu
     }
     Camera &Camera::GetCubemapGenCamera(const Camera &base_cam, ECubemapFace::ECubemapFace face)
     {
+        static bool s_is_init = false;
         static Camera cameras[6];
+        if (!s_is_init)
+        {
+            cameras[0].Name("CubemapGenCamera+X");
+            cameras[1].Name("CubemapGenCamera-X");
+            cameras[2].Name("CubemapGenCamera+Y");
+            cameras[3].Name("CubemapGenCamera-Y");
+            cameras[4].Name("CubemapGenCamera+Z");
+            cameras[5].Name("CubemapGenCamera-Z");
+            s_is_init = true;
+        }
         Camera &out = cameras[face - 1];
         out._layer_mask = base_cam._layer_mask;
         float x = base_cam._position.x, y = base_cam._position.y, z = base_cam._position.z;
         Vector3f center = {x, y, z};
         Vector3f world_up = Vector3f::kUp;
-        Matrix4x4f view, proj;
+        Matrix4x4f  proj{};
         BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0, base_cam._near_clip, base_cam._far_clip);
         const static Vector3f targets[] =
                 {

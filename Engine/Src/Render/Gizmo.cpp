@@ -12,8 +12,8 @@ namespace Ailu
                 {"POSITION", EShaderDateType::kFloat3, 0},
                 {"COLOR", EShaderDateType::kFloat4, 1},
         };
-        _world_vbuf.reset(IVertexBuffer::Create(layout));
-        _screen_vbuf.reset(IVertexBuffer::Create(layout));
+        _world_vbuf.reset(VertexBuffer::Create(layout));
+        _screen_vbuf.reset(VertexBuffer::Create(layout));
         _world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
         _world_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector4f), 1, true);
         _screen_vbuf->SetStream(nullptr, kMaxVertexNum * sizeof(Vector3f), 0, true);
@@ -23,12 +23,18 @@ namespace Ailu
         _screen_pos.resize(kMaxVertexNum);
         _screen_color.resize(kMaxVertexNum);
         _tex_screen_vbufs.resize(kMaxDrawTextureNum);
+        _world_vbuf->Name("GizmoWolrdBuffer");
+        _screen_vbuf->Name("GizmoScreenBuffer");
+        GraphicsContext::Get().CreateResource(_world_vbuf.get());
+        GraphicsContext::Get().CreateResource(_screen_vbuf.get());
         for(u32 i = 0; i < kMaxDrawTextureNum;i++)
         {
-            _tex_screen_vbufs[i].reset(IVertexBuffer::Create({
+            _tex_screen_vbufs[i].reset(VertexBuffer::Create({
                 {"POSITION", EShaderDateType::kFloat2, 0},
             }));
             _tex_screen_vbufs[i]->SetStream(nullptr, 6 * sizeof(Vector2f), 0, true);
+            _tex_screen_vbufs[i]->Name("GizmoTextureBuffer");
+            GraphicsContext::Get().CreateResource(_tex_screen_vbufs[i].get());
         }
 
         _draw_tex_items.resize(kMaxDrawTextureNum);
@@ -361,7 +367,7 @@ namespace Ailu
     void Gizmo::Submit(CommandBuffer *cmd, const RenderingData &data)
     {
         //auto line_pso = GraphicsPipelineStateMgr::Get().GetLineGizmoPSO();
-        //line_pso->Bind(cmd);
+        //line_pso->BindImpl(cmd);
         //u8 camera_buf_slot = line_pso->NameToSlot(RenderConstants::kCBufNamePerCamera);
         //line_pso->SetPipelineResource(cmd, data._p_per_camera_cbuf, EBindResDescType::kConstBuffer, camera_buf_slot);
         if (s_pInstance->_world_vertex_num > RenderConstants::KMaxDynamicVertexNum)
@@ -373,6 +379,7 @@ namespace Ailu
 
         if (s_pInstance->_world_vertex_num > 0)
         {
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,data._p_per_camera_cbuf);
             auto cur_time = std::chrono::system_clock::now();
             s_geometry_draw_list.erase(std::remove_if(s_geometry_draw_list.begin(), s_geometry_draw_list.end(),
                                                       [&](const auto &it) -> bool

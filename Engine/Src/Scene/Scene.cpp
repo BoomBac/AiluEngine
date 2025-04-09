@@ -477,7 +477,7 @@ namespace Ailu
     }
     void SceneMgr::EnterPlayMode()
     {
-        Application::Get()->_is_playing_mode = true;
+        Application::Get()._is_playing_mode = true;
         _runtime_scene = new Scene(*_p_current);
         auto name = _runtime_scene->Name();
         name.append("_copy");
@@ -491,7 +491,7 @@ namespace Ailu
         _p_current = _runtime_scene_src;
         _runtime_scene_src = nullptr;
         DESTORY_PTR(_runtime_scene);
-        Application::Get()->_is_playing_mode = false;
+        Application::Get()._is_playing_mode = false;
     }
     void SceneMgr::EnterSimulateMode()
     {
@@ -500,7 +500,7 @@ namespace Ailu
         {
             _transform_cache.emplace_back(t._transform);
         }
-        Application::Get()->_is_simulate_mode = true;
+        Application::Get()._is_simulate_mode = true;
     }
     void SceneMgr::ExitSimulateMode()
     {
@@ -515,7 +515,7 @@ namespace Ailu
             c._velocity = Vector3f::kZero;
             c._angular_velocity = Vector3f::kZero;
         }
-        Application::Get()->_is_simulate_mode = false;
+        Application::Get()._is_simulate_mode = false;
         _transform_cache.clear();
     }
     //-----------------------------------------------------------------------SceneMgr----------------------------------------------------------------------------

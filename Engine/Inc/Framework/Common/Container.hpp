@@ -5,7 +5,7 @@
 namespace Ailu
 {
     template<typename T,u32 capacity>
-    class RingBuffer 
+    class RingBuffer
     {
     public:
         explicit RingBuffer()
@@ -73,7 +73,7 @@ namespace Ailu
         explicit LockFreeQueue(size_t capacity = 64u)
             : _buffer(capacity), _capacity(capacity), _head(0), _tail(0) {}
 
-        bool Enqueue(const T& value)
+        bool Push(const T& value)
         {
             size_t current_tail = _tail.load(std::memory_order_relaxed);
             size_t next_tail = Increment(current_tail);
@@ -89,23 +89,22 @@ namespace Ailu
         }
 
         // 出队操作（多消费者）
-        bool Dequeue(T& result)
+        std::optional<T> Pop()
         {
             size_t current_head = _head.load(std::memory_order_relaxed);
 
             // 先检查队列是否为空
             if (current_head == _tail.load(std::memory_order_acquire)) {
                 // 队列为空
-                return false;
+                return std::nullopt;
             }
 
             // 这里的 CAS 检查确保没有其他线程在修改 _head
             if (_head.compare_exchange_strong(current_head, Increment(current_head), std::memory_order_acquire)) {
-                result = _buffer[current_head];  // 从缓冲区中取出数据
-                return true;
+                return std::make_optional(_buffer[current_head]);
             }
 
-            return false;  // 如果 CAS 失败，表示有其他线程已更新 _head
+            return std::nullopt;  // 如果 CAS 失败，表示有其他线程已更新 _head
         }
 
         bool Empty() const

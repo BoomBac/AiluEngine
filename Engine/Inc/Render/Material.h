@@ -68,16 +68,28 @@ namespace Ailu
         ShaderPropertyInfo *GetShaderProperty(const String &name);
         //根据材质存储的关键字和传入shader的关键字，为每个Pass构建合法的关键字序列
         void ConstructKeywords(Shader *shader);
-
+        /// 构造 drawcmd时调用，将当前状态推入队列
+        void PushState(u16 pass_index = 0u);
     protected:
         virtual void Construct(bool first_time);
 
+    private:
+        struct BindState
+        {
+            u16 _pass_index = 0;
+            u16 _max_bind_slot = 0;
+            i16 _cbuf_bind_slot = -1;
+            ShaderVariantHash _variant_hash;
+            Array<GpuResource*,32> _bind_res;
+            Array<u16,32u> _bind_res_priority;
+        };
+        std::mutex _state_mutex;
+        Queue<BindState> _states;
     private:
         void UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash);
 
     protected:
         inline static u32 s_total_material_num = 0u;
-        inline static u32 s_current_cbuf_offset = 0u;
         inline const static String kCullModeKey = "_cull";
         inline const static String kSurfaceKey = "_surface";
         u16 _standard_pass_index = -1;

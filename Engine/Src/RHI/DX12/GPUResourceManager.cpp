@@ -14,11 +14,11 @@ namespace Ailu
         auto heap_prop = CD3DX12_HEAP_PROPERTIES(type);
         if (type == D3D12_HEAP_TYPE_UPLOAD)
         {
-            auto d3d_context = D3DContext::Get();
+            auto& d3d_context = static_cast<D3DContext&>(GraphicsContext::Get());
             size = ALIGN_TO_256(size);
             _size = size;
             auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-            ThrowIfFailed(d3d_context->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
+            ThrowIfFailed(d3d_context.GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
                                                                             D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(_res.GetAddressOf())));
             _res->Map(0, nullptr, reinterpret_cast<void **>(&_ptr_cpu));
             _ptr_gpu = _res->GetGPUVirtualAddress();
@@ -95,7 +95,7 @@ namespace Ailu
     void GpuResourceManager::Free(GpuResourceManager::Allocation &&handle)
     {
         AL_ASSERT(handle._page_id < _pages.size());
-        _pages[handle._page_id].Free(handle._offset, handle._size,Application::s_frame_count);
+        _pages[handle._page_id].Free(handle._offset, handle._size,Application::Application::Get().GetFrameCount());
     }
     u32 GpuResourceManager::ReleaseSpace()
     {
@@ -103,7 +103,7 @@ namespace Ailu
         u32 release_num = 0u;
         for (auto& page : _pages)
         {
-            release_num += page.ReleaseAllStaleBlock(Application::s_frame_count);
+            release_num += page.ReleaseAllStaleBlock(Application::Application::Get().GetFrameCount());
             _page_free_space_lut[page._type].emplace(std::make_pair(page.AvailableSize(), page.PageID()));
         }
         return release_num;

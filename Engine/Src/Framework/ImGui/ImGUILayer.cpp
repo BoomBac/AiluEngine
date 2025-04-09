@@ -91,7 +91,7 @@ namespace Ailu
         colors[ImGuiCol_TabDimmedSelected]      = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
         colors[ImGuiCol_TabDimmed]              = ImVec4(0.33f, 0.48f, 0.40f, 0.31f);
         colors[ImGuiCol_DockingPreview]         = ImVec4(0.26f, 0.98f, 0.71f, 0.70f);
-        ImGui_ImplWin32_Init(Application::Get()->GetWindow().GetNativeWindowPtr());
+        ImGui_ImplWin32_Init(Application::Get().GetWindow().GetNativeWindowPtr());
 	}
 
 	Ailu::ImGUILayer::~ImGUILayer()
@@ -139,7 +139,7 @@ namespace Ailu
 
 	void Ailu::ImGUILayer::End()
 	{
-		const Window& window = Application::Get()->GetWindow();
+		const Window& window = Application::Get().GetWindow();
 		ImGuiIO& io = ImGui::GetIO();
 		io.DisplaySize = ImVec2(static_cast<float>(window.GetWidth()), static_cast<float>(window.GetHeight()));
 		//ImGuiWidget::EndFrame();

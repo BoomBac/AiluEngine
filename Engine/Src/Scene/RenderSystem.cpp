@@ -155,7 +155,7 @@ namespace Ailu
             }
             ProcessVXGI(r);
             index = 0;
-            static ObjectLayer shadow_cast_layer = Application::Get()->NameToLayer("ShadowCaster");
+            static ObjectLayer shadow_cast_layer = Application::Get().NameToLayer("ShadowCaster");
             for (auto &e: _entities)
             {
                 auto transf = r.GetComponent<TransformComponent>(e)->_transform;

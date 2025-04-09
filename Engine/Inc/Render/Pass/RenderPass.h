@@ -236,8 +236,8 @@ namespace Ailu
 
     private:
         Ref<Shader> _ui_default_shader;
-        Ref<IVertexBuffer> _vbuf;
-        Ref<IIndexBuffer> _ibuf;
+        Ref<VertexBuffer> _vbuf;
+        Ref<IndexBuffer> _ibuf;
         Ref<Material> _ui_default_mat;
         Ref<ConstantBuffer> _obj_cb;
     };

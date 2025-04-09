@@ -97,6 +97,21 @@ namespace Ailu
             return temp;
         }
 
+        struct Rect
+        {
+            uint16_t left;
+            uint16_t top;
+            uint16_t width;
+            uint16_t height;
+            Rect(uint16_t l, uint16_t t, uint16_t w, uint16_t h)
+                : left(l), top(t), width(w), height(h)
+            {
+            }
+            Rect() : Rect(0, 0, 0, 0) {};
+        };
+    
+        using ScissorRect = Rect;
+
         template<template<typename> class TT, typename T, int... Indexes>
         class Swizzle
         {
@@ -237,7 +252,7 @@ namespace Ailu
                 Swizzle<Vector2D, T, 1, 0> yx;
             };
             Vector2D<T>() : x(0), y(0){};
-            Vector2D<T>(const T &v) : x(v), y(v){};
+            explicit Vector2D<T>(const T &v) : x(v), y(v){};
             Vector2D<T>(const T &v, const T &w) : x(v), y(w){};
             operator T *() { return data; };
             operator const T *() { return static_cast<const T *>(data); };
@@ -294,6 +309,14 @@ namespace Ailu
                 for (u8 i = 0; i < CountOf(data); i++)
                 {
                     data[i] *= other.data[i];
+                }
+                return *this;
+            }
+            Vector2D<T> &operator*=(T other)
+            {
+                for (u8 i = 0; i < CountOf(data); i++)
+                {
+                    data[i] *= other;
                 }
                 return *this;
             }
@@ -427,7 +450,7 @@ namespace Ailu
                 return *this;
             }
 
-            Vector3D<T> &operator*=(const float &other)
+            Vector3D<T> &operator*=(T &other)
             {
                 for (u8 i = 0; i < CountOf(data); i++)
                 {
@@ -554,7 +577,7 @@ namespace Ailu
             };
 
             Vector4D<T>() : x(0), y(0), z(0), w(0){};
-            Vector4D<T>(const T &_v) : x(_v), y(_v), z(_v), w(_v){};
+            explicit Vector4D<T>(const T &_v) : x(_v), y(_v), z(_v), w(_v){};
             Vector4D<T>(const T &_x, const T &_y, const T &_z, const T &_w) : x(_x), y(_y), z(_z), w(_w){};
             Vector4D<T>(const Vector2D<T> &v2) : x(v2.x), y(v2.y), z(0), w(0){};
             Vector4D<T>(const Vector2D<T> &v2, T _z, T _w) : x(v2.x), y(v2.y), z(_z), w(_w){};
@@ -607,6 +630,15 @@ namespace Ailu
                 for (u8 i = 0; i < CountOf(data); i++)
                 {
                     data[i] *= other.data[i];
+                }
+                return *this;
+            }
+
+            Vector4D<T> &operator*=(T other)
+            {
+                for (u8 i = 0; i < CountOf(data); i++)
+                {
+                    data[i] *= other;
                 }
                 return *this;
             }
@@ -2654,7 +2686,7 @@ namespace Ailu
             }
 
             template<u8 Size>
-            class Hash
+            class AILU_API Hash
             {
             public:
                 Hash()

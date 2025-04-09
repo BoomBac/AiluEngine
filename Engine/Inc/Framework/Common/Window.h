@@ -36,6 +36,7 @@ namespace Ailu
 		virtual void SetVSync(bool enabled) = 0;
 		virtual bool IsVSync() const = 0;
 		virtual void* GetNativeWindowPtr() const = 0;
+		virtual void SetTitle(const WString& title) = 0;
 	};
 }
 

@@ -229,6 +229,7 @@ namespace Ailu
                     {
                         m_pos = m_pos - _p_scene_view->ContentPosition();
                         ECS::Entity closest_entity = _pick.GetPickID(m_pos.x, m_pos.y);
+                        LOG_INFO("Pick entity: {}", closest_entity);
                         if (Input::IsKeyPressed(AL_KEY_SHIFT))
                             Selection::AddSelection(closest_entity);
                         else
@@ -385,7 +386,7 @@ namespace Ailu
             }
             ImGui::SetNextWindowSizeConstraints(ImVec2(100, 0), ImVec2(FLT_MAX, ImGui::GetTextLineHeight()));
             ImGui::Begin("ToolBar", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
-            auto app = Application::Get();
+            Application* app = &Application::Get();
             float window_width = ImGui::GetContentRegionAvail().x;// 获取当前窗口的可用宽度
             float button_width = 100.0f;                          // 假设每个按钮宽度为100，实际可用ImGui::CalcTextSize计算
 
@@ -431,8 +432,9 @@ namespace Ailu
             ImGui::End();
 
             ImGui::Begin("Common");// Create a window called "Hello, world!" and append into it.
-            ImGui::Text("FrameRate: %.2f", ImGui::GetIO().Framerate);
-            ImGui::Text("FrameTime: %.2f ms", ModuleTimeStatics::RenderDeltatime);
+            ImGui::Text("FrameRate: %.2f", RenderingStates::s_frame_rate);
+            ImGui::Text("FrameTime: %.2f ms", RenderingStates::s_frame_time);
+            ImGui::Text("GpuLatency: %.2f ms", RenderingStates::s_gpu_latency);
             ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
             ImGui::Text("Dispatch Call: %d", RenderingStates::s_dispatch_call);
             ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
@@ -521,12 +523,12 @@ namespace Ailu
                 ImGui::Text("GPU Time:");
                 while (!Profiler::Get()._gpu_profiler_queue.empty())
                 {
-                    auto [is_start, profiler_id] = Profiler::Get()._gpu_profiler_queue.front();
+                    const auto& marker = Profiler::Get()._gpu_profiler_queue.front();
                     Profiler::Get()._gpu_profiler_queue.pop();
-                    if (is_start)
+                    if (marker._is_start)
                     {
                         space.append("-");
-                        const auto &profiler = Profiler::Get().GetProfileData(profiler_id);
+                        const auto &profiler = Profiler::Get().GetGpuProfileData(marker._profiler_index);
                         ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
                     }
                     else
@@ -584,7 +586,13 @@ namespace Ailu
                     g_blend_space_editor->SetTarget(&sk_comp->_blend_space);
                 }
             }
+            static RenderTexture* s_last_scene_rt = nullptr;
             auto scene_rt = g_pGfxContext->GetPipeline()->GetTarget(0);
+            if (s_last_scene_rt != scene_rt)
+            {
+                //LOG_INFO("Scene RT Changed");
+            }
+            s_last_scene_rt = scene_rt;
             static_cast<SceneView *>(_p_scene_view)->SetSource(scene_rt);
 
             for (auto &widget: _widgets)

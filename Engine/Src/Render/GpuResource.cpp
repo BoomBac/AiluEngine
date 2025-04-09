@@ -1,35 +1,46 @@
 #include "Render/GpuResource.h"
 #include "Render/GraphicsContext.h"
 #include "pch.h"
+#include "Framework/Common/Log.h"
 
 namespace Ailu
 {
-    bool GpuResourceState::IsReferenceByGpu() const
+    void GpuResource::Track(u64 fence)
     {
-        u64 fence_value = g_pGfxContext->GetFenceValueGPU();
-        return fence_value < _fence_value;
-    }
-    void GpuResourceState::Track()
-    {
-        _fence_value = g_pGfxContext->GetFenceValueCPU() + 1;
-    }
-    void GpuResourceState::SetSize(u64 size)
-    {
-        if (_mem_size != 0)
-            s_total_mem_size -= _mem_size;
-        _mem_size = size;
-        s_total_mem_size += size;
+        _fence_value = fence == 0u? GraphicsContext::Get().GetFenceValueCPU() + 1 : fence;
     }
     GpuResource::GpuResource()
     {
     }
-
-    void GpuResource::Bind()
-    {
-        _state.Track();
-    }
     GpuResource::~GpuResource()
     {
-        GpuResourceState::s_total_mem_size -= _state._mem_size;
+        s_total_mem_size -= _mem_size;
+    }
+    void GpuResource::Apply()
+    {
+        GraphicsContext::Get().CreateResource(this);
+    }
+    void GpuResource::UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
+    {
+        s_total_mem_size += _mem_size;
+    }
+    bool GpuResource::IsReferenceByGpu() const
+    {
+        u64 fence_value = GraphicsContext::Get().GetFenceValueGPU();
+        return fence_value < _fence_value;
+    }
+    void GpuResource::Bind(RHICommandBuffer *rhi_cmd, BindParams *params)
+    {
+        if (_is_ready_for_rendering)
+            BindImpl(rhi_cmd, params);
+        else
+        {
+            LOG_WARNING("GpuResource::Bind: {} not ready yet",_name);
+        }
+    }
+    void GpuResource::Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
+    {
+        UploadImpl(ctx,rhi_cmd,params);
+        _is_ready_for_rendering = true;
     }
 }// namespace Ailu

@@ -27,84 +27,120 @@ namespace Ailu
         // D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS	= 5,
         // D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE	= 6
     };
-    class IVertexBuffer;
-    class IIndexBuffer;
-    class ConstantBuffer;
 
-    class CommandBuffer
+    class RHICommandBuffer : public Object
     {
     public:
-        virtual ~CommandBuffer() = default;
-        virtual void Clear() = 0;
-        virtual void Close() = 0;
-        virtual u32 GetID() const = 0;
-        virtual const String &GetName() const = 0;
-        virtual void SetName(const String &name) = 0;
-        virtual ECommandBufferType GetType() const = 0;
+        explicit RHICommandBuffer(String name,ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect) : _cmd_type(type)
+        {
+            _name = std::move(name);
+        };
+        virtual ~RHICommandBuffer(){};
+        virtual void Clear(){};
+        virtual bool IsReady() const { return true; }
+        [[nodiscard]] ECommandBufferType  GetCommandBufferType() const { return _cmd_type; }
+        [[nodiscard]] bool IsExecuted() const { return _is_executed; }
+    protected:
+        bool _is_executed;
+    private:
+        ECommandBufferType _cmd_type;
+    };
+    class RHICommandBufferPool
+    {
+    public:
+        static void Init();
+        static void Shutdown();
+        static Ref<RHICommandBuffer> Get(const String &name = "", ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect);
+        static void Release(Ref<RHICommandBuffer> &cmd);
 
-        virtual void ClearRenderTarget(RenderTexture *color, RenderTexture *depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(Vector<RenderTexture *> &colors, RenderTexture *depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(RenderTexture *color, Vector4f clear_color, u16 index = 0u) = 0;
-        virtual void ClearRenderTarget(RenderTexture *depth, float depth_value = kZFar, u8 stencil_value = 0u) = 0;
-        virtual void ClearRenderTarget(RenderTexture *depth, u16 index, float depth_value = kZFar) = 0;
-        virtual void ClearRenderTarget(Vector<RTHandle> &colors, RTHandle depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(RTHandle color, RTHandle depth, Vector4f clear_color, float clear_depth) = 0;
-        virtual void ClearRenderTarget(RTHandle color, Vector4f clear_color, u16 index = 0u) = 0;
-        virtual void ClearRenderTarget(RTHandle depth, float depth_value = kZFar, u8 stencil_value = 0u) = 0;
+    private:
+        inline static const u16 kInitialPoolSize = 10u;
+        u16 _cur_pool_size = kInitialPoolSize;
+        std::vector<std::tuple<bool, Ref<RHICommandBuffer>>> _cmd_buffers{};
+        std::mutex _mutex;
+    };
 
-        virtual void SetRenderTargets(Vector<RenderTexture *> &colors, RenderTexture *depth) = 0;
-        virtual void SetRenderTarget(RenderTexture *color, RenderTexture *depth) = 0;
+    class VertexBuffer;
+    class IndexBuffer;
+    class ConstantBuffer;
+    struct GfxCommand;
+    class AILU_API CommandBuffer : public Object
+    {
+        friend class D3DContext;
+    public:
+        CommandBuffer(String name);
+        ~CommandBuffer() override = default;
+        void Clear();
+        void ClearRenderTarget(Color color,f32 depth,u8 stencil);
+        void ClearRenderTarget(Color c);
+        void ClearRenderTarget(f32 depth, u8 stencil);
+        void ClearRenderTarget(Color* colors,u16 num,f32 depth,u8 stencil);
+        void ClearRenderTarget(Color* colors, u16 num);
+
+        void SetRenderTarget(RenderTexture *color, RenderTexture *depth);
         /// <summary>
         /// 设置rendertarget，index用于cubemap或者texture array
         /// </summary>
         /// <param name="color"></param>
         /// <param name="index"></param>
-        virtual void SetRenderTarget(RenderTexture *color, u16 index = 0u) = 0;
-        virtual void SetRenderTarget(RenderTexture *color, RenderTexture *depth, u16 color_index, u16 depth_index) = 0;
-        virtual void SetRenderTargets(Vector<RTHandle> &colors, RTHandle depth) = 0;
-        virtual void SetRenderTarget(RTHandle color, RTHandle depth) = 0;
-        virtual void SetRenderTarget(RTHandle color, u16 index = 0u) = 0;
+        void SetRenderTarget(RenderTexture *color, u16 index = 0u);
+        void SetRenderTarget(RenderTexture *color, RenderTexture *depth, u16 color_index, u16 depth_index);
+        void SetRenderTargets(Vector<RTHandle> &colors, RTHandle depth);
+        void SetRenderTarget(RTHandle color, RTHandle depth);
+        void SetRenderTarget(RTHandle color, u16 index = 0u);
+        /// @brief 立即生效
+        /// @param tex 
+        /// @param action 
+        void SetRenderTargetLoadAction(RenderTexture* tex, ELoadStoreAction action);
+        /// @brief 立即生效
+        /// @param tex 
+        /// @param action 
+        void SetRenderTargetLoadAction(RTHandle handle, ELoadStoreAction action);
 
-        virtual void DrawIndexed(IVertexBuffer *vb, IIndexBuffer *ib, ConstantBuffer *cb_per_draw, Material *mat, u16 pass_index = 0u) = 0;
-        virtual void DrawInstanced(IVertexBuffer *vb, ConstantBuffer *cb_per_draw,Material*mat,u16 pass_index,u16 instance_count) = 0;
+        void DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index = 0u);
+        void DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb,Material*mat,u16 pass_index,u16 instance_count);
 
-        virtual void SetViewport(const Rect &viewport) = 0;
-        virtual void SetScissorRect(const Rect &rect) = 0;
-        virtual void SetViewports(const std::initializer_list<Rect> &viewports) = 0;
-        virtual void SetScissorRects(const std::initializer_list<Rect> &rects) = 0;
-        virtual void SetViewports(const Vector<Rect> &viewports) = 0;
-        virtual void SetScissorRects(const Vector<Rect> &rects) = 0;
+        void SetViewport(const Rect &viewport);
+        void SetScissorRect(const Rect &rect);
+        void SetViewports(const std::initializer_list<Rect> &viewports);
+        void SetScissorRects(const std::initializer_list<Rect> &rects);
 
-        virtual RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access) = 0;
-        virtual void ReleaseTempRT(RTHandle handle) = 0;
+        RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access);
+        void ReleaseTempRT(RTHandle handle);
 
-        virtual void Blit(RTHandle src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u) = 0;
-        virtual void Blit(RenderTexture *src, RenderTexture *dst, Material *mat = nullptr, u16 pass_index = 0u) = 0;
-        virtual void Blit(RenderTexture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat = nullptr, u16 pass_index = 0u) = 0;
-        virtual void Blit(RTHandle src, RenderTexture *dst, Material *mat = nullptr, u16 pass_index = 0u) = 0;
-        virtual void Blit(RenderTexture *src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u) = 0;
+        void Blit(RTHandle src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u);
+        void Blit(RenderTexture *src, RenderTexture *dst, Material *mat = nullptr, u16 pass_index = 0u);
+        void Blit(RenderTexture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat = nullptr, u16 pass_index = 0u);
+        void Blit(RTHandle src, RenderTexture *dst, Material *mat = nullptr, u16 pass_index = 0u);
+        void Blit(RenderTexture *src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u);
 
-        virtual void DrawFullScreenQuad(Material *mat, u16 pass_index = 0u) = 0;
-        virtual void SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj) = 0;
-        virtual void SetGlobalBuffer(const String &name, void *data, u64 data_size) = 0;
-        virtual void SetGlobalBuffer(const String &name, ConstantBuffer *buffer) = 0;
-        virtual void SetGlobalBuffer(const String &name, GPUBuffer *buffer) = 0;
-        virtual void SetComputeBuffer(const String &name, u16 kernel,void *data, u64 data_size) = 0;
-        virtual void SetGlobalTexture(const String &name, Texture *tex) = 0;
-        virtual void SetGlobalTexture(const String &name, RTHandle handle) = 0;
+        void DrawFullScreenQuad(Material *mat, u16 pass_index = 0u);
 
-        virtual void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_matrix, u16 submesh_index = 0u, u32 instance_count = 1u) = 0;
+        void SetGlobalBuffer(const String &name, void *data, u64 data_size);
+        void SetGlobalBuffer(const String &name, ConstantBuffer *buffer);
+        void SetGlobalBuffer(const String &name, GPUBuffer *buffer);
+        void SetComputeBuffer(const String &name, u16 kernel,void *data, u64 data_size);
+        void SetGlobalTexture(const String &name, Texture *tex);
+        void SetGlobalTexture(const String &name, RTHandle handle);
 
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u32 instance_count = 1u) = 0;
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u16 submesh_index, u32 instance_count = 1u) = 0;
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cbuf, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 submesh_index, u16 pass_index, u32 instance_count) = 0;
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count = 1u) = 0;
-        virtual u16 DrawRenderer(Mesh *mesh, Material *material, u32 instance_count, u16 pass_index) = 0;
+        void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_matrix, u16 sub_mesh = 0u, u32 instance_count = 1u);
 
-        virtual void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y) = 0;
-        virtual void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) = 0;
+        void DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count = 1u);
+        void DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count = 1u);
+        void DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count);
+        void DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count);
+        void DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count);
+
+        void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y);
+        void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+
+        void BeginProfiler(const String &name);
+        void EndProfiler();
+
+        void StateTransition(GpuResource* res,EResourceState new_state,u32 sub_res = kTotalSubRes);
+    private:
+        Vector<GfxCommand *> _commands;
+        Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
     };
 
     class AILU_API CommandBufferPool
@@ -112,14 +148,14 @@ namespace Ailu
     public:
         static void Init();
         static void Shutdown();
-        static std::shared_ptr<CommandBuffer> Get(const String &name = "", ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect);
-        static void Release(std::shared_ptr<CommandBuffer> &cmd);
+        static Ref<CommandBuffer> Get(const String &name = "");
+        static void Release(Ref<CommandBuffer> &cmd);
         static void ReleaseAll();
 
     private:
         inline static const u16 kInitialPoolSize = 10u;
         u16 _cur_pool_size = kInitialPoolSize;
-        std::vector<std::tuple<bool, std::shared_ptr<CommandBuffer>>> _cmd_buffers{};
+        std::vector<std::tuple<bool, Ref<CommandBuffer>>> _cmd_buffers{};
         std::mutex _mutex;
     };
 }// namespace Ailu

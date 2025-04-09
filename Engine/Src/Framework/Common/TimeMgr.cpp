@@ -7,6 +7,8 @@ namespace Ailu
 {
     f32 TimeMgr::s_time_scale = 1.0f;
     static std::mutex s_mark_mutex;
+    thread_local static std::stack<TimeMgr::ALTimeStamp> s_mark_stamps{};
+
     int TimeMgr::Initialize()
     {
         int ret = 0;
@@ -22,11 +24,10 @@ namespace Ailu
     void TimeMgr::Tick(f32 delta_time)
     {
         _cur_tick_stamp = std::chrono::high_resolution_clock::now();
+        TickTimeSinceLoad = ALMSecond(_cur_tick_stamp - _init_stamp).count();
         DeltaTime = ALMSecond(_cur_tick_stamp - s_pre_tick_stamp).count();
         s_smooth_delta_time = Lerp(DeltaTime, s_smooth_delta_time, 0.95f);
         s_pre_tick_stamp = _cur_tick_stamp;
-        if (!_b_stop)
-            TimeSinceLoad += DeltaTime;
     }
     void TimeMgr::Pause()
     {
@@ -53,38 +54,57 @@ namespace Ailu
     void TimeMgr::Reset()
     {
         s_pre_tick_stamp = std::chrono::high_resolution_clock::now();
-        while (!_mark_stamps.empty())
-        {
-            _mark_stamps.pop();
-        }
+        // while (!s_mark_stamps.empty())
+        // {
+        //     s_mark_stamps.pop();
+        // }
     }
 
     void TimeMgr::Mark()
     {
-        std::lock_guard<std::mutex> lock(s_mark_mutex);
-        _mark_stamps.push(std::move(std::chrono::high_resolution_clock::now()));
+        //std::lock_guard<std::mutex> lock(s_mark_mutex);
+        s_mark_stamps.push(std::move(std::chrono::high_resolution_clock::now()));
     }
-    float TimeMgr::GetElapsedSinceLastMark()
+    f32 TimeMgr::GetElapsedSinceLastMark()
     {
-        std::lock_guard<std::mutex> lock(s_mark_mutex);
-        if (!_mark_stamps.empty())
+        //std::lock_guard<std::mutex> lock(s_mark_mutex);
+        if (!s_mark_stamps.empty())
         {
-            float count = ALMSecond(std::chrono::high_resolution_clock::now() -_mark_stamps.top()).count();
-            count -= _last_pause_time;
-            _last_pause_time = 0;
-            _mark_stamps.pop();
+            f32 count = ALMSecond(std::chrono::high_resolution_clock::now() -s_mark_stamps.top()).count();
+            // count -= _last_pause_time;
+            // _last_pause_time = 0;
+            s_mark_stamps.pop();
             return count;
         }
         else
         {
-            //LOG_WARNING("TimeMgr hasn't mark brfore! will return 0.0");
+            return 0.0f;
+        }
+    }
+
+    void TimeMgr::MarkLocal()
+    {
+        _local_mark_stack.push(std::move(std::chrono::high_resolution_clock::now()));
+    }
+    f32 TimeMgr::GetElapsedSinceLastLocalMark()
+    {
+        if (!_local_mark_stack.empty())
+        {
+            f32 count = ALMSecond(std::chrono::high_resolution_clock::now() -_local_mark_stack.top()).count();
+            count -= _last_pause_time;
+            _last_pause_time = 0;
+            _local_mark_stack.pop();
+            return count;
+        }
+        else
+        {
             return 0.0f;
         }
     }
 
     float TimeMgr::GetScaledWorldTime(float scale, bool smooth_scale)
     {
-        return smooth_scale ? TimeSinceLoad * scale * scale : TimeSinceLoad * scale;
+        return smooth_scale ? TickTimeSinceLoad * scale * scale : TickTimeSinceLoad * scale;
     }
 
     String TimeMgr::CurrentTime(String format)

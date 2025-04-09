@@ -310,7 +310,6 @@ namespace Ailu::ECS
     CLightProbe::CLightProbe()
     {
         _cubemap = RenderTexture::Create(512, "light probe", ERenderTargetFormat::kDefaultHDR, true, true, true);
-        _cubemap->CreateView();
         _pass = MakeRef<CubeMapGenPass>(_cubemap.get());
         _debug_material = nullptr;
     }

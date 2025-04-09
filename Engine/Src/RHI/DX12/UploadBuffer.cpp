@@ -1,6 +1,7 @@
 #include "RHI/DX12/UploadBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
+#include "RHI/DX12/D3DCommandBuffer.h"
 #include "pch.h"
 #include <new>// for std::bad_alloc
 
@@ -10,6 +11,7 @@ namespace Ailu
     UploadBuffer::UploadBuffer(const String& name,u64 page_size) : m_PageSize(page_size)
     {
         _name = name;
+        _is_ready_for_rendering = true;
     }
 
     UploadBuffer::Allocation UploadBuffer::Allocate(size_t sizeInBytes, size_t alignment)
@@ -56,6 +58,18 @@ namespace Ailu
             // Reset the page for new allocations.
             page->Reset();
         }
+    }
+    void UploadBuffer::BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params)
+    {
+        if (params == nullptr)
+            return;
+        GpuResource::BindImpl(rhi_cmd, params);
+        BindParamsUB* param = dynamic_cast<BindParamsUB*>(params);
+        auto dxcmd = dynamic_cast<D3DCommandBuffer*>(rhi_cmd)->NativeCmdList();
+        if (param->_is_compute_pipeline)
+            dxcmd->SetComputeRootConstantBufferView(param->_slot, param->_gpu_ptr);
+        else
+            dxcmd->SetGraphicsRootConstantBufferView(param->_slot, param->_gpu_ptr);
     }
     UploadBuffer::Page::Page(const String& name,size_t sizeInBytes)
         : m_PageSize(sizeInBytes), m_Offset(0), m_CPUPtr(nullptr), m_GPUPtr(D3D12_GPU_VIRTUAL_ADDRESS(0))
@@ -104,7 +118,7 @@ namespace Ailu
         Allocation allocation;
         allocation.CPU = static_cast<u8 *>(m_CPUPtr) + m_Offset;
         allocation.GPU = m_GPUPtr + m_Offset;
-
+        allocation._size = alignedSize;
         m_Offset += alignedSize;
 
         return allocation;

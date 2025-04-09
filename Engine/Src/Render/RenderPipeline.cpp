@@ -73,6 +73,7 @@ namespace Ailu
     {
         TIMER_BLOCK("RenderPipeline::Init()");
         _renderers.push_back(MakeScope<Renderer>());
+        _renderers.back()->_p_cur_pipeline = this;
         _cameras.emplace_back(Camera::sCurrent);
     }
     void RenderPipeline::Destory()
@@ -81,25 +82,22 @@ namespace Ailu
 
     void RenderPipeline::Setup()
     {
-
-        _cur_frame_packet = &_frame_packets[Application::s_frame_count % _frame_packets.size()];
-        _cur_frame_res = &_frame_res[Application::s_frame_count % _frame_res.size()];
+        _cur_frame_packet = &_frame_packets[Application::Application::Get().GetFrameCount() % _frame_packets.size()];
+        _cur_frame_res = &_frame_res[Application::Application::Get().GetFrameCount() % _frame_res.size()];
         ProcessPendingRenderObjects();
         {
             PROFILE_BLOCK_CPU(CollectView)
             CollectViews(*g_pSceneMgr->ActiveScene());
         }
-         auto update_render_obj_job = g_pJobSystem->CreateJob("UpdateRenderObject",&RenderPipeline::UpdateRenderObject,this, 0u, _render_objs.size());
-         auto update_vis_obj_job = g_pJobSystem->CreateJob("UpdateVisibilityObject", &RenderPipeline::UpdateVisibilityObject, this, 0u, _visiblity_objs.size());
-         g_pJobSystem->AddDependency(update_render_obj_job,update_vis_obj_job);
-         g_pJobSystem->Dispatch(update_render_obj_job);
-
+         auto update_render_obj_job = JobSystem::Get().CreateJob("UpdateRenderObject",&RenderPipeline::UpdateRenderObject,this, 0u, _render_objs.size());
+         auto update_vis_obj_job = JobSystem::Get().CreateJob("UpdateVisibilityObject", &RenderPipeline::UpdateVisibilityObject, this, 0u, _visiblity_objs.size());
+         JobSystem::Get().AddDependency(update_render_obj_job,update_vis_obj_job);
+         JobSystem::Get().Dispatch(update_render_obj_job);
         _targets.clear();
         _cameras.clear();
         _cameras.emplace_back(Camera::sCurrent);
-
         for (auto &r: _renderers)
-            r->SetupFrameResource(&_frame_res[(Application::s_frame_count - 1) % _frame_res.size()], _cur_frame_res);
+            r->SetupFrameResource(&_frame_res[(Application::Application::Get().GetFrameCount() - 1) % _frame_res.size()], _cur_frame_res);
     }
     void RenderPipeline::Render()
     {
@@ -134,6 +132,7 @@ namespace Ailu
         for (auto &r: _renderers)
             r->FrameCleanup();
         _cur_frame_packet->ClearView();
+        _is_need_wait_for_render_thread = true;
         //LOG_INFO("FrameCleanup");
     }
     void RenderPipeline::OnRenderObjectSubmeshCountChanged(u32 render_obj_id, u16 old_mesh_count, u32 new_mesh_count)
@@ -207,15 +206,15 @@ namespace Ailu
         // for(u32 i = 0; i < _cur_frame_packet->GetViewNum(); ++i)
         // {
         //     auto& view = _cur_frame_packet->GetView(i);
-        //     auto job = g_pJobSystem->CreateJob(std::format("CullView_{}",i), &RenderPipeline::CullView, this,view);
-        //     //auto handle  = g_pJobSystem->Dispatch(job);
-        //     //g_pJobSystem->Wait(handle);
-        //     s_cull_task_handle[cur_view_count++] = std::move(g_pJobSystem->Dispatch(job));
+        //     auto job = JobSystem::Get().CreateJob(std::format("CullView_{}",i), &RenderPipeline::CullView, this,view);
+        //     //auto handle  = JobSystem::Get().Dispatch(job);
+        //     //JobSystem::Get().Wait(handle);
+        //     s_cull_task_handle[cur_view_count++] = std::move(JobSystem::Get().Dispatch(job));
 
         // }
         // for(u32 i = 0; i < _cur_frame_packet->GetViewNum(); ++i)
         // {
-        //     g_pJobSystem->Wait(s_cull_task_handle[i]);
+        //     JobSystem::Get().Wait(s_cull_task_handle[i]);
         // }
     }
     void RenderPipeline::OnAddRenderObject(ECS::Entity e)

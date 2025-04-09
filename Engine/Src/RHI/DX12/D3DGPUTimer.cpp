@@ -47,15 +47,15 @@ namespace Ailu
         }
     };
 
-    void D3DGPUTimer::BeginFrame(CommandBuffer * cmd)
+    void D3DGPUTimer::BeginFrame(RHICommandBuffer * cmd)
     {
-        auto commandList = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+        auto commandList = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
         UNREFERENCED_PARAMETER(commandList);
     }
 
     void D3DGPUTimer::EndFrame()
     {
-        //auto commandList = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+        //auto commandList = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
         //// Resolve query for the current frame.
         //static UINT resolveToFrameID = 0;
         ////buffer大小为 sizeof(u64) * 3 * c_timerSlots，为每一帧维护c_timerSlots个 u64.
@@ -93,18 +93,18 @@ namespace Ailu
         //resolveToFrameID = readBackFrameID;
     }
 
-    void D3DGPUTimer::Start(CommandBuffer * cmd, u32 timerid)
+    void D3DGPUTimer::Start(RHICommandBuffer * cmd, u32 timerid)
     {
-        auto commandList = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+        auto commandList = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
         if (timerid >= kMaxGpuTimerNum)
             throw std::out_of_range("Timer ID out of range");
 
         commandList->EndQuery(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, timerid * 2);
     }
 
-    void D3DGPUTimer::Stop(CommandBuffer * cmd, u32 timerid)
+    void D3DGPUTimer::Stop(RHICommandBuffer * cmd, u32 timerid)
     {
-        auto commandList = static_cast<D3DCommandBuffer*>(cmd)->GetCmdList();
+        auto commandList = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
         if (timerid >= kMaxGpuTimerNum)
             throw std::out_of_range("Timer ID out of range");
 

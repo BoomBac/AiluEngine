@@ -65,7 +65,7 @@ namespace Ailu
                 }
                 //write to pick buffer
                 cmd->SetRenderTarget(_color, _depth);
-                cmd->ClearRenderTarget(_color, _depth, Colors::kBlack, kZFar);
+                //cmd->ClearRenderTarget(_color, _depth, Colors::kBlack, kZFar);
                 for (const auto &queue_data: *rendering_data._cull_results)
                 {
                     auto &[queue, objs] = queue_data;
@@ -140,8 +140,6 @@ namespace Ailu
                     RTHandle select_buf = cmd->GetTempRT(_color->Width(), _color->Height(), "select_buffer", ERenderTargetFormat::kDefault, false, false, false);
                     RTHandle select_buf_blur_temp = cmd->GetTempRT(_color->Width(), _color->Height(), "select_buf_blur_temp", ERenderTargetFormat::kDefault, false, false, false);
                     cmd->SetRenderTarget(select_buf, rendering_data._camera_depth_target_handle);
-                    cmd->ClearRenderTarget(select_buf, Colors::kBlack);
-                    cmd->ClearRenderTarget(select_buf_blur_temp, Colors::kBlack);
                     for (auto entity: selected)
                     {
                         const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
@@ -343,7 +341,7 @@ namespace Ailu
                 _read_pickbuf->SetBuffer("_PickResult", _readback_buf);
                 _read_pickbuf->SetVector("pixel_pos", Vector4f((f32) x, (f32) y, 0.0f, 0.0f));
                 cmd->Dispatch(_read_pickbuf.get(), kernel, 1, 1, 1);
-                g_pGfxContext->ExecuteAndWaitCommandBuffer(cmd);
+                GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
                 CommandBufferPool::Release(cmd);
                 u8 data[256];
                 _readback_buf->ReadBack(data, 256);

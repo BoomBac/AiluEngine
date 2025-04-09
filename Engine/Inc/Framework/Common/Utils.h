@@ -13,6 +13,7 @@
 #include <numeric>
 #include <fstream>
 #include <set>
+#include <thread>
 
 namespace Ailu
 {
@@ -57,7 +58,10 @@ namespace Ailu
         }
         return ret;
     }
-
+    AILU_API void SetThreadName(const String& name);
+    AILU_API const String& GetThreadName();
+    AILU_API const String& GetThreadName(std::thread::id id);
+    AILU_API const HashMap<std::thread::id, String>& GetAllThreadNameMap();
 
     namespace StringUtils
     {

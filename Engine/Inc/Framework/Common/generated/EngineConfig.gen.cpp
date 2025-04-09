@@ -56,6 +56,14 @@ metaMaxRenderObjectPerTask._is_range=false;
 metaMaxRenderObjectPerTask._is_float_range=true;
 metaMaxRenderObjectPerTask._is_color=false;
 initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"MaxRenderObjectPerTask","u32", false, true,offsetof(EngineConfig,MaxRenderObjectPerTask),&EngineConfig::MaxRenderObjectPerTask,metaMaxRenderObjectPerTask,false));
+Meta metaisMultiThreadRender;
+metaisMultiThreadRender._category="Render";
+metaisMultiThreadRender._min=(float)0;
+metaisMultiThreadRender._max=(float)1;
+metaisMultiThreadRender._is_range=false;
+metaisMultiThreadRender._is_float_range=true;
+metaisMultiThreadRender._is_color=false;
+initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"isMultiThreadRender","bool", false, true,offsetof(EngineConfig,isMultiThreadRender),&EngineConfig::isMultiThreadRender,metaisMultiThreadRender,false));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }

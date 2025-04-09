@@ -41,13 +41,15 @@ namespace Ailu
         {
             u16 cur_mip_width = rendering_data._width >> i;
             u16 cur_mip_height = rendering_data._height >> i;
-            bloom_mips.emplace_back(RenderTexture::GetTempRT(cur_mip_width, cur_mip_height, std::format("bloom_mip_{}", i), ERenderTargetFormat::kDefaultHDR));
+            RenderTextureDesc desc = RenderTextureDesc(cur_mip_width,cur_mip_height);
+            desc._load_action = ELoadStoreAction::kNotCare;
+            bloom_mips.emplace_back(RenderTexture::GetTempRT(desc, std::format("bloom_mip_{}", i)));
         }
         cmd->Clear();
         RenderTexture* scene_color = rendering_data._postprocess_input? rendering_data._postprocess_input : 
             g_pRenderTexturePool->Get(rendering_data._camera_color_target_handle);
         {
-            ProfileBlock p(cmd.get(), cmd->GetName());
+            GpuProfileBlock p(cmd.get(), cmd->Name());
             if (_is_use_blur)
             {
                 auto blur_x = cmd->GetTempRT(rendering_data._width, rendering_data._height, "blur_x", ERenderTargetFormat::kDefault, false, false, true);
@@ -55,8 +57,7 @@ namespace Ailu
                 _cs_blur->SetTexture("_SourceTex", scene_color);
                 _cs_blur->SetTexture("_OutTex", blur_x);
                 auto kernel = _cs_blur->FindKernel("blur_x");
-                u16 group_num_x = std::ceil((f32) rendering_data._width / 16.0f);
-                u16 group_num_y = std::ceil((f32) rendering_data._height / 16.0f);
+                auto [group_num_x,group_num_y,group_num_z] = _cs_blur->CalculateDispatchNum(kernel,rendering_data._width,rendering_data._height,1u);
                 cmd->Dispatch(_cs_blur.get(), kernel, group_num_x, group_num_y, 1);
                 _cs_blur->SetTexture("_SourceTex", blur_x);
                 _cs_blur->SetTexture("_OutTex", blur_y);
@@ -84,7 +85,7 @@ namespace Ailu
                 cmd->DrawFullScreenQuad(_bloom_mats[i].get(), 1);
             }
             //up sample
-            for (u16 i = bloom_mips.size() - 1; i > 0; i--)
+            for (u16 i = (u16)bloom_mips.size() - 1; i > 0; i--)
             {
                 auto cur_mip = bloom_mips[i], next_mip = bloom_mips[i - 1];
                 cmd->SetRenderTarget(next_mip);
@@ -101,7 +102,7 @@ namespace Ailu
                 light_pos.xy /= light_pos.w;
                 light_pos.w = 1.0f;
                 light_pos.xy = light_pos.xy * 0.5f + 0.5f;
-                light_pos.y = 1.0 - light_pos.y;
+                light_pos.y = 1.0f - light_pos.y;
                 //LOG_INFO("light_pos {}", light_pos.ToString());
                 _bloom_mats[0]->SetVector("_SunScreenPos", light_pos);
 

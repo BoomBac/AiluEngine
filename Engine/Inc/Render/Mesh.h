@@ -43,7 +43,7 @@ namespace Ailu
         Mesh(const std::string &name);
         ~Mesh();
         virtual void Clear();
-        virtual void BuildRHIResource();
+        virtual void Apply();
         void SetVertices(Vector3f *vertices);
         void SetNormals(Vector3f *normals);
         void SetTangents(Vector4f *tangents);
@@ -54,10 +54,9 @@ namespace Ailu
         inline Vector2f *GetUVs(u8 index) { return _uv[index]; };
         inline u32 *GetIndices(u16 submesh_index = 0) { return std::get<0>(_p_indices[submesh_index]); };
         inline u32 GetIndicesCount(u16 submesh_index = 0) { return std::get<1>(_p_indices[submesh_index]); };
-        const Ref<IVertexBuffer> &GetVertexBuffer() const;
-        const Ref<IIndexBuffer> &GetIndexBuffer(u16 submesh_index = 0) const;
+        const Ref<VertexBuffer> &GetVertexBuffer() const;
+        const Ref<IndexBuffer> &GetIndexBuffer(u16 submesh_index = 0) const;
         void AddSubmesh(u32 *indices, u32 indices_count);
-        bool _is_rhi_res_ready = false;
         const u16 SubmeshCount() const { return static_cast<u16>(_p_indices.size()); };
         void AddCacheMaterial(ImportedMaterialInfo material) { _imported_materials.emplace_back(material); };
         const List<ImportedMaterialInfo> &GetCacheMaterials() const { return _imported_materials; };
@@ -69,8 +68,8 @@ namespace Ailu
         
     protected:
         Vector<AABB> _bound_boxs;
-        Ref<IVertexBuffer> _p_vbuf;
-        Vector<Ref<IIndexBuffer>> _p_ibufs;
+        Ref<VertexBuffer> _p_vbuf;
+        Vector<Ref<IndexBuffer>> _p_ibufs;
         Vector3f *_vertices;
         Vector3f *_normals;
         Color *_colors;
@@ -87,7 +86,7 @@ namespace Ailu
         SkeletonMesh();
         explicit SkeletonMesh(const String &name);
         ~SkeletonMesh();
-        void BuildRHIResource() final;
+        void Apply() final;
         void Clear() final;
         void SetBoneWeights(Vector4f *bone_weights);
         void SetBoneIndices(Vector4D<u32> *bone_indices);

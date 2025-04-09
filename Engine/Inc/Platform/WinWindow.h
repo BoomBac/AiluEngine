@@ -17,6 +17,7 @@ namespace Ailu
 		bool IsVSync() const override;
 		void* GetNativeWindowPtr() const override;
 		std::tuple<i32, i32> GetWindowPosition() const override;
+		void SetTitle(const WString& title) final;
 	private:
 		void Init(const WindowProps& prop);
 		void Shutdown();

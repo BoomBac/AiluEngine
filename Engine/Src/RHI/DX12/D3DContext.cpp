@@ -3,6 +3,8 @@
 #include "Framework/Common/Assert.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/Profiler.h"
+#include "Framework/Common/Application.h"
+#include "Framework/Common/JobSystem.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DGPUTimer.h"
 #include "RHI/DX12/GPUResourceManager.h"
@@ -11,10 +13,14 @@
 #include "Render/GpuResource.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/RenderingData.h"
+#include "Render/Material.h"
+#include "Render/Buffer.h"
 #include "pch.h"
 #include <dxgidebug.h>
 #include <limits>
 
+#include "RHI/DX12/D3DGraphicsPipelineState.h"
+#include <RHI/DX12/D3DTexture.h>
 #include <d3d11.h>
 
 
@@ -26,6 +32,167 @@
 
 namespace Ailu
 {
+    #pragma region GpuCommandWorker
+
+    GpuCommandWorker::GpuCommandWorker(GraphicsContext* context) : _ctx(context),_is_stop(false),
+    _worker_thread(nullptr)
+    {
+        
+    }
+    GpuCommandWorker::~GpuCommandWorker()
+    {
+        if (_worker_thread && _worker_thread->joinable())
+            _worker_thread->join();
+        LOG_INFO("Destory GpuCommandWorker");
+    }
+
+    void GpuCommandWorker::Push(Vector<GfxCommand *>&& cmds,SubmitParams params)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        CommandGroup group;
+        _cmd_queue.emplace(std::move(cmds),params);
+        _cv.notify_one();
+    }
+    bool GpuCommandWorker::Pop(GpuCommandWorker::CommandGroup& group)
+    {
+        std::unique_lock<std::mutex> lock(_mutex);
+        if (!_cmd_queue.empty())
+        {
+            group = std::move(_cmd_queue.front());
+            _cmd_queue.pop();
+            return true;
+        }
+        return false;
+    }
+    void GpuCommandWorker::RunAsync()
+    {
+        SetThreadName("RenderThread");
+        while(!_is_stop)
+        {
+            Application::Get().WaitForMain();
+            if (Application::Get().State() == EApplicationState::EApplicationState_Exit)
+            {
+                _is_stop = true;
+                break;
+            }
+            std::unique_lock<std::mutex> lock(_run_mutex);
+            _cv.wait(lock, [this] { return (!_cmd_queue.empty()); });
+            CPUProfileBlock b("GpuCommandWorker::RunAsync");
+            while (true)
+            {
+                CommandGroup group;
+                if (Pop(group))
+                {
+                    auto cmd = RHICommandBufferPool::Get(group._params._name);
+                    for(auto* task : group._cmds)
+                        _ctx->ProcessGpuCommand(task,cmd.get());
+                    if (group._cmds.size() > 1)
+                    {
+                        CPUProfileBlock b(group._params._name +"_Execute");
+                        _ctx->ExecuteRHICommandBuffer(cmd.get());
+                    }
+                    RenderTexture::ResetRenderTarget();
+                    RHICommandBufferPool::Release(cmd);
+                    if (group._params._is_end_frame)
+                    {
+                        CPUProfileBlock b("EndFrame");
+                        EndFrame();
+                        break;
+                    }
+                }
+                else
+                {
+                    std::this_thread::yield();
+                }
+            }
+        }
+    }
+    void GpuCommandWorker::EndFrame()
+    {
+        u16 compiled_shader_num = 0u,compiled_compute_shader_num = 0u;
+        while (!_pending_update_shaders.Empty())
+        {
+            if (auto obj = _pending_update_shaders.Pop(); obj.has_value())
+            {
+                if (Shader* shader = dynamic_cast<Shader*>(obj.value()); shader != nullptr)
+                {
+                    if (shader->PreProcessShader())
+                    {
+                        bool is_all_succeed = true;
+                        is_all_succeed = shader->Compile(); //暂时重编所有变体，避免材质切换变体后使用的是旧的shader
+                        for (auto &mat: shader->GetAllReferencedMaterials())
+                        {
+                            mat->ConstructKeywords(shader);
+                            // for (u16 i = 0; i < shader->PassCount(); i++)
+                            // {
+                            //     is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
+                            // }
+                            if (is_all_succeed)
+                            {
+                                mat->ChangeShader(shader);
+                            }
+                        }
+                        compiled_shader_num++;
+                    }
+                }
+                else if (ComputeShader* shader = dynamic_cast<ComputeShader*>(obj.value()); shader != nullptr)
+                {
+                    if (shader->Preprocess())
+                    {
+                        shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
+                        shader->Compile(); 
+                        compiled_compute_shader_num++;
+                    }
+                }
+            }
+        }
+        if (compiled_shader_num + compiled_compute_shader_num > 0u)
+        {
+            LOG_INFO("Compiled {} shaders and {} compute shaders!", compiled_shader_num,compiled_compute_shader_num);
+        }
+        if (Application::Get()._is_multi_thread_rendering)
+            Application::Get().NotifyMain();
+        RenderingStates::Reset();
+    }
+    void GpuCommandWorker::Start()
+    {
+        if (_worker_thread == nullptr)
+        {
+            _worker_thread = new std::thread(&GpuCommandWorker::RunAsync, this);
+        }
+        _is_stop = false;
+    }
+    void GpuCommandWorker::Stop()
+    {
+        if (_worker_thread)
+        {
+            _is_stop = true;
+            if (_worker_thread->joinable())
+                _worker_thread->join();
+            DESTORY_PTR(_worker_thread);
+        }
+    }
+    void GpuCommandWorker::RunSync()
+    {
+        CPUProfileBlock b("GpuCommandWorker::RunSync");
+        while(!_cmd_queue.empty())
+        {
+            CommandGroup& group = _cmd_queue.front();
+            auto cmd = RHICommandBufferPool::Get(group._params._name);
+            for(auto* task : group._cmds)
+                _ctx->ProcessGpuCommand(task, cmd.get());
+            {
+                CPUProfileBlock b(group._params._name +"_Execute");
+                _ctx->ExecuteRHICommandBuffer(cmd.get());
+            }
+            RenderTexture::ResetRenderTarget();
+            RHICommandBufferPool::Release(cmd);
+            _cmd_queue.pop();
+        }
+    }
+#pragma endregion
+
+    #pragma region DX Helper
     static void GetHardwareAdapter(IDXGIFactory6 *pFactory, IDXGIAdapter4 **ppAdapter, DXGI_QUERY_VIDEO_MEMORY_INFO *p_local_video_memory_info, DXGI_QUERY_VIDEO_MEMORY_INFO *p_non_local_video_memory_info)
     {
         IDXGIAdapter *pAdapter = nullptr;
@@ -123,10 +290,32 @@ namespace Ailu
         else
             LOG_ERROR(L"Failed to get renderdoc dll path. Error: {}", result)
     };
+    namespace D3DConvertUtils
+    {
+        D3D12_VIEWPORT ToD3DViewport(const Rect &viewport)
+        {
+            D3D12_VIEWPORT ret;
+            ret.TopLeftX = (f32)viewport.left;
+            ret.TopLeftY = (f32)viewport.top;
+            ret.Width =    (f32)viewport.width;
+            ret.Height =   (f32)viewport.height;
+            ret.MinDepth = 0.0f;
+            ret.MaxDepth = 1.0f;
+            return ret;
+        }
+        D3D12_RECT ToD3DRect(const Rect &rect)
+        {
+            D3D12_RECT ret;
+            ret.left = rect.left;
+            ret.top = rect.top;
+            ret.right = rect.width;
+            ret.bottom = rect.height;
+            return ret;
+        }
+    }
+    #pragma endregion
 
-    CPUVisibleDescriptorAllocator *g_pCPUDescriptorAllocator;
-    GPUVisibleDescriptorAllocator *g_pGPUDescriptorAllocator;
-
+    #pragma region D3DContext
     D3DContext::D3DContext(WinWindow *window) : _window(window), _width(window->GetWidth()), _height(window->GetHeight())
     {
         m_aspectRatio = (float) _width / (float) _height;
@@ -134,6 +323,7 @@ namespace Ailu
         PIXLoadLatestWinPixGpuCapturerLibrary();
         //RdcLoadLatestRdcGpuCapturerLibrary();
 #endif// _PIX_DEBUG
+        _cmd_worker = MakeScope<GpuCommandWorker>(this);
     }
 
     D3DContext::~D3DContext()
@@ -145,18 +335,16 @@ namespace Ailu
     void D3DContext::Init()
     {
         g_pGfxContext = this;
-        g_pCPUDescriptorAllocator = new CPUVisibleDescriptorAllocator();
-        g_pGPUDescriptorAllocator = new GPUVisibleDescriptorAllocator();
         LoadPipeline();
         LoadAssets();
 #ifdef DEAR_IMGUI
         //init imgui
         {
-            _imgui_allocation = g_pGPUDescriptorAllocator->Allocate(1);
-            auto [cpu_handle, gpu_handle] = _imgui_allocation.At(0);
+            auto bind_heap = D3DDescriptorMgr::Get().GetBindHeap();
+            auto [cpu_handle, gpu_handle] = std::make_tuple(bind_heap->GetCPUDescriptorHandleForHeapStart(),bind_heap->GetGPUDescriptorHandleForHeapStart());
             auto ret = ImGui_ImplDX12_Init(m_device.Get(), RenderConstants::kFrameCount,
                                            RenderConstants::kColorRange == EColorRange::kLDR ? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat),
-                                           _imgui_allocation.Page()->GetHeap().Get(), cpu_handle, gpu_handle);
+                                           bind_heap, cpu_handle, gpu_handle);
         }
 #endif// DEAR_IMGUI
         m_commandList->Close();
@@ -164,6 +352,10 @@ namespace Ailu
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
         WaitForGpu();
         _p_gpu_timer = MakeScope<D3DGPUTimer>(m_device.Get(), m_commandQueue.Get(), RenderConstants::kFrameCount);
+        if (Application::Get()._is_multi_thread_rendering)
+        {
+            _cmd_worker->Start();
+        }
     }
 
     void D3DContext::TryReleaseUnusedResources()
@@ -184,7 +376,7 @@ namespace Ailu
                 g_pLogMgr->LogWarningFormat("Release unused upload buffer with num {}.", origin_res_num);
         }
         g_pRenderTexturePool->TryCleanUp();
-        if (auto num = g_pGPUDescriptorAllocator->ReleaseSpace(); num > 0)
+        if (auto num = D3DDescriptorMgr::Get().ReleaseSpace(); num > 0)
         {
             g_pLogMgr->LogFormat("Release GPUVisibleDescriptor at with num {}.", num);
         }
@@ -229,13 +421,31 @@ namespace Ailu
         _global_tracked_resource.insert(std::make_pair(_frame_count, resource));
     }
 
-    u64 D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd)
+    void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd)
     {
-        cmd->Close();
-        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
-        ID3D12CommandList *ppCommandLists[] = {d3dcmd->GetCmdList()};
+        _cmd_worker->Push(std::move(cmd->_commands),SubmitParams{cmd->Name()});
+    }
+
+    void D3DContext::ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd)
+    {
+        auto rhi_cmd = RHICommandBufferPool::Get(cmd->Name());
+        for(auto* gfx_cmd : cmd->_commands)
+        {
+            ProcessGpuCommand(gfx_cmd,rhi_cmd.get());
+        }
+        ExecuteRHICommandBuffer(rhi_cmd.get());
+        RHICommandBufferPool::Release(rhi_cmd);
+    }
+
+    void D3DContext::ExecuteRHICommandBuffer(RHICommandBuffer* cmd)
+    {
+        if (cmd->IsExecuted())
+            return;
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd);
+        d3dcmd->Close();
+        ID3D12CommandList *ppCommandLists[] = {d3dcmd->NativeCmdList()};
 #ifdef _PIX_DEBUG
-        PIXBeginEvent(m_commandQueue.Get(), cmd->GetID(), ToWStr(cmd->GetName()).c_str());
+        PIXBeginEvent(m_commandQueue.Get(), cmd->ID(), ToWStr(cmd->Name()).c_str());
 #endif// _PIX_DEBUG
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
         ++_fence_value[m_frameIndex];
@@ -243,49 +453,8 @@ namespace Ailu
 #ifdef _PIX_DEBUG
         PIXEndEvent(m_commandQueue.Get());
 #endif// _PIX_DEBUG
-
-        if (_cmd_target_fence_value.contains(cmd->GetID()))
-            _cmd_target_fence_value[cmd->GetID()] = _fence_value[m_frameIndex];
-        else
-            _cmd_target_fence_value.insert(std::make_pair(cmd->GetID(), _fence_value[m_frameIndex]));
-        return _fence_value[m_frameIndex];
-    }
-
-    u64 D3DContext::ExecuteAndWaitCommandBuffer(Ref<CommandBuffer> &cmd)
-    {
-        auto ret = ExecuteCommandBuffer(cmd);
-        WaitForGpu();
-        return ret;
-    }
-
-    void D3DContext::BeginBackBuffer(CommandBuffer *cmd)
-    {
-        auto dxcmd = static_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
-        auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        dxcmd->ResourceBarrier(1, &bar_before);
-        //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, _rtv_desc_size);
-        auto rtv_handle = _rtv_allocation.At(m_frameIndex);
-        dxcmd->OMSetRenderTargets(1, &rtv_handle, FALSE, nullptr);
-        dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
-    }
-
-    void D3DContext::EndBackBuffer(CommandBuffer *cmd)
-    {
-#ifndef _DIRECT_WRITE
-        auto dxcmd = static_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
-        auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-        dxcmd->ResourceBarrier(1, &bar_after);
-#endif// !_DIRECT_WRITE
-    }
-
-    void D3DContext::DrawOverlay(CommandBuffer *cmd)
-    {
-        ProfileBlock p(cmd, "ImGui");
-        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd);
-        _imgui_allocation.SetupDescriptorHeap(static_cast<D3DCommandBuffer *>(cmd));
-#ifdef DEAR_IMGUI
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), d3dcmd->GetCmdList());
-#endif// DEAR_IMGUI
+        d3dcmd->_fence_value = _fence_value[m_frameIndex];
+        d3dcmd->PostExecute();
     }
 
     void D3DContext::Destroy()
@@ -294,10 +463,11 @@ namespace Ailu
         // cleaned up by the destructor.
         WaitForGpu();
         CloseHandle(m_fenceEvent);
+        if (Application::Get()._is_multi_thread_rendering)
+            _cmd_worker->Stop();
         //_p_gpu_timer->ReleaseDevice();
         //在这里析构分配器应该会有问题，纹理实际在在这之后还需要归还之前的分配
-        DESTORY_PTR(g_pCPUDescriptorAllocator);
-        DESTORY_PTR(g_pGPUDescriptorAllocator);
+        D3DDescriptorMgr::Shutdown();
         // 在程序终止时调用 ReportLiveObjects() 函数
         IDXGIDebug1 *pDebug = nullptr;
         if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
@@ -330,6 +500,7 @@ namespace Ailu
         ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
         GetHardwareAdapter(factory.Get(), _p_adapter.GetAddressOf(), &_local_video_memory_info, &_non_local_video_memory_info);
         ThrowIfFailed(D3D12CreateDevice(_p_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)));
+        D3DDescriptorMgr::Init();
         // Describe and create the command queue.
         D3D12_COMMAND_QUEUE_DESC queueDesc = {};
         queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -358,7 +529,7 @@ namespace Ailu
         PIXSetHUDOptions(PIXHUDOptions::PIX_HUD_SHOW_ON_NO_WINDOWS);
 #endif
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-        _rtv_allocation = g_pCPUDescriptorAllocator->Allocate(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RenderConstants::kFrameCount);
+        _rtv_allocation = D3DDescriptorMgr::Get().AllocCPU(RenderConstants::kFrameCount,D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
         // Create a RTV for each frame.
         for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
@@ -449,140 +620,12 @@ namespace Ailu
 
     void D3DContext::Present()
     {
-        //if (!_resize_msg.empty())
-        //{
-        //    auto& [w, h] = _resize_msg.top();
-        //    ResizeSwapChainImpl(w,h);
-        //    do
-        //    {
-        //        _resize_msg.pop();
-        //    } while (!_resize_msg.empty());
-        //}
-        auto cmd = CommandBufferPool::Get("GUI Reslove");
+        Vector<GfxCommand *> cmds{CommandPool::Get().Alloc<CommandPresent>()};
+        _cmd_worker->Push(std::move(cmds), SubmitParams{"Present",true});
+        if (!Application::Get()._is_multi_thread_rendering)
         {
-            ProfileBlock p(cmd.get(), "GUI Reslove");
-            g_pGfxContext->BeginBackBuffer(cmd.get());
-            g_pGfxContext->DrawOverlay(cmd.get());
-            g_pGfxContext->EndBackBuffer(cmd.get());
+            _cmd_worker->RunSync();
         }
-        g_pGfxContext->ExecuteCommandBuffer(cmd);
-        CommandBufferPool::Release(cmd);
-
-        DoResourceTask();
-        //ThrowIfFailed(m_commandAllocators[m_frameIndex]->Reset());
-        //ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
-        //ThrowIfFailed(m_commandList->Close());
-//		ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-//		m_commandQueue->ExecuteCommandLists(1, ppCommandLists);
-#ifdef DEAR_IMGUI
-        ImGuiIO &io = ImGui::GetIO();
-        // Update and Render additional Platform Windows
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault(nullptr, (void *) m_commandList.Get());
-        }
-#endif// DEAR_IMGUI \
-
-#ifdef _DIRECT_WRITE
-
-        //RenderUI
-        {
-            D2D1_SIZE_F rtSize = m_d2dRenderTargets[m_frameIndex]->GetSize();
-            D2D1_RECT_F textRect = D2D1::RectF(0, 0, rtSize.width, rtSize.height);
-            static const WCHAR text[] = L"11On12";
-
-            // Acquire our wrapped render target resource for the current back buffer.
-            m_d3d11On12Device->AcquireWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
-
-            // Render text directly to the back buffer.
-            m_d2dDeviceContext->SetTarget(m_d2dRenderTargets[m_frameIndex].Get());
-            m_d2dDeviceContext->BeginDraw();
-            m_d2dDeviceContext->SetTransform(D2D1::Matrix3x2F::Identity());
-            m_d2dDeviceContext->DrawText(
-                    text,
-                    _countof(text) - 1,
-                    m_textFormat.Get(),
-                    &textRect,
-                    m_textBrush.Get());
-            ThrowIfFailed(m_d2dDeviceContext->EndDraw());
-
-            // Release our wrapped render target resource. Releasing
-            // transitions the back buffer resource to the state specified
-            // as the OutState when the wrapped resource was created.
-            m_d3d11On12Device->ReleaseWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
-
-            // Flush to submit the 11 command list to the shared command queue.
-            m_d3d11DeviceContext->Flush();
-        }
-#endif//  _DIRECT_WRITE \
-        // Present the frame.
-        ThrowIfFailed(m_swapChain->Present(1, 0));
-        {
-            CPUProfileBlock p("WaitForGPU");
-            MoveToNextFrame();
-            //WaitForGpu();
-            //m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-        }
-        if (_is_cur_frame_capturing)
-        {
-            EndCapture();
-        }
-
-        ++_frame_count;
-        if (_frame_count % kResourceCleanupIntervalTick == 0)
-        {
-            if (_global_tracked_resource.size() > 0)
-            {
-                u64 origin_res_num = _global_tracked_resource.size();
-                auto it = _global_tracked_resource.lower_bound(_frame_count);
-                if (it != _global_tracked_resource.end())
-                {
-                    _global_tracked_resource.erase(_global_tracked_resource.begin(), it);
-                }
-                else
-                    _global_tracked_resource.clear();
-                origin_res_num -= _global_tracked_resource.size();
-                g_pLogMgr->LogWarningFormat("D3DContext::Present: Resource cleanup, {} resources released.", origin_res_num);
-            }
-            if (u32 release_size = GpuResourceManager::Get()->ReleaseSpace(); release_size > 0)
-            {
-                LOG_INFO("D3DContext::Present: Resource cleanup, {} byte released.", release_size);
-            }
-            if (RenderTexture::TotalGPUMemerySize() > kMaxRenderTextureMemorySize)
-            {
-                g_pRenderTexturePool->TryCleanUp();
-                g_pGPUDescriptorAllocator->ReleaseSpace();
-            }
-        }
-        _p_gpu_timer->EndFrame();
-        //CommandBufferPool::ReleaseAll();
-        if (_is_next_frame_capture)
-        {
-            BeginCapture();
-            _is_next_frame_capture = false;
-            _is_cur_frame_capturing = true;
-        }
-    }
-
-    void D3DContext::DoResourceTask()
-    {
-        while (!_resource_task.empty())
-        {
-            _resource_task.front()();
-            _resource_task.pop();
-        }
-    }
-
-    const u64 &D3DContext::GetFenceValue(const u32 &cmd_index) const
-    {
-        static u64 u64_max = std::numeric_limits<u64>::max();
-        if (!_cmd_target_fence_value.contains(cmd_index))
-        {
-            LOG_WARNING("GetFenceValue with invaild cmd index");
-            return u64_max;
-        }
-        return _cmd_target_fence_value.at(cmd_index);
     }
 
     u64 D3DContext::GetFenceValueGPU() const
@@ -593,24 +636,6 @@ namespace Ailu
     u64 D3DContext::GetFenceValueCPU() const
     {
         return _fence_value[m_frameIndex];
-    }
-
-    bool D3DContext::IsCommandBufferReady(const u32 cmd_index)
-    {
-        static u64 u64_max = std::numeric_limits<u64>::max();
-        if (!_cmd_target_fence_value.contains(cmd_index))
-        {
-            return true;
-        }
-        else
-        {
-            return _p_cmd_buffer_fence->GetCompletedValue() >= _cmd_target_fence_value.at(cmd_index);
-        }
-    }
-
-    void D3DContext::SubmitRHIResourceBuildTask(RHIResourceTask task)
-    {
-        _resource_task.push(task);
     }
 
     void D3DContext::TakeCapture()
@@ -650,22 +675,148 @@ namespace Ailu
     }
     void D3DContext::MoveToNextFrame()
     {
+        //执行时已经递增了，这里不再需要
         // Schedule a Signal command in the queue.
         const UINT64 currentFenceValue = _fence_value[m_frameIndex];
         ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), currentFenceValue));
 
-        // Update the frame index.
+        // Update the frame index.之前交换后，此时索引即为本帧工作的buffer
         m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
-        // If the next frame is not ready to be rendered yet, wait until it is ready.
+        // 如果该buffer上一次绘制还未结束，等待
         if (_p_cmd_buffer_fence->GetCompletedValue() < _fence_value[m_frameIndex])
         {
+            CPUProfileBlock p("WaitForGPU");
             ThrowIfFailed(_p_cmd_buffer_fence->SetEventOnCompletion(_fence_value[m_frameIndex], m_fenceEvent));
             WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
         }
 
         // Set the fence value for the next frame.
         _fence_value[m_frameIndex] = currentFenceValue + 1;
+    }
+    void D3DContext::PresentImpl(D3DCommandBuffer* cmd)
+    {
+        static TimeMgr s_timer;
+        CPUProfileBlock b("Present");
+        auto dxcmd = cmd->NativeCmdList();
+        {
+            u32 pid = Profiler::Get().StartGpuProfile(cmd,"Present");
+            Profiler::Get().AddGPUProfilerHierarchy(true,pid);
+            auto bar_before = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            dxcmd->ResourceBarrier(1, &bar_before);
+            auto rtv_handle = _rtv_allocation.At(m_frameIndex);
+            dxcmd->OMSetRenderTargets(1, &rtv_handle, FALSE, nullptr);
+            dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
+    #ifdef DEAR_IMGUI
+            auto bind_heap = D3DDescriptorMgr::Get().GetBindHeap();
+            dxcmd->SetDescriptorHeaps(1u,&bind_heap);
+            for(auto&it : _imgui_used_rt)
+                it->StateTranslation(cmd,EResourceState::kPixelShaderResource,kTotalSubRes);
+            _imgui_used_rt.clear();
+            ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxcmd);
+    #endif// DEAR_IMGUI
+    
+    #ifndef _DIRECT_WRITE
+            auto bar_after = CD3DX12_RESOURCE_BARRIER::Transition(_color_buffer[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+            dxcmd->ResourceBarrier(1, &bar_after);
+    #endif// !_DIRECT_WRITE
+    
+    #ifdef DEAR_IMGUI
+            ImGuiIO &io = ImGui::GetIO();
+            // Update and Render additional Platform Windows
+            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            {
+                ImGui::UpdatePlatformWindows();
+                ImGui::RenderPlatformWindowsDefault(nullptr, (void *) m_commandList.Get());
+            }
+    #endif// DEAR_IMGUI \
+    
+    #ifdef _DIRECT_WRITE
+    
+            //RenderUI
+            {
+                D2D1_SIZE_F rtSize = m_d2dRenderTargets[m_frameIndex]->GetSize();
+                D2D1_RECT_F textRect = D2D1::RectF(0, 0, rtSize.width, rtSize.height);
+                static const WCHAR text[] = L"11On12";
+    
+                // Acquire our wrapped render target resource for the current back buffer.
+                m_d3d11On12Device->AcquireWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
+    
+                // Render text directly to the back buffer.
+                m_d2dDeviceContext->SetTarget(m_d2dRenderTargets[m_frameIndex].Get());
+                m_d2dDeviceContext->BeginDraw();
+                m_d2dDeviceContext->SetTransform(D2D1::Matrix3x2F::Identity());
+                m_d2dDeviceContext->DrawText(
+                        text,
+                        _countof(text) - 1,
+                        m_textFormat.Get(),
+                        &textRect,
+                        m_textBrush.Get());
+                ThrowIfFailed(m_d2dDeviceContext->EndDraw());
+    
+                // Release our wrapped render target resource. Releasing
+                // transitions the back buffer resource to the state specified
+                // as the OutState when the wrapped resource was created.
+                m_d3d11On12Device->ReleaseWrappedResources(m_wrappedBackBuffers[m_frameIndex].GetAddressOf(), 1);
+    
+                // Flush to submit the 11 command list to the shared command queue.
+                m_d3d11DeviceContext->Flush();
+            }
+    #endif//  _DIRECT_WRITE
+            Profiler::Get().EndGpuProfile(cmd,pid);
+            Profiler::Get().AddGPUProfilerHierarchy(false,pid);
+        }
+        // Present the frame.
+        ExecuteRHICommandBuffer(cmd);
+        ThrowIfFailed(m_swapChain->Present(1, 0));
+        {
+            s_timer.MarkLocal();
+            MoveToNextFrame();
+            RenderingStates::s_gpu_latency = s_timer.GetElapsedSinceLastLocalMark();
+        }
+        if (_is_cur_frame_capturing)
+        {
+            EndCapture();
+        }
+
+        ++_frame_count;
+        if (_frame_count % kResourceCleanupIntervalTick == 0)
+        {
+            if (_global_tracked_resource.size() > 0)
+            {
+                u64 origin_res_num = _global_tracked_resource.size();
+                auto it = _global_tracked_resource.lower_bound(_frame_count);
+                if (it != _global_tracked_resource.end())
+                {
+                    _global_tracked_resource.erase(_global_tracked_resource.begin(), it);
+                }
+                else
+                    _global_tracked_resource.clear();
+                origin_res_num -= _global_tracked_resource.size();
+                g_pLogMgr->LogWarningFormat("D3DContext::Present: Resource cleanup, {} resources released.", origin_res_num);
+            }
+            if (u32 release_size = GpuResourceManager::Get()->ReleaseSpace(); release_size > 0)
+            {
+                LOG_INFO("D3DContext::Present: Resource cleanup, {} byte released.", release_size);
+            }
+            if (RenderTexture::TotalGPUMemerySize() > kMaxRenderTextureMemorySize)
+            {
+                g_pRenderTexturePool->TryCleanUp();
+                D3DDescriptorMgr::Get().ReleaseSpace();
+            }
+        }
+        _p_gpu_timer->EndFrame();
+        //CommandBufferPool::ReleaseAll();
+        if (_is_next_frame_capture)
+        {
+            BeginCapture();
+            _is_next_frame_capture = false;
+            _is_cur_frame_capturing = true;
+        }
+        CommandPool::Get().EndFrame();
+        RenderingStates::s_frame_time = s_timer.GetElapsedSinceLastLocalMark();
+        RenderingStates::s_frame_rate = 1000.0f / RenderingStates::s_frame_time;
+        s_timer.MarkLocal();
     }
     void D3DContext::BeginCapture()
     {
@@ -806,4 +957,292 @@ namespace Ailu
         }
     }
 #endif
+    void D3DContext::ReadBack(GpuResource* res,u8* data,u32 size)
+    {
+        if (res->GetResourceType() == EGpuResType::kBuffer)
+        {
+            size = ALIGN_TO_256(size);
+            ComPtr<ID3D12Resource> copy_dst;
+            auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+            res_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+            heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+            res_desc.Flags &= ~D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+            ThrowIfFailed(m_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST,
+                                                                            nullptr, IID_PPV_ARGS(copy_dst.GetAddressOf())));
+            auto cmd = RHICommandBufferPool::Get("Readback");
+            auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
+            auto dxcmd = d3dcmd->NativeCmdList();
+            res->StateTranslation(cmd.get(),EResourceState::kCopySource,UINT32_MAX);
+            dxcmd->CopyResource(copy_dst.Get(), reinterpret_cast<ID3D12Resource*>(res->NativeResource()));
+            //_state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            ExecuteRHICommandBuffer(cmd.get());
+            u64 cmd_fence_value = d3dcmd->_fence_value;
+            while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value)
+            {
+                std::this_thread::yield();
+            }
+            D3D12_RANGE readbackBufferRange{0, size};
+            u8* tmp_data = nullptr;
+            copy_dst->Map(0, &readbackBufferRange, reinterpret_cast<void **>(&tmp_data));
+            D3D12_RANGE emptyRange{0, 0};
+            copy_dst->Unmap(0, &emptyRange);
+            memcpy(data, tmp_data, size);
+            RHICommandBufferPool::Release(cmd);
+            TrackResource(copy_dst);
+        }
+        else
+        {
+            LOG_ERROR("Readback only support buffer resource!");
+        }
+    }
+    void D3DContext::ReadBackAsync(GpuResource* res,std::function<void(u8*)> callback)
+    {
+        if (res->GetResourceType() == EGpuResType::kBuffer)
+        {
+            u32 size = res->GetSize();
+            ComPtr<ID3D12Resource> copy_dst;
+            auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+            res_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+            heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+            res_desc.Flags &= ~D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+            ThrowIfFailed(m_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST,
+                                                                            nullptr, IID_PPV_ARGS(copy_dst.GetAddressOf())));
+            auto cmd = RHICommandBufferPool::Get("Readback");
+            auto dxcmd = static_cast<D3DCommandBuffer *>(cmd.get())->NativeCmdList();
+            res->StateTranslation(cmd.get(),EResourceState::kCopySource,UINT32_MAX);
+            dxcmd->CopyResource(copy_dst.Get(), reinterpret_cast<ID3D12Resource*>(res->NativeResource()));
+            //_state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            ExecuteRHICommandBuffer(cmd.get());
+            u64 cmd_fence_value = static_cast<D3DCommandBuffer *>(cmd.get())->_fence_value;
+            JobSystem::Get().Dispatch([&]() mutable {
+                while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value)
+                {
+                    std::this_thread::yield();
+                }
+                D3D12_RANGE readbackBufferRange{0, size};
+                u8* data = nullptr;
+                copy_dst->Map(0, &readbackBufferRange, reinterpret_cast<void **>(&data));
+                D3D12_RANGE emptyRange{0, 0};
+                copy_dst->Unmap(0, &emptyRange);
+                callback(data);
+            });
+            TrackResource(copy_dst);
+            RHICommandBufferPool::Release(cmd);
+        }
+        else
+        {
+            LOG_ERROR("Readback only support buffer resource!");
+        }
+    }
+
+    void D3DContext::CreateResource(GpuResource *res)
+    {
+        CreateResource(res,nullptr);
+    }
+
+    
+    void D3DContext::CreateResource(GpuResource *res, UploadParams *params)
+    {
+        if (res->GetResourceType() == EGpuResType::kGraphicsPSO || res->GetResourceType() == EGpuResType::kRenderTexture)
+        {
+            res->Upload(this,nullptr,params);
+            DESTORY_PTR(params);
+        }
+        else
+        {
+            auto cmd = CommandPool::Get().Alloc<CommandGpuResourceUpload>();
+            cmd->_res = res;
+            cmd->_params = params;
+            Vector<GfxCommand*> cmds = {cmd};
+            _cmd_worker->Push(std::move(cmds),SubmitParams{"ResourceCreate: " + res->Name()});
+        }
+    }
+
+    void D3DContext::ProcessGpuCommand(GfxCommand *cmd, RHICommandBuffer *cmd_buffer)
+    {
+        D3DCommandBuffer *d3dcmd = static_cast<D3DCommandBuffer *>(cmd_buffer);
+        auto dxcmd = d3dcmd->NativeCmdList();
+        static std::stack<CommandProfiler*> s_begin_profiler_stack{};
+        if (cmd->GetCmdType() == EGpuCommandType::kAllocConstBuffer)
+        {
+            auto alloc_cmd = static_cast<CommandAllocConstBuffer *>(cmd);
+            d3dcmd->AllocConstBuffer(alloc_cmd->_name, alloc_cmd->_size, alloc_cmd->_data);
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kClearTarget)
+        {
+            auto clear_cmd = static_cast<CommandClearTarget *>(cmd);
+            if (clear_cmd->_flag & EClearFlag::kColor)
+            {
+                u16 color_num = std::min<u16>(clear_cmd->_color_target_num, d3dcmd->_color_count);
+                for (u16 i = 0; i < color_num; ++i)
+                {
+                    dxcmd->ClearRenderTargetView(*d3dcmd->_colors[i], clear_cmd->_colors[i], 0, nullptr);
+                }
+            }
+            if (clear_cmd->_flag & EClearFlag::kDepth)
+            {
+                D3D12_CLEAR_FLAGS depth_flag = D3D12_CLEAR_FLAG_DEPTH;
+                if (clear_cmd->_flag & EClearFlag::kStencil)
+                    depth_flag |= D3D12_CLEAR_FLAG_STENCIL;
+                dxcmd->ClearDepthStencilView(*d3dcmd->_depth, depth_flag, clear_cmd->_depth, clear_cmd->_stencil, 0, nullptr);
+            }
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kSetTarget)
+        {
+            auto set_cmd = static_cast<CommandSetTarget *>(cmd);
+            d3dcmd->ResetRenderTarget();
+            if (set_cmd->_color_target_num == 0)
+            {
+                if (set_cmd->_depth_target != nullptr)
+                {
+                    
+                    GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUnknown, set_cmd->_depth_target->PixelFormat(), 0);
+                    auto drt = static_cast<D3DRenderTexture *>(set_cmd->_depth_target);
+                    d3dcmd->_color_count = 0u;
+                    d3dcmd->_depth = drt->TargetCPUHandle(d3dcmd, set_cmd->_depth_index);
+                    d3dcmd->_scissors[0] = D3DConvertUtils::ToD3DRect(set_cmd->_viewports[0]);
+                    d3dcmd->_viewports[0] = D3DConvertUtils::ToD3DViewport(set_cmd->_viewports[0]);
+                    dxcmd->OMSetRenderTargets(0, nullptr, 0, d3dcmd->_depth);
+                    dxcmd->RSSetScissorRects(1, d3dcmd->_scissors.data());
+                    dxcmd->RSSetViewports(1, d3dcmd->_viewports.data());
+                    d3dcmd->MarkUsedResource(set_cmd->_depth_target);
+                }
+            }
+            else
+            {
+                d3dcmd->_color_count = set_cmd->_color_target_num;
+                bool is_depth_valid = set_cmd->_depth_target != nullptr;
+                d3dcmd->_depth = is_depth_valid? static_cast<D3DRenderTexture *>(set_cmd->_depth_target)->TargetCPUHandle(d3dcmd, set_cmd->_depth_index) : nullptr;
+                static D3D12_CPU_DESCRIPTOR_HANDLE handles[8];
+                for (u16 i = 0; i < d3dcmd->_color_count; ++i)
+                {
+                    auto rt = static_cast<D3DRenderTexture *>(set_cmd->_color_target[i]);
+                    GraphicsPipelineStateMgr::SetRenderTargetState(rt->PixelFormat(),is_depth_valid? set_cmd->_depth_target->PixelFormat(): EALGFormat::EALGFormat::kALGFormatUnknown, (u8)i);
+                    d3dcmd->_colors[i] = rt->TargetCPUHandle(d3dcmd, set_cmd->_color_indices[i]);
+                    d3dcmd->_scissors[i] = D3DConvertUtils::ToD3DRect(set_cmd->_viewports[i]);
+                    d3dcmd->_viewports[i] = D3DConvertUtils::ToD3DViewport(set_cmd->_viewports[i]);
+                    d3dcmd->MarkUsedResource(set_cmd->_color_target[i]);
+                    handles[i] = *d3dcmd->_colors[i];
+                }
+                if (is_depth_valid)
+                    d3dcmd->MarkUsedResource(set_cmd->_depth_target);
+                dxcmd->RSSetScissorRects(set_cmd->_color_target_num, d3dcmd->_scissors.data());
+                dxcmd->RSSetViewports(set_cmd->_color_target_num, d3dcmd->_viewports.data());
+                dxcmd->OMSetRenderTargets(d3dcmd->_color_count,handles , false, d3dcmd->_depth);
+            }
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kCustom)
+        {
+            auto custom_cmd = static_cast<CommandCustom *>(cmd);
+            custom_cmd->_func();
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kResourceUpload)
+        {
+            auto upload_cmd = static_cast<CommandGpuResourceUpload *>(cmd);
+            if (ObjectRegister::Get().Alive(upload_cmd->_res))
+            {
+                upload_cmd->_res->Upload(this,cmd_buffer,upload_cmd->_params);
+                upload_cmd->_res->Name(upload_cmd->_res->Name());//这里将name写入d3d resource，之前resource一直为空
+            }
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kTransResourceState)
+        {
+            auto transf_cmd = static_cast<CommandTranslateState *>(cmd);
+            transf_cmd->_res->StateTranslation(cmd_buffer, transf_cmd->_new_state,transf_cmd->_sub_res);
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kDraw)
+        {
+            auto draw_cmd = static_cast<CommandDraw *>(cmd);
+            draw_cmd->_mat->Bind(draw_cmd->_pass_index);
+            if (auto pso = GraphicsPipelineStateMgr::Get().FindMatchPSO(); pso != nullptr)
+            {
+                AL_ASSERT(draw_cmd->_mat->GetShader() == pso->StateDescriptor()._p_vertex_shader);
+                bool is_indexed_draw = draw_cmd->_ib != nullptr;
+                bool is_instance_draw = draw_cmd->_instance_count > 1;
+                BindParamsVB params;
+                params._layout = &draw_cmd->_mat->GetShader()->PipelineInputLayout(draw_cmd->_pass_index);
+                bool is_produced = draw_cmd->_vb == nullptr;
+                if (!is_produced)
+                    draw_cmd->_vb->Bind(d3dcmd, &params);
+                if (is_indexed_draw)
+                    draw_cmd->_ib->Bind(d3dcmd, nullptr);
+                if (draw_cmd->_per_obj_cb != nullptr)
+                    pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
+                for(auto& it : d3dcmd->_allocations)
+                {
+                    auto& [name,alloc] = it;
+                    if (pso->IsValidPipelineResource(EBindResDescType::kConstBuffer, name))
+                    {
+                        auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw, name, PipelineResource::kPriorityCmd);
+                        res._addi_info._gpu_handle = alloc.GPU;
+                        pso->SetPipelineResource(res);
+                    }
+                }
+
+                ++RenderingStates::s_temp_draw_call;
+                u32 vertex_count = is_produced? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
+                u32 triangle_count = is_indexed_draw? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb->GetVertexCount() / 3;
+                triangle_count *= draw_cmd->_instance_count;
+                RenderingStates::s_temp_triangle_num += triangle_count;
+                RenderingStates::s_temp_vertex_num += vertex_count;
+                pso->Bind(cmd_buffer, nullptr);
+                if (is_indexed_draw)
+                    dxcmd->DrawIndexedInstanced(draw_cmd->_ib->GetCount(),draw_cmd->_instance_count,0,0,0);
+                else
+                    dxcmd->DrawInstanced(draw_cmd->_vb->GetVertexCount(),draw_cmd->_instance_count, 0, 0);
+            }
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kDispatch)
+        {
+            auto cmd_disp = static_cast<CommandDispatch*>(cmd);
+            u16 thread_group_x = std::max<u16>(1u, cmd_disp->_group_num_x);
+            u16 thread_group_y = std::max<u16>(1u, cmd_disp->_group_num_y);
+            u16 thread_group_z = std::max<u16>(1u, cmd_disp->_group_num_z);
+            ShaderVariantHash active_variant = cmd_disp->_cs->ActiveVariant(cmd_disp->_kernel);
+            cmd_disp->_cs->Bind(d3dcmd,cmd_disp->_kernel,thread_group_x,thread_group_y,thread_group_z);
+            for(auto& it : d3dcmd->_allocations)
+            {
+                auto& [name,alloc] = it;
+                if (auto slot = cmd_disp->_cs->NameToSlot(name,cmd_disp->_kernel,active_variant); slot >= 0)
+                {
+                    dxcmd->SetComputeRootConstantBufferView(slot, alloc.GPU);
+                }
+            }
+            dxcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
+            ++RenderingStates::s_temp_dispatch_call;
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kCommandProfiler)
+        {
+            auto cmd_profiler = static_cast<CommandProfiler*>(cmd);
+            if (cmd_profiler->_is_start)
+            {
+                cmd_profiler->_gpu_index = Profiler::Get().StartGpuProfile(cmd_buffer, cmd_profiler->_name);
+                Profiler::Get().AddGPUProfilerHierarchy(true, (u32)cmd_profiler->_gpu_index);
+                cmd_profiler->_cpu_index = Profiler::Get().StartCPUProfile(cmd_profiler->_name + "_Submit");
+                Profiler::Get().AddCPUProfilerHierarchy(true, (u32)cmd_profiler->_cpu_index);
+                s_begin_profiler_stack.push(cmd_profiler);
+            }
+            else
+            {
+                Profiler::Get().EndGpuProfile(cmd_buffer, s_begin_profiler_stack.top()->_gpu_index);
+                Profiler::Get().AddGPUProfilerHierarchy(false, (u32)s_begin_profiler_stack.top()->_gpu_index);
+                Profiler::Get().EndCPUProfile(s_begin_profiler_stack.top()->_cpu_index);
+                Profiler::Get().AddCPUProfilerHierarchy(false, (u32)s_begin_profiler_stack.top()->_cpu_index);
+                s_begin_profiler_stack.pop();
+            }
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kPresent)
+            PresentImpl(d3dcmd);
+        else {};
+    }
+    void D3DContext::SubmitGpuCommandSync(GfxCommand *cmd)
+    {
+        auto rhi_cmd = RHICommandBufferPool::Get("SyncTask");
+        ProcessGpuCommand(cmd, rhi_cmd.get());
+        ExecuteRHICommandBuffer(rhi_cmd.get());
+        RHICommandBufferPool::Release(rhi_cmd);
+    }
+#pragma endregion
 }// namespace Ailu

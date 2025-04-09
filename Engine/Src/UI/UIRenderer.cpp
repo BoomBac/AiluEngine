@@ -85,7 +85,7 @@ namespace Ailu
         {
             f32 w = (f32) color->Width();
             f32 h = (f32) color->Height();
-            cmd->ClearRenderTarget(color,depth,Colors::kBlack,kZFar);
+            //cmd->ClearRenderTarget(color,depth,Colors::kBlack,kZFar);
             CBufferPerCameraData cb_per_cam;
             cb_per_cam._MatrixVP = Camera::GetDefaultOrthogonalViewProj(w, h);
             cb_per_cam._ScreenParams = Vector4f( 1.0f / w, 1.0f / h,w, h);
@@ -132,8 +132,8 @@ namespace Ailu
             Vector<VertexBufferLayoutDesc> desc_list;
             desc_list.emplace_back("POSITION", EShaderDateType::kFloat3, 0);
             desc_list.emplace_back("TEXCOORD", EShaderDateType::kFloat2, 1);
-            _vbuf = IVertexBuffer::Create(desc_list, "ui_vbuf");
-            _ibuf = IIndexBuffer::Create(nullptr, vert_num, "ui_ibuf", true);
+            _vbuf = VertexBuffer::Create(desc_list, "ui_vbuf");
+            _ibuf = IndexBuffer::Create(nullptr, vert_num, "ui_ibuf", true);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector3f), 0, true);
             _vbuf->SetStream(nullptr, vert_num * sizeof(Vector2f), 1, true);
             _mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_ui.alasset"), "DefaultUIMaterial");

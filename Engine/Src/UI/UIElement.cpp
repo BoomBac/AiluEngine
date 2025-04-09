@@ -168,7 +168,7 @@ namespace Ailu
                 UIRenderer::DrawQuad(_deserved_rect.xy, _deserved_rect.zw, _depth, Colors::kGreen);
             auto text_size = TextRenderer::CalculateTextSize("Button");
             Vector2f text_pos = {_deserved_rect.x + _deserved_rect.z / 2 - text_size.x / 2, _deserved_rect.y - (_deserved_rect.w / 2 - text_size.y / 2)};
-            TextRenderer::DrawText("Button", text_pos, 14u,1,Colors::kRed);
+            TextRenderer::DrawText("Button", text_pos, 14u,Vector2f::kOne,Colors::kRed);
         }
     }// namespace UI
 }// namespace Ailu

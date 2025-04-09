@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 # 设置项目名称
 project(Ailu)
+message("AiluEngine generator is set to ${CMAKE_GENERATOR}")
 
 # 设置编译器标准为C++20
 set(CMAKE_CXX_STANDARD 20)

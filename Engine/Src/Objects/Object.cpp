@@ -45,30 +45,38 @@ namespace Ailu
 
     void ObjectRegister::Register(Object *object)
     {
+        std::unique_lock lock(_mutex);
         u32 id = object->ID();
-        if (!_global_register.contains(id))
+        if (!_global_register.contains(object))
         {
-            _global_register[id] = object;
-            _global_references[id] = std::set<Object *>{};
-            _global_references_by[id] = std::set<Object *>{};
+            _global_register.insert(object);
+            _id_to_obj_lut[id] = object;
+            _global_references[id] = ObjectSet{};
+            _global_references_by[id] = ObjectSet{};
         }
     }
 
     void ObjectRegister::Unregister(Object *object)
     {
+        std::unique_lock lock(_mutex);
         u32 id = object->ID();
-        if (_global_register.contains(id))
+        if (_global_register.contains(object))
         {
-            _global_register.erase(id);
+            _global_register.erase(object);
+            _id_to_obj_lut.erase(id);
             _global_references.erase(id);
             _global_references_by.erase(id);
         }
     }
     Object *ObjectRegister::Find(const u32 &id)
     {
-        if (_global_register.contains(id))
-            return _global_register[id];
+        if (_id_to_obj_lut.contains(id))
+            return _id_to_obj_lut[id];
         return nullptr;
+    }
+    bool ObjectRegister::Alive(Object* obj) const
+    {
+        return _global_register.contains(obj);
     }
 
     void ObjectRegister::AddReference(Object *parent, Object *child)
@@ -82,12 +90,12 @@ namespace Ailu
         _global_references_by.at(child->ID()).erase(parent);
     }
 
-    const std::set<Object *>& ObjectRegister::GetReferences(Object *object) const
+    const ObjectRegister::ObjectSet& ObjectRegister::GetReferences(Object *object) const
     {
         return _global_references.at(object->ID());
     }
 
-    const std::set<Object *>& ObjectRegister::GetReferencesBy(Object *object) const
+    const ObjectRegister::ObjectSet& ObjectRegister::GetReferencesBy(Object *object) const
     {
         return _global_references_by.at(object->ID());
     }

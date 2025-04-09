@@ -66,7 +66,7 @@ namespace Ailu
             {
                 LOG_WARNING("Current Camera is null");
                 Camera::GetDefaultCamera();
-                Camera::sCurrent->_anti_aliasing = EAntiAliasing::kTAA;
+                Camera::sCurrent->_anti_aliasing = EAntiAliasing::kNone;
             }
             FirstPersonCameraController::s_inst.Attach(Camera::sCurrent);
             FirstPersonCameraController::s_inst._is_receive_input = true;

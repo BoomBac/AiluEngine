@@ -58,7 +58,7 @@
 //		if (!IsNull() && m_Page)
 //		{
 //			//param2: Application::GetFrameCount()
-//			m_Page->Free(std::move(*this), Application::s_frame_count);
+//			m_Page->Free(std::move(*this), Application::Application::Get().GetFrameCount());
 //
 //			m_Descriptor.ptr = 0;
 //			m_NumHandles = 0;

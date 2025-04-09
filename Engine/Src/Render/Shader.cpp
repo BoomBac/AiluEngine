@@ -262,37 +262,37 @@ namespace Ailu
         GraphicsPipelineStateMgr::ConfigureBlendState(_passes[pass_index]._pipeline_blend_state.Hash());
         GraphicsPipelineStateMgr::ConfigureShader(ConstructHash(_id, pass_index, variant_hash));
         _topology = _passes[pass_index]._pipeline_topology;
-        for (auto &it: s_global_textures_bind_info)
-        {
-            auto &pass_bind_res_info = _passes[pass_index]._variants[variant_hash]._bind_res_infos;
-            auto tex_it = pass_bind_res_info.find(it.first);
-            if (tex_it != pass_bind_res_info.end())
-            {
-                if (tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray || tex_it->second._res_type == EBindResDescType::kTexture2D)
-                    GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(it.second, EBindResDescType::kTexture2D, tex_it->second._bind_slot, PipelineResource::kPriorityGlobal));
-            }
-        }
-        for (auto &it: s_global_matrix_bind_info)
-        {
-            throw std::runtime_error("s_global_matrix_bind_info");
-            //auto mat_it = _bind_res_infos.find(it.first);
-            //if (mat_it != _bind_res_infos.end() && (mat_it->second._res_type & EBindResDescType::kCBufferAttribute))
-            //{
-            //	auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
-            //	Matrix4x4f* mat_ptr = std::get<0>(it.second);
-            //	u32 mat_num = std::get<1>(it.second);
-            //	memcpy(s_p_per_frame_cbuffer->GetData() + offset, mat_ptr, sizeof(Matrix4x4f) * mat_num);
-            //}
-        }
-        for (auto &it: s_global_buffer_bind_info)
-        {
-            auto &pass_bind_res_info = _passes[pass_index]._variants[variant_hash]._bind_res_infos;
-            auto buf_it = pass_bind_res_info.find(it.first);
-            if (buf_it != pass_bind_res_info.end())
-            {
-                GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(it.second, EBindResDescType::kConstBuffer, buf_it->second._bind_slot, PipelineResource::kPriorityGlobal));
-            }
-        }
+        // for (auto &it: s_global_textures_bind_info)
+        // {
+        //     auto &pass_bind_res_info = _passes[pass_index]._variants[variant_hash]._bind_res_infos;
+        //     auto tex_it = pass_bind_res_info.find(it.first);
+        //     if (tex_it != pass_bind_res_info.end())
+        //     {
+        //         if (tex_it->second._res_type == EBindResDescType::kCubeMap || tex_it->second._res_type == EBindResDescType::kTexture2DArray || tex_it->second._res_type == EBindResDescType::kTexture2D)
+        //             GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(it.second, EBindResDescType::kTexture2D, tex_it->second._name, PipelineResource::kPriorityGlobal));
+        //     }
+        // }
+        // for (auto &it: s_global_matrix_bind_info)
+        // {
+        //     throw std::runtime_error("s_global_matrix_bind_info");
+        //     //auto mat_it = _bind_res_infos.find(it.first);
+        //     //if (mat_it != _bind_res_infos.end() && (mat_it->second._res_type & EBindResDescType::kCBufferAttribute))
+        //     //{
+        //     //	auto offset = ShaderBindResourceInfo::GetVariableOffset(mat_it->second);
+        //     //	Matrix4x4f* mat_ptr = std::get<0>(it.second);
+        //     //	u32 mat_num = std::get<1>(it.second);
+        //     //	memcpy(s_p_per_frame_cbuffer->GetData() + offset, mat_ptr, sizeof(Matrix4x4f) * mat_num);
+        //     //}
+        // }
+        // for (auto &it: s_global_buffer_bind_info)
+        // {
+        //     auto &pass_bind_res_info = _passes[pass_index]._variants[variant_hash]._bind_res_infos;
+        //     auto buf_it = pass_bind_res_info.find(it.first);
+        //     if (buf_it != pass_bind_res_info.end())
+        //     {
+        //         GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(it.second, EBindResDescType::kConstBuffer, buf_it->second._name, PipelineResource::kPriorityGlobal));
+        //     }
+        // }
     }
 
     bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash)
@@ -303,19 +303,13 @@ namespace Ailu
         auto &pass = _passes[pass_id];
         AL_ASSERT(pass._variants.contains(variant_hash));
         _variant_state[pass_id][variant_hash] = EShaderVariantState::kCompiling;
-        if (pass._vert_src_file.empty())
-            pass._vert_src_file = _src_file_path;
-        if (pass._pixel_src_file.empty())
-            pass._pixel_src_file = _src_file_path;
-        if (pass._geom_src_file.empty())
-            pass._geom_src_file = _src_file_path;
         if (RHICompileImpl(pass_id, variant_hash))
         {
             pass._variants[variant_hash]._pipeline_input_layout.Hash(PipelineStateHash<VertexInputLayout>::GenHash(pass._variants[variant_hash]._pipeline_input_layout));
             pass._pipeline_raster_state.Hash(PipelineStateHash<RasterizerState>::GenHash(pass._pipeline_raster_state));
             pass._pipeline_blend_state.Hash(PipelineStateHash<BlendState>::GenHash(pass._pipeline_blend_state));
             pass._pipeline_ds_state.Hash(PipelineStateHash<DepthStencilState>::GenHash(pass._pipeline_ds_state));
-            GraphicsPipelineStateMgr::OnShaderRecompiled(this, pass_id, variant_hash);
+            GraphicsPipelineStateMgr::Get().OnShaderCompiled(this, pass_id, variant_hash);
             _variant_state[pass_id][variant_hash] = EShaderVariantState::kReady;
             LOG_INFO("Shader compile success with {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
         }
@@ -948,6 +942,9 @@ namespace Ailu
                 cur_pass._pipeline_topology = pass_pipeline_topology;
                 cur_pass._pipeline_blend_state = pass_pipeline_blend_state;
                 cur_pass._render_queue = pass_render_queue;
+                cur_pass._vert_src_file = _src_file_path;
+                cur_pass._pixel_src_file = _src_file_path;
+                cur_pass._geom_src_file = _src_file_path;
                 _stencil_ref = pass_pipeline_ds_state._stencil_ref_value;
                 _passes[i] = cur_pass;
                 _variant_state.emplace_back(std::move(cur_pass_variant_state));
@@ -991,7 +988,7 @@ namespace Ailu
     {
         s_global_textures_bind_info[name] = g_pRenderTexturePool->Get(texture);
     }
-    void ComputeShader::Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+    void ComputeShader::Bind(RHICommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
     {
         if (s_global_variant_update_map[_id])
         {
@@ -1009,21 +1006,23 @@ namespace Ailu
             }
             ele._active_variant = ele._variant_mgr.GetVariantHash(ele._active_keywords);
         }
-        auto &variant = _kernels[kernel]._variants[_kernels[kernel]._active_variant];
-        for (auto &it: s_global_buffer_bind_info)
-        {
-            if (variant._bind_res_infos.find(it.first) != variant._bind_res_infos.end())
-            {
-                SetBuffer(it.first, it.second);
-            }
-        }
-        for (auto &it: s_global_textures_bind_info)
-        {
-            if (variant._bind_res_infos.find(it.first) != variant._bind_res_infos.end())
-            {
-                SetTexture(it.first, it.second);
-            }
-        }
+        // std::lock_guard<std::mutex> lock(_state_mutex);
+        // auto& cur_state = _bind_state.front();
+        // auto &variant = _kernels[kernel]._variants[_kernels[kernel]._active_variant];
+        // for (auto &it: s_global_buffer_bind_info)
+        // {
+        //     if (variant._bind_res_infos.find(it.first) != variant._bind_res_infos.end())
+        //     {
+        //         SetBuffer(it.first, it.second);
+        //     }
+        // }
+        // for (auto &it: s_global_textures_bind_info)
+        // {
+        //     if (variant._bind_res_infos.find(it.first) != variant._bind_res_infos.end())
+        //     {
+        //         SetTexture(it.first, it.second);
+        //     }
+        // }
     }
 
     void ComputeShader::SetTexture(const String &name, Texture *texture)
@@ -1038,8 +1037,7 @@ namespace Ailu
                 u16 depth_slice = -1;
                 if (texture->Dimension() == ETextureDimension::kTex3D)
                     depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
-                _texture_addi_bind_info[it->second._bind_slot] = ViewInfo{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
-                _all_bind_textures.insert(texture);
+                _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
             }
         }
     }
@@ -1065,8 +1063,7 @@ namespace Ailu
                     u16 depth_slice = -1;
                     if (texture->Dimension() == ETextureDimension::kTex3D)
                         depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
-                    _texture_addi_bind_info[rit->second._bind_slot] = ViewInfo{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
-                    _all_bind_textures.insert(texture);
+                    _bind_params[rit->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
                 }
             }
         }
@@ -1089,8 +1086,7 @@ namespace Ailu
                 u16 depth_slice = -1;
                 if (texture->Dimension() == ETextureDimension::kTex3D)
                     depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
-                _texture_addi_bind_info[it->second._bind_slot] = ViewInfo{face, mipmap, depth_slice, sub_res};
-                _all_bind_textures.insert(texture);
+                _bind_params[it->second._bind_slot] = ComputeBindParams{face, mipmap, depth_slice, sub_res};
             }
         }
     }
@@ -1259,6 +1255,8 @@ namespace Ailu
             if (buf != nullptr && it != variant._bind_res_infos.end())
             {
                 it->second._p_res = buf;
+                _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
+                _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
             }
         }
     }
@@ -1271,6 +1269,8 @@ namespace Ailu
             if (buf != nullptr && it != variant._bind_res_infos.end())
             {
                 it->second._p_res = buf;
+                _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
+                _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
             }
         }
     }
@@ -1338,6 +1338,79 @@ namespace Ailu
         }
         _is_compiling.store(false);
         return is_succeed;
+    }
+    
+    i16 ComputeShader::NameToSlot(const String &name, u16 kernel,ShaderVariantHash variant_hash) const
+    {
+        AL_ASSERT(kernel < _kernels.size());
+        if (auto it = _kernels[kernel]._variants.at(variant_hash)._bind_res_infos.find(name); it != _kernels[kernel]._variants.at(variant_hash)._bind_res_infos.end())
+            return it->second._bind_slot;
+        return -1;
+    }
+    void ComputeShader::PushState(u16 kernel)
+    {
+        BindState cur_state;
+        cur_state._kernel = kernel;
+        cur_state._variant_hash = _kernels[kernel]._active_variant;
+        cur_state._max_bind_slot = 0u;
+        auto &cs_ele = _kernels[kernel]._variants[cur_state._variant_hash];
+        memset(cur_state._bind_res.data(),0,sizeof(GpuResource*)*32);
+        memset(cur_state._bind_res_priority.data(),0u,sizeof(u16) * 32);
+        for (auto &info: cs_ele._bind_res_infos)
+        {
+            auto &bind_info = info.second;
+            if (bind_info._res_type == EBindResDescType::kConstBuffer && bind_info._bind_flag & ShaderBindResourceInfo::kBindFlagInternal)
+            {
+                ConstantBuffer* cb = ConstantBuffer::Create(bind_info._cbuf_size,true,std::format("cb_{}_{}",bind_info._name,_bind_state.size()));
+                cb->SetData(_cbuf_data);
+                cur_state._bind_res[bind_info._bind_slot] = cb;
+                cur_state._bind_params[bind_info._bind_slot] = ComputeBindParams{};
+                cur_state._bind_params[bind_info._bind_slot]._is_internal_cbuf = true;
+                cur_state._bind_res_priority[bind_info._bind_slot] = PipelineResource::kPriorityLocal;
+            }
+            else
+            {
+                if (bind_info._p_res == nullptr)
+                    continue;
+                cur_state._bind_res[bind_info._bind_slot] = bind_info._p_res;
+                cur_state._bind_params[bind_info._bind_slot] = _bind_params[bind_info._bind_slot];
+                cur_state._bind_res_priority[bind_info._bind_slot] = PipelineResource::kPriorityLocal;
+            }
+            cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot,bind_info._bind_slot);
+        }
+        for (auto &it: s_global_buffer_bind_info)
+        {
+            if (const auto& itt = cs_ele._bind_res_infos.find(it.first);itt != cs_ele._bind_res_infos.end())
+            {
+                const auto& bind_info = itt->second;
+                if (cur_state._bind_res_priority[bind_info._bind_slot] <= PipelineResource::kPriorityGlobal)
+                {
+                    cur_state._bind_res[bind_info._bind_slot] = it.second;
+                    cur_state._bind_params[bind_info._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
+                    cur_state._bind_res_priority[bind_info._bind_slot] = PipelineResource::kPriorityGlobal;
+                    cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot,bind_info._bind_slot);
+                }
+            }
+        }
+        for (auto &it: s_global_textures_bind_info)
+        {
+            if (const auto& itt = cs_ele._bind_res_infos.find(it.first);itt != cs_ele._bind_res_infos.end())
+            {
+                const auto& bind_info = itt->second;
+                if (cur_state._bind_res_priority[bind_info._bind_slot] <= PipelineResource::kPriorityGlobal)
+                {
+                    cur_state._bind_res[bind_info._bind_slot] = it.second;
+                    u16 depth_slice = -1;
+                    if (it.second->Dimension() == ETextureDimension::kTex3D)
+                        depth_slice = dynamic_cast<Texture3D *>(it.second)->Depth();
+                    cur_state._bind_params[bind_info._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, depth_slice, UINT32_MAX, Texture::kMainSRVIndex};
+                    cur_state._bind_res_priority[bind_info._bind_slot] = PipelineResource::kPriorityGlobal;
+                    cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot,bind_info._bind_slot);
+                }
+            }
+        }
+        std::unique_lock lock(_state_mutex);
+        _bind_state.push(cur_state);
     }
 
 
@@ -1438,10 +1511,6 @@ namespace Ailu
         }
         AL_ASSERT(!_kernels.empty());
         return !_kernels.empty();
-    }
-    u16 ComputeShader::NameToSlot(const String &name, u16 kernel, ShaderVariantHash variant_hash) const
-    {
-        return UINT16_MAX;
     }
 
     void ComputeShader::EnableKeyword(const String &kw)

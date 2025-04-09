@@ -54,8 +54,18 @@ namespace Ailu
                 auto w = std::min<f32>(_size.x, _size.y);
                 f32 aspect = (f32) _src->Width() / (f32) _src->Height();
                 ImVec2 img_size = ImVec2(w, w / aspect);
-                ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(_src->ColorTexture()), img_size);
-                style.Colors[ImGuiCol_WindowBg] = origin_color;
+                auto handle = _src->ColorTexture(Texture::kMainSRVIndex);
+                if (handle == 0)
+                {
+                    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_white->GetNativeTextureHandle()), img_size);
+                    LOG_ERROR("RenderView::ShowImpl: handle is 0")
+                }
+                else
+                {
+                    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(handle), img_size);
+                    style.Colors[ImGuiCol_WindowBg] = origin_color;
+                }
+
             }
             else
             {
@@ -87,7 +97,7 @@ namespace Ailu
         {
             if (_src)
             {
-                static const auto &cur_window = Application::Get()->GetWindow();
+                static const auto &cur_window = Application::Get().GetWindow();
                 ImVec2 vMin = ImGui::GetWindowContentRegionMin();
                 ImVec2 vMax = ImGui::GetWindowContentRegionMax();
                 vMin.x += ImGui::GetWindowPos().x;
@@ -104,7 +114,16 @@ namespace Ailu
                 ImGuiStyle &style = ImGui::GetStyle();
                 auto origin_color = style.Colors[ImGuiCol_WindowBg];
                 style.Colors[ImGuiCol_WindowBg] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);// 设置窗口背景颜色为灰色
-                ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(_src->ColorTexture()), gameview_size);
+                auto handle = _src->ColorTexture(Texture::kMainSRVIndex);
+                if (handle == 0)
+                {
+                    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_white->GetNativeTextureHandle()), gameview_size);
+                    LOG_ERROR("SceneView::ShowImpl: handle is 0")
+                }
+                else
+                {
+                    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(handle), gameview_size);
+                }
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right))
                 {
                     _is_focus = true;

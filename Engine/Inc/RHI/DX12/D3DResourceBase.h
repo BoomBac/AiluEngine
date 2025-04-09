@@ -1,7 +1,9 @@
 #pragma once
 #ifndef __D3D_UTILS_H__
 #define __D3D_UTILS_H__
+#include "GlobalMarco.h"
 #include "d3dx12.h"
+#include "Render/GpuResource.h"
 namespace Ailu
 {
     struct D3DResourceStateGuard
@@ -51,6 +53,18 @@ namespace Ailu
     private:
         Map<u32,D3D12_RESOURCE_STATES> _cur_res_state;
     };
+
+    namespace D3DConvertUtils
+    {
+        static EResourceState ToALResState(D3D12_RESOURCE_STATES state)
+        {
+            return (EResourceState)state;
+        };
+        static D3D12_RESOURCE_STATES FromALResState(EResourceState state)
+        {
+            return (D3D12_RESOURCE_STATES)state;
+        };
+    }
 }
 
 #endif// !D3D_UTILS_H__

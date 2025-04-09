@@ -267,6 +267,12 @@ namespace Ailu
         return std::tuple<u32, u32>(rect.left - monitorRect.left + 8, rect.top - monitorRect.top + 8);
     }
 
+    void WinWindow::SetTitle(const WString& title)
+    {
+        _data.Title = title;
+        SetWindowText(_hwnd,_data.Title.c_str());
+    }
+
     void WinWindow::Shutdown()
     {
     }

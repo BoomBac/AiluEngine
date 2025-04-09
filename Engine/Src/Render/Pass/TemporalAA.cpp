@@ -70,7 +70,7 @@ namespace Ailu
         renderer.EnqueuePass(&_execute_pass);
 
         haltonSequence.prevViewProj = viewProj;
-        haltonSequence.frameCount = Application::s_frame_count;
+        haltonSequence.frameCount = Application::Application::Get().GetFrameCount();
         _halton_sequence[hash] = haltonSequence;
     }
     TAAPreparePass::TAAPreparePass() : RenderPass("TAAPreparePass")
@@ -87,9 +87,9 @@ namespace Ailu
     }
     void TAAPreparePass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
-        auto cmd = CommandBufferPool::Get("TAAPreparePass");
-        cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), _jitter_matrix);
-        CommandBufferPool::Release(cmd);
+//        auto cmd = CommandBufferPool::Get("TAAPreparePass");
+//        cmd->SetViewProjectionMatrix(rendering_data._camera->GetView(), _jitter_matrix);
+//        CommandBufferPool::Release(cmd);
     }
     void TAAPreparePass::BeginPass(GraphicsContext *context)
     {
@@ -141,7 +141,7 @@ namespace Ailu
         bool is_compute = true;
         {
             PROFILE_BLOCK_GPU(cmd.get(),TemporaAA)
-            //ProfileBlock b(cmd.get(), cmd->GetName());
+            //GpuProfileBlock b(cmd.get(), cmd->Name());
             if (cur_info._first_tick || cur_info._target_a->Width() != camera_data._camera_color_target_desc._width || cur_info._target_a->Height() != camera_data._camera_color_target_desc._height)
             {
                 if (cur_info._target_a)

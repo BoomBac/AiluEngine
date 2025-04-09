@@ -18,8 +18,11 @@ namespace Ailu
             void OnEvent(Event& e) final;
         private:
             void ShowImpl() final;
+            void ShowTimeLine(std::thread::id tid,f32& offset_x,f32& scale_factor);
         private:
-            ProfileFrameData _cur_frame_data;
+            Vector<ProfileFrameData> _cached_frame_data;
+            u64 _view_frame_index = 0u;
+            u32 _view_data_index = 0u;
         };
     }
 }

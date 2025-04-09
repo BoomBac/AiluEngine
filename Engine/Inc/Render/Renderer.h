@@ -27,11 +27,12 @@ namespace Ailu
     class RenderPipeline;
     class AILU_API Renderer
     {
+        friend class RenderPipeline;
     public:
         using BeforeTickEvent = std::function<void()>;
         using AfterTickEvent = std::function<void()>;
         DISALLOW_COPY_AND_ASSIGN(Renderer)
-        public:
+    public:
         inline static RendererAPI::ERenderAPI GetAPI() { return RendererAPI::GetAPI(); }
         Renderer();
         ~Renderer();
@@ -39,7 +40,6 @@ namespace Ailu
         void BeginScene(const Camera &cam, const Scene &s);
         void EndScene(const Scene &s);
         void FrameCleanup();
-        float GetDeltaTime() const;
         void EnqueuePass(RenderPass *pass);
         void SubmitTaskPass(RenderPass *task);
         Vector<RenderPass *> &GetRenderPasses() { return _render_passes; };
@@ -52,7 +52,6 @@ namespace Ailu
         RenderTexture *GetTargetTexture() const { return g_pRenderTexturePool->Get(_gameview_rt_handle); }
         const RenderingData &GetRenderingData() const { return _rendering_data; }
         RenderTexture *TargetTexture();
-        void SetViewProjectionMatrix(const Matrix4x4f &view, const Matrix4x4f &proj);
         void AddFeature(RenderFeature *feature) { _features.emplace_back(feature); };
         void SetShadingMode(EShadingMode::EShadingMode mode) { _mode = mode; }
         void SetupFrameResource(FrameResource* prev_fr,FrameResource *cur_fr) { _prev_fs = prev_fr;_cur_fs = cur_fr; }
@@ -107,7 +106,6 @@ namespace Ailu
         //存储一份当前renderer使用的所有feature，不对元素的生命周期负责
         Vector<RenderFeature *> _features;
         bool _b_init = false;
-        TimeMgr *_p_timemgr = nullptr;
         Camera *_active_cam;
         Queue<Vector2f> _resize_events;
         List<BeforeTickEvent> _events_before_tick;

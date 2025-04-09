@@ -3,6 +3,7 @@
 #ifndef __OBJECT_H__
 #define __OBJECT_H__
 #include <set>
+#include <mutex>
 #include "Framework/Math/Guid.h"
 #include "generated/Object.gen.h"
 
@@ -42,6 +43,12 @@ namespace Ailu
         //0~64 reserve for shader, shader id hash only hash 6bit
         inline static u32 s_global_object_id = 65u;
     };
+    struct ObjectPtrCompare
+    {
+        bool operator()(Object* lhs, Object* rhs) const {
+            return *lhs < *rhs;
+        }
+    };
 
     class AILU_API ObjectRegister
     {
@@ -50,18 +57,22 @@ namespace Ailu
         static void Shutdown();
         static ObjectRegister& Get();
     public:
+        using ObjectSet = std::set<Object*,ObjectPtrCompare>;
         ObjectRegister() = default;
         void Register(Object* object);
         void Unregister(Object* object);
+        bool Alive(Object* obj) const;
         Object* Find(const u32 &id);
         void AddReference(Object* parent, Object* child);
         void RemoveReference(Object* parent, Object* child);
-        const std::set<Object*>& GetReferences(Object* object) const;
-        const std::set<Object*>& GetReferencesBy(Object* object) const;
+        const ObjectSet& GetReferences(Object* object) const;
+        const ObjectSet& GetReferencesBy(Object* object) const;
     private:
-        HashMap<u32,Object*> _global_register;
-        HashMap<u32,std::set<Object*>> _global_references;
-        HashMap<u32,std::set<Object*>> _global_references_by;
+        std::mutex _mutex;
+        std::set<Object*> _global_register;
+        HashMap<u32,Object*> _id_to_obj_lut;
+        HashMap<u32,ObjectSet> _global_references;
+        HashMap<u32,ObjectSet> _global_references_by;
     };
 }// namespace Ailu
 

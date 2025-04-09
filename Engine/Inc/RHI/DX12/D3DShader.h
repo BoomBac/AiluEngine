@@ -366,9 +366,13 @@ namespace Ailu
         };
     public:
         D3DComputeShader(const WString &sys_path);
-        //void Dispatch(u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
-        void Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
-        u16 NameToSlot(const String& name,u16 kernel,ShaderVariantHash variant_hash) const final;
+        /// @brief 设置根签名，管线状态，绑定资源纹理/缓冲区等
+        /// @param cmd 
+        /// @param kernel 0~xx
+        /// @param thread_group_x 
+        /// @param thread_group_y 
+        /// @param thread_group_z 
+        void Bind(RHICommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
     private:
         bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash) final;
         void GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash);

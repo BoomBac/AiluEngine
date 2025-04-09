@@ -32,7 +32,7 @@ namespace Ailu
             _canvas.SetPosition(_content_pos);
             _canvas.Update(1.0f);
             _canvas.Render();
-            auto handle = _canvas.GetRenderTexture()->ColorTexture();
+            auto handle = _canvas.GetRenderTexture()->ColorTexture(Texture::kMainSRVIndex);
             Vector2f mpos = Input::GetMousePos() - _content_pos;
             if (handle == 0)
             {

@@ -56,9 +56,9 @@ namespace Ailu
         u32 _world_vertex_num = 0u;
         u32 _screen_vertex_num = 0u;
         u32 _tex_screen_item_num = 0u;
-        Ref<IVertexBuffer> _world_vbuf = nullptr;
-        Ref<IVertexBuffer> _screen_vbuf = nullptr;
-        Vector<Ref<IVertexBuffer>> _tex_screen_vbufs;
+        Ref<VertexBuffer> _world_vbuf = nullptr;
+        Ref<VertexBuffer> _screen_vbuf = nullptr;
+        Vector<Ref<VertexBuffer>> _tex_screen_vbufs;
         CBufferPerCameraData _screen_camera_cb;
         Material* _line_drawer;
         Vector<Vector3f> _world_pos;

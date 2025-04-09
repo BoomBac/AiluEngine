@@ -34,6 +34,21 @@ namespace Ailu
         for(auto& item : _jobs)
             DESTORY_PTR(item);
     }
+    JobSystem* g_pJobSystem = nullptr;
+    void JobSystem::Init(u32 thread_count)
+    {
+        if (g_pJobSystem == nullptr)
+            g_pJobSystem = new JobSystem(thread_count);
+    }
+    void JobSystem::Shutdown()
+    {
+        DESTORY_PTR(g_pJobSystem);
+    }
+    JobSystem& JobSystem::Get()
+    {
+        return *g_pJobSystem;
+    }
+
     Job *JobSystem::JobPool::Fetch()
     {
         std::lock_guard lock(_mutex);
@@ -123,9 +138,7 @@ namespace Ailu
 
     void JobSystem::WorkerThread(size_t index)
     {
-        std::wstring thread_name = std::format(L"JobWorker_{0}", index);
-        SetThreadDescription(GetCurrentThread(), thread_name.c_str());
-        _thread_names[std::this_thread::get_id()] = ToChar(thread_name);
+        SetThreadName(std::format("JobWorker_{0}", index));
         while (!_stop)
         {
             Job *job = nullptr;

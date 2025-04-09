@@ -132,6 +132,8 @@ namespace Ailu
         FrameResource *CurFrameResource() { return _cur_frame_res; }
         //新添加网格组件时mesh不能为空
         void OnAddRenderObject(ECS::Entity e);
+    public:
+        bool _is_need_wait_for_render_thread = true;
     private:
         void RenderSingleCamera(const Camera &cam, Renderer &renderer);
         void UpdateRenderObject(u32 start,u32 end);

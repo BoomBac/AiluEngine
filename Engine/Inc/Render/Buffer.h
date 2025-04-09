@@ -23,23 +23,14 @@ namespace Ailu
         bool _is_random_write = false;
         EALGFormat::EALGFormat _format = EALGFormat::kALGFormatUnknown;
     };
-    class AILU_API IGPUBuffer
-    {
-    public:
-        virtual ~IGPUBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) = 0;
-        virtual u8 *ReadBack() = 0;
-        virtual void ReadBack(u8 *dst, u32 size) = 0;
-        virtual void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete) = 0;
-    };
-    class AILU_API GPUBuffer : public IGPUBuffer, public GpuResource
+    class AILU_API GPUBuffer : public GpuResource
     {
     public:
         static GPUBuffer *Create(GPUBufferDesc desc, const String &name = std::format("common_buffer_{}", s_global_buffer_index++));
-        GPUBuffer(GPUBufferDesc desc) : _desc(desc) {}
+        GPUBuffer(GPUBufferDesc desc) : _desc(desc) {
+            _res_type = EGpuResType::kBuffer;
+        }
         virtual ~GPUBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false){};
-        virtual u8 *ReadBack() {return nullptr;};
         virtual void ReadBack(u8 *dst, u32 size) {};
         virtual void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete) {};
         [[nodiscard]] bool IsRandomAccess() const {return _desc._is_random_write;};
@@ -47,55 +38,72 @@ namespace Ailu
         GPUBufferDesc _desc;
     };
 
-    class AILU_API IVertexBuffer
+    struct BindParamsVB : public BindParams
     {
-    public:
-        static IVertexBuffer *Create(VertexBufferLayout layout, const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
-        virtual ~IVertexBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, const VertexBufferLayout &pipeline_input_layout) = 0;
-        virtual void SetLayout(VertexBufferLayout layout) = 0;
-        virtual void SetStream(float *vertices, u32 size, u8 stream_index) = 0;
-        virtual void SetStream(u8 *data, u32 size, u8 stream_index, bool dynamic) = 0;
-        virtual void SetData(u8 *data, u32 size, u8 stream_index, u32 offset) = 0;
-        virtual void SetName(const String &name) = 0;
-        virtual u8 *GetStream(u8 index) = 0;
-        [[nodiscard]] virtual const VertexBufferLayout &GetLayout() const = 0;
-        virtual u32 GetVertexCount() const = 0;
+        const VertexBufferLayout* _layout;
     };
 
-    class AILU_API IIndexBuffer
+    class VertexBuffer : public GpuResource
     {
     public:
-        static IIndexBuffer *Create(u32 *indices, u32 count, const String &name = std::format("index_buffer_{}", s_global_buffer_index++), bool is_dynamic = false);
-        virtual ~IIndexBuffer() = default;
-        virtual void SetName(const String &name) = 0;
-        virtual void Bind(CommandBuffer *cmd) = 0;
-        [[nodiscard]] virtual u32 GetCount() const = 0;
-        virtual u8 *GetData() = 0;
-        virtual void SetData(u8 *data, u32 size) = 0;
+        static VertexBuffer *Create(VertexBufferLayout layout, const String &name = std::format("vertex_buffer_{}", s_global_buffer_index++));
+        VertexBuffer(VertexBufferLayout layout);
+        virtual ~VertexBuffer() = default;
+        void SetStream(u8 *data, u32 size, u8 stream_index, bool is_dynamic);
+        void SetData(u8 *data, u32 size, u8 stream_index, u32 offset);
+		u8* GetStream(u8 index) {return _mapped_data[index];};
+        void SetLayout(VertexBufferLayout layout) {_buffer_layout = std::move(layout);};
+        [[nodiscard]] const VertexBufferLayout &GetLayout() const {return _buffer_layout;};
+        u32 GetVertexCount() const {return _vertices_count;};
+    protected:
+        VertexBufferLayout _buffer_layout;
+        u32 _vertices_count;
+        //只读
+        struct StreamData
+        {
+            u8* _data;
+            u64 _size;
+            bool _is_dynamic;
+        };
+        Vector<StreamData> _stream_data;
+        //just for dynamic buffer
+        Vector<u8*> _mapped_data;
+        std::map<String, u8> _buffer_layout_indexer;
+    };
+
+    class IndexBuffer : public GpuResource
+    {
+    public:
+        static IndexBuffer *Create(u32 *indices, u32 count, const String &name = std::format("index_buffer_{}", s_global_buffer_index++), bool is_dynamic = false);
+        IndexBuffer(u32 *indices, u32 count, bool is_dynamic);
+        virtual ~IndexBuffer() = default;
+        /// @brief 返回当前索引的数量
+        /// @return 
+        [[nodiscard]] u32 GetCount() const {return _count;};
+        u8 *GetData() {return _data;};
+        void SetData(u8 *data, u32 size);
         virtual void Resize(u32 new_size) = 0;
+    protected:
+        u32 _capacity;//最大可容纳的个数
+        u32 _count;//当前索引个数
+        bool _is_dynamic;
+        u8* _data = nullptr;
     };
 
-    class IConstantBuffer
-    {
-    public:
-        virtual ~IConstantBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline) = 0;
-        virtual u8 *GetData() = 0;
-        [[nodiscard]] virtual u64 GetBufferSize() const = 0;
-        virtual void Reset() = 0;
-    };
-
-    class ConstantBuffer : public IConstantBuffer,public GpuResource
+    class ConstantBuffer : public GpuResource
     {
     public:
         static ConstantBuffer *Create(u32 size, bool compute_buffer = false, const String &name = std::format("const_buffer_{}", s_global_buffer_index++));
-        static void Release(u8 *ptr);
+        static void Release(ConstantBuffer* ptr);
+        ConstantBuffer() {_res_type = EGpuResType::kConstBuffer;};
         virtual ~ConstantBuffer() = default;
-        virtual void Bind(CommandBuffer *cmd, u8 bind_slot, bool is_compute_pipeline = false) override{};
-        virtual u8 *GetData() override {return _data;};
-        [[nodiscard]]virtual u64 GetBufferSize() const override {return _size;};
-        virtual void Reset() override{};
+        virtual u8 *GetData() {return _data;};
+        void SetData(const u8* data,u32 size = 0u)
+        {
+            size = size == 0u? (u32)_mem_size : std::min<u32>(size,(u32)_mem_size);
+            memcpy(_data,data,size);
+        }
+        virtual void Reset() {};
         template<typename T>
         static T *As(ConstantBuffer *buffer)
         {
@@ -103,7 +111,6 @@ namespace Ailu
         }
     protected:
         u8* _data = nullptr;
-        u64 _size = 0u;
     };
 
 }// namespace Ailu

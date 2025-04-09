@@ -2,7 +2,6 @@
 cmake_minimum_required (VERSION 3.5)
 
 project (AiluEngine)
-message("AiluEngine generator is set to ${CMAKE_GENERATOR}")
 # 设置输出目录的根目录
 set(OUTPUT_ROOT "${AiluBuildPath}/out/engine/lib/x64")
 # 设置 C++ 标准
@@ -40,8 +39,10 @@ set(RENDER_MODULE
         Src/Render/FrameResource.cpp
         Inc/Render/FrameResource.h
         Src/Render/Pass/VoxelGI.cpp
-        Inc/Render/Pass/VoxelGI.h)
+        Inc/Render/Pass/VoxelGI.h
+        Src/Render/GfxCommand.cpp)
 set(RHI_DX12
+        Inc/RHI/DX12/D3DResourceBase.h
         Inc/RHI/DX12/GPUResourceManager.h
         Src/RHI/DX12/GPUResourceManager.cpp
         Inc/RHI/DX12/Page.h
@@ -83,7 +84,7 @@ add_custom_target(pre_build_cmd ALL
         COMMAND cmd /c "${PROJECT_SOURCE_DIR}/pre_build_script.bat")
 
 add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
-"Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp" "Inc/RHI/DX12/D3DUtils.h"
+"Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp"
 "Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp" "Inc/Physics/PhysicsSystem.h" "Src/Physics/PhysicsSystem.cpp" "Src/Render/Gizmo.cpp" "Inc/Physics/Collision.h" "Src/Physics/Collision.cpp" "Inc/Animation/AnimationSystem.h" "Src/Animation/AnimationSystem.cpp"
         Inc/Framework/Common/JobSystem.h
         Src/Framework/Common/JobSystem.cpp

@@ -10,6 +10,7 @@
 #include "Render/RenderPipeline.h"
 #include <thread>
 #include "Framework/Common/Container.hpp"
+#include "Framework/Events/Event.h"
 
 namespace Ailu
 {
@@ -52,7 +53,7 @@ namespace Ailu
         /// @brief 获取用户目录，c:/UserName/
         /// @return 用户目录
         static WString GetUseHomePath();
-        static Application *Get();
+        static Application& Get();
         int Initialize() override;
         int Initialize(ApplicationDesc desc);
         void Finalize() override;
@@ -61,16 +62,25 @@ namespace Ailu
         void PushLayer(Layer *layer);
         void PushOverLayer(Layer *layer);
 
+        void WaitForRender();
+        void WaitForMain();
+        void NotifyMain();
+        void NotifyRender();
+
         [[nodiscard]] const Window &GetWindow() const { return *_p_window; }
         Window *GetWindowPtr() { return _p_window; }
-
-        inline static u64 s_frame_count = 0u;
+        /// @brief 返回逻辑帧
+        /// @return 
+        u64 GetFrameCount() const {return _frame_count;}
         bool _is_playing_mode = false;
         bool _is_simulate_mode = false;
+        bool _is_multi_thread_rendering = false;
 
         const Array<ObjectLayer,32>& GetObjectLayers() const {return _object_layers;}
         const ObjectLayer& NameToLayer(const String& name);
-
+        const EApplicationState::EApplicationState State() const {return _state;}
+        Delegate<> _before_update;
+        Delegate<> _after_update;
     protected:
         virtual bool OnWindowClose(WindowCloseEvent &e);
         virtual bool OnGetFocus(WindowFocusEvent &e);
@@ -94,6 +104,13 @@ namespace Ailu
         double _update_lag = 0.0;
         WString _engin_config_path;
         Array<ObjectLayer,32> _object_layers;
+    private:
+        std::mutex _mutex;
+        std::condition_variable _main_wait;
+        std::condition_variable _render_wait;
+        bool _render_finished = true;
+        bool _main_finished = false;
+        u64 _frame_count = 0u;
     };
 }// namespace Ailu
 

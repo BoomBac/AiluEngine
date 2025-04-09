@@ -86,46 +86,22 @@ namespace Ailu
     }// namespace Math::ALHash
 
 
-    class D3DGraphicsPipelineState : public GraphicsPipelineStateObject, public GpuResource
+    class D3DGraphicsPipelineState : public GraphicsPipelineStateObject
     {
     public:
         D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer);
-        void Build(u16 pass_index = 0, ShaderVariantHash variant_hash = 0) final;
-        void Bind(CommandBuffer *cmd) final;
-        void SetPipelineResource(const PipelineResource& pipeline_res) final;
-        //just compare res type is same by slot,maybe cause some error
-        bool IsValidPipelineResource(const EBindResDescType &res_type, u8 slot) const final;
-        const PSOHash &Hash() final { return _hash; };
-        const String &Name() const final { return _name; };
-        const String &SlotToName(u8 slot) final;
-        const u8 NameToSlot(const String &name) final;
+        ~D3DGraphicsPipelineState();
         void SetTopology(ETopology topology) final;
-        void SetStencilRef(u8 ref) final;
-        const GraphicsPipelineStateInitializer& StateDescriptor() const final {return _state_desc;};
-        u32 GetBindResourceSignature() const {return _bind_res_signature;};
-        const Array<PipelineResource,32>& GetBindResource(u16 index = 0) const {return _bind_res;};
-
+        private:
+        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+        void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
+        void BindResource(RHICommandBuffer* cmd,const PipelineResource& res);
     private:
-        void BindResource(CommandBuffer * cmd,const PipelineResource& res);
-    private:
-        String _name;
-        u8 _per_frame_cbuf_bind_slot = 255u;
-        std::set<String> _defines;
-        String _pass_name;
         D3D12_GRAPHICS_PIPELINE_STATE_DESC _d3d_pso_desc;
-        GraphicsPipelineStateInitializer _state_desc;
-        bool _b_build = false;
+        D3D_PRIMITIVE_TOPOLOGY _d3d_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         ComPtr<ID3D12PipelineState> _p_plstate;
         ComPtr<ID3D12RootSignature> _p_sig;
         ID3D12GraphicsCommandList *_p_cmd;
-        std::unordered_map<std::string, ShaderBindResourceInfo> *_p_bind_res_desc_infos = nullptr;
-        std::unordered_multimap<u8, EBindResDescType> _bind_res_desc_type_lut;
-        std::unordered_map<u8, const String &> _bind_res_name_lut;
-        PSOHash _hash;
-        D3D_PRIMITIVE_TOPOLOGY _d3d_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-        u8 _stencil_ref = 0u;
-        u32 _bind_res_signature = 0u;
-        Array<PipelineResource,32> _bind_res;
     };
 }// namespace Ailu
 

@@ -128,10 +128,9 @@ namespace Ailu
                         ImGui::Text(EALGFormat::ToString(rt_info._rt->PixelFormat()));
                         ImGui::TableSetColumnIndex(4);
                         //byte to mb
-                        const auto &res_state = rt_info._rt->GetState();
-                        ImGui::Text("%.2f mb", res_state.GetSize() * 9.5367431640625E-07);
+                        ImGui::Text("%.2f mb", rt_info._rt->GetSize() * 9.5367431640625E-07);
                         ImGui::TableSetColumnIndex(5);
-                        ImGui::Text("%s", std::format("{}", res_state.GetFenceValue()).c_str());
+                        ImGui::Text("%s", std::format("{}", rt_info._rt->GetFenceValue()).c_str());
                         row++;
                     }
                     ImGui::EndTable();

@@ -93,14 +93,16 @@ namespace Ailu
 	template<typename... Targs>
 	static std::wstring BuildLogMsg(ELogLevel level, std::wstring_view str, Targs... args)
 	{
-        std::wstring s = log_strw[level] + L": ";
+        std::wstring t_name = ToWStr(GetThreadName());
+        std::wstring s = t_name + L": " + log_strw[level] + L": ";
 		s.append(format(str, args...));
 		return s;
 	}
 	template<typename... Targs>
 	static std::string BuildLogMsg(ELogLevel level, std::string_view str, Targs... args)
 	{
-        std::string s = log_str[level] + ": ";
+        std::string t_name = GetThreadName();
+        std::string s = t_name + ": " + log_str[level] + ": ";
 		s.append(format(str, args...));
 		return s;
 	}

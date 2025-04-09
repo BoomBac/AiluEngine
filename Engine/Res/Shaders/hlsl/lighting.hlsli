@@ -242,9 +242,9 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	//indirect light
 
 	float lod = surface.roughness * PREFILTER_CUBEMAP_NUM;
-	float3 irradiance = RadianceTex.Sample(g_LinearWrapSampler, surface.wnormal);
+	float3 irradiance = RadianceTex.SampleLevel(g_LinearWrapSampler, surface.wnormal,0.0);
 	float3 radiance = PrefilterEnvTex.SampleLevel(g_AnisotropicClampSampler, reflect(shading_data.view_dir,surface.wnormal),lod);
-	float2 lut = IBLLut.Sample(g_LinearClampSampler,float2(shading_data.nv,surface.roughness)).xy;
+	float2 lut = SAMPLE_TEXTURE2D_LOD(IBLLut,g_LinearClampSampler,float2(shading_data.nv,surface.roughness),0.0).xy;
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;// * g_IndirectLightingIntensity;
 	float voxel_shadow = 1.0;//ConeTraceShadow(world_pos + surface.wnormal * 0.05,-_DirectionalLights[0]._LightPosOrDir);
 	light += voxel_shadow * AmbientLighting(surface,shading_data,irradiance,radiance,lut,ao);

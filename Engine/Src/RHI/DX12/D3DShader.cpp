@@ -156,7 +156,7 @@ namespace Ailu
         }
         else
         {
-            LOG_INFO(L"[D3DShader compiler]: compile : {},entry : {}", filename, ToWStr(entryPoint));
+            LOG_INFO(L"[D3DShader compiler]: compile : {},entry : {},defines: {}", filename, ToWStr(entryPoint), ToWStr(su::Join(keyword_str, ",")));
             ID3DBlob *pErrorBlob = nullptr;
             //D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
             UINT compileFlags = 0;
@@ -287,27 +287,27 @@ namespace Ailu
         auto res_type = bind_desc.Type;
         if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
         {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kConstBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kConstBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
         {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
         {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kSampler, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kSampler, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED)
         {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED)
         {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
         else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED)
         {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kUAVTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 0u, bind_desc.Name});
+            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kUAVTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
         else
         {
@@ -521,7 +521,7 @@ namespace Ailu
         else if (size == 64)
             value_type = (EBindResDescType) (EBindResDescType::kCBufferMatrix | value_type);
         else {}
-        auto info = ShaderBindResourceInfo{value_type, variable_info, 0u, desc.Name};
+        auto info = ShaderBindResourceInfo{value_type, variable_info, 255u, desc.Name};
         return info;
     }
     
@@ -594,7 +594,7 @@ namespace Ailu
         AL_ASSERT(_pass_elements[pass_index]._variants.contains(variant_hash));
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        auto device = D3DContext::Get()->GetDevice();
+        auto device = static_cast<D3DContext&>(GraphicsContext::Get()).GetDevice();
         if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
         {
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
@@ -851,6 +851,7 @@ namespace Ailu
                     auto info = ParserBindVariable(vdesc);
                     info._bind_flag = flag;
                     info._p_root_cbuf = &pass_variant._bind_res_infos.find(desc.Name)->second;
+                    info._p_root_cbuf->_cbuf_size += vdesc.Size;
                     pass_variant._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
                 }
             }
@@ -878,6 +879,8 @@ namespace Ailu
                     variable->GetDesc(&vdesc);
                     auto info = ParserBindVariable(vdesc);
                     info._bind_flag = flag;
+                    info._p_root_cbuf = &pass_variant._bind_res_infos.find(desc.Name)->second;
+                    info._p_root_cbuf->_cbuf_size += vdesc.Size;
                     pass_variant._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
                 }
             }
@@ -921,7 +924,7 @@ namespace Ailu
         Compile();
     }
 
-    void D3DComputeShader::Bind(CommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+    void D3DComputeShader::Bind(RHICommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
     {
         if (!_is_valid && kernel >= _kernels.size())
         {
@@ -929,61 +932,92 @@ namespace Ailu
             return;
         }
         ComputeShader::Bind(cmd, kernel, thread_group_x, thread_group_y, thread_group_z);
-        ShaderVariantHash cur_hash = _kernels[kernel]._active_variant;
-        if (_variant_state[kernel][cur_hash] != EShaderVariantState::kReady)
+        AL_ASSERT(!_bind_state.empty());
+        std::unique_lock lock(_state_mutex);
+        auto& cur_state = _bind_state.front();
+        if (_variant_state[kernel][cur_state._variant_hash] != EShaderVariantState::kReady)
             return;
-        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd)->GetCmdList();
-        auto &d3d_ele = _elements[kernel]._variants[cur_hash];
-        auto &cs_ele = _kernels[kernel]._variants[cur_hash];
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList();
+        auto &d3d_ele = _elements[kernel]._variants[cur_state._variant_hash];
+        auto &cs_ele = _kernels[kernel]._variants[cur_state._variant_hash];
         d3dcmd->SetPipelineState(d3d_ele._pso.Get());
         d3dcmd->SetComputeRootSignature(d3d_ele._p_sig.Get());
-        for (auto &info: cs_ele._bind_res_infos)
+        for (u16 i = 0; i <= cur_state._max_bind_slot;i++)
         {
-            auto &bind_info = info.second;
-            if (bind_info._p_res != nullptr)
+            auto it = std::find_if(cs_ele._bind_res_infos.begin(),cs_ele._bind_res_infos.end(),[&](const auto& it)->bool{
+                return it.second._bind_slot == i;
+            });
+            if (it != cs_ele._bind_res_infos.end())
             {
-                auto &view_info = _texture_addi_bind_info[bind_info._bind_slot];
+                auto& bind_info = it->second;
+                auto &view_info = cur_state._bind_params[bind_info._bind_slot];
+                GpuResource* bind_res = cur_state._bind_res[bind_info._bind_slot];
+                if (bind_res == nullptr)
+                    continue;
                 if (bind_info._res_type == EBindResDescType::kTexture2D)
                 {
-                    auto tex = static_cast<Texture2D *>(bind_info._p_res);
+                    auto tex = static_cast<Texture2D *>(bind_res);
                     u16 view_index = view_info._view_index == (u16)-1? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, 0) : view_info._view_index;
-                    tex->Bind(cmd, view_index, bind_info._bind_slot, view_info._sub_res, true);
+                    BindParamsTexture params;
+                    params._is_compute_pipeline = true;
+                    params._sub_res = view_info._sub_res;
+                    params._view_idx = view_index;
+                    params._slot = bind_info._bind_slot;
+                    tex->Bind(cmd, &params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
                 {
-                    auto tex = static_cast<Texture *>(bind_info._p_res);
-                    tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, 0), bind_info._bind_slot, view_info._sub_res, true);
+                    auto tex = static_cast<Texture *>(bind_res);
+                    BindParamsTexture params;
+                    params._is_compute_pipeline = true;
+                    params._sub_res = view_info._sub_res;
+                    params._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, 0);
+                    params._slot = bind_info._bind_slot;
+                    tex->Bind(cmd, &params);
                 }
                 if (bind_info._res_type == EBindResDescType::kTexture3D)
                 {
-                    auto tex = static_cast<Texture3D *>(bind_info._p_res);
+                    auto tex = static_cast<Texture3D *>(bind_res);
                     u16 view_index = view_info._view_index == (u16)-1? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, view_info._slice): view_info._view_index;
-                    tex->Bind(cmd, view_index, bind_info._bind_slot, view_info._sub_res, true);
+                    BindParamsTexture params;
+                    params._is_compute_pipeline = true;
+                    params._sub_res = view_info._sub_res;
+                    params._view_idx = view_index;
+                    params._slot = bind_info._bind_slot;
+                    tex->Bind(cmd, &params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kRWTexture3D)
                 {
-                    auto tex = static_cast<Texture3D *>(bind_info._p_res);
-                    tex->Bind(cmd, tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, view_info._slice), bind_info._bind_slot, view_info._sub_res, true);
+                    auto tex = static_cast<Texture3D *>(bind_res);
+                    BindParamsTexture params;
+                    params._is_compute_pipeline = true;
+                    params._sub_res = view_info._sub_res;
+                    params._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, view_info._slice);
+                    params._slot = bind_info._bind_slot;
+                    tex->Bind(cmd, &params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kRWBuffer)
                 {
-                    auto buf = static_cast<GPUBuffer *>(bind_info._p_res);
-                    buf->Bind(cmd, bind_info._bind_slot, true);
+                    BindParams params;
+                    params._is_compute_pipeline = true;
+                    params._slot = bind_info._bind_slot;
+                    bind_res->Bind(cmd, &params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kConstBuffer)
                 {
-                    reinterpret_cast<ConstantBuffer *>(bind_info._p_res)->Bind(cmd, bind_info._bind_slot, true);
+                    BindParams params;
+                    params._is_compute_pipeline = true;
+                    params._slot = bind_info._bind_slot;
+                    bind_res->Bind(cmd, &params);
                 }
-            }
-            else
-            {
-                if (bind_info._res_type == EBindResDescType::kConstBuffer)
+                else 
                 {
-
-                    cmd->SetComputeBuffer(bind_info._name, kernel, _cbuf_data, sizeof(_cbuf_data));
+                    AL_ASSERT(true);
                 }
             }
         }
+        cur_state.Release();
+        _bind_state.pop();
         //d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
     }
 
@@ -1006,6 +1040,7 @@ namespace Ailu
             auto cbuf = p_reflect->GetConstantBufferByIndex(i);
             D3D12_SHADER_BUFFER_DESC desc{};
             cbuf->GetDesc(&desc);
+            cs_ele._temp_bind_res_infos.find(desc.Name)->second._bind_flag = ShaderBindResourceInfo::GetBindResourceFlag(desc.Name);
             for (u32 j = 0u; j < desc.Variables; j++)
             {
                 auto variable = cbuf->GetVariableByIndex(j);
@@ -1013,6 +1048,7 @@ namespace Ailu
                 variable->GetDesc(&vdesc);
                 auto info = ParserBindVariable(vdesc);
                 info._p_root_cbuf = &cs_ele._temp_bind_res_infos.find(desc.Name)->second;
+                info._p_root_cbuf->_cbuf_size += vdesc.Size;
                 cs_ele._temp_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
             }
         }
@@ -1100,7 +1136,7 @@ namespace Ailu
     {
         D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
         featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-        auto device = D3DContext::Get()->GetDevice();
+        auto device = static_cast<D3DContext&>(GraphicsContext::Get()).GetDevice();
         if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
         {
             featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
@@ -1173,6 +1209,13 @@ namespace Ailu
                 std::unordered_map<String, ShaderBindResourceInfo> cbuffer_bind_info;
                 u32 cbuffer_size = 0;
                 u16 cbuffer_count = 0;
+                auto cb_iter = std::find_if(cs_ele._temp_bind_res_infos.begin(), cs_ele._temp_bind_res_infos.end(), [this](auto it)->bool {
+					auto& desc = it.second;
+					return desc._res_type == EBindResDescType::kConstBuffer && desc._name != RenderConstants::kCBufNamePerScene & desc._name != RenderConstants::kCBufNamePerCamera; });
+                if (cb_iter != cs_ele._temp_bind_res_infos.end())
+                {
+                    _internal_cbuf_name = cb_iter->second._name;
+                }
                 for (auto it = cs_ele._temp_bind_res_infos.begin(); it != cs_ele._temp_bind_res_infos.end(); it++)
                 {
                     //临时方案，kCBufNameSceneState外部创建
@@ -1236,13 +1279,6 @@ namespace Ailu
             _is_valid = false;
             LOG_ERROR(L"Create compute shader {} failed when generate internal pso!", _src_file_path);
         }
-    }
-    u16 D3DComputeShader::NameToSlot(const String &name, u16 kernel,ShaderVariantHash variant_hash) const
-    {
-        AL_ASSERT(kernel < _kernels.size());
-        if (auto it = _kernels[kernel]._variants.at(variant_hash)._bind_res_infos.find(name); it != _kernels[kernel]._variants.at(variant_hash)._bind_res_infos.end())
-            return it->second._bind_slot;
-        return INT16_MAX;
     }
 #pragma endregion
     //-------------------------------------------------------------------------------D3DComputeShader---------------------------------------------------------------------------

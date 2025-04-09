@@ -35,8 +35,7 @@ namespace Ailu
     SceneMgr *g_pSceneMgr = new SceneMgr();
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     LogMgr *g_pLogMgr = new LogMgr();
-    Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(18, "GlobalThreadPool");
-    JobSystem *g_pJobSystem = new JobSystem(4u);
+    Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(6u, "GlobalThreadPool");
 
 
     WString Application::GetWorkingPath()
@@ -84,34 +83,6 @@ namespace Ailu
         g_pTimeMgr->Initialize();
         g_pTimeMgr->Mark();
         sp_instance = this;
-        g_pLogMgr->Initialize();
-        g_pLogMgr->AddAppender(new FileAppender());
-        //g_pLogMgr->AddAppender(new ConsoleAppender());
-        auto window_props = Ailu::WindowProps();
-        window_props.Width = desc._window_width;
-        window_props.Height = desc._window_height;
-        _p_window = new Ailu::WinWindow(window_props);
-        _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
-        _layer_stack = new LayerStack();
-#ifdef DEAR_IMGUI
-        //初始化imgui gfx时要求imgui window已经初始化
-        _p_imgui_layer = new ImGUILayer();
-#endif// DEAR_IMGUI
-        GraphicsContext::InitGlobalContext();
-        g_pGfxContext->ResizeSwapChain(desc._window_width, desc._window_height);
-        g_pResourceMgr->Initialize();
-        Gizmo::Initialize();
-        TextRenderer::Init();
-        UI::UIRenderer::Init();
-#ifdef DEAR_IMGUI
-        PushLayer(_p_imgui_layer);
-#endif// DEAR_IMGUI
-        g_pSceneMgr->Initialize();
-        SetThreadDescription(GetCurrentThread(), L"ALEngineMainThread");
-        _state = EApplicationState::EApplicationState_Running;
-        _render_lag = s_target_lag;
-        _update_lag = s_target_lag;
-        _is_handling_event.store(true);
         //Load ini
         {
             auto work_path = GetWorkingPath();
@@ -136,9 +107,50 @@ namespace Ailu
                         type->FindPropertyByName(cur_layer._name)->SetValue<u32>(s_engine_config,cur_layer._value);
                     }
                 }
+                s_engine_config.isMultiThreadRender = (bool)std::stoul(ini_parser.GetValue("Render","isMultiThreadRender","0"));
             }
         }
+        _is_multi_thread_rendering = s_engine_config.isMultiThreadRender;
+        g_pLogMgr->Initialize();
+        g_pLogMgr->AddAppender(new FileAppender());
+        //g_pLogMgr->AddAppender(new ConsoleAppender());
+        auto window_props = Ailu::WindowProps();
+        window_props.Width = desc._window_width;
+        window_props.Height = desc._window_height;
+        _p_window = new Ailu::WinWindow(window_props);
+        _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
+        _p_window->SetTitle(s_engine_config.isMultiThreadRender? L"AiluEngine -mt" : L"AiluEngine");
+        _layer_stack = new LayerStack();
+#ifdef DEAR_IMGUI
+        //初始化imgui gfx时要求imgui window已经初始化
+        _p_imgui_layer = new ImGUILayer();
+#endif// DEAR_IMGUI
+        JobSystem::Init(6u);
+        GraphicsContext::InitGlobalContext();
+        g_pGfxContext->ResizeSwapChain(desc._window_width, desc._window_height);
+        g_pResourceMgr->Initialize();
+        Gizmo::Initialize();
+        TextRenderer::Init();
+        UI::UIRenderer::Init();
+#ifdef DEAR_IMGUI
+        PushLayer(_p_imgui_layer);
+#endif// DEAR_IMGUI
+        g_pSceneMgr->Initialize();
+        SetThreadName("MainThread");
+        _state = EApplicationState::EApplicationState_Running;
+        _render_lag = s_target_lag;
+        _update_lag = s_target_lag;
+        _is_handling_event.store(true);
         LOG_INFO("Application Initialize Success with {} s", 0.001f * g_pTimeMgr->GetElapsedSinceLastMark());
+        _before_update += []()
+        {
+            Profiler::Get().BeginFrame();
+        };
+        _after_update += [this](){
+            Profiler::Get().EndFrame();
+            g_pThreadTool->ClearRecords();
+            _frame_count++;
+        };
         return 0;
     }
 
@@ -151,6 +163,10 @@ namespace Ailu
             if (it.DataType() == EDataType::kUInt32)
             {
                 ini_parser.SetValue(it.MetaInfo()._category,it.Name(),std::format("{}",it.GetValue<u32>(s_engine_config)));
+            }
+            else if (it.DataType() == EDataType::kBool)
+            {
+                ini_parser.SetValue(it.MetaInfo()._category, it.Name(), std::format("{}", (u32)it.GetValue<bool>(s_engine_config)));
             }
         }
         if (ini_parser.Save(_engin_config_path))
@@ -172,14 +188,13 @@ namespace Ailu
         DESTORY_PTR(g_pTimeMgr);
         g_pLogMgr->Finalize();
         DESTORY_PTR(g_pLogMgr);
-        DESTORY_PTR(g_pJobSystem);
+        JobSystem::Shutdown();
         ObjectRegister::Shutdown();
     }
 
     void Application::Tick(f32 delta_time)
     {
         g_pTimeMgr->Reset();
-        g_pGfxContext->DoResourceTask();
         while (_state != EApplicationState::EApplicationState_Exit)
         {
             if (_state == EApplicationState::EApplicationState_Pause)
@@ -189,56 +204,65 @@ namespace Ailu
             }
             else
             {
-                _p_window->OnUpdate();
-                //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
-                //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
-                if (_state == EApplicationState::EApplicationState_Pause)
-                    continue;
-                else if (_state == EApplicationState::EApplicationState_Exit)
-                    break;
-                else {};
+                _before_update.Invoke();
                 auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
                 g_pTimeMgr->Tick(last_mark);
                 _render_lag += last_mark;
                 _update_lag += last_mark;
                 g_pTimeMgr->Mark();
-                //此时更新已经传入delta_time了，所以不需要多次更新，也就是while(_update_lag >= s_target_lag)
-                //这也是固定频率更新，所以实际上delta_time始终为1
-                //if (_update_lag >= s_target_lag)
-                if (_update_lag >= s_target_lag)
                 {
-                    g_pResourceMgr->Tick(delta_time);
-                    for (Layer *layer: *_layer_stack)
+                    CPUProfileBlock main_b("Application::Tick");
+                    _p_window->OnUpdate();
+                    //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
+                    //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
+                    if (_state == EApplicationState::EApplicationState_Pause)
+                        continue;
+                    else if (_state == EApplicationState::EApplicationState_Exit)
+                        break;
+                    else {};
+                    //此时更新已经传入delta_time了，所以不需要多次更新，也就是while(_update_lag >= s_target_lag)
+                    //这也是固定频率更新，所以实际上delta_time始终为1
+                    //if (_update_lag >= s_target_lag)
                     {
-                        layer->OnUpdate((_update_lag / s_target_lag));
+                        CPUProfileBlock b("LayerUpdate");
+                        //if (_update_lag >= s_target_lag)
+                        {
+                            g_pResourceMgr->Tick(delta_time);
+                            for (Layer *layer: *_layer_stack)
+                            {
+                                //layer->OnUpdate((f32)(_update_lag / s_target_lag));
+                                layer->OnUpdate(1.0f);
+                            }
+                            //_update_lag -= s_target_lag;
+                            //_update_lag = std::max<f32>(_update_lag,0.0f);
+                            _update_lag = last_mark;
+                        }
                     }
-                    //_update_lag -= s_target_lag;
-                    //_update_lag = std::max<f32>(_update_lag,0.0f);
-                    _update_lag = last_mark;
-                }
-                if (_render_lag >= s_target_lag)
-                {
-                    s_frame_count++;
+                    //if (_render_lag >= s_target_lag)
                     {
-                        CPUProfileBlock b("SceneTick");
-                        g_pSceneMgr->Tick(delta_time);
-                    }
-                    {
-                        CPUProfileBlock b("Render");
-                        g_pGfxContext->GetPipeline()->Render();
-#ifdef DEAR_IMGUI
-                        _p_imgui_layer->Begin();
-                        for (Layer *layer: *_layer_stack)
-                            layer->OnImguiRender();
-                        _p_imgui_layer->End();
-#endif// DEAR_IMGUI
+                        {
+                            CPUProfileBlock b("SceneTick");
+                            g_pSceneMgr->Tick(delta_time);
+                        }
+                        {
+                            CPUProfileBlock b("RenderScene");
+                            g_pGfxContext->GetPipeline()->Render();
+                        }
+    #ifdef DEAR_IMGUI
+                        {
+                           CPUProfileBlock b("RenderImGui");
+                            _p_imgui_layer->Begin();
+                            for (Layer *layer: *_layer_stack)
+                                layer->OnImguiRender();
+                            _p_imgui_layer->End();
+                        }
+    #endif// DEAR_IMGUI
                         g_pGfxContext->Present();
                         g_pGfxContext->GetPipeline()->FrameCleanUp();
+                        _render_lag -= s_target_lag;
                     }
-                    _render_lag -= s_target_lag;
-                    Profiler::Get().EndFrame();
                 }
-                g_pThreadTool->ClearRecords();
+                _after_update.Invoke();
             }
         }
         g_pLogMgr->Log("Exit");
@@ -253,14 +277,53 @@ namespace Ailu
         _layer_stack->PushOverLayer(layer);
         layer->OnAttach();
     }
-    Application *Application::Get()
+    void Application::WaitForRender()
     {
-        return sp_instance;
+        //LOG_INFO("Application::WaitForRender...");
+        CPUProfileBlock b("Application::WaitForRender");
+        std::unique_lock<std::mutex> lock(_mutex);
+        _main_wait.wait(lock, [this] { return _render_finished; });
+        _render_finished = false;
+    }
+
+    void Application::WaitForMain()
+    {
+        //LOG_INFO("Application::WaitForMain...");
+        CPUProfileBlock b("Application::WaitForMain");
+        std::unique_lock<std::mutex> lock(_mutex);
+        _render_wait.wait(lock, [this] { return _main_finished || _state == EApplicationState::EApplicationState_Exit; });
+        _main_finished = false;
+    }
+
+    void Application::NotifyMain()
+    {
+        //LOG_INFO("Application::NotifyMain");
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            _render_finished = true;
+        }
+        _main_wait.notify_one();
+    }
+
+    void Application::NotifyRender()
+    {
+        //LOG_INFO("Application::NotifyRender");
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            _main_finished = true;
+        }
+        _render_wait.notify_one();
+    }
+    Application& Application::Get()
+    {
+        return *sp_instance;
     }
     bool Application::OnWindowClose(WindowCloseEvent &e)
     {
         _state = EApplicationState::EApplicationState_Exit;
+        _main_finished = true;
         _is_handling_event.store(false);
+        NotifyRender();
         return false;
     }
     const ObjectLayer &Application::NameToLayer(const String &name)

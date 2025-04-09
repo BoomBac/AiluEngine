@@ -243,29 +243,30 @@ namespace Ailu
                             if (head_file == cur_path)
                             {
                                 match_file = true;
-                                g_pResourceMgr->SubmitTaskSync([=]()->bool
-                                                               {
-                                    auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload shader: {}...",shader->Name()).c_str(),0.5f);
-                                    if (shader->PreProcessShader())
-                                    {
-                                        for (auto &mat: shader->GetAllReferencedMaterials())
-                                        {
-                                            mat->ConstructKeywords(shader.get());
-                                            bool is_all_succeed = true;
-                                            is_all_succeed = shader->Compile(); //暂时重编所有变体，避免材质切换变体后使用的是旧的shader
-                                            // for (u16 i = 0; i < shader->PassCount(); i++)
-                                            // {
-                                            //     is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
-                                            // }
-                                            if (is_all_succeed)
-                                            {
-                                                mat->ChangeShader(shader.get());
-                                            }
-                                        }
-                                    }
-                                    ImGuiWidget::RemoveProgressBar(handle);
-                                    return true;
-                                });
+                                GraphicsContext::Get().CompileShaderAsync(shader.get());
+                                // g_pResourceMgr->SubmitTaskSync([=]()->bool
+                                //                                {
+                                //     auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload shader: {}...",shader->Name()).c_str(),0.5f);
+                                //     if (shader->PreProcessShader())
+                                //     {
+                                //         for (auto &mat: shader->GetAllReferencedMaterials())
+                                //         {
+                                //             mat->ConstructKeywords(shader.get());
+                                //             bool is_all_succeed = true;
+                                //             is_all_succeed = shader->Compile(); //暂时重编所有变体，避免材质切换变体后使用的是旧的shader
+                                //             // for (u16 i = 0; i < shader->PassCount(); i++)
+                                //             // {
+                                //             //     is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
+                                //             // }
+                                //             if (is_all_succeed)
+                                //             {
+                                //                 mat->ChangeShader(shader.get());
+                                //             }
+                                //         }
+                                //     }
+                                //     ImGuiWidget::RemoveProgressBar(handle);
+                                //     return true;
+                                // });
                                 ++record._reload_shader_count;
                             }
                         }
@@ -278,18 +279,19 @@ namespace Ailu
                 auto cs = ResourceMgr::IterToRefPtr<ComputeShader>(it);
                 if (cs->IsDependencyFile(cur_path))
                 {
-                    g_pResourceMgr->SubmitTaskSync([=]()->bool
-                                                   {
-                        auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload compute shader: {}...",cs->Name()).c_str(),0.5f);
-                        ComputeShader *shader = cs.get();
-                        if (shader->Preprocess())
-                        {
-                            shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
-                            shader->Compile(); 
-                        }
-                        ImGuiWidget::RemoveProgressBar(handle);
-                        return true;
-                    });
+                    GraphicsContext::Get().CompileShaderAsync(cs.get());
+                    // g_pResourceMgr->SubmitTaskSync([=]()->bool
+                    //                                {
+                    //     auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload compute shader: {}...",cs->Name()).c_str(),0.5f);
+                    //     ComputeShader *shader = cs.get();
+                    //     if (shader->Preprocess())
+                    //     {
+                    //         shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
+                    //         shader->Compile(); 
+                    //     }
+                    //     ImGuiWidget::RemoveProgressBar(handle);
+                    //     return true;
+                    // });
                     ++record._reload_compute_count;
                 }
             }
@@ -301,17 +303,18 @@ namespace Ailu
                 {
                     if (cur_asset_path == linked_asset->_external_asset_path)
                     {
-                        g_pResourceMgr->SubmitTaskSync([=]()->bool
-                        {
-                           auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload texture2d: {}...",tex->Name()).c_str(),0.5f);
-                           TextureImportSetting setting = TextureImportSetting::Default();
-                           setting._is_reimport = true;
-                           g_pResourceMgr->Load<Texture2D>(linked_asset->_asset_path,&setting);
-                           ImGuiWidget::RemoveProgressBar(handle);
-                           return true;
-                        });
-                        ++record._reload_tex2d_count;
-                        LOG_INFO(L"Reloaded texture {}", linked_asset->_asset_path);
+                        LOG_WARNING(L"Texture2d {} has changed,but reload not support yet", linked_asset->_asset_path);
+                        // g_pResourceMgr->SubmitTaskSync([=]()->bool
+                        // {
+                        //    auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload texture2d: {}...",tex->Name()).c_str(),0.5f);
+                        //    TextureImportSetting setting = TextureImportSetting::Default();
+                        //    setting._is_reimport = true;
+                        //    g_pResourceMgr->Load<Texture2D>(linked_asset->_asset_path,&setting);
+                        //    ImGuiWidget::RemoveProgressBar(handle);
+                        //    return true;
+                        // });
+                        // ++record._reload_tex2d_count;
+                        // LOG_INFO(L"Reloaded texture {}", linked_asset->_asset_path);
                     }
                 }
             }

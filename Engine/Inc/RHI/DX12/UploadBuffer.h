@@ -1,3 +1,6 @@
+#ifndef __UOLOAD_BUFFER__
+#define __UOLOAD_BUFFER_
+#pragma once
 #include "GlobalMarco.h"
 #include <deque>
 #include <memory>
@@ -8,6 +11,10 @@
 
 namespace Ailu
 {
+    struct BindParamsUB : public BindParams
+    {
+        D3D12_GPU_VIRTUAL_ADDRESS _gpu_ptr;
+    };
 #define _2MB 2097152u
     class UploadBuffer : public GpuResource
     {
@@ -17,6 +24,7 @@ namespace Ailu
         {
             void *CPU;
             D3D12_GPU_VIRTUAL_ADDRESS GPU;
+            u64 _size;
             void SetData(const void* data,u64 data_size)
             {
                 memcpy(CPU,data,data_size);
@@ -26,7 +34,7 @@ namespace Ailu
         u64 GetPageSize() const { return m_PageSize; }
         Allocation Allocate(size_t sizeInBytes, size_t alignment);
         void Reset();
-
+        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
     private:
         struct Page
         {
@@ -55,3 +63,4 @@ namespace Ailu
         size_t m_PageSize;
     };
 }// namespace Ailu
+#endif

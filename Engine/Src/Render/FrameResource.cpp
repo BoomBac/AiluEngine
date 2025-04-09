@@ -43,6 +43,7 @@ namespace Ailu
         if (!_camera_cb_lut.contains(hash))
         {
             _camera_cbs.push_back(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
+            _camera_cbs.back()->Name(std::format("CameraCB_{}", hash));
             _camera_cb_lut[hash] = _camera_cbs.size() - 1;
             return _camera_cbs.back();
         }

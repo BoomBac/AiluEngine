@@ -18,7 +18,7 @@ namespace Ailu
 	}
 	WinInput::WinInput()
 	{
-		_hwnd = static_cast<HWND>(Application::Get()->GetWindow().GetNativeWindowPtr());
+		_hwnd = static_cast<HWND>(Application::Get().GetWindow().GetNativeWindowPtr());
 		_mouse_point = {0,0};
 	}
 	WinInput::WinInput(HWND hwnd)

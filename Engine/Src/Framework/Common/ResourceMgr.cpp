@@ -91,7 +91,7 @@ namespace Ailu
         //
         //			Load<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
         //		}
-        g_pJobSystem->Dispatch([](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([](ResourceMgr *mgr)
                                { Shader::s_p_defered_standart_lit = mgr->Load<Shader>(L"Shaders/defered_standard_lit.alasset"); },
                                this);
         Vector<WString> compute_shader_pathes = {
@@ -101,15 +101,15 @@ namespace Ailu
                     L"Shaders/taa.alasset",
         };
         for (auto &p: shader_asset_pathes)
-            g_pJobSystem->Dispatch([&](WString p)
+            JobSystem::Get().Dispatch([&](WString p)
                                    { Load<Shader>(p); },
                                    p);
         for (auto &p: shader_pathes)
-            g_pJobSystem->Dispatch([&](WString p)
+            JobSystem::Get().Dispatch([&](WString p)
                                    { RegisterResource(p, LoadExternalShader(p)); },
                                    p);
         for (auto &p: compute_shader_pathes)
-            g_pJobSystem->Dispatch([&](WString p){
+            JobSystem::Get().Dispatch([&](WString p){
                 Load<ComputeShader>(p);
             },p);
         {
@@ -162,7 +162,7 @@ namespace Ailu
             RegisterResource(L"Runtime/ltc_lut2", lut2);
             auto noise = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"rgba-noise-medium.png",setting);
             RegisterResource(L"Textures/noise_medium.png", noise);
-            g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+            JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                    { mgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset",&TextureImportSetting::Default()); },
                                    this);
         }
@@ -185,28 +185,28 @@ namespace Ailu
         //		Mesh::s_p_plane = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_plane]);
         //		Mesh::s_p_capsule = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_capsule]);
 
-        g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_cube);Mesh::s_p_cube = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cube]); },
                                this);
-        g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_sphere);Mesh::s_p_shpere = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_sphere]); },
                                this);
-        g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_plane);Mesh::s_p_plane = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_plane]); },
                                this);
-        g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_capsule);Mesh::s_p_capsule = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_capsule]); },
                                this);
-        g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_monkey);Mesh::s_p_monkey = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_monkey]); },
                                this);
-        g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_cone);Mesh::s_p_monkey = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cone]); },
                                this);
-        g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_cylinder);Mesh::s_p_cylinder = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cylinder]); },
                                this);
-        g_pJobSystem->Dispatch([&](ResourceMgr *mgr)
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_torus);Mesh::s_p_torus = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_torus]); },
                                this);
 
@@ -221,16 +221,16 @@ namespace Ailu
         FullScreenQuad->SetVertices(vertices);
         FullScreenQuad->AddSubmesh(indices, 6);
         FullScreenQuad->SetUVs(uv0, 0);
-        FullScreenQuad->BuildRHIResource();
+        FullScreenQuad->Apply();
         RegisterResource(L"Runtime/Mesh/FullScreenQuad", FullScreenQuad);
         auto FullScreenTriangle = MakeRef<Mesh>("FullScreenTriangle");
         FullScreenTriangle->_vertex_count = 3;
         FullScreenTriangle->AddSubmesh(new u32[3]{0, 1, 2}, 3);
-        FullScreenTriangle->BuildRHIResource();
+        FullScreenTriangle->Apply();
         RegisterResource(L"Runtime/Mesh/FullScreenTriangle", FullScreenTriangle);
         Mesh::s_p_quad = std::static_pointer_cast<Mesh>(_global_resources[L"Runtime/Mesh/FullScreenQuad"]);
         Mesh::s_p_fullscreen_triangle = std::static_pointer_cast<Mesh>(_global_resources[L"Runtime/Mesh/FullScreenTriangle"]);
-        g_pJobSystem->Wait();
+        JobSystem::Get().Wait();
         //这里所有需要的shader应该加载完毕，此时再进行预热
         {
             GraphicsPipelineStateMgr::BuildPSOCache();
@@ -656,8 +656,7 @@ namespace Ailu
             {
                 mesh->AddCacheMaterial(*it);
             }
-            g_pGfxContext->SubmitRHIResourceBuildTask([=]()
-                                                      { mesh->BuildRHIResource(); });
+            mesh->Apply();
         }
         for (auto &clip: parser->GetAnimationClips())
             clips.emplace_back(clip);
@@ -685,8 +684,7 @@ namespace Ailu
         AL_ASSERT(tex_parser != nullptr);
         g_pLogMgr->LogFormat(L"Start load image file {}...", sys_path);
         auto tex = tex_parser->Parser(sys_path,dynamic_cast<const TextureImportSetting&>(settings));
-        g_pGfxContext->SubmitRHIResourceBuildTask([=]()
-                                                  { tex->Apply(); });
+        tex->Apply();
         return tex;
     }
     bool ResourceMgr::LoadExternalTexture(const WString &asset_path,Ref<Texture2D>& tex,const ImportSetting& settings)
@@ -710,8 +708,7 @@ namespace Ailu
         AL_ASSERT(tex_parser != nullptr);
         g_pLogMgr->LogFormat(L"Start load image file {}...", sys_path);
         bool ret = tex_parser->Parser(sys_path,tex,dynamic_cast<const TextureImportSetting&>(settings));
-        g_pGfxContext->SubmitRHIResourceBuildTask([=]()
-                                                  { tex->Apply(); });
+        tex->Apply();
         return ret;
     }
 

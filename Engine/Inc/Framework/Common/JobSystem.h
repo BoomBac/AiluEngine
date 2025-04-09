@@ -72,62 +72,6 @@ namespace Ailu
         Ref<std::promise<void>> _promise;
     };
 
-    class LockFreeJobQueue
-    {
-    public:
-        explicit LockFreeJobQueue(size_t capacity = 1024)
-            : _buffer(capacity), _head(0), _tail(0), _capacity(capacity) {}
-
-        bool Enqueue(Job *job)
-        {
-            size_t current_tail = _tail.load(std::memory_order_relaxed);
-            size_t next_tail = (current_tail + 1) % _capacity;
-
-            if (next_tail == _head.load(std::memory_order_acquire))
-                return false;
-
-            _buffer[current_tail] = job;
-            _tail.store(next_tail, std::memory_order_release);
-            return true;
-        }
-
-        bool Dequeue(Job *&job)
-        {
-            size_t current_head = _head.load(std::memory_order_relaxed);
-            if (current_head == _tail.load(std::memory_order_acquire))
-                return false;
-            //提前更新 _head，防止 Steal() 获取相同的 job
-            //_head.store((current_head + 1) % _capacity, std::memory_order_release);
-            job = _buffer[current_head];
-            if (_head.compare_exchange_strong(current_head, (current_head + 1) % _capacity, std::memory_order_acquire))
-            {
-                return true;
-            }
-            return false;
-        }
-
-
-        std::optional<Job *> Steal()
-        {
-            size_t current_head = _head.load(std::memory_order_relaxed);
-            if (current_head == _tail.load(std::memory_order_acquire))
-                return std::nullopt;
-
-            Job *job = _buffer[current_head];
-            if (_head.compare_exchange_strong(current_head, (current_head + 1) % _capacity, std::memory_order_acquire))
-            {
-                return job;
-            }
-            return std::nullopt;
-        }
-
-    private:
-        std::vector<Job *> _buffer;
-        std::atomic<size_t> _head;
-        std::atomic<size_t> _tail;
-        size_t _capacity;
-    };
-
     struct JobHandle
     {
         u32 _job_index;
@@ -179,8 +123,66 @@ namespace Ailu
             Map<Job*,u32> _job_to_index;
             std::mutex _mutex;
         };
+        class LockFreeJobQueue
+        {
+        public:
+            explicit LockFreeJobQueue(size_t capacity = 1024)
+                : _buffer(capacity), _head(0), _tail(0), _capacity(capacity) {}
+    
+            bool Enqueue(Job *job)
+            {
+                size_t current_tail = _tail.load(std::memory_order_relaxed);
+                size_t next_tail = (current_tail + 1) % _capacity;
+    
+                if (next_tail == _head.load(std::memory_order_acquire))
+                    return false;
+    
+                _buffer[current_tail] = job;
+                _tail.store(next_tail, std::memory_order_release);
+                return true;
+            }
+    
+            bool Dequeue(Job *&job)
+            {
+                size_t current_head = _head.load(std::memory_order_relaxed);
+                if (current_head == _tail.load(std::memory_order_acquire))
+                    return false;
+                //提前更新 _head，防止 Steal() 获取相同的 job
+                //_head.store((current_head + 1) % _capacity, std::memory_order_release);
+                job = _buffer[current_head];
+                if (_head.compare_exchange_strong(current_head, (current_head + 1) % _capacity, std::memory_order_acquire))
+                {
+                    return true;
+                }
+                return false;
+            }
+    
+    
+            std::optional<Job *> Steal()
+            {
+                size_t current_head = _head.load(std::memory_order_relaxed);
+                if (current_head == _tail.load(std::memory_order_acquire))
+                    return std::nullopt;
+    
+                Job *job = _buffer[current_head];
+                if (_head.compare_exchange_strong(current_head, (current_head + 1) % _capacity, std::memory_order_acquire))
+                {
+                    return job;
+                }
+                return std::nullopt;
+            }
+    
+        private:
+            std::vector<Job *> _buffer;
+            std::atomic<size_t> _head;
+            std::atomic<size_t> _tail;
+            size_t _capacity;
+        };
         inline static const u32 kMaxJobPoolSize = 128u;
     public:
+        static void Init(u32 thread_count = std::thread::hardware_concurrency());
+        static void Shutdown();
+        static JobSystem& Get();
         explicit JobSystem(u32 thread_count = std::thread::hardware_concurrency());
         ~JobSystem();
         [[nodiscard]] Job *CreateJob(const String& name,JobFunction func);
@@ -218,7 +220,6 @@ namespace Ailu
         void WorkerThread(size_t index);
         bool TrySteal(Job *&job, size_t current_index);
     private:
-        HashMap<std::thread::id,String> _thread_names;
         std::vector<std::unique_ptr<LockFreeJobQueue>> _queues;
         std::vector<std::thread> _threads;
         std::atomic<bool> _stop;
@@ -234,7 +235,5 @@ namespace Ailu
         std::condition_variable _all_job_cv;
         std::set<u32> _temp_jobs;
     };
-
-    extern JobSystem *g_pJobSystem;
 };// namespace Ailu
 #endif//AILU_JOBSYSTEM_H

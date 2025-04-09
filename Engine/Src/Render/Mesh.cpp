@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Render/Mesh.h"
+#include "Render/GraphicsContext.h"
 #include "Framework/Common/Asset.h"
 #include "Framework/Common/Utils.h"
 
@@ -71,11 +72,11 @@ namespace Ailu
 		_vertex_count = 0;
 	}
 
-	const Ref<IVertexBuffer>& Mesh::GetVertexBuffer() const
+	const Ref<VertexBuffer>& Mesh::GetVertexBuffer() const
 	{
 		return _p_vbuf;
 	}
-	const Ref<IIndexBuffer>& Mesh::GetIndexBuffer(u16 submesh_index) const
+	const Ref<IndexBuffer>& Mesh::GetIndexBuffer(u16 submesh_index) const
 	{
 		return _p_ibufs[submesh_index];
 	}
@@ -84,7 +85,7 @@ namespace Ailu
 		if(indices_count > 0)
 			_p_indices.emplace_back(std::make_tuple(indices, indices_count));
 	}
-	void Mesh::BuildRHIResource()
+	void Mesh::Apply()
 	{
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
@@ -111,22 +112,23 @@ namespace Ailu
 		}
 		if (!desc_list.empty())
 		{
-			_p_vbuf.reset(IVertexBuffer::Create(desc_list, _name));
-			if (_vertices) _p_vbuf->SetStream(reinterpret_cast<float*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index);
-			if (_normals) _p_vbuf->SetStream(reinterpret_cast<float*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index);
-			if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<float*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index);
-			if (_tangents) _p_vbuf->SetStream(reinterpret_cast<float*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index);
-			_p_vbuf->SetName(_name);
+			_p_vbuf.reset(VertexBuffer::Create(desc_list, _name));
+			if (_vertices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index,false);
+			if (_normals) _p_vbuf->SetStream(reinterpret_cast<u8*>(_normals), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), normal_index,false);
+			if (_uv[0]) _p_vbuf->SetStream(reinterpret_cast<u8*>(_uv[0]), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat2), uv_index,false);
+			if (_tangents) _p_vbuf->SetStream(reinterpret_cast<u8*>(_tangents), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), tangent_index,false);
+			_p_vbuf->Name(_name);
+            GraphicsContext::Get().CreateResource(_p_vbuf.get());
 		}
 		_p_ibufs.resize(_p_indices.size());
 		for(int i = 0; i < _p_indices.size(); i++)
 		{
 			if(std::get<1>(_p_indices[i]) != 0)
-				_p_ibufs[i].reset(IIndexBuffer::Create(std::get<0>(_p_indices[i]), std::get<1>(_p_indices[i])));
+				_p_ibufs[i].reset(IndexBuffer::Create(std::get<0>(_p_indices[i]), std::get<1>(_p_indices[i])));
 			String ib_name = std::format("{}_{}",_name,i);
-			_p_ibufs[i]->SetName(ib_name);
+			_p_ibufs[i]->Name(ib_name);
+            GraphicsContext::Get().CreateResource(_p_ibufs[i].get());
 		}
-		_is_rhi_res_ready = true;
 	}
 
 	//----------------------------------------------------------------------SkinedMesh---------------------------------------------------------------------------
@@ -163,7 +165,7 @@ namespace Ailu
 		DESTORY_PTRARR(_previous_vertices);
 	}
 
-	void SkeletonMesh::BuildRHIResource()
+	void SkeletonMesh::Apply()
 	{
 		u8 count = 0;
 		Vector<VertexBufferLayoutDesc> desc_list;
@@ -202,7 +204,7 @@ namespace Ailu
 			desc_list.push_back({ "TEXCOORD",EShaderDateType::kFloat3,count ,1});
 			prev_vert_index = count++;
 		}
-		_p_vbuf.reset(IVertexBuffer::Create(desc_list, _name));
+		_p_vbuf.reset(VertexBuffer::Create(desc_list, _name));
 		if (_vertices) 
 		{
 			_p_vbuf->SetStream(reinterpret_cast<u8*>(_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, true);
@@ -215,12 +217,13 @@ namespace Ailu
 		//if (_bone_indices) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_indices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kInt4), bone_index_index);
 		//if (_bone_weights) _p_vbuf->SetStream(reinterpret_cast<u8*>(_bone_weights), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat4), bone_weight_index);
 		_p_vbuf->SetStream(reinterpret_cast<u8*>(_previous_vertices), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), tangent_index,true);
-		_p_ibufs.resize(_p_indices.size());
+		GraphicsContext::Get().CreateResource(_p_vbuf.get());
+        _p_ibufs.resize(_p_indices.size());
 		for (int i = 0; i < _p_indices.size(); i++)
 		{
-			_p_ibufs[i].reset(IIndexBuffer::Create(std::get<0>(_p_indices[i]), std::get<1>(_p_indices[i])));
+			_p_ibufs[i].reset(IndexBuffer::Create(std::get<0>(_p_indices[i]), std::get<1>(_p_indices[i])));
+            GraphicsContext::Get().CreateResource(_p_ibufs[i].get());
 		}
-		_is_rhi_res_ready = true;
 	}
     void SkeletonMesh::SetSkeleton(const Skeleton &skeleton)
     {
