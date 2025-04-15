@@ -170,7 +170,7 @@ namespace Ailu
                 {
                     if (Input::IsKeyPressed(AL_KEY_CONTROL))
                     {
-                        g_pLogMgr->Log("Save assets...");
+                        LOG_INFO("Save assets...");
                         g_pThreadTool->Enqueue([]()
                                                {
                                                    f32 asset_count = 1.0f;

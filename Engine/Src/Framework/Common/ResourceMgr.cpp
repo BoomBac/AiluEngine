@@ -283,16 +283,16 @@ namespace Ailu
         //    }
         //    catch (const std::exception &)
         //    {
-        //        g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {}!", clip->Name());
+        //        LOG_ERROR("Serialize failed when save scene: {}!", clip->Name());
         //        return;
         //    }
         //    WString sys_path = ResourceMgr::GetResSysPath(std::format(L"AnimClips/a.clip"));
         //    if (!FileManager::WriteFile(sys_path, true, ss.str()))
         //    {
-        //        g_pLogMgr->LogErrorFormat(L"Save scene failed to {}", sys_path);
+        //        LOG_ERROR(L"Save scene failed to {}", sys_path);
         //        return;
         //    }
-        //    g_pLogMgr->LogFormat(L"Save scene to {}", sys_path);
+        //    LOG_INFO(L"Save scene to {}", sys_path);
         //}
     }
 
@@ -327,7 +327,7 @@ namespace Ailu
         using std::endl;
         if (asset->_p_obj == nullptr)
         {
-            g_pLogMgr->LogWarningFormat(L"SaveAsset: Asset: {} save failed!it hasn't a instanced object!", asset->_name);
+            LOG_WARNING(L"SaveAsset: Asset: {} save failed!it hasn't a instanced object!", asset->_name);
             return;
         }
         AL_ASSERT(!asset->_asset_path.empty());
@@ -443,7 +443,7 @@ namespace Ailu
                 return;
             }
         }
-        g_pLogMgr->LogErrorFormat(L"Save shader to {} failed!", sys_path);
+        LOG_ERROR(L"Save shader to {} failed!", sys_path);
     }
 
     void ResourceMgr::SaveComputeShader(const WString &asset_path, const Asset *asset)
@@ -463,7 +463,7 @@ namespace Ailu
                 return;
             }
         }
-        g_pLogMgr->LogErrorFormat(L"Save compute shader to {} failed!", sys_path);
+        LOG_ERROR(L"Save compute shader to {} failed!", sys_path);
     }
 
     Scope<Asset> ResourceMgr::LoadShader(const WString &asset_path,const ImportSetting& settings)
@@ -576,7 +576,7 @@ namespace Ailu
                 return;
             }
         }
-        g_pLogMgr->LogErrorFormat(L"Save mesh to {} failed!", sys_path);
+        LOG_ERROR(L"Save mesh to {} failed!", sys_path);
     }
 
     void ResourceMgr::SaveTexture2D(const WString &asset_path, const Asset *asset)
@@ -592,7 +592,7 @@ namespace Ailu
                 return;
             }
         }
-        g_pLogMgr->LogErrorFormat(L"Save texture2d to {} failed!", sys_path);
+        LOG_ERROR(L"Save texture2d to {} failed!", sys_path);
     }
 
     void ResourceMgr::SaveScene(const WString &asset_path, const Asset *asset)
@@ -607,16 +607,16 @@ namespace Ailu
         }
         catch (const std::exception &e)
         {
-            g_pLogMgr->LogErrorFormat("Serialize failed when save scene: {} with exce {}", scene->Name(), e.what());
+            LOG_ERROR("Serialize failed when save scene: {} with exce {}", scene->Name(), e.what());
             return;
         }
         WString sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
         if (!FileManager::WriteFile(sys_path, true, ss.str()))
         {
-            g_pLogMgr->LogErrorFormat(L"Save scene failed to {}", sys_path);
+            LOG_ERROR(L"Save scene failed to {}", sys_path);
             return;
         }
-        g_pLogMgr->LogFormat(L"Save scene to {}", sys_path);
+        LOG_INFO(L"Save scene to {}", sys_path);
     }
     void ResourceMgr::SaveAnimClip(const WString &asset_path, const Asset *asset)
     {
@@ -630,16 +630,16 @@ namespace Ailu
         }
         catch (const std::exception &)
         {
-            g_pLogMgr->LogErrorFormat("Serialize failed when save animclip: {}!", clip->Name());
+            LOG_ERROR("Serialize failed when save animclip: {}!", clip->Name());
             return;
         }
         WString sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
         if (!FileManager::WriteFile(sys_path, true, ss.str()))
         {
-            g_pLogMgr->LogErrorFormat(L"Save animclip failed to {}", sys_path);
+            LOG_ERROR(L"Save animclip failed to {}", sys_path);
             return;
         }
-        g_pLogMgr->LogFormat(L"Save animclip to {}", sys_path);
+        LOG_INFO(L"Save animclip to {}", sys_path);
     }
 
     List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting, List<Ref<AnimationClip>> &clips)
@@ -682,7 +682,7 @@ namespace Ailu
         }
         else {};
         AL_ASSERT(tex_parser != nullptr);
-        g_pLogMgr->LogFormat(L"Start load image file {}...", sys_path);
+        LOG_INFO(L"Start load image file {}...", sys_path);
         auto tex = tex_parser->Parser(sys_path,dynamic_cast<const TextureImportSetting&>(settings));
         tex->Apply();
         return tex;
@@ -706,7 +706,7 @@ namespace Ailu
         }
         else {};
         AL_ASSERT(tex_parser != nullptr);
-        g_pLogMgr->LogFormat(L"Start load image file {}...", sys_path);
+        LOG_INFO(L"Start load image file {}...", sys_path);
         bool ret = tex_parser->Parser(sys_path,tex,dynamic_cast<const TextureImportSetting&>(settings));
         tex->Apply();
         return ret;
@@ -976,7 +976,7 @@ namespace Ailu
         bool is_already_exist = _asset_looktable.contains(asset_path);
         if (is_already_exist && !overwrite)
         {
-            g_pLogMgr->LogWarningFormat(L"CreateAsset: Asset: {} already exist!", asset_path);
+            LOG_WARNING(L"CreateAsset: Asset: {} already exist!", asset_path);
         }
         Guid new_guid = Guid::Generate();
         Scope<Asset> new_asset = nullptr;
@@ -1083,7 +1083,7 @@ namespace Ailu
         WString ext_name = PathUtils::ExtractExt(p_asset->_asset_path);
         if (ExistInAssetDB(new_asset_path))
         {
-            g_pLogMgr->LogWarningFormat(L"Rename asset {} whih name {} failed,try another name!", p_asset->_asset_path, new_name);
+            LOG_WARNING(L"Rename asset {} whih name {} failed,try another name!", p_asset->_asset_path, new_name);
             return false;
         }
         UnRegisterResource(old_asset_path);
@@ -1102,7 +1102,7 @@ namespace Ailu
         WString old_asset_path = p_asset->_asset_path;
         if (ExistInAssetDB(new_asset_path))
         {
-            g_pLogMgr->LogWarningFormat(L"MoveAsset to path {} failed,try another name!", new_asset_path);
+            LOG_WARNING(L"MoveAsset to path {} failed,try another name!", new_asset_path);
             return false;
         }
         UnRegisterResource(old_asset_path);
@@ -1186,7 +1186,7 @@ namespace Ailu
         auto is_exist = ExistInAssetDB(asset.get());
         if (is_exist && !override)
         {
-            g_pLogMgr->LogWarningFormat(L"Asset {} already exist in database,it will be destory...", asset->_asset_path);
+            LOG_WARNING(L"Asset {} already exist in database,it will be destory...", asset->_asset_path);
             return nullptr;
         }
         if (is_exist && _asset_db[asset->GetGuid()]->_asset_path != asset->_asset_path)
@@ -1197,7 +1197,7 @@ namespace Ailu
                 new_guid = Guid::Generate();
             }
             is_exist = false;
-            g_pLogMgr->LogWarningFormat(L"Asset {} guid conflict, assign a new one!", asset->_asset_path);
+            LOG_WARNING(L"Asset {} guid conflict, assign a new one!", asset->_asset_path);
             asset->AssignGuid(new_guid);
         }
         if (asset->GetGuid() == Guid::EmptyGuid())
@@ -1263,7 +1263,7 @@ namespace Ailu
         }
         else
         {
-            g_pLogMgr->LogWarningFormat("RegisterResource: skip register {}", obj->Name());
+            LOG_WARNING("RegisterResource: skip register {}", obj->Name());
         }
     }
 
@@ -1280,7 +1280,7 @@ namespace Ailu
             _object_to_asset.erase(obj->ID());
             _lut_global_resources.erase(obj->ID());
             _global_resources.erase(asset_path);
-            g_pLogMgr->LogWarningFormat(L"UnRegisterResource: {} ref count is {}", asset_path, ref_count - 1);
+            LOG_WARNING(L"UnRegisterResource: {} ref count is {}", asset_path, ref_count - 1);
         }
     }
 
@@ -1393,18 +1393,18 @@ namespace Ailu
         fs::path p(sys_path);
         if (!FileManager::Exist(sys_path))
         {
-            g_pLogMgr->LogErrorFormat(L"Path {} not exist on the disk!", sys_path);
+            LOG_ERROR(L"Path {} not exist on the disk!", sys_path);
             return nullptr;
         }
         auto ext = p.extension().string();
         if (ext.empty() || (!kHDRImageExt.contains(ext) && !kLDRImageExt.contains(ext) && !kMeshExt.contains(ext)))
         {
-            g_pLogMgr->LogErrorFormat(L"Path {} is not a supported file!", sys_path);
+            LOG_ERROR(L"Path {} is not a supported file!", sys_path);
             return nullptr;
         }
         if (!IsFileOnDiskUpdated(sys_path))
         {
-            g_pLogMgr->LogWarningFormat(L"File {} is new,skip load!", sys_path);
+            LOG_WARNING(L"File {} is new,skip load!", sys_path);
             return nullptr;
         }
         auto new_sys_path = FileManager::GetCurSysDirStr();
@@ -1416,7 +1416,7 @@ namespace Ailu
                 FileManager::CopyFile(sys_path, new_sys_path);
             else
             {
-                g_pLogMgr->LogErrorFormat(std::source_location::current(), L"Path {} is not a file!", sys_path);
+                LOG_ERROR(L"Path {} is not a file!", sys_path);
             }
         }
         else
@@ -1493,7 +1493,7 @@ namespace Ailu
         {
             auto &[path, obj] = loaded_objects.front();
             CreateAsset(path, obj)->_external_asset_path = external_asset_path;
-            g_pLogMgr->LogFormat(L"Create asset at path {}", path);
+            LOG_INFO(L"Create asset at path {}", path);
             loaded_objects.pop();
         }
         OnAssetDataBaseChanged();

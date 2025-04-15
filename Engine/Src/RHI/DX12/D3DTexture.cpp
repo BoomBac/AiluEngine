@@ -171,7 +171,7 @@ namespace Ailu
         }
         if (view_type == kDSV || view_type == kRTV)
         {
-            g_pLogMgr->LogWarningFormat("Try to create dsv/rtv on a raw texture2d,call is on render texture instead!");
+            LOG_WARNING("Try to create dsv/rtv on a raw texture2d,call is on render texture instead!");
             return;
         }
         u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
@@ -387,7 +387,7 @@ namespace Ailu
         }
         if (view_type == kDSV || view_type == kRTV)
         {
-            g_pLogMgr->LogWarningFormat("Try to create dsv/rtv on a raw cubemap,call is on render texture instead!");
+            LOG_WARNING("Try to create dsv/rtv on a raw cubemap,call is on render texture instead!");
             return;
         }
         u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
@@ -673,7 +673,7 @@ namespace Ailu
         Texture::CreateView(view_type, mipmap, dpeth_slice);
         if (view_type == kDSV || view_type == kRTV)
         {
-            g_pLogMgr->LogWarningFormat("Try to create dsv/rtv on a raw texture3d,call is on render texture instead!");
+            LOG_WARNING("Try to create dsv/rtv on a raw texture3d,call is on render texture instead!");
             return;
         }
         u16 view_index = CalculateViewIndex(view_type, mipmap, dpeth_slice);
@@ -827,7 +827,7 @@ namespace Ailu
             main_view_dimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
             texture_num = _slice_num * 6;
             _mipmap_count = 1;
-            g_pLogMgr->LogWarningFormat("Cubemap array not support multi mipmap");
+            LOG_WARNING("Cubemap array not support multi mipmap");
         }
         else {}
         bool is_for_depth = _depth_bit > 0;
@@ -947,7 +947,7 @@ namespace Ailu
                 auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
                 if (!RenderTexture::CanAsShaderResource(this) && !param->_is_compute_pipeline)
                 {
-                    g_pLogMgr->LogWarningFormat("D3DRenderTexture::BindImpl: try to use a render texture: {} as rt and srv at the same time!", _name);
+                    LOG_WARNING("D3DRenderTexture::BindImpl: try to use a render texture: {} as rt and srv at the same time!", _name);
                     return;
                 }
                 auto view_type = _views[param->_view_idx]._view_type;

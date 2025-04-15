@@ -55,7 +55,7 @@ private:                                                                  \
                     _comps[i]->_transform._position = _new_transforms[i]._position;
                     _comps[i]->_transform._rotation = _new_transforms[i]._rotation;
                     _comps[i]->_transform._scale = _new_transforms[i]._scale;
-                    g_pLogMgr->LogFormat("Exe or redo {} on obj {}", s_name, _obj_names[i]);
+                    LOG_INFO("Exe or redo {} on obj {}", s_name, _obj_names[i]);
                 }
             }
 
@@ -66,7 +66,7 @@ private:                                                                  \
                     _comps[i]->_transform._position = _old_transforms[i]._position;
                     _comps[i]->_transform._rotation = _old_transforms[i]._rotation;
                     _comps[i]->_transform._scale = _old_transforms[i]._scale;
-                    g_pLogMgr->LogFormat("Undo {} on obj {}", s_name, _obj_names[i]);
+                    LOG_INFO("Undo {} on obj {}", s_name, _obj_names[i]);
                 }
             }
 

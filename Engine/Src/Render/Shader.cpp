@@ -297,7 +297,7 @@ namespace Ailu
 
     bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash)
     {
-        g_pLogMgr->LogFormat(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWStr(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
+        LOG_INFO(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWStr(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
         g_pTimeMgr->Mark();
         AL_ASSERT(pass_id < _passes.size());
         auto &pass = _passes[pass_id];
@@ -1326,7 +1326,7 @@ namespace Ailu
         _is_compiling.store(true);
         if (!FileManager::Exist(_src_file_path))
         {
-            g_pLogMgr->LogErrorFormat(L"ComputeShader::Compile: source:{} not exist!", _src_file_path);
+            LOG_ERROR(L"ComputeShader::Compile: source:{} not exist!", _src_file_path);
             return false;
         }
         Preprocess();

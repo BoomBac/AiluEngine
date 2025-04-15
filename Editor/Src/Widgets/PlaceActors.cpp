@@ -36,7 +36,7 @@ namespace Ailu
             memset(_input_buffer, 0, 256);
             if (ImGui::InputText("Search", _input_buffer, 256))
             {
-                g_pLogMgr->LogFormat("Search {}", _input_buffer);
+                LOG_INFO("Search {}", _input_buffer);
             }
             ImGui::Spacing();
             ImVec2 avail_size = ImGui::GetContentRegionAvail();

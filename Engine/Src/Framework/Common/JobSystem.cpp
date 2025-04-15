@@ -46,6 +46,8 @@ namespace Ailu
     }
     JobSystem& JobSystem::Get()
     {
+        if (g_pJobSystem == nullptr)
+            Init(6);
         return *g_pJobSystem;
     }
 

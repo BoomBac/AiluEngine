@@ -88,7 +88,7 @@ namespace Ailu::Editor
             //ImGui::GetStyle().Colors[ImGuiCol_ChildBg] = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
             {
                 auto main_it = std::find_if(all_thread.begin(),all_thread.end(),[](const auto& it){
-                    return it.second == "MainThread";
+                    return it.second == "LogicThread";
                 });
                 ShowTimeLine(main_it->first,s_offset_x,s_scale_factor);
             }

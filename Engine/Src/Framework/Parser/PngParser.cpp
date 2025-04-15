@@ -12,7 +12,7 @@ namespace Ailu
     {
         if (paths.size() != 6)
         {
-            g_pLogMgr->LogErrorFormat("{}: load cubemap at {} failed,make sure input 6 textures!", Modules::Parser, paths.empty() ? "none" : paths[0]);
+            LOG_ERROR("{}: load cubemap at {} failed,make sure input 6 textures!", Modules::Parser, paths.empty() ? "none" : paths[0]);
             return nullptr;
         }
         int x, y, n;
@@ -23,7 +23,7 @@ namespace Ailu
             u8 *expand_data = nullptr;
             if (data == nullptr)
             {
-                g_pLogMgr->LogErrorFormat("{}: Load {} failed: {}", Modules::Parser, paths[i], stbi_failure_reason());
+                LOG_ERROR("{}: Load {} failed: {}", Modules::Parser, paths[i], stbi_failure_reason());
                 return nullptr;
             }
             else

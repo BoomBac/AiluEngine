@@ -403,7 +403,7 @@ namespace Ailu
             if (_selected_file_index == cur_file_index && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             {
                 FileManager::SetCurPath(dir_path);
-                g_pLogMgr->LogFormat(L"Move dir to {}", dir_path.wstring());
+                LOG_INFO(L"Move dir to {}", dir_path.wstring());
                 MarkDirty();
             }
             ImGui::PopID();
@@ -430,7 +430,7 @@ namespace Ailu
                         g_pResourceMgr->DeleteAsset(p);
                     }
                     FileManager::DeleteDirectory(dir_path);
-                    g_pLogMgr->LogWarningFormat(L"Delete directory {}", dir_path.wstring());
+                    LOG_WARNING(L"Delete directory {}", dir_path.wstring());
                     MarkDirty();
                 }
                 ImGui::EndPopup();
@@ -479,7 +479,7 @@ namespace Ailu
             }
             if (ImGui::ImageButton(tex_id, ImVec2(_preview_tex_size, _preview_tex_size), _uv0, _uv1, 0, kColorBg, kColorTint))
             {
-                g_pLogMgr->LogFormat("selected file {}", file_name.c_str());
+                LOG_INFO("selected file {}", file_name.c_str());
                 Selection::AddAndRemovePreSelection(asset->_p_obj.get());
             }
             ImGui::PushID(asset->_name.c_str());
@@ -551,7 +551,7 @@ namespace Ailu
                         WString new_path = PathUtils::RenameFile(old_path, new_name);
                         g_pResourceMgr->RenameAsset(asset, new_name);
                         FileManager::RenameDirectory(old_path, new_path);
-                        g_pLogMgr->LogWarningFormat("Rename to {}", _rename_buffer);
+                        LOG_WARNING("Rename to {}", _rename_buffer);
                         MarkDirty();
                     }
                     _selected_file_rename_index = -1;
@@ -576,7 +576,7 @@ namespace Ailu
             if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
             {
                 Selection::AddAndRemovePreSelection(asset->_p_obj.get());
-                g_pLogMgr->LogFormat("selected asset {}", file_name.c_str());
+                LOG_INFO("selected asset {}", file_name.c_str());
                 _selected_file_sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
                 _selected_file_index = cur_file_index;
             }
@@ -636,7 +636,7 @@ namespace Ailu
                 }
                 if (ImGui::MenuItem("Delete"))
                 {
-                    g_pLogMgr->LogWarningFormat(L"Delete asset: {}", asset->_asset_path);
+                    LOG_WARNING(L"Delete asset: {}", asset->_asset_path);
                     g_pResourceMgr->DeleteAsset(asset);
                     FileManager::DeleteDirectory(ResourceMgr::GetResSysPath(asset->_asset_path));
                     MarkDirty();
@@ -806,7 +806,7 @@ namespace Ailu
                         g_pResourceMgr->MoveAsset(asset, PathUtils::ExtractAssetPath(new_asset_path));
                     }
                     FileManager::DeleteDirectory(from);
-                    g_pLogMgr->LogWarningFormat(L"Cut folder: from {} to {}", from, to);
+                    LOG_WARNING(L"Cut folder: from {} to {}", from, to);
                     MarkDirty();
                     return true;
                 }
@@ -820,7 +820,7 @@ namespace Ailu
                         g_pResourceMgr->MoveAsset(asset, PathUtils::ExtractAssetPath(to));
                     }
                     FileManager::DeleteDirectory(from);
-                    g_pLogMgr->LogWarningFormat(L"Cut file: from {} to {}", from, to);
+                    LOG_WARNING(L"Cut file: from {} to {}", from, to);
                     MarkDirty();
                     return true;
                 }

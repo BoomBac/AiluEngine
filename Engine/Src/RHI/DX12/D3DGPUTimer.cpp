@@ -129,7 +129,7 @@ namespace Ailu
     {
         if (timerid >= kMaxGpuTimerNum)
         {
-            g_pLogMgr->LogWarningFormat("Timer ID out of range");
+            LOG_WARNING("Timer ID out of range");
             return 0.0;
         }
 

@@ -337,7 +337,7 @@ namespace Ailu
         auto texture = g_pResourceMgr->Get<Texture2D>(texture_path);
         if (texture == nullptr)
         {
-            g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
+            LOG_ERROR("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
             return;
         }
         SetTexture(name, texture);
@@ -938,7 +938,7 @@ namespace Ailu
         auto texture = g_pResourceMgr->Get<Texture2D>(texture_path);
         if (texture == nullptr)
         {
-            g_pLogMgr->LogErrorFormat("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
+            LOG_ERROR("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
             return;
         }
         SetTexture(name, texture);

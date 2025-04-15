@@ -36,7 +36,7 @@ namespace Ailu
                     TextureHandle cur_tex_handle = tex->GetNativeTextureHandle();
                     if (cur_tex_handle == 0)
                     {
-                        g_pLogMgr->LogErrorFormat("{} tex handle is 0", tex_name);
+                        LOG_ERROR("{} tex handle is 0", tex_name);
                         continue;
                     }
                     ImGui::BeginGroup();
@@ -198,7 +198,7 @@ namespace Ailu
             _allow_close = true;
             OnWidgetClose([this]()
                           {
-				g_pLogMgr->LogWarning("TextureDetailView close");
+				LOG_WARNING("TextureDetailView close");
 				_p_tex = nullptr; });
         }
 
@@ -215,7 +215,7 @@ namespace Ailu
         {
             if (!tex)
             {
-                g_pLogMgr->LogWarning("Clocked asset is not texture");
+                LOG_WARNING("Clocked asset is not texture");
                 return;
             }
 

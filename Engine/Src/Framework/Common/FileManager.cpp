@@ -31,7 +31,7 @@ namespace Ailu
         {
             if (!FileManager::Exist(src_file))
             {
-                g_pLogMgr->LogErrorFormat(std::source_location::current(), L"CopyFile: Path {} not exist on the disk!", src_file);
+                LOG_ERROR(L"CopyFile: Path {} not exist on the disk!", src_file);
                 return false;
             }
             fs::copy_file(src_file, dest_file, fs::copy_options::overwrite_existing);
@@ -52,7 +52,7 @@ namespace Ailu
         {
             if (!FileManager::Exist(src_file))
             {
-                g_pLogMgr->LogErrorFormat(std::source_location::current(), L"CopyDirectory: Path {} not exist on the disk!", src_file);
+                LOG_ERROR(L"CopyDirectory: Path {} not exist on the disk!", src_file);
                 return false;
             }
             auto flag = fs::copy_options::overwrite_existing;
@@ -108,7 +108,7 @@ namespace Ailu
         fs::path p(sys_path);
         if (fs::exists(p) && !override)
         {
-            g_pLogMgr->LogWarningFormat(L"CreateFile: File {} already exist!", sys_path);
+            LOG_WARNING(L"CreateFile: File {} already exist!", sys_path);
             return false;
         }
         std::wofstream out_file(sys_path);
@@ -121,7 +121,7 @@ namespace Ailu
         fs::path p(sys_path);
         if (!fs::exists(p))
         {
-            g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist!", sys_path);
+            LOG_WARNING(L"WriteFile: File {} not exist!", sys_path);
             return false;
         }
         std::wofstream out_asset_file(sys_path, append ? std::ios::app : std::ios::trunc);
@@ -150,7 +150,7 @@ namespace Ailu
         if (!fs::exists(p))
         {
             FileManager::CreateFile(sys_path, true);
-            g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist! create it", sys_path);
+            LOG_WARNING(L"WriteFile: File {} not exist! create it", sys_path);
         }
         std::ofstream out_asset_file(sys_path, append ? std::ios::app : std::ios::trunc);
         if (!out_asset_file.is_open())
@@ -178,7 +178,7 @@ namespace Ailu
         if (!fs::exists(p))
         {
             FileManager::CreateFile(sys_path, true);
-            g_pLogMgr->LogWarningFormat(L"WriteFile: File {} not exist! create it", sys_path);
+            LOG_WARNING(L"WriteFile: File {} not exist! create it", sys_path);
         }
         auto flag = std::ios::trunc | std::ios::binary;
         std::ofstream out_asset_file(sys_path, append ? flag | std::ios::app : flag);
@@ -254,7 +254,7 @@ namespace Ailu
         in_file.read(reinterpret_cast<char *>(data), data_size == -1 ? (u64) file_size : data_size);
         if (in_file.fail())
         {
-            g_pLogMgr->LogErrorFormat(L"Failed to read file {} at position {}!", sys_path, data_start);
+            LOG_ERROR(L"Failed to read file {} at position {}!", sys_path, data_start);
             in_file.close();
             return false;
         }
@@ -281,7 +281,7 @@ namespace Ailu
         in_file.close();
         if (in_file.fail())
         {
-            g_pLogMgr->LogErrorFormat(L"Failed to read file {} at position {}!", sys_path, data_start);
+            LOG_ERROR(L"Failed to read file {} at position {}!", sys_path, data_start);
             delete[] read_data;
             return std::tuple<u8 *, u64>(nullptr, -1);
         }

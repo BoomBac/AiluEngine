@@ -182,7 +182,7 @@ namespace Ailu
                 auto ref_count = _global_resources[asset_path].use_count();
                 obj_id = _global_resources[asset_path]->ID();
                 _global_resources.erase(asset_path);
-                g_pLogMgr->LogFormat(L"Release resource: {},and current ref count is {}", asset_path.c_str(), ref_count - 1);
+                LOG_INFO(L"Release resource: {},and current ref count is {}", asset_path.c_str(), ref_count - 1);
             }
         }
         void Release(Object *obj)
@@ -290,7 +290,7 @@ namespace Ailu
         //AL_ASSERT(type != EAssetType::kUndefined);
         if (type == EAssetType::kUndefined)
         {
-            g_pLogMgr->LogErrorFormat(L"Load asset {} failed with invalid asset type after {}ms", asset_path, timer.GetElapsedSinceLastMark());
+            LOG_ERROR(L"Load asset {} failed with invalid asset type after {}ms", asset_path, timer.GetElapsedSinceLastMark());
             return nullptr;
         }
         Loader asset_loader = nullptr;
@@ -345,10 +345,10 @@ namespace Ailu
                 RegisterResource(asset_path, out_asset->_p_obj);
                 RegisterAsset(std::move(out_asset));
                 MarkFileTimeStamp(sys_path);
-                g_pLogMgr->LogWarningFormat(L"Load asset {} succeed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
+                LOG_WARNING(L"Load asset {} succeed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
             }
             else
-                g_pLogMgr->LogErrorFormat(L"Load asset {} failed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
+            LOG_ERROR(L"Load asset {} failed after {} ms", asset_path, timer.GetElapsedSinceLastMark());
         }
         else
         {
@@ -356,7 +356,7 @@ namespace Ailu
             {
                 asset_loader(this, asset_path,*cur_setting);
                 MarkFileTimeStamp(sys_path);
-                g_pLogMgr->LogWarningFormat(L"Reload asset {} after {} ms", asset_path, timer.GetElapsedSinceLastMark());
+                LOG_WARNING(L"Reload asset {} after {} ms", asset_path, timer.GetElapsedSinceLastMark());
             }
         }
 

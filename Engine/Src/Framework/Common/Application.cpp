@@ -186,86 +186,98 @@ namespace Ailu
         GraphicsContext::FinalizeGlobalContext();
         g_pTimeMgr->Finalize();
         DESTORY_PTR(g_pTimeMgr);
-        g_pLogMgr->Finalize();
-        DESTORY_PTR(g_pLogMgr);
         JobSystem::Shutdown();
         ObjectRegister::Shutdown();
+        g_pLogMgr->Finalize();
+        DESTORY_PTR(g_pLogMgr);
     }
 
     void Application::Tick(f32 delta_time)
     {
         g_pTimeMgr->Reset();
+        std::thread logic_thread = std::thread([&](){
+            SetThreadName("LogicThread");
+            while (_state == EApplicationState::EApplicationState_Running)
+            {
+                {
+                    _before_update.Invoke();
+                    auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
+                    g_pTimeMgr->Tick(last_mark);
+                    _render_lag += last_mark;
+                    _update_lag += last_mark;
+                    g_pTimeMgr->Mark();
+                    {
+                        CPUProfileBlock main_b("Application::Tick");
+                        //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
+                        //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
+                        if (_state == EApplicationState::EApplicationState_Pause)
+                            continue;
+                        else if (_state == EApplicationState::EApplicationState_Exit)
+                            break;
+                        else {};
+                        //此时更新已经传入delta_time了，所以不需要多次更新，也就是while(_update_lag >= s_target_lag)
+                        //这也是固定频率更新，所以实际上delta_time始终为1
+                        //if (_update_lag >= s_target_lag)
+                        {
+                            CPUProfileBlock b("LayerUpdate");
+                            //if (_update_lag >= s_target_lag)
+                            {
+                                g_pResourceMgr->Tick(delta_time);
+                                for (Layer *layer: *_layer_stack)
+                                {
+                                    //layer->OnUpdate((f32)(_update_lag / s_target_lag));
+                                    layer->OnUpdate(1.0f);
+                                }
+                                //_update_lag -= s_target_lag;
+                                //_update_lag = std::max<f32>(_update_lag,0.0f);
+                                _update_lag = last_mark;
+                            }
+                        }
+                        //if (_render_lag >= s_target_lag)
+                        {
+                            {
+                                CPUProfileBlock b("SceneTick");
+                                g_pSceneMgr->Tick(delta_time);
+                            }
+                            {
+                                CPUProfileBlock b("RenderScene");
+                                g_pGfxContext->GetPipeline()->Render();
+                            }
+        #ifdef DEAR_IMGUI
+                            {
+                               CPUProfileBlock b("RenderImGui");
+                                _p_imgui_layer->Begin();
+                                for (Layer *layer: *_layer_stack)
+                                    layer->OnImguiRender();
+                                _p_imgui_layer->End();
+                            }
+        #endif// DEAR_IMGUI
+                            g_pGfxContext->Present();
+                            g_pGfxContext->GetPipeline()->FrameCleanUp();
+                            _render_lag -= s_target_lag;
+                        }
+                    }
+                    _after_update.Invoke();
+                }
+            }
+            LOG_INFO("Exit Logic Thread");
+        });
         while (_state != EApplicationState::EApplicationState_Exit)
         {
             if (_state == EApplicationState::EApplicationState_Pause)
             {
                 _p_window->OnUpdate();
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
             }
             else
             {
-                _before_update.Invoke();
-                auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
-                g_pTimeMgr->Tick(last_mark);
-                _render_lag += last_mark;
-                _update_lag += last_mark;
-                g_pTimeMgr->Mark();
-                {
-                    CPUProfileBlock main_b("Application::Tick");
-                    _p_window->OnUpdate();
-                    //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
-                    //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
-                    if (_state == EApplicationState::EApplicationState_Pause)
-                        continue;
-                    else if (_state == EApplicationState::EApplicationState_Exit)
-                        break;
-                    else {};
-                    //此时更新已经传入delta_time了，所以不需要多次更新，也就是while(_update_lag >= s_target_lag)
-                    //这也是固定频率更新，所以实际上delta_time始终为1
-                    //if (_update_lag >= s_target_lag)
-                    {
-                        CPUProfileBlock b("LayerUpdate");
-                        //if (_update_lag >= s_target_lag)
-                        {
-                            g_pResourceMgr->Tick(delta_time);
-                            for (Layer *layer: *_layer_stack)
-                            {
-                                //layer->OnUpdate((f32)(_update_lag / s_target_lag));
-                                layer->OnUpdate(1.0f);
-                            }
-                            //_update_lag -= s_target_lag;
-                            //_update_lag = std::max<f32>(_update_lag,0.0f);
-                            _update_lag = last_mark;
-                        }
-                    }
-                    //if (_render_lag >= s_target_lag)
-                    {
-                        {
-                            CPUProfileBlock b("SceneTick");
-                            g_pSceneMgr->Tick(delta_time);
-                        }
-                        {
-                            CPUProfileBlock b("RenderScene");
-                            g_pGfxContext->GetPipeline()->Render();
-                        }
-    #ifdef DEAR_IMGUI
-                        {
-                           CPUProfileBlock b("RenderImGui");
-                            _p_imgui_layer->Begin();
-                            for (Layer *layer: *_layer_stack)
-                                layer->OnImguiRender();
-                            _p_imgui_layer->End();
-                        }
-    #endif// DEAR_IMGUI
-                        g_pGfxContext->Present();
-                        g_pGfxContext->GetPipeline()->FrameCleanUp();
-                        _render_lag -= s_target_lag;
-                    }
-                }
-                _after_update.Invoke();
+                _p_window->OnUpdate();
+                std::this_thread::sleep_for(std::chrono::milliseconds(8));
             }
         }
-        g_pLogMgr->Log("Exit");
+        if (logic_thread.joinable())
+            logic_thread.join();
+        LOG_INFO("Exit");
     }
     void Application::PushLayer(Layer *layer)
     {
@@ -356,7 +368,7 @@ namespace Ailu
         //if (_state == EApplicationState::EApplicationState_Pause)
         //	_state = EApplicationState::EApplicationState_Running;
         //g_pLogMgr->LogWarningFormat("Application state: {}", EApplicationState::ToString(_state));
-        g_pLogMgr->LogFormat("Window resize: {}x{}", e.GetWidth(), e.GetHeight());
+        LOG_INFO("Window resize: {}x{}", e.GetWidth(), e.GetHeight());
         return false;
     }
     bool Application::OnWindowMove(WindowMovedEvent &e)

@@ -101,7 +101,7 @@ target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 # 宏定义
-target_compile_definitions(Engine PUBLIC AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX;_REVERSED_Z)
+target_compile_definitions(Engine PRIVATE AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX;_REVERSED_Z)
 set_target_properties (Engine PROPERTIES
         OUTPUT_NAME_DEBUG Engine_d
         OUTPUT_NAME_RELEASE Engine
@@ -110,9 +110,9 @@ set_target_properties (Engine PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>")
 # 编译器参数
 # if(MSVC)
-    target_compile_options(Engine PUBLIC /MP)
+    target_compile_options(Engine PRIVATE /MP)
     # MSVC 编译器的警告选项不同，以下是一个示例
-    target_compile_options(Engine PUBLIC /D_UNICODE /DUNICODE /wd4819 /wd4251) # /wd4100 禁用未使用的参数警告
+    target_compile_options(Engine PRIVATE /D_UNICODE /DUNICODE /wd4819 /wd4251) # /wd4100 禁用未使用的参数警告
 # endif()
 target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库

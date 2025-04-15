@@ -927,7 +927,7 @@ namespace Ailu
 	{
 		if (!mesh)
 		{
-			g_pLogMgr->LogErrorFormat(std::source_location::current(), "mesh is null");
+			LOG_ERROR("mesh is null");
 			return;
 		}
 		SkeletonMesh* skined_mesh = dynamic_cast<SkeletonMesh*>(mesh);
@@ -1102,7 +1102,7 @@ namespace Ailu
 		_p_cur_fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
 		if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.c_str(), -1, fbx_manager_->GetIOSettings()))
 		{
-			g_pLogMgr->LogErrorFormat(std::source_location::current(), "Load mesh failed whit invalid path {}", path);
+			LOG_ERROR("Load mesh failed whit invalid path {}", path);
 		}
         //_time_mgr.Mark();
         if (fbx_importer_->Import(_p_cur_fbx_scene))

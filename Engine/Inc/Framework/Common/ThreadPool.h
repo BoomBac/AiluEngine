@@ -106,7 +106,7 @@ namespace Ailu
 	private:
 		void Start(size_t num_threads)
 		{
-			LOG_INFO("Thread pool {} is starting...", _pool_name);
+			//LOG_INFO("Thread pool {} is starting...", _pool_name);
 			_timers.resize(num_threads, TimeMgr());
 			_thread_status.resize(num_threads, EThreadStatus::kNotStarted);
             _task_time_records.resize(num_threads);

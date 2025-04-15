@@ -191,7 +191,7 @@ namespace Ailu
         bool _is_cur_frame_capturing = false;
         WString _cur_capture_name;
         RenderPipeline* _pipiline = nullptr;
-        std::stack<std::tuple<u32, u32>> _resize_msg;
+        std::atomic<u32> _new_backbuffer_size;
         Scope<GpuCommandWorker> _cmd_worker;
     #if defined(DEAR_IMGUI)
         std::set<RenderTexture*,ObjectPtrCompare> _imgui_used_rt;

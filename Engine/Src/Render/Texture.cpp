@@ -776,7 +776,7 @@ namespace Ailu
         auto it = _pool.emplace(std::make_pair(hash, std::move(info)));
         _lut_pool.emplace(std::make_pair(id, it));
         if (_pool.size() > 100)
-            g_pLogMgr->LogWarningFormat("Expand rt pool to {} with texture {} at frame {}", _pool.size(), _lut_pool[id]->second._rt->Name(), Application::Application::Get().GetFrameCount());
+            LOG_WARNING("Expand rt pool to {} with texture {} at frame {}", _pool.size(), _lut_pool[id]->second._rt->Name(), Application::Application::Get().GetFrameCount());
         return id;
     }
     std::optional<u32> RenderTexturePool::GetByIDHash(RTHash hash)
@@ -838,7 +838,7 @@ namespace Ailu
         {
             _lut_pool.emplace(std::make_pair(it->second._id, it));
         }
-        g_pLogMgr->LogFormat("RT pool release {} rt", released_rt_num);
+        LOG_INFO("RT pool release {} rt", released_rt_num);
     }
     void RenderTexturePool::Register(RenderTexture *rt)
     {

@@ -19,15 +19,9 @@ namespace Ailu
 				Clear();
 			}
 
-			void Print(const String& str) final
+			void Print(const LogMessage& log_msg)
 			{
-				std::lock_guard<std::mutex> m(_add_mutex);
-				AddLog("%s\r\n", str.c_str());
-			}
-			void Print(const WString& str) final
-			{
-				std::lock_guard<std::mutex> m(_add_mutex);
-				AddLog("%s\r\n", ToChar(str).c_str());
+				AddLog(log_msg,"[%s] [%s]: %s \r\n",log_msg._thread_name.c_str(),ToChar(LogMessage::LogLevelToString(log_msg._level)).c_str(),ToChar(log_msg._message).c_str());
 			}
 
 			void Draw(const char* title)
@@ -73,12 +67,9 @@ namespace Ailu
 							const char* line_end = (line_no + 1 < LineOffsets.Size) ? (buf + LineOffsets[line_no + 1] - 1) : buf_end;
 							if (Filter.PassFilter(line_start, line_end))
 							{
-								if (*line_start == *"E")
-									ImGui::PushStyleColor(ImGuiCol_Text, _red_color);
-								else if (*line_start == *"W")
-									ImGui::PushStyleColor(ImGuiCol_Text, _yellow_color);
-								else
-									ImGui::PushStyleColor(ImGuiCol_Text, _white_color);
+								int log_index = line_no + 1;
+								log_index = std::min<int>(log_index, (int)_log_messages.size() - 1);
+								ImGui::PushStyleColor(ImGuiCol_Text, _log_color[_log_messages[log_index]._level]);
 								ImGui::TextUnformatted(line_start, line_end);
 								ImGui::PopStyleColor();
 							}
@@ -109,12 +100,9 @@ namespace Ailu
 								const char* line_end = (line_no + 1 < LineOffsets.Size) ? (buf + LineOffsets[line_no + 1] - 1) : buf_end;
 								if (line_start != nullptr)
 								{
-									if (*line_start == *"E")
-										ImGui::PushStyleColor(ImGuiCol_Text, _red_color);
-									else if (*line_start == *"W")
-										ImGui::PushStyleColor(ImGuiCol_Text, _yellow_color);
-									else
-										ImGui::PushStyleColor(ImGuiCol_Text, _white_color);
+									int log_index = line_no + 1;
+									log_index = std::min<int>(log_index, (int)_log_messages.size() - 1);
+									ImGui::PushStyleColor(ImGuiCol_Text, _log_color[_log_messages[log_index]._level]);
 									ImGui::TextUnformatted(line_start, line_end);
 									ImGui::PopStyleColor();
 								}
@@ -136,11 +124,14 @@ namespace Ailu
 			{
 				Buf.clear();
 				LineOffsets.clear();
+				_log_messages.clear();
 				LineOffsets.push_back(0);
+				_log_messages.emplace_back(ELogLevel::kInfo, L"", "", 0, "");
 			}
 
-			void    AddLog(const char* fmt, ...) IM_FMTARGS(2)
+			void    AddLog(const LogMessage& log_msg,const char* fmt, ...) IM_FMTARGS(2)
 			{
+				std::lock_guard<std::mutex> guard(_mutex);
 				int old_size = Buf.size();
 				va_list args;
 				va_start(args, fmt);
@@ -148,18 +139,25 @@ namespace Ailu
 				va_end(args);
 				for (int new_size = Buf.size(); old_size < new_size; old_size++)
 					if (Buf[old_size] == '\n')
+					{
 						LineOffsets.push_back(old_size + 1);
+						_log_messages.push_back(log_msg);
+					}
 			}
 		private:
+			std::mutex _mutex;
 			ImGuiTextBuffer     Buf;
 			ImGuiTextFilter     Filter;
 			ImVector<int>       LineOffsets; // Index to lines offset. We maintain this with AddLog() calls.
+			Vector<LogMessage> _log_messages;
 			bool                AutoScroll;  // Keep scrolling if already at the bottom.
 
-			ImVec4 _red_color = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
-			ImVec4 _yellow_color = ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
-			ImVec4 _white_color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-			std::mutex _add_mutex;
+			ImVec4 _log_color[4] = {
+				ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
+				ImVec4(1.0f, 1.0f, 0.0f, 1.0f),
+				ImVec4(1.0f, 0.0f, 0.0f, 1.0f),
+				ImVec4(1.0f, 0.0f, 0.0f, 1.0f)
+			};
 		};
 
 		//这个类是用来输出日志的，它是一个简单的文本输出窗口，它可以过滤文本，并且可以自动滚动。

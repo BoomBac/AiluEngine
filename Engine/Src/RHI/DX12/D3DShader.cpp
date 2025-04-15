@@ -729,7 +729,7 @@ namespace Ailu
         catch (const std::exception &)
         {
             succeed = false;
-            g_pLogMgr->LogErrorFormat(L"Compile shader with src {0} failed!", _src_file_path);
+            LOG_ERROR(L"Compile shader with src {0} failed!", _src_file_path);
         }
         if (succeed)
         {
@@ -825,7 +825,7 @@ namespace Ailu
                 }
                 else
                 {
-                    g_pLogMgr->LogWarningFormat("LoadShaderReflection {} skip input element: {}", _name, input_desc.SemanticName);
+                    LOG_WARNING("LoadShaderReflection {} skip input element: {}", _name, input_desc.SemanticName);
                 }
             }
             pass_variant._vertex_input_num = (u8) vb_input_desc.size();
@@ -1115,7 +1115,7 @@ namespace Ailu
         catch (const std::exception &)
         {
             succeed = false;
-            g_pLogMgr->LogErrorFormat(L"Compile shader with src {0} failed!", _src_file_path);
+            LOG_ERROR(L"Compile shader with src {0} failed!", _src_file_path);
             _is_valid = false;
         }
         if (succeed)
@@ -1127,7 +1127,7 @@ namespace Ailu
             LoadAdditionalShaderReflection(_src_file_path, kernel_index,variant_hash);
             GenerateInternalPSO(kernel_index,variant_hash);
             succeed = _is_valid;
-            g_pLogMgr->LogFormat(L"Compile shader with src {0} succeed!", _src_file_path);
+            LOG_INFO(L"Compile shader with src {0} succeed!", _src_file_path);
         }
         return succeed;
     }
