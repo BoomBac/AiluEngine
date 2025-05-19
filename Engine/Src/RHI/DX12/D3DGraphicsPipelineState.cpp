@@ -6,8 +6,9 @@
 #include "RHI/DX12/dxhelper.h"
 //#include "RHI/DX12/UploadBuffer.h"
 #include "pch.h"
+using namespace Ailu::Render;
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     D3DGraphicsPipelineState::D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer) : GraphicsPipelineStateObject(initializer)
     {
@@ -15,19 +16,24 @@ namespace Ailu
     }
     D3DGraphicsPipelineState::~D3DGraphicsPipelineState()
     {
-        LOG_INFO("Destory gpso {}",_name);
+        LOG_INFO("Destory gpso {}", _name);
     }
 
-    void D3DGraphicsPipelineState::UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
+    void D3DGraphicsPipelineState::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
         if (!_is_ready_for_rendering)
         {
-            GpuResource::UploadImpl(ctx,rhi_cmd,params);
+            GpuResource::UploadImpl(ctx, rhi_cmd, params);
+            if (rhi_cmd)
+            {
+                auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+                d3dcmd->MarkUsedResource(this);
+            }
             u16 pass_index = 0u;
             ShaderVariantHash variant_hash = 0u;
             if (params)
             {
-                if (auto param = dynamic_cast<UploadParamsGPSO*>(params); param != nullptr)
+                if (auto param = dynamic_cast<UploadParamsGPSO *>(params); param != nullptr)
                 {
                     pass_index = param->_pass_index;
                     variant_hash = param->_variant_hash;
@@ -38,7 +44,7 @@ namespace Ailu
             _bind_res_desc_type_lut.clear();
             for (auto &it: *_p_bind_res_desc_infos)
             {
-                _bind_res_desc_type_lut.insert(std::make_pair(it.second._bind_slot, it.second._res_type));
+                _bind_res_desc_type_lut.insert(std::make_pair((i16)it.second._bind_slot, it.second._res_type));
                 _bind_res_name_lut.insert(std::make_pair(it.second._bind_slot, it.first));
             }
             auto it = _p_bind_res_desc_infos->find(RenderConstants::kCBufNamePerScene);
@@ -67,12 +73,12 @@ namespace Ailu
             {
                 D3D12_INPUT_ELEMENT_DESC desc = *(_d3d_pso_desc.InputLayout.pInputElementDescs + i);
                 desc.SemanticName = layout_descs[i].Name.data();
-                desc.SemanticIndex = (u32)layout_descs[i]._semantic_index;
+                desc.SemanticIndex = (u32) layout_descs[i]._semantic_index;
                 v.push_back(desc);
             }
-            _d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::EALGFormat::kALGFormatUnknown ? 0 : _state_desc._rt_state._color_rt_num;
+            _d3d_pso_desc.NumRenderTargets = _state_desc._rt_state._color_rt[0] == EALGFormat::EALGFormat::kALGFormatUNKOWN ? 0 : _state_desc._rt_state._color_rt_num;
             if (_state_desc._depth_stencil_state._b_depth_write || _state_desc._depth_stencil_state._depth_test_func != ECompareFunc::kAlways ||
-             _state_desc._depth_stencil_state._b_front_stencil)
+                _state_desc._depth_stencil_state._b_front_stencil)
                 _d3d_pso_desc.DSVFormat = ConvertToDXGIFormat(_state_desc._rt_state._depth_rt);
             for (u16 i = 0; i < _d3d_pso_desc.NumRenderTargets; i++)
             {
@@ -84,9 +90,9 @@ namespace Ailu
             //// 创建输入布局
             D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
             inputLayoutDesc.pInputElementDescs = v.data();
-            inputLayoutDesc.NumElements = (UINT)v.size();
+            inputLayoutDesc.NumElements = (UINT) v.size();
             _d3d_pso_desc.InputLayout = inputLayoutDesc;
-            ThrowIfFailed(static_cast<D3DContext&>(GraphicsContext::Get()).GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)));
+            AL_ASSERT(static_cast<D3DContext &>(GraphicsContext::Get()).GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)) == 0);
             _is_ready_for_rendering = true;
             _hash = ConstructPSOHash(_state_desc, pass_index, variant_hash);
             //u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
@@ -98,13 +104,13 @@ namespace Ailu
             //}
             _defines = _state_desc._p_vertex_shader->ActiveKeywords(pass_index, variant_hash);
             _pass_name = _state_desc._p_vertex_shader->GetPassInfo(pass_index)._name;
-            WString debug_name = ToWStr(std::format("{}_{}_{}", d3dshader->Name(), pass_index, variant_hash));
+            WString debug_name = ToWChar(std::format("{}_{}_{}", d3dshader->Name(), pass_index, variant_hash));
             _p_plstate->SetName(debug_name.c_str());
             _p_sig->SetName(debug_name.c_str());
         }
     }
 
-    void D3DGraphicsPipelineState::BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params)
+    void D3DGraphicsPipelineState::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {
         if (!_is_ready_for_rendering)
         {
@@ -117,59 +123,67 @@ namespace Ailu
         _p_cmd->SetGraphicsRootSignature(_p_sig.Get());
         _p_cmd->SetPipelineState(_p_plstate.Get());
         _p_cmd->IASetPrimitiveTopology(_d3d_topology);
-        for(u16 i = 0; i <= _max_slot; i++)
+        for (u16 i = 0; i <= _max_slot; i++)
         {
             if (_bind_res_signature & (1 << i))
                 BindResource(rhi_cmd, _bind_res[i]);
         }
     }
 
-    void D3DGraphicsPipelineState::BindResource(RHICommandBuffer * cmd,const PipelineResource& res)
+    void D3DGraphicsPipelineState::BindResource(RHICommandBuffer *cmd, const PipelineResource &res)
     {
         if (res._p_resource == nullptr)
             return;
-        static_cast<D3DCommandBuffer*>(cmd)->MarkUsedResource(res._p_resource);
+        static_cast<D3DCommandBuffer *>(cmd)->MarkUsedResource(res._p_resource);
         switch (res._res_type)
         {
-            case Ailu::EBindResDescType::kConstBuffer:
+            case EBindResDescType::kConstBuffer:
             {
                 BindParams params;
                 params._is_compute_pipeline = false;
                 params._slot = res._slot;
-                res._p_resource->Bind(cmd, &params);
+                res._p_resource->Bind(cmd, params);
             }
             break;
-            case Ailu::EBindResDescType::kConstBufferRaw:
+            case EBindResDescType::kConstBufferRaw:
             {
-                BindParamsUB params;
-                params._gpu_ptr = res._addi_info._gpu_handle;
+                BindParams params;
                 params._is_compute_pipeline = false;
                 params._slot = res._slot;
-                res._p_resource->Bind(cmd, &params);
+                params._params._ub_binder._gpu_ptr = res._addi_info._gpu_handle;
+                res._p_resource->Bind(cmd, params);
             }
             break;
             case EBindResDescType::kBuffer:
+            {
+                BindParams params;
+                params._is_compute_pipeline = false;
+                params._slot = res._slot;
+                res._p_resource->Bind(cmd, params);
+            }
+            break;
             case EBindResDescType::kRWBuffer:
             {
                 BindParams params;
                 params._is_compute_pipeline = false;
                 params._slot = res._slot;
-                res._p_resource->Bind(cmd, &params);
+                params._is_random_access = true;
+                res._p_resource->Bind(cmd, params);
             }
             break;
-            case Ailu::EBindResDescType::kTexture2D:
+            case EBindResDescType::kTexture2D:
             {
-                BindParamsTexture params;
+                BindParams params;
                 params._is_compute_pipeline = false;
                 params._slot = res._slot;
-                params._sub_res = res._addi_info._sub_res;
-                params._view_idx = res._addi_info._view_index;
-                res._p_resource->Bind(cmd, &params);
+                params._params._texture_binder._sub_res = res._addi_info._sub_res;
+                params._params._texture_binder._view_idx = res._addi_info._view_index;
+                res._p_resource->Bind(cmd, params);
             }
             break;
-            case Ailu::EBindResDescType::kSampler:
+            case EBindResDescType::kSampler:
                 break;
-            case Ailu::EBindResDescType::kCBufferAttribute:
+            case EBindResDescType::kCBufferAttribute:
                 break;
             default:
                 break;
@@ -180,4 +194,4 @@ namespace Ailu
         GraphicsPipelineStateObject::SetTopology(topology);
         _d3d_topology = D3DConvertUtils::ConvertToDXTopology(_state_desc._topology);
     }
-}// namespace Ailu
+}// namespace Ailu::RHI::DX12

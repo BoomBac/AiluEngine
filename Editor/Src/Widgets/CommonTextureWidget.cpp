@@ -8,6 +8,7 @@
 
 namespace Ailu
 {
+    using namespace Render;
     namespace Editor
     {
         TextureSelector::TextureSelector() : ImGuiWidget("TextureSelector")

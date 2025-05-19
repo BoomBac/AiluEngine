@@ -50,7 +50,7 @@ namespace Ailu::Editor
                     if (!_cached_frame_data.empty())
                     {
                         f32 r = (_view_frame_index - _cached_frame_data.front()._frame_index) / (f32) (_cached_frame_data.back()._frame_index - _cached_frame_data.front()._frame_index);
-                        _view_frame_index = (f32) (data.back()._frame_index - data.front()._frame_index) * r + data.front()._frame_index;
+                        _view_frame_index = (u64)((data.back()._frame_index - data.front()._frame_index) * r + data.front()._frame_index);
                     }
                     _cached_frame_data.clear();
                     _cached_frame_data.reserve(data.size());
@@ -72,7 +72,7 @@ namespace Ailu::Editor
             {
                 u64 frame_start = _cached_frame_data.front()._frame_index;
                 u64 frame_end = _cached_frame_data.back()._frame_index;
-                u32 old_view_frame_index = _view_frame_index;
+                u64 old_view_frame_index = _view_frame_index;
                 ImGui::SliderScalar("FrameIndex", ImGuiDataType_U64, &_view_frame_index, &frame_start, &frame_end, "%d", ImGuiSliderFlags_AlwaysClamp);
                 _view_data_index = (u32) (_view_frame_index - (_view_frame_index > frame_start ? frame_start : 0u));
                 if (old_view_frame_index != _view_frame_index)

@@ -26,7 +26,7 @@
 #endif//__cplusplus
 // C++
 #ifdef __cplusplus
-namespace Ailu
+namespace Ailu::Render
 {
 #endif//__cplusplus
     struct ShaderDirectionalAndPointLightData

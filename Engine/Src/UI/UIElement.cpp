@@ -8,6 +8,7 @@
 
 namespace Ailu
 {
+    using namespace Render;
     namespace UI
     {
         UIElement::UIElement() : Object()

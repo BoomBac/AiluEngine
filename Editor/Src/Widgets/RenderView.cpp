@@ -25,6 +25,7 @@
 // https://zhuanlan.zhihu.com/p/689092580  gpu pickup
 namespace Ailu
 {
+    using namespace Render;
     namespace Editor
     {
         RenderView::RenderView(const String &name) : ImGuiWidget(name)
@@ -154,7 +155,7 @@ namespace Ailu
                     //g_pRenderer->ResizeBuffer(static_cast<u32>(gameview_size.x), static_cast<u32>(gameview_size.y));
                     if (_pre_tick_window_width != window_size.x || _pre_tick_window_height != window_size.y)
                     {
-                        g_pGfxContext->ResizeSwapChain(window_size.x, window_size.y);
+                        GraphicsContext::Get().ResizeSwapChain(window_size.x, window_size.y);
                     }
                     s_is_begin_resize = false;
                     s_resize_end_frame_count = 0;

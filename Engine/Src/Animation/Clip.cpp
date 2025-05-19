@@ -54,7 +54,7 @@ namespace Ailu
         _name = kvs["_name"];
         _frame_count = std::stoul(kvs["_frame_count"]);
         _duration = std::stof(kvs["_duration"]);
-        _frame_rate = std::stoul(kvs["_frame_rate"]);
+        _frame_rate = std::stof(kvs["_frame_rate"]);
         _frame_duration = std::stof(kvs["_frame_duration"]);
         _is_looping = kvs["_is_looping"] == "true";
         _tracks.resize(std::stoul(kvs["_tracks"]));
@@ -67,8 +67,8 @@ namespace Ailu
             auto kw2 = su::Split(bufs[1], ":");
             AL_ASSERT(kw1[0] == "_joint_index");
             AL_ASSERT(kw2[0] == "_frame_num");
-            u16 joint_index = std::stoul(kw1[1]);
-            u16 _frame_num = std::stoul(kw2[1]);
+            u16 joint_index = (u16)std::stoul(kw1[1]);
+            u16 _frame_num =  (u16)std::stoul(kw2[1]);
             _tracks[i].SetId(joint_index);
             f32 cur_time = 0.f;
             for (u16 frame_index = 0; frame_index < _frame_num; frame_index++)
@@ -110,7 +110,7 @@ namespace Ailu
         if (_duration == 0.f)
             return 0.f;
         time = AdjustTimeToFitRange(time);
-        u32 size = _tracks.size();
+        u32 size = (u32)_tracks.size();
         for (u32 i = 0; i < size; i++)
         {
             u16 joint_index = _tracks[i].GetId();
@@ -123,7 +123,7 @@ namespace Ailu
 
     TransformTrack &AnimationClip::operator[](u16 joint)
     {
-        for (int i = 0, s = _tracks.size(); i < s; ++i)
+        for (u64 i = 0, s = _tracks.size(); i < s; ++i)
         {
             if (_tracks[i].GetId() == joint)
             {
@@ -140,7 +140,7 @@ namespace Ailu
         _end_time = 0.0f;
         bool startSet = false;
         bool endSet = false;
-        u32 tracksSize = _tracks.size();
+        u32 tracksSize = (u32)_tracks.size();
         for (unsigned int i = 0; i < tracksSize; ++i)
         {
             if (_tracks[i].IsValid())

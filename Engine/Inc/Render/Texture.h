@@ -17,7 +17,7 @@
 #include "Framework/Common/Asset.h"
 #include "Framework/Common/Reflect.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     namespace TextureUtils
     {
@@ -102,7 +102,7 @@ namespace Ailu
         EALGFormat::EALGFormat _srv_format;
         EALGFormat::EALGFormat _uav_format;
         bool _read_only;
-        TextureDesc() : _width(0), _height(0), _mipmap(1), _res_format(EALGFormat::EALGFormat::kALGFormatUnknown), _srv_format(EALGFormat::EALGFormat::kALGFormatUnknown), _uav_format(EALGFormat::EALGFormat::kALGFormatUnknown), _read_only(false) {}
+        TextureDesc() : _width(0), _height(0), _mipmap(1), _res_format(EALGFormat::EALGFormat::kALGFormatUNKOWN), _srv_format(EALGFormat::EALGFormat::kALGFormatUNKOWN), _uav_format(EALGFormat::EALGFormat::kALGFormatUNKOWN), _read_only(false) {}
         TextureDesc(u16 w, u16 h, u8 mipmap, EALGFormat::EALGFormat res_format, EALGFormat::EALGFormat srv_format, EALGFormat::EALGFormat uav_format, bool read_only) : _width(w), _height(h), _mipmap(mipmap),
                                                                                                                                                                         _res_format(res_format), _srv_format(srv_format), _uav_format(uav_format), _read_only(read_only)
         {
@@ -134,17 +134,13 @@ namespace Ailu
             default:
                 break;
         }
-        return EALGFormat::EALGFormat::kALGFormatUnknown;
+        return EALGFormat::EALGFormat::kALGFormatUNKOWN;
     }
 
     //------------
     class CommandBuffer;
     using TextureHandle = size_t;
-    struct BindParamsTexture : public BindParams
-    {
-        u16 _view_idx;
-        u32 _sub_res;
-    };
+
     class AILU_API Texture : public GpuResource
     {
         DECLARE_PROTECTED_PROPERTY(mipmap_count, MipmapLevel, u16)
@@ -340,7 +336,7 @@ namespace Ailu
         switch (format)
         {
             case ERenderTargetFormat::kUnknown:
-                return EALGFormat::EALGFormat::kALGFormatUnknown;
+                return EALGFormat::EALGFormat::kALGFormatUNKOWN;
             case ERenderTargetFormat::kDefault:
                 return EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
             case ERenderTargetFormat::kDefaultHDR:
@@ -366,7 +362,7 @@ namespace Ailu
             default:
                 break;
         }
-        return EALGFormat::EALGFormat::kALGFormatUnknown;
+        return EALGFormat::EALGFormat::kALGFormatUNKOWN;
     }
     enum class ELoadStoreAction
     {

@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __LOG_H__
 #define __LOG_H__
+#pragma warning(disable:4251)
 
 //#include <Windows.h>
 #include <format>

@@ -3,7 +3,7 @@
 #define __FRAME_RESOURCE_H__
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
-namespace Ailu
+namespace Ailu::Render
 {
     const static u32 kTotalSubRes = 0XFFFFFFFF;
     enum class EResourceState
@@ -39,6 +39,7 @@ namespace Ailu
     enum class EGpuResType
     {
         kBuffer,
+        KRWBuffer,
         kTexture,
         kRenderTexture,
         kVertexBuffer,
@@ -52,13 +53,33 @@ namespace Ailu
         kWrite     = 0x02,
         kReadWrite = 0x03
     };
-
+    class VertexBufferLayout;
     struct BindParams
     {
-        virtual ~BindParams() = default;
         u16 _slot = 0u;
         u16 _register = 0u;
         bool _is_compute_pipeline = false;
+        bool _is_random_access = false;
+        union
+        {
+            struct
+            {
+                u32 _view_idx;
+                u32 _sub_res;
+            } _texture_binder;
+            struct
+            {
+                const VertexBufferLayout* _layout;
+            } _vb_binder;
+            struct
+            {
+                u64 _gpu_ptr;
+            } _ub_binder;
+            struct
+            {
+                u64 _is_uav;
+            } _buffer_binder;
+        } _params;
     };
     struct UploadParams
     {
@@ -84,8 +105,9 @@ namespace Ailu
         Vector<Usage> _usages;
     };
     class RHICommandBuffer;
+
     class GraphicsContext;
-    class GpuResource : public Object
+    class AILU_API GpuResource : public Object
     {
     public:
         static u64 TotalMemSize() { return s_total_mem_size; }
@@ -98,8 +120,8 @@ namespace Ailu
         virtual void* NativeResource() {return nullptr;};
         void Apply();
         void Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params);
-        void Bind(RHICommandBuffer* rhi_cmd,BindParams* params);
-        u32 GetSize() const {return _mem_size;}
+        void Bind(RHICommandBuffer* rhi_cmd, const BindParams& params);
+        u64 GetSize() const {return _mem_size;}
         u64 GetFenceValue() const {return _fence_value;}
         void Track(u64 fence = 0u);
         bool IsReferenceByGpu() const;
@@ -108,11 +130,11 @@ namespace Ailu
     public:
         //GpuResUsageTrack _usage_track;
     protected:
-        virtual void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params){};
+        virtual void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params){};
         virtual void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params);
     protected:
         inline static u64 s_total_mem_size = 0u;
-        u32 _mem_size = 0u;
+        u64 _mem_size = 0u;
         u64 _fence_value = 0u;
         EResourceState _state;
         EGpuResType _res_type;

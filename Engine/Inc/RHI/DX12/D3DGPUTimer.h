@@ -5,7 +5,7 @@
 #include "Render/RenderConstants.h"
 #include <d3dx12.h>
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     //https://github.com/TheRealMJP/DeferredTexturing/blob/experimental/SampleFramework12/v1.01/Graphics/Profiler.cpp
     class D3DGPUTimer : public IGPUTimer
@@ -51,7 +51,7 @@ namespace Ailu
         // Returns running average in milliseconds
         f32 GetAverageMS(u32 timerid = 0) const final
         {
-            return (timerid < kMaxGpuTimerNum) ? m_avg[timerid] : 0.f;
+            return (timerid < Render::RenderConstants::kMaxGpuTimerNum) ? m_avg[timerid] : 0.f;
         }
 
         // Device management
@@ -61,13 +61,13 @@ namespace Ailu
 
     private:
         //kMaxGpuTimerNum * kBakcBufferCount
-        static const size_t c_timerSlots = kMaxGpuTimerNum * RenderConstants::kFrameCount;
+        static const size_t c_timerSlots = Render::RenderConstants::kMaxGpuTimerNum * Render::RenderConstants::kFrameCount;
 
         Microsoft::WRL::ComPtr<ID3D12QueryHeap> m_heap;
         Microsoft::WRL::ComPtr<ID3D12Resource>  m_buffer;
         // clock/per ms
         f64                                  m_gpuFreqInv;
-        f32                                   m_avg[kMaxGpuTimerNum];
+        f32                                   m_avg[Render::RenderConstants::kMaxGpuTimerNum];
         //timestamp data
         u64                                  m_timing[c_timerSlots];
         //back buffer num

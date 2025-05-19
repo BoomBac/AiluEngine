@@ -6,7 +6,7 @@
 #define AILU_FONT_H
 #include "GlobalMarco.h"
 #include "Texture.h"
-namespace Ailu
+namespace Ailu::Render
 {
 
     struct FontChar

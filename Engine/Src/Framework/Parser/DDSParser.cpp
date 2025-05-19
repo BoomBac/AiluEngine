@@ -7,36 +7,34 @@
 
 
 using namespace DirectX;
-
-namespace
-{
-    // 创建一个映射函数，将 DXGI_FORMAT 转换为 ETextureFormat
-    Ailu::ETextureFormat::ETextureFormat DXGIToETextureFormat(DXGI_FORMAT dxgiFormat)
-    {
-        switch (dxgiFormat) {
-            case DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM:
-                return Ailu::ETextureFormat::kRGBA32;
-            case DXGI_FORMAT::DXGI_FORMAT_R32G32B32A32_FLOAT:
-                return Ailu::ETextureFormat::kRGBAFloat;
-            case DXGI_FORMAT::DXGI_FORMAT_R32G32B32_FLOAT:
-                return Ailu::ETextureFormat::kRGBFloat;
-            case DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_FLOAT:
-                return Ailu::ETextureFormat::kRGBAHalf;
-            case DXGI_FORMAT::DXGI_FORMAT_R32G32_FLOAT:
-                return Ailu::ETextureFormat::kRGFloat;
-            case DXGI_FORMAT::DXGI_FORMAT_R11G11B10_FLOAT:
-                return Ailu::ETextureFormat::kR11G11B10;
-            default:
-            {
-                AL_ASSERT(true);
-                return Ailu::ETextureFormat::kRGBA32;
-            }
-        }
-    }
-}
+using namespace Ailu::Render;
 
 namespace Ailu
 {
+    // 创建一个映射函数，将 DXGI_FORMAT 转换为 ETextureFormat
+    ETextureFormat::ETextureFormat DXGIToETextureFormat(DXGI_FORMAT dxgiFormat)
+    {
+        switch (dxgiFormat) {
+            case DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM:
+                return ETextureFormat::kRGBA32;
+            case DXGI_FORMAT::DXGI_FORMAT_R32G32B32A32_FLOAT:
+                return ETextureFormat::kRGBAFloat;
+            case DXGI_FORMAT::DXGI_FORMAT_R32G32B32_FLOAT:
+                return ETextureFormat::kRGBFloat;
+            case DXGI_FORMAT::DXGI_FORMAT_R16G16B16A16_FLOAT:
+                return ETextureFormat::kRGBAHalf;
+            case DXGI_FORMAT::DXGI_FORMAT_R32G32_FLOAT:
+                return ETextureFormat::kRGFloat;
+            case DXGI_FORMAT::DXGI_FORMAT_R11G11B10_FLOAT:
+                return ETextureFormat::kR11G11B10;
+            default:
+            {
+                AL_ASSERT(true);
+                return ETextureFormat::kRGBA32;
+            }
+        }
+    }
+
     Ref<CubeMap> DDSParser::Parser(Vector<String> &paths,const TextureImportSetting& import_settings)
     {
         return nullptr;

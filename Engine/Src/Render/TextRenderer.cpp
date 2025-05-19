@@ -7,7 +7,7 @@
 #include <Framework/Common/Profiler.h>
 #include <Framework/Common/ResourceMgr.h>
 
-namespace Ailu
+namespace Ailu::Render
 {
     TextRenderer::DrawerBlock::DrawerBlock(u32 char_num)
     {

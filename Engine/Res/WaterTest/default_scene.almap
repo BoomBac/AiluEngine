@@ -45,12 +45,12 @@ _layer_mask:1
         _transform_component:
             _transform:
                 _position:14.517980576,3.078702927,4.210923672
-                _rotation:0.338296711,-0.256796300,0.096508339,0.900165081
-                _scale:0.999835134,0.999847293,0.999841154
+                _rotation:0.520812929,-0.058561586,0.010056916,0.851600409
+                _scale:0.999818504,0.999846101,0.999833703
         _light_component:
             _type:kDirectional
             _light:
-                _light_color:1,1,1,2.13
+                _light_color:1,1,1,2
                 _light_param:10,4.9,5,0
                 _is_two_side:0
             _shadow:
@@ -195,9 +195,9 @@ Entity:9
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:17.210599899,-3.803706884,20.532587051
+                _position:17.210599899,-3.803706884,21.169315338
                 _rotation:0.000000000,0.358988762,0.000000000,0.933341861
-                _scale:0.597808540,0.597824216,0.597879589
+                _scale:0.597808540,0.597824156,0.597879589
         _static_mesh_component:
             _p_mesh:2ff30e48-6661-479b-a90c-863e606734f6
             _material_num:1
@@ -222,7 +222,7 @@ Entity:10
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:2.611100674,-6.246251583,-8.538733482
+                _position:2.611100674,-5.781131268,-8.538733482
                 _rotation:-0.000000037,0.000000068,-0.000000000,1.000000000
                 _scale:3.724302053,2.646023512,0.101077698
         _static_mesh_component:

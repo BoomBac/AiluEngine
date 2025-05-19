@@ -5,7 +5,7 @@
 #include "Framework/Common/SystemInfo.h"
 #include "pch.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     struct HaltonSequence
     {
@@ -188,7 +188,7 @@ namespace Ailu
             return;
         if (g_pGfxContext)
         {
-            u32 cur_frame = g_pGfxContext->GetFrameCount();
+            u64 cur_frame = g_pGfxContext->GetFrameCount();
             if (cur_frame != _prev_vp_matrix_update_frame)
             {
                 _prev_view_proj_matrix = _no_jitter_view_proj_matrix;
@@ -227,7 +227,7 @@ namespace Ailu
     {
         if (g_pGfxContext)
         {
-            u32 cur_frame = g_pGfxContext->GetFrameCount();
+            u64 cur_frame = g_pGfxContext->GetFrameCount();
             if (cur_frame != _prev_vp_matrix_update_frame)
             {
                 _prev_view_proj_matrix = _no_jitter_view_proj_matrix;

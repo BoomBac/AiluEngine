@@ -9,7 +9,7 @@ namespace Ailu
     static bool IsEnumType(const String &type_name)
     {
         bool is_enum = su::BeginWith(type_name, "E");
-        is_enum &= isupper(type_name[1]);
+        is_enum &= static_cast<bool>(isupper(type_name[1]));
         return is_enum;
     }
     static EDataType GetDataTypeFromName(const String &name)

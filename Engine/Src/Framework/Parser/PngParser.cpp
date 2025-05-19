@@ -5,6 +5,7 @@
 #include "Ext/stb/stb_image.h"
 #include "Framework/Common/Path.h"
 
+using namespace Ailu::Render;
 
 namespace Ailu
 {

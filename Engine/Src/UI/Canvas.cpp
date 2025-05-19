@@ -11,6 +11,7 @@
 
 namespace Ailu
 {
+    using namespace Render;
     namespace UI
     {
         Canvas::Canvas()
@@ -68,8 +69,8 @@ namespace Ailu
             {
                 _color.reset();
                 _depth.reset();
-                _color = RenderTexture::Create(_size.x, _size.y, _name, ERenderTargetFormat::kDefault);
-                _depth = RenderTexture::Create(_size.x, _size.y, _name, ERenderTargetFormat::kDepth);
+                _color = RenderTexture::Create((u16)_size.x, (u16)_size.y, _name, ERenderTargetFormat::kDefault);
+                _depth = RenderTexture::Create((u16)_size.x, (u16)_size.y, _name, ERenderTargetFormat::kDepth);
             }
             for (auto &c: _children)
                 c->Render();

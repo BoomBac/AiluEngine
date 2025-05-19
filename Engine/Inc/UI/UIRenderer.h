@@ -12,6 +12,14 @@
 
 namespace Ailu
 {
+    using Render::RTHandle;
+    using Render::RenderTexture;
+    using Render::Material;
+    using Render::VertexBuffer;
+    using Render::IndexBuffer;
+    using Render::ConstantBuffer;
+    using Render::CommandBuffer;
+
     namespace UI
     {
         class AILU_API UIRenderer
@@ -51,7 +59,7 @@ namespace Ailu
             u16 _frame_index = 0u;
             Ref<ConstantBuffer> _obj_cb;
             using FrameDrawerBlock = Map<Color, DrawerBlock*>;
-            Array<FrameDrawerBlock, RenderConstants::kFrameCount> _drawer_blocks;
+            Array<FrameDrawerBlock, Render::RenderConstants::kFrameCount> _drawer_blocks;
         };
 
     }// namespace UI

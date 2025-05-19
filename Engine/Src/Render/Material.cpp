@@ -6,7 +6,7 @@
 #include "pch.h"
 #include <iosfwd>
 
-namespace Ailu
+namespace Ailu::Render
 {
     Material::Material(Shader *shader, String name) : _p_shader(shader)
     {
@@ -27,7 +27,7 @@ namespace Ailu
         _p_active_shader = other._p_active_shader;
         for (auto &cbuf: other._p_cbufs)
         {
-            u32 buffer_size = cbuf->GetSize();
+            u32 buffer_size = (u32)cbuf->GetSize();
             _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
             memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
         }
@@ -59,7 +59,7 @@ namespace Ailu
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
         for (auto &cbuf: other._p_cbufs)
         {
-            u32 buffer_size = cbuf->GetSize();
+            u32 buffer_size = (u32)cbuf->GetSize();
             _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
             memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
         }
@@ -113,6 +113,8 @@ namespace Ailu
                     {
                         GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(res, EBindResDescType::kBuffer, i, cur_state._bind_res_priority[i]));
                     }
+                    else
+                        AL_ASSERT_MSG(false,"Unknown resource type");
                 }
             }
             _states.pop();
@@ -347,6 +349,18 @@ namespace Ailu
     {
         auto raw_texture = g_pRenderTexturePool->Get(texture);
         SetTexture(name, raw_texture);
+    }
+
+    void Material::SetBuffer(const String& name,GPUBuffer* buffer)
+    {
+        u16 pass_index = 0;
+        for (auto &pass: _p_shader->_passes)
+        {
+            auto &res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
+            auto it = res_info.find(name);
+            if (it != res_info.end())
+                it->second._p_res = buffer;
+        }
     }
 
     void Material::EnableKeyword(const String &keyword)
@@ -754,6 +768,14 @@ namespace Ailu
                 }
             }
         }
+        for (const auto& it : bind_infos)
+        {
+            if (it.second._bind_slot >= 32 || it.second._p_res == nullptr)
+                continue;
+            cur_state._bind_res[it.second._bind_slot] = it.second._p_res;
+            cur_state._bind_res_priority[it.second._bind_slot] = PipelineResource::kPriorityLocal;
+            cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, it.second._bind_slot);
+        }
         for (const auto &it: Shader::s_global_textures_bind_info)
         {
             const auto& bind_it = bind_infos.find(it.first);
@@ -795,22 +817,22 @@ namespace Ailu
     {
         switch (usage)
         {
-            case Ailu::ETextureUsage::kAlbedo:
+            case ETextureUsage::kAlbedo:
                 mask = b_use ? mask | StandardMaterial::StandardPropertyName::kAlbedo._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kAlbedo._mask_flag);
                 break;
-            case Ailu::ETextureUsage::kNormal:
+            case ETextureUsage::kNormal:
                 mask = b_use ? mask | StandardMaterial::StandardPropertyName::kNormal._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kNormal._mask_flag);
                 break;
-            case Ailu::ETextureUsage::kEmission:
+            case ETextureUsage::kEmission:
                 mask = b_use ? mask | StandardMaterial::StandardPropertyName::kEmission._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kEmission._mask_flag);
                 break;
-            case Ailu::ETextureUsage::kRoughness:
+            case ETextureUsage::kRoughness:
                 mask = b_use ? mask | StandardMaterial::StandardPropertyName::kRoughness._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kRoughness._mask_flag);
                 break;
-            case Ailu::ETextureUsage::kMetallic:
+            case ETextureUsage::kMetallic:
                 mask = b_use ? mask | StandardMaterial::StandardPropertyName::kMetallic._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kMetallic._mask_flag);
                 break;
-            case Ailu::ETextureUsage::kSpecular:
+            case ETextureUsage::kSpecular:
                 mask = b_use ? StandardMaterial::StandardPropertyName::kSpecular._mask_flag : mask & (~StandardMaterial::StandardPropertyName::kSpecular._mask_flag);
                 break;
         }
@@ -837,17 +859,17 @@ namespace Ailu
         u32 sampler_mask = *reinterpret_cast<u32 *>(_p_cbufs[_standard_pass_index]->GetData() + _sampler_mask_offset);
         switch (use_info)
         {
-            case Ailu::ETextureUsage::kAlbedo:
+            case ETextureUsage::kAlbedo:
                 return sampler_mask & StandardPropertyName::kAlbedo._mask_flag;
-            case Ailu::ETextureUsage::kNormal:
+            case ETextureUsage::kNormal:
                 return sampler_mask & StandardPropertyName::kNormal._mask_flag;
-            case Ailu::ETextureUsage::kEmission:
+            case ETextureUsage::kEmission:
                 return sampler_mask & StandardPropertyName::kEmission._mask_flag;
-            case Ailu::ETextureUsage::kRoughness:
+            case ETextureUsage::kRoughness:
                 return sampler_mask & StandardPropertyName::kRoughness._mask_flag;
-            case Ailu::ETextureUsage::kMetallic:
+            case ETextureUsage::kMetallic:
                 return sampler_mask & StandardPropertyName::kMetallic._mask_flag;
-            case Ailu::ETextureUsage::kSpecular:
+            case ETextureUsage::kSpecular:
                 return sampler_mask & StandardPropertyName::kSpecular._mask_flag;
         }
         return false;

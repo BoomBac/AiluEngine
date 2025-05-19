@@ -23,10 +23,10 @@
 21ed1f88-ac3b-404c-a296-b16784617df7,Shaders/cs_mipmap_gen.alasset,kComputeShader
 26247411-5cb6-4bf7-a6c4-7c48b9f5caee,Shaders/default_ui.alasset,kShader
 266fceb5-389b-4a08-892c-1e9b2f58d83f,Shaders/default_text.alasset,kShader
-2800bee2-b69e-46af-8111-e454ff8a5660,NewScene/Palace/MAT_fabric_a.alasset,kMaterial
+2800bee2-b69e-46af-8111-e454ff8a5660,Shaders/terrain.alasset,kShader
 2ff30e48-6661-479b-a90c-863e606734f6,Meshs/sphere.alasset,kMesh
 3110f020-ca16-4ded-ad94-0332327a2bde,NewScene/new_scene.almap,kScene
-32414c6f-47f1-47a1-883c-678fac6e47e8,NewScene/Palace/Mesh_0.alasset,kMesh
+32414c6f-47f1-47a1-883c-678fac6e47e8,Meshs/terrain_plane.alasset,kMesh
 324335bf-8def-4583-911a-047863b48455,Shaders/voxel_drawer.alasset,kShader
 339a1a1a-522a-4872-a110-cfbc21f0215c,Shaders/gizmo.alasset,kShader
 352bbe93-08cc-4780-bacf-2eb126bfba98,Icons/shader.alasset,kTexture2D
@@ -49,7 +49,7 @@
 6b616d87-aefe-4b8d-9914-531b11a6efc5,NewScene/Palace/textures/sponza_column_a_baseColor.alasset,kTexture2D
 6d1148fb-00a4-4720-8ca0-7dd877b0da55,NewScene/Palace/textures/sponza_arch_baseColor.alasset,kTexture2D
 6fd672ec-676e-41b4-9da8-b367d6ab6d2b,WaterTest/Grass_Wildgrass08_N.alasset,kTexture2D
-7182a502-ba5e-4de5-a517-ed226a6b7805,NewScene/Palace/MAT_column_a.alasset,kMaterial
+7182a502-ba5e-4de5-a517-ed226a6b7805,Shaders/gpu_terrain.alasset,kComputeShader
 731c4c95-0f59-48a9-9fc9-5411ed7c2ae4,NewScene/Material_MR.alasset,kMaterial
 777ae3e2-d1ef-4087-8838-10a063b0fdcd,NewScene/Palace/MAT_fabric_e.alasset,kMaterial
 793cbfbb-97ad-41c7-905d-28e1da26495d,NewScene/Palace/textures/sponza_column_c_normal.alasset,kTexture2D

@@ -203,10 +203,10 @@ namespace Ailu
         {
             dep->AddContinuation(dep_by);
         }
-        [[nodiscard]] WaitHandle Dispatch(Job *job);
-        [[nodiscard]] WaitHandle Dispatch(const String& name,JobFunction func);
+        WaitHandle Dispatch(Job *job);
+        WaitHandle Dispatch(const String& name,JobFunction func);
         template<typename Callable,typename... Args>
-        [[nodiscard]] WaitHandle Dispatch(Callable&& task,Args&&... args)
+        WaitHandle Dispatch(Callable&& task,Args&&... args)
         {
             Job* job = _pool->Fetch();
             auto fn = std::bind(std::forward<Callable>(task), std::forward<Args>(args)...);

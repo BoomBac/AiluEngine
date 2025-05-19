@@ -3,7 +3,7 @@
 #include "pch.h"
 #include "Framework/Common/Log.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     void GpuResource::Track(u64 fence)
     {
@@ -29,7 +29,7 @@ namespace Ailu
         u64 fence_value = GraphicsContext::Get().GetFenceValueGPU();
         return fence_value < _fence_value;
     }
-    void GpuResource::Bind(RHICommandBuffer *rhi_cmd, BindParams *params)
+    void GpuResource::Bind(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {
         if (_is_ready_for_rendering)
             BindImpl(rhi_cmd, params);

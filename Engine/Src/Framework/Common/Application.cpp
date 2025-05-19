@@ -1,5 +1,7 @@
 #include "Framework/Common/Application.h"
 #include "CompanyEnv.h"
+#include "Framework/Common/Allocator.hpp"
+#include "Framework/Common/EngineConfig.h"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -10,7 +12,6 @@
 #include "pch.h"
 #include <Render/Gizmo.h>
 #include <Render/TextRenderer.h>
-#include "Framework/Common/EngineConfig.h"
 #ifdef PLATFORM_WINDOWS
 //WINDOWS marco CSIDL_PROFILE
 #include <Shlobj.h>
@@ -18,24 +19,27 @@
 
 #include "Framework/Common/Input.h"
 #include "Framework/Common/Profiler.h"
+#include "Framework/Common/StackTrace.h"
 #include "Framework/Common/ThreadPool.h"
-#include "Objects/Type.h"
-#include "Render/GraphicsContext.h"
-#include "Render/Pass/VolumetricClouds.h"
-#include "Render/RenderPipeline.h"
 #include "Framework/Parser/TextParser.h"
+#include "Objects/Type.h"
+#include "Render/Features/VolumetricClouds.h"
+#include "Render/GraphicsContext.h"
+#include "Render/RenderPipeline.h"
 
 #include "Objects/ReflectData.h"
+
+using namespace Ailu::Render;
 
 namespace Ailu
 {
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f, this, std::placeholders::_1)
 
     TimeMgr *g_pTimeMgr = new TimeMgr();
-    SceneMgr *g_pSceneMgr = new SceneMgr();
+    SceneManagement::SceneMgr *g_pSceneMgr = new SceneManagement::SceneMgr();
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     LogMgr *g_pLogMgr = new LogMgr();
-    Scope<ThreadPool> g_pThreadTool = MakeScope<ThreadPool>(6u, "GlobalThreadPool");
+    Scope<Core::ThreadPool> g_pThreadTool = MakeScope<Core::ThreadPool>(6u, "GlobalThreadPool");
 
 
     WString Application::GetWorkingPath()
@@ -80,6 +84,7 @@ namespace Ailu
         AL_ASSERT_MSG(sp_instance == nullptr, "Application already init!");
         ObjectRegister::Initialize();
         Enum::InitTypeInfo();
+        Core::Allocator::Init();
         g_pTimeMgr->Initialize();
         g_pTimeMgr->Mark();
         sp_instance = this;
@@ -95,31 +100,31 @@ namespace Ailu
             INIParser ini_parser;
             if (ini_parser.Load(_engin_config_path))
             {
-                Type* type = EngineConfig::StaticType();
-                for(auto& it : ini_parser.GetValues("Layer"))
+                Type *type = EngineConfig::StaticType();
+                for (auto &it: ini_parser.GetValues("Layer"))
                 {
-                    auto&[k,v] = it;
+                    auto &[k, v] = it;
                     {
                         ObjectLayer cur_layer;
                         cur_layer._name = k;
                         cur_layer._value = std::stoul(v);
-                        cur_layer._bit_pos = (u32)sqrt((f32)cur_layer._value);
-                        type->FindPropertyByName(cur_layer._name)->SetValue<u32>(s_engine_config,cur_layer._value);
+                        cur_layer._bit_pos = (u32) sqrt((f32) cur_layer._value);
+                        type->FindPropertyByName(cur_layer._name)->SetValue<u32>(s_engine_config, cur_layer._value);
                     }
                 }
-                s_engine_config.isMultiThreadRender = (bool)std::stoul(ini_parser.GetValue("Render","isMultiThreadRender","0"));
+                s_engine_config.isMultiThreadRender = (bool) std::stoul(ini_parser.GetValue("Render", "isMultiThreadRender", "0"));
             }
         }
         _is_multi_thread_rendering = s_engine_config.isMultiThreadRender;
         g_pLogMgr->Initialize();
         g_pLogMgr->AddAppender(new FileAppender());
         //g_pLogMgr->AddAppender(new ConsoleAppender());
-        auto window_props = Ailu::WindowProps();
+        auto window_props = WindowProps();
         window_props.Width = desc._window_width;
         window_props.Height = desc._window_height;
-        _p_window = new Ailu::WinWindow(window_props);
+        _p_window = new WinWindow(window_props);
         _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
-        _p_window->SetTitle(s_engine_config.isMultiThreadRender? L"AiluEngine -mt" : L"AiluEngine");
+        _p_window->SetTitle(s_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine");
         _layer_stack = new LayerStack();
 #ifdef DEAR_IMGUI
         //初始化imgui gfx时要求imgui window已经初始化
@@ -146,27 +151,47 @@ namespace Ailu
         {
             Profiler::Get().BeginFrame();
         };
-        _after_update += [this](){
+        _after_update += [this]()
+        {
             Profiler::Get().EndFrame();
             g_pThreadTool->ClearRecords();
             _frame_count++;
         };
+        // {
+        //     TIMER_BLOCK("TestAlloc");
+        //     for (u16 i = 0; i < 2000; i++)
+        //     {
+        //         u32 *a = AL_NEW(u32);
+        //         *a = 20;
+        //         AL_FREE(a);
+        //     }
+        // }
+        // {
+        //     TIMER_BLOCK("TestSysAlloc");
+        //     for (u16 i = 0; i < 2000; i++)
+        //     {
+        //         u32 *a = new u32();
+        //         *a = 20;
+        //         delete a;
+        //     }
+        // }
+        // Core::Allocator::Get().PrintLeaks();
         return 0;
     }
 
     void Application::Finalize()
     {
         INIParser ini_parser;
-        Type* type = EngineConfig::StaticType();
-        for(const auto& it : type->GetProperties())
+        Type *type = EngineConfig::StaticType();
+        for (const auto &it: type->GetProperties())
         {
             if (it.DataType() == EDataType::kUInt32)
             {
-                ini_parser.SetValue(it.MetaInfo()._category,it.Name(),std::format("{}",it.GetValue<u32>(s_engine_config)));
+                ini_parser.SetValue(it.MetaInfo()._category, it.Name(), std::format("{}", it.GetValue<u32>(s_engine_config)));
             }
             else if (it.DataType() == EDataType::kBool)
             {
-                ini_parser.SetValue(it.MetaInfo()._category, it.Name(), std::format("{}", (u32)it.GetValue<bool>(s_engine_config)));
+                ini_parser.SetValue(it.MetaInfo()._category, it.Name(), std::format("{}", (u32) it.GetValue<bool>(s_engine_config)));
             }
         }
         if (ini_parser.Save(_engin_config_path))
@@ -188,6 +213,8 @@ namespace Ailu
         DESTORY_PTR(g_pTimeMgr);
         JobSystem::Shutdown();
         ObjectRegister::Shutdown();
+        Core::Allocator::Get().PrintLeaks();
+        Core::Allocator::Shutdown();
         g_pLogMgr->Finalize();
         DESTORY_PTR(g_pLogMgr);
     }
@@ -195,7 +222,8 @@ namespace Ailu
     void Application::Tick(f32 delta_time)
     {
         g_pTimeMgr->Reset();
-        std::thread logic_thread = std::thread([&](){
+        std::thread logic_thread = std::thread([&]()
+                                               {
             SetThreadName("LogicThread");
             while (_state == EApplicationState::EApplicationState_Running)
             {
@@ -243,7 +271,7 @@ namespace Ailu
                                 CPUProfileBlock b("RenderScene");
                                 g_pGfxContext->GetPipeline()->Render();
                             }
-        #ifdef DEAR_IMGUI
+#ifdef DEAR_IMGUI
                             {
                                CPUProfileBlock b("RenderImGui");
                                 _p_imgui_layer->Begin();
@@ -251,7 +279,7 @@ namespace Ailu
                                     layer->OnImguiRender();
                                 _p_imgui_layer->End();
                             }
-        #endif// DEAR_IMGUI
+#endif// DEAR_IMGUI
                             g_pGfxContext->Present();
                             g_pGfxContext->GetPipeline()->FrameCleanUp();
                             _render_lag -= s_target_lag;
@@ -260,8 +288,7 @@ namespace Ailu
                     _after_update.Invoke();
                 }
             }
-            LOG_INFO("Exit Logic Thread");
-        });
+            LOG_INFO("Exit Logic Thread"); });
         while (_state != EApplicationState::EApplicationState_Exit)
         {
             if (_state == EApplicationState::EApplicationState_Pause)
@@ -272,7 +299,7 @@ namespace Ailu
             else
             {
                 _p_window->OnUpdate();
-                std::this_thread::sleep_for(std::chrono::milliseconds(8));
+                //std::this_thread::sleep_for(std::chrono::milliseconds(2));
             }
         }
         if (logic_thread.joinable())
@@ -294,7 +321,8 @@ namespace Ailu
         //LOG_INFO("Application::WaitForRender...");
         CPUProfileBlock b("Application::WaitForRender");
         std::unique_lock<std::mutex> lock(_mutex);
-        _main_wait.wait(lock, [this] { return _render_finished; });
+        _main_wait.wait(lock, [this]
+                        { return _render_finished; });
         _render_finished = false;
     }
 
@@ -303,7 +331,8 @@ namespace Ailu
         //LOG_INFO("Application::WaitForMain...");
         CPUProfileBlock b("Application::WaitForMain");
         std::unique_lock<std::mutex> lock(_mutex);
-        _render_wait.wait(lock, [this] { return _main_finished || _state == EApplicationState::EApplicationState_Exit; });
+        _render_wait.wait(lock, [this]
+                          { return _main_finished || _state == EApplicationState::EApplicationState_Exit; });
         _main_finished = false;
     }
 
@@ -326,7 +355,7 @@ namespace Ailu
         }
         _render_wait.notify_one();
     }
-    Application& Application::Get()
+    Application &Application::Get()
     {
         return *sp_instance;
     }
@@ -340,10 +369,9 @@ namespace Ailu
     }
     const ObjectLayer &Application::NameToLayer(const String &name)
     {
-        auto it = std::find_if(_object_layers.begin(),_object_layers.end(),[&](const ObjectLayer& cur_layer)->bool{
-            return name == cur_layer._name;
-        });
-        return it==_object_layers.end()? _object_layers[1] : *it;
+        auto it = std::find_if(_object_layers.begin(), _object_layers.end(), [&](const ObjectLayer &cur_layer) -> bool
+                               { return name == cur_layer._name; });
+        return it == _object_layers.end() ? _object_layers[1] : *it;
     }
     bool Application::OnLostFocus(WindowLostFocusEvent &e)
     {
@@ -398,11 +426,6 @@ namespace Ailu
         dispather.Dispatch<WindowMinimizeEvent>(BIND_EVENT_HANDLER(OnWindowMinimize));
         dispather.Dispatch<WindowResizeEvent>(BIND_EVENT_HANDLER(OnWindowResize));
         dispather.Dispatch<WindowMovedEvent>(BIND_EVENT_HANDLER(OnWindowMove));
-        //		dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseBtnClicked));
-        //static bool b_handle_input = true;
-        //if (e.GetEventType() == EEventType::kWindowLostFocus) b_handle_input = false;
-        //else if (e.GetEventType() == EEventType::kWindowFocus) b_handle_input = true;
-        //if (!b_handle_input) return;
 
         for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
         {

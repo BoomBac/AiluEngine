@@ -11,6 +11,7 @@ namespace Ailu
 {
     namespace UI
     {
+        using namespace Render;
         static UIRenderer* s_Renderer = nullptr;
         void UIRenderer::Init()
         {
@@ -49,7 +50,7 @@ namespace Ailu
         }
         UIRenderer::UIRenderer()
         {
-            _obj_cb.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
+            _obj_cb.reset(ConstantBuffer::Create(Render::RenderConstants::kPerObjectDataSize));
         }
         UIRenderer::~UIRenderer()
         {

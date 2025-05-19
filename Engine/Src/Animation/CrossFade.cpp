@@ -51,7 +51,7 @@ namespace Ailu
     {
         if (mClip == nullptr || !mWasSkeletonSet)
             return;
-        u32 numTargets = mTargets.size();
+        u32 numTargets = (u32)mTargets.size();
         //淡入淡出完毕的话，移除第一个对象，每帧移除一个
         for (unsigned int i = 0; i < numTargets; ++ i)
         {
@@ -66,7 +66,7 @@ namespace Ailu
             }
         }
         //混合列表内的所有动画
-        numTargets = mTargets.size();
+        numTargets = (u32)mTargets.size();
         mPose = mSkeleton.GetRestPose();
         mTime = mClip->Sample(mPose, mTime + dt);
         for (unsigned int i = 0; i < numTargets; ++ i)
@@ -98,8 +98,8 @@ namespace Ailu
         }
         void Add(Pose& out,Pose& in_pose,Pose& add_pose,Pose& base_pose,int blend_root)
         {
-            unsigned int numJoints = add_pose.Size();
-            for (int i = 0; i < numJoints; ++ i)
+            u32 numJoints = add_pose.Size();
+            for (u32 i = 0; i < numJoints; ++ i)
             {
                 Transform input = in_pose.GetLocalTransform(i);
                 Transform additive = add_pose.GetLocalTransform(i);

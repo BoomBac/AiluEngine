@@ -31,6 +31,9 @@ set(CORE_MODULE
         Inc/Objects/Type.h
         Inc/Framework/Common/Container.hpp
         Inc/Framework/Common/EngineConfig.h
+        Inc/Framework/Common/Allocator.hpp
+        Inc/Framework/Common/Allocator.cpp
+        Inc/Framework/Common/StackTrace.cpp
 )
 set(RENDER_MODULE
         Inc/Render/Gizmo.h
@@ -38,9 +41,11 @@ set(RENDER_MODULE
         Src/Render/TextRenderer.cpp
         Src/Render/FrameResource.cpp
         Inc/Render/FrameResource.h
-        Src/Render/Pass/VoxelGI.cpp
-        Inc/Render/Pass/VoxelGI.h
-        Src/Render/GfxCommand.cpp)
+        Src/Render/Features/VoxelGI.cpp
+        Inc/Render/Features/VoxelGI.h
+        Src/Render/Features/GpuTerrain.cpp
+        Src/Render/GfxCommand.cpp
+)
 set(RHI_DX12
         Inc/RHI/DX12/D3DResourceBase.h
         Inc/RHI/DX12/GPUResourceManager.h
@@ -113,6 +118,14 @@ set_target_properties (Engine PROPERTIES
     target_compile_options(Engine PRIVATE /MP)
     # MSVC 编译器的警告选项不同，以下是一个示例
     target_compile_options(Engine PRIVATE /D_UNICODE /DUNICODE /wd4819 /wd4251) # /wd4100 禁用未使用的参数警告
+if (MSVC)
+    # Enable RTC checks in Debug
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTC1")
+    # or: set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTCs /RTCu")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
+endif()
 # endif()
 target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库

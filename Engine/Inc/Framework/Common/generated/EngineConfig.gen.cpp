@@ -10,7 +10,7 @@ if(cur_type == nullptr)
 {
 TypeInitializer initializer;
 initializer._name = "EngineConfig";
-initializer._size = sizeof(EngineConfig);
+initializer._size = sizeof(Ailu::EngineConfig);
 initializer._full_name = "Ailu::EngineConfig";
 initializer._is_class = true;
 initializer._is_abstract = false;
@@ -70,13 +70,13 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* EngineConfig::GetPrivateStaticClass()
+Ailu::Type* Ailu::EngineConfig::GetPrivateStaticClass()
 {
 	static Ailu::Type* type = Z_Construct_EngineConfig_Type();
 	return type;
 }
 
-    const Type *EngineConfig::GetType() const
+    const Type *Ailu::EngineConfig::GetType() const
 {
-return EngineConfig::GetPrivateStaticClass();
+return Ailu::EngineConfig::GetPrivateStaticClass();
 }

@@ -3,7 +3,7 @@
 #include "Render/GraphicsPipelineStateObject.h"
 #include "pch.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     static Gizmo *s_pInstance = nullptr;
     Gizmo::Gizmo()
@@ -325,7 +325,7 @@ namespace Ailu
     void Gizmo::DrawCircle(const Vector3f &center, const Vector3f &forward, const Vector3f &right, u16 num_segments, Color color)
     {
         u16 sgem = num_segments;
-        Vector3f lastPoint = center + right * std::cos(0) + forward * std::sin(0);
+        Vector3f lastPoint = center + right * std::cosf(0) + forward * std::sinf(0);
         for (int i = 1; i <= sgem; i++)
         {
             float theta = (float) i / sgem * kPi * 2;

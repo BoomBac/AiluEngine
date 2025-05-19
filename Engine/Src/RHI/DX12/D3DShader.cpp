@@ -18,7 +18,7 @@
 #include "Render/GraphicsPipelineStateObject.h"
 
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     class D3DShaderInclude : public ID3DInclude
     {
@@ -151,12 +151,12 @@ namespace Ailu
         WString cached_blob_path = working_path + std::format(L"cache/shader_cache/hlsl/{}.cso", shader_hash);
         if (is_load_cache && FileManager::Exist(cached_blob_path) && FileManager::IsFileNewer(cached_blob_path, filename))
         {
-            LOG_INFO(L"[D3DShader compiler]: load cache: {},entry : {}", filename, ToWStr(entryPoint));
+            LOG_INFO(L"[D3DShader compiler]: load cache: {},entry : {}", filename, ToWChar(entryPoint));
             ThrowIfFailed(D3DReadFileToBlob(cached_blob_path.c_str(), p_blob.GetAddressOf()));
         }
         else
         {
-            LOG_INFO(L"[D3DShader compiler]: compile : {},entry : {},defines: {}", filename, ToWStr(entryPoint), ToWStr(su::Join(keyword_str, ",")));
+            LOG_INFO(L"[D3DShader compiler]: compile : {},entry : {},defines: {}", filename, ToWChar(entryPoint), ToWChar(su::Join(keyword_str, ",")));
             ID3DBlob *pErrorBlob = nullptr;
             //D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
             UINT compileFlags = 0;
@@ -217,7 +217,7 @@ namespace Ailu
             auto pName = reinterpret_cast<const char *>(pDebugNameData + 1);
             // Now write the contents of the blob pPDB to a file named the value of pName
             // Not illustrated here
-            WString p = ResourceMgr::GetResSysPath(L"ShaderPDB/" + ToWStr(pName));
+            WString p = ResourceMgr::GetResSysPath(L"ShaderPDB/" + ToWChar(pName));
             FileManager::CreateFile(p);
             FileManager::WriteFile(p, false, (u8*)p_blob->GetBufferPointer(), p_blob->GetBufferSize());
             // Now remove the debug info from the target shader, resulting in a smaller shader
@@ -301,7 +301,7 @@ namespace Ailu
         {
             ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED)
+        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_APPEND_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_CONSUME_STRUCTURED)
         {
             ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
@@ -311,7 +311,7 @@ namespace Ailu
         }
         else
         {
-            AL_ASSERT(true);
+            AL_ASSERT(false);
         }
         ret.second._register_space = bind_desc.Space;
         return ret;
@@ -553,14 +553,14 @@ namespace Ailu
             }
             else
             {
-                p = ResourceMgr::GetResSysPath(include_path) + ToWStr(pFileName);
+                p = ResourceMgr::GetResSysPath(include_path) + ToWChar(pFileName);
             }
             if (FileManager::Exist(p))
             {
                 auto [file_data, byte_size] = FileManager::ReadFile(p);
                 _data = file_data;
                 *ppData = _data;
-                *pBytes = byte_size;
+                *pBytes = (u32)byte_size;
                 _include_files.insert(p);
                 return S_OK;
             }
@@ -662,9 +662,16 @@ namespace Ailu
                 }
                 break;
                 case EBindResDescType::kRWBuffer:
-                case EBindResDescType::kBuffer:
                 {
                     ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, desc._res_slot);
+                    rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
+                    desc._bind_slot = root_param_index;
+                    ++root_param_index;
+                }
+                break;
+                case EBindResDescType::kBuffer:
+                {
+                    ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, desc._res_slot);
                     rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
                     desc._bind_slot = root_param_index;
                     ++root_param_index;
@@ -714,9 +721,9 @@ namespace Ailu
             auto &pass = _passes[pass_index];
             keyword_defines = ConstructVariantMarcos(pass._variants[variant_hash]._active_keywords);
 #ifdef SHADER_DXC
-            CreateFromFileDXC(ToWStr(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
+            CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
-            CreateFromFileDXC(ToWStr(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
+            CreateFromFileDXC(ToWChar(file_name.data()), L"PSMain", D3DConstants::kPSModel_6_1, _p_pblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
 #else
             succeed &= CreateFromFileFXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_5_0, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files, _is_first_compile);
@@ -900,9 +907,9 @@ namespace Ailu
     {
         switch (type)
         {
-            case Ailu::EShaderType::kVertex:
+            case EShaderType::kVertex:
                 return reinterpret_cast<void *>(_pass_elements[pass_index]._variants[variant_hash]._p_vblob.Get());
-            case Ailu::EShaderType::kPixel:
+            case EShaderType::kPixel:
                 return reinterpret_cast<void *>(_pass_elements[pass_index]._variants[variant_hash]._p_pblob.Get());
             case EShaderType::kGeometry:
                 return reinterpret_cast<void *>(_pass_elements[pass_index]._variants[variant_hash]._p_gblob.Get());
@@ -924,14 +931,14 @@ namespace Ailu
         Compile();
     }
 
-    void D3DComputeShader::Bind(RHICommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+    void D3DComputeShader::Bind(RHICommandBuffer *cmd, u16 kernel)
     {
         if (!_is_valid && kernel >= _kernels.size())
         {
             LOG_WARNING("ComputeShader or kernel id is not valid!");
             return;
         }
-        ComputeShader::Bind(cmd, kernel, thread_group_x, thread_group_y, thread_group_z);
+        ComputeShader::Bind(cmd, kernel);
         AL_ASSERT(!_bind_state.empty());
         std::unique_lock lock(_state_mutex);
         auto& cur_state = _bind_state.front();
@@ -958,61 +965,69 @@ namespace Ailu
                 {
                     auto tex = static_cast<Texture2D *>(bind_res);
                     u16 view_index = view_info._view_index == (u16)-1? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, 0) : view_info._view_index;
-                    BindParamsTexture params;
+                    BindParams params;
                     params._is_compute_pipeline = true;
-                    params._sub_res = view_info._sub_res;
-                    params._view_idx = view_index;
+                    params._params._texture_binder._sub_res = view_info._sub_res;
+                    params._params._texture_binder._view_idx = view_index;
                     params._slot = bind_info._bind_slot;
-                    tex->Bind(cmd, &params);
+                    tex->Bind(cmd, params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kUAVTexture2D)
                 {
                     auto tex = static_cast<Texture *>(bind_res);
-                    BindParamsTexture params;
+                    BindParams params;
                     params._is_compute_pipeline = true;
-                    params._sub_res = view_info._sub_res;
-                    params._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, 0);
+                    params._params._texture_binder._sub_res = view_info._sub_res;
+                    params._params._texture_binder._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, 0);
                     params._slot = bind_info._bind_slot;
-                    tex->Bind(cmd, &params);
+                    tex->Bind(cmd, params);
                 }
-                if (bind_info._res_type == EBindResDescType::kTexture3D)
+                else if (bind_info._res_type == EBindResDescType::kTexture3D)
                 {
                     auto tex = static_cast<Texture3D *>(bind_res);
                     u16 view_index = view_info._view_index == (u16)-1? tex->CalculateViewIndex(Texture::ETextureViewType::kSRV, view_info._face, view_info._mipmap, view_info._slice): view_info._view_index;
-                    BindParamsTexture params;
+                    BindParams params;
                     params._is_compute_pipeline = true;
-                    params._sub_res = view_info._sub_res;
-                    params._view_idx = view_index;
+                    params._params._texture_binder._sub_res = view_info._sub_res;
+                    params._params._texture_binder._view_idx = view_index;
                     params._slot = bind_info._bind_slot;
-                    tex->Bind(cmd, &params);
+                    tex->Bind(cmd, params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kRWTexture3D)
                 {
                     auto tex = static_cast<Texture3D *>(bind_res);
-                    BindParamsTexture params;
+                    BindParams params;
                     params._is_compute_pipeline = true;
-                    params._sub_res = view_info._sub_res;
-                    params._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, view_info._slice);
+                    params._params._texture_binder._sub_res = view_info._sub_res;
+                    params._params._texture_binder._view_idx = tex->CalculateViewIndex(Texture::ETextureViewType::kUAV, view_info._face, view_info._mipmap, view_info._slice);
                     params._slot = bind_info._bind_slot;
-                    tex->Bind(cmd, &params);
+                    tex->Bind(cmd, params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kRWBuffer)
                 {
                     BindParams params;
                     params._is_compute_pipeline = true;
                     params._slot = bind_info._bind_slot;
-                    bind_res->Bind(cmd, &params);
+                    params._is_random_access = true;
+                    bind_res->Bind(cmd, params);
+                }
+                else if (bind_info._res_type == EBindResDescType::kBuffer)
+                {
+                    BindParams params;
+                    params._is_compute_pipeline = true;
+                    params._slot = bind_info._bind_slot;
+                    bind_res->Bind(cmd, params);
                 }
                 else if (bind_info._res_type == EBindResDescType::kConstBuffer)
                 {
                     BindParams params;
                     params._is_compute_pipeline = true;
                     params._slot = bind_info._bind_slot;
-                    bind_res->Bind(cmd, &params);
+                    bind_res->Bind(cmd, params);
                 }
                 else 
                 {
-                    AL_ASSERT(true);
+                    AL_ASSERT(false);
                 }
             }
         }
@@ -1020,6 +1035,7 @@ namespace Ailu
         _bind_state.pop();
         //d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
     }
+
 
     void D3DComputeShader::LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index,ShaderVariantHash variant_hash)
     {
@@ -1106,7 +1122,7 @@ namespace Ailu
         try
         {
 #ifdef SHADER_DXC
-            CreateFromFileDXC(ToWStr(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
+            CreateFromFileDXC(ToWChar(file_name.data()), L"VSMain", D3DConstants::kVSModel_6_1, _p_vblob, _p_reflection);
             LoadShaderReflection(_p_reflection.Get());
 #else
             succeed &= CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_5_0, marcos, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes);

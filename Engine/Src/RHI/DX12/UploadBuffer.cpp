@@ -1,14 +1,16 @@
 #include "RHI/DX12/UploadBuffer.h"
+#include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/dxhelper.h"
-#include "RHI/DX12/D3DCommandBuffer.h"
 #include "pch.h"
 #include <new>// for std::bad_alloc
 
+using namespace Ailu::Render;
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
-    UploadBuffer::UploadBuffer(const String& name,u64 page_size) : m_PageSize(page_size)
+#pragma region UploadBuffer
+    UploadBuffer::UploadBuffer(const String &name, u64 page_size) : m_PageSize(page_size)
     {
         _name = name;
         _is_ready_for_rendering = true;
@@ -41,7 +43,7 @@ namespace Ailu
         }
         else
         {
-            page = std::make_shared<Page>(_name,m_PageSize);
+            page = std::make_shared<Page>(_name, m_PageSize);
             m_PagePool.push_back(page);
         }
 
@@ -59,19 +61,18 @@ namespace Ailu
             page->Reset();
         }
     }
-    void UploadBuffer::BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params)
+    void UploadBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {
-        if (params == nullptr)
+        if (&params == nullptr)
             return;
         GpuResource::BindImpl(rhi_cmd, params);
-        BindParamsUB* param = dynamic_cast<BindParamsUB*>(params);
-        auto dxcmd = dynamic_cast<D3DCommandBuffer*>(rhi_cmd)->NativeCmdList();
-        if (param->_is_compute_pipeline)
-            dxcmd->SetComputeRootConstantBufferView(param->_slot, param->_gpu_ptr);
+        auto dxcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
+        if (params._is_compute_pipeline)
+            dxcmd->SetComputeRootConstantBufferView(params._slot, params._params._ub_binder._gpu_ptr);
         else
-            dxcmd->SetGraphicsRootConstantBufferView(param->_slot, param->_gpu_ptr);
+            dxcmd->SetGraphicsRootConstantBufferView(params._slot, params._params._ub_binder._gpu_ptr);
     }
-    UploadBuffer::Page::Page(const String& name,size_t sizeInBytes)
+    UploadBuffer::Page::Page(const String &name, size_t sizeInBytes)
         : m_PageSize(sizeInBytes), m_Offset(0), m_CPUPtr(nullptr), m_GPUPtr(D3D12_GPU_VIRTUAL_ADDRESS(0))
     {
 
@@ -88,7 +89,7 @@ namespace Ailu
 
         m_GPUPtr = m_d3d12Resource->GetGPUVirtualAddress();
         m_d3d12Resource->Map(0, nullptr, &m_CPUPtr);
-        m_d3d12Resource->SetName(ToWStr(name).c_str());
+        m_d3d12Resource->SetName(ToWChar(name).c_str());
     }
     UploadBuffer::Page::~Page()
     {
@@ -119,12 +120,51 @@ namespace Ailu
         allocation.CPU = static_cast<u8 *>(m_CPUPtr) + m_Offset;
         allocation.GPU = m_GPUPtr + m_Offset;
         allocation._size = alignedSize;
+        allocation._offset = (u32)m_Offset;
+        allocation._page_res = m_d3d12Resource.Get();
         m_Offset += alignedSize;
-
         return allocation;
     }
     void UploadBuffer::Page::Reset()
     {
         m_Offset = 0;
     }
+#pragma endregion
+
+#pragma region ReadbackBufferPool
+    ReadbackBufferPool::ReadbackBufferPool(ID3D12Device *device) : _device(device) ,_total_used(0u){}
+
+    ComPtr<ID3D12Resource> ReadbackBufferPool::Acquire(u64 size, u64 current_frame)
+    {
+        std::unique_lock lock(_mutex);
+        size = AlignTo(size, size);
+        for (auto &buf: _buffers)
+        {
+            if (buf._size >= size && (current_frame - buf._last_used_frame) > 1)
+            {
+                buf._last_used_frame = current_frame;
+                return buf._resource;
+            }
+        }
+        CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_READBACK);
+        CD3DX12_RESOURCE_DESC res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+        ComPtr<ID3D12Resource> resource;
+        _device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
+                                         D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                         IID_PPV_ARGS(resource.GetAddressOf()));
+        _total_used += size;
+        _buffers.push_back({resource, size, current_frame});
+        return resource;
+    }
+
+    void ReadbackBufferPool::Tick(u64 current_frame)
+    {
+        if (_total_used > kMaxStaleBufferSize)
+        {
+            std::erase_if(_buffers, [current_frame](const Buffer &buf) {
+                return (current_frame - buf._last_used_frame) > 1;
+            });
+        }
+    }
+#pragma endregion
 }// namespace Ailu

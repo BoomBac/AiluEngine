@@ -20,6 +20,8 @@
 #include <limits>
 
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
+#include <RHI/DX12/D3DBuffer.h>
+#include <RHI/DX12/D3DShader.h>
 #include <RHI/DX12/D3DTexture.h>
 #include <d3d11.h>
 
@@ -29,8 +31,9 @@
 #include "Ext/renderdoc_app.h"//1.35
 #endif                        // _PIX_DEBUG
 
+using namespace Ailu::Render;
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
 #pragma region GpuCommandWorker
 
@@ -45,23 +48,11 @@ namespace Ailu
         LOG_INFO("Destory GpuCommandWorker");
     }
 
-    void GpuCommandWorker::Push(Vector<GfxCommand *> &&cmds, SubmitParams params)
+    void GpuCommandWorker::Push(Vector<GfxCommand *> &&cmds, SubmitParams &&params)
     {
-        std::lock_guard<std::mutex> lock(_mutex);
-        CommandGroup group;
-        _cmd_queue.emplace(std::move(cmds), params);
-        _cv.notify_one();
-    }
-    bool GpuCommandWorker::Pop(GpuCommandWorker::CommandGroup &group)
-    {
-        std::unique_lock<std::mutex> lock(_mutex);
-        if (!_cmd_queue.empty())
-        {
-            group = std::move(_cmd_queue.front());
-            _cmd_queue.pop();
-            return true;
-        }
-        return false;
+        while (_cmd_queue.Full())
+            std::this_thread::yield();
+        _cmd_queue.Push(CommandGroup(std::move(cmds), std::move(params)));
     }
     void GpuCommandWorker::RunAsync()
     {
@@ -74,26 +65,28 @@ namespace Ailu
                 _is_stop = true;
                 break;
             }
-            std::unique_lock<std::mutex> lock(_run_mutex);
-            _cv.wait(lock, [this]
-                     { return (!_cmd_queue.empty()); });
             CPUProfileBlock b("GpuCommandWorker::RunAsync");
+            if (Application::Get().State() == EApplicationState::EApplicationState_Exit)
+            {
+                _is_stop = true;
+                break;
+            }
             while (true)
             {
-                CommandGroup group;
-                if (Pop(group))
+                auto group_opt = _cmd_queue.Pop();
+                if (group_opt.has_value())
                 {
-                    auto cmd = RHICommandBufferPool::Get(group._params._name);
-                    for (auto *task: group._cmds)
+                    auto cmd = RHICommandBufferPool::Get(group_opt.value()._params._name);
+                    for (auto *task: group_opt.value()._cmds)
                         _ctx->ProcessGpuCommand(task, cmd.get());
-                    if (group._cmds.size() > 1)
+                    if (group_opt.value()._cmds.size() >= 1)
                     {
-                        CPUProfileBlock b(group._params._name + "_Execute");
+                        CPUProfileBlock b(group_opt.value()._params._name + "_Execute");
                         _ctx->ExecuteRHICommandBuffer(cmd.get());
                     }
                     RenderTexture::ResetRenderTarget();
                     RHICommandBufferPool::Release(cmd);
-                    if (group._params._is_end_frame)
+                    if (group_opt.value()._params._is_end_frame)
                     {
                         CPUProfileBlock b("EndFrame");
                         EndFrame();
@@ -106,6 +99,9 @@ namespace Ailu
                 }
             }
         }
+        LOG_INFO("GpuCommandWorker::RunAsync: Release {} un-executed cmd", _cmd_queue.Size())
+        while (!_cmd_queue.Empty())
+            _cmd_queue.Pop();
     }
     void GpuCommandWorker::EndFrame()
     {
@@ -152,7 +148,7 @@ namespace Ailu
         }
         if (Application::Get()._is_multi_thread_rendering)
             Application::Get().NotifyMain();
-        RenderingStates::Reset();
+        Render::RenderingStates::Reset();
     }
     void GpuCommandWorker::Start()
     {
@@ -176,19 +172,22 @@ namespace Ailu
     void GpuCommandWorker::RunSync()
     {
         CPUProfileBlock b("GpuCommandWorker::RunSync");
-        while (!_cmd_queue.empty())
+        while (!_cmd_queue.Empty())
         {
-            CommandGroup &group = _cmd_queue.front();
-            auto cmd = RHICommandBufferPool::Get(group._params._name);
-            for (auto *task: group._cmds)
+            auto &&group_opt = _cmd_queue.Pop();
+            auto cmd = RHICommandBufferPool::Get(group_opt.value()._params._name);
+            for (auto *task: group_opt.value()._cmds)
                 _ctx->ProcessGpuCommand(task, cmd.get());
             {
-                CPUProfileBlock b(group._params._name + "_Execute");
+                CPUProfileBlock b(group_opt.value()._params._name + "_Execute");
                 _ctx->ExecuteRHICommandBuffer(cmd.get());
             }
             RenderTexture::ResetRenderTarget();
             RHICommandBufferPool::Release(cmd);
-            _cmd_queue.pop();
+        }
+        {
+            CPUProfileBlock b("EndFrame");
+            EndFrame();
         }
     }
 #pragma endregion
@@ -316,6 +315,137 @@ namespace Ailu
     }// namespace D3DConvertUtils
 #pragma endregion
 
+#pragma region SignatureHelper
+    // 创建命令签名的实用函数
+    HRESULT CreateCommandSignature(
+            ID3D12Device *device,
+            ID3D12RootSignature *rootSignature,
+            const std::vector<D3D12_INDIRECT_ARGUMENT_DESC> &arguments,
+            UINT byteStride,
+            ID3D12CommandSignature **ppCommandSignature)
+    {
+        D3D12_COMMAND_SIGNATURE_DESC desc = {};
+        desc.ByteStride = byteStride;
+        desc.NumArgumentDescs = static_cast<UINT>(arguments.size());
+        desc.pArgumentDescs = arguments.data();
+        desc.NodeMask = 0;
+
+        return device->CreateCommandSignature(&desc, rootSignature, IID_PPV_ARGS(ppCommandSignature));
+    }
+
+    namespace CommandSignatureHelper
+    {
+        // 1. 创建用于间接调度的命令签名
+        HRESULT CreateDispatchCommandSignature(
+                ID3D12Device *device,
+                ID3D12RootSignature *rootSignature,
+                ID3D12CommandSignature **ppCommandSignature)
+        {
+            D3D12_INDIRECT_ARGUMENT_DESC argDesc = {};
+            argDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+
+            return CreateCommandSignature(
+                    device,
+                    rootSignature,
+                    {argDesc},
+                    sizeof(D3D12_DISPATCH_ARGUMENTS),
+                    ppCommandSignature);
+        }
+
+        // 2. 创建用于间接绘制的命令签名
+        HRESULT CreateDrawCommandSignature(
+                ID3D12Device *device,
+                ID3D12RootSignature *rootSignature,
+                ID3D12CommandSignature **ppCommandSignature)
+        {
+            D3D12_INDIRECT_ARGUMENT_DESC argDesc = {};
+            argDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+
+            return CreateCommandSignature(
+                    device,
+                    rootSignature,
+                    {argDesc},
+                    sizeof(D3D12_DRAW_ARGUMENTS),
+                    ppCommandSignature);
+        }
+
+        // 3. 创建用于间接索引绘制的命令签名
+        HRESULT CreateDrawIndexedCommandSignature(
+                ID3D12Device *device,
+                ID3D12RootSignature *rootSignature,
+                ID3D12CommandSignature **ppCommandSignature)
+        {
+            D3D12_INDIRECT_ARGUMENT_DESC argDesc = {};
+            argDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+
+            return CreateCommandSignature(
+                    device,
+                    rootSignature,
+                    {argDesc},
+                    sizeof(D3D12_DRAW_INDEXED_ARGUMENTS),
+                    ppCommandSignature);
+        }
+
+        // 4. 创建带顶点缓冲区视图的间接绘制命令签名
+        HRESULT CreateDrawCommandSignatureWithVBV(
+                ID3D12Device *device,
+                ID3D12RootSignature *rootSignature,
+                UINT slot,
+                ID3D12CommandSignature **ppCommandSignature)
+        {
+            std::vector<D3D12_INDIRECT_ARGUMENT_DESC> args;
+
+            // 顶点缓冲区视图
+            D3D12_INDIRECT_ARGUMENT_DESC vbvArg = {};
+            vbvArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
+            vbvArg.VertexBuffer.Slot = slot;
+            args.push_back(vbvArg);
+
+            // 绘制命令
+            D3D12_INDIRECT_ARGUMENT_DESC drawArg = {};
+            drawArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+            args.push_back(drawArg);
+
+            return CreateCommandSignature(
+                    device,
+                    rootSignature,
+                    args,
+                    sizeof(D3D12_VERTEX_BUFFER_VIEW) + sizeof(D3D12_DRAW_ARGUMENTS),
+                    ppCommandSignature);
+        }
+
+        // 5. 创建带常量的间接调度命令签名
+        HRESULT CreateDispatchCommandSignatureWithConstants(
+                ID3D12Device *device,
+                ID3D12RootSignature *rootSignature,
+                UINT rootParameterIndex,
+                ID3D12CommandSignature **ppCommandSignature)
+        {
+            std::vector<D3D12_INDIRECT_ARGUMENT_DESC> args;
+
+            // 常量数据
+            D3D12_INDIRECT_ARGUMENT_DESC constantArg = {};
+            constantArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+            constantArg.Constant.RootParameterIndex = rootParameterIndex;
+            constantArg.Constant.DestOffsetIn32BitValues = 0;
+            constantArg.Constant.Num32BitValuesToSet = 1;// 设置1个32位值
+            args.push_back(constantArg);
+
+            // 调度命令
+            D3D12_INDIRECT_ARGUMENT_DESC dispatchArg = {};
+            dispatchArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+            args.push_back(dispatchArg);
+
+            return CreateCommandSignature(
+                    device,
+                    rootSignature,
+                    args,
+                    sizeof(UINT) + sizeof(D3D12_DISPATCH_ARGUMENTS),// 常量+调度参数
+                    ppCommandSignature);
+        }
+    };// namespace CommandSignatureHelper
+#pragma endregion
+
 #pragma region D3DContext
     D3DContext::D3DContext(WinWindow *window) : _window(window), _width(window->GetWidth()), _height(window->GetHeight())
     {
@@ -338,6 +468,7 @@ namespace Ailu
         g_pGfxContext = this;
         LoadPipeline();
         LoadAssets();
+        _readback_pool = MakeScope<ReadbackBufferPool>(m_device.Get());
 #ifdef DEAR_IMGUI
         //init imgui
         {
@@ -446,7 +577,7 @@ namespace Ailu
         d3dcmd->Close();
         ID3D12CommandList *ppCommandLists[] = {d3dcmd->NativeCmdList()};
 #ifdef _PIX_DEBUG
-        PIXBeginEvent(m_commandQueue.Get(), cmd->ID(), ToWStr(cmd->Name()).c_str());
+        PIXBeginEvent(m_commandQueue.Get(), cmd->ID(), ToWChar(cmd->Name()).c_str());
 #endif// _PIX_DEBUG
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
         ++_fence_value[m_frameIndex];
@@ -540,6 +671,12 @@ namespace Ailu
             _color_buffer[n]->SetName(std::format(L"BackBuffer_{}", n).c_str());
             ThrowIfFailed(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
             _fence_value[n] = 0;
+        }
+
+        {
+            ThrowIfFailed(CommandSignatureHelper::CreateDispatchCommandSignature(m_device.Get(),nullptr,_dispatch_cmd_sig.GetAddressOf()));
+            ThrowIfFailed(CommandSignatureHelper::CreateDrawCommandSignature(m_device.Get(),nullptr,_draw_cmd_sig.GetAddressOf()));
+            ThrowIfFailed(CommandSignatureHelper::CreateDrawIndexedCommandSignature(m_device.Get(),nullptr,_draw_indexed_cmd_sig.GetAddressOf()));
         }
 #ifdef _DIRECT_WRITE
         InitDirectWriteContext();
@@ -656,7 +793,9 @@ namespace Ailu
 
     void D3DContext::WaitForGpu()
     {
-        FlushCommandQueue(m_commandQueue.Get(), _p_cmd_buffer_fence.Get(), _fence_value[m_frameIndex]);
+        u64 fence_value = _fence_value[m_frameIndex];
+        FlushCommandQueue(m_commandQueue.Get(), _p_cmd_buffer_fence.Get(), fence_value);
+        _fence_value[m_frameIndex] = fence_value;
     }
 
     void D3DContext::WaitForFence(u64 fence_value)
@@ -773,8 +912,8 @@ namespace Ailu
         {
             s_timer.MarkLocal();
             MoveToNextFrame();
-            if (Application::Get().GetFrameCount() % 60 == 0)
-                RenderingStates::s_gpu_latency = s_timer.GetElapsedSinceLastLocalMark();
+            //if (Application::Get().GetFrameCount() % 60 == 0)
+            Render::RenderingStates::s_gpu_latency = s_timer.GetElapsedSinceLastLocalMark();
         }
         if (_is_cur_frame_capturing)
         {
@@ -784,12 +923,11 @@ namespace Ailu
             u32 new_pack_size = _new_backbuffer_size.load();
             if (new_pack_size != 0u)
             {
-                ResizeSwapChainImpl((new_pack_size>>16) & 0xFFFF, new_pack_size & 0xFFFF);
+                ResizeSwapChainImpl((new_pack_size >> 16) & 0xFFFF, new_pack_size & 0xFFFF);
                 _new_backbuffer_size.store(0u);
             }
         }
 
-        ++_frame_count;
         if (_frame_count % kResourceCleanupIntervalTick == 0)
         {
             if (_global_tracked_resource.size() > 0)
@@ -815,6 +953,8 @@ namespace Ailu
                 D3DDescriptorMgr::Get().ReleaseSpace();
             }
         }
+        _readback_pool->Tick(_frame_count);
+        ++_frame_count;
         _p_gpu_timer->EndFrame();
         //CommandBufferPool::ReleaseAll();
         if (_is_next_frame_capture)
@@ -823,11 +963,10 @@ namespace Ailu
             _is_next_frame_capture = false;
             _is_cur_frame_capturing = true;
         }
-        CommandPool::Get().EndFrame();
-        if (Application::Get().GetFrameCount() % 60 == 0)
+        //if (Application::Get().GetFrameCount() % 60 == 0)
         {
-            RenderingStates::s_frame_time = s_timer.GetElapsedSinceLastLocalMark();
-            RenderingStates::s_frame_rate = 1000.0f / RenderingStates::s_frame_time;
+            Render::RenderingStates::s_frame_time = s_timer.GetElapsedSinceLastLocalMark();
+            Render::RenderingStates::s_frame_rate = 1000.0f / Render::RenderingStates::s_frame_time;
         }
         s_timer.MarkLocal();
     }
@@ -837,7 +976,7 @@ namespace Ailu
         LOG_WARNING("Begin take capture...");
         static PIXCaptureParameters parms{};
         static u32 s_capture_count = 0u;
-        _cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWStr(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
+        _cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWChar(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
         parms.GpuCaptureParameters.FileName = _cur_capture_name.data();
         PIXBeginCapture(PIX_CAPTURE_GPU, &parms);
         _is_next_frame_capture = true;
@@ -975,14 +1114,7 @@ namespace Ailu
         if (res->GetResourceType() == EGpuResType::kBuffer)
         {
             size = ALIGN_TO_256(size);
-            ComPtr<ID3D12Resource> copy_dst;
-            auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-            res_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-            heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
-            res_desc.Flags &= ~D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-            ThrowIfFailed(m_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                                                            nullptr, IID_PPV_ARGS(copy_dst.GetAddressOf())));
+            auto copy_dst = _readback_pool->Acquire(size,_frame_count);
             auto cmd = RHICommandBufferPool::Get("Readback");
             auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
             auto dxcmd = d3dcmd->NativeCmdList();
@@ -1009,19 +1141,37 @@ namespace Ailu
             LOG_ERROR("Readback only support buffer resource!");
         }
     }
+    void D3DContext::ReadBack(ID3D12Resource *res, D3DResourceStateGuard &state_guard, u8 *data, u32 size)
+    {
+        size = ALIGN_TO_256(size);
+        auto copy_dst = _readback_pool->Acquire(size,_frame_count);
+        auto cmd = RHICommandBufferPool::Get("Readback");
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
+        auto dxcmd = d3dcmd->NativeCmdList();
+        auto old_state = state_guard.CurState();
+        state_guard.MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        dxcmd->CopyResource(copy_dst.Get(), res);
+        state_guard.MakesureResourceState(dxcmd, old_state);
+        ExecuteRHICommandBuffer(cmd.get());
+        u64 cmd_fence_value = d3dcmd->_fence_value;
+        while (_p_cmd_buffer_fence->GetCompletedValue() < cmd_fence_value)
+        {
+            std::this_thread::yield();
+        }
+        D3D12_RANGE readbackBufferRange{0, size};
+        u8 *tmp_data = nullptr;
+        copy_dst->Map(0, &readbackBufferRange, reinterpret_cast<void **>(&tmp_data));
+        D3D12_RANGE emptyRange{0, 0};
+        copy_dst->Unmap(0, &emptyRange);
+        memcpy(data, tmp_data, size);
+        RHICommandBufferPool::Release(cmd);
+    }
     void D3DContext::ReadBackAsync(GpuResource *res, std::function<void(u8 *)> callback)
     {
         if (res->GetResourceType() == EGpuResType::kBuffer)
         {
-            u32 size = res->GetSize();
-            ComPtr<ID3D12Resource> copy_dst;
-            auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
-            res_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-            heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
-            res_desc.Flags &= ~D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-            ThrowIfFailed(m_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                                                            nullptr, IID_PPV_ARGS(copy_dst.GetAddressOf())));
+            u64 size = res->GetSize();
+            auto copy_dst = _readback_pool->Acquire(size,_frame_count);
             auto cmd = RHICommandBufferPool::Get("Readback");
             auto dxcmd = static_cast<D3DCommandBuffer *>(cmd.get())->NativeCmdList();
             res->StateTranslation(cmd.get(), EResourceState::kCopySource, UINT32_MAX);
@@ -1041,7 +1191,6 @@ namespace Ailu
                 D3D12_RANGE emptyRange{0, 0};
                 copy_dst->Unmap(0, &emptyRange);
                 callback(data); });
-            TrackResource(copy_dst);
             RHICommandBufferPool::Release(cmd);
         }
         else
@@ -1111,7 +1260,7 @@ namespace Ailu
                 if (set_cmd->_depth_target != nullptr)
                 {
 
-                    GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUnknown, set_cmd->_depth_target->PixelFormat(), 0);
+                    GraphicsPipelineStateMgr::SetRenderTargetState(EALGFormat::EALGFormat::kALGFormatUNKOWN, set_cmd->_depth_target->PixelFormat(), 0);
                     auto drt = static_cast<D3DRenderTexture *>(set_cmd->_depth_target);
                     d3dcmd->_color_count = 0u;
                     d3dcmd->_depth = drt->TargetCPUHandle(d3dcmd, set_cmd->_depth_index);
@@ -1132,7 +1281,7 @@ namespace Ailu
                 for (u16 i = 0; i < d3dcmd->_color_count; ++i)
                 {
                     auto rt = static_cast<D3DRenderTexture *>(set_cmd->_color_target[i]);
-                    GraphicsPipelineStateMgr::SetRenderTargetState(rt->PixelFormat(), is_depth_valid ? set_cmd->_depth_target->PixelFormat() : EALGFormat::EALGFormat::kALGFormatUnknown, (u8) i);
+                    GraphicsPipelineStateMgr::SetRenderTargetState(rt->PixelFormat(), is_depth_valid ? set_cmd->_depth_target->PixelFormat() : EALGFormat::EALGFormat::kALGFormatUNKOWN, (u8) i);
                     d3dcmd->_colors[i] = rt->TargetCPUHandle(d3dcmd, set_cmd->_color_indices[i]);
                     d3dcmd->_scissors[i] = D3DConvertUtils::ToD3DRect(set_cmd->_viewports[i]);
                     d3dcmd->_viewports[i] = D3DConvertUtils::ToD3DViewport(set_cmd->_viewports[i]);
@@ -1174,13 +1323,13 @@ namespace Ailu
                 AL_ASSERT(draw_cmd->_mat->GetShader() == pso->StateDescriptor()._p_vertex_shader);
                 bool is_indexed_draw = draw_cmd->_ib != nullptr;
                 bool is_instance_draw = draw_cmd->_instance_count > 1;
-                BindParamsVB params;
-                params._layout = &draw_cmd->_mat->GetShader()->PipelineInputLayout(draw_cmd->_pass_index);
+                BindParams params;
+                params._params._vb_binder._layout = &draw_cmd->_mat->GetShader()->PipelineInputLayout(draw_cmd->_pass_index);
                 bool is_produced = draw_cmd->_vb == nullptr;
                 if (!is_produced)
-                    draw_cmd->_vb->Bind(d3dcmd, &params);
+                    draw_cmd->_vb->Bind(d3dcmd, params);
                 if (is_indexed_draw)
-                    draw_cmd->_ib->Bind(d3dcmd, nullptr);
+                    draw_cmd->_ib->Bind(d3dcmd, params);
                 if (draw_cmd->_per_obj_cb != nullptr)
                     pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
                 for (auto &it: d3dcmd->_allocations)
@@ -1193,28 +1342,48 @@ namespace Ailu
                         pso->SetPipelineResource(res);
                     }
                 }
-
-                ++RenderingStates::s_temp_draw_call;
+                ++Render::RenderingStates::s_temp_draw_call;
                 u32 vertex_count = is_produced ? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
                 u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb->GetVertexCount() / 3;
                 triangle_count *= draw_cmd->_instance_count;
-                RenderingStates::s_temp_triangle_num += triangle_count;
-                RenderingStates::s_temp_vertex_num += vertex_count;
-                pso->Bind(cmd_buffer, nullptr);
-                if (is_indexed_draw)
-                    dxcmd->DrawIndexedInstanced(draw_cmd->_ib->GetCount(), draw_cmd->_instance_count, 0, 0, 0);
+                Render::RenderingStates::s_temp_triangle_num += triangle_count;
+                Render::RenderingStates::s_temp_vertex_num += vertex_count;
+                pso->Bind(cmd_buffer, params);
+                if (draw_cmd->_arg_buffer)
+                {
+                    D3DGPUBuffer *d3d_buf = static_cast<D3DGPUBuffer *>(draw_cmd->_arg_buffer);
+                    dxcmd->ExecuteIndirect(is_indexed_draw? _draw_indexed_cmd_sig.Get() : _draw_cmd_sig.Get(),1u,
+                        d3d_buf->GetNativeResource(),draw_cmd->_arg_offset,d3d_buf->GetCounterBuffer(),0u);
+                }
                 else
-                    dxcmd->DrawInstanced(draw_cmd->_vb->GetVertexCount(), draw_cmd->_instance_count, 0, 0);
+                {
+                    if (is_indexed_draw)
+                        dxcmd->DrawIndexedInstanced(draw_cmd->_ib->GetCount(), draw_cmd->_instance_count, 0, 0, 0);
+                    else
+                        dxcmd->DrawInstanced(draw_cmd->_vb->GetVertexCount(), draw_cmd->_instance_count, 0, 0);
+                }
             }
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kCopyCounter)
+        {
+            auto cmd_cpc = static_cast<CommandCopyCounter *>(cmd);
+            // 获取 ID3D12Resource* 对象
+            D3DGPUBuffer* src_d3d_buf = static_cast<D3DGPUBuffer *>(cmd_cpc->_src);
+            D3DGPUBuffer* dst_d3d_buf = static_cast<D3DGPUBuffer *>(cmd_cpc->_dst);
+            auto src_old_state = src_d3d_buf->_counter_state_guard.CurState();
+            auto dst_old_state = dst_d3d_buf->_state_guard.CurState();
+            src_d3d_buf->_counter_state_guard.MakesureResourceState(dxcmd,D3D12_RESOURCE_STATE_COPY_SOURCE);
+            dst_d3d_buf->_state_guard.MakesureResourceState(dxcmd,D3D12_RESOURCE_STATE_COPY_DEST);
+            dxcmd->CopyBufferRegion(dst_d3d_buf->GetNativeResource(), cmd_cpc->_dst_offset, src_d3d_buf->GetCounterBuffer(), 0u, sizeof(u32));
+            src_d3d_buf->_counter_state_guard.MakesureResourceState(dxcmd,src_old_state);
+            dst_d3d_buf->_state_guard.MakesureResourceState(dxcmd,dst_old_state);
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kDispatch)
         {
             auto cmd_disp = static_cast<CommandDispatch *>(cmd);
-            u16 thread_group_x = std::max<u16>(1u, cmd_disp->_group_num_x);
-            u16 thread_group_y = std::max<u16>(1u, cmd_disp->_group_num_y);
-            u16 thread_group_z = std::max<u16>(1u, cmd_disp->_group_num_z);
+            bool is_indirect = cmd_disp->_arg_buffer != nullptr;
             ShaderVariantHash active_variant = cmd_disp->_cs->ActiveVariant(cmd_disp->_kernel);
-            cmd_disp->_cs->Bind(d3dcmd, cmd_disp->_kernel, thread_group_x, thread_group_y, thread_group_z);
+            cmd_disp->_cs->Bind(d3dcmd, cmd_disp->_kernel);
             for (auto &it: d3dcmd->_allocations)
             {
                 auto &[name, alloc] = it;
@@ -1223,8 +1392,17 @@ namespace Ailu
                     dxcmd->SetComputeRootConstantBufferView(slot, alloc.GPU);
                 }
             }
-            dxcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
-            ++RenderingStates::s_temp_dispatch_call;
+            if (is_indirect)
+            {
+                D3DGPUBuffer *d3d_buf = static_cast<D3DGPUBuffer *>(cmd_disp->_arg_buffer);
+                dxcmd->ExecuteIndirect(_dispatch_cmd_sig.Get(),1u,d3d_buf->GetNativeResource(), cmd_disp->_arg_offset,
+                    d3d_buf->GetCounterBuffer(), 0u);
+            }
+            else
+            {
+                dxcmd->Dispatch(cmd_disp->_group_num_x, cmd_disp->_group_num_y, cmd_disp->_group_num_z);
+            }
+            ++Render::RenderingStates::s_temp_dispatch_call;
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kCommandProfiler)
         {

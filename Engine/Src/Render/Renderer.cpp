@@ -5,17 +5,18 @@
 #include "Framework/Common/Application.h"
 #include "Render/Gizmo.h"
 #include "Render/GraphicsPipelineStateObject.h"
-#include "Render/Pass/PostprocessPass.h"
-#include "Render/Pass/SSAO.h"
-#include "Render/Pass/TemporalAA.h"
-#include "Render/Pass/VolumetricClouds.h"
-#include "Render/Pass/VoxelGI.h"
+#include "Render/Features/PostprocessPass.h"
+#include "Render/Features/SSAO.h"
+#include "Render/Features/TemporalAA.h"
+#include "Render/Features/VolumetricClouds.h"
+#include "Render/Features/VoxelGI.h"
+#include "Render/Features/GpuTerrain.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
 #include "pch.h"
 
 
-namespace Ailu
+namespace Ailu::Render
 {
     Renderer::Renderer()
     {
@@ -43,10 +44,13 @@ namespace Ailu
         _cloud = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new SSAO())));
         _ssao = _owned_features.back().get();
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new GpuTerrain())));
+        _gpu_terrain = _owned_features.back().get();
         //_features.push_back(_vxgi);
         _features.push_back(_cloud);
         _features.push_back(_taa);
         _features.push_back(_ssao);
+        _features.push_back(_gpu_terrain);
         RegisterEventBeforeTick([]()
                                 { GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
         // RegisterEventAfterTick([]()
@@ -329,9 +333,9 @@ namespace Ailu
                     const auto &t = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index)->_transform;
                     obj_cb->_MatrixWorld = t._world_matrix;
                     obj_cb->_MatrixInvWorld = MatrixInverse(t._world_matrix);
-                    obj_cb->_ObjectID = r.GetEntity<ECS::StaticMeshComponent>(entity_index);
-                    obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == ECS::EMotionVectorType::kPerObject? 1.0f : 0.0; //dynamic object
-                    obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == ECS::EMotionVectorType::kForceZero? 1.0f : 0.0; //force off
+                    obj_cb->_ObjectID = (i32)r.GetEntity<ECS::StaticMeshComponent>(entity_index);
+                    obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == ECS::EMotionVectorType::kPerObject? 1.0f : 0.0f; //dynamic object
+                    obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == ECS::EMotionVectorType::kForceZero? 1.0f : 0.0f; //force off
                     ++obj_index;
                 }
             }
@@ -351,7 +355,7 @@ namespace Ailu
                     const auto &t = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(entity_index)->_transform;
                     auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
                     obj_cb->_MatrixWorld = t._world_matrix;
-                    obj_cb->_ObjectID = r.GetEntity<ECS::CSkeletonMesh>(entity_index);
+                    obj_cb->_ObjectID = (i32)r.GetEntity<ECS::CSkeletonMesh>(entity_index);
                     ++obj_index;
                 }
             }
@@ -559,7 +563,7 @@ namespace Ailu
         auto cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(cam.HashCode()));
         f32 f = cam.Far(), n = cam.Near();
         u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
-        cam_cb_data->_ScreenParams = Vector4f(1.0f / (f32) pixel_width,1.0f / (f32) pixel_height,pixel_width,pixel_height);
+        cam_cb_data->_ScreenParams = Vector4f(1.0f / (f32) pixel_width,1.0f / (f32) pixel_height,(f32)pixel_width,(f32)pixel_height);
         Camera::CalculateZBUfferAndProjParams(cam,cam_cb_data->_ZBufferParams,cam_cb_data->_ProjectionParams);
         cam_cb_data->_CameraPos = cam.Position();
         cam_cb_data->_MatrixV = cam.GetView();
@@ -687,7 +691,7 @@ namespace Ailu
                       { return a._distance_to_cam < b._distance_to_cam; });
         }
     }
-    void Ailu::Renderer::StableSort(Vector<RenderPass *> list)
+    void Renderer::StableSort(Vector<RenderPass *> list)
     {
         for (int i = 0; i < list.size() - 1; i++)
         {

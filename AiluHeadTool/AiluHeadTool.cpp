@@ -263,6 +263,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
     using std::endl;
     if (fs::exists(path))
     {
+        _tracker.Clean();
         std::ifstream file(path);
         if (!file.is_open())
         {
@@ -278,9 +279,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
             bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_enum_marked = false;
             bool is_cur_access_scope_public = false;
             int line_count = 0;
+            std::string cur_namespace;
             PropertyMeta pre_prop_meta;
             while (std::getline(file, line))
             {
+                cur_namespace = _tracker.ProcessLine(line);
                 if (line.empty())
                 {
                     ++line_count;
@@ -356,6 +359,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     {
                         ClassInfo class_info;
                         ParserClassInfo(line, class_info, *this);
+                        class_info._namespace = cur_namespace;
                         has_class_marked = false;
                         _classes.emplace_back(class_info);
                         continue;
@@ -446,22 +450,22 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     {
                         generate_body = R"(
                             private: \
-                                friend Ailu::Type* Z_Construct_TClass_Type();\
-                                static Ailu::Type* GetPrivateStaticClass();\
+                                friend Type* Z_Construct_TClass_Type();\
+                                static Type* GetPrivateStaticClass();\
                             public:\
-                                static class Ailu::Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Ailu::Type  *GetType() const;
+                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() const;
                             )";
                     }
                     else
                     {
                         generate_body = R"(
                             private: \
-                                friend Ailu::Type* Z_Construct_TClass_Type();\
-                                static Ailu::Type* GetPrivateStaticClass();\
+                                friend Type* Z_Construct_TClass_Type();\
+                                static Type* GetPrivateStaticClass();\
                             public:\
-                                static class Ailu::Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Ailu::Type  *GetType() const override;
+                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() const override;
                             )";
                     }
 
@@ -503,19 +507,20 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 cpp_file << "using namespace " << work_namespace << ";" << std::endl;
                 for (auto &class_info: _classes)
                 {
-                    cpp_file << std::format("Ailu::Type* Ailu::Z_Construct_{}_Type()", class_info._name) << std::endl;
+                    std::string full_name = class_info._namespace + "::" + class_info._name;
+                    cpp_file << std::format("Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace,class_info._name) << std::endl;
                     cpp_file << "{" << std::endl;
                     cpp_file << std::format("static std::unique_ptr<Ailu::Type> cur_type = nullptr;") << std::endl;
                     cpp_file << std::format("if(cur_type == nullptr)") << std::endl;
                     cpp_file << "{" << std::endl;
                     cpp_file << "TypeInitializer initializer;" << endl;
                     cpp_file << std::format("initializer._name = \"{}\"", class_info._name) << ";" << endl;
-                    cpp_file << std::format("initializer._size = sizeof({});", class_info._name) << endl;
-                    cpp_file << std::format("initializer._full_name = \"{}\"", work_namespace + "::" + class_info._name) << ";" << endl;
+                    cpp_file << std::format("initializer._size = sizeof({});", full_name) << endl;
+                    cpp_file << std::format("initializer._full_name = \"{}\"", full_name) << ";" << endl;
                     cpp_file << std::format("initializer._is_class = true;") << endl;
                     cpp_file << std::format("initializer._is_abstract = {}", BOOL_STR(class_info._is_abstract)) << ";" << endl;
-                    cpp_file << std::format("initializer._namespace = \"{}\"", work_namespace) << ";" << endl;
-                    cpp_file << std::format("initializer._base_name = \"{}\"", !class_info._parent.empty() ? work_namespace + "::" + class_info._parent : "") << ";" << endl;
+                    cpp_file << std::format("initializer._namespace = \"{}\"", class_info._namespace) << ";" << endl;
+                    cpp_file << std::format("initializer._base_name = \"{}\"", !class_info._parent.empty() ? class_info._namespace + "::" + class_info._parent : "") << ";" << endl;
                     for (auto &mem: class_info._members)
                     {
                         if (mem._is_function)
@@ -547,15 +552,15 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     cpp_file << "}" << std::endl;
 
                     cpp_file << std::endl;
-                    cpp_file << std::format("Ailu::Type* {}::GetPrivateStaticClass()", class_info._name) << std::endl;
+                    cpp_file << std::format("Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
                     cpp_file << "{" << std::endl;
                     cpp_file << std::format("\tstatic Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
                     cpp_file << std::format("\treturn type;") << std::endl;
                     cpp_file << "}" << std::endl;
                     cpp_file << std::endl;
-                    cpp_file << std::format("    const Type *{}::GetType() const", class_info._name) << std::endl;
+                    cpp_file << std::format("    const Type *{}::GetType() const", full_name) << std::endl;
                     cpp_file << "{" << std::endl;
-                    cpp_file << "return " << std::format("{}::GetPrivateStaticClass();", class_info._name) << std::endl;
+                    cpp_file << "return " << std::format("{}::GetPrivateStaticClass();", full_name) << std::endl;
                     cpp_file << "}" << std::endl;
                 }
                 for (auto &enum_info: _enums)

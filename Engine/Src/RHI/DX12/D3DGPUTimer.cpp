@@ -5,8 +5,9 @@
 //放到最后，否则编译有报错
 #include "RHI/DX12/dxhelper.h"
 
+using namespace Ailu::Render;
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
 #ifndef IID_GRAPHICS_PPV_ARGS
 #define IID_GRAPHICS_PPV_ARGS(x) IID_PPV_ARGS(x)
@@ -65,8 +66,7 @@ namespace Ailu
         //commandList->ResolveQueryData(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0, 2, m_buffer.Get(), resolveToBaseAddress);
 
         // Grab read-back data for the queries from a finished frame m_maxframeCount ago.
-
-        SIZE_T readBackBaseOffset = g_pGfxContext->CurBackbufIndex() * c_timerSlots * sizeof(u64);
+        SIZE_T readBackBaseOffset = GraphicsContext::Get().CurBackbufIndex() * c_timerSlots * sizeof(u64);
         D3D12_RANGE dataRange =
         {
             readBackBaseOffset,
@@ -79,7 +79,7 @@ namespace Ailu
         //memcpy(timings.data(), timingData, sizeof(u64) * c_timerSlots);
         m_buffer->Unmap(0, nullptr);
 
-        for (u32 j = 0; j < kMaxGpuTimerNum; ++j)
+        for (u32 j = 0; j < RenderConstants::kMaxGpuTimerNum; ++j)
         {
             u64 start = m_timing[j * 2];
             u64 end = m_timing[j * 2 + 1];
@@ -96,7 +96,7 @@ namespace Ailu
     void D3DGPUTimer::Start(RHICommandBuffer * cmd, u32 timerid)
     {
         auto commandList = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
-        if (timerid >= kMaxGpuTimerNum)
+        if (timerid >= RenderConstants::kMaxGpuTimerNum)
             throw std::out_of_range("Timer ID out of range");
 
         commandList->EndQuery(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, timerid * 2);
@@ -105,7 +105,7 @@ namespace Ailu
     void D3DGPUTimer::Stop(RHICommandBuffer * cmd, u32 timerid)
     {
         auto commandList = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
-        if (timerid >= kMaxGpuTimerNum)
+        if (timerid >= RenderConstants::kMaxGpuTimerNum)
             throw std::out_of_range("Timer ID out of range");
 
         const u32 start_query_index = timerid * 2;
@@ -115,7 +115,7 @@ namespace Ailu
         //static UINT resolveToFrameID = 0;
         //buffer大小为 sizeof(u64) * 3 * c_timerSlots，为每一帧维护c_timerSlots个 u64.
         //开始查询和结束查询分别进行 query_index 和 query_index + 1两个查询
-        u64 dst_offset = (g_pGfxContext->CurBackbufIndex() * c_timerSlots + start_query_index) * sizeof(u64);
+        u64 dst_offset = (GraphicsContext::Get().CurBackbufIndex() * c_timerSlots + start_query_index) * sizeof(u64);
         //这里第四个参数应该是实际使用的timer数量 * 2，对没查询索引的解析结果会报错
         commandList->ResolveQueryData(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, start_query_index, 2, m_buffer.Get(), dst_offset);
     }
@@ -127,7 +127,7 @@ namespace Ailu
 
     f64 D3DGPUTimer::GetElapsedMS(u32 timerid) const
     {
-        if (timerid >= kMaxGpuTimerNum)
+        if (timerid >= RenderConstants::kMaxGpuTimerNum)
         {
             LOG_WARNING("Timer ID out of range");
             return 0.0;

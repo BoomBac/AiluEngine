@@ -1,0 +1,5 @@
+guid: 7182a502-ba5e-4de5-a517-ed226a6b7805
+type: kComputeShader
+name: GpuTerrain
+  file: Shaders/hlsl/Compute/gpu_terrain.hlsl
+  kernel: Noname

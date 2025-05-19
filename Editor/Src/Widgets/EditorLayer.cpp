@@ -9,8 +9,8 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Render/Gizmo.h"
-#include "Render/Pass/PostprocessPass.h"
-#include "Render/Pass/VolumetricClouds.h"
+#include "Render/Features/PostprocessPass.h"
+#include "Render/Features/VolumetricClouds.h"
 #include "Render/RenderingData.h"
 #include "Render/TextRenderer.h"
 #include <Framework/Common/Application.h>
@@ -42,6 +42,7 @@
 
 namespace Ailu
 {
+    using namespace Render;
     namespace Editor
     {
         // User callback
@@ -143,7 +144,7 @@ namespace Ailu
             _p_preview_cam_view->Close(_p_preview_cam_view->Handle());
             _p_profiler_window->Close(_p_profiler_window->Handle());
             ImGuiWidget::SetFocus("AssetBrowser");
-            auto r = static_cast<CommonRenderPipeline *>(g_pGfxContext->GetPipeline())->GetRenderer();
+            auto r = static_cast<CommonRenderPipeline *>(GraphicsContext::Get().GetPipeline())->GetRenderer();
             r->AddFeature(&_pick);
             r->SetShadingMode(EShadingMode::kLit);
         }
@@ -228,7 +229,7 @@ namespace Ailu
                     if (_p_scene_view->Hover(m_pos) && _p_scene_view->Focus())
                     {
                         m_pos = m_pos - _p_scene_view->ContentPosition();
-                        ECS::Entity closest_entity = _pick.GetPickID(m_pos.x, m_pos.y);
+                        ECS::Entity closest_entity = _pick.GetPickID((u16)m_pos.x, (u16)m_pos.y);
                         LOG_INFO("Pick entity: {}", closest_entity);
                         if (Input::IsKeyPressed(AL_KEY_SHIFT))
                             Selection::AddSelection(closest_entity);
@@ -336,7 +337,7 @@ namespace Ailu
             {
                 ImGui::Text("Thread %d", i);
                 ImGui::Indent();
-                ImGui::Text("ThreadStatus: %s", EThreadStatus::ToString(g_pThreadTool->Status(i)));
+                ImGui::Text("ThreadStatus: %s", Core::EThreadStatus::ToString(g_pThreadTool->Status(i)));
                 const auto &records = s_foucs_record ? s_foucs_records[i] : g_pThreadTool->TaskTimeRecord(i);
                 if (records.size() > 0)
                 {

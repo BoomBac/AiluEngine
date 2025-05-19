@@ -10,7 +10,7 @@ if(cur_type == nullptr)
 {
 TypeInitializer initializer;
 initializer._name = "Object";
-initializer._size = sizeof(Object);
+initializer._size = sizeof(Ailu::Object);
 initializer._full_name = "Ailu::Object";
 initializer._is_class = true;
 initializer._is_abstract = false;
@@ -54,13 +54,13 @@ Ailu::Type::RegisterType(cur_type.get());
 return cur_type.get();
 }
 
-Ailu::Type* Object::GetPrivateStaticClass()
+Ailu::Type* Ailu::Object::GetPrivateStaticClass()
 {
 	static Ailu::Type* type = Z_Construct_Object_Type();
 	return type;
 }
 
-    const Type *Object::GetType() const
+    const Type *Ailu::Object::GetType() const
 {
-return Object::GetPrivateStaticClass();
+return Ailu::Object::GetPrivateStaticClass();
 }

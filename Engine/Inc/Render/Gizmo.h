@@ -6,7 +6,7 @@
 #include "CommandBuffer.h"
 #include "Framework/Math/Geometry.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     class AILU_API Gizmo
     {

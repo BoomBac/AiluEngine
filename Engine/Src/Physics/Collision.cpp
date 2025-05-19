@@ -3,6 +3,9 @@
 #include "Render/Gizmo.h"
 #include "pch.h"
 
+
+using Ailu::Render::Gizmo;
+
 namespace Ailu
 {
     void DebugDrawer::DebugWireframe(const ContactData &data, f32 duration_sec)

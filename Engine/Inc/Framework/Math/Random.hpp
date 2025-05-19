@@ -21,8 +21,8 @@ namespace
 }
 namespace Ailu
 {
-    #undef max;
-    #undef min;
+    #undef max
+    #undef min
     namespace Random
     {
         Color AILU_API RandomColor(u32 seed, bool ignore_alpha = true);

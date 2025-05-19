@@ -3,7 +3,7 @@
 #define __RENDER_VIEW_H__
 #include "ImGuiWidget.h"
 #include "PlaceActors.h"
-#include <Render/Texture.h>
+#include "Render/Texture.h"
 #include <Framework/Math/Transform.h>
 
 namespace Ailu
@@ -17,7 +17,7 @@ namespace Ailu
 			~RenderView();
 			void Open(const i32& handle) final;
 			void Close(i32 handle) final;
-			void SetSource(RenderTexture* src) {_src = src;};
+			void SetSource(Render::RenderTexture* src) {_src = src;};
 			Vector2f GetViewportSize() const
 			{
 				return Vector2f(_pre_tick_width, _pre_tick_height);
@@ -30,7 +30,7 @@ namespace Ailu
 			f32 _pre_tick_width, _pre_tick_height;
 			//当gameview尺寸改变时的window大小
 			f32 _pre_tick_window_width, _pre_tick_window_height;
-			RenderTexture* _src = nullptr;
+			Render::RenderTexture* _src = nullptr;
 		};
 
 		class SceneView : public RenderView

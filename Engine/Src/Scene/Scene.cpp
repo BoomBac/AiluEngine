@@ -8,7 +8,9 @@
 #include "pch.h"
 #include <regex>
 
-namespace Ailu
+using namespace Ailu::Render;
+
+namespace Ailu::SceneManagement
 {
     void Scene::Serialize(Archive &arch)
     {
@@ -199,10 +201,10 @@ namespace Ailu
         anim_sig.set(_register.GetComponentTypeID<ECS::CSkeletonMesh>(), true);
         _register.RegisterSystem<ECS::AnimationSystem>(anim_sig);
         _register.RegisterOnComponentAdd<ECS::StaticMeshComponent>([](ECS::Entity entity){
-                                                          g_pGfxContext->GetPipeline()->OnAddRenderObject(entity);
+                                                          GraphicsContext::Get().GetPipeline()->OnAddRenderObject(entity);
         });
         _register.RegisterOnComponentAdd<ECS::CSkeletonMesh>([](ECS::Entity entity){
-                                                          g_pGfxContext->GetPipeline()->OnAddRenderObject(entity);
+                                                          GraphicsContext::Get().GetPipeline()->OnAddRenderObject(entity);
                                                       });
     }
 
@@ -387,7 +389,7 @@ namespace Ailu
         //FileManager::CreateFile(ResourceMgr::GetResSysPath(L"Test/a.txt"));
         //FileManager::WriteFile(ResourceMgr::GetResSysPath(L"Test/a.txt"), false, oss.str());
     }
-    Ref<Scene> Ailu::SceneMgr::Create(String name)
+    Ref<Scene> SceneMgr::Create(String name)
     {
         return MakeRef<Scene>(name);
     }

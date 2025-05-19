@@ -9,7 +9,7 @@
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
 #endif// _PIX_DEBUG
 
-namespace Ailu
+namespace Ailu::Render
 {
 #pragma region FramePacket
     void ViewEntity::FormCamera(const Camera &cam, ViewEntity &entry)
@@ -89,8 +89,8 @@ namespace Ailu
             PROFILE_BLOCK_CPU(CollectView)
             CollectViews(*g_pSceneMgr->ActiveScene());
         }
-         auto update_render_obj_job = JobSystem::Get().CreateJob("UpdateRenderObject",&RenderPipeline::UpdateRenderObject,this, 0u, _render_objs.size());
-         auto update_vis_obj_job = JobSystem::Get().CreateJob("UpdateVisibilityObject", &RenderPipeline::UpdateVisibilityObject, this, 0u, _visiblity_objs.size());
+         auto update_render_obj_job = JobSystem::Get().CreateJob("UpdateRenderObject",&RenderPipeline::UpdateRenderObject,this, 0u, (u32)_render_objs.size());
+         auto update_vis_obj_job = JobSystem::Get().CreateJob("UpdateVisibilityObject", &RenderPipeline::UpdateVisibilityObject, this, 0u, (u32)_visiblity_objs.size());
          JobSystem::Get().AddDependency(update_render_obj_job,update_vis_obj_job);
          JobSystem::Get().Dispatch(update_render_obj_job);
         _targets.clear();
@@ -221,7 +221,7 @@ namespace Ailu
     {
         _pending_add_render_objs.push(e);
     }
-    void RenderPipeline::CollectViews(const Ailu::Scene&s)
+    void RenderPipeline::CollectViews(const Scene&s)
     {
         const auto &r = s.GetRegister();
         for (auto &cam: r.View<ECS::CCamera>())
@@ -256,7 +256,7 @@ namespace Ailu
                 auto p = &(comp->_p_mats);
                 _render_objs.emplace_back(e, true, true, comp->_p_mesh ? comp->_p_mesh.get() : nullptr, comp->_p_mats);
             }
-            _render_obj_lut[e] = _render_objs.size() - 1;
+            _render_obj_lut[(u32)e] = (u32)(_render_objs.size() - 1);
             // std::sort(_render_objs.begin(),_render_objs.end());
             // _dynamic_obj_start_pos = (u32)std::distance(_render_objs.begin(),std::find(_render_objs.begin(),_render_objs.end(),
             //     [](const RenderObject& obj)->bool{return obj._is_dynamic;}));
@@ -275,7 +275,7 @@ namespace Ailu
                 if (RenderObject *render_obj = GetRenderObject(vis_obj._render_obj_handle); render_obj != nullptr)
                 {
                     RenderNode node;
-                    node._game_obj_handle = GetRenderObject(vis_obj._render_obj_handle)->_game_obj_handle;
+                    node._game_obj_handle = (u32)GetRenderObject(vis_obj._render_obj_handle)->_game_obj_handle;
                     node._sqr_distance = SqrMagnitude(render_obj->_world_pos - view_entity._position);
                     node._render_obj_handle = vis_obj._render_obj_handle;
                     node._submesh = vis_obj._submesh;
@@ -284,9 +284,9 @@ namespace Ailu
                     node._object_data._MatrixWorld = render_obj->_world_matrix;
                     node._object_data._MatrixInvWorld = MatrixInverse(render_obj->_world_matrix);
                     node._object_data._MatrixWorld_Pre = render_obj->_prev_world_matrix;
-                    node._object_data._ObjectID = node._game_obj_handle;
-                    node._object_data._MotionVectorParam.x = render_obj->_motion_type == ECS::EMotionVectorType::kPerObject ? 1.0f : 0.0;//dynamic object
-                    node._object_data._MotionVectorParam.y = render_obj->_motion_type == ECS::EMotionVectorType::kForceZero ? 1.0f : 0.0;//force off
+                    node._object_data._ObjectID = (i32)node._game_obj_handle;
+                    node._object_data._MotionVectorParam.x = render_obj->_motion_type == ECS::EMotionVectorType::kPerObject ? 1.0f : 0.0f;//dynamic object
+                    node._object_data._MotionVectorParam.y = render_obj->_motion_type == ECS::EMotionVectorType::kForceZero ? 1.0f : 0.0f;//force off
                     view_entity.PushRenderNode(node);
                 }
             }

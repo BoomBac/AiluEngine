@@ -2,11 +2,11 @@
 
 #include "Ext/imgui/imgui.h"
 #include "Render/Renderer.h"
-#include "Render/Pass/PostprocessPass.h"
+#include "Render/Features/PostprocessPass.h"
 
 namespace Ailu
 {
-	SSAOPass* p_ssao_pass;
+	Render::SSAOPass* p_ssao_pass;
 	namespace Editor
 	{
 		EnvironmentSetting::EnvironmentSetting() : ImGuiWidget("EnvironmentSetting")

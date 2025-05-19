@@ -15,7 +15,7 @@
 #include <unordered_map>
 
 
-namespace Ailu
+namespace Ailu::Render
 {
     enum class EShaderType : u8
     {
@@ -537,7 +537,7 @@ namespace Ailu
         static Ref<ComputeShader> Create(const WString &sys_path);
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
-        virtual void Bind(RHICommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+        virtual void Bind(RHICommandBuffer *cmd, u16 kernel);
         void SetTexture(const String &name, Texture *texture);
         void SetTexture(u8 bind_slot, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
@@ -549,8 +549,24 @@ namespace Ailu
         void SetInt(const String &name, i32 value);
         void SetInts(const String &name, Vector<i32> values);
         void SetVector(const String &name, Vector4f vector);
+        /// @brief 为所有kernel的对应名称设置buffer
+        /// @param name 
+        /// @param buf 
         void SetBuffer(const String &name, ConstantBuffer *buf);
+        /// @brief 为所有kernel的对应名称设置buffer
+        /// @param name 
+        /// @param buf 
         void SetBuffer(const String &name, GPUBuffer *buf);
+        /// @brief 为指定kernel的对应名称设置buffer
+        /// @param kernel 
+        /// @param name 
+        /// @param buf 
+        void SetBuffer(u16 kernel,const String &name, ConstantBuffer *buf);
+        /// @brief 为指定kernel的对应名称设置buffer
+        /// @param kernel 
+        /// @param name 
+        /// @param buf 
+        void SetBuffer(u16 kernel,const String &name, GPUBuffer *buf);
         void SetMatrix(const String& name,Matrix4x4f mat);
         void SetMatrixArray(const String& name,Vector<Matrix4x4f> matrix_arr);
         void GetThreadNum(u16 kernel, u16 &x, u16 &y, u16 &z) const;

@@ -1,14 +1,14 @@
 #pragma once
 #ifndef __PICK_PASS__
 #define __PICK_PASS__
-#include <Render/Pass/RenderPass.h>
+#include <Render/Features/RenderFeature.h>
 #include <Scene/Component.h>
 
 namespace Ailu
 {
-    namespace Editor
+    namespace Render
     {
-        class PickPass : public RenderPass
+        class PickPass : public Render::RenderPass
         {
         public:
             PickPass();
@@ -43,7 +43,7 @@ namespace Ailu
             GPUBuffer *_readback_buf;
             Vector4f _params;
         };
-    };// namespace Editor
+    }
 }// namespace Ailu
 
 #endif// !PICK_PASS__

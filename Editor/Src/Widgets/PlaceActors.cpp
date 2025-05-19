@@ -10,6 +10,7 @@
 
 namespace Ailu
 {
+    using namespace Render;
     namespace Editor
     {
 
@@ -41,10 +42,10 @@ namespace Ailu
             ImGui::Spacing();
             ImVec2 avail_size = ImGui::GetContentRegionAvail();
             ImVec2 left_size, right_size;
-            left_size.x = avail_size.x * 0.3;
+            left_size.x = avail_size.x * 0.3f;
             left_size.y = avail_size.y;
             right_size = left_size;
-            right_size.x = avail_size.x * 0.7;
+            right_size.x = avail_size.x * 0.7f;
             ImGui::BeginChild("##Group", left_size);
             static i16 s_selected_index = -1;
             for (i16 i = 0; i < _groups.size(); i++)

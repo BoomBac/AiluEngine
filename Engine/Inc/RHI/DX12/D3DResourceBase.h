@@ -4,11 +4,11 @@
 #include "GlobalMarco.h"
 #include "d3dx12.h"
 #include "Render/GpuResource.h"
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     struct D3DResourceStateGuard
     {
-        void MakesureResourceState(ID3D12GraphicsCommandList *cmd, ID3D12Resource *p_res, D3D12_RESOURCE_STATES target_state,u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+        void MakesureResourceState(ID3D12GraphicsCommandList *cmd,D3D12_RESOURCE_STATES target_state,u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
         {
             if (!_cur_res_state.contains(sub_res))
                 _cur_res_state[sub_res] = _cur_res_state[D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES];
@@ -20,7 +20,7 @@ namespace Ailu
                     {
                         if (state != target_state)
                         {
-                            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(p_res, state, target_state, sub_res_id);
+                            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, state, target_state, sub_res_id);
                             cmd->ResourceBarrier(1, &barrier);
                             _cur_res_state[sub_res_id] = target_state;
                         }
@@ -28,7 +28,7 @@ namespace Ailu
                 }
                 return;
             }
-            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(p_res, _cur_res_state[sub_res], target_state,sub_res);
+            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, _cur_res_state[sub_res], target_state,sub_res);
             cmd->ResourceBarrier(1, &barrier);
             _cur_res_state[sub_res] = target_state;
             if (sub_res ==  D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
@@ -46,21 +46,22 @@ namespace Ailu
             return _cur_res_state.at(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
         }
         D3DResourceStateGuard() = default;
-        explicit D3DResourceStateGuard(D3D12_RESOURCE_STATES initial_state)
+        D3DResourceStateGuard(ID3D12Resource* resource,D3D12_RESOURCE_STATES initial_state) : _resource(resource)
         {
             _cur_res_state[D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES] =  initial_state;
         };
     private:
         Map<u32,D3D12_RESOURCE_STATES> _cur_res_state;
+        ID3D12Resource* _resource = nullptr;
     };
 
     namespace D3DConvertUtils
     {
-        static EResourceState ToALResState(D3D12_RESOURCE_STATES state)
+        static Ailu::Render::EResourceState ToALResState(D3D12_RESOURCE_STATES state)
         {
-            return (EResourceState)state;
+            return (Ailu::Render::EResourceState)state;
         };
-        static D3D12_RESOURCE_STATES FromALResState(EResourceState state)
+        static D3D12_RESOURCE_STATES FromALResState(Ailu::Render::EResourceState state)
         {
             return (D3D12_RESOURCE_STATES)state;
         };

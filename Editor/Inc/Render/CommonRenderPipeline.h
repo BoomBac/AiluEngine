@@ -8,7 +8,7 @@ namespace Ailu
 {
 	namespace Editor
 	{
-		class CommonRenderPipeline : public Ailu::RenderPipeline
+		class CommonRenderPipeline : public Render::RenderPipeline
 		{
 			DISALLOW_COPY_AND_ASSIGN(CommonRenderPipeline)
 		public:
@@ -16,7 +16,7 @@ namespace Ailu
             void Setup() final;
 
         public:
-            PickFeature _pick;
+            Render::PickFeature _pick;
 		private:
 			void BeforeReslove() final;
 

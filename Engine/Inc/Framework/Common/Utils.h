@@ -17,37 +17,40 @@
 
 namespace Ailu
 {
-    static WString ToWStr(const char* multiByteStr)
+    static WString ToWChar(const char* multi_byte_str)
     {
-        int size = MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, nullptr, 0);
-        if (size == 0 || size > 512) {
-            throw std::runtime_error("to wstring error!");
-            return WString{};
-        }
-        wchar_t wideStr[512];
-        MultiByteToWideChar(CP_UTF8, 0, multiByteStr, -1, wideStr, size);
-        return WString{ wideStr };
+        if (!multi_byte_str) return {};
+        int size = MultiByteToWideChar(CP_UTF8, 0, multi_byte_str, -1, nullptr, 0);
+        if (size <= 0) return {};
+        WString wstr(size, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, multi_byte_str, -1, &wstr[0], size);
+        wstr.resize(size - 1); 
+        return wstr;
     }
-    static WString ToWStr(const String& multiByteStr)
+    
+    static WString ToWChar(const String& multi_byte_str)
     {
-        return ToWStr(multiByteStr.c_str());
-    }
-
-    static String ToChar(const wchar_t* wideStr)
-    {
-        int size = WideCharToMultiByte(CP_UTF8, 0, wideStr, -1, nullptr, 0, nullptr, nullptr);
-        if (size == 0 || size > 512) {
-            throw std::runtime_error("to nstring error!");
-            return nullptr;
-        }
-        char multiByteStr[512];
-        WideCharToMultiByte(CP_UTF8, 0, wideStr, -1, multiByteStr, size, nullptr, nullptr);
-        return multiByteStr;
+        return ToWChar(multi_byte_str.c_str());
     }
 
-    static String ToChar(const WString& wideStr)
+    static String ToChar(const wchar_t* wide_str)
     {
-        return ToChar(wideStr.c_str());
+        if (!wide_str) return {};
+    
+        int size = WideCharToMultiByte(CP_UTF8, 0, wide_str, -1, nullptr, 0, nullptr, nullptr);
+        if (size <= 0) return {};
+    
+        String str(size, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, wide_str, -1, &str[0], size, nullptr, nullptr);
+    
+        str.resize(size - 1); // 去掉末尾 '\0'
+        return str;
+    }
+    
+
+    static String ToChar(const WString& wide_str)
+    {
+        return ToChar(wide_str.c_str());
     }
     static String GetIndentation(int level)
     {

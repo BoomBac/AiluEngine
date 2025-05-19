@@ -9,7 +9,7 @@
 #include "Font.h"
 
 #undef DrawText
-namespace Ailu
+namespace Ailu::Render
 {
     class CommandBuffer;
     struct TextVertex

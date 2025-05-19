@@ -9,7 +9,7 @@
 #include "Page.h"
 using Microsoft::WRL::ComPtr;
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
 
     class GPUResourcePage : public Page
@@ -46,14 +46,14 @@ namespace Ailu
         static void Shutdown();
         static GpuResourceManager* Get();
     public:
-        Allocation&& Allocate(u32 size = 1024u,D3D12_HEAP_TYPE type = D3D12_HEAP_TYPE_UPLOAD);
+        Allocation Allocate(u32 size = 1024u,D3D12_HEAP_TYPE type = D3D12_HEAP_TYPE_UPLOAD);
         void Free(Allocation&& handle);
         u32 ReleaseSpace();
     private:
-        std::multimap<u32,u32>::iterator AddNewPage(D3D12_HEAP_TYPE type,u32 size = kPerPageSize);
+        std::multimap<u32,u16>::iterator AddNewPage(D3D12_HEAP_TYPE type,u32 size = kPerPageSize);
     private:
         Vector<GPUResourcePage> _pages;
-        Map<D3D12_HEAP_TYPE ,std::multimap<u32,u32>> _page_free_space_lut;
+        Map<D3D12_HEAP_TYPE ,std::multimap<u32,u16>> _page_free_space_lut;
 
     };
 }

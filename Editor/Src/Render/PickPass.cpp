@@ -8,7 +8,8 @@
 
 namespace Ailu
 {
-    namespace Editor
+    using namespace Editor;
+    namespace Render
     {
         PickPass::PickPass() : RenderPass("PickPass")
         {
@@ -40,7 +41,7 @@ namespace Ailu
                 PROFILE_BLOCK_GPU(cmd.get(), PickPass);
                 ECS::Register &r = g_pSceneMgr->ActiveScene()->GetRegister();
                 cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
-                if (auto &selected = Selection::SelectedEntities(); selected.size() > 0)
+                if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
                 {
                     for (auto entity: selected)
                     {
@@ -55,7 +56,7 @@ namespace Ailu
                             //Gizmo::DrawCube(t._position, comp->_size);
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
                             Gizmo::DrawAABB(t._position - ext,t._position + ext);
-                            cmd->DrawRenderer(Mesh::s_p_shpere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
+                            cmd->DrawMesh(Mesh::s_p_shpere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CCamera>(entity); comp != nullptr)
                         {
@@ -71,7 +72,7 @@ namespace Ailu
                     auto &[queue, objs] = queue_data;
                     for (auto &obj: objs)
                     {
-                        cmd->DrawRenderer(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                        cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     }
                 }
                 u16 entity_index = 0;
@@ -80,7 +81,7 @@ namespace Ailu
                     const auto &t = r.GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
                     CBufferPerObjectData obj_data;
-                    obj_data._ObjectID = r.GetEntity<ECS::LightComponent>(entity_index);
+                    obj_data._ObjectID = (i32)r.GetEntity<ECS::LightComponent>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
@@ -88,22 +89,22 @@ namespace Ailu
                     {
                         case ECS::ELightType::kDirectional:
                         {
-                            cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_directional_light, obj_data, 0, 1, 1);
+                            cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_directional_light, obj_data, 0, 1, 1);
                         }
                         break;
                         case ECS::ELightType::kPoint:
                         {
-                            cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_point_light, obj_data, 0, 1, 1);
+                            cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_point_light, obj_data, 0, 1, 1);
                         }
                         break;
                         case ECS::ELightType::kSpot:
                         {
-                            cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_spot_light, obj_data, 0, 1, 1);
+                            cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_spot_light, obj_data, 0, 1, 1);
                         }
                         break;
                         case ECS::ELightType::kArea:
                         {
-                            cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_area_light, obj_data, 0, 1, 1);
+                            cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_area_light, obj_data, 0, 1, 1);
                         }
                         break;
                     }
@@ -115,11 +116,11 @@ namespace Ailu
                     const auto &t = r.GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
                     CBufferPerObjectData obj_data;
-                    obj_data._ObjectID = r.GetEntity<ECS::CLightProbe>(entity_index);
+                    obj_data._ObjectID = (i32)r.GetEntity<ECS::CLightProbe>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
-                    cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
+                    cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
                 }
                 entity_index = 0;
                 for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
@@ -127,11 +128,11 @@ namespace Ailu
                     const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
                     CBufferPerObjectData obj_data;
-                    obj_data._ObjectID = r.GetEntity<ECS::CCamera>(entity_index);
+                    obj_data._ObjectID = (i32)r.GetEntity<ECS::CCamera>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
-                    cmd->DrawRenderer(Mesh::s_p_quad.lock().get(), mat_camera, obj_data, 0, 1, 1);
+                    cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_camera, obj_data, 0, 1, 1);
                     ++entity_index;
                 }
                 //write to select buffer and draw debug outline
@@ -145,13 +146,13 @@ namespace Ailu
                         const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
                         if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
                         {
-                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
-                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
                         {
-                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
-                            cmd->DrawRenderer(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
                             Gizmo::DrawAABB(comp->_transformed_aabbs[0],Colors::kGreen);
                         }
                         if (auto c = r.GetComponent<ECS::CCollider>(entity))

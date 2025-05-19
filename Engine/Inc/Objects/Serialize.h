@@ -10,7 +10,7 @@
 namespace Ailu
 {
     class Archive;
-    class IPersistentable
+    class AILU_API IPersistentable
     {
     public:
         virtual ~IPersistentable() = default;
@@ -28,7 +28,11 @@ namespace Ailu
 
         virtual void InsertIndent(){};
         virtual void NewLine(){};
-        virtual const String &GetIndent() const{ return ""; };
+        virtual const String &GetIndent() const
+        { 
+            static String ret = "";
+            return ret;
+        };
         virtual void IncreaseIndent() {};
         virtual void DecreaseIndent() {};
         template<typename T>

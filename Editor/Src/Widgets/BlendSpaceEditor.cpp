@@ -4,6 +4,7 @@
 #include "Framework/Common/Input.h"
 namespace Ailu
 {
+    using namespace Render;
     namespace Editor
     {
 #define VEC2_TO_IMGUI_VEC2(vec) ImVec2(vec[0], vec[1])

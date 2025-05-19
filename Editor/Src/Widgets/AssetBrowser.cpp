@@ -20,6 +20,7 @@
 #undef CreateFile
 namespace Ailu
 {
+    using namespace Render;
     namespace Editor
     {
         static std::tuple<ImVec2, ImVec2> GetCurImguiWindowRect()
@@ -259,7 +260,6 @@ namespace Ailu
             pos.x += _left_pannel_width + 2;
             ImVec2 size = ImVec2(2.0f, ImGui::GetContentRegionAvail().y);
             ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
-            bool hovered, held;
             ImGui::BeginChild("LeftPane", ImVec2(_left_pannel_width, 0), true);
             // 左侧内容
             DrawTreePannel();
@@ -315,7 +315,7 @@ namespace Ailu
                     }
                     else
                         new_mat = MakeRef<Material>(selected_shader.get(), name);
-                    g_pResourceMgr->CreateAsset(ToWStr(asset_path), new_mat);
+                    g_pResourceMgr->CreateAsset(ToWChar(asset_path), new_mat);
                     g_pResourceMgr->SaveAllUnsavedAssets();
                 }
                 ImGui::CloseCurrentPopup();
@@ -381,7 +381,7 @@ namespace Ailu
                     {
                         WString path_str = dir_path.wstring();
                         PathUtils::FormatFilePathInPlace(path_str);
-                        WString new_dir = path_str.substr(0, path_str.find_last_of(L"/") + 1) + ToWStr(_rename_buffer);
+                        WString new_dir = path_str.substr(0, path_str.find_last_of(L"/") + 1) + ToWChar(_rename_buffer);
                         new_dir.append(L"/");
                         SearchFilterByDirectory filter({PathUtils::ExtractAssetPath(path_str)});
                         for (auto p: g_pResourceMgr->GetAssets(filter))
@@ -546,7 +546,7 @@ namespace Ailu
                 {
                     if (strcmp(file_name.c_str(), _rename_buffer) != 0)
                     {
-                        WString new_name = ToWStr(_rename_buffer);
+                        WString new_name = ToWChar(_rename_buffer);
                         WString old_path = ResourceMgr::GetResSysPath(asset->_asset_path);
                         WString new_path = PathUtils::RenameFile(old_path, new_name);
                         g_pResourceMgr->RenameAsset(asset, new_name);
@@ -688,7 +688,7 @@ namespace Ailu
                 if (ImGui::InputText("##Search", _search_buf, IM_ARRAYSIZE(_search_buf)))
                 {
                     if (strlen(_search_buf) != _search_str.size())
-                        _search_str = ToWStr(_search_buf);
+                        _search_str = ToWChar(_search_buf);
                     if (!_search_str.empty())
                     {
                         SearchFilterByFileName filter({_search_str});

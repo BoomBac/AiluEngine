@@ -2,7 +2,7 @@
 // Created by 22292 on 2024/10/27.
 //
 #include "RHI/DX12//Page.h"
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     Page::Page(u16 id, u64 size) : _id(id), _size(size),_available_num(size)
     {

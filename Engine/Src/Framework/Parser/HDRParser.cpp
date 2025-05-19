@@ -6,6 +6,7 @@
 //#endif // !STB_IMAGE_IMPLEMENTATION
 
 #include "Ext/stb/stb_image.h"
+using namespace Ailu::Render;
 
 namespace Ailu
 {

@@ -5,6 +5,8 @@
 
 namespace Ailu::ECS
 {
+    using namespace Render;
+
     Archive &operator<<(Archive &ar, const TagComponent &c)
     {
         ar.IncreaseIndent();
@@ -309,7 +311,7 @@ namespace Ailu::ECS
 
     CLightProbe::CLightProbe()
     {
-        _cubemap = RenderTexture::Create(512, "light probe", ERenderTargetFormat::kDefaultHDR, true, true, true);
+        _cubemap = RenderTexture::Create(512, "light probe", Ailu::Render::ERenderTargetFormat::ERenderTargetFormat::kDefaultHDR, true, true, true);
         _pass = MakeRef<CubeMapGenPass>(_cubemap.get());
         _debug_material = nullptr;
     }
@@ -423,6 +425,7 @@ namespace Ailu::ECS
 
 namespace Ailu
 {
+    using namespace Render;
     namespace DebugDrawer
     {
         void DebugWireframe(const ECS::CCollider &c, const Transform &t,Color color)

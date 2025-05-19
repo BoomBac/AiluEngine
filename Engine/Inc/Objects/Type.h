@@ -261,7 +261,7 @@ namespace Ailu
         static void RegisterEnum(Enum *enum_ptr);
         Enum() = default;
         explicit Enum(const EnumInitializer &initializer);
-        u32 EnumCount() const { return _str_to_enum_lut.size(); }
+        u32 EnumCount() const { return static_cast<u32>(_str_to_enum_lut.size()); }
         i32 GetIndexByName(const std::string &name) const;
         const Vector<const String *> &GetEnumNames() const { return _enum_names; };
         /// @brief 根据枚举值返回其名称

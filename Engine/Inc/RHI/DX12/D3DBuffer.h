@@ -9,8 +9,19 @@
 #include <map>
 
 using Microsoft::WRL::ComPtr;
+using Ailu::Render::GPUBuffer;
+using Ailu::Render::VertexBuffer;
+using Ailu::Render::IndexBuffer;
+using Ailu::Render::ConstantBuffer;
+using Ailu::Render::GPUBufferDesc;
+using Ailu::Render::EResourceState;
+using Ailu::Render::BindParams;
+using Ailu::Render::UploadParams;
+using Ailu::Render::GraphicsContext;
+using Ailu::Render::RHICommandBuffer;
+using Ailu::Render::VertexBufferLayout;
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     class D3DGPUBuffer : public GPUBuffer
     {
@@ -21,14 +32,24 @@ namespace Ailu
         void Name(const String &name) final;
         void ReadBack(u8 *dst, u32 size) final;
         void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete);
+		u32 GetCounter() final;
+		void SetCounter(u32 counter) final;
+
+		ID3D12Resource* GetCounterBuffer() {return _counter_buffer.Get();}
+		ID3D12Resource* GetNativeResource() {return _p_d3d_res.Get();}
+	protected:
+		void OnDataChanged() final;
+	public:
 		D3DResourceStateGuard _state_guard;
-		private:
-        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+		D3DResourceStateGuard _counter_state_guard;
+	private:
+        void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
 		void* NativeResource() {return reinterpret_cast<void*>(_p_d3d_res.Get());};
     private:
-        GPUVisibleDescriptorAllocation _alloc;
+        GPUVisibleDescriptorAllocation _uav_alloc,_srv_alloc,_counter_uav;
         ComPtr<ID3D12Resource> _p_d3d_res;
+        ComPtr<ID3D12Resource> _counter_buffer;
         D3D12_GPU_VIRTUAL_ADDRESS _gpu_ptr;
     };
 
@@ -39,7 +60,7 @@ namespace Ailu
 		~D3DVertexBuffer();
 		void Name(const String& name) final;
 		private:
-        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
 	private:
 		Vector<ComPtr<ID3D12Resource>> _vertex_buffers;
@@ -55,7 +76,7 @@ namespace Ailu
 		void Name(const String& name) final;
         void Resize(u32 new_size) final;
 	private:
-        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
 	private:
 		ComPtr<ID3D12Resource> _index_buf;
 		D3D12_INDEX_BUFFER_VIEW _index_buf_view;
@@ -68,7 +89,7 @@ namespace Ailu
 		~D3DConstantBuffer() override;
         void Reset() final;
 	private:
-        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
 	private:
         GpuResourceManager::Allocation _alloc;
 		bool _is_compute_buffer;

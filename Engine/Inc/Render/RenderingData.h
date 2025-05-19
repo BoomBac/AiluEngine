@@ -7,7 +7,12 @@
 #include "RendererAPI.h"
 #include "Texture.h"
 
-namespace Ailu
+namespace Ailu::RHI::DX12
+{
+    class D3DContext;
+}
+
+namespace Ailu::Render
 {
     enum class EShaderingMode : u8
     {
@@ -18,7 +23,8 @@ namespace Ailu
 
     struct AILU_API RenderingStates
     {
-        friend class D3DContext;
+        friend class Ailu::RHI::DX12::D3DContext;
+
         inline static u32 s_vertex_num = 0u;
         inline static u32 s_triangle_num = 0u;
         inline static u32 s_draw_call = 0u;

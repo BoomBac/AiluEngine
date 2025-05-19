@@ -1,7 +1,7 @@
 project (AiluHeadTool)
 set(AHT_ROOT_PATH ${CMAKE_SOURCE_DIR}/AiluHeadTool)
-set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
-set(ENGINE_LIB_ROOT ${ENGINE_ROOT_PATH}/lib/x64)
+#set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
+#set(ENGINE_LIB_ROOT ${ENGINE_ROOT_PATH}/lib/x64)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AHT_ROOT_PATH}/bin/x64)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${AHT_ROOT_PATH}/bin/x64/debug)
@@ -18,8 +18,8 @@ add_executable(AiluHeadTool "AiluHeadTool.h" "AiluHeadTool.cpp" "main.cpp"
 # 包含路径
 #target_include_directories(AiluHeadTool PUBLIC ${AHT_ROOT_PATH}/)
 #target_include_directories(AiluHeadTool PUBLIC ${AHT_ROOT_PATH}/Inc)
-target_include_directories(AiluHeadTool PUBLIC ${ENGINE_ROOT_PATH})
-target_include_directories(AiluHeadTool PUBLIC ${ENGINE_ROOT_PATH}/Inc)
+#target_include_directories(AiluHeadTool PUBLIC ${ENGINE_ROOT_PATH})
+#target_include_directories(AiluHeadTool PUBLIC ${ENGINE_ROOT_PATH}/Inc)
 # target_include_directories(Test PUBLIC ${ENGINE_ROOT_PATH}/Ext)
 
 # 宏定义

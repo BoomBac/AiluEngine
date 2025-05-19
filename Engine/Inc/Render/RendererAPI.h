@@ -4,7 +4,7 @@
 
 #include "Buffer.h"
 #include "Framework/Math/ALMath.hpp"
-namespace Ailu
+namespace Ailu::Render
 {
 	class RendererAPI
 	{

@@ -66,8 +66,15 @@ using Queue = std::queue<T>;
 template<typename Key, typename Value>
 using Map = std::map<Key, Value>;
 
-template<typename Key, typename Value>
-using HashMap = std::unordered_map<Key, Value>;
+template<
+    typename Key,
+    typename Value,
+    typename Hasher = std::hash<Key>,
+    typename KeyEqual = std::equal_to<Key>,
+    typename Allocator = std::allocator<std::pair<const Key, Value>>
+>
+using HashMap = std::unordered_map<Key, Value, Hasher, KeyEqual, Allocator>;
+
 
 template<typename T>
 using Scope = std::unique_ptr<T>;

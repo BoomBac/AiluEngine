@@ -12,9 +12,11 @@
 #include "Objects/Serialize.h"
 #include "Render/GraphicsPipelineStateObject.h"
 
+using namespace Ailu::Render;
 
 namespace Ailu
 {
+    using namespace SceneManagement;
     String ResourceMgr::GetResSysPath(const String &sub_path)
     {
         String path = sub_path;
@@ -64,6 +66,7 @@ namespace Ailu
                 L"Shaders/texture3d_drawer.alasset",
                 L"Shaders/standard_volume.alasset",
                 L"Shaders/motion_vector.alasset",
+                L"Shaders/terrain.alasset",
                 L"Shaders/water.alasset"};
         Vector<WString> shader_pathes = {
                 L"Shaders/hlsl/debug.hlsl",
@@ -209,6 +212,9 @@ namespace Ailu
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                {mgr->Load<Mesh>(mesh_path_torus);Mesh::s_p_torus = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_torus]); },
                                this);
+        JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
+                        {mgr->Load<Mesh>(L"Meshs/terrain_plane.alasset");},
+                        this);
 
         auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
         Vector3f *vertices = new Vector3f[4]{{-1.0f, 1.0f, 0.0f},
@@ -335,7 +341,7 @@ namespace Ailu
         auto sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
         std::wofstream out_asset_file(sys_path, std::ios::out | std::ios::trunc);
         AL_ASSERT(out_asset_file.is_open());
-        out_asset_file << "guid: " << ToWStr(asset->GetGuid().ToString()) << endl;
+        out_asset_file << "guid: " << ToWChar(asset->GetGuid().ToString()) << endl;
         out_asset_file << "type: " << EAssetType::ToString(asset->_asset_type) << endl;
         out_asset_file << "name: " << asset->_name << endl;
         out_asset_file.close();
@@ -436,8 +442,8 @@ namespace Ailu
             std::wstringstream wss;
             WString indent = L"  ";
             wss << indent << L"file: " << asset->_external_asset_path << std::endl;
-            wss << indent << L"vs_entry: " << ToWStr(vs.c_str()) << std::endl;
-            wss << indent << L"ps_entry: " << ToWStr(ps.c_str()) << std::endl;
+            wss << indent << L"vs_entry: " << ToWChar(vs.c_str()) << std::endl;
+            wss << indent << L"ps_entry: " << ToWChar(ps.c_str()) << std::endl;
             if (FileManager::WriteFile(sys_path, true, wss.str()))
             {
                 return;
@@ -456,7 +462,7 @@ namespace Ailu
             std::wstringstream wss;
             WString indent = L"  ";
             wss << indent << L"file: " << asset->_external_asset_path << std::endl;
-            //wss << indent << L"kernel: " << ToWStr(kernel.c_str()) << std::endl;
+            //wss << indent << L"kernel: " << ToWChar(kernel.c_str()) << std::endl;
             wss << indent << L"kernel: " << L"Noname" << std::endl;
             if (FileManager::WriteFile(sys_path, true, wss.str()))
             {
@@ -570,7 +576,7 @@ namespace Ailu
         {
             std::wstringstream wss;
             wss << L"file: " << asset->_external_asset_path << std::endl;
-            wss << L"inner_file_name: " << ToWStr(asset->_p_obj->Name().c_str()) << std::endl;
+            wss << L"inner_file_name: " << ToWChar(asset->_p_obj->Name().c_str()) << std::endl;
             if (FileManager::WriteFile(sys_path, true, wss.str()))
             {
                 return;
@@ -992,14 +998,14 @@ namespace Ailu
         if (asset_type == EAssetType::kMesh || asset_type == EAssetType::kSkeletonMesh)
         {
             //new_asset = MakeScope<Asset>(new_guid, EAssetType::kMesh, asset_path);
-            new_asset->_addi_info = std::format(L"_{}", ToWStr(obj->Name().c_str()));
+            new_asset->_addi_info = std::format(L"_{}", ToWChar(obj->Name().c_str()));
         }
         if (asset_type == EAssetType::kShader)
         {
             Shader *shader = dynamic_cast<Shader *>(obj.get());
             auto [vs, ps] = shader->GetShaderEntry();
             //new_asset = MakeScope<Asset>(new_guid, EAssetType::kShader, asset_path);
-            new_asset->_addi_info = std::format(L"_{}_{}", ToWStr(vs.c_str()), ToWStr(ps.c_str()));
+            new_asset->_addi_info = std::format(L"_{}_{}", ToWChar(vs.c_str()), ToWChar(ps.c_str()));
         }
         AL_ASSERT(new_asset != nullptr);
         if (obj)
@@ -1171,9 +1177,9 @@ namespace Ailu
         for (auto &[guid, asset]: _asset_db)
         {
             if (cur_count != db_size)
-                file << ToWStr(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
+                file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
             else
-                file << ToWStr(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type);
+                file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type);
             ++cur_count;
         }
         //_asset_db.clear();
@@ -1447,7 +1453,7 @@ namespace Ailu
             for (auto &mesh: mesh_list)
             {
                 WString imported_asset_path = created_asset_dir;
-                imported_asset_path.append(std::format(L"{}.alasset", ToWStr(mesh->Name().c_str())));
+                imported_asset_path.append(std::format(L"{}.alasset", ToWChar(mesh->Name().c_str())));
                 loaded_objects.push(std::make_tuple(imported_asset_path, mesh));
                 if (mesh_import_setting->_is_import_material)
                 {
@@ -1456,18 +1462,18 @@ namespace Ailu
                         auto mat = MakeRef<StandardMaterial>("MAT_" + it->_name);
                         if (!it->_textures[0].empty())
                         {
-                            auto albedo = ImportResource(ToWStr(it->_textures[0]));
+                            auto albedo = ImportResource(ToWChar(it->_textures[0]));
                             if (albedo != nullptr)
                                 mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, std::static_pointer_cast<Texture>(albedo).get());
                         }
                         if (!it->_textures[1].empty())
                         {
-                            auto normal = ImportResource(ToWStr(it->_textures[1]));
+                            auto normal = ImportResource(ToWChar(it->_textures[1]));
                             if (normal != nullptr)
                                 mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());
                         }
                         imported_asset_path = created_asset_dir;
-                        imported_asset_path.append(std::format(L"{}.alasset", ToWStr(mat->_name.c_str())));
+                        imported_asset_path.append(std::format(L"{}.alasset", ToWChar(mat->_name.c_str())));
                         loaded_objects.push(std::make_tuple(imported_asset_path, mat));
                     }
                 }
@@ -1476,7 +1482,7 @@ namespace Ailu
             {
                 //AnimationClipLibrary::AddClip(clip);
                 WString imported_asset_path = created_asset_dir;
-                imported_asset_path.append(std::format(L"{}.alasset", ToWStr(clip->Name().c_str())));
+                imported_asset_path.append(std::format(L"{}.alasset", ToWChar(clip->Name().c_str())));
                 loaded_objects.push(std::make_tuple(imported_asset_path, clip));
             }
         }
@@ -1485,7 +1491,7 @@ namespace Ailu
             asset_type = EAssetType::kTexture2D;
             auto tex = LoadExternalTexture(external_asset_path,dynamic_cast<const TextureImportSetting&>(*setting));
             WString imported_asset_path = created_asset_dir;
-            imported_asset_path.append(std::format(L"{}.alasset", ToWStr(tex->Name().c_str())));
+            imported_asset_path.append(std::format(L"{}.alasset", ToWChar(tex->Name().c_str())));
             loaded_objects.push(std::make_tuple(imported_asset_path, tex));
         }
         else {}

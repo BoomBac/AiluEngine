@@ -7,7 +7,9 @@
 #include <Framework/Common/Application.h>
 #include <Framework/Common/Log.h>
 
-namespace Ailu
+using namespace Ailu::Render;
+
+namespace Ailu::RHI::DX12
 {
     GPUResourcePage::GPUResourcePage(u16 id, D3D12_HEAP_TYPE type, u32 size) : Page(id,size),_type(type)
     {
@@ -54,7 +56,7 @@ namespace Ailu
         return s_GpuResourceManager;
     }
     //-------------------------------------------------------------------------------------------------------------------------------------------------
-    GpuResourceManager::Allocation &&GpuResourceManager::Allocate(u32 size, D3D12_HEAP_TYPE type)
+    GpuResourceManager::Allocation GpuResourceManager::Allocate(u32 size, D3D12_HEAP_TYPE type)
     {
         static bool s_first_alloc = true;
         if (s_first_alloc)
@@ -65,7 +67,7 @@ namespace Ailu
         }
         if (!_page_free_space_lut.contains(type))
         {
-            _page_free_space_lut[type] = std::multimap<u32, u32>{};
+            _page_free_space_lut[type] = std::multimap<u32, u16>{};
         }
         auto page_it = _page_free_space_lut[type].lower_bound(size);
         if (page_it == _page_free_space_lut[type].end())
@@ -77,20 +79,20 @@ namespace Ailu
         if (offset != -1)
         {
             _page_free_space_lut[type].erase(page_it);
-            _page_free_space_lut[type].emplace(std::make_pair(page.AvailableSize(), page.PageID()));
+            _page_free_space_lut[type].emplace(std::make_pair((u32)page.AvailableSize(),page.PageID()));
             if (type == D3D12_HEAP_TYPE_UPLOAD)
             {
                 Allocation allocation(page._id, offset, size);
                 allocation._cpu_ptr = reinterpret_cast<u8 *>(page._ptr_cpu) + offset;
                 allocation._gpu_ptr = page._ptr_gpu + offset;
-                return std::move(allocation);
+                return allocation;
             }
         }
         else
         {
             LOG_ERROR("GpuResourceManager::Allocate: allocate failed");
-            return Allocation(-1,0u,0u);
         }
+        return Allocation(-1,0u,0u);
     }
     void GpuResourceManager::Free(GpuResourceManager::Allocation &&handle)
     {
@@ -104,11 +106,11 @@ namespace Ailu
         for (auto& page : _pages)
         {
             release_num += page.ReleaseAllStaleBlock(Application::Application::Get().GetFrameCount());
-            _page_free_space_lut[page._type].emplace(std::make_pair(page.AvailableSize(), page.PageID()));
+            _page_free_space_lut[page._type].emplace(std::make_pair((u32)page.AvailableSize(), page.PageID()));
         }
         return release_num;
     }
-    std::multimap<u32, u32>::iterator GpuResourceManager::AddNewPage(D3D12_HEAP_TYPE type, u32 size)
+    std::multimap<u32, u16>::iterator GpuResourceManager::AddNewPage(D3D12_HEAP_TYPE type, u32 size)
     {
         GPUResourcePage new_page(static_cast<u16>(_pages.size()), type, size);
         _pages.emplace_back(std::move(new_page));

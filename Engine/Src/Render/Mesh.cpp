@@ -4,7 +4,7 @@
 #include "Framework/Common/Asset.h"
 #include "Framework/Common/Utils.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
 	Mesh::Mesh()
 	{
@@ -33,7 +33,7 @@ namespace Ailu
 	{
 		_vertices = vertices;
 	}
-	void Ailu::Mesh::SetNormals(Vector3f* normals)
+	void Mesh::SetNormals(Vector3f* normals)
 	{
 		_normals = normals;
 	}

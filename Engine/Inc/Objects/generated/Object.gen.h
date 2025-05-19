@@ -6,11 +6,11 @@
 //Class Object begin...........................
 #define OBJECT_GEN_H_16_GENERATED_BODY \
                             private: \
-                                friend Ailu::Type* Z_Construct_Object_Type();\
-                                static Ailu::Type* GetPrivateStaticClass();\
+                                friend Type* Z_Construct_Object_Type();\
+                                static Type* GetPrivateStaticClass();\
                             public:\
-                                static class Ailu::Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Ailu::Type  *GetType() const;
+                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() const;
                             //Class Object end...........................
 
 #undef CURRENT_FILE_ID

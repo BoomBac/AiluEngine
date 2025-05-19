@@ -4,6 +4,8 @@
 #include "Render/GraphicsContext.h"
 #include "pch.h"
 
+using namespace Ailu::Render;
+
 namespace Ailu
 {
     static Profiler g_Profiler;
@@ -15,7 +17,7 @@ namespace Ailu
 
     void Profiler::Initialize()
     {
-        g_Profiler._p_gpu_timer = g_pGfxContext->GetTimer();
+        g_Profiler._p_gpu_timer = GraphicsContext::Get().GetTimer();
         for(const auto& [id,name] : GetAllThreadNameMap())
         {
             g_Profiler._cpu_profiler_queue[id] = List<BlockMark>();

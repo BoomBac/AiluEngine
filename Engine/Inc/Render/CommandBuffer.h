@@ -13,6 +13,13 @@
 
 namespace Ailu
 {
+    namespace RHI::DX12
+    {
+        class D3DContext;
+    }
+
+    namespace Render
+    {
     enum class ECommandBufferType
     {
         kCommandBufTypeDirect = 0,
@@ -31,17 +38,19 @@ namespace Ailu
     class RHICommandBuffer : public Object
     {
     public:
-        explicit RHICommandBuffer(String name,ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect) : _cmd_type(type)
+        explicit RHICommandBuffer(String name, ECommandBufferType type = ECommandBufferType::kCommandBufTypeDirect) : _cmd_type(type)
         {
             _name = std::move(name);
         };
-        virtual ~RHICommandBuffer(){};
-        virtual void Clear(){};
+        virtual ~RHICommandBuffer() {};
+        virtual void Clear() {};
         virtual bool IsReady() const { return true; }
-        [[nodiscard]] ECommandBufferType  GetCommandBufferType() const { return _cmd_type; }
+        [[nodiscard]] ECommandBufferType GetCommandBufferType() const { return _cmd_type; }
         [[nodiscard]] bool IsExecuted() const { return _is_executed; }
+
     protected:
         bool _is_executed;
+
     private:
         ECommandBufferType _cmd_type;
     };
@@ -66,16 +75,17 @@ namespace Ailu
     struct GfxCommand;
     class AILU_API CommandBuffer : public Object
     {
-        friend class D3DContext;
+        friend class RHI::DX12::D3DContext;
+
     public:
         CommandBuffer(String name);
         ~CommandBuffer() override = default;
         void Clear();
-        void ClearRenderTarget(Color color,f32 depth,u8 stencil);
+        void ClearRenderTarget(Color color, f32 depth, u8 stencil);
         void ClearRenderTarget(Color c);
         void ClearRenderTarget(f32 depth, u8 stencil);
-        void ClearRenderTarget(Color* colors,u16 num,f32 depth,u8 stencil);
-        void ClearRenderTarget(Color* colors, u16 num);
+        void ClearRenderTarget(Color *colors, u16 num, f32 depth, u8 stencil);
+        void ClearRenderTarget(Color *colors, u16 num);
 
         void SetRenderTarget(RenderTexture *color, RenderTexture *depth);
         /// <summary>
@@ -89,16 +99,16 @@ namespace Ailu
         void SetRenderTarget(RTHandle color, RTHandle depth);
         void SetRenderTarget(RTHandle color, u16 index = 0u);
         /// @brief 立即生效
-        /// @param tex 
-        /// @param action 
-        void SetRenderTargetLoadAction(RenderTexture* tex, ELoadStoreAction action);
+        /// @param tex
+        /// @param action
+        void SetRenderTargetLoadAction(RenderTexture *tex, ELoadStoreAction action);
         /// @brief 立即生效
-        /// @param tex 
-        /// @param action 
+        /// @param tex
+        /// @param action
         void SetRenderTargetLoadAction(RTHandle handle, ELoadStoreAction action);
 
         void DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index = 0u);
-        void DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb,Material*mat,u16 pass_index,u16 instance_count);
+        void DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u16 instance_count);
 
         void SetViewport(const Rect &viewport);
         void SetScissorRect(const Rect &rect);
@@ -119,25 +129,32 @@ namespace Ailu
         void SetGlobalBuffer(const String &name, void *data, u64 data_size);
         void SetGlobalBuffer(const String &name, ConstantBuffer *buffer);
         void SetGlobalBuffer(const String &name, GPUBuffer *buffer);
-        void SetComputeBuffer(const String &name, u16 kernel,void *data, u64 data_size);
+        void SetComputeBuffer(const String &name, u16 kernel, void *data, u64 data_size);
         void SetGlobalTexture(const String &name, Texture *tex);
         void SetGlobalTexture(const String &name, RTHandle handle);
 
         void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_matrix, u16 sub_mesh = 0u, u32 instance_count = 1u);
-
-        void DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count = 1u);
-        void DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count = 1u);
-        void DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count);
-        void DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count);
-        void DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count);
+        void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count = 1u);
+        void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count = 1u);
+        void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count);
+        void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count);
+        void DrawMesh(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count);
+        void DrawMeshIndirect(Mesh *mesh,u16 sub_mesh, Material *material ,u16 pass_index,GPUBuffer* arg_buffer,u32 arg_offset = 0u);
 
         void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y);
         void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
+        void Dispatch(ComputeShader *cs, u16 kernel, GPUBuffer *arg_buffer, u16 arg_offset);
 
         void BeginProfiler(const String &name);
         void EndProfiler();
+        /// @brief 拷贝src的counter value到dst的目标位置，dst无需counter buffer
+        /// @param src
+        /// @param dst
+        /// @param dst_offset
+        void CopyCounterValue(GPUBuffer *src, GPUBuffer *dst, u32 dst_offset);
 
-        void StateTransition(GpuResource* res,EResourceState new_state,u32 sub_res = kTotalSubRes);
+        void StateTransition(GpuResource *res, EResourceState new_state, u32 sub_res = kTotalSubRes);
+
     private:
         Vector<GfxCommand *> _commands;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
@@ -158,6 +175,7 @@ namespace Ailu
         std::vector<std::tuple<bool, Ref<CommandBuffer>>> _cmd_buffers{};
         std::mutex _mutex;
     };
+}
 }// namespace Ailu
 
 

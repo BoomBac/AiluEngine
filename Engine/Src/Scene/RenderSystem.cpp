@@ -8,6 +8,7 @@
 #include <Render/RenderPipeline.h>
 #include "Framework/Common/Application.h"
 #include "DirectXMath.h"
+#include "Render/Features/RenderFeature.h"
 #include "DirectXPackedVector.h"
 
 using namespace DirectX;
@@ -17,6 +18,7 @@ namespace Ailu
 {
     namespace ECS
     {
+        using namespace Ailu::Render;
         #pragma region LightingSystem
         static Vector3f XMVecToVec3(const XMVECTOR &vec)
         {
@@ -28,33 +30,33 @@ namespace Ailu
         Ailu::ECS::LightingSystem::LightingSystem()
         {
             _light_probe_debug_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/cubemap_debug.hlsl"), "lightprobe_debug");
-
-            auto [probe_data, data_size] = FileManager::ReadFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"));
-            LightProbeHeadInfo head;
-            memcpy(&head, probe_data, sizeof(LightProbeHeadInfo));
-            u16 w = head._prefilter_size;
-            _test_prefilter_map = CubeMap::Create(w, true, ETextureFormat::kR11G11B10);
-            _test_radiance_map = CubeMap::Create(head._radiance_size, false, ETextureFormat::kR11G11B10);
-            u64 offset = sizeof(LightProbeHeadInfo);
-            for (u16 face = 1; face <= 6; face++)
-            {
-                for (u16 i = 0; i < _test_prefilter_map->MipmapLevel(); i++)
-                {
-                    auto [cur_w, cur_h] = Texture::CalculateMipSize(_test_prefilter_map->Width(), _test_prefilter_map->Width(), i);
-                    _test_prefilter_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, i);
-                    offset += cur_w * cur_h * GetPixelByteSize(_test_prefilter_map->PixelFormat());
-                }
-            }
-            for (u16 face = 1; face <= 6; face++)
-            {
-                _test_radiance_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, 0);
-                offset += head._radiance_size * head._radiance_size * GetPixelByteSize(_test_radiance_map->PixelFormat());
-            }
-            _test_prefilter_map->Name("_test_prefilter_map");
-            _test_prefilter_map->Apply();
-            _test_radiance_map->Name("_test_radiance_map");
-            _test_radiance_map->Apply();
-            delete[] probe_data;
+            //TODO: 似乎存在额外的对齐原因导致读写大小不匹配，后续在看看
+            //auto [probe_data, data_size] = FileManager::ReadFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"));
+            //LightProbeHeadInfo head;
+            //memcpy(&head, probe_data, sizeof(LightProbeHeadInfo));
+            //u16 w = head._prefilter_size;
+            //_test_prefilter_map = CubeMap::Create(w, true, ETextureFormat::kR11G11B10);
+            //_test_radiance_map = CubeMap::Create(head._radiance_size, false, ETextureFormat::kR11G11B10);
+            //u64 offset = sizeof(LightProbeHeadInfo);
+            //for (u16 face = 1; face <= 6; face++)
+            //{
+            //    for (u16 i = 0; i < _test_prefilter_map->MipmapLevel(); i++)
+            //    {
+            //        auto [cur_w, cur_h] = Texture::CalculateMipSize(_test_prefilter_map->Width(), _test_prefilter_map->Width(), i);
+            //        _test_prefilter_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, i);
+            //        offset += cur_w * cur_h * GetPixelByteSize(_test_prefilter_map->PixelFormat());
+            //    }
+            //}
+            //for (u16 face = 1; face <= 6; face++)
+            //{
+            //    _test_radiance_map->SetPixelData((ECubemapFace::ECubemapFace) face, probe_data + offset, 0);
+            //    offset += head._radiance_size * head._radiance_size * GetPixelByteSize(_test_radiance_map->PixelFormat());
+            //}
+            //_test_prefilter_map->Name("_test_prefilter_map");
+            //_test_prefilter_map->Apply();
+            //_test_radiance_map->Name("_test_radiance_map");
+            //_test_radiance_map->Apply();
+            //delete[] probe_data;
         }
 
         void LightingSystem::OnPushEntity(Entity e)
@@ -135,16 +137,16 @@ namespace Ailu
                         _light_probe_debug_mat->EnableKeyword("DEBUG_REFLECT");
                         _light_probe_debug_mat->SetTexture("_SrcCubeMap", comp._pass->_prefilter_cubemap.get());
                     }
-                    else if (comp._src_type == 3)
-                    {
-                        _light_probe_debug_mat->EnableKeyword("DEBUG_REFLECT");
-                        _light_probe_debug_mat->SetTexture("_SrcCubeMap", _test_prefilter_map.get());
-                    }
-                    else if (comp._src_type == 4)
-                    {
-                        _light_probe_debug_mat->DisableKeyword("DEBUG_REFLECT");
-                        _light_probe_debug_mat->SetTexture("_SrcCubeMap", _test_radiance_map.get());
-                    }
+                    //else if (comp._src_type == 3)
+                    //{
+                    //    _light_probe_debug_mat->EnableKeyword("DEBUG_REFLECT");
+                    //    _light_probe_debug_mat->SetTexture("_SrcCubeMap", _test_prefilter_map.get());
+                    //}
+                    //else if (comp._src_type == 4)
+                    //{
+                    //    _light_probe_debug_mat->DisableKeyword("DEBUG_REFLECT");
+                    //    _light_probe_debug_mat->SetTexture("_SrcCubeMap", _test_radiance_map.get());
+                    //}
                     else {}
                     _light_probe_debug_mat->SetFloat("_mipmap", comp._mipmap);
                     Shader::SetGlobalTexture("SkyBox", comp._cubemap.get());
@@ -417,7 +419,7 @@ namespace Ailu
                         //cam._is_gen_voxel = true;
                         vxgi._center = aabb.Center();
                         vxgi._size = Vector3f(voxel_size);
-                        vxgi._grid_size = vxgi._size / Vector3f(vxgi._grid_num.x, vxgi._grid_num.y, vxgi._grid_num.z);
+                        vxgi._grid_size = vxgi._size / Vector3f((f32)vxgi._grid_num.x,(f32) vxgi._grid_num.y,(f32) vxgi._grid_num.z);
                         aabb._min = vxgi._center - vxgi._size * 0.5f;
                         aabb._max = vxgi._center + vxgi._size * 0.5f;
                         Gizmo::DrawAABB(aabb, Colors::kYellow);

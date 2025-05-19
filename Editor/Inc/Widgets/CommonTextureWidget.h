@@ -4,7 +4,10 @@
 #include "ImGuiWidget.h"
 namespace Ailu
 {
-	class Texture;
+	namespace Render
+	{
+		class Texture;
+	}
 	namespace Editor
 	{
 #undef max
@@ -41,14 +44,14 @@ namespace Ailu
 			TextureDetailView();
 			~TextureDetailView();
 			void Open(const i32& handle) final;
-			void Open(const i32& handle, Texture* tex);
+			void Open(const i32& handle, Render::Texture* tex);
 			void Close(i32 handle) final;
 		private:
 			void ShowImpl() final;
 		private:
 			inline static const char* s_cubeface_str[] = { "+Y", "-X", "+Z", "+X","-Z","-Y" };
 			inline static const char* s_mipmap_str[] = { "mipmap0","mipmap1", "mipmap2", "mipmap3", "mipmap4", "mipmap5", "mipmap6", "mipmap7", "mipmap8", "mipmap9", "mipmap10", "mipmap11" };
-			Texture* _p_tex;
+			Render::Texture* _p_tex;
 			i32 _cur_mipmap_level = 0;
 		};
 	}

@@ -10,6 +10,7 @@
 
 namespace Ailu
 {
+    using namespace Render;
     namespace
     {
         static void SkinTask(SkeletonMesh *skined_mesh, const Vector<Matrix4x4f> &pose_palette, Vector3f *vert, Vector3f *norm, u32 begin, u32 end)

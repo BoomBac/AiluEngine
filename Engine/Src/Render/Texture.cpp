@@ -9,7 +9,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "Ext/stb/stb_image_write.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
 #pragma region Texture
     //-----------------------------------------------------------------------TextureNew----------------------------------------------------------------------------------
@@ -89,7 +89,7 @@ namespace Ailu
         return in_w <= w && in_h <= h && in_d <= d;
     }
 
-    Texture::Texture() : _mipmap_count(1), _pixel_format(EALGFormat::EALGFormat::kALGFormatUnknown), _dimension(ETextureDimension::kUnknown),
+    Texture::Texture() : _mipmap_count(1), _pixel_format(EALGFormat::EALGFormat::kALGFormatUNKOWN), _dimension(ETextureDimension::kUnknown),
                          _filter_mode(EFilterMode::kBilinear), _wrap_mode(EWrapMode::kClamp), _is_readble(false), _is_srgb(false), _pixel_size(0), _is_random_access(false)
     {
         _res_type = EGpuResType::kTexture;
@@ -97,7 +97,7 @@ namespace Ailu
     void Texture::Release()
     {
         _pixel_size = 0u;
-        _pixel_format = EALGFormat::EALGFormat::kALGFormatUnknown;
+        _pixel_format = EALGFormat::EALGFormat::kALGFormatUNKOWN;
         _dimension = ETextureDimension::kUnknown;
         _filter_mode = EFilterMode::kBilinear;
         _wrap_mode = EWrapMode::kClamp;
@@ -155,7 +155,7 @@ namespace Ailu
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                return MakeRef<D3DTexture2D>(initializer);
+                return MakeRef<RHI::DX12::D3DTexture2D>(initializer);
             }
         }
         AL_ASSERT_MSG(false, "Unsupport render api!");
@@ -196,7 +196,7 @@ namespace Ailu
         for (int i = 0; i < _pixel_data.size(); i++)
         {
             auto [w, h] = CalculateMipSize(_width, _height, i);
-            u64 cur_mipmap_byte_size = w * h * _pixel_size;
+            u64 cur_mipmap_byte_size = std::max<u64>(w * h * _pixel_size,4u);
             _pixel_data[i] = new u8[cur_mipmap_byte_size];
             memset(_pixel_data[i], 0, cur_mipmap_byte_size);
             _mem_size += cur_mipmap_byte_size;
@@ -292,7 +292,7 @@ namespace Ailu
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                return MakeRef<D3DCubeMap>(width, mipmap_chain, format, linear, random_access);
+                return MakeRef<RHI::DX12::D3DCubeMap>(width, mipmap_chain, format, linear, random_access);
             }
         }
         AL_ASSERT_MSG(false, "Unsupport render api!");
@@ -318,7 +318,7 @@ namespace Ailu
             for (u16 mipmap = 0; mipmap < _mipmap_count; ++mipmap)
             {
                 auto [w, h] = Texture::CalculateMipSize(_width, _width, mipmap);
-                u64 cur_mipmap_byte_size = w * h * _pixel_size;
+                u64 cur_mipmap_byte_size = std::max<u64>(w * h * _pixel_size, 4u);
                 _pixel_data[face * _mipmap_count + mipmap] = new u8[cur_mipmap_byte_size];
                 memset(_pixel_data[face * _mipmap_count + mipmap], 0, cur_mipmap_byte_size);
                 _mem_size += cur_mipmap_byte_size;
@@ -386,7 +386,7 @@ namespace Ailu
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                return MakeRef<D3DTexture3D>(initializer);
+                return MakeRef<RHI::DX12::D3DTexture3D>(initializer);
             }
         }
         AL_ASSERT_MSG(false, "Unsupport render api!");
@@ -524,7 +524,7 @@ namespace Ailu
                 desc._dimension = ETextureDimension::kTex2D;
                 desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, height) : 1;
                 desc._random_access = random_access;
-                auto rt = MakeScope<D3DRenderTexture>(desc);
+                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -548,7 +548,7 @@ namespace Ailu
                 desc._dimension = ETextureDimension::kTex2DArray;
                 desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, height) : 1;
                 desc._random_access = random_access;
-                auto rt = MakeScope<D3DRenderTexture>(desc);
+                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -571,7 +571,7 @@ namespace Ailu
                 desc._dimension = ETextureDimension::kCube;
                 desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, width) : 1;
                 desc._random_access = random_access;
-                auto rt = MakeScope<D3DRenderTexture>(desc);
+                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -590,7 +590,7 @@ namespace Ailu
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto rt = MakeScope<D3DRenderTexture>(desc);
+                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -614,7 +614,7 @@ namespace Ailu
                 desc._dimension = ETextureDimension::kCubeArray;
                 desc._mipmap_count = 0;
                 desc._random_access = random_access;
-                auto rt = MakeScope<D3DRenderTexture>(desc);
+                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -687,7 +687,7 @@ namespace Ailu
         for (int i = 0; i < _mipmap_count; i++)
         {
             auto [w, h, d] = CalculateMipSize(_width, _height, _depth, i);
-            u64 cur_mipmap_byte_size = w * h * d * _pixel_size;
+            u64 cur_mipmap_byte_size = std::max<u64>(w * h * _pixel_size, 4u);
             _mem_size += cur_mipmap_byte_size;
         }
         _mem_size *= slice_num;
@@ -804,7 +804,7 @@ namespace Ailu
             return;
         it->second->second._is_available = true;
     }
-    void Ailu::RenderTexturePool::RelesaeUnusedRT()
+    void RenderTexturePool::RelesaeUnusedRT()
     {
         for (auto it = _pool.begin(); it != _pool.end(); it++)
         {

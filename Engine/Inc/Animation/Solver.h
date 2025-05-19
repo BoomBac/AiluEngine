@@ -1,6 +1,8 @@
 //
 // Created by 22292 on 2024/10/16.
 //
+//disbale compile warning C4251
+#pragma warning(disable:4251)
 
 #ifndef AILU_SOLVER_H
 #define AILU_SOLVER_H
@@ -14,7 +16,7 @@
 
 namespace Ailu
 {
-    class IConstraint
+    class AILU_API IConstraint
     {
     public:
         virtual ~IConstraint() = default;

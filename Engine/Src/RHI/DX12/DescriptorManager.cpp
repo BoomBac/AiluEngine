@@ -5,7 +5,9 @@
 #include "RHI/DX12/dxhelper.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 
-namespace Ailu
+using namespace Ailu::Render;
+
+namespace Ailu::RHI::DX12
 {
 
 	#pragma region DescriptorPage
@@ -359,6 +361,25 @@ namespace Ailu
 		_main_page_index += alloc.DescriptorNum();
 		return ret_handle;
 	}
+	std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE,D3D12_GPU_DESCRIPTOR_HANDLE> GPUVisibleDescriptorAllocator::GetBindHandle(const GPUVisibleDescriptorAllocation& alloc)
+	{
+		std::lock_guard lock(g_mutex);
+		if (_main_page_index + alloc.DescriptorNum() > kMaxDescriptorNumPerPage)
+		{
+			_main_page_index = 1u;
+		}
+		D3D12_CPU_DESCRIPTOR_HANDLE dst_handle = _main_heap->GetCPUDescriptorHandleForHeapStart();
+		dst_handle.ptr += _desc_size * _main_page_index;
+		auto[src_handle,gh] = alloc.At(0u);
+		_device->CopyDescriptorsSimple(alloc.DescriptorNum(), dst_handle, src_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		D3D12_CPU_DESCRIPTOR_HANDLE ret_cpu_handle = _main_heap->GetCPUDescriptorHandleForHeapStart();
+		ret_cpu_handle.ptr += _desc_size * _main_page_index;
+		D3D12_GPU_DESCRIPTOR_HANDLE ret_gpu_handle = _main_heap->GetGPUDescriptorHandleForHeapStart();
+		ret_gpu_handle.ptr += _desc_size * _main_page_index;
+		_main_page_index += alloc.DescriptorNum();
+		return std::make_tuple(ret_cpu_handle,ret_gpu_handle);
+	}
+
 	void GPUVisibleDescriptorAllocator::CommitDescriptorsForDraw(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc)
 	{
 		auto cmd_heap_id = cmd->GetDescriptorHeapId();

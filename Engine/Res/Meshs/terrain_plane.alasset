@@ -1,0 +1,5 @@
+guid: 32414c6f-47f1-47a1-883c-678fac6e47e8
+type: kMesh
+name: terrain_plane
+file: Meshs/src_res/terrain_plane.fbx
+inner_file_name: TerrainPlane

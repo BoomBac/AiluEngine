@@ -59,8 +59,9 @@ namespace Ailu
             if (_jobs.size() < kMaxJobPoolSize)
             {
                 _jobs.push_back(new Job());
-                _free_indices.push(_jobs.size() - 1);
-                _job_to_index[_jobs.back()] = _jobs.size() - 1;
+                u32 index = static_cast<i32>(_jobs.size() - 1);
+                _free_indices.push(index);
+                _job_to_index[_jobs.back()] = index;
                 LOG_INFO("JobSystem::JobPool::Fetch: job pool resized to {}", _jobs.size());
                 return _jobs.back();
             }

@@ -8,6 +8,10 @@
 #include <list>
 #include <string>
 
+using Ailu::Render::Mesh;
+using Ailu::Render::Texture2D;
+using Ailu::Render::CubeMap;
+
 namespace Ailu
 {
     enum class EResourceType : u8
@@ -100,7 +104,7 @@ namespace Ailu
     public:
         virtual ~IMeshParser() = default;
         virtual void Parser(const WString &sys_path, const MeshImportSetting &import_setting) = 0;
-        virtual const List<ImportedMaterialInfo> &GetImportedMaterialInfos() const = 0;
+        virtual const List<Mesh::ImportedMaterialInfo> &GetImportedMaterialInfos() const = 0;
         virtual const List<Ref<AnimationClip>> &GetAnimationClips() const = 0;
         virtual void GetMeshes(List<Ref<Mesh>> &out_mesh) = 0;
     };
@@ -110,7 +114,7 @@ namespace Ailu
         u16 _width;
         u16 _height;
         Vector<u8*> _data;
-        ETextureFormat::ETextureFormat _format;
+        Render::ETextureFormat::ETextureFormat _format;
         ~TextureLoadData()
         {
             for (auto &d : _data)

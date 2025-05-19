@@ -5,8 +5,13 @@
 #include "Scene/Entity.hpp"
 namespace Ailu
 {
+	namespace Render
+	{
+		class Shader;
+	}
+
 	class SceneActor;
-	class Shader;
+
 	namespace Editor
 	{
 		class TextureSelector;
@@ -20,7 +25,7 @@ namespace Ailu
 		private:
 			void ShowImpl() final;
 			void ShowSceneActorPannel(ECS::Entity entity);
-			void ShowShaderPannel(Shader* s);
+			void ShowShaderPannel(Render::Shader* s);
 		private:
 			TextureSelector* _p_texture_selector = nullptr;
 			u32 _property_handle = 0u;

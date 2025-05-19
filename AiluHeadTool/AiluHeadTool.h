@@ -3,6 +3,8 @@
 #include <mutex>
 #include <vector>
 
+#include "NamespaceTracker.h"
+
 namespace fs = std::filesystem;
 using Path = std::filesystem::path;
 class AiluHeadTool
@@ -52,6 +54,7 @@ public:
         std::string _parent;
         std::string _export_id;
         std::string _gen_macro_body;
+        std::string _namespace;
         bool _is_abstract = false;
         bool is_export;
         std::vector<MemberInfo> _members;
@@ -81,4 +84,5 @@ private:
 private:
     std::vector<ClassInfo> _classes;
     std::vector<EnumInfo> _enums;
+    NamespaceTracker _tracker;
 };

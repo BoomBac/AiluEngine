@@ -4,7 +4,7 @@
 #include "RHI/DX12/D3DBuffer.h"
 #include "GlobalMarco.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
 	#pragma region GPUBuffer
     GPUBuffer *GPUBuffer::Create(GPUBufferDesc desc, const String &name)
@@ -16,7 +16,7 @@ namespace Ailu
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto buf = new D3DGPUBuffer(desc);
+                auto buf = new RHI::DX12::D3DGPUBuffer(desc);
                 buf->Name(name);
 				GraphicsContext::Get().CreateResource(buf);
                 return buf;
@@ -25,6 +25,16 @@ namespace Ailu
         AL_ASSERT_MSG(false, "Unsupported render api!");
         return nullptr;
     }
+
+	GPUBuffer *GPUBuffer::Create(EGPUBufferTarget target,u32 element_size,u32 element_num, const String &name)
+	{
+		GPUBufferDesc desc;
+		desc._element_num = element_num;
+		desc._element_size = element_size;
+		desc._size = element_num * element_size;
+		desc._target = target;
+		return Create(desc,name);
+	}
 	#pragma endregion
 
 	#pragma region VertexBuffer
@@ -37,7 +47,7 @@ namespace Ailu
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
-			auto buf = new D3DVertexBuffer(layout);
+			auto buf = new RHI::DX12::D3DVertexBuffer(layout);
 			return buf;
 		}
 		}
@@ -83,7 +93,7 @@ namespace Ailu
 			AL_ASSERT_MSG(false, "None render api used!");
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-			return new D3DIndexBuffer(indices, count,is_dynamic);
+			return new RHI::DX12::D3DIndexBuffer(indices, count,is_dynamic);
 		}
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;
@@ -121,7 +131,7 @@ namespace Ailu
 			AL_ASSERT_MSG(false, "None render api used!");
 			return nullptr;
 		case RendererAPI::ERenderAPI::kDirectX12:
-			return new D3DConstantBuffer(size, compute_buffer);
+			return new RHI::DX12::D3DConstantBuffer(size, compute_buffer);
 		}
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;

@@ -9,7 +9,6 @@ namespace Ailu
     {
         struct LightProbeHeadInfo
         {
-
             u16 _prefilter_size;
             u16 _radiance_size;
             EALGFormat::EALGFormat _format;
@@ -31,9 +30,9 @@ namespace Ailu
         private:
             void ProcessVXGI(Register& r);
         private:
-            Ref<Material> _light_probe_debug_mat;
-            Ref<CubeMap> _test_prefilter_map;
-            Ref<CubeMap> _test_radiance_map;
+            Ref<Render::Material> _light_probe_debug_mat;
+            Ref<Render::CubeMap> _test_prefilter_map;
+            Ref<Render::CubeMap> _test_radiance_map;
         };
     }// namespace ECS
 }// namespace Ailu

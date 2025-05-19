@@ -8,6 +8,8 @@
 #include "Render/Texture.h"
 namespace Ailu
 {
+    using Render::RenderTexture;
+
     namespace UI
     {
         class AILU_API Canvas : public UIElement

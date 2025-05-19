@@ -10,6 +10,7 @@
 using fbxsdk::FbxNodeAttribute;
 using fbxsdk::FbxCast;
 using fbxsdk::FbxNode;
+using namespace Ailu::Render;
 
 namespace Ailu
 {
@@ -381,7 +382,7 @@ namespace Ailu
                 FbxSurfaceMaterial *mat = node->GetMaterial(i);
                 if (mat)
                 {
-                    ImportedMaterialInfo mat_info(i, mat->GetName());
+                    Mesh::ImportedMaterialInfo mat_info(i, mat->GetName());
                     mat_info._textures[0] = fill_tex(mat->FindProperty(FbxSurfaceMaterial::sDiffuse));
                     mat_info._textures[1] = fill_tex(mat->FindProperty(FbxSurfaceMaterial::sNormalMap));
                     _loaded_materials.emplace_back(mat_info);

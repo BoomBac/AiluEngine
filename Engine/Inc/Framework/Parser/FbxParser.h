@@ -9,6 +9,7 @@
 
 namespace Ailu
 {
+    using Render::Mesh;
     class FbxParser : public IMeshParser
     {
     public:
@@ -16,7 +17,7 @@ namespace Ailu
         FbxParser();
         virtual ~FbxParser();
         void Parser(const WString &sys_path, const MeshImportSetting &import_setting) final;
-        const List<ImportedMaterialInfo> &GetImportedMaterialInfos() const final { return _loaded_materials; };
+        const List<Mesh::ImportedMaterialInfo> &GetImportedMaterialInfos() const final { return _loaded_materials; };
         const List<Ref<AnimationClip>> &GetAnimationClips() const final { return _loaded_anims; }
         void GetMeshes(List<Ref<Mesh>> &out_mesh) final
         {
@@ -54,7 +55,7 @@ namespace Ailu
         FbxArray<FbxString *> _fbx_anim_stack_names;
 
         std::mutex _parser_lock;
-        List<ImportedMaterialInfo> _loaded_materials;
+        List<Mesh::ImportedMaterialInfo> _loaded_materials;
         List<Ref<AnimationClip>> _loaded_anims;
         List<Ref<Mesh>> _loaded_meshes;
         WString _cur_file_sys_path;

@@ -186,7 +186,7 @@ namespace Ailu
     CCDSolver::CCDSolver() : Solver()
     {
     }
-    bool CCDSolver::Solve(const Ailu::Transform &target)
+    bool CCDSolver::Solve(const Transform &target)
     {
         if (_ik_chains.empty())
             return false;

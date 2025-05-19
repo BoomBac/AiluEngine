@@ -10,7 +10,7 @@
 #include "Render/RenderingData.h"
 #include "pch.h"
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     D3DCommandBuffer::D3DCommandBuffer(String name,ECommandBufferType type) : RHICommandBuffer(name,type)
     {
@@ -73,9 +73,19 @@ namespace Ailu
         }
         _is_executed = true;
     }
+
+    void D3DCommandBuffer::UploadDataToBuffer(void* src,u64 src_size,ID3D12Resource* dst,D3DResourceStateGuard& state_guard)
+    {
+        auto alloc = _upload_buf->Allocate(src_size,256);
+        alloc.SetData(src,src_size);
+        auto old_state = state_guard.CurState();
+        state_guard.MakesureResourceState(_p_cmd.Get(),D3D12_RESOURCE_STATE_COPY_DEST);
+        _p_cmd->CopyBufferRegion(dst, 0u, alloc._page_res, alloc._offset, src_size);
+        state_guard.MakesureResourceState(_p_cmd.Get(),old_state);
+    }
     void D3DCommandBuffer::Name(const String &name)
     {
-        auto wname = ToWStr(name);
+        auto wname = ToWChar(name);
         _p_cmd->SetName(wname.c_str());
         _p_alloc->SetName(wname.c_str());
         _name = name;

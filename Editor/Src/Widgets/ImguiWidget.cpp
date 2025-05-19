@@ -46,7 +46,7 @@ namespace Ailu
                     i32 new_value = old_value;
                     if (meta_info._is_range)
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min, meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info._min, (i32)meta_info._max);
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
@@ -61,7 +61,7 @@ namespace Ailu
                     i32 new_value = old_value;
                     if (meta_info._is_range)
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min, meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info._min, (i32)meta_info._max);
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
@@ -76,7 +76,7 @@ namespace Ailu
                     i32 new_value = old_value;
                     if (meta_info._is_range)
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min, meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info._min, (i32)meta_info._max);
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
@@ -91,7 +91,7 @@ namespace Ailu
                     i32 new_value = old_value;
                     if (meta_info._is_range)
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0 ? 0 : meta_info._min, meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0.0f ? 0 : (i32)meta_info._min, (i32)meta_info._max);
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
@@ -106,7 +106,7 @@ namespace Ailu
                     i32 new_value = old_value;
                     if (meta_info._is_range)
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0 ? 0 : meta_info._min, meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0 ? 0 : (i32)meta_info._min, (i32)meta_info._max);
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
@@ -121,7 +121,7 @@ namespace Ailu
                     i32 new_value = old_value;
                     if (meta_info._is_range)
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0 ? 0 : meta_info._min, meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0 ? 0 : (i32)meta_info._min, (i32)meta_info._max);
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
@@ -423,7 +423,7 @@ namespace Ailu
             std::lock_guard<std::mutex> lock(s_progress_lock);
             progress = std::clamp(progress, 0.0f, 1.0f);
             s_progress_infos.emplace_back(title, progress);
-            return s_progress_infos.size() - 1;
+            return (u32)(s_progress_infos.size() - 1);
         }
         void ImGuiWidget::RemoveProgressBar(u32 handle)
         {

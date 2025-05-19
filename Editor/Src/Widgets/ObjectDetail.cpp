@@ -13,6 +13,8 @@ namespace Ailu
 {
     namespace Editor
     {
+        using namespace Render;
+
         static u16 s_mini_tex_size = 64;
         static const String kNullStr = "null";
         namespace TreeStats
@@ -144,10 +146,10 @@ namespace Ailu
             ++property_handle;
             switch (prop._type)
             {
-                case Ailu::EShaderPropertyType::kFloat:
+                case EShaderPropertyType::kFloat:
                     ImGui::DragFloat(prop._prop_name.c_str(), static_cast<float *>(prop._value_ptr));
                     break;
-                case Ailu::EShaderPropertyType::kBool:
+                case EShaderPropertyType::kBool:
                 {
                     auto bool_value = (f32 *) prop._value_ptr;
                     bool old_value = *bool_value == 1.0f;
@@ -168,7 +170,7 @@ namespace Ailu
                     }
                 }
                 break;
-                case Ailu::EShaderPropertyType::kEnum:
+                case EShaderPropertyType::kEnum:
                 {
                     auto mat = dynamic_cast<Material *>(obj);
                     if (mat != nullptr)
@@ -177,7 +179,7 @@ namespace Ailu
                         auto it = keywords.find(prop._value_name);
                         if (it != keywords.end())
                         {
-                            f32 prop_value = prop._default_value.x;
+                            u64 prop_value = (u64)prop._default_value.x;
                             if (ImGui::BeginCombo(prop._prop_name.c_str(), it->second[prop_value].substr(it->second[prop_value].rfind("_") + 1).c_str()))
                             {
                                 static int s_selected_index = -1;
@@ -203,10 +205,10 @@ namespace Ailu
                         ImGui::Text("Non-Material Eunm %s value missing", prop._prop_name.c_str());
                 }
                 break;
-                case Ailu::EShaderPropertyType::kVector:
+                case EShaderPropertyType::kVector:
                     ImGui::DragFloat4(prop._prop_name.c_str(), static_cast<Vector3f *>(prop._value_ptr)->data);
                     break;
-                case Ailu::EShaderPropertyType::kColor:
+                case EShaderPropertyType::kColor:
                 {
                     ImGuiColorEditFlags_ flag = ImGuiColorEditFlags_None;
                     if (prop.IsHDRProperty())
@@ -219,7 +221,7 @@ namespace Ailu
                     ImGui::ColorEdit4(prop._prop_name.c_str(), static_cast<Vector4f *>(prop._value_ptr)->data,flag);
                 }
                 break;
-                case Ailu::EShaderPropertyType::kRange:
+                case EShaderPropertyType::kRange:
                 {
                     ImGui::Text("%s", prop._prop_name.c_str());
                     ImGui::SameLine();
@@ -231,7 +233,7 @@ namespace Ailu
                         prop.SetValue(new_value);
                 }
                 break;
-                case Ailu::EShaderPropertyType::kTexture2D:
+                case EShaderPropertyType::kTexture2D:
                 {
                     ImGui::Text("Texture2D : %s", prop._prop_name.c_str());
                     auto tex = (Texture *) prop._value_ptr;
@@ -248,7 +250,7 @@ namespace Ailu
                     }
                 }
                 break;
-                case Ailu::EShaderPropertyType::kTexture3D:
+                case EShaderPropertyType::kTexture3D:
                 {
                     ImGui::Text("Texture3D : %s", prop._prop_name.c_str());
                     auto tex = (Texture *) prop._value_ptr;
@@ -324,13 +326,13 @@ namespace Ailu
                     {
                         switch (prop->_type)
                         {
-                            case Ailu::EShaderPropertyType::kVector:
+                            case EShaderPropertyType::kVector:
                             {
                                 ImGui::DragFloat4("##f4", static_cast<Vector4f *>(prop->_value_ptr)->data);
                                 mat->SetVector(prop->_value_name, *static_cast<Vector4f *>(prop->_value_ptr));
                             }
                             break;
-                            case Ailu::EShaderPropertyType::kColor:
+                            case EShaderPropertyType::kColor:
                             {
                                 ImGuiColorEditFlags_ flag = ImGuiColorEditFlags_None;
                                 if (prop->IsHDRProperty())
@@ -344,7 +346,7 @@ namespace Ailu
                                 mat->SetVector(prop->_value_name, *static_cast<Vector4f *>(prop->_value_ptr));
                             }
                             break;
-                            case Ailu::EShaderPropertyType::kRange:
+                            case EShaderPropertyType::kRange:
                             {
                                 ImGui::SliderFloat("##r", static_cast<float *>(prop->_value_ptr), prop->_default_value[0], prop->_default_value[1]);
                                 mat->SetFloat(prop->_value_name, *static_cast<f32 *>(prop->_value_ptr));

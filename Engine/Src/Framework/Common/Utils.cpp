@@ -11,7 +11,7 @@ namespace Ailu
     {
         std::lock_guard<std::mutex> lock(s_thread_name_mutex);
 #if defined(PLATFORM_WINDOWS)
-        SetThreadDescription(GetCurrentThread(), ToWStr(name).c_str());
+        SetThreadDescription(GetCurrentThread(), ToWChar(name).c_str());
 #endif
         s_thread_names[std::this_thread::get_id()] = name;
     }

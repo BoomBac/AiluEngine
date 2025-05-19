@@ -11,9 +11,16 @@
 #include "Render/Texture.h"
 using Microsoft::WRL::ComPtr;
 
-namespace Ailu
+using namespace Ailu::Render;
+
+namespace Ailu::Render
 {
     class ComputeShader;
+}
+using Ailu::Render::ComputeShader;
+
+namespace Ailu::RHI::DX12
+{
     struct D3DTextureViewInfo
     {
     public:
@@ -50,12 +57,12 @@ namespace Ailu
         Texture::ETextureViewType _view_type;
     };
 
-    class D3DTexture2D : public Texture2D
+    class D3DTexture2D : public Render::Texture2D
     {
         friend class DDSParser;
 
     public:
-        D3DTexture2D(const Texture2DInitializer& initializer);
+        D3DTexture2D(const Render::Texture2DInitializer& initializer);
         ~D3DTexture2D();
         void Release() final;
         //for texture2d(s)
@@ -68,14 +75,14 @@ namespace Ailu
         
         private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
-        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:
         D3DResourceStateGuard _state_guard;
         ComPtr<ID3D12Resource> _p_d3dres;
         Map<u16, D3DTextureViewInfo> _views;
     };
 
-    class D3DCubeMap : public CubeMap
+    class D3DCubeMap : public Render::CubeMap
     {
     public:
         D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
@@ -87,17 +94,17 @@ namespace Ailu
 
         private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
-        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:
         ComPtr<ID3D12Resource> _p_d3dres;
         D3DResourceStateGuard _state_guard;
         Map<u16, D3DTextureViewInfo> _views;
     };
 
-    class D3DTexture3D : public Texture3D
+    class D3DTexture3D : public Render::Texture3D
     {
     public:
-        explicit D3DTexture3D(const Texture3DInitializer &initializer);
+        explicit D3DTexture3D(const Render::Texture3DInitializer &initializer);
         ~D3DTexture3D() override;
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) final;
         [[nodiscard]] TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) const final;
@@ -107,7 +114,7 @@ namespace Ailu
         void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
     private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
-        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:
         ComPtr<ID3D12Resource> _p_d3dres;
         D3DResourceStateGuard _state_guard;
@@ -144,7 +151,7 @@ namespace Ailu
         
         private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
-        void BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params) final;
+        void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:
         D3D12_RESOURCE_DESC _tex_desc{};
         ComPtr<ID3D12Resource> _p_d3dres;

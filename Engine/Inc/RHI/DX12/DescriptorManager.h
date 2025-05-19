@@ -11,7 +11,7 @@
 暂时为了简单起见，直接套用cpu的版本的设计，目前也没有使用描述符表的特性，每个表中只有一个描述符（见D3DShader中根签名生成部分）2024.4.20
 */
 using Microsoft::WRL::ComPtr;
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
 	#pragma region CPUDescriptorScope
 	struct DescriptorPage
@@ -223,10 +223,8 @@ namespace Ailu
 		void Free(GPUVisibleDescriptorAllocation&& handle);
 		u32 ReleaseSpace();
 		void AllocationInfo(u32& total_num, u32& available_num) const;
-		/// @brief 将传入的描述符分配对象拷贝到绑定堆并返回其在绑定堆中的gpu句柄
-		/// @param alloc 
-		/// @return 
 		D3D12_GPU_DESCRIPTOR_HANDLE GetBindGpuHandle(const GPUVisibleDescriptorAllocation& alloc);
+		std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE,D3D12_GPU_DESCRIPTOR_HANDLE> GetBindHandle(const GPUVisibleDescriptorAllocation& alloc);
 		ID3D12DescriptorHeap* GetBindHeap() {return _main_heap.Get();}
 	private:
 		void CommitDescriptorsForDraw(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc);
@@ -269,7 +267,14 @@ namespace Ailu
 			_cpu_alloc->ReleaseSpace();
 			return _gpu_alloc->ReleaseSpace();
 		}
+		/// @brief 将传入的描述符分配对象拷贝到绑定堆并返回其在绑定堆中的gpu句柄
+		/// @param alloc 
+		/// @return 
 		D3D12_GPU_DESCRIPTOR_HANDLE GetBindGpuHandle(const GPUVisibleDescriptorAllocation& alloc) {return _gpu_alloc->GetBindGpuHandle(alloc);};
+		/// @brief 将传入的描述符分配对象拷贝到绑定堆并返回其在绑定堆中的cpu和gpu句柄
+		/// @param alloc 
+		/// @return 
+		std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE,D3D12_GPU_DESCRIPTOR_HANDLE> GetBindHandle(const GPUVisibleDescriptorAllocation& alloc) {return _gpu_alloc->GetBindHandle(alloc);};
 		ID3D12DescriptorHeap* GetBindHeap() {return _gpu_alloc->GetBindHeap();}
 		void CommitDescriptorsForDraw(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc) {
 			_gpu_alloc->CommitDescriptorsForDraw(cmd,slot,alloc);

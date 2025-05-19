@@ -7,7 +7,7 @@
 
 #include "GlobalMarco.h"
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     class Page
     {

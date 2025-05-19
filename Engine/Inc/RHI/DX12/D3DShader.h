@@ -11,18 +11,35 @@
 
 
 using Microsoft::WRL::ComPtr;
+using Ailu::Render::EShaderDateType;
+using Ailu::Render::EShaderType;
+using Ailu::Render::Shader;
+using Ailu::Render::ComputeShader;
+using Ailu::Render::VertexInputLayout;
+using Ailu::Render::RasterizerState;
+using Ailu::Render::EBlendFactor;
+using Ailu::Render::EBlendOp;
+using Ailu::Render::BlendState;
+using Ailu::Render::EColorMask;
+using Ailu::Render::ECompareFunc;
+using Ailu::Render::EStencilOp;
+using Ailu::Render::DepthStencilState;
+using Ailu::Render::ETopology;
+using Ailu::Render::ShaderVariantHash;
+using Ailu::Render::ECullMode;
+using Ailu::Render::EFillMode;
 
-namespace Ailu
+namespace Ailu::RHI::DX12
 {
     namespace D3DConvertUtils
     {
         static EShaderDateType GetShaderDataType(const char *semantic, u8 mask)
         {
             String set_str(semantic);
-            if (su::Equal(set_str, RenderConstants::kSemanticPosition) || su::Equal(set_str, RenderConstants::kSemanticNormal) || 
-            su::Equal(set_str, RenderConstants::kSemanticTangent) || su::Equal(set_str, RenderConstants::kSemanticColor) || 
-            su::Equal(set_str, RenderConstants::kSemanticTexcoord) || su::Equal(set_str, RenderConstants::kSemanticBoneWeight) || 
-            su::BeginWith(set_str, RenderConstants::kSemanticTexcoord))
+            if (su::Equal(set_str, Render::RenderConstants::kSemanticPosition) || su::Equal(set_str, Render::RenderConstants::kSemanticNormal) || 
+            su::Equal(set_str, Render::RenderConstants::kSemanticTangent) || su::Equal(set_str, Render::RenderConstants::kSemanticColor) || 
+            su::Equal(set_str, Render::RenderConstants::kSemanticTexcoord) || su::Equal(set_str, Render::RenderConstants::kSemanticBoneWeight) || 
+            su::BeginWith(set_str, Render::RenderConstants::kSemanticTexcoord))
             {
                 if (mask == 15)//1111b
                     return EShaderDateType::kFloat4;
@@ -35,7 +52,7 @@ namespace Ailu
                 else
                     return EShaderDateType::kNone;
             }
-            else if (su::Equal(set_str, RenderConstants::kSemanticBoneIndex))
+            else if (su::Equal(set_str, Render::RenderConstants::kSemanticBoneIndex))
             {
                 if (mask == 15)
                     return EShaderDateType::kuInt4;
@@ -48,10 +65,11 @@ namespace Ailu
                 else
                     return EShaderDateType::kNone;
             }
-            else if (su::Equal(set_str, RenderConstants::kSemanticVertexIndex) || su::Equal(set_str, RenderConstants::kSemanticInstanceID))
+            else if (su::Equal(set_str, Render::RenderConstants::kSemanticVertexIndex) || su::Equal(set_str, Render::RenderConstants::kSemanticInstanceID))
                 return EShaderDateType::kNone;
             return EShaderDateType::kNone;
         }
+        
         static DXGI_FORMAT GetGXGIFormatByShaderDataType(EShaderDateType data_type)
         {
             switch (data_type)
@@ -74,9 +92,10 @@ namespace Ailu
                     return DXGI_FORMAT_UNKNOWN;
             }
         }
+        
         static std::tuple<D3D12_INPUT_ELEMENT_DESC *, u8> ConvertToD3D12InputLayout(const VertexInputLayout &layout)
         {
-            static D3D12_INPUT_ELEMENT_DESC desc_arr[RenderConstants::kMaxVertexAttrNum];
+            static D3D12_INPUT_ELEMENT_DESC desc_arr[Render::RenderConstants::kMaxVertexAttrNum];
             u8 layout_index = 0;
             for (auto &it: layout)
             {
@@ -165,23 +184,23 @@ namespace Ailu
         {
             switch (mask)
             {
-                case Ailu::EColorMask::kRED:
+                case EColorMask::kRED:
                     return D3D12_COLOR_WRITE_ENABLE_RED;
-                case Ailu::EColorMask::kGREEN:
+                case EColorMask::kGREEN:
                     return D3D12_COLOR_WRITE_ENABLE_GREEN;
-                case Ailu::EColorMask::kBLUE:
+                case EColorMask::kBLUE:
                     return D3D12_COLOR_WRITE_ENABLE_BLUE;
-                case Ailu::EColorMask::kALPHA:
+                case EColorMask::kALPHA:
                     return D3D12_COLOR_WRITE_ENABLE_ALPHA;
-                case Ailu::EColorMask::k_NONE:
+                case EColorMask::k_NONE:
                     return 0u;
-                case Ailu::EColorMask::k_RGB:
+                case EColorMask::k_RGB:
                     return (D3D12_COLOR_WRITE_ENABLE_RED | D3D12_COLOR_WRITE_ENABLE_GREEN | D3D12_COLOR_WRITE_ENABLE_BLUE);
-                case Ailu::EColorMask::k_RGBA:
+                case EColorMask::k_RGBA:
                     return D3D12_COLOR_WRITE_ENABLE_ALL;
-                case Ailu::EColorMask::k_RG:
+                case EColorMask::k_RG:
                     return (D3D12_COLOR_WRITE_ENABLE_RED | D3D12_COLOR_WRITE_ENABLE_GREEN);
-                case Ailu::EColorMask::k_BA:
+                case EColorMask::k_BA:
                     return (D3D12_COLOR_WRITE_ENABLE_BLUE | D3D12_COLOR_WRITE_ENABLE_ALPHA);
             }
             return D3D12_COLOR_WRITE_ENABLE_ALL;
@@ -325,7 +344,7 @@ namespace Ailu
                 ComPtr<ID3D12ShaderReflection> _p_v_reflection;
                 ComPtr<ID3D12ShaderReflection> _p_p_reflection;
                 ComPtr<ID3D12ShaderReflection> _p_g_reflection;
-                D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[RenderConstants::kMaxVertexAttrNum];
+                D3D12_INPUT_ELEMENT_DESC _vertex_input_layout[Render::RenderConstants::kMaxVertexAttrNum];
             };
             Map<ShaderVariantHash, D3DVariantElement> _variants;
             D3D12_PRIMITIVE_TOPOLOGY _topology = D3D12_PRIMITIVE_TOPOLOGY::D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -372,7 +391,7 @@ namespace Ailu
         /// @param thread_group_x 
         /// @param thread_group_y 
         /// @param thread_group_z 
-        void Bind(RHICommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z) final;
+        void Bind(RHICommandBuffer *cmd, u16 kernel) final;
     private:
         bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash) final;
         void GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash);

@@ -41,8 +41,8 @@ namespace Ailu
     {                                                                              \
         if (!(cond))                                                                  \
         {                                                                          \
-            if (Ailu::pow2::Assert::ReportFailure(#cond, __FILE__, __LINE__, 0) == \
-                Ailu::pow2::Assert::Halt)                                          \
+            if (pow2::Assert::ReportFailure(#cond, __FILE__, __LINE__, 0) == \
+                pow2::Assert::Halt)                                          \
                 POW2_HALT();                                                       \
         }                                                                          \
     } while (0)
@@ -52,8 +52,8 @@ namespace Ailu
     {                                                                                               \
         if (!(cond))                                                                                   \
         {                                                                                           \
-            if (Ailu::pow2::Assert::ReportFailure(#cond, __FILE__, __LINE__, (msg), __VA_ARGS__) == \
-                Ailu::pow2::Assert::Halt)                                                           \
+            if (pow2::Assert::ReportFailure(#cond, __FILE__, __LINE__, (msg), __VA_ARGS__) == \
+                pow2::Assert::Halt)                                                           \
                 POW2_HALT();                                                                        \
         }                                                                                           \
     } while (0)
@@ -61,8 +61,8 @@ namespace Ailu
 #define POW2_ASSERT_FAIL(msg, ...)                                                          \
     do                                                                                      \
     {                                                                                       \
-        if (Ailu::pow2::Assert::ReportFailure(0, __FILE__, __LINE__, (msg), __VA_ARGS__) == \
-            Ailu::pow2::Assert::Halt)                                                       \
+        if (pow2::Assert::ReportFailure(0, __FILE__, __LINE__, (msg), __VA_ARGS__) == \
+            pow2::Assert::Halt)                                                       \
             POW2_HALT();                                                                    \
     } while (0)
 

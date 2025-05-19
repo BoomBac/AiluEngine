@@ -3,6 +3,7 @@
 
 #include "Test.h"
 #include <Framework/Common/TimeMgr.h>
+#include <Framework/Common/Allocator.hpp>
 #include <Framework/Math/ALMath.hpp>
 #include <Framework/Math/Random.hpp>
 #include <Render/Texture.h>
@@ -66,5 +67,8 @@ struct MatrixCompute : public Test
 
 int main(int argc, char **argv)
 {
-
+    auto& alloc = Allocator::Get();
+    int* a = AL_NEW(int);
+    alloc.PrintLeaks();
+    Allocator::Shutdown();
 }

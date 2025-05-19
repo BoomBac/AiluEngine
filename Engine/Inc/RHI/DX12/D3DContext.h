@@ -16,15 +16,27 @@
 
 #include "Render/RenderConstants.h"
 #include "Render/GraphicsContext.h"
+#include "D3DResourceBase.h"
 #include "Platform/WinWindow.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/Common/Container.hpp"
 #include "DescriptorManager.h"
+#include "UploadBuffer.h"
 #include "Render/RenderPipeline.h"
+#include "Render/Shader.h"
 
 using Microsoft::WRL::ComPtr;
-namespace Ailu
+using Ailu::Render::RenderPipeline;
+using Ailu::Render::GpuResource;
+using Ailu::Render::GfxCommand;
+using Ailu::Render::Shader;
+using Ailu::Render::ComputeShader;
+using Ailu::Render::CommandBuffer;
+using Ailu::Render::RHICommandBuffer;
+using Ailu::Render::UploadParams;
+
+namespace Ailu::RHI::DX12
 {
     struct SubmitParams
     {
@@ -34,9 +46,9 @@ namespace Ailu
     class GpuCommandWorker
     {
     public:
-        GpuCommandWorker(GraphicsContext* context);
+        GpuCommandWorker(Render::GraphicsContext* context);
         ~GpuCommandWorker();
-        void Push(Vector<GfxCommand *>&& cmds,SubmitParams params);
+        void Push(Vector<GfxCommand *>&& cmds,SubmitParams&& params);
         void RunSync();
         //async scope
         void Start();
@@ -50,16 +62,29 @@ namespace Ailu
         {
             Vector<GfxCommand *> _cmds;
             SubmitParams _params;
+            CommandGroup() = default;
+            CommandGroup(Vector<GfxCommand *>&& cmds,SubmitParams&& params) : _cmds(std::move(cmds)), _params(std::move(params)){}
             ~CommandGroup()
             {
                 for(auto& c : _cmds)
-                    CommandPool::Get().Free(c);
+                    Render::CommandPool::Get().DeAlloc(c);
                 _cmds.clear();
             }
-            void operator=(CommandGroup&& other) noexcept
+            CommandGroup& operator=(CommandGroup&& other) noexcept
             {
                 for(auto& c : _cmds)
-                    CommandPool::Get().Free(c);
+                    Render::CommandPool::Get().DeAlloc(c);
+                _cmds.clear();
+                _params = other._params;
+                _cmds = std::move(other._cmds);
+                other._params = SubmitParams{};
+                other._cmds.clear();
+                return *this;
+            }
+            CommandGroup(CommandGroup&& other) noexcept
+            {
+                for(auto& c : _cmds)
+                    Render::CommandPool::Get().DeAlloc(c);
                 _cmds.clear();
                 _params = other._params;
                 _cmds = std::move(other._cmds);
@@ -68,20 +93,16 @@ namespace Ailu
             }
         };
         void RunAsync();
-        bool Pop(CommandGroup& group);
         void EndFrame();
     private:
-        LockFreeQueue<Object*> _pending_update_shaders;
-        std::mutex _mutex;
-        std::mutex _run_mutex;
-        Queue<CommandGroup> _cmd_queue;
+        Core::LockFreeQueue<Object*,64> _pending_update_shaders;
+        Core::LockFreeQueue<CommandGroup,512> _cmd_queue;
         std::thread* _worker_thread;
-        std::condition_variable _cv;
-        GraphicsContext* _ctx;
+        Render::GraphicsContext* _ctx;
         bool _is_stop;
     };
 
-    class D3DContext : public GraphicsContext
+    class D3DContext : public Render::GraphicsContext
     {
         friend class D3DCommandBuffer;
     public:
@@ -107,16 +128,19 @@ namespace Ailu
         void TrackResource(ComPtr<ID3D12Resource> resource);
 
         void ReadBack(GpuResource* res,u8* data,u32 size);
+
+        void ReadBack(ID3D12Resource* res,D3DResourceStateGuard& state_guard,u8* data, u32 size);
         void ReadBackAsync(GpuResource* res,std::function<void(u8*)> callback);
         void CreateResource(GpuResource* res) final;
         void CreateResource(GpuResource* res,UploadParams* params) final;
         void ProcessGpuCommand(GfxCommand * cmd,RHICommandBuffer* cmd_buffer) final;
         void SubmitGpuCommandSync(GfxCommand * cmd) final;
         void CompileShaderAsync(Shader* shader) final {_cmd_worker->SubmitUpdateShader(shader);};
-        void CompileShaderAsync(ComputeShader* shader) {_cmd_worker->SubmitUpdateShader(shader);};
+        void CompileShaderAsync(Render::ComputeShader* shader) {_cmd_worker->SubmitUpdateShader(shader);};
 
         void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd) final;
+        void ExecuteRHICommandBuffer(RHICommandBuffer* cmd) final;
         void WaitForGpu() final;
         void WaitForFence(u64 fence_value) final;
     #if defined(DEAR_IMGUI)
@@ -126,7 +150,6 @@ namespace Ailu
     #endif
 
     private:
-        void ExecuteRHICommandBuffer(RHICommandBuffer* cmd) final;
         void Destroy();
         void LoadPipeline();
         void LoadAssets();
@@ -144,14 +167,16 @@ namespace Ailu
         inline static const u32 kResourceCleanupIntervalTick = 2000u;
         //1600 * 900 * 4 * 20
         inline static constexpr u64 kMaxRenderTextureMemorySize = 115200000u;
+        inline static constexpr u32 kMaxIndirectDispatchCount = 2048u;
+        inline static constexpr u32 kMaxIndirectDrawCount     = 2048u;
         WinWindow* _window;
         //u32 _cbv_desc_num = 0u;
         // Pipeline objects.
         DXGI_FORMAT _backbuffer_format;
         ComPtr<IDXGISwapChain3> m_swapChain;
         ComPtr<ID3D12Device> m_device;
-        ComPtr<ID3D12Resource> _color_buffer[RenderConstants::kFrameCount];
-        ComPtr<ID3D12CommandAllocator> m_commandAllocators[RenderConstants::kFrameCount];
+        ComPtr<ID3D12Resource> _color_buffer[Render::RenderConstants::kFrameCount];
+        ComPtr<ID3D12CommandAllocator> m_commandAllocators[Render::RenderConstants::kFrameCount];
         ComPtr<ID3D12CommandQueue> m_commandQueue;
         ComPtr<ID3D12GraphicsCommandList> m_commandList;
         ComPtr<IDXGIAdapter4> _p_adapter;
@@ -180,7 +205,7 @@ namespace Ailu
         // Synchronization objects.
         u8 m_frameIndex;
         HANDLE m_fenceEvent;
-        u64 _fence_value[RenderConstants::kFrameCount];
+        std::atomic<u64> _fence_value[Render::RenderConstants::kFrameCount];
         ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
         std::multimap<u64, ComPtr<ID3D12Resource>> _global_tracked_resource;
         std::mutex _resource_task_lock;
@@ -190,9 +215,14 @@ namespace Ailu
         bool _is_next_frame_capture = false;
         bool _is_cur_frame_capturing = false;
         WString _cur_capture_name;
-        RenderPipeline* _pipiline = nullptr;
+        Render::RenderPipeline* _pipiline = nullptr;
         std::atomic<u32> _new_backbuffer_size;
         Scope<GpuCommandWorker> _cmd_worker;
+        //command signature
+        ComPtr<ID3D12CommandSignature> _dispatch_cmd_sig;
+        ComPtr<ID3D12CommandSignature> _draw_cmd_sig;
+        ComPtr<ID3D12CommandSignature> _draw_indexed_cmd_sig;
+        Scope<ReadbackBufferPool> _readback_pool;
     #if defined(DEAR_IMGUI)
         std::set<RenderTexture*,ObjectPtrCompare> _imgui_used_rt;
     #endif

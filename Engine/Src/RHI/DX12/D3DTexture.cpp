@@ -6,48 +6,37 @@
 #include "RHI/DX12/dxhelper.h"
 #include "pch.h"
 
-namespace Ailu
+using namespace Ailu::Render;
+
+namespace Ailu::RHI::DX12
 {
     static DXGI_FORMAT GetCompatibleSRVFormat(DXGI_FORMAT dx_format)
     {
-        if (dx_format == DXGI_FORMAT_D24_UNORM_S8_UINT)
-            return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-        else if (dx_format == DXGI_FORMAT_D32_FLOAT_S8X24_UINT)
-            return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
-        else if (dx_format == DXGI_FORMAT_D32_FLOAT)
-            return DXGI_FORMAT_R32_FLOAT;
-        else if (dx_format == DXGI_FORMAT_R16_FLOAT)
-            return DXGI_FORMAT_R16_FLOAT;
-        else
-            return dx_format;
+        if (dx_format == DXGI_FORMAT_D24_UNORM_S8_UINT) return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        else if (dx_format == DXGI_FORMAT_D32_FLOAT_S8X24_UINT) return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
+        else if (dx_format == DXGI_FORMAT_D32_FLOAT) return DXGI_FORMAT_R32_FLOAT;
+        else if (dx_format == DXGI_FORMAT_R16_FLOAT) return DXGI_FORMAT_R16_FLOAT;
+        else return dx_format;
     }
-    static u16 GetTextureSizePower2Info(const std::tuple<u16,u16>& size)
+
+    static u16 GetTextureSizePower2Info(const std::tuple<u16, u16> &size)
     {
         auto [w, h] = size;
-        if (w % 2 == 0 && h % 2 == 0)
-            return 0;
-        else if ( w % 2 != 0 && h % 2 == 0)
-            return 1;
-        else if (w % 2 == 0 && h % 2 != 0)
-            return 2;
-        else
-            return 3;
+        if (w % 2 == 0 && h % 2 == 0) return 0;
+        else if (w % 2 != 0 && h % 2 == 0) return 1;
+        else if (w % 2 == 0 && h % 2 != 0) return 2;
+        else return 3;
     }
-    #pragma region D3DTexture2D
+#pragma region D3DTexture2D
     //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
-    D3DTexture2D::D3DTexture2D(const Texture2DInitializer& initializer) : Texture2D(initializer)
-    {
-    }
+    D3DTexture2D::D3DTexture2D(const Texture2DInitializer &initializer) : Texture2D(initializer) {}
 
-    D3DTexture2D::~D3DTexture2D()
-    {
-        Release();
-    }
+    D3DTexture2D::~D3DTexture2D() { Release(); }
 
-    void D3DTexture2D::UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
+    void D3DTexture2D::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
-        GpuResource::UploadImpl(ctx,rhi_cmd,params);
-        auto d3d_ctx = dynamic_cast<D3DContext*>(ctx);
+        GpuResource::UploadImpl(ctx, rhi_cmd, params);
+        auto d3d_ctx = dynamic_cast<D3DContext *>(ctx);
         auto p_device = d3d_ctx->GetDevice();
         auto p_cmdlist = static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
         //ComPtr<ID3D12Resource> pTextureGPU;
@@ -72,9 +61,9 @@ namespace Ailu
             }
         }
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        _state_guard = D3DResourceStateGuard(is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON);
-        //_state_guard = D3DResourceStateGuard(D3D12_RESOURCE_STATE_COPY_DEST);
-        ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _state_guard.CurState(), nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        D3D12_RESOURCE_STATES init_state = is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
+        ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        _state_guard = D3DResourceStateGuard(_p_d3dres.Get(), init_state);
         if (is_data_filed)
         {
             ComPtr<ID3D12Resource> pTextureUpload;
@@ -97,7 +86,7 @@ namespace Ailu
                 subres_datas.emplace_back(subdata);
             }
             UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, subres_datas.data());
-            _state_guard.MakesureResourceState(p_cmdlist, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            _state_guard.MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             d3d_ctx->TrackResource(pTextureUpload);
         }
         {
@@ -116,9 +105,8 @@ namespace Ailu
             _views[kMainSRVIndex] = std::move(view_info);
         }
         CreateView(ETextureViewType::kSRV, 0);
-        if (_is_random_access)
-            CreateView(ETextureViewType::kUAV, 0);
-        _p_d3dres->SetName(ToWStr(_name).c_str());
+        if (_is_random_access) CreateView(ETextureViewType::kUAV, 0);
+        _p_d3dres->SetName(ToWChar(_name).c_str());
         _is_ready_for_rendering = true;
         Texture2D::CreateView();
     }
@@ -126,39 +114,31 @@ namespace Ailu
     void D3DTexture2D::Release()
     {
         Texture2D::Release();
-        if (g_pGfxContext)
-            g_pGfxContext->WaitForFence(_fence_value);
+        if (g_pGfxContext) g_pGfxContext->WaitForFence(_fence_value);
         _p_d3dres.Reset();
         _views.clear();
     }
 
-    void D3DTexture2D::BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params)
+    void D3DTexture2D::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
     {
-        if (auto bind_param = dynamic_cast<BindParamsTexture*>(params); bind_param != nullptr)
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        const auto &bp = params._params._texture_binder;
+        if (_views.contains(bp._view_idx))
         {
-            auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-            if (_views.contains(bind_param->_view_idx))
+            GpuResource::BindImpl(rhi_cmd, params);
+            auto view_type = _views[bp._view_idx]._view_type;
+            if (view_type == ETextureViewType::kSRV)
             {
-                GpuResource::BindImpl(rhi_cmd, params);
-                auto view_type = _views[bind_param->_view_idx]._view_type;
-                if (view_type == ETextureViewType::kSRV)
-                {
-                    _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, bind_param->_sub_res);
-                    if (params->_is_compute_pipeline)
-                        _views[bind_param->_view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, bind_param->_slot);
-                    else
-                        _views[bind_param->_view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, bind_param->_slot);
-                }
-                else if (view_type == ETextureViewType::kUAV)
-                {
-                    _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bind_param->_sub_res);
-                    _views[bind_param->_view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, bind_param->_slot);
-                }
-                else
-                {
-                    AL_ASSERT(false);
-                }
+                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, bp._sub_res);
+                if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
+                else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
+            else if (view_type == ETextureViewType::kUAV)
+            {
+                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
+                _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
+            }
+            else { AL_ASSERT(false); }
         }
     }
 
@@ -175,8 +155,7 @@ namespace Ailu
             return;
         }
         u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
-        if (_views.contains(view_index) || view_index == kMainSRVIndex)
-            return;
+        if (_views.contains(view_index) || view_index == kMainSRVIndex) return;
         D3DTextureViewInfo view_info(view_type, false);
         auto p_device = dynamic_cast<D3DContext *>(g_pGfxContext)->GetDevice();
         GPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
@@ -199,10 +178,7 @@ namespace Ailu
             slice_uav_desc.Texture2D.MipSlice = 0;
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
         }
-        else
-        {
-            AL_ASSERT(false);
-        }
+        else { AL_ASSERT(false); }
         view_info._gpu_handle = gpu_handle;
         view_info._gpu_alloc = std::move(alloc);
         _views[view_index] = std::move(view_info);
@@ -211,12 +187,8 @@ namespace Ailu
     TextureHandle D3DTexture2D::GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice) const
     {
         u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
-        if (_views.contains(idx))
-        {
-            return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr;
-        }
-        else
-            return 0;
+        if (_views.contains(idx)) { return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr; }
+        else return 0;
     }
 
     void D3DTexture2D::ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
@@ -228,8 +200,7 @@ namespace Ailu
     void D3DTexture2D::Name(const String &new_name)
     {
         _name = new_name;
-        if (_p_d3dres)
-            _p_d3dres->SetName(ToWStr(new_name).c_str());
+        if (_p_d3dres) _p_d3dres->SetName(ToWChar(new_name).c_str());
     }
 
     void D3DTexture2D::GenerateMipmap()
@@ -243,7 +214,7 @@ namespace Ailu
         auto [mip1w, mip1h] = CalculateMipSize(_width, _height, 1);
         mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 0)));
         mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip1w, 1.0f / (float) mip1h, 0.0f, 0.0f));
-        mipmap_gen->SetTexture("SrcMip", this,  ECubemapFace::kUnknown, 0);
+        mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 0);
         mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 1);
         mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 2);
         mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 3);
@@ -259,12 +230,12 @@ namespace Ailu
             mipmap_gen->SetInt("SrcDimension", GetTextureSizePower2Info(CalculateMipSize(_width, _height, 4)));
             mipmap_gen->SetBool("IsSRGB", false);
             mipmap_gen->SetVector("TexelSize", Vector4f(1.0f / (float) mip5w, 1.0f / (float) mip5h, 0.0f, 0.0f));
-            mipmap_gen->SetTexture("SrcMip", this,  ECubemapFace::kUnknown, 4);
+            mipmap_gen->SetTexture("SrcMip", this, ECubemapFace::kUnknown, 4);
             mipmap_gen->SetTexture("OutMip1", this, ECubemapFace::kUnknown, 5);
             mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 6);
             mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 7);
             mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 8);
-            cmd->Dispatch(mipmap_gen.get(), kernel, std::max(mip5w / 8,1), std::max(mip5h / 8,1), 1);
+            cmd->Dispatch(mipmap_gen.get(), kernel, std::max(mip5w / 8, 1), std::max(mip5h / 8, 1), 1);
         }
         if (_mipmap_count > 9)
         {
@@ -279,31 +250,26 @@ namespace Ailu
             mipmap_gen->SetTexture("OutMip2", this, ECubemapFace::kUnknown, 10);
             mipmap_gen->SetTexture("OutMip3", this, ECubemapFace::kUnknown, 11);
             mipmap_gen->SetTexture("OutMip4", this, ECubemapFace::kUnknown, 12);
-            cmd->Dispatch(mipmap_gen.get(), kernel, std::max(mip9w / 8,1), std::max(mip9h / 8,1) ,1);
+            cmd->Dispatch(mipmap_gen.get(), kernel, std::max(mip9w / 8, 1), std::max(mip9h / 8, 1), 1);
         }
-        cmd->StateTransition(this,D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
-    #pragma endregion
+#pragma endregion
     //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
-    
-    #pragma region D3DCubeMap
+
+#pragma region D3DCubeMap
     //----------------------------------------------------------------------------D3DCubeMap----------------------------------------------------------------------------
     D3DCubeMap::D3DCubeMap(u16 width, bool mipmap_chain, ETextureFormat::ETextureFormat format, bool linear, bool random_access)
-        : CubeMap(width, mipmap_chain, format, linear, random_access)
-    {
-    }
+        : CubeMap(width, mipmap_chain, format, linear, random_access) {}
 
-    D3DCubeMap::~D3DCubeMap()
-    {
-        g_pGfxContext->WaitForFence(_fence_value);
-    }
+    D3DCubeMap::~D3DCubeMap() { g_pGfxContext->WaitForFence(_fence_value); }
 
-    void D3DCubeMap::UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
+    void D3DCubeMap::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
-        GpuResource::UploadImpl(ctx,rhi_cmd,params);
-        auto d3d_ctx = dynamic_cast<D3DContext*>(ctx);
+        GpuResource::UploadImpl(ctx, rhi_cmd, params);
+        auto d3d_ctx = dynamic_cast<D3DContext *>(ctx);
         auto p_device = d3d_ctx->GetDevice();
         auto p_cmdlist = dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
         //ComPtr<ID3D12Resource> pTextureGPU;
@@ -319,10 +285,9 @@ namespace Ailu
         textureDesc.SampleDesc.Quality = 0;
         textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        _state_guard = D3DResourceStateGuard(_is_random_access ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_COPY_DEST);
-        ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _state_guard.CurState(),
-                                                        nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-
+        auto init_state = _is_random_access ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_COPY_DEST;
+        ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        _state_guard = D3DResourceStateGuard(_p_d3dres.Get(), init_state);
         const u32 subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
         const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
         heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -344,7 +309,7 @@ namespace Ailu
         }
 
         UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, cubemap_datas.data());
-        _state_guard.MakesureResourceState(p_cmdlist, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        _state_guard.MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         d3d_ctx->TrackResource(pTextureUpload);
         //Main srv
         {
@@ -369,12 +334,10 @@ namespace Ailu
         }
         for (u16 face = 1; face <= 6; face++)
         {
-            if (_is_random_access)
-                CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace) face, 0);
-            else
-                CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace) face, 0);
+            if (_is_random_access) CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace) face, 0);
+            else CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace) face, 0);
         }
-        _p_d3dres->SetName(ToWStr(_name).c_str());
+        _p_d3dres->SetName(ToWChar(_name).c_str());
         CubeMap::CreateView();
     }
 
@@ -391,8 +354,7 @@ namespace Ailu
             return;
         }
         u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
-        if (_views.contains(view_index))
-            return;
+        if (_views.contains(view_index)) return;
         D3DTextureViewInfo view_info(view_type, false);
         auto p_device = dynamic_cast<D3DContext *>(g_pGfxContext)->GetDevice();
         GPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
@@ -420,10 +382,7 @@ namespace Ailu
             slice_uav_desc.Texture2DArray.MipSlice = mipmap;
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
         }
-        else
-        {
-            AL_ASSERT(false);
-        }
+        else { AL_ASSERT(false); }
         view_info._gpu_handle = gpu_handle;
         view_info._gpu_alloc = std::move(alloc);
         _views[view_index] = std::move(view_info);
@@ -432,12 +391,8 @@ namespace Ailu
     TextureHandle D3DCubeMap::GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const
     {
         u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
-        if (_views.contains(idx))
-        {
-            return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr;
-        }
-        else
-            return 0;
+        if (_views.contains(idx)) { return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr; }
+        else return 0;
     }
 
     void D3DCubeMap::ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
@@ -446,39 +401,32 @@ namespace Ailu
         _views.erase(idx);
     }
 
-    void D3DCubeMap::BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params)
+    void D3DCubeMap::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
     {
-        if (auto param = dynamic_cast<BindParamsTexture*>(params);param != nullptr)
+        const auto &bp = params._params._texture_binder;
+        if (_views.contains(bp._view_idx))
         {
-            if (_views.contains(param->_view_idx))
+            GpuResource::BindImpl(rhi_cmd, params);
+            auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+            auto view_type = _views[bp._view_idx]._view_type;
+            if (view_type == ETextureViewType::kSRV)
             {
-                GpuResource::BindImpl(rhi_cmd, params);
-                auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-                auto view_type = _views[param->_view_idx]._view_type;
-                if (view_type == ETextureViewType::kSRV)
-                {
-                    _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, param->_sub_res);
-                    if (param->_is_compute_pipeline)
-                        _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, param->_slot);
-                    else
-                        _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, param->_slot);
-                }
-                else if (view_type == ETextureViewType::kUAV)
-                {
-                    _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, param->_sub_res);
-                    _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, param->_slot);
-                }
-                else
-                {
-                    AL_ASSERT(false);
-                }
+                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, bp._sub_res);
+                if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
+                else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
+            else if (view_type == ETextureViewType::kUAV)
+            {
+                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
+                _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
+            }
+            else { AL_ASSERT(false); }
         }
     }
-    #pragma endregion
+#pragma endregion
     //----------------------------------------------------------------------------D3DCubeMap-----------------------------------------------------------------------------
 
-    #pragma region D3DTexture3D
+#pragma region D3DTexture3D
     //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
     D3DTexture3D::D3DTexture3D(const Texture3DInitializer &initializer) : Texture3D(initializer)
     {
@@ -488,16 +436,15 @@ namespace Ailu
             _p_mipmapgen_cs1 = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
         }
     }
-    D3DTexture3D::~D3DTexture3D()
+
+    D3DTexture3D::~D3DTexture3D() { g_pGfxContext->WaitForFence(_fence_value); }
+
+    void D3DTexture3D::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
-        g_pGfxContext->WaitForFence(_fence_value);
-    }
-    void D3DTexture3D::UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
-    {
-        GpuResource::UploadImpl(ctx,rhi_cmd,params);
-        auto d3d_ctx = dynamic_cast<D3DContext*>(ctx);
+        GpuResource::UploadImpl(ctx, rhi_cmd, params);
+        auto d3d_ctx = dynamic_cast<D3DContext *>(ctx);
         auto p_device = d3d_ctx->GetDevice();
-        auto p_cmdlist = dynamic_cast<D3DCommandBuffer*>(rhi_cmd)->NativeCmdList();
+        auto p_cmdlist = dynamic_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList();
         //ComPtr<ID3D12Resource> pTextureGPU;
 
         D3D12_RESOURCE_DESC textureDesc{};
@@ -527,9 +474,9 @@ namespace Ailu
             }
         }
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        _state_guard = D3DResourceStateGuard(is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON);
-        //_state_guard = D3DResourceStateGuard(D3D12_RESOURCE_STATE_COPY_DEST);
-        ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, _state_guard.CurState(), nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        auto init_state = is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
+        ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        _state_guard = D3DResourceStateGuard(_p_d3dres.Get(), init_state);
         if (is_data_filed)
         {
             // 2. 创建上传缓冲区
@@ -542,15 +489,12 @@ namespace Ailu
             CD3DX12_RESOURCE_DESC uploadBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
             if (FAILED(p_device->CreateCommittedResource(
-                        &heap_prop,
-                        D3D12_HEAP_FLAG_NONE,
-                        &uploadBufferDesc,
-                        D3D12_RESOURCE_STATE_GENERIC_READ,
-                        nullptr,
-                        IID_PPV_ARGS(&uploadBuffer))))
-            {
-                throw std::runtime_error("Failed to create upload buffer");
-            }
+                &heap_prop,
+                D3D12_HEAP_FLAG_NONE,
+                &uploadBufferDesc,
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr,
+                IID_PPV_ARGS(&uploadBuffer)))) { throw std::runtime_error("Failed to create upload buffer"); }
             // 3. 填充上传缓冲区并复制每个 Mipmap 级别
             UINT8 *mappedData;
             D3D12_RANGE readRange = {};// 不需要读取回数据
@@ -608,7 +552,7 @@ namespace Ailu
                 currentDepth = std::max(1u, currentDepth / 2);
             }
             uploadBuffer->Unmap(0, nullptr);
-            _state_guard.MakesureResourceState(p_cmdlist, _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            _state_guard.MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             d3d_ctx->TrackResource(uploadBuffer);
         }
         {
@@ -627,41 +571,35 @@ namespace Ailu
             _views[kMainSRVIndex] = std::move(view_info);
         }
         CreateView(ETextureViewType::kSRV, 0, UINT16_MAX);
-        if (_is_random_access)
-            CreateView(ETextureViewType::kUAV, 0, UINT16_MAX);
-        _p_d3dres->SetName(ToWStr(_name).c_str());
+        if (_is_random_access) CreateView(ETextureViewType::kUAV, 0, UINT16_MAX);
+        _p_d3dres->SetName(ToWChar(_name).c_str());
         _is_ready_for_rendering = true;
         Texture3D::CreateView();
     }
-    void D3DTexture3D::BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params)
+
+    void D3DTexture3D::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
     {
-        if (auto param = dynamic_cast<BindParamsTexture*>(params); param != nullptr)
+        const auto &bp = params._params._texture_binder;
+        if (_views.contains(bp._view_idx))
         {
-            if (_views.contains(param->_view_idx))
+            GpuResource::BindImpl(rhi_cmd, params);
+            auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+            auto view_type = _views[bp._view_idx]._view_type;
+            if (view_type == ETextureViewType::kSRV)
             {
-                GpuResource::BindImpl(rhi_cmd, params);
-                auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-                auto view_type = _views[param->_view_idx]._view_type;
-                if (view_type == ETextureViewType::kSRV)
-                {
-                    _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, param->_sub_res);
-                    if (param->_is_compute_pipeline)
-                        _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, param->_slot);
-                    else
-                        _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, param->_slot);
-                }
-                else if (view_type == ETextureViewType::kUAV)
-                {
-                    _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, param->_sub_res);
-                    _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, param->_slot);
-                }
-                else
-                {
-                    AL_ASSERT(false);
-                }
+                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, bp._sub_res);
+                if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
+                else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
+            else if (view_type == ETextureViewType::kUAV)
+            {
+                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
+                _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
+            }
+            else { AL_ASSERT(false); }
         }
     }
+
     void D3DTexture3D::CreateView(Texture::ETextureViewType view_type, u16 mipmap, u16 dpeth_slice)
     {
         if (!_p_d3dres)
@@ -677,8 +615,7 @@ namespace Ailu
             return;
         }
         u16 view_index = CalculateViewIndex(view_type, mipmap, dpeth_slice);
-        if (_views.contains(view_index) || view_index == kMainSRVIndex)
-            return;
+        if (_views.contains(view_index) || view_index == kMainSRVIndex) return;
         D3DTextureViewInfo view_info(view_type, false);
         auto p_device = dynamic_cast<D3DContext *>(g_pGfxContext)->GetDevice();
         GPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
@@ -703,26 +640,25 @@ namespace Ailu
             slice_uav_desc.Texture3D.WSize = -1;
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
         }
-        else
-        {
-            AL_ASSERT(false);
-        }
+        else { AL_ASSERT(false); }
         view_info._gpu_handle = gpu_handle;
         view_info._gpu_alloc = std::move(alloc);
         _views[view_index] = std::move(view_info);
     }
+
     void D3DTexture3D::ReleaseView(Texture::ETextureViewType view_type, u16 mipmap, u16 dpeth_slice)
     {
         dpeth_slice = dpeth_slice == UINT16_MAX ? _depth : dpeth_slice;
         u16 idx = CalculateViewIndex(view_type, mipmap, dpeth_slice);
         _views.erase(idx);
     }
+
     void D3DTexture3D::Name(const String &new_name)
     {
         Object::Name(new_name);
-        if (_p_d3dres)
-            _p_d3dres->SetName(ToWStr(new_name).c_str());
+        if (_p_d3dres) _p_d3dres->SetName(ToWChar(new_name).c_str());
     }
+
     void D3DTexture3D::GenerateMipmap()
     {
         auto cmd = CommandBufferPool::Get("MipmapGen0");
@@ -742,7 +678,7 @@ namespace Ailu
         _p_mipmapgen_cs0->SetTexture("_OutMip4", this, 4);
         //保证线程数和第一级输出的mipmap像素数一一对应
         cmd->Dispatch(_p_mipmapgen_cs0.get(), kernel, mip1w / thread_num_x, mip1h / thread_num_y, mip1d / thread_num_z);
-        cmd->StateTransition(this,D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_UNORDERED_ACCESS),0);
+        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_UNORDERED_ACCESS), 0);
         if (_mipmap_count > 4)
         {
             auto [mip5w, mip5h, mip5d] = CalculateMipSize(_width, _height, _depth, 5);
@@ -757,31 +693,26 @@ namespace Ailu
             _p_mipmapgen_cs1->SetTexture("_OutMip3", this, 7);
             _p_mipmapgen_cs1->SetTexture("_OutMip4", this, 8);
             cmd->Dispatch(_p_mipmapgen_cs1.get(), kernel, mip5w / thread_num_x, mip5h / thread_num_y, mip5d / thread_num_z);
-            cmd->StateTransition(this,D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_UNORDERED_ACCESS),4);
+            cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_UNORDERED_ACCESS), 4);
         }
-        cmd->StateTransition(this,D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
+
     TextureHandle D3DTexture3D::GetView(Texture::ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) const
     {
         dpeth_slice = dpeth_slice == -1 ? _depth : dpeth_slice;
         u16 idx = CalculateViewIndex(view_type, mipmap, dpeth_slice);
-        if (_views.contains(idx))
-        {
-            return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr;
-        }
-        else
-            return 0;
+        if (_views.contains(idx)) { return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr; }
+        else return 0;
     }
-    void D3DTexture3D::StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res)
-    {
-        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer*>(rhi_cmd)->NativeCmdList(),_p_d3dres.Get(),D3DConvertUtils::FromALResState(new_state),sub_res);
-    }
-    //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
-    #pragma endregion
 
-    #pragma region D3DRenderTexture
+    void D3DTexture3D::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) { _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res); }
+    //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
+#pragma endregion
+
+#pragma region D3DRenderTexture
     //--------------------------------------------------------------------------D3DRenderTexture---------------------------------------------------------------------------
     static D3D12_RESOURCE_STATES ConvertToD3DResourceState(ETextureResState state)
     {
@@ -797,19 +728,13 @@ namespace Ailu
         return D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON;
     }
 
-    D3DRenderTexture::D3DRenderTexture(const RenderTextureDesc &desc) : RenderTexture(desc)
-    {
+    D3DRenderTexture::D3DRenderTexture(const RenderTextureDesc &desc) : RenderTexture(desc) {}
 
-    }
+    D3DRenderTexture::~D3DRenderTexture() { g_pGfxContext->WaitForFence(_fence_value); }
 
-    D3DRenderTexture::~D3DRenderTexture()
+    void D3DRenderTexture::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
-        g_pGfxContext->WaitForFence(_fence_value);
-    }
-
-    void D3DRenderTexture::UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) 
-    {
-        GpuResource::UploadImpl(ctx,rhi_cmd,params);
+        GpuResource::UploadImpl(ctx, rhi_cmd, params);
         D3D12_SRV_DIMENSION main_view_dimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         u16 texture_num = 1u;
         if (_dimension == ETextureDimension::kCube)
@@ -831,14 +756,13 @@ namespace Ailu
         }
         else {}
         bool is_for_depth = _depth_bit > 0;
-        auto p_device = static_cast<D3DContext*>(ctx)->GetDevice();
+        auto p_device = static_cast<D3DContext *>(ctx)->GetDevice();
         _tex_desc.MipLevels = _mipmap_count;
         //https://gamedev.stackexchange.com/questions/26687/what-are-the-valid-depthbuffer-texture-formats-in-directx-11-and-which-are-also
         //depth buffer format
         _tex_desc.Format = ConvertToDXGIFormat(_pixel_format);
         _tex_desc.Flags = is_for_depth ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        if (_is_random_access)
-            _tex_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        if (_is_random_access) _tex_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         _tex_desc.Width = std::max<u16>(_width, 1u);
         _tex_desc.Height = _height;
         _tex_desc.DepthOrArraySize = texture_num;
@@ -847,15 +771,13 @@ namespace Ailu
         _tex_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         D3D12_CLEAR_VALUE clear_value{};
         clear_value.Format = _tex_desc.Format;
-        if (is_for_depth)
-            clear_value.DepthStencil = {kZFar, 0};
-        else
-            memcpy(clear_value.Color, kClearColor, sizeof(kClearColor));
+        if (is_for_depth) clear_value.DepthStencil = {kZFar, 0};
+        else memcpy(clear_value.Color, kClearColor, sizeof(kClearColor));
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
-        _state_guard = D3DResourceStateGuard(is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
-        ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &_tex_desc, _state_guard.CurState(),
-                                                        &clear_value, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-        _p_d3dres->SetName(ToWStr(_name).c_str());
+        auto init_state = is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
+        ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &_tex_desc, init_state, &clear_value, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        _state_guard = D3DResourceStateGuard(_p_d3dres.Get(), init_state);
+        _p_d3dres->SetName(ToWChar(_name).c_str());
         u16 view_slice_count = std::max<u16>(1, _slice_num);
         _is_ready_for_rendering = true;
         //Main srv
@@ -905,13 +827,10 @@ namespace Ailu
         {
             for (u16 i = 0; i < view_slice_count; i++)
             {
-                if (is_for_depth)
-                    CreateView(ETextureViewType::kDSV, 0, i);
-                else
-                    CreateView(ETextureViewType::kRTV, 0, i);
+                if (is_for_depth) CreateView(ETextureViewType::kDSV, 0, i);
+                else CreateView(ETextureViewType::kRTV, 0, i);
                 CreateView(ETextureViewType::kSRV, 0, i);
-                if (_is_random_access)
-                    CreateView(ETextureViewType::kUAV, 0, i);
+                if (_is_random_access) CreateView(ETextureViewType::kUAV, 0, i);
             }
         }
         else if (_dimension == ETextureDimension::kCube || _dimension == ETextureDimension::kCubeArray)
@@ -920,60 +839,44 @@ namespace Ailu
             {
                 for (u16 j = 1; j <= 6; j++)
                 {
-                    if (is_for_depth)
-                        CreateView(ETextureViewType::kDSV, (ECubemapFace::ECubemapFace) j, 0, i);
-                    else
-                        CreateView(ETextureViewType::kRTV, (ECubemapFace::ECubemapFace) j, 0, i);
+                    if (is_for_depth) CreateView(ETextureViewType::kDSV, (ECubemapFace::ECubemapFace) j, 0, i);
+                    else CreateView(ETextureViewType::kRTV, (ECubemapFace::ECubemapFace) j, 0, i);
                     CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace) j, 0, i);
-                    if (_is_random_access)
-                        CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace) j, 0, i);
+                    if (_is_random_access) CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace) j, 0, i);
                 }
             }
         }
-        else
-        {
-            AL_ASSERT(false);
-        }
+        else { AL_ASSERT(false); }
         RenderTexture::CreateView();
     }
 
-    void D3DRenderTexture::BindImpl(RHICommandBuffer* rhi_cmd,BindParams* params)
+    void D3DRenderTexture::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
     {
-        if (auto param = dynamic_cast<BindParamsTexture*>(params); param != nullptr)
+        const auto &bp = params._params._texture_binder;
+        if (_views.contains(bp._view_idx))
         {
-            if (_views.contains(param->_view_idx))
+            GpuResource::BindImpl(rhi_cmd, params);
+            auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+            if (!RenderTexture::CanAsShaderResource(this) && !params._is_compute_pipeline)
             {
-                GpuResource::BindImpl(rhi_cmd, params);
-                auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
-                if (!RenderTexture::CanAsShaderResource(this) && !param->_is_compute_pipeline)
-                {
-                    LOG_WARNING("D3DRenderTexture::BindImpl: try to use a render texture: {} as rt and srv at the same time!", _name);
-                    return;
-                }
-                auto view_type = _views[param->_view_idx]._view_type;
-                if (view_type == ETextureViewType::kSRV)
-                {
-                    _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, param->_sub_res);
-                    if (param->_is_compute_pipeline)
-                        _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, param->_slot);
-                    else
-                        _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, param->_slot);
-                }
-                else if (view_type == ETextureViewType::kUAV)
-                {
-                    _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), _p_d3dres.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, param->_sub_res);
-                    _views[param->_view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, param->_slot);
-                }
-                else
-                {
-                    AL_ASSERT(false);
-                }
+                LOG_WARNING("D3DRenderTexture::BindImpl: try to use a render texture: {} as rt and srv at the same time!", _name);
+                return;
             }
-            else
+            auto view_type = _views[bp._view_idx]._view_type;
+            if (view_type == ETextureViewType::kSRV)
             {
-                LOG_WARNING("D3DRenderTexture({})::BindImpl: invalid view index", _name);
+                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, bp._sub_res);
+                if (params._is_compute_pipeline) _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
+                else _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDraw(d3dcmd, params._slot);
             }
+            else if (view_type == ETextureViewType::kUAV)
+            {
+                _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, bp._sub_res);
+                _views[bp._view_idx]._gpu_alloc.CommitDescriptorsForDispatch(d3dcmd, params._slot);
+            }
+            else { AL_ASSERT(false); }
         }
+        else { LOG_WARNING("D3DRenderTexture({})::BindImpl: invalid view index", _name); }
     }
 
     void D3DRenderTexture::CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
@@ -983,16 +886,14 @@ namespace Ailu
             LOG_ERROR("Can't create view before it been applied![RenderTexture: {}]", _name);
             return;
         }
-        if (_dimension == ETextureDimension::kCube || _dimension == ETextureDimension::kCubeArray)
-            return;
+        if (_dimension == ETextureDimension::kCube || _dimension == ETextureDimension::kCubeArray) return;
         u16 view_index = CalculateViewIndex(view_type, mipmap, array_slice);
-        if (_views.contains(view_index))
-            return;
+        if (_views.contains(view_index)) return;
         auto p_device = dynamic_cast<D3DContext *>(g_pGfxContext)->GetDevice();
         DXGI_FORMAT dx_format = ConvertToDXGIFormat(_pixel_format);
         if (view_type == ETextureViewType::kRTV)
         {
-            CPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocCPU(1u,D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+            CPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocCPU(1u, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
             D3DTextureViewInfo view_info(view_type, true);
             auto cpu_handle = alloc.At(0);
             D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
@@ -1017,15 +918,12 @@ namespace Ailu
         }
         else if (view_type == ETextureViewType::kDSV)
         {
-            CPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocCPU(1u,D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+            CPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocCPU(1u, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
             D3DTextureViewInfo view_info(view_type, true);
             auto cpu_handle = alloc.At(0);
             D3D12_DEPTH_STENCIL_VIEW_DESC view_desc{};
             view_desc.ViewDimension = _dimension == ETextureDimension::kTex2DArray ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY : D3D12_DSV_DIMENSION_TEXTURE2D;
-            if (_dimension == ETextureDimension::kTex2D)
-            {
-                view_desc.Texture2D.MipSlice = mipmap;
-            }
+            if (_dimension == ETextureDimension::kTex2D) { view_desc.Texture2D.MipSlice = mipmap; }
             else if (_dimension == ETextureDimension::kTex2DArray)
             {
                 view_desc.Texture2DArray.FirstArraySlice = array_slice;
@@ -1073,10 +971,7 @@ namespace Ailu
             D3D12_UNORDERED_ACCESS_VIEW_DESC view_desc{};
             view_desc.ViewDimension = _dimension == ETextureDimension::kTex2DArray ? D3D12_UAV_DIMENSION_TEXTURE2DARRAY : D3D12_UAV_DIMENSION_TEXTURE2D;
             view_desc.Format = dx_format;
-            if (_dimension == ETextureDimension::kTex2D)
-            {
-                view_desc.Texture2D.MipSlice = mipmap;
-            }
+            if (_dimension == ETextureDimension::kTex2D) { view_desc.Texture2D.MipSlice = mipmap; }
             else if (_dimension == ETextureDimension::kTex2DArray)
             {
                 view_desc.Texture2DArray.FirstArraySlice = array_slice;
@@ -1094,12 +989,8 @@ namespace Ailu
     TextureHandle D3DRenderTexture::GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice) const
     {
         u16 idx = CalculateViewIndex(view_type, mipmap, array_slice);
-        if (_views.contains(idx))
-        {
-            return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr;
-        }
-        else
-            return 0;
+        if (_views.contains(idx)) { return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr; }
+        else return 0;
     }
 
     void D3DRenderTexture::ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice)
@@ -1110,17 +1001,15 @@ namespace Ailu
 
     void D3DRenderTexture::CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
     {
-        if (_dimension == ETextureDimension::kTex2D || _dimension == ETextureDimension::kTex2DArray)
-            return;
+        if (_dimension == ETextureDimension::kTex2D || _dimension == ETextureDimension::kTex2DArray) return;
         u16 view_index = CalculateViewIndex(view_type, face, mipmap, array_slice);
-        if (_views.contains(view_index))
-            return;
+        if (_views.contains(view_index)) return;
         auto p_device = dynamic_cast<D3DContext *>(g_pGfxContext)->GetDevice();
         DXGI_FORMAT dx_format = ConvertToDXGIFormat(_pixel_format);
         u16 face_index = (u16) face - 1;
         if (view_type == ETextureViewType::kRTV)
         {
-            CPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocCPU(1u,D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+            CPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocCPU(1u, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
             D3DTextureViewInfo view_info(view_type, true);
             auto cpu_handle = alloc.At(0);
             D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
@@ -1136,7 +1025,7 @@ namespace Ailu
         }
         else if (view_type == ETextureViewType::kDSV)
         {
-            CPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocCPU(1u,D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+            CPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocCPU(1u, D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
             D3DTextureViewInfo view_info(view_type, true);
             auto cpu_handle = alloc.At(0);
             D3D12_DEPTH_STENCIL_VIEW_DESC view_desc{};
@@ -1189,12 +1078,8 @@ namespace Ailu
     TextureHandle D3DRenderTexture::GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice) const
     {
         u16 idx = CalculateViewIndex(view_type, face, mipmap, array_slice);
-        if (_views.contains(idx))
-        {
-            return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr;
-        }
-        else
-            return 0;
+        if (_views.contains(idx)) { return D3DDescriptorMgr::Get().GetBindGpuHandle(_views.at(idx)._gpu_alloc).ptr; }
+        else return 0;
     }
 
     void D3DRenderTexture::ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice)
@@ -1205,9 +1090,9 @@ namespace Ailu
 
     void D3DRenderTexture::GenerateMipmap()
     {
-        static ComputeShader* s_mipmap_gen = g_pResourceMgr->Get<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
+        static ComputeShader *s_mipmap_gen = g_pResourceMgr->Get<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
         auto cmd = CommandBufferPool::Get("MipmapGen");
-        cmd->StateTransition(this,D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         u16 kernel = s_mipmap_gen->FindKernel("MipmapGen2D");
         for (int i = 1; i < 7; i++)
         {
@@ -1235,10 +1120,9 @@ namespace Ailu
             s_mipmap_gen->SetTexture("OutMip1", this, (ECubemapFace::ECubemapFace) i, 5);
             s_mipmap_gen->SetTexture("OutMip2", this, (ECubemapFace::ECubemapFace) i, 6);
             s_mipmap_gen->SetTexture("OutMip3", this, (ECubemapFace::ECubemapFace) i, 7);
-            if (_mipmap_count > 6)
-            s_mipmap_gen->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace) i, 8);
+            if (_mipmap_count > 6) s_mipmap_gen->SetTexture("OutMip4", this, (ECubemapFace::ECubemapFace) i, 8);
             cmd->Dispatch(s_mipmap_gen, kernel, mip5w / 8, mip5h / 8, 1);
-            cmd->StateTransition(this,D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
+            cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         }
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
@@ -1308,65 +1192,61 @@ namespace Ailu
         // }
         // return aligned_out_data;
     }
+
     void D3DRenderTexture::ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice, ECubemapFace::ECubemapFace face)
     {
         // 使用引用捕获，处理异常并确保回调有效
         auto ret = std::async(std::launch::async, [&, callback]()
-                   {
-        try {
-            void* result = ReadBack(mipmap, array_slice, face);
-            callback(result);
-        } catch (const std::exception& e) {
-            LOG_ERROR("Exception: {}", e.what());
-            std::cerr << "Exception: " << e.what() << std::endl;
-            callback(nullptr);
-        } });
+        {
+            try
+            {
+                void *result = ReadBack(mipmap, array_slice, face);
+                callback(result);
+            }
+            catch (const std::exception &e)
+            {
+                LOG_ERROR("Exception: {}", e.what());
+                std::cerr << "Exception: " << e.what() << std::endl;
+                callback(nullptr);
+            }
+        });
     }
 
     void D3DRenderTexture::Name(const String &value)
     {
         _name = value;
-        if (_p_d3dres)
-            _p_d3dres->SetName(ToWStr(value).c_str());
+        if (_p_d3dres) _p_d3dres->SetName(ToWChar(value).c_str());
     }
-    void D3DRenderTexture::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res)
-    {
-        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), _p_d3dres.Get(), D3DConvertUtils::FromALResState(new_state),sub_res);
-    }
+
+    void D3DRenderTexture::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) { _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res); }
 
     TextureHandle D3DRenderTexture::ColorTexture(u16 view_index)
     {
-        if (/*!CanAsShaderResource(this) || */ !_views.contains(view_index))
-            return 0;
-    #if defined(DEAR_IMGUI)
-        static_cast<D3DContext&>(GraphicsContext::Get()).RecordImguiUsedTexture(this);
-    #endif
+        if (/*!CanAsShaderResource(this) || */ !_views.contains(view_index)) return 0;
+#if defined(DEAR_IMGUI)
+        static_cast<D3DContext &>(GraphicsContext::Get()).RecordImguiUsedTexture(this);
+#endif
         return D3DDescriptorMgr::Get().GetBindGpuHandle(_views[view_index]._gpu_alloc).ptr;
     }
 
     TextureHandle D3DRenderTexture::DepthTexture(u16 view_index)
     {
-        if (!CanAsShaderResource(this) || !_views.contains(view_index))
-            return 0;
-    #if defined(DEAR_IMGUI)
-        static_cast<D3DContext&>(GraphicsContext::Get()).RecordImguiUsedTexture(this);
-    #endif
+        if (!CanAsShaderResource(this) || !_views.contains(view_index)) return 0;
+#if defined(DEAR_IMGUI)
+        static_cast<D3DContext &>(GraphicsContext::Get()).RecordImguiUsedTexture(this);
+#endif
         return D3DDescriptorMgr::Get().GetBindGpuHandle(_views[view_index]._gpu_alloc).ptr;
         //return _views[view_index]._gpu_handle.ptr;
     }
 
     D3D12_CPU_DESCRIPTOR_HANDLE *D3DRenderTexture::TargetCPUHandle(RHICommandBuffer *cmd, u16 index)
     {
-        if (index == 0)
-        {
-            index = _depth_bit > 0 ? kMainDSVIndex : kMainRTVIndex;
-        }
-        if (!_views.contains(index))
-            return nullptr;
-        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList(), _p_d3dres.Get(), _depth_bit > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
+        if (index == 0) { index = _depth_bit > 0 ? kMainDSVIndex : kMainRTVIndex; }
+        if (!_views.contains(index)) return nullptr;
+        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList(), _depth_bit > 0 ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET);
         RenderTexture::ResetRenderTarget(this);
         return &_views[index]._cpu_handle;
     }
-    #pragma endregion
+#pragma endregion
     //----------------------------------------------------------D3DRenderTexture----------------------------------------------------------------------
 }// namespace Ailu

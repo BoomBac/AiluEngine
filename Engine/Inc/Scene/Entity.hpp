@@ -16,7 +16,7 @@ namespace Ailu
     //https://skypjack.github.io/2019-06-25-ecs-baf-part-4/
     namespace ECS
     {
-        using Entity = u32;
+        using Entity = u64;
         static const Entity kInvalidEntity = 0u;
         static const u32 kMaxEntityNum = 200;
 
@@ -289,7 +289,7 @@ namespace Ailu
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(!_mgrs.contains(type_name));
                 _mgrs[type_name] = MakeRef<ComponentManager<T>>();
-                _comp_types[type_name] = _comp_types.size();
+                _comp_types[type_name] = static_cast<u16>(_comp_types.size());
                 _on_comp_add_callback[type_name] = List<CompAddCallback>();
                 _on_comp_remove_callback[type_name] = List<CompRemoveCallback>();
             }

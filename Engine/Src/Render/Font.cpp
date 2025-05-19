@@ -6,7 +6,7 @@
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     Ref<Font> Font::Create(const WString &file_path)
     {
@@ -34,7 +34,7 @@ namespace Ailu
                     {
                         size_t first_quote = keyword.find('"');
                         size_t second_quote = keyword.find('"', first_quote + 1);
-                        font->_name = ToWStr(keyword.substr(6, second_quote - first_quote - 1));
+                        font->_name = ToWChar(keyword.substr(6, second_quote - first_quote - 1));
                     }
                     else if (keyword.find("size=") == 0)
                     {
@@ -117,7 +117,7 @@ namespace Ailu
                     {
                         size_t first_quote = keyword.find('"');
                         size_t second_quote = keyword.find('"', first_quote + 1);
-                        p._file = parent + ToWStr(keyword.substr(6, second_quote - first_quote - 1));
+                        p._file = parent + ToWChar(keyword.substr(6, second_quote - first_quote - 1));
                     }
                 }
                 font->_pages.push_back(p);

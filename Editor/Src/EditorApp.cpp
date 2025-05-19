@@ -15,6 +15,7 @@ using namespace Ailu;
 
 namespace Ailu
 {
+    using namespace Render;
     namespace Editor
     {
         namespace fs = std::filesystem;
@@ -142,14 +143,14 @@ namespace Ailu
             LoadVector(config_pairs["ControllerRotation"].c_str(), v2);
             FirstPersonCameraController::s_inst._rotation = v2;
             _p_scene_camera->RecalculateMatrix(true);
-            _opened_scene_path = ToWStr(config_pairs["Scene"].c_str());
+            _opened_scene_path = ToWChar(config_pairs["Scene"].c_str());
 
             LoadVector(config_pairs["WindowSize"].c_str(), v2);
-            desc._window_width = v2.x;
-            desc._window_height = v2.y;
+            desc._window_width = (u32)v2.x;
+            desc._window_height = (u32)v2.y;
             LoadVector(config_pairs["ViewPortSize"].c_str(), v2);
-            desc._gameview_width = v2.x;
-            desc._gameview_height = v2.y;
+            desc._gameview_width =  (u32)v2.x;
+            desc._gameview_height = (u32)v2.y;
         }
         void EditorApp::SaveEditorConfig()
         {

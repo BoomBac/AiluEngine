@@ -20,6 +20,15 @@
 
 namespace Ailu
 {
+    using Render::Mesh;
+    using Render::SkeletonMesh;
+    using Render::Material;
+    using Render::Texture;
+    using Render::Texture2D;
+    using Render::Texture3D;
+    using Render::Shader;
+    using Render::ComputeShader;
+    using Render::Font;
     class AILU_API ISearchFilter
     {
     public:
@@ -326,7 +335,7 @@ namespace Ailu
         {
             asset_loader = &ResourceMgr::LoadMaterial;
         }
-        else if constexpr (std::is_same<T, Scene>::value)
+        else if constexpr (std::is_same<T, SceneManagement::Scene>::value)
         {
             asset_loader = &ResourceMgr::LoadScene;
         }
@@ -464,7 +473,7 @@ namespace Ailu
         {
             return (u32)_lut_global_resources_by_type.at(EAssetType::kMaterial).size();
         }
-        else if constexpr (std::is_same<T, Scene>::value)
+        else if constexpr (std::is_same<T, SceneManagement::Scene>::value)
         {
             return (u32)_lut_global_resources_by_type.at(EAssetType::kScene).size();
         }
@@ -509,7 +518,7 @@ namespace Ailu
         {
             return _lut_global_resources_by_type[EAssetType::kMaterial].begin();
         }
-        else if constexpr (std::is_same<T, Scene>::value)
+        else if constexpr (std::is_same<T, SceneManagement::Scene>::value)
         {
             return _lut_global_resources_by_type[EAssetType::kScene].begin();
         }
@@ -549,7 +558,7 @@ namespace Ailu
         {
             return _lut_global_resources_by_type[EAssetType::kMaterial].end();
         }
-        else if constexpr (std::is_same<T, Scene>::value)
+        else if constexpr (std::is_same<T, SceneManagement::Scene>::value)
         {
             return _lut_global_resources_by_type[EAssetType::kScene].end();
         }

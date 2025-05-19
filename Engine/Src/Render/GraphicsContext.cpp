@@ -7,18 +7,18 @@
 #include "pch.h"
 #include <Render/CommandBuffer.h>
 
-namespace Ailu
+namespace Ailu::Render
 {
 	GraphicsContext* g_pGfxContext;
 	RenderTexturePool* g_pRenderTexturePool;
 	void GraphicsContext::InitGlobalContext()
 	{
         TimerBlock b("----------------------------------------------------------- GraphicsContext::InitGlobalContext");
-		g_pGfxContext = new D3DContext(dynamic_cast<WinWindow*>(Application::Get().GetWindowPtr()));
+		g_pGfxContext = new RHI::DX12::D3DContext(dynamic_cast<WinWindow*>(Application::Get().GetWindowPtr()));
 		g_pGfxContext->Init();
 		g_pRenderTexturePool = new RenderTexturePool();
 		CommandPool::Init();
-        GpuResourceManager::Init();
+        RHI::DX12::GpuResourceManager::Init();
         CommandBufferPool::Init();
         RHICommandBufferPool::Init();
 		GraphicsPipelineStateMgr::Init();
@@ -28,7 +28,7 @@ namespace Ailu
 		GraphicsPipelineStateMgr::Shutdown();
         RHICommandBufferPool::Shutdown();
         CommandBufferPool::Shutdown();
-        GpuResourceManager::Shutdown();
+        RHI::DX12::GpuResourceManager::Shutdown();
 		CommandPool::Shutdown();
 		DESTORY_PTR(g_pRenderTexturePool);
 		DESTORY_PTR(g_pGfxContext);

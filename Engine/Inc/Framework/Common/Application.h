@@ -14,6 +14,8 @@
 
 namespace Ailu
 {
+    using Render::RenderPipeline;
+
     DECLARE_ENUM(EApplicationState,
                  EApplicationState_None,
                  EApplicationState_Running,

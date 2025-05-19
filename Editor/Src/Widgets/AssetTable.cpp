@@ -5,6 +5,7 @@
 
 namespace Ailu
 {
+    using namespace Render;
     namespace Editor
     {
         static void PushStyleCompact()

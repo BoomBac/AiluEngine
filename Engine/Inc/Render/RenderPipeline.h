@@ -7,8 +7,9 @@
 #include "FrameResource.h"
 #include "Renderer.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
+    using SceneManagement::Scene;
     struct VisibilityObject
     {
         u32 _id;
@@ -84,7 +85,7 @@ namespace Ailu
         auto end() {return _render_nodes.begin() + _render_node_count;}
     public:
         //相机的哈希值
-        u32 _cam_hash;
+        u64 _cam_hash;
         Vector3f _position;
         u32 _layer_mask;
         ViewFrustum _frustum;
@@ -113,7 +114,7 @@ namespace Ailu
     private:
         Array<ViewEntity,kMaxViewNum> _views;
         u32 _view_num;
-        HashMap<u32, ConstantBuffer *> _cam_cb;
+        HashMap<u64, ConstantBuffer *> _cam_cb;
     };
 
     class AILU_API RenderPipeline

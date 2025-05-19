@@ -11,7 +11,7 @@
 #include "Render/Renderer.h"
 #include "Render/Shader.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
 #pragma region Utils
     static List<String> ReadFileToLines(const String &sys_path, u32 &line_count, String begin = "", String end = "")
@@ -190,7 +190,7 @@ namespace Ailu
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto shader = MakeRef<D3DShader>(sys_path);
+                auto shader = MakeRef<RHI::DX12::D3DShader>(sys_path);
                 return shader;
             }
         }
@@ -297,7 +297,7 @@ namespace Ailu
 
     bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash)
     {
-        LOG_INFO(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWStr(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
+        LOG_INFO(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWChar(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
         g_pTimeMgr->Mark();
         AL_ASSERT(pass_id < _passes.size());
         auto &pass = _passes[pass_id];
@@ -970,7 +970,7 @@ namespace Ailu
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto shader = MakeRef<D3DComputeShader>(sys_path);
+                auto shader = MakeRef<RHI::DX12::D3DComputeShader>(sys_path);
                 s_global_variant_update_map[shader->ID()] = true;
                 return shader;
             }
@@ -988,7 +988,7 @@ namespace Ailu
     {
         s_global_textures_bind_info[name] = g_pRenderTexturePool->Get(texture);
     }
-    void ComputeShader::Bind(RHICommandBuffer *cmd, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
+    void ComputeShader::Bind(RHICommandBuffer *cmd, u16 kernel)
     {
         if (s_global_variant_update_map[_id])
         {
@@ -1006,23 +1006,6 @@ namespace Ailu
             }
             ele._active_variant = ele._variant_mgr.GetVariantHash(ele._active_keywords);
         }
-        // std::lock_guard<std::mutex> lock(_state_mutex);
-        // auto& cur_state = _bind_state.front();
-        // auto &variant = _kernels[kernel]._variants[_kernels[kernel]._active_variant];
-        // for (auto &it: s_global_buffer_bind_info)
-        // {
-        //     if (variant._bind_res_infos.find(it.first) != variant._bind_res_infos.end())
-        //     {
-        //         SetBuffer(it.first, it.second);
-        //     }
-        // }
-        // for (auto &it: s_global_textures_bind_info)
-        // {
-        //     if (variant._bind_res_infos.find(it.first) != variant._bind_res_infos.end())
-        //     {
-        //         SetTexture(it.first, it.second);
-        //     }
-        // }
     }
 
     void ComputeShader::SetTexture(const String &name, Texture *texture)
@@ -1101,7 +1084,7 @@ namespace Ailu
         for (auto &cs_ele: _kernels)
         {
             auto &variant = cs_ele._variants[cs_ele._active_variant];
-            auto it = variant._bind_res_infos.find(name);
+            const auto& it = variant._bind_res_infos.find(name);
             if (it != variant._bind_res_infos.end() && it->second._res_type & EBindResDescType::kCBufferFloat)
                 memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
         }
@@ -1274,6 +1257,34 @@ namespace Ailu
             }
         }
     }
+
+    void ComputeShader::SetBuffer(u16 kernel,const String &name, ConstantBuffer *buf)
+    {
+        AL_ASSERT(kernel<_kernels.size());
+        auto &cs_ele = _kernels[kernel];
+        auto &variant = cs_ele._variants[cs_ele._active_variant];
+        auto it = variant._bind_res_infos.find(name);
+        if (buf != nullptr && it != variant._bind_res_infos.end())
+        {
+            it->second._p_res = buf;
+            _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
+            _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+        }
+    }
+    void ComputeShader::SetBuffer(u16 kernel,const String &name, GPUBuffer *buf)
+    {
+        AL_ASSERT(kernel<_kernels.size());
+        auto &cs_ele = _kernels[kernel];
+        auto &variant = cs_ele._variants[cs_ele._active_variant];
+        auto it = variant._bind_res_infos.find(name);
+        if (buf != nullptr && it != variant._bind_res_infos.end())
+        {
+            it->second._p_res = buf;
+            _bind_params[it->second._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
+            _bind_params[it->second._bind_slot]._is_internal_cbuf = it->second._bind_flag & ShaderBindResourceInfo::kBindFlagInternal;
+        }
+    }
+
     void ComputeShader::SetMatrix(const String& name,Matrix4x4f mat)
     {
         for (auto &cs_ele: _kernels)

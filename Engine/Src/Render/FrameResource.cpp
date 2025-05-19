@@ -4,7 +4,7 @@
 
 #include "Inc/Render/FrameResource.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     FrameResource::FrameResource() : Object("FrameResource")
     {

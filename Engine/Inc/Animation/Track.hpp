@@ -52,7 +52,7 @@ namespace Ailu
     public:
         Track();
         void Resize(u32 new_size) {_frames.resize(new_size);};
-        [[nodiscard]] u32 Size() const {return _frames.size();};
+        [[nodiscard]] u32 Size() const {return (u32)_frames.size();};
         [[nodiscard]] EInterpolationType::EInterpolationType InterpolationType() const {return _interpolation_type;};
         void SetInterpolation(EInterpolationType::EInterpolationType interp) { _interpolation_type = interp;};
         f32 GetStartTime();

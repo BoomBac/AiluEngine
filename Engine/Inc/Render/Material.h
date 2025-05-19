@@ -11,7 +11,7 @@
 #include <unordered_set>
 
 
-namespace Ailu
+namespace Ailu::Render
 {
     class AILU_API Material : public Object
     {
@@ -41,6 +41,7 @@ namespace Ailu
         void SetVector(const String &name, const Vector4f &vector);
         void SetVector(const String &name, const Vector4Int &vector);
         void SetMatrix(const String &name, const Matrix4x4f &matrix);
+        void SetBuffer(const String& name,GPUBuffer* buffer);
         float GetFloat(const String &name);
         void SetCullMode(ECullMode mode);
         [[nodiscard]] ECullMode GetCullMode() const;
@@ -169,6 +170,7 @@ namespace Ailu
                     default:
                         break;
                 }
+                return kAlbedo;
             }
         };
         explicit StandardMaterial(String name);

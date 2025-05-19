@@ -84,12 +84,13 @@ namespace Ailu
 	#define TIMER_BLOCK() 
 #endif// _DEBUG
 
-    class RHICommandBuffer;
+    namespace Render{class RHICommandBuffer;}
+	using Ailu::Render::RHICommandBuffer;
+	
 	//GPUTimer create by GfxContext
     class IGPUTimer
     {
     public:
-        static const u64 kMaxGpuTimerNum = 128u;
         IGPUTimer() = default;
         ~IGPUTimer() = default;
 

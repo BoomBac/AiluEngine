@@ -1,3 +1,5 @@
+#pragma once
+#pragma warning(disable:4251)
 #ifndef __AL_MATH_H__
 #define __AL_MATH_H__
 
@@ -64,19 +66,21 @@ namespace Ailu
         constexpr float Pi_over_sixteen = kPi / 16.f;
         constexpr float kFloatEpsilon = 1e-6f;
 
-        static u64 AlignTo(u64 sizeInBytes, u64 alignment)
+        static u64 AlignTo(u64 value, u64 alignment)
         {
-            if (alignment == 0)
+            if (alignment == 0) return value;
+            //alignment is pow of 2
+            if ((alignment & (alignment - 1)) == 0)
             {
-                return sizeInBytes;
+                return (value + alignment - 1) & ~(alignment - 1);
             }
-            u64 remainder = sizeInBytes % alignment;
-            if (remainder == 0)
+            else
             {
-                return sizeInBytes;
+                u64 remainder = value % alignment;
+                return remainder == 0 ? value : value + alignment - remainder;
             }
-            return sizeInBytes + alignment - remainder;
         }
+        
         template<typename T>
         T Normalize(const T &var)
         {

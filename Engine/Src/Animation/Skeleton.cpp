@@ -42,7 +42,7 @@ namespace Ailu
     {
         _joints.push_back(joint);
         if (_bind_pose.Size() != _joints.size())
-            _bind_pose.Resize(_joints.size());
+            _bind_pose.Resize((u32)_joints.size());
         _bind_pose.SetParent(joint._self, joint._parent);
     }
 
@@ -135,8 +135,8 @@ namespace Ailu
         }
         AL_ASSERT(su::BeginWith(bufs[0], "_name"));
         c._name = kvs["_name"];
-        c._parent = std::stoul(kvs["_parent"]);
-        c._self = std::stoul(kvs["_self"]);
+        c._parent = (u16)std::stoul(kvs["_parent"]);
+        c._self = (u16)std::stoul(kvs["_self"]);
         c._inv_bind_pos.FromString(kvs["_inv_bind_pos"]);
         c._node_inv_world_mat.FromString(kvs["_node_inv_world_mat"]);
         return ar;

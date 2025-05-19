@@ -9,7 +9,7 @@
 
 namespace Ailu
 {
-    class Camera;
+    class Render::Camera;
     namespace Editor
     {
         ACLASS()

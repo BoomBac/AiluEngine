@@ -67,7 +67,7 @@ namespace Ailu
             static const ImGuiTreeNodeFlags s_base_node_flags = ImGuiTreeNodeFlags_SpanAvailWidth;
             ImGuiTreeNodeFlags node_flags = s_base_node_flags;
             bool is_cur_node_selected = entity == _selected_entity;
-            ImGui::PushID(entity);
+            ImGui::PushID((i32)entity);
             if (is_cur_node_selected)
                 node_flags |= ImGuiTreeNodeFlags_Selected;
             auto hiera_comp = _scene_register->GetComponent<ECS::CHierarchy>(entity);
@@ -116,7 +116,7 @@ namespace Ailu
                             node_flags |= ImGuiTreeNodeFlags_Leaf;// | ImGuiTreeNodeFlags_NoTreePushOnOpen;
                             if (is_cur_node_selected)
                                 node_flags |= ImGuiTreeNodeFlags_Selected;
-                            ImGui::PushID(child_entity);// PushID 需要在进入子节点前
+                            ImGui::PushID((i32)child_entity);// PushID 需要在进入子节点前
                             auto hiera_comp = _scene_register->GetComponent<ECS::CHierarchy>(child_entity);
                             auto tag_comp = _scene_register->GetComponent<ECS::TagComponent>(child_entity);
                             if (ImGui::TreeNodeEx(hiera_comp, node_flags, "%s", tag_comp->_name.c_str()))

@@ -10,7 +10,7 @@
 #include <Render/GraphicsPipelineStateObject.h>
 #include "Framework/Common/Profiler.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     static CommandBufferPool *s_pCommandBufferPool = nullptr;
     static RHICommandBufferPool *s_pRHICommandBufferPool = nullptr;
@@ -92,7 +92,7 @@ namespace Ailu
         if (_commands.size() > 0)
         {
             for (auto &cmd: _commands)
-                CommandPool::Get().Free(cmd);
+                CommandPool::Get().DeAlloc(cmd);
         }
         _commands.clear();
     }
@@ -439,7 +439,7 @@ namespace Ailu
         cmd->_mat->PushState(cmd->_pass_index);
         _commands.emplace_back(cmd);
     }
-    void CommandBuffer::DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count)
+    void CommandBuffer::DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
@@ -452,7 +452,7 @@ namespace Ailu
         cmd->_mat->PushState(cmd->_pass_index);
         _commands.emplace_back(cmd);
     }
-    void CommandBuffer::DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count)
+    void CommandBuffer::DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
@@ -465,7 +465,7 @@ namespace Ailu
         cmd->_mat->PushState(cmd->_pass_index);
         _commands.emplace_back(cmd);
     }
-    void CommandBuffer::DrawRenderer(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count)
+    void CommandBuffer::DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
@@ -478,7 +478,7 @@ namespace Ailu
         cmd->_mat->PushState(cmd->_pass_index);
         _commands.emplace_back(cmd);
     }
-    void CommandBuffer::DrawRenderer(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count)
+    void CommandBuffer::DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count)
     {
         CBufferPerObjectData per_obj_data;
         per_obj_data._MatrixWorld = world_mat;
@@ -493,7 +493,7 @@ namespace Ailu
         cmd->_mat->PushState(cmd->_pass_index);
         _commands.emplace_back(cmd);
     }
-    void CommandBuffer::DrawRenderer(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count)
+    void CommandBuffer::DrawMesh(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count)
     {
         SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
@@ -506,6 +506,20 @@ namespace Ailu
         cmd->_mat->PushState(cmd->_pass_index);
         _commands.emplace_back(cmd);
     }
+    void CommandBuffer::DrawMeshIndirect(Mesh *mesh,u16 sub_mesh, Material *material ,u16 pass_index,GPUBuffer* arg_buffer,u32 arg_offset)
+    {
+        auto cmd = CommandPool::Get().Alloc<CommandDraw>();
+        cmd->_vb = mesh->GetVertexBuffer().get();
+        cmd->_ib = mesh->GetIndexBuffer().get();
+        cmd->_mat = material;
+        cmd->_sub_mesh = sub_mesh;
+        cmd->_pass_index = pass_index;
+        cmd->_arg_buffer = arg_buffer;
+        cmd->_arg_offset = arg_offset;
+        cmd->_mat->PushState(cmd->_pass_index);
+        _commands.emplace_back(cmd);
+    }
+
     void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDispatch>();
@@ -521,11 +535,21 @@ namespace Ailu
     {
         auto cmd = CommandPool::Get().Alloc<CommandDispatch>();
         cmd->_cs = cs;
-        cmd->_group_num_x = thread_group_x;
-        cmd->_group_num_y = thread_group_y;
-        cmd->_group_num_z = thread_group_z;
+        cmd->_group_num_x = std::max<u16>(1u, thread_group_x);
+        cmd->_group_num_y = std::max<u16>(1u, thread_group_y);
+        cmd->_group_num_z = std::max<u16>(1u, thread_group_z);
         cmd->_kernel = kernel;
         cmd->_cs->PushState(cmd->_kernel);
+        _commands.emplace_back(cmd);
+    }
+    void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel,GPUBuffer* arg_buffer,u16 arg_offset)
+    {
+        auto cmd = CommandPool::Get().Alloc<CommandDispatch>();
+        cmd->_cs = cs;
+        cmd->_kernel = kernel;
+        cmd->_cs->PushState(cmd->_kernel);
+        cmd->_arg_buffer = arg_buffer;
+        cmd->_arg_offset = arg_offset;
         _commands.emplace_back(cmd);
     }
     void CommandBuffer::BeginProfiler(const String &name)
@@ -539,6 +563,14 @@ namespace Ailu
     {
         auto cmd = CommandPool::Get().Alloc<CommandProfiler>();
         cmd->_is_start = false;
+        _commands.emplace_back(cmd);
+    }
+    void CommandBuffer::CopyCounterValue(GPUBuffer* src,GPUBuffer* dst,u32 dst_offset)
+    {
+        auto cmd = CommandPool::Get().Alloc<CommandCopyCounter>();
+        cmd->_src = src;
+        cmd->_dst = dst;
+        cmd->_dst_offset = dst_offset;
         _commands.emplace_back(cmd);
     }
     void CommandBuffer::SetRenderTargetLoadAction(RenderTexture *tex, ELoadStoreAction action)
@@ -567,7 +599,7 @@ namespace Ailu
         {
             Ref<RHICommandBuffer> cmd = nullptr;
             if (RendererAPI::GetAPI() == RendererAPI::ERenderAPI::kDirectX12)
-                cmd = MakeRef<D3DCommandBuffer>("noname",ECommandBufferType::kCommandBufTypeDirect);
+                cmd = MakeRef<RHI::DX12::D3DCommandBuffer>("noname",ECommandBufferType::kCommandBufTypeDirect);
             else
             {
                 AL_ASSERT(true);
@@ -581,6 +613,7 @@ namespace Ailu
     }
     Ref<RHICommandBuffer> RHICommandBufferPool::Get(const String &name, ECommandBufferType type)
     {
+        std::unique_lock<std::mutex> lock(s_pRHICommandBufferPool->_mutex);
         for (auto &cmd: s_pRHICommandBufferPool->_cmd_buffers)
         {
             auto &[available, cmd_buf] = cmd;
@@ -593,10 +626,9 @@ namespace Ailu
                 return cmd_buf;
             }
         }
-        //std::unique_lock<std::mutex> lock(s_pRHICommandBufferPool->_mutex);
         Ref<RHICommandBuffer> cmd = nullptr;
         if (RendererAPI::GetAPI() == RendererAPI::ERenderAPI::kDirectX12)
-            cmd = MakeRef<D3DCommandBuffer>(name,type);
+            cmd = MakeRef<RHI::DX12::D3DCommandBuffer>(name,type);
         else
         {
             AL_ASSERT(true);
@@ -611,7 +643,7 @@ namespace Ailu
     }
     void RHICommandBufferPool::Release(Ref<RHICommandBuffer> &cmd)
     {
-        //std::unique_lock<std::mutex> lock(s_pRHICommandBufferPool->_mutex);
+        std::unique_lock<std::mutex> lock(s_pRHICommandBufferPool->_mutex);
         for (auto &it: s_pRHICommandBufferPool->_cmd_buffers)
         {
             auto &[available, cmd_buf] = it;

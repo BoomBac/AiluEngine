@@ -8,7 +8,7 @@
 #include "Objects/Object.h"
 #include "Buffer.h"
 
-namespace Ailu
+namespace Ailu::Render
 {
     class FrameResource : public Object
     {

@@ -6,11 +6,11 @@
 //Class EngineConfig begin...........................
 #define ENGINECONFIG_GEN_H_10_GENERATED_BODY \
                             private: \
-                                friend Ailu::Type* Z_Construct_EngineConfig_Type();\
-                                static Ailu::Type* GetPrivateStaticClass();\
+                                friend Type* Z_Construct_EngineConfig_Type();\
+                                static Type* GetPrivateStaticClass();\
                             public:\
-                                static class Ailu::Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Ailu::Type  *GetType() const override;
+                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual const Type  *GetType() const override;
                             //Class EngineConfig end...........................
 
 #undef CURRENT_FILE_ID

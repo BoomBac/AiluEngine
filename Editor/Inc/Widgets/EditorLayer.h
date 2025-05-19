@@ -35,7 +35,7 @@ namespace Ailu
 			ImFont* _font = nullptr;
 			Vector<Scope<ImGuiWidget>> _widgets;
 			ImGuiWidget* _p_env_setting;
-            PickFeature _pick;
+            Render::PickFeature _pick;
 		};
 	}
 }
