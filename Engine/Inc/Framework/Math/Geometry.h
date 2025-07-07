@@ -139,7 +139,7 @@ namespace Ailu
     struct ViewFrustum
     {
         static bool Conatin(const ViewFrustum& vf, const AABB& aabb);
-        Array<Plane, 8> _planes;
+        Array<Plane, 6> _planes;
     };
 
     struct OBB

@@ -67,6 +67,10 @@ namespace Ailu
             _global_references.erase(id);
             _global_references_by.erase(id);
         }
+        else
+        {
+            //LOG_WARNING("Object not registered: {}", object->Name());
+        }
     }
     Object *ObjectRegister::Find(const u32 &id)
     {

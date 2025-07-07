@@ -67,7 +67,7 @@
 880ca96c-98e3-4b02-904a-0146448b47e0,NewScene/Default_normal.alasset,kTexture2D
 881f94ee-2dbb-48e9-b084-72c9bfb729ea,Icons/folder.alasset,kTexture2D
 8cfd12eb-99bd-464d-acbd-63b433d14614,NewScene/Palace/textures/sponza_column_b_normal.alasset,kTexture2D
-92f5350a-f983-4448-93a3-ae0fd06ce1f3,NewScene/Palace/MAT_vase_hanging.alasset,kMaterial
+92f5350a-f983-4448-93a3-ae0fd06ce1f3,Shaders/hzb.alasset,kComputeShader
 949381d0-6c70-457a-ac9b-afcb1eab3547,AnimClips/ik_test_leg_mesh.alasset,kAnimClip
 96ddf81e-5cc0-4f50-8400-47a122a37cce,NewScene/Palace/MAT_column_c.alasset,kMaterial
 9740b31d-e345-409c-9535-2aa870a54d3d,NewScene/Palace/MAT_arch.alasset,kMaterial

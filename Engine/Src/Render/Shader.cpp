@@ -1031,6 +1031,12 @@ namespace Ailu::Render
         SetTexture(name, texture);
     }
 
+    void ComputeShader::SetTexture(const String &name, RTHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap)
+     {
+        auto texture = g_pRenderTexturePool->Get(handle);
+        SetTexture(name, texture,face,mipmap);
+     }
+
     void ComputeShader::SetTexture(u8 bind_slot, Texture *texture)
     {
         if (texture != nullptr)
@@ -1059,6 +1065,7 @@ namespace Ailu::Render
             sub_res = texture->CalculateSubResIndex(mipmap, 0);
         else
             sub_res = texture->CalculateSubResIndex(face, mipmap, 0);
+        bool is_set = false;
         for (auto &cs_ele: _kernels)
         {
             auto &variant = cs_ele._variants[cs_ele._active_variant];
@@ -1070,8 +1077,11 @@ namespace Ailu::Render
                 if (texture->Dimension() == ETextureDimension::kTex3D)
                     depth_slice = dynamic_cast<Texture3D *>(texture)->Depth();
                 _bind_params[it->second._bind_slot] = ComputeBindParams{face, mipmap, depth_slice, sub_res};
+                is_set = true;
             }
         }
+        if (!is_set)
+            LOG_WARNING("ComputeShader::SetTexture: texture with name {} not found on shader({})",name,_name);
     }
 
 
@@ -1121,12 +1131,13 @@ namespace Ailu::Render
 
     void ComputeShader::SetBool(const String &name, bool value)
     {
+        f32 v = value ? 1.0f : 0.0f;
         for (auto &cs_ele: _kernels)
         {
             auto &variant = cs_ele._variants[cs_ele._active_variant];
             auto it = variant._bind_res_infos.find(name);
             if (it != variant._bind_res_infos.end() && it->second._res_type & EBindResDescType::kCBufferBool)
-                memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(f32));
+                memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &v, sizeof(f32));
         }
     }
 
@@ -1225,6 +1236,37 @@ namespace Ailu::Render
                 }
                 else
                     memcpy(_cbuf_data + offset, &vector, size);
+            }
+        }
+    }
+
+    void ComputeShader::SetVectorArray(const String& name,const Vector<Vector4f>& vectors)
+    {
+        for (auto &cs_ele: _kernels)
+        {
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end())
+            {
+                u16 offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                u16 size = ShaderBindResourceInfo::GetVariableSize(it->second);
+                u16 array_size = std::min<u16>((u16)it->second._array_size,(u16)vectors.size());
+                memcpy(_cbuf_data + offset, vectors.data(), array_size * sizeof(Vector4f));
+            }
+        }
+    }
+    void ComputeShader::SetVectorArray(const String& name,Vector4f* vectors,u16 num)
+    {
+        for (auto &cs_ele: _kernels)
+        {
+            auto &variant = cs_ele._variants[cs_ele._active_variant];
+            auto it = variant._bind_res_infos.find(name);
+            if (it != variant._bind_res_infos.end())
+            {
+                u16 offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
+                u16 size = ShaderBindResourceInfo::GetVariableSize(it->second);
+                u16 array_size = std::min<u16>((u16)it->second._array_size,num);
+                memcpy(_cbuf_data + offset, vectors, array_size * sizeof(Vector4f));
             }
         }
     }
@@ -1372,7 +1414,7 @@ namespace Ailu::Render
             auto &bind_info = info.second;
             if (bind_info._res_type == EBindResDescType::kConstBuffer && bind_info._bind_flag & ShaderBindResourceInfo::kBindFlagInternal)
             {
-                ConstantBuffer* cb = ConstantBuffer::Create(bind_info._cbuf_size,true,std::format("cb_{}_{}",bind_info._name,_bind_state.size()));
+                ConstantBuffer *cb = ConstBufferPool::Acquire(bind_info._cbuf_size);
                 cb->SetData(_cbuf_data);
                 cur_state._bind_res[bind_info._bind_slot] = cb;
                 cur_state._bind_params[bind_info._bind_slot] = ComputeBindParams{};

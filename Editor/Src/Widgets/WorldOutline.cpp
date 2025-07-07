@@ -56,6 +56,30 @@ namespace Ailu
             {
                 Selection::AddAndRemovePreSelection(_selected_entity);
             }
+            // ---- 树底部空白区域作为 Detach 目标 ----
+            ImGui::Spacing();
+            ImGui::InvisibleButton("DETACH_DROP_ZONE", ImVec2(_content_size.x, 30));
+            if (ImGui::BeginDragDropTarget())
+            {
+                ImVec2 pos = ImGui::GetItemRectMin();
+                ImVec2 size = ImGui::GetItemRectSize();
+                ImVec2 textSize = ImGui::CalcTextSize("Drop to detach");
+                ImVec2 textPos = ImVec2(
+                    pos.x + (size.x - textSize.x) * 0.5f,
+                    pos.y + (size.y - textSize.y) * 0.5f
+                );
+                ImGui::GetWindowDrawList()->AddText(
+                    textPos,
+                    IM_COL32(180, 180, 180, 255),
+                    "Drop to detach"
+                );
+                if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("WORLD_OUTLINE_ENTITY"))
+                {
+                    ECS::Entity e = *(ECS::Entity*)payload->Data;
+                    g_pSceneMgr->ActiveScene()->Detach(e);
+                }
+                ImGui::EndDragDropTarget();
+            }
             //g_pSceneMgr->_p_selected_actor = _selected_actor;
         }
 
@@ -87,7 +111,11 @@ namespace Ailu
                 }
             }
             else
+            {
                 b_root_node_open = ImGui::TreeNodeEx(hiera_comp, node_flags, "%s", tag_comp->_name.c_str());
+                OnDragEntity(entity);
+                OnDropEntity(entity);
+            }
             if (ImGui::IsItemClicked())
             {
                 _selected_entity = entity;
@@ -121,6 +149,8 @@ namespace Ailu
                             auto tag_comp = _scene_register->GetComponent<ECS::TagComponent>(child_entity);
                             if (ImGui::TreeNodeEx(hiera_comp, node_flags, "%s", tag_comp->_name.c_str()))
                             {
+                                OnDragEntity(child_entity);
+                                OnDropEntity(child_entity);
                                 if (ImGui::IsItemClicked())
                                 {
                                     _selected_entity = child_entity;
@@ -194,6 +224,27 @@ namespace Ailu
                 {
                     _rename_entity = _selected_entity;
                 }
+            }
+        }
+        void WorldOutline::OnDragEntity(ECS::Entity entity)
+        {
+            if (ImGui::BeginDragDropSource())
+            {
+                ImGui::SetDragDropPayload("WORLD_OUTLINE_ENTITY", &entity, sizeof(ECS::Entity));
+                ImGui::Text("Dragging %d", entity);
+                ImGui::EndDragDropSource();
+            }
+        }
+        void WorldOutline::OnDropEntity(ECS::Entity entity)
+        {
+            if (ImGui::BeginDragDropTarget())
+            {
+                if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("WORLD_OUTLINE_ENTITY"))
+                {
+                    ECS::Entity payload_entity = *(ECS::Entity *)payload->Data;
+                    g_pSceneMgr->ActiveScene()->Attach(payload_entity,entity);
+                }
+                ImGui::EndDragDropTarget();
             }
         }
     }// namespace Editor

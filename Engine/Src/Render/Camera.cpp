@@ -90,13 +90,13 @@ namespace Ailu::Render
         Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, c);
         Gizmo::DrawLine(p_camera->_near_bottom_left, p_camera->_far_bottom_left, c);
 
-        // auto& vf = p_camera->_vf;
-        // for (int i = 0; i < 6; i++)
-        // {
-        // 	auto& p = vf._planes[i];
-        // 	float3 start = p_camera->Position();
-        // 	Gizmo::DrawLine(p._point, p._point + p._normal,Color(1.0f,0.0f,1.0f,1.0f));
-        // }
+        auto& vf = p_camera->_vf;
+        for (int i = 0; i < 6; i++)
+        {
+        	auto& p = vf._planes[i];
+        	float3 start = p_camera->Position();
+        	Gizmo::DrawLine(p._point, p._point + p._normal,Color(1.0f,0.0f,1.0f,1.0f));
+        }
     }
 
     static Vector3f calculateCenter(Vector3f p1, Vector3f p2, Vector3f p3, Vector3f p4)
@@ -318,13 +318,14 @@ namespace Ailu::Render
         for (int i = 0; i < 6; ++i)
         {
             _vf._planes[i]._normal = Normalize(_vf._planes[i]._normal);
+            _vf._planes[i]._distance = -DotProduct(_vf._planes[i]._normal, _vf._planes[i]._point);
         }
-        _vf._planes[0]._distance = -DotProduct(_vf._planes[0]._normal, _near_top_left);
-        _vf._planes[1]._distance = -DotProduct(_vf._planes[1]._normal, _far_top_left);
-        _vf._planes[2]._distance = -DotProduct(_vf._planes[2]._normal, _far_top_left);
-        _vf._planes[3]._distance = -DotProduct(_vf._planes[3]._normal, _near_bottom_left);
-        _vf._planes[4]._distance = -DotProduct(_vf._planes[4]._normal, _far_bottom_left);
-        _vf._planes[5]._distance = -DotProduct(_vf._planes[5]._normal, _far_bottom_right);
+        // _vf._planes[0]._distance = -DotProduct(_vf._planes[0]._normal, _near_top_left);
+        // _vf._planes[1]._distance = -DotProduct(_vf._planes[1]._normal, _far_top_left);
+        // _vf._planes[2]._distance = -DotProduct(_vf._planes[2]._normal, _far_top_left);
+        // _vf._planes[3]._distance = -DotProduct(_vf._planes[3]._normal, _near_bottom_left);
+        // _vf._planes[4]._distance = -DotProduct(_vf._planes[4]._normal, _far_bottom_left);
+        // _vf._planes[5]._distance = -DotProduct(_vf._planes[5]._normal, _far_bottom_right);
     }
     Camera &Camera::GetCubemapGenCamera(const Camera &base_cam, ECubemapFace::ECubemapFace face)
     {

@@ -76,6 +76,40 @@ namespace Ailu
                     _lut.erase(entity);
                 }
             }
+            /// @brief 将索引位置组件移动到新位置，并将沿途组件左/右移
+            /// @param src 原索引
+            /// @param dst 目标索引
+            void Move(u64 src, u64 dst)
+            {
+                AL_ASSERT(src < _comps.size() && dst < _comps.size());
+                if (src == dst) return;
+                T comp = std::move(_comps[src]);
+                Entity ent = _entities[src];
+
+                const i64 step = (dst > src) ? +1 : -1;
+
+                for (u64 i = src; i != dst; i += step)
+                {
+                    u64 next = i + step;
+                    _comps[i] = std::move(_comps[next]);
+                    _entities[i] = _entities[next];
+                    _lut[_entities[i]] = i;
+                }
+                _comps[dst] = std::move(comp);
+                _entities[dst] = ent;
+                _lut[ent] = dst;
+            }
+
+            void MoveToFirst(u64 src)
+            {
+                Move(src,0);
+            }
+
+            void MoveToLast(u64 src)
+            {
+                Move(src,_comps.size() - 1);
+            }
+
             T *GetComponent(Entity entity)
             {
                 return _lut.contains(entity) ? &_comps[_lut[entity]] : nullptr;
@@ -87,6 +121,10 @@ namespace Ailu
             {
                 AL_ASSERT(index < _entities.size());
                 return _entities[index];
+            }
+            i64 GetIndex(Entity entity) const
+            {
+                return _lut.contains(entity)? _lut.at(entity) : -1;
             }
             auto &begin() { return _comps.begin(); }
             auto &end() { return _comps.end(); }
@@ -359,6 +397,12 @@ namespace Ailu
             {
                 Entity e = GetEntity<SrcT>(index);
                 return GetComponent<DstT>(e);
+            }
+            template<typename T>
+            ComponentManager<T> *GetComponentMgr()
+            {
+                const auto &type_name = T::TypeName();
+                return static_cast<ComponentManager<T> *>(_mgrs[type_name].get());
             }
 
             template<typename T>

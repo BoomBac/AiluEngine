@@ -26,15 +26,14 @@ namespace Ailu::RHI::DX12
     class D3DGPUBuffer : public GPUBuffer
     {
     public:
-        D3DGPUBuffer(GPUBufferDesc desc);
-        ~D3DGPUBuffer();
+		D3DGPUBuffer(GPUBufferDesc desc);
+		~D3DGPUBuffer();
 		void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
-        void Name(const String &name) final;
-        void ReadBack(u8 *dst, u32 size) final;
-        void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete);
-		u32 GetCounter() final;
+		void Name(const String &name) final;
+		void ReadBack(u8 *dst, u32 size) final;
+		void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete);
+		void GetCounter(std::function<void(u32)> callback) final;
 		void SetCounter(u32 counter) final;
-
 		ID3D12Resource* GetCounterBuffer() {return _counter_buffer.Get();}
 		ID3D12Resource* GetNativeResource() {return _p_d3d_res.Get();}
 	protected:
@@ -85,14 +84,13 @@ namespace Ailu::RHI::DX12
 	class D3DConstantBuffer : public ConstantBuffer
 	{
 	public:
-		D3DConstantBuffer(u32 size,bool compute_buffer);
+		D3DConstantBuffer(u32 size);
 		~D3DConstantBuffer() override;
         void Reset() final;
 	private:
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
 	private:
         GpuResourceManager::Allocation _alloc;
-		bool _is_compute_buffer;
 	};
 }
 #endif // !D3DBUFFER_H__

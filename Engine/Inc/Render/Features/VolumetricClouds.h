@@ -59,13 +59,13 @@ namespace Ailu::Render
     public:
         VolumetricClouds();
         ~VolumetricClouds();
-        void AddRenderPasses(Renderer &renderer, RenderingData &rendering_data) override;
+        void AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data) override;
         APROPERTY(Category = "Base")
         bool _is_tile_render = true;
         APROPERTY(Category = "Base")
         bool _is_high_quality = true;
-        APROPERTY(Category = "Base"; Range(0.0f, 5000.0f))
-        f32 _height = 500.0f;
+        APROPERTY(Category = "Base"; Range(0.0f, 10000.0f))
+        f32 _height = 5000.0f;
         APROPERTY(Category = "Base"; Range(100.0f, 10000.0f))
         f32 _thickness = 6000.0f;
         APROPERTY(Category = "Base")

@@ -130,6 +130,7 @@ namespace Ailu::RHI::DX12
         void ReadBack(GpuResource* res,u8* data,u32 size);
 
         void ReadBack(ID3D12Resource* res,D3DResourceStateGuard& state_guard,u8* data, u32 size);
+        void ReadBackAsync(ID3D12Resource* res,D3DResourceStateGuard& state_guard,u32 size,std::function<void(const u8*)> callback);
         void ReadBackAsync(GpuResource* res,std::function<void(u8*)> callback);
         void CreateResource(GpuResource* res) final;
         void CreateResource(GpuResource* res,UploadParams* params) final;
@@ -164,7 +165,7 @@ namespace Ailu::RHI::DX12
 #endif
 
     private:
-        inline static const u32 kResourceCleanupIntervalTick = 2000u;
+        inline static const u32 kResourceCleanupIntervalTick = 8000u;
         //1600 * 900 * 4 * 20
         inline static constexpr u64 kMaxRenderTextureMemorySize = 115200000u;
         inline static constexpr u32 kMaxIndirectDispatchCount = 2048u;

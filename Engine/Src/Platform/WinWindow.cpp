@@ -6,6 +6,7 @@
 #include "Platform/WinInput.h"
 #include "pch.h"
 #include <dwmapi.h> //dark theme
+#include <imm.h>
 
 #include "Ext/imgui/backends/imgui_impl_win32.h"
 #include "Ext/imgui/imgui.h"
@@ -36,6 +37,23 @@ namespace Ailu
     static void ShowCursor()
     {
         while (::ShowCursor(TRUE) < 0);// 显示鼠标指针，直到它可见
+    }
+
+    // 禁用输入法
+    static void DisableIME(HWND hWnd)
+    {
+        ImmAssociateContext(hWnd, NULL);
+    }
+
+    // 恢复输入法
+    static void EnableIME(HWND hWnd)
+    {
+        HIMC hIMC = ImmGetContext(hWnd);
+        if (hIMC)
+        {
+            ImmAssociateContext(hWnd, hIMC);
+            ImmReleaseContext(hWnd, hIMC);
+        }
     }
 
     DWORD cmd_id;
@@ -211,6 +229,8 @@ namespace Ailu
         WinInput::Create(_hwnd);
         DragAcceptFiles(_hwnd, true);
         _is_focused = true;
+        //关闭输入法
+        DisableIME(_hwnd);
     }
     void WinWindow::OnUpdate()
     {

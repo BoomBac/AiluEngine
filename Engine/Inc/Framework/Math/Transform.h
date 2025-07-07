@@ -22,36 +22,78 @@ namespace Ailu
         Vector3f _up = Vector3f::kUp;
         Matrix4x4f _world_matrix;
 
-        static Matrix4x4f ToMatrix(const Transform &transform)
+        static Matrix4x4f ToMatrix(const Transform &t)
         {
-            Vector3f x = transform._rotation * Vector3f(1, 0, 0);
-            Vector3f y = transform._rotation * Vector3f(0, 1, 0);
-            Vector3f z = transform._rotation * Vector3f(0, 0, 1);
-            x = x * transform._scale.x;// Vector * float
-            y = y * transform._scale.y;// Vector * float
-            z = z * transform._scale.z;// Vector * float
-            Vector3f t = transform._position;
-            return {{{
-                    {x.x, x.y, x.z, 0},// X basis (& Scale)
-                    {y.x, y.y, y.z, 0},// Y basis (& scale)
-                    {z.x, z.y, z.z, 0},// Z basis (& scale)
-                    {t.x, t.y, t.z, 1} // Position
-            }}};
+            Matrix4x4f m{};
+            m[3][0] = t._position.x;
+            m[3][1] = t._position.y;
+            m[3][2] = t._position.z;
+            const f32 x2 = t._rotation.x + t._rotation.x;
+            const f32 y2 = t._rotation.y + t._rotation.y;
+            const f32 z2 = t._rotation.z + t._rotation.z;
+            {
+                const f32 xx2 = t._rotation.x * x2;
+                const f32 yy2 = t._rotation.y * y2;
+                const f32 zz2 = t._rotation.z * z2;
+                m[0][0] = (1.0f - (yy2+zz2)) * t._scale.x;
+                m[1][1] = (1.0f - (xx2+zz2)) * t._scale.y;
+                m[2][2] = (1.0f - (xx2+yy2)) * t._scale.z;
+            }
+            {
+                const f32 yz2 = t._rotation.y * z2;
+                const f32 wx2 = t._rotation.w * x2;
+                m[2][1] = (yz2 - wx2) * t._scale.z;
+                m[1][2] = (yz2 + wx2) * t._scale.y;
+            }
+            {
+                const f32 xy2 = t._rotation.x * y2;
+                const f32 wz2 = t._rotation.w * z2;
+
+                m[1][0] = (xy2 - wz2) * t._scale.y;
+                m[0][1] = (xy2 + wz2) * t._scale.z;
+            }
+            {
+                const f32 xz2 = t._rotation.x * z2;
+                const f32 wy2 = t._rotation.w * y2;
+
+                m[2][0] = (xz2 + wy2) * t._scale.z;
+                m[0][2] = (xz2 - wy2) * t._scale.x;
+            }
+            m[0][3] = 0.0f;
+            m[1][3] = 0.0f;
+            m[2][3] = 0.0f;
+            m[3][3] = 1.0f;
+            return m;
+            // Vector3f x = transform._rotation * Vector3f(1, 0, 0);
+            // Vector3f y = transform._rotation * Vector3f(0, 1, 0);
+            // Vector3f z = transform._rotation * Vector3f(0, 0, 1);
+            // x = x * transform._scale.x;// Vector * float
+            // y = y * transform._scale.y;// Vector * float
+            // z = z * transform._scale.z;// Vector * float
+            // Vector3f t = transform._position;
+            // return {{{
+            //         {x.x, x.y, x.z, 0},// X basis (& Scale)
+            //         {y.x, y.y, y.z, 0},// Y basis (& scale)
+            //         {z.x, z.y, z.z, 0},// Z basis (& scale)
+            //         {t.x, t.y, t.z, 1} // Position
+            // }}};
         }
 
         static void ToMatrix(const Transform &transform, Matrix4x4f &out_matrix)
         {
-            Vector3f x = transform._rotation * Vector3f(1, 0, 0);
-            Vector3f y = transform._rotation * Vector3f(0, 1, 0);
-            Vector3f z = transform._rotation * Vector3f(0, 0, 1);
-            x = x * transform._scale.x;// Vector * float
-            y = y * transform._scale.y;// Vector * float
-            z = z * transform._scale.z;// Vector * float
-            Vector3f t = transform._position;
-            out_matrix.SetRow(0, Vector4f{x, 0.f});
-            out_matrix.SetRow(1, Vector4f{y, 0.f});
-            out_matrix.SetRow(2, Vector4f{z, 0.f});
-            out_matrix.SetRow(3, Vector4f{t, 1.f});
+            const auto& mat = ToMatrix(transform);
+            out_matrix = mat;
+            // Vector3f x = transform._rotation * Vector3f(1, 0, 0);
+            // Vector3f y = transform._rotation * Vector3f(0, 1, 0);
+            // Vector3f z = transform._rotation * Vector3f(0, 0, 1);
+            // x = x * transform._scale.x;// Vector * float
+            // y = y * transform._scale.y;// Vector * float
+            // z = z * transform._scale.z;// Vector * float
+            // Vector3f t = transform._position;
+            // out_matrix.SetRow(0, Vector4f{x, 0.f});
+            // out_matrix.SetRow(1, Vector4f{y, 0.f});
+            // out_matrix.SetRow(2, Vector4f{z, 0.f});
+            // out_matrix.SetRow(3, Vector4f{t, 1.f});
         }
 
         //expensive! don't use realtime!
@@ -142,7 +184,7 @@ namespace Ailu
             return worldTransform;
         }
 
-        static Matrix4x4f GetWorldMatrix(Transform transform)
+        static Matrix4x4f GetWorldMatrix(const Transform& transform)
         {
             Transform worldSpaceTransform = GetWorldTransform(transform);
             return ToMatrix(worldSpaceTransform);

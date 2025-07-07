@@ -75,6 +75,7 @@ namespace Ailu::RHI::DX12
     private:
         //16 mb
         static constexpr u64 kMaxStaleBufferSize = 1024 * 1024 * 16;
+        static constexpr u16 kMaxStaleFrameCount = 2u;
         struct Buffer
         {
             ComPtr<ID3D12Resource> _resource;

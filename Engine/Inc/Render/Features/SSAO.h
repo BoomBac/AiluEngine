@@ -30,7 +30,7 @@ namespace Ailu::Render
     public:
 		SSAO();
 		~SSAO();
-		void AddRenderPasses(Renderer &renderer, RenderingData &rendering_data) override;
+		void AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data) override;
 		APROPERTY()
 		bool _is_cbr = false;
 		APROPERTY()

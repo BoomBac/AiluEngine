@@ -45,8 +45,8 @@ _layer_mask:1
         _transform_component:
             _transform:
                 _position:14.517980576,3.078702927,4.210923672
-                _rotation:0.520812929,-0.058561586,0.010056916,0.851600409
-                _scale:0.999818504,0.999846101,0.999833703
+                _rotation:0.386361241,0.170422658,-0.078974023,0.903019488
+                _scale:0.999831676,0.999866247,0.999835551
         _light_component:
             _type:kDirectional
             _light:
@@ -70,9 +70,9 @@ Entity:4
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:25.551151276,-8.519515991,10.805520058
+                _position:-4.867369652,164.338043213,-22.373046875
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:42.710632324,42.710586548,42.710632324
+                _scale:1.000000000,1.000000000,1.000000000
         _static_mesh_component:
             _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
             _material_num:1
@@ -195,11 +195,11 @@ Entity:9
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:17.210599899,-3.803706884,21.169315338
-                _rotation:0.000000000,0.358988762,0.000000000,0.933341861
-                _scale:0.597808540,0.597824156,0.597879589
+                _position:13.762855530,-3.170633554,11.022795677
+                _rotation:-0.000000000,0.000000068,-0.000000012,1.000000000
+                _scale:1.000000000,1.000000000,1.000000000
         _static_mesh_component:
-            _p_mesh:2ff30e48-6661-479b-a90c-863e606734f6
+            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
             _material_num:1
             _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         _hierarchy_component:
@@ -303,9 +303,9 @@ Entity:13
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:26.772270203,8.068866730,-17.758403778
+                _position:-0.000071335,172.796417236,-528.007385254
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:0.999941528,0.999964237,0.999958515
+                _scale:0.999922395,0.999932170,0.999934077
         _hierarchy_component:
             _first_child:0
             _prev_sibling:0
@@ -315,11 +315,11 @@ _layer_mask:1
             _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
         _camera_component:
             _camera:
-                _type:kOrthographic
-                _aspect:1
-                _far:45.1
+                _type:kPerspective
+                _aspect:1.875
+                _far:2000
                 _near:3
-                _fovh:60
+                _fovh:41.269
                 _size:15.651
 Entity:14
         _tag_component:
@@ -328,7 +328,7 @@ _layer_mask:1
         _transform_component:
             _transform:
                 _position:-0.913319349,-5.712336063,-5.156910896
-                _rotation:0.000000000,0.707228780,0.000000000,0.706984758
+                _rotation:-0.000000000,0.707228780,-0.000000000,0.706984758
                 _scale:4.795448303,2.646114349,0.101081021
         _static_mesh_component:
             _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
@@ -355,7 +355,7 @@ _layer_mask:1
         _transform_component:
             _transform:
                 _position:6.114803314,-5.775127411,-5.299366474
-                _rotation:0.000000000,-0.707106769,0.000000000,0.707106769
+                _rotation:0.000000000,-0.706984758,0.000000000,0.707228839
                 _scale:5.006343842,2.645932913,0.101074770
         _static_mesh_component:
             _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
@@ -409,7 +409,7 @@ _layer_mask:1
         _transform_component:
             _transform:
                 _position:2.618528843,-8.374788284,-4.761664391
-                _rotation:0.707818627,-0.005775541,-0.003821881,0.706360221
+                _rotation:0.707818627,-0.005775543,-0.003821882,0.706360221
                 _scale:3.724031925,5.207654476,0.101069197
         _static_mesh_component:
             _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
@@ -421,7 +421,7 @@ _layer_mask:1
             _next_sibling:0
             _parent:0
             _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
+            _inv_matrix_attach:0.2685,-0.00053322,-0.134261,0;-0.00364533,-0.000392444,-9.89328,0;0.000738132,0.192024,-0.0205919,0;-0.73009,0.912463,-82.6006,1
         _rigidbody_component:
             _mass:1
         _collider_component:

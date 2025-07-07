@@ -25,6 +25,7 @@
 #define PLATFORM_WINDOWS 1
 
 #define ACLASS()
+#define ASTRUCT()
 #define AENUM()
 #define APROPERTY(...)
 #define AFIELD(...)

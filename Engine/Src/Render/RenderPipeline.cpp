@@ -52,7 +52,7 @@ namespace Ailu::Render
     {
         if (!_cam_cb.contains(view._cam_hash))
         {
-            _cam_cb[view._cam_hash] = ConstantBuffer::Create(RenderConstants::kPerCameraDataSize, false, std::format("CameraCB_{}", view._cam_hash));
+            _cam_cb[view._cam_hash] = ConstantBuffer::Create(RenderConstants::kPerCameraDataSize, std::format("CameraCB_{}", view._cam_hash));
             LOG_INFO("Create CameraCB: {}", view._cam_hash);
         }
         memcpy(_cam_cb[view._cam_hash]->GetData(), &view._camera_data, RenderConstants::kPerCameraDataSize);

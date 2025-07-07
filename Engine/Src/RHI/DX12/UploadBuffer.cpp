@@ -140,7 +140,7 @@ namespace Ailu::RHI::DX12
         size = AlignTo(size, size);
         for (auto &buf: _buffers)
         {
-            if (buf._size >= size && (current_frame - buf._last_used_frame) > 1)
+            if (buf._size >= size && (current_frame - buf._last_used_frame) > kMaxStaleFrameCount)
             {
                 buf._last_used_frame = current_frame;
                 return buf._resource;
@@ -161,9 +161,14 @@ namespace Ailu::RHI::DX12
     {
         if (_total_used > kMaxStaleBufferSize)
         {
-            std::erase_if(_buffers, [current_frame](const Buffer &buf) {
-                return (current_frame - buf._last_used_frame) > 1;
+            u64 old_size = _buffers.size(),old_data_size = _total_used;
+            std::erase_if(_buffers, [this,current_frame](const Buffer &buf) {
+                bool should_release = (current_frame - buf._last_used_frame) > kMaxStaleFrameCount;
+                if (should_release)
+                    _total_used -= buf._size;
+                return should_release;
             });
+            LOG_WARNING("ReadbackBufferPool::Tick: Release {} readback buffer with {} byte.", old_size - _buffers.size(),old_data_size - _total_used);
         }
     }
 #pragma endregion

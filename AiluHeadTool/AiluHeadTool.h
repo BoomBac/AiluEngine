@@ -57,6 +57,7 @@ public:
         std::string _namespace;
         bool _is_abstract = false;
         bool is_export;
+        bool _is_struct = false;
         std::vector<MemberInfo> _members;
     };
     struct EnumInfo
@@ -76,6 +77,7 @@ private:
     inline static std::string kStructMacro = "ASTRUCT";
     inline static std::string kEnumMacro = "AENUM";
     inline static std::string kBodyMacro = "GENERATED_BODY";
+    inline static std::string kStructBodyMacro = "GENERATED_BODY";
     inline static std::string kPropertyMacro = "APROPERTY";
     inline static std::string kFunctionMacro = "AFUNCTION";
     inline static std::string kClassID = "class";
@@ -83,6 +85,7 @@ private:
 
 private:
     std::vector<ClassInfo> _classes;
+    std::vector<ClassInfo> _structs;
     std::vector<EnumInfo> _enums;
     NamespaceTracker _tracker;
 };

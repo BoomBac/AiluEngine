@@ -25,6 +25,10 @@ struct PSInput
     float3 world_pos : TEXCOORD0;
 };
 
+PerMaterialCBufferBegin
+    float _grid_alpha;
+PerMaterialCBufferEnd
+
 PSInput VSMain(VSInput v)
 {
 	PSInput result;
@@ -73,5 +77,6 @@ float4 PSMain(PSInput i) : SV_TARGET
     float4 grid_l = Grid(i.world_pos,0.01,_GridWidth * 100);
     float4 grid_color = lerp(lerp(grid_s,grid_m,vis_small_grid),grid_l,vis_mid_grid);
     grid_color.a *= lerp(_GridAlpha,0.0,saturate(distance(GetCameraPositionWS(),i.world_pos) / lerp(lerp(30,200,vis_small_grid),3000,vis_mid_grid * vis_mid_grid)));
+    grid_color.a *= _grid_alpha;
     return grid_color;
 }

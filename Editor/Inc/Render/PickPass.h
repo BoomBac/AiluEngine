@@ -31,7 +31,7 @@ namespace Ailu
         public:
             PickFeature();
             ~PickFeature();
-            void AddRenderPasses(Renderer &renderer, RenderingData &rendering_data) final;
+            void AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data) final;
             u32 GetPickID(u16 x, u16 y) const;
 
         private:

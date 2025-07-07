@@ -81,7 +81,7 @@ namespace DebugAlloc
     }
 }
 
-inline void *AlignedAlloc(size_t alignment, size_t size)
+static void *AlignedAlloc(size_t alignment, size_t size)
 {
 #if defined(_MSC_VER)
     return _aligned_malloc(size, alignment);
@@ -91,7 +91,7 @@ inline void *AlignedAlloc(size_t alignment, size_t size)
 #endif
 }
 
-inline void AlignedFree(void *ptr)
+static void AlignedFree(void *ptr)
 {
 #if defined(_MSC_VER)
     //DebugAlloc::DebugAlignedFree(ptr);
@@ -190,6 +190,7 @@ namespace Ailu
             void *page_mem = AlignedAlloc(kPageSize, kPageSize);
             AL_ASSERT(page_mem != nullptr);
             _head = new (page_mem) PageHeader;
+            //AL_ASSERT(reinterpret_cast<uintptr_t>(_head) % block_size == 0);
             _head->_page_index = s_page_index++;
             _head->_bin = bin;
             _head->_block_size = block_size;
@@ -234,9 +235,12 @@ namespace Ailu
             for (auto &bin: _bins)
                 DESTORY_PTR(bin);
         }
-        void *Arena::Allocate(u64 size)
+        void *Arena::Allocate(u64 size, u64 align)
         {
-            return _bins[s_bin_mapper.GetBinIndex(size)]->Allocate(size);
+            u32 bin_index = s_bin_mapper.GetBinIndex(size);
+            u32 bin_size = s_bin_mapper.GetBinSizeByIndex(bin_index);
+            AL_ASSERT(bin_size % (u32) align == 0);
+            return _bins[bin_index]->Allocate(size);
         }
         void Arena::Deallocate(void *ptr)
         {
@@ -363,6 +367,9 @@ namespace Ailu
         }
         void Allocator::Shutdown()
         {
+            g_Allocator->PrintLeaks();
+            g_Allocator->_allocations.clear();
+            g_Allocator->_arenas.clear();
             DESTORY_PTR(g_Allocator);
         }
         Allocator &Allocator::Get()
@@ -381,7 +388,7 @@ namespace Ailu
             }
             return *s_thread_arena;
         }
-        void *Allocator::Allocate(u64 size, const char *file, const char *function, u16 line)
+        void *Allocator::Allocate(u64 size, const char *file, const char *function, u16 line, u64 align)
         {
             std::lock_guard<std::mutex> lock(_mutex);
             void *data;
@@ -389,15 +396,17 @@ namespace Ailu
             size += kAllocHeaderSize;
             if (size <= kMaxBinSize)
             {
-                data = ThreadArena().Allocate(size);
+                data = ThreadArena().Allocate(size, align);
             }
             else
             {
-                data = std::malloc(size);
+                data = AlignedAlloc(align,size);
                 is_sys_alloc = true;
             }
             if (data)
             {
+                //makesure data is aligned
+                AL_ASSERT_MSG(reinterpret_cast<uintptr_t>(data) % align == 0, "Allocator::Allocate: data is not aligned, size: {}, align: {}, ptr: {}", size, align, PtrToAddress(data));
                 AllocHeader *header = reinterpret_cast<AllocHeader *>(data);
                 header->_size_and_flags = AllocHeader::PackAllocSize((u32) size, is_sys_alloc);
                 header->_magic = 0xDEADC0DE;
@@ -435,10 +444,9 @@ namespace Ailu
 #endif//_DEBUG
             _total_allocated.fetch_sub(AllocHeader::UnpackAllocSize(header->_size_and_flags));
             if (AllocHeader::IsSysAlloc(header->_size_and_flags))
-                std::free(header);
+                AlignedFree(header);
             else
                 ThreadArena().Deallocate(header);
-
         }
 
 

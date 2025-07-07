@@ -41,6 +41,9 @@ namespace Ailu
         kVec2Int,
         kVec3Int,
         kVec4Int,
+        kVec2UInt,
+        kVec3UInt,
+        kVec4UInt,
         kChar,
         kBool,
         kString,
@@ -164,7 +167,18 @@ namespace Ailu
             // instance.*fieldPtr = value;
         }
         [[nodiscard]] const EDataType &DataType() const { return _data_type; }
-
+        /// <summary>
+        /// 获取属性的字符串值,eg: uint8_t -> "255", bool -> "true", String -> "Hello"
+        /// </summary>
+        /// <returns></returns>
+        [[nodiscard]] String StringValue(void* instance) const;
+        /// <summary>
+        /// Sets the value of an instance from a string representation.
+        /// </summary>
+        /// <param name="instance">A pointer to the instance whose value will be set.</param>
+        /// <param name="str">The string containing the value to assign.</param>
+        /// <returns>True if the value was successfully set from the string; otherwise, false.</returns>
+        bool SetValueFromString(void *instance, const String &str) const;
     private:
         EDataType _data_type = EDataType::kNone;
     };
@@ -207,7 +221,6 @@ namespace Ailu
     {
     public:
         static void RegisterType(Type *type);
-
     public:
         Type();
         explicit Type(TypeInitializer initializer);
@@ -224,11 +237,18 @@ namespace Ailu
         [[nodiscard]] PropertyInfo *FindPropertyByName(const String &name);
         [[nodiscard]] FunctionInfo *FindFunctionByName(const String &name);
         [[nodiscard]] const std::set<Type *> &DerivedTypes() const;
+        // Iterator support
+        using PropertyIterator = Vector<PropertyInfo>::const_iterator;
+        using FunctionIterator = Vector<FunctionInfo>::const_iterator;
+        using MemberIterator = Vector<MemberInfo*>::const_iterator;
 
+        [[nodiscard]] PropertyIterator PropertyBegin() const { return _properties.begin(); }
+        [[nodiscard]] PropertyIterator PropertyEnd() const { return _properties.end(); }
+        [[nodiscard]] FunctionIterator FunctionBegin() const { return _functions.begin(); }
+        [[nodiscard]] FunctionIterator FunctionEnd() const { return _functions.end(); }
 
     private:
         inline static Map<String, Type *> s_global_types;
-
     private:
         Type *_base;
         bool _is_class;
@@ -263,6 +283,10 @@ namespace Ailu
         explicit Enum(const EnumInitializer &initializer);
         u32 EnumCount() const { return static_cast<u32>(_str_to_enum_lut.size()); }
         i32 GetIndexByName(const std::string &name) const;
+        template<typename E>
+        Enum* StaticEnum(){
+            return nullptr;
+        };
         const Vector<const String *> &GetEnumNames() const { return _enum_names; };
         /// @brief 根据枚举值返回其名称
         /// @tparam E 可转化为u32的枚举值

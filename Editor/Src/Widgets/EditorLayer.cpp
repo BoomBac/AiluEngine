@@ -505,35 +505,11 @@ namespace Ailu
             static bool s_show_time_info = false;
             if (ImGui::CollapsingHeader("Performace Statics"))
             {
-                String space = "";
-                // ImGui::Text("CPU Time:");
-                // while (!Profiler::Get()._cpu_profiler_queue.empty())
-                // {
-                //     auto [is_start, profiler_id] = Profiler::Get()._cpu_profiler_queue.front();
-                //     Profiler::Get()._cpu_profiler_queue.pop();
-                //     if (is_start)
-                //     {
-                //         space.append("-");
-                //         const auto &profiler = Profiler::Get().GetCPUProfileData(profiler_id);
-                //         ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
-                //     }
-                //     else
-                //         space = space.substr(0, space.size() - 1);
-                // }
-                // space = "";
                 ImGui::Text("GPU Time:");
-                while (!Profiler::Get()._gpu_profiler_queue.empty())
+                for (const auto &it: Profiler::Get().GetPassGPUTime())
                 {
-                    const auto& marker = Profiler::Get()._gpu_profiler_queue.front();
-                    Profiler::Get()._gpu_profiler_queue.pop();
-                    if (marker._is_start)
-                    {
-                        space.append("-");
-                        const auto &profiler = Profiler::Get().GetGpuProfileData(marker._profiler_index);
-                        ImGui::Text("%s%s,%.2f ms", space.c_str(), profiler->Name.c_str(), profiler->_avg_time);
-                    }
-                    else
-                        space = space.substr(0, space.size() - 1);
+                    auto& [name, time] = it;
+                    ImGui::Text("   %s,%.2f ms", name.c_str(), time);
                 }
             }
             ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");

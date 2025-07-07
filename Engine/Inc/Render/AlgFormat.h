@@ -111,46 +111,112 @@ namespace Ailu
                  kALGFormatBC7_UNORM_SRGB)
 
 
-    static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat::EALGFormat &format)
+    static DXGI_FORMAT ConvertToDXGIFormat(const EALGFormat::EALGFormat& format)
     {
+        using namespace EALGFormat;
         switch (format)
         {
-            case EALGFormat::kALGFormatUNKOWN:
+            // 128-bit
+            case kALGFormatR32G32B32A32_FLOAT:    return DXGI_FORMAT_R32G32B32A32_FLOAT;
+            case kALGFormatR32G32B32A32_UINT:     return DXGI_FORMAT_R32G32B32A32_UINT;
+            case kALGFormatR32G32B32A32_SINT:     return DXGI_FORMAT_R32G32B32A32_SINT;
+            case kALGFormatR32G32B32A32_TYPELESS: return DXGI_FORMAT_R32G32B32A32_TYPELESS;
+
+            // 96-bit
+            case kALGFormatR32G32B32_FLOAT:       return DXGI_FORMAT_R32G32B32_FLOAT;
+            case kALGFormatR32G32B32_UINT:        return DXGI_FORMAT_R32G32B32_UINT;
+            case kALGFormatR32G32B32_SINT:        return DXGI_FORMAT_R32G32B32_SINT;
+            case kALGFormatR32G32B32_TYPELESS:    return DXGI_FORMAT_R32G32B32_TYPELESS;
+
+            // 64-bit
+            case kALGFormatR16G16B16A16_FLOAT:    return DXGI_FORMAT_R16G16B16A16_FLOAT;
+            case kALGFormatR16G16B16A16_UNORM:    return DXGI_FORMAT_R16G16B16A16_UNORM;
+            case kALGFormatR16G16B16A16_UINT:     return DXGI_FORMAT_R16G16B16A16_UINT;
+            case kALGFormatR16G16B16A16_SNORM:    return DXGI_FORMAT_R16G16B16A16_SNORM;
+            case kALGFormatR16G16B16A16_SINT:     return DXGI_FORMAT_R16G16B16A16_SINT;
+            case kALGFormatR32G32_FLOAT:          return DXGI_FORMAT_R32G32_FLOAT;
+            case kALGFormatR32G32_UINT:           return DXGI_FORMAT_R32G32_UINT;
+            case kALGFormatR32G32_SINT:           return DXGI_FORMAT_R32G32_SINT;
+            case kALGFormatR32G32_TYPELESS:       return DXGI_FORMAT_R32G32_TYPELESS;
+
+            // 32-bit
+            case kALGFormatR8G8B8A8_UNORM:        return DXGI_FORMAT_R8G8B8A8_UNORM;
+            case kALGFormatR8G8B8A8_UNORM_SRGB:   return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+            case kALGFormatR8G8B8A8_UINT:         return DXGI_FORMAT_R8G8B8A8_UINT;
+            case kALGFormatR8G8B8A8_SNORM:        return DXGI_FORMAT_R8G8B8A8_SNORM;
+            case kALGFormatR8G8B8A8_SINT:         return DXGI_FORMAT_R8G8B8A8_SINT;
+            case kALGFormatR10G10B10A2_TYPELESS:  return DXGI_FORMAT_R10G10B10A2_TYPELESS;
+            case kALGFormatR10G10B10A2_UNORM:     return DXGI_FORMAT_R10G10B10A2_UNORM;
+            case kALGFormatR10G10B10A2_UINT:      return DXGI_FORMAT_R10G10B10A2_UINT;
+            case kALGFormatR11G11B10_FLOAT:       return DXGI_FORMAT_R11G11B10_FLOAT;
+
+            case kALGFormatR32_FLOAT:             return DXGI_FORMAT_R32_FLOAT;
+            case kALGFormatR32_UINT:              return DXGI_FORMAT_R32_UINT;
+            case kALGFormatR32_SINT:              return DXGI_FORMAT_R32_SINT;
+            case kALGFormatR32_TYPELESS:          return DXGI_FORMAT_R32_TYPELESS;
+
+            case kALGFormatR16G16_FLOAT:          return DXGI_FORMAT_R16G16_FLOAT;
+            case kALGFormatR16G16_UNORM:          return DXGI_FORMAT_R16G16_UNORM;
+            case kALGFormatR16G16_UINT:           return DXGI_FORMAT_R16G16_UINT;
+            case kALGFormatR16G16_SNORM:          return DXGI_FORMAT_R16G16_SNORM;
+            case kALGFormatR16G16_SINT:           return DXGI_FORMAT_R16G16_SINT;
+
+            case kALGFormatR16_FLOAT:             return DXGI_FORMAT_R16_FLOAT;
+            case kALGFormatR16_UNORM:             return DXGI_FORMAT_R16_UNORM;
+            case kALGFormatR16_UINT:              return DXGI_FORMAT_R16_UINT;
+            case kALGFormatR16_SNORM:             return DXGI_FORMAT_R16_SNORM;
+            case kALGFormatR16_SINT:              return DXGI_FORMAT_R16_SINT;
+
+            case kALGFormatR8_UNORM:              return DXGI_FORMAT_R8_UNORM;
+            case kALGFormatR8_UINT:               return DXGI_FORMAT_R8_UINT;
+            case kALGFormatR8_SNORM:              return DXGI_FORMAT_R8_SNORM;
+            case kALGFormatR8_SINT:               return DXGI_FORMAT_R8_SINT;
+
+            case kALGFormatR8G8_UNORM:            return DXGI_FORMAT_R8G8_UNORM;
+            case kALGFormatR8G8_UINT:             return DXGI_FORMAT_R8G8_UINT;
+            case kALGFormatR8G8_SNORM:            return DXGI_FORMAT_R8G8_SNORM;
+            case kALGFormatR8G8_SINT:             return DXGI_FORMAT_R8G8_SINT;
+
+            case kALGFormatD32_FLOAT:             return DXGI_FORMAT_D32_FLOAT;
+            case kALGFormatD16_UNORM:             return DXGI_FORMAT_D16_UNORM;
+            case kALGFormatD24S8_UINT:            return DXGI_FORMAT_D24_UNORM_S8_UINT;
+            case kALGFormatD32_FLOAT_S8X24_UINT:  return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+
+            // Compressed formats
+            case kALGFormatBC1_UNORM:             return DXGI_FORMAT_BC1_UNORM;
+            case kALGFormatBC1_UNORM_SRGB:        return DXGI_FORMAT_BC1_UNORM_SRGB;
+            case kALGFormatBC2_UNORM:             return DXGI_FORMAT_BC2_UNORM;
+            case kALGFormatBC2_UNORM_SRGB:        return DXGI_FORMAT_BC2_UNORM_SRGB;
+            case kALGFormatBC3_UNORM:             return DXGI_FORMAT_BC3_UNORM;
+            case kALGFormatBC3_UNORM_SRGB:        return DXGI_FORMAT_BC3_UNORM_SRGB;
+            case kALGFormatBC4_UNORM:             return DXGI_FORMAT_BC4_UNORM;
+            case kALGFormatBC4_SNORM:             return DXGI_FORMAT_BC4_SNORM;
+            case kALGFormatBC5_UNORM:             return DXGI_FORMAT_BC5_UNORM;
+            case kALGFormatBC5_SNORM:             return DXGI_FORMAT_BC5_SNORM;
+            case kALGFormatBC6H_UF16:             return DXGI_FORMAT_BC6H_UF16;
+            case kALGFormatBC6H_SF16:             return DXGI_FORMAT_BC6H_SF16;
+            case kALGFormatBC7_UNORM:             return DXGI_FORMAT_BC7_UNORM;
+            case kALGFormatBC7_UNORM_SRGB:        return DXGI_FORMAT_BC7_UNORM_SRGB;
+
+            // BGRA formats
+            case kALGFormatB8G8R8A8_UNORM:        return DXGI_FORMAT_B8G8R8A8_UNORM;
+            case kALGFormatB8G8R8A8_UNORM_SRGB:   return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+            case kALGFormatB8G8R8X8_UNORM:        return DXGI_FORMAT_B8G8R8X8_UNORM;
+            case kALGFormatB8G8R8X8_UNORM_SRGB:   return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
+
+            // Special cases
+            case kALGFormatA8_UNORM:              return DXGI_FORMAT_A8_UNORM;
+            case kALGFormatR1_UNORM:              return DXGI_FORMAT_R1_UNORM;
+            case kALGFormatR9G9B9E5_SHAREDEXP:    return DXGI_FORMAT_R9G9B9E5_SHAREDEXP;
+
+            // Unknown / fallback
+            case kALGFormatUNKOWN:
+            default:
+            {
+                //AL_ASSERT_MSG(false,"Format({}): convert not define yet",format);
                 return DXGI_FORMAT_UNKNOWN;
-            case EALGFormat::kALGFormatR8G8B8A8_UNORM:
-                return DXGI_FORMAT_R8G8B8A8_UNORM;
-            case EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB:
-                return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-            case EALGFormat::kALGFormatR24G8_TYPELESS:
-                return DXGI_FORMAT_R24G8_TYPELESS;
-            case EALGFormat::kALGFormatD24S8_UINT:
-                return DXGI_FORMAT_D24_UNORM_S8_UINT;
-            case EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT:
-                return DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
-            case EALGFormat::kALGFormatR32_FLOAT:
-                return DXGI_FORMAT_R32_FLOAT;
-            case EALGFormat::kALGFormatD32_FLOAT:
-                return DXGI_FORMAT_D32_FLOAT;
-            case EALGFormat::kALGFormatR16_FLOAT:
-                return DXGI_FORMAT_R16_FLOAT;
-            case EALGFormat::kALGFormatR32G32B32A32_FLOAT:
-                return DXGI_FORMAT_R32G32B32A32_FLOAT;
-            case EALGFormat::kALGFormatR32G32B32_FLOAT:
-                return DXGI_FORMAT_R32G32B32_FLOAT;
-            case EALGFormat::kALGFormatR32G32_FLOAT:
-                return DXGI_FORMAT_R32G32_FLOAT;
-            case EALGFormat::kALGFormatR16G16B16A16_FLOAT:
-                return DXGI_FORMAT_R16G16B16A16_FLOAT;
-            case EALGFormat::kALGFormatR11G11B10_FLOAT:
-                return DXGI_FORMAT_R11G11B10_FLOAT;
-            case EALGFormat::kALGFormatR16G16_FLOAT:
-                return DXGI_FORMAT_R16G16_FLOAT;
-            case EALGFormat::kALGFormatR32_UINT:
-                return DXGI_FORMAT_R32_UINT;
-            case EALGFormat::kALGFormatR32_SINT:
-                return DXGI_FORMAT_R32_SINT;
+            }
         }
-        return DXGI_FORMAT_UNKNOWN;
     }
 
     static i8 GetFormatChannel(const EALGFormat::EALGFormat &format)
@@ -204,61 +270,105 @@ namespace Ailu
         return false;
     }
 
-    static u16 GetPixelByteSize(const EALGFormat::EALGFormat &format)
+static uint16_t GetPixelByteSize(const EALGFormat::EALGFormat& format)
+{
+    using namespace EALGFormat;
+    switch (format)
     {
-        switch (format)
+        // 128-bit formats (16 bytes per pixel)
+        case kALGFormatR32G32B32A32_FLOAT:
+        case kALGFormatR32G32B32A32_UINT:
+        case kALGFormatR32G32B32A32_SINT:
+            return 16;
+
+        // 96-bit formats (12 bytes per pixel)
+        case kALGFormatR32G32B32_FLOAT:
+        case kALGFormatR32G32B32_UINT:
+        case kALGFormatR32G32B32_SINT:
+            return 12;
+
+        // 64-bit formats (8 bytes per pixel)
+        case kALGFormatR16G16B16A16_FLOAT:
+        case kALGFormatR16G16B16A16_UNORM:
+        case kALGFormatR16G16B16A16_UINT:
+        case kALGFormatR16G16B16A16_SNORM:
+        case kALGFormatR16G16B16A16_SINT:
+        case kALGFormatR32G32_FLOAT:
+        case kALGFormatR32G32_UINT:
+        case kALGFormatR32G32_SINT:
+        case kALGFormatD32_FLOAT_S8X24_UINT:  // technically 64-bit
+            return 8;
+
+        // 48-bit formats (6 bytes per pixel)
+        case kALGFormatR10G10B10A2_UNORM:
+        case kALGFormatR10G10B10A2_UINT:
+            return 4; // Note: Packed into 32-bit (4 bytes), though "10/10/10" suggests more
+
+        // 32-bit formats (4 bytes per pixel)
+        case kALGFormatR8G8B8A8_UNORM:
+        case kALGFormatR8G8B8A8_UNORM_SRGB:
+        case kALGFormatR8G8B8A8_UINT:
+        case kALGFormatR8G8B8A8_SNORM:
+        case kALGFormatR8G8B8A8_SINT:
+        case kALGFormatR16G16_FLOAT:
+        case kALGFormatR16G16_UNORM:
+        case kALGFormatR16G16_UINT:
+        case kALGFormatR16G16_SNORM:
+        case kALGFormatR16G16_SINT:
+        case kALGFormatR32_FLOAT:
+        case kALGFormatR32_UINT:
+        case kALGFormatR32_SINT:
+        case kALGFormatD32_FLOAT:
+        case kALGFormatD24S8_UINT:
+        case kALGFormatR10G10B10A2_TYPELESS:
+        case kALGFormatR11G11B10_FLOAT:
+        case kALGFormatB8G8R8A8_UNORM:
+        case kALGFormatB8G8R8X8_UNORM:
+        case kALGFormatB8G8R8A8_UNORM_SRGB:
+            return 4;
+
+        // 16-bit formats (2 bytes per pixel)
+        case kALGFormatR16_FLOAT:
+        case kALGFormatR16_UNORM:
+        case kALGFormatR16_UINT:
+        case kALGFormatR16_SNORM:
+        case kALGFormatR16_SINT:
+        case kALGFormatD16_UNORM:
+            return 2;
+
+        // 8-bit formats (1 byte per pixel)
+        case kALGFormatR8_UNORM:
+        case kALGFormatR8_UINT:
+        case kALGFormatR8_SNORM:
+        case kALGFormatR8_SINT:
+        case kALGFormatA8_UNORM:
+            return 1;
+
+        // Compressed formats - return 0 or special case
+        case kALGFormatBC1_UNORM:
+        case kALGFormatBC1_UNORM_SRGB:
+        case kALGFormatBC2_UNORM:
+        case kALGFormatBC2_UNORM_SRGB:
+        case kALGFormatBC3_UNORM:
+        case kALGFormatBC3_UNORM_SRGB:
+        case kALGFormatBC4_UNORM:
+        case kALGFormatBC4_SNORM:
+        case kALGFormatBC5_UNORM:
+        case kALGFormatBC5_SNORM:
+        case kALGFormatBC6H_UF16:
+        case kALGFormatBC6H_SF16:
+        case kALGFormatBC7_UNORM:
+        case kALGFormatBC7_UNORM_SRGB:
+            return 0; // block-compressed, pixel size is not constant
+
+        default:
         {
-            case EALGFormat::kALGFormatUNKOWN:
-                return 65535;
-                break;
-            case EALGFormat::kALGFormatR8G8B8A8_UNORM:
-            case EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB:
-                return 4;
-                break;
-            case EALGFormat::kALGFormatR24G8_TYPELESS:
-                return 4;
-                break;
-            case EALGFormat::kALGFormatR32_FLOAT:
-                return 4;
-                break;
-            case EALGFormat::kALGFormatD32_FLOAT:
-                return 4;
-                break;
-            case EALGFormat::kALGFormatR16_FLOAT:
-                return 2;
-                break;
-            case EALGFormat::kALGFormatD24S8_UINT:
-                return 4;
-                break;
-            case EALGFormat::kALGFormatR32G32B32A32_FLOAT:
-                return 16;
-                break;
-            case EALGFormat::kALGFormatR32G32B32_FLOAT:
-                return 12;
-                break;
-            case EALGFormat::kALGFormatR16G16B16A16_FLOAT:
-                return 8;
-                break;
-            case EALGFormat::kALGFormatR11G11B10_FLOAT:
-                return 4;
-                break;
-            case EALGFormat::kALGFormatR32_UINT:
-                return 4;
-                break;
-            case EALGFormat::kALGFormatR32_SINT:
-                return 4;
-                break;
-            case EALGFormat::kALGFormatR16G16_FLOAT:
-                return 4;
-            case EALGFormat::kALGFormatR32G32_FLOAT:
-            case EALGFormat::kALGFormatD32_FLOAT_S8X24_UINT:
-                return 8;
-            default:
-                break;
+            AL_ASSERT_MSG(false,"Unknown format {}",format);
         }
-        AL_ASSERT_MSG(false, "Unknown format %d", (u32) format);
-        return 65535;
+            return 0;
     }
+}
+
 }// namespace Ailu
 
 #endif// !ALG_FORMAT_H__

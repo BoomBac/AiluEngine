@@ -11,6 +11,8 @@
 #include "Render/CommonRenderPipeline.h"
 #include "Render/Renderer.h"
 
+#include "Framework/Parser/TextParser.h"
+
 using namespace Ailu;
 
 namespace Ailu
@@ -112,66 +114,55 @@ namespace Ailu
         void EditorApp::LoadEditorConfig(ApplicationDesc &desc)
         {
             //auto work_dir = PathUtils::ExtarctDirectory(Application::GetWorkingPath());
-            String configs;
-            FileManager::ReadFile(s_editor_config_path, configs);
-            Map<String, String> config_pairs;
-            auto config_lines = su::Split(configs, "\n");
-            for (auto line: config_lines)
+            INIParser parser;
+            parser.Load(s_editor_config_path);
+            Type* type = EditorConfig::StaticType();
+            const auto &config_values = parser.GetValues();
+            for (auto &it: type->GetProperties())
             {
-                String f_line = line;
-                su::RemoveSpaces(f_line);
-                auto v = su::Split(f_line, "=");
-                if (v.size() != 2)
-                    continue;
-                config_pairs[v[0]] = v[1];
+                if (auto itt = config_values.find(it.Name()); itt != config_values.end())
+                    it.SetValueFromString(&_editor_config, itt->second);
             }
             _p_scene_camera = new Camera();
-            _p_scene_camera->_anti_aliasing = EAntiAliasing::kTAA;
+            _p_scene_camera->_anti_aliasing = EAntiAliasing::kNone;
             _p_scene_camera->Name("SceneCamera");
+            _p_scene_camera->Position(_editor_config._position);
+            _p_scene_camera->Rotation(_editor_config._rotation);
+            _p_scene_camera->FovH(_editor_config._fov);
+            _p_scene_camera->Aspect(_editor_config._aspect);
+            _p_scene_camera->Near(_editor_config._near);
+            _p_scene_camera->Far(_editor_config._far);
             Camera::sCurrent = _p_scene_camera;
-            Vector2f v2;
-            Vector3f v3;
-            Vector4f v4;
-            LoadVector(config_pairs["Position"].c_str(), v3);
-            _p_scene_camera->Position(v3);
-            LoadVector(config_pairs["Rotation"].c_str(), v4);
-            _p_scene_camera->Rotation(v4);
-            _p_scene_camera->FovH(LoadFloat(config_pairs["Fov"].c_str()));
-            _p_scene_camera->Aspect(LoadFloat(config_pairs["Aspect"].c_str()));
-            _p_scene_camera->Near(LoadFloat(config_pairs["Near"].c_str()));
-            _p_scene_camera->Far(LoadFloat(config_pairs["Far"].c_str()));
-            LoadVector(config_pairs["ControllerRotation"].c_str(), v2);
-            FirstPersonCameraController::s_inst._rotation = v2;
+            FirstPersonCameraController::s_inst._rotation = _editor_config._controller_rot;
+            FirstPersonCameraController::s_inst._base_camera_move_speed = _editor_config._move_speed;
             _p_scene_camera->RecalculateMatrix(true);
-            _opened_scene_path = ToWChar(config_pairs["Scene"].c_str());
-
-            LoadVector(config_pairs["WindowSize"].c_str(), v2);
-            desc._window_width = (u32)v2.x;
-            desc._window_height = (u32)v2.y;
-            LoadVector(config_pairs["ViewPortSize"].c_str(), v2);
-            desc._gameview_width =  (u32)v2.x;
-            desc._gameview_height = (u32)v2.y;
+            _opened_scene_path = ToWChar(_editor_config._scene_path);
+            desc._window_width = _editor_config._window_size.x;
+            desc._window_height = _editor_config._window_size.y;
+            desc._gameview_width = _editor_config._viewport_size.x;
+            desc._gameview_height = _editor_config._viewport_size.y;
         }
         void EditorApp::SaveEditorConfig()
         {
             Camera::sCurrent = _p_scene_camera;
-            using std::endl;
-            std::stringstream ss;
-            ss << "[Common]" << std::endl;
-            ss << "WindowSize = " << Vector2f((f32) _p_window->GetWidth(), (f32) _p_window->GetHeight()) << endl;
-            ss << "ViewPortSize = " << _p_editor_layer->_p_scene_view->Size() << endl;
-            ss << "[SceneCamera]" << std::endl;
-            ss << "Type = " << ECameraType::ToString(Camera::sCurrent->Type()) << std::endl;
-            ss << "Position = " << Camera::sCurrent->Position() << endl;
-            ss << "Rotation = " << Camera::sCurrent->Rotation() << endl;
-            ss << "Fov = " << Camera::sCurrent->FovH() << endl;
-            ss << "Aspect = " << Camera::sCurrent->Aspect() << endl;
-            ss << "Near = " << Camera::sCurrent->Near() << endl;
-            ss << "Far = " << Camera::sCurrent->Far() << endl;
-            ss << "ControllerRotation = " << FirstPersonCameraController::s_inst._rotation << endl;
-            ss << "[Scene]" << endl;
-            ss << "Scene = " << ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->ActiveScene())) << endl;//;
-            FileManager::WriteFile(s_editor_config_path, false, ss.str());
+            _editor_config._window_size = Vector2UInt(_p_window->GetWidth(),_p_window->GetHeight());
+            _editor_config._viewport_size = Vector2UInt((u32)_p_editor_layer->_p_scene_view->Size().x, (u32)_p_editor_layer->_p_scene_view->Size().y);
+            _editor_config._position = Camera::sCurrent->Position();
+            _editor_config._rotation = Vector4f(Camera::sCurrent->Rotation().x, Camera::sCurrent->Rotation().y, Camera::sCurrent->Rotation().z, Camera::sCurrent->Rotation().w);
+            _editor_config._fov = Camera::sCurrent->FovH();
+            _editor_config._aspect = Camera::sCurrent->Aspect();
+            _editor_config._near = Camera::sCurrent->Near();
+            _editor_config._far = Camera::sCurrent->Far();
+            _editor_config._move_speed = FirstPersonCameraController::s_inst._base_camera_move_speed;
+            _editor_config._controller_rot = FirstPersonCameraController::s_inst._rotation;
+            _editor_config._scene_path = ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->ActiveScene()));
+            INIParser ini_parser;
+            
+            for (auto &prop: EditorConfig::StaticType()->GetProperties())
+            {
+                ini_parser.SetValue(prop.MetaInfo()._category, prop.Name(), prop.StringValue(&_editor_config));
+            }
+            ini_parser.Save(s_editor_config_path);
         }
         void EditorApp::LoadEditorResource()
         {
@@ -193,9 +184,11 @@ namespace Ailu
             g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset");
             g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_N.alasset");
             g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_M.alasset");
-            auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name)
+            auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name)->Material*
             {
-                g_pResourceMgr->RegisterResource(mat_path, MakeRef<Material>(g_pResourceMgr->Get<Shader>(shader_path), mat_name));
+                auto mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(shader_path), mat_name);
+                g_pResourceMgr->RegisterResource(mat_path, mat);
+                return mat.get();
             };
             mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/PointLightBillboard", "PointLightBillboard");
             mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/DirectionalLightBillboard", "DirectionalLightBillboard");
@@ -209,7 +202,7 @@ namespace Ailu
             g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"area_light.alasset");
             g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"camera.alasset");
             g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
-            mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane");
+            mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane")->SetFloat("_grid_alpha",1.0f);
             Material::s_checker = g_pResourceMgr->Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
             WatchDirectory();
         }

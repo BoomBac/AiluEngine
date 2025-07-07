@@ -126,7 +126,21 @@ namespace Ailu
         // if (!_is_record_mode)
         // 	return;
         // std::lock_guard<std::mutex> lock(_lock);
-        // _gpu_profiler_queue.push(std::make_tuple(begin_profiler, index));
+        _gpu_profiler_queue.emplace(begin_profiler, index, std::this_thread::get_id(), _gpu_profiles[index].Name,_cur_frame);
+    }
+
+    void Profiler::CollectGPUTimeData()
+    {
+        while (!Profiler::Get()._gpu_profiler_queue.empty())
+        {
+            const auto &marker = _gpu_profiler_queue.front();
+            if (marker._is_start && !marker._name.empty())
+            {
+                const auto &profiler = Profiler::Get().GetGpuProfileData(marker._profiler_index);
+                _gpu_time[marker._name] = profiler->_avg_time;
+            }
+            _gpu_profiler_queue.pop();
+        }
     }
 
     static List<Profiler::BlockMark> CleanCompletedProfiles(const List<Profiler::BlockMark> &queue)

@@ -72,7 +72,10 @@ namespace Ailu
     class VertexBuffer;
     class IndexBuffer;
     class ConstantBuffer;
+    class GPUBuffer;
     struct GfxCommand;
+    using ReadbackCallback = std::function<void(const u8*,u32)>;//also define in GfxCommand.h
+
     class AILU_API CommandBuffer : public Object
     {
         friend class RHI::DX12::D3DContext;
@@ -129,7 +132,7 @@ namespace Ailu
         void SetGlobalBuffer(const String &name, void *data, u64 data_size);
         void SetGlobalBuffer(const String &name, ConstantBuffer *buffer);
         void SetGlobalBuffer(const String &name, GPUBuffer *buffer);
-        void SetComputeBuffer(const String &name, u16 kernel, void *data, u64 data_size);
+
         void SetGlobalTexture(const String &name, Texture *tex);
         void SetGlobalTexture(const String &name, RTHandle handle);
 
@@ -154,6 +157,8 @@ namespace Ailu
         void CopyCounterValue(GPUBuffer *src, GPUBuffer *dst, u32 dst_offset);
 
         void StateTransition(GpuResource *res, EResourceState new_state, u32 sub_res = kTotalSubRes);
+
+        void ReadbackBuffer(GPUBuffer* buffer,bool is_counter,u32 size,ReadbackCallback callback);
 
     private:
         Vector<GfxCommand *> _commands;

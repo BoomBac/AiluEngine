@@ -43,7 +43,6 @@ namespace Ailu
             {
                 ss << pair.first << " = " << pair.second << "\n";
             }
-            ss << "\n";
         }
         return FileManager::WriteFile(sys_path,false,ss.str());
     }
@@ -66,6 +65,19 @@ namespace Ailu
         if(_data.contains(section))
             return _data.at(section);
         return {};
+    }
+
+    Map<String, String> INIParser::GetValues() const
+    {
+        Map<String, String> ret;
+        for (auto& [section, map] : _data)
+        {
+            for (auto& [key, value] : map)
+            {
+                ret[key] = value;
+            }
+        }
+        return ret;
     }
 
     void INIParser::SetValue(const String &section, const String &key, const String &value)

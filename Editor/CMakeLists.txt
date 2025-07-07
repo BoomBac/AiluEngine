@@ -2,7 +2,7 @@
 cmake_minimum_required (VERSION 3.5)
 
 project (AiluEditor)
-set(TEST_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
+set(EDITOR_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AiluBuildPath}/out/editor/bin/x64)
 
@@ -26,7 +26,13 @@ function(add_source_files_recursive dir)
     set(PROJECT_SOURCES ${PROJECT_SOURCES} PARENT_SCOPE)
 endfunction()
 
-add_source_files_recursive(${TEST_ROOT_PATH}/Src)
+add_source_files_recursive(${EDITOR_ROOT_PATH}/Src)
+add_source_files_recursive(${EDITOR_ROOT_PATH}/Inc)
+
+# 文件夹结构映射
+# source_group(TREE "${EDITOR_ROOT_PATH}/Src" PREFIX "Src" FILES ${PROJECT_SOURCES})
+# source_group(TREE "${EDITOR_ROOT_PATH}/Inc" PREFIX "Inc" FILES ${PROJECT_SOURCES})
+
 #aux_source_directory (${CMAKE_SOURCE_DIR}/Ext/imgui IMGUI_ROOT)
 #set(IMGUI_BACKENDS ${CMAKE_SOURCE_DIR}/Ext/imgui/backends/imgui_impl_dx12.cpp;${CMAKE_SOURCE_DIR}/Ext/imgui/backends/imgui_impl_win32.cpp)
 # aux_source_directory (Src Editor_src_dir)
@@ -37,8 +43,8 @@ add_executable(Editor WIN32 ${PROJECT_SOURCES}
 
 
 # 包含路径
-target_include_directories(Editor PUBLIC ${TEST_ROOT_PATH}/)
-target_include_directories(Editor PUBLIC ${TEST_ROOT_PATH}/Inc)
+target_include_directories(Editor PUBLIC ${EDITOR_ROOT_PATH}/)
+target_include_directories(Editor PUBLIC ${EDITOR_ROOT_PATH}/Inc)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH})
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Inc)

@@ -35,12 +35,40 @@ static void ParserClassInfo(const std::string &line, AiluHeadTool::ClassInfo &in
             info._parent = "";// 如果没有父类，设置为空字符串
         }
         info.is_export = !info._export_id.empty();
+        info._is_struct = false;
     }
-    else
-    {
-        aht.Log(std::format("ParserClassInfo failed with line: {}", line));
-    }
+    else { aht.Log(std::format("ParserClassInfo failed with line: {}", line)); }
 }
+
+static void ParserStructInfo(const std::string &line, AiluHeadTool::ClassInfo &info, AiluHeadTool &aht)
+{
+    std::regex pattern(R"(struct\s+((\w*_API)\s+)?(\w+)(?:\s*:\s*public\s+(\w+))?)");
+    std::smatch matches;
+    if (std::regex_search(line, matches, pattern))
+    {
+        if (matches[2].matched)
+        {
+            info._export_id = matches[2].str();// 导出符号（如 EXPORT_API）
+        }
+        else
+        {
+            info._export_id = "";// 如果没有导出符号，设置为空字符串
+        }
+        info._name = matches[3].str();// 类名
+        if (matches[4].matched)
+        {
+            info._parent = matches[4].str();// 父类名
+        }
+        else
+        {
+            info._parent = "";// 如果没有父类，设置为空字符串
+        }
+        info.is_export = !info._export_id.empty();
+        info._is_struct = true;
+    }
+    else { aht.Log(std::format("ParserClassInfo failed with line: {}", line)); }
+}
+
 static void ParserEnumInfo(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
 {
     // 正则表达式解释：
@@ -54,7 +82,7 @@ static void ParserEnumInfo(const std::string &line, AiluHeadTool::EnumInfo &info
     if (std::regex_search(line, matches, pattern))
     {
         info._is_enum_class = matches[1].matched;// 是否为 enum class
-        info._name = matches[2].str();           // 枚举名称
+        info._name = matches[2].str();// 枚举名称
 
         if (matches[3].matched)
         {
@@ -65,11 +93,9 @@ static void ParserEnumInfo(const std::string &line, AiluHeadTool::EnumInfo &info
             info._underlying_type = "";// 如果没有底层类型，设置为空字符串
         }
     }
-    else
-    {
-        aht.Log(std::format("ParserEnumInfo failed with line: {}", line));
-    }
+    else { aht.Log(std::format("ParserEnumInfo failed with line: {}", line)); }
 }
+
 static void ParserEnumClass(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
 {
     std::regex enumRegex(
@@ -80,8 +106,7 @@ static void ParserEnumClass(const std::string &line, AiluHeadTool::EnumInfo &inf
 
     while (std::regex_search(searchStart, line.cend(), match, enumRegex))
     {
-        if (match[2].matched)
-            info._name = match[2].str();
+        if (match[2].matched) info._name = match[2].str();
         info._is_enum_class = line.find("class") != std::string::npos;
         searchStart = match.suffix().first;
     }
@@ -110,18 +135,12 @@ static void ParserEnumValues(const std::string &line, AiluHeadTool::EnumInfo &in
         {
             id = std::stoi(matches[2].str());// 解析赋值
         }
-        else
-        {
-            id = (uint32_t)info._members.size();
-        }
+        else { id = (uint32_t) info._members.size(); }
         info._members.emplace_back(value);
         begin = matches.suffix().first;
         ++parser_num;
     }
-    if (parser_num == 0)
-    {
-        aht.Log(std::format("ParserEnumValues failed with line: {}", line));
-    }
+    if (parser_num == 0) { aht.Log(std::format("ParserEnumValues failed with line: {}", line)); }
 }
 
 
@@ -136,10 +155,7 @@ static void ParserPropertyInfo(const std::string &line, AiluHeadTool::MemberInfo
         info._name = matches[3].str();
         info._is_enum = info._type[0] == 'E' && std::isupper(info._type[1]);
     }
-    else
-    {
-        aht.Log(std::format("ParserPropertyInfo failed with line: {}", line));
-    }
+    else { aht.Log(std::format("ParserPropertyInfo failed with line: {}", line)); }
 }
 
 static std::vector<std::string> SplitParams(const std::string &params)
@@ -147,10 +163,7 @@ static std::vector<std::string> SplitParams(const std::string &params)
     std::vector<std::string> result;
     std::istringstream stream(params);
     std::string param;
-    while (std::getline(stream, param, ','))
-    {
-        result.push_back(param.substr(0, param.find_first_of(' ')));
-    }
+    while (std::getline(stream, param, ',')) { result.push_back(param.substr(0, param.find_first_of(' '))); }
     return result;
 }
 
@@ -163,21 +176,16 @@ static void ParserFunctionInfo(const std::string &line, AiluHeadTool::MemberInfo
     {
         info._is_static = matches[1].matched;
         info._is_virtual = matches[2].matched;
-        if (line.find("final") != std::string::npos || line.find("override") != std::string::npos)
-        {
-            info._is_virtual = true;
-        }
+        if (line.find("final") != std::string::npos || line.find("override") != std::string::npos) { info._is_virtual = true; }
         info._return_type = matches[3].str();
         info._name = matches[4].str();
         info._params = SplitParams(matches[5].str());
         info._is_const = matches[6].matched;
         info._is_function = true;
     }
-    else
-    {
-        aht.Log(std::format("ParserFunctionInfo failed with line: {}", line));
-    }
+    else { aht.Log(std::format("ParserFunctionInfo failed with line: {}", line)); }
 }
+
 static void Replace(std::string &str, const std::string &old_str, const std::string &new_str)
 {
     size_t pos = str.find(old_str);
@@ -187,22 +195,17 @@ static void Replace(std::string &str, const std::string &old_str, const std::str
         pos = str.find(old_str, pos + new_str.length());
     }
 }
+
 static std::string ConstructFuncType(std::string return_type, const std::vector<std::string> &params, bool is_const)
 {
     std::string func_type = return_type + "(";
     for (size_t i = 0; i < params.size(); ++i)
     {
         func_type += params[i];
-        if (i != params.size() - 1)
-        {
-            func_type += ",";
-        }
+        if (i != params.size() - 1) { func_type += ","; }
     }
     func_type += ")";
-    if (is_const)
-    {
-        func_type += " const";
-    }
+    if (is_const) { func_type += " const"; }
     return func_type;
 }
 
@@ -238,8 +241,7 @@ static void ParserMeta(std::string line, AiluHeadTool::PropertyMeta &meta)
                     // 正则表达式：匹配 "Range(x,y)" 中的浮点数 x 和 y
                     rgx = std::regex("Range\\((-?\\d+\\.\\d+)f?,\\s*(-?\\d+\\.\\d+)f?\\)");
                 }
-                else
-                    rgx = std::regex(R"(Range\((-?\d+),\s*(-?\d+)\))");
+                else rgx = std::regex(R"(Range\((-?\d+),\s*(-?\d+)\))");
                 if (std::regex_search(item, match, rgx))
                 {
                     meta._min = meta._is_float_range ? std::stof(match[1].str()) : std::stoi(match[1].str());
@@ -254,21 +256,83 @@ static void ParserMeta(std::string line, AiluHeadTool::PropertyMeta &meta)
     }
 }
 
+#define BOOL_STR(x) x ? "true" : "false"
+
+static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std::ofstream &file)
+{
+    using std::endl;
+    std::string full_name = class_info._namespace + "::" + class_info._name;
+    file << std::format("Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace, class_info._name) << std::endl;
+    file << "{" << std::endl;
+    file << std::format("static std::unique_ptr<Ailu::Type> cur_type = nullptr;") << std::endl;
+    file << std::format("if(cur_type == nullptr)") << std::endl;
+    file << "{" << std::endl;
+    file << "TypeInitializer initializer;" << endl;
+    file << std::format("initializer._name = \"{}\"", class_info._name) << ";" << endl;
+    file << std::format("initializer._size = sizeof({});", full_name) << endl;
+    file << std::format("initializer._full_name = \"{}\"", full_name) << ";" << endl;
+    file << std::format("initializer._is_class = true;") << endl;
+    file << std::format("initializer._is_abstract = {}", BOOL_STR(class_info._is_abstract)) << ";" << endl;
+    file << std::format("initializer._namespace = \"{}\"", class_info._namespace) << ";" << endl;
+    file << std::format("initializer._base_name = \"{}\"", !class_info._parent.empty() ? class_info._namespace + "::" + class_info._parent : "") << ";" << endl;
+    for (auto &mem: class_info._members)
+    {
+        if (mem._is_function)
+        {
+            auto s = std::format(R"(initializer._functions.emplace_back(MemberInfoInitializer(EMemberType::kFunction, "{}", "{}", {}, {}, {}, &{}::{}));)",
+                                 mem._name, ConstructFuncType(mem._return_type, mem._params, mem._is_const), BOOL_STR(mem._is_static), BOOL_STR(mem._is_public), mem._offset, class_info._name, mem._name);
+            file << s << std::endl;
+        }
+        else
+        {
+            //cpp_file << "Meta " <<mem._name << "_meta{"<< std::format("{}")<<"};"<<std::endl;
+            std::string cur_meta = "meta" + mem._name;
+            file << "Meta " << cur_meta << ";" << std::endl;
+            file << cur_meta << "._category=" << std::format("\"{}\"", mem._meta._category) << ";" << std::endl;
+            file << cur_meta << "._min=(float)" << mem._meta._min << ";" << std::endl;
+            file << cur_meta << "._max=(float)" << mem._meta._max << ";" << std::endl;
+            file << cur_meta << "._is_range=" << (BOOL_STR(mem._meta._is_range)) << ";" << std::endl;
+            file << cur_meta << "._is_float_range=" << (BOOL_STR(mem._meta._is_float_range)) << ";" << std::endl;
+            file << cur_meta << "._is_color=" << (BOOL_STR(mem._meta._is_color)) << ";" << std::endl;
+            auto s = std::format(R"(initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"{}","{}", {}, {},{},&{}::{},{},{}));)",
+                                 mem._name, mem._type, BOOL_STR(mem._is_static), BOOL_STR(mem._is_public), std::format("offsetof({},{})", class_info._name, mem._name), class_info._name, mem._name, cur_meta, BOOL_STR(mem._is_const));
+            file << s << std::endl;
+        }
+    }
+    file << "cur_type = std::make_unique<Ailu::Type>(initializer);" << std::endl;
+    file << "Ailu::Type::RegisterType(cur_type.get());" << std::endl;
+    file << "}" << std::endl;
+    file << "return cur_type.get();" << std::endl;
+    file << "}" << std::endl;
+    file << std::endl;
+    file << std::format("Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
+    file << "{" << std::endl;
+    file << std::format("\tstatic Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
+    file << std::format("\treturn type;") << std::endl;
+    file << "}" << std::endl;
+    file << std::endl;
+    if (!class_info._is_struct)
+    {
+        file << std::format("    const Type *{}::GetType() const", full_name) << std::endl;
+        file << "{" << std::endl;
+        file << "return " << std::format("{}::GetPrivateStaticClass();", full_name) << std::endl;
+        file << "}" << std::endl;
+    }
+}
+
 void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string work_namespace)
 {
     g_Timer.start();
     _classes.clear();
     _enums.clear();
-#define BOOL_STR(x) x ? "true" : "false"
+    _structs.clear();
+
     using std::endl;
     if (fs::exists(path))
     {
         _tracker.Clean();
         std::ifstream file(path);
-        if (!file.is_open())
-        {
-            Log(std::format("AiluHeadTool::Parser {} with result open file failed", path.string()));
-        }
+        if (!file.is_open()) { Log(std::format("AiluHeadTool::Parser {} with result open file failed", path.string())); }
         else
         {
             std::string cur_file_id = path.stem().string();
@@ -276,8 +340,9 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
             std::transform(cur_file_id.begin(), cur_file_id.end(), cur_file_id.begin(), ::toupper);
             std::string line, last_line;
             bool is_include_start = false, is_include_end = false;
-            bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_enum_marked = false;
+            bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_enum_marked = false, has_struct_marked = false;
             bool is_cur_access_scope_public = false;
+            bool is_process_class = false;
             int line_count = 0;
             std::string cur_namespace;
             PropertyMeta pre_prop_meta;
@@ -289,10 +354,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     ++line_count;
                     continue;
                 }
-                if (line.find("#include") != std::string::npos)
-                {
-                    is_include_start = true;
-                }
+                if (line.find("#include") != std::string::npos) { is_include_start = true; }
                 else if (is_include_start)
                 {
                     if (!is_include_end)
@@ -321,7 +383,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 else {};
                 if (has_enum_marked)
                 {
-                    if (line.find("enum") != std::string ::npos)
+                    if (line.find("enum") != std::string::npos)
                     {
                         EnumInfo enum_info;
                         if (line.find('}') != std::string::npos)
@@ -342,13 +404,9 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                                     std::getline(file, line);
                                 }
                             }
-                            else
-                            {
-                                Log("[Error]: the next line of enum define must only have {");
-                            }
+                            else { Log("[Error]: the next line of enum define must only have {"); }
                         }
-                        if (!enum_info._members.empty())
-                            _enums.emplace_back(enum_info);
+                        if (!enum_info._members.empty()) _enums.emplace_back(enum_info);
                         has_enum_marked = false;
                     }
                 }
@@ -361,7 +419,21 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         ParserClassInfo(line, class_info, *this);
                         class_info._namespace = cur_namespace;
                         has_class_marked = false;
+                        is_process_class = true;
                         _classes.emplace_back(class_info);
+                        continue;
+                    }
+                }
+                if (has_struct_marked)
+                {
+                    if (line.find("struct") != std::string::npos)
+                    {
+                        ClassInfo struct_info;
+                        ParserStructInfo(line, struct_info, *this);
+                        struct_info._namespace = cur_namespace;
+                        has_struct_marked = false;
+                        is_process_class = false;
+                        _structs.emplace_back(struct_info);
                         continue;
                     }
                 }
@@ -371,12 +443,17 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     has_class_marked = true;
                     continue;
                 }
+                if (line.find(kStructMacro) != std::string::npos)
+                {
+                    has_struct_marked = true;
+                    continue;
+                }
                 if (line.find(kEnumMacro) != std::string::npos)
                 {
                     has_enum_marked = true;
                     continue;
                 }
-                if (!_classes.empty())
+                if (!_classes.empty() && is_process_class)
                 {
                     if (_classes.back()._gen_macro_body.empty())
                     {
@@ -419,10 +496,52 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         continue;
                     }
                 }
+                if (!_structs.empty() && !is_process_class)
+                {
+                    if (_structs.back()._gen_macro_body.empty())
+                    {
+                        if (line.find(kBodyMacro) != std::string::npos)
+                        {
+                            _structs.back()._gen_macro_body = std::format("{}_{}_GENERATED_BODY", cur_file_id, line_count);
+                        }
+                    }
+                    if (has_property_marked)
+                    {
+                        MemberInfo member_info;
+                        ParserPropertyInfo(line, member_info, *this);
+                        member_info._is_public = is_cur_access_scope_public;
+                        member_info._meta = pre_prop_meta;
+                        member_info._meta._is_color = member_info._type == "Color" || member_info._type == "Color32";
+                        pre_prop_meta.Reset();
+                        has_property_marked = false;
+                        _structs.back()._members.emplace_back(member_info);
+                        continue;
+                    }
+                    if (has_function_marked)
+                    {
+                        MemberInfo member_info;
+                        ParserFunctionInfo(line, member_info, *this);
+                        member_info._is_public = is_cur_access_scope_public;
+                        member_info._is_function = true;
+                        has_function_marked = false;
+                        _structs.back()._members.emplace_back(member_info);
+                        continue;
+                    }
+                    if (line.find(kPropertyMacro) != std::string::npos)
+                    {
+                        has_property_marked = true;
+                        ParserMeta(line, pre_prop_meta);
+                        continue;
+                    }
+                    if (line.find(kFunctionMacro) != std::string::npos)
+                    {
+                        has_function_marked = true;
+                        continue;
+                    }
+                }
             }
             file.close();
-            if (_classes.empty() && _enums.empty())
-                return;
+            if (_classes.empty() && _enums.empty() && _structs.empty()) return;
             //write gen head file
             Path out_path = out_dir / path.filename().replace_extension(".gen.h");
             std::string unique_def = std::format("__{}__", cur_file_id);
@@ -434,7 +553,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 out_file << "#error " << out_path.filename().string() << " already included, missing '#pragma once' in " << path.filename().string() << std::endl;
                 out_file << "#endif " << std::endl;
                 out_file << "#define " << unique_def << std::endl;
-                for (auto &class_info: _classes)
+                for (const auto &class_info: _classes)
                 {
                     out_file << "//Class " << class_info._name << " begin..........................." << std::endl;
                     out_file << std::format("#define {} \\", class_info._gen_macro_body);
@@ -442,9 +561,6 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     std::string search = "TClass";
                     bool is_base_object = class_info._name == "Object";
                     size_t pos = 0;
-                    //                    /** Private move- and copy-constructors, should never be used */ \
-//                    TClass(TClass&&) = delete;                                     \
-//                    TClass(const TClass &) = delete;
                     std::string generate_body;
                     if (is_base_object)
                     {
@@ -478,10 +594,36 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     out_file << "//Class " << class_info._name << " end..........................." << std::endl;
                     out_file << std::endl;
                 }
+                for (const auto &struct_info: _structs)
+                {
+                    out_file << "//Struct " << struct_info._name << " begin..........................." << std::endl;
+                    out_file << std::format("#define {} \\", struct_info._gen_macro_body);
+                    std::string search = "TClass";
+                    size_t pos = 0;
+                    std::string generate_body = R"(
+                            private: \
+                                friend Type* Z_Construct_TClass_Type();\
+                                static Type* GetPrivateStaticClass();\
+                            public:\
+                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                            )";
+
+                    while ((pos = generate_body.find(search, pos)) != std::string::npos)
+                    {
+                        generate_body.replace(pos, search.length(), struct_info._name);
+                        pos += struct_info._name.length();
+                    }
+                    out_file << generate_body;
+                    out_file << "//Struct " << struct_info._name << " end..........................." << std::endl;
+                    out_file << std::endl;
+                }
                 for (auto &enum_info: _enums)
                 {
                     out_file << "//Enum " << enum_info._name << " begin..........................." << std::endl;
-                    out_file << std::format("void Z_Construct_Enum_{}_Type();", enum_info._name) << std::endl;
+                    std::string func_name = std::format("void Z_Construct_Enum_{}_Type()", enum_info._name);
+                    out_file << func_name <<";" << std::endl;
+                    // out_file << "template<>" << std::endl;
+                    // out_file << std::format("Ailu::Enum* Ailu::Enum::StaticEnum<{}>() return {};",enum_info._name,func_name)<< std::endl;
                     out_file << "//Enum " << enum_info._name << " end..........................." << std::endl;
                     out_file << std::endl;
                 }
@@ -490,10 +632,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 out_file.close();
                 Log(std::format("AiluHeadTool::Parser {} with create gen.h file success", out_path.string()));
             }
-            else
-            {
-                Log(std::format("AiluHeadTool::Parser {} with create gen.h file failed", out_path.string()));
-            }
+            else { Log(std::format("AiluHeadTool::Parser {} with create gen.h file failed", out_path.string())); }
             //write gen cpp file
             Path cpp_path = out_dir / path.filename().replace_extension(".gen.cpp");
             std::ofstream cpp_file(cpp_path);
@@ -502,67 +641,14 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 cpp_file << "//Generated by ahl" << std::endl;
                 //cpp_file << "#include \"" << out_path.filename().string() <<"\""<< std::endl;
                 cpp_file << "#include \"../" << path.filename().string() << "\"" << std::endl;
-                for (auto &inc: s_common_src_dep_file)
-                    cpp_file << "#include " << inc << std::endl;
+                for (auto &inc: s_common_src_dep_file) cpp_file << "#include " << inc << std::endl;
                 cpp_file << "using namespace " << work_namespace << ";" << std::endl;
-                for (auto &class_info: _classes)
+                for (const auto &class_info: _classes)
                 {
-                    std::string full_name = class_info._namespace + "::" + class_info._name;
-                    cpp_file << std::format("Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace,class_info._name) << std::endl;
-                    cpp_file << "{" << std::endl;
-                    cpp_file << std::format("static std::unique_ptr<Ailu::Type> cur_type = nullptr;") << std::endl;
-                    cpp_file << std::format("if(cur_type == nullptr)") << std::endl;
-                    cpp_file << "{" << std::endl;
-                    cpp_file << "TypeInitializer initializer;" << endl;
-                    cpp_file << std::format("initializer._name = \"{}\"", class_info._name) << ";" << endl;
-                    cpp_file << std::format("initializer._size = sizeof({});", full_name) << endl;
-                    cpp_file << std::format("initializer._full_name = \"{}\"", full_name) << ";" << endl;
-                    cpp_file << std::format("initializer._is_class = true;") << endl;
-                    cpp_file << std::format("initializer._is_abstract = {}", BOOL_STR(class_info._is_abstract)) << ";" << endl;
-                    cpp_file << std::format("initializer._namespace = \"{}\"", class_info._namespace) << ";" << endl;
-                    cpp_file << std::format("initializer._base_name = \"{}\"", !class_info._parent.empty() ? class_info._namespace + "::" + class_info._parent : "") << ";" << endl;
-                    for (auto &mem: class_info._members)
-                    {
-                        if (mem._is_function)
-                        {
-                            auto s = std::format(R"(initializer._functions.emplace_back(MemberInfoInitializer(EMemberType::kFunction, "{}", "{}", {}, {}, {}, &{}::{}));)",
-                                                 mem._name, ConstructFuncType(mem._return_type, mem._params, mem._is_const), BOOL_STR(mem._is_static), BOOL_STR(mem._is_public), mem._offset, class_info._name, mem._name);
-                            cpp_file << s << std::endl;
-                        }
-                        else
-                        {
-                            //cpp_file << "Meta " <<mem._name << "_meta{"<< std::format("{}")<<"};"<<std::endl;
-                            std::string cur_meta = "meta" + mem._name;
-                            cpp_file << "Meta " << cur_meta << ";" << std::endl;
-                            cpp_file << cur_meta << "._category=" << std::format("\"{}\"", mem._meta._category) << ";" << std::endl;
-                            cpp_file << cur_meta << "._min=(float)" << mem._meta._min << ";" << std::endl;
-                            cpp_file << cur_meta << "._max=(float)" << mem._meta._max << ";" << std::endl;
-                            cpp_file << cur_meta << "._is_range=" << (BOOL_STR(mem._meta._is_range)) << ";" << std::endl;
-                            cpp_file << cur_meta << "._is_float_range=" << (BOOL_STR(mem._meta._is_float_range)) << ";" << std::endl;
-                            cpp_file << cur_meta << "._is_color=" << (BOOL_STR(mem._meta._is_color)) << ";" << std::endl;
-                            auto s = std::format(R"(initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"{}","{}", {}, {},{},&{}::{},{},{}));)",
-                                                 mem._name, mem._type, BOOL_STR(mem._is_static), BOOL_STR(mem._is_public), std::format("offsetof({},{})", class_info._name, mem._name), class_info._name, mem._name, cur_meta, BOOL_STR(mem._is_const));
-                            cpp_file << s << std::endl;
-                        }
-                    }
-                    cpp_file << "cur_type = std::make_unique<Ailu::Type>(initializer);" << std::endl;
-                    cpp_file << "Ailu::Type::RegisterType(cur_type.get());" << std::endl;
-                    cpp_file << "}" << std::endl;
-                    cpp_file << "return cur_type.get();" << std::endl;
-                    cpp_file << "}" << std::endl;
-
-                    cpp_file << std::endl;
-                    cpp_file << std::format("Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
-                    cpp_file << "{" << std::endl;
-                    cpp_file << std::format("\tstatic Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
-                    cpp_file << std::format("\treturn type;") << std::endl;
-                    cpp_file << "}" << std::endl;
-                    cpp_file << std::endl;
-                    cpp_file << std::format("    const Type *{}::GetType() const", full_name) << std::endl;
-                    cpp_file << "{" << std::endl;
-                    cpp_file << "return " << std::format("{}::GetPrivateStaticClass();", full_name) << std::endl;
-                    cpp_file << "}" << std::endl;
+                    GenerateClassTypeInfo(class_info, cpp_file);
                 }
+                for (const auto &struct_info: _structs)
+                    GenerateClassTypeInfo(struct_info, cpp_file);
                 for (auto &enum_info: _enums)
                 {
                     std::string construct_enum_func = std::format("Z_Construct_Enum_{}_Type", enum_info._name);
@@ -582,6 +668,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     }
                     cpp_file << "cur_type = std::make_unique<Ailu::Enum>(initializer);" << std::endl;
                     cpp_file << "Ailu::Enum::RegisterEnum(cur_type.get());" << std::endl;
+                    //cpp_file << "return cur_type.get();" << std::endl;
                     cpp_file << "}" << std::endl;
                     cpp_file << "}" << std::endl;
                     cpp_file << "//Enum " << enum_info._name << " end..........................." << std::endl;
@@ -589,8 +676,25 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 }
                 cpp_file.close();
                 Log(std::format("AiluHeadTool::Parser create file {} succeed!", cpp_path.string()));
+                std::string all_classes, all_structs, all_enums;
+                for (const auto &class_info: _classes)
+                {
+                    all_classes += class_info._name + ",";
+                }
+                for (const auto &struct_info: _structs)
+                {
+                    all_structs += struct_info._name + ",";
+                }
+                for (const auto &enum_info: _enums)
+                {
+                    all_enums += enum_info._name + ",";
+                }
+                Log(std::format("AiluHeadTool::Parser file {} success({}ms) with result:"
+                                "       class({}):{}"
+                                "       struct({}):{}"
+                                "       enum({}):{}",
+                                path.string(), g_Timer.ElapsedMilliseconds(),_classes.size(), all_classes, _structs.size(), all_structs, _enums.size(), all_enums));
                 g_Timer.stop();
-                Log(std::format("AiluHeadTool::Parser file {} success with {} class and {} enum after {}ms", path.string(), _classes.size(), _enums.size(), g_Timer.ElapsedMilliseconds()));
                 g_Timer.reset();
                 return;
             }
@@ -609,6 +713,7 @@ void AiluHeadTool::Log(const std::string &msg)
     _log_ss << msg << std::endl;
     std::cout << msg << std::endl;
 }
+
 void AiluHeadTool::SaveLog(const Path &out_dir)
 {
     std::lock_guard<std::mutex> l(_log_mutex);

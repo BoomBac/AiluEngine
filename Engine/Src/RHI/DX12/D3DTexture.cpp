@@ -27,6 +27,15 @@ namespace Ailu::RHI::DX12
         else if (w % 2 == 0 && h % 2 != 0) return 2;
         else return 3;
     }
+
+    static u16 CalculateSubResourceNum(ID3D12Device* device,const D3D12_RESOURCE_DESC& desc)
+    {
+        UINT planeCount = D3D12GetFormatPlaneCount(device, desc.Format);
+        UINT arraySize = (desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D) 
+                        ? 1 
+                        : desc.DepthOrArraySize;
+        return (u16)(desc.MipLevels * arraySize * planeCount);
+    }
 #pragma region D3DTexture2D
     //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
     D3DTexture2D::D3DTexture2D(const Texture2DInitializer &initializer) : Texture2D(initializer) {}
@@ -63,7 +72,7 @@ namespace Ailu::RHI::DX12
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         D3D12_RESOURCE_STATES init_state = is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-        _state_guard = D3DResourceStateGuard(_p_d3dres.Get(), init_state);
+        _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
         if (is_data_filed)
         {
             ComPtr<ID3D12Resource> pTextureUpload;
@@ -73,7 +82,6 @@ namespace Ailu::RHI::DX12
             auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
             ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
                                                             nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
-
             Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
             for (size_t i = 0; i < _mipmap_count; i++)
             {
@@ -175,7 +183,7 @@ namespace Ailu::RHI::DX12
             D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
             slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
             slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-            slice_uav_desc.Texture2D.MipSlice = 0;
+            slice_uav_desc.Texture2D.MipSlice = mipmap;
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, cpu_handle);
         }
         else { AL_ASSERT(false); }
@@ -287,7 +295,6 @@ namespace Ailu::RHI::DX12
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         auto init_state = _is_random_access ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_COPY_DEST;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-        _state_guard = D3DResourceStateGuard(_p_d3dres.Get(), init_state);
         const u32 subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
         const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
         heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -307,7 +314,7 @@ namespace Ailu::RHI::DX12
                 cubemap_datas.emplace_back(subdata);
             }
         }
-
+        _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
         UpdateSubresources(p_cmdlist, _p_d3dres.Get(), pTextureUpload.Get(), 0, 0, subresourceCount, cubemap_datas.data());
         _state_guard.MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         d3d_ctx->TrackResource(pTextureUpload);
@@ -476,7 +483,7 @@ namespace Ailu::RHI::DX12
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         auto init_state = is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-        _state_guard = D3DResourceStateGuard(_p_d3dres.Get(), init_state);
+        _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
         if (is_data_filed)
         {
             // 2. 创建上传缓冲区
@@ -708,7 +715,10 @@ namespace Ailu::RHI::DX12
         else return 0;
     }
 
-    void D3DTexture3D::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) { _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res); }
+    void D3DTexture3D::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) 
+    { 
+        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res); 
+    }
     //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
 #pragma endregion
 
@@ -776,7 +786,7 @@ namespace Ailu::RHI::DX12
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         auto init_state = is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &_tex_desc, init_state, &clear_value, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
-        _state_guard = D3DResourceStateGuard(_p_d3dres.Get(), init_state);
+        _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,_tex_desc)));
         _p_d3dres->SetName(ToWChar(_name).c_str());
         u16 view_slice_count = std::max<u16>(1, _slice_num);
         _is_ready_for_rendering = true;

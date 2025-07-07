@@ -1,71 +1,100 @@
 #pragma once
 #ifndef __D3D_UTILS_H__
 #define __D3D_UTILS_H__
+#include "Framework/Common/Log.h"
 #include "GlobalMarco.h"
-#include "d3dx12.h"
 #include "Render/GpuResource.h"
+#include "d3dx12.h"
+#include <mutex>
+
 namespace Ailu::RHI::DX12
 {
     struct D3DResourceStateGuard
     {
-        void MakesureResourceState(ID3D12GraphicsCommandList *cmd,D3D12_RESOURCE_STATES target_state,u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+        static constexpr u16 kMaxSubresources = 64u;
+        D3DResourceStateGuard() = default;
+
+        D3DResourceStateGuard(ID3D12Resource *resource, D3D12_RESOURCE_STATES initial_state, u16 subres_num)
+            : _resource(resource),_sub_res_num(subres_num)
         {
-            if (!_cur_res_state.contains(sub_res))
-                _cur_res_state[sub_res] = _cur_res_state[D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES];
-            if (_cur_res_state[sub_res] == target_state)
+            AL_ASSERT(_sub_res_num < kMaxSubresources);
+            for (u16 i = 0; i < _sub_res_num; i++)
             {
-                if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+                _cur_states[i] = initial_state;
+                _new_states[i] = initial_state;
+            }
+        }
+
+        D3DResourceStateGuard &operator=(D3DResourceStateGuard &&other) noexcept
+        {
+            if (this != &other)
+            {
+                std::scoped_lock lock(_mutex, other._mutex);
+                _cur_states = std::move(other._cur_states);
+                _new_states = std::move(other._new_states);
+                _resource = other._resource;
+                _sub_res_num = other._sub_res_num;
+                other._resource = nullptr;
+            }
+            return *this;
+        }
+
+        [[nodiscard]] D3D12_RESOURCE_STATES CurState(u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+        {
+            std::unique_lock lock(_mutex);
+            if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+                return _cur_states[0u];
+            AL_ASSERT(sub_res < kMaxSubresources);
+            return _cur_states[sub_res];
+        }
+
+        void MakesureResourceState(ID3D12GraphicsCommandList *cmd, D3D12_RESOURCE_STATES target_state, u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+        {
+            std::unique_lock lock(_mutex);
+            if (sub_res == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+            {
+                for(u16 i = 0; i < _sub_res_num; i++)
                 {
-                    for(auto&[sub_res_id, state]: _cur_res_state)
+                    if (_cur_states[i] != target_state)
                     {
-                        if (state != target_state)
-                        {
-                            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, state, target_state, sub_res_id);
-                            cmd->ResourceBarrier(1, &barrier);
-                            _cur_res_state[sub_res_id] = target_state;
-                        }
+                        auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, _cur_states[i], target_state, i);
+                        cmd->ResourceBarrier(1, &barrier);
+                        _cur_states[i] = target_state;
                     }
                 }
-                return;
             }
-            auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, _cur_res_state[sub_res], target_state,sub_res);
-            cmd->ResourceBarrier(1, &barrier);
-            _cur_res_state[sub_res] = target_state;
-            if (sub_res ==  D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
+            else
             {
-                for(auto&[sub_res_id, state]: _cur_res_state)
+                AL_ASSERT(sub_res < kMaxSubresources);
+                if (_cur_states[sub_res] != target_state)
                 {
-                    _cur_res_state[sub_res_id] = target_state;
+                    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, _cur_states[sub_res], target_state, sub_res);
+                    cmd->ResourceBarrier(1, &barrier);
+                    _cur_states[sub_res] = target_state;
                 }
             }
         }
-        [[nodiscard]] D3D12_RESOURCE_STATES CurState(u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES) const
-        {
-            if (_cur_res_state.contains(sub_res))
-                return _cur_res_state.at(sub_res);
-            return _cur_res_state.at(D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-        }
-        D3DResourceStateGuard() = default;
-        D3DResourceStateGuard(ID3D12Resource* resource,D3D12_RESOURCE_STATES initial_state) : _resource(resource)
-        {
-            _cur_res_state[D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES] =  initial_state;
-        };
+
     private:
-        Map<u32,D3D12_RESOURCE_STATES> _cur_res_state;
-        ID3D12Resource* _resource = nullptr;
+        Array<D3D12_RESOURCE_STATES, kMaxSubresources> _cur_states;
+        Array<D3D12_RESOURCE_STATES, kMaxSubresources> _new_states;
+        ID3D12Resource *_resource = nullptr;
+        std::mutex _mutex;
+        u16 _sub_res_num;
     };
+
 
     namespace D3DConvertUtils
     {
         static Ailu::Render::EResourceState ToALResState(D3D12_RESOURCE_STATES state)
         {
-            return (Ailu::Render::EResourceState)state;
+            return (Ailu::Render::EResourceState) state;
         };
         static D3D12_RESOURCE_STATES FromALResState(Ailu::Render::EResourceState state)
         {
-            return (D3D12_RESOURCE_STATES)state;
+            return (D3D12_RESOURCE_STATES) state;
         };
-    }
-}
+    }// namespace D3DConvertUtils
+}// namespace Ailu::RHI::DX12
 
 #endif// !D3D_UTILS_H__

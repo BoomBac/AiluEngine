@@ -105,7 +105,7 @@ namespace Ailu::Render
     public:
         TemporalAA();
         ~TemporalAA();
-        void AddRenderPasses(Renderer &renderer, RenderingData &rendering_data) override;
+        void AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data) override;
         APROPERTY(Range(0.0f,1.0f))
         f32 _history_factor = 0.95f;
         APROPERTY(Range(0.0f,1.0f))

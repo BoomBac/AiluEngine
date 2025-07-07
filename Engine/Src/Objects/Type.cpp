@@ -4,6 +4,9 @@
 
 #include "Inc/Objects/Type.h"
 #include <Framework/Common/Utils.h>
+#include "Framework/Math/ALMath.hpp"
+#include "Framework/Common/Log.h"
+
 namespace Ailu
 {
     static bool IsEnumType(const String &type_name)
@@ -50,6 +53,12 @@ namespace Ailu
             return EDataType::kVec3Int;
         else if (name == "Vector4Int")
             return EDataType::kVec4Int;
+        else if (name == "Vector2UInt")
+            return EDataType::kVec2UInt;
+        else if (name == "Vector3UInt")
+            return EDataType::kVec3UInt;
+        else if (name == "Vector4UInt")
+            return EDataType::kVec4UInt;
         else if (name == "String" || name == "string")
             return EDataType::kString;
         else if (su::EndWith(name, "*"))
@@ -79,6 +88,200 @@ namespace Ailu
     {
         _data_type = GetDataTypeFromName(initializer._type_name);
     }
+
+String PropertyInfo::StringValue(void *instance) const
+    {
+        const char *ptr = reinterpret_cast<char *>(instance) + _offset;
+
+        auto static formatVec = [](auto &v, int dim) -> String
+        {
+            switch (dim)
+            {
+                case 2:
+                    return std::format("{},{}", v.data[0], v.data[1]);
+                case 3:
+                    return std::format("{},{},{}", v.data[0], v.data[1], v.data[2]);
+                case 4:
+                    return std::format("{},{},{},{}", v.data[0], v.data[1],v.data[2], v.data[3]);
+                default:
+                    return "[Invalid Vector]";
+            }
+        };
+
+        switch (_data_type)
+        {
+            case Ailu::EDataType::kInt8:
+                return std::format("{}", *reinterpret_cast<const i8 *>(ptr));
+            case Ailu::EDataType::kInt16:
+                return std::format("{}", *reinterpret_cast<const i16 *>(ptr));
+            case Ailu::EDataType::kInt32:
+                return std::format("{}", *reinterpret_cast<const i32 *>(ptr));
+            case Ailu::EDataType::kInt64:
+                return std::format("{}", *reinterpret_cast<const i64 *>(ptr));
+            case Ailu::EDataType::kUInt8:
+                return std::format("{}", *reinterpret_cast<const u8 *>(ptr));
+            case Ailu::EDataType::kUInt16:
+                return std::format("{}", *reinterpret_cast<const u16 *>(ptr));
+            case Ailu::EDataType::kUInt32:
+                return std::format("{}", *reinterpret_cast<const u32 *>(ptr));
+            case Ailu::EDataType::kUInt64:
+                return std::format("{}", *reinterpret_cast<const u64 *>(ptr));
+            case Ailu::EDataType::kFloat:
+                return std::format("{:.6f}", *reinterpret_cast<const float *>(ptr));
+            case Ailu::EDataType::kDouble:
+                return std::format("{:.6f}", *reinterpret_cast<const double *>(ptr));
+            case Ailu::EDataType::kChar:
+                return std::format("'{}'", *reinterpret_cast<const char *>(ptr));
+            case Ailu::EDataType::kBool:
+                return *reinterpret_cast<const bool *>(ptr) ? "true" : "false";
+            case Ailu::EDataType::kString:
+                return *reinterpret_cast<const std::string *>(ptr);
+            case Ailu::EDataType::kVec2:
+                return formatVec(*reinterpret_cast<const Vector2f *>(ptr), 2);
+            case Ailu::EDataType::kVec3:
+                return formatVec(*reinterpret_cast<const Vector3f *>(ptr), 3);
+            case Ailu::EDataType::kVec4:
+                return formatVec(*reinterpret_cast<const Vector4f *>(ptr), 4);
+            case Ailu::EDataType::kVec2Int:
+                return formatVec(*reinterpret_cast<const Vector2Int *>(ptr), 2);
+            case Ailu::EDataType::kVec3Int:
+                return formatVec(*reinterpret_cast<const Vector3Int *>(ptr), 3);
+            case Ailu::EDataType::kVec4Int:
+                return formatVec(*reinterpret_cast<const Vector4Int *>(ptr), 4);
+            case Ailu::EDataType::kVec2UInt:
+                return formatVec(*reinterpret_cast<const Vector2UInt *>(ptr), 2);
+            case Ailu::EDataType::kVec3UInt:
+                return formatVec(*reinterpret_cast<const Vector3UInt *>(ptr), 3);
+            case Ailu::EDataType::kVec4UInt:
+                return formatVec(*reinterpret_cast<const Vector4UInt *>(ptr), 4);
+            case Ailu::EDataType::kEnum:
+                return std::format("{}", static_cast<int>(*reinterpret_cast<const i32 *>(ptr)));
+            case Ailu::EDataType::kPtr:
+                return std::format("ptr: {}", *reinterpret_cast<void *const *>(ptr));
+            case Ailu::EDataType::kRef:
+                return std::format("ref: {}", *reinterpret_cast<void *const *>(ptr));
+            case Ailu::EDataType::kObject:
+                return "[Object]";
+            case Ailu::EDataType::kVoid:
+                return "[Void]";
+            case Ailu::EDataType::kNone:
+            default:
+                return "[Unknown]";
+        }
+    }
+
+
+
+bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
+    {
+        char *ptr = reinterpret_cast<char *>(instance) + _offset;
+
+        auto parseVec = [](const String &s, auto &v, int dim) -> bool
+        {
+            int matched = 0;
+            switch (dim)
+            {
+                case 2:
+                    matched = sscanf_s(s.c_str(), "%f,%f", &v.data[0], &v.data[1]);
+                    return matched == 2;
+                case 3:
+                    matched = sscanf_s(s.c_str(), "%f, %f, %f", &v.data[0], &v.data[1], &v.data[2]);
+                    return matched == 3;
+                case 4:
+                    matched = sscanf_s(s.c_str(), "%f, %f, %f, %f", &v.data[0], &v.data[1], &v.data[2], &v.data[3]);
+                    return matched == 4;
+                default:
+                    return false;
+            }
+        };
+
+        try
+        {
+            switch (_data_type)
+            {
+                case Ailu::EDataType::kInt8:
+                    *reinterpret_cast<i8 *>(ptr) = static_cast<i8>(std::stoi(str));
+                    return true;
+                case Ailu::EDataType::kInt16:
+                    *reinterpret_cast<i16 *>(ptr) = static_cast<i16>(std::stoi(str));
+                    return true;
+                case Ailu::EDataType::kInt32:
+                    *reinterpret_cast<i32 *>(ptr) = std::stoi(str);
+                    return true;
+                case Ailu::EDataType::kInt64:
+                    *reinterpret_cast<i64 *>(ptr) = std::stoll(str);
+                    return true;
+                case Ailu::EDataType::kUInt8:
+                    *reinterpret_cast<u8 *>(ptr) = static_cast<u8>(std::stoul(str));
+                    return true;
+                case Ailu::EDataType::kUInt16:
+                    *reinterpret_cast<u16 *>(ptr) = static_cast<u16>(std::stoul(str));
+                    return true;
+                case Ailu::EDataType::kUInt32:
+                    *reinterpret_cast<u32 *>(ptr) = std::stoul(str);
+                    return true;
+                case Ailu::EDataType::kUInt64:
+                    *reinterpret_cast<u64 *>(ptr) = std::stoull(str);
+                    return true;
+                case Ailu::EDataType::kFloat:
+                    *reinterpret_cast<float *>(ptr) = std::stof(str);
+                    return true;
+                case Ailu::EDataType::kDouble:
+                    *reinterpret_cast<double *>(ptr) = std::stod(str);
+                    return true;
+                case Ailu::EDataType::kBool:
+                    *reinterpret_cast<bool *>(ptr) = (str == "true" || str == "1" || str == "True");
+                    return true;
+                case Ailu::EDataType::kChar:
+                    if (!str.empty())
+                    {
+                        *reinterpret_cast<char *>(ptr) = str[0];
+                        return true;
+                    }
+                    return false;
+                case Ailu::EDataType::kString:
+                    *reinterpret_cast<std::string *>(ptr) = str;
+                    return true;
+                case Ailu::EDataType::kVec2:
+                    return parseVec(str, *reinterpret_cast<Vector2f *>(ptr), 2);
+                case Ailu::EDataType::kVec3:
+                    return parseVec(str, *reinterpret_cast<Vector3f *>(ptr), 3);
+                case Ailu::EDataType::kVec4:
+                    return parseVec(str, *reinterpret_cast<Vector4f *>(ptr), 4);
+                case Ailu::EDataType::kVec2Int:
+                    return sscanf_s(str.c_str(), "%d,%d", &reinterpret_cast<Vector2Int *>(ptr)->x, &reinterpret_cast<Vector2Int *>(ptr)->y) == 2;
+                case Ailu::EDataType::kVec3Int:
+                    return sscanf_s(str.c_str(), "%d,%d,%d", &reinterpret_cast<Vector3Int *>(ptr)->x, &reinterpret_cast<Vector3Int *>(ptr)->y, &reinterpret_cast<Vector3Int *>(ptr)->z) == 3;
+                case Ailu::EDataType::kVec4Int:
+                    return sscanf_s(str.c_str(), "%d,%d,%d,%d", &reinterpret_cast<Vector4Int *>(ptr)->x, &reinterpret_cast<Vector4Int *>(ptr)->y, &reinterpret_cast<Vector4Int *>(ptr)->z, &reinterpret_cast<Vector4Int *>(ptr)->w) == 4;
+                case Ailu::EDataType::kVec2UInt:
+                    return sscanf_s(str.c_str(), "%u,%u", &reinterpret_cast<Vector2UInt *>(ptr)->x, &reinterpret_cast<Vector2UInt *>(ptr)->y) == 2;
+                case Ailu::EDataType::kVec3UInt:
+                    return sscanf_s(str.c_str(), "%u,%u,%u", &reinterpret_cast<Vector3UInt *>(ptr)->x, &reinterpret_cast<Vector3UInt *>(ptr)->y, &reinterpret_cast<Vector3UInt *>(ptr)->z) == 3;
+                case Ailu::EDataType::kVec4UInt:
+                    return sscanf_s(str.c_str(), "%u,%u,%u,%u", &reinterpret_cast<Vector4UInt *>(ptr)->x, &reinterpret_cast<Vector4UInt *>(ptr)->y, &reinterpret_cast<Vector4UInt *>(ptr)->z, &reinterpret_cast<Vector4UInt *>(ptr)->w) == 4;
+                case Ailu::EDataType::kEnum:
+                    *reinterpret_cast<i32 *>(ptr) = std::stoi(str);
+                    return true;
+                case Ailu::EDataType::kPtr:
+                case Ailu::EDataType::kRef:
+                case Ailu::EDataType::kObject:
+                case Ailu::EDataType::kVoid:
+                case Ailu::EDataType::kNone:
+                default:
+                    AL_ASSERT_MSG(false, "PropertyInfo::SetValueFromString: Unsupported type");
+                    return false;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            LOG_WARNING("PropertyInfo::SetValueFromString parse error: {}", e.what());
+            return false;
+        }
+    }
+
+
+
     //------------------------------------------------------------------------------------------------------------
     void Type::RegisterType(Type *type)
     {

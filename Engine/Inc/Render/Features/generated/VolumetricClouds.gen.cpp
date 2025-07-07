@@ -35,7 +35,7 @@ initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kPropert
 Meta meta_height;
 meta_height._category="Base";
 meta_height._min=(float)0;
-meta_height._max=(float)5000;
+meta_height._max=(float)10000;
 meta_height._is_range=true;
 meta_height._is_float_range=true;
 meta_height._is_color=false;

@@ -34,13 +34,11 @@ using namespace Ailu::Render;
 namespace Ailu
 {
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f, this, std::placeholders::_1)
-
     TimeMgr *g_pTimeMgr = new TimeMgr();
     SceneManagement::SceneMgr *g_pSceneMgr = new SceneManagement::SceneMgr();
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     LogMgr *g_pLogMgr = new LogMgr();
     Scope<Core::ThreadPool> g_pThreadTool = MakeScope<Core::ThreadPool>(6u, "GlobalThreadPool");
-
 
     WString Application::GetWorkingPath()
     {
@@ -225,9 +223,14 @@ namespace Ailu
         std::thread logic_thread = std::thread([&]()
                                                {
             SetThreadName("LogicThread");
-            while (_state == EApplicationState::EApplicationState_Running)
+            while (_state == EApplicationState::EApplicationState_Running || _state == EApplicationState::EApplicationState_Pause)
             {
                 {
+                    if (_state == EApplicationState::EApplicationState_Pause)
+                    {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                        continue;
+                    }
                     _before_update.Invoke();
                     auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
                     g_pTimeMgr->Tick(last_mark);
@@ -258,7 +261,7 @@ namespace Ailu
                                 }
                                 //_update_lag -= s_target_lag;
                                 //_update_lag = std::max<f32>(_update_lag,0.0f);
-                                _update_lag = last_mark;
+                                //_update_lag = last_mark;
                             }
                         }
                         //if (_render_lag >= s_target_lag)
@@ -283,6 +286,15 @@ namespace Ailu
                             g_pGfxContext->Present();
                             g_pGfxContext->GetPipeline()->FrameCleanUp();
                             _render_lag -= s_target_lag;
+                        }
+                        //锁帧处理
+                        {
+                            f64 remaining = s_target_lag - _update_lag;
+                            if (remaining > 0.0)
+                            {
+                                std::this_thread::sleep_for(std::chrono::microseconds((i64) (remaining * 1000.0)));
+                            }
+                            _update_lag = 0.0;
                         }
                     }
                     _after_update.Invoke();

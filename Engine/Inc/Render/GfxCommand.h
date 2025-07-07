@@ -150,9 +150,11 @@ namespace Ailu::Render
         i16 _kernel;
         ~CommandAllocConstBuffer()
         {
-            DESTORY_PTRARR(_data);
+            AL_FREE(_data);
         }
-        void Reset() final {}
+        void Reset() final {
+            AL_FREE(_data);
+        }
     };
     //同时也会创建一个cpu profile
     struct CommandProfiler : public GfxCommand
@@ -179,15 +181,20 @@ namespace Ailu::Render
         CMD_CLASS_TYPE(kPresent);
         void Reset() final {}
     };
-
+    using ReadbackCallback = std::function<void(const u8*,u32)>;
     struct CommandReadBack : public GfxCommand
     {
         CMD_CLASS_TYPE(kReadBack);
         GpuResource *_res;
         bool _is_buffer;
-        u8 *_dst;
+        bool _is_counter_value;
         u32 _size;
-        void Reset() final {}
+        ReadbackCallback _callback;
+        void Reset() final 
+        {
+            _res = nullptr;
+            _callback = nullptr;
+        }
     };
 
     class CommandPool
@@ -245,6 +252,10 @@ namespace Ailu::Render
             {
                 return _pool_present.Pop().value_or(nullptr);
             }
+            else if constexpr (std::is_same_v<T, CommandReadBack>)
+            {
+                return _pool_rb.Pop().value_or(nullptr);
+            }
             else {}
             return nullptr;
         }
@@ -295,6 +306,10 @@ namespace Ailu::Render
             {
                 _pool_present.Push(static_cast<CommandPresent*>(cmd));
             }
+            else if (cmd->GetCmdType() == EGpuCommandType::kReadBack)
+            {
+                _pool_rb.Push(static_cast<CommandReadBack*>(cmd));
+            }
             else {}
         }
 
@@ -310,6 +325,7 @@ namespace Ailu::Render
         Core::LockFreeQueue<CommandProfiler *, 256> _pool_profiler;
         Core::LockFreeQueue<CommandPresent *, 32> _pool_present;
         Core::LockFreeQueue<CommandCopyCounter *, 32> _pool_cp_counter;
+        Core::LockFreeQueue<CommandReadBack *, 32> _pool_rb;
     };
 }// namespace Ailu
 

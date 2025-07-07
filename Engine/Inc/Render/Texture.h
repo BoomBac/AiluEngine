@@ -113,28 +113,162 @@ namespace Ailu::Render
     DECLARE_ENUM(ETextureDimension, kUnknown, kTex2D, kTex3D, kCube, kTex2DArray, kCubeArray)
     DECLARE_ENUM(EFilterMode, kPoint, kBilinear, kTrilinear)
     DECLARE_ENUM(EWrapMode, kClamp, kRepeat, kMirror)
-    DECLARE_ENUM(ETextureFormat, kRGBA32, kRGBAFloat, kRGBFloat, kRGBAHalf, kRGFloat, kR11G11B10)
+    DECLARE_ENUM(ETextureFormat,
+        // 8-bit formats
+        kR8UNorm,         // R8_UNORM
+        kR8UInt,          // R8_UINT
+        kR8SInt,          // R8_SINT
+
+        kRG8UNorm,        // R8G8_UNORM
+        kRG8UInt,         // R8G8_UINT
+        kRG8SInt,         // R8G8_SINT
+
+        kRGBA8UNorm,      // R8G8B8A8_UNORM
+        kRGBA8UNormSRGB,  // R8G8B8A8_UNORM_SRGB
+        kRGBA8UInt,       // R8G8B8A8_UINT
+        kRGBA8SInt,       // R8G8B8A8_SINT
+
+        // 16-bit formats
+        kR16Float,        // R16_FLOAT
+        kR16UNorm,        // R16_UNORM
+        kR16UInt,         // R16_UINT
+        kR16SInt,         // R16_SINT
+
+        kRG16Float,       // R16G16_FLOAT
+        kRG16UNorm,       // R16G16_UNORM
+        kRG16UInt,        // R16G16_UINT
+        kRG16SInt,        // R16G16_SINT
+
+        kRGBAHalf,        // R16G16B16A16_FLOAT
+        kRGBA16UNorm,     // R16G16B16A16_UNORM
+        kRGBA16UInt,      // R16G16B16A16_UINT
+
+        // 32-bit float formats
+        kR32Float,        // R32_FLOAT
+        kR32UInt,         // R32_UINT
+        kR32SInt,         // R32_SINT
+
+        kRGFloat,         // R32G32_FLOAT
+        kRG32UInt,        // R32G32_UINT
+        kRGBAFloat,       // R32G32B32A32_FLOAT
+        kRGBA32UInt,      // R32G32B32A32_UINT
+        kRGBFloat,        // R32G32B32_FLOAT
+
+        // Packed formats
+        kR11G11B10,  // R11G11B10_FLOAT
+        kRGB10A2UNorm,    // R10G10B10A2_UNORM
+        kRGB10A2UInt,     // R10G10B10A2_UINT
+
+        // Depth-stencil formats
+        kD16UNorm,        // D16_UNORM
+        kD24UNormS8UInt,  // D24_UNORM_S8_UINT
+        kD32Float,        // D32_FLOAT
+        kD32FloatS8X24,   // D32_FLOAT_S8X24_UINT
+
+        // Compressed formats
+        kBC1_UNorm,       // DXT1
+        kBC1_UNorm_SRGB,  // DXT1 SRGB
+        kBC3_UNorm,       // DXT5
+        kBC3_UNorm_SRGB,  // DXT5 SRGB
+        kBC4_UNorm,       // Single-channel compressed
+        kBC5_UNorm,       // Two-channel compressed
+        kBC6H_UF16,       // HDR, unsigned float
+        kBC6H_SF16,       // HDR, signed float
+        kBC7_UNorm,       // High-quality RGBA compressed
+        kBC7_UNorm_SRGB,  // BC7 + SRGB
+
+        // Legacy / platform formats
+        kRGBA32,          // 32-bit UNORM (R8G8B8A8)
+        kBGRA8UNorm,      // B8G8R8A8_UNORM
+        kBGRA8UNormSRGB,  // B8G8R8A8_UNORM_SRGB
+
+        // Special/utility
+        kUnknown          // 未知格式
+    )
+
     DECLARE_ENUM(ECubemapFace, kUnknown, kPositiveX, kNegativeX, kPositiveY, kNegativeY, kPositiveZ, kNegativeZ)
-    static EALGFormat::EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format,bool is_sRGB = true)
+
+    static EALGFormat::EALGFormat ConvertTextureFormatToPixelFormat(ETextureFormat::ETextureFormat format)
     {
+        if (format == ETextureFormat::kUnknown)
+            return EALGFormat::kALGFormatUNKOWN;
+        using namespace EALGFormat;
+        using namespace ETextureFormat;
         switch (format)
         {
-            case ETextureFormat::kRGBA32:
-                return is_sRGB? EALGFormat::kALGFormatR8G8B8A8_UNORM_SRGB : EALGFormat::EALGFormat::kALGFormatR8G8B8A8_UNORM;
-            case ETextureFormat::kRGBAFloat:
-                return EALGFormat::EALGFormat::kALGFormatR32G32B32A32_FLOAT;
-            case ETextureFormat::kRGBFloat:
-                return EALGFormat::EALGFormat::kALGFormatR32G32B32_FLOAT;
-            case ETextureFormat::kRGBAHalf:
-                return EALGFormat::EALGFormat::kALGFormatR16G16B16A16_FLOAT;
-            case ETextureFormat::kRGFloat:
-                return EALGFormat::EALGFormat::kALGFormatR32G32_FLOAT;
-            case ETextureFormat::kR11G11B10:
-                return EALGFormat::EALGFormat::kALGFormatR11G11B10_FLOAT;
+            // 8-bit formats
+            case kR8UNorm:           return kALGFormatR8_UNORM;
+            case kR8UInt:            return kALGFormatR8_UINT;
+            case kR8SInt:            return kALGFormatR8_SINT;
+
+            case kRG8UNorm:          return kALGFormatR8G8_UNORM;
+            case kRG8UInt:           return kALGFormatR8G8_UINT;
+            case kRG8SInt:           return kALGFormatR8G8_SINT;
+
+            case kRGBA8UNorm:        return kALGFormatR8G8B8A8_UNORM;
+            case kRGBA8UNormSRGB:    return kALGFormatR8G8B8A8_UNORM_SRGB;
+            case kRGBA8UInt:         return kALGFormatR8G8B8A8_UINT;
+            case kRGBA8SInt:         return kALGFormatR8G8B8A8_SINT;
+
+            // 16-bit formats
+            case kR16Float:          return kALGFormatR16_FLOAT;
+            case kR16UNorm:          return kALGFormatR16_UNORM;
+            case kR16UInt:           return kALGFormatR16_UINT;
+            case kR16SInt:           return kALGFormatR16_SINT;
+
+            case kRG16Float:         return kALGFormatR16G16_FLOAT;
+            case kRG16UNorm:         return kALGFormatR16G16_UNORM;
+            case kRG16UInt:          return kALGFormatR16G16_UINT;
+            case kRG16SInt:          return kALGFormatR16G16_SINT;
+
+            case kRGBAHalf:          return kALGFormatR16G16B16A16_FLOAT;
+            case kRGBA16UNorm:       return kALGFormatR16G16B16A16_UNORM;
+            case kRGBA16UInt:        return kALGFormatR16G16B16A16_UINT;
+
+            // 32-bit float formats
+            case kR32Float:          return kALGFormatR32_FLOAT;
+            case kR32UInt:           return kALGFormatR32_UINT;
+            case kR32SInt:           return kALGFormatR32_SINT;
+
+            case kRGFloat:           return kALGFormatR32G32_FLOAT;
+            case kRG32UInt:          return kALGFormatR32G32_UINT;
+
+            case kRGBAFloat:         return kALGFormatR32G32B32A32_FLOAT;
+            case kRGBA32UInt:        return kALGFormatR32G32B32A32_UINT;
+
+            case kRGBFloat:          return kALGFormatR32G32B32_FLOAT;
+
+            // Packed formats
+            case kR11G11B10:    return kALGFormatR11G11B10_FLOAT;
+            case kRGB10A2UNorm:      return kALGFormatR10G10B10A2_UNORM;
+            case kRGB10A2UInt:       return kALGFormatR10G10B10A2_UINT;
+
+            // Depth-stencil formats
+            case kD16UNorm:          return kALGFormatD16_UNORM;
+            case kD24UNormS8UInt:    return kALGFormatD24S8_UINT;
+            case kD32Float:          return kALGFormatD32_FLOAT;
+            case kD32FloatS8X24:     return kALGFormatD32_FLOAT_S8X24_UINT;
+
+            // Compressed formats
+            case kBC1_UNorm:         return kALGFormatBC1_UNORM;
+            case kBC1_UNorm_SRGB:    return kALGFormatBC1_UNORM_SRGB;
+            case kBC3_UNorm:         return kALGFormatBC3_UNORM;
+            case kBC3_UNorm_SRGB:    return kALGFormatBC3_UNORM_SRGB;
+            case kBC4_UNorm:         return kALGFormatBC4_UNORM;
+            case kBC5_UNorm:         return kALGFormatBC5_UNORM;
+            case kBC6H_UF16:         return kALGFormatBC6H_UF16;
+            case kBC6H_SF16:         return kALGFormatBC6H_SF16;
+            case kBC7_UNorm:         return kALGFormatBC7_UNORM;
+            case kBC7_UNorm_SRGB:    return kALGFormatBC7_UNORM_SRGB;
+
+            // Legacy / platform
+            case kRGBA32:            return kALGFormatR8G8B8A8_UNORM;
+            case kBGRA8UNorm:        return kALGFormatB8G8R8A8_UNORM;
+            case kBGRA8UNormSRGB:    return kALGFormatB8G8R8A8_UNORM_SRGB;
+
             default:
-                break;
+                return kALGFormatUNKOWN;
         }
-        return EALGFormat::EALGFormat::kALGFormatUNKOWN;
     }
 
     //------------

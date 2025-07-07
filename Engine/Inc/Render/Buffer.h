@@ -6,6 +6,7 @@
 #include "GlobalMarco.h"
 #include "GpuResource.h"
 #include "PipelineState.h"
+#include "Framework/Common/Misc.h"
 #include <functional>
 
 namespace Ailu::Render
@@ -57,10 +58,6 @@ namespace Ailu::Render
         i32 _base_vertex_location;
         u32 _start_index_location;
         u32 _start_instance_location;
-        static u32 constexpr OffsetOfInstanceCount()
-        {
-            return sizeof(_index_count_per_instance);
-        }
     };
 
     struct GPUBufferDesc
@@ -88,9 +85,9 @@ namespace Ailu::Render
         virtual void ReadBack(u8 *dst, u32 size) {};
         virtual void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete) {};
         [[nodiscard]] bool IsRandomAccess() const { return _desc._is_random_write; };
-        /// @brief 返回 append/consume中元素个数
+        /// @brief  异步获取append/consume中元素个数，可能会延迟数帧
         /// @return
-        virtual u32 GetCounter() { return 0u; };
+        virtual void GetCounter(std::function<void(u32)> callback) { };
         virtual void SetCounter(u32 counter) { _counter = counter; };
         template<typename T>
         void SetData(const Vector<T> &data)
@@ -103,6 +100,7 @@ namespace Ailu::Render
                 AL_FREE(_data);
                 _data = nullptr;
             }
+            _fill_data_size = data_size;
             _data = reinterpret_cast<u8 *>(AL_ALLOC(T, data.size()));
             memcpy(_data, data.data(), data_size);
             _counter = (u32) data.size();
@@ -116,6 +114,7 @@ namespace Ailu::Render
                 AL_FREE(_data);
                 _data = nullptr;
             }
+            _fill_data_size = size;
             _data = reinterpret_cast<u8 *>(AL_ALLOC(u8, size));
             memcpy(_data, data, size);
             _counter = size / _desc._element_size;
@@ -130,6 +129,8 @@ namespace Ailu::Render
         //for append/consume buffer
         u32 _counter = 0u;
         u8 *_data = nullptr;
+        //每次设置data时的实际大小，使用容量拷贝时可能会有越界错误
+        u64 _fill_data_size = 0u;
     };
 
     class VertexBuffer : public GpuResource
@@ -184,7 +185,7 @@ namespace Ailu::Render
     class ConstantBuffer : public GpuResource
     {
     public:
-        static ConstantBuffer *Create(u32 size, bool compute_buffer = false, const String &name = std::format("const_buffer_{}", s_global_buffer_index++));
+        static ConstantBuffer *Create(u32 size, const String &name = std::format("const_buffer_{}", s_global_buffer_index++));
         static void Release(ConstantBuffer *ptr);
         ConstantBuffer() { _res_type = EGpuResType::kConstBuffer; };
         virtual ~ConstantBuffer() = default;
@@ -203,6 +204,21 @@ namespace Ailu::Render
 
     protected:
         u8 *_data = nullptr;
+    };
+
+    class ConstBufferPool : public Ailu::Core::NonCopyble
+    {
+    public:
+        static void Init();
+        static void ShutDown();
+        static ConstantBuffer* Acquire(u32 size);
+    private:
+        struct ConstbufferNode
+        {
+            ConstantBuffer *_buffer;
+            u64 _access_frame_count = 0u;
+        };
+        std::multimap<u32,ConstbufferNode> _buffer_pool;
     };
 
 }// namespace Ailu

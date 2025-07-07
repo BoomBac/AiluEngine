@@ -123,15 +123,20 @@ namespace Ailu::Render
 	#pragma endregion
 
 	#pragma region ConstantBuffer
-    ConstantBuffer *ConstantBuffer::Create(u32 size, bool compute_buffer, const String& name)
+    ConstantBuffer *ConstantBuffer::Create(u32 size,const String& name)
 	{
 		switch (Renderer::GetAPI())
 		{
 		case RendererAPI::ERenderAPI::kNone:
 			AL_ASSERT_MSG(false, "None render api used!");
 			return nullptr;
-		case RendererAPI::ERenderAPI::kDirectX12:
-			return new RHI::DX12::D3DConstantBuffer(size, compute_buffer);
+        case RendererAPI::ERenderAPI::kDirectX12:
+        {
+            RHI::DX12::D3DConstantBuffer *buffer = new RHI::DX12::D3DConstantBuffer(size);//AL_NEW(RHI::DX12::D3DConstantBuffer, size);
+            buffer->Name(name);
+            return buffer;
+        }
+			return new RHI::DX12::D3DConstantBuffer(size);
 		}
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;
@@ -141,4 +146,43 @@ namespace Ailu::Render
 		DESTORY_PTR(ptr);
 	}
 	#pragma endregion
-}
+
+	#pragma region ConstBufferPool
+    ConstBufferPool *s_ConstBufferPool = nullptr;
+	void ConstBufferPool::Init()
+    {
+        if (!s_ConstBufferPool)
+            s_ConstBufferPool = AL_NEW(ConstBufferPool);
+    }
+    void ConstBufferPool::ShutDown()
+    {
+        if (s_ConstBufferPool)
+        {
+            for (auto& it: s_ConstBufferPool->_buffer_pool)
+                ConstantBuffer::Release(it.second._buffer);
+            s_ConstBufferPool->_buffer_pool.clear();
+            AL_DELETE(s_ConstBufferPool);
+        }
+    }
+    ConstantBuffer *ConstBufferPool::Acquire(u32 size)
+    {
+        size = (u32)AlignTo(size, 256u);
+        u64 cur_frame = GraphicsContext::Get().GetFrameCount();
+        for (auto it = s_ConstBufferPool->_buffer_pool.lower_bound(size); it != s_ConstBufferPool->_buffer_pool.end(); it++)
+        {
+            auto &[buffer, frame_count] = it->second;
+            if (cur_frame - frame_count > 2)
+            {
+				//buffer->Reset();
+				frame_count = cur_frame;
+                return buffer;
+            }
+        }
+        ConstantBuffer *buffer = ConstantBuffer::Create(size);
+        s_ConstBufferPool->_buffer_pool.emplace(size, ConstbufferNode{buffer, cur_frame});
+        if (s_ConstBufferPool->_buffer_pool.size()> 100u)
+			LOG_INFO("[ConstBufferPool::Acquire]: Create a new constant buffer pool: {}", s_ConstBufferPool->_buffer_pool.size());
+        return buffer;
+    }
+	#pragma endregion
+}// namespace Ailu::Render

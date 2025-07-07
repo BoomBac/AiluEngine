@@ -541,6 +541,7 @@ namespace Ailu::Render
         void SetTexture(const String &name, Texture *texture);
         void SetTexture(u8 bind_slot, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
+        void SetTexture(const String &name, RTHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap);
         void SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap);
         void SetTexture(const String &name, Texture *texture, u16 mipmap);
         void SetFloat(const String &name, f32 value);
@@ -549,6 +550,8 @@ namespace Ailu::Render
         void SetInt(const String &name, i32 value);
         void SetInts(const String &name, Vector<i32> values);
         void SetVector(const String &name, Vector4f vector);
+        void SetVectorArray(const String& name,const Vector<Vector4f>& vectors);
+        void SetVectorArray(const String& name,Vector4f* vectors,u16 num);
         /// @brief 为所有kernel的对应名称设置buffer
         /// @param name 
         /// @param buf 
@@ -619,17 +622,6 @@ namespace Ailu::Render
             Array<GpuResource*,32> _bind_res;
             Array<u16,32> _bind_res_priority;
             Array<ComputeBindParams,32> _bind_params;
-            void Release()
-            {
-                for(u16 i = 0; i < _max_bind_slot; i++)
-                {
-                    if (_bind_res[i] && _bind_res[i]->GetResourceType() == EGpuResType::kConstBuffer)
-                    {
-                        if (_bind_params[i]._is_internal_cbuf)
-                            ConstantBuffer::Release(static_cast<ConstantBuffer*>(_bind_res[i]));
-                    }
-                }
-            }
         };
         inline static std::set<String> s_global_active_keywords;
         inline static HashMap<u32,bool> s_global_variant_update_map{};

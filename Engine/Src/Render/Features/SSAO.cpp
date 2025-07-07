@@ -16,7 +16,7 @@ namespace Ailu::Render
     {
     }
 
-    void SSAO::AddRenderPasses(Renderer &renderer, RenderingData &rendering_data)
+    void Ailu::Render::SSAO::AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data)
     {
         _pass._is_half_res = _is_half_res;
         _pass._is_cbr = _is_cbr;

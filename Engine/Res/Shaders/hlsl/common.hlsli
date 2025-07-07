@@ -251,5 +251,53 @@ float3x3 OrthonormalBasis(in float3 n, out float3 u, out float3 v)
     return ( float3x3(u,v,n) );
 }
 
+half MaxCompHalf(half4 v) 
+{
+    return max(max(v.x, v.y), max(v.z, v.w));
+}
+
+half MinCompHalf(half4 v) 
+{
+    return min(min(v.x, v.y), min(v.z, v.w));
+}
+
+float MaxCompFloat(float4 v) 
+{
+    return max(max(v.x, v.y), max(v.z, v.w));
+}
+
+float MinCompFloat(float4 v) 
+{
+    return min(min(v.x, v.y), min(v.z, v.w));
+}
+
+// 打包 float4 (RGBA) 到 uint (32位)
+uint PackFloat4(float4 color)
+{
+    uint4 scaled = uint4(color * 255.0 + 0.5);
+    return (scaled.r << 24) | (scaled.g << 16) | (scaled.b << 8) | scaled.a;
+}
+
+// 解包 uint 到 float4 (RGBA)
+float4 UnpackFloat4(uint packed)
+{
+    return float4(
+        float((packed >> 24) & 0xFF) / 255.0,
+        float((packed >> 16) & 0xFF) / 255.0,
+        float((packed >> 8) & 0xFF) / 255.0,
+        float(packed & 0xFF) / 255.0
+    );
+}
+
+uint PackHalf2(half2 value)
+{
+    return f32tof16(value.x) | (f32tof16(value.y) << 16);
+}
+
+half2 UnpackHalf2(uint packed)
+{
+    return half2(f16tof32(packed), f16tof32(packed >> 16));
+}
+
 #endif // !__COMMON_H__ 
 

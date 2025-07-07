@@ -316,7 +316,7 @@ namespace Ailu
         {
             DESTORY_PTR(_readback_buf);
         }
-        void PickFeature::AddRenderPasses(Renderer &renderer, RenderingData &rendering_data)
+        void Ailu::Render::PickFeature::AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data)
         {
             if (rendering_data._camera->_is_scene_camera)
             {

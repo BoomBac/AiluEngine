@@ -38,10 +38,13 @@ namespace Ailu::Render
                 g_pCommandPool->_pool_present.Push(AL_NEW(CommandPresent));
             for (u32 i = 0; i < g_pCommandPool->_pool_cp_counter.Capacity(); i++)
                 g_pCommandPool->_pool_cp_counter.Push(AL_NEW(CommandCopyCounter));
+            for (u32 i = 0; i < g_pCommandPool->_pool_rb.Capacity(); i++)
+                g_pCommandPool->_pool_rb.Push(AL_NEW(CommandReadBack));
         }
     }
     void CommandPool::Shutdown()
     {
+        /*
         for (u32 i = 0; i < g_pCommandPool->_pool_set_target.Capacity(); i++)
             AL_DELETE(g_pCommandPool->_pool_set_target.Pop().value());
         for (u32 i = 0; i < g_pCommandPool->_pool_clear_target.Capacity(); i++)
@@ -64,5 +67,8 @@ namespace Ailu::Render
             AL_DELETE(g_pCommandPool->_pool_present.Pop().value());
         for (u32 i = 0; i < g_pCommandPool->_pool_cp_counter.Capacity(); i++)
             AL_DELETE(g_pCommandPool->_pool_cp_counter.Pop().value());
+        for (u32 i = 0; i < g_pCommandPool->_pool_rb.Capacity(); i++)
+            AL_DELETE(g_pCommandPool->_pool_rb.Pop().value());
+            */
     }
 }// namespace Ailu

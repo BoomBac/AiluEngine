@@ -1,4 +1,4 @@
-#include "Render/Features/RenderFeature.h"
+#include "Render/Features/CommonPasses.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Buffer.h"
@@ -20,27 +20,6 @@
 
 namespace Ailu::Render
 {
-    #pragma region RenderFeature
-    //-------------------------------------------------------------RenderFeature-------------------------------------------------------------
-    RenderFeature::RenderFeature(const String &name) : Object(name)
-    {
-    }
-
-
-    RenderFeature::~RenderFeature()
-    {
-    }
-    #pragma endregion
-    //-------------------------------------------------------------RenderFeature-------------------------------------------------------------
-
-
-    #pragma region RenderPass
-    //-------------------------------------------------------------RenderPass-------------------------------------------------------------
-    void RenderPass::EndPass(GraphicsContext *context)
-    {
-        RenderTexture::ResetRenderTarget();
-    }
-    #pragma endregion
     #pragma region ForwardPass
     //-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
     ForwardPass::ForwardPass() : RenderPass("TransparentPass")
@@ -1001,8 +980,8 @@ namespace Ailu::Render
         CommandBufferPool::Release(cmd);
         Shader::SetGlobalTexture("_MotionVectorTexture", motion_vector_rt);
         ComputeShader::SetGlobalTexture("_MotionVectorTexture", motion_vector_rt);
-        f32 aspect = (f32)rendering_data._width / (f32)rendering_data._height;
-        Gizmo::DrawTexture(Rect(0,0,256,static_cast<u16>(256 / aspect)),g_pRenderTexturePool->Get(motion_vector_rt));
+        //f32 aspect = (f32)rendering_data._width / (f32)rendering_data._height;
+        //Gizmo::DrawTexture(Rect(0,0,256,static_cast<u16>(256 / aspect)),g_pRenderTexturePool->Get(motion_vector_rt));
     }
 
     void MotionVectorPass::BeginPass(GraphicsContext *context)
@@ -1013,5 +992,60 @@ namespace Ailu::Render
     {
         RenderPass::EndPass(context);
     }
-#pragma endregion
+    #pragma endregion
+
+    #pragma region HZB
+    HZBPass::HZBPass() : RenderPass("HZB")
+    {
+        _hzb_gen = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/hzb.alasset");
+        _event = ERenderPassEvent::kAfterGbuffer;
+    }
+    HZBPass::~HZBPass()
+    {
+    }
+    void HZBPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
+    {
+        auto cmd = CommandBufferPool::Get(_name);
+        u16 w = (rendering_data._width + 1) >> 1;
+        u16 h = (rendering_data._height + 1) >> 1;
+        RTHandle hzb_rt = cmd->GetTempRT(w,h,"_HZB", ERenderTargetFormat::kRFloat,true,false,true);
+        cmd->Clear();
+        {
+            PROFILE_BLOCK_GPU(cmd.get(), HZB)
+            auto kernel = _hzb_gen->FindKernel("CSMain");
+            _hzb_gen->SetTexture("_DepthInput", rendering_data._camera_depth_target_handle);
+            u16 mip = Texture::MaxMipmapCount(w,h);
+            u16 first_dispatch_mip_num = std::min<u16>(4,mip);
+            {
+                _hzb_gen->SetInt("NumMipLevels",first_dispatch_mip_num);
+                _hzb_gen->SetTexture("_HZ_Buffer_Mip1", hzb_rt,ECubemapFace::kUnknown,0);
+                _hzb_gen->SetTexture("_HZ_Buffer_Mip2", hzb_rt,ECubemapFace::kUnknown,1);
+                _hzb_gen->SetTexture("_HZ_Buffer_Mip3", hzb_rt,ECubemapFace::kUnknown,2);
+                _hzb_gen->SetTexture("_HZ_Buffer_Mip4", hzb_rt,ECubemapFace::kUnknown,3);
+                auto [x,y,z] = _hzb_gen->CalculateDispatchNum(kernel,w,h,1);
+                cmd->Dispatch(_hzb_gen.get(),kernel,x,y);
+            }
+            if (u16 second_dispatch_mip_num = mip - first_dispatch_mip_num; second_dispatch_mip_num > 0)
+            {
+                _hzb_gen->SetInt("NumMipLevels", second_dispatch_mip_num);
+                _hzb_gen->SetTexture("_DepthInput", hzb_rt,ECubemapFace::kUnknown,3);
+                _hzb_gen->SetTexture("_HZ_Buffer_Mip1", hzb_rt, ECubemapFace::kUnknown, 4);
+                _hzb_gen->SetTexture("_HZ_Buffer_Mip2", hzb_rt, ECubemapFace::kUnknown, 5);
+                _hzb_gen->SetTexture("_HZ_Buffer_Mip3", hzb_rt, ECubemapFace::kUnknown, 6);
+                _hzb_gen->SetTexture("_HZ_Buffer_Mip4", hzb_rt, ECubemapFace::kUnknown, 7);
+                //u16 base_w = w, base_h = h;
+                auto [base_w,base_h] = Texture::CalculateMipSize(w,h,4);
+                auto [x,y,z] = _hzb_gen->CalculateDispatchNum(kernel,base_w,base_h,1);
+                cmd->Dispatch(_hzb_gen.get(),kernel,x,y);
+            }
+        }
+        cmd->ReleaseTempRT(hzb_rt);
+        context->ExecuteCommandBuffer(cmd);
+        CommandBufferPool::Release(cmd);
+        Shader::SetGlobalTexture("_CameraHiZTexture", hzb_rt);
+        ComputeShader::SetGlobalTexture("_CameraHiZTexture", hzb_rt);
+    }
+    void HZBPass::BeginPass(GraphicsContext *context){}
+    void HZBPass::EndPass(GraphicsContext *context){}
+    #pragma endregion
 }// namespace Ailu

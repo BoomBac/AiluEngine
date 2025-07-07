@@ -22,9 +22,11 @@ namespace Ailu::Render
         CommandBufferPool::Init();
         RHICommandBufferPool::Init();
 		GraphicsPipelineStateMgr::Init();
+        ConstBufferPool::Init();
 	}
 	void GraphicsContext::FinalizeGlobalContext()
 	{
+        ConstBufferPool::ShutDown();
 		GraphicsPipelineStateMgr::Shutdown();
         RHICommandBufferPool::Shutdown();
         CommandBufferPool::Shutdown();

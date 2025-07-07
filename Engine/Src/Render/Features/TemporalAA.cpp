@@ -20,13 +20,13 @@ namespace Ailu::Render
     TemporalAA::~TemporalAA()
     {
     }
-    void TemporalAA::AddRenderPasses(Renderer &renderer, RenderingData &rendering_data)
+    void Ailu::Render::TemporalAA::AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data)
     {
         static bool first_time = false;
-        auto camera = *rendering_data._camera;
+        const Camera& camera = *rendering_data._camera;
         auto hash = camera.HashCode();
-        auto proj = camera.GetProj();
-        auto view = camera.GetView();
+        const auto& proj = camera.GetProj();
+        const auto& view = camera.GetView();
         //auto viewProj = proj * view;
         auto viewProj = view * proj;
         HaltonSequence haltonSequence;

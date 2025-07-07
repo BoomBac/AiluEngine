@@ -11,7 +11,7 @@
 #include "Render/Camera.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
-#include "Render/Features/RenderFeature.h"
+#include "Render/Features/CommonPasses.h"
 #include "Objects/Type.h"
 
 #include "generated/Component.gen.h"
@@ -27,7 +27,7 @@ namespace Ailu
     namespace ECS
     {
         AENUM()
-        enum class EMotionVectorType
+        enum class EMotionVectorType 
         {
             kCameraOnly,
             kPerObject,

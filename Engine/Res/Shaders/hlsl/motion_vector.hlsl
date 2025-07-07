@@ -27,7 +27,9 @@ float2 CalculateNdcMotionFormClip(float4 clip_pos_cur, float4 clip_pos_pre)
 struct VertInput
 {
     float3 position : POSITION;
+#if defined(CPU_DEFORM)
     float3 position_prev : TEXCOORD0;
+#endif
 #if defined(ALPHA_TEST)
     float2 uv : TEXCOORD1;
 #endif

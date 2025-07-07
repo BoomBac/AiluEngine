@@ -1,11 +1,14 @@
 #include "pch.h"
 #include "Framework/Parser/HDRParser.h"
-
+#include "Framework/Common/StackTrace.h"
 //#ifndef STB_IMAGE_IMPLEMENTATION
 //#define STB_IMAGE_IMPLEMENTATION
 //#endif // !STB_IMAGE_IMPLEMENTATION
-
 #include "Ext/stb/stb_image.h"
+
+#define TINYEXR_IMPLEMENTATION
+#include "Ext/tinyexr.h"
+
 using namespace Ailu::Render;
 
 namespace Ailu
@@ -55,7 +58,26 @@ namespace Ailu
 		//stbi_set_flip_vertically_on_load(true);
 		i32 w,h,n;
 		auto sys_path_n = ToChar(sys_path);
-		float* raw_data = stbi_loadf(sys_path_n.data(), &w, &h, &n, 0);
+        f32 *raw_data = nullptr;
+        if (su::EndWith(sys_path_n, "hdr"))
+        {
+            raw_data = stbi_loadf(sys_path_n.data(), &w, &h, &n, 0);
+        }
+        else if (su::EndWith(sys_path_n, "exr"))
+        {
+            const char *err = nullptr;
+            if (int ret = LoadEXR(&raw_data, &w, &h, sys_path_n.data(), &err); ret != TINYEXR_SUCCESS)
+            {
+                LOG_ERROR("HDRParser::LoadTextureDat: Load {} failed: {}", sys_path_n, err);
+                LOG_ERROR("{}", StackTrace::Capture());
+                FreeEXRErrorMessage(err);
+                return false;
+            }
+            else
+                n = 4;//tinyexr会填充a通道即使没有
+        }
+        else
+            LOG_ERROR("HDRParser::LoadTextureDat: Unsupported HDR format: {}", sys_path_n);
 		if (raw_data == nullptr)
 		{
 			LOG_ERROR("Load {} failed: {}", sys_path_n, stbi_failure_reason());

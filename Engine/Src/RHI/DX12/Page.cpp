@@ -64,7 +64,7 @@ namespace Ailu::RHI::DX12
             auto offset = stale_block._offset;
             auto numDescriptors = stale_block._size;
             FreeBlock(offset, numDescriptors);
-            num_released += numDescriptors;
+            num_released += static_cast<u16>(numDescriptors);
             _stale_blocks.pop();
         }
         return num_released;

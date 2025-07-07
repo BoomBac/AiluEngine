@@ -215,28 +215,41 @@ namespace Ailu::SceneManagement
         AL_ASSERT(_register.HasComponent<ECS::CHierarchy>(current) && _register.HasComponent<ECS::CHierarchy>(parent));
         auto parent_hierarchy = _register.GetComponent<ECS::CHierarchy>(parent);
         auto cur_hierarchy = _register.GetComponent<ECS::CHierarchy>(current);
-        if (parent_hierarchy->_children_num == 0)
+        if (cur_hierarchy->_parent != ECS::kInvalidEntity)
         {
-            parent_hierarchy->_first_child = current;
+            Detach(current);
         }
         else
         {
-            auto last_child = _register.GetComponent<ECS::CHierarchy>(parent_hierarchy->_first_child);
-            ECS::Entity last_child_entity = parent_hierarchy->_first_child;
-            while (last_child->_next_sibling != ECS::kInvalidEntity)
+            if (parent_hierarchy->_children_num == 0)
             {
-                last_child_entity = last_child->_next_sibling;
-                last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
+                parent_hierarchy->_first_child = current;
             }
-            last_child->_next_sibling = current;
-            cur_hierarchy->_prev_sibling = last_child_entity;
-        }
-        if (auto parent_transf = _register.GetComponent<ECS::TransformComponent>(parent))
-        {
-            cur_hierarchy->_inv_matrix_attach = Math::MatrixInverse(parent_transf->_transform._world_matrix);
+            else
+            {
+                auto last_child = _register.GetComponent<ECS::CHierarchy>(parent_hierarchy->_first_child);
+                ECS::Entity last_child_entity = parent_hierarchy->_first_child;
+                while (last_child->_next_sibling != ECS::kInvalidEntity)
+                {
+                    last_child_entity = last_child->_next_sibling;
+                    last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
+                }
+                last_child->_next_sibling = current;
+                cur_hierarchy->_prev_sibling = last_child_entity;
+            }
         }
         cur_hierarchy->_parent = parent;
         parent_hierarchy->_children_num++;
+        auto mgr = _register.GetComponentMgr<ECS::CHierarchy>();
+        mgr->MoveToLast(mgr->GetIndex(current));
+        if (auto parent_transf = _register.GetComponent<ECS::TransformComponent>(parent))
+        {
+            cur_hierarchy->_inv_matrix_attach = Math::MatrixInverse(parent_transf->_transform._world_matrix);
+            if (auto cur_transf = _register.GetComponent<ECS::TransformComponent>(current))
+            {
+                cur_transf->_transform._p_parent = &parent_transf->_transform;
+            }
+        }
     }
     void Scene::Detach(ECS::Entity current)
     {
@@ -264,6 +277,10 @@ namespace Ailu::SceneManagement
         cur_hierarchy->_prev_sibling = ECS::kInvalidEntity;
         cur_hierarchy->_next_sibling = ECS::kInvalidEntity;
         parent_hierarchy->_children_num--;
+        if (auto cur_transf = _register.GetComponent<ECS::TransformComponent>(current))
+        {
+            cur_transf->_transform._p_parent = nullptr;
+        }
     }
     const Vector<ECS::Entity> &Scene::EntityView() const
     {
@@ -400,7 +417,8 @@ namespace Ailu::SceneManagement
             auto& r = _p_current->_register;
             for (auto &comp: r.View<ECS::TransformComponent>())
             {
-                Transform::ToMatrix(comp._transform, comp._transform._world_matrix);
+                comp._transform._world_matrix = Transform::GetWorldMatrix(comp._transform);
+                //Transform::ToMatrix(comp._transform, comp._transform._world_matrix);
             }
             u32 index = 0;
             for (auto& comp : r.View<ECS::StaticMeshComponent>())
@@ -436,7 +454,7 @@ namespace Ailu::SceneManagement
                 auto t = r.GetComponent<ECS::CCamera, ECS::TransformComponent>(index);
                 comp._camera.Position(t->_transform._position);
                 comp._camera.Rotation(t->_transform._rotation);
-                comp._camera.RecalculateMatrix();
+                comp._camera.RecalculateMatrix(true);
             }
             for (auto &it: _p_current->GetRegister().SystemView())
             {

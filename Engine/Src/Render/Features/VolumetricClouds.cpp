@@ -208,7 +208,7 @@ namespace Ailu::Render
     {
     }
 
-    void VolumetricClouds::AddRenderPasses(Renderer &renderer, RenderingData &rendering_data)
+    void Ailu::Render::VolumetricClouds::AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data)
     {
         if (renderer._is_render_light_probe)
             return;

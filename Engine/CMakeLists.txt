@@ -24,6 +24,10 @@ set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
 
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Src)
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Inc)
+# 文件夹结构映射
+# source_group(TREE "${ENGINE_ROOT_PATH}/Src" PREFIX "Src" FILES ${PROJECT_SOURCES})
+# source_group(TREE "${ENGINE_ROOT_PATH}/Inc" PREFIX "Inc" FILES ${PROJECT_SOURCES})
+
 aux_source_directory (${ENGINE_ROOT_PATH}/Ext/imgui IMGUI_ROOT)
 aux_source_directory (${ENGINE_ROOT_PATH}/Ext/implot IMPLOT_ROOT)
 set(CORE_MODULE
@@ -64,6 +68,7 @@ set(UI_MODULE
 set(IMGUI_BACKENDS ${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_dx12.cpp;${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_win32.cpp)
 set(IMGUIZMO_SRC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo/ImGuizmo.cpp)
 set(DDS_LOADER ${ENGINE_ROOT_PATH}/Ext/dds_loader/DDSTextureLoader12.cpp)
+set(HDR_LOADER ${ENGINE_ROOT_PATH}/Ext/miniz.cpp)
 set(ANIM_MODULE
         Src/Animation/Curve.cpp
         Inc/Animation/Track.hpp
@@ -89,6 +94,7 @@ add_custom_target(pre_build_cmd ALL
         COMMAND cmd /c "${PROJECT_SOURCE_DIR}/pre_build_script.bat")
 
 add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
+${HDR_LOADER}
 "Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp"
 "Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp" "Inc/Physics/PhysicsSystem.h" "Src/Physics/PhysicsSystem.cpp" "Src/Render/Gizmo.cpp" "Inc/Physics/Collision.h" "Src/Physics/Collision.cpp" "Inc/Animation/AnimationSystem.h" "Src/Animation/AnimationSystem.cpp"
         Inc/Framework/Common/JobSystem.h
@@ -129,7 +135,9 @@ endif()
 # endif()
 target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库
-target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;d2d1.lib;dwrite.lib;d3d11.lib;
+target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;
+d2d1.lib;dwrite.lib;d3d11.lib;
+imm32.lib;
         ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib) # ;msvcrtd.lib
 
 

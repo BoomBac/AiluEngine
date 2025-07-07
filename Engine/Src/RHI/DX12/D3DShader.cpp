@@ -20,6 +20,8 @@
 
 namespace Ailu::RHI::DX12
 {
+    //-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
+    #pragma region D3DShaderInclude
     class D3DShaderInclude : public ID3DInclude
     {
         HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) override;
@@ -39,7 +41,43 @@ namespace Ailu::RHI::DX12
         u8 *_data;
         inline static std::mutex s_compile_lock;
     };
+    HRESULT D3DShaderInclude::Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes)
+    {
+        for (auto &include_path: _addi_include_pathes)
+        {
+            std::lock_guard<std::mutex> l(s_compile_lock);
+            WString p;
+            if ((const char *) pFileName[0] == ".")
+            {
+                p = PathUtils::ResolveRelPath(pFileName, _cur_source_file_path);
+            }
+            else
+            {
+                p = ResourceMgr::GetResSysPath(include_path) + ToWChar(pFileName);
+            }
+            if (FileManager::Exist(p))
+            {
+                auto [file_data, byte_size] = FileManager::ReadFile(p);
+                _data = file_data;
+                *ppData = _data;
+                *pBytes = (u32)byte_size;
+                _include_files.insert(p);
+                return S_OK;
+            }
+            //AL_ASSERT(true);
+        }
+        AL_ASSERT(true);
+        return E_FAIL;
+    }
 
+    HRESULT D3DShaderInclude::Close(LPCVOID pData)
+    {
+        delete[] pData;
+        return S_OK;
+    }
+    #pragma endregion
+    //-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
+#pragma region CompileUtils
     //shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
     static bool CreateFromFileDXC(const std::wstring &filename, const std::wstring &entryPoint, const std::wstring &pTarget, ComPtr<ID3DBlob> &p_blob,
                                   ComPtr<ID3D12ShaderReflection> &shader_reflection)
@@ -163,7 +201,7 @@ namespace Ailu::RHI::DX12
 #if defined(_DEBUG)
             if (pTarget == RenderConstants::kCSModel_5_0)
             {
-                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
+                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;// | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
             }
             else
             {
@@ -317,7 +355,7 @@ namespace Ailu::RHI::DX12
         return ret;
     }
 
-    static void ParserBindResourceAddiInfo(HashMap<String,ShaderBindResourceInfo>& bind_res_infos,String line)
+    static void ParserBindResourceAddiInfo(HashMap<String,ShaderBindResourceInfo>& bind_res_infos,String line,bool is_in_cbuf_scope)
     {
         line = line.find(";") != line.npos ? line.substr(0, line.find_first_of(";")+1) : line;
         if (su::BeginWith(line, "Texture2D"))
@@ -503,6 +541,24 @@ namespace Ailu::RHI::DX12
                 }
             }
         }
+        else if (line.find("[") != line.npos && is_in_cbuf_scope) //cbuf内结构体解析支持
+        {
+            std::regex pattern(R"(^(\w+)\s+(\w+)\s*(\[\d*\])?\s*;)");
+            std::smatch matches;
+            if (std::regex_match(line, matches, pattern))
+            {
+                const auto &type_name = matches[1].str();
+                const auto &value_name = matches[2].str();
+                u8 array_size = matches[3].str().empty()? 0u : (u8)std::stoi(matches[3].str().substr(1,matches[3].str().size()-2));
+                auto it = bind_res_infos.find(value_name);
+                if (it != bind_res_infos.end())
+                {
+                    auto &c = it->second;
+                    c._res_type = (EBindResDescType) (EBindResDescType::kCBufferAttribute | EBindResDescType::kCBufferFloats);
+                    c._array_size = array_size;
+                }
+            }
+        }
         else {};
     }
 
@@ -540,42 +596,8 @@ namespace Ailu::RHI::DX12
         v.emplace_back(D3D_SHADER_MACRO{NULL, NULL});
         return v;
     }
-    //-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
-    HRESULT D3DShaderInclude::Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes)
-    {
-        for (auto &include_path: _addi_include_pathes)
-        {
-            std::lock_guard<std::mutex> l(s_compile_lock);
-            WString p;
-            if ((const char *) pFileName[0] == ".")
-            {
-                p = PathUtils::ResolveRelPath(pFileName, _cur_source_file_path);
-            }
-            else
-            {
-                p = ResourceMgr::GetResSysPath(include_path) + ToWChar(pFileName);
-            }
-            if (FileManager::Exist(p))
-            {
-                auto [file_data, byte_size] = FileManager::ReadFile(p);
-                _data = file_data;
-                *ppData = _data;
-                *pBytes = (u32)byte_size;
-                _include_files.insert(p);
-                return S_OK;
-            }
-            //AL_ASSERT(true);
-        }
-        AL_ASSERT(true);
-        return E_FAIL;
-    }
 
-    HRESULT D3DShaderInclude::Close(LPCVOID pData)
-    {
-        delete[] pData;
-        return S_OK;
-    }
-    //-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
+#pragma endregion
 
 #pragma region D3DShader
     D3DShader::D3DShader(const WString &sys_path) : Shader(sys_path)
@@ -761,6 +783,7 @@ namespace Ailu::RHI::DX12
         vector<string> lines;
         List<WString> cur_file_head_files{};
         WString parent_path = su::SubStrRange(_src_file_path, 0, _src_file_path.find_last_of(L"/"));
+        bool is_in_cbuf_scope = false; //为了支持cbuffer中对于结构体数组的解析
         while (getline(src, line))
         {
             line = su::Trim(line);
@@ -769,7 +792,11 @@ namespace Ailu::RHI::DX12
                 lines.emplace_back(line);
                 continue;
             }
-            ParserBindResourceAddiInfo(_passes[pass_index]._variants[variant_hash]._bind_res_infos,line);
+            if (su::BeginWith(line,"CBUFFER_START"))
+                is_in_cbuf_scope = true;
+            if (su::BeginWith(line,"CBUFFER_END") && is_in_cbuf_scope)
+                is_in_cbuf_scope = false;
+            ParserBindResourceAddiInfo(_passes[pass_index]._variants[variant_hash]._bind_res_infos,line,is_in_cbuf_scope);
             lines.emplace_back(line);
         }
         src.close();
@@ -961,6 +988,7 @@ namespace Ailu::RHI::DX12
                 GpuResource* bind_res = cur_state._bind_res[bind_info._bind_slot];
                 if (bind_res == nullptr)
                     continue;
+                static_cast<D3DCommandBuffer *>(cmd)->MarkUsedResource(bind_res);
                 if (bind_info._res_type == EBindResDescType::kTexture2D)
                 {
                     auto tex = static_cast<Texture2D *>(bind_res);
@@ -1031,7 +1059,7 @@ namespace Ailu::RHI::DX12
                 }
             }
         }
-        cur_state.Release();
+        
         _bind_state.pop();
         //d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
     }
@@ -1081,6 +1109,7 @@ namespace Ailu::RHI::DX12
         List<WString> cur_file_head_files{};
         WString parent_path = su::SubStrRange(_src_file_path, 0, _src_file_path.find_last_of(L"/"));
         auto& cur_kernel = _kernels[kernel_index]._variants[variant_hash];
+        bool is_in_cbuf_scope = false;
         while (getline(src, line))
         {
             line = su::Trim(line);
@@ -1089,7 +1118,11 @@ namespace Ailu::RHI::DX12
                 lines.emplace_back(line);
                 continue;
             }
-            ParserBindResourceAddiInfo(_kernels[kernel_index]._variants[variant_hash]._temp_bind_res_infos,line);
+            if (su::BeginWith(line,"CBUFFER_START"))
+                is_in_cbuf_scope = true;
+            if (su::BeginWith(line,"CBUFFER_END") && is_in_cbuf_scope)
+                is_in_cbuf_scope = false;
+            ParserBindResourceAddiInfo(_kernels[kernel_index]._variants[variant_hash]._temp_bind_res_infos,line,is_in_cbuf_scope);
             lines.emplace_back(line);
         }
         src.close();

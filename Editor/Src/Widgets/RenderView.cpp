@@ -130,6 +130,19 @@ namespace Ailu
                     _is_focus = true;
                     ImGui::SetKeyboardFocusHere();
                 }
+                //浮动元素
+                {
+                    ImVec2 buttonSize = ImVec2(80, 20);
+                    ImVec2 buttonOffset = ImVec2(10, 10); // 相对于 image 左上角偏移
+                    ImGui::SetCursorScreenPos(ImVec2(_pos.x + buttonOffset.x, _pos.y + buttonOffset.y + GetLineHeight()));
+                    if (ImGui::Button("Grid", buttonSize))
+                    {
+                        static bool s_is_on = true;
+                        static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
+                        mat_gird_plane->SetFloat("_grid_alpha",s_is_on? 1.0f : 0.0f);
+                        s_is_on = !s_is_on;
+                    }
+                }
                 style.Colors[ImGuiCol_WindowBg] = origin_color;
                 static bool s_is_begin_resize = false;
                 static u32 s_resize_end_frame_count = 0;
@@ -253,16 +266,10 @@ namespace Ailu
             bool is_pivot_point_center = true;
             bool is_single_mode = selected_entities.size() == 1;
             Vector3f pivot_point;
-
             if (is_pivot_point_center)
             {
                 auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
-                for (auto e: selected_entities)
-                {
-                    pivot_point += r.GetComponent<ECS::TransformComponent>(e)->_transform._position;
-                }
-                pivot_point /= (f32) selected_entities.size();
-                Matrix4x4f world_mat = MatrixTranslation(pivot_point);
+                Matrix4x4f world_mat;
                 if (is_single_mode)
                     world_mat = r.GetComponent<ECS::TransformComponent>(selected_entities.front())->_transform._world_matrix;
                 else
@@ -280,6 +287,15 @@ namespace Ailu
                         {
                             _old_trans.push_back(r.GetComponent<ECS::TransformComponent>(e)->_transform);
                         }
+                        if (!is_single_mode)
+                        {
+                            for (auto e: selected_entities)
+                            {
+                                pivot_point += r.GetComponent<ECS::TransformComponent>(e)->_transform._position;
+                            }
+                            pivot_point /= (f32) selected_entities.size();
+                            world_mat = MatrixTranslation(pivot_point);
+                        }
                     }
                     Vector3f new_pos;
                     Vector3f new_scale;
@@ -295,19 +311,19 @@ namespace Ailu
                     }
                     else
                     {
-
                         u16 index = 0;
                         for (auto e: selected_entities)
                         {
                             auto &t = r.GetComponent<ECS::TransformComponent>(e)->_transform;
                             Vector3f rela_pos = t._position - pivot_point;
-                            rela_pos = new_rot * rela_pos;
-                            Vector3f scaled_pos = rela_pos * (new_scale / s_pre_tick_new_scale);
-                            Vector3f pivot_offset = new_pos - pivot_point;
-                            t._position = pivot_point + scaled_pos + pivot_offset;
+                            t._position = rela_pos + new_pos;
+                            //rela_pos = new_rot * rela_pos;
+                            //Vector3f scaled_pos = rela_pos * (new_scale / s_pre_tick_new_scale);
+                            //Vector3f pivot_offset = new_pos - pivot_point;
+                            //t._position = pivot_point + scaled_pos + pivot_offset;
                             //TODO
-                            t._scale = new_scale * _old_trans[index]._scale;
-                            t._rotation = new_rot * _old_trans[index++]._rotation;
+                            //t._scale = new_scale * _old_trans[index]._scale;
+                            //t._rotation = new_rot * _old_trans[index++]._rotation;
                         }
                     }
                     s_pre_tick_new_scale = new_scale;

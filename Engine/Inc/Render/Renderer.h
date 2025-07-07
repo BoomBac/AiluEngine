@@ -5,7 +5,7 @@
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
 
-#include "./Features/RenderFeature.h"
+#include "./Features/CommonPasses.h"
 #include "GlobalMarco.h"
 #include "RendererAPI.h"
 #include "Texture.h"
@@ -58,6 +58,7 @@ namespace Ailu
             void SetupFrameResource(FrameResource* prev_fr,FrameResource *cur_fr) { _prev_fs = prev_fr;_cur_fs = cur_fr; }
         public:
             bool _is_render_light_probe = false;
+            bool _is_hiz_active = true;
         private:
             void PrepareScene(const Scene &s);
             void PrepareLight(const Scene &s);
@@ -94,6 +95,7 @@ namespace Ailu
             Scope<GizmoPass> _gizmo_pass;
             Scope<GUIPass> _gui_pass;
             Scope<WireFramePass> _wireframe_pass;
+            Scope<HZBPass> _hzb_pass;
             Vector<RenderPass *> _render_passes;
             RenderFeature *_vxgi;
             RenderFeature *_cloud;

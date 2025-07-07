@@ -45,6 +45,7 @@ namespace Ailu
             static u32 GetGlobalWidgetHandle() { return s_global_widegt_handle++; }
 
             static void OnObjectDropdown(const String &tag, std::function<void(Object *)> f);
+            static f32 GetLineHeight();
 
             ImGuiWidget(const String &title);
             ~ImGuiWidget();

@@ -101,6 +101,23 @@ namespace Ailu
             return temp;
         }
 
+        static u32 NextPowOfTwo(u32 value)
+        {
+#if __cplusplus >= 202002L
+            return std::bit_ceil(value);
+#else
+            if (value <= 0) return 1u;
+            --value;
+            value |= value >> 1u;
+            value |= value >> 2u;
+            value |= value >> 4u;
+            value |= value >> 8u;
+            value |= value >> 16u;
+            return value + 1u;
+#endif
+        }
+
+
         struct Rect
         {
             uint16_t left;
@@ -2049,6 +2066,11 @@ namespace Ailu
                 memcpy(this, &other, sizeof(Quaternion));
                 return *this;
             }
+            Quaternion &operator=(const Vector4f &other)
+            {
+                memcpy(this, &other, sizeof(Quaternion));
+                return *this;
+            }
             f32 &operator[](u16 index)
             {
                 return _quat[index];
@@ -2276,7 +2298,7 @@ namespace Ailu
             //flip axis,replace inverse if quat's len sq is 1
             static Quaternion Conjugate(const Quaternion &q)
             {
-                return Quaternion(-q.x, -q.y, -q.z, -q.w);
+                return Quaternion(-q.x, -q.y, -q.z, q.w);
             }
 
             static Quaternion Inverse(const Quaternion &q)

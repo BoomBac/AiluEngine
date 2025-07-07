@@ -102,6 +102,7 @@ namespace Ailu
                     L"Shaders/voxelize.alasset",
                     L"Shaders/ssao_cs.alasset",
                     L"Shaders/taa.alasset",
+                    L"Shaders/hzb.alasset",
         };
         for (auto &p: shader_asset_pathes)
             JobSystem::Get().Dispatch([&](WString p)
@@ -168,6 +169,14 @@ namespace Ailu
             JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                    { mgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset",&TextureImportSetting::Default()); },
                                    this);
+            JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
+                                      { 
+                                          auto terrain_map = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"terrain_height.png", setting); 
+                                          RegisterResource(L"Textures/TerrainHeight", terrain_map);
+                                          setting._generate_mipmap = true;
+                                          terrain_map = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"terrain_color.png", setting); 
+                                          RegisterResource(L"Textures/TerrainDiffuse", terrain_map);
+                                      },this);
         }
         WString mesh_path_cube = L"Meshs/cube.alasset";
         WString mesh_path_sphere = L"Meshs/sphere.alasset";
@@ -274,7 +283,8 @@ namespace Ailu
         _is_watching_directory = false;
         for (auto &[guid, asset]: _asset_db)
         {
-            SaveAsset(asset.get());
+            if (asset->_asset_type == EAssetType::kScene || asset->_asset_type == EAssetType::kMaterial)
+                SaveAsset(asset.get());
         }
         SaveAssetDB();
         //for (auto it = AnimationClipLibrary::Begin(); it != AnimationClipLibrary::End(); it++)

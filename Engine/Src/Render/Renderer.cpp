@@ -36,6 +36,7 @@ namespace Ailu::Render
         _gizmo_pass = MakeScope<GizmoPass>();
         _wireframe_pass = MakeScope<WireFramePass>();
         _gui_pass = MakeScope<GUIPass>();
+        _hzb_pass = MakeScope<HZBPass>();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TemporalAA())));
         _taa = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VoxelGI())));
@@ -51,14 +52,17 @@ namespace Ailu::Render
         _features.push_back(_taa);
         _features.push_back(_ssao);
         _features.push_back(_gpu_terrain);
-        RegisterEventBeforeTick([]()
-                                { GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
+        _features.push_back(_taa);
+
+        //RegisterEventBeforeTick([]()
+        //                        { GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
         // RegisterEventAfterTick([]()
         //                        { Profiler::Get().EndFrame(); });
     }
 
     Renderer::~Renderer()
     {
+        _owned_features.clear();
         Profiler::Shutdown();
     }
 
@@ -184,7 +188,8 @@ namespace Ailu::Render
             _rendering_data._gbuffers[2] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer2", ERenderTargetFormat::kDefault);
             _rendering_data._gbuffers[3] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer3", ERenderTargetFormat::kRGBAHalf);
         }
-        Cull(*g_pSceneMgr->ActiveScene(), cam);
+        
+        Cull(*g_pSceneMgr->ActiveScene(),cam);
         PrepareCamera(cam);
         PrepareScene(*g_pSceneMgr->ActiveScene());
         PrepareLight(*g_pSceneMgr->ActiveScene());
@@ -226,6 +231,8 @@ namespace Ailu::Render
             else
                 _skybox_pass->Setup(true);
         }
+        if (_is_hiz_active)
+            _render_passes.emplace_back(_hzb_pass.get());
         _render_passes.emplace_back(_gui_pass.get());
         for (auto &feature: _features)
         {
@@ -672,16 +679,17 @@ namespace Ailu::Render
         u16 scene_render_obj_index = 0u;
         u64 entity_index = 0u;
         auto &cur_cam_cull_results = _cull_results[cam.HashCode()];
-        auto &vf = cam.GetViewFrustum();
+        const Camera& cull_cam = Camera::sSelected? *Camera::sSelected : cam;
+        auto &vf = cull_cam.GetViewFrustum();
         for (auto &comp: s.GetAllStaticRenderable())
         {
-            CullObject(comp, vf, cur_cam_cull_results, scene_render_obj_index, entity_index, cam, s);
+            CullObject(comp, vf, cur_cam_cull_results, scene_render_obj_index, entity_index, cull_cam, s);
             ++entity_index;
         }
         entity_index = 0u;
         for (auto &comp: s.GetAllSkinedRenderable())
         {
-            CullObject(comp, vf, cur_cam_cull_results, scene_render_obj_index, entity_index, cam, s);
+            CullObject(comp, vf, cur_cam_cull_results, scene_render_obj_index, entity_index, cull_cam, s);
             ++entity_index;
         }
         for (auto &it: cur_cam_cull_results)

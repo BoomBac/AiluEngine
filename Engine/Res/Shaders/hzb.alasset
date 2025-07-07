@@ -1,0 +1,5 @@
+guid: 92f5350a-f983-4448-93a3-ae0fd06ce1f3
+type: kComputeShader
+name: HZB
+  file: Shaders/hlsl/Compute/hzb.hlsl
+  kernel: Noname

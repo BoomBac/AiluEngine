@@ -16,12 +16,12 @@ namespace Ailu::Render
     u16 Texture::MaxMipmapCount(u16 w, u16 h)
     {
         u16 lw = 1, lh = 1;
-        while (w != 1)
+        while (w > 1)
         {
             w >>= 1;
             ++lw;
         }
-        while (h != 1)
+        while (h > 1)
         {
             h >>= 1;
             ++lh;
@@ -182,7 +182,7 @@ namespace Ailu::Render
         _width = std::max<u16>(1u, initializer._width);
         _height = std::max<u16>(1u, initializer._height);
         bool is_linear = initializer._is_linear && !initializer._is_random_access;
-        _pixel_format = ConvertTextureFormatToPixelFormat(initializer._format, is_linear);
+        _pixel_format = ConvertTextureFormatToPixelFormat(initializer._format);
         _dimension = ETextureDimension::kTex2D;
         _format = initializer._format;
         _mipmap_count = initializer._is_mipmap_chain ? MaxMipmapCount(_width, _height) : 1;
@@ -398,7 +398,7 @@ namespace Ailu::Render
         _height = std::max<u16>(1u, initializer._height);
         _depth = std::max<u16>(1u, initializer._depth);
         bool is_linear = initializer._is_linear && !initializer._is_random_access;
-        _pixel_format = ConvertTextureFormatToPixelFormat(initializer._format, is_linear);
+        _pixel_format = ConvertTextureFormatToPixelFormat(initializer._format);
         _dimension = ETextureDimension::kTex3D;
         _format = initializer._format;
         _mipmap_count = initializer._is_mipmap_chain ? MaxMipmapCount(_width, _height, _depth) : 1;

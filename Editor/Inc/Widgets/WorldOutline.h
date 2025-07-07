@@ -18,6 +18,8 @@ namespace Ailu
 		private:
 			void ShowImpl() final;
             void DrawTreeNode(ECS::Entity entity);
+			void OnDragEntity(ECS::Entity entity);
+			void OnDropEntity(ECS::Entity entity);
 		private:
             std::set<ECS::Entity> _drawed_entity;
             void OnOutlineDoubleClicked(ECS::Entity entity);

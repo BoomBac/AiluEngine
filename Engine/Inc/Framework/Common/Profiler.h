@@ -94,6 +94,11 @@ namespace Ailu
         void BeginFrame();
         void EndFrame();
         void AddCPUProfilerHierarchy(bool begin_profiler, u32 index);
+        /// <summary>
+        /// 仅能从渲染线程调用
+        /// </summary>
+        /// <param name="begin_profiler"></param>
+        /// <param name="index"></param>
         void AddGPUProfilerHierarchy(bool begin_profiler, u32 index);
         struct BlockMark
         {
@@ -105,11 +110,11 @@ namespace Ailu
         };
         void StartRecord() { _is_start_record = true; };
         void StopRecord() { _is_start_record = false; };
-
-        Queue<BlockMark> _gpu_profiler_queue;
-
-    public:
-    private:
+        const HashMap<String, f32> &GetPassGPUTime() { return _gpu_time;}
+        /// <summary>
+        /// 渲染线程调用，避免对gpu marker加锁
+        /// </summary>
+        void CollectGPUTimeData();
     private:
         Array<ProfileData, kMaxProfileNum> _gpu_profiles;
         Array<ProfileData, kMaxProfileNum> _cpu_profiles;
@@ -123,6 +128,9 @@ namespace Ailu
         bool _is_record_mode = false;
         bool _is_start_record = false;
         HashMap<std::thread::id, List<BlockMark>> _cpu_profiler_queue;
+
+        Queue<BlockMark> _gpu_profiler_queue;
+        HashMap<String, f32> _gpu_time;//用于主线程面板显示
         u64 _cur_frame;
     };
 

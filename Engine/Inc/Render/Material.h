@@ -105,7 +105,7 @@ namespace Ailu::Render
         Map<String, ShaderPropertyInfo> _properties;
         Vector<ShaderPropertyInfo *> _prop_views;
         Vector<Scope<ConstantBuffer>> _p_cbufs;
-        Vector<Map<String, std::tuple<u8, Texture *>>> _textures_all_passes{};
+        Map<String,Texture *> _bind_textures{};
         //非shader使用的变量
         Map<String, u32> _common_uint_property;
         Map<String, f32> _common_float_property;

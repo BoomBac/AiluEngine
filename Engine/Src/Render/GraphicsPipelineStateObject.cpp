@@ -320,6 +320,7 @@ namespace Ailu::Render
         if (compiled_shader_num > 0u)
         {
             LOG_INFO("Compiled {} shaders!", compiled_shader_num);
+            UpdateAllPSOObject();
         }
         g_pPSOMgr->_render_target_state.Hash(RenderTargetState::_s_hash_obj.GenHash(g_pPSOMgr->_render_target_state));
         ConfigureRenderTarget(g_pPSOMgr->_render_target_state.Hash());

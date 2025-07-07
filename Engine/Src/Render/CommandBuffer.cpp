@@ -374,7 +374,7 @@ namespace Ailu::Render
     void CommandBuffer::SetGlobalBuffer(const String &name, void *data, u64 data_size)
     {
         auto cmd = CommandPool::Get().Alloc<CommandAllocConstBuffer>();
-        cmd->_data = new u8[data_size];
+        cmd->_data = AL_ALLOC(u8,data_size);
         cmd->_size = (u32) data_size;
         memcpy(cmd->_data, data, data_size);
         memcpy(cmd->_name, name.c_str(), name.length() + 1);
@@ -401,15 +401,7 @@ namespace Ailu::Render
         };
         _commands.emplace_back(cmd);
     }
-    void CommandBuffer::SetComputeBuffer(const String &name, u16 kernel, void *data, u64 data_size)
-    {
-        auto cmd = CommandPool::Get().Alloc<CommandAllocConstBuffer>();
-        cmd->_data = (u8 *) data;
-        cmd->_size = (u32) data_size;
-        memcpy(cmd->_name, name.c_str(), name.length() + 1);
-        cmd->_kernel = kernel;
-        _commands.emplace_back(cmd);
-    }
+
     void CommandBuffer::SetGlobalTexture(const String &name, Texture *tex)
     {
         auto cmd = CommandPool::Get().Alloc<CommandCustom>();
@@ -522,14 +514,7 @@ namespace Ailu::Render
 
     void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y)
     {
-        auto cmd = CommandPool::Get().Alloc<CommandDispatch>();
-        cmd->_cs = cs;
-        cmd->_group_num_x = thread_group_x;
-        cmd->_group_num_y = thread_group_y;
-        cmd->_group_num_z = 1u;
-        cmd->_kernel = kernel;
-        cmd->_cs->PushState(cmd->_kernel);
-        _commands.emplace_back(cmd);
+        Dispatch(cs, kernel, thread_group_x, thread_group_y, 1u);
     }
     void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z)
     {
@@ -590,8 +575,19 @@ namespace Ailu::Render
         _commands.emplace_back(cmd);
     }
 
+    void CommandBuffer::ReadbackBuffer(GPUBuffer *buffer, bool is_counter, u32 size, ReadbackCallback callback)
+    {
+        auto cmd = CommandPool::Get().Alloc<CommandReadBack>();
+        cmd->_is_buffer = true;
+        cmd->_is_counter_value = is_counter;
+        cmd->_res = buffer;
+        cmd->_size = size;
+        cmd->_callback = callback;
+        _commands.emplace_back(cmd);
+    }
 
-#pragma endregion
+    #pragma endregion 
+
     void RHICommandBufferPool::Init()
     {
         s_pRHICommandBufferPool = new RHICommandBufferPool();

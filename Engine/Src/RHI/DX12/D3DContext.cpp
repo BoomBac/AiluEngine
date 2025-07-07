@@ -20,11 +20,10 @@
 #include <limits>
 
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
-#include <RHI/DX12/D3DBuffer.h>
+#include "RHI/DX12/D3DBuffer.h"
 #include <RHI/DX12/D3DShader.h>
 #include <RHI/DX12/D3DTexture.h>
 #include <d3d11.h>
-
 
 #ifdef _PIX_DEBUG
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
@@ -255,8 +254,11 @@ namespace Ailu::RHI::DX12
         }
         *ppAdapter = pAdapter4;
     }
-
+#ifdef _PIX_DEBUG
     static RENDERDOC_API_1_1_2 *g_rdc_api = nullptr;
+
+#endif// _PIX_DEBUG
+
     static void RdcLoadLatestRdcGpuCapturerLibrary()
     {
         HKEY hKey = HKEY_LOCAL_MACHINE;                                                                        // 根键
@@ -273,7 +275,7 @@ namespace Ailu::RHI::DX12
                 nullptr,
                 value,
                 &bufferSize);
-
+#ifdef _PIX_DEBUG
         if (result == ERROR_SUCCESS)
         {
             if (HMODULE mod = LoadLibrary(value))
@@ -289,7 +291,17 @@ namespace Ailu::RHI::DX12
         }
         else
             LOG_ERROR(L"Failed to get renderdoc dll path. Error: {}", result)
+#endif
     };
+
+    static void EnableShaderBasedValidation()
+    {
+        ComPtr<ID3D12Debug> spDebugController0;
+        ComPtr<ID3D12Debug1> spDebugController1;
+        ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&spDebugController0)));
+        ThrowIfFailed(spDebugController0->QueryInterface(IID_PPV_ARGS(&spDebugController1)));
+        spDebugController1->SetEnableGPUBasedValidation(true);
+    }
     namespace D3DConvertUtils
     {
         D3D12_VIEWPORT ToD3DViewport(const Rect &viewport)
@@ -626,6 +638,8 @@ namespace Ailu::RHI::DX12
                 dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
             }
         }
+        //https://learn.microsoft.com/zh-cn/windows/win32/direct3d12/using-d3d12-debug-layer-gpu-based-validation
+        //EnableShaderBasedValidation();
 #endif
 
         ComPtr<IDXGIFactory6> factory;
@@ -956,6 +970,7 @@ namespace Ailu::RHI::DX12
         _readback_pool->Tick(_frame_count);
         ++_frame_count;
         _p_gpu_timer->EndFrame();
+        Profiler::Get().CollectGPUTimeData();
         //CommandBufferPool::ReleaseAll();
         if (_is_next_frame_capture)
         {
@@ -1166,6 +1181,38 @@ namespace Ailu::RHI::DX12
         memcpy(data, tmp_data, size);
         RHICommandBufferPool::Release(cmd);
     }
+
+    void D3DContext::ReadBackAsync(ID3D12Resource* src, D3DResourceStateGuard& state_guard, u32 size, std::function<void(const u8*)> callback)
+    {
+        auto copy_dst = _readback_pool->Acquire(size, _frame_count); // 已对齐分配
+        auto cmd = RHICommandBufferPool::Get("Readback");
+        auto dxcmd = static_cast<D3DCommandBuffer *>(cmd.get())->NativeCmdList();
+
+        auto old_state = state_guard.CurState();
+        state_guard.MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        dxcmd->CopyBufferRegion(copy_dst.Get(), 0, src, 0, size); // 替换 CopyResource
+        state_guard.MakesureResourceState(dxcmd, old_state);
+
+        ExecuteRHICommandBuffer(cmd.get());
+        u64 fence_value = static_cast<D3DCommandBuffer *>(cmd.get())->_fence_value;
+
+        auto copy_dst_capture = copy_dst; // 确保 lambda 生命周期
+        JobSystem::Get().Dispatch([this, copy_dst_capture, size, fence_value, callback]() {
+            while (_p_cmd_buffer_fence->GetCompletedValue() < fence_value)
+                std::this_thread::yield();
+            D3D12_RANGE range{0, size};
+            u8* raw_data = nullptr;
+            copy_dst_capture->Map(0, &range, reinterpret_cast<void **>(const_cast<u8**>(&raw_data)));
+            //u8* copy_data = AL_NEW(u8,size);
+            //memcpy(copy_data, raw_data, size);
+            callback(raw_data);
+            copy_dst_capture->Unmap(0, nullptr);
+            //AL_FREE(copy_data);
+        });
+
+        RHICommandBufferPool::Release(cmd); // 无需早于 callback 完成
+    }
+
     void D3DContext::ReadBackAsync(GpuResource *res, std::function<void(u8 *)> callback)
     {
         if (res->GetResourceType() == EGpuResType::kBuffer)
@@ -1349,6 +1396,7 @@ namespace Ailu::RHI::DX12
                 Render::RenderingStates::s_temp_triangle_num += triangle_count;
                 Render::RenderingStates::s_temp_vertex_num += vertex_count;
                 pso->Bind(cmd_buffer, params);
+                d3dcmd->MarkUsedResource(pso);
                 if (draw_cmd->_arg_buffer)
                 {
                     D3DGPUBuffer *d3d_buf = static_cast<D3DGPUBuffer *>(draw_cmd->_arg_buffer);
@@ -1423,6 +1471,37 @@ namespace Ailu::RHI::DX12
                 Profiler::Get().AddCPUProfilerHierarchy(false, (u32) s_begin_profiler_stack.top()->_cpu_index);
                 s_begin_profiler_stack.pop();
             }
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kReadBack)
+        {
+            auto cmd_rb = static_cast<CommandReadBack *>(cmd);
+            if (cmd_rb->_res == nullptr)
+            {
+                LOG_WARNING("D3DContext::ProcessGpuCommand: Readback resource is nullptr!");
+                return;
+            }
+            u64 size = cmd_rb->_is_counter_value? 4u : std::min<u64>(cmd_rb->_res->GetSize(),(u64)cmd_rb->_size);
+            auto copy_dst = _readback_pool->Acquire(size,_frame_count);
+            D3DGPUBuffer* d3dbuffer = static_cast<D3DGPUBuffer *>(cmd_rb->_res);
+            D3DResourceStateGuard* state_guard = cmd_rb->_is_counter_value? &d3dbuffer->_counter_state_guard : &d3dbuffer->_state_guard;
+            ID3D12Resource * copy_src = cmd_rb->_is_counter_value? d3dbuffer->GetCounterBuffer() : d3dbuffer->GetNativeResource();
+            auto old_state = state_guard->CurState();
+            state_guard->MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            dxcmd->CopyBufferRegion(copy_dst.Get(), 0u,copy_src,0u,size);
+            state_guard->MakesureResourceState(dxcmd, old_state);
+
+            u64 fence_value = _fence_value[m_frameIndex]+1;
+            auto copy_dst_capture = copy_dst; // 确保 lambda 生命周期
+            ReadbackCallback callback = std::move(cmd_rb->_callback);
+            JobSystem::Get().Dispatch([this, copy_dst_capture, size, fence_value,callback ]() {
+                while (_p_cmd_buffer_fence->GetCompletedValue() < fence_value)
+                    std::this_thread::yield();
+                D3D12_RANGE range{0, size};
+                u8* raw_data = nullptr;
+                copy_dst_capture->Map(0, &range, reinterpret_cast<void **>(const_cast<u8**>(&raw_data)));
+                callback(raw_data,(u32)size);
+                copy_dst_capture->Unmap(0, nullptr);
+            });
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kPresent)
             PresentImpl(d3dcmd);

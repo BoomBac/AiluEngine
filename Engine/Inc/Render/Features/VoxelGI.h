@@ -55,7 +55,7 @@ namespace Ailu::Render
     public:
         VoxelGI();
         ~VoxelGI() final;
-        void AddRenderPasses(Renderer &renderer, RenderingData &rendering_data) final;
+        void AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data) final;
 
     public:
         bool _is_draw_debug_voxel = false;

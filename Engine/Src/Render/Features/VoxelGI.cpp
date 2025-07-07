@@ -15,7 +15,7 @@ namespace Ailu::Render
     {
         _standard_lit_forward = Shader::s_p_defered_standart_lit.lock();
         _voxel_pass_index = _standard_lit_forward->FindPass("VoxelLit");
-        _cam_cbuf = ConstantBuffer::Create(sizeof(CBufferPerCameraData), false, "VoxelCbuf");
+        _cam_cbuf = ConstantBuffer::Create(sizeof(CBufferPerCameraData), "VoxelCbuf");
         _voxelize_cs = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/voxelize.alasset");
     }
     VoxelizePass::~VoxelizePass()
@@ -180,7 +180,7 @@ namespace Ailu::Render
     VoxelGI::~VoxelGI()
     {
     }
-    void VoxelGI::AddRenderPasses(Renderer &renderer, RenderingData &rendering_data)
+    void Ailu::Render::VoxelGI::AddRenderPasses(Renderer &renderer, const RenderingData & rendering_data)
     {
         _voxelize_pass.Setup(rendering_data._vxgi_data);
         renderer.EnqueuePass(&_voxelize_pass);

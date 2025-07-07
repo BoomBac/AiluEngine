@@ -370,7 +370,7 @@ namespace Ailu
                                           _content_size.ToString(), _screen_pos.ToString(), Input::GetMousePos().ToString());
                 ImGui::Text(info.c_str());
             }
-            if (!ImGui::IsWindowCollapsed())
+            if (!ImGui::IsWindowCollapsed() && _content_size.x > 0 && _content_size.y > 0)
                 ShowImpl();
             ImGui::End();
         }
@@ -417,6 +417,12 @@ namespace Ailu
                 }
                 ImGui::EndDragDropTarget();
             }
+        }
+
+        f32 Ailu::Editor::ImGuiWidget::GetLineHeight()
+        {
+            ImGuiStyle& style = ImGui::GetStyle();
+            return ImGui::GetFontSize() + style.FramePadding.y * 2.0f;
         }
         u32 ImGuiWidget::DisplayProgressBar(const String &title, f32 progress)
         {

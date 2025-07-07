@@ -81,7 +81,7 @@ namespace Ailu
         public:
             explicit Arena(Allocator *allocator);
             ~Arena();
-            void *Allocate(u64 size);
+            void *Allocate(u64 size,u64 align);
             void Deallocate(void *ptr);
 
         private:
@@ -97,8 +97,9 @@ namespace Ailu
             static Allocator &Get();
 
         public:
+            inline static u64 kDefaultAlign = 8u;
             Arena &ThreadArena();
-            void *Allocate(u64 size, const char *file, const char *function, u16 line);
+            void *Allocate(u64 size, const char *file, const char *function, u16 line, u64 align = kDefaultAlign);
             void Deallocate(void *ptr);
             void PrintLeaks();
             void PrintAllocatedInfo();
@@ -153,14 +154,14 @@ namespace Ailu
     template<typename T, typename... Args>
     static T *DebugNew(const char *file, const char *function, int line, Args &&...args)
     {
-        void *mem = Core::Allocator::Get().Allocate(sizeof(T), file, function, line);
+        void *mem = Core::Allocator::Get().Allocate(sizeof(T), file, function, line,std::alignment_of<T>::value);
         return new (mem) T(std::forward<Args>(args)...);
     }
 
     template<typename T>
-    static T *DebugAlloc(const char *file, const char *function, int line, u64 size)
+    static T *DebugAlloc(const char *file, const char *function, int line, u64 size, u64 align = Core::Allocator::kDefaultAlign)
     {
-        return reinterpret_cast<T *>(Core::Allocator::Get().Allocate(size * sizeof(T), file, function, line));
+        return reinterpret_cast<T *>(Core::Allocator::Get().Allocate(size * sizeof(T), file, function, line, align));
     }
 
     template<typename T>
@@ -183,10 +184,12 @@ namespace Ailu
         }
     }
 
-#define AL_NEW(T, ...) DebugNew<T>(__FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
-#define AL_DELETE(ptr) DebugDelete(ptr)
-#define AL_ALLOC(T, size) DebugAlloc<T>(__FILE__, __FUNCTION__, __LINE__, size)
-#define AL_FREE(ptr) DebugFree(ptr)
+#define AL_NEW(T, ...)               DebugNew<T>(__FILE__, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define AL_DELETE(ptr)               DebugDelete(ptr)
+
+#define AL_ALLOC(T, size)            DebugAlloc<T>(__FILE__, __FUNCTION__, __LINE__, size)
+#define AL_ALIGN_ALLOC(T,size,align) DebugAlloc<T>(__FILE__, __FUNCTION__, __LINE__, size, align)
+#define AL_FREE(ptr)                 DebugFree(ptr)
 
 };// namespace Ailu
 #endif//__ALLOCATOR__

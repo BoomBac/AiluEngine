@@ -35,30 +35,22 @@ namespace Ailu::RHI::DX12
         if (_desc._target & EGPUBufferTarget::kAppend || _desc._target & EGPUBufferTarget::kIndirectArguments)
             _desc._target = (EGPUBufferTarget)(_desc._target | EGPUBufferTarget::kCounter);
         auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-        D3D12_RESOURCE_STATES init_state = _data ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        D3D12_RESOURCE_STATES init_state = D3D12_RESOURCE_STATE_COMMON;//Buffer类型起始状态一律为common
         init_state = _desc._target & EGPUBufferTarget::kIndirectArguments? D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT : init_state;
         ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, init_state,nullptr, IID_PPV_ARGS(_p_d3d_res.GetAddressOf())));
-        _state_guard = D3DResourceStateGuard(_p_d3d_res.Get(),init_state);
+        _state_guard = std::move(D3DResourceStateGuard(_p_d3d_res.Get(),init_state,1u));
         if (_data)
         {
-            d3dcmd->UploadDataToBuffer(_data, _mem_size, _p_d3d_res.Get(), _state_guard);
+            d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res.Get(), _state_guard);
         }
-        // if (_desc._is_readable)
-        // {
-        //     heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
-        //     _state_guard_readback = D3DResourceStateGuard(D3D12_RESOURCE_STATE_COPY_DEST);
-        //     res_desc.Flags &= ~D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-        //     ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, D3D12_RESOURCE_STATE_COPY_DEST,
-        //                                                                     nullptr, IID_PPV_ARGS(_p_d3d_res_readback.GetAddressOf())));
-        // }
         auto p_device = d3d_conetxt->GetDevice();
         bool is_with_counter = _desc._target & EGPUBufferTarget::kCounter;
-        bool is_structured = _desc._target & EGPUBufferTarget::kStructured;
+        bool is_structured = _desc._target & EGPUBufferTarget::kStructured || is_with_counter;
         {
             _srv_alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
             auto [cpu_handle, gpu_handle] = _srv_alloc.At(0);
             D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
-            srv_desc.Format = ConvertToDXGIFormat(_desc._format);
+            srv_desc.Format = is_structured? DXGI_FORMAT_UNKNOWN : ConvertToDXGIFormat(_desc._format);
             srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
             srv_desc.Buffer.FirstElement = 0;
             srv_desc.Buffer.NumElements = _desc._element_num;
@@ -85,24 +77,15 @@ namespace Ailu::RHI::DX12
                         D3D12_RESOURCE_STATE_COMMON,
                         nullptr,
                         IID_PPV_ARGS(_counter_buffer.GetAddressOf()));
-                _counter_state_guard = D3DResourceStateGuard(_counter_buffer.Get(),D3D12_RESOURCE_STATE_COMMON);
+                _counter_state_guard = std::move(D3DResourceStateGuard(_counter_buffer.Get(),D3D12_RESOURCE_STATE_COMMON,1u));
                 d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
                 _counter_buffer->SetName(ToWChar(std::format("{}_counter",_name)).c_str());
                 if (_desc._target & EGPUBufferTarget::kIndirectArguments)
                     _counter_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(),D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
-                // _counter_uav = D3DDescriptorMgr::Get().AllocGPU(1u);
-                // auto [cpu_handle, gpu_handle] = _counter_uav.At(0);
-                // D3D12_UNORDERED_ACCESS_VIEW_DESC counter_uav_desc = {};
-                // counter_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-                // counter_uav_desc.Buffer.FirstElement = 0;
-                // counter_uav_desc.Buffer.NumElements = 1;
-                // counter_uav_desc.Format = DXGI_FORMAT_R32_TYPELESS; // 注意！必须 typeless
-                // counter_uav_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
-                // p_device->CreateUnorderedAccessView(_counter_buffer.Get(), nullptr, &counter_uav_desc, cpu_handle);
             }
             auto [cpu_handle, gpu_handle] = _uav_alloc.At(0);
             D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
-            uav_desc.Format = ConvertToDXGIFormat(_desc._format);
+            uav_desc.Format = is_structured? DXGI_FORMAT_UNKNOWN : ConvertToDXGIFormat(_desc._format);
             uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
             uav_desc.Buffer.FirstElement = 0;
             uav_desc.Buffer.NumElements = _desc._element_num;
@@ -217,13 +200,13 @@ namespace Ailu::RHI::DX12
         if (_counter_buffer)
             _counter_buffer->SetName(ToWChar(std::format("{}_counter",_name)).c_str());
     }
-    u32 D3DGPUBuffer::GetCounter()
+    void D3DGPUBuffer::GetCounter(std::function<void(u32)> callback)
     {
-        AL_ASSERT(true);
         if (!_is_ready_for_rendering)
-            return 0u;
-        dynamic_cast<D3DContext &>(GraphicsContext::Get()).ReadBack(_counter_buffer.Get(), _counter_state_guard, (u8 *) &_counter, 4u);
-        return _counter;
+            return;
+        static_cast<D3DContext &>(GraphicsContext::Get()).ReadBackAsync(_counter_buffer.Get(), _counter_state_guard,4u,[=](const u8* data){
+            callback(*reinterpret_cast<const u32*>(data));
+        });
     }
     void D3DGPUBuffer::SetCounter(u32 counter)
     {
@@ -262,7 +245,8 @@ namespace Ailu::RHI::DX12
             if (it != _buffer_layout_indexer.end())
             {
                 const u8 stream_index = it->second;
-                //cmdlist->IASetVertexBuffers(layout_ele.Stream, 1, &s_vertex_buf_views[_buf_start + stream_index]);
+                if (_buffer_views[stream_index].StrideInBytes != layout_ele.Size)
+                    LOG_WARNING("Stride mismatch between vertex buffer and layout element {} between {} and {}", layout_ele.Name, _buffer_views[stream_index].StrideInBytes, layout_ele.Size);
                 cmdlist->IASetVertexBuffers(layout_ele.Stream, 1, &_buffer_views[stream_index]);
             }
             else
@@ -413,7 +397,7 @@ namespace Ailu::RHI::DX12
         return (byte_size + 255) & ~255;
     }
 
-    D3DConstantBuffer::D3DConstantBuffer(u32 size, bool compute_buffer) : _is_compute_buffer(compute_buffer)
+    D3DConstantBuffer::D3DConstantBuffer(u32 size)
     {
         size = (u32) AlignTo(size, 256);
         _alloc = GpuResourceManager::Get()->Allocate(size);

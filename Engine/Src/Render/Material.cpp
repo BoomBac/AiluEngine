@@ -31,7 +31,7 @@ namespace Ailu::Render
             _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
             memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
         }
-        _textures_all_passes = other._textures_all_passes;
+        _bind_textures = other._bind_textures;
         return *this;
     }
 
@@ -45,8 +45,8 @@ namespace Ailu::Render
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
         _p_cbufs = std::move(other._p_cbufs);
         other._p_cbufs.clear();
-        _textures_all_passes = std::move(other._textures_all_passes);
-        other._textures_all_passes.clear();
+        _bind_textures = std::move(other._bind_textures);
+        other._bind_textures.clear();
         return *this;
     }
 
@@ -63,7 +63,7 @@ namespace Ailu::Render
             _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
             memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
         }
-        _textures_all_passes = other._textures_all_passes;
+        _bind_textures = other._bind_textures;
     }
     Material::Material(Material &&other) noexcept
     {
@@ -73,8 +73,8 @@ namespace Ailu::Render
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
         _p_cbufs = std::move(other._p_cbufs);
         other._p_cbufs.clear();
-        _textures_all_passes = std::move(other._textures_all_passes);
-        other._textures_all_passes.clear();
+        _bind_textures = std::move(other._bind_textures);
+        other._bind_textures.clear();
     }
 
     Material::~Material()
@@ -317,19 +317,9 @@ namespace Ailu::Render
 
     void Material::SetTexture(const String &name, Texture *texture)
     {
-        for (auto &pass_tex: _textures_all_passes)
-        {
-            auto it = pass_tex.find(name);
-            if (it == pass_tex.end())
-            {
-                continue;
-            }
-            std::get<1>(pass_tex[name]) = texture;
-            if (_properties.find(name) != _properties.end())
-            {
-                _properties[name]._value_ptr = reinterpret_cast<void *>(texture);
-            }
-        }
+        _bind_textures[name] = texture;
+        if (_properties.find(name) != _properties.end())
+            _properties[name]._value_ptr = reinterpret_cast<void *>(texture);
         //else
         //	LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
     }
@@ -356,7 +346,7 @@ namespace Ailu::Render
         u16 pass_index = 0;
         for (auto &pass: _p_shader->_passes)
         {
-            auto &res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
+            auto &res_info = pass._variants[_pass_variants[pass_index++]._variant_hash]._bind_res_infos;
             auto it = res_info.find(name);
             if (it != res_info.end())
                 it->second._p_res = buffer;
@@ -410,15 +400,8 @@ namespace Ailu::Render
 
     void Material::RemoveTexture(const String &name)
     {
-        for (auto &pass_tex: _textures_all_passes)
-        {
-            auto it = pass_tex.find(name);
-            if (it == pass_tex.end())
-            {
-                return;
-            }
-            std::get<1>(pass_tex[name]) = nullptr;
-        }
+        if (_bind_textures.contains(name))
+            _bind_textures[name] = nullptr;
     }
 
     List<std::tuple<String, float>> Material::GetAllFloatValue()
@@ -565,13 +548,11 @@ namespace Ailu::Render
         }
         else
         {
-            _textures_all_passes.resize(pass_count);
             _mat_cbuf_per_pass_size.resize(pass_count);
             _p_cbufs.resize(pass_count);
         }
         _prop_views.clear();
         _properties.clear();
-        _textures_all_passes.resize(pass_count);
         _mat_cbuf_per_pass_size.resize(pass_count);
         _p_cbufs.resize(pass_count);
         Vector<Map<String, std::tuple<u8, Texture *>>> _tmp_textures_all_passes(pass_count);
@@ -581,41 +562,12 @@ namespace Ailu::Render
             {
                 if (bind_info.second._res_type == EBindResDescType::kTexture2D)
                 {
-                    auto tex_info = std::make_tuple(bind_info.second._bind_slot, nullptr);
-                    auto &[slot, tex_ptr] = tex_info;
-                    if (first_time)
-                    {
-                        _textures_all_passes[i].insert(std::make_pair(bind_info.second._name, tex_info));
-                    }
-                    else
-                    {
-                        _tmp_textures_all_passes[i].insert(std::make_pair(bind_info.second._name, tex_info));
-                    }
                 }
                 else if (bind_info.second._res_type & EBindResDescType::kCBufferAttribute && bind_info.second._bind_flag & ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
                     auto byte_size = ShaderBindResourceInfo::GetVariableSize(bind_info.second);
                     cbuf_size_per_passes[i] += byte_size;
                 }
-            }
-        }
-
-        if (!first_time)
-        {
-            for (int i = 0; i < pass_count; i++)
-            {
-                auto &tmp_textures = _tmp_textures_all_passes[i];
-                auto &textures = _textures_all_passes[i];
-                for (auto it = tmp_textures.begin(); it != tmp_textures.end(); it++)
-                {
-                    if (textures.contains(it->first))
-                    {
-                        const auto& [old_slot, old_tex] = textures[it->first];
-                        auto& [new_slot, new_tex] = it->second;
-                        it->second = std::make_tuple(new_slot,old_tex);
-                    }
-                }
-                textures = std::move(tmp_textures);
             }
         }
         for (int i = 0; i < pass_count; i++)
@@ -643,7 +595,6 @@ namespace Ailu::Render
             else {}
             //处理纹理和属性
             auto &bind_info = _p_shader->GetBindResInfo(i, _pass_variants[i]._variant_hash);
-            auto &textures = _textures_all_passes[i];
             for (auto &prop_info: _p_shader->GetShaderPropertyInfos(i))
             {
                 ShaderPropertyInfo cur_prop = prop_info;
@@ -652,10 +603,9 @@ namespace Ailu::Render
                     _properties.insert(std::make_pair(prop_info._value_name, cur_prop));
                     if (!first_time)
                     {
-                        if (auto it = textures.find(prop_info._value_name); it != textures.end())
+                        if (auto it = _bind_textures.find(prop_info._value_name); it != _bind_textures.end())
                         {
-                            auto [slot, tex] = it->second;
-                            _properties[prop_info._value_name]._value_ptr = tex;
+                            _properties[prop_info._value_name]._value_ptr = it->second;
                         }
                     }
                 }
@@ -720,18 +670,16 @@ namespace Ailu::Render
 
     void Material::UpdateBindTexture(u16 pass_index, ShaderVariantHash new_hash)
     {
-        auto &bind_textures = _textures_all_passes[pass_index];
-        auto &bind_infos = _p_active_shader->_passes[pass_index]._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
-        for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
-        {
-            auto shader_bind_info_it = bind_infos.find(it->first);
-            if (shader_bind_info_it != bind_infos.end())
-            {
-                auto &[slot, texture] = it->second;
-                u8 new_slot = shader_bind_info_it->second._bind_slot;
-                it->second = std::make_pair(new_slot, texture);
-            }
-        }
+        //auto &bind_infos = _p_active_shader->_passes[pass_index]._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
+        //for (auto it = _bind_textures.begin(); it != _bind_textures.end(); it++)
+        //{
+        //    auto shader_bind_info_it = bind_infos.find(it->first);
+        //    if (shader_bind_info_it != bind_infos.end())
+        //    {
+        //        u8 new_slot = shader_bind_info_it->second._bind_slot;
+        //        it->second = std::make_pair(new_slot, texture);
+        //    }
+        //}
     }
     ShaderPropertyInfo *Material::GetShaderProperty(const String &name)
     {
@@ -751,19 +699,18 @@ namespace Ailu::Render
         memset(cur_state._bind_res.data(),0,sizeof(GpuResource*) * 32);
         memset(cur_state._bind_res_priority.data(),0u,sizeof(u16) * 32);
         auto &cur_pass_variant_hash = _pass_variants[pass_index]._variant_hash;
-        auto &bind_textures = _textures_all_passes[pass_index];
         auto &bind_infos = _p_active_shader->_passes[pass_index]._variants[cur_pass_variant_hash]._bind_res_infos;
-        for (auto it = bind_textures.begin(); it != bind_textures.end(); it++)
+        for (auto it = _bind_textures.begin(); it != _bind_textures.end(); it++)
         {
-            const auto& bind_it = bind_infos.find(it->first);
-            if (bind_it != bind_infos.end())
+            if (const auto &bind_it = bind_infos.find(it->first) ;bind_it != bind_infos.end())
             {
-                auto &[slot, texture] = it->second;
+                u8 slot = bind_it->second._bind_slot;
+                Texture *texture = it->second;
                 AL_ASSERT(slot < 32);
                 if (texture)
                 {
                     cur_state._bind_res[slot] = texture;
-                    cur_state._bind_res_priority[bind_it->second._bind_slot] = PipelineResource::kPriorityLocal;
+                    cur_state._bind_res_priority[slot] = PipelineResource::kPriorityLocal;
                     cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, slot);
                 }
             }
@@ -938,21 +885,7 @@ namespace Ailu::Render
         else if (name == StandardPropertyName::kNormal._tex_name)
             MarkTextureUsed({ETextureUsage::kNormal}, use_tex);
         else {};
-        for (auto &pass_tex: _textures_all_passes)
-        {
-            auto it = pass_tex.find(name);
-            if (it == pass_tex.end())
-            {
-                return;
-            }
-            std::get<1>(pass_tex[name]) = texture;
-            if (_properties.find(name) != _properties.end())
-            {
-                _properties[name]._value_ptr = reinterpret_cast<void *>(texture);
-            }
-        }
-        //else
-        //	LOG_WARNING("Cann't find texture prop with value name: {} when set material {} texture!", name, _name);
+        Material::SetTexture(name, texture);
     }
 
     void StandardMaterial::SetTexture(const String &name, const WString &texture_path)
