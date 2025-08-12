@@ -27,8 +27,6 @@
 #include "Render/GraphicsContext.h"
 #include "Render/RenderPipeline.h"
 
-#include "Objects/ReflectData.h"
-
 using namespace Ailu::Render;
 
 namespace Ailu
@@ -37,7 +35,6 @@ namespace Ailu
     TimeMgr *g_pTimeMgr = new TimeMgr();
     SceneManagement::SceneMgr *g_pSceneMgr = new SceneManagement::SceneMgr();
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
-    LogMgr *g_pLogMgr = new LogMgr();
     Scope<Core::ThreadPool> g_pThreadTool = MakeScope<Core::ThreadPool>(6u, "GlobalThreadPool");
 
     WString Application::GetWorkingPath()
@@ -77,6 +74,7 @@ namespace Ailu
         desc._gameview_height = 900;
         return Initialize(desc);
     }
+
     int Application::Initialize(ApplicationDesc desc)
     {
         AL_ASSERT_MSG(sp_instance == nullptr, "Application already init!");
@@ -86,6 +84,7 @@ namespace Ailu
         g_pTimeMgr->Initialize();
         g_pTimeMgr->Mark();
         sp_instance = this;
+        LogMgr::Get().AddAppender(new FileAppender());
         //Load ini
         {
             auto work_path = GetWorkingPath();
@@ -98,7 +97,7 @@ namespace Ailu
             INIParser ini_parser;
             if (ini_parser.Load(_engin_config_path))
             {
-                Type *type = EngineConfig::StaticType();
+                const Type *type = EngineConfig::StaticType();
                 for (auto &it: ini_parser.GetValues("Layer"))
                 {
                     auto &[k, v] = it;
@@ -114,9 +113,7 @@ namespace Ailu
             }
         }
         _is_multi_thread_rendering = s_engine_config.isMultiThreadRender;
-        g_pLogMgr->Initialize();
-        g_pLogMgr->AddAppender(new FileAppender());
-        //g_pLogMgr->AddAppender(new ConsoleAppender());
+        //LogMgr::Get().AddAppender(new ConsoleAppender());
         auto window_props = WindowProps();
         window_props.Width = desc._window_width;
         window_props.Height = desc._window_height;
@@ -180,7 +177,7 @@ namespace Ailu
     void Application::Finalize()
     {
         INIParser ini_parser;
-        Type *type = EngineConfig::StaticType();
+        const Type *type = EngineConfig::StaticType();
         for (const auto &it: type->GetProperties())
         {
             if (it.DataType() == EDataType::kUInt32)
@@ -213,8 +210,6 @@ namespace Ailu
         ObjectRegister::Shutdown();
         Core::Allocator::Get().PrintLeaks();
         Core::Allocator::Shutdown();
-        g_pLogMgr->Finalize();
-        DESTORY_PTR(g_pLogMgr);
     }
 
     void Application::Tick(f32 delta_time)
@@ -407,7 +402,8 @@ namespace Ailu
     {
         //if (_state == EApplicationState::EApplicationState_Pause)
         //	_state = EApplicationState::EApplicationState_Running;
-        //g_pLogMgr->LogWarningFormat("Application state: {}", EApplicationState::ToString(_state));
+        //LogMgr::Get().LogWarningFormat("Application state: {}", EApplicationState::ToString(_state));
+        GraphicsContext::Get().ResizeSwapChain((u32)e.GetWidth(), (u32)e.GetHeight());
         LOG_INFO("Window resize: {}x{}", e.GetWidth(), e.GetHeight());
         return false;
     }

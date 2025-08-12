@@ -20,7 +20,6 @@ namespace Ailu::Render
     }
     VoxelizePass::~VoxelizePass()
     {
-        DESTORY_PTR(_voxel_buf);
         DESTORY_PTR(_cam_cbuf);
     }
     void VoxelizePass::Execute(GraphicsContext *context, RenderingData &rendering_data)
@@ -47,7 +46,7 @@ namespace Ailu::Render
                         for (auto &obj: obj_list)
                         {
                             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cam_cbuf);
-                            cmd->SetGlobalBuffer("g_voxel_data_block", _voxel_buf);
+                            cmd->SetGlobalBuffer("g_voxel_data_block", _voxel_buf.get());
                             cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index,
                                               _voxel_pass_index, 1u);
                         }
@@ -59,7 +58,7 @@ namespace Ailu::Render
             _voxelize_cs->SetVector("_grid_num", grid_num);
             //write to texture3d
             _voxelize_cs->SetTexture("_VoxelTex", _voxel_tex.get());
-            _voxelize_cs->SetBuffer("_VoxelBuffer", _voxel_buf);
+            _voxelize_cs->SetBuffer("_VoxelBuffer", _voxel_buf.get());
             auto kernel = _voxelize_cs->FindKernel("FillTexture3D");
             u16 x, y, z;
             _voxelize_cs->GetThreadNum(kernel, x, y, z);
@@ -81,8 +80,8 @@ namespace Ailu::Render
     {
         if (_pre_grid_num != _data._grid_num)
         {
-            DESTORY_PTR(_voxel_buf);
-            GPUBufferDesc desc;
+            _voxel_tex.reset();
+            BufferDesc desc;
             desc._is_random_write = true;
             desc._is_readable = false;
             desc._format = EALGFormat::kALGFormatR32_UINT;
@@ -93,12 +92,13 @@ namespace Ailu::Render
             _voxel_buf = GPUBuffer::Create(desc, "VoexlBuffer");
             if (_voxel_tex)
                 _voxel_tex.reset();
-            Texture3DInitializer initializer;
+            TextureDesc initializer;
             initializer._width = _data._grid_num.x;
             initializer._height = _data._grid_num.y;
             initializer._depth = _data._grid_num.z;
-            initializer._format = ETextureFormat::kRGBAFloat;
+            initializer._format = ConvertTextureFormatToPixelFormat(ETextureFormat::kRGBAFloat);
             initializer._is_random_access = true;
+            initializer._dimension = ETextureDimension::kTex3D;
             _voxel_tex = Texture3D::Create(initializer);
             _voxel_tex->Name("VoxelTex");
             _voxel_tex->Apply();

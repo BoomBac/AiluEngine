@@ -12,6 +12,7 @@
 #include <functional>
 #include "RenderingData.h"
 #include "Scene/Scene.h"
+#include "RenderGraph/RenderGraph.h"
 
 
 
@@ -26,6 +27,25 @@ namespace Ailu
         class FrameResource;
         class RenderPipeline;
         using SceneManagement::Scene;
+
+        struct RenderResourceName
+        {
+            inline static const String kCameraColorA = "_CameraColorAttachmentA";
+            inline static const String kCameraColorB = "_CameraColorAttachmentB";
+            inline static const String kCameraColorTex = "_CameraColoTexture";
+            inline static const String kCameraDepth = "_CameraDepthAttachment";
+            inline static const String kCameraDepthTex = "_CameraDepthTexture";
+            inline static const String kGBuffer0 = "_GBuffer0";
+            inline static const String kGBuffer1 = "_GBuffer1";
+            inline static const String kGBuffer2 = "_GBuffer2";
+            inline static const String kGBuffer3 = "_GBuffer3";
+            inline static const String kMainLightShadowMap = "_MainLightShadowMap";
+            inline static const String kAddLightShadowMap = "_AddLightShadowMaps";
+            inline static const String kPointLightShadowMap = "_PointLightShadowMap";
+            inline static const String kHZB = "_HZB";
+            inline static const String kMotionVectorTex = "_CameraMotionVector";
+            inline static const String kMotionVectorDepth = "_CameraMotionDepth";
+        };
         class AILU_API Renderer
         {
             friend class RenderPipeline;
@@ -56,9 +76,11 @@ namespace Ailu
             void AddFeature(RenderFeature *feature) { _features.emplace_back(feature); };
             void SetShadingMode(EShadingMode::EShadingMode mode) { _mode = mode; }
             void SetupFrameResource(FrameResource* prev_fr,FrameResource *cur_fr) { _prev_fs = prev_fr;_cur_fs = cur_fr; }
+            RDG::RenderGraph& GetRenderGraph() { return *_rd_graph; }
         public:
             bool _is_render_light_probe = false;
             bool _is_hiz_active = true;
+            bool _is_use_render_graph = true;
         private:
             void PrepareScene(const Scene &s);
             void PrepareLight(const Scene &s);
@@ -82,6 +104,7 @@ namespace Ailu
             //CBufferPerSceneData _per_scene_cbuf_data;
             //CBufferPerCameraData _per_cam_cbuf_data;
 
+            RDG::RenderGraph* _rd_graph;
 
             Scope<ShadowCastPass> _shadowcast_pass;
             Scope<DeferredGeometryPass> _gbuffer_pass;

@@ -102,6 +102,7 @@ namespace Ailu::RHI::DX12
         bool _is_stop;
     };
 
+    class D3DSwapchainTexture;
     class D3DContext : public Render::GraphicsContext
     {
         friend class D3DCommandBuffer;
@@ -110,7 +111,7 @@ namespace Ailu::RHI::DX12
         ~D3DContext();
         void Init() final;
         void Present() final;
-        u64 GetFenceValueGPU() const final;
+        u64 GetFenceValueGPU() final;
         u64 GetFenceValueCPU() const final;
         void TakeCapture() final;
         void ResizeSwapChain(const u32 width, const u32 height) final;
@@ -144,12 +145,7 @@ namespace Ailu::RHI::DX12
         void ExecuteRHICommandBuffer(RHICommandBuffer* cmd) final;
         void WaitForGpu() final;
         void WaitForFence(u64 fence_value) final;
-    #if defined(DEAR_IMGUI)
-        /// @brief 记录imgui使用的rt，在绘制之前统一转换至srv
-        /// @param tex 
-        void RecordImguiUsedTexture(RenderTexture* tex) {_imgui_used_rt.insert(tex);};
-    #endif
-
+        DXGI_FORMAT BackBufferFormat() const { return _swapchain_format; };
     private:
         void Destroy();
         void LoadPipeline();
@@ -173,18 +169,14 @@ namespace Ailu::RHI::DX12
         WinWindow* _window;
         //u32 _cbv_desc_num = 0u;
         // Pipeline objects.
-        DXGI_FORMAT _backbuffer_format;
-        ComPtr<IDXGISwapChain3> m_swapChain;
+        D3DSwapchainTexture *_swapchain;
         ComPtr<ID3D12Device> m_device;
-        ComPtr<ID3D12Resource> _color_buffer[Render::RenderConstants::kFrameCount];
-        ComPtr<ID3D12CommandAllocator> m_commandAllocators[Render::RenderConstants::kFrameCount];
         ComPtr<ID3D12CommandQueue> m_commandQueue;
-        ComPtr<ID3D12GraphicsCommandList> m_commandList;
         ComPtr<IDXGIAdapter4> _p_adapter;
         DXGI_QUERY_VIDEO_MEMORY_INFO _local_video_memory_info;
         DXGI_QUERY_VIDEO_MEMORY_INFO _non_local_video_memory_info;
         Scope<IGPUTimer> _p_gpu_timer;
-
+        DXGI_FORMAT _swapchain_format;
 #ifdef _DIRECT_WRITE
         IDWriteFactory * _dw_factory;
         IDWriteTextFormat * _dw_textformat;
@@ -205,6 +197,7 @@ namespace Ailu::RHI::DX12
         CPUVisibleDescriptorAllocation _rtv_allocation;
         // Synchronization objects.
         u8 m_frameIndex;
+        u64 _cur_fence_value;
         HANDLE m_fenceEvent;
         std::atomic<u64> _fence_value[Render::RenderConstants::kFrameCount];
         ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
@@ -224,9 +217,6 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3D12CommandSignature> _draw_cmd_sig;
         ComPtr<ID3D12CommandSignature> _draw_indexed_cmd_sig;
         Scope<ReadbackBufferPool> _readback_pool;
-    #if defined(DEAR_IMGUI)
-        std::set<RenderTexture*,ObjectPtrCompare> _imgui_used_rt;
-    #endif
     };
 
 

@@ -13,14 +13,19 @@
 #include "Render/Features/VolumetricClouds.h"
 #include "Render/RenderingData.h"
 #include "Render/TextRenderer.h"
-#include <Framework/Common/Application.h>
+//#include <Framework/Common/Application.h>
 #include <Objects/Type.h>
+
+#include "Inc/EditorApp.h"
 
 #include "Framework/Common/Input.h"
 #include "Framework/Events/MouseEvent.h"
 
 #include "Framework/Common/Profiler.h"
 #include "Render/RenderPipeline.h"
+
+#include "UI/UIRenderer.h"
+#include "UI/Canvas.h"
 
 #include "Animation/Curve.hpp"
 #include "Animation/Solver.h"
@@ -39,6 +44,9 @@
 #include "Widgets/RenderView.h"
 #include "Widgets/WorldOutline.h"
 #include "Widgets/ProfileWindow.h"
+#include <Widgets/RenderGraphDebugger.h>
+
+#include "Framework/Parser/TextParser.h"
 
 namespace Ailu
 {
@@ -91,11 +99,13 @@ namespace Ailu
         BlendSpaceEditor *g_blend_space_editor;
         EditorLayer::EditorLayer() : Layer("EditorLayer")
         {
+#if defined(DEAR_IMGUI)
             ImGuiIO &io = ImGui::GetIO();
             (void) io;
             //_font = io.Fonts->AddFontFromFileTTF(ResourceMgr::GetResSysPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
             _font = io.Fonts->AddFontFromFileTTF(ResourceMgr::GetResSysPath("Fonts/Open_Sans/static/OpenSans-Regular.ttf").c_str(), 14.0f);
             io.Fonts->Build();
+#endif
         }
 
         EditorLayer::EditorLayer(const String &name) : Layer(name)
@@ -104,6 +114,7 @@ namespace Ailu
 
         EditorLayer::~EditorLayer()
         {
+
         }
 
         void EditorLayer::OnAttach()
@@ -115,7 +126,7 @@ namespace Ailu
             _widgets.emplace_back(std::move(MakeScope<ObjectDetail>()));
             _widgets.emplace_back(std::move(MakeScope<PlaceActors>()));
             _widgets.emplace_back(std::move(MakeScope<RenderTextureView>()));
-            for (auto appender: g_pLogMgr->GetAppenders())
+            for (auto appender: LogMgr::Get().GetAppenders())
             {
                 auto imgui_appender = dynamic_cast<ImGuiLogAppender *>(appender);
                 if (imgui_appender)
@@ -134,6 +145,8 @@ namespace Ailu
             g_blend_space_editor = static_cast<BlendSpaceEditor *>(_widgets.back().get());
             _widgets.emplace_back(std::move(MakeScope<ProfileWindow>()));
             _p_profiler_window = _widgets.back().get();
+            _widgets.emplace_back(std::move(MakeScope<RenderGraphDebugger>()));
+            _p_rdg_debugger = _widgets.back().get();
             for (auto &widget: _widgets)
             {
                 widget->Open(ImGuiWidget::GetGlobalWidgetHandle());
@@ -143,10 +156,27 @@ namespace Ailu
             g_blend_space_editor->Close(g_blend_space_editor->Handle());
             _p_preview_cam_view->Close(_p_preview_cam_view->Handle());
             _p_profiler_window->Close(_p_profiler_window->Handle());
+            _p_rdg_debugger->Close(_p_rdg_debugger->Handle());
             ImGuiWidget::SetFocus("AssetBrowser");
             auto r = static_cast<CommonRenderPipeline *>(GraphicsContext::Get().GetPipeline())->GetRenderer();
             r->AddFeature(&_pick);
             r->SetShadingMode(EShadingMode::kLit);
+            _canvas = UI::UIRenderer::Get()->AddCanvas();
+            _canvas->BindOutput(RenderTexture::s_backbuffer, nullptr);
+            _canvas->AddChild(UI::UIElement::Create<UI::Button>(), UI::Slot());
+            dynamic_cast<EditorApp &>(Application::Get())._on_file_changed_delegate += [&](const fs::path &file)
+            {
+                const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+                if (cur_path.ends_with(L".json"))
+                {
+                    JSONParser p;
+                    p.Load(cur_path);
+                    for (auto& it: p.GetValues())
+                    {
+                        LOG_INFO("{}_{}",it.first,it.second)
+                    }
+                }
+            };
         }
 
         void EditorLayer::OnDetach()
@@ -242,13 +272,7 @@ namespace Ailu
             }
             else if (e.GetEventType() == EEventType::kMouseScrolled)
             {
-                MouseScrollEvent event = static_cast<MouseScrollEvent &>(e);
-                f32 zoom = ImNodes::GetZoomFactor();
-                if (event.GetOffsetY() > 0)
-                    zoom += 0.01f;
-                else
-                    zoom -= 0.01f;
-                ImNodes::SetZoomFactor(zoom);
+                
             }
         }
         std::once_flag flag;
@@ -287,17 +311,17 @@ namespace Ailu
             } });
 
 
-            if (ccd_solver.Size() > 0)
-            {
+            //if (ccd_solver.Size() > 0)
+            //{
 
-                Gizmo::DrawLine(ccd_solver.GetGlobalTransform(0)._position, ccd_solver.GetGlobalTransform(1)._position, Colors::kRed);
-                Gizmo::DrawLine(ccd_solver.GetGlobalTransform(1)._position, ccd_solver.GetGlobalTransform(2)._position, Colors::kBlue);
-                //Gizmo::DrawLine(ccd_solver.GetGlobalTransform(2)._position, ccd_solver.GetGlobalTransform(3)._position, Colors::kWhite);
+            //    Gizmo::DrawLine(ccd_solver.GetGlobalTransform(0)._position, ccd_solver.GetGlobalTransform(1)._position, Colors::kRed);
+            //    Gizmo::DrawLine(ccd_solver.GetGlobalTransform(1)._position, ccd_solver.GetGlobalTransform(2)._position, Colors::kBlue);
+            //    //Gizmo::DrawLine(ccd_solver.GetGlobalTransform(2)._position, ccd_solver.GetGlobalTransform(3)._position, Colors::kWhite);
 
-                Gizmo::DrawLine(fabrik_solver.GetGlobalTransform(0)._position, fabrik_solver.GetGlobalTransform(1)._position, Colors::kYellow);
-                Gizmo::DrawLine(fabrik_solver.GetGlobalTransform(1)._position, fabrik_solver.GetGlobalTransform(2)._position, Colors::kGreen);
-                //Gizmo::DrawLine(fabrik_solver.GetGlobalTransform(2)._position, fabrik_solver.GetGlobalTransform(3)._position, Colors::kCyan);
-            }
+            //    Gizmo::DrawLine(fabrik_solver.GetGlobalTransform(0)._position, fabrik_solver.GetGlobalTransform(1)._position, Colors::kYellow);
+            //    Gizmo::DrawLine(fabrik_solver.GetGlobalTransform(1)._position, fabrik_solver.GetGlobalTransform(2)._position, Colors::kGreen);
+            //    //Gizmo::DrawLine(fabrik_solver.GetGlobalTransform(2)._position, fabrik_solver.GetGlobalTransform(3)._position, Colors::kCyan);
+            //}
             //            Bezier<Vector3f> curve;
             //            curve.P1 = Vector3f(-5, 0, 0);
             //            curve.P2 = Vector3f(5, 0, 0);
@@ -526,8 +550,11 @@ namespace Ailu
             ImGui::Checkbox("ShowAnimClip", &s_show_anim_clip);
             ImGui::Checkbox("ShowThreadPoolView", &s_show_threadpool_view);
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
+            ImGui::Checkbox("UseRenderGraph", &GraphicsContext::Get().GetPipeline()->GetRenderer()->_is_use_render_graph);
             if (ImGui::Button("Profile"))
                 _p_profiler_window->Open(_p_profiler_window->Handle());
+            if (ImGui::Button("RdGraph Debugger"))
+                _p_rdg_debugger->Open(_p_rdg_debugger->Handle());
 
             // for (auto &info: g_pResourceMgr->GetImportInfos())
             // {

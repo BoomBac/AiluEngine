@@ -3,9 +3,11 @@
 //
 
 #include "Inc/Render/FrameResource.h"
+#include "Inc/Render/GraphicsContext.h"
 
 namespace Ailu::Render
 {
+#pragma region FrameResource
     FrameResource::FrameResource() : Object("FrameResource")
     {
         for (u32 i = 0; i < RenderConstants::kMaxRenderObjectCount; ++i)
@@ -59,4 +61,132 @@ namespace Ailu::Render
         }
         return _scene_cbs[_scene_cb_lut[hash]];
     }
-}// namespace Ailu
+#pragma endregion
+
+#pragma region FrameResourceManager
+    static FrameResourceManager* g_frame_resource_manager = nullptr;
+    void FrameResourceManager::Init()
+    {
+        AL_ASSERT(g_frame_resource_manager == nullptr);
+        g_frame_resource_manager = AL_NEW(FrameResourceManager);
+        LOG_INFO("FrameResourceManager initialized.");
+    }
+    void FrameResourceManager::Shutdown()
+    {
+        AL_DELETE(g_frame_resource_manager);
+        LOG_INFO("FrameResourceManager shutdown.");
+    }
+    FrameResourceManager& FrameResourceManager::Get()
+    {
+        return *g_frame_resource_manager;
+    }
+    FrameResourceManager::FrameResourceManager()
+    {
+    }
+    FrameResourceManager::~FrameResourceManager()
+    {
+    }
+    void FrameResourceManager::Tick()
+    {
+        const u64 cur_frame = GraphicsContext::Get().GetFrameCount();
+        u32 released_count = 0;
+        if (cur_frame % 120 == 0u)
+        {
+            for (auto &it: _texture_pool)
+            {
+                auto &[hash, handle] = it;
+                if (handle._last_access_frame_count)
+                {
+                    if (cur_frame - handle._last_access_frame_count > kMaxResourceStaleFrame)
+                    {
+                        handle._is_available = true;
+                        ++released_count;
+                    }
+                }
+            }
+            for (auto &it: _buffer_pool)
+            {
+                auto &[hash, handle] = it;
+                if (handle._last_access_frame_count)
+                {
+                    if (cur_frame - handle._last_access_frame_count > kMaxResourceStaleFrame)
+                    {
+                        handle._is_available = true;
+                        ++released_count;
+                    }
+                }
+            }
+        }
+        if (cur_frame % 1000 == 0)
+        {
+            CleanupStaleResources();
+        }
+    }
+
+    FrameResourceManager::TextureHandle FrameResourceManager::AllocTexture(TextureDesc desc)
+    {
+        auto it = _texture_pool.Get(desc);
+        Texture *out_texture = nullptr;
+        if (it.has_value())
+        {
+            return it.value();
+        }
+        else
+        {
+            Ref<Texture> new_res = nullptr;
+            if (desc._is_color_target || desc._is_depth_target)
+            {
+                new_res = RenderTexture::Create(desc);
+            }
+            else
+            {
+                if (desc._dimension == ETextureDimension::kTex2D)
+                {
+                    new_res = Texture2D::Create(desc);
+                }
+                else if (desc._dimension == ETextureDimension::kTex3D)
+                {
+                    new_res = Texture3D::Create(desc);
+                }
+                else
+                {
+                    AL_ASSERT_MSG(false, "Unsupported texture dimension!");
+                }
+            }
+            if (new_res)
+            {
+                return _texture_pool.Add(desc, new_res);
+            }
+        }
+        return FrameResourceManager::TextureHandle{0, nullptr};
+    }
+    FrameResourceManager::BufferHandle FrameResourceManager::AllocBuffer(BufferDesc desc)
+    {
+        auto it = _buffer_pool.Get(desc);
+        if (it.has_value())
+        {
+            return it.value();
+        }
+        else
+        {
+            Ref<GPUBuffer> new_buf = GPUBuffer::Create(desc);
+            return _buffer_pool.Add(desc, new_buf);
+        }
+        return FrameResourceManager::BufferHandle{0, nullptr};
+    }
+    void FrameResourceManager::FreeTexture(TextureHandle handle)
+    {
+        _texture_pool.Release(handle);
+    }
+    void FrameResourceManager::FreeBuffer(BufferHandle handle)
+    {
+        _buffer_pool.Release(handle);
+    }
+    void FrameResourceManager::CleanupStaleResources()
+    {
+        _texture_pool.ReleaseUnused();
+        _buffer_pool.ReleaseUnused();
+    }
+#pragma endregion
+
+}// namespace Ailu::Render

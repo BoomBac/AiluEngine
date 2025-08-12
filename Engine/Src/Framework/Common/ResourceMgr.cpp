@@ -119,7 +119,7 @@ namespace Ailu
         {
             u8 *default_data = new u8[4 * 4 * 4];
             memset(default_data, 255, 64);
-            auto default_white = Texture2D::Create(Texture2DInitializer(4, 4,ETextureFormat::kRGBA32));
+            auto default_white = Texture2D::Create(4, 4,ETextureFormat::kRGBA32);
             default_white->SetPixelData(default_data, 0);
             default_white->Name("default_white");
             default_white->Apply();
@@ -128,7 +128,7 @@ namespace Ailu
             memset(default_data, 0, 64);
             for (int i = 3; i < 64; i += 4)
                 default_data[i] = 255;
-            auto default_black = Texture2D::Create(Texture2DInitializer(4, 4,ETextureFormat::kRGBA32));
+            auto default_black = Texture2D::Create(4, 4,ETextureFormat::kRGBA32);
             default_black->SetPixelData(default_data, 0);
             default_black->Name("default_black");
             default_black->Apply();
@@ -136,7 +136,7 @@ namespace Ailu
             memset(default_data, 128, 64);
             for (int i = 3; i < 64; i += 4)
                 default_data[i] = 255;
-            auto default_gray = Texture2D::Create(Texture2DInitializer(4, 4,ETextureFormat::kRGBA32));
+            auto default_gray = Texture2D::Create(4, 4,ETextureFormat::kRGBA32);
             default_gray->SetPixelData(default_data, 0);
             default_gray->Name("default_gray");
             default_gray->Apply();
@@ -147,7 +147,7 @@ namespace Ailu
                 default_data[i] = 128;
                 default_data[i + 1] = 128;
             }
-            auto default_normal = Texture2D::Create(Texture2DInitializer(4, 4,ETextureFormat::kRGBA32));
+            auto default_normal = Texture2D::Create(4, 4,ETextureFormat::kRGBA32);
             default_normal->SetPixelData(default_data, 0);
             default_normal->Name("default_normal");
             default_normal->Apply();

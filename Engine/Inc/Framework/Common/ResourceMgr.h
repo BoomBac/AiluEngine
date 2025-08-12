@@ -306,7 +306,7 @@ namespace Ailu
         // bool is_skip_load = false;
         // if (!IsFileOnDiskUpdated(sys_path))
         // {
-        //     g_pLogMgr->LogWarningFormat(L"Load asset {} succeed with everything is new after {}ms", asset_path, timer.GetElapsedSinceLastMark());
+        //     LogMgr::Get().LogWarningFormat(L"Load asset {} succeed with everything is new after {}ms", asset_path, timer.GetElapsedSinceLastMark());
         //     return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
         // }
         ImportSetting *cur_setting = setting ? const_cast<ImportSetting *>(setting) : &ImportSetting::Default();

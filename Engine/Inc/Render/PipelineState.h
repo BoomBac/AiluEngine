@@ -175,7 +175,7 @@ namespace Ailu
     namespace Math::ALHash
     {
         template<>
-        static u32 Hasher(const Ailu::Render::ETopology &obj)
+        static u32 HashFunc(const Ailu::Render::ETopology &obj)
         {
             switch (obj)
             {
@@ -192,7 +192,7 @@ namespace Ailu
         }
 
         template<>
-        static u32 Hasher(const EALGFormat::EALGFormat &obj)
+        static u32 HashFunc(const EALGFormat::EALGFormat &obj)
         {
             //separate color and depth hash
             switch (obj)

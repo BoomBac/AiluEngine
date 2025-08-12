@@ -2,16 +2,23 @@
 #ifdef __RENDERFEATURE_GEN_H__
 #error RenderFeature.gen.h already included, missing '#pragma once' in RenderFeature.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __RENDERFEATURE_GEN_H__
 //Class RenderPass begin...........................
-#define RENDERFEATURE_GEN_H_32_GENERATED_BODY \
+#define RENDERFEATURE_GEN_H_38_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_RenderPass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_RenderPass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const override;
-                            //Class RenderPass end...........................
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+class RenderPass ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::RenderPass>();
+//Class RenderPass end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID RENDERFEATURE_GEN_H

@@ -2,16 +2,23 @@
 #ifdef __ENGINECONFIG_GEN_H__
 #error EngineConfig.gen.h already included, missing '#pragma once' in EngineConfig.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __ENGINECONFIG_GEN_H__
 //Class EngineConfig begin...........................
 #define ENGINECONFIG_GEN_H_10_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_EngineConfig_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_EngineConfig_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const override;
-                            //Class EngineConfig end...........................
+                            namespace Ailu {class Type;}
+namespace Ailu{
+class EngineConfig ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::EngineConfig>();
+//Class EngineConfig end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID ENGINECONFIG_GEN_H

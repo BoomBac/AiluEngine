@@ -273,7 +273,10 @@ namespace Ailu::RHI::DX12
             ReleaseSpace();
             page_it = _page_free_space_lut[type].lower_bound(num);
             if (page_it == _page_free_space_lut[type].end())
-				page_it = AddNewPage(type);
+            {
+                page_it = AddNewPage(type);
+                AL_ASSERT(_pages.size() <= 10);
+            }
 		}
 		auto& page = _pages[page_it->second];
 		i16 offset = page.Allocate(num);

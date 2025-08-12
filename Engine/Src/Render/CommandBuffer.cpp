@@ -9,6 +9,7 @@
 #include <Framework/Common/ResourceMgr.h>
 #include <Render/GraphicsPipelineStateObject.h>
 #include "Framework/Common/Profiler.h"
+#include "Render/RenderGraph/RenderGraph.h"
 
 namespace Ailu::Render
 {
@@ -87,6 +88,10 @@ namespace Ailu::Render
     {
         _name = std::move(name);
     }
+    void CommandBuffer::SetRenderGraph(RDG::RenderGraph *render_graph)
+    {
+        _render_graph = render_graph;
+    }
     void CommandBuffer::Clear()
     {
         if (_commands.size() > 0)
@@ -162,9 +167,9 @@ namespace Ailu::Render
             cmd->_viewports[0] = Rect(0, 0, rt->Width(), rt->Height());
         }
         _commands.push_back(cmd);
-        if (color->_load_action == ELoadStoreAction::kClear)
+        if (color && color->_load_action == ELoadStoreAction::kClear)
             ClearRenderTarget(Colors::kBlack);
-        if (depth->_load_action == ELoadStoreAction::kClear)
+        if (depth && depth->_load_action == ELoadStoreAction::kClear)
             ClearRenderTarget(kZFar, 0u);
     }
     void CommandBuffer::SetRenderTarget(RenderTexture *color, u16 index)
@@ -208,14 +213,14 @@ namespace Ailu::Render
         if (depth->_load_action == ELoadStoreAction::kClear)
             ClearRenderTarget(kZFar, 0u);
     }
-    void CommandBuffer::SetRenderTargets(Vector<RTHandle> &colors, RTHandle depth)
+    void CommandBuffer::SetRenderTargets(const Vector<RenderTexture *> &colors, RenderTexture *depth)
     {
         auto cmd = CommandPool::Get().Alloc<CommandSetTarget>();
         cmd->_color_target_num = (u16) colors.size();
-        static Color s_clear_colors[RenderConstants::kMaxMRTNum] = {Colors::kBlack,Colors::kBlack,Colors::kBlack,Colors::kBlack,Colors::kBlack,Colors::kBlack,Colors::kBlack,Colors::kBlack};
+        static Color s_clear_colors[RenderConstants::kMaxMRTNum] = {Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack, Colors::kBlack};
         for (u16 i = 0; i < colors.size(); ++i)
         {
-            cmd->_color_target[i] = g_pRenderTexturePool->Get(colors[i]);
+            cmd->_color_target[i] = colors[i];
             cmd->_color_indices[i] = 0u;
             if (_viewports[i].width != 0u)
             {
@@ -225,13 +230,20 @@ namespace Ailu::Render
             else
                 cmd->_viewports[i] = Rect(0, 0, cmd->_color_target[i]->Width(), cmd->_color_target[i]->Height());
         }
-        cmd->_depth_target = g_pRenderTexturePool->Get(depth);
+        cmd->_depth_target = depth;
         cmd->_depth_index = 0u;
         _commands.push_back(cmd);
         if (cmd->_color_target[0]->_load_action == ELoadStoreAction::kClear)
             ClearRenderTarget(s_clear_colors, cmd->_color_target_num);
         if (cmd->_depth_target->_load_action == ELoadStoreAction::kClear)
             ClearRenderTarget(kZFar, 0u);
+    }
+    void CommandBuffer::SetRenderTargets(const Vector<RTHandle> &colors, RTHandle depth)
+    {
+        Vector<RenderTexture *> rts(colors.size());
+        for (u64 i = 0; i < colors.size(); i++)
+            rts[i] = g_pRenderTexturePool->Get(colors[i]);
+        SetRenderTargets(rts, g_pRenderTexturePool->Get(depth));
     }
     void CommandBuffer::SetRenderTarget(RTHandle color, RTHandle depth)
     {
@@ -240,6 +252,21 @@ namespace Ailu::Render
     void CommandBuffer::SetRenderTarget(RTHandle color, u16 index)
     {
         SetRenderTarget(g_pRenderTexturePool->Get(color), index);
+    }
+    void CommandBuffer::SetRenderTargets(const Vector<RDG::RGHandle> &colors, RDG::RGHandle depth)
+    {
+        Vector<RenderTexture *> rts(colors.size());
+        for (u64 i = 0; i < colors.size(); i++)
+            rts[i] = _render_graph->Resolve<RenderTexture>(colors[i]);
+        SetRenderTargets(rts, _render_graph->Resolve<RenderTexture>(depth));
+    }
+    void CommandBuffer::SetRenderTarget(RDG::RGHandle color, RDG::RGHandle depth)
+    {
+        SetRenderTarget(_render_graph->Resolve<RenderTexture>(color), _render_graph->Resolve<RenderTexture>(depth));
+    }
+    void CommandBuffer::SetRenderTarget(RDG::RGHandle color, u16 index)
+    {
+        SetRenderTarget(_render_graph->Resolve<RenderTexture>(color), index);
     }
     void CommandBuffer::DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index)
     {
@@ -358,6 +385,10 @@ namespace Ailu::Render
     void CommandBuffer::Blit(RenderTexture *src, RTHandle dst, Material *mat, u16 pass_index)
     {
         Blit(src, g_pRenderTexturePool->Get(dst), mat, pass_index);
+    }
+    void CommandBuffer::Blit(const RDG::RGHandle &src, const RDG::RGHandle &dst, Material *mat, u16 pass_index)
+    {
+        Blit(_render_graph->Resolve<RenderTexture>(src), _render_graph->Resolve<RenderTexture>(dst), mat, pass_index);
     }
     void CommandBuffer::DrawFullScreenQuad(Material *mat, u16 pass_index)
     {
@@ -565,6 +596,10 @@ namespace Ailu::Render
     void CommandBuffer::SetRenderTargetLoadAction(RTHandle handle, ELoadStoreAction action)
     {
         SetRenderTargetLoadAction(g_pRenderTexturePool->Get(handle),action);
+    }
+    void CommandBuffer::SetRenderTargetLoadAction(RDG::RGHandle handle, ELoadStoreAction action)
+    {
+        SetRenderTargetLoadAction(_render_graph->Resolve<RenderTexture>(handle), action);
     }
     void CommandBuffer::StateTransition(GpuResource* res,EResourceState new_state,u32 sub_res)
     {

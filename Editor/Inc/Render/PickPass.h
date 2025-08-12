@@ -40,7 +40,7 @@ namespace Ailu
             Ref<RenderTexture> _pick_buf = nullptr;
             Ref<RenderTexture> _pick_buf_depth = nullptr;
             Ref<ComputeShader> _read_pickbuf;
-            GPUBuffer *_readback_buf;
+            Ref<GPUBuffer> _readback_buf;
             Vector4f _params;
         };
     }

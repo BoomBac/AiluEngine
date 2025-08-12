@@ -1,5 +1,5 @@
 # https://blog.csdn.net/weixin_43717839/article/details/128032486
-cmake_minimum_required (VERSION 3.5)
+cmake_minimum_required (VERSION 3.8)
 
 project (AiluEditor)
 set(EDITOR_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)
@@ -29,18 +29,8 @@ endfunction()
 add_source_files_recursive(${EDITOR_ROOT_PATH}/Src)
 add_source_files_recursive(${EDITOR_ROOT_PATH}/Inc)
 
-# 文件夹结构映射
-# source_group(TREE "${EDITOR_ROOT_PATH}/Src" PREFIX "Src" FILES ${PROJECT_SOURCES})
-# source_group(TREE "${EDITOR_ROOT_PATH}/Inc" PREFIX "Inc" FILES ${PROJECT_SOURCES})
-
-#aux_source_directory (${CMAKE_SOURCE_DIR}/Ext/imgui IMGUI_ROOT)
-#set(IMGUI_BACKENDS ${CMAKE_SOURCE_DIR}/Ext/imgui/backends/imgui_impl_dx12.cpp;${CMAKE_SOURCE_DIR}/Ext/imgui/backends/imgui_impl_win32.cpp)
-# aux_source_directory (Src Editor_src_dir)
-# 为目标添加 include 目录
-# ${ENGINE_ROOT_PATH}/Ext/implot/implot_internal.h ${ENGINE_ROOT_PATH}/Ext/implot/implot.cpp ${ENGINE_ROOT_PATH}/Ext/implot/implot_demo.cpp ${ENGINE_ROOT_PATH}/Ext/implot/implot_items.cpp
-add_executable(Editor WIN32 ${PROJECT_SOURCES}
-        Src/Common/Undo.cpp Inc/Common/Undo.h Inc/Widgets/PlaceActors.h Src/Render/CommonRenderPipeline.cpp "Inc/Render/PickPass.h" "Src/Render/PickPass.cpp" "Inc/Widgets/AnimClipEditor.h" "Src/Widgets/AnimClipEditor.cpp" "Src/Widgets/BlendSpaceEditor.cpp")
-
+add_executable(Editor WIN32 ${PROJECT_SOURCES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${PROJECT_SOURCES})
 
 # 包含路径
 target_include_directories(Editor PUBLIC ${EDITOR_ROOT_PATH}/)

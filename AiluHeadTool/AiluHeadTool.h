@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <filesystem>
 #include <mutex>
 #include <vector>
@@ -39,6 +39,9 @@ public:
         bool _is_static = false;
         bool _is_public = false;
         bool _is_enum = false;
+        bool _is_pointer = false;
+        bool _is_reference = false;
+        bool _is_primitive = false;
         //function
         bool _is_const = false;
         bool _is_virtual = false;
@@ -64,7 +67,9 @@ public:
     {
         std::string _name;
         std::string _underlying_type;
-        std::vector<std::tuple<std::string, uint32_t>> _members;
+        std::string _decl_type;
+        std::string _namespace;
+        std::vector<std::tuple<std::string, int>> _members;
         bool _is_enum_class;
     };
 

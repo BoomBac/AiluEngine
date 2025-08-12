@@ -2,16 +2,23 @@
 #ifdef __OBJECT_GEN_H__
 #error Object.gen.h already included, missing '#pragma once' in Object.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __OBJECT_GEN_H__
 //Class Object begin...........................
 #define OBJECT_GEN_H_16_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_Object_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_Object_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const;
-                            //Class Object end...........................
+                            namespace Ailu {class Type;}
+namespace Ailu{
+class Object ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Object>();
+//Class Object end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID OBJECT_GEN_H

@@ -1,4 +1,4 @@
-﻿//// AiluHeadTool.cpp : Source file for your target.
+//// AiluHeadTool.cpp : Source file for your target.
 ////
 #include "AiluHeadTool.h"
 #include "Timer.h"
@@ -69,46 +69,38 @@ static void ParserStructInfo(const std::string &line, AiluHeadTool::ClassInfo &i
     else { aht.Log(std::format("ParserClassInfo failed with line: {}", line)); }
 }
 
-static void ParserEnumInfo(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
+static void ParserEnumClass(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
 {
-    // 正则表达式解释：
-    // - `enum\s+`：匹配 "enum " 或 "enum class "
-    // - `(?:class\s+)?`：可选的 "class" 关键字
-    // - `(\w+)`：匹配枚举的名称
-    // - `(?:\s*:\s*(\w+))?`：匹配可选的继承类型，如 `: uint32_t`
+    // 捕获顺序：
+    // [1] 可选的 "class "
+    // [2] 枚举名
+    // [3] 可选的底层类型
     std::regex pattern(R"(enum\s+(class\s+)?(\w+)(?:\s*:\s*(\w+))?)");
     std::smatch matches;
 
     if (std::regex_search(line, matches, pattern))
     {
-        info._is_enum_class = matches[1].matched;// 是否为 enum class
-        info._name = matches[2].str();// 枚举名称
+        // 是 enum class 吗？
+        info._is_enum_class = matches[1].matched;
 
+        // 保存名称
+        info._name = matches[2].str();
+
+        // 保存底层类型
         if (matches[3].matched)
-        {
-            info._underlying_type = matches[3].str();// 枚举的底层类型
-        }
+            info._underlying_type = matches[3].str();
         else
-        {
-            info._underlying_type = "";// 如果没有底层类型，设置为空字符串
-        }
+            info._underlying_type = "i32";// 默认底层类型
+
+        // 保存声明方式
+        if (info._is_enum_class)
+            info._decl_type = "enum class";
+        else
+            info._decl_type = "enum";
     }
-    else { aht.Log(std::format("ParserEnumInfo failed with line: {}", line)); }
-}
-
-static void ParserEnumClass(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
-{
-    std::regex enumRegex(
-            R"((?:(\b_API\(.*?\)\b)\s*)?enum\s+(?:class|struct)?\s*(\w+)?(?:\s*:\s*\w+)?)");
-
-    std::smatch match;
-    std::string::const_iterator searchStart(line.cbegin());
-
-    while (std::regex_search(searchStart, line.cend(), match, enumRegex))
+    else
     {
-        if (match[2].matched) info._name = match[2].str();
-        info._is_enum_class = line.find("class") != std::string::npos;
-        searchStart = match.suffix().first;
+        aht.Log(std::format("ParserEnumClass failed with line: {}", line));
     }
 }
 
@@ -143,20 +135,26 @@ static void ParserEnumValues(const std::string &line, AiluHeadTool::EnumInfo &in
     if (parser_num == 0) { aht.Log(std::format("ParserEnumValues failed with line: {}", line)); }
 }
 
-
 static void ParserPropertyInfo(const std::string &line, AiluHeadTool::MemberInfo &info, AiluHeadTool &aht)
 {
-    std::regex pattern(R"((static\s+)?([\w\*]+(?:\s*::\s*\w+)?)\s+(\w+)\s*(=\s*[^;]+)?;)");
+    std::regex pattern(R"((static\s+)?([\w:]+(?:<[^<>]*>)?)\s*([\*\&]*)\s+(\w+)\s*(=\s*[^;]+)?;)");
     std::smatch matches;
     if (std::regex_search(line, matches, pattern))
     {
         info._is_static = matches[1].matched;
         info._type = matches[2].str();
-        info._name = matches[3].str();
-        info._is_enum = info._type[0] == 'E' && std::isupper(info._type[1]);
+        std::string ptrref = matches[3].str();
+        info._is_pointer = ptrref.find('*') != std::string::npos;
+        info._is_reference = ptrref.find('&') != std::string::npos;
+        info._name = matches[4].str();
+        info._is_enum = info._type.size() > 1 && info._type[0] == 'E' && std::isupper(info._type[1]);
     }
-    else { aht.Log(std::format("ParserPropertyInfo failed with line: {}", line)); }
+    else
+    {
+        aht.Log(std::format("ParserPropertyInfo failed with line: {}", line));
+    }
 }
+
 
 static std::vector<std::string> SplitParams(const std::string &params)
 {
@@ -262,7 +260,7 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
 {
     using std::endl;
     std::string full_name = class_info._namespace + "::" + class_info._name;
-    file << std::format("Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace, class_info._name) << std::endl;
+    file << std::format("const Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace, class_info._name) << std::endl;
     file << "{" << std::endl;
     file << std::format("static std::unique_ptr<Ailu::Type> cur_type = nullptr;") << std::endl;
     file << std::format("if(cur_type == nullptr)") << std::endl;
@@ -294,9 +292,13 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
             file << cur_meta << "._is_range=" << (BOOL_STR(mem._meta._is_range)) << ";" << std::endl;
             file << cur_meta << "._is_float_range=" << (BOOL_STR(mem._meta._is_float_range)) << ";" << std::endl;
             file << cur_meta << "._is_color=" << (BOOL_STR(mem._meta._is_color)) << ";" << std::endl;
-            auto s = std::format(R"(initializer._properties.emplace_back(MemberInfoInitializer(EMemberType::kProperty,"{}","{}", {}, {},{},&{}::{},{},{}));)",
-                                 mem._name, mem._type, BOOL_STR(mem._is_static), BOOL_STR(mem._is_public), std::format("offsetof({},{})", class_info._name, mem._name), class_info._name, mem._name, cur_meta, BOOL_STR(mem._is_const));
-            file << s << std::endl;
+            auto init_name = "initializer_" + mem._name;
+            std::string init_str = std::format("MemberInfoInitializer {} = {{EMemberType::kProperty, \"{}\", \"{}\", {}, &{}::{}, {}, {}, {}, {}, {}, {}, {}, nullptr, nullptr}};", init_name, mem._name, mem._type, std::format("offsetof({},{})", class_info._name, mem._name), class_info._name, mem._name, cur_meta, BOOL_STR(mem._is_static), BOOL_STR(mem._is_public),BOOL_STR(mem._is_const), BOOL_STR(mem._is_pointer), BOOL_STR(mem._is_reference),false);
+            file << init_str << std::endl;
+            file << init_name << "._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<" << mem._type << ">);" << std::endl;
+            file << init_name << "._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<" << mem._type << ">);" << std::endl;
+            file << init_name << "._type = Ailu::Type::Find(\"" << mem._type << "\");" << std::endl;
+            file << std::format("initializer._properties.emplace_back({});", init_name) << std::endl;
         }
     }
     file << "cur_type = std::make_unique<Ailu::Type>(initializer);" << std::endl;
@@ -305,12 +307,16 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
     file << "return cur_type.get();" << std::endl;
     file << "}" << std::endl;
     file << std::endl;
-    file << std::format("Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
+    file << std::format("const Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
     file << "{" << std::endl;
-    file << std::format("\tstatic Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
+    file << std::format("\tstatic const Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
     file << std::format("\treturn type;") << std::endl;
     file << "}" << std::endl;
     file << std::endl;
+    file << std::format("template<> const Ailu::Type* Ailu::StaticClass<{}::{}>()", class_info._namespace, class_info._name) << std::endl;
+    file << "{" << std::endl;
+    file << "return " << std::format("{}::StaticType();", full_name) << std::endl;
+    file << "}" << std::endl;
     if (!class_info._is_struct)
     {
         file << std::format("    const Type *{}::GetType() const", full_name) << std::endl;
@@ -320,6 +326,36 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
     }
 }
 
+static void GenerateEnumTypeInfo(const AiluHeadTool::EnumInfo &enum_info, std::ofstream &file)
+{
+    std::string type_ins_name = std::format("s_enum_type_{}", enum_info._name);
+    file << std::format("static std::unique_ptr<Ailu::Enum> {} = nullptr;", type_ins_name) << std::endl;
+    std::string construct_enum_func = std::format("Z_Construct_Enum_{}_Type", enum_info._name);
+    file << "//Enum " << enum_info._name << " begin..........................." << std::endl;
+    file << std::format("const Ailu::Enum* Z_Construct_Enum_{}_Type()", enum_info._name) << std::endl;
+    file << "{" << std::endl;
+    file << std::format("if({} == nullptr)", type_ins_name) << std::endl;
+    file << "{" << std::endl;
+    file << "EnumInitializer initializer;" << std::endl;
+    file << std::format("initializer._name = \"{}\"", enum_info._name) << ";" << std::endl;
+    for (auto &mem: enum_info._members)
+    {
+        auto &[name, id] = mem;
+        file << std::format("initializer._str_to_enum_lut[\"{}\"] = {};", name, id) << std::endl;
+    }
+    file << std::format("{} = std::make_unique<Ailu::Enum>(initializer);", type_ins_name) << std::endl;
+    file << std::format("Ailu::Enum::RegisterEnum({}.get());", type_ins_name) << std::endl;
+    file << "}" << std::endl;
+    file << "return "<<type_ins_name << ".get();" << std::endl;
+    file << "}" << std::endl;
+    file << std::format("static Ailu::EnumTypeRegister g_register_{}({});", enum_info._name, construct_enum_func) << std::endl;
+    file << std::format("template<> const Ailu::Enum* Ailu::StaticEnum<{}::{}>()", enum_info._namespace, enum_info._name) << std::endl;
+    file << "{" << std::endl;
+    file << "return " << type_ins_name << ".get();" << std::endl;
+    file << "}" << std::endl;
+    file << "//Enum " << enum_info._name << " end..........................." << std::endl;
+    file << std::endl;
+}
 void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string work_namespace)
 {
     g_Timer.start();
@@ -405,6 +441,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                                 }
                             }
                             else { Log("[Error]: the next line of enum define must only have {"); }
+                            enum_info._namespace = cur_namespace;
                         }
                         if (!enum_info._members.empty()) _enums.emplace_back(enum_info);
                         has_enum_marked = false;
@@ -552,6 +589,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 out_file << "#ifdef " << unique_def << std::endl;
                 out_file << "#error " << out_path.filename().string() << " already included, missing '#pragma once' in " << path.filename().string() << std::endl;
                 out_file << "#endif " << std::endl;
+                out_file << "#include \"Objects/ReflectTemplate.h\"" << std::endl;
                 out_file << "#define " << unique_def << std::endl;
                 for (const auto &class_info: _classes)
                 {
@@ -566,10 +604,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     {
                         generate_body = R"(
                             private: \
-                                friend Type* Z_Construct_TClass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TClass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const;
                             )";
                     }
@@ -577,10 +615,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     {
                         generate_body = R"(
                             private: \
-                                friend Type* Z_Construct_TClass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TClass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const override;
                             )";
                     }
@@ -591,6 +629,13 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         pos += class_info._name.length();
                     }
                     out_file << generate_body;
+                    out_file << "namespace Ailu {class Type;}" << std::endl;
+                    out_file << "namespace " << class_info._namespace << "{" << std::endl;
+                    out_file << "class " << class_info._name << " ;" << std::endl;
+                    out_file << "}" << std::endl;
+                    out_file << "template<>" << std::endl;
+                    std::string full_name = class_info._namespace + "::" + class_info._name;
+                    out_file << std::format("AILU_API const class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
                     out_file << "//Class " << class_info._name << " end..........................." << std::endl;
                     out_file << std::endl;
                 }
@@ -602,10 +647,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     size_t pos = 0;
                     std::string generate_body = R"(
                             private: \
-                                friend Type* Z_Construct_TClass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TClass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};
                             )";
 
                     while ((pos = generate_body.find(search, pos)) != std::string::npos)
@@ -614,16 +659,29 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         pos += struct_info._name.length();
                     }
                     out_file << generate_body;
+                    out_file << "namespace Ailu {class Type;}" << std::endl;
+                    out_file << "namespace " << struct_info._namespace << "{" << std::endl;
+                    out_file << "struct " << struct_info._name << " ;" << std::endl;
+                    out_file << "}" << std::endl;
+                    out_file << "template<>" << std::endl;
+                    std::string full_name = struct_info._namespace + "::" + struct_info._name;
+                    out_file << std::format("AILU_API const class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
                     out_file << "//Struct " << struct_info._name << " end..........................." << std::endl;
                     out_file << std::endl;
                 }
                 for (auto &enum_info: _enums)
                 {
                     out_file << "//Enum " << enum_info._name << " begin..........................." << std::endl;
-                    std::string func_name = std::format("void Z_Construct_Enum_{}_Type()", enum_info._name);
+                    std::string func_name = std::format("const Ailu::Enum* Z_Construct_Enum_{}_Type()", enum_info._name);
                     out_file << func_name <<";" << std::endl;
-                    // out_file << "template<>" << std::endl;
-                    // out_file << std::format("Ailu::Enum* Ailu::Enum::StaticEnum<{}>() return {};",enum_info._name,func_name)<< std::endl;
+                    out_file << "namespace " << enum_info._namespace << " { " << std::endl;
+                    out_file << enum_info._decl_type << " " << enum_info._name << " : " << enum_info._underlying_type <<";"<< std::endl;
+                    out_file << "}" << std::endl;
+                    out_file << "template<>" << std::endl;
+                    std::string full_name = enum_info._namespace + "::" + enum_info._name;
+                    out_file << std::format("AILU_API const Ailu::Enum* Ailu::StaticEnum<{}>();", full_name) <<std::endl;
+                    //out_file << " return " << std::format("Z_Construct_Enum_{}_Type()", enum_info._name) << ";" << std::endl;
+                    //out_file << "}" << std::endl;
                     out_file << "//Enum " << enum_info._name << " end..........................." << std::endl;
                     out_file << std::endl;
                 }
@@ -650,30 +708,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                 for (const auto &struct_info: _structs)
                     GenerateClassTypeInfo(struct_info, cpp_file);
                 for (auto &enum_info: _enums)
-                {
-                    std::string construct_enum_func = std::format("Z_Construct_Enum_{}_Type", enum_info._name);
-                    cpp_file << "//Enum " << enum_info._name << " begin..........................." << std::endl;
-                    //cpp_file << std::format("static Ailu::EnumTypeRegister g_register_{}({});", enum_info._name, construct_enum_func) << std::endl;
-                    cpp_file << std::format("void Z_Construct_Enum_{}_Type()", enum_info._name) << std::endl;
-                    cpp_file << "{" << std::endl;
-                    cpp_file << std::format("static std::unique_ptr<Ailu::Enum> cur_type = nullptr;") << std::endl;
-                    cpp_file << std::format("if(cur_type == nullptr)") << std::endl;
-                    cpp_file << "{" << std::endl;
-                    cpp_file << "EnumInitializer initializer;" << endl;
-                    cpp_file << std::format("initializer._name = \"{}\"", enum_info._name) << ";" << endl;
-                    for (auto &mem: enum_info._members)
-                    {
-                        auto &[name, id] = mem;
-                        cpp_file << std::format("initializer._str_to_enum_lut[\"{}\"] = {};", name, id) << std::endl;
-                    }
-                    cpp_file << "cur_type = std::make_unique<Ailu::Enum>(initializer);" << std::endl;
-                    cpp_file << "Ailu::Enum::RegisterEnum(cur_type.get());" << std::endl;
-                    //cpp_file << "return cur_type.get();" << std::endl;
-                    cpp_file << "}" << std::endl;
-                    cpp_file << "}" << std::endl;
-                    cpp_file << "//Enum " << enum_info._name << " end..........................." << std::endl;
-                    cpp_file << std::endl;
-                }
+                    GenerateEnumTypeInfo(enum_info, cpp_file);
                 cpp_file.close();
                 Log(std::format("AiluHeadTool::Parser create file {} succeed!", cpp_path.string()));
                 std::string all_classes, all_structs, all_enums;

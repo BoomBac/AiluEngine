@@ -28,6 +28,87 @@ namespace Ailu::Render
     PostProcessPass::~PostProcessPass()
     {
     }
+
+    void Ailu::Render::PostProcessPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData & rendering_data)
+    {
+        RenderTexture *scene_color = rendering_data._postprocess_input ? rendering_data._postprocess_input : g_pRenderTexturePool->Get(rendering_data._camera_color_target_handle);
+        u16 iterator_count = std::min<u16>(Texture::MaxMipmapCount(rendering_data._width, rendering_data._height), _bloom_iterator_count);
+        Vector<RDG::RGHandle> bloom_mips;
+        for (u16 i = 1; i <= iterator_count; i++)
+        {
+            u16 cur_mip_width = rendering_data._width >> i;
+            u16 cur_mip_height = rendering_data._height >> i;
+            TextureDesc desc;
+            desc._width = cur_mip_width;
+            desc._height = cur_mip_height;
+            desc._format = ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::kDefaultHDR);
+            desc._is_color_target = true;
+            desc._load = ELoadStoreAction::kNotCare;
+            bloom_mips.emplace_back(graph.GetOrCreate(desc, std::format("BloomMip_{}", i - 1)));
+        }
+        //down sample
+        for (u16 i = 0; i < iterator_count; i++)
+        {
+            auto& input = i == 0 ? rendering_data._rg_handles._color_target : bloom_mips[i - 1];
+            auto& output = bloom_mips[i];
+            graph.AddPass(std::format("Downsample_{}",i), RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+            { 
+                builder.Read(input);
+                builder.Write(output);
+            }, [=,this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            { 
+                cmd->SetRenderTarget(output);
+                f32 blur_radius = _upsample_radius / (f32) i;
+                Vector4f v{1.0f / (f32) (rendering_data._width >> i), 1.0f / (f32) (rendering_data._height >> i), blur_radius, _bloom_intensity};
+                _bloom_mats[i]->SetVector("_SampleParams", v);
+                _bloom_mats[i]->SetTexture("_SourceTex", graph.Resolve<Texture>(input));
+                cmd->DrawFullScreenQuad(_bloom_mats[i].get(), 1);
+            });
+        }
+        //up sample
+        for (u16 i = (u16) bloom_mips.size() - 1; i > 0; i--)
+        {
+            auto &cur_mip = bloom_mips[i];
+            auto &next_mip = bloom_mips[i - 1];
+            graph.AddPass(std::format("Upsample_{}", i), RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+            { 
+                builder.Read(cur_mip);
+                builder.Write(next_mip); 
+            }, [=, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            { 
+                cmd->SetRenderTarget(next_mip);
+                _bloom_mats[i]->SetTexture("_SourceTex", graph.Resolve<Texture>(cur_mip));
+                cmd->DrawFullScreenQuad(_bloom_mats[i].get(), 2); 
+            });
+        }
+        //TODO:TAA input
+        auto& final_input = rendering_data._rg_handles._color_tex;
+        graph.AddPass("Compose", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+        { 
+            builder.Read(final_input);
+            builder.Read(bloom_mips[0]);
+            builder.Write(rendering_data._rg_handles._color_target); 
+        }, [=, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        { 
+            cmd->SetRenderTarget(data._rg_handles._color_target);
+            //Vector4f light_pos = -rendering_data._mainlight_world_position * 10000;
+            //light_pos.w = 1.0f;
+            //Matrix4x4f vp = rendering_data._camera->GetView() * rendering_data._camera->GetProj();
+            //TransformVector(light_pos, vp);
+            //light_pos.xy /= light_pos.w;
+            //light_pos.w = 1.0f;
+            //light_pos.xy = light_pos.xy * 0.5f + 0.5f;
+            //light_pos.y = 1.0f - light_pos.y;
+            ////LOG_INFO("light_pos {}", light_pos.ToString());
+            //_bloom_mats[0]->SetVector("_SunScreenPos", light_pos);
+
+            //_bloom_mats[0]->SetVector("_NoiseTex_TexelSize", _noise_texel_size);
+            //_bloom_mats[0]->SetTexture("_NoiseTex", _nose_tex);
+            _bloom_mats[0]->SetTexture("_SourceTex", graph.Resolve<Texture>(final_input));
+            _bloom_mats[0]->SetTexture("_BloomTex", graph.Resolve<Texture>(bloom_mips[0]));
+            cmd->DrawFullScreenQuad(_bloom_mats[0].get(), 3);
+        });
+    }
     void PostProcessPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
         _bloom_thread_rect.width = rendering_data._width >> 1;
@@ -41,8 +122,12 @@ namespace Ailu::Render
         {
             u16 cur_mip_width = rendering_data._width >> i;
             u16 cur_mip_height = rendering_data._height >> i;
-            RenderTextureDesc desc = RenderTextureDesc(cur_mip_width,cur_mip_height);
-            desc._load_action = ELoadStoreAction::kNotCare;
+            TextureDesc desc;
+            desc._width = cur_mip_width;
+            desc._height = cur_mip_height;
+            desc._format = ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::kDefaultHDR);
+            desc._is_color_target = true;
+            desc._load = ELoadStoreAction::kNotCare;
             bloom_mips.emplace_back(RenderTexture::GetTempRT(desc, std::format("bloom_mip_{}", i)));
         }
         cmd->Clear();

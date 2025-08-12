@@ -29,7 +29,7 @@ namespace Ailu
             virtual ~GraphicsContext() = default;
             virtual void Init() = 0;
             virtual void Present() = 0;
-            virtual u64 GetFenceValueGPU() const = 0;
+            virtual u64 GetFenceValueGPU() = 0;
             virtual u64 GetFenceValueCPU() const = 0;
             /// @brief 提交命令，帧结束时执行或者渲染线程异步执行
             /// @param cmd

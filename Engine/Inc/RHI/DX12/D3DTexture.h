@@ -62,7 +62,7 @@ namespace Ailu::RHI::DX12
         friend class DDSParser;
 
     public:
-        D3DTexture2D(const Render::Texture2DInitializer& initializer);
+        D3DTexture2D(const Render::TextureDesc& initializer);
         ~D3DTexture2D();
         void Release() final;
         //for texture2d(s)
@@ -104,7 +104,7 @@ namespace Ailu::RHI::DX12
     class D3DTexture3D : public Render::Texture3D
     {
     public:
-        explicit D3DTexture3D(const Render::Texture3DInitializer &initializer);
+        explicit D3DTexture3D(const Render::TextureDesc &initializer);
         ~D3DTexture3D() override;
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) final;
         [[nodiscard]] TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) const final;
@@ -130,7 +130,7 @@ namespace Ailu::RHI::DX12
         inline const static Vector4f kClearColor = Colors::kBlack;
 
     public:
-        D3DRenderTexture(const RenderTextureDesc &desc);
+        D3DRenderTexture(const TextureDesc &desc);
         ~D3DRenderTexture() final;
         void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
         //for texture2d(s)
@@ -149,7 +149,7 @@ namespace Ailu::RHI::DX12
         void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
         D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(RHICommandBuffer *cmd, u16 index);
         
-        private:
+    private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
     private:

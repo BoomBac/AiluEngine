@@ -48,42 +48,86 @@ namespace Ailu
         {
             return _rect;
         }
-        void UIElement::Render()
+        void Ailu::UI::UIElement::Render(UIRenderer& r)
         {
             if (!_is_visible)
                 return;
             for (auto child: _children)
             {
-                child->Render();
+                child->Render(r);
             }
         }
+        void UIElement::OnEvent(UIEvent &e)
+        {
+            if (e._is_handled)
+                return;
+            switch (e._type)
+            {
+                case UIEvent::EType::kMouseEnter:
+                    _eventmap[UIEvent::EType::kMouseEnter].Invoke(e);
+                    SetElementState(EElementState::kHover);
+                    break;
+                case UIEvent::EType::kMouseExit:
+                    _eventmap[UIEvent::EType::kMouseExit].Invoke(e);
+                    SetElementState(EElementState::kNormal);
+                    break;
+                case UIEvent::EType::kMouseDown:
+                    _eventmap[UIEvent::EType::kMouseDown].Invoke(e);
+                    SetElementState(EElementState::kPressed);
+                    break;
+                case UIEvent::EType::kMouseUp:
+                    _eventmap[UIEvent::EType::kMouseUp].Invoke(e);
+                    SetElementState(EElementState::kNormal);
+                    break;
+                case UIEvent::EType::kMouseDoubleClick:
+                    _eventmap[UIEvent::EType::kMouseDoubleClick].Invoke(e);
+                    SetElementState(EElementState::kNormal);
+                    break;
+                case UIEvent::EType::kMouseClick:
+                    _eventmap[UIEvent::EType::kMouseClick].Invoke(e);
+                    SetElementState(EElementState::kNormal);
+                    break;
+                case UIEvent::EType::kMouseMove:
+                    _eventmap[UIEvent::EType::kMouseMove].Invoke(e);
+                    SetElementState(IsPointInside(e._mouse_position) ? EElementState::kHover : EElementState::kNormal);
+                    break;
+                default:
+                    AL_ASSERT(false);
+                    break;
+            }
+        }
+
         Event &UIElement::OnMouseEnter()
         {
-            return _on_mouse_enter;
+            return _eventmap[UIEvent::EType::kMouseEnter];
         }
         Event &UIElement::OnMouseExit()
         {
-            return _on_mouse_exit;
+            return _eventmap[UIEvent::EType::kMouseExit];
         }
         Event &UIElement::OnMouseDown()
         {
-            return _on_mouse_move;
+            return _eventmap[UIEvent::EType::kMouseDown];
         }
         Event &UIElement::OnMouseUp()
         {
-            return _on_mouse_up;
+            return _eventmap[UIEvent::EType::kMouseUp];
         }
         Event &UIElement::OnMouseDoubleClick()
         {
-            return _on_mouse_double_click;
+            return _eventmap[UIEvent::EType::kMouseDoubleClick];
         }
         Event &UIElement::OnMouseMove()
         {
-            return _on_mouse_move;
+            return _eventmap[UIEvent::EType::kMouseMove];
         }
-        void UIElement::SetDeservedRect(f32 x, f32 y, f32 width, f32 height)
+        Event &UIElement::OnMouseClick()
         {
-            _deserved_rect = {x,y,width,height};
+            return _eventmap[UIEvent::EType::kMouseClick];
+        }
+        void UIElement::SetDesiredRect(f32 x, f32 y, f32 width, f32 height)
+        {
+            _desired_rect = {x, y, width, height};
         }
         void UIElement::SetVisible(bool visible)
         {
@@ -102,13 +146,21 @@ namespace Ailu
             for (auto child: _children)
                 DESTORY_PTR(child);
         }
-        Vector4f UIElement::GetDeservedRect() const
+        Vector4f UIElement::GetDesiredRect() const
         {
-            return _deserved_rect;
+            return _desired_rect;
         }
-        bool UIElement::IsMouseOver(Vector2f mouse_pos) const
+        bool UIElement::IsPointInside(Vector2f mouse_pos) const
         {
-            return mouse_pos.x >= _deserved_rect.x && mouse_pos.y >= _deserved_rect.y && mouse_pos.x <= _deserved_rect.x + _deserved_rect.z && mouse_pos.y <= _deserved_rect.y + _deserved_rect.w;
+            return mouse_pos.x >= _desired_rect.x && mouse_pos.y >= _desired_rect.y && mouse_pos.x <= _desired_rect.x + _desired_rect.z && mouse_pos.y <= _desired_rect.y + _desired_rect.w;
+        }
+        Vector2f UIElement::GetWorldPosition() const
+        {
+            return Vector2f();
+        }
+        RectTransform UIElement::GetWorldRect() const
+        {
+            return RectTransform();
         }
         void UIElement::SetElementState(EElementState::EElementState state)
         {
@@ -118,10 +170,7 @@ namespace Ailu
         {
             return _state;
         }
-        Event &UIElement::OnMouseClick()
-        {
-            return _on_mouse_click;
-        }
+
 
         //-------------------------------------------------------------------------------------Event---------------------------------------------------------------------------
         void Event::AddListener(const Event::Callback &callback)
@@ -130,9 +179,8 @@ namespace Ailu
         }
         void Event::RemoveListener(const Event::Callback &callback)
         {
-
         }
-        void Event::Invoke(const Ailu::Event &e)
+        void Event::Invoke(UIEvent &e)
         {
             for (auto &callback: _callbacks)
             {
@@ -161,15 +209,15 @@ namespace Ailu
         void Button::Update(f32 dt)
         {
         }
-        void Button::Render()
+        void Ailu::UI::Button::Render(UIRenderer &r)
         {
             if (_state == EElementState::kHover)
-                UIRenderer::DrawQuad(_deserved_rect.xy, _deserved_rect.zw,_depth,Colors::kRed);
+                r.DrawQuad(_desired_rect.xy, _desired_rect.zw, _depth, Colors::kRed);
             else if (_state == EElementState::kNormal)
-                UIRenderer::DrawQuad(_deserved_rect.xy, _deserved_rect.zw, _depth, Colors::kGreen);
-            auto text_size = TextRenderer::CalculateTextSize("Button");
-            Vector2f text_pos = {_deserved_rect.x + _deserved_rect.z / 2 - text_size.x / 2, _deserved_rect.y - (_deserved_rect.w / 2 - text_size.y / 2)};
-            TextRenderer::DrawText("Button", text_pos, 14u,Vector2f::kOne,Colors::kRed);
+                r.DrawQuad(_desired_rect.xy, _desired_rect.zw, _depth, Colors::kGreen);
+            //auto text_size = TextRenderer::CalculateTextSize("Button");
+            //Vector2f text_pos = {_desired_rect.x + _desired_rect.z / 2 - text_size.x / 2, _desired_rect.y - (_desired_rect.w / 2 - text_size.y / 2)};
+            //TextRenderer::DrawText("Button", text_pos, 14u, Vector2f::kOne, Colors::kRed);
         }
     }// namespace UI
 }// namespace Ailu

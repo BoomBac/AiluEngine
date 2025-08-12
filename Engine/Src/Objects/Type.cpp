@@ -3,9 +3,10 @@
 //
 
 #include "Inc/Objects/Type.h"
-#include <Framework/Common/Utils.h>
-#include "Framework/Math/ALMath.hpp"
+#include "Objects/Serialize.h"
 #include "Framework/Common/Log.h"
+#include "Framework/Math/ALMath.hpp"
+#include <Framework/Common/Utils.h>
 
 namespace Ailu
 {
@@ -72,7 +73,7 @@ namespace Ailu
     MemberInfo::MemberInfo(const MemberInfoInitializer &initializer)
     {
         _name = initializer._name;
-        _type = initializer._type;
+        _mem_type = initializer._mem_type;
         _type_name = initializer._type_name;
         _is_public = initializer._is_public;
         _is_static = initializer._is_static;
@@ -80,19 +81,21 @@ namespace Ailu
         _member_ptr = initializer._member_ptr;
         _meta = initializer._meta;
         _is_const = initializer._is_const;
+        _type = initializer._type;
     }
     MemberInfo::MemberInfo() : MemberInfo(MemberInfoInitializer())
     {
     }
     PropertyInfo::PropertyInfo(const MemberInfoInitializer &initializer) : MemberInfo(initializer)
     {
+        _serialize_fn = initializer._serialize_fn;
+        _deserialize_fn = initializer._deserialize_fn;
         _data_type = GetDataTypeFromName(initializer._type_name);
     }
 
-String PropertyInfo::StringValue(void *instance) const
+    String PropertyInfo::StringValue(void *instance) const
     {
         const char *ptr = reinterpret_cast<char *>(instance) + _offset;
-
         auto static formatVec = [](auto &v, int dim) -> String
         {
             switch (dim)
@@ -102,7 +105,7 @@ String PropertyInfo::StringValue(void *instance) const
                 case 3:
                     return std::format("{},{},{}", v.data[0], v.data[1], v.data[2]);
                 case 4:
-                    return std::format("{},{},{},{}", v.data[0], v.data[1],v.data[2], v.data[3]);
+                    return std::format("{},{},{},{}", v.data[0], v.data[1], v.data[2], v.data[3]);
                 default:
                     return "[Invalid Vector]";
             }
@@ -171,8 +174,7 @@ String PropertyInfo::StringValue(void *instance) const
     }
 
 
-
-bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
+    bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
     {
         char *ptr = reinterpret_cast<char *>(instance) + _offset;
 
@@ -280,6 +282,19 @@ bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
         }
     }
 
+    void PropertyInfo::Serialize(void *instance, FArchive &ar) const
+    {
+        AL_ASSERT(_serialize_fn != nullptr);
+        const String &name = _name;
+        _serialize_fn(GetFieldPtr(instance), ar, &name);
+    }
+
+    void PropertyInfo::Deserialize(void *instance, FArchive &ar) const
+    {
+        AL_ASSERT(_deserialize_fn != nullptr);
+        const String &name = _name;
+        _deserialize_fn(GetFieldPtr(instance), ar, &name);
+    }
 
 
     //------------------------------------------------------------------------------------------------------------
@@ -293,6 +308,11 @@ bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
                     type->_base = type;
                     type->_base_name = type->FullName();
                 } });
+        if (!s_is_base_type_init)
+        {
+            InitBaseTypeInfo();
+            s_is_base_type_init = true;
+        }
         if (!s_global_types.contains(type->FullName()))
         {
             for (auto &it: s_global_types)
@@ -369,10 +389,12 @@ bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
         _namespace = initializer._namespace;
         _is_class = initializer._is_class;
         _is_abstract = initializer._is_abstract;
+        _is_enum = false;
         _properties = initializer._properties;
         _functions = initializer._functions;
         _size = initializer._size;
         _base_name = initializer._base_name;
+        _base = nullptr;
         for (auto &prop: _properties)
             _members.emplace_back(&prop);
         for (auto &func: _functions)
@@ -384,25 +406,28 @@ bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
     {
         return _size;
     }
-    PropertyInfo *Type::FindPropertyByName(const String &name)
+    PropertyInfo *Type::FindPropertyByName(const String &name) const
     {
         if (_members_lut.contains(name))
-            return dynamic_cast<PropertyInfo *>(_members_lut[name]);
+            return dynamic_cast<PropertyInfo *>(_members_lut.at(name));
         return nullptr;
     }
-    FunctionInfo *Type::FindFunctionByName(const String &name)
+    FunctionInfo *Type::FindFunctionByName(const String &name) const
     {
         if (_members_lut.contains(name))
-            return dynamic_cast<FunctionInfo *>(_members_lut[name]);
+            return dynamic_cast<FunctionInfo *>(_members_lut.at(name));
         return nullptr;
     }
     const std::set<Type *> &Type::DerivedTypes() const
     {
         return _derived_types;
     }
+
     //---------------------------------------------------------------------------------------Enum------------------------------------------------------------------------------
-    Enum::Enum(const EnumInitializer &initializer) : Object(initializer._name)
+    Enum::Enum(const EnumInitializer &initializer) : Type(TypeInitializer{})
     {
+        _name = initializer._name;
+        _is_enum = true;
         _str_to_enum_lut = initializer._str_to_enum_lut;
         for (auto &pair: _str_to_enum_lut)
         {
@@ -429,6 +454,7 @@ bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
     void Enum::RegisterEnum(Enum *enum_ptr)
     {
         s_global_enums[enum_ptr->Name()] = enum_ptr;
+        Type::RegisterType(enum_ptr);
     }
     i32 Enum::GetIndexByName(const std::string &name) const
     {
@@ -438,4 +464,74 @@ bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
         }
         return -1;
     }
+
+
+    //---------------------------------------------
+
+    //template<T>
+    static void RegisterHelper(const String &name, u32 size)
+    {
+        TypeInitializer initializer;
+        initializer._base_name = "";
+        initializer._name = name;
+        initializer._full_name = name;
+        initializer._namespace = "";
+        initializer._is_abstract = false;
+        initializer._is_class = false;
+        initializer._size = size;
+        Type::RegisterType(new Type(initializer));
+    }
+    void Type::InitBaseTypeInfo()
+    {
+        static auto make_base_type = [](const String &name, u32 size)->Type*
+        {
+            TypeInitializer initializer;
+            initializer._base_name = "";
+            initializer._name = name;
+            initializer._full_name = name;
+            initializer._namespace = "";
+            initializer._is_abstract = false;
+            initializer._is_class = false;
+            initializer._size = size;
+            return new Type(initializer);
+        };
+        Vector<Type *> all_base_types;
+#define MAKE_BASE_TYPE(name) all_base_types.push_back(make_base_type(#name, sizeof(name)))
+        MAKE_BASE_TYPE(i8);
+        MAKE_BASE_TYPE(u8);
+        MAKE_BASE_TYPE(i16);
+        MAKE_BASE_TYPE(u16);
+        MAKE_BASE_TYPE(i32);
+        MAKE_BASE_TYPE(u32);
+        MAKE_BASE_TYPE(i64);
+        MAKE_BASE_TYPE(u64);
+        MAKE_BASE_TYPE(f32);
+        MAKE_BASE_TYPE(f64);
+        MAKE_BASE_TYPE(bool);
+        MAKE_BASE_TYPE(String);
+        MAKE_BASE_TYPE(Vector2f);
+        MAKE_BASE_TYPE(Vector3f);
+        MAKE_BASE_TYPE(Vector4f);
+        MAKE_BASE_TYPE(Vector2Int);
+        MAKE_BASE_TYPE(Vector3Int);
+        MAKE_BASE_TYPE(Vector4Int);
+        MAKE_BASE_TYPE(Vector2UInt);
+        MAKE_BASE_TYPE(Vector3UInt);
+        MAKE_BASE_TYPE(Vector4UInt);
+        for (auto *type: all_base_types)
+            s_global_types[type->FullName()] = type;
+    }
+
+    IMPL_STATIC_TYPE(i8)
+    IMPL_STATIC_TYPE(u8)
+    IMPL_STATIC_TYPE(i16)
+    IMPL_STATIC_TYPE(u16)
+    IMPL_STATIC_TYPE(i32)
+    IMPL_STATIC_TYPE(u32)
+    IMPL_STATIC_TYPE(i64)
+    IMPL_STATIC_TYPE(u64)
+    IMPL_STATIC_TYPE(f32)
+    IMPL_STATIC_TYPE(f64)
+    IMPL_STATIC_TYPE(bool)
+    IMPL_STATIC_TYPE(String)
 }// namespace Ailu

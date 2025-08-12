@@ -3,6 +3,7 @@
 //
 
 #include "Inc/UI/Canvas.h"
+#include "Render/Texture.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Events/MouseEvent.h"
 #include "Render/CommandBuffer.h"
@@ -14,58 +15,69 @@ namespace Ailu
     using namespace Render;
     namespace UI
     {
-        Canvas::Canvas()
+        Canvas::Canvas() : Object("Canvas")
         {
             _name = "Canvas";
             _color = RenderTexture::Create(1920, 1080, _name, ERenderTargetFormat::kDefault);
             _depth = RenderTexture::Create(1920, 1080, _name, ERenderTargetFormat::kDepth);
             _size = Vector2f(1920, 1080);
+            _scale = Vector2f(1.0f, 1.0f);
+            _position = Vector2f::kZero;
         }
-        void Canvas::AddChild(UIElement *child, Canvas::Slot slot)
+        void Canvas::BindOutput(RenderTexture *color, RenderTexture *depth)
         {
-            UIElement::AddChild(child);
-            if (!_slots.contains(child->ID()))
-                _slots[child->ID()] = slot;
-
-            child->OnMouseEnter().AddListener([](const Ailu::Event &e)
-                                              { LOG_INFO("mouse enter") });
-            child->OnMouseExit().AddListener([](const Ailu::Event &e)
+            _external_color = color;
+            _external_depth = depth;
+            _is_external_output = true;
+        }
+        void Canvas::AddChild(UIElement *child, Slot slot)
+        {
+            if (_slots.contains(child->ID()))
+            {
+                LOG_WARNING("child already exists");
+                return;
+            }
+            _slots[child->ID()] = SlotItem{slot,child};
+            _children.push_back(child);
+            child->OnMouseEnter() += [](UIEvent &e)
+            { LOG_INFO("mouse enter") };
+            child->OnMouseExit().AddListener([](UIEvent &e)
                                              { LOG_INFO("mouse leave") });
-            child->OnMouseDown().AddListener([](const Ailu::Event &e)
+            child->OnMouseDown().AddListener([](UIEvent &e)
                                              { LOG_INFO("mouse down") });
-            child->OnMouseUp().AddListener([](const Ailu::Event &e)
+            child->OnMouseUp().AddListener([](UIEvent &e)
                                            { LOG_INFO("mouse up") });
-            child->OnMouseClick().AddListener([](const Ailu::Event &e)
+            child->OnMouseClick().AddListener([](UIEvent &e)
                                               { LOG_INFO("mouse click") });
         }
         void Canvas::RemoveChild(UIElement *child)
         {
-            UIElement::RemoveChild(child);
+            std::erase_if(_children, [&](UIElement *c){ return *c == *child; });
             _slots.erase(child->ID());
+            UIElement::Destroy(child);
         }
-        Canvas::Slot &Canvas::GetSlot(UIElement *child)
+        Slot &Canvas::GetSlot(UIElement *child)
         {
-            return _slots[child->ID()];
+            return _slots[child->ID()]._slot;
         }
-        void Canvas::Update(f32 dt)
+        void Canvas::Update()
         {
             Vector2f loc_mouse_pos = Input::GetMousePos() - _position;
-            TextRenderer::DrawText(std::format("MousePos: ({}, {})", loc_mouse_pos.x, loc_mouse_pos.y), Vector2f(0, 0));
+            //TextRenderer::DrawText(std::format("MousePos: ({}, {})", loc_mouse_pos.x, loc_mouse_pos.y), Vector2f(0, 0));
             f32 depth = 0.0f;
             for (auto child: _children)
             {
-                auto &s = _slots[child->ID()];
+                auto &s = _slots[child->ID()]._slot;
                 {
-                    child->SetDeservedRect(s._position.x, s._position.y, s._size.x, s._size.y);
+                    child->SetDesiredRect(s._position.x, s._position.y, s._size.x, s._size.y);
                     child->SetDepth(depth);
                     depth += 0.1f;
                 }
             }
         }
-        void Canvas::Render()
+        void Ailu::UI::Canvas::Render(UIRenderer& r)
         {
-            //auto cmd = CommandBufferPool::Get(_name);
-            if (_size.x > _color->Width() || _size.y > _color->Height())
+            if (!_is_external_output && (_size.x > _color->Width() || _size.y > _color->Height()))
             {
                 _color.reset();
                 _depth.reset();
@@ -73,14 +85,9 @@ namespace Ailu
                 _depth = RenderTexture::Create((u16)_size.x, (u16)_size.y, _name, ERenderTargetFormat::kDepth);
             }
             for (auto &c: _children)
-                c->Render();
-            UI::UIRenderer::Get()->Render(_color.get(), _depth.get());
-            TextRenderer::Get()->Render(_color.get());
+                c->Render(r);
         }
-        RenderTexture *Canvas::GetRenderTexture() const
-        {
-            return _color.get();
-        }
+
         Vector2f Canvas::GetSize() const
         {
             return _size;
@@ -89,64 +96,9 @@ namespace Ailu
         {
             _position = position;
         }
-        void Canvas::OnEvent(Ailu::Event &event)
+        void Canvas::OnEvent(UIEvent &event)
         {
-            if (event.GetEventType() == EEventType::kMouseMoved)
-            {
-                //相对于窗口的坐标
-                MouseMovedEvent e = static_cast<MouseMovedEvent &>(event);
-                //实际返回的是相对于屏幕的坐标
-                Vector2f loc_mouse_pos = Input::GetMousePos() - _position;
-                for (auto child: _children)
-                {
-                    auto &s = _slots[child->ID()];
-                    {
-                        if (child->IsMouseOver(loc_mouse_pos))
-                        {
-                            if (child->GetState() == EElementState::kNormal)
-                                child->OnMouseEnter().Invoke(event);
-                            child->SetElementState(EElementState::kHover);
-                        }
-                        else
-                        {
-                            if (child->GetState() == EElementState::kHover)
-                            {
-                                child->SetElementState(EElementState::kNormal);
-                                child->OnMouseExit().Invoke(event);
-                            }
-                        }
-                    }
-                }
-            }
-            else if (event.GetEventType() == EEventType::kMouseButtonPressed)
-            {
-                MouseButtonPressedEvent e = static_cast<MouseButtonPressedEvent &>(event);
-                for (auto child: _children)
-                {
-                    auto &s = _slots[child->ID()];
-                    if (child->GetState() == EElementState::kHover)
-                    {
-                        child->SetElementState(EElementState::kPressed);
-                        child->OnMouseDown().Invoke(event);
-                    }
-                }
-            }
-            else if (event.GetEventType() == EEventType::kMouseButtonReleased)
-            {
-                MouseButtonReleasedEvent e = static_cast<MouseButtonReleasedEvent &>(event);
-                for (auto child: _children)
-                {
-                    auto &s = _slots[child->ID()];
-                    {
-                        if (child->GetState() == EElementState::kPressed)
-                        {
-                            child->OnMouseUp().Invoke(event);
-                            child->OnMouseClick().Invoke(event);
-                            child->SetElementState(EElementState::kHover);
-                        }
-                    }
-                }
-            }
+
         }
     }// namespace UI
 }// namespace Ailu

@@ -9,7 +9,8 @@
 #include <set>
 #include <tuple>
 #include <utility>
-
+#include <functional>
+#include "ReflectTemplate.h"
 #include "generated/Type.gen.h"
 
 namespace Ailu
@@ -64,18 +65,29 @@ namespace Ailu
         bool _is_float_range = true;
         bool _is_color = false;
     };
+    class FArchive;
+    using SerializeFunc   = void(*)(void* field_ptr,FArchive &ar,const String* path);
+    using DeserializeFunc = void(*)(void* field_ptr,FArchive &ar,const String* path);
 
+    class Type;
     struct AILU_API MemberInfoInitializer
     {
-        EMemberType _type = EMemberType::kTypeInfo;
+        EMemberType _mem_type = EMemberType::kTypeInfo;
         String _name = "MemberInfo";
         String _type_name = "MemberInfo";
-        bool _is_static = false;
-        bool _is_public = false;
         u32 _offset = 0;
         std::any _member_ptr = nullptr;
         Meta _meta;
+        bool _is_static = false;
+        bool _is_public = false;
         bool _is_const = false;
+        bool _is_pointer = false;
+        bool _is_ref = false;
+        bool _is_func = false;
+        //property only
+        SerializeFunc _serialize_fn = nullptr;
+        DeserializeFunc _deserialize_fn = nullptr;
+        const Type *_type;
     };
     class AILU_API MemberInfo
     {
@@ -85,60 +97,44 @@ namespace Ailu
         MemberInfo();
         explicit MemberInfo(const MemberInfoInitializer &initializer);
         virtual ~MemberInfo() = default;
-        [[nodiscard]] EMemberType Type() const { return _type; }
+        [[nodiscard]] EMemberType MemberType() const { return _mem_type; }
+        [[nodiscard]] const Type *SrcType() const { return _type; }
         [[nodiscard]] const String &Name() const { return _name; }
         [[nodiscard]] const String &TypeName() const { return _type_name; }
         [[nodiscard]] const Meta &MetaInfo() const { return _meta; }
-        [[nodiscard]] const bool &IsConst() const { return _is_const; }
-
+        [[nodiscard]] bool IsConst() const { return _is_const; }
+        [[nodiscard]] bool IsPointer() const { return _is_pointer; }
+        [[nodiscard]] bool IsRef() const { return _is_ref; }
+        [[nodiscard]] bool IsFunc() const { return _is_func; }
+        [[nodiscard]] bool IsStatic() const { return _is_static; }
     protected:
-        EMemberType _type;
+        EMemberType _mem_type;
         String _name;
         String _type_name;
-        bool _is_static;
-        bool _is_public;
-        bool _is_const;
+        const Type *_type;
+        union
+        {
+            struct
+            {
+                u32 _is_static : 1;
+                u32 _is_public : 1;
+                u32 _is_const : 1;
+                u32 _is_pointer : 1;
+                u32 _is_ref : 1;
+                u32 _is_func : 1;
+            };
+            u32 _flag;
+        };
+
         std::any _member_ptr;
         u64 _offset;
         Meta _meta;
     };
-    //    class AILU_API FieldInfo : public MemberInfo
-    //    {
-    //        friend class Type;
-    //    public:
-    //        FieldInfo() : MemberInfo() { _type = EMemberType::kField; }
-    //        explicit FieldInfo(const MemberInfoInitializer& initializer);
-    //        ~FieldInfo() override = default;
-    //        template<typename T, typename ClassType>
-    //        T GetValue(const ClassType& instance) const
-    //        {
-    //            if (!_member_ptr.has_value()) {
-    //                throw std::runtime_error("FieldInfo not initialized with a member pointer.");
-    //            }
-    //            auto fieldPtr = std::any_cast<T ClassType::*>(_member_ptr);
-    //            return instance.*fieldPtr;
-    //        }
-    //
-    //        template<typename T, typename ClassType>
-    //        void SetValue(ClassType& instance, const T& value) const
-    //        {
-    //            if (!_member_ptr.has_value()) {
-    //                throw std::runtime_error("FieldInfo not initialized with a member pointer.");
-    //            }
-    //            auto fieldPtr = std::any_cast<T ClassType::*>(_member_ptr);
-    //            instance.*fieldPtr = value;
-    //        }
-    //        [[nodiscard]] const EDataType & DataType() const { return _data_type; }
-    //    private:
-    //        EDataType _data_type = EDataType::kNone;
-    //    };
-
     class AILU_API PropertyInfo : public MemberInfo
     {
         friend class Type;
-
     public:
-        PropertyInfo() : MemberInfo() { _type = EMemberType::kField; }
+        PropertyInfo() : MemberInfo() { _mem_type = EMemberType::kField; }
         explicit PropertyInfo(const MemberInfoInitializer &initializer);
         ~PropertyInfo() override = default;
         template<typename T, typename ClassType>
@@ -150,8 +146,6 @@ namespace Ailu
             }
             const T *value_ptr = reinterpret_cast<const T *>(reinterpret_cast<const char *>(&instance) + _offset);
             return *value_ptr;
-            // auto fieldPtr = std::any_cast<T ClassType::*>(_member_ptr);
-            // return instance.*fieldPtr;
         }
 
         template<typename T, typename ClassType>
@@ -163,8 +157,6 @@ namespace Ailu
             }
             T *value_ptr = reinterpret_cast<T *>(reinterpret_cast<char *>(&instance) + _offset);
             *value_ptr = value;
-            // auto fieldPtr = std::any_cast<T ClassType::*>(_member_ptr);
-            // instance.*fieldPtr = value;
         }
         [[nodiscard]] const EDataType &DataType() const { return _data_type; }
         /// <summary>
@@ -179,7 +171,17 @@ namespace Ailu
         /// <param name="str">The string containing the value to assign.</param>
         /// <returns>True if the value was successfully set from the string; otherwise, false.</returns>
         bool SetValueFromString(void *instance, const String &str) const;
+
+        void Serialize(void *instance, FArchive &ar) const;
+        void Deserialize(void *instance, FArchive &ar) const;
     private:
+        void *GetFieldPtr(void *instance) const
+        {
+            return reinterpret_cast<u8 *>(instance) + _offset;
+        }
+    private:
+        SerializeFunc _serialize_fn = nullptr;
+        DeserializeFunc _deserialize_fn = nullptr;
         EDataType _data_type = EDataType::kNone;
     };
 
@@ -188,7 +190,7 @@ namespace Ailu
         friend class Type;
 
     public:
-        FunctionInfo() : MemberInfo() { _type = EMemberType::kFunction; }
+        FunctionInfo() : MemberInfo() { _mem_type = EMemberType::kFunction; }
         explicit FunctionInfo(const MemberInfoInitializer &initializer) : MemberInfo(initializer) {}
         ~FunctionInfo() override = default;
         // 调用成员函数
@@ -221,12 +223,17 @@ namespace Ailu
     {
     public:
         static void RegisterType(Type *type);
+        static const Type *Find(const String &name) {
+            auto it = s_global_types.find(name);
+            return it != s_global_types.end() ? it->second : nullptr; 
+        };
     public:
         Type();
         explicit Type(TypeInitializer initializer);
         [[nodiscard]] Type *BaseType() const;
         [[nodiscard]] bool IsClass() const;
         [[nodiscard]] bool IsAbstract() const;
+        [[nodiscard]] bool IsEnum() const { return _is_enum; };
         //name without namespace
         [[nodiscard]] String FullName() const;
         [[nodiscard]] String Namespace() const;
@@ -234,8 +241,8 @@ namespace Ailu
         [[nodiscard]] const Vector<FunctionInfo> &GetFunctions() const;
         [[nodiscard]] const Vector<MemberInfo *> &GetMembers() const;
         [[nodiscard]] u32 Size() const;
-        [[nodiscard]] PropertyInfo *FindPropertyByName(const String &name);
-        [[nodiscard]] FunctionInfo *FindFunctionByName(const String &name);
+        [[nodiscard]] PropertyInfo *FindPropertyByName(const String &name) const;
+        [[nodiscard]] FunctionInfo *FindFunctionByName(const String &name) const;
         [[nodiscard]] const std::set<Type *> &DerivedTypes() const;
         // Iterator support
         using PropertyIterator = Vector<PropertyInfo>::const_iterator;
@@ -248,11 +255,17 @@ namespace Ailu
         [[nodiscard]] FunctionIterator FunctionEnd() const { return _functions.end(); }
 
     private:
-        inline static Map<String, Type *> s_global_types;
+        static void InitBaseTypeInfo();
     private:
+        inline static Map<String, Type *> s_global_types;
+        inline static bool s_is_base_type_init = false;
+        SerializeFunc _serialize_fn;
+        DeserializeFunc _deserialize_fn;
+    protected:
         Type *_base;
         bool _is_class;
         bool _is_abstract;
+        bool _is_enum;
         u32 _size;
         String _full_name;
         String _namespace;
@@ -264,18 +277,34 @@ namespace Ailu
         std::set<Type *> _derived_types;
     };
 
+    DECLARE_STATIC_TYPE(i8)
+    DECLARE_STATIC_TYPE(u8)
+    DECLARE_STATIC_TYPE(i16)
+    DECLARE_STATIC_TYPE(u16)
+    DECLARE_STATIC_TYPE(i32)
+    DECLARE_STATIC_TYPE(u32)
+    DECLARE_STATIC_TYPE(i64)
+    DECLARE_STATIC_TYPE(u64)
+    DECLARE_STATIC_TYPE(f32)
+    DECLARE_STATIC_TYPE(f64)
+    DECLARE_STATIC_TYPE(bool)
+    DECLARE_STATIC_TYPE(String)
+
+
     struct AILU_API EnumInitializer
     {
         String _name;
+        String _full_name;
         Map<String, u32> _str_to_enum_lut;
     };
 
 
-    class AILU_API Enum : public Object
+    class AILU_API Enum : public Type
     {
         friend class EnumTypeRegister;
 
     public:
+        using RegisterFunc = std::function<const Enum*()>;
         static Enum *GetEnumByName(const String &name);
         static void InitTypeInfo();
         static void RegisterEnum(Enum *enum_ptr);
@@ -313,7 +342,7 @@ namespace Ailu
 
     private:
         inline static Map<String, Enum *> s_global_enums;
-        inline static Queue<std::function<void()>> s_registers;
+        inline static Queue<RegisterFunc> s_registers;
         inline static String kErrorEnumValue = "ErrorEnumValue";
     private:
         Map<std::string, u32> _str_to_enum_lut;
@@ -321,9 +350,15 @@ namespace Ailu
         Vector<const String *> _enum_names;
     };
 
+    template<typename T>
+    struct TEnumReflection
+    {
+        static const Enum *StaticType() { return nullptr; }
+    };
+
     class AILU_API EnumTypeRegister{
         public:
-                EnumTypeRegister(std::function<void()> fn){
+                EnumTypeRegister(Enum::RegisterFunc fn){
                         Enum::s_registers.push(fn);
 }// namespace Ailu
 }

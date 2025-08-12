@@ -2,16 +2,23 @@
 #ifdef __TEMPORALAA_GEN_H__
 #error TemporalAA.gen.h already included, missing '#pragma once' in TemporalAA.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __TEMPORALAA_GEN_H__
 //Class TemporalAA begin...........................
 #define TEMPORALAA_GEN_H_104_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_TemporalAA_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_TemporalAA_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const override;
-                            //Class TemporalAA end...........................
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+class TemporalAA ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::TemporalAA>();
+//Class TemporalAA end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID TEMPORALAA_GEN_H

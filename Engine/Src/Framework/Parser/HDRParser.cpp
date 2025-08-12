@@ -22,13 +22,13 @@ namespace Ailu
 		TextureLoadData load_data;
 		if (LoadTextureData(sys_path, load_data))
 		{
-			Texture2DInitializer desc;
-            desc._width = load_data._width;
-            desc._height = load_data._height;
-            desc._is_linear = import_settings._is_srgb;
-            desc._is_mipmap_chain = import_settings._generate_mipmap;
-            desc._is_readble = import_settings._is_readble;
-            desc._format = load_data._format;
+			TextureDesc desc;
+			desc._width = load_data._width;
+			desc._height = load_data._height;
+			desc._is_linear = import_settings._is_srgb;
+			desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
+			desc._is_readable = import_settings._is_readble;
+			desc._format = ConvertTextureFormatToPixelFormat(load_data._format);
 			Ref<Texture2D> texture = Texture2D::Create(desc);
 			texture->SetPixelData(load_data._data[0],0);
 			return texture;
@@ -40,13 +40,13 @@ namespace Ailu
 		TextureLoadData load_data;
 		if (LoadTextureData(sys_path, load_data))
 		{
-			Texture2DInitializer desc;
-            desc._width = load_data._width;
-            desc._height = load_data._height;
-            desc._is_linear = import_settings._is_srgb;
-            desc._is_mipmap_chain = import_settings._generate_mipmap;
-            desc._is_readble = import_settings._is_readble;
-            desc._format = load_data._format;
+			TextureDesc desc;
+			desc._width = load_data._width;
+			desc._height = load_data._height;
+			desc._is_linear = import_settings._is_srgb;
+			desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
+			desc._is_readable = import_settings._is_readble;
+			desc._format = ConvertTextureFormatToPixelFormat(load_data._format);
 			texture->ReCreate(desc);
 			texture->SetPixelData(load_data._data[0],0);
 			return true;

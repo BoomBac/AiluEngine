@@ -56,7 +56,7 @@ namespace Ailu
 		f32 _last_pause_time = 0.0f;
 		bool _b_stop = false;
 	};
-	extern TimeMgr* g_pTimeMgr;
+	extern AILU_API TimeMgr* g_pTimeMgr;
 
 	struct TimerBlock
     {

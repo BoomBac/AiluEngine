@@ -67,7 +67,7 @@ namespace Ailu::Render
                 last_char = c;
                 continue;
             }
-            if (_characters_count > kMaxCharacters)
+            if (_characters_count >= kMaxCharacters)
             {
                 LOG_WARNING("TextRenderer::DrawText: Too many characters, max is %d", kMaxCharacters);
                 break;

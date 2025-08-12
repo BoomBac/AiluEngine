@@ -143,6 +143,8 @@ namespace Ailu
             for (auto it = g_pRenderTexturePool->PersistentRTBegin(); it != g_pRenderTexturePool->PersistentRTEnd(); it++)
             {
                 auto tex = it->second;
+                if (!tex->IsReady())
+                    continue;
                 if (tex->Dimension() == ETextureDimension::kTex2D)
                 {
                     TextureHandle cur_tex_handle = tex->GetNativeTextureHandle();

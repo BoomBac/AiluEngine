@@ -3,6 +3,7 @@
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Profiler.h"
 #include "Render/CommandBuffer.h"
+#include "UI/UIRenderer.h"
 #include "pch.h"
 
 #ifdef _PIX_DEBUG
@@ -75,6 +76,9 @@ namespace Ailu::Render
         _renderers.push_back(MakeScope<Renderer>());
         _renderers.back()->_p_cur_pipeline = this;
         _cameras.emplace_back(Camera::sCurrent);
+        _frame_res_manager = &FrameResourceManager::Get();
+        _cur_frame_packet = nullptr;
+        _cur_frame_res = nullptr;
     }
     void RenderPipeline::Destory()
     {
@@ -101,6 +105,7 @@ namespace Ailu::Render
     }
     void RenderPipeline::Render()
     {
+        /*
         Setup();
         for (auto cam: _cameras)
         {
@@ -115,6 +120,16 @@ namespace Ailu::Render
             _targets.push_back(_renderers[0]->TargetTexture());
         }
         RenderTexture::ResetRenderTarget();
+        */
+        {
+            Application::Get().NotifyRender();
+            Application::Get().WaitForRender();
+            PROFILE_BLOCK_CPU(UIRender)
+            auto cmd = CommandBufferPool::Get("UI");
+            UI::UIRenderer::Get()->Render(cmd.get());
+            GraphicsContext::Get().ExecuteCommandBuffer(cmd);
+            CommandBufferPool::Release(cmd);
+        }
     }
     RenderTexture *RenderPipeline::GetTarget(u16 index)
     {
@@ -131,8 +146,10 @@ namespace Ailu::Render
         g_pRenderTexturePool->RelesaeUnusedRT();
         for (auto &r: _renderers)
             r->FrameCleanup();
-        _cur_frame_packet->ClearView();
+        if (_cur_frame_packet)
+            _cur_frame_packet->ClearView();
         _is_need_wait_for_render_thread = true;
+        _frame_res_manager->Tick();
         //LOG_INFO("FrameCleanup");
     }
     void RenderPipeline::OnRenderObjectSubmeshCountChanged(u32 render_obj_id, u16 old_mesh_count, u32 new_mesh_count)

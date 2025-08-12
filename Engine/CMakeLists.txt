@@ -1,5 +1,5 @@
 # https://blog.csdn.net/weixin_43717839/article/details/128032486
-cmake_minimum_required (VERSION 3.5)
+cmake_minimum_required (VERSION 3.8)
 
 project (AiluEngine)
 # 设置输出目录的根目录
@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 自定义递归函数
 function(add_source_files_recursive dir)
-    file(GLOB_RECURSE SOURCES RELATIVE ${dir} ${dir}/*.cpp ${dir}/*.h)
+    file(GLOB_RECURSE SOURCES RELATIVE ${dir} ${dir}/*.cpp ${dir}/*.hpp ${dir}/*.h)
     foreach(source ${SOURCES})
         if(IS_DIRECTORY ${dir}/${source})
             add_source_files_recursive(${dir}/${source})
@@ -76,6 +76,7 @@ set(ANIM_MODULE
         Src/Animation/TransformTrack.cpp
         Src/Animation/CrossFade.cpp
         Src/Animation/Solver.cpp "Src/Animation/BlendSpace.cpp")
+set(IMNODE Ext/imnodes/imnodes.cpp Ext/imnodes/imnodes.h Ext/imnodes/imnodes_internal.h)
 # set(IMGUI_PLOT ${ENGINE_ROOT_PATH}/Ext/implot/implot.cpp ${ENGINE_ROOT_PATH}/Ext/implot/implot_items.cpp)
 # 禁用特定文件的预编译头
 # 使用 file(GLOB_RECURSE) 获取所有源文件
@@ -93,14 +94,20 @@ add_custom_target(pre_build_cmd ALL
         COMMAND ${CMAKE_COMMAND} -E echo "Running pre-build script..."
         COMMAND cmd /c "${PROJECT_SOURCE_DIR}/pre_build_script.bat")
 
-add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
-${HDR_LOADER}
-"Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp"
-"Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp" "Inc/Physics/PhysicsSystem.h" "Src/Physics/PhysicsSystem.cpp" "Src/Render/Gizmo.cpp" "Inc/Physics/Collision.h" "Src/Physics/Collision.cpp" "Inc/Animation/AnimationSystem.h" "Src/Animation/AnimationSystem.cpp"
-        Inc/Framework/Common/JobSystem.h
-        Src/Framework/Common/JobSystem.cpp
-        Ext/imnodes/imnodes.cpp
-        Src/Render/Font.cpp)
+# add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
+# ${HDR_LOADER}
+# "Inc/Scene/Scene.h" "Src/Scene/Scene.cpp" "Inc/Scene/RenderSystem.h" "Src/Scene/RenderSystem.cpp"
+# "Src/Scene/Component.cpp" "Inc/Framework/Parser/DDSParser.h" "Src/Framework/Parser/DDSParser.cpp" "Inc/Physics/PhysicsSystem.h" "Src/Physics/PhysicsSystem.cpp" "Src/Render/Gizmo.cpp" "Inc/Physics/Collision.h" "Src/Physics/Collision.cpp" "Inc/Animation/AnimationSystem.h" "Src/Animation/AnimationSystem.cpp"
+#         Inc/Framework/Common/JobSystem.h
+#         Src/Framework/Common/JobSystem.cpp
+#         Ext/imnodes/imnodes.cpp
+#         Src/Render/Font.cpp)
+set(SOURCE_LIST ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
+${HDR_LOADER} ${IMNODE})
+
+add_library (Engine SHARED ${SOURCE_LIST})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
+
 add_dependencies(Engine pre_build_cmd)
 # 包含路径
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/)
@@ -111,6 +118,7 @@ target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
+target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/rapidjson)
 # 宏定义
 target_compile_definitions(Engine PRIVATE AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX;_REVERSED_Z)
 set_target_properties (Engine PROPERTIES

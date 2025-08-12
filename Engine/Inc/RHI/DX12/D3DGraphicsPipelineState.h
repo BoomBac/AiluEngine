@@ -10,7 +10,7 @@ using Microsoft::WRL::ComPtr;
 namespace Ailu::Math::ALHash
 {
     template<>
-    static u32 Hasher(const D3D12_PRIMITIVE_TOPOLOGY_TYPE &obj)
+    static u32 HashFunc(const D3D12_PRIMITIVE_TOPOLOGY_TYPE &obj)
     {
         switch (obj)
         {

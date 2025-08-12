@@ -13,7 +13,7 @@ namespace Ailu::RHI::DX12
 {
 //----------------------------------------------------------------D3DGPUBuffer------------------------------------------------------------------------
 #pragma region D3DGPUBuffer
-    D3DGPUBuffer::D3DGPUBuffer(GPUBufferDesc desc) : GPUBuffer(desc)
+    D3DGPUBuffer::D3DGPUBuffer(BufferDesc desc) : GPUBuffer(desc)
     {
         _mem_size = (u32)Math::AlignTo(_desc._size, 16);
     }
@@ -131,7 +131,7 @@ namespace Ailu::RHI::DX12
         GraphicsContext::Get().ReadBack(this, dst, size);
         // if (!_desc._is_readable)
         // {
-        //     g_pLogMgr->LogErrorFormat(std::source_location::current(), "{} not a readable resource", _name);
+        //     LogMgr::Get().LogErrorFormat(std::source_location::current(), "{} not a readable resource", _name);
         //     return;
         // }
         // auto cmd = CommandBufferPool::Get();
@@ -157,7 +157,7 @@ namespace Ailu::RHI::DX12
         AL_ASSERT(true);
         // if (!_desc._is_readable)
         // {
-        //     g_pLogMgr->LogErrorFormat(std::source_location::current(), "{} not a readable resource", _name);
+        //     LogMgr::Get().LogErrorFormat(std::source_location::current(), "{} not a readable resource", _name);
         //     return;
         // }
         // auto cmd = CommandBufferPool::Get();

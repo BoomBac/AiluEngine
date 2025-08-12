@@ -100,7 +100,7 @@ namespace Ailu::RHI::DX12
             //GraphicsPipelineStateObject::ExtractPSOHash(_hash, input_layout, shader_hash, topology, blend_state, raster_state, ds_state, rt_state);
             //if (_state_desc._raster_state.Hash() != raster_state)
             //{
-            //	g_pLogMgr->LogErrorFormat("PSO {}: _state_desc._raster_state.Hash() != raster_state",_name);
+            //	LogMgr::Get().LogErrorFormat("PSO {}: _state_desc._raster_state.Hash() != raster_state",_name);
             //}
             _defines = _state_desc._p_vertex_shader->ActiveKeywords(pass_index, variant_hash);
             _pass_name = _state_desc._p_vertex_shader->GetPassInfo(pass_index)._name;

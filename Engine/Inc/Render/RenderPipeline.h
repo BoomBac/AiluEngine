@@ -162,6 +162,7 @@ namespace Ailu::Render
         u32 _dynamic_obj_start_pos = 0u;
         Vector<VisibilityObject> _visiblity_objs;
         Queue<ECS::Entity> _pending_add_render_objs;
+        FrameResourceManager *_frame_res_manager = nullptr;
     };
 }// namespace Ailu
 

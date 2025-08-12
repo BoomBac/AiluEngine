@@ -13,17 +13,24 @@
 #include "Render/Features/GpuTerrain.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
+
+#include "Render/RenderGraph/RenderGraph.h"
+
 #include "pch.h"
+
 
 
 namespace Ailu::Render
 {
-    Renderer::Renderer()
+    Renderer::Renderer() : _cur_fs(nullptr)
     {
         _p_context = g_pGfxContext;
         _b_init = true;
         Profiler::Initialize();
+        _rd_graph = nullptr;
+        _rd_graph = AL_NEW(RDG::RenderGraph);
         _rendering_data._gbuffers.resize(4);
+        _rendering_data._rg_handles._gbuffers.resize(4);
         _shadowcast_pass = MakeScope<ShadowCastPass>();
         _gbuffer_pass = MakeScope<DeferredGeometryPass>();
         _coptdepth_pass = MakeScope<CopyDepthPass>();
@@ -48,26 +55,25 @@ namespace Ailu::Render
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new GpuTerrain())));
         _gpu_terrain = _owned_features.back().get();
         //_features.push_back(_vxgi);
-        _features.push_back(_cloud);
-        _features.push_back(_taa);
-        _features.push_back(_ssao);
-        _features.push_back(_gpu_terrain);
-        _features.push_back(_taa);
+        //_features.push_back(_cloud);
+        //_features.push_back(_taa);
+        //_features.push_back(_ssao);
+        //_features.push_back(_gpu_terrain);
+        //_features.push_back(_taa);
 
-        //RegisterEventBeforeTick([]()
-        //                        { GraphicsPipelineStateMgr::UpdateAllPSOObject(); });
-        // RegisterEventAfterTick([]()
-        //                        { Profiler::Get().EndFrame(); });
     }
 
     Renderer::~Renderer()
     {
         _owned_features.clear();
+        AL_DELETE(_rd_graph);
         Profiler::Shutdown();
     }
 
     void Renderer::Render(const Camera &cam, const Scene &s)
     {
+        if (_cur_fs == nullptr)
+            return;
         bool is_output_to_camera_tex = cam.TargetTexture() != nullptr;
         for (auto &e: _events_before_tick)
         {
@@ -167,6 +173,46 @@ namespace Ailu::Render
             _rendering_data._area_shadow_data[i]._shadowmap_index = -1;
         }
         u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
+        _rendering_data._width = pixel_width;
+        _rendering_data._height = pixel_height;
+        if (_is_use_render_graph)
+        {
+            _rendering_data._rg_handles._gbuffers[0] = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGHalf),RenderResourceName::kGBuffer0);
+            _rendering_data._rg_handles._gbuffers[1] = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer1);
+            _rendering_data._rg_handles._gbuffers[2] = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer2);
+            _rendering_data._rg_handles._gbuffers[3] = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGBAHalf), RenderResourceName::kGBuffer3);
+            _rendering_data._rg_handles._color_target = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR), RenderResourceName::kCameraColorA);
+            _rendering_data._rg_handles._depth_target = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDepth), RenderResourceName::kCameraDepth);
+            TextureDesc desc = TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
+            desc._load = ELoadStoreAction::kNotCare;
+            _rendering_data._rg_handles._color_tex = _rd_graph->GetOrCreate(desc, RenderResourceName::kCameraColorTex);
+            desc._format = ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::kRFloat);
+            _rendering_data._rg_handles._depth_tex = _rd_graph->GetOrCreate(desc, RenderResourceName::kCameraDepthTex);
+
+            auto shadow_map_size = QuailtySetting::s_cascade_shaodw_map_resolution;
+            TextureDesc sm_desc = TextureDesc(shadow_map_size, shadow_map_size, ERenderTargetFormat::kShadowMap);
+            sm_desc._array_size = RenderConstants::kMaxCascadeShadowMapSplitNum;
+            sm_desc._store = ELoadStoreAction::kClear;
+            sm_desc._dimension = ETextureDimension::kTex2DArray;
+            _rendering_data._rg_handles._main_light_shadow_map = _rd_graph->GetOrCreate(sm_desc, RenderResourceName::kMainLightShadowMap);
+            sm_desc._width = shadow_map_size >> 1;
+            sm_desc._height = shadow_map_size >> 1;
+            sm_desc._array_size = RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxAreaLightNum;
+            _rendering_data._rg_handles._addi_shadow_maps = _rd_graph->GetOrCreate(sm_desc, RenderResourceName::kAddLightShadowMap);
+            sm_desc._array_size = RenderConstants::kMaxPointLightNum;
+            sm_desc._dimension = ETextureDimension::kCubeArray;
+            _rendering_data._rg_handles._point_light_shadow_maps = _rd_graph->GetOrCreate(sm_desc, RenderResourceName::kPointLightShadowMap);
+
+            auto mv_desc = TextureDesc(_rendering_data._width, _rendering_data._height, ERenderTargetFormat::kRGHalf);
+            _rendering_data._rg_handles._motion_vector_tex = _rd_graph->GetOrCreate(mv_desc, RenderResourceName::kMotionVectorTex);
+            mv_desc = TextureDesc(_rendering_data._width, _rendering_data._height, ERenderTargetFormat::kDepth);
+            _rendering_data._rg_handles._motion_vector_depth = _rd_graph->GetOrCreate(mv_desc, RenderResourceName::kMotionVectorDepth);
+            auto hzb_desc = TextureDesc((_rendering_data._width + 1) >> 1, (_rendering_data._height + 1) >> 1, ERenderTargetFormat::kRFloat);
+            hzb_desc._is_random_access = true;
+            hzb_desc._mip_num = Texture::MaxMipmapCount(hzb_desc._width, hzb_desc._height);
+            _rendering_data._rg_handles._hzb = _rd_graph->GetOrCreate(hzb_desc, RenderResourceName::kHZB);
+        }
+        else
         {
             RenderTexture::ReleaseTempRT(_camera_color_handle);//不释放color rt，防止多摄像机复用同一张color
             RenderTexture::ReleaseTempRT(_camera_depth_handle);
@@ -177,8 +223,10 @@ namespace Ailu::Render
             {
                 RenderTexture::ReleaseTempRT(_rendering_data._gbuffers[i]);
             }
-            _rendering_data._camera_data._camera_color_target_desc = RenderTextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
-            _rendering_data._camera_data._camera_color_target_desc._load_action = ELoadStoreAction::kNotCare;
+            _rendering_data._camera_data._camera_color_target_desc._width = pixel_width;
+            _rendering_data._camera_data._camera_color_target_desc._height = pixel_height;
+            _rendering_data._camera_data._camera_color_target_desc._format = ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::kDefaultHDR);
+            _rendering_data._camera_data._camera_color_target_desc._load = ELoadStoreAction::kNotCare;
             _camera_color_handle = RenderTexture::GetTempRT(_rendering_data._camera_data._camera_color_target_desc, "CameraColorAttachment");
             _camera_depth_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraDepthAttachment", ERenderTargetFormat::kDepth);
             _camera_depth_tex_handle = RenderTexture::GetTempRT(pixel_width, pixel_height, "CameraDepthTexture", ERenderTargetFormat::kRFloat,ELoadStoreAction::kNotCare);
@@ -262,6 +310,16 @@ namespace Ailu::Render
             for (auto &sys: s.GetRegister().SystemView())
                 sys.second->WaitFor();
         }
+        //RENDER GRAPH
+        if (_is_use_render_graph)
+        {
+            _rendering_data._postprocess_input = nullptr;//taa关闭时，这个不赋值会导致bloom输入为空
+            {
+                for (auto *pass: _render_passes)
+                    pass->OnRecordRenderGraph(*_rd_graph, _rendering_data);
+                _rd_graph->Compile();
+            }
+        }
     }
     void Renderer::EndScene(const Scene &s)
     {
@@ -284,6 +342,12 @@ namespace Ailu::Render
         }
         _render_passes.clear();
         _rendering_data.Reset();
+        //RENDER GRAPH
+        if (_is_use_render_graph)
+        {
+            _target_tex = static_cast<RenderTexture *>(_rd_graph->Export(_rendering_data._rg_handles._color_target));
+            _rd_graph->EndFrame();
+        }
         Gizmo::EndFrame();
     }
     void Renderer::FrameCleanup()
@@ -606,25 +670,32 @@ namespace Ailu::Render
             PROFILE_BLOCK_CPU(BeginScene)
             BeginScene(cam, s);
         }
-        if (cam._layer_mask & ERenderLayer::kDefault)
+        if (_is_use_render_graph)
         {
-            for (auto &pass: _render_passes)
+            _rd_graph->Execute(*_p_context,_rendering_data);
+        }
+        else
+        {
+            if (cam._layer_mask & ERenderLayer::kDefault)
             {
-                if (pass->IsActive())
+                for (auto &pass: _render_passes)
                 {
-                    CPUProfileBlock cblock(pass->GetName());
-                    pass->BeginPass(_p_context);
-                    pass->Execute(_p_context, _rendering_data);
-                    pass->EndPass(_p_context);
+                    if (pass->IsActive())
+                    {
+                        CPUProfileBlock cblock(pass->GetName());
+                        pass->BeginPass(_p_context);
+                        pass->Execute(_p_context, _rendering_data);
+                        pass->EndPass(_p_context);
+                    }
                 }
             }
-        }
-        else if (cam._layer_mask & ERenderLayer::kSkyBox)
-        {
-            CPUProfileBlock cblock(_skybox_pass->GetName());
-            _skybox_pass->BeginPass(_p_context);
-            _skybox_pass->Execute(_p_context, _rendering_data);
-            _skybox_pass->EndPass(_p_context);
+            else if (cam._layer_mask & ERenderLayer::kSkyBox)
+            {
+                CPUProfileBlock cblock(_skybox_pass->GetName());
+                _skybox_pass->BeginPass(_p_context);
+                _skybox_pass->Execute(_p_context, _rendering_data);
+                _skybox_pass->EndPass(_p_context);
+            }
         }
         EndScene(s);
     }

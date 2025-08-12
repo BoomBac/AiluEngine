@@ -22,6 +22,7 @@ namespace Ailu
 
     namespace UI
     {
+        class Canvas;
         class AILU_API UIRenderer
         {
         public:
@@ -30,36 +31,45 @@ namespace Ailu
             static UIRenderer* Get();
             static void DrawQuad(Vector2f position, Vector2f size,f32 depth,Color color = Colors::kWhite);
         public:
-            UIRenderer();
-            ~UIRenderer();
-            void Render(RTHandle color, RTHandle depth);
-            void Render(RTHandle color, RTHandle depth, CommandBuffer *cmd);
-            void Render(RenderTexture *color, RenderTexture* depth);
-            void Render(RenderTexture *color, RenderTexture *depth, CommandBuffer *cmd);
-        private:
             struct DrawerBlock
             {
             public:
                 DISALLOW_COPY_AND_ASSIGN(DrawerBlock)
-                DrawerBlock(DrawerBlock && other) noexcept ;
-                DrawerBlock & operator=(DrawerBlock && other) noexcept ;
+                DrawerBlock(DrawerBlock &&other) noexcept;
+                DrawerBlock &operator=(DrawerBlock &&other) noexcept;
                 explicit DrawerBlock(u32 vert_num = 1000u);
                 ~DrawerBlock();
+
             public:
                 Ref<Material> _mat;
-                VertexBuffer* _vbuf;
-                IndexBuffer* _ibuf;
+                VertexBuffer *_vbuf;
+                IndexBuffer *_ibuf;
                 Vector<Vector3f> _pos_buf;
                 Vector<Vector2f> _uv_buf;
+                Vector<Color> _color_buf;
                 Vector<u32> _index_buf;
-                u32 _pos_offset = 0u;
-                u32 _uv_offset = 0u;
-                u32 _index_offset = 0u;
+                u32 _cur_vert_num = 0u;
+                u32 _cur_index_num = 0u;
+                u32 _max_vert_num = 0u;
             };
+        public:
+            UIRenderer();
+            ~UIRenderer();
+            void Render(CommandBuffer* cmd);
+            //add/remove canvas  dynamic
+            Canvas *AddCanvas();
+            void RemoveCanvas(Canvas* canvas);
+            //delete
+            void DeleteCanvas(Canvas *canvas);
+        private:
+            Vector<struct DrawerBlock *> &FrameBlocks() {return _drawer_blocks[_frame_index];};
+        private:
+
             u16 _frame_index = 0u;
             Ref<ConstantBuffer> _obj_cb;
-            using FrameDrawerBlock = Map<Color, DrawerBlock*>;
-            Array<FrameDrawerBlock, Render::RenderConstants::kFrameCount> _drawer_blocks;
+            Array<Vector<DrawerBlock *>, Render::RenderConstants::kFrameCount> _drawer_blocks;
+            Vector<Canvas *> _canvases;
+            Vector<Canvas *> _active_canvases;
         };
 
     }// namespace UI

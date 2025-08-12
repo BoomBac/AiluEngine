@@ -9,6 +9,8 @@
 #include <Render/Texture.h>
 #include <iostream>
 
+#include <Framework/Common/FileManager.h>
+
 #include "DirectXMath.h"
 #include "DirectXPackedVector.h"
 #include "PerlinNoise.hpp"
@@ -67,8 +69,28 @@ struct MatrixCompute : public Test
 
 int main(int argc, char **argv)
 {
-    auto& alloc = Allocator::Get();
-    int* a = AL_NEW(int);
-    alloc.PrintLeaks();
-    Allocator::Shutdown();
+    const u64 size = 1024*1024 * 16;
+    // Vector<u8> data(size);
+    // for(u64 i = 0; i < size; ++i)
+    // {
+    //     data.push_back(1);
+    // }
+    // FileManager::WriteFile(L"test_data.bin",false,data.data(),size);
+    TimeMgr timer;
+    WString p = L"test_data.bin";
+    {
+        timer.Mark();
+        FileManager::ReadFile(p,(u64)0u,800);
+        std::cout << "read total: " << timer.GetElapsedSinceLastMark() << std::endl;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+    {
+        timer.Mark();
+        FileManager::ReadFile(p,(u64)0u,100);
+        // for(u64 i = 0; i < size; i+=1024)
+        // {
+        //     FileManager::ReadFile(p,i,1024);
+        // }
+        std::cout << "read block: " << timer.GetElapsedSinceLastMark() << std::endl;
+    }
 }

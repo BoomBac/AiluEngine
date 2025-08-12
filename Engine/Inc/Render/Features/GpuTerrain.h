@@ -44,12 +44,12 @@ namespace Ailu::Render
         f32* _max_height;
         Mesh* _plane;
         Material* _terrain_mat;
-        GPUBuffer* _src_node_buf;
-        GPUBuffer* _temp_node_buf;
-        GPUBuffer* _final_node_buf;
-        GPUBuffer* _disp_args_buf;
-        GPUBuffer* _patches_buf;
-        GPUBuffer* _draw_arg_buf;
+        Ref<GPUBuffer> _src_node_buf;
+        Ref<GPUBuffer> _temp_node_buf;
+        Ref<GPUBuffer> _final_node_buf;
+        Ref<GPUBuffer> _disp_args_buf;
+        Ref<GPUBuffer> _patches_buf;
+        Ref<GPUBuffer> _draw_arg_buf;
         Vector<Vector2UInt> _lod5_nodes;
         Ref<Texture2D>  _minmax_height;
         Ref<Texture2D>  _lod_map;

@@ -2,9 +2,15 @@
 #ifdef __TYPE_GEN_H__
 #error Type.gen.h already included, missing '#pragma once' in Type.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __TYPE_GEN_H__
 //Enum EDataType begin...........................
-void Z_Construct_Enum_EDataType_Type();
+const Ailu::Enum* Z_Construct_Enum_EDataType_Type();
+namespace Ailu { 
+enum class EDataType : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::EDataType>();
 //Enum EDataType end...........................
 
 #undef CURRENT_FILE_ID

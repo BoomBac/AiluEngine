@@ -2,9 +2,15 @@
 #ifdef __COMPONENT_GEN_H__
 #error Component.gen.h already included, missing '#pragma once' in Component.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __COMPONENT_GEN_H__
 //Enum EMotionVectorType begin...........................
-void Z_Construct_Enum_EMotionVectorType_Type();
+const Ailu::Enum* Z_Construct_Enum_EMotionVectorType_Type();
+namespace Ailu::ECS { 
+enum class EMotionVectorType : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::ECS::EMotionVectorType>();
 //Enum EMotionVectorType end...........................
 
 #undef CURRENT_FILE_ID

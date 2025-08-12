@@ -2,16 +2,23 @@
 #ifdef __GPUTERRAIN_GEN_H__
 #error GpuTerrain.gen.h already included, missing '#pragma once' in GpuTerrain.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __GPUTERRAIN_GEN_H__
 //Class GpuTerrain begin...........................
 #define GPUTERRAIN_GEN_H_9_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_GpuTerrain_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_GpuTerrain_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const override;
-                            //Class GpuTerrain end...........................
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+class GpuTerrain ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::GpuTerrain>();
+//Class GpuTerrain end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID GPUTERRAIN_GEN_H

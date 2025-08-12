@@ -6,6 +6,7 @@
 #include "GlobalMarco.h"
 #include "RendererAPI.h"
 #include "Texture.h"
+#include "RenderGraph/RenderGraph.h"
 
 namespace Ailu::RHI::DX12
 {
@@ -97,7 +98,8 @@ namespace Ailu::Render
 
     struct CameraData
     {
-        RenderTextureDesc _camera_color_target_desc;
+        TextureDesc _camera_color_target_desc;
+        TextureDesc _camera_depth_target_desc;
     };
     struct VoxelGIData
     {
@@ -109,6 +111,7 @@ namespace Ailu::Render
 
     class CommandBuffer;
     class Camera;
+
     struct RenderingData
     {
     public:
@@ -138,6 +141,20 @@ namespace Ailu::Render
           GBuffer2 (RGBA, 4通道) - 存储高光颜色 (RGB) 和 金属度 (A)
           GBuffer3 (RGBA, 4通道) - 存储自发光颜色 (RGB) 和 可能的附加信息 (A)*/
         Vector<RTHandle> _gbuffers;
+        struct
+        {
+            Vector<RDG::RGHandle> _gbuffers;
+            RDG::RGHandle         _color_target;
+            RDG::RGHandle         _color_tex;
+            RDG::RGHandle         _depth_target;
+            RDG::RGHandle         _depth_tex;
+            RDG::RGHandle         _motion_vector_tex;
+            RDG::RGHandle         _motion_vector_depth;
+            RDG::RGHandle         _hzb;
+            RDG::RGHandle _main_light_shadow_map;
+            RDG::RGHandle _addi_shadow_maps;
+            RDG::RGHandle _point_light_shadow_maps;
+        } _rg_handles;
         CommandBuffer *cmd;
         const CullResult *_cull_results;
         const Camera *_camera;

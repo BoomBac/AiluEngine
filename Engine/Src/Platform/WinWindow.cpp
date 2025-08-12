@@ -300,16 +300,10 @@ namespace Ailu
     LRESULT WinWindow::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
 #ifdef DEAR_IMGUI
+        //ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam);
         if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
             return true;
 #endif// DEAR_IMGUI
-
-        //return DefWindowProc(hWnd, message, wParam, lParam);
-        //if (message == WM_NCCREATE)
-        //{
-        //    SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)((CREATESTRUCT*)lParam)->lpCreateParams);
-        //    return TRUE;
-        //}
         return ((WinWindow *) GetWindowLongPtr(hWnd, GWLP_USERDATA))->WindowProcImpl(hWnd, message, wParam, lParam);
     }
 
@@ -476,6 +470,7 @@ namespace Ailu
                 return 0;
         }
         // Handle any messages the switch statement didn't.
+        LOG_WARNING("Unhandled message: " + std::to_string(message));
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
 

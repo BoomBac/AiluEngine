@@ -2,16 +2,23 @@
 #ifdef __SSAO_GEN_H__
 #error SSAO.gen.h already included, missing '#pragma once' in SSAO.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __SSAO_GEN_H__
 //Class SSAO begin...........................
 #define SSAO_GEN_H_29_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_SSAO_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_SSAO_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const override;
-                            //Class SSAO end...........................
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+class SSAO ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::SSAO>();
+//Class SSAO end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID SSAO_GEN_H

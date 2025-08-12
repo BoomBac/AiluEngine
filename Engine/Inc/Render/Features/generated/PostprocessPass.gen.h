@@ -2,16 +2,23 @@
 #ifdef __POSTPROCESSPASS_GEN_H__
 #error PostprocessPass.gen.h already included, missing '#pragma once' in PostprocessPass.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __POSTPROCESSPASS_GEN_H__
 //Class PostProcessPass begin...........................
 #define POSTPROCESSPASS_GEN_H_14_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_PostProcessPass_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_PostProcessPass_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const override;
-                            //Class PostProcessPass end...........................
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+class PostProcessPass ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::PostProcessPass>();
+//Class PostProcessPass end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID POSTPROCESSPASS_GEN_H

@@ -4,14 +4,12 @@
 #include "Framework/Common/Input.h"
 namespace Ailu
 {
-    using namespace Render;
     namespace Editor
     {
 #define VEC2_TO_IMGUI_VEC2(vec) ImVec2(vec[0], vec[1])
         BlendSpaceEditor::BlendSpaceEditor() : ImGuiWidget("BlendSpace Editor")
         {
             _allow_close = true;
-            _canvas.AddChild(new UI::Button,UI::Canvas::Slot({400.0f,240.0f}));
         }
         BlendSpaceEditor::~BlendSpaceEditor()
         {
@@ -30,20 +28,20 @@ namespace Ailu
         }
         void BlendSpaceEditor::ShowImpl()
         {
-            _canvas.SetPosition(_content_pos);
-            _canvas.Update(1.0f);
-            _canvas.Render();
-            auto handle = _canvas.GetRenderTexture()->ColorTexture(Texture::kMainSRVIndex);
-            Vector2f mpos = Input::GetMousePos() - _content_pos;
-            if (handle == 0)
-            {
-                LOG_WARNING("_canvas.GetRenderTexture()->ColorTexture() is 0");
-            }
-            else
-            {
-                //ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(handle),VEC2_TO_IMGUI_VEC2(_canvas.GetSize()));
-                ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(handle),VEC2_TO_IMGUI_VEC2(_content_size));
-            }
+            //_canvas.SetPosition(_content_pos);
+            //_canvas.Update(1.0f);
+            //_canvas.Render();
+            //auto handle = _canvas.GetRenderTexture()->ColorTexture(Texture::kMainSRVIndex);
+            //Vector2f mpos = Input::GetMousePos() - _content_pos;
+            //if (handle == 0)
+            //{
+            //    LOG_WARNING("_canvas.GetRenderTexture()->ColorTexture() is 0");
+            //}
+            //else
+            //{
+            //    //ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(handle),VEC2_TO_IMGUI_VEC2(_canvas.GetSize()));
+            //    ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(handle),VEC2_TO_IMGUI_VEC2(_content_size));
+            //}
 //            if (_target)
 //            {
 //                AnimationClip* _delete_clip = nullptr;
@@ -103,7 +101,7 @@ namespace Ailu
         }
         void BlendSpaceEditor::OnEvent(Event &event)
         {
-            _canvas.OnEvent(event);
+            
         }
     }// namespace Editor
 }

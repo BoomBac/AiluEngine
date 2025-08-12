@@ -35,7 +35,7 @@ namespace Ailu::Render
             BindImpl(rhi_cmd, params);
         else
         {
-            LOG_WARNING("GpuResource::Bind: {} not ready yet",_name);
+            LOG_WARNING("GpuResource::Bind: {} not ready yet,forget call `GraphicsContext::CreateResource`?", _name);
         }
     }
     void GpuResource::Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)

@@ -186,6 +186,9 @@ namespace Ailu
     class AILU_API LogMgr : public IRuntimeModule
     {
     public:
+        static void Init();
+        static void Shutdown();
+        static LogMgr& Get();
         LogMgr();
         LogMgr(std::string name, ELogLevel output_level = kLogLevel, TraceLevle output_mark = kTraceLevel);
         int Initialize() override;
@@ -217,12 +220,11 @@ namespace Ailu
         std::string _output_path;
         std::string _name;
     };
-    extern AILU_API LogMgr *g_pLogMgr;
-#define AE_LOG(maker, Level, msg, ...) g_pLogMgr->LogMsg(Level,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
-#define LOG_INFO(msg, ...)    g_pLogMgr->LogMsg(ELogLevel::kInfo,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
-#define LOG_WARNING(msg, ...) g_pLogMgr->LogMsg(ELogLevel::kWarning,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
-#define LOG_ERROR(msg, ...)   g_pLogMgr->LogMsg(ELogLevel::kError,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
-#define LOG_FATAL(msg,...)    g_pLogMgr->LogMsg(ELogLevel::kFatal,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
+#define AE_LOG(maker, Level, msg, ...) LogMgr::Get().LogMsg(Level,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
+#define LOG_INFO(msg, ...)    LogMgr::Get().LogMsg(ELogLevel::kInfo,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
+#define LOG_WARNING(msg, ...) LogMgr::Get().LogMsg(ELogLevel::kWarning,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
+#define LOG_ERROR(msg, ...)   LogMgr::Get().LogMsg(ELogLevel::kError,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
+#define LOG_FATAL(msg,...)    LogMgr::Get().LogMsg(ELogLevel::kFatal,std::source_location::current(),__FUNCTION__,msg, ##__VA_ARGS__);
 }// namespace Ailu
 
 #endif// !LOG_H__

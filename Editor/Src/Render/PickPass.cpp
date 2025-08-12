@@ -305,7 +305,7 @@ namespace Ailu
         PickFeature::PickFeature() : RenderFeature("Pick")
         {
             _read_pickbuf = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/pick_buffer_reader.hlsl"));
-            GPUBufferDesc desc{};
+            BufferDesc desc{};
             desc._size = 256;
             desc._is_readable = true;
             desc._format = EALGFormat::kALGFormatR32_UINT;
@@ -314,7 +314,7 @@ namespace Ailu
         }
         PickFeature::~PickFeature()
         {
-            DESTORY_PTR(_readback_buf);
+
         }
         void Ailu::Render::PickFeature::AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data)
         {
@@ -339,7 +339,7 @@ namespace Ailu
                 auto cmd = CommandBufferPool::Get("ReadbackPickBuffer");
                 auto kernel = _read_pickbuf->FindKernel("cs_main");
                 _read_pickbuf->SetTexture("_PickBuffer", _pick_buf.get());
-                _read_pickbuf->SetBuffer("_PickResult", _readback_buf);
+                _read_pickbuf->SetBuffer("_PickResult", _readback_buf.get());
                 _read_pickbuf->SetVector("pixel_pos", Vector4f((f32) x, (f32) y, 0.0f, 0.0f));
                 cmd->Dispatch(_read_pickbuf.get(), kernel, 1, 1, 1);
                 GraphicsContext::Get().ExecuteCommandBufferSync(cmd);

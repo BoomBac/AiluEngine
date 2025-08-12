@@ -2,16 +2,23 @@
 #ifdef __VOLUMETRICCLOUDS_GEN_H__
 #error VolumetricClouds.gen.h already included, missing '#pragma once' in VolumetricClouds.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __VOLUMETRICCLOUDS_GEN_H__
 //Class VolumetricClouds begin...........................
 #define VOLUMETRICCLOUDS_GEN_H_58_GENERATED_BODY \
                             private: \
-                                friend Type* Z_Construct_VolumetricClouds_Type();\
-                                static Type* GetPrivateStaticClass();\
+                                friend const Type* Z_Construct_VolumetricClouds_Type();\
+                                static const Type* GetPrivateStaticClass();\
                             public:\
-                                static class Type *StaticType() {return GetPrivateStaticClass();};\
+                                static const Type *StaticType() {return GetPrivateStaticClass();};\
                                 virtual const Type  *GetType() const override;
-                            //Class VolumetricClouds end...........................
+                            namespace Ailu {class Type;}
+namespace Ailu::Render{
+class VolumetricClouds ;
+}
+template<>
+AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::VolumetricClouds>();
+//Class VolumetricClouds end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID VOLUMETRICCLOUDS_GEN_H

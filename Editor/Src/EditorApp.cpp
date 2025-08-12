@@ -11,6 +11,7 @@
 #include "Render/CommonRenderPipeline.h"
 #include "Render/Renderer.h"
 
+#include "Objects/JsonArchive.h"
 #include "Framework/Parser/TextParser.h"
 
 using namespace Ailu;
@@ -41,6 +42,27 @@ namespace Ailu
         CommandManager *g_pCommandMgr = new CommandManager;
         int EditorApp::Initialize()
         {
+            LogMgr::Init();
+            JsonArchive ar;
+            //TestObj test_obj;
+            //test_obj._name = "TestObj1";
+            //test_obj._objs.push_back(Object("11"));
+            //test_obj._objs.push_back(Object("12"));
+            ////test_obj._objs.push_back(Object("13"));
+            //test_obj._p = Object("asasa");
+            //test_obj._nums.push_back(1);
+            //test_obj._nums.push_back(2);
+            //for (const auto &p: TestObj::StaticType()->GetProperties())
+            //{
+            //    p.Serialize(&test_obj, ar);
+            //}
+            //ar.Save("test_obj.json");
+            ar.Load("test_obj_read.json");
+            TestObj test_obj;
+            for (const auto &p: TestObj::StaticType()->GetProperties())
+            {
+                p.Deserialize(&test_obj, ar);
+            }
             auto work_path = GetWorkingPath();
             work_path = Application::GetUseHomePath();
             LOG_INFO(L"WorkPath: {}", work_path);
@@ -61,7 +83,7 @@ namespace Ailu
             PushLayer(_p_input_layer);
             _p_scene_layer = new SceneLayer();
             PushLayer(_p_scene_layer);
-            g_pLogMgr->AddAppender(new ImGuiLogAppender());
+            LogMgr::Get().AddAppender(new ImGuiLogAppender());
             _pipeline.reset(new CommonRenderPipeline());
             g_pGfxContext->RegisterPipeline(_pipeline.get());
             {
@@ -73,6 +95,61 @@ namespace Ailu
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;
             _is_simulate_mode = false;
+            _on_file_changed_delegate += [](const fs::path &file)
+            {
+                const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+                WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
+                for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
+                {
+                    auto shader = ResourceMgr::IterToRefPtr<Shader>(it);
+                    if (shader)
+                    {
+                        bool match_file = false;
+                        for (i16 i = 0; i < shader->PassCount(); i++)
+                        {
+                            if (match_file)
+                                break;
+                            const auto &pass = shader->GetPassInfo(i);
+                            for (auto &head_file: pass._source_files)
+                            {
+                                if (head_file == cur_path)
+                                {
+                                    match_file = true;
+                                    GraphicsContext::Get().CompileShaderAsync(shader.get());
+                                    //++record._reload_shader_count;
+                                }
+                            }
+                        }
+                    }
+                } };
+            _on_file_changed_delegate += [](const fs::path &file) {
+                for (auto it = g_pResourceMgr->ResourceBegin<ComputeShader>(); it != g_pResourceMgr->ResourceEnd<ComputeShader>(); it++)
+                {
+                    const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+                    WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
+                    auto cs = ResourceMgr::IterToRefPtr<ComputeShader>(it);
+                    if (cs->IsDependencyFile(cur_path))
+                    {
+                        GraphicsContext::Get().CompileShaderAsync(cs.get());
+                    }
+                }
+            };
+            _on_file_changed_delegate += [](const fs::path &file) {
+                const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+                WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
+                for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
+                {
+                    auto tex = ResourceMgr::IterToRefPtr<Texture2D>(it);
+                    auto linked_asset = g_pResourceMgr->GetLinkedAsset(tex.get());
+                    if (linked_asset && !linked_asset->_external_asset_path.empty())
+                    {
+                        if (cur_asset_path == linked_asset->_external_asset_path)
+                        {
+                            LOG_WARNING(L"Texture2d {} has changed,but reload not support yet", linked_asset->_asset_path);
+                        }
+                    }
+                }
+            };
             return ret;
         }
         void EditorApp::Finalize()
@@ -95,6 +172,7 @@ namespace Ailu
             }
             for (auto &dp: deleted_wpix_files)
                 FileManager::DeleteDirectory(dp);
+            LogMgr::Shutdown();
         }
         void EditorApp::Tick(f32 delta_time)
         {
@@ -116,7 +194,7 @@ namespace Ailu
             //auto work_dir = PathUtils::ExtarctDirectory(Application::GetWorkingPath());
             INIParser parser;
             parser.Load(s_editor_config_path);
-            Type* type = EditorConfig::StaticType();
+            const Type* type = EditorConfig::StaticType();
             const auto &config_values = parser.GetValues();
             for (auto &it: type->GetProperties())
             {
@@ -221,6 +299,7 @@ namespace Ailu
         {
             const WString cur_path = PathUtils::FormatFilePath(file.wstring());
             WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
+            LOG_INFO("Asset {} changed...", file.string());
             for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
             {
                 auto shader = ResourceMgr::IterToRefPtr<Shader>(it);
@@ -238,29 +317,6 @@ namespace Ailu
                             {
                                 match_file = true;
                                 GraphicsContext::Get().CompileShaderAsync(shader.get());
-                                // g_pResourceMgr->SubmitTaskSync([=]()->bool
-                                //                                {
-                                //     auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload shader: {}...",shader->Name()).c_str(),0.5f);
-                                //     if (shader->PreProcessShader())
-                                //     {
-                                //         for (auto &mat: shader->GetAllReferencedMaterials())
-                                //         {
-                                //             mat->ConstructKeywords(shader.get());
-                                //             bool is_all_succeed = true;
-                                //             is_all_succeed = shader->Compile(); //暂时重编所有变体，避免材质切换变体后使用的是旧的shader
-                                //             // for (u16 i = 0; i < shader->PassCount(); i++)
-                                //             // {
-                                //             //     is_all_succeed &= shader->Compile(i, mat->ActiveVariantHash(i));
-                                //             // }
-                                //             if (is_all_succeed)
-                                //             {
-                                //                 mat->ChangeShader(shader.get());
-                                //             }
-                                //         }
-                                //     }
-                                //     ImGuiWidget::RemoveProgressBar(handle);
-                                //     return true;
-                                // });
                                 ++record._reload_shader_count;
                             }
                         }
@@ -274,21 +330,10 @@ namespace Ailu
                 if (cs->IsDependencyFile(cur_path))
                 {
                     GraphicsContext::Get().CompileShaderAsync(cs.get());
-                    // g_pResourceMgr->SubmitTaskSync([=]()->bool
-                    //                                {
-                    //     auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload compute shader: {}...",cs->Name()).c_str(),0.5f);
-                    //     ComputeShader *shader = cs.get();
-                    //     if (shader->Preprocess())
-                    //     {
-                    //         shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
-                    //         shader->Compile(); 
-                    //     }
-                    //     ImGuiWidget::RemoveProgressBar(handle);
-                    //     return true;
-                    // });
                     ++record._reload_compute_count;
                 }
             }
+
             for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
             {
                 auto tex = ResourceMgr::IterToRefPtr<Texture2D>(it);
@@ -313,12 +358,15 @@ namespace Ailu
                 }
             }
         }
+
         void EditorApp::WatchDirectory()
         {
             namespace fs = std::filesystem;
-            static Vector<fs::path> s_watching_paths{
+            static Vector<fs::path> s_watching_paths
+            {
                 ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW,
-                ResourceMgr::EngineResRootPath() + EnginePath::kEngineTexturePathW
+                        ResourceMgr::EngineResRootPath() + EnginePath::kEngineTexturePathW,
+                    s_editor_root_path + L"/Res/UI/"
             };
             static bool is_first_execute = true;
             static std::set<fs::path> path_set{};
@@ -345,7 +393,9 @@ namespace Ailu
                 {
                     if (cur_files_time[file] != last_write_time)
                     {
-                        ReloadAsset(file,record);
+                        //ReloadAsset(file,record);
+                        LOG_INFO("file {} changed", file.string());
+                        _on_file_changed_delegate.Invoke(file);
                         s_cache_files_time[file] = cur_files_time[file];
                     }
                 }

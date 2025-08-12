@@ -2,13 +2,11 @@
 #ifndef __SHADER_H__
 #define __SHADER_H__
 #include "Buffer.h"
-#include "Framework/Common/Path.h"
-#include "Framework/Common/Reflect.h"
 #include "Framework/Math/ALMath.hpp"
 #include "Objects/Object.h"
 #include "PipelineState.h"
 #include "Texture.h"
-#include <fstream>
+#include "RenderGraph/RenderGraph.h"
 #include <map>
 #include <set>
 #include <string>
@@ -542,8 +540,10 @@ namespace Ailu::Render
         void SetTexture(u8 bind_slot, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
         void SetTexture(const String &name, RTHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap);
-        void SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap);
         void SetTexture(const String &name, Texture *texture, u16 mipmap);
+        void SetTexture(const String &name, Texture *texture, ECubemapFace::ECubemapFace face, u16 mipmap);
+        //void SetTexture(const String &name, RDG::RGHandle handle);
+        //void SetTexture(const String &name, RDG::RGHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap);
         void SetFloat(const String &name, f32 value);
         void SetFloats(const String& name,Vector<f32> values);
         void SetBool(const String &name, bool value);

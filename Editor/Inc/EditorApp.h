@@ -39,6 +39,20 @@ namespace Ailu
             String _scene_path;
         };
 
+        ASTRUCT()
+        struct TestObj
+        {
+            GENERATED_BODY()
+            APROPERTY()
+            String _name;
+            APROPERTY()
+            Object _p;
+            APROPERTY()
+            Vector<u32> _nums;
+            APROPERTY()
+            Vector<Object> _objs;
+        };
+
         class InputLayer;
         class SceneLayer;
         class EditorApp : public Ailu::Application
@@ -48,6 +62,7 @@ namespace Ailu
             void Finalize() final;
             void Tick(f32 delta_time) final;
 
+            Delegate<const fs::path &> _on_file_changed_delegate;
         private:
             EditorLayer *_p_editor_layer;
             InputLayer *_p_input_layer;
@@ -58,7 +73,6 @@ namespace Ailu
             Camera *_p_scene_camera;
             WString _opened_scene_path;
             EditorConfig _editor_config;
-
         private:
             bool OnGetFocus(WindowFocusEvent &e) final;
             bool OnLostFocus(WindowLostFocusEvent &e) final;

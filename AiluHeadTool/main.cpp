@@ -216,7 +216,10 @@ int main(int argc, char **argv)
     }
     cache_file.close();
     AiluHeadTool::AddDependencyInc("<memory>");
-    AiluHeadTool::AddDependencyInc("<Inc/Objects/Type.h>");
+    AiluHeadTool::AddDependencyInc("<Objects/Type.h>");
+    AiluHeadTool::AddDependencyInc("<Objects/Serialize.h>");
+    AiluHeadTool::AddDependencyInc("<Objects/SerializeSpecializations.h>");
+    AiluHeadTool::AddDependencyInc("<Framework/Common/Log.h>");
     AiluHeadTool aht;
     for (auto &p: work_files)
     {

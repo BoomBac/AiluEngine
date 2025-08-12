@@ -4,6 +4,7 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/dxhelper.h"
+#include "Render/ImGuiRenderer.h"
 #include "pch.h"
 
 using namespace Ailu::Render;
@@ -38,7 +39,7 @@ namespace Ailu::RHI::DX12
     }
 #pragma region D3DTexture2D
     //----------------------------------------------------------------------------D3DTexture2DNew-----------------------------------------------------------------------
-    D3DTexture2D::D3DTexture2D(const Texture2DInitializer &initializer) : Texture2D(initializer) {}
+    D3DTexture2D::D3DTexture2D(const TextureDesc &initializer) : Texture2D(initializer) {}
 
     D3DTexture2D::~D3DTexture2D() { Release(); }
 
@@ -61,6 +62,7 @@ namespace Ailu::RHI::DX12
         textureDesc.SampleDesc.Quality = 0;
         textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
         bool is_data_filed = false;
+        AL_ASSERT(textureDesc.Width < 16384 && textureDesc.Height < 16384 && textureDesc.DepthOrArraySize < 2048);
         for (const auto &fill: _is_data_filled)
         {
             if (fill)
@@ -435,7 +437,7 @@ namespace Ailu::RHI::DX12
 
 #pragma region D3DTexture3D
     //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
-    D3DTexture3D::D3DTexture3D(const Texture3DInitializer &initializer) : Texture3D(initializer)
+    D3DTexture3D::D3DTexture3D(const TextureDesc &initializer) : Texture3D(initializer)
     {
         if (_p_mipmapgen_cs0 == nullptr)
         {
@@ -464,6 +466,7 @@ namespace Ailu::RHI::DX12
         textureDesc.SampleDesc.Count = 1;
         textureDesc.SampleDesc.Quality = 0;
         textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+        AL_ASSERT(textureDesc.Width < 16384 && textureDesc.Height < 16384 && textureDesc.DepthOrArraySize < 2048);
         bool is_data_filed = false;
         if (_is_data_filled[0])
         {
@@ -738,7 +741,7 @@ namespace Ailu::RHI::DX12
         return D3D12_RESOURCE_STATES::D3D12_RESOURCE_STATE_COMMON;
     }
 
-    D3DRenderTexture::D3DRenderTexture(const RenderTextureDesc &desc) : RenderTexture(desc) {}
+    D3DRenderTexture::D3DRenderTexture(const TextureDesc &desc) : RenderTexture(desc) {}
 
     D3DRenderTexture::~D3DRenderTexture() { g_pGfxContext->WaitForFence(_fence_value); }
 
@@ -779,6 +782,7 @@ namespace Ailu::RHI::DX12
         _tex_desc.SampleDesc.Count = 1;
         _tex_desc.SampleDesc.Quality = 0;
         _tex_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        AL_ASSERT(_tex_desc.Width < 16384 && _tex_desc.Height < 16384 && _tex_desc.DepthOrArraySize < 2048);
         D3D12_CLEAR_VALUE clear_value{};
         clear_value.Format = _tex_desc.Format;
         if (is_for_depth) clear_value.DepthStencil = {kZFar, 0};
@@ -1234,7 +1238,7 @@ namespace Ailu::RHI::DX12
     {
         if (/*!CanAsShaderResource(this) || */ !_views.contains(view_index)) return 0;
 #if defined(DEAR_IMGUI)
-        static_cast<D3DContext &>(GraphicsContext::Get()).RecordImguiUsedTexture(this);
+        ImGuiRenderer::Get().RecordImguiUsedTexture(this);
 #endif
         return D3DDescriptorMgr::Get().GetBindGpuHandle(_views[view_index]._gpu_alloc).ptr;
     }
@@ -1243,7 +1247,7 @@ namespace Ailu::RHI::DX12
     {
         if (!CanAsShaderResource(this) || !_views.contains(view_index)) return 0;
 #if defined(DEAR_IMGUI)
-        static_cast<D3DContext &>(GraphicsContext::Get()).RecordImguiUsedTexture(this);
+        ImGuiRenderer::Get().RecordImguiUsedTexture(this);
 #endif
         return D3DDescriptorMgr::Get().GetBindGpuHandle(_views[view_index]._gpu_alloc).ptr;
         //return _views[view_index]._gpu_handle.ptr;
@@ -1259,4 +1263,4 @@ namespace Ailu::RHI::DX12
     }
 #pragma endregion
     //----------------------------------------------------------D3DRenderTexture----------------------------------------------------------------------
-}// namespace Ailu
+}// namespace Ailu::RHI::DX12

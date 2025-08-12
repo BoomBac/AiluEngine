@@ -2,9 +2,15 @@
 #ifdef __CAMERA_GEN_H__
 #error Camera.gen.h already included, missing '#pragma once' in Camera.h
 #endif 
+#include "Objects/ReflectTemplate.h"
 #define __CAMERA_GEN_H__
 //Enum EAntiAliasing begin...........................
-void Z_Construct_Enum_EAntiAliasing_Type();
+const Ailu::Enum* Z_Construct_Enum_EAntiAliasing_Type();
+namespace Ailu::Render { 
+enum class EAntiAliasing : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::Render::EAntiAliasing>();
 //Enum EAntiAliasing end...........................
 
 #undef CURRENT_FILE_ID

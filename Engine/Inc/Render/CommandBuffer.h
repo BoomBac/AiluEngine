@@ -5,6 +5,7 @@
 #include "Framework/Math/ALMath.hpp"
 #include "Material.h"
 #include "Mesh.h"
+#include "RenderGraph/RenderGraph.h"
 #include "RendererAPI.h"
 #include "Texture.h"
 #include <mutex>
@@ -34,6 +35,8 @@ namespace Ailu
         // D3D12_COMMAND_LIST_TYPE_VIDEO_PROCESS	= 5,
         // D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE	= 6
     };
+
+    class Render::RDG::RenderGraph;
 
     class RHICommandBuffer : public Object
     {
@@ -65,7 +68,7 @@ namespace Ailu
     private:
         inline static const u16 kInitialPoolSize = 10u;
         u16 _cur_pool_size = kInitialPoolSize;
-        std::vector<std::tuple<bool, Ref<RHICommandBuffer>>> _cmd_buffers{};
+        Vector<std::tuple<bool, Ref<RHICommandBuffer>>> _cmd_buffers{};
         std::mutex _mutex;
     };
 
@@ -83,6 +86,7 @@ namespace Ailu
     public:
         CommandBuffer(String name);
         ~CommandBuffer() override = default;
+        void SetRenderGraph(RDG::RenderGraph *render_graph);
         void Clear();
         void ClearRenderTarget(Color color, f32 depth, u8 stencil);
         void ClearRenderTarget(Color c);
@@ -98,9 +102,13 @@ namespace Ailu
         /// <param name="index"></param>
         void SetRenderTarget(RenderTexture *color, u16 index = 0u);
         void SetRenderTarget(RenderTexture *color, RenderTexture *depth, u16 color_index, u16 depth_index);
-        void SetRenderTargets(Vector<RTHandle> &colors, RTHandle depth);
+        void SetRenderTargets(const Vector<RenderTexture *> &colors, RenderTexture* depth);
         void SetRenderTarget(RTHandle color, RTHandle depth);
         void SetRenderTarget(RTHandle color, u16 index = 0u);
+        void SetRenderTargets(const Vector<RTHandle> &colors, RTHandle depth);
+        void SetRenderTarget(RDG::RGHandle color, RDG::RGHandle depth);
+        void SetRenderTarget(RDG::RGHandle color, u16 index = 0u);
+        void SetRenderTargets(const Vector<RDG::RGHandle> &colors, RDG::RGHandle depth);
         /// @brief 立即生效
         /// @param tex
         /// @param action
@@ -109,6 +117,7 @@ namespace Ailu
         /// @param tex
         /// @param action
         void SetRenderTargetLoadAction(RTHandle handle, ELoadStoreAction action);
+        void SetRenderTargetLoadAction(RDG::RGHandle handle, ELoadStoreAction action);
 
         void DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index = 0u);
         void DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u16 instance_count);
@@ -126,6 +135,7 @@ namespace Ailu
         void Blit(RenderTexture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat = nullptr, u16 pass_index = 0u);
         void Blit(RTHandle src, RenderTexture *dst, Material *mat = nullptr, u16 pass_index = 0u);
         void Blit(RenderTexture *src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u);
+        void Blit(const RDG::RGHandle& src, const RDG::RGHandle& dst, Material *mat = nullptr, u16 pass_index = 0u);
 
         void DrawFullScreenQuad(Material *mat, u16 pass_index = 0u);
 
@@ -163,6 +173,7 @@ namespace Ailu
     private:
         Vector<GfxCommand *> _commands;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
+        RDG::RenderGraph *_render_graph = nullptr;
     };
 
     class AILU_API CommandBufferPool

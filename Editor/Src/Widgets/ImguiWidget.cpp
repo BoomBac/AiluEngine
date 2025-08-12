@@ -302,7 +302,9 @@ namespace Ailu
         }
         void ImGuiWidget::SetFocus(const String &title)
         {
+        #if defined(DEAR_IMGUI)
             ImGui::SetWindowFocus(title.c_str());
+        #endif
         }
         ImGuiWidget::ImGuiWidget(const String &title) : _title(title), _is_focus(false)
         {

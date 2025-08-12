@@ -13,7 +13,7 @@ using Ailu::Render::GPUBuffer;
 using Ailu::Render::VertexBuffer;
 using Ailu::Render::IndexBuffer;
 using Ailu::Render::ConstantBuffer;
-using Ailu::Render::GPUBufferDesc;
+using Ailu::Render::BufferDesc;
 using Ailu::Render::EResourceState;
 using Ailu::Render::BindParams;
 using Ailu::Render::UploadParams;
@@ -26,7 +26,7 @@ namespace Ailu::RHI::DX12
     class D3DGPUBuffer : public GPUBuffer
     {
     public:
-		D3DGPUBuffer(GPUBufferDesc desc);
+		D3DGPUBuffer(BufferDesc desc);
 		~D3DGPUBuffer();
 		void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
 		void Name(const String &name) final;

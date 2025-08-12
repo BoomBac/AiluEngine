@@ -258,7 +258,7 @@ namespace Ailu::Render
         GraphicsPipelineStateMgr::ConfigureVertexInputLayout(_passes[pass_index]._variants[variant_hash]._pipeline_input_layout.Hash());
         GraphicsPipelineStateMgr::ConfigureRasterizerState(_passes[pass_index]._pipeline_raster_state.Hash());
         GraphicsPipelineStateMgr::ConfigureDepthStencilState(_passes[pass_index]._pipeline_ds_state.Hash());
-        GraphicsPipelineStateMgr::ConfigureTopology(static_cast<u8>(ALHash::Hasher(_passes[pass_index]._pipeline_topology)));
+        GraphicsPipelineStateMgr::ConfigureTopology(static_cast<u8>(ALHash::HashFunc(_passes[pass_index]._pipeline_topology)));
         GraphicsPipelineStateMgr::ConfigureBlendState(_passes[pass_index]._pipeline_blend_state.Hash());
         GraphicsPipelineStateMgr::ConfigureShader(ConstructHash(_id, pass_index, variant_hash));
         _topology = _passes[pass_index]._pipeline_topology;
@@ -620,7 +620,7 @@ namespace Ailu::Render
         }
         else
         {
-            //g_pLogMgr->LogWarningFormat("Undefined shader property type with name {}", prop_name);
+            //LogMgr::Get().LogWarningFormat("Undefined shader property type with name {}", prop_name);
         }
     }
 
@@ -1083,6 +1083,18 @@ namespace Ailu::Render
         if (!is_set)
             LOG_WARNING("ComputeShader::SetTexture: texture with name {} not found on shader({})",name,_name);
     }
+
+    //void ComputeShader::SetTexture(const String &name, RDG::RGHandle handle)
+    //{
+    //    auto tex = dynamic_cast<Texture *>(handle._res);
+    //    SetTexture(name, tex);
+    //}
+
+    //void ComputeShader::SetTexture(const String &name, RDG::RGHandle handle, ECubemapFace::ECubemapFace face, u16 mipmap)
+    //{
+    //    auto tex = dynamic_cast<Texture *>(handle._res);
+    //    SetTexture(name, tex,face,mipmap);
+    //}
 
 
     void ComputeShader::SetTexture(const String &name, Texture *texture, u16 mipmap)

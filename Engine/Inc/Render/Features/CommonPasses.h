@@ -13,6 +13,7 @@ namespace Ailu
         public:
             ForwardPass();
             ~ForwardPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
@@ -29,6 +30,7 @@ namespace Ailu
         public:
             CopyColorPass();
             ~CopyColorPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
@@ -45,6 +47,7 @@ namespace Ailu
         public:
             CopyDepthPass();
             ~CopyDepthPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
@@ -59,26 +62,29 @@ namespace Ailu
         {
         public:
             ShadowCastPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
 
         private:
-            Scope<RenderTexture> _p_mainlight_shadow_map;
-            Scope<RenderTexture> _p_addlight_shadow_maps;
-            Scope<RenderTexture> _p_point_light_shadow_maps;
+            Ref<RenderTexture> _p_mainlight_shadow_map;
+            Ref<RenderTexture> _p_addlight_shadow_maps;
+            Ref<RenderTexture> _p_point_light_shadow_maps;
+            RDG::RGHandle _mainlight_shadow_map,_addlight_shadow_maps,_point_light_shadow_maps;
         };
 
         class AILU_API CubeMapGenPass : public RenderPass
         {
         public:
             CubeMapGenPass(Texture *src_tex, u16 size = 512u);
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data);
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
-            Scope<RenderTexture> _src_cubemap;
-            Scope<RenderTexture> _prefilter_cubemap;
-            Scope<RenderTexture> _radiance_map;
+            Ref<RenderTexture> _src_cubemap;
+            Ref<RenderTexture> _prefilter_cubemap;
+            Ref<RenderTexture> _radiance_map;
 
         private:
             bool _is_src_cubemap = false;
@@ -103,18 +109,20 @@ namespace Ailu
         {
         public:
             DeferredGeometryPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data);
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
 
         private:
-            Array<Rect, 4> _rects;
+
         };
 
         class DeferredLightingPass : public RenderPass
         {
         public:
             DeferredLightingPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
@@ -129,6 +137,7 @@ namespace Ailu
         {
         public:
             SkyboxPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Setup(bool clear_first) { _is_clear = clear_first; }
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
@@ -150,6 +159,7 @@ namespace Ailu
         {
         public:
             GizmoPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
@@ -163,6 +173,7 @@ namespace Ailu
         public:
             WireFramePass();
             ~WireFramePass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
@@ -179,6 +190,7 @@ namespace Ailu
         public:
             GUIPass();
             ~GUIPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
@@ -196,6 +208,7 @@ namespace Ailu
         public:
             MotionVectorPass();
             ~MotionVectorPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;
@@ -208,6 +221,7 @@ namespace Ailu
         public:
             HZBPass();
             ~HZBPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
             void BeginPass(GraphicsContext *context) final;
             void EndPass(GraphicsContext *context) final;

@@ -48,8 +48,8 @@ namespace Ailu::Render
         Ref<Texture2D> _weather_map;
         Ref<ComputeShader> _noise_gen;
         Ref<ComputeShader> _cloud_gen;
-        Scope<RenderTexture> _cloud_rt_a;
-        Scope<RenderTexture> _cloud_rt_b;
+        Ref<RenderTexture> _cloud_rt_a;
+        Ref<RenderTexture> _cloud_rt_b;
         bool _is_cur_a;
     };
     ACLASS()

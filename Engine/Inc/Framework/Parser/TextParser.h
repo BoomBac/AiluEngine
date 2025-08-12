@@ -32,6 +32,34 @@ namespace Ailu
     private:
         INIMap _data;
     };
+
+    class AILU_API JSONParser : public ITextParser
+    {
+    public:
+        JSONParser();
+        ~JSONParser();
+
+        bool Load(const WString &sys_path) final;
+        bool Save(const WString &sys_path) final;
+        String GetValue(const String &section, const String &key, const String &default_value) const final;
+        Map<String, String> GetValues(const String &section) const final;
+        Map<String, String> GetValues() const final;
+        void SetValue(const String &section, const String &key, const String &value) final;
+
+        String GetString(const String &json_path, const String &default_value = "") const;
+        i32 GetInt(const String &json_path, i32 default_value = 0) const;
+        bool GetBool(const String &json_path, bool default_value = false) const;
+        f64 GetFloat(const String &json_path, f64 default_value = 0.0) const;
+
+        void SetValue(const String &json_path, const String &value);
+        void SetValue(const String &json_path, i32 value);
+        void SetValue(const String &json_path, bool value);
+        void SetValue(const String &json_path, f64 value);
+
+    private:
+        class Impl;
+        Impl *_impl;
+    };
 }
 
 #endif

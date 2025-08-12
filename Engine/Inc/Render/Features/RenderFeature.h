@@ -6,6 +6,7 @@
 #include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/RenderingData.h"
+#include "Render/RenderGraph/RenderGraph.h"
 #include "generated/RenderFeature.gen.h"
 
 namespace Ailu
@@ -18,7 +19,12 @@ namespace Ailu
         class AILU_API IRenderPass
         {
         public:
-            ~IRenderPass() = default;
+            virtual ~IRenderPass() = default;
+            /// <summary>
+            /// 执行RenderGraph setup工作，声明输入输出
+            /// </summary>
+            /// <param name="graph"></param>
+            virtual void OnRecordRenderGraph(RDG::RenderGraph& graph, RenderingData& rendering_data) = 0;
             virtual void Execute(GraphicsContext *context, RenderingData &rendering_data) = 0;
             virtual void BeginPass(GraphicsContext *context) = 0;
             virtual void EndPass(GraphicsContext *context) = 0;
@@ -33,6 +39,7 @@ namespace Ailu
             DISALLOW_COPY_AND_ASSIGN(RenderPass)
         public:
             RenderPass(const String &name) : Object(name), _is_active(true) {};
+            virtual void OnRecordRenderGraph(RDG::RenderGraph& graph, RenderingData& rendering_data) override {};
             virtual void Execute(GraphicsContext *context, RenderingData &rendering_data) override {};
             virtual void BeginPass(GraphicsContext *context) override {};
             virtual void EndPass(GraphicsContext *context)

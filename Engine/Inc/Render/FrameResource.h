@@ -7,6 +7,8 @@
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
 #include "Buffer.h"
+#include "Texture.h"
+#include "ResourcePool.h"
 
 namespace Ailu::Render
 {
@@ -28,6 +30,31 @@ namespace Ailu::Render
         Vector<ConstantBuffer *> _scene_cbs;
         Map<u64,u64> _camera_cb_lut;
         Map<u64,u64> _scene_cb_lut;
+    };
+
+    class FrameResourceManager
+    {
+    public:
+        using TexturePool = THashableResourcePool<TextureDesc,Texture>;
+        using BufferPool = THashableResourcePool<BufferDesc,GPUBuffer>;
+        using TextureHandle = TexturePool::PoolResourceHandle;
+        using BufferHandle = BufferPool::PoolResourceHandle;
+        inline static constexpr u32 kMaxResourceStaleFrame = 3u;
+    public:
+        static FrameResourceManager &Get();
+        static void Init();
+        static void Shutdown();
+        FrameResourceManager();
+        ~FrameResourceManager();
+        void Tick();
+        TextureHandle AllocTexture(TextureDesc desc);
+        BufferHandle AllocBuffer(BufferDesc desc);
+        void FreeTexture(TextureHandle handle);
+        void FreeBuffer(BufferHandle handle);
+        void CleanupStaleResources();
+    private:
+        TexturePool _texture_pool;
+        BufferPool _buffer_pool;
     };
 
 }// namespace Ailu

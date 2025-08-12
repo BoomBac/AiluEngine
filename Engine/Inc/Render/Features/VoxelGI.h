@@ -30,7 +30,7 @@ namespace Ailu::Render
         Vector3Int _pre_grid_num;
         ConstantBuffer *_cam_cbuf;
         Ref<ComputeShader> _voxelize_cs;
-        GPUBuffer *_voxel_buf = nullptr;
+        Ref<GPUBuffer> _voxel_buf = nullptr;
     };
 
     class VoxelDebugPass : public RenderPass

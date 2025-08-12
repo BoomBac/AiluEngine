@@ -52,20 +52,20 @@ namespace Ailu
         TextureLoadData load_data;
         if (!LoadTextureData(sys_path, load_data))
         {
-            return MakeRef<Texture2D>(Texture2DInitializer(4,4,ETextureFormat::kRGBA32));
+            return Texture2D::Create(4,4,ETextureFormat::kRGBA32);
         }
         else
         {
-            Texture2DInitializer desc;
+            TextureDesc desc;
             desc._width = load_data._width;
             desc._height = load_data._height;
             desc._is_linear = import_settings._is_srgb;
-            desc._is_mipmap_chain = import_settings._generate_mipmap;
-            desc._is_readble = import_settings._is_readble;
-            desc._format = ETextureFormat::kRGBA32;
-            if (desc._is_mipmap_chain)
+            desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
+            desc._is_readable = import_settings._is_readble;
+            desc._format = ConvertTextureFormatToPixelFormat(ETextureFormat::kRGBA32);
+            if (desc._mip_num > 1)
             {
-                auto mip_level = Texture::MaxMipmapCount(desc._width,desc._height) - 1;
+                auto mip_level = desc._mip_num - 1;
                 for (int i = 0; i < mip_level; i++)
                 {
                     load_data._data.emplace_back(TextureUtils::DownSample(load_data._data.back(), desc._width >> i, desc._height >> i, 4));
@@ -91,13 +91,13 @@ namespace Ailu
         }
         else
         {
-            Texture2DInitializer desc;
+            TextureDesc desc;
             desc._width = load_data._width;
             desc._height = load_data._height;
             desc._is_linear = import_settings._is_srgb;
-            desc._is_mipmap_chain = import_settings._generate_mipmap;
-            desc._is_readble = import_settings._is_readble;
-            desc._format = ETextureFormat::kRGBA32;
+            desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
+            desc._is_readable = import_settings._is_readble;
+            desc._format = ConvertTextureFormatToPixelFormat(ETextureFormat::kRGBA32);
             texture->ReCreate(desc);
             for(u16 i = 0; i < load_data._data.size(); ++i)
             {

@@ -74,13 +74,13 @@ namespace Ailu
         /// @brief 返回逻辑帧
         /// @return 
         u64 GetFrameCount() const {return _frame_count;}
-        bool _is_playing_mode = false;
-        bool _is_simulate_mode = false;
-        bool _is_multi_thread_rendering = false;
-
         const Array<ObjectLayer,32>& GetObjectLayers() const {return _object_layers;}
         const ObjectLayer& NameToLayer(const String& name);
         const EApplicationState::EApplicationState State() const {return _state;}
+
+        bool _is_playing_mode = false;
+        bool _is_simulate_mode = false;
+        bool _is_multi_thread_rendering = false;
         Delegate<> _before_update;
         Delegate<> _after_update;
     protected:

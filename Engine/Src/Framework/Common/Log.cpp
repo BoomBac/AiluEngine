@@ -34,6 +34,24 @@ namespace Ailu
 #pragma endregion
 
 #pragma region LogMgr
+    static LogMgr* g_LogMgr = nullptr;
+    void LogMgr::Init()
+    {
+        AL_ASSERT(g_LogMgr == nullptr);
+        g_LogMgr = new LogMgr();
+        g_LogMgr->Initialize();
+    }
+    void LogMgr::Shutdown()
+    {
+        AL_ASSERT(g_LogMgr != nullptr);
+        g_LogMgr->Finalize();
+        DESTORY_PTR(g_LogMgr);
+    }
+    LogMgr &LogMgr::Get()
+    {
+        return *g_LogMgr;
+    }
+
     int LogMgr::Initialize()
     {
         int ret = 0;

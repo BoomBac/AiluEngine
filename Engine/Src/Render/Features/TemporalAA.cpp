@@ -149,7 +149,7 @@ namespace Ailu::Render
                 if (cur_info._target_b)
                     cur_info._target_b->Release();
                 auto desc = camera_data._camera_color_target_desc;
-                desc._random_access = true;
+                desc._is_random_access = true;
                 cur_info._target_a = RenderTexture::Create(desc, "_TemporalAA_TargetA");
                 cur_info._target_b = RenderTexture::Create(desc, "_TemporalAA_TargetB");
                 cmd->Blit(rendering_data._camera_color_target_handle, cur_info._is_cur_a? cur_info._target_a.get() : cur_info._target_b.get());

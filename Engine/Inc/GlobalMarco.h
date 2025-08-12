@@ -19,7 +19,6 @@
 #define AILU_API __declspec(dllimport)
 #endif
 
-#define DEAR_IMGUI
 #define _SIMD
 #define _PIX_DEBUG
 #define PLATFORM_WINDOWS 1
@@ -50,6 +49,8 @@ using Path = std::filesystem::path;
 
 using String = std::string;
 using WString = std::wstring;
+using StringView = std::string_view;
+using WStringView = std::wstring_view;
 static const WString EmptyWString = L"";
 
 template<typename T>

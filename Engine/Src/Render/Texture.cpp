@@ -146,7 +146,7 @@ namespace Ailu::Render
 #pragma region Texture2D
     //-----------------------------------------------------------------------Texture2DNew----------------------------------------------------------------------------------
 
-    Ref<Texture2D> Texture2D::Create(const Texture2DInitializer &initializer)
+    Ref<Texture2D> Texture2D::Create(const TextureDesc &initializer)
     {
         switch (Renderer::GetAPI())
         {
@@ -162,11 +162,23 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Texture2D::Texture2D(const Texture2DInitializer &initializer) : Texture()
+    Ref<Texture2D> Texture2D::Create(u16 w,u16 h,ETextureFormat::ETextureFormat format,bool is_mip,bool is_random_access)
+    {
+        TextureDesc initializer;
+        initializer._width = w;
+        initializer._height = h;
+        initializer._format = ConvertTextureFormatToPixelFormat(format);
+        initializer._mip_num = is_mip? Texture::MaxMipmapCount(w,h) : 1;
+        initializer._is_random_access = is_random_access;
+        return Texture2D::Create(initializer);
+    }
+    
+
+    Texture2D::Texture2D(const TextureDesc &initializer) : Texture()
     {
         Construct(initializer);
     }
-    void Texture2D::ReCreate(const Texture2DInitializer &initializer)
+    void Texture2D::ReCreate(const TextureDesc &initializer)
     {
         Release();
         Construct(initializer);
@@ -177,16 +189,15 @@ namespace Ailu::Render
         Texture::Release();
     }
 
-    void Texture2D::Construct(const Texture2DInitializer &initializer)
+    void Texture2D::Construct(const TextureDesc &initializer)
     {
         _width = std::max<u16>(1u, initializer._width);
         _height = std::max<u16>(1u, initializer._height);
         bool is_linear = initializer._is_linear && !initializer._is_random_access;
-        _pixel_format = ConvertTextureFormatToPixelFormat(initializer._format);
+        _pixel_format = initializer._format;
         _dimension = ETextureDimension::kTex2D;
-        _format = initializer._format;
-        _mipmap_count = initializer._is_mipmap_chain ? MaxMipmapCount(_width, _height) : 1;
-        _is_readble = false;
+        _mipmap_count = initializer._mip_num > 0 ? MaxMipmapCount(_width, _height) : 1;
+        _is_readble = initializer._is_readable;
         _is_srgb = is_linear;
         _pixel_size = GetPixelByteSize(_pixel_format);
         _pixel_data.resize(_mipmap_count);
@@ -377,7 +388,7 @@ namespace Ailu::Render
 
 #pragma region Texture3D
     //----------------------------------------------------------Texture3D---------------------------------------------------------------------
-    Ref<Texture3D> Texture3D::Create(const Texture3DInitializer &initializer)
+    Ref<Texture3D> Texture3D::Create(const TextureDesc &initializer)
     {
         switch (Renderer::GetAPI())
         {
@@ -392,17 +403,16 @@ namespace Ailu::Render
         AL_ASSERT_MSG(false, "Unsupport render api!");
         return nullptr;
     }
-    Texture3D::Texture3D(const Texture3DInitializer &initializer) : Texture()
+    Texture3D::Texture3D(const TextureDesc &initializer) : Texture()
     {
         _width = std::max<u16>(1u, initializer._width);
         _height = std::max<u16>(1u, initializer._height);
         _depth = std::max<u16>(1u, initializer._depth);
         bool is_linear = initializer._is_linear && !initializer._is_random_access;
-        _pixel_format = ConvertTextureFormatToPixelFormat(initializer._format);
+        _pixel_format = initializer._format;
         _dimension = ETextureDimension::kTex3D;
-        _format = initializer._format;
-        _mipmap_count = initializer._is_mipmap_chain ? MaxMipmapCount(_width, _height, _depth) : 1;
-        _is_readble = initializer._is_readble;
+        _mipmap_count = initializer._mip_num >0 ? MaxMipmapCount(_width, _height, _depth) : 1;
+        _is_readble = initializer._is_readable;
         _is_srgb = is_linear;
         _pixel_size = GetPixelByteSize(_pixel_format);
         _pixel_data.resize(_mipmap_count);
@@ -496,22 +506,22 @@ namespace Ailu::Render
     //----------------------------------------------------------Texture3D---------------------------------------------------------------------
 
 #pragma region RenderTexture
-    static RTHash ConstructRTHash(const RenderTextureDesc &desc)
+    static RTHash ConstructRTHash(const TextureDesc &desc)
     {
         RTHash rt_hash;
         AL_ASSERT(desc._width <= 4096 && desc._height <= 4096);
         rt_hash.Set(0, 12, desc._width);
         rt_hash.Set(12, 12, desc._height);
-        rt_hash.Set(24, 5, desc._color_format);
-        rt_hash.Set(29, 1, desc._mipmap_count > 1);
-        rt_hash.Set(30, 1, desc._random_access);
-        rt_hash.Set(31, 1, desc._is_srgb);
-        rt_hash.Set(32, 2, (u64) desc._load_action);
-        rt_hash.Set(34, 2, (u64) desc._store_action);
+        rt_hash.Set(24, 5, desc._format);
+        rt_hash.Set(29, 1, desc._mip_num > 1);
+        rt_hash.Set(30, 1, desc._is_random_access);
+        rt_hash.Set(31, 1, desc._is_linear);
+        rt_hash.Set(32, 2, (u64) desc._load);
+        rt_hash.Set(34, 2, (u64) desc._store);
         return rt_hash;
     }
     //----------------------------------------------------------RenderTexture---------------------------------------------------------------------
-    Scope<RenderTexture> RenderTexture::Create(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    Ref<RenderTexture> RenderTexture::Create(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -520,11 +530,16 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                RenderTextureDesc desc(width, height, format);
+                TextureDesc desc;
+                desc._width = width;
+                desc._height = height;
+                desc._format = ConvertRenderTextureFormatToPixelFormat(format);
                 desc._dimension = ETextureDimension::kTex2D;
-                desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, height) : 1;
-                desc._random_access = random_access;
-                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
+                desc._mip_num = mipmap_chain ? MaxMipmapCount(width, height) : 1;
+                desc._is_random_access = random_access;
+                desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
+                desc._is_color_target = !desc._is_depth_target;
+                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -534,7 +549,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Scope<RenderTexture> RenderTexture::Create(u16 width, u16 height, u16 array_slice, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    Ref<RenderTexture> RenderTexture::Create(u16 width, u16 height, u16 array_slice, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -543,12 +558,17 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                RenderTextureDesc desc(width, height, format);
-                desc._slice_num = array_slice;
+                TextureDesc desc;
+                desc._width = width;
+                desc._height = height;
+                desc._format = ConvertRenderTextureFormatToPixelFormat(format);
+                desc._array_size = array_slice;
                 desc._dimension = ETextureDimension::kTex2DArray;
-                desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, height) : 1;
-                desc._random_access = random_access;
-                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
+                desc._mip_num = mipmap_chain ? MaxMipmapCount(width, height) : 1;
+                desc._is_random_access = random_access;
+                desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
+                desc._is_color_target = !desc._is_depth_target;
+                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -558,7 +578,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Scope<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
+    Ref<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -567,11 +587,16 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                RenderTextureDesc desc(width, width, format);
+                TextureDesc desc;
+                desc._width = width;
+                desc._height = width;
+                desc._format = ConvertRenderTextureFormatToPixelFormat(format);
                 desc._dimension = ETextureDimension::kCube;
-                desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, width) : 1;
-                desc._random_access = random_access;
-                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
+                desc._mip_num = mipmap_chain ? MaxMipmapCount(width, width) : 1;
+                desc._is_random_access = random_access;
+                desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
+                desc._is_color_target = !desc._is_depth_target;
+                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -581,7 +606,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Scope<RenderTexture> RenderTexture::Create(RenderTextureDesc desc, String name)
+    Ref<RenderTexture> RenderTexture::Create(const TextureDesc& desc, String name)
     {
         switch (Renderer::GetAPI())
         {
@@ -590,7 +615,7 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
+                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -600,7 +625,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    Scope<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat::ERenderTargetFormat format, u16 array_slice, bool linear, bool random_access)
+    Ref<RenderTexture> RenderTexture::Create(u16 width, String name, ERenderTargetFormat::ERenderTargetFormat format, u16 array_slice, bool linear, bool random_access)
     {
         switch (Renderer::GetAPI())
         {
@@ -609,12 +634,17 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                RenderTextureDesc desc(width, width, format);
-                desc._slice_num = array_slice;
+                TextureDesc desc;
+                desc._width = width;
+                desc._height = width;
+                desc._format = ConvertRenderTextureFormatToPixelFormat(format);
+                desc._array_size = array_slice;
                 desc._dimension = ETextureDimension::kCubeArray;
-                desc._mipmap_count = 0;
-                desc._random_access = random_access;
-                auto rt = MakeScope<RHI::DX12::D3DRenderTexture>(desc);
+                desc._mip_num = 0;
+                desc._is_random_access = random_access;
+                desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
+                desc._is_color_target = !desc._is_depth_target;
+                auto rt = MakeRef<RHI::DX12::D3DRenderTexture>(desc);
                 rt->Name(name);
                 rt->Apply();
                 return rt;
@@ -626,23 +656,33 @@ namespace Ailu::Render
 
     RTHandle RenderTexture::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {
-        RenderTextureDesc desc(width, height, format);
-        desc._mipmap_count = mipmap_chain ? MaxMipmapCount(width, height) : 1;
-        desc._random_access = random_access;
-        desc._is_srgb = linear;
+        TextureDesc desc;
+        desc._width = width;
+        desc._height = height;
+        desc._format = ConvertRenderTextureFormatToPixelFormat(format);
+        desc._mip_num = mipmap_chain ? MaxMipmapCount(width, height) : 1;
+        desc._is_random_access = random_access;
+        desc._is_linear = linear;
+        desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
+        desc._is_color_target = !desc._is_depth_target;
         return GetTempRT(desc, name);
     }
     RTHandle RenderTexture::GetTempRT(u16 width, u16 height,String name,ERenderTargetFormat::ERenderTargetFormat format,ELoadStoreAction load_action)
     {
-        RenderTextureDesc desc(width, height, format);
-        desc._mipmap_count = 1u;
-        desc._random_access = false;
-        desc._is_srgb = true;
-        desc._load_action = load_action;
+        TextureDesc desc;
+        desc._width = width;
+        desc._height = height;
+        desc._format = ConvertRenderTextureFormatToPixelFormat(format);
+        desc._mip_num = 1u;
+        desc._is_random_access = false;
+        desc._is_linear = true;
+        desc._load = load_action;
+        desc._is_depth_target = format == ERenderTargetFormat::kDepth || format == ERenderTargetFormat::kShadowMap;
+        desc._is_color_target = !desc._is_depth_target;
         return GetTempRT(desc, name);
     }
 
-    RTHandle RenderTexture::GetTempRT(RenderTextureDesc desc, String name)
+    RTHandle RenderTexture::GetTempRT(const TextureDesc& desc, String name)
     {
         RTHash rt_hash = ConstructRTHash(desc);
         auto rt = g_pRenderTexturePool->GetByIDHash(rt_hash);
@@ -657,28 +697,28 @@ namespace Ailu::Render
             g_pRenderTexturePool->ReleaseRT(handle);
     }
 
-    RenderTexture::RenderTexture(const RenderTextureDesc &desc) : Texture()
+    RenderTexture::RenderTexture(const TextureDesc &desc) : Texture()
     {
         _width = std::max<u16>(1u, desc._width);
         _height = std::max<u16>(1u, desc._height);
         _depth = std::max<u16>(1u, desc._depth);
-        _depth_bit = desc._depth_bit;
-        _pixel_format = ConvertRenderTextureFormatToPixelFormat(desc._depth_bit > 0 ? desc._depth_format : desc._color_format);
+        _pixel_format = desc._format;
         _dimension = desc._dimension;
-        _slice_num = desc._slice_num;
-        _mipmap_count = desc._mipmap_count;
-        _is_readble = false;
-        _is_srgb = false;
+        _slice_num = desc._array_size;
+        _mipmap_count = desc._mip_num;
+        _is_readble = desc._is_readable;
+        _is_srgb = desc._is_linear;
         _pixel_size = GetPixelByteSize(_pixel_format);
-        _is_random_access = desc._random_access;
+        _is_random_access = desc._is_random_access;
         _texel_size = Vector4f(1.0f / _width, 1.0f / _height, (f32) _width, (f32) _height);
-        _load_action = desc._load_action;
-        _store_action = desc._store_action;
+        _load_action = desc._load;
+        _store_action = desc._store;
+        _depth_bit = desc._is_depth_target? 32u : 0;
         u16 slice_num = 1;
         if (_dimension == ETextureDimension::kTex2DArray)
-            slice_num = desc._slice_num;
+            slice_num = desc._array_size;
         else if (_dimension == ETextureDimension::kCubeArray)
-            slice_num = 6 * desc._slice_num;
+            slice_num = 6 * desc._array_size;
         else if (_dimension == ETextureDimension::kCube)
             slice_num = 6;
         else if (_dimension == ETextureDimension::kTex3D)
@@ -748,7 +788,8 @@ namespace Ailu::Render
     RenderTexture::~RenderTexture()
     {
         s_render_texture_gpu_mem_usage -= _mem_size;
-        g_pRenderTexturePool->UnRegister(ID());
+        if (g_pRenderTexturePool)
+            g_pRenderTexturePool->UnRegister(ID());
     }
 #pragma endregion
 
@@ -763,14 +804,14 @@ namespace Ailu::Render
     }
 
     //----------------------------------------------------------RenderTexturePool---------------------------------------------------------------------
-    u32 RenderTexturePool::Add(RTHash hash, Scope<RenderTexture> rt)
+    u32 RenderTexturePool::Add(RTHash hash, Ref<RenderTexture> rt)
     {
         auto id = rt->ID();
         RTInfo info;
         info._is_available = false;
         info._last_access_frame_count = Application::Application::Get().GetFrameCount();
         info._id = id;
-        info._rt = std::move(rt);
+        info._rt = rt;
         //先设置为当前+1，防止该纹理未使用从而其fence value一致保持较大的默认值而无法被复用。
         //info._rt->SetFenceValue(g_pGfxContext->GetFenceValueGPU() + 1);
         auto it = _pool.emplace(std::make_pair(hash, std::move(info)));

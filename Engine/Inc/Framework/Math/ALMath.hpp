@@ -13,6 +13,8 @@
 #include <random>
 #include <string>
 
+#include "Objects/ReflectTemplate.h" //为了StaticClass<T>能返回数学类型
+
 
 //https://github.com/blender/blender/blob/756538b4a117cb51a15e848fa6170143b6aafcd8/source/blender/blenlib/intern/math_rotation.c#L272
 /* hints for branch prediction, only use in code that runs a _lot_ */
@@ -297,11 +299,11 @@ namespace Ailu
                 os << vec.x << "," << vec.y;
                 return os;
             }
-            bool operator==(const Vector2D<T> &other)
+            bool operator==(const Vector2D<T> &other) const
             {
                 return x == other.x && y == other.y;
             }
-            bool operator<(const Vector2D<T> &other)
+            bool operator<(const Vector2D<T> &other) const
             {
                 if (x != other.x) return x < other.x;
                 return y < other.y;
@@ -2780,11 +2782,21 @@ namespace Ailu
             };
 
             template<typename T>
-            static u32 Hasher(const T &obj)
+            static u32 HashFunc(const T &obj)
             {
                 throw std::runtime_error("Unhandled type whth hasher");
                 return 0;
             }
+
+            template<typename T>
+            struct Hasher
+            {
+                u64 operator()(const T &obj) const
+                {
+                    throw std::runtime_error("Unhandled type whth hasher");
+                    return 0;
+                }
+            };
 
             template<typename T>
             static u32 CommonRuntimeHasher(const T &obj)
@@ -2801,7 +2813,15 @@ namespace Ailu
         }// namespace ALHash
     }// namespace Math
 #pragma warning(pop)
-
+    template<> const AILU_API Type* StaticClass<Math::Vector2f>();
+    template<> const AILU_API Type* StaticClass<Math::Vector3f>();
+    template<> const AILU_API Type* StaticClass<Math::Vector4f>();
+    template<> const AILU_API Type* StaticClass<Math::Vector2Int>();
+    template<> const AILU_API Type* StaticClass<Math::Vector3Int>();
+    template<> const AILU_API Type* StaticClass<Math::Vector4Int>();
+    template<> const AILU_API Type *StaticClass<Math::Vector2UInt>();
+    template<> const AILU_API Type *StaticClass<Math::Vector3UInt>();
+    template<> const AILU_API Type *StaticClass<Math::Vector4UInt>();
 }// namespace Ailu
 using namespace Ailu::Math;
 #endif// __AL_MATH_H__
