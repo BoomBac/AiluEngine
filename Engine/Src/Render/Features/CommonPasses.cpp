@@ -8,7 +8,7 @@
 #include "Render/RenderConstants.h"
 #include "Render/RenderQueue.h"
 #include "Render/RenderingData.h"
-#include "Render/TextRenderer.h"
+#include "UI/TextRenderer.h"
 #include "pch.h"
 
 #include "Render/Renderer.h"

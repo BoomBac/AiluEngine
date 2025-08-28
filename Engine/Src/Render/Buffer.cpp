@@ -48,6 +48,7 @@ namespace Ailu::Render
 		case RendererAPI::ERenderAPI::kDirectX12:
 		{
 			auto buf = new RHI::DX12::D3DVertexBuffer(layout);
+            buf->Name(name);
 			return buf;
 		}
 		}
@@ -92,8 +93,12 @@ namespace Ailu::Render
 		case RendererAPI::ERenderAPI::kNone:
 			AL_ASSERT_MSG(false, "None render api used!");
 			return nullptr;
-		case RendererAPI::ERenderAPI::kDirectX12:
-			return new RHI::DX12::D3DIndexBuffer(indices, count,is_dynamic);
+        case RendererAPI::ERenderAPI::kDirectX12:
+        {
+			auto buf = new RHI::DX12::D3DIndexBuffer(indices, count,is_dynamic);
+			buf->Name(name);
+            return buf;
+        }
 		}
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;

@@ -4,14 +4,15 @@
 #include "Framework/Events/Layer.h"
 #include "ImGuiWidget.h"
 #include "Render/PickPass.h"
+#include "Dock/DockManager.h"
 
 struct ImFont;
 namespace Ailu
 {
-    namespace UI
-    {
-        class Canvas;
-    }
+	namespace UI
+	{
+		class Widget;
+	}
 	namespace Editor
 	{
 		class SceneView;
@@ -26,7 +27,7 @@ namespace Ailu
 			void OnAttach() override;
 			void OnDetach() override;
 			void OnEvent(Event& e) override;
-            void OnUpdate(f32 dt) override;
+			void OnUpdate(f32 dt) override;
 			void OnImguiRender() override;
 
 			void Begin();
@@ -35,13 +36,14 @@ namespace Ailu
 			ImGuiWidget* _p_scene_view;
 			ImGuiWidget* _p_preview_cam_view;
 			ImGuiWidget* _p_profiler_window;
-            ImGuiWidget *_p_rdg_debugger;
+			ImGuiWidget *_p_rdg_debugger;
 		private:
 			ImFont* _font = nullptr;
 			Vector<Scope<ImGuiWidget>> _widgets;
 			ImGuiWidget* _p_env_setting;
-            Render::PickFeature _pick;
-            UI::Canvas *_canvas = nullptr;
+			Render::PickFeature _pick;
+			Ref<UI::Widget> _main_widget = nullptr;
+			Scope<DockManager> _dock_manager = nullptr;
 		};
 	}
 }

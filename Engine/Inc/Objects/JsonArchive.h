@@ -62,6 +62,21 @@ namespace Ailu
         FArchive &operator<<(const i16 &obj) final { return *this << (i64) obj; }
         FArchive &operator<<(const i32 &obj) final { return *this << (i64) obj; }
         FArchive &operator<<(const f32 &obj) final { return *this << (f64) obj; }
+        FArchive &operator<<(Object &obj) final 
+        {
+            if (auto sob = dynamic_cast<SerializeObject *>(&obj); sob != nullptr)
+            {
+                sob->Serialize(*this);
+            }
+            else
+            {
+                for (const auto &p: obj.GetType()->GetProperties())
+                {
+                    p.Serialize(&obj, *this);
+                }
+            }
+            return *this;
+        }
         IMPL_LEFT_OP(u64)
         IMPL_LEFT_OP(i64)
         IMPL_LEFT_OP(f64)
@@ -117,7 +132,21 @@ namespace Ailu
             obj = static_cast<f32>(tmp);
             return *this;
         }
-
+        FArchive &operator>>(Object &obj) final
+        {
+            if (auto sob = dynamic_cast<SerializeObject *>(&obj); sob != nullptr)
+            {
+                sob->Deserialize(*this);
+            }
+            else
+            {
+                for (const auto &p: obj.GetType()->GetProperties())
+                {
+                    p.Deserialize(&obj, *this);
+                }
+            }
+            return *this;
+        }
         IMPL_RIGHT_OP(u64)
         IMPL_RIGHT_OP(i64)
         IMPL_RIGHT_OP(f64)
@@ -150,6 +179,14 @@ namespace Ailu
         void Load(const Path &sys_path) final;
     private:
         JsonValue *FindNode();
+        void Reset()
+        {
+            _cur_key.clear();
+            _cur_sub_name.clear();
+            while (!_cur_obj_nodes.empty())
+                _cur_obj_nodes.pop();
+            _root = JsonObject{};
+        }
     private:
         class Impl;
         Impl *_impl = nullptr;
@@ -172,7 +209,6 @@ namespace Ailu
             };
         };
         std::stack<JsonNode> _cur_obj_nodes;
-        JsonNode *_pre_arr_node;
         JsonValue _root;
     };
 }

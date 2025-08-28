@@ -7,17 +7,17 @@
 //Class Object begin...........................
 #define OBJECT_GEN_H_16_GENERATED_BODY \
                             private: \
-                                friend const Type* Z_Construct_Object_Type();\
-                                static const Type* GetPrivateStaticClass();\
+                                friend Type* Z_Construct_Object_Type();\
+                                static Type* GetPrivateStaticClass();\
                             public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType() const;
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual Type  *GetType();
                             namespace Ailu {class Type;}
 namespace Ailu{
 class Object ;
 }
 template<>
-AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Object>();
+AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Object>();
 //Class Object end...........................
 
 #undef CURRENT_FILE_ID

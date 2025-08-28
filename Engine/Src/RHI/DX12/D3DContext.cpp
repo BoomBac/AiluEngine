@@ -914,7 +914,8 @@ namespace Ailu::RHI::DX12
         _swapchain->Present();
         {
             s_timer.MarkLocal();
-            MoveToNextFrame();
+            WaitForGpu();
+            //MoveToNextFrame();
             //if (Application::Get().GetFrameCount() % 60 == 0)
             Render::RenderingStates::s_gpu_latency = s_timer.GetElapsedSinceLastLocalMark();
         }

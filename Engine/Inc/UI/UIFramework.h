@@ -10,12 +10,18 @@
 #include "UIElement.h"
 namespace Ailu::UI
 {
-    struct UISkin
+    enum class ECursorType
     {
-
+        kArrow,
+        kSizeNS,  // 上下
+        kSizeEW,  // 左右
+        kSizeNESW,// ↘↖ 对角
+        kSizeNWSE,// ↗↙ 对角
+        kHand
     };
 
-    class UIManager
+
+    class AILU_API UIManager
     {
     public:
         static void Init();
@@ -24,18 +30,8 @@ namespace Ailu::UI
     public:
         UIManager();
         ~UIManager();
-        void AddElement(UIElement* element);
-        void RemoveElement(UIElement* element);
-        [[nodiscard]] UIElement* FindElement(u32 id) const;
-        [[nodiscard]] UIElement* FindElement(String& name) const;
-        void DispatchEvent(const Event& event);
-        void Update(f32 dt);
-        void Render();
-        void SetSkin(const UISkin& skin);
-        UISkin& GetSkin();
+        void SetCursor(ECursorType type);
     private:
-        // 根UI容器，所有UI元素的父节点
-        UISkin _skin;
     };
 
 }

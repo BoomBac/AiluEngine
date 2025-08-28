@@ -1,0 +1,128 @@
+{
+    "_type_name": "Ailu::UI::Widget",
+    "_guid": {},
+    "_size": [1920.0, 1080.0],
+    "_position": [0.0, 0.0],
+    "_scale": [1.0, 1.0],
+    "_name": "Widget",
+    "_id": 943,
+    "_hash": 943,
+    "_root": {
+        "_type_name": "Ailu::UI::Canvas",
+        "_slot": {
+            "_size": [100.0, 100.0],
+            "_anchor": [0.0, 0.0],
+            "_margin": [0.0, 0.0, 0.0, 0.0],
+            "_position": [0.0, 0.0],
+            "_alignment_h": "kLeft",
+            "_alignment_v": "kCenter",
+            "_type": "kCanvas",
+            "_is_fill_size": false
+        },
+        "_hash": 944,
+        "_padding": [0.0, 0.0, 0.0, 0.0],
+        "_guid": {},
+        "_name": "Canvas",
+        "_id": 944,
+        "_children": [{
+                "_type_name": "Ailu::UI::Text",
+                "_text": "This is a text",
+                "_name": "ui_element_947",
+                "_color": [1.0, 1.0, 1.0, 1.0],
+                "_font_size": 14,
+                "_slot": {
+                    "_margin": [0.0, 0.0, 0.0, 0.0],
+                    "_anchor": [0.0, 0.0],
+                    "_size": [100.0, 100.0],
+                    "_position": [0.0, 0.0],
+                    "_alignment_h": "kLeft",
+                    "_type": "kCanvas",
+                    "_alignment_v": "kCenter",
+                    "_is_fill_size": false
+                },
+                "_padding": [0.0, 0.0, 0.0, 0.0],
+                "_id": 947,
+                "_hash": 947,
+                "_guid": {},
+                "_children": []
+            }, {
+                "_type_name": "Ailu::UI::VerticalBox",
+                "_is_size_to_content": false,
+                "_hash": 945,
+                "_slot": {
+                    "_size": [200.0, 100.0],
+                    "_anchor": [0.0, 0.0],
+                    "_margin": [0.0, 0.0, 0.0, 0.0],
+                    "_position": [0.0, 200.0],
+                    "_alignment_h": "kLeft",
+                    "_alignment_v": "kCenter",
+                    "_type": "kCanvas",
+                    "_is_fill_size": false
+                },
+                "_guid": {},
+                "_padding": [0.0, 0.0, 0.0, 0.0],
+                "_name": "vertical_box",
+                "_id": 945,
+                "_children": [{
+                        "_type_name": "Ailu::UI::Button",
+                        "_hash": 946,
+                        "_slot": {
+                            "_margin": [0.0, 0.0, 0.0, 0.0],
+                            "_anchor": [0.0, 0.0],
+                            "_size": [100.0, 32.0],
+                            "_position": [0.0, 0.0],
+                            "_alignment_h": "kFill",
+                            "_type": "kCanvas",
+                            "_alignment_v": "kCenter",
+                            "_is_fill_size": false
+                        },
+                        "_guid": {},
+                        "_padding": [0.0, 0.0, 0.0, 0.0],
+                        "_name": "button",
+                        "_id": 946,
+                        "_children": []
+                    }, {
+                        "_type_name": "Ailu::UI::Slider",
+                        "_id": 948,
+                        "_range": [0.0, 1.0],
+                        "_padding": [0.0, 0.0, 0.0, 0.0],
+                        "_value": 0.0,
+                        "_font_size": 12,
+                        "_slot": {
+                            "_size": [100.0, 32.0],
+                            "_anchor": [0.0, 0.0],
+                            "_margin": [0.0, 0.0, 0.0, 0.0],
+                            "_position": [0.0, 0.0],
+                            "_alignment_h": "kFill",
+                            "_alignment_v": "kCenter",
+                            "_type": "kCanvas",
+                            "_is_fill_size": false
+                        },
+                        "_name": "ui_element_948",
+                        "_hash": 948,
+                        "_guid": {},
+                        "_children": []
+                    },{
+                        "_type_name": "Ailu::UI::CheckBox",
+                        "_hash": 946,
+                        "_slot": {
+                            "_margin": [0.0, 0.0, 0.0, 0.0],
+                            "_anchor": [0.0, 0.0],
+                            "_size": [32.0, 32.0],
+                            "_position": [0.0, 0.0],
+                            "_alignment_h": "kLeft",
+                            "_type": "kCanvas",
+                            "_alignment_v": "kCenter",
+                            "_is_fill_size": false
+                        },
+                        "_guid": {},
+                        "_padding": [0.0, 0.0, 0.0, 0.0],
+                        "_name": "CheckBox",
+                        "_id": 946,
+                        "_is_checked": false,
+                        "_children": []
+                    }
+                ]
+            }]
+    }
+}

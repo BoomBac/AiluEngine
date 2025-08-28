@@ -1,0 +1,13 @@
+{
+    "_aspect": 1.858223,
+    "_controller_rot": [14.760873, 23775.908],
+    "_far": 13395.209961,
+    "_fov": 60.0,
+    "_move_speed": 1.819999,
+    "_near": 1.0,
+    "_position": [20.91335, 17.143353, -31.684212],
+    "_rotation": [0.127221, 0.13724053, -0.01777678, 0.982173],
+    "_scene_path": "WaterTest/default_scene.almap",
+    "_viewport_size": [0, 0],
+    "_window_size": [1324, 777]
+}

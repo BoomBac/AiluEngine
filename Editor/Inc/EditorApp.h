@@ -51,6 +51,12 @@ namespace Ailu
             Vector<u32> _nums;
             APROPERTY()
             Vector<Object> _objs;
+            APROPERTY()
+            Vector2f _v2;
+            APROPERTY()
+            Vector3f _v3;
+            APROPERTY()
+            Vector4f _v4;
         };
 
         class InputLayer;
@@ -58,10 +64,13 @@ namespace Ailu
         class EditorApp : public Ailu::Application
         {
         public:
+            static EditorApp *GetEditor() { return static_cast<EditorApp *>(&Application::Get()); }
+        public:
             int Initialize() final;
             void Finalize() final;
             void Tick(f32 delta_time) final;
 
+        public:
             Delegate<const fs::path &> _on_file_changed_delegate;
         private:
             EditorLayer *_p_editor_layer;

@@ -42,7 +42,6 @@ set(CORE_MODULE
 set(RENDER_MODULE
         Inc/Render/Gizmo.h
         Src/Render/Gizmo.cpp
-        Src/Render/TextRenderer.cpp
         Src/Render/FrameResource.cpp
         Inc/Render/FrameResource.h
         Src/Render/Features/VoxelGI.cpp
@@ -61,8 +60,6 @@ set(UI_MODULE
         Src/UI/UIFramework.cpp
         Src/UI/UIElement.cpp
         Inc/UI/UIElement.h
-        Src/UI/Canvas.cpp
-        Inc/UI/Canvas.h
         Src/UI/UIRenderer.cpp
         Inc/UI/UIRenderer.h)
 set(IMGUI_BACKENDS ${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_dx12.cpp;${ENGINE_ROOT_PATH}/Ext/imgui/backends/imgui_impl_win32.cpp)

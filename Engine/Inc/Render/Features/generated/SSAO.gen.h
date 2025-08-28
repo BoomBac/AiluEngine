@@ -7,17 +7,17 @@
 //Class SSAO begin...........................
 #define SSAO_GEN_H_29_GENERATED_BODY \
                             private: \
-                                friend const Type* Z_Construct_SSAO_Type();\
-                                static const Type* GetPrivateStaticClass();\
+                                friend Type* Z_Construct_SSAO_Type();\
+                                static Type* GetPrivateStaticClass();\
                             public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType() const override;
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual Type  *GetType() override;
                             namespace Ailu {class Type;}
 namespace Ailu::Render{
 class SSAO ;
 }
 template<>
-AILU_API const class Ailu::Type* Ailu::StaticClass<class Ailu::Render::SSAO>();
+AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::Render::SSAO>();
 //Class SSAO end...........................
 
 #undef CURRENT_FILE_ID

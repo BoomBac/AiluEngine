@@ -260,8 +260,10 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
 {
     using std::endl;
     std::string full_name = class_info._namespace + "::" + class_info._name;
-    file << std::format("const Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace, class_info._name) << std::endl;
+    file << std::format("Ailu::Type* {}::Z_Construct_{}_Type()", class_info._namespace, class_info._name) << std::endl;
     file << "{" << std::endl;
+    if (!class_info._parent.empty())
+        file << std::format("{}::StaticType();",class_info._parent) << std::endl;
     file << std::format("static std::unique_ptr<Ailu::Type> cur_type = nullptr;") << std::endl;
     file << std::format("if(cur_type == nullptr)") << std::endl;
     file << "{" << std::endl;
@@ -272,33 +274,67 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
     file << std::format("initializer._is_class = true;") << endl;
     file << std::format("initializer._is_abstract = {}", BOOL_STR(class_info._is_abstract)) << ";" << endl;
     file << std::format("initializer._namespace = \"{}\"", class_info._namespace) << ";" << endl;
-    file << std::format("initializer._base_name = \"{}\"", !class_info._parent.empty() ? class_info._namespace + "::" + class_info._parent : "") << ";" << endl;
+    file << std::format("initializer._base_name = \"{}\"", class_info._parent) << ";" << endl;
+    file << std::format("initializer._constructor = []()->{}* {{return new {};}}",full_name, full_name)<< ";" << endl;
+
     for (auto &mem: class_info._members)
     {
         if (mem._is_function)
         {
             auto s = std::format(R"(initializer._functions.emplace_back(MemberInfoInitializer(EMemberType::kFunction, "{}", "{}", {}, {}, {}, &{}::{}));)",
                                  mem._name, ConstructFuncType(mem._return_type, mem._params, mem._is_const), BOOL_STR(mem._is_static), BOOL_STR(mem._is_public), mem._offset, class_info._name, mem._name);
+
+            std::string cur_meta = "meta" + mem._name;
+            file << "Meta " << cur_meta << ";" << std::endl;
+            auto bd_name = "builder" + mem._name;
+            file << std::format("MemberBuilder {};", bd_name) << std::endl;
+            file << std::format("{}._name = {};", bd_name, mem._name) << std::endl;
+            file << std::format("{}._type_name = {};", bd_name, ConstructFuncType(mem._return_type, mem._params, mem._is_const)) << std::endl;
+            file << std::format("{}._offset = offsetof({},{});", bd_name, class_info._name, mem._name) << std::endl;
+            file << std::format("{}._is_const = {};", bd_name, BOOL_STR(mem._is_const)) << std::endl;
+            file << std::format("{}._is_static = {};", bd_name, BOOL_STR(mem._is_static)) << std::endl;
+            file << std::format("{}._is_public = {};", bd_name, BOOL_STR(mem._is_public)) << std::endl;
+            file << std::format("{}._ret_type_name = {};", bd_name, mem._return_type) << std::endl;
+            file << std::format("{}._meta = {};", bd_name, cur_meta) << std::endl;
+            file << std::format("{}._member_ptr = &{}::{};", bd_name, class_info._name, mem._name) << std::endl;
+            //file << std::format("{}._accessor = MakeScope<OffsetPropertyAccessor>({}._offset);", bd_name) << std::endl;
+            file << std::format("initializer._functions.emplace_back(MemberBuilder::BuildFunction({}));", bd_name) << std::endl;
             file << s << std::endl;
         }
         else
         {
-            //cpp_file << "Meta " <<mem._name << "_meta{"<< std::format("{}")<<"};"<<std::endl;
             std::string cur_meta = "meta" + mem._name;
             file << "Meta " << cur_meta << ";" << std::endl;
-            file << cur_meta << "._category=" << std::format("\"{}\"", mem._meta._category) << ";" << std::endl;
-            file << cur_meta << "._min=(float)" << mem._meta._min << ";" << std::endl;
-            file << cur_meta << "._max=(float)" << mem._meta._max << ";" << std::endl;
-            file << cur_meta << "._is_range=" << (BOOL_STR(mem._meta._is_range)) << ";" << std::endl;
-            file << cur_meta << "._is_float_range=" << (BOOL_STR(mem._meta._is_float_range)) << ";" << std::endl;
-            file << cur_meta << "._is_color=" << (BOOL_STR(mem._meta._is_color)) << ";" << std::endl;
-            auto init_name = "initializer_" + mem._name;
-            std::string init_str = std::format("MemberInfoInitializer {} = {{EMemberType::kProperty, \"{}\", \"{}\", {}, &{}::{}, {}, {}, {}, {}, {}, {}, {}, nullptr, nullptr}};", init_name, mem._name, mem._type, std::format("offsetof({},{})", class_info._name, mem._name), class_info._name, mem._name, cur_meta, BOOL_STR(mem._is_static), BOOL_STR(mem._is_public),BOOL_STR(mem._is_const), BOOL_STR(mem._is_pointer), BOOL_STR(mem._is_reference),false);
-            file << init_str << std::endl;
-            file << init_name << "._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<" << mem._type << ">);" << std::endl;
-            file << init_name << "._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<" << mem._type << ">);" << std::endl;
-            file << init_name << "._type = Ailu::Type::Find(\"" << mem._type << "\");" << std::endl;
-            file << std::format("initializer._properties.emplace_back({});", init_name) << std::endl;
+            file << std::format("{}.Set(\"Category\",\"{}\");", cur_meta, mem._meta._category) << std::endl;
+            file << std::format("{}.Set(\"IsColor\",{});", cur_meta, BOOL_STR(mem._meta._is_color)) << std::endl;
+            file << std::format("{}.Set(\"IsRange\",{});", cur_meta, BOOL_STR(mem._meta._is_range)) << std::endl;
+            file << std::format("{}.Set(\"IsFloatRange\",{});", cur_meta, BOOL_STR(mem._meta._is_float_range)) << std::endl;
+            if (mem._meta._is_float_range)
+            {
+                file << std::format("{}.Set(\"RangeMin\",{});", cur_meta, mem._meta._min) << std::endl;
+                file << std::format("{}.Set(\"RangeMax\",{});", cur_meta, mem._meta._max) << std::endl;
+            }
+            else
+            {
+                file << std::format("{}.Set(\"RangeMin\",(i32){});", cur_meta, mem._meta._min)<< std::endl;
+                file << std::format("{}.Set(\"RangeMax\",(i32){});", cur_meta, mem._meta._max)<< std::endl;
+            }
+            auto bd_name = "builder" + mem._name;
+            file << std::format("MemberBuilder {};", bd_name) << std::endl;
+            file << std::format("{}._name = \"{}\";", bd_name,mem._name) << std::endl;
+            file << std::format("{}._type_name = \"{}\";", bd_name,mem._type) << std::endl;
+            file << std::format("{}._offset = offsetof({},{});", bd_name, class_info._name, mem._name) << std::endl;
+            file << std::format("{}._is_const = {};", bd_name,BOOL_STR(mem._is_const)) << std::endl;
+            file << std::format("{}._is_static = {};", bd_name, BOOL_STR(mem._is_static)) << std::endl;
+            file << std::format("{}._is_public = {};", bd_name, BOOL_STR(mem._is_public)) << std::endl;
+            file << std::format("{}._is_pointer = {};", bd_name, BOOL_STR(mem._is_pointer)) << std::endl;
+            file << std::format("{}._is_ref = {};", bd_name, BOOL_STR(mem._is_reference)) << std::endl;
+            file << std::format("{}._is_template = {};", bd_name, BOOL_STR(mem._is_template)) << std::endl;
+            file << std::format("{}._meta = {};", bd_name, cur_meta) << std::endl;
+            //file << std::format("{}._accessor = MakeScope<OffsetPropertyAccessor>({}._offset);", bd_name, bd_name) << std::endl;
+            file << std::format("{}._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<{}>);",bd_name,mem._type) << std::endl;
+            file << std::format("{}._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<{}>);",bd_name,mem._type) << std::endl;
+            file << std::format("initializer._properties.emplace_back(MemberBuilder::BuildProperty({}));", bd_name) << std::endl;
         }
     }
     file << "cur_type = std::make_unique<Ailu::Type>(initializer);" << std::endl;
@@ -307,23 +343,25 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
     file << "return cur_type.get();" << std::endl;
     file << "}" << std::endl;
     file << std::endl;
-    file << std::format("const Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
+    file << std::format("Ailu::Type* {}::GetPrivateStaticClass()", full_name) << std::endl;
     file << "{" << std::endl;
-    file << std::format("\tstatic const Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
+    file << std::format("\tstatic Ailu::Type* type = Z_Construct_{}_Type();", class_info._name) << std::endl;
     file << std::format("\treturn type;") << std::endl;
     file << "}" << std::endl;
     file << std::endl;
-    file << std::format("template<> const Ailu::Type* Ailu::StaticClass<{}::{}>()", class_info._namespace, class_info._name) << std::endl;
+    file << std::format("template<> Ailu::Type* Ailu::StaticClass<{}::{}>()", class_info._namespace, class_info._name) << std::endl;
     file << "{" << std::endl;
     file << "return " << std::format("{}::StaticType();", full_name) << std::endl;
     file << "}" << std::endl;
     if (!class_info._is_struct)
     {
-        file << std::format("    const Type *{}::GetType() const", full_name) << std::endl;
+        file << std::format("    Type *{}::GetType()", full_name) << std::endl;
         file << "{" << std::endl;
         file << "return " << std::format("{}::GetPrivateStaticClass();", full_name) << std::endl;
         file << "}" << std::endl;
     }
+    //ClassTypeRegister s_register_object(&Ailu::Object::StaticType, "Ailu::Object");
+    file << std::format("ClassTypeRegister s_register_{}(&{}::StaticType, \"{}\");", class_info._name, full_name, full_name) << std::endl;
 }
 
 static void GenerateEnumTypeInfo(const AiluHeadTool::EnumInfo &enum_info, std::ofstream &file)
@@ -363,383 +401,490 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
     _enums.clear();
     _structs.clear();
 
-    using std::endl;
-    if (fs::exists(path))
+    try
     {
-        _tracker.Clean();
-        std::ifstream file(path);
-        if (!file.is_open()) { Log(std::format("AiluHeadTool::Parser {} with result open file failed", path.string())); }
-        else
+        using std::endl;
+        if (fs::exists(path))
         {
-            std::string cur_file_id = path.stem().string();
-            cur_file_id.append("_GEN_H");
-            std::transform(cur_file_id.begin(), cur_file_id.end(), cur_file_id.begin(), ::toupper);
-            std::string line, last_line;
-            bool is_include_start = false, is_include_end = false;
-            bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_enum_marked = false, has_struct_marked = false;
-            bool is_cur_access_scope_public = false;
-            bool is_process_class = false;
-            int line_count = 0;
-            std::string cur_namespace;
-            PropertyMeta pre_prop_meta;
-            while (std::getline(file, line))
-            {
-                cur_namespace = _tracker.ProcessLine(line);
-                if (line.empty())
-                {
-                    ++line_count;
-                    continue;
-                }
-                if (line.find("#include") != std::string::npos) { is_include_start = true; }
-                else if (is_include_start)
-                {
-                    if (!is_include_end)
-                    {
-                        is_include_end = true;
-                        if (last_line.find("gen.h") == std::string::npos)
-                        {
-                            Log(std::format("input file {} is not mark as generated", path.string()));
-                            return;
-                        }
-                    }
-                }
-                last_line = line;
-                ++line_count;
-                //标记scope
-                if (line.find("public:") != std::string::npos)
-                {
-                    is_cur_access_scope_public = true;
-                    continue;
-                }
-                else if (line.find("private:") != std::string::npos || line.find("protected:") != std::string::npos)
-                {
-                    is_cur_access_scope_public = false;
-                    continue;
-                }
-                else {};
-                if (has_enum_marked)
-                {
-                    if (line.find("enum") != std::string::npos)
-                    {
-                        EnumInfo enum_info;
-                        if (line.find('}') != std::string::npos)
-                        {
-                            Log("[Error]: enum can't be define in one line");
-                            //ParserEnumValues(line, enum_info, *this);
-                        }
-                        else//多行枚举
-                        {
-                            ParserEnumClass(line, enum_info, *this);
-                            std::getline(file, line);
-                            if (line.find('{') != std::string::npos)
-                            {
-                                std::getline(file, line);
-                                while (line.find('}') == std::string::npos)
-                                {
-                                    ParserEnumValues(line, enum_info, *this);
-                                    std::getline(file, line);
-                                }
-                            }
-                            else { Log("[Error]: the next line of enum define must only have {"); }
-                            enum_info._namespace = cur_namespace;
-                        }
-                        if (!enum_info._members.empty()) _enums.emplace_back(enum_info);
-                        has_enum_marked = false;
-                    }
-                }
-                //提取信息
-                if (has_class_marked)
-                {
-                    if (line.find("class") != std::string::npos)
-                    {
-                        ClassInfo class_info;
-                        ParserClassInfo(line, class_info, *this);
-                        class_info._namespace = cur_namespace;
-                        has_class_marked = false;
-                        is_process_class = true;
-                        _classes.emplace_back(class_info);
-                        continue;
-                    }
-                }
-                if (has_struct_marked)
-                {
-                    if (line.find("struct") != std::string::npos)
-                    {
-                        ClassInfo struct_info;
-                        ParserStructInfo(line, struct_info, *this);
-                        struct_info._namespace = cur_namespace;
-                        has_struct_marked = false;
-                        is_process_class = false;
-                        _structs.emplace_back(struct_info);
-                        continue;
-                    }
-                }
-                //检查标记
-                if (line.find(kClassMacro) != std::string::npos)
-                {
-                    has_class_marked = true;
-                    continue;
-                }
-                if (line.find(kStructMacro) != std::string::npos)
-                {
-                    has_struct_marked = true;
-                    continue;
-                }
-                if (line.find(kEnumMacro) != std::string::npos)
-                {
-                    has_enum_marked = true;
-                    continue;
-                }
-                if (!_classes.empty() && is_process_class)
-                {
-                    if (_classes.back()._gen_macro_body.empty())
-                    {
-                        if (line.find(kBodyMacro) != std::string::npos)
-                        {
-                            _classes.back()._gen_macro_body = std::format("{}_{}_GENERATED_BODY", cur_file_id, line_count);
-                        }
-                    }
-                    if (has_property_marked)
-                    {
-                        MemberInfo member_info;
-                        ParserPropertyInfo(line, member_info, *this);
-                        member_info._is_public = is_cur_access_scope_public;
-                        member_info._meta = pre_prop_meta;
-                        member_info._meta._is_color = member_info._type == "Color" || member_info._type == "Color32";
-                        pre_prop_meta.Reset();
-                        has_property_marked = false;
-                        _classes.back()._members.emplace_back(member_info);
-                        continue;
-                    }
-                    if (has_function_marked)
-                    {
-                        MemberInfo member_info;
-                        ParserFunctionInfo(line, member_info, *this);
-                        member_info._is_public = is_cur_access_scope_public;
-                        member_info._is_function = true;
-                        has_function_marked = false;
-                        _classes.back()._members.emplace_back(member_info);
-                        continue;
-                    }
-                    if (line.find(kPropertyMacro) != std::string::npos)
-                    {
-                        has_property_marked = true;
-                        ParserMeta(line, pre_prop_meta);
-                        continue;
-                    }
-                    if (line.find(kFunctionMacro) != std::string::npos)
-                    {
-                        has_function_marked = true;
-                        continue;
-                    }
-                }
-                if (!_structs.empty() && !is_process_class)
-                {
-                    if (_structs.back()._gen_macro_body.empty())
-                    {
-                        if (line.find(kBodyMacro) != std::string::npos)
-                        {
-                            _structs.back()._gen_macro_body = std::format("{}_{}_GENERATED_BODY", cur_file_id, line_count);
-                        }
-                    }
-                    if (has_property_marked)
-                    {
-                        MemberInfo member_info;
-                        ParserPropertyInfo(line, member_info, *this);
-                        member_info._is_public = is_cur_access_scope_public;
-                        member_info._meta = pre_prop_meta;
-                        member_info._meta._is_color = member_info._type == "Color" || member_info._type == "Color32";
-                        pre_prop_meta.Reset();
-                        has_property_marked = false;
-                        _structs.back()._members.emplace_back(member_info);
-                        continue;
-                    }
-                    if (has_function_marked)
-                    {
-                        MemberInfo member_info;
-                        ParserFunctionInfo(line, member_info, *this);
-                        member_info._is_public = is_cur_access_scope_public;
-                        member_info._is_function = true;
-                        has_function_marked = false;
-                        _structs.back()._members.emplace_back(member_info);
-                        continue;
-                    }
-                    if (line.find(kPropertyMacro) != std::string::npos)
-                    {
-                        has_property_marked = true;
-                        ParserMeta(line, pre_prop_meta);
-                        continue;
-                    }
-                    if (line.find(kFunctionMacro) != std::string::npos)
-                    {
-                        has_function_marked = true;
-                        continue;
-                    }
-                }
-            }
-            file.close();
-            if (_classes.empty() && _enums.empty() && _structs.empty()) return;
-            //write gen head file
-            Path out_path = out_dir / path.filename().replace_extension(".gen.h");
-            std::string unique_def = std::format("__{}__", cur_file_id);
-            std::ofstream out_file(out_path);
-            if (out_file.is_open())
-            {
-                out_file << "//Generated by ahl" << std::endl;
-                out_file << "#ifdef " << unique_def << std::endl;
-                out_file << "#error " << out_path.filename().string() << " already included, missing '#pragma once' in " << path.filename().string() << std::endl;
-                out_file << "#endif " << std::endl;
-                out_file << "#include \"Objects/ReflectTemplate.h\"" << std::endl;
-                out_file << "#define " << unique_def << std::endl;
-                for (const auto &class_info: _classes)
-                {
-                    out_file << "//Class " << class_info._name << " begin..........................." << std::endl;
-                    out_file << std::format("#define {} \\", class_info._gen_macro_body);
-                    // Replace "Person" with the specified className
-                    std::string search = "TClass";
-                    bool is_base_object = class_info._name == "Object";
-                    size_t pos = 0;
-                    std::string generate_body;
-                    if (is_base_object)
-                    {
-                        generate_body = R"(
-                            private: \
-                                friend const Type* Z_Construct_TClass_Type();\
-                                static const Type* GetPrivateStaticClass();\
-                            public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType() const;
-                            )";
-                    }
-                    else
-                    {
-                        generate_body = R"(
-                            private: \
-                                friend const Type* Z_Construct_TClass_Type();\
-                                static const Type* GetPrivateStaticClass();\
-                            public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};\
-                                virtual const Type  *GetType() const override;
-                            )";
-                    }
-
-                    while ((pos = generate_body.find(search, pos)) != std::string::npos)
-                    {
-                        generate_body.replace(pos, search.length(), class_info._name);
-                        pos += class_info._name.length();
-                    }
-                    out_file << generate_body;
-                    out_file << "namespace Ailu {class Type;}" << std::endl;
-                    out_file << "namespace " << class_info._namespace << "{" << std::endl;
-                    out_file << "class " << class_info._name << " ;" << std::endl;
-                    out_file << "}" << std::endl;
-                    out_file << "template<>" << std::endl;
-                    std::string full_name = class_info._namespace + "::" + class_info._name;
-                    out_file << std::format("AILU_API const class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
-                    out_file << "//Class " << class_info._name << " end..........................." << std::endl;
-                    out_file << std::endl;
-                }
-                for (const auto &struct_info: _structs)
-                {
-                    out_file << "//Struct " << struct_info._name << " begin..........................." << std::endl;
-                    out_file << std::format("#define {} \\", struct_info._gen_macro_body);
-                    std::string search = "TClass";
-                    size_t pos = 0;
-                    std::string generate_body = R"(
-                            private: \
-                                friend const Type* Z_Construct_TClass_Type();\
-                                static const Type* GetPrivateStaticClass();\
-                            public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};
-                            )";
-
-                    while ((pos = generate_body.find(search, pos)) != std::string::npos)
-                    {
-                        generate_body.replace(pos, search.length(), struct_info._name);
-                        pos += struct_info._name.length();
-                    }
-                    out_file << generate_body;
-                    out_file << "namespace Ailu {class Type;}" << std::endl;
-                    out_file << "namespace " << struct_info._namespace << "{" << std::endl;
-                    out_file << "struct " << struct_info._name << " ;" << std::endl;
-                    out_file << "}" << std::endl;
-                    out_file << "template<>" << std::endl;
-                    std::string full_name = struct_info._namespace + "::" + struct_info._name;
-                    out_file << std::format("AILU_API const class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
-                    out_file << "//Struct " << struct_info._name << " end..........................." << std::endl;
-                    out_file << std::endl;
-                }
-                for (auto &enum_info: _enums)
-                {
-                    out_file << "//Enum " << enum_info._name << " begin..........................." << std::endl;
-                    std::string func_name = std::format("const Ailu::Enum* Z_Construct_Enum_{}_Type()", enum_info._name);
-                    out_file << func_name <<";" << std::endl;
-                    out_file << "namespace " << enum_info._namespace << " { " << std::endl;
-                    out_file << enum_info._decl_type << " " << enum_info._name << " : " << enum_info._underlying_type <<";"<< std::endl;
-                    out_file << "}" << std::endl;
-                    out_file << "template<>" << std::endl;
-                    std::string full_name = enum_info._namespace + "::" + enum_info._name;
-                    out_file << std::format("AILU_API const Ailu::Enum* Ailu::StaticEnum<{}>();", full_name) <<std::endl;
-                    //out_file << " return " << std::format("Z_Construct_Enum_{}_Type()", enum_info._name) << ";" << std::endl;
-                    //out_file << "}" << std::endl;
-                    out_file << "//Enum " << enum_info._name << " end..........................." << std::endl;
-                    out_file << std::endl;
-                }
-                out_file << "#undef CURRENT_FILE_ID" << std::endl;
-                out_file << "#define CURRENT_FILE_ID " << cur_file_id << std::endl;
-                out_file.close();
-                Log(std::format("AiluHeadTool::Parser {} with create gen.h file success", out_path.string()));
-            }
-            else { Log(std::format("AiluHeadTool::Parser {} with create gen.h file failed", out_path.string())); }
-            //write gen cpp file
-            Path cpp_path = out_dir / path.filename().replace_extension(".gen.cpp");
-            std::ofstream cpp_file(cpp_path);
-            if (cpp_file.is_open())
-            {
-                cpp_file << "//Generated by ahl" << std::endl;
-                //cpp_file << "#include \"" << out_path.filename().string() <<"\""<< std::endl;
-                cpp_file << "#include \"../" << path.filename().string() << "\"" << std::endl;
-                for (auto &inc: s_common_src_dep_file) cpp_file << "#include " << inc << std::endl;
-                cpp_file << "using namespace " << work_namespace << ";" << std::endl;
-                for (const auto &class_info: _classes)
-                {
-                    GenerateClassTypeInfo(class_info, cpp_file);
-                }
-                for (const auto &struct_info: _structs)
-                    GenerateClassTypeInfo(struct_info, cpp_file);
-                for (auto &enum_info: _enums)
-                    GenerateEnumTypeInfo(enum_info, cpp_file);
-                cpp_file.close();
-                Log(std::format("AiluHeadTool::Parser create file {} succeed!", cpp_path.string()));
-                std::string all_classes, all_structs, all_enums;
-                for (const auto &class_info: _classes)
-                {
-                    all_classes += class_info._name + ",";
-                }
-                for (const auto &struct_info: _structs)
-                {
-                    all_structs += struct_info._name + ",";
-                }
-                for (const auto &enum_info: _enums)
-                {
-                    all_enums += enum_info._name + ",";
-                }
-                Log(std::format("AiluHeadTool::Parser file {} success({}ms) with result:"
-                                "       class({}):{}"
-                                "       struct({}):{}"
-                                "       enum({}):{}",
-                                path.string(), g_Timer.ElapsedMilliseconds(),_classes.size(), all_classes, _structs.size(), all_structs, _enums.size(), all_enums));
-                g_Timer.stop();
-                g_Timer.reset();
-                return;
-            }
+            _tracker.Clean();
+            std::ifstream file(path);
+            if (!file.is_open()) { Log(std::format("AiluHeadTool::Parser {} with result open file failed", path.string())); }
             else
             {
-                Log(std::format("AiluHeadTool::Parser {} with create gen.cpp file failed", cpp_path.string()));
-                g_Timer.reset();
+                std::string cur_file_id = path.stem().string();
+                cur_file_id.append("_GEN_H");
+                std::transform(cur_file_id.begin(), cur_file_id.end(), cur_file_id.begin(), ::toupper);
+                std::string line, last_line;
+                bool is_include_start = false, is_include_end = false;
+                bool has_class_marked = false, has_property_marked = false, has_function_marked = false, has_enum_marked = false, has_struct_marked = false;
+                bool is_cur_access_scope_public = false;
+                bool is_process_class = false;
+                int line_count = 0;
+                std::string cur_namespace;
+                PropertyMeta pre_prop_meta;
+                while (std::getline(file, line))
+                {
+                    cur_namespace = _tracker.ProcessLine(line);
+                    if (line.empty())
+                    {
+                        ++line_count;
+                        continue;
+                    }
+                    if (line.find("#include") != std::string::npos) { is_include_start = true; }
+                    else if (is_include_start)
+                    {
+                        if (!is_include_end)
+                        {
+                            is_include_end = true;
+                            if (last_line.find("gen.h") == std::string::npos)
+                            {
+                                Log(std::format("input file {} is not mark as generated", path.string()));
+                                return;
+                            }
+                        }
+                    }
+                    last_line = line;
+                    ++line_count;
+                    //标记scope
+                    if (line.find("public:") != std::string::npos)
+                    {
+                        is_cur_access_scope_public = true;
+                        continue;
+                    }
+                    else if (line.find("private:") != std::string::npos || line.find("protected:") != std::string::npos)
+                    {
+                        is_cur_access_scope_public = false;
+                        continue;
+                    }
+                    else {};
+                    if (has_enum_marked)
+                    {
+                        if (line.find("enum") != std::string::npos)
+                        {
+                            EnumInfo enum_info;
+                            if (line.find('}') != std::string::npos)
+                            {
+                                Log("[Error]: enum can't be define in one line");
+                                //ParserEnumValues(line, enum_info, *this);
+                            }
+                            else//多行枚举
+                            {
+                                ParserEnumClass(line, enum_info, *this);
+                                std::getline(file, line);
+                                ++line_count;
+                                if (line.find('{') != std::string::npos)
+                                {
+                                    std::getline(file, line);
+                                    ++line_count;
+                                    while (line.find('}') == std::string::npos)
+                                    {
+                                        ParserEnumValues(line, enum_info, *this);
+                                        std::getline(file, line);
+                                        ++line_count;
+                                    }
+                                }
+                                else { Log("[Error]: the next line of enum define must only have {"); }
+                                enum_info._namespace = cur_namespace;
+                            }
+                            if (!enum_info._members.empty()) _enums.emplace_back(enum_info);
+                            has_enum_marked = false;
+                        }
+                    }
+                    //提取信息
+                    if (has_class_marked)
+                    {
+                        if (line.find("class") != std::string::npos)
+                        {
+                            ClassInfo class_info;
+                            ParserClassInfo(line, class_info, *this);
+                            class_info._namespace = cur_namespace;
+                            has_class_marked = false;
+                            is_process_class = true;
+                            FindBaseClass(class_info);
+                            _classes.emplace_back(class_info);
+                            continue;
+                        }
+                    }
+                    if (has_struct_marked)
+                    {
+                        if (line.find("struct") != std::string::npos)
+                        {
+                            ClassInfo struct_info;
+                            ParserStructInfo(line, struct_info, *this);
+                            struct_info._namespace = cur_namespace;
+                            has_struct_marked = false;
+                            is_process_class = false;
+                            _structs.emplace_back(struct_info);
+                            continue;
+                        }
+                    }
+                    //检查标记
+                    if (line.find(kClassMacro) != std::string::npos)
+                    {
+                        has_class_marked = true;
+                        continue;
+                    }
+                    if (line.find(kStructMacro) != std::string::npos)
+                    {
+                        has_struct_marked = true;
+                        continue;
+                    }
+                    if (line.find(kEnumMacro) != std::string::npos)
+                    {
+                        has_enum_marked = true;
+                        continue;
+                    }
+                    if (!_classes.empty() && is_process_class)
+                    {
+                        if (_classes.back()._gen_macro_body.empty())
+                        {
+                            if (line.find(kBodyMacro) != std::string::npos)
+                            {
+                                _classes.back()._gen_macro_body = std::format("{}_{}_GENERATED_BODY", cur_file_id, line_count);
+                            }
+                        }
+                        if (has_property_marked)
+                        {
+                            MemberInfo member_info;
+                            ParserPropertyInfo(line, member_info, *this);
+                            member_info._is_public = is_cur_access_scope_public;
+                            member_info._meta = pre_prop_meta;
+                            member_info._meta._is_color = member_info._type == "Color" || member_info._type == "Color32";
+                            pre_prop_meta.Reset();
+                            has_property_marked = false;
+                            _classes.back()._members.emplace_back(member_info);
+                            continue;
+                        }
+                        if (has_function_marked)
+                        {
+                            MemberInfo member_info;
+                            ParserFunctionInfo(line, member_info, *this);
+                            member_info._is_public = is_cur_access_scope_public;
+                            member_info._is_function = true;
+                            has_function_marked = false;
+                            _classes.back()._members.emplace_back(member_info);
+                            continue;
+                        }
+                        if (line.find(kPropertyMacro) != std::string::npos)
+                        {
+                            has_property_marked = true;
+                            ParserMeta(line, pre_prop_meta);
+                            continue;
+                        }
+                        if (line.find(kFunctionMacro) != std::string::npos)
+                        {
+                            has_function_marked = true;
+                            continue;
+                        }
+                    }
+                    if (!_structs.empty() && !is_process_class)
+                    {
+                        if (_structs.back()._gen_macro_body.empty())
+                        {
+                            if (line.find(kBodyMacro) != std::string::npos)
+                            {
+                                _structs.back()._gen_macro_body = std::format("{}_{}_GENERATED_BODY", cur_file_id, line_count);
+                            }
+                        }
+                        if (has_property_marked)
+                        {
+                            MemberInfo member_info;
+                            ParserPropertyInfo(line, member_info, *this);
+                            member_info._is_public = is_cur_access_scope_public;
+                            member_info._meta = pre_prop_meta;
+                            member_info._meta._is_color = member_info._type == "Color" || member_info._type == "Color32";
+                            pre_prop_meta.Reset();
+                            has_property_marked = false;
+                            _structs.back()._members.emplace_back(member_info);
+                            continue;
+                        }
+                        if (has_function_marked)
+                        {
+                            MemberInfo member_info;
+                            ParserFunctionInfo(line, member_info, *this);
+                            member_info._is_public = is_cur_access_scope_public;
+                            member_info._is_function = true;
+                            has_function_marked = false;
+                            _structs.back()._members.emplace_back(member_info);
+                            continue;
+                        }
+                        if (line.find(kPropertyMacro) != std::string::npos)
+                        {
+                            has_property_marked = true;
+                            ParserMeta(line, pre_prop_meta);
+                            continue;
+                        }
+                        if (line.find(kFunctionMacro) != std::string::npos)
+                        {
+                            has_function_marked = true;
+                            continue;
+                        }
+                    }
+                }
+                file.close();
+                if (_classes.empty() && _enums.empty() && _structs.empty()) return;
+                //write gen head file
+                Path out_path = out_dir / path.filename().replace_extension(".gen.h");
+                std::string unique_def = std::format("__{}__", cur_file_id);
+                std::ofstream out_file(out_path);
+                if (out_file.is_open())
+                {
+                    out_file << "//Generated by ahl" << std::endl;
+                    out_file << "#ifdef " << unique_def << std::endl;
+                    out_file << "#error " << out_path.filename().string() << " already included, missing '#pragma once' in " << path.filename().string() << std::endl;
+                    out_file << "#endif " << std::endl;
+                    out_file << "#include \"Objects/ReflectTemplate.h\"" << std::endl;
+                    out_file << "#define " << unique_def << std::endl;
+                    for (const auto &class_info: _classes)
+                    {
+                        out_file << "//Class " << class_info._name << " begin..........................." << std::endl;
+                        out_file << std::format("#define {} \\", class_info._gen_macro_body);
+                        // Replace "Person" with the specified className
+                        std::string search = "TClass";
+                        bool is_base_object = class_info._name == "Object";
+                        size_t pos = 0;
+                        std::string generate_body;
+                        if (is_base_object)
+                        {
+                            generate_body = R"(
+                            private: \
+                                friend Type* Z_Construct_TClass_Type();\
+                                static Type* GetPrivateStaticClass();\
+                            public:\
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual Type  *GetType();
+                            )";
+                        }
+                        else
+                        {
+                            generate_body = R"(
+                            private: \
+                                friend Type* Z_Construct_TClass_Type();\
+                                static Type* GetPrivateStaticClass();\
+                            public:\
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual Type  *GetType() override;
+                            )";
+                        }
+
+                        while ((pos = generate_body.find(search, pos)) != std::string::npos)
+                        {
+                            generate_body.replace(pos, search.length(), class_info._name);
+                            pos += class_info._name.length();
+                        }
+                        out_file << generate_body;
+                        out_file << "namespace Ailu {class Type;}" << std::endl;
+                        out_file << "namespace " << class_info._namespace << "{" << std::endl;
+                        out_file << "class " << class_info._name << " ;" << std::endl;
+                        out_file << "}" << std::endl;
+                        out_file << "template<>" << std::endl;
+                        std::string full_name = class_info._namespace + "::" + class_info._name;
+                        out_file << std::format("AILU_API class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
+                        out_file << "//Class " << class_info._name << " end..........................." << std::endl;
+                        out_file << std::endl;
+                    }
+                    for (const auto &struct_info: _structs)
+                    {
+                        out_file << "//Struct " << struct_info._name << " begin..........................." << std::endl;
+                        out_file << std::format("#define {} \\", struct_info._gen_macro_body);
+                        std::string search = "TClass";
+                        size_t pos = 0;
+                        std::string generate_body = R"(
+                            private: \
+                                friend Type* Z_Construct_TClass_Type();\
+                                static Type* GetPrivateStaticClass();\
+                            public:\
+                                static Type *StaticType() {return GetPrivateStaticClass();};
+                            )";
+
+                        while ((pos = generate_body.find(search, pos)) != std::string::npos)
+                        {
+                            generate_body.replace(pos, search.length(), struct_info._name);
+                            pos += struct_info._name.length();
+                        }
+                        out_file << generate_body;
+                        out_file << "namespace Ailu {class Type;}" << std::endl;
+                        out_file << "namespace " << struct_info._namespace << "{" << std::endl;
+                        out_file << "struct " << struct_info._name << " ;" << std::endl;
+                        out_file << "}" << std::endl;
+                        out_file << "template<>" << std::endl;
+                        std::string full_name = struct_info._namespace + "::" + struct_info._name;
+                        out_file << std::format("AILU_API class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
+                        out_file << "//Struct " << struct_info._name << " end..........................." << std::endl;
+                        out_file << std::endl;
+                    }
+                    for (auto &enum_info: _enums)
+                    {
+                        out_file << "//Enum " << enum_info._name << " begin..........................." << std::endl;
+                        std::string func_name = std::format("const Ailu::Enum* Z_Construct_Enum_{}_Type()", enum_info._name);
+                        out_file << func_name << ";" << std::endl;
+                        out_file << "namespace " << enum_info._namespace << " { " << std::endl;
+                        out_file << enum_info._decl_type << " " << enum_info._name << " : " << enum_info._underlying_type << ";" << std::endl;
+                        out_file << "}" << std::endl;
+                        out_file << "template<>" << std::endl;
+                        std::string full_name = enum_info._namespace + "::" + enum_info._name;
+                        out_file << std::format("AILU_API const Ailu::Enum* Ailu::StaticEnum<{}>();", full_name) << std::endl;
+                        //out_file << " return " << std::format("Z_Construct_Enum_{}_Type()", enum_info._name) << ";" << std::endl;
+                        //out_file << "}" << std::endl;
+                        out_file << "//Enum " << enum_info._name << " end..........................." << std::endl;
+                        out_file << std::endl;
+                    }
+                    out_file << "#undef CURRENT_FILE_ID" << std::endl;
+                    out_file << "#define CURRENT_FILE_ID " << cur_file_id << std::endl;
+                    out_file.close();
+                    Log(std::format("AiluHeadTool::Parser {} with create gen.h file success", out_path.string()));
+                }
+                else { Log(std::format("AiluHeadTool::Parser {} with create gen.h file failed", out_path.string())); }
+                //write gen cpp file
+                Path cpp_path = out_dir / path.filename().replace_extension(".gen.cpp");
+                std::ofstream cpp_file(cpp_path);
+                if (cpp_file.is_open())
+                {
+                    cpp_file << "//Generated by ahl" << std::endl;
+                    //cpp_file << "#include \"" << out_path.filename().string() <<"\""<< std::endl;
+                    cpp_file << "#include \"../" << path.filename().string() << "\"" << std::endl;
+                    for (auto &inc: s_common_src_dep_file) cpp_file << "#include " << inc << std::endl;
+                    cpp_file << "using namespace " << work_namespace << ";" << std::endl;
+                    for (const auto &class_info: _classes)
+                    {
+                        GenerateClassTypeInfo(class_info, cpp_file);
+                    }
+                    for (const auto &struct_info: _structs)
+                        GenerateClassTypeInfo(struct_info, cpp_file);
+                    for (auto &enum_info: _enums)
+                        GenerateEnumTypeInfo(enum_info, cpp_file);
+                    cpp_file.close();
+                    Log(std::format("AiluHeadTool::Parser create file {} succeed!", cpp_path.string()));
+                    std::string all_classes, all_structs, all_enums;
+                    for (const auto &class_info: _classes)
+                    {
+                        all_classes += class_info._name + ",";
+                    }
+                    for (const auto &struct_info: _structs)
+                    {
+                        all_structs += struct_info._name + ",";
+                    }
+                    for (const auto &enum_info: _enums)
+                    {
+                        all_enums += enum_info._name + ",";
+                    }
+                    Log(std::format("AiluHeadTool::Parser file {} success({}ms) with result:"
+                                    "       class({}):{}"
+                                    "       struct({}):{}"
+                                    "       enum({}):{}",
+                                    path.string(), g_Timer.ElapsedMilliseconds(), _classes.size(), all_classes, _structs.size(), all_structs, _enums.size(), all_enums));
+                    g_Timer.stop();
+                    g_Timer.reset();
+                    return;
+                }
+                else
+                {
+                    Log(std::format("AiluHeadTool::Parser {} with create gen.cpp file failed", cpp_path.string()));
+                    g_Timer.reset();
+                }
             }
         }
     }
+    catch (const std::exception & e) 
+    {
+        Log(std::format("AiluHeadTool::Parser {} with exception: {}", path.string(), e.what()));
+    }
+}
+
+void AiluHeadTool::SaveClassNamespaceMap(const std::unordered_map<std::string, std::set<std::string>> &map, const std::string &filename)
+{
+    std::ofstream ofs(filename);
+    if (!ofs.is_open())
+    {
+        throw std::runtime_error("Failed to open file for writing: " + filename);
+    }
+
+    for (const auto &[className, namespaces]: map)
+    {
+        for (const auto &ns: namespaces)
+        {
+            ofs << className << "|" << ns << "\n";
+        }
+    }
+}
+
+std::unordered_map<std::string, std::set<std::string>> AiluHeadTool::LoadClassNamespaceMap(const std::string &filename)
+{
+    std::unordered_map<std::string, std::set<std::string>> result;
+    std::ifstream ifs(filename);
+    if (!ifs.is_open())
+    {
+        throw std::runtime_error("Failed to open file for reading: " + filename);
+    }
+
+    std::string line;
+    while (std::getline(ifs, line))
+    {
+        if (line.empty()) continue;
+
+        size_t sep = line.find('|');
+        if (sep == std::string::npos) continue;// 跳过无效行
+
+        std::string className = line.substr(0, sep);
+        std::string ns = line.substr(sep + 1);
+        result[className].insert(ns);
+    }
+
+    return result;
+}
+
+void AiluHeadTool::FindBaseClass(ClassInfo &info)
+{
+    if (info._parent.empty()) 
+        return;
+    static auto GetParentNamespace = [](const std::string &ns) -> std::string
+    {
+        size_t pos = ns.rfind("::");
+        if (pos == std::string::npos) return "";
+        return ns.substr(0, pos);
+    };
+    auto it = _class_ns_map.find(info._parent);
+    if (it == _class_ns_map.end())
+    {
+        info._parent = "";// 没找到
+        Log(std::format("Error: class: {} not found in class_ns map", info._parent));
+        return;
+    }
+    const auto &candidates = it->second;// std::set<std::string>（候选命名空间集合）
+    // 1. 当前 namespace 完全匹配
+    if (!info._namespace.empty())
+    {
+        std::string full = info._namespace + "::" + info._parent;
+        if (candidates.count(info._namespace))
+        {
+            info._parent = full;
+            return;
+        }
+    }
+    // 2. 父 namespace 逐层回退
+    std::string ns = info._namespace;
+    while (!ns.empty())
+    {
+        ns = GetParentNamespace(ns);
+        if (!ns.empty())
+        {
+            std::string full = ns + "::" + info._parent;
+            if (candidates.count(ns))
+            {
+                info._parent = full;
+                return;
+            }
+        }
+    }
+    // 3. 全局唯一
+    if (candidates.size() == 1)
+    {
+        info._parent = *candidates.begin();
+        return;
+    }
+    Log(std::format("Warning: class: {} in multi namespace!", info._parent));
+    // 4. 无法确定
+    info._parent.clear();
 }
 
 void AiluHeadTool::Log(const std::string &msg)
@@ -747,6 +892,44 @@ void AiluHeadTool::Log(const std::string &msg)
     std::lock_guard<std::mutex> l(_log_mutex);
     _log_ss << msg << std::endl;
     std::cout << msg << std::endl;
+}
+
+void AiluHeadTool::ColloctClassNamespace(std::set<fs::path> inc_files, Path p)
+{
+    _class_ns_map = std::move(LoadClassNamespaceMap(p.string()));
+    for (auto &p: inc_files)
+    {
+        std::ifstream file(p);
+        if (!file.is_open())
+        {
+            Log(std::format("AiluHeadTool::ColloctClassNamespace {} with result open file failed,skip it", p.string()));
+            continue;
+        }
+        std::string line;
+        _tracker.Clean();
+        std::regex classRegex(R"(^\s*(class|struct)\s+([_A-Za-z]\w*)(?:\s*[:{]|$))");
+        std::regex classWithMacroRegex(R"(^\s*(class|struct)\s+[A-Z0-9_]+\s+([_A-Za-z]\w*)(?:\s*[:{]|$))");
+        while (std::getline(file, line))
+        {
+            auto &&cur_namespace = _tracker.ProcessLine(line);
+            std::smatch match;
+            if (std::regex_search(line, match, classRegex) ||
+                std::regex_search(line, match, classWithMacroRegex))
+            {
+                std::string class_name = match[2].str();
+                std::string full_name = cur_namespace.empty()
+                                               ? class_name
+                                               : cur_namespace + "::" + class_name;
+                if (!_class_ns_map.contains(class_name))
+                {
+                    _class_ns_map[p.string()] = {};
+                }
+                _class_ns_map[class_name].insert(full_name);
+                Log(std::format("Found class {} in namespace {}", class_name, cur_namespace));
+            }
+        }
+    }
+    SaveClassNamespaceMap(_class_ns_map, p.string());
 }
 
 void AiluHeadTool::SaveLog(const Path &out_dir)

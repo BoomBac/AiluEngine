@@ -16,192 +16,192 @@ namespace Ailu
             auto &meta_info = prop_info.MetaInfo();
             if (!prop_info.IsConst())
             {
-                if (prop_info.DataType() == EDataType::kBool)
+                if (prop_info.GetType() == StaticClass<bool>())
                 {
-                    bool old_value = prop_info.GetValue<bool>(obj);
+                    bool old_value = prop_info.Get<bool>(obj);
                     bool new_value = old_value;
                     if (ImGui::Checkbox(prop_info.Name().c_str(), &new_value))
                     {
-                        prop_info.SetValue<bool>(obj, new_value);
+                        prop_info.Set<bool>(obj, new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kFloat)
+                else if (prop_info.GetType() == StaticClass<f32>())
                 {
-                    f32 old_value = prop_info.GetValue<f32>(obj);
+                    f32 old_value = prop_info.Get<f32>(obj);
                     f32 new_value = old_value;
-                    if (meta_info._is_range)
+                    if (meta_info.GetBool("IsRange"))
                     {
-                        ImGui::SliderFloat(prop_info.Name().c_str(), &new_value, meta_info._min, meta_info._max);
+                        ImGui::SliderFloat(prop_info.Name().c_str(), &new_value, meta_info.GetFloat("RangeMin"), meta_info.GetFloat("RangeMax"));
                     }
                     else
                         ImGui::InputFloat(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.SetValue<f32>(obj, new_value);
+                        prop_info.Set<f32>(obj, new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kInt8)
+                else if (prop_info.GetType() == StaticClass<i8>())
                 {
-                    i32 old_value = prop_info.GetValue<i8>(obj);
+                    i32 old_value = prop_info.Get<i8>(obj);
                     i32 new_value = old_value;
-                    if (meta_info._is_range)
+                    if (meta_info.GetBool("IsRange"))
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info._min, (i32)meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info.GetFloat("RangeMin"), (i32)meta_info.GetFloat("RangeMax"));
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.SetValue<i8>(obj, (i8) new_value);
+                        prop_info.Set<i8>(obj, (i8) new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kInt16)
+                else if (prop_info.GetType() == StaticClass<i16>())
                 {
-                    i32 old_value = prop_info.GetValue<i16>(obj);
+                    i32 old_value = prop_info.Get<i16>(obj);
                     i32 new_value = old_value;
-                    if (meta_info._is_range)
+                    if (meta_info.GetBool("IsRange"))
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info._min, (i32)meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info.GetFloat("RangeMin"), (i32)meta_info.GetFloat("RangeMax"));
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.SetValue<i16>(obj, (i16) new_value);
+                        prop_info.Set<i16>(obj, (i16) new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kInt32)
+                else if (prop_info.GetType() == StaticClass<i32>())
                 {
-                    i32 old_value = prop_info.GetValue<i32>(obj);
+                    i32 old_value = prop_info.Get<i32>(obj);
                     i32 new_value = old_value;
-                    if (meta_info._is_range)
+                    if (meta_info.GetBool("IsRange"))
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info._min, (i32)meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32)meta_info.GetFloat("RangeMin"), (i32)meta_info.GetFloat("RangeMax"));
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.SetValue<i32>(obj, new_value);
+                        prop_info.Set<i32>(obj, new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kUInt8)
+                else if (prop_info.GetType() == StaticClass<u8>())
                 {
-                    i32 old_value = prop_info.GetValue<u8>(obj);
+                    i32 old_value = prop_info.Get<u8>(obj);
                     i32 new_value = old_value;
-                    if (meta_info._is_range)
+                    if (meta_info.GetBool("IsRange"))
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0.0f ? 0 : (i32)meta_info._min, (i32)meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetFloat("RangeMin") < 0.0f ? 0 : (i32)meta_info.GetFloat("RangeMin"), (i32)meta_info.GetFloat("RangeMax"));
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.SetValue<u8>(obj, (u8) new_value);
+                        prop_info.Set<u8>(obj, (u8) new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kUInt16)
+                else if (prop_info.GetType() == StaticClass<u16>())
                 {
-                    i32 old_value = prop_info.GetValue<u16>(obj);
+                    i32 old_value = prop_info.Get<u16>(obj);
                     i32 new_value = old_value;
-                    if (meta_info._is_range)
+                    if (meta_info.GetBool("IsRange"))
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0 ? 0 : (i32)meta_info._min, (i32)meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetFloat("RangeMin") < 0 ? 0 : (i32)meta_info.GetFloat("RangeMin"), (i32)meta_info.GetFloat("RangeMax"));
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.SetValue<u16>(obj, (u16) new_value);
+                        prop_info.Set<u16>(obj, (u16) new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kUInt32)
+                else if (prop_info.GetType() == StaticClass<u32>())
                 {
-                    i32 old_value = prop_info.GetValue<u32>(obj);
+                    i32 old_value = prop_info.Get<u32>(obj);
                     i32 new_value = old_value;
-                    if (meta_info._is_range)
+                    if (meta_info.GetBool("IsRange"))
                     {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info._min < 0 ? 0 : (i32)meta_info._min, (i32)meta_info._max);
+                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetFloat("RangeMin") < 0 ? 0 : (i32)meta_info.GetFloat("RangeMin"), (i32)meta_info.GetFloat("RangeMax"));
                     }
                     else
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.SetValue<u32>(obj, (u32) new_value);
+                        prop_info.Set<u32>(obj, (u32) new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kString)
+                else if (prop_info.GetType() == StaticClass<String>())
                 {
-                    String old_value = prop_info.GetValue<String>(obj);
+                    String old_value = prop_info.Get<String>(obj);
                     auto str_len = old_value.size();
                     char buf[256];
                     memcpy(buf, old_value.c_str(), str_len);
                     buf[str_len] = '\0';
                     if (ImGui::InputText(prop_info.Name().c_str(), buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
                     {
-                        prop_info.SetValue<String>(obj, buf);
+                        prop_info.Set<String>(obj, buf);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kVec2)
+                else if (prop_info.GetType() == StaticClass<Vector2f>())
                 {
-                    Vector2f old_value = prop_info.GetValue<Vector2f>(obj);
+                    Vector2f old_value = prop_info.Get<Vector2f>(obj);
                     Vector2f new_value = old_value;
                     if (ImGui::InputFloat2(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.SetValue<Vector2f>(obj, new_value);
+                        prop_info.Set<Vector2f>(obj, new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kVec3)
+                else if (prop_info.GetType() == StaticClass<Vector3f>())
                 {
-                    Vector3f old_value = prop_info.GetValue<Vector3f>(obj);
+                    Vector3f old_value = prop_info.Get<Vector3f>(obj);
                     Vector3f new_value = old_value;
                     if (ImGui::InputFloat3(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.SetValue<Vector3f>(obj, new_value);
+                        prop_info.Set<Vector3f>(obj, new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kVec4)
+                else if (prop_info.GetType() == StaticClass<Vector4f>())
                 {
-                    Vector4f old_value = prop_info.GetValue<Vector4f>(obj);
+                    Vector4f old_value = prop_info.Get<Vector4f>(obj);
                     Vector4f new_value = old_value;
-                    if (prop_info.MetaInfo()._is_color)
+                    if (meta_info.GetBool("IsColor"))
                     {
                         ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data,ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-                        prop_info.SetValue<Vector4f>(obj, new_value);
+                        prop_info.Set<Vector4f>(obj, new_value);
                     }
                     else
                     {
                         if (ImGui::InputFloat4(prop_info.Name().c_str(), new_value.data))
                         {
-                            prop_info.SetValue<Vector4f>(obj, new_value);
+                            prop_info.Set<Vector4f>(obj, new_value);
                         }
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kVec2Int)
+                else if (prop_info.GetType() == StaticClass<Vector2Int>())
                 {
-                    Vector2Int old_value = prop_info.GetValue<Vector2Int>(obj);
+                    Vector2Int old_value = prop_info.Get<Vector2Int>(obj);
                     Vector2Int new_value = old_value;
                     if (ImGui::InputInt2(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.SetValue<Vector2Int>(obj, new_value);
+                        prop_info.Set<Vector2Int>(obj, new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kVec3Int)
+                else if (prop_info.GetType() == StaticClass<Vector3Int>())
                 {
-                    Vector3Int old_value = prop_info.GetValue<Vector3Int>(obj);
+                    Vector3Int old_value = prop_info.Get<Vector3Int>(obj);
                     Vector3Int new_value = old_value;
                     if (ImGui::InputInt3(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.SetValue<Vector3Int>(obj, new_value);
+                        prop_info.Set<Vector3Int>(obj, new_value);
                     }
                 }
-                else if (prop_info.DataType() == EDataType::kVec4Int)
+                else if (prop_info.GetType() == StaticClass<Vector4Int>())
                 {
-                    Vector4Int old_value = prop_info.GetValue<Vector4Int>(obj);
+                    Vector4Int old_value = prop_info.Get<Vector4Int>(obj);
                     Vector4Int new_value = old_value;
                     if (ImGui::InputInt4(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.SetValue<Vector4Int>(obj, new_value);
+                        prop_info.Set<Vector4Int>(obj, new_value);
                     }
                 }
                 else

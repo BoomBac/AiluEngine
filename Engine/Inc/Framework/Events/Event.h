@@ -27,6 +27,8 @@ namespace Ailu
         kMouseButtonReleased,
         kMouseMoved,
         kMouseScrolled,
+        kMouseEnterWindow,
+        kMouseExitWindow,
         kDragFile
     };
 

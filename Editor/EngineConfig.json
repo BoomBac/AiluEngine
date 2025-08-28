@@ -1,0 +1,8 @@
+{
+    "None": 0,
+    "Default": 1,
+    "ShadowCaster": 65536,
+    "All": 4294967295,
+    "MaxRenderObjectPerTask": 0,
+    "isMultiThreadRender": false
+}

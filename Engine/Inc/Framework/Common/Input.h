@@ -26,10 +26,17 @@ namespace Ailu
         { 
             return sp_instance->GetMouseYImpl();
         };
-        //mouse pos,start at left-top of the window
+        /// @brief 获取鼠标位置，起始点为客户区左上角
+        /// @return 
         inline static Vector2f GetMousePos()
         {
             return sp_instance->GetMousePosImpl();
+        }
+        /// @brief 获取鼠标位置，起始点为屏幕左上角
+        /// @return 
+        inline static Vector2f GetGlobalMousePos()
+        {
+            return sp_instance->GetGlobalMousePosImpl();
         }
         inline static bool IsInputBlock()
         {
@@ -47,6 +54,7 @@ namespace Ailu
         virtual float GetMouseXImpl() = 0;
         virtual float GetMouseYImpl() = 0;
         virtual Vector2f GetMousePosImpl() = 0;
+        virtual Vector2f GetGlobalMousePosImpl() = 0;
     protected:
         inline static Input* sp_instance;
         inline static bool s_block_input = false;

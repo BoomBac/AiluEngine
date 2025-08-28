@@ -10,7 +10,6 @@
 #include "Render/RenderPipeline.h"
 #include <thread>
 #include "Framework/Common/Container.hpp"
-#include "Framework/Events/Event.h"
 
 namespace Ailu
 {
@@ -77,7 +76,7 @@ namespace Ailu
         const Array<ObjectLayer,32>& GetObjectLayers() const {return _object_layers;}
         const ObjectLayer& NameToLayer(const String& name);
         const EApplicationState::EApplicationState State() const {return _state;}
-
+        LayerStack &GetLayerStack() { return *_layer_stack; }
         bool _is_playing_mode = false;
         bool _is_simulate_mode = false;
         bool _is_multi_thread_rendering = false;
@@ -93,6 +92,7 @@ namespace Ailu
         virtual bool OnDragFile(DragFileEvent &e);
         virtual void OnEvent(Event &e);
 
+        void LogicLoop();
     protected:
         inline static Application *sp_instance = nullptr;
         LayerStack *_layer_stack;

@@ -6,8 +6,9 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-const Ailu::Type* Ailu::Render::Z_Construct_SSAO_Type()
+Ailu::Type* Ailu::Render::Z_Construct_SSAO_Type()
 {
+Ailu::Render::RenderFeature::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -19,47 +20,67 @@ initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
 initializer._base_name = "Ailu::Render::RenderFeature";
+initializer._constructor = []()->Ailu::Render::SSAO* {return new Ailu::Render::SSAO;};
 Meta meta_is_cbr;
-meta_is_cbr._category="";
-meta_is_cbr._min=(float)0;
-meta_is_cbr._max=(float)1;
-meta_is_cbr._is_range=false;
-meta_is_cbr._is_float_range=true;
-meta_is_cbr._is_color=false;
-MemberInfoInitializer initializer__is_cbr = {EMemberType::kProperty, "_is_cbr", "bool", offsetof(SSAO,_is_cbr), &SSAO::_is_cbr, meta_is_cbr, false, true, false, false, false, false, nullptr, nullptr};
-initializer__is_cbr._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-initializer__is_cbr._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer__is_cbr._type = Ailu::Type::Find("bool");
-initializer._properties.emplace_back(initializer__is_cbr);
+meta_is_cbr.Set("Category","");
+meta_is_cbr.Set("IsColor",false);
+meta_is_cbr.Set("IsRange",false);
+meta_is_cbr.Set("IsFloatRange",true);
+meta_is_cbr.Set("RangeMin",0);
+meta_is_cbr.Set("RangeMax",1);
+MemberBuilder builder_is_cbr;
+builder_is_cbr._name = "_is_cbr";
+builder_is_cbr._type_name = "bool";
+builder_is_cbr._offset = offsetof(SSAO,_is_cbr);
+builder_is_cbr._is_const = false;
+builder_is_cbr._is_static = false;
+builder_is_cbr._is_public = true;
+builder_is_cbr._is_pointer = false;
+builder_is_cbr._is_ref = false;
+builder_is_cbr._is_template = false;
+builder_is_cbr._meta = meta_is_cbr;
+builder_is_cbr._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_cbr._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_cbr));
 Meta meta_is_half_res;
-meta_is_half_res._category="";
-meta_is_half_res._min=(float)0;
-meta_is_half_res._max=(float)1;
-meta_is_half_res._is_range=false;
-meta_is_half_res._is_float_range=true;
-meta_is_half_res._is_color=false;
-MemberInfoInitializer initializer__is_half_res = {EMemberType::kProperty, "_is_half_res", "bool", offsetof(SSAO,_is_half_res), &SSAO::_is_half_res, meta_is_half_res, false, true, false, false, false, false, nullptr, nullptr};
-initializer__is_half_res._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-initializer__is_half_res._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer__is_half_res._type = Ailu::Type::Find("bool");
-initializer._properties.emplace_back(initializer__is_half_res);
+meta_is_half_res.Set("Category","");
+meta_is_half_res.Set("IsColor",false);
+meta_is_half_res.Set("IsRange",false);
+meta_is_half_res.Set("IsFloatRange",true);
+meta_is_half_res.Set("RangeMin",0);
+meta_is_half_res.Set("RangeMax",1);
+MemberBuilder builder_is_half_res;
+builder_is_half_res._name = "_is_half_res";
+builder_is_half_res._type_name = "bool";
+builder_is_half_res._offset = offsetof(SSAO,_is_half_res);
+builder_is_half_res._is_const = false;
+builder_is_half_res._is_static = false;
+builder_is_half_res._is_public = true;
+builder_is_half_res._is_pointer = false;
+builder_is_half_res._is_ref = false;
+builder_is_half_res._is_template = false;
+builder_is_half_res._meta = meta_is_half_res;
+builder_is_half_res._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_half_res._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_half_res));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-const Ailu::Type* Ailu::Render::SSAO::GetPrivateStaticClass()
+Ailu::Type* Ailu::Render::SSAO::GetPrivateStaticClass()
 {
-	static const Ailu::Type* type = Z_Construct_SSAO_Type();
+	static Ailu::Type* type = Z_Construct_SSAO_Type();
 	return type;
 }
 
-template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::SSAO>()
+template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::SSAO>()
 {
 return Ailu::Render::SSAO::StaticType();
 }
-    const Type *Ailu::Render::SSAO::GetType() const
+    Type *Ailu::Render::SSAO::GetType()
 {
 return Ailu::Render::SSAO::GetPrivateStaticClass();
 }
+ClassTypeRegister s_register_SSAO(&Ailu::Render::SSAO::StaticType, "Ailu::Render::SSAO");

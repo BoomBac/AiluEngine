@@ -31,6 +31,8 @@ namespace Ailu
 		virtual void OnUpdate() = 0;
 		virtual u32 GetWidth() const = 0;
 		virtual u32 GetHeight() const = 0;
+		/// @brief 获取客户区的屏幕坐标，包含标题栏
+		/// @return 
 		virtual std::tuple<i32, i32> GetWindowPosition() const = 0;
 		virtual void SetEventHandler(const EventHandler& handler) = 0;
 		virtual void SetVSync(bool enabled) = 0;

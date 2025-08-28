@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-const Ailu::Type* Ailu::Render::Z_Construct_PostProcessPass_Type()
+Ailu::Type* Ailu::Render::Z_Construct_PostProcessPass_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -18,60 +18,89 @@ initializer._full_name = "Ailu::Render::PostProcessPass";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::RenderPass";
+initializer._base_name = "";
+initializer._constructor = []()->Ailu::Render::PostProcessPass* {return new Ailu::Render::PostProcessPass;};
 Meta meta_upsample_radius;
-meta_upsample_radius._category="";
-meta_upsample_radius._min=(float)0;
-meta_upsample_radius._max=(float)1;
-meta_upsample_radius._is_range=false;
-meta_upsample_radius._is_float_range=true;
-meta_upsample_radius._is_color=false;
-MemberInfoInitializer initializer__upsample_radius = {EMemberType::kProperty, "_upsample_radius", "f32", offsetof(PostProcessPass,_upsample_radius), &PostProcessPass::_upsample_radius, meta_upsample_radius, false, true, false, false, false, false, nullptr, nullptr};
-initializer__upsample_radius._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
-initializer__upsample_radius._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
-initializer__upsample_radius._type = Ailu::Type::Find("f32");
-initializer._properties.emplace_back(initializer__upsample_radius);
+meta_upsample_radius.Set("Category","");
+meta_upsample_radius.Set("IsColor",false);
+meta_upsample_radius.Set("IsRange",false);
+meta_upsample_radius.Set("IsFloatRange",true);
+meta_upsample_radius.Set("RangeMin",0);
+meta_upsample_radius.Set("RangeMax",1);
+MemberBuilder builder_upsample_radius;
+builder_upsample_radius._name = "_upsample_radius";
+builder_upsample_radius._type_name = "f32";
+builder_upsample_radius._offset = offsetof(PostProcessPass,_upsample_radius);
+builder_upsample_radius._is_const = false;
+builder_upsample_radius._is_static = false;
+builder_upsample_radius._is_public = true;
+builder_upsample_radius._is_pointer = false;
+builder_upsample_radius._is_ref = false;
+builder_upsample_radius._is_template = false;
+builder_upsample_radius._meta = meta_upsample_radius;
+builder_upsample_radius._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_upsample_radius._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_upsample_radius));
 Meta meta_bloom_intensity;
-meta_bloom_intensity._category="";
-meta_bloom_intensity._min=(float)0;
-meta_bloom_intensity._max=(float)1;
-meta_bloom_intensity._is_range=false;
-meta_bloom_intensity._is_float_range=true;
-meta_bloom_intensity._is_color=false;
-MemberInfoInitializer initializer__bloom_intensity = {EMemberType::kProperty, "_bloom_intensity", "f32", offsetof(PostProcessPass,_bloom_intensity), &PostProcessPass::_bloom_intensity, meta_bloom_intensity, false, true, false, false, false, false, nullptr, nullptr};
-initializer__bloom_intensity._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
-initializer__bloom_intensity._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
-initializer__bloom_intensity._type = Ailu::Type::Find("f32");
-initializer._properties.emplace_back(initializer__bloom_intensity);
+meta_bloom_intensity.Set("Category","");
+meta_bloom_intensity.Set("IsColor",false);
+meta_bloom_intensity.Set("IsRange",false);
+meta_bloom_intensity.Set("IsFloatRange",true);
+meta_bloom_intensity.Set("RangeMin",0);
+meta_bloom_intensity.Set("RangeMax",1);
+MemberBuilder builder_bloom_intensity;
+builder_bloom_intensity._name = "_bloom_intensity";
+builder_bloom_intensity._type_name = "f32";
+builder_bloom_intensity._offset = offsetof(PostProcessPass,_bloom_intensity);
+builder_bloom_intensity._is_const = false;
+builder_bloom_intensity._is_static = false;
+builder_bloom_intensity._is_public = true;
+builder_bloom_intensity._is_pointer = false;
+builder_bloom_intensity._is_ref = false;
+builder_bloom_intensity._is_template = false;
+builder_bloom_intensity._meta = meta_bloom_intensity;
+builder_bloom_intensity._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_bloom_intensity._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_bloom_intensity));
 Meta meta_is_use_blur;
-meta_is_use_blur._category="";
-meta_is_use_blur._min=(float)0;
-meta_is_use_blur._max=(float)1;
-meta_is_use_blur._is_range=false;
-meta_is_use_blur._is_float_range=true;
-meta_is_use_blur._is_color=false;
-MemberInfoInitializer initializer__is_use_blur = {EMemberType::kProperty, "_is_use_blur", "bool", offsetof(PostProcessPass,_is_use_blur), &PostProcessPass::_is_use_blur, meta_is_use_blur, false, true, false, false, false, false, nullptr, nullptr};
-initializer__is_use_blur._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-initializer__is_use_blur._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer__is_use_blur._type = Ailu::Type::Find("bool");
-initializer._properties.emplace_back(initializer__is_use_blur);
+meta_is_use_blur.Set("Category","");
+meta_is_use_blur.Set("IsColor",false);
+meta_is_use_blur.Set("IsRange",false);
+meta_is_use_blur.Set("IsFloatRange",true);
+meta_is_use_blur.Set("RangeMin",0);
+meta_is_use_blur.Set("RangeMax",1);
+MemberBuilder builder_is_use_blur;
+builder_is_use_blur._name = "_is_use_blur";
+builder_is_use_blur._type_name = "bool";
+builder_is_use_blur._offset = offsetof(PostProcessPass,_is_use_blur);
+builder_is_use_blur._is_const = false;
+builder_is_use_blur._is_static = false;
+builder_is_use_blur._is_public = true;
+builder_is_use_blur._is_pointer = false;
+builder_is_use_blur._is_ref = false;
+builder_is_use_blur._is_template = false;
+builder_is_use_blur._meta = meta_is_use_blur;
+builder_is_use_blur._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_use_blur._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_use_blur));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-const Ailu::Type* Ailu::Render::PostProcessPass::GetPrivateStaticClass()
+Ailu::Type* Ailu::Render::PostProcessPass::GetPrivateStaticClass()
 {
-	static const Ailu::Type* type = Z_Construct_PostProcessPass_Type();
+	static Ailu::Type* type = Z_Construct_PostProcessPass_Type();
 	return type;
 }
 
-template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::PostProcessPass>()
+template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::PostProcessPass>()
 {
 return Ailu::Render::PostProcessPass::StaticType();
 }
-    const Type *Ailu::Render::PostProcessPass::GetType() const
+    Type *Ailu::Render::PostProcessPass::GetType()
 {
 return Ailu::Render::PostProcessPass::GetPrivateStaticClass();
 }
+ClassTypeRegister s_register_PostProcessPass(&Ailu::Render::PostProcessPass::StaticType, "Ailu::Render::PostProcessPass");

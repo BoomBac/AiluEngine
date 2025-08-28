@@ -41,21 +41,22 @@ namespace Ailu
 	}
 	float WinInput::GetMouseXImpl()
 	{
-		GetCursorPos(&_mouse_point); // 获取鼠标的屏幕坐标
-		//ScreenToClient(_hwnd, &_mouse_point); // 将屏幕坐标转换为客户区坐标
-		int mouseY = _mouse_point.y; // 鼠标的Y坐标
-		return static_cast<float>(_mouse_point.x);
+		return GetMousePosImpl().x;
 	}
 	float WinInput::GetMouseYImpl()
 	{
+		return GetMousePosImpl().y;
+	}
+	Vector2f WinInput::GetGlobalMousePosImpl()
+	{
 		GetCursorPos(&_mouse_point); // 获取鼠标的屏幕坐标
-		//ScreenToClient(_hwnd, &_mouse_point); // 将屏幕坐标转换为客户区坐标
-		return static_cast<float>(_mouse_point.y);
+		return Vector2f((f32)(_mouse_point.x), (f32)(_mouse_point.y));
 	}
 	Vector2f WinInput::GetMousePosImpl()
 	{
 		GetCursorPos(&_mouse_point); // 获取鼠标的屏幕坐标
-		//ScreenToClient(_hwnd, &_mouse_point); // 将屏幕坐标转换为客户区坐标
-		return Vector2f((float)_mouse_point.x, (float)_mouse_point.y);
+		POINT pt = { 0, 0 };
+		ClientToScreen(_hwnd, &pt);
+		return Vector2f((f32)(_mouse_point.x - pt.x), (f32)(_mouse_point.y - pt.y));
 	}
 }

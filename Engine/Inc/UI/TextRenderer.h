@@ -29,14 +29,14 @@ namespace Ailu::Render
         static void Init();
         static void Shutdown();
         static TextRenderer* Get();
+        static Vector2f CalculateTextSize(const String &text, Font *font = nullptr,u16 font_size = 14u, Vector2f scale = Vector2f::kOne);
     public:
         inline static u16 kMaxCharacters = 1024u;
         TextRenderer();
         void Initialize();
         ~TextRenderer();
         //push a text
-        static void DrawText(const String &text, Vector2f pos,u16 font_size = 14u,Vector2f scale = Vector2f::kOne,Color color = Colors::kWhite,Font *font = Get()->GetDefaultFont());
-        static Vector2f CalculateTextSize(const String &text, Font *font = Get()->GetDefaultFont(),u16 font_size = 14u, Vector2f scale = Vector2f::kOne);
+        void DrawText(const String &text, Vector2f pos,u16 font_size,Vector2f scale,Color color,Font *font = nullptr);
         void Render(RenderTexture* target, CommandBuffer * cmd);
         void Render(RenderTexture* target);
         bool _is_draw_debug_line = true;

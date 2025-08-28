@@ -1,7 +1,7 @@
 //
 // Created by 22292 on 2024/10/24.
 //
-#include "Render/TextRenderer.h"
+#include "UI/TextRenderer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Gizmo.h"
 #include <Framework/Common/Profiler.h>
@@ -28,21 +28,24 @@ namespace Ailu::Render
         _indices.resize(kMaxCharacters * 6);
         _default_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial");
         _default_mat->SetTexture("_MainTex", Texture::s_p_default_white);
+        GraphicsContext::Get().CreateResource(_vbuf);
+        GraphicsContext::Get().CreateResource(_ibuf);
     }
     TextRenderer::DrawerBlock::~DrawerBlock()
     {
-//        delete _vbuf;
-//        delete _ibuf;
-//        delete _obj_cb;
+        //        delete _vbuf;
+        //        delete _ibuf;
+        //        delete _obj_cb;
         DESTORY_PTR(_vbuf);
         DESTORY_PTR(_ibuf);
         DESTORY_PTR(_obj_cb);
     }
-    void TextRenderer::DrawerBlock::AppendText(Font *font, const String &text, Vector2f pos, u16 font_size,Vector2f scale, Vector2f padding, Color color)
+    void TextRenderer::DrawerBlock::AppendText(Font *font, const String &text, Vector2f pos, u16 font_size, Vector2f scale, Vector2f padding, Color color)
     {
         if (text.empty())
             return;
-        scale *= (f32)font_size / (f32)font->_size;
+        pos.y *= -1.0f;
+        scale *= (f32) font_size / (f32) font->_size;
         f32 x = pos.x, y = pos.y;
         f32 h_padding = (font->_left_padding + font->_right_padding) * padding.x;
         f32 v_padding = (font->_top_padding + font->_bottom_padding) * padding.y;
@@ -53,7 +56,8 @@ namespace Ailu::Render
             char &c = const_cast<char &>(text[i]);
             auto &char_info = font->GetChar(c);
             if (c == '\0')
-                break;
+                continue;
+            // 换行
             if (c == '\n')
             {
                 x = pos.x;
@@ -61,9 +65,11 @@ namespace Ailu::Render
                 last_char = -1;
                 continue;
             }
-            if (c == ' ')
+
+            // 如果是空格或不可见字符（宽度为0但有advance）
+            if (char_info._width == 0 && char_info._height == 0)
             {
-                x += (font->_left_padding + h_padding) * scale.x;
+                x += char_info._xadvance * scale.x;
                 last_char = c;
                 continue;
             }
@@ -111,30 +117,32 @@ namespace Ailu::Render
 
     void TextRenderer::DrawerBlock::Render(RenderTexture *target, CommandBuffer *cmd, bool is_debug)
     {
+        if (_characters_count == 0)
+            return;
         _vbuf->SetData((u8 *) _pos_stream.data(), _characters_count * sizeof(Vector3f) * 4, 0, 0);
         _vbuf->SetData((u8 *) _uv_stream.data(), _characters_count * sizeof(Vector2f) * 4, 1, 0);
         _vbuf->SetData((u8 *) _color_stream.data(), _characters_count * sizeof(Vector4f) * 4, 2, 0);
         _ibuf->SetData((u8 *) _indices.data(), _characters_count * sizeof(u32) * 6);
         if (is_debug)
         {
-            for (u32 i = 0; i < _characters_count; ++i)
-            {
-                Gizmo::DrawLine(_pos_stream[i * 4].xy, _pos_stream[i * 4 + 1].xy, Colors::kGreen);
-                Gizmo::DrawLine(_pos_stream[i * 4 + 1].xy, _pos_stream[i * 4 + 3].xy, Colors::kGreen);
-                Gizmo::DrawLine(_pos_stream[i * 4 + 3].xy, _pos_stream[i * 4 + 2].xy, Colors::kGreen);
-                Gizmo::DrawLine(_pos_stream[i * 4 + 2].xy, _pos_stream[i * 4].xy, Colors::kGreen);
-            }
+            // for (u32 i = 0; i < _characters_count; ++i)
+            // {
+            //     Gizmo::DrawLine(_pos_stream[i * 4].xy, _pos_stream[i * 4 + 1].xy, Colors::kGreen);
+            //     Gizmo::DrawLine(_pos_stream[i * 4 + 1].xy, _pos_stream[i * 4 + 3].xy, Colors::kGreen);
+            //     Gizmo::DrawLine(_pos_stream[i * 4 + 3].xy, _pos_stream[i * 4 + 2].xy, Colors::kGreen);
+            //     Gizmo::DrawLine(_pos_stream[i * 4 + 2].xy, _pos_stream[i * 4].xy, Colors::kGreen);
+            // }
         }
         f32 w = (f32) target->Width();
         f32 h = (f32) target->Height();
         CBufferPerCameraData cb_per_cam;
         cb_per_cam._MatrixVP = Camera::GetDefaultOrthogonalViewProj(w, h);
-        cb_per_cam._ScreenParams = Vector4f( 1.0f / w, 1.0f / h,w, h);
+        cb_per_cam._ScreenParams = Vector4f(1.0f / w, 1.0f / h, w, h);
         CBufferPerObjectData per_obj_data;
-        per_obj_data._MatrixWorld = MatrixTranslation(-w*0.5f,h*0.5f,0);
+        per_obj_data._MatrixWorld = MatrixTranslation(-w * 0.5f, h * 0.5f, 0);
         memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
-        cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,&cb_per_cam, RenderConstants::kPerCameraDataSize);
-        cmd->SetRenderTarget(target);
+        cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &cb_per_cam, RenderConstants::kPerCameraDataSize);
+        //cmd->SetRenderTarget(target);
         cmd->DrawIndexed(_vbuf, _ibuf, _obj_cb, _default_mat.get());
     }
 
@@ -142,7 +150,7 @@ namespace Ailu::Render
     {
         _characters_count = 0;
     }
-    TextRenderer::DrawerBlock& TextRenderer::DrawerBlock::operator=(TextRenderer::DrawerBlock &&other) noexcept
+    TextRenderer::DrawerBlock &TextRenderer::DrawerBlock::operator=(TextRenderer::DrawerBlock &&other) noexcept
     {
         _vbuf = other._vbuf;
         _ibuf = other._ibuf;
@@ -186,17 +194,18 @@ namespace Ailu::Render
     }
     TextRenderer::~TextRenderer()
     {
-        for (auto & b: _drawer_blocks)
+        for (auto &b: _drawer_blocks)
         {
-            for (auto& it : b)
+            for (auto &it: b)
                 DESTORY_PTR(it.second);
         }
     }
-    void TextRenderer::DrawText(const String &text, Vector2f pos, u16 font_size,Vector2f scale, Color color, Font *font)
+    void TextRenderer::DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color, Font *font)
     {
-        s_pTextRenderer->_drawer_blocks[s_pTextRenderer->_current_frame_index][font->_name]->AppendText(font, text, pos, font_size,scale, Vector2f(1.f, 1.f), color);
+        font = font ? font : _default_font.get();
+        _drawer_blocks[_current_frame_index][font->_name]->AppendText(font, text, pos, font_size, scale, Vector2f(1.f, 1.f), color);
     }
-    void TextRenderer::Render(RenderTexture* target, CommandBuffer *cmd)
+    void TextRenderer::Render(RenderTexture *target, CommandBuffer *cmd)
     {
         for (auto &it: _drawer_blocks[_current_frame_index])
         {
@@ -210,7 +219,7 @@ namespace Ailu::Render
     }
     void TextRenderer::Render(RenderTexture *target)
     {
-        auto cmd = CommandBufferPool::Get("UI");
+        auto cmd = CommandBufferPool::Get("Text");
         {
             PROFILE_BLOCK_GPU(cmd.get(), Text);
             Render(target, cmd.get());
@@ -218,14 +227,15 @@ namespace Ailu::Render
         g_pGfxContext->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
-    Vector2f TextRenderer::CalculateTextSize(const String &text, Font* font,u16 font_size, Vector2f scale)
+    Vector2f TextRenderer::CalculateTextSize(const String &text, Font *font, u16 font_size, Vector2f scale)
     {
         if (text.empty())
-            return {0.f,0.f};
-        Vector2f start,end;
-        Vector2f pos = {0.f,0.f};
+            return {0.f, 0.f};
+        font = font ? font : Get()->GetDefaultFont();
+        Vector2f start, end;
+        Vector2f pos = {0.f, 0.f};
         Vector2f deserved_size = pos;
-        scale *= (f32)font_size / (f32)font->_size;
+        scale *= (f32) font_size / (f32) font->_size;
         f32 x = 0.f, y = 0.f;
         f32 h_padding = (font->_left_padding + font->_right_padding);
         f32 v_padding = (font->_top_padding + font->_bottom_padding);
@@ -273,4 +283,4 @@ namespace Ailu::Render
         deserved_size.y = std::abs(deserved_size.y);
         return deserved_size;
     }
-}// namespace Ailu
+}// namespace Ailu::Render

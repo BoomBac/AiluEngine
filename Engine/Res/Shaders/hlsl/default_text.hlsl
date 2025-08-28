@@ -39,9 +39,6 @@ PSInput VSMain(VSInput v,uint vert_id : SV_VertexID)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    float4 c = SAMPLE_TEXTURE2D_LOD(_MainTex,g_LinearClampSampler,input.uv,0);// * input.color;
-    c.rgb = c.a;
-    c.rgb = float3(1,0,0);
-    //c.a *= 0.5f;
+    float4 c = SAMPLE_TEXTURE2D_LOD(_MainTex,g_LinearClampSampler,input.uv,0) * input.color;
     return c;
 }

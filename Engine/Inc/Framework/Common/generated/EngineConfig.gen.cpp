@@ -6,8 +6,9 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-const Ailu::Type* Ailu::Z_Construct_EngineConfig_Type()
+Ailu::Type* Ailu::Z_Construct_EngineConfig_Type()
 {
+Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -19,95 +20,151 @@ initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu";
 initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::EngineConfig* {return new Ailu::EngineConfig;};
 Meta metaNone;
-metaNone._category="Layer";
-metaNone._min=(float)0;
-metaNone._max=(float)1;
-metaNone._is_range=false;
-metaNone._is_float_range=true;
-metaNone._is_color=false;
-MemberInfoInitializer initializer_None = {EMemberType::kProperty, "None", "u32", offsetof(EngineConfig,None), &EngineConfig::None, metaNone, false, true, false, false, false, false, nullptr, nullptr};
-initializer_None._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
-initializer_None._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
-initializer_None._type = Ailu::Type::Find("u32");
-initializer._properties.emplace_back(initializer_None);
+metaNone.Set("Category","Layer");
+metaNone.Set("IsColor",false);
+metaNone.Set("IsRange",false);
+metaNone.Set("IsFloatRange",true);
+metaNone.Set("RangeMin",0);
+metaNone.Set("RangeMax",1);
+MemberBuilder builderNone;
+builderNone._name = "None";
+builderNone._type_name = "u32";
+builderNone._offset = offsetof(EngineConfig,None);
+builderNone._is_const = false;
+builderNone._is_static = false;
+builderNone._is_public = true;
+builderNone._is_pointer = false;
+builderNone._is_ref = false;
+builderNone._is_template = false;
+builderNone._meta = metaNone;
+builderNone._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builderNone._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builderNone));
 Meta metaDefault;
-metaDefault._category="Layer";
-metaDefault._min=(float)0;
-metaDefault._max=(float)1;
-metaDefault._is_range=false;
-metaDefault._is_float_range=true;
-metaDefault._is_color=false;
-MemberInfoInitializer initializer_Default = {EMemberType::kProperty, "Default", "u32", offsetof(EngineConfig,Default), &EngineConfig::Default, metaDefault, false, true, false, false, false, false, nullptr, nullptr};
-initializer_Default._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
-initializer_Default._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
-initializer_Default._type = Ailu::Type::Find("u32");
-initializer._properties.emplace_back(initializer_Default);
+metaDefault.Set("Category","Layer");
+metaDefault.Set("IsColor",false);
+metaDefault.Set("IsRange",false);
+metaDefault.Set("IsFloatRange",true);
+metaDefault.Set("RangeMin",0);
+metaDefault.Set("RangeMax",1);
+MemberBuilder builderDefault;
+builderDefault._name = "Default";
+builderDefault._type_name = "u32";
+builderDefault._offset = offsetof(EngineConfig,Default);
+builderDefault._is_const = false;
+builderDefault._is_static = false;
+builderDefault._is_public = true;
+builderDefault._is_pointer = false;
+builderDefault._is_ref = false;
+builderDefault._is_template = false;
+builderDefault._meta = metaDefault;
+builderDefault._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builderDefault._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builderDefault));
 Meta metaShadowCaster;
-metaShadowCaster._category="Layer";
-metaShadowCaster._min=(float)0;
-metaShadowCaster._max=(float)1;
-metaShadowCaster._is_range=false;
-metaShadowCaster._is_float_range=true;
-metaShadowCaster._is_color=false;
-MemberInfoInitializer initializer_ShadowCaster = {EMemberType::kProperty, "ShadowCaster", "u32", offsetof(EngineConfig,ShadowCaster), &EngineConfig::ShadowCaster, metaShadowCaster, false, true, false, false, false, false, nullptr, nullptr};
-initializer_ShadowCaster._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
-initializer_ShadowCaster._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
-initializer_ShadowCaster._type = Ailu::Type::Find("u32");
-initializer._properties.emplace_back(initializer_ShadowCaster);
+metaShadowCaster.Set("Category","Layer");
+metaShadowCaster.Set("IsColor",false);
+metaShadowCaster.Set("IsRange",false);
+metaShadowCaster.Set("IsFloatRange",true);
+metaShadowCaster.Set("RangeMin",0);
+metaShadowCaster.Set("RangeMax",1);
+MemberBuilder builderShadowCaster;
+builderShadowCaster._name = "ShadowCaster";
+builderShadowCaster._type_name = "u32";
+builderShadowCaster._offset = offsetof(EngineConfig,ShadowCaster);
+builderShadowCaster._is_const = false;
+builderShadowCaster._is_static = false;
+builderShadowCaster._is_public = true;
+builderShadowCaster._is_pointer = false;
+builderShadowCaster._is_ref = false;
+builderShadowCaster._is_template = false;
+builderShadowCaster._meta = metaShadowCaster;
+builderShadowCaster._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builderShadowCaster._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builderShadowCaster));
 Meta metaAll;
-metaAll._category="Layer";
-metaAll._min=(float)0;
-metaAll._max=(float)1;
-metaAll._is_range=false;
-metaAll._is_float_range=true;
-metaAll._is_color=false;
-MemberInfoInitializer initializer_All = {EMemberType::kProperty, "All", "u32", offsetof(EngineConfig,All), &EngineConfig::All, metaAll, false, true, false, false, false, false, nullptr, nullptr};
-initializer_All._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
-initializer_All._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
-initializer_All._type = Ailu::Type::Find("u32");
-initializer._properties.emplace_back(initializer_All);
+metaAll.Set("Category","Layer");
+metaAll.Set("IsColor",false);
+metaAll.Set("IsRange",false);
+metaAll.Set("IsFloatRange",true);
+metaAll.Set("RangeMin",0);
+metaAll.Set("RangeMax",1);
+MemberBuilder builderAll;
+builderAll._name = "All";
+builderAll._type_name = "u32";
+builderAll._offset = offsetof(EngineConfig,All);
+builderAll._is_const = false;
+builderAll._is_static = false;
+builderAll._is_public = true;
+builderAll._is_pointer = false;
+builderAll._is_ref = false;
+builderAll._is_template = false;
+builderAll._meta = metaAll;
+builderAll._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builderAll._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builderAll));
 Meta metaMaxRenderObjectPerTask;
-metaMaxRenderObjectPerTask._category="Render";
-metaMaxRenderObjectPerTask._min=(float)0;
-metaMaxRenderObjectPerTask._max=(float)1;
-metaMaxRenderObjectPerTask._is_range=false;
-metaMaxRenderObjectPerTask._is_float_range=true;
-metaMaxRenderObjectPerTask._is_color=false;
-MemberInfoInitializer initializer_MaxRenderObjectPerTask = {EMemberType::kProperty, "MaxRenderObjectPerTask", "u32", offsetof(EngineConfig,MaxRenderObjectPerTask), &EngineConfig::MaxRenderObjectPerTask, metaMaxRenderObjectPerTask, false, true, false, false, false, false, nullptr, nullptr};
-initializer_MaxRenderObjectPerTask._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
-initializer_MaxRenderObjectPerTask._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
-initializer_MaxRenderObjectPerTask._type = Ailu::Type::Find("u32");
-initializer._properties.emplace_back(initializer_MaxRenderObjectPerTask);
+metaMaxRenderObjectPerTask.Set("Category","Render");
+metaMaxRenderObjectPerTask.Set("IsColor",false);
+metaMaxRenderObjectPerTask.Set("IsRange",false);
+metaMaxRenderObjectPerTask.Set("IsFloatRange",true);
+metaMaxRenderObjectPerTask.Set("RangeMin",0);
+metaMaxRenderObjectPerTask.Set("RangeMax",1);
+MemberBuilder builderMaxRenderObjectPerTask;
+builderMaxRenderObjectPerTask._name = "MaxRenderObjectPerTask";
+builderMaxRenderObjectPerTask._type_name = "u32";
+builderMaxRenderObjectPerTask._offset = offsetof(EngineConfig,MaxRenderObjectPerTask);
+builderMaxRenderObjectPerTask._is_const = false;
+builderMaxRenderObjectPerTask._is_static = false;
+builderMaxRenderObjectPerTask._is_public = true;
+builderMaxRenderObjectPerTask._is_pointer = false;
+builderMaxRenderObjectPerTask._is_ref = false;
+builderMaxRenderObjectPerTask._is_template = false;
+builderMaxRenderObjectPerTask._meta = metaMaxRenderObjectPerTask;
+builderMaxRenderObjectPerTask._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builderMaxRenderObjectPerTask._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builderMaxRenderObjectPerTask));
 Meta metaisMultiThreadRender;
-metaisMultiThreadRender._category="Render";
-metaisMultiThreadRender._min=(float)0;
-metaisMultiThreadRender._max=(float)1;
-metaisMultiThreadRender._is_range=false;
-metaisMultiThreadRender._is_float_range=true;
-metaisMultiThreadRender._is_color=false;
-MemberInfoInitializer initializer_isMultiThreadRender = {EMemberType::kProperty, "isMultiThreadRender", "bool", offsetof(EngineConfig,isMultiThreadRender), &EngineConfig::isMultiThreadRender, metaisMultiThreadRender, false, true, false, false, false, false, nullptr, nullptr};
-initializer_isMultiThreadRender._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-initializer_isMultiThreadRender._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer_isMultiThreadRender._type = Ailu::Type::Find("bool");
-initializer._properties.emplace_back(initializer_isMultiThreadRender);
+metaisMultiThreadRender.Set("Category","Render");
+metaisMultiThreadRender.Set("IsColor",false);
+metaisMultiThreadRender.Set("IsRange",false);
+metaisMultiThreadRender.Set("IsFloatRange",true);
+metaisMultiThreadRender.Set("RangeMin",0);
+metaisMultiThreadRender.Set("RangeMax",1);
+MemberBuilder builderisMultiThreadRender;
+builderisMultiThreadRender._name = "isMultiThreadRender";
+builderisMultiThreadRender._type_name = "bool";
+builderisMultiThreadRender._offset = offsetof(EngineConfig,isMultiThreadRender);
+builderisMultiThreadRender._is_const = false;
+builderisMultiThreadRender._is_static = false;
+builderisMultiThreadRender._is_public = true;
+builderisMultiThreadRender._is_pointer = false;
+builderisMultiThreadRender._is_ref = false;
+builderisMultiThreadRender._is_template = false;
+builderisMultiThreadRender._meta = metaisMultiThreadRender;
+builderisMultiThreadRender._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builderisMultiThreadRender._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builderisMultiThreadRender));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-const Ailu::Type* Ailu::EngineConfig::GetPrivateStaticClass()
+Ailu::Type* Ailu::EngineConfig::GetPrivateStaticClass()
 {
-	static const Ailu::Type* type = Z_Construct_EngineConfig_Type();
+	static Ailu::Type* type = Z_Construct_EngineConfig_Type();
 	return type;
 }
 
-template<> const Ailu::Type* Ailu::StaticClass<Ailu::EngineConfig>()
+template<> Ailu::Type* Ailu::StaticClass<Ailu::EngineConfig>()
 {
 return Ailu::EngineConfig::StaticType();
 }
-    const Type *Ailu::EngineConfig::GetType() const
+    Type *Ailu::EngineConfig::GetType()
 {
 return Ailu::EngineConfig::GetPrivateStaticClass();
 }
+ClassTypeRegister s_register_EngineConfig(&Ailu::EngineConfig::StaticType, "Ailu::EngineConfig");

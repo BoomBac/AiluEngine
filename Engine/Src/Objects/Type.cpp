@@ -16,287 +16,95 @@ namespace Ailu
         is_enum &= static_cast<bool>(isupper(type_name[1]));
         return is_enum;
     }
-    static EDataType GetDataTypeFromName(const String &name)
-    {
-        if (name == "bool")
-            return EDataType::kBool;
-        else if (name == "char")
-            return EDataType::kChar;
-        else if (name == "i8")
-            return EDataType::kInt8;
-        else if (name == "i16")
-            return EDataType::kInt16;
-        else if (name == "i32" || name == "int")
-            return EDataType::kInt32;
-        else if (name == "i64")
-            return EDataType::kInt64;
-        else if (name == "u8")
-            return EDataType::kUInt8;
-        else if (name == "u16")
-            return EDataType::kUInt16;
-        else if (name == "u32")
-            return EDataType::kUInt32;
-        else if (name == "u64")
-            return EDataType::kUInt64;
-        else if (name == "float" || name == "f32")
-            return EDataType::kFloat;
-        else if (name == "double" || name == "f64")
-            return EDataType::kDouble;
-        else if (name == "Vector2f")
-            return EDataType::kVec2;
-        else if (name == "Vector3f")
-            return EDataType::kVec3;
-        else if (name == "Vector4f" || name == "Color")
-            return EDataType::kVec4;
-        else if (name == "Vector2Int")
-            return EDataType::kVec2Int;
-        else if (name == "Vector3Int")
-            return EDataType::kVec3Int;
-        else if (name == "Vector4Int")
-            return EDataType::kVec4Int;
-        else if (name == "Vector2UInt")
-            return EDataType::kVec2UInt;
-        else if (name == "Vector3UInt")
-            return EDataType::kVec3UInt;
-        else if (name == "Vector4UInt")
-            return EDataType::kVec4UInt;
-        else if (name == "String" || name == "string")
-            return EDataType::kString;
-        else if (su::EndWith(name, "*"))
-            return EDataType::kPtr;
-        else if (IsEnumType(name))
-            return EDataType::kEnum;
-        else
-            return EDataType::kNone;
-    }
 
-    MemberInfo::MemberInfo(const MemberInfoInitializer &initializer)
+    // 递归解析模板
+    TemplateParamInfo Ailu::TemplateParamInfo::ParseTemplate(const std::string &s, size_t &pos)
     {
-        _name = initializer._name;
-        _mem_type = initializer._mem_type;
-        _type_name = initializer._type_name;
-        _is_public = initializer._is_public;
-        _is_static = initializer._is_static;
-        _offset = initializer._offset;
-        _member_ptr = initializer._member_ptr;
-        _meta = initializer._meta;
-        _is_const = initializer._is_const;
-        _type = initializer._type;
-    }
-    MemberInfo::MemberInfo() : MemberInfo(MemberInfoInitializer())
-    {
-    }
-    PropertyInfo::PropertyInfo(const MemberInfoInitializer &initializer) : MemberInfo(initializer)
-    {
-        _serialize_fn = initializer._serialize_fn;
-        _deserialize_fn = initializer._deserialize_fn;
-        _data_type = GetDataTypeFromName(initializer._type_name);
-    }
-
-    String PropertyInfo::StringValue(void *instance) const
-    {
-        const char *ptr = reinterpret_cast<char *>(instance) + _offset;
-        auto static formatVec = [](auto &v, int dim) -> String
+        // 跳过空格
+        static auto SkipSpaces = [](const std::string &s, size_t &pos)
         {
-            switch (dim)
-            {
-                case 2:
-                    return std::format("{},{}", v.data[0], v.data[1]);
-                case 3:
-                    return std::format("{},{},{}", v.data[0], v.data[1], v.data[2]);
-                case 4:
-                    return std::format("{},{},{},{}", v.data[0], v.data[1], v.data[2], v.data[3]);
-                default:
-                    return "[Invalid Vector]";
-            }
+            while (pos < s.size() && std::isspace((unsigned char) s[pos])) ++pos;
         };
 
-        switch (_data_type)
+        // 读取一个标识符（允许 :: 和模板参数名）
+        static auto ReadIdentifier = [](const std::string &s, size_t &pos) -> std::string
         {
-            case Ailu::EDataType::kInt8:
-                return std::format("{}", *reinterpret_cast<const i8 *>(ptr));
-            case Ailu::EDataType::kInt16:
-                return std::format("{}", *reinterpret_cast<const i16 *>(ptr));
-            case Ailu::EDataType::kInt32:
-                return std::format("{}", *reinterpret_cast<const i32 *>(ptr));
-            case Ailu::EDataType::kInt64:
-                return std::format("{}", *reinterpret_cast<const i64 *>(ptr));
-            case Ailu::EDataType::kUInt8:
-                return std::format("{}", *reinterpret_cast<const u8 *>(ptr));
-            case Ailu::EDataType::kUInt16:
-                return std::format("{}", *reinterpret_cast<const u16 *>(ptr));
-            case Ailu::EDataType::kUInt32:
-                return std::format("{}", *reinterpret_cast<const u32 *>(ptr));
-            case Ailu::EDataType::kUInt64:
-                return std::format("{}", *reinterpret_cast<const u64 *>(ptr));
-            case Ailu::EDataType::kFloat:
-                return std::format("{:.6f}", *reinterpret_cast<const float *>(ptr));
-            case Ailu::EDataType::kDouble:
-                return std::format("{:.6f}", *reinterpret_cast<const double *>(ptr));
-            case Ailu::EDataType::kChar:
-                return std::format("'{}'", *reinterpret_cast<const char *>(ptr));
-            case Ailu::EDataType::kBool:
-                return *reinterpret_cast<const bool *>(ptr) ? "true" : "false";
-            case Ailu::EDataType::kString:
-                return *reinterpret_cast<const std::string *>(ptr);
-            case Ailu::EDataType::kVec2:
-                return formatVec(*reinterpret_cast<const Vector2f *>(ptr), 2);
-            case Ailu::EDataType::kVec3:
-                return formatVec(*reinterpret_cast<const Vector3f *>(ptr), 3);
-            case Ailu::EDataType::kVec4:
-                return formatVec(*reinterpret_cast<const Vector4f *>(ptr), 4);
-            case Ailu::EDataType::kVec2Int:
-                return formatVec(*reinterpret_cast<const Vector2Int *>(ptr), 2);
-            case Ailu::EDataType::kVec3Int:
-                return formatVec(*reinterpret_cast<const Vector3Int *>(ptr), 3);
-            case Ailu::EDataType::kVec4Int:
-                return formatVec(*reinterpret_cast<const Vector4Int *>(ptr), 4);
-            case Ailu::EDataType::kVec2UInt:
-                return formatVec(*reinterpret_cast<const Vector2UInt *>(ptr), 2);
-            case Ailu::EDataType::kVec3UInt:
-                return formatVec(*reinterpret_cast<const Vector3UInt *>(ptr), 3);
-            case Ailu::EDataType::kVec4UInt:
-                return formatVec(*reinterpret_cast<const Vector4UInt *>(ptr), 4);
-            case Ailu::EDataType::kEnum:
-                return std::format("{}", static_cast<int>(*reinterpret_cast<const i32 *>(ptr)));
-            case Ailu::EDataType::kPtr:
-                return std::format("ptr: {}", *reinterpret_cast<void *const *>(ptr));
-            case Ailu::EDataType::kRef:
-                return std::format("ref: {}", *reinterpret_cast<void *const *>(ptr));
-            case Ailu::EDataType::kObject:
-                return "[Object]";
-            case Ailu::EDataType::kVoid:
-                return "[Void]";
-            case Ailu::EDataType::kNone:
-            default:
-                return "[Unknown]";
+            size_t start = pos;
+            while (pos < s.size() && (std::isalnum((unsigned char) s[pos]) || s[pos] == '_' || s[pos] == ':'))
+            {
+                ++pos;
+            }
+            return s.substr(start, pos - start);
+        };
+        TemplateParamInfo info;
+        SkipSpaces(s, pos);
+        info._param_type_name = ReadIdentifier(s, pos);
+
+        SkipSpaces(s, pos);
+        if (pos < s.size() && s[pos] == '<')
+        {
+            // 进入模板参数
+            ++pos;// 跳过 '<'
+            while (pos < s.size())
+            {
+                SkipSpaces(s, pos);
+                TemplateParamInfo child = ParseTemplate(s, pos);
+                info._sub_params.push_back(std::move(child));
+
+                SkipSpaces(s, pos);
+                if (pos < s.size() && s[pos] == ',')
+                {
+                    ++pos;// 跳过逗号
+                    continue;
+                }
+                else if (pos < s.size() && s[pos] == '>')
+                {
+                    ++pos;// 跳过 '>'
+                    break;
+                }
+                else
+                {
+                    // 格式错误或结束
+                    break;
+                }
+            }
         }
+        return info;
     }
 
-
-    bool PropertyInfo::SetValueFromString(void *instance, const String &str) const
+    TemplateParamInfo TemplateParamInfo::Parse(const String &full_type)
     {
-        char *ptr = reinterpret_cast<char *>(instance) + _offset;
-
-        auto parseVec = [](const String &s, auto &v, int dim) -> bool
-        {
-            int matched = 0;
-            switch (dim)
-            {
-                case 2:
-                    matched = sscanf_s(s.c_str(), "%f,%f", &v.data[0], &v.data[1]);
-                    return matched == 2;
-                case 3:
-                    matched = sscanf_s(s.c_str(), "%f, %f, %f", &v.data[0], &v.data[1], &v.data[2]);
-                    return matched == 3;
-                case 4:
-                    matched = sscanf_s(s.c_str(), "%f, %f, %f, %f", &v.data[0], &v.data[1], &v.data[2], &v.data[3]);
-                    return matched == 4;
-                default:
-                    return false;
-            }
-        };
-
-        try
-        {
-            switch (_data_type)
-            {
-                case Ailu::EDataType::kInt8:
-                    *reinterpret_cast<i8 *>(ptr) = static_cast<i8>(std::stoi(str));
-                    return true;
-                case Ailu::EDataType::kInt16:
-                    *reinterpret_cast<i16 *>(ptr) = static_cast<i16>(std::stoi(str));
-                    return true;
-                case Ailu::EDataType::kInt32:
-                    *reinterpret_cast<i32 *>(ptr) = std::stoi(str);
-                    return true;
-                case Ailu::EDataType::kInt64:
-                    *reinterpret_cast<i64 *>(ptr) = std::stoll(str);
-                    return true;
-                case Ailu::EDataType::kUInt8:
-                    *reinterpret_cast<u8 *>(ptr) = static_cast<u8>(std::stoul(str));
-                    return true;
-                case Ailu::EDataType::kUInt16:
-                    *reinterpret_cast<u16 *>(ptr) = static_cast<u16>(std::stoul(str));
-                    return true;
-                case Ailu::EDataType::kUInt32:
-                    *reinterpret_cast<u32 *>(ptr) = std::stoul(str);
-                    return true;
-                case Ailu::EDataType::kUInt64:
-                    *reinterpret_cast<u64 *>(ptr) = std::stoull(str);
-                    return true;
-                case Ailu::EDataType::kFloat:
-                    *reinterpret_cast<float *>(ptr) = std::stof(str);
-                    return true;
-                case Ailu::EDataType::kDouble:
-                    *reinterpret_cast<double *>(ptr) = std::stod(str);
-                    return true;
-                case Ailu::EDataType::kBool:
-                    *reinterpret_cast<bool *>(ptr) = (str == "true" || str == "1" || str == "True");
-                    return true;
-                case Ailu::EDataType::kChar:
-                    if (!str.empty())
-                    {
-                        *reinterpret_cast<char *>(ptr) = str[0];
-                        return true;
-                    }
-                    return false;
-                case Ailu::EDataType::kString:
-                    *reinterpret_cast<std::string *>(ptr) = str;
-                    return true;
-                case Ailu::EDataType::kVec2:
-                    return parseVec(str, *reinterpret_cast<Vector2f *>(ptr), 2);
-                case Ailu::EDataType::kVec3:
-                    return parseVec(str, *reinterpret_cast<Vector3f *>(ptr), 3);
-                case Ailu::EDataType::kVec4:
-                    return parseVec(str, *reinterpret_cast<Vector4f *>(ptr), 4);
-                case Ailu::EDataType::kVec2Int:
-                    return sscanf_s(str.c_str(), "%d,%d", &reinterpret_cast<Vector2Int *>(ptr)->x, &reinterpret_cast<Vector2Int *>(ptr)->y) == 2;
-                case Ailu::EDataType::kVec3Int:
-                    return sscanf_s(str.c_str(), "%d,%d,%d", &reinterpret_cast<Vector3Int *>(ptr)->x, &reinterpret_cast<Vector3Int *>(ptr)->y, &reinterpret_cast<Vector3Int *>(ptr)->z) == 3;
-                case Ailu::EDataType::kVec4Int:
-                    return sscanf_s(str.c_str(), "%d,%d,%d,%d", &reinterpret_cast<Vector4Int *>(ptr)->x, &reinterpret_cast<Vector4Int *>(ptr)->y, &reinterpret_cast<Vector4Int *>(ptr)->z, &reinterpret_cast<Vector4Int *>(ptr)->w) == 4;
-                case Ailu::EDataType::kVec2UInt:
-                    return sscanf_s(str.c_str(), "%u,%u", &reinterpret_cast<Vector2UInt *>(ptr)->x, &reinterpret_cast<Vector2UInt *>(ptr)->y) == 2;
-                case Ailu::EDataType::kVec3UInt:
-                    return sscanf_s(str.c_str(), "%u,%u,%u", &reinterpret_cast<Vector3UInt *>(ptr)->x, &reinterpret_cast<Vector3UInt *>(ptr)->y, &reinterpret_cast<Vector3UInt *>(ptr)->z) == 3;
-                case Ailu::EDataType::kVec4UInt:
-                    return sscanf_s(str.c_str(), "%u,%u,%u,%u", &reinterpret_cast<Vector4UInt *>(ptr)->x, &reinterpret_cast<Vector4UInt *>(ptr)->y, &reinterpret_cast<Vector4UInt *>(ptr)->z, &reinterpret_cast<Vector4UInt *>(ptr)->w) == 4;
-                case Ailu::EDataType::kEnum:
-                    *reinterpret_cast<i32 *>(ptr) = std::stoi(str);
-                    return true;
-                case Ailu::EDataType::kPtr:
-                case Ailu::EDataType::kRef:
-                case Ailu::EDataType::kObject:
-                case Ailu::EDataType::kVoid:
-                case Ailu::EDataType::kNone:
-                default:
-                    AL_ASSERT_MSG(false, "PropertyInfo::SetValueFromString: Unsupported type");
-                    return false;
-            }
-        }
-        catch (const std::exception &e)
-        {
-            LOG_WARNING("PropertyInfo::SetValueFromString parse error: {}", e.what());
-            return false;
-        }
+        size_t pos = 0;
+        return ParseTemplate(full_type, pos);
     }
 
     void PropertyInfo::Serialize(void *instance, FArchive &ar) const
     {
         AL_ASSERT(_serialize_fn != nullptr);
         const String &name = _name;
-        _serialize_fn(GetFieldPtr(instance), ar, &name);
+        _serialize_fn(reinterpret_cast<u8 *>(instance) + _offset, ar, &name);
     }
 
     void PropertyInfo::Deserialize(void *instance, FArchive &ar) const
     {
         AL_ASSERT(_deserialize_fn != nullptr);
         const String &name = _name;
-        _deserialize_fn(GetFieldPtr(instance), ar, &name);
+        _deserialize_fn(reinterpret_cast<u8 *>(instance) + _offset, ar, &name);
     }
 
+    const Type *Ailu::PropertyInfo::GetType()
+    {
+        if (_type == nullptr)
+            _type = Type::Find(_type_name);
+        return _type;
+    }
 
+    const Type *Ailu::FunctionInfo::GetRetType()
+    {
+        if (_ret_type == nullptr)
+            _ret_type = Type::Find(_ret_type_name);
+        return _ret_type;
+    }
     //------------------------------------------------------------------------------------------------------------
     void Type::RegisterType(Type *type)
     {
@@ -305,8 +113,8 @@ namespace Ailu
                        {
             if (type->Name() == "Object")
                 {
-                    type->_base = type;
-                    type->_base_name = type->FullName();
+                    type->_base = nullptr;
+                    type->_base_name = "";
                 } });
         if (!s_is_base_type_init)
         {
@@ -336,6 +144,26 @@ namespace Ailu
             }
         }
     }
+
+    Type *Type::Find(const String &name)
+    {
+        auto it = s_global_types.find(name);
+        if (it == s_global_types.end())
+        {
+            LOG_WARNING("Type::Find: Type not found: {},try register it...", name);
+            if (auto itt = s_global_register.find(name); itt != s_global_register.end())
+            {
+                s_global_types[name] = s_global_register[name]();
+                s_global_register.erase(name);
+            }
+            else
+            {
+                LOG_ERROR("Type::Find: Type not found: {}", name);
+                return nullptr;
+            }
+        }
+        return s_global_types[name];
+    };
 
 
     Type::Type()
@@ -369,7 +197,7 @@ namespace Ailu
     {
         return _namespace;
     }
-    const Vector<PropertyInfo> &Type::GetProperties() const
+    Vector<PropertyInfo> &Type::GetProperties()
     {
         return _properties;
     }
@@ -395,12 +223,13 @@ namespace Ailu
         _size = initializer._size;
         _base_name = initializer._base_name;
         _base = nullptr;
+        _constructor = initializer._constructor;
         for (auto &prop: _properties)
             _members.emplace_back(&prop);
         for (auto &func: _functions)
             _members.emplace_back(&func);
         for (auto &member: _members)
-            _members_lut[member->_name] = member;
+            _members_lut[member->Name()] = member;
     }
     u32 Type::Size() const
     {
@@ -447,8 +276,9 @@ namespace Ailu
     {
         while (!s_registers.empty())
         {
-            s_registers.front()();
+            auto new_enum = s_registers.front()();
             s_registers.pop();
+            LOG_INFO("Enum::InitTypeInfo: Register enum type: {}", new_enum->Name());
         }
     }
     void Enum::RegisterEnum(Enum *enum_ptr)
@@ -456,6 +286,7 @@ namespace Ailu
         s_global_enums[enum_ptr->Name()] = enum_ptr;
         Type::RegisterType(enum_ptr);
     }
+
     i32 Enum::GetIndexByName(const std::string &name) const
     {
         if (_str_to_enum_lut.contains(name))
@@ -464,7 +295,6 @@ namespace Ailu
         }
         return -1;
     }
-
 
     //---------------------------------------------
 

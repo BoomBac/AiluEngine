@@ -7,31 +7,31 @@
 //Struct EditorConfig begin...........................
 #define EDITORAPP_GEN_H_17_GENERATED_BODY \
                             private: \
-                                friend const Type* Z_Construct_EditorConfig_Type();\
-                                static const Type* GetPrivateStaticClass();\
+                                friend Type* Z_Construct_EditorConfig_Type();\
+                                static Type* GetPrivateStaticClass();\
                             public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct EditorConfig ;
 }
 template<>
-AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::EditorConfig>();
+AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::EditorConfig>();
 //Struct EditorConfig end...........................
 
 //Struct TestObj begin...........................
 #define EDITORAPP_GEN_H_45_GENERATED_BODY \
                             private: \
-                                friend const Type* Z_Construct_TestObj_Type();\
-                                static const Type* GetPrivateStaticClass();\
+                                friend Type* Z_Construct_TestObj_Type();\
+                                static Type* GetPrivateStaticClass();\
                             public:\
-                                static const Type *StaticType() {return GetPrivateStaticClass();};
+                                static Type *StaticType() {return GetPrivateStaticClass();};
                             namespace Ailu {class Type;}
 namespace Ailu::Editor{
 struct TestObj ;
 }
 template<>
-AILU_API const class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::TestObj>();
+AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::TestObj>();
 //Struct TestObj end...........................
 
 #undef CURRENT_FILE_ID

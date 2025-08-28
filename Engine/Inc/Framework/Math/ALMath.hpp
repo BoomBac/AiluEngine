@@ -211,6 +211,59 @@ namespace Ailu
                 }
                 return *(TT<T> *) this;
             }
+            TT<T> operator+(TT<T> other) const
+            {
+                TT<T> r = *this;
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    r[indexes[i]] += other.data[i];
+                }
+                return r;
+            }
+            TT<T> &operator-=(TT<T> other)
+            {
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    v[indexes[i]] -= other.data[i];
+                }
+                return *(TT<T> *) this;
+            }
+            TT<T> operator-(TT<T> other) const
+            {
+                TT<T> r = *this;
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    r[indexes[i]] -= other.data[i];
+                }
+                return r;
+            }
+            TT<T> &operator*=(TT<T> other)
+            {
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    v[indexes[i]] *= other.data[i];
+                }
+                return *(TT<T> *) this;
+            }
+            TT<T> operator*(TT<T> other) const
+            {
+                TT<T> r = *this;
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    r[indexes[i]] *= other.data[i];
+                }
+                return r;
+            }
             TT<T> &operator-=(T scale)
             {
                 int indexes[] = {Indexes...};
@@ -292,6 +345,17 @@ namespace Ailu
                 {
                     return std::format("{},{}", x, y);
                 }
+            }
+            bool FromString(const std::string &str)
+            {
+                std::stringstream ss(str);
+                char delimiter;
+                if (!(ss >> data[0] >> delimiter) || delimiter != ',' ||
+                    !(ss >> data[1] >> delimiter) || delimiter != ',')
+                {
+                    return false;
+                }
+                return true;
             }
 
             friend std::ostream &operator<<(std::ostream &os, const Vector2D<T> &vec)
@@ -2813,15 +2877,15 @@ namespace Ailu
         }// namespace ALHash
     }// namespace Math
 #pragma warning(pop)
-    template<> const AILU_API Type* StaticClass<Math::Vector2f>();
-    template<> const AILU_API Type* StaticClass<Math::Vector3f>();
-    template<> const AILU_API Type* StaticClass<Math::Vector4f>();
-    template<> const AILU_API Type* StaticClass<Math::Vector2Int>();
-    template<> const AILU_API Type* StaticClass<Math::Vector3Int>();
-    template<> const AILU_API Type* StaticClass<Math::Vector4Int>();
-    template<> const AILU_API Type *StaticClass<Math::Vector2UInt>();
-    template<> const AILU_API Type *StaticClass<Math::Vector3UInt>();
-    template<> const AILU_API Type *StaticClass<Math::Vector4UInt>();
+    template<> AILU_API Type* StaticClass<Math::Vector2f>();
+    template<> AILU_API Type* StaticClass<Math::Vector3f>();
+    template<> AILU_API Type* StaticClass<Math::Vector4f>();
+    template<> AILU_API Type* StaticClass<Math::Vector2Int>();
+    template<> AILU_API Type* StaticClass<Math::Vector3Int>();
+    template<> AILU_API Type* StaticClass<Math::Vector4Int>();
+    template<> AILU_API Type *StaticClass<Math::Vector2UInt>();
+    template<> AILU_API Type *StaticClass<Math::Vector3UInt>();
+    template<> AILU_API Type *StaticClass<Math::Vector4UInt>();
 }// namespace Ailu
 using namespace Ailu::Math;
 #endif// __AL_MATH_H__

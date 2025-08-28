@@ -6,8 +6,8 @@ namespace Ailu
 {
     using namespace Math;
 #define IMPL(x) template<>\
-    const Type *StaticClass<x>() { \
-        static const Type * s_type = Type::Find(#x); \
+    Type *StaticClass<x>() { \
+        static Type * s_type = Type::Find(#x); \
         return s_type;                              \
     };
     IMPL(Vector2f);

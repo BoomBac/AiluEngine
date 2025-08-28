@@ -5,52 +5,42 @@
 #ifndef AILU_CANVAS_H
 #define AILU_CANVAS_H
 
-#include "UILayout.h"
 #include "UIElement.h"
 #include "Render/Texture.h"
-#include "generated/Canvas.gen.h"
+#include "Objects/Serialize.h"
+#include "generated/Widget.gen.h"
 
 namespace Ailu
 {
     namespace UI
     {
+
         ASTRUCT()
-        struct Slot
-        {
-            GENERATED_BODY()
-            Slot(Vector2f size) : _anchor(), _position(), _size(size), _alignment(EAlignment::kLeft) {};
-            Slot() : Slot({100.f, 100.f}) {};
-            APROPERTY()
-            Vector2f _size;
-            APROPERTY()
-            Vector2f _anchor;
-            APROPERTY()
-            Vector2f _position;
-            APROPERTY()
-            EAlignment _alignment;
-        };
-        ASTRUCT()
-        struct SlotItem
+        struct SlotItemData
         {
             GENERATED_BODY()
             APROPERTY()
             Slot _slot;
             APROPERTY()
-            UIElement* _element;
+            String _element_id;
+            APROPERTY()
+            String _element_type;
         };
+
         /// <summary>
         /// 画布管理其所有ui元素的布局和渲染以及生命周期
         /// </summary>
         ACLASS()
-        class AILU_API Canvas : public Object
+        class AILU_API Widget : public SerializeObject
         {
             GENERATED_BODY()
         public:
-            Canvas();
+            Widget();
+            void Serialize(FArchive &ar) final;
+            void Deserialize(FArchive &ar) final;
             void BindOutput(Render::RenderTexture *color, Render::RenderTexture *depth = nullptr);
-            void AddChild(UIElement* child, Slot slot);
-            void RemoveChild(UIElement* child);
-            Slot& GetSlot(UIElement* child);
+            void AddToWidget(Ref<UIElement> root);
+
             void Update();
             void Render(UIRenderer &r);
             void OnEvent(UIEvent& event);
@@ -59,11 +49,19 @@ namespace Ailu
                 return _is_external_output ? std::make_tuple(_external_color, _external_depth) : std::make_tuple(_color.get(), _depth.get());
             };
             Vector2f GetSize() const;
+            void SetSize(Vector2f size) { _size = size; };
             void SetPosition(Vector2f position);
-            auto begin() { return _children.begin(); }
-            auto end() { return _children.end(); }
+            auto begin() { return _root->begin(); }
+            auto end() { return _root->end(); }
+            UIElement *Root() { return _root.get(); }
+
+            bool operator<(const Widget &other) const { return _sort_order < other._sort_order; }
         public:
             bool _is_external_output = false;
+            APROPERTY()
+            u32 _sort_order = 0u;
+        private:
+            bool DispatchEvent(UIEvent& e);
         private:
             APROPERTY()
             Vector2f _size;
@@ -74,8 +72,9 @@ namespace Ailu
             Ref<Render::RenderTexture> _color, _depth;
             Render::RenderTexture *_external_color; 
             Render::RenderTexture * _external_depth;
-            HashMap<u32, SlotItem> _slots;
-            Vector<UIElement *> _children;
+            Ref<UIElement> _root;
+            Vector<UIElement*> _prev_hover_path;
+            UIElement *_capture_target = nullptr;//记录按下时的目标
         };
 
     }// namespace UI

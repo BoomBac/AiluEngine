@@ -6,7 +6,7 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-const Ailu::Type* Ailu::Z_Construct_Object_Type()
+Ailu::Type* Ailu::Z_Construct_Object_Type()
 {
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
@@ -19,71 +19,109 @@ initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu";
 initializer._base_name = "";
+initializer._constructor = []()->Ailu::Object* {return new Ailu::Object;};
 Meta meta_name;
-meta_name._category="";
-meta_name._min=(float)0;
-meta_name._max=(float)1;
-meta_name._is_range=false;
-meta_name._is_float_range=true;
-meta_name._is_color=false;
-MemberInfoInitializer initializer__name = {EMemberType::kProperty, "_name", "String", offsetof(Object,_name), &Object::_name, meta_name, false, false, false, false, false, false, nullptr, nullptr};
-initializer__name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
-initializer__name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
-initializer__name._type = Ailu::Type::Find("String");
-initializer._properties.emplace_back(initializer__name);
+meta_name.Set("Category","");
+meta_name.Set("IsColor",false);
+meta_name.Set("IsRange",false);
+meta_name.Set("IsFloatRange",true);
+meta_name.Set("RangeMin",0);
+meta_name.Set("RangeMax",1);
+MemberBuilder builder_name;
+builder_name._name = "_name";
+builder_name._type_name = "String";
+builder_name._offset = offsetof(Object,_name);
+builder_name._is_const = false;
+builder_name._is_static = false;
+builder_name._is_public = false;
+builder_name._is_pointer = false;
+builder_name._is_ref = false;
+builder_name._is_template = false;
+builder_name._meta = meta_name;
+builder_name._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_name._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_name));
 Meta meta_id;
-meta_id._category="";
-meta_id._min=(float)0;
-meta_id._max=(float)1;
-meta_id._is_range=false;
-meta_id._is_float_range=true;
-meta_id._is_color=false;
-MemberInfoInitializer initializer__id = {EMemberType::kProperty, "_id", "u32", offsetof(Object,_id), &Object::_id, meta_id, false, false, false, false, false, false, nullptr, nullptr};
-initializer__id._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
-initializer__id._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
-initializer__id._type = Ailu::Type::Find("u32");
-initializer._properties.emplace_back(initializer__id);
+meta_id.Set("Category","");
+meta_id.Set("IsColor",false);
+meta_id.Set("IsRange",false);
+meta_id.Set("IsFloatRange",true);
+meta_id.Set("RangeMin",0);
+meta_id.Set("RangeMax",1);
+MemberBuilder builder_id;
+builder_id._name = "_id";
+builder_id._type_name = "u32";
+builder_id._offset = offsetof(Object,_id);
+builder_id._is_const = false;
+builder_id._is_static = false;
+builder_id._is_public = false;
+builder_id._is_pointer = false;
+builder_id._is_ref = false;
+builder_id._is_template = false;
+builder_id._meta = meta_id;
+builder_id._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
+builder_id._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_id));
 Meta meta_hash;
-meta_hash._category="";
-meta_hash._min=(float)0;
-meta_hash._max=(float)1;
-meta_hash._is_range=false;
-meta_hash._is_float_range=true;
-meta_hash._is_color=false;
-MemberInfoInitializer initializer__hash = {EMemberType::kProperty, "_hash", "u64", offsetof(Object,_hash), &Object::_hash, meta_hash, false, false, false, false, false, false, nullptr, nullptr};
-initializer__hash._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u64>);
-initializer__hash._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u64>);
-initializer__hash._type = Ailu::Type::Find("u64");
-initializer._properties.emplace_back(initializer__hash);
+meta_hash.Set("Category","");
+meta_hash.Set("IsColor",false);
+meta_hash.Set("IsRange",false);
+meta_hash.Set("IsFloatRange",true);
+meta_hash.Set("RangeMin",0);
+meta_hash.Set("RangeMax",1);
+MemberBuilder builder_hash;
+builder_hash._name = "_hash";
+builder_hash._type_name = "u64";
+builder_hash._offset = offsetof(Object,_hash);
+builder_hash._is_const = false;
+builder_hash._is_static = false;
+builder_hash._is_public = false;
+builder_hash._is_pointer = false;
+builder_hash._is_ref = false;
+builder_hash._is_template = false;
+builder_hash._meta = meta_hash;
+builder_hash._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u64>);
+builder_hash._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u64>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_hash));
 Meta meta_guid;
-meta_guid._category="";
-meta_guid._min=(float)0;
-meta_guid._max=(float)1;
-meta_guid._is_range=false;
-meta_guid._is_float_range=true;
-meta_guid._is_color=false;
-MemberInfoInitializer initializer__guid = {EMemberType::kProperty, "_guid", "Guid", offsetof(Object,_guid), &Object::_guid, meta_guid, false, false, false, false, false, false, nullptr, nullptr};
-initializer__guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
-initializer__guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
-initializer__guid._type = Ailu::Type::Find("Guid");
-initializer._properties.emplace_back(initializer__guid);
+meta_guid.Set("Category","");
+meta_guid.Set("IsColor",false);
+meta_guid.Set("IsRange",false);
+meta_guid.Set("IsFloatRange",true);
+meta_guid.Set("RangeMin",0);
+meta_guid.Set("RangeMax",1);
+MemberBuilder builder_guid;
+builder_guid._name = "_guid";
+builder_guid._type_name = "Guid";
+builder_guid._offset = offsetof(Object,_guid);
+builder_guid._is_const = false;
+builder_guid._is_static = false;
+builder_guid._is_public = false;
+builder_guid._is_pointer = false;
+builder_guid._is_ref = false;
+builder_guid._is_template = false;
+builder_guid._meta = meta_guid;
+builder_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Guid>);
+builder_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Guid>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_guid));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-const Ailu::Type* Ailu::Object::GetPrivateStaticClass()
+Ailu::Type* Ailu::Object::GetPrivateStaticClass()
 {
-	static const Ailu::Type* type = Z_Construct_Object_Type();
+	static Ailu::Type* type = Z_Construct_Object_Type();
 	return type;
 }
 
-template<> const Ailu::Type* Ailu::StaticClass<Ailu::Object>()
+template<> Ailu::Type* Ailu::StaticClass<Ailu::Object>()
 {
 return Ailu::Object::StaticType();
 }
-    const Type *Ailu::Object::GetType() const
+    Type *Ailu::Object::GetType()
 {
 return Ailu::Object::GetPrivateStaticClass();
 }
+ClassTypeRegister s_register_Object(&Ailu::Object::StaticType, "Ailu::Object");

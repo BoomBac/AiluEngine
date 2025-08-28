@@ -103,6 +103,7 @@ namespace Ailu::Render
         for (auto &r: _renderers)
             r->SetupFrameResource(&_frame_res[(Application::Application::Get().GetFrameCount() - 1) % _frame_res.size()], _cur_frame_res);
     }
+
     void RenderPipeline::Render()
     {
         /*
@@ -122,10 +123,16 @@ namespace Ailu::Render
         RenderTexture::ResetRenderTarget();
         */
         {
-            Application::Get().NotifyRender();
-            Application::Get().WaitForRender();
+            if (Application::Get()._is_multi_thread_rendering)
+            {
+                Application::Get().NotifyRender();
+                Application::Get().WaitForRender();
+            }
             PROFILE_BLOCK_CPU(UIRender)
             auto cmd = CommandBufferPool::Get("UI");
+            //强制clear一下，backbuffer load action默认为是dont care
+            cmd->SetRenderTarget(RenderTexture::s_backbuffer);
+            cmd->ClearRenderTarget(Colors::kBlack);
             UI::UIRenderer::Get()->Render(cmd.get());
             GraphicsContext::Get().ExecuteCommandBuffer(cmd);
             CommandBufferPool::Release(cmd);

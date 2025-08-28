@@ -14,6 +14,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
 
+
 //#define _USE_CONSOLE
 
 #ifdef DEAR_IMGUI
@@ -271,21 +272,13 @@ namespace Ailu
         return static_cast<void *>(_hwnd);
     }
 
-    std::tuple<i32, i32> WinWindow::GetWindowPosition() const
+    std::tuple<i32, i32> WinWindow::GetWindowPosition() const 
     {
-        RECT rect;
-        //GetClientRect(_hwnd, &rect);
-        GetWindowRect(_hwnd, &rect);
-        // 获取窗口所在的显示器
-        HMONITOR hMonitor = MonitorFromWindow(_hwnd, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO monitorInfo;
-        monitorInfo.cbSize = sizeof(MONITORINFO);
-        GetMonitorInfo(hMonitor, &monitorInfo);
-        // 获取显示器的工作区域
-        RECT monitorRect = monitorInfo.rcWork;
-        // 计算窗口相对于显示器的坐标
-        return std::tuple<u32, u32>(rect.left - monitorRect.left + 8, rect.top - monitorRect.top + 8);
+        POINT pt = { 0, 0 };
+        ClientToScreen(_hwnd, &pt);
+        return { static_cast<i32>(pt.x), static_cast<i32>(pt.y) };
     }
+
 
     void WinWindow::SetTitle(const WString& title)
     {
@@ -311,6 +304,7 @@ namespace Ailu
 #pragma warning(disable : 4244)
     LRESULT WinWindow::WindowProcImpl(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
+        static bool s_is_track = false;
         switch (message)
         {
                 //case WM_NCCALCSIZE:
@@ -399,6 +393,16 @@ namespace Ailu
                 return 0;
             case WM_MOUSEMOVE:
             {
+                if (!s_is_track)
+                {
+                    TRACKMOUSEEVENT tme;
+                    tme.cbSize = sizeof(tme);
+                    tme.dwFlags = TME_LEAVE;// 请求接收 WM_MOUSELEAVE
+                    tme.hwndTrack = _hwnd;
+                    tme.dwHoverTime = HOVER_DEFAULT;
+                    TrackMouseEvent(&tme);
+                    s_is_track = true;
+                }
                 MouseMovedEvent e(static_cast<float>(HIGH_BIT(lParam, 16)), static_cast<float>(LOW_BIT(lParam, 16)));
                 _data.Handler(e);
             }
@@ -468,9 +472,22 @@ namespace Ailu
                 _data.Handler(e);
             }
                 return 0;
+            case WM_MOUSELEAVE:
+            {
+                s_is_track = false;
+                MouseExitWindowEvent e;
+                _data.Handler(e);
+            }
+                return 0;
+            case WM_MOUSEHOVER:
+            {
+                MouseEnterWindowEvent e;
+                _data.Handler(e);
+            }
+                return 0;
         }
         // Handle any messages the switch statement didn't.
-        LOG_WARNING("Unhandled message: " + std::to_string(message));
+        //LOG_WARNING("Unhandled message: " + std::to_string(message));
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
 

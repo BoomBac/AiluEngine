@@ -227,6 +227,7 @@ namespace Ailu
             char *buffer = new char[65536];
             rapidjson::FileWriteStream os(fp, buffer, sizeof(buffer));
             rapidjson::PrettyWriter<rapidjson::FileWriteStream> writer(os);
+            writer.SetFormatOptions(rapidjson::kFormatSingleLineArray);
             doc.Accept(writer);
             fclose(fp);
             delete[] buffer;
@@ -533,8 +534,14 @@ namespace Ailu
     {
         if (auto node = FindNode(); node != nullptr)
         {
-            AL_ASSERT(std::holds_alternative<f64>(node->value));
-            value = std::get<f64>(node->value);
+            if (std::holds_alternative<f64>(node->value))
+                value = std::get<f64>(node->value);
+            else if (std::holds_alternative<i64>(node->value))
+            {
+                value = static_cast<f64>(std::get<i64>(node->value));
+                LOG_WARNING("Read f64 from i64 type, key {},name {}", _cur_key, _cur_sub_name);
+            }
+            else {}
         }
         else
             LOG_ERROR("Read f64 form key {},name {} failed", _cur_key, _cur_sub_name);
@@ -606,7 +613,6 @@ namespace Ailu
         _cur_obj_nodes.top()._value = arr;
         _cur_obj_nodes.top()._is_array = true;
         _cur_obj_nodes.top()._is_struct = type == EStructedDataType::kStruct;
-        _pre_arr_node = &_cur_obj_nodes.top();
     }
 
     u32 JsonArchive::BeginArray(EStructedDataType &type)
@@ -693,9 +699,11 @@ namespace Ailu
         {
             LOG_ERROR("Failed to save JSON archive to {}", sys_path);
         }
+        Reset();
     }
     void JsonArchive::Load(const Path &sys_path)
     {
+        Reset();
         if (!_impl->Load(sys_path.wstring(),_root))
         {
             LOG_ERROR("Failed to load JSON archive from {}", sys_path);

@@ -7,6 +7,7 @@
 #include <string>
 #include <type_traits>
 #include "Type.h"
+#include "generated/Serialize.gen.h"
 namespace Ailu
 {
     class Archive;
@@ -148,6 +149,7 @@ namespace Ailu
         INTERFACE_LEFT_OP(f64)
         INTERFACE_LEFT_OP(bool)
         INTERFACE_LEFT_OP(String)
+        virtual FArchive &operator<<(Object &obj) = 0;
 
         INTERFACE_RIGHT_OP(u8)
         INTERFACE_RIGHT_OP(i8)
@@ -161,6 +163,7 @@ namespace Ailu
         INTERFACE_RIGHT_OP(f64)
         INTERFACE_RIGHT_OP(bool)
         INTERFACE_RIGHT_OP(String)
+        virtual FArchive &operator>>(Object &obj) = 0;
 
         virtual void Serialize(void *data, u64 size) = 0;
         virtual void Deserialize(void *data, u64 size) = 0;
@@ -261,35 +264,53 @@ namespace Ailu
         virtual void ReadString(String &v) = 0;
     };
 
+    ACLASS()
     class AILU_API SerializeObject : public Object
     {
+        GENERATED_BODY()
+    public:
         virtual ~SerializeObject() = default;
         virtual void Serialize(FArchive &ar) 
         {
-            const Type *class_type = GetType();
-            if (class_type == nullptr)
+            Type *class_type = GetType();
+            auto sar = dynamic_cast<FStructedArchive *>(&ar);
+            if (sar != nullptr)
             {
-                LOG_ERROR(" SerializeObject::Serialize : class_type is nullptr ");
-                return;
+                sar->BeginObject("_type_name");
+                *sar << class_type->FullName();
+                sar->EndObject();
             }
-            for (const auto &p: class_type->GetProperties())
+            while (class_type != nullptr)
             {
-                p.Serialize(this, ar);
+                for (auto &p: class_type->GetProperties())
+                {
+                    p.Serialize(this, ar);
+                }
+                class_type = class_type->BaseType();
             }
         }
         virtual void Deserialize(FArchive &ar)
         {
-            const Type *class_type = GetType();
-            if (class_type == nullptr)
+            Type *class_type = GetType();
+            while (class_type != nullptr)
             {
-                LOG_ERROR(" SerializeObject::Deserialize : class_type is nullptr ");
-                return;
-            }
-            for (const auto &p: class_type->GetProperties())
-            {
-                p.Deserialize(this, ar);
+                for (auto &p: class_type->GetProperties())
+                {
+                    p.Deserialize(this, ar);
+                }
+                class_type = class_type->BaseType();
             }
         }
+    };
+
+    template<typename T>
+    concept Serializable = requires(T a, FArchive &ar) {
+        { a.Serialize(ar) } -> std::same_as<void>;
+    };
+
+    template<typename T>
+    concept Deserializable = requires(T a, FArchive &ar) {
+        { a.Deserialize(ar) } -> std::same_as<void>;
     };
 
     template<typename T>
@@ -320,9 +341,14 @@ namespace Ailu
                 T *obj = reinterpret_cast<T *>(data);
                 obj->Serialize(ar);
             }
+            else if constexpr (Serializable<T>)
+            {
+                T *obj = reinterpret_cast<T *>(data);
+                obj->Serialize(ar);
+            }
             else
             {
-                const Type *class_type = StaticClass<T>();
+                Type *class_type = StaticClass<T>();
                 if (class_type == nullptr)
                 {
                     if (sar && name) 
@@ -373,9 +399,14 @@ namespace Ailu
                 T *obj = reinterpret_cast<T *>(data);
                 obj->Deserialize(ar);
             }
+            else if constexpr (Deserializable<T>)
+            {
+                T *obj = reinterpret_cast<T *>(data);
+                obj->Deserialize(ar);
+            }
             else
             {
-                const Type *class_type = StaticClass<T>();
+                Type *class_type = StaticClass<T>();
                 if (class_type == nullptr)
                 {
                     if (sar && name)

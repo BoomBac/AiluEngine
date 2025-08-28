@@ -69,6 +69,30 @@ namespace Ailu
 	private:
 		u8 _mouse_btn;
 	};
+
+	class AILU_API MouseEnterWindowEvent : public Event
+    {
+    public:
+        MouseEnterWindowEvent() = default;
+        std::string ToString() const override
+        {
+            return "MouseEnterWindowEvent";
+        }
+        EVENT_CLASS_TYPE(kMouseEnterWindow)
+        EVENT_CLASS_CATEGORY(kEventCategoryMouse | kEventCategoryInput)
+    };
+
+	class AILU_API MouseExitWindowEvent : public Event
+    {
+    public:
+        MouseExitWindowEvent() = default;
+        std::string ToString() const override
+        {
+            return "MouseExitWindowEvent";
+        }
+        EVENT_CLASS_TYPE(kMouseExitWindow)
+        EVENT_CLASS_CATEGORY(kEventCategoryMouse | kEventCategoryInput)
+    };
 }
 
 

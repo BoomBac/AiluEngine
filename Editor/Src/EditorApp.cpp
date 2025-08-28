@@ -14,6 +14,10 @@
 #include "Objects/JsonArchive.h"
 #include "Framework/Parser/TextParser.h"
 
+#include "UI/Widget.h"
+#include "UI/Container.h"
+#include "Common/EditorStyle.h"
+
 using namespace Ailu;
 
 namespace Ailu
@@ -40,29 +44,18 @@ namespace Ailu
         }
 
         CommandManager *g_pCommandMgr = new CommandManager;
+
+        EditorStyle g_editor_style = {};
         int EditorApp::Initialize()
         {
             LogMgr::Init();
-            JsonArchive ar;
-            //TestObj test_obj;
-            //test_obj._name = "TestObj1";
-            //test_obj._objs.push_back(Object("11"));
-            //test_obj._objs.push_back(Object("12"));
-            ////test_obj._objs.push_back(Object("13"));
-            //test_obj._p = Object("asasa");
-            //test_obj._nums.push_back(1);
-            //test_obj._nums.push_back(2);
-            //for (const auto &p: TestObj::StaticType()->GetProperties())
-            //{
-            //    p.Serialize(&test_obj, ar);
-            //}
-            //ar.Save("test_obj.json");
-            ar.Load("test_obj_read.json");
-            TestObj test_obj;
-            for (const auto &p: TestObj::StaticType()->GetProperties())
-            {
-                p.Deserialize(&test_obj, ar);
-            }
+            Enum::InitTypeInfo();
+            //JsonArchive ar;
+            //auto c = MakeRef<UI::Widget>();
+            //ar.Load("F:\\AiluBuild\\out\\editor\\bin\\x64\\debug\\widget.json");
+            //ar >> *c.get();
+
+
             auto work_path = GetWorkingPath();
             work_path = Application::GetUseHomePath();
             LOG_INFO(L"WorkPath: {}", work_path);
@@ -70,7 +63,7 @@ namespace Ailu
             WString prex_w = work_path + L"OneDrive/AiluEngine/";
             ResourceMgr::ConfigRootPath(prex_w);
             s_editor_root_path = prex_w + L"Editor/";
-            s_editor_config_path = prex_w + L"Editor/EditorConfig.ini";
+            s_editor_config_path = prex_w + L"Editor/EditorConfig.json";
 
             ApplicationDesc desc;
             desc._window_width = 1600;
@@ -91,10 +84,19 @@ namespace Ailu
                 g_pSceneMgr->OpenScene(_opened_scene_path);
             }
             LoadEditorResource();
+            JsonArchive ar;
+            ar.Load(Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/EditorStyle.json");
+            auto t = EditorStyle::StaticType();
+            auto ps = &g_editor_style;
+            for (auto &p: t->GetProperties())
+                p.Deserialize(&g_editor_style, ar);
+
             _p_editor_layer = new EditorLayer();
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;
             _is_simulate_mode = false;
+
+
             _on_file_changed_delegate += [](const fs::path &file)
             {
                 const WString cur_path = PathUtils::FormatFilePath(file.wstring());
@@ -150,6 +152,13 @@ namespace Ailu
                     }
                 }
             };
+            _on_file_changed_delegate += [this](const fs::path &file) {
+                JsonArchive ar;
+                ar.Load(file);
+                auto t = EditorStyle::StaticType();
+                for (auto& p : t->GetProperties())
+                    p.Deserialize(&g_editor_style, ar);
+            };
             return ret;
         }
         void EditorApp::Finalize()
@@ -192,15 +201,19 @@ namespace Ailu
         void EditorApp::LoadEditorConfig(ApplicationDesc &desc)
         {
             //auto work_dir = PathUtils::ExtarctDirectory(Application::GetWorkingPath());
-            INIParser parser;
-            parser.Load(s_editor_config_path);
-            const Type* type = EditorConfig::StaticType();
-            const auto &config_values = parser.GetValues();
+            JsonArchive ar;
+            ar.Load(s_editor_config_path);
+            Type* type = EditorConfig::StaticType();
             for (auto &it: type->GetProperties())
-            {
-                if (auto itt = config_values.find(it.Name()); itt != config_values.end())
-                    it.SetValueFromString(&_editor_config, itt->second);
-            }
+                it.Deserialize(&_editor_config, ar);
+            //INIParser parser;
+            //parser.Load(s_editor_config_path);
+            //const auto &config_values = parser.GetValues();
+            //for (auto &it: type->GetProperties())
+            //{
+            //    if (auto itt = config_values.find(it.Name()); itt != config_values.end())
+            //        it.SetValueFromString(&_editor_config, itt->second);
+            //}
             _p_scene_camera = new Camera();
             _p_scene_camera->_anti_aliasing = EAntiAliasing::kNone;
             _p_scene_camera->Name("SceneCamera");
@@ -234,13 +247,20 @@ namespace Ailu
             _editor_config._move_speed = FirstPersonCameraController::s_inst._base_camera_move_speed;
             _editor_config._controller_rot = FirstPersonCameraController::s_inst._rotation;
             _editor_config._scene_path = ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->ActiveScene()));
-            INIParser ini_parser;
-            
-            for (auto &prop: EditorConfig::StaticType()->GetProperties())
-            {
-                ini_parser.SetValue(prop.MetaInfo()._category, prop.Name(), prop.StringValue(&_editor_config));
-            }
-            ini_parser.Save(s_editor_config_path);
+
+            JsonArchive ar;
+            Type *type = EditorConfig::StaticType();
+            for (auto &it: type->GetProperties())
+                it.Serialize(&_editor_config, ar);
+            ar.Load(s_editor_config_path);
+
+            //INIParser ini_parser;
+            //
+            //for (auto &prop: EditorConfig::StaticType()->GetProperties())
+            //{
+            //    ini_parser.SetValue(prop.MetaInfo()._category, prop.Name(), prop.StringValue(&_editor_config));
+            //}
+            //ini_parser.Save(s_editor_config_path);
         }
         void EditorApp::LoadEditorResource()
         {

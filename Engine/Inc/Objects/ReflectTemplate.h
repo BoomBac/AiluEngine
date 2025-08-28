@@ -11,19 +11,19 @@ namespace Ailu
     }
     class Type;
     template<typename E>
-    const Type *StaticClass()
+    Type *StaticClass()
     {
         return nullptr;
     }
 
 #define DECLARE_STATIC_TYPE(x) template<>\
-    const AILU_API Type *StaticClass<x>();
+    AILU_API Type *StaticClass<x>();
 
 #define IMPL_STATIC_TYPE(x)                         \
     template<>                                      \
-    const Type *StaticClass<x>()                    \
+    Type *StaticClass<x>()                    \
     {                                               \
-        static const Type *s_type = Type::Find(#x); \
+        static Type *s_type = Type::Find(#x); \
         return s_type;                              \
     };
 }

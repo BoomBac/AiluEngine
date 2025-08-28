@@ -131,6 +131,7 @@ int main(int argc, char **argv)
     auto tool_dir = work_path / "AHT/";
     auto config_dir = tool_dir / "aht.ini";
     auto cache_dir = tool_dir / "cache.txt";
+    auto class_ns_path = tool_dir / "class_ns_map.txt";
     Config config;
     LoadConfig(config_dir, config);
     map<string, long long> cache_file_times;
@@ -182,32 +183,31 @@ int main(int argc, char **argv)
         current_file_times[all_inc_rela_path.back().string()] = fs::last_write_time(inc_file).time_since_epoch().count();
     }
     set<fs::path> work_files;
-    if (is_rebuild_all)
+    set<fs::path> class_ns_update_files;
+    //is_rebuild_all = true;
+    //std::cout << "force rebuild all..." << std::endl;
+    for (auto &p: all_inc_rela_path)
     {
-        std::cout << "force rebuild all..." << std::endl;
-        work_files = all_inc_sys_path;
-    }
-    else
-    {
-        for (auto &p: all_inc_rela_path)
+        auto sys_path = proj_dir / p;
+        auto cur_time = fs::last_write_time(sys_path).time_since_epoch().count();
+        if (cache_file_times.contains(p.string()))
         {
-            auto sys_path = proj_dir / p;
-            auto cur_time = fs::last_write_time(sys_path).time_since_epoch().count();
-            if (cache_file_times.contains(p.string()))
+            if (cur_time > cache_file_times[p.string()])
             {
-                if (cur_time > cache_file_times[p.string()])
-                {
-                    cout << "File changed: " << p.string() << endl;
-                    work_files.insert(sys_path);
-                }
-            }
-            else
-            {
+                cout << "File changed: " << p.string() << endl;
                 work_files.insert(sys_path);
-                cout << "New file: " << p.string() << endl;
+                class_ns_update_files.insert(sys_path);
             }
-            cache_file_times[p.string()] = cur_time;
         }
+        else
+        {
+            work_files.insert(sys_path);
+            class_ns_update_files.insert(sys_path);
+            cout << "New file: " << p.string() << endl;
+        }
+        cache_file_times[p.string()] = cur_time;
+        if (is_rebuild_all)
+            work_files.insert(sys_path);
     }
     ofstream cache_file(cache_dir.string());
     for (auto &p: cache_file_times)
@@ -221,6 +221,8 @@ int main(int argc, char **argv)
     AiluHeadTool::AddDependencyInc("<Objects/SerializeSpecializations.h>");
     AiluHeadTool::AddDependencyInc("<Framework/Common/Log.h>");
     AiluHeadTool aht;
+    std::cout << "ColloctClassNamespace..." << std::endl;
+    aht.ColloctClassNamespace(class_ns_update_files, class_ns_path);
     for (auto &p: work_files)
     {
         auto out_dir = p.parent_path() / "generated";
@@ -231,5 +233,6 @@ int main(int argc, char **argv)
     aht.SaveLog(tool_dir);
     timer.stop();
     cout << "AiluHeadTool end after " << timer.ElapsedSeconds() << " sec..." << endl;
+    return 0;
     //system("pause");
 }

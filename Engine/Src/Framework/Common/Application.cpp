@@ -1,5 +1,4 @@
 #include "Framework/Common/Application.h"
-#include "CompanyEnv.h"
 #include "Framework/Common/Allocator.hpp"
 #include "Framework/Common/EngineConfig.h"
 #include "Framework/Common/JobSystem.h"
@@ -9,6 +8,7 @@
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
 #include "UI/UIRenderer.h"
+#include "UI/UILayer.h"
 #include "pch.h"
 #include <Render/Gizmo.h>
 #include <Render/TextRenderer.h>
@@ -23,6 +23,7 @@
 #include "Framework/Common/ThreadPool.h"
 #include "Framework/Parser/TextParser.h"
 #include "Objects/Type.h"
+#include "Objects/JsonArchive.h"
 #include "Render/Features/VolumetricClouds.h"
 #include "Render/GraphicsContext.h"
 #include "Render/RenderPipeline.h"
@@ -93,24 +94,12 @@ namespace Ailu
             //AlluEngine/
             WString prex_w = work_path + L"OneDrive/AiluEngine/";
             ResourceMgr::ConfigRootPath(prex_w);
-            _engin_config_path = prex_w + L"Editor/EngineConfig.ini";
-            INIParser ini_parser;
-            if (ini_parser.Load(_engin_config_path))
-            {
-                const Type *type = EngineConfig::StaticType();
-                for (auto &it: ini_parser.GetValues("Layer"))
-                {
-                    auto &[k, v] = it;
-                    {
-                        ObjectLayer cur_layer;
-                        cur_layer._name = k;
-                        cur_layer._value = std::stoul(v);
-                        cur_layer._bit_pos = (u32) sqrt((f32) cur_layer._value);
-                        type->FindPropertyByName(cur_layer._name)->SetValue<u32>(s_engine_config, cur_layer._value);
-                    }
-                }
-                s_engine_config.isMultiThreadRender = (bool) std::stoul(ini_parser.GetValue("Render", "isMultiThreadRender", "0"));
-            }
+            _engin_config_path = prex_w + L"Editor/EngineConfig.json";
+            JsonArchive ar;
+            ar.Load(_engin_config_path);
+            Type *type = EngineConfig::StaticType();
+            for (auto &it: type->GetProperties())
+                it.Deserialize(&s_engine_config, ar);
         }
         _is_multi_thread_rendering = s_engine_config.isMultiThreadRender;
         //LogMgr::Get().AddAppender(new ConsoleAppender());
@@ -121,6 +110,7 @@ namespace Ailu
         _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
         _p_window->SetTitle(s_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine");
         _layer_stack = new LayerStack();
+        PushLayer(new UI::UILayer());
 #ifdef DEAR_IMGUI
         //初始化imgui gfx时要求imgui window已经初始化
         _p_imgui_layer = new ImGUILayer();
@@ -152,47 +142,16 @@ namespace Ailu
             g_pThreadTool->ClearRecords();
             _frame_count++;
         };
-        // {
-        //     TIMER_BLOCK("TestAlloc");
-        //     for (u16 i = 0; i < 2000; i++)
-        //     {
-        //         u32 *a = AL_NEW(u32);
-        //         *a = 20;
-        //         AL_FREE(a);
-        //     }
-        // }
-        // {
-        //     TIMER_BLOCK("TestSysAlloc");
-        //     for (u16 i = 0; i < 2000; i++)
-        //     {
-        //         u32 *a = new u32();
-        //         *a = 20;
-        //         delete a;
-        //     }
-        // }
-        // Core::Allocator::Get().PrintLeaks();
         return 0;
     }
 
     void Application::Finalize()
     {
-        INIParser ini_parser;
-        const Type *type = EngineConfig::StaticType();
-        for (const auto &it: type->GetProperties())
-        {
-            if (it.DataType() == EDataType::kUInt32)
-            {
-                ini_parser.SetValue(it.MetaInfo()._category, it.Name(), std::format("{}", it.GetValue<u32>(s_engine_config)));
-            }
-            else if (it.DataType() == EDataType::kBool)
-            {
-                ini_parser.SetValue(it.MetaInfo()._category, it.Name(), std::format("{}", (u32) it.GetValue<bool>(s_engine_config)));
-            }
-        }
-        if (ini_parser.Save(_engin_config_path))
-        {
-            LOG_INFO("Application::Finalize: write engine config...");
-        }
+        JsonArchive ar;
+        Type *type = EngineConfig::StaticType();
+        for (auto &it: type->GetProperties())
+            it.Serialize(&s_engine_config,ar);
+        ar.Save(_engin_config_path);
         DESTORY_PTR(_layer_stack);
         //DESTORY_PTR(_p_event_handle_thread);
         DESTORY_PTR(_p_window);
@@ -215,87 +174,14 @@ namespace Ailu
     void Application::Tick(f32 delta_time)
     {
         g_pTimeMgr->Reset();
-        std::thread logic_thread = std::thread([&]()
-                                               {
-            SetThreadName("LogicThread");
-            while (_state == EApplicationState::EApplicationState_Running || _state == EApplicationState::EApplicationState_Pause)
-            {
-                {
-                    if (_state == EApplicationState::EApplicationState_Pause)
-                    {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                        continue;
-                    }
-                    _before_update.Invoke();
-                    auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
-                    g_pTimeMgr->Tick(last_mark);
-                    _render_lag += last_mark;
-                    _update_lag += last_mark;
-                    g_pTimeMgr->Mark();
-                    {
-                        CPUProfileBlock main_b("Application::Tick");
-                        //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
-                        //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
-                        if (_state == EApplicationState::EApplicationState_Pause)
-                            continue;
-                        else if (_state == EApplicationState::EApplicationState_Exit)
-                            break;
-                        else {};
-                        //此时更新已经传入delta_time了，所以不需要多次更新，也就是while(_update_lag >= s_target_lag)
-                        //这也是固定频率更新，所以实际上delta_time始终为1
-                        //if (_update_lag >= s_target_lag)
-                        {
-                            CPUProfileBlock b("LayerUpdate");
-                            //if (_update_lag >= s_target_lag)
-                            {
-                                g_pResourceMgr->Tick(delta_time);
-                                for (Layer *layer: *_layer_stack)
-                                {
-                                    //layer->OnUpdate((f32)(_update_lag / s_target_lag));
-                                    layer->OnUpdate(1.0f);
-                                }
-                                //_update_lag -= s_target_lag;
-                                //_update_lag = std::max<f32>(_update_lag,0.0f);
-                                //_update_lag = last_mark;
-                            }
-                        }
-                        //if (_render_lag >= s_target_lag)
-                        {
-                            {
-                                CPUProfileBlock b("SceneTick");
-                                g_pSceneMgr->Tick(delta_time);
-                            }
-                            {
-                                CPUProfileBlock b("RenderScene");
-                                g_pGfxContext->GetPipeline()->Render();
-                            }
-#ifdef DEAR_IMGUI
-                            {
-                               CPUProfileBlock b("RenderImGui");
-                                _p_imgui_layer->Begin();
-                                for (Layer *layer: *_layer_stack)
-                                    layer->OnImguiRender();
-                                _p_imgui_layer->End();
-                            }
-#endif// DEAR_IMGUI
-                            g_pGfxContext->Present();
-                            g_pGfxContext->GetPipeline()->FrameCleanUp();
-                            _render_lag -= s_target_lag;
-                        }
-                        //锁帧处理
-                        {
-                            f64 remaining = s_target_lag - _update_lag;
-                            if (remaining > 0.0)
-                            {
-                                std::this_thread::sleep_for(std::chrono::microseconds((i64) (remaining * 1000.0)));
-                            }
-                            _update_lag = 0.0;
-                        }
-                    }
-                    _after_update.Invoke();
-                }
-            }
-            LOG_INFO("Exit Logic Thread"); });
+        //std::thread logic_thread = std::thread([&]()
+        //                                       {
+        //    SetThreadName("LogicThread");
+        //    while (_state == EApplicationState::EApplicationState_Running || _state == EApplicationState::EApplicationState_Pause)
+        //    {
+        //        LogicLoop();
+        //    }
+        //    LOG_INFO("Exit Logic Thread"); });
         while (_state != EApplicationState::EApplicationState_Exit)
         {
             if (_state == EApplicationState::EApplicationState_Pause)
@@ -306,11 +192,12 @@ namespace Ailu
             else
             {
                 _p_window->OnUpdate();
+                LogicLoop();
                 //std::this_thread::sleep_for(std::chrono::milliseconds(2));
             }
         }
-        if (logic_thread.joinable())
-            logic_thread.join();
+        //if (logic_thread.joinable())
+        //    logic_thread.join();
         LOG_INFO("Exit");
     }
     void Application::PushLayer(Layer *layer)
@@ -440,5 +327,81 @@ namespace Ailu
             (*--it)->OnEvent(e);
             if (e.Handled()) break;
         }
+    }
+    void Application::LogicLoop()
+    {
+        f32 delta_time = 0.16f;
+        if (_state == EApplicationState::EApplicationState_Pause)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            return;
+        }
+        _before_update.Invoke();
+        auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
+        g_pTimeMgr->Tick(last_mark);
+        _render_lag += last_mark;
+        _update_lag += last_mark;
+        g_pTimeMgr->Mark();
+        {
+            CPUProfileBlock main_b("Application::Tick");
+            //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
+            //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
+            if (_state == EApplicationState::EApplicationState_Pause)
+                return;
+            else if (_state == EApplicationState::EApplicationState_Exit)
+                return;
+            else {};
+            //此时更新已经传入delta_time了，所以不需要多次更新，也就是while(_update_lag >= s_target_lag)
+            //这也是固定频率更新，所以实际上delta_time始终为1
+            //if (_update_lag >= s_target_lag)
+            {
+                CPUProfileBlock b("LayerUpdate");
+                //if (_update_lag >= s_target_lag)
+                {
+                    g_pResourceMgr->Tick(delta_time);
+                    for (Layer *layer: *_layer_stack)
+                    {
+                        //layer->OnUpdate((f32)(_update_lag / s_target_lag));
+                        layer->OnUpdate(1.0f);
+                    }
+                    //_update_lag -= s_target_lag;
+                    //_update_lag = std::max<f32>(_update_lag,0.0f);
+                    //_update_lag = last_mark;
+                }
+            }
+            //if (_render_lag >= s_target_lag)
+            {
+                {
+                    CPUProfileBlock b("SceneTick");
+                    g_pSceneMgr->Tick(delta_time);
+                }
+                {
+                    CPUProfileBlock b("RenderScene");
+                    g_pGfxContext->GetPipeline()->Render();
+                }
+#ifdef DEAR_IMGUI
+                {
+                    CPUProfileBlock b("RenderImGui");
+                    _p_imgui_layer->Begin();
+                    for (Layer *layer: *_layer_stack)
+                        layer->OnImguiRender();
+                    _p_imgui_layer->End();
+                }
+#endif// DEAR_IMGUI
+                g_pGfxContext->Present();
+                g_pGfxContext->GetPipeline()->FrameCleanUp();
+                _render_lag -= s_target_lag;
+            }
+            //锁帧处理
+            {
+                f64 remaining = s_target_lag - _update_lag;
+                if (remaining > 0.0)
+                {
+                    std::this_thread::sleep_for(std::chrono::microseconds((i64) (remaining * 1000.0)));
+                }
+                _update_lag = 0.0;
+            }
+        }
+        _after_update.Invoke();
     }
 }// namespace Ailu

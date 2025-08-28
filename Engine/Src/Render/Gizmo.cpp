@@ -402,7 +402,12 @@ namespace Ailu::Render
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &s_pInstance->_screen_camera_cb, RenderConstants::kPerCameraDataSize);
             s_pInstance->_screen_vbuf->SetData((u8 *) s_pInstance->_screen_pos.data(), s_pInstance->_screen_vertex_num * sizeof(Vector3f), 0u, 0);
             s_pInstance->_screen_vbuf->SetData((u8 *) s_pInstance->_screen_color.data(), s_pInstance->_screen_vertex_num * sizeof(Color), 1u, 0);
-            s_pInstance->_screen_camera_cb._MatrixVP = Camera::GetDefaultOrthogonalViewProj((f32)data._width, (f32)data._height);
+            Matrix4x4f view, proj;
+            f32 w = (f32)data._width,h = (f32)data._height;
+            f32 half_width = w * 0.5f, half_height = h * 0.5f;
+            BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
+            BuildOrthographicMatrix(proj, 0.0f, w, 0.0f, h, 1.f, 200.f);
+            s_pInstance->_screen_camera_cb._MatrixVP = view * proj;
             s_pInstance->_screen_camera_cb._MatrixVP_NoJitter = s_pInstance->_screen_camera_cb._MatrixVP;
             cmd->DrawInstanced(s_pInstance->_screen_vbuf.get(), nullptr, s_pInstance->_line_drawer, 0, 1);
             s_pInstance->_screen_vertex_num = 0u;

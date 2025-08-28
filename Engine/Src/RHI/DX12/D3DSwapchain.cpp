@@ -31,6 +31,7 @@ namespace Ailu::RHI::DX12
             _state_guard[i] = AL_NEW(D3DResourceStateGuard,_back_buffers[i].Get(), D3D12_RESOURCE_STATE_PRESENT, 1u);
         }
         RenderTexture::s_backbuffer = this;
+        _load_action = Render::ELoadStoreAction::kNotCare;
     }
 
     D3DSwapchainTexture::~D3DSwapchainTexture()

@@ -6,8 +6,9 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-const Ailu::Type* Ailu::Render::Z_Construct_RenderPass_Type()
+Ailu::Type* Ailu::Render::Z_Construct_RenderPass_Type()
 {
+Ailu::Object::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -18,24 +19,26 @@ initializer._full_name = "Ailu::Render::RenderPass";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
-initializer._base_name = "Ailu::Render::IRenderPass";
+initializer._base_name = "Ailu::Object";
+initializer._constructor = []()->Ailu::Render::RenderPass* {return new Ailu::Render::RenderPass;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-const Ailu::Type* Ailu::Render::RenderPass::GetPrivateStaticClass()
+Ailu::Type* Ailu::Render::RenderPass::GetPrivateStaticClass()
 {
-	static const Ailu::Type* type = Z_Construct_RenderPass_Type();
+	static Ailu::Type* type = Z_Construct_RenderPass_Type();
 	return type;
 }
 
-template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::RenderPass>()
+template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::RenderPass>()
 {
 return Ailu::Render::RenderPass::StaticType();
 }
-    const Type *Ailu::Render::RenderPass::GetType() const
+    Type *Ailu::Render::RenderPass::GetType()
 {
 return Ailu::Render::RenderPass::GetPrivateStaticClass();
 }
+ClassTypeRegister s_register_RenderPass(&Ailu::Render::RenderPass::StaticType, "Ailu::Render::RenderPass");

@@ -9,10 +9,6 @@
  #endif
 
 using namespace Ailu;
-static Ailu::ApplicationDesc LoadApplicationConfig(WString sys_path)
-{
-    return ApplicationDesc();
-}
 
 int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR cmdline, _In_ int cmdshow)
 {
@@ -20,8 +16,6 @@ int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hInstPrev, _In_ PSTR
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     //_CrtSetBreakAlloc(4627010);
 #endif// _DEBUG_MEM_LEAK
-
-    auto desc = LoadApplicationConfig(Ailu::Application::GetWorkingPath());
     Editor::EditorApp *app = new Editor::EditorApp();
     //Ailu::Application* app = new Ailu::Application();
     app->Initialize();

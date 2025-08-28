@@ -268,7 +268,7 @@ namespace Ailu::Render
     {
         SetRenderTarget(_render_graph->Resolve<RenderTexture>(color), index);
     }
-    void CommandBuffer::DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index)
+    void CommandBuffer::DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u32 index_start)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = vb;
@@ -278,9 +278,10 @@ namespace Ailu::Render
         cmd->_pass_index = pass_index;
         cmd->_instance_count = 1u;
         cmd->_mat->PushState(cmd->_pass_index);
+        cmd->_index_start = index_start;
         _commands.push_back(cmd);
     }
-    void CommandBuffer::DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u16 instance_count)
+    void CommandBuffer::DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u16 instance_count, u32 index_start)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = vb;
@@ -289,6 +290,7 @@ namespace Ailu::Render
         cmd->_mat = mat;
         cmd->_pass_index = pass_index;
         cmd->_instance_count = 1u;
+        cmd->_index_start = index_start;
         cmd->_mat->PushState(cmd->_pass_index);
         _commands.push_back(cmd);
     }

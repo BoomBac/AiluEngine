@@ -33,11 +33,12 @@ namespace Ailu
             virtual const void SetActive(bool is_active) = 0;
         };
         ACLASS()
-        class AILU_API RenderPass : public IRenderPass, public Object
+        class AILU_API RenderPass : public Object,public IRenderPass
         {
             GENERATED_BODY();
             DISALLOW_COPY_AND_ASSIGN(RenderPass)
         public:
+            RenderPass() : Object(), _is_active(true) {};
             RenderPass(const String &name) : Object(name), _is_active(true) {};
             virtual void OnRecordRenderGraph(RDG::RenderGraph& graph, RenderingData& rendering_data) override {};
             virtual void Execute(GraphicsContext *context, RenderingData &rendering_data) override {};

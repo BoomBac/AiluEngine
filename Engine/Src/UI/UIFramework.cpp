@@ -2,6 +2,7 @@
 // Created by 22292 on 2024/10/28.
 //
 #include "UI/UIFramework.h"
+
 namespace Ailu::UI
 {
     static UIManager* g_pUIManager = nullptr;
@@ -25,36 +26,34 @@ namespace Ailu::UI
     UIManager::~UIManager()
     {
     }
-    void UIManager::AddElement(UIElement *element)
+
+    void UIManager::SetCursor(ECursorType type)
     {
-    }
-    void UIManager::RemoveElement(UIElement *element)
-    {
-    }
-    UIElement *UIManager::FindElement(u32 id) const
-    {
-        return nullptr;
-    }
-    UIElement *UIManager::FindElement(String &name) const
-    {
-        return nullptr;
-    }
-    void UIManager::DispatchEvent(const Event &event)
-    {
-    }
-    void UIManager::Update(float dt)
-    {
-    }
-    void UIManager::Render()
-    {
-    }
-    void UIManager::SetSkin(const UISkin &skin)
-    {
-        _skin = skin;
-    }
-    UISkin& UIManager::GetSkin()
-    {
-        return _skin;
+#if PLATFORM_WINDOWS
+        HCURSOR cursor = nullptr;
+        switch (type)
+        {
+            case ECursorType::kArrow:
+                cursor = LoadCursor(NULL, IDC_ARROW);
+                break;
+            case ECursorType::kSizeNS:
+                cursor = LoadCursor(NULL, IDC_SIZENS);
+                break;
+            case ECursorType::kSizeEW:
+                cursor = LoadCursor(NULL, IDC_SIZEWE);
+                break;
+            case ECursorType::kSizeNWSE:
+                cursor = LoadCursor(NULL, IDC_SIZENWSE);
+                break;
+            case ECursorType::kSizeNESW:
+                cursor = LoadCursor(NULL, IDC_SIZENESW);
+                break;
+            default:
+                cursor = LoadCursor(NULL, IDC_ARROW);
+                break;
+        }
+        ::SetCursor(cursor);
+#endif// PLATFORM_WINDOWS
     }
 
 

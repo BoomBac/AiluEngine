@@ -10,6 +10,8 @@
 #include "Render/Material.h"
 #include "Render/Shader.h"
 
+#undef DrawText
+
 namespace Ailu
 {
     using Render::RTHandle;
@@ -20,16 +22,21 @@ namespace Ailu
     using Render::ConstantBuffer;
     using Render::CommandBuffer;
 
+    namespace Render
+    {
+        struct Font;
+    };
+
     namespace UI
     {
-        class Canvas;
+        class Widget;
         class AILU_API UIRenderer
         {
         public:
             static void Init();
             static void Shutdown();
             static UIRenderer* Get();
-            static void DrawQuad(Vector2f position, Vector2f size,f32 depth,Color color = Colors::kWhite);
+            
         public:
             struct DrawerBlock
             {
@@ -56,20 +63,28 @@ namespace Ailu
             UIRenderer();
             ~UIRenderer();
             void Render(CommandBuffer* cmd);
-            //add/remove canvas  dynamic
-            Canvas *AddCanvas();
-            void RemoveCanvas(Canvas* canvas);
+            void AddWidget(Ref<Widget> w);
+            void RemoveWidget(Widget *w);
             //delete
-            void DeleteCanvas(Canvas *canvas);
+            void DeleteWidget(Widget *w);
+
+            void DrawQuad(Vector2f position, Vector2f size, f32 depth, Color color = Colors::kWhite);
+            void DrawQuad(Vector4f rect,f32 depth, Color color = Colors::kWhite);
+            void DrawText(const String &text, Vector2f pos,u16 font_size,Vector2f scale,Color color,Render::Font *font = nullptr);
+
+            void DrawLine(Vector2f a, Vector2f b, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
+            void DrawBox(Vector2f pos, Vector2f size, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
         private:
             Vector<struct DrawerBlock *> &FrameBlocks() {return _drawer_blocks[_frame_index];};
+            DrawerBlock *GetAvailableBlock(u32 vert_num);
         private:
-
             u16 _frame_index = 0u;
             Ref<ConstantBuffer> _obj_cb;
             Array<Vector<DrawerBlock *>, Render::RenderConstants::kFrameCount> _drawer_blocks;
-            Vector<Canvas *> _canvases;
-            Vector<Canvas *> _active_canvases;
+            Vector<Ref<Widget>> _widgets;
+            Vector<Ref<Widget>> _active_widgets;
+            //暂时每个widget独立一个block
+            u16 _cur_widget_index = 0u;
         };
 
     }// namespace UI

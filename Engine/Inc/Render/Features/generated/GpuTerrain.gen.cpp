@@ -6,8 +6,9 @@
 #include <Objects/SerializeSpecializations.h>
 #include <Framework/Common/Log.h>
 using namespace Ailu;
-const Ailu::Type* Ailu::Render::Z_Construct_GpuTerrain_Type()
+Ailu::Type* Ailu::Render::Z_Construct_GpuTerrain_Type()
 {
+Ailu::Render::RenderFeature::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -19,71 +20,109 @@ initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Render";
 initializer._base_name = "Ailu::Render::RenderFeature";
+initializer._constructor = []()->Ailu::Render::GpuTerrain* {return new Ailu::Render::GpuTerrain;};
 Meta meta_world_size;
-meta_world_size._category="";
-meta_world_size._min=(float)1000;
-meta_world_size._max=(float)10240;
-meta_world_size._is_range=true;
-meta_world_size._is_float_range=true;
-meta_world_size._is_color=false;
-MemberInfoInitializer initializer__world_size = {EMemberType::kProperty, "_world_size", "f32", offsetof(GpuTerrain,_world_size), &GpuTerrain::_world_size, meta_world_size, false, true, false, false, false, false, nullptr, nullptr};
-initializer__world_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
-initializer__world_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
-initializer__world_size._type = Ailu::Type::Find("f32");
-initializer._properties.emplace_back(initializer__world_size);
+meta_world_size.Set("Category","");
+meta_world_size.Set("IsColor",false);
+meta_world_size.Set("IsRange",true);
+meta_world_size.Set("IsFloatRange",true);
+meta_world_size.Set("RangeMin",1000);
+meta_world_size.Set("RangeMax",10240);
+MemberBuilder builder_world_size;
+builder_world_size._name = "_world_size";
+builder_world_size._type_name = "f32";
+builder_world_size._offset = offsetof(GpuTerrain,_world_size);
+builder_world_size._is_const = false;
+builder_world_size._is_static = false;
+builder_world_size._is_public = true;
+builder_world_size._is_pointer = false;
+builder_world_size._is_ref = false;
+builder_world_size._is_template = false;
+builder_world_size._meta = meta_world_size;
+builder_world_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_world_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_world_size));
 Meta meta_max_height;
-meta_max_height._category="";
-meta_max_height._min=(float)0;
-meta_max_height._max=(float)5000;
-meta_max_height._is_range=true;
-meta_max_height._is_float_range=true;
-meta_max_height._is_color=false;
-MemberInfoInitializer initializer__max_height = {EMemberType::kProperty, "_max_height", "f32", offsetof(GpuTerrain,_max_height), &GpuTerrain::_max_height, meta_max_height, false, true, false, false, false, false, nullptr, nullptr};
-initializer__max_height._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
-initializer__max_height._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
-initializer__max_height._type = Ailu::Type::Find("f32");
-initializer._properties.emplace_back(initializer__max_height);
+meta_max_height.Set("Category","");
+meta_max_height.Set("IsColor",false);
+meta_max_height.Set("IsRange",true);
+meta_max_height.Set("IsFloatRange",true);
+meta_max_height.Set("RangeMin",0);
+meta_max_height.Set("RangeMax",5000);
+MemberBuilder builder_max_height;
+builder_max_height._name = "_max_height";
+builder_max_height._type_name = "f32";
+builder_max_height._offset = offsetof(GpuTerrain,_max_height);
+builder_max_height._is_const = false;
+builder_max_height._is_static = false;
+builder_max_height._is_public = true;
+builder_max_height._is_pointer = false;
+builder_max_height._is_ref = false;
+builder_max_height._is_template = false;
+builder_max_height._meta = meta_max_height;
+builder_max_height._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_max_height._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_max_height));
 Meta meta_debug;
-meta_debug._category="";
-meta_debug._min=(float)0;
-meta_debug._max=(float)1;
-meta_debug._is_range=false;
-meta_debug._is_float_range=true;
-meta_debug._is_color=false;
-MemberInfoInitializer initializer__debug = {EMemberType::kProperty, "_debug", "bool", offsetof(GpuTerrain,_debug), &GpuTerrain::_debug, meta_debug, false, true, false, false, false, false, nullptr, nullptr};
-initializer__debug._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-initializer__debug._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer__debug._type = Ailu::Type::Find("bool");
-initializer._properties.emplace_back(initializer__debug);
+meta_debug.Set("Category","");
+meta_debug.Set("IsColor",false);
+meta_debug.Set("IsRange",false);
+meta_debug.Set("IsFloatRange",true);
+meta_debug.Set("RangeMin",0);
+meta_debug.Set("RangeMax",1);
+MemberBuilder builder_debug;
+builder_debug._name = "_debug";
+builder_debug._type_name = "bool";
+builder_debug._offset = offsetof(GpuTerrain,_debug);
+builder_debug._is_const = false;
+builder_debug._is_static = false;
+builder_debug._is_public = true;
+builder_debug._is_pointer = false;
+builder_debug._is_ref = false;
+builder_debug._is_template = false;
+builder_debug._meta = meta_debug;
+builder_debug._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_debug._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_debug));
 Meta meta_enable_cull;
-meta_enable_cull._category="";
-meta_enable_cull._min=(float)0;
-meta_enable_cull._max=(float)1;
-meta_enable_cull._is_range=false;
-meta_enable_cull._is_float_range=true;
-meta_enable_cull._is_color=false;
-MemberInfoInitializer initializer__enable_cull = {EMemberType::kProperty, "_enable_cull", "bool", offsetof(GpuTerrain,_enable_cull), &GpuTerrain::_enable_cull, meta_enable_cull, false, true, false, false, false, false, nullptr, nullptr};
-initializer__enable_cull._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-initializer__enable_cull._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer__enable_cull._type = Ailu::Type::Find("bool");
-initializer._properties.emplace_back(initializer__enable_cull);
+meta_enable_cull.Set("Category","");
+meta_enable_cull.Set("IsColor",false);
+meta_enable_cull.Set("IsRange",false);
+meta_enable_cull.Set("IsFloatRange",true);
+meta_enable_cull.Set("RangeMin",0);
+meta_enable_cull.Set("RangeMax",1);
+MemberBuilder builder_enable_cull;
+builder_enable_cull._name = "_enable_cull";
+builder_enable_cull._type_name = "bool";
+builder_enable_cull._offset = offsetof(GpuTerrain,_enable_cull);
+builder_enable_cull._is_const = false;
+builder_enable_cull._is_static = false;
+builder_enable_cull._is_public = true;
+builder_enable_cull._is_pointer = false;
+builder_enable_cull._is_ref = false;
+builder_enable_cull._is_template = false;
+builder_enable_cull._meta = meta_enable_cull;
+builder_enable_cull._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_enable_cull._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_enable_cull));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
 return cur_type.get();
 }
 
-const Ailu::Type* Ailu::Render::GpuTerrain::GetPrivateStaticClass()
+Ailu::Type* Ailu::Render::GpuTerrain::GetPrivateStaticClass()
 {
-	static const Ailu::Type* type = Z_Construct_GpuTerrain_Type();
+	static Ailu::Type* type = Z_Construct_GpuTerrain_Type();
 	return type;
 }
 
-template<> const Ailu::Type* Ailu::StaticClass<Ailu::Render::GpuTerrain>()
+template<> Ailu::Type* Ailu::StaticClass<Ailu::Render::GpuTerrain>()
 {
 return Ailu::Render::GpuTerrain::StaticType();
 }
-    const Type *Ailu::Render::GpuTerrain::GetType() const
+    Type *Ailu::Render::GpuTerrain::GetType()
 {
 return Ailu::Render::GpuTerrain::GetPrivateStaticClass();
 }
+ClassTypeRegister s_register_GpuTerrain(&Ailu::Render::GpuTerrain::StaticType, "Ailu::Render::GpuTerrain");

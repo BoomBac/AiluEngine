@@ -12,7 +12,7 @@
 #include "Render/Features/PostprocessPass.h"
 #include "Render/Features/VolumetricClouds.h"
 #include "Render/RenderingData.h"
-#include "Render/TextRenderer.h"
+#include "UI/TextRenderer.h"
 //#include <Framework/Common/Application.h>
 #include <Objects/Type.h>
 
@@ -25,7 +25,12 @@
 #include "Render/RenderPipeline.h"
 
 #include "UI/UIRenderer.h"
-#include "UI/Canvas.h"
+#include "UI/Widget.h"
+#include "UI/Container.h"
+#include "UI/Basic.h"
+#include "UI/UILayer.h"
+
+#include "Objects/JsonArchive.h"
 
 #include "Animation/Curve.hpp"
 #include "Animation/Solver.h"
@@ -116,7 +121,20 @@ namespace Ailu
         {
 
         }
+        UI::Text* g_text = nullptr;
+        static void FindFirstText(UI::Widget* w)
+        {
+            for(auto c : *w)
+            {
+                if (c->GetType() == UI::Text::StaticType())
+                {
+                    g_text = dynamic_cast<UI::Text*>(c.get());
+                    break;
+                }
+            }
+        }
 
+        UI::UILayer* g_ui_layer;
         void EditorLayer::OnAttach()
         {
             auto tex_detail_view = _widgets.emplace_back(std::move(MakeScope<TextureDetailView>())).get();
@@ -161,26 +179,67 @@ namespace Ailu
             auto r = static_cast<CommonRenderPipeline *>(GraphicsContext::Get().GetPipeline())->GetRenderer();
             r->AddFeature(&_pick);
             r->SetShadingMode(EShadingMode::kLit);
-            _canvas = UI::UIRenderer::Get()->AddCanvas();
-            _canvas->BindOutput(RenderTexture::s_backbuffer, nullptr);
-            _canvas->AddChild(UI::UIElement::Create<UI::Button>(), UI::Slot());
+
+            //auto root = MakeRef<UI::Canvas>();
+            //auto vb = MakeRef<UI::VerticalBox>();
+            //vb->AddChild(MakeRef<UI::Button>())->OnMouseClick() += [](UI::UIEvent &e)
+            //{ LOG_INFO("Clicked!"); };
+            //dynamic_cast<UI::Text*>(root->AddChild(MakeRef<UI::Text>()))->_text = "This is a text";
+            //vb->AddChild(MakeRef<UI::Slider>());
+            //root->AddChild(vb);
+            //_main_widget->AddToWidget(root);
+            _dock_manager = MakeScope<DockManager>();
+
+            DockWindow *testw = new DockWindow("Test",{800.0f,600.0f} );
+            testw->_position = {500.0f, 500.0f};
+            _dock_manager->AddDock(testw);
+            testw = new DockWindow("Output", {600.0f, 600.0f});
+            _dock_manager->AddDock(testw);
+            for (auto layer: Application::Get().GetLayerStack())
+            {
+                if (g_ui_layer = dynamic_cast<UI::UILayer *>(layer);g_ui_layer != nullptr)
+                    break;
+            }
+
+            /*
+            auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
+            JsonArchive ar;
+            ar.Load(p);
+            ar >> *_main_widget;
+            UI::UIRenderer::Get()->AddWidget(_main_widget);
+
+            FindFirstText(_main_widget.get());
+            g_ui_layer = new UI::UILayer();
+            Application::Get().PushLayer(g_ui_layer);
+            g_ui_layer->RegisterWidget(_main_widget.get());
             dynamic_cast<EditorApp &>(Application::Get())._on_file_changed_delegate += [&](const fs::path &file)
             {
                 const WString cur_path = PathUtils::FormatFilePath(file.wstring());
-                if (cur_path.ends_with(L".json"))
+                if (PathUtils::GetFileName(cur_path) == L"main_widget")
                 {
-                    JSONParser p;
-                    p.Load(cur_path);
-                    for (auto& it: p.GetValues())
-                    {
-                        LOG_INFO("{}_{}",it.first,it.second)
-                    }
+                    LOG_INFO(L"Reload widget {}",cur_path);
+                    JsonArchive ar;
+                    ar.Load(cur_path);
+                    UI::UIRenderer::Get()->RemoveWidget(_main_widget.get());
+                    _main_widget.reset();
+                    _main_widget = MakeRef<UI::Widget>();
+                    _main_widget->BindOutput(RenderTexture::s_backbuffer, nullptr);
+                    ar >> *_main_widget;
+                    UI::UIRenderer::Get()->AddWidget(_main_widget);
+                    FindFirstText(_main_widget.get());
+                    g_ui_layer->RegisterWidget(_main_widget.get());
                 }
             };
+            */
         }
 
         void EditorLayer::OnDetach()
         {
+            //JsonArchive ar;
+            //ar << *_main_widget;
+            //auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
+            //LOG_INFO(L"Save widget to ", p);
+            //ar.Save(p);
         }
         static CCDSolver ccd_solver;
         //static CCDSolver ccd_solver1;
@@ -278,7 +337,15 @@ namespace Ailu
         std::once_flag flag;
         void EditorLayer::OnUpdate(f32 dt)
         {
-
+            _dock_manager->Update(dt);
+            auto [wx,wy] = Application::Get().GetWindow().GetWindowPosition();
+            Vector2f window_pos = {(f32)wx,(f32)wy};
+            if (g_text)
+            {
+                g_text->_text = std::format("MousePos: {},WinPos: {},{},FPS: {}", Input::GetMousePos().ToString(), wx, wy, Render::RenderingStates::s_frame_rate);
+            }
+            //LOG_INFO("--------------------------------------");
+            //LOG_INFO("EditorLayer::OnUpdate: mpos({})", Input::GetMousePos().ToString());
             ccd_solver.Resize(3);
             ccd_solver[0]._position = Vector3f(0, 9, 0);
             ccd_solver[1]._position = Vector3f(0, -3, 0);

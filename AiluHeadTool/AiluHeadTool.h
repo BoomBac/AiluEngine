@@ -2,6 +2,8 @@
 #include <filesystem>
 #include <mutex>
 #include <vector>
+#include <set>
+#include <unordered_map>
 
 #include "NamespaceTracker.h"
 
@@ -12,6 +14,7 @@ class AiluHeadTool
 public:
     void SaveLog(const Path &out_dir);
     void Log(const std::string &msg);
+    void ColloctClassNamespace(std::set<fs::path> inc_files,Path p);
     void Parser(const Path &path, const Path &out_dir, std::string work_namespace = "Ailu");
     static void AddDependencyInc(std::string file) { s_common_src_dep_file.push_back(std::move(file)); };
     struct PropertyMeta
@@ -41,6 +44,7 @@ public:
         bool _is_enum = false;
         bool _is_pointer = false;
         bool _is_reference = false;
+        bool _is_template = false;
         bool _is_primitive = false;
         //function
         bool _is_const = false;
@@ -72,10 +76,10 @@ public:
         std::vector<std::tuple<std::string, int>> _members;
         bool _is_enum_class;
     };
-
 private:
-    std::mutex _log_mutex;
-    std::stringstream _log_ss;
+    void SaveClassNamespaceMap(const std::unordered_map<std::string, std::set<std::string>> &map, const std::string &filename);
+    std::unordered_map<std::string, std::set<std::string>> LoadClassNamespaceMap(const std::string &filename);
+    void FindBaseClass(ClassInfo &info);
 
 private:
     inline static std::string kClassMacro = "ACLASS";
@@ -86,11 +90,13 @@ private:
     inline static std::string kPropertyMacro = "APROPERTY";
     inline static std::string kFunctionMacro = "AFUNCTION";
     inline static std::string kClassID = "class";
+    inline static std::string kClassNsCachePath = "AHT/class_ns_map.txt";
     inline static std::vector<std::string> s_common_src_dep_file;
-
-private:
+    std::mutex _log_mutex;
+    std::stringstream _log_ss;
     std::vector<ClassInfo> _classes;
     std::vector<ClassInfo> _structs;
     std::vector<EnumInfo> _enums;
     NamespaceTracker _tracker;
+    std::unordered_map<std::string, std::set<std::string>> _class_ns_map;
 };
