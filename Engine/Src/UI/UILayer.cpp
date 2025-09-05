@@ -1,6 +1,9 @@
 #include "UI/UILayer.h"
-#include "UI/Widget.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Events/KeyEvent.h"
+#include "Framework/Events/MouseEvent.h"
+#include "UI/Widget.h"
+#include "UI/UIFramework.h"
 #include "pch.h"
 
 
@@ -8,22 +11,26 @@ namespace Ailu
 {
     namespace UI
     {
-        static UI::UIEvent::EType EventToUIEvent(const Ailu::Event& e)
+        static UI::UIEvent::EType EventToUIEvent(const Ailu::Event &e)
         {
             switch (e.GetEventType())
             {
-            case EEventType::kMouseMoved:
-                return UI::UIEvent::EType::kMouseMove;
-            case EEventType::kMouseButtonPressed:
-                return UI::UIEvent::EType::kMouseDown;
-            case EEventType::kMouseButtonReleased:
-                return UI::UIEvent::EType::kMouseUp;
-            case EEventType::kMouseScrolled:
-                return UI::UIEvent::EType::kMouseScroll;
-            case EEventType::kMouseExitWindow:
-                return UI::UIEvent::EType::kMouseExitWindow;
-            default:
-                return UI::UIEvent::EType::kMouseMove;
+                case EEventType::kMouseMoved:
+                    return UI::UIEvent::EType::kMouseMove;
+                case EEventType::kMouseButtonPressed:
+                    return UI::UIEvent::EType::kMouseDown;
+                case EEventType::kMouseButtonReleased:
+                    return UI::UIEvent::EType::kMouseUp;
+                case EEventType::kMouseScroll:
+                    return UI::UIEvent::EType::kMouseScroll;
+                case EEventType::kMouseExitWindow:
+                    return UI::UIEvent::EType::kMouseExitWindow;
+                case EEventType::kKeyPressed:
+                    return UI::UIEvent::EType::kKeyDown;
+                case EEventType::kKeyReleased:
+                    return UI::UIEvent::EType::kKeyUp;
+                default:
+                    return UI::UIEvent::EType::kMouseMove;
             }
             return UI::UIEvent::EType::kMouseMove;
         }
@@ -40,20 +47,56 @@ namespace Ailu
         void UILayer::OnDetach() {}
         void UILayer::OnEvent(Ailu::Event &e)
         {
-            static Vector2f s_mouse_pos = Input::GetMousePos();
-            for (auto w : _widgets)
+            static UIManager *s_mgr = UIManager::Get();
+            Widget *cur_hover_widget = nullptr;
+            UI::UIEvent ue;
+            ue._type = EventToUIEvent(e);
+            ue._mouse_position = Input::GetMousePos(e._window);
+            ue._mouse_delta = Input::GetMousePosDelta();
+            if (e.GetCategoryFlags() & EEventCategory::kEventCategoryKeyboard)
+                ue._key_code = dynamic_cast<KeyEvent *>(&e)->GetKeyCode();
+            else if (e.GetEventType() == EEventType::kMouseButtonPressed)
+                ue._key_code = static_cast<MouseButtonPressedEvent *>(&e)->GetButton();
+            else if (e.GetEventType() == EEventType::kMouseButtonReleased)
+            {
+                ue._key_code = static_cast<MouseButtonReleasedEvent *>(&e)->GetButton();
+                if (ue._key_code == EKey::kRBUTTON)
+                {
+
+                }
+                if (s_mgr->GetPopupWidget() != s_mgr->_pre_hover_widget)
+                {
+                    s_mgr->HidePopup();
+                }
+            }
+            else if (e.GetEventType() == EEventType::kMouseScroll)
+            {
+                ue._scroll_delta = static_cast<MouseScrollEvent *>(&e)->GetOffsetY();
+            }
+            else {}
+            auto &widget = s_mgr->_widgets;
+            for (i32 i = (i32)widget.size() - 1; i >= 0; i--)
+            {
+                auto w = widget[i].get();
+                if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false)
+                    continue;
+                w->OnEvent(ue);
+                if (w->IsHover(ue._mouse_position))//上层已经生成了事件，下次就不再响应
+                {
+                    cur_hover_widget = w;
+                    break;
+                }
+            }
+            if (s_mgr->_pre_hover_widget && cur_hover_widget && cur_hover_widget != s_mgr->_pre_hover_widget)
             {
                 UI::UIEvent ue;
-                ue._type = EventToUIEvent(e);
-                ue._mouse_position = Input::GetMousePos();
-                ue._mouse_delta = ue._mouse_position - s_mouse_pos;
-                w->OnEvent(ue);
-                if (ue._is_handled)
-                    break;
+                ue._type = UIEvent::EType::kMouseExitWindow;
+                ue._mouse_position = Input::GetMousePos(e._window);
+                ue._mouse_delta = Input::GetMousePosDelta();
+                s_mgr->_pre_hover_widget->OnEvent(ue);
             }
-            s_mouse_pos = Input::GetMousePos();
+            s_mgr->_pre_hover_widget = cur_hover_widget;
         }
-        void UILayer::OnImguiRender() {}
     }// namespace UI
 
 }// namespace Ailu

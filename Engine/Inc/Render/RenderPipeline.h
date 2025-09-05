@@ -121,9 +121,12 @@ namespace Ailu::Render
     {
         DISALLOW_COPY_AND_ASSIGN(RenderPipeline)
     public:
+        static RenderPipeline &Get() { return *s_instance; };
+        static void Register(RenderPipeline *pipe) { s_instance = pipe; }
+
         using RenderEvent = std::function<void>();
         RenderPipeline();
-        void Init();
+        void Initialize();
         void Destory();
         void Render();
         virtual void Setup();
@@ -150,6 +153,7 @@ namespace Ailu::Render
         void CullView(ViewEntity& view_entity);
         void Test(ViewEntity& view_entity) {};
     protected:
+        inline static RenderPipeline *s_instance;
         Array<FramePacket,RenderConstants::kFrameCount + 1> _frame_packets;
         Array<FrameResource, RenderConstants::kFrameCount + 1> _frame_res;
         Vector<Camera *> _cameras;

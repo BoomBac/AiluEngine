@@ -57,27 +57,6 @@ initializer._is_abstract = false;
 initializer._namespace = "Ailu::UI";
 initializer._base_name = "Ailu::UI::UIElement";
 initializer._constructor = []()->Ailu::UI::Text* {return new Ailu::UI::Text;};
-Meta meta_text;
-meta_text.Set("Category","");
-meta_text.Set("IsColor",false);
-meta_text.Set("IsRange",false);
-meta_text.Set("IsFloatRange",true);
-meta_text.Set("RangeMin",0);
-meta_text.Set("RangeMax",1);
-MemberBuilder builder_text;
-builder_text._name = "_text";
-builder_text._type_name = "String";
-builder_text._offset = offsetof(Text,_text);
-builder_text._is_const = false;
-builder_text._is_static = false;
-builder_text._is_public = true;
-builder_text._is_pointer = false;
-builder_text._is_ref = false;
-builder_text._is_template = false;
-builder_text._meta = meta_text;
-builder_text._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
-builder_text._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_text));
 Meta meta_font_size;
 meta_font_size.Set("Category","");
 meta_font_size.Set("IsColor",false);
@@ -120,6 +99,69 @@ builder_color._meta = meta_color;
 builder_color._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Color>);
 builder_color._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Color>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_color));
+Meta meta_horizontal_align;
+meta_horizontal_align.Set("Category","");
+meta_horizontal_align.Set("IsColor",false);
+meta_horizontal_align.Set("IsRange",false);
+meta_horizontal_align.Set("IsFloatRange",true);
+meta_horizontal_align.Set("RangeMin",0);
+meta_horizontal_align.Set("RangeMax",1);
+MemberBuilder builder_horizontal_align;
+builder_horizontal_align._name = "_horizontal_align";
+builder_horizontal_align._type_name = "EAlignment";
+builder_horizontal_align._offset = offsetof(Text,_horizontal_align);
+builder_horizontal_align._is_const = false;
+builder_horizontal_align._is_static = false;
+builder_horizontal_align._is_public = true;
+builder_horizontal_align._is_pointer = false;
+builder_horizontal_align._is_ref = false;
+builder_horizontal_align._is_template = false;
+builder_horizontal_align._meta = meta_horizontal_align;
+builder_horizontal_align._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EAlignment>);
+builder_horizontal_align._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EAlignment>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_horizontal_align));
+Meta meta_vertical_align;
+meta_vertical_align.Set("Category","");
+meta_vertical_align.Set("IsColor",false);
+meta_vertical_align.Set("IsRange",false);
+meta_vertical_align.Set("IsFloatRange",true);
+meta_vertical_align.Set("RangeMin",0);
+meta_vertical_align.Set("RangeMax",1);
+MemberBuilder builder_vertical_align;
+builder_vertical_align._name = "_vertical_align";
+builder_vertical_align._type_name = "EAlignment";
+builder_vertical_align._offset = offsetof(Text,_vertical_align);
+builder_vertical_align._is_const = false;
+builder_vertical_align._is_static = false;
+builder_vertical_align._is_public = true;
+builder_vertical_align._is_pointer = false;
+builder_vertical_align._is_ref = false;
+builder_vertical_align._is_template = false;
+builder_vertical_align._meta = meta_vertical_align;
+builder_vertical_align._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EAlignment>);
+builder_vertical_align._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EAlignment>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_vertical_align));
+Meta meta_text;
+meta_text.Set("Category","");
+meta_text.Set("IsColor",false);
+meta_text.Set("IsRange",false);
+meta_text.Set("IsFloatRange",true);
+meta_text.Set("RangeMin",0);
+meta_text.Set("RangeMax",1);
+MemberBuilder builder_text;
+builder_text._name = "_text";
+builder_text._type_name = "String";
+builder_text._offset = offsetof(Text,_text);
+builder_text._is_const = false;
+builder_text._is_static = false;
+builder_text._is_public = false;
+builder_text._is_pointer = false;
+builder_text._is_ref = false;
+builder_text._is_template = false;
+builder_text._meta = meta_text;
+builder_text._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_text._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_text));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -177,27 +219,6 @@ builder_range._meta = meta_range;
 builder_range._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
 builder_range._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_range));
-Meta meta_value;
-meta_value.Set("Category","");
-meta_value.Set("IsColor",false);
-meta_value.Set("IsRange",false);
-meta_value.Set("IsFloatRange",true);
-meta_value.Set("RangeMin",0);
-meta_value.Set("RangeMax",1);
-MemberBuilder builder_value;
-builder_value._name = "_value";
-builder_value._type_name = "f32";
-builder_value._offset = offsetof(Slider,_value);
-builder_value._is_const = false;
-builder_value._is_static = false;
-builder_value._is_public = true;
-builder_value._is_pointer = false;
-builder_value._is_ref = false;
-builder_value._is_template = false;
-builder_value._meta = meta_value;
-builder_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
-builder_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_value));
 Meta meta_font_size;
 meta_font_size.Set("Category","");
 meta_font_size.Set("IsColor",false);
@@ -219,6 +240,27 @@ builder_font_size._meta = meta_font_size;
 builder_font_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<u32>);
 builder_font_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<u32>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_font_size));
+Meta meta_value;
+meta_value.Set("Category","");
+meta_value.Set("IsColor",false);
+meta_value.Set("IsRange",false);
+meta_value.Set("IsFloatRange",true);
+meta_value.Set("RangeMin",0);
+meta_value.Set("RangeMax",1);
+MemberBuilder builder_value;
+builder_value._name = "_value";
+builder_value._type_name = "f32";
+builder_value._offset = offsetof(Slider,_value);
+builder_value._is_const = false;
+builder_value._is_static = false;
+builder_value._is_public = false;
+builder_value._is_pointer = false;
+builder_value._is_ref = false;
+builder_value._is_template = false;
+builder_value._meta = meta_value;
+builder_value._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_value._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_value));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -363,17 +405,17 @@ meta_thickness.Set("RangeMin",0);
 meta_thickness.Set("RangeMax",1);
 MemberBuilder builder_thickness;
 builder_thickness._name = "_thickness";
-builder_thickness._type_name = "f32";
+builder_thickness._type_name = "Vector4f";
 builder_thickness._offset = offsetof(Border,_thickness);
 builder_thickness._is_const = false;
 builder_thickness._is_static = false;
-builder_thickness._is_public = true;
+builder_thickness._is_public = false;
 builder_thickness._is_pointer = false;
 builder_thickness._is_ref = false;
 builder_thickness._is_template = false;
 builder_thickness._meta = meta_thickness;
-builder_thickness._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
-builder_thickness._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+builder_thickness._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector4f>);
+builder_thickness._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector4f>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_thickness));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -396,3 +438,138 @@ return Ailu::UI::Border::StaticType();
 return Ailu::UI::Border::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_Border(&Ailu::UI::Border::StaticType, "Ailu::UI::Border");
+Ailu::Type* Ailu::UI::Z_Construct_InputBlock_Type()
+{
+Ailu::UI::UIElement::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "InputBlock";
+initializer._size = sizeof(Ailu::UI::InputBlock);
+initializer._full_name = "Ailu::UI::InputBlock";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "Ailu::UI::UIElement";
+initializer._constructor = []()->Ailu::UI::InputBlock* {return new Ailu::UI::InputBlock;};
+Meta meta_content;
+meta_content.Set("Category","");
+meta_content.Set("IsColor",false);
+meta_content.Set("IsRange",false);
+meta_content.Set("IsFloatRange",true);
+meta_content.Set("RangeMin",0);
+meta_content.Set("RangeMax",1);
+MemberBuilder builder_content;
+builder_content._name = "_content";
+builder_content._type_name = "String";
+builder_content._offset = offsetof(InputBlock,_content);
+builder_content._is_const = false;
+builder_content._is_static = false;
+builder_content._is_public = false;
+builder_content._is_pointer = false;
+builder_content._is_ref = false;
+builder_content._is_template = false;
+builder_content._meta = meta_content;
+builder_content._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_content._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_content));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::UI::InputBlock::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_InputBlock_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::InputBlock>()
+{
+return Ailu::UI::InputBlock::StaticType();
+}
+    Type *Ailu::UI::InputBlock::GetType()
+{
+return Ailu::UI::InputBlock::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_InputBlock(&Ailu::UI::InputBlock::StaticType, "Ailu::UI::InputBlock");
+Ailu::Type* Ailu::UI::Z_Construct_Image_Type()
+{
+Ailu::UI::UIElement::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "Image";
+initializer._size = sizeof(Ailu::UI::Image);
+initializer._full_name = "Ailu::UI::Image";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "Ailu::UI::UIElement";
+initializer._constructor = []()->Ailu::UI::Image* {return new Ailu::UI::Image;};
+Meta meta_tint_color;
+meta_tint_color.Set("Category","");
+meta_tint_color.Set("IsColor",true);
+meta_tint_color.Set("IsRange",false);
+meta_tint_color.Set("IsFloatRange",true);
+meta_tint_color.Set("RangeMin",0);
+meta_tint_color.Set("RangeMax",1);
+MemberBuilder builder_tint_color;
+builder_tint_color._name = "_tint_color";
+builder_tint_color._type_name = "Color";
+builder_tint_color._offset = offsetof(Image,_tint_color);
+builder_tint_color._is_const = false;
+builder_tint_color._is_static = false;
+builder_tint_color._is_public = true;
+builder_tint_color._is_pointer = false;
+builder_tint_color._is_ref = false;
+builder_tint_color._is_template = false;
+builder_tint_color._meta = meta_tint_color;
+builder_tint_color._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Color>);
+builder_tint_color._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Color>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_tint_color));
+Meta meta_texture_guid;
+meta_texture_guid.Set("Category","");
+meta_texture_guid.Set("IsColor",false);
+meta_texture_guid.Set("IsRange",false);
+meta_texture_guid.Set("IsFloatRange",true);
+meta_texture_guid.Set("RangeMin",0);
+meta_texture_guid.Set("RangeMax",1);
+MemberBuilder builder_texture_guid;
+builder_texture_guid._name = "_texture_guid";
+builder_texture_guid._type_name = "String";
+builder_texture_guid._offset = offsetof(Image,_texture_guid);
+builder_texture_guid._is_const = false;
+builder_texture_guid._is_static = false;
+builder_texture_guid._is_public = true;
+builder_texture_guid._is_pointer = false;
+builder_texture_guid._is_ref = false;
+builder_texture_guid._is_template = false;
+builder_texture_guid._meta = meta_texture_guid;
+builder_texture_guid._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_texture_guid._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_texture_guid));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::UI::Image::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_Image_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Image>()
+{
+return Ailu::UI::Image::StaticType();
+}
+    Type *Ailu::UI::Image::GetType()
+{
+return Ailu::UI::Image::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_Image(&Ailu::UI::Image::StaticType, "Ailu::UI::Image");

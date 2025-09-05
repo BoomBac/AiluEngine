@@ -40,6 +40,8 @@ namespace Ailu::Render
                 g_pCommandPool->_pool_cp_counter.Push(AL_NEW(CommandCopyCounter));
             for (u32 i = 0; i < g_pCommandPool->_pool_rb.Capacity(); i++)
                 g_pCommandPool->_pool_rb.Push(AL_NEW(CommandReadBack));
+            for (u32 i = 0; i < g_pCommandPool->_pool_scissor.Capacity(); i++)
+                g_pCommandPool->_pool_scissor.Push(AL_NEW(CommandScissor));
         }
     }
     void CommandPool::Shutdown()

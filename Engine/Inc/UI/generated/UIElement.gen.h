@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __UIELEMENT_GEN_H__
 //Class UIElement begin...........................
-#define UIELEMENT_GEN_H_117_GENERATED_BODY \
+#define UIELEMENT_GEN_H_184_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_UIElement_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::UIElement>();
 //Class UIElement end...........................
 
 //Struct Padding begin...........................
-#define UIELEMENT_GEN_H_41_GENERATED_BODY \
+#define UIELEMENT_GEN_H_49_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Padding_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -36,7 +36,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::UI::Padding>();
 //Struct Padding end...........................
 
 //Struct Slot begin...........................
-#define UIELEMENT_GEN_H_62_GENERATED_BODY \
+#define UIELEMENT_GEN_H_74_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Slot_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -67,6 +67,24 @@ enum class ESlotType : i32;
 template<>
 AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::ESlotType>();
 //Enum ESlotType end...........................
+
+//Enum ESizePolicy begin...........................
+const Ailu::Enum* Z_Construct_Enum_ESizePolicy_Type();
+namespace Ailu::UI { 
+enum class ESizePolicy : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::ESizePolicy>();
+//Enum ESizePolicy end...........................
+
+//Enum EVisibility begin...........................
+const Ailu::Enum* Z_Construct_Enum_EVisibility_Type();
+namespace Ailu::UI { 
+enum class EVisibility : i32;
+}
+template<>
+AILU_API const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EVisibility>();
+//Enum EVisibility end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID UIELEMENT_GEN_H

@@ -1,0 +1,138 @@
+{
+    "_type_name": "Ailu::UI::Widget",
+    "_name": "Preview_title",
+    "_sort_order": 0,
+    "_is_receive_event": true,
+    "_id": 953,
+    "_visibility": "kVisible",
+    "_size": [1920.0, 1080.0],
+    "_position": [0.0, 0.0],
+    "_scale": [1.0, 1.0],
+    "_hash": 953,
+    "_guid": {},
+    "_root": {
+        "_type_name": "Ailu::UI::Canvas",
+        "_hash": 954,
+        "_slot": {
+            "_size": [200.0, 20.0],
+            "_anchor": [0.0, 0.0],
+            "_position": [0.0, 0.0],
+            "_alignment_h": "kLeft",
+            "_alignment_v": "kCenter",
+            "_type": "kCanvas",
+            "_margin": [0.0, 0.0, 0.0, 0.0],
+            "_is_fill_size": false
+        },
+        "_guid": {},
+        "_padding": [0.0, 0.0, 0.0, 0.0],
+        "_visibility": "kVisible",
+        "_name": "Canvas",
+        "_id": 954,
+        "_children": [{
+                "_thickness": 0.0,
+                "_type_name": "Ailu::UI::Border",
+                "_name": "Border",
+                "_bg_color": [0.30000001192092896, 0.30000001192092896, 0.30000001192092896, 1.0],
+                "_border_color": [1.0, 1.0, 1.0, 1.0],
+                "_slot": {
+                    "_size": [500.0, 100.0],
+                    "_anchor": [0.0, 0.0],
+                    "_position": [200.0, 100.0],
+                    "_alignment_h": "kLeft",
+                    "_alignment_v": "kCenter",
+                    "_type": "kCanvas",
+                    "_margin": [0.0, 0.0, 0.0, 0.0],
+                    "_is_fill_size": false
+                },
+                "_padding": [0.0, 0.0, 0.0, 0.0],
+                "_visibility": "kVisible",
+                "_id": 955,
+                "_hash": 955,
+                "_guid": {},
+                "_children": [{
+                        "_type_name": "Ailu::UI::HorizontalBox",
+                        "_is_size_to_content": false,
+                        "_hash": 956,
+                        "_slot": {
+                            "_size": [500.0, 100.0],
+                            "_anchor": [0.0, 0.0],
+                            "_position": [0.0, 0.0],
+                            "_alignment_h": "kLeft",
+                            "_alignment_v": "kCenter",
+                            "_type": "kCanvas",
+                            "_margin": [0.0, 0.0, 0.0, 0.0],
+                            "_is_fill_size": false
+                        },
+                        "_padding": [0.0, 0.0, 0.0, 0.0],
+                        "_visibility": "kVisible",
+                        "_name": "HorizontalBox_956",
+                        "_id": 956,
+                        "_guid": {},
+                        "_children": [{
+                                "_type_name": "Ailu::UI::Text",
+                                "_name": "Text",
+                                "_text": "Preview",
+                                "_color": [1.0, 1.0, 1.0, 1.0],
+                                "_font_size": 14,
+                                "_slot": {
+                                    "_size": [100.0, 20.0],
+                                    "_anchor": [0.0, 0.0],
+                                    "_position": [0.0, 0.0],
+                                    "_alignment_h": "kLeft",
+                                    "_alignment_v": "kCenter",
+                                    "_type": "kCanvas",
+                                    "_margin": [0.0, 0.0, 0.0, 0.0],
+                                    "_is_fill_size": false
+                                },
+                                "_padding": [0.0, 0.0, 0.0, 0.0],
+                                "_visibility": "kVisible",
+                                "_id": 957,
+                                "_hash": 957,
+                                "_guid": {},
+                                "_children": []
+                            }, {
+                                "_thickness": 0.0,
+                                "_type_name": "Ailu::UI::Border",
+                                "_name": "Border",
+                                "_bg_color": [0.0, 0.0, 1.0, 1.0],
+                                "_border_color": [1.0, 1.0, 1.0, 1.0],
+                                "_slot": {
+                                    "_anchor": [0.0, 0.0],
+                                    "_size": [50.0, 20.0],
+                                    "_position": [0.0, 0.0],
+                                    "_alignment_h": "kLeft",
+                                    "_type": "kCanvas",
+                                    "_alignment_v": "kCenter",
+                                    "_margin": [0.0, 0.0, 0.0, 0.0],
+                                    "_is_fill_size": true
+                                },
+                                "_padding": [0.0, 0.0, 0.0, 0.0],
+                                "_visibility": "kVisible",
+                                "_id": 958,
+                                "_hash": 958,
+                                "_guid": {},
+                                "_children": []
+                            }, {
+                                "_type_name": "Ailu::UI::Button",
+                                "_hash": 959,
+                                "_slot": {
+                                    "_size": [20.0, 20.0],
+                                    "_anchor": [0.0, 0.0],
+                                    "_position": [0.0, 0.0],
+                                    "_alignment_h": "kLeft",
+                                    "_alignment_v": "kCenter",
+                                    "_type": "kCanvas",
+                                    "_margin": [0.0, 0.0, 0.0, 0.0],
+                                    "_is_fill_size": false
+                                },
+                                "_guid": {},
+                                "_padding": [0.0, 0.0, 0.0, 0.0],
+                                "_visibility": "kVisible",
+                                "_name": "button",
+                                "_id": 959,
+                                "_children": []
+                            }]
+                    }]
+            }]
+    }
+}

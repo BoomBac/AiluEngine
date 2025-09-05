@@ -268,7 +268,7 @@ namespace Ailu::Render
     {
         SetRenderTarget(_render_graph->Resolve<RenderTexture>(color), index);
     }
-    void CommandBuffer::DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u32 index_start)
+    void CommandBuffer::DrawIndexed(VertexBuffer *vb, IndexBuffer *ib, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u32 index_start, u32 index_num)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = vb;
@@ -279,9 +279,10 @@ namespace Ailu::Render
         cmd->_instance_count = 1u;
         cmd->_mat->PushState(cmd->_pass_index);
         cmd->_index_start = index_start;
+        cmd->_index_num = index_num;
         _commands.push_back(cmd);
     }
-    void CommandBuffer::DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u16 instance_count, u32 index_start)
+    void CommandBuffer::DrawInstanced(VertexBuffer *vb, ConstantBuffer *per_obj_cb, Material *mat, u16 pass_index, u16 instance_count)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = vb;
@@ -290,11 +291,10 @@ namespace Ailu::Render
         cmd->_mat = mat;
         cmd->_pass_index = pass_index;
         cmd->_instance_count = 1u;
-        cmd->_index_start = index_start;
         cmd->_mat->PushState(cmd->_pass_index);
         _commands.push_back(cmd);
     }
-    void CommandBuffer::SetViewport(const Rect &viewport)
+    void CommandBuffer::SetViewport(Rect viewport)
     {
         _viewports[0] = viewport;
         if (_commands.back()->GetCmdType() == EGpuCommandType::kSetTarget)
@@ -303,14 +303,12 @@ namespace Ailu::Render
             _viewports[0] = Rect();
         }
     }
-    void CommandBuffer::SetScissorRect(const Rect &rect)
+    void CommandBuffer::SetScissorRect(Rect rect, u16 index)
     {
-        _viewports[0] = rect;
-        if (_commands.back()->GetCmdType() == EGpuCommandType::kSetTarget)
-        {
-            static_cast<CommandSetTarget *>(_commands.back())->_viewports[0] = rect;
-            _viewports[0] = Rect();
-        }
+        auto cmd = CommandPool::Get().Alloc<CommandScissor>();
+        cmd->_rects[index] = rect;
+        cmd->_num = 1u;
+        _commands.push_back(cmd);
     }
     void CommandBuffer::SetViewports(const std::initializer_list<Rect> &viewports)
     {
@@ -332,21 +330,15 @@ namespace Ailu::Render
     }
     void CommandBuffer::SetScissorRects(const std::initializer_list<Rect> &rects)
     {
+       auto cmd = CommandPool::Get().Alloc<CommandScissor>();
         u16 count = std::min((u16) rects.size(), RenderConstants::kMaxMRTNum);
         u16 index = 0u;
-        for(auto it = rects.begin(); it != rects.end(); ++it)
+        for(auto it = rects.begin(); it != rects.end() && index < count; ++it, ++index)
         {
-            _viewports[index++] = *it;
+            cmd->_rects[index] = *it;
         }
-        if (_commands.back()->GetCmdType() == EGpuCommandType::kSetTarget)
-        {
-            auto cmd = static_cast<CommandSetTarget *>(_commands.back());
-            for (u16 i = 0; i < count; ++i)
-            {
-                cmd->_viewports[i] = _viewports[i];
-                _viewports[i] = Rect();
-            }
-        }
+        cmd->_num = count;
+        _commands.push_back(cmd);
     }
     RTHandle CommandBuffer::GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, bool mipmap_chain, bool linear, bool random_access)
     {

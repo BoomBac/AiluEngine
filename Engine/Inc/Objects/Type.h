@@ -555,7 +555,7 @@ namespace Ailu
             u32 index = static_cast<u32>(enum_value);
             if (_enum_to_str_lut.contains(index))
             {
-                return _enum_to_str_lut[index]->first;
+                return _enum_to_str_lut.at(index)->first;
             }
             return kErrorEnumValue;
         }

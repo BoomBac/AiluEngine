@@ -3,6 +3,7 @@
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "Render/CommandBuffer.h"
 #include "Framework/Common/Allocator.hpp"
+#include "Framework/Common/Window.h"
 
 
 
@@ -18,9 +19,9 @@ namespace Ailu::RHI::DX12
         _pixel_format = initializer._format;
         _state_guard.resize(_buffer_num);
         ComPtr<IDXGISwapChain1> swapChain;
-        ThrowIfFailed(initializer._factory->CreateSwapChainForHwnd(initializer._command_queue, initializer._window_handle, &initializer._swapchain_desc, nullptr, nullptr, &swapChain));
+        ThrowIfFailed(initializer._factory->CreateSwapChainForHwnd(initializer._command_queue, (HWND) initializer._window->GetNativeWindowPtr(), &initializer._swapchain_desc, nullptr, nullptr, &swapChain));
         // This sample does not support fullscreen transitions.
-        ThrowIfFailed(initializer._factory->MakeWindowAssociation(initializer._window_handle, DXGI_MWA_NO_ALT_ENTER));
+        ThrowIfFailed(initializer._factory->MakeWindowAssociation((HWND)initializer._window->GetNativeWindowPtr(), DXGI_MWA_NO_ALT_ENTER));
         ThrowIfFailed(swapChain->SetFullscreenState(FALSE, nullptr));
         ThrowIfFailed(swapChain.As(&_swapchain));
         for (u16 i = 0; i < initializer._swapchain_desc.BufferCount; i++)
@@ -30,8 +31,9 @@ namespace Ailu::RHI::DX12
             initializer._device->CreateRenderTargetView(_back_buffers[i].Get(), nullptr, _rtvs[i]);
             _state_guard[i] = AL_NEW(D3DResourceStateGuard,_back_buffers[i].Get(), D3D12_RESOURCE_STATE_PRESENT, 1u);
         }
-        RenderTexture::s_backbuffer = this;
         _load_action = Render::ELoadStoreAction::kNotCare;
+        _cur_backbuf_index = _swapchain->GetCurrentBackBufferIndex();
+        s_window_backbuffers[reinterpret_cast<u64>(initializer._window)] = this;
     }
 
     D3DSwapchainTexture::~D3DSwapchainTexture()

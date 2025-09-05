@@ -16,7 +16,7 @@ namespace Ailu::Editor{
 struct EditorStyle ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::EditorStyle>();
+class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::EditorStyle>();
 //Struct EditorStyle end...........................
 
 #undef CURRENT_FILE_ID

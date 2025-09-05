@@ -617,7 +617,6 @@ namespace Ailu::Render
                 r.height = h;
                 u16 rt_index = _prefilter_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), j, 0);
                 cmd->SetViewport(r);
-                cmd->SetScissorRect(r);
                 cmd->SetRenderTarget(_prefilter_cubemap.get(), rt_index);
                 //cmd->ClearRenderTarget(_prefilter_cubemap.get(), Colors::kBlack, rt_index);
                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
@@ -738,6 +737,7 @@ namespace Ailu::Render
                           builder.Read(rendering_data._rg_handles._main_light_shadow_map);
                           builder.Read(rendering_data._rg_handles._addi_shadow_maps);
                           builder.Read(rendering_data._rg_handles._point_light_shadow_maps);
+                          builder.Read(builder.GetTexture("_OcclusionTex"));
                           builder.Write(rendering_data._rg_handles._color_target);
                       },
                           [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)

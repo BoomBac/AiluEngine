@@ -58,13 +58,13 @@ namespace Ailu
             void RecalculateMatrix(bool force = false);
             void SetLens(float fovh, float aspect, float nz, float fz);
 
-            void Rect(u16 w, u16 h)
+            void OutputSize(u16 w, u16 h)
             {
                 _pixel_width = w;
                 _pixel_height = h;
                 _aspect = (f32) _pixel_width / (f32) _pixel_height;
             };
-            Vector2D<u32> Rect() const { return Vector2D<u32>{_pixel_width, _pixel_height}; }
+            Vector2D<u32> OutputSize() const { return Vector2D<u32>{_pixel_width, _pixel_height}; }
             //包括抖动的透视矩阵
             const Matrix4x4f &GetProj() const { return _proj_matrix; }
 

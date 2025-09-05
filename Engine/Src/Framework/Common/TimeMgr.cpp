@@ -24,9 +24,9 @@ namespace Ailu
     void TimeMgr::Tick(f32 delta_time)
     {
         _cur_tick_stamp = std::chrono::high_resolution_clock::now();
-        TickTimeSinceLoad = ALMSecond(_cur_tick_stamp - _init_stamp).count();
-        DeltaTime = ALMSecond(_cur_tick_stamp - s_pre_tick_stamp).count();
-        s_smooth_delta_time = Lerp(DeltaTime, s_smooth_delta_time, 0.95f);
+        TickTimeSinceLoad = ALSecond(_cur_tick_stamp - _init_stamp).count();
+        s_delta_time = ALSecond(_cur_tick_stamp - s_pre_tick_stamp).count();
+        s_smooth_delta_time = Lerp(s_delta_time, s_smooth_delta_time, 0.95f);
         s_pre_tick_stamp = _cur_tick_stamp;
     }
     void TimeMgr::Pause()
@@ -43,10 +43,10 @@ namespace Ailu
         if (_b_stop)
         {
             _total_pause_time +=
-                    ALMSecond(std::chrono::high_resolution_clock::now() - _pause_stamp)
+                    ALMilliSecond(std::chrono::high_resolution_clock::now() - _pause_stamp)
                             .count();
             _last_pause_time =
-                    ALMSecond(std::chrono::high_resolution_clock::now() - _pause_stamp)
+                    ALMilliSecond(std::chrono::high_resolution_clock::now() - _pause_stamp)
                             .count();
             _b_stop = false;
         }
@@ -70,7 +70,7 @@ namespace Ailu
         //std::lock_guard<std::mutex> lock(s_mark_mutex);
         if (!s_mark_stamps.empty())
         {
-            f32 count = ALMSecond(std::chrono::high_resolution_clock::now() -s_mark_stamps.top()).count();
+            f32 count = ALMilliSecond(std::chrono::high_resolution_clock::now() - s_mark_stamps.top()).count();
             // count -= _last_pause_time;
             // _last_pause_time = 0;
             s_mark_stamps.pop();
@@ -90,7 +90,7 @@ namespace Ailu
     {
         if (!_local_mark_stack.empty())
         {
-            f32 count = ALMSecond(std::chrono::high_resolution_clock::now() -_local_mark_stack.top()).count();
+            f32 count = ALMilliSecond(std::chrono::high_resolution_clock::now() - _local_mark_stack.top()).count();
             count -= _last_pause_time;
             _last_pause_time = 0;
             _local_mark_stack.pop();

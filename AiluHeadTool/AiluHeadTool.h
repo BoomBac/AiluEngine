@@ -99,4 +99,5 @@ private:
     std::vector<EnumInfo> _enums;
     NamespaceTracker _tracker;
     std::unordered_map<std::string, std::set<std::string>> _class_ns_map;
+    bool _is_cur_file_engine_lib = true;
 };

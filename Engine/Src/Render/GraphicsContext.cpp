@@ -17,7 +17,7 @@ namespace Ailu::Render
 	{
         TimerBlock b("----------------------------------------------------------- GraphicsContext::InitGlobalContext");
 		g_pRenderTexturePool = new RenderTexturePool();//在ctx之前，使得backbuffer可以被注册到池中
-		g_pGfxContext = new RHI::DX12::D3DContext(dynamic_cast<WinWindow*>(Application::Get().GetWindowPtr()));
+		g_pGfxContext = new RHI::DX12::D3DContext();
 		g_pGfxContext->Init();
 		CommandPool::Init();
         RHI::DX12::GpuResourceManager::Init();

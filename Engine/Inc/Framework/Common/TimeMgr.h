@@ -18,10 +18,15 @@ namespace Ailu
 	class AILU_API TimeMgr : IRuntimeModule
 	{
 	public:
-		using ALSecond = std::chrono::seconds;
-		using ALMSecond = std::chrono::duration<float, std::ratio<1, 1000>>;
+		using ALSecond      = std::chrono::duration<f32>;                     // 秒
+		using ALMilliSecond = std::chrono::duration<f32, std::milli>;        // 毫秒
+		using ALMicroSecond = std::chrono::duration<f32, std::micro>;        // 微秒
+		using ALNanoSecond  = std::chrono::duration<f32, std::nano>;         // 纳秒
+		using ALMinute      = std::chrono::duration<f32, std::ratio<60>>;    // 分钟
+		using ALHour        = std::chrono::duration<f32, std::ratio<3600>>;  // 小时
 		using ALTimeStamp = std::chrono::high_resolution_clock::time_point;
-		inline static f32 DeltaTime = 0.0f;
+		//帧间隔秒
+		inline static f32 s_delta_time = 0.0f;
 		//程序启动距当前帧的时间
 		inline static f32 TickTimeSinceLoad = 0.0f;
 		inline static f32 s_smooth_delta_time = 0.0f;
@@ -32,10 +37,10 @@ namespace Ailu
 		static f32 GetElapsedSinceLastMark();
 		/// @brief 返回距当前帧开始的时间差ms
 		/// @return 
-		f32 GetElapsedSinceCurrentTick() const { return ALMSecond(std::chrono::high_resolution_clock::now() - _cur_tick_stamp).count(); };
+		f32 GetElapsedSinceCurrentTick() const { return ALMilliSecond(std::chrono::high_resolution_clock::now() - _cur_tick_stamp).count(); };
 		/// @brief 返回距程序启动的时间差ms
 		/// @return 
-		f32 GetElapsedSinceLaunch() const {return ALMSecond(std::chrono::high_resolution_clock::now() - _init_stamp).count(); }
+		f32 GetElapsedSinceLaunch() const { return ALMilliSecond(std::chrono::high_resolution_clock::now() - _init_stamp).count(); }
 		int Initialize() final;
         void Finalize() final;
 		void Tick(f32 delta_time) final;

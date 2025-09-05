@@ -34,16 +34,24 @@ namespace Ailu
         class AILU_API Widget : public SerializeObject
         {
             GENERATED_BODY()
+            DECLARE_DELEGATE(on_sort_order_changed);
+            DECLARE_DELEGATE(on_get_focus);
+            friend class UIManager;
         public:
             Widget();
+            ~Widget();
             void Serialize(FArchive &ar) final;
             void Deserialize(FArchive &ar) final;
+            void PostDeserialize() final;
             void BindOutput(Render::RenderTexture *color, Render::RenderTexture *depth = nullptr);
             void AddToWidget(Ref<UIElement> root);
 
-            void Update();
+            void PreUpdate(f32 dt);
+            void Update(f32 dt);
+            void PostUpdate(f32 dt);
             void Render(UIRenderer &r);
-            void OnEvent(UIEvent& event);
+            bool OnEvent(UIEvent& event);
+            bool IsHover(Vector2f pos) const;
             std::tuple<Render::RenderTexture *, Render::RenderTexture *> GetOutput() 
             {
                 return _is_external_output ? std::make_tuple(_external_color, _external_depth) : std::make_tuple(_color.get(), _depth.get());
@@ -56,10 +64,15 @@ namespace Ailu
             UIElement *Root() { return _root.get(); }
 
             bool operator<(const Widget &other) const { return _sort_order < other._sort_order; }
+            bool operator>(const Widget &other) const { return _sort_order > other._sort_order; }
         public:
             bool _is_external_output = false;
             APROPERTY()
             u32 _sort_order = 0u;
+            APROPERTY()
+            bool _is_receive_event = true;
+            APROPERTY()
+            EVisibility _visibility = EVisibility::kVisible;
         private:
             bool DispatchEvent(UIEvent& e);
         private:
@@ -74,7 +87,6 @@ namespace Ailu
             Render::RenderTexture * _external_depth;
             Ref<UIElement> _root;
             Vector<UIElement*> _prev_hover_path;
-            UIElement *_capture_target = nullptr;//记录按下时的目标
         };
 
     }// namespace UI

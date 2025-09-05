@@ -8,7 +8,7 @@
 #include "Render/CommandBuffer.h"
 #include "Render/Texture.h"
 #include "UI/UIRenderer.h"
-#include <Render/TextRenderer.h>
+#include "UI/UIFramework.h"
 
 namespace Ailu
 {
@@ -27,6 +27,16 @@ namespace Ailu
             _depth = nullptr;
             _root = nullptr;
             BindOutput(RenderTexture::s_backbuffer, nullptr);
+        }
+        Widget::~Widget()
+        {
+            if (_root)
+                _root.reset();
+            _prev_hover_path.clear();
+            if (UIManager::Get()->_pre_hover_widget == this)
+            {
+                UIManager::Get()->_pre_hover_widget = nullptr;
+            }
         }
         void Widget::Serialize(FArchive &ar)
         {
@@ -61,6 +71,11 @@ namespace Ailu
                 sar->EndObject();
             }
         }
+        void Widget::PostDeserialize()
+        {
+            if (_root)
+                _root->PostDeserialize();
+        }
         void Widget::BindOutput(RenderTexture *color, RenderTexture *depth)
         {
             _external_color = color;
@@ -73,29 +88,30 @@ namespace Ailu
             if (_root)
                 LOG_WARNING("Widget::AddToWidget: Root() already exists,replace to ()", _root->Name(),root->Name());
             _root = root;
-            _root->SetDesiredRect(0.0f, 0.0f, _size.x, _size.y);
+            _root->Translate(_position);
+            _root->Arrange(0.0f, 0.0f, _size.x, _size.y);
         }
 
-        void Widget::Update()
+        void Widget::PreUpdate(f32 dt)
         {
-            Vector2f loc_mouse_pos = Input::GetMousePos() - _position;
+            if (_root)
+                _root->PreUpdate(dt);
+        }
+
+        void Widget::Update(f32 dt)
+        {
             if (_root)
             {
-                const auto& s = _root->_slot;
-                _root->SetDesiredRect(s._position.x + _position.x, s._position.y + _position.y,s._size.x,s._size.y);
-                _root->Update(0.16f);
+                //const auto& s = _root->SlotSize();
+                //const auto& p = _root->SlotPosition();
+                //_root->Arrange(p.x + _position.x, p.y + _position.y,s.x,s.y);
+                _root->Update(dt);
             }
-            //TextRenderer::DrawText(std::format("MousePos: ({}, {})", loc_mouse_pos.x, loc_mouse_pos.y), Vector2f(0, 0));
-            //f32 depth = 0.0f;
-            //for (auto child: _children)
-            //{
-            //    auto &s = _slots[child->ID()]._slot;
-            //    {
-            //        child->SetDesiredRect(s._position.x, s._position.y, s._size.x, s._size.y);
-            //        child->SetDepth(depth);
-            //        depth += 0.1f;
-            //    }
-            //}
+        }
+        void Widget::PostUpdate(f32 dt)
+        {
+            if (_root)
+                _root->PostUpdate(dt);
         }
         void Ailu::UI::Widget::Render(UIRenderer &r)
         {
@@ -116,7 +132,11 @@ namespace Ailu
         }
         void Widget::SetPosition(Vector2f position)
         {
+            if (NearbyEqual(position, _position))
+                return;
             _position = position;
+            if (_root)
+                _root->Translate(position);
         }
 
         bool Widget::DispatchEvent(UIEvent& e)
@@ -133,8 +153,9 @@ namespace Ailu
             return e._is_handled;
         }
 
-        void Widget::OnEvent(UIEvent &event)
+        bool Widget::OnEvent(UIEvent &event)
         {
+            bool is_event_gen = false;
             if (event._type == UIEvent::EType::kMouseExitWindow)
             {
                 for (auto it = _prev_hover_path.rbegin(); it != _prev_hover_path.rend(); ++it)
@@ -146,17 +167,46 @@ namespace Ailu
                     event._is_handled = DispatchEvent(e);
                 }
                 _prev_hover_path.clear();
-                return;
+                return false;
+            }
+
+            if (event._type == UIEvent::EType::kMouseDown && IsHover(event._mouse_position))
+            {
+                UI::UIManager::Get()->BringToFront(this);
+            }
+            UIElement *focus = UIManager::Get()->GetFocusedElement();
+            if (focus)
+            {
+                if (event._type == UIEvent::EType::kKeyDown)
+                {
+                    UIEvent e(event);
+                    e._type = UIEvent::EType::kKeyDown;
+                    e._target = focus;
+                    e._key_code = event._key_code;
+                    event._is_handled = DispatchEvent(e);
+                }
+                else if (event._type == UIEvent::EType::kKeyUp)
+                {
+                    UIEvent e(event);
+                    e._type = UIEvent::EType::kKeyUp;
+                    e._target = focus;
+                    e._key_code = event._key_code;
+                    event._is_handled = DispatchEvent(e);
+                }
             }
             UIElement *target = nullptr;
-            for (auto ele: *_root)
+            for (auto& ele: *_root)
             {
                 target = ele->HitTest(event._mouse_position);
                 if (target)
                     break;
             }
-            if (target)
-                LOG_INFO("target is {}",target->Name());
+            if (event._type == UIEvent::EType::kMouseDown)
+            {
+                UIManager::Get()->SetFocus(target);
+            }
+            //if (target)
+            //    LOG_INFO("target is {}",target->Name());
             // 2. 构造 HoverPath
             Vector<UIElement *> cur_hover_path;
             if (target)
@@ -176,7 +226,6 @@ namespace Ailu
                 {
                     i++;// 找公共前缀
                 }
-
                 // Exit: 从 i 开始的 prevHoverPath
                 for (size_t j = _prev_hover_path.size(); j > i; j--)
                 {
@@ -184,7 +233,11 @@ namespace Ailu
                     e._type = UIEvent::EType::kMouseExit;
                     e._mouse_position = event._mouse_position;
                     e._target = _prev_hover_path[j - 1];
-                    event._is_handled = DispatchEvent(e);
+                    e._current_target = e._target;
+                    _prev_hover_path[j - 1]->OnEvent(e);
+                    //event._is_handled = DispatchEvent(e);
+                    is_event_gen = true;
+                    //LOG_INFO("Event stop at widget: {},event: {}", _name,e.ToString());
                 }
 
                 // Enter: 从 i 开始的 currHoverPath
@@ -194,74 +247,95 @@ namespace Ailu
                     e._type = UIEvent::EType::kMouseEnter;
                     e._mouse_position = event._mouse_position;
                     e._target = cur_hover_path[j];
-                    event._is_handled = DispatchEvent(e);
+                    e._current_target = e._target;
+                    cur_hover_path[j]->OnEvent(e);
+                    //event._is_handled = DispatchEvent(e);
+                    is_event_gen = true;
+
+                    //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
                 }
+                _prev_hover_path = std::move(cur_hover_path);
             }
             // 4. 生成基本事件（Move / Down / Up / Click / Scroll）
-            if (target || _capture_target)
+            if (target || UIManager::Get()->_capture_target)
             {
+                is_event_gen = true;
                 // 鼠标移动
                 if (event._type == UIEvent::EType::kMouseMove)
                 {
                     UIEvent e(event);
                     e._type = UIEvent::EType::kMouseMove;
                     e._mouse_position = event._mouse_position;
-                    if (_capture_target)
+                    if (UIManager::Get()->_capture_target)
                     {
-                        e._target = _capture_target;
+                        e._target = UIManager::Get()->_capture_target;
                         event._is_handled = DispatchEvent(e);
+                        //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
                     }
                     e._target = target;
                     event._is_handled = DispatchEvent(e);// 从 currTarget 开始冒泡
+                    //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
                 }
-
                 // 鼠标按下
-                if (event._type == UIEvent::EType::kMouseDown)
+                else if (event._type == UIEvent::EType::kMouseDown)
                 {
                     UIEvent e(event);
                     e._type = UIEvent::EType::kMouseDown;
                     e._mouse_position = event._mouse_position;
                     e._target = target;
                     event._is_handled = DispatchEvent(e);
-
-                    _capture_target = target;// 记录捕获目标
+                    //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
+                    UIManager::Get()->_capture_target = target;// 记录捕获目标
                 }
                 // 鼠标释放
-                if (event._type == UIEvent::EType::kMouseUp)
+                else if (event._type == UIEvent::EType::kMouseUp)
                 {
                     UIEvent e(event);
                     e._type = UIEvent::EType::kMouseUp;
                     e._mouse_position = event._mouse_position;
 
-                    if (_capture_target)
+                    if (UIManager::Get()->_capture_target)
                     {
                         // Up 始终交给 capture_target
-                        e._target = _capture_target;
+                        e._target = UIManager::Get()->_capture_target;
                         event._is_handled = DispatchEvent(e);
-
+                        //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
                         // 判断 Click（按下和抬起在同一元素上）
-                        if (_capture_target == target)
+                        if (UIManager::Get()->_capture_target == target)
                         {
                             UIEvent click(event);
                             click._type = UIEvent::EType::kMouseClick;
                             click._mouse_position = event._mouse_position;
-                            click._target = _capture_target;
+                            click._target = UIManager::Get()->_capture_target;
+                            click._key_code = event._key_code;
                             event._is_handled = DispatchEvent(click);
+                            //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
                         }
-                        _capture_target = nullptr;// 清理捕获
+                        UIManager::Get()->_capture_target = nullptr;// 清理捕获
                     }
                 }
                 // 鼠标滚轮
-                if (event._type == UIEvent::EType::kMouseScroll)
+                else if (event._type == UIEvent::EType::kMouseScroll)
                 {
                     UIEvent e(event);
                     e._type = UIEvent::EType::kMouseScroll;
                     e._mouse_position = event._mouse_position;
                     e._target = target;
+                    e._scroll_delta = event._scroll_delta;
                     event._is_handled = DispatchEvent(e);
+                    //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
                 }
-                _prev_hover_path = std::move(cur_hover_path);
+                else 
+                {
+                    is_event_gen = false;
+                }
             }
-        }// namespace UI
+            return is_event_gen;
+        }
+        bool Widget::IsHover(Vector2f pos) const
+        {
+            return UIElement::IsPointInside(pos,Vector4f{_position.x,_position.y,_size.x,_size.y});
+        }
+        // namespace UI
     }// namespace UI
 }// namespace Ailu

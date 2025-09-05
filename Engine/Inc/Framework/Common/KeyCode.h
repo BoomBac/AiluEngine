@@ -2,137 +2,140 @@
 #ifndef __KEYCODE_H__
 #define __KEYCODE_H__
 
-#define AL_KEY_LBUTTON 0x01
-#define AL_KEY_RBUTTON 0x02
-#define AL_KEY_CANCEL 0x03
-#define AL_KEY_MBUTTON 0x04
-#define AL_KEY_XBUTTON1 0x05
-#define AL_KEY_XBUTTON2 0x06
-#define AL_KEY_BACK 0x08
-#define AL_KEY_TAB 0x09
-#define AL_KEY_CLEAR 0x0C
-#define AL_KEY_RETURN 0x0D
-#define AL_KEY_SHIFT 0x10
-#define AL_KEY_CONTROL 0x11
-#define AL_KEY_MENU 0x12
-#define AL_KEY_ALT 0x12
-#define AL_KEY_PAUSE 0x13
-#define AL_KEY_CAPITAL 0x14
-#define AL_KEY_KANA 0x15
-#define AL_KEY_HANGEUL 0x15
-#define AL_KEY_HANGUL 0x15
-#define AL_KEY_IME_ON 0x16
-#define AL_KEY_JUNJA 0x17
-#define AL_KEY_FINAL 0x18
-#define AL_KEY_HANJA 0x19
-#define AL_KEY_KANJI 0x19
-#define AL_KEY_IME_OFF 0x1A
-#define AL_KEY_ESCAPE 0x1B
-#define AL_KEY_CONVERT 0x1C
-#define AL_KEY_NONCONVERT 0x1D
-#define AL_KEY_ACCEPT 0x1E
-#define AL_KEY_MODECHANGE 0x1F
-#define AL_KEY_SPACE 0x20
-#define AL_KEY_PRIOR 0x21
-#define AL_KEY_NEXT 0x22
-#define AL_KEY_END 0x23
-#define AL_KEY_HOME 0x24
-#define AL_KEY_LEFT 0x25
-#define AL_KEY_UP 0x26
-#define AL_KEY_RIGHT 0x27
-#define AL_KEY_DOWN 0x28
-#define AL_KEY_SELECT 0x29
-#define AL_KEY_PRINT 0x2A
-#define AL_KEY_EXECUTE 0x2B
-#define AL_KEY_SNAPSHOT 0x2C
-#define AL_KEY_INSERT 0x2D
-#define AL_KEY_DELETE 0x2E
-#define AL_KEY_HELP 0x2F
-#define AL_KEY_0 0x30
-#define AL_KEY_1 0x31
-#define AL_KEY_2 0x32
-#define AL_KEY_3 0x33
-#define AL_KEY_4 0x34
-#define AL_KEY_5 0x35
-#define AL_KEY_6 0x36
-#define AL_KEY_7 0x37
-#define AL_KEY_8 0x38
-#define AL_KEY_9 0x39
-#define AL_KEY_A 0x41
-#define AL_KEY_B 0x42
-#define AL_KEY_C 0x43
-#define AL_KEY_D 0x44
-#define AL_KEY_E 0x45
-#define AL_KEY_F 0x46
-#define AL_KEY_G 0x47
-#define AL_KEY_H 0x48
-#define AL_KEY_I 0x49
-#define AL_KEY_J 0x4A
-#define AL_KEY_K 0x4B
-#define AL_KEY_L 0x4C
-#define AL_KEY_M 0x4D
-#define AL_KEY_N 0x4E
-#define AL_KEY_O 0x4F
-#define AL_KEY_P 0x50
-#define AL_KEY_Q 0x51
-#define AL_KEY_R 0x52
-#define AL_KEY_S 0x53
-#define AL_KEY_T 0x54
-#define AL_KEY_U 0x55
-#define AL_KEY_V 0x56
-#define AL_KEY_W 0x57
-#define AL_KEY_X 0x58
-#define AL_KEY_Y 0x59
-#define AL_KEY_Z 0x5A
-#define AL_KEY_LWIN 0x5B
-#define AL_KEY_RWIN 0x5C
-#define AL_KEY_APPS 0x5D
-#define AL_KEY_SLEEP 0x5F
-#define AL_KEY_NUMPAD0 0x60
-#define AL_KEY_NUMPAD1 0x61
-#define AL_KEY_NUMPAD2 0x62
-#define AL_KEY_NUMPAD3 0x63
-#define AL_KEY_NUMPAD4 0x64
-#define AL_KEY_NUMPAD5 0x65
-#define AL_KEY_NUMPAD6 0x66
-#define AL_KEY_NUMPAD7 0x67
-#define AL_KEY_NUMPAD8 0x68
-#define AL_KEY_NUMPAD9 0x69
-#define AL_KEY_MULTIPLY 0x6A
-#define AL_KEY_ADD 0x6B
-#define AL_KEY_SEPARATOR 0x6C
-#define AL_KEY_SUBTRACT 0x6D
-#define AL_KEY_DECIMAL 0x6E
-#define AL_KEY_DIVIDE 0x6F
-#define AL_KEY_F1 0x70
-#define AL_KEY_F2 0x71
-#define AL_KEY_F3 0x72
-#define AL_KEY_F4 0x73
-#define AL_KEY_F5 0x74
-#define AL_KEY_F6 0x75
-#define AL_KEY_F7 0x76
-#define AL_KEY_F8 0x77
-#define AL_KEY_F9 0x78
-#define AL_KEY_F10 0x79
-#define AL_KEY_F11 0x7A
-#define AL_KEY_F12 0x7B
-#define AL_KEY_F13 0x7C
-#define AL_KEY_F14 0x7D
-#define AL_KEY_F15 0x7E
-#define AL_KEY_F16 0x7F
-#define AL_KEY_F17 0x80
-#define AL_KEY_F18 0x81
-#define AL_KEY_F19 0x82
-#define AL_KEY_F20 0x83
-#define AL_KEY_F21 0x84
-#define AL_KEY_F22 0x85
-#define AL_KEY_F23 0x86
-#define AL_KEY_F24 0x87
-#define AL_KEY_NUMLOCK 0x90
-#define AL_KEY_SCROLL 0x91
-#define AL_KEY_LSHIFT 0xA0
-#define AL_KEY_RSHIFT 0xA1
-#define AL_KEY_LCONTROL 0xA2
-#define AL_KEY_RCONTROL 0xA3
+enum EKey
+{
+    kLBUTTON = 0x01,
+    kRBUTTON = 0x02,
+    kCANCEL = 0x03,
+    kMBUTTON = 0x04,
+    kXBUTTON1 = 0x05,
+    kXBUTTON2 = 0x06,
+    kBACK = 0x08,
+    kTAB = 0x09,
+    kCLEAR = 0x0C,
+    kRETURN = 0x0D,
+    kSHIFT = 0x10,
+    kCONTROL = 0x11,
+    kMENU = 0x12,
+    kALT = 0x12,
+    kPAUSE = 0x13,
+    kCAPITAL = 0x14,
+    kKANA = 0x15,
+    kHANGEUL = 0x15,
+    kHANGUL = 0x15,
+    kIME_ON = 0x16,
+    kJUNJA = 0x17,
+    kFINAL = 0x18,
+    kHANJA = 0x19,
+    kKANJI = 0x19,
+    kIME_OFF = 0x1A,
+    kESCAPE = 0x1B,
+    kCONVERT = 0x1C,
+    kNONCONVERT = 0x1D,
+    kACCEPT = 0x1E,
+    kMODECHANGE = 0x1F,
+    kSPACE = 0x20,
+    kPRIOR = 0x21,
+    kNEXT = 0x22,
+    kEND = 0x23,
+    kHOME = 0x24,
+    kLEFT = 0x25,
+    kUP = 0x26,
+    kRIGHT = 0x27,
+    kDOWN = 0x28,
+    kSELECT = 0x29,
+    kPRINT = 0x2A,
+    kEXECUTE = 0x2B,
+    kSNAPSHOT = 0x2C,
+    kINSERT = 0x2D,
+    kDELETE = 0x2E,
+    kHELP = 0x2F,
+    k0 = 0x30,
+    k1 = 0x31,
+    k2 = 0x32,
+    k3 = 0x33,
+    k4 = 0x34,
+    k5 = 0x35,
+    k6 = 0x36,
+    k7 = 0x37,
+    k8 = 0x38,
+    k9 = 0x39,
+    kA = 0x41,
+    kB = 0x42,
+    kC = 0x43,
+    kD = 0x44,
+    kE = 0x45,
+    kF = 0x46,
+    kG = 0x47,
+    kH = 0x48,
+    kI = 0x49,
+    kJ = 0x4A,
+    kK = 0x4B,
+    kL = 0x4C,
+    kM = 0x4D,
+    kN = 0x4E,
+    kO = 0x4F,
+    kP = 0x50,
+    kQ = 0x51,
+    kR = 0x52,
+    kS = 0x53,
+    kT = 0x54,
+    kU = 0x55,
+    kV = 0x56,
+    kW = 0x57,
+    kX = 0x58,
+    kY = 0x59,
+    kZ = 0x5A,
+    kLWIN = 0x5B,
+    kRWIN = 0x5C,
+    kAPPS = 0x5D,
+    kSLEEP = 0x5F,
+    kNUMPAD0 = 0x60,
+    kNUMPAD1 = 0x61,
+    kNUMPAD2 = 0x62,
+    kNUMPAD3 = 0x63,
+    kNUMPAD4 = 0x64,
+    kNUMPAD5 = 0x65,
+    kNUMPAD6 = 0x66,
+    kNUMPAD7 = 0x67,
+    kNUMPAD8 = 0x68,
+    kNUMPAD9 = 0x69,
+    kMULTIPLY = 0x6A,
+    kADD = 0x6B,
+    kSEPARATOR = 0x6C,
+    kSUBTRACT = 0x6D,
+    kDECIMAL = 0x6E,
+    kDIVIDE = 0x6F,
+    kF1 = 0x70,
+    kF2 = 0x71,
+    kF3 = 0x72,
+    kF4 = 0x73,
+    kF5 = 0x74,
+    kF6 = 0x75,
+    kF7 = 0x76,
+    kF8 = 0x77,
+    kF9 = 0x78,
+    kF10 = 0x79,
+    kF11 = 0x7A,
+    kF12 = 0x7B,
+    kF13 = 0x7C,
+    kF14 = 0x7D,
+    kF15 = 0x7E,
+    kF16 = 0x7F,
+    kF17 = 0x80,
+    kF18 = 0x81,
+    kF19 = 0x82,
+    kF20 = 0x83,
+    kF21 = 0x84,
+    kF22 = 0x85,
+    kF23 = 0x86,
+    kF24 = 0x87,
+    kNUMLOCK = 0x90,
+    kSCROLL = 0x91,
+    kLSHIFT = 0xA0,
+    kRSHIFT = 0xA1,
+    kLCONTROL = 0xA2,
+    kRCONTROL = 0xA3
+};
 
 #endif // !KEYCODE_H__

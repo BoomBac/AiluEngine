@@ -25,6 +25,7 @@ namespace Ailu::Render
     Renderer::Renderer() : _cur_fs(nullptr)
     {
         _p_context = g_pGfxContext;
+        _target_tex = nullptr;
         _b_init = true;
         Profiler::Initialize();
         _rd_graph = nullptr;
@@ -57,7 +58,7 @@ namespace Ailu::Render
         //_features.push_back(_vxgi);
         //_features.push_back(_cloud);
         //_features.push_back(_taa);
-        //_features.push_back(_ssao);
+        _features.push_back(_ssao);
         //_features.push_back(_gpu_terrain);
         //_features.push_back(_taa);
 
@@ -100,7 +101,7 @@ namespace Ailu::Render
                     Camera &tmp_cam = Camera::GetCubemapGenCamera(cam, face);
                     tmp_cam._is_scene_camera = false;
                     tmp_cam._is_render_shadow = false;
-                    tmp_cam.Rect(cam.TargetTexture()->Width(), cam.TargetTexture()->Height());
+                    tmp_cam.OutputSize(cam.TargetTexture()->Width(), cam.TargetTexture()->Height());
                     Cull(s, tmp_cam);
                     DoRender(tmp_cam, s);
                     auto cmd = CommandBufferPool::Get("FinalBlit");
@@ -172,7 +173,7 @@ namespace Ailu::Render
             scene_cb_data->_AreaLights[i]._shadowmap_index = -1;
             _rendering_data._area_shadow_data[i]._shadowmap_index = -1;
         }
-        u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
+        u32 pixel_width = cam.OutputSize().x, pixel_height = cam.OutputSize().y;
         _rendering_data._width = pixel_width;
         _rendering_data._height = pixel_height;
         if (_is_use_render_graph)
@@ -440,8 +441,7 @@ namespace Ailu::Render
                                                     1.0f / QuailtySetting::s_shadow_fade_out_factor, 1.0f / cascade_shaodw_max_dis, 0.f);
         scene_data->g_IndirectLightingIntensity = s._light_data._indirect_lighting_intensity;
         PrepareLight(s);
-        f32 t = g_pTimeMgr->TickTimeSinceLoad, dt = g_pTimeMgr->DeltaTime, sdt = g_pTimeMgr->s_smooth_delta_time;
-        t*= 0.001f;
+        f32 t = g_pTimeMgr->TickTimeSinceLoad, dt = g_pTimeMgr->s_delta_time, sdt = g_pTimeMgr->s_smooth_delta_time;
         scene_data->_Time = Vector4f(t / 20, t, t * 2, (f32) g_pGfxContext->GetFrameCount());
         scene_data->_SinTime = Vector4f(sin(t / 8), sin(t / 4), sin(t / 2), sin(t));
         scene_data->_CosTime = Vector4f(cos(t / 8), cos(t / 4), cos(t / 2), cos(t));
@@ -633,7 +633,7 @@ namespace Ailu::Render
         //auto cam_hash = cam.HashCode();
         auto cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_cur_fs->GetCameraCB(cam.HashCode()));
         f32 f = cam.Far(), n = cam.Near();
-        u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
+        u32 pixel_width = cam.OutputSize().x, pixel_height = cam.OutputSize().y;
         cam_cb_data->_ScreenParams = Vector4f(1.0f / (f32) pixel_width,1.0f / (f32) pixel_height,(f32)pixel_width,(f32)pixel_height);
         Camera::CalculateZBUfferAndProjParams(cam,cam_cb_data->_ZBufferParams,cam_cb_data->_ProjectionParams);
         cam_cb_data->_CameraPos = cam.Position();

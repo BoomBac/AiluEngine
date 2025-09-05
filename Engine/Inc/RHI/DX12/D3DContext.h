@@ -107,23 +107,20 @@ namespace Ailu::RHI::DX12
     {
         friend class D3DCommandBuffer;
     public:
-        D3DContext(WinWindow* window);
+        D3DContext();
         ~D3DContext();
         void Init() final;
         void Present() final;
         u64 GetFenceValueGPU() final;
         u64 GetFenceValueCPU() const final;
+        void RegisterWindow(Window *window);
+        void UnRegisterWindow(Window *window);
         void TakeCapture() final;
-        void ResizeSwapChain(const u32 width, const u32 height) final;
+        void ResizeSwapChain(void *window_handle, const u32 width, const u32 height) final;
         virtual u64 GetFrameCount() const final { return _frame_count; };
-        std::tuple<u32, u32> GetSwapChainSize() const final { return std::make_pair(_width, _height);};
         IGPUTimer* GetTimer() final { return _p_gpu_timer.get(); }
-        const u32 CurBackbufIndex() const final {return m_frameIndex ;};
         void TryReleaseUnusedResources() final;
         f32 TotalGPUMemeryUsage() final;
-
-        RenderPipeline* GetPipeline() final;
-        void RegisterPipeline(RenderPipeline* pipiline) final;
 
         ID3D12Device* GetDevice() { return m_device.Get(); };
         void TrackResource(ComPtr<ID3D12Resource> resource);
@@ -139,44 +136,42 @@ namespace Ailu::RHI::DX12
         void SubmitGpuCommandSync(GfxCommand * cmd) final;
         void CompileShaderAsync(Shader* shader) final {_cmd_worker->SubmitUpdateShader(shader);};
         void CompileShaderAsync(Render::ComputeShader* shader) {_cmd_worker->SubmitUpdateShader(shader);};
-
+        const u32 CurBackbufIndex() const;
         void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd) final;
         void ExecuteRHICommandBuffer(RHICommandBuffer* cmd) final;
         void WaitForGpu() final;
         void WaitForFence(u64 fence_value) final;
-        DXGI_FORMAT BackBufferFormat() const { return _swapchain_format; };
     private:
         void Destroy();
         void LoadPipeline();
         void LoadAssets();
-        void FlushCommandQueue(ID3D12CommandQueue* cmd_queue,ID3D12Fence* fence,u64& fence_value);
         void BeginCapture();
         void EndCapture();
         void ResizeSwapChainImpl(const u32 width, const u32 height);
-        void MoveToNextFrame();
         void PresentImpl(D3DCommandBuffer* cmd);
 #ifdef _DIRECT_WRITE
         void InitDirectWriteContext();
 #endif
 
     private:
+        struct RenderWindowCtx;
+    private:
         inline static const u32 kResourceCleanupIntervalTick = 8000u;
         //1600 * 900 * 4 * 20
         inline static constexpr u64 kMaxRenderTextureMemorySize = 115200000u;
         inline static constexpr u32 kMaxIndirectDispatchCount = 2048u;
         inline static constexpr u32 kMaxIndirectDrawCount     = 2048u;
-        WinWindow* _window;
+        Vector<Scope<RenderWindowCtx>> _render_windows;
+        u32 _cur_ctx_index = 0u;
         //u32 _cbv_desc_num = 0u;
         // Pipeline objects.
-        D3DSwapchainTexture *_swapchain;
         ComPtr<ID3D12Device> m_device;
         ComPtr<ID3D12CommandQueue> m_commandQueue;
         ComPtr<IDXGIAdapter4> _p_adapter;
         DXGI_QUERY_VIDEO_MEMORY_INFO _local_video_memory_info;
         DXGI_QUERY_VIDEO_MEMORY_INFO _non_local_video_memory_info;
         Scope<IGPUTimer> _p_gpu_timer;
-        DXGI_FORMAT _swapchain_format;
 #ifdef _DIRECT_WRITE
         IDWriteFactory * _dw_factory;
         IDWriteTextFormat * _dw_textformat;
@@ -194,23 +189,20 @@ namespace Ailu::RHI::DX12
 #endif
 
         u64 _frame_count = 0u;
-        CPUVisibleDescriptorAllocation _rtv_allocation;
+        //CPUVisibleDescriptorAllocation _rtv_allocation;
         // Synchronization objects.
-        u8 m_frameIndex;
+        //u8 m_frameIndex = 0u;
         u64 _cur_fence_value;
-        HANDLE m_fenceEvent;
-        std::atomic<u64> _fence_value[Render::RenderConstants::kFrameCount];
+        u64 _fence_value;
+        //HANDLE m_fenceEvent;
+        //std::atomic<u64> _fence_value[Render::RenderConstants::kFrameCount];
         ComPtr<ID3D12Fence> _p_cmd_buffer_fence;
         std::multimap<u64, ComPtr<ID3D12Resource>> _global_tracked_resource;
         std::mutex _resource_task_lock;
-        u32 _width;
-        u32 _height;
         float m_aspectRatio;
         bool _is_next_frame_capture = false;
         bool _is_cur_frame_capturing = false;
         WString _cur_capture_name;
-        Render::RenderPipeline* _pipiline = nullptr;
-        std::atomic<u32> _new_backbuffer_size;
         Scope<GpuCommandWorker> _cmd_worker;
         //command signature
         ComPtr<ID3D12CommandSignature> _dispatch_cmd_sig;

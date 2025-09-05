@@ -63,22 +63,25 @@ namespace Ailu
         class SceneLayer;
         class EditorApp : public Ailu::Application
         {
+            DECLARE_DELEGATE(on_file_changed,const fs::path &);
         public:
             static EditorApp *GetEditor() { return static_cast<EditorApp *>(&Application::Get()); }
+            //return  AiluEngine/Editor/EditorConfig.json
+            static const WString &GetEditorConfigPath() { return s_editor_config_path; }
+            //return  AiluEngine/Editor/
+            static const WString &GetEditorRootPath() { return s_editor_root_path; }
         public:
             int Initialize() final;
             void Finalize() final;
             void Tick(f32 delta_time) final;
 
-        public:
-            Delegate<const fs::path &> _on_file_changed_delegate;
         private:
+            inline static WString s_editor_config_path;
+            inline static WString s_editor_root_path;
             EditorLayer *_p_editor_layer;
             InputLayer *_p_input_layer;
             SceneLayer *_p_scene_layer;
             ApplicationDesc _desc;
-            WString s_editor_config_path;
-            WString s_editor_root_path;
             Camera *_p_scene_camera;
             WString _opened_scene_path;
             EditorConfig _editor_config;

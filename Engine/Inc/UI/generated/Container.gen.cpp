@@ -57,27 +57,6 @@ initializer._is_abstract = false;
 initializer._namespace = "Ailu::UI";
 initializer._base_name = "Ailu::UI::UIElement";
 initializer._constructor = []()->Ailu::UI::LinearBox* {return new Ailu::UI::LinearBox;};
-Meta meta_is_size_to_content;
-meta_is_size_to_content.Set("Category","");
-meta_is_size_to_content.Set("IsColor",false);
-meta_is_size_to_content.Set("IsRange",false);
-meta_is_size_to_content.Set("IsFloatRange",true);
-meta_is_size_to_content.Set("RangeMin",0);
-meta_is_size_to_content.Set("RangeMax",1);
-MemberBuilder builder_is_size_to_content;
-builder_is_size_to_content._name = "_is_size_to_content";
-builder_is_size_to_content._type_name = "bool";
-builder_is_size_to_content._offset = offsetof(LinearBox,_is_size_to_content);
-builder_is_size_to_content._is_const = false;
-builder_is_size_to_content._is_static = false;
-builder_is_size_to_content._is_public = true;
-builder_is_size_to_content._is_pointer = false;
-builder_is_size_to_content._is_ref = false;
-builder_is_size_to_content._is_template = false;
-builder_is_size_to_content._meta = meta_is_size_to_content;
-builder_is_size_to_content._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-builder_is_size_to_content._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_size_to_content));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -171,3 +150,231 @@ return Ailu::UI::HorizontalBox::StaticType();
 return Ailu::UI::HorizontalBox::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_HorizontalBox(&Ailu::UI::HorizontalBox::StaticType, "Ailu::UI::HorizontalBox");
+Ailu::Type* Ailu::UI::Z_Construct_ScrollView_Type()
+{
+Ailu::UI::UIElement::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "ScrollView";
+initializer._size = sizeof(Ailu::UI::ScrollView);
+initializer._full_name = "Ailu::UI::ScrollView";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "Ailu::UI::UIElement";
+initializer._constructor = []()->Ailu::UI::ScrollView* {return new Ailu::UI::ScrollView;};
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::UI::ScrollView::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_ScrollView_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::ScrollView>()
+{
+return Ailu::UI::ScrollView::StaticType();
+}
+    Type *Ailu::UI::ScrollView::GetType()
+{
+return Ailu::UI::ScrollView::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_ScrollView(&Ailu::UI::ScrollView::StaticType, "Ailu::UI::ScrollView");
+Ailu::Type* Ailu::UI::Z_Construct_ListView_Type()
+{
+Ailu::UI::ScrollView::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "ListView";
+initializer._size = sizeof(Ailu::UI::ListView);
+initializer._full_name = "Ailu::UI::ListView";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "Ailu::UI::ScrollView";
+initializer._constructor = []()->Ailu::UI::ListView* {return new Ailu::UI::ListView;};
+Meta meta_is_size_to_content;
+meta_is_size_to_content.Set("Category","");
+meta_is_size_to_content.Set("IsColor",false);
+meta_is_size_to_content.Set("IsRange",false);
+meta_is_size_to_content.Set("IsFloatRange",true);
+meta_is_size_to_content.Set("RangeMin",0);
+meta_is_size_to_content.Set("RangeMax",1);
+MemberBuilder builder_is_size_to_content;
+builder_is_size_to_content._name = "_is_size_to_content";
+builder_is_size_to_content._type_name = "bool";
+builder_is_size_to_content._offset = offsetof(ListView,_is_size_to_content);
+builder_is_size_to_content._is_const = false;
+builder_is_size_to_content._is_static = false;
+builder_is_size_to_content._is_public = false;
+builder_is_size_to_content._is_pointer = false;
+builder_is_size_to_content._is_ref = false;
+builder_is_size_to_content._is_template = false;
+builder_is_size_to_content._meta = meta_is_size_to_content;
+builder_is_size_to_content._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_size_to_content._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_size_to_content));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::UI::ListView::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_ListView_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::ListView>()
+{
+return Ailu::UI::ListView::StaticType();
+}
+    Type *Ailu::UI::ListView::GetType()
+{
+return Ailu::UI::ListView::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_ListView(&Ailu::UI::ListView::StaticType, "Ailu::UI::ListView");
+Ailu::Type* Ailu::UI::Z_Construct_Dropdown_Type()
+{
+Ailu::UI::UIElement::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "Dropdown";
+initializer._size = sizeof(Ailu::UI::Dropdown);
+initializer._full_name = "Ailu::UI::Dropdown";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "Ailu::UI::UIElement";
+initializer._constructor = []()->Ailu::UI::Dropdown* {return new Ailu::UI::Dropdown;};
+Meta meta_items;
+meta_items.Set("Category","");
+meta_items.Set("IsColor",false);
+meta_items.Set("IsRange",false);
+meta_items.Set("IsFloatRange",true);
+meta_items.Set("RangeMin",0);
+meta_items.Set("RangeMax",1);
+MemberBuilder builder_items;
+builder_items._name = "_items";
+builder_items._type_name = "Vector<String>";
+builder_items._offset = offsetof(Dropdown,_items);
+builder_items._is_const = false;
+builder_items._is_static = false;
+builder_items._is_public = false;
+builder_items._is_pointer = false;
+builder_items._is_ref = false;
+builder_items._is_template = false;
+builder_items._meta = meta_items;
+builder_items._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector<String>>);
+builder_items._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector<String>>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_items));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::UI::Dropdown::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_Dropdown_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::Dropdown>()
+{
+return Ailu::UI::Dropdown::StaticType();
+}
+    Type *Ailu::UI::Dropdown::GetType()
+{
+return Ailu::UI::Dropdown::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_Dropdown(&Ailu::UI::Dropdown::StaticType, "Ailu::UI::Dropdown");
+Ailu::Type* Ailu::UI::Z_Construct_CollapsibleView_Type()
+{
+Ailu::UI::UIElement::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "CollapsibleView";
+initializer._size = sizeof(Ailu::UI::CollapsibleView);
+initializer._full_name = "Ailu::UI::CollapsibleView";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "Ailu::UI::UIElement";
+initializer._constructor = []()->Ailu::UI::CollapsibleView* {return new Ailu::UI::CollapsibleView;};
+Meta meta_title_text;
+meta_title_text.Set("Category","");
+meta_title_text.Set("IsColor",false);
+meta_title_text.Set("IsRange",false);
+meta_title_text.Set("IsFloatRange",true);
+meta_title_text.Set("RangeMin",0);
+meta_title_text.Set("RangeMax",1);
+MemberBuilder builder_title_text;
+builder_title_text._name = "_title_text";
+builder_title_text._type_name = "String";
+builder_title_text._offset = offsetof(CollapsibleView,_title_text);
+builder_title_text._is_const = false;
+builder_title_text._is_static = false;
+builder_title_text._is_public = false;
+builder_title_text._is_pointer = false;
+builder_title_text._is_ref = false;
+builder_title_text._is_template = false;
+builder_title_text._meta = meta_title_text;
+builder_title_text._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<String>);
+builder_title_text._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<String>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_title_text));
+Meta meta_is_collapsed;
+meta_is_collapsed.Set("Category","");
+meta_is_collapsed.Set("IsColor",false);
+meta_is_collapsed.Set("IsRange",false);
+meta_is_collapsed.Set("IsFloatRange",true);
+meta_is_collapsed.Set("RangeMin",0);
+meta_is_collapsed.Set("RangeMax",1);
+MemberBuilder builder_is_collapsed;
+builder_is_collapsed._name = "_is_collapsed";
+builder_is_collapsed._type_name = "bool";
+builder_is_collapsed._offset = offsetof(CollapsibleView,_is_collapsed);
+builder_is_collapsed._is_const = false;
+builder_is_collapsed._is_static = false;
+builder_is_collapsed._is_public = false;
+builder_is_collapsed._is_pointer = false;
+builder_is_collapsed._is_ref = false;
+builder_is_collapsed._is_template = false;
+builder_is_collapsed._meta = meta_is_collapsed;
+builder_is_collapsed._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_collapsed._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_collapsed));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::UI::CollapsibleView::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_CollapsibleView_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::CollapsibleView>()
+{
+return Ailu::UI::CollapsibleView::StaticType();
+}
+    Type *Ailu::UI::CollapsibleView::GetType()
+{
+return Ailu::UI::CollapsibleView::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_CollapsibleView(&Ailu::UI::CollapsibleView::StaticType, "Ailu::UI::CollapsibleView");

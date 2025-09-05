@@ -461,9 +461,79 @@ namespace Ailu::RHI::DX12
 #pragma endregion
 
 #pragma region D3DContext
-    D3DContext::D3DContext(WinWindow *window) : _window(window), _width(window->GetWidth()), _height(window->GetHeight())
+
+    struct D3DContext::RenderWindowCtx
     {
-        m_aspectRatio = (float) _width / (float) _height;
+        CPUVisibleDescriptorAllocation _rtv_allocation;
+        Window *_window;
+        D3DSwapchainTexture *_swapchain;
+        DXGI_FORMAT _swapchain_format;
+        u32 _width, _height;
+        std::atomic<u32> _new_backbuffer_size;
+
+        u8 _frame_index = 0u;
+        u64 _cur_fence_value = 0;
+        HANDLE _fence_event = nullptr;
+        ComPtr<ID3D12Fence> _fence;
+        u64 _fence_value[Render::RenderConstants::kFrameCount] = {};
+
+        mutable std::mutex _mtx;// 新增：保护 fence/帧索引
+
+        void MoveToNextFrame(ID3D12CommandQueue *queue)
+        {
+            std::lock_guard lock(_mtx);
+
+            const UINT64 currentFenceValue = _fence_value[_frame_index];
+            _frame_index = _swapchain->GetCurrentBackBufferIndex();
+
+            // 如果该buffer上一次绘制还未结束，等待
+            u64 gpu_fence_value = _fence->GetCompletedValue();
+            if (gpu_fence_value < _fence_value[_frame_index])
+            {
+                CPUProfileBlock p("WaitForGPU");
+                ThrowIfFailed(_fence->SetEventOnCompletion(_fence_value[_frame_index], _fence_event));
+                WaitForSingleObjectEx(_fence_event, INFINITE, FALSE);
+            }
+
+            // Set the fence value for the next frame.
+            _fence_value[_frame_index] = currentFenceValue + 1;
+            ThrowIfFailed(queue->Signal(_fence.Get(), _fence_value[_frame_index]));
+        }
+
+        void WaitForGpu(ID3D12CommandQueue *queue)
+        {
+            std::lock_guard lock(_mtx);
+            u64 fence_value = _fence_value[_frame_index];
+            FlushCommandQueue(queue, _fence.Get(), fence_value);
+            _fence_value[_frame_index] = fence_value;
+        }
+
+        void WaitForFence(ID3D12CommandQueue *queue, u64 fence_value)
+        {
+            std::lock_guard lock(_mtx);
+            FlushCommandQueue(queue, _fence.Get(), fence_value);
+        }
+
+        void FlushCommandQueue(ID3D12CommandQueue *cmd_queue, ID3D12Fence *fence, u64 &fence_value)
+        {
+            // 注意：这里 fence_value 是局部副本，必须在锁下修改
+            if (fence_value < fence->GetCompletedValue())
+                return;
+
+            ++fence_value;
+            ThrowIfFailed(cmd_queue->Signal(fence, fence_value));
+            if (fence->GetCompletedValue() < fence_value)
+            {
+                ThrowIfFailed(fence->SetEventOnCompletion(fence_value, _fence_event));
+                WaitForSingleObjectEx(_fence_event, INFINITE, FALSE);
+            }
+        }
+    };
+
+
+
+    D3DContext::D3DContext()
+    {
 #ifdef _PIX_DEBUG
         PIXLoadLatestWinPixGpuCapturerLibrary();
         //RdcLoadLatestRdcGpuCapturerLibrary();
@@ -480,6 +550,7 @@ namespace Ailu::RHI::DX12
     void D3DContext::Init()
     {
         g_pGfxContext = this;
+        _fence_value = 0u;
         LoadPipeline();
         LoadAssets();
         _readback_pool = MakeScope<ReadbackBufferPool>(m_device.Get());
@@ -538,19 +609,14 @@ namespace Ailu::RHI::DX12
         //}
     }
 
-    RenderPipeline *D3DContext::GetPipeline()
-    {
-        return _pipiline;
-    }
-
-    void D3DContext::RegisterPipeline(RenderPipeline *pipiline)
-    {
-        _pipiline = pipiline;
-    };
-
     void D3DContext::TrackResource(ComPtr<ID3D12Resource> resource)
     {
         _global_tracked_resource.insert(std::make_pair(_frame_count, resource));
+    }
+
+    const u32 D3DContext::CurBackbufIndex() const
+    {
+        return _render_windows[0]->_frame_index;
     }
 
     void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd)
@@ -580,12 +646,12 @@ namespace Ailu::RHI::DX12
         PIXBeginEvent(m_commandQueue.Get(), cmd->ID(), ToWChar(cmd->Name()).c_str());
 #endif// _PIX_DEBUG
         m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-        ++_fence_value[m_frameIndex];
-        ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value[m_frameIndex]));
+        ++_fence_value;
+        ThrowIfFailed(m_commandQueue->Signal(_p_cmd_buffer_fence.Get(), _fence_value));
 #ifdef _PIX_DEBUG
         PIXEndEvent(m_commandQueue.Get());
 #endif// _PIX_DEBUG
-        d3dcmd->_fence_value = _fence_value[m_frameIndex];
+        d3dcmd->_fence_value = _fence_value;
         d3dcmd->PostExecute();
     }
 
@@ -594,10 +660,9 @@ namespace Ailu::RHI::DX12
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
         WaitForGpu();
-        CloseHandle(m_fenceEvent);
+        //CloseHandle(m_fenceEvent);
         if (Application::Get()._is_multi_thread_rendering)
             _cmd_worker->Stop();
-        AL_DELETE(_swapchain);
         //_p_gpu_timer->ReleaseDevice();
         //在这里析构分配器应该会有问题，纹理实际在在这之后还需要归还之前的分配
         D3DDescriptorMgr::Shutdown();
@@ -663,46 +728,15 @@ namespace Ailu::RHI::DX12
         queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
         queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
-        _rtv_allocation = D3DDescriptorMgr::Get().AllocCPU(RenderConstants::kFrameCount, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-        // Describe and create the swap chain.
-        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-        swapChainDesc.BufferCount = RenderConstants::kFrameCount;
-        swapChainDesc.Width = _width;
-        swapChainDesc.Height = _height;
-        swapChainDesc.Format = RenderConstants::kColorRange == EColorRange::kLDR ? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat);
-        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swapChainDesc.SampleDesc.Count = 1;
-        swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
-        auto hwnd = static_cast<HWND>(_window->GetNativeWindowPtr());
-        {
-            D3DSwapchainInitializer initializer;
-            initializer._command_queue = m_commandQueue.Get();
-            initializer._device = m_device.Get();
-            initializer._factory = factory.Get();
-            initializer._format = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
-            initializer._is_fullscreen = false;
-            Vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvs(RenderConstants::kFrameCount);
-            for(u16 i = 0; i < RenderConstants::kFrameCount; i++)
-                rtvs[i] = _rtv_allocation.At(i);
-            initializer._rtvs = rtvs;
-            initializer._swapchain_desc = swapChainDesc;
-            initializer._window_handle = hwnd;
-            _swapchain = AL_NEW(D3DSwapchainTexture, initializer);
-            _swapchain_format = ConvertToDXGIFormat(initializer._format);
-        }
-#if defined(_PIX_DEBUG)
-        PIXSetTargetWindow(hwnd);
-        PIXSetHUDOptions(PIXHUDOptions::PIX_HUD_SHOW_ON_NO_WINDOWS);
-#endif
+
         //m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-        m_frameIndex = _swapchain->GetCurrentBackBufferIndex();
+        //m_frameIndex = _swapchain->GetCurrentBackBufferIndex();
 
         // Create a RTV for each frame.
-        for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
-        {
-            _fence_value[n] = 0;
-        }
+        //for (UINT n = 0; n < RenderConstants::kFrameCount; n++)
+        //{
+        //    _fence_value[n] = 0;
+        //}
 
         {
             ThrowIfFailed(CommandSignatureHelper::CreateDispatchCommandSignature(m_device.Get(), nullptr, _dispatch_cmd_sig.GetAddressOf()));
@@ -776,12 +810,12 @@ namespace Ailu::RHI::DX12
         {
             ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(_p_cmd_buffer_fence.GetAddressOf())));
             _p_cmd_buffer_fence->SetName(L"ALD3DFence");
-            m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-            if (m_fenceEvent == nullptr)
-            {
-                ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
-            }
-            WaitForGpu();
+            //m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+            //if (m_fenceEvent == nullptr)
+            //{
+            //    ThrowIfFailed(HRESULT_FROM_WIN32(GetLastError()));
+            //}
+            //WaitForGpu();
         }
     }
 
@@ -803,7 +837,81 @@ namespace Ailu::RHI::DX12
 
     u64 D3DContext::GetFenceValueCPU() const
     {
-        return _fence_value[m_frameIndex];
+        return _fence_value;
+    }
+
+    void D3DContext::RegisterWindow(Window *window)
+    {
+        UINT dxgiFactoryFlags = 0;
+
+#if defined(_DEBUG)
+        // Enable the debug layer (requires the Graphics Tools "optional feature").
+        // NOTE: Enabling the debug layer after device creation will invalidate the active device.
+        {
+            ComPtr<ID3D12Debug> debugController;
+            if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
+            {
+                debugController->EnableDebugLayer();
+
+                // Enable additional debug layers.
+                dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+            }
+        }
+        //https://learn.microsoft.com/zh-cn/windows/win32/direct3d12/using-d3d12-debug-layer-gpu-based-validation
+        //EnableShaderBasedValidation();
+#endif
+
+        ComPtr<IDXGIFactory6> factory;
+        ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
+
+        auto ctx = MakeScope<RenderWindowCtx>();
+        ctx->_window = window;
+        ctx->_rtv_allocation = D3DDescriptorMgr::Get().AllocCPU(RenderConstants::kFrameCount, D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+        ctx->_width = window->GetWidth();
+        ctx->_height = window->GetHeight();
+        // Describe and create the swap chain.
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+        swapChainDesc.BufferCount = RenderConstants::kFrameCount;
+        swapChainDesc.Width = window->GetWidth();
+        swapChainDesc.Height = window->GetHeight();
+        swapChainDesc.Format = RenderConstants::kColorRange == EColorRange::kLDR ? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat);
+        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+        swapChainDesc.SampleDesc.Count = 1;
+        swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+        auto hwnd = static_cast<HWND>(ctx->_window->GetNativeWindowPtr());
+        {
+            D3DSwapchainInitializer initializer;
+            initializer._command_queue = m_commandQueue.Get();
+            initializer._device = m_device.Get();
+            initializer._factory = factory.Get();
+            initializer._format = RenderConstants::kColorRange == EColorRange::kLDR ? RenderConstants::kLDRFormat : RenderConstants::kHDRFormat;
+            initializer._is_fullscreen = false;
+            Vector<D3D12_CPU_DESCRIPTOR_HANDLE> rtvs(RenderConstants::kFrameCount);
+            for (u16 i = 0; i < RenderConstants::kFrameCount; i++)
+                rtvs[i] = ctx->_rtv_allocation.At(i);
+            initializer._rtvs = rtvs;
+            initializer._swapchain_desc = swapChainDesc;
+            initializer._window = window;
+            ctx->_swapchain = AL_NEW(D3DSwapchainTexture, initializer);
+            ctx->_swapchain_format = ConvertToDXGIFormat(initializer._format);
+        }
+#if defined(_PIX_DEBUG)
+        PIXSetTargetWindow(hwnd);
+        PIXSetHUDOptions(PIXHUDOptions::PIX_HUD_SHOW_ON_NO_WINDOWS);
+#endif
+        ctx->_frame_index = ctx->_swapchain->GetCurrentBackBufferIndex();
+        ThrowIfFailed(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(ctx->_fence.GetAddressOf())));
+        ctx->_fence->SetName(std::format(L"{}_fence", ctx->_window->GetTitle()).c_str());
+        ctx->_fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+        //ctx->_swapchain->Name(ToChar(ctx->_window->GetTitle()));
+        _render_windows.emplace_back(std::move(ctx));
+    }
+
+    void D3DContext::UnRegisterWindow(Window *window)
+    {
+        std::erase_if(_render_windows, [&](Scope<RenderWindowCtx> &ctx) -> bool
+                      { return ctx->_window == window; });
     }
 
     void D3DContext::TakeCapture()
@@ -814,68 +922,80 @@ namespace Ailu::RHI::DX12
         _is_next_frame_capture = true;
     }
 
-    void D3DContext::ResizeSwapChain(const u32 width, const u32 height)
+    void D3DContext::ResizeSwapChain(void *window_handle, const u32 width, const u32 height)
     {
-        u32 new_size = (static_cast<u32>(width) << 16) | static_cast<u32>(height & 0xFFFF);
-        _new_backbuffer_size.store(new_size);
+        auto it = std::find_if(_render_windows.begin(), _render_windows.end(), [&](Scope<RenderWindowCtx> &ctx) -> bool
+                               { return ctx->_window->GetNativeWindowPtr() == window_handle; });
+        if (it != _render_windows.end())
+        {
+            u32 new_size = (static_cast<u32>(width) << 16) | static_cast<u32>(height & 0xFFFF);
+            it->get()->_new_backbuffer_size.store(new_size);
+        }
     }
 
 
     void D3DContext::WaitForGpu()
     {
-        u64 fence_value = _fence_value[m_frameIndex];
-        FlushCommandQueue(m_commandQueue.Get(), _p_cmd_buffer_fence.Get(), fence_value);
-        _fence_value[m_frameIndex] = fence_value;
+        for (auto &ctx: _render_windows)
+        {
+            ctx->WaitForGpu(m_commandQueue.Get());
+        }
     }
 
     void D3DContext::WaitForFence(u64 fence_value)
     {
-        FlushCommandQueue(m_commandQueue.Get(), _p_cmd_buffer_fence.Get(), fence_value);
-    }
-
-    void D3DContext::FlushCommandQueue(ID3D12CommandQueue *cmd_queue, ID3D12Fence *fence, u64 &fence_value)
-    {
-        ++fence_value;
-        ThrowIfFailed(cmd_queue->Signal(fence, fence_value));
-        if (fence->GetCompletedValue() < fence_value)
+        for (auto &ctx: _render_windows)
         {
-            ThrowIfFailed(fence->SetEventOnCompletion(fence_value, m_fenceEvent));
-            WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
+            ctx->WaitForFence(m_commandQueue.Get(), fence_value);
         }
     }
-    void D3DContext::MoveToNextFrame()
-    {
-        //执行时已经递增了，这里不再需要
-        // Schedule a Signal command in the queue.
-        const UINT64 currentFenceValue = _fence_value[m_frameIndex];
-        m_frameIndex = _swapchain->GetCurrentBackBufferIndex();
 
-        // 如果该buffer上一次绘制还未结束，等待
-        if (_p_cmd_buffer_fence->GetCompletedValue() < _fence_value[m_frameIndex])
-        {
-            CPUProfileBlock p("WaitForGPU");
-            ThrowIfFailed(_p_cmd_buffer_fence->SetEventOnCompletion(_fence_value[m_frameIndex], m_fenceEvent));
-            WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
-        }
-
-        // Set the fence value for the next frame.
-        _fence_value[m_frameIndex] = currentFenceValue + 1;
-    }
     void D3DContext::PresentImpl(D3DCommandBuffer *cmd)
     {
         static TimeMgr s_timer;
         CPUProfileBlock b("Reslove");
 #ifdef DEAR_IMGUI
         auto dxcmd = cmd->NativeCmdList();
-        auto rtv_handle = *_swapchain->TargetCPUHandle(cmd);
+        auto rtv_handle = *_render_windows[0]->_swapchain->TargetCPUHandle(cmd);
         dxcmd->OMSetRenderTargets(1, &rtv_handle, FALSE, nullptr);
-        dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
+        //dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
         ImGuiRenderer::Get().Render(cmd);
 #endif// DEAR_IMGUI
-
+        // Present the frame.
+        for (auto &ctx: _render_windows)
+        {
 #ifndef _DIRECT_WRITE
-            _swapchain->PreparePresent(cmd);
+            ctx->_swapchain->PreparePresent(cmd);
 #endif// !_DIRECT_WRITE
+        }
+        ExecuteRHICommandBuffer(cmd);
+        for (auto &ctx: _render_windows)
+        {
+            ctx->_swapchain->Present();
+            {
+                s_timer.MarkLocal();
+                //WaitForGpu();
+                ctx->MoveToNextFrame(m_commandQueue.Get());
+                //if (Application::Get().GetFrameCount() % 60 == 0)
+                Render::RenderingStates::s_gpu_latency = s_timer.GetElapsedSinceLastLocalMark();
+            }
+            if (_is_cur_frame_capturing)
+            {
+                EndCapture();
+            }
+            {
+                u32 new_pack_size = ctx->_new_backbuffer_size.load();
+                if (new_pack_size != 0u)
+                {
+                    u32 new_width = (new_pack_size >> 16) & 0xFFFF;
+                    u32 new_height = new_pack_size & 0xFFFF;
+                    ctx->WaitForGpu(m_commandQueue.Get());
+                    ctx->_swapchain->Resize(new_width, new_height);
+                    ctx->WaitForGpu(m_commandQueue.Get());
+                    ctx->_new_backbuffer_size.store(0u);
+                }
+            }
+        }
 
 #ifdef _DIRECT_WRITE
             //RenderUI
@@ -909,33 +1029,6 @@ namespace Ailu::RHI::DX12
             }
 #endif//  _DIRECT_WRITE
         
-        // Present the frame.
-        ExecuteRHICommandBuffer(cmd);
-        _swapchain->Present();
-        {
-            s_timer.MarkLocal();
-            WaitForGpu();
-            //MoveToNextFrame();
-            //if (Application::Get().GetFrameCount() % 60 == 0)
-            Render::RenderingStates::s_gpu_latency = s_timer.GetElapsedSinceLastLocalMark();
-        }
-        if (_is_cur_frame_capturing)
-        {
-            EndCapture();
-        }
-        {
-            u32 new_pack_size = _new_backbuffer_size.load();
-            if (new_pack_size != 0u)
-            {
-                u32 new_width = (new_pack_size >> 16) & 0xFFFF;
-                u32 new_height = new_pack_size & 0xFFFF;
-                WaitForGpu();
-                _swapchain->Resize(new_width, new_height);
-                WaitForGpu();
-                _new_backbuffer_size.store(0u);
-            }
-        }
-
         if (_frame_count % kResourceCleanupIntervalTick == 0)
         {
             if (_global_tracked_resource.size() > 0)
@@ -985,6 +1078,7 @@ namespace Ailu::RHI::DX12
         LOG_WARNING("Begin take capture...");
         static PIXCaptureParameters parms{};
         static u32 s_capture_count = 0u;
+        PIXSetTargetWindow((HWND) Application::FocusedWindow()->GetNativeWindowPtr());
         _cur_capture_name = std::format(L"{}_{}{}", L"NewCapture", ToWChar(TimeMgr::CurrentTime("%Y-%m-%d_%H%M%S")), L".wpix");
         parms.GpuCaptureParameters.FileName = _cur_capture_name.data();
         PIXBeginCapture(PIX_CAPTURE_GPU, &parms);
@@ -1004,7 +1098,7 @@ namespace Ailu::RHI::DX12
     }
     void D3DContext::ResizeSwapChainImpl(const u32 width, const u32 height)
     {
-        if (width == _width && height == _height)
+        if (width == _render_windows[_cur_ctx_index]->_width && height == _render_windows[_cur_ctx_index]->_height)
             return;
         //m_frameIndex = _swapchain->GetCurrentBackBufferIndex();
 #ifdef _DIRECT_WRITE
@@ -1034,8 +1128,8 @@ namespace Ailu::RHI::DX12
         //m_windowedMode = !fullscreenState;
         //m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
         WaitForGpu();
-        _width = width;
-        _height = height;
+        _render_windows[_cur_ctx_index]->_width = width;
+        _render_windows[_cur_ctx_index]->_height = height;
 #ifdef _DIRECT_WRITE
         // Query the desktop's dpi settings, which will be used to create
         // D2D's render targets.
@@ -1347,6 +1441,16 @@ namespace Ailu::RHI::DX12
             auto custom_cmd = static_cast<CommandCustom *>(cmd);
             custom_cmd->_func();
         }
+        else if (cmd->GetCmdType() == EGpuCommandType::kScissorRect)
+        {
+            auto scissor_cmd = static_cast<CommandScissor*>(cmd);
+            static D3D12_RECT s_d3d_rects[RenderConstants::kMaxMRTNum];
+            for (u32 i = 0; i < scissor_cmd->_num; ++i)
+            {
+                s_d3d_rects[i] = D3DConvertUtils::ToD3DRect(scissor_cmd->_rects[i]);
+            }
+            dxcmd->RSSetScissorRects(scissor_cmd->_num, s_d3d_rects);
+        }
         else if (cmd->GetCmdType() == EGpuCommandType::kResourceUpload)
         {
             auto upload_cmd = static_cast<CommandGpuResourceUpload *>(cmd);
@@ -1406,7 +1510,10 @@ namespace Ailu::RHI::DX12
                 else
                 {
                     if (is_indexed_draw)
-                        dxcmd->DrawIndexedInstanced(draw_cmd->_ib->GetCount(), draw_cmd->_instance_count, 0, 0, 0);
+                    {
+                        const u32 index_count = draw_cmd->_index_num == 0u ? draw_cmd->_ib->GetCount() : draw_cmd->_index_num;
+                        dxcmd->DrawIndexedInstanced(index_count, draw_cmd->_instance_count, draw_cmd->_index_start, 0, 0);
+                    }
                     else
                         dxcmd->DrawInstanced(draw_cmd->_vb->GetVertexCount(), draw_cmd->_instance_count, 0, 0);
                 }
@@ -1490,7 +1597,7 @@ namespace Ailu::RHI::DX12
             dxcmd->CopyBufferRegion(copy_dst.Get(), 0u, copy_src, 0u, size);
             state_guard->MakesureResourceState(dxcmd, old_state);
 
-            u64 fence_value = _fence_value[m_frameIndex] + 1;
+            u64 fence_value = _fence_value + 1;
             auto copy_dst_capture = copy_dst;// 确保 lambda 生命周期
             ReadbackCallback callback = std::move(cmd_rb->_callback);
             JobSystem::Get().Dispatch([this, copy_dst_capture, size, fence_value, callback]()

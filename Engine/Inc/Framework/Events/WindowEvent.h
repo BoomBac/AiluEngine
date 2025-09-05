@@ -11,13 +11,14 @@ namespace Ailu
 	class AILU_API WindowCloseEvent : public Event
 	{
 	public:
-		WindowCloseEvent() {};
+		WindowCloseEvent(void* handle) : _handle(handle){};
 		std::string ToString() const override
 		{
 			return "WindowCloseEvent";
 		}
-		EVENT_CLASS_TYPE(kWindowClose)
-		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
+        EVENT_CLASS_TYPE(kWindowClose)
+        EVENT_CLASS_CATEGORY(kEventCategoryApplication)
+        void *_handle;
 	};
 
 	class AILU_API WindowFocusEvent : public Event
@@ -47,7 +48,7 @@ namespace Ailu
 	class AILU_API WindowResizeEvent : public Event
 	{
 	public:
-		WindowResizeEvent(uint16_t w, uint16_t h) : _width(w), _height(h) {}
+        WindowResizeEvent(void *handle, uint16_t w, uint16_t h) : _handle(handle), _width(w), _height(h) {}
 		inline float GetWidth() const { return _width; }
 		inline float GetHeight() const { return _height; }
 		std::string ToString() const override
@@ -56,8 +57,9 @@ namespace Ailu
 		}
 		EVENT_CLASS_TYPE(kWindowResize)
 		EVENT_CLASS_CATEGORY(kEventCategoryApplication)
-	private:
+	//private:
 		uint16_t _width, _height;
+        void *_handle;
 	};
 
 	class AILU_API WindowMovedEvent : public Event

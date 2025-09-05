@@ -62,26 +62,26 @@ public:
             {
                 if (!_stack.empty())
                 {
-                    // 如果是命名空间的结束，可能需要弹出多个命名空间
-                    if (!_stack.empty() && _stack.back().is_namespace)
-                    {
-                        // 找到最近的命名空间块的开始
-                        size_t ns_count = 0;
-                        for (auto it = _stack.rbegin(); it != _stack.rend(); ++it)
-                        {
-                            if (it->is_namespace)
-                                ns_count++;
-                            else
-                                break;
-                        }
+                    //// 如果是命名空间的结束，可能需要弹出多个命名空间
+                    //if (!_stack.empty() && _stack.back().is_namespace)
+                    //{
+                    //    // 找到最近的命名空间块的开始
+                    //    size_t ns_count = 0;
+                    //    for (auto it = _stack.rbegin(); it != _stack.rend(); ++it)
+                    //    {
+                    //        if (it->is_namespace)
+                    //            ns_count++;
+                    //        else
+                    //            break;
+                    //    }
 
-                        // 弹出整个命名空间块
-                        for (size_t i = 0; i < ns_count && !_stack.empty(); ++i)
-                        {
-                            _stack.pop_back();
-                        }
-                    }
-                    else
+                    //    // 弹出整个命名空间块
+                    //    for (size_t i = 0; i < ns_count && !_stack.empty(); ++i)
+                    //    {
+                    //        _stack.pop_back();
+                    //    }
+                    //}
+                    //else
                     {
                         // 普通大括号，弹出一个
                         _stack.pop_back();

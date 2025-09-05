@@ -81,7 +81,7 @@ namespace Ailu
                         cam._layer_mask = 0;
                         cam._layer_mask |= ERenderLayer::kDefault;
                         cam.TargetTexture(comp._cubemap.get());
-                        auto renderer = g_pGfxContext->GetPipeline()->GetRenderer();
+                        auto renderer = Render::RenderPipeline::Get().GetRenderer();
                         renderer->_is_render_light_probe = true;
                         renderer->SubmitTaskPass(comp._pass.get());
                         renderer->Render(cam, *g_pSceneMgr->ActiveScene());

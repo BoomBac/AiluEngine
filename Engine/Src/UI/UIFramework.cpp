@@ -2,6 +2,12 @@
 // Created by 22292 on 2024/10/28.
 //
 #include "UI/UIFramework.h"
+#include "UI/UIRenderer.h"
+#include "UI/UILayer.h"
+#include "UI/Widget.h"
+#include "UI/Container.h"
+#include "UI/Basic.h"
+#include "Framework/Common/Application.h"
 
 namespace Ailu::UI
 {
@@ -13,6 +19,7 @@ namespace Ailu::UI
     }
     void UIManager::Shutdown()
     {
+        UIRenderer::Shutdown();
         DESTORY_PTR(g_pUIManager);
     }
     UIManager *UIManager::Get()
@@ -22,39 +29,128 @@ namespace Ailu::UI
 
     UIManager::UIManager()
     {
+        UIRenderer::Init();
+        _ui_layer = new UILayer();
+        Application::Get().PushLayer(_ui_layer);
+        _renderer = UIRenderer::Get();
+        _capture_target = nullptr;
+        auto popup_widget = MakeRef<Widget>();
+        popup_widget->Name("PopupWidget");
+        popup_widget->AddToWidget(MakeRef<Canvas>());
+        popup_widget->_visibility = EVisibility::kHide;
+        RegisterWidget(popup_widget);
+        _popup_widget = popup_widget.get();
     }
     UIManager::~UIManager()
     {
+
     }
 
-    void UIManager::SetCursor(ECursorType type)
+    void UIManager::RegisterWidget(Ref<Widget> w)
     {
-#if PLATFORM_WINDOWS
-        HCURSOR cursor = nullptr;
-        switch (type)
-        {
-            case ECursorType::kArrow:
-                cursor = LoadCursor(NULL, IDC_ARROW);
-                break;
-            case ECursorType::kSizeNS:
-                cursor = LoadCursor(NULL, IDC_SIZENS);
-                break;
-            case ECursorType::kSizeEW:
-                cursor = LoadCursor(NULL, IDC_SIZEWE);
-                break;
-            case ECursorType::kSizeNWSE:
-                cursor = LoadCursor(NULL, IDC_SIZENWSE);
-                break;
-            case ECursorType::kSizeNESW:
-                cursor = LoadCursor(NULL, IDC_SIZENESW);
-                break;
-            default:
-                cursor = LoadCursor(NULL, IDC_ARROW);
-                break;
-        }
-        ::SetCursor(cursor);
-#endif// PLATFORM_WINDOWS
+
+        if (auto it = std::find_if(_widgets.begin(), _widgets.end(), [&](Ref<Widget> e) -> bool
+                                   { return e.get() == w.get(); });
+            it != _widgets.end())
+            return;
+        _widgets.push_back(w);
     }
 
+    void UIManager::UnRegisterWidget(Widget *w)
+    {
+        std::erase_if(_widgets, [&](Ref<Widget> e) -> bool
+                      { return e.get() == w; });
+    }
 
+    void UIManager::BringToFront(Widget *w)
+    {
+        auto it = std::find_if(_widgets.begin(), _widgets.end(), [&](Ref<Widget> e) -> bool
+                               { return e.get() == w; });
+        if (it == _widgets.end()-1)
+            return;
+        Ref<Widget> current = *it;
+        if (it != _widgets.end())
+        {
+            _widgets.erase(it);
+            _widgets.push_back(current);// 移到最前
+        }
+        // 重新计算z
+        for (u64 i = 0; i < _widgets.size(); i++)
+        {
+            _widgets[i]->_sort_order = (u32)i;
+        }
+        w->_on_get_focus_delegate.Invoke();
+        w->_on_get_focus_delegate.Invoke();
+    }
+
+    void UIManager::SetFocus(UIElement *element)
+    {
+        if (_focus_target == element)
+            return;
+        UIElement *old = _focus_target;
+        _focus_target = element;
+        ApplyFocusChange(old, element);
+        LOG_INFO("UIManager::SetFocus: foucs on {}", element ? element->Name() : "null");
+    }
+
+    void UIManager::ClearFocus(UIElement *element)
+    {
+        if (element && _focus_target != element)
+            return;// 只清除当前焦点
+        if (_focus_target == nullptr)
+            return;
+        UIElement *old = _focus_target;
+        _focus_target = nullptr;
+        ApplyFocusChange(old, nullptr);
+    }
+    void UIManager::ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close, Window *win)
+    {
+        _popup_widget->SetPosition({x, y});
+        _popup_widget->_visibility = EVisibility::kVisible;
+        _popup_widget->BindOutput(RenderTexture::WindowBackBuffer(win? win : &Application::Get().GetWindow()));
+        _popup_widget->Root()->AddChild(root);
+        BringToFront(_popup_widget);
+        _popup_widget->SetSize(_popup_widget->Root()->MeasureDesiredSize());
+        if (on_close)
+            _on_popup_close = on_close;
+    }
+    void UIManager::HidePopup()
+    {
+        if (_popup_widget)
+        {
+            _popup_widget->_visibility = EVisibility::kHide;
+            if (!_popup_widget->Root()->GetChildren().empty())
+                LOG_INFO("UIManager::HidePopup: destory element {}", _popup_widget->Root()->ChildAt(0u)->Name())
+            _popup_widget->Root()->ClearChildren();
+            if (_on_popup_close)
+            {
+                _on_popup_close();
+                _on_popup_close = nullptr;
+            }
+        }
+    }
+    void UIManager::OnElementDestroying(UIElement *element)
+    {
+        if (_capture_target == element)
+            _capture_target = nullptr;
+        if (_focus_target == element)
+            _focus_target = nullptr;
+        for (auto &w: _widgets)
+        {
+            if (auto it = std::find_if(w->_prev_hover_path.begin(), w->_prev_hover_path.end(), [&](UIElement *e)
+                                       { return e == element; });
+                it != w->_prev_hover_path.end())
+            {
+                w->_prev_hover_path.erase(it, w->_prev_hover_path.end());
+                break;
+            }
+        }
+    }
+    void UIManager::ApplyFocusChange(UIElement *old_f, UIElement *new_f)
+    {
+        if (old_f)
+            old_f->SetFocusedInternal(false);
+        if (new_f)
+            new_f->SetFocusedInternal(true);
+    }
 }// namespace Ailu::UI

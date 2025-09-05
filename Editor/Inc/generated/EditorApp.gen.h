@@ -16,7 +16,7 @@ namespace Ailu::Editor{
 struct EditorConfig ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::EditorConfig>();
+class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::EditorConfig>();
 //Struct EditorConfig end...........................
 
 //Struct TestObj begin...........................
@@ -31,7 +31,7 @@ namespace Ailu::Editor{
 struct TestObj ;
 }
 template<>
-AILU_API class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::TestObj>();
+class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::TestObj>();
 //Struct TestObj end...........................
 
 #undef CURRENT_FILE_ID

@@ -301,6 +301,7 @@ namespace Ailu
                 class_type = class_type->BaseType();
             }
         }
+        virtual void PostDeserialize() { /*optional override*/ }
     };
 
     template<typename T>

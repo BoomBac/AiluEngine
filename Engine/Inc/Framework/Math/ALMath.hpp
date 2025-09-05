@@ -12,6 +12,7 @@
 #include <math.h>
 #include <random>
 #include <string>
+#include <concepts>
 
 #include "Objects/ReflectTemplate.h" //为了StaticClass<T>能返回数学类型
 
@@ -122,25 +123,27 @@ namespace Ailu
 
         struct Rect
         {
-            uint16_t left;
-            uint16_t top;
-            uint16_t width;
-            uint16_t height;
-            Rect(uint16_t l, uint16_t t, uint16_t w, uint16_t h)
+            u16 left;
+            u16 top;
+            u16 width;
+            u16 height;
+            Rect(u16 l, u16 t, u16 w, u16 h)
                 : left(l), top(t), width(w), height(h)
             {
             }
             Rect() : Rect(0, 0, 0, 0) {};
+            bool operator==(const Rect &other) const
+            {
+                return left == other.left && top == other.top && width == other.width && height == other.height;
+            }
         };
     
         using ScissorRect = Rect;
 
         template<template<typename> class TT, typename T, int... Indexes>
-        class Swizzle
+        struct Swizzle
         {
             T v[sizeof...(Indexes)];
-
-        public:
             TT<T> &operator=(const TT<T> &rhs)
             {
                 int indexes[] = {Indexes...};
@@ -201,6 +204,7 @@ namespace Ailu
                 }
                 return *(TT<T> *) this;
             }
+            
             TT<T> &operator+=(TT<T> other)
             {
                 int indexes[] = {Indexes...};
@@ -210,59 +214,6 @@ namespace Ailu
                     v[indexes[i]] += other.data[i];
                 }
                 return *(TT<T> *) this;
-            }
-            TT<T> operator+(TT<T> other) const
-            {
-                TT<T> r = *this;
-                int indexes[] = {Indexes...};
-                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
-                for (int i = 0; i < count; i++)
-                {
-                    r[indexes[i]] += other.data[i];
-                }
-                return r;
-            }
-            TT<T> &operator-=(TT<T> other)
-            {
-                int indexes[] = {Indexes...};
-                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
-                for (int i = 0; i < count; i++)
-                {
-                    v[indexes[i]] -= other.data[i];
-                }
-                return *(TT<T> *) this;
-            }
-            TT<T> operator-(TT<T> other) const
-            {
-                TT<T> r = *this;
-                int indexes[] = {Indexes...};
-                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
-                for (int i = 0; i < count; i++)
-                {
-                    r[indexes[i]] -= other.data[i];
-                }
-                return r;
-            }
-            TT<T> &operator*=(TT<T> other)
-            {
-                int indexes[] = {Indexes...};
-                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
-                for (int i = 0; i < count; i++)
-                {
-                    v[indexes[i]] *= other.data[i];
-                }
-                return *(TT<T> *) this;
-            }
-            TT<T> operator*(TT<T> other) const
-            {
-                TT<T> r = *this;
-                int indexes[] = {Indexes...};
-                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
-                for (int i = 0; i < count; i++)
-                {
-                    r[indexes[i]] *= other.data[i];
-                }
-                return r;
             }
             TT<T> &operator-=(T scale)
             {
@@ -303,12 +254,90 @@ namespace Ailu
                 }
                 return r;
             }
+            TT<T> operator+(TT<T> other) const
+            {
+                TT<T> result;
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    result.data[i] = v[indexes[i]] + other.data[i];
+                }
+                return result;
+            }
+
+            TT<T> &operator-=(TT<T> other)
+            {
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    v[indexes[i]] -= other.data[i];
+                }
+                return *(TT<T> *) this;
+            }
+
+            TT<T> operator-(TT<T> other) const
+            {
+                TT<T> result;
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    result.data[i] = v[indexes[i]] - other.data[i];
+                }
+                return result;
+            }
+
+            TT<T> &operator*=(TT<T> other)
+            {
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    v[indexes[i]] *= other.data[i];
+                }
+                return *(TT<T> *) this;
+            }
+            TT<T> operator*(TT<T> other) const
+            {
+                TT<T> result;
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    result.data[i] = v[indexes[i]] * other.data[i];
+                }
+                return result;
+            }
+            TT<T>& operator/=(TT<T> other)
+            {
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    v[indexes[i]] /= (other.data[i] + FLT_EPSILON);
+                }
+                return *(TT<T> *) this;
+            }
+            TT<T> operator/(TT<T> other) const
+            {
+                TT<T> result;
+                int indexes[] = {Indexes...};
+                int count = std::min<int>(sizeof...(Indexes), CountOf(other.data));
+                for (int i = 0; i < count; i++)
+                {
+                    result.data[i] = v[indexes[i]] / other.data[i];
+                }
+                return result;
+            }
         };
         template<typename T>
         struct Vector2D
         {
             static const Vector2D<T> kZero;
             static const Vector2D<T> kOne;
+            inline static constexpr u16 s_length = 2u;
             union
             {
                 T data[2];
@@ -331,7 +360,7 @@ namespace Ailu
             explicit Vector2D<T>(const T &v) : x(v), y(v){};
             Vector2D<T>(const T &v, const T &w) : x(v), y(w){};
             operator T *() { return data; };
-            operator const T *() { return static_cast<const T *>(data); };
+            operator const T *() const { return static_cast<const T *>(data); };
             T &operator[](u32 index) { return data[index]; }
             const T &operator[](u32 index) const { return data[index]; }
 
@@ -667,6 +696,7 @@ namespace Ailu
             explicit Vector4D<T>(const T &_v) : x(_v), y(_v), z(_v), w(_v){};
             Vector4D<T>(const T &_x, const T &_y, const T &_z, const T &_w) : x(_x), y(_y), z(_z), w(_w){};
             Vector4D<T>(const Vector2D<T> &v2) : x(v2.x), y(v2.y), z(0), w(0){};
+            Vector4D<T>(Vector2D<T> v1,Vector2D<T> v2) : x(v1.x), y(v1.y), z(v2.x), w(v2.y){};
             Vector4D<T>(const Vector2D<T> &v2, T _z, T _w) : x(v2.x), y(v2.y), z(_z), w(_w){};
             Vector4D<T>(const Vector3D<T> &v3) : x(v3.x), y(v3.y), z(v3.z), w(1.0f){};
             Vector4D<T>(const Vector3D<T> &v3, const T &_w) : x(v3.x), y(v3.y), z(v3.z), w(_w){};
@@ -1145,6 +1175,69 @@ namespace Ailu
         {
             return (first - ... - arg);
         }
+
+        template<typename T, template<typename> class VT1, template<typename> class VT2, int... Indexes>
+        auto operator+(const VT1<T> &vec, const Swizzle<VT2, T, Indexes...> &swizzle)
+                -> VT2<T>
+        {
+            VT2<T> result;
+            int indexes[] = {Indexes...};
+            constexpr int swizzle_size = sizeof...(Indexes);
+            int count = std::min<int>(VT1<T>::s_length, swizzle_size);
+
+            for (int i = 0; i < count; i++)
+            {
+                result.data[i] = vec.data[i] + swizzle.v[indexes[i]];
+            }
+            return result;
+        }
+
+        template<typename T, template<typename> class VT1, template<typename> class VT2, int... Indexes>
+        auto operator-(const VT1<T> &vec, const Swizzle<VT2, T, Indexes...> &swizzle)
+                -> VT2<T>
+        {
+            VT2<T> result;
+            int indexes[] = {Indexes...};
+            constexpr int swizzle_size = sizeof...(Indexes);
+            int count = std::min<int>(VT1<T>::s_length, swizzle_size);
+            for (int i = 0; i < count; i++)
+            {
+                result.data[i] = vec.data[i] - swizzle.v[indexes[i]];
+            }
+            return result;
+        }
+
+        template<typename T, template<typename> class VT1, template<typename> class VT2, int... Indexes>
+        auto operator*(const VT1<T> &vec, const Swizzle<VT2, T, Indexes...> &swizzle)
+                -> VT2<T>
+        {
+            VT2<T> result;
+            int indexes[] = {Indexes...};
+            constexpr int swizzle_size = sizeof...(Indexes);
+            int count = std::min<int>(VT1<T>::s_length, swizzle_size);
+            for (int i = 0; i < count; i++)
+            {
+                result.data[i] = vec.data[i] * swizzle.v[indexes[i]];
+            }
+            return result;
+        }
+
+        template<typename T, template<typename> class VT1, template<typename> class VT2, int... Indexes>
+        auto operator/(const VT1<T> &vec, const Swizzle<VT2, T, Indexes...> &swizzle)
+                -> VT2<T>
+        {
+            VT2<T> result;
+            int indexes[] = {Indexes...};
+            constexpr int swizzle_size = sizeof...(Indexes);
+            int count = std::min<int>(VT1<T>::s_length, swizzle_size);
+            for (int i = 0; i < count; i++)
+            {
+                result.data[i] = vec.data[i] / swizzle.v[indexes[i]];
+            }
+            return result;
+        }
+
+
         template<template<typename> typename TT, typename T>
         T DotProduct(const TT<T> &first, const TT<T> &second)
         {
@@ -1252,10 +1345,37 @@ namespace Ailu
             return distance;
         }
 
+        template<template<typename> typename TT, typename T>
+        static bool NearbyEqual(const TT<T> v1, const TT<T> v2, T epsilon = kFloatEpsilon)
+        {
+            for (u32 i = 0; i < CountOf(v1.data); i++)
+            {
+                if (std::fabs(v1.data[i] - v2.data[i]) > epsilon)
+                    return false;
+            }
+            return true;
+        }
+        //add check T is float or double
+        template<std::floating_point T>
+        static bool NearbyEqual(const T v1, const T v2, T epsilon = kFloatEpsilon)
+        {
+            return std::fabs(v1 - v2) <= epsilon;
+        }
+
+        template<template<typename> typename TT, typename T>
+        static TT<T> Abs(const TT<T> v)
+        {
+            TT<T> res;
+            for (u32 i = 0; i < CountOf(v.data); i++)
+            {
+                res.data[i] = std::fabs(v.data[i]);
+            }
+            return res;
+        }
         template<typename T, int rows, int cols>
         struct Matrix
         {
-            static Matrix<T,rows,cols> Identity()
+            static Matrix<T, rows, cols> Identity()
             {
                 Matrix<T,rows,cols> m;
                 for (int i = 0; i < rows; ++i)
@@ -1267,6 +1387,7 @@ namespace Ailu
                 }
                 return m;
             }
+
             union
             {
                 T data[rows][cols];
@@ -2322,7 +2443,19 @@ namespace Ailu
             {
                 auto nq = NormalizedQ(quat);
                 auto naxis = Normalize(axis);
+
+                // 虚部
+                Vector3f qv{nq.x, nq.y, nq.z};
+
+                // 投影到 axis 上
+                float proj = DotProduct(qv, axis);
+
+                // 角度 = 2 * atan2(|虚部在axis上的分量|, w)
+                float angle = 2.0f * std::atan2(std::abs(proj), nq.w);
+
+                return angle;
             }
+
 
             static bool IsSameOrientation(const Quaternion &l, const Quaternion &r)
             {

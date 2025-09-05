@@ -29,6 +29,7 @@
 #include "UI/Container.h"
 #include "UI/Basic.h"
 #include "UI/UILayer.h"
+#include "UI/UIFramework.h"
 
 #include "Objects/JsonArchive.h"
 
@@ -37,19 +38,9 @@
 #include "Common/Undo.h"
 #include "Framework/Events/KeyEvent.h"
 #include "Render/CommonRenderPipeline.h"
-#include "Widgets/AnimClipEditor.h"
-#include "Widgets/AssetBrowser.h"
-#include "Widgets/AssetTable.h"
-#include "Widgets/BlendSpaceEditor.h"
-#include "Widgets/CommonTextureWidget.h"
-#include "Widgets/EnvironmentSetting.h"
-#include "Widgets/ObjectDetail.h"
-#include "Widgets/OutputLog.h"
-#include "Widgets/PlaceActors.h"
+
 #include "Widgets/RenderView.h"
-#include "Widgets/WorldOutline.h"
-#include "Widgets/ProfileWindow.h"
-#include <Widgets/RenderGraphDebugger.h>
+#include "Widgets/CommonView.h"
 
 #include "Framework/Parser/TextParser.h"
 
@@ -58,50 +49,6 @@ namespace Ailu
     using namespace Render;
     namespace Editor
     {
-        // User callback
-        static void mini_map_node_hovering_callback(int node_id, void *user_data)
-        {
-            ImGui::SetTooltip("This is node %d", node_id);
-        }
-
-        static void ShowImNodeTest(bool *is_show)
-        {
-            const int hardcoded_node_id = 1;
-            ImGui::Begin("Node", is_show);
-            if (ImGui::BeginDragDropTarget())
-            {
-                const ImGuiPayload *payload = ImGui::AcceptDragDropPayload(ImGuiWidget::kDragAssetAnimClip.c_str());
-                if (payload)
-                {
-                    auto clip = *(Asset **) (payload->Data);
-                    auto clip_ref = clip->AsRef<AnimationClip>();
-                    LOG_INFO("{}", clip_ref->Name().c_str());
-                }
-                ImGui::EndDragDropTarget();
-            }
-            ImNodes::BeginNodeEditor();
-            {
-                ImNodes::BeginNode(hardcoded_node_id);
-                ImNodes::BeginNodeTitleBar();
-                ImGui::TextUnformatted("Title");
-                ImNodes::EndNodeTitleBar();
-
-                ImGui::Dummy(ImVec2(80.0f, 45.0f));
-                const int output_attr_id = 2;
-                ImNodes::BeginOutputAttribute(output_attr_id);
-                // in between Begin|EndAttribute calls, you can call ImGui
-                // UI functions
-                ImGui::Text("output pin");
-                ImNodes::EndOutputAttribute();
-
-                ImNodes::EndNode();
-            }
-            ImNodes::MiniMap();
-            //ImNodes::MiniMap(0.2f, ImNodesMiniMapLocation_TopRight, mini_map_node_hovering_callback);
-            ImNodes::EndNodeEditor();
-            ImGui::End();
-        }
-        BlendSpaceEditor *g_blend_space_editor;
         EditorLayer::EditorLayer() : Layer("EditorLayer")
         {
 #if defined(DEAR_IMGUI)
@@ -137,46 +84,7 @@ namespace Ailu
         UI::UILayer* g_ui_layer;
         void EditorLayer::OnAttach()
         {
-            auto tex_detail_view = _widgets.emplace_back(std::move(MakeScope<TextureDetailView>())).get();
-            _widgets.emplace_back(std::move(MakeScope<AssetBrowser>(tex_detail_view)));
-            _widgets.emplace_back(std::move(MakeScope<AssetTable>()));
-            _widgets.emplace_back(std::move(MakeScope<WorldOutline>()));
-            _widgets.emplace_back(std::move(MakeScope<ObjectDetail>()));
-            _widgets.emplace_back(std::move(MakeScope<PlaceActors>()));
-            _widgets.emplace_back(std::move(MakeScope<RenderTextureView>()));
-            for (auto appender: LogMgr::Get().GetAppenders())
-            {
-                auto imgui_appender = dynamic_cast<ImGuiLogAppender *>(appender);
-                if (imgui_appender)
-                {
-                    _widgets.emplace_back(std::move(MakeScope<OutputLog>(imgui_appender)));
-                }
-            }
-
-            _widgets.emplace_back(std::move(MakeScope<SceneView>()));
-            _p_scene_view = _widgets.back().get();
-            _widgets.emplace_back(std::move(MakeScope<RenderView>()));
-            _p_preview_cam_view = _widgets.back().get();
-            _widgets.emplace_back(std::move(MakeScope<EnvironmentSetting>()));
-            _p_env_setting = _widgets.back().get();
-            _widgets.emplace_back(std::move(MakeScope<BlendSpaceEditor>()));
-            g_blend_space_editor = static_cast<BlendSpaceEditor *>(_widgets.back().get());
-            _widgets.emplace_back(std::move(MakeScope<ProfileWindow>()));
-            _p_profiler_window = _widgets.back().get();
-            _widgets.emplace_back(std::move(MakeScope<RenderGraphDebugger>()));
-            _p_rdg_debugger = _widgets.back().get();
-            for (auto &widget: _widgets)
-            {
-                widget->Open(ImGuiWidget::GetGlobalWidgetHandle());
-            }
-            //默认不显示纹理细节窗口
-            tex_detail_view->Close(tex_detail_view->Handle());
-            g_blend_space_editor->Close(g_blend_space_editor->Handle());
-            _p_preview_cam_view->Close(_p_preview_cam_view->Handle());
-            _p_profiler_window->Close(_p_profiler_window->Handle());
-            _p_rdg_debugger->Close(_p_rdg_debugger->Handle());
-            ImGuiWidget::SetFocus("AssetBrowser");
-            auto r = static_cast<CommonRenderPipeline *>(GraphicsContext::Get().GetPipeline())->GetRenderer();
+            auto r = Render::RenderPipeline::Get().GetRenderer();
             r->AddFeature(&_pick);
             r->SetShadingMode(EShadingMode::kLit);
 
@@ -188,31 +96,49 @@ namespace Ailu
             //vb->AddChild(MakeRef<UI::Slider>());
             //root->AddChild(vb);
             //_main_widget->AddToWidget(root);
-            _dock_manager = MakeScope<DockManager>();
+            DockManager::Init();
 
-            DockWindow *testw = new DockWindow("Test",{800.0f,600.0f} );
-            testw->_position = {500.0f, 500.0f};
-            _dock_manager->AddDock(testw);
-            testw = new DockWindow("Output", {600.0f, 600.0f});
-            _dock_manager->AddDock(testw);
-            for (auto layer: Application::Get().GetLayerStack())
-            {
-                if (g_ui_layer = dynamic_cast<UI::UILayer *>(layer);g_ui_layer != nullptr)
-                    break;
-            }
-
-            /*
+            //auto testw = MakeRef<RenderView>();
+            //testw->SetPosition({200.0f, 200.0f});
+            //_scene_view = testw.get();
+            //DockManager::Get().AddDock(testw);
+            //auto common_view = MakeRef<CommonView>();
+            //common_view->SetPosition({200.0f, 200.0f});
+            //_common_view = common_view.get();
+            //DockManager::Get().AddDock(common_view);
+            
+            _main_widget = MakeRef<UI::Widget>();
+            
             auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
             JsonArchive ar;
             ar.Load(p);
             ar >> *_main_widget;
-            UI::UIRenderer::Get()->AddWidget(_main_widget);
 
+            //auto root = MakeRef<UI::Canvas>();
+            //auto vb = MakeRef<UI::VerticalBox>();
+            //vb->AddChild(MakeRef<UI::Button>())->OnMouseClick() += [](UI::UIEvent &e)
+            //{ LOG_INFO("Clicked!"); };
+            //vb->AddChild<UI::Text>()->SetText("This is a text");
+            //vb->AddChild(MakeRef<UI::Slider>());
+            //auto cv = vb->AddChild<UI::CollapsibleView>("CollapsibleView");
+            //{
+            //    auto cvb = MakeRef<UI::VerticalBox>();
+            //    cvb->AddChild<UI::Button>();
+            //    cvb->AddChild<UI::Text>()->SetText("CVB: This is a text");
+            //    cvb->AddChild(MakeRef<UI::Slider>());
+            //    cv->GetContent()->AddChild(cvb);
+            //}
+            //root->AddChild(vb);
+            //_main_widget->AddToWidget(root);
+            //JsonArchive ar;
+            //ar << *_main_widget;
+            //auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
+            //LOG_INFO(L"Save widget to ", p);
+            //ar.Save(p);
+
+            //UI::UIManager::Get()->RegisterWidget(_main_widget);
             FindFirstText(_main_widget.get());
-            g_ui_layer = new UI::UILayer();
-            Application::Get().PushLayer(g_ui_layer);
-            g_ui_layer->RegisterWidget(_main_widget.get());
-            dynamic_cast<EditorApp &>(Application::Get())._on_file_changed_delegate += [&](const fs::path &file)
+            dynamic_cast<EditorApp &>(Application::Get())._on_file_changed += [&](const fs::path &file)
             {
                 const WString cur_path = PathUtils::FormatFilePath(file.wstring());
                 if (PathUtils::GetFileName(cur_path) == L"main_widget")
@@ -220,45 +146,42 @@ namespace Ailu
                     LOG_INFO(L"Reload widget {}",cur_path);
                     JsonArchive ar;
                     ar.Load(cur_path);
-                    UI::UIRenderer::Get()->RemoveWidget(_main_widget.get());
+                    UI::UIManager::Get()->UnRegisterWidget(_main_widget.get());
                     _main_widget.reset();
                     _main_widget = MakeRef<UI::Widget>();
                     _main_widget->BindOutput(RenderTexture::s_backbuffer, nullptr);
                     ar >> *_main_widget;
-                    UI::UIRenderer::Get()->AddWidget(_main_widget);
+                    UI::UIManager::Get()->RegisterWidget(_main_widget);
                     FindFirstText(_main_widget.get());
-                    g_ui_layer->RegisterWidget(_main_widget.get());
                 }
             };
-            */
         }
 
         void EditorLayer::OnDetach()
         {
-            //JsonArchive ar;
-            //ar << *_main_widget;
-            //auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
-            //LOG_INFO(L"Save widget to ", p);
-            //ar.Save(p);
+            DockManager::Shutdown();
+            JsonArchive ar;
+            ar << *_main_widget;
+            auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
+            LOG_INFO(L"Save widget to ", p);
+            ar.Save(p);
         }
         static CCDSolver ccd_solver;
         //static CCDSolver ccd_solver1;
         static CCDSolver fabrik_solver;
         void EditorLayer::OnEvent(Event &e)
         {
-            for (auto &w: _widgets)
-                w->OnEvent(e);
             if (e.GetEventType() == EEventType::kKeyPressed)
             {
                 auto &key_e = static_cast<KeyPressedEvent &>(e);
-                if (key_e.GetKeyCode() == AL_KEY_F11)
+                if (key_e.GetKeyCode() == EKey::kF11)
                 {
                     LOG_INFO("Capture frame...");
                     g_pGfxContext->TakeCapture();
                 }
-                if (key_e.GetKeyCode() == AL_KEY_S)
+                if (key_e.GetKeyCode() == EKey::kS)
                 {
-                    if (Input::IsKeyPressed(AL_KEY_CONTROL))
+                    if (Input::IsKeyPressed(EKey::kCONTROL))
                     {
                         LOG_INFO("Save assets...");
                         g_pThreadTool->Enqueue([]()
@@ -267,16 +190,16 @@ namespace Ailu
                                                    for(auto it = g_pResourceMgr->Begin(); it != g_pResourceMgr->End(); it++)
                                                    {
                                                        g_pResourceMgr->SaveAsset(it->second.get());
-                                                       ImGuiWidget::DisplayProgressBar("SaveAsset...",asset_count / (f32)g_pResourceMgr->AssetNum());
+                                                       //ImGuiWidget::DisplayProgressBar("SaveAsset...",asset_count / (f32)g_pResourceMgr->AssetNum());
                                                        asset_count += 1.0;
                                                    } });
                     }
                 }
-                if (key_e.GetKeyCode() == AL_KEY_Z)
+                if (key_e.GetKeyCode() == EKey::kZ)
                 {
-                    if (Input::IsKeyPressed(AL_KEY_CONTROL))
+                    if (Input::IsKeyPressed(EKey::kCONTROL))
                     {
-                        if (Input::IsKeyPressed(AL_KEY_SHIFT))
+                        if (Input::IsKeyPressed(EKey::kSHIFT))
                         {
                             g_pCommandMgr->Redo();
                         }
@@ -286,9 +209,9 @@ namespace Ailu
                         }
                     }
                 }
-                if (key_e.GetKeyCode() == AL_KEY_D)
+                if (key_e.GetKeyCode() == EKey::kD)
                 {
-                    if (Input::IsKeyPressed(AL_KEY_CONTROL))
+                    if (Input::IsKeyPressed(EKey::kCONTROL))
                     {
                         List<ECS::Entity> new_entities;
                         for (auto e: Selection::SelectedEntities())
@@ -300,7 +223,7 @@ namespace Ailu
                             Selection::AddSelection(e);
                     }
                 }
-                if (key_e.GetKeyCode() == AL_KEY_F)
+                if (key_e.GetKeyCode() == EKey::kF)
                 {
                     static u16 s_count = 1;
                     Solver::s_is_apply_constraint = s_count % 2;
@@ -312,24 +235,24 @@ namespace Ailu
             else if (e.GetEventType() == EEventType::kMouseButtonPressed)
             {
                 MouseButtonPressedEvent &event = static_cast<MouseButtonPressedEvent &>(e);
-                if (event.GetButton() == AL_KEY_LBUTTON)
+                if (event.GetButton() == EKey::kLBUTTON)
                 {
                     auto m_pos = Input::GetMousePos();
-                    if (_p_scene_view->Hover(m_pos) && _p_scene_view->Focus())
-                    {
-                        m_pos = m_pos - _p_scene_view->ContentPosition();
-                        ECS::Entity closest_entity = _pick.GetPickID((u16)m_pos.x, (u16)m_pos.y);
-                        LOG_INFO("Pick entity: {}", closest_entity);
-                        if (Input::IsKeyPressed(AL_KEY_SHIFT))
-                            Selection::AddSelection(closest_entity);
-                        else
-                            Selection::AddAndRemovePreSelection(closest_entity);
-                        if (closest_entity == ECS::kInvalidEntity)
-                            Selection::RemoveSlection();
-                    }
+                    //if (_p_scene_view->Hover(m_pos) && _p_scene_view->Focus())
+                    //{
+                    //    m_pos = m_pos - _p_scene_view->ContentPosition();
+                    //    ECS::Entity closest_entity = _pick.GetPickID((u16)m_pos.x, (u16)m_pos.y);
+                    //    LOG_INFO("Pick entity: {}", closest_entity);
+                    //    if (Input::IsKeyPressed(EKey::kSHIFT))
+                    //        Selection::AddSelection(closest_entity);
+                    //    else
+                    //        Selection::AddAndRemovePreSelection(closest_entity);
+                    //    if (closest_entity == ECS::kInvalidEntity)
+                    //        Selection::RemoveSlection();
+                    //}
                 }
             }
-            else if (e.GetEventType() == EEventType::kMouseScrolled)
+            else if (e.GetEventType() == EEventType::kMouseScroll)
             {
                 
             }
@@ -337,13 +260,7 @@ namespace Ailu
         std::once_flag flag;
         void EditorLayer::OnUpdate(f32 dt)
         {
-            _dock_manager->Update(dt);
-            auto [wx,wy] = Application::Get().GetWindow().GetWindowPosition();
-            Vector2f window_pos = {(f32)wx,(f32)wy};
-            if (g_text)
-            {
-                g_text->_text = std::format("MousePos: {},WinPos: {},{},FPS: {}", Input::GetMousePos().ToString(), wx, wy, Render::RenderingStates::s_frame_rate);
-            }
+            DockManager::Get().Update(dt);
             //LOG_INFO("--------------------------------------");
             //LOG_INFO("EditorLayer::OnUpdate: mpos({})", Input::GetMousePos().ToString());
             ccd_solver.Resize(3);
@@ -449,33 +366,35 @@ namespace Ailu
         void EditorLayer::OnImguiRender()
         {
             static bool s_show_undo_view = false;
-            ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
-            if (ImGui::BeginMainMenuBar())
-            {
-                if (ImGui::BeginMenu("File"))
-                {
-                    ImGui::EndMenu();
-                }
-                if (ImGui::BeginMenu("Edit"))
-                {
-                    if (ImGui::MenuItem("Undo", "CTRL+Z")) {}
-                    if (ImGui::MenuItem("Redo", "CTRL+Y", false, false)) {}// Disabled item
-                    ImGui::Separator();
-                    if (ImGui::MenuItem("Cut", "CTRL+X")) {}
-                    if (ImGui::MenuItem("Copy", "CTRL+C")) {}
-                    if (ImGui::MenuItem("Paste", "CTRL+V")) {}
-                    ImGui::EndMenu();
-                }
-                if (ImGui::BeginMenu("Window"))
-                {
-                    if (ImGui::MenuItem("BlendSpace"))
-                    {
-                        g_blend_space_editor->Open(g_blend_space_editor->Handle());
-                    }
-                    ImGui::EndMenu();
-                }
-                ImGui::EndMainMenuBar();
-            }
+            //ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+            //if (ImGui::BeginMainMenuBar())
+            //{
+            //    if (ImGui::BeginMenu("File"))
+            //    {
+            //        ImGui::EndMenu();
+            //    }
+            //    if (ImGui::BeginMenu("Edit"))
+            //    {
+            //        if (ImGui::MenuItem("Undo", "CTRL+Z")) {}
+            //        if (ImGui::MenuItem("Redo", "CTRL+Y", false, false)) {}// Disabled item
+            //        ImGui::Separator();
+            //        if (ImGui::MenuItem("Cut", "CTRL+X")) {}
+            //        if (ImGui::MenuItem("Copy", "CTRL+C")) {}
+            //        if (ImGui::MenuItem("Paste", "CTRL+V")) {}
+            //        ImGui::EndMenu();
+            //    }
+            //    if (ImGui::BeginMenu("Window"))
+            //    {
+            //        if (ImGui::MenuItem("BlendSpace"))
+            //        {
+            //            //g_blend_space_editor->Open(g_blend_space_editor->Handle());
+            //        }
+            //        ImGui::EndMenu();
+            //    }
+            //    ImGui::EndMainMenuBar();
+            //}
+
+            /*
             ImGui::SetNextWindowSizeConstraints(ImVec2(100, 0), ImVec2(FLT_MAX, ImGui::GetTextLineHeight()));
             ImGui::Begin("ToolBar", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
             Application* app = &Application::Get();
@@ -522,7 +441,7 @@ namespace Ailu
                 }
             }
             ImGui::End();
-
+            */
             ImGui::Begin("Common");// Create a window called "Hello, world!" and append into it.
             ImGui::Text("FrameRate: %.2f", RenderingStates::s_frame_rate);
             ImGui::Text("FrameTime: %.2f ms", RenderingStates::s_frame_time);
@@ -533,7 +452,7 @@ namespace Ailu
             ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
             if (ImGui::CollapsingHeader("Features"))
             {
-                for (auto feature: g_pGfxContext->GetPipeline()->GetRenderer()->GetFeatures())
+                for (auto feature: Render::RenderPipeline::Get().GetRenderer()->GetFeatures())
                 {
                     bool active = feature->IsActive();
                     ImGui::Checkbox(feature->Name().c_str(), &active);
@@ -543,10 +462,10 @@ namespace Ailu
                     ImGui::Text("Members: ");
                     if (cur_type->BaseType() && cur_type->BaseType() != cur_type)//除去Object
                     {
-                        for (auto prop: cur_type->GetProperties())
-                        {
-                            DrawMemberProperty(prop, *feature);
-                        }
+                        //for (auto prop: cur_type->GetProperties())
+                        //{
+                        //    DrawMemberProperty(prop, *feature);
+                        //}
                     }
                 }
             }
@@ -560,7 +479,7 @@ namespace Ailu
                 {
                     if (checkbox1)
                     {
-                        g_pGfxContext->GetPipeline()->GetRenderer()->SetShadingMode(EShadingMode::kLit);
+                        Render::RenderPipeline::Get().GetRenderer()->SetShadingMode(EShadingMode::kLit);
                         s_selected_chechbox = 0;
                     }
                 }
@@ -569,7 +488,7 @@ namespace Ailu
                 {
                     if (checkbox2)
                     {
-                        g_pGfxContext->GetPipeline()->GetRenderer()->SetShadingMode(EShadingMode::kWireframe);
+                        Render::RenderPipeline::Get().GetRenderer()->SetShadingMode(EShadingMode::kWireframe);
                         s_selected_chechbox = 1;
                     }
                 }
@@ -578,7 +497,7 @@ namespace Ailu
                 {
                     if (checkbox3)
                     {
-                        g_pGfxContext->GetPipeline()->GetRenderer()->SetShadingMode(EShadingMode::kLitWireframe);
+                        Render::RenderPipeline::Get().GetRenderer()->SetShadingMode(EShadingMode::kLitWireframe);
                         s_selected_chechbox = 2;
                     }
                 }
@@ -586,7 +505,7 @@ namespace Ailu
             // static bool s_show_pass = false;
             // if (ImGui::CollapsingHeader("Features"))
             // {
-            //     for (auto feature: g_pGfxContext->GetPipeline()->GetRenderer()->GetFeatures())
+            //     for (auto feature: Render::RenderPipeline::Get().GetRenderer()->GetFeatures())
             //     {
             //         bool active = feature->IsActive();
             //         ImGui::Checkbox(feature->Name().c_str(), &active);
@@ -617,11 +536,7 @@ namespace Ailu
             ImGui::Checkbox("ShowAnimClip", &s_show_anim_clip);
             ImGui::Checkbox("ShowThreadPoolView", &s_show_threadpool_view);
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
-            ImGui::Checkbox("UseRenderGraph", &GraphicsContext::Get().GetPipeline()->GetRenderer()->_is_use_render_graph);
-            if (ImGui::Button("Profile"))
-                _p_profiler_window->Open(_p_profiler_window->Handle());
-            if (ImGui::Button("RdGraph Debugger"))
-                _p_rdg_debugger->Open(_p_rdg_debugger->Handle());
+            ImGui::Checkbox("UseRenderGraph", &RenderPipeline::Get().GetRenderer()->_is_use_render_graph);
 
             // for (auto &info: g_pResourceMgr->GetImportInfos())
             // {
@@ -643,36 +558,28 @@ namespace Ailu
                 {
                     auto &cam = r.GetComponent<ECS::CCamera>(e)->_camera;
                     cam.SetPixelSize(300, (u16) (300.0f / cam.Aspect()));
-                    static_cast<RenderView *>(_p_preview_cam_view)->SetSource(g_pGfxContext->GetPipeline()->GetTarget(1));
-                    _p_preview_cam_view->Open(_p_preview_cam_view->Handle());
+                    //static_cast<RenderView *>(_p_preview_cam_view)->SetSource(Render::RenderPipeline::Get().GetTarget(1));
+                    //_p_preview_cam_view->Open(_p_preview_cam_view->Handle());
                     Camera::sSelected = &cam;
                 }
                 else
                 {
                     Camera::sSelected = nullptr;
-                    _p_preview_cam_view->Close(_p_preview_cam_view->Handle());
+                    //_p_preview_cam_view->Close(_p_preview_cam_view->Handle());
                 }
                 if (auto sk_comp = r.GetComponent<ECS::CSkeletonMesh>(e); sk_comp != nullptr)
                 {
-                    g_blend_space_editor->SetTarget(&sk_comp->_blend_space);
+                    //g_blend_space_editor->SetTarget(&sk_comp->_blend_space);
                 }
             }
             static RenderTexture* s_last_scene_rt = nullptr;
-            auto scene_rt = g_pGfxContext->GetPipeline()->GetTarget(0);
+            auto scene_rt = Render::RenderPipeline::Get().GetTarget(0);
             if (s_last_scene_rt != scene_rt)
             {
                 //LOG_INFO("Scene RT Changed");
             }
             s_last_scene_rt = scene_rt;
-            static_cast<SceneView *>(_p_scene_view)->SetSource(scene_rt);
 
-            for (auto &widget: _widgets)
-            {
-                widget->Show();
-            }
-            if (s_show_threadpool_view)
-                ShowThreadPoolView(&s_show_threadpool_view);
-            ImGuiWidget::ShowProgressBar();
             if (s_show_undo_view)
             {
                 ImGui::Begin("UndoView", &s_show_undo_view);
@@ -681,16 +588,6 @@ namespace Ailu
                     ImGui::Text("%s", cmd->ToString().c_str());
                 }
                 ImGui::End();
-            }
-            static AnimClipEditor anim_editor;
-            if (s_show_anim_clip)
-            {
-                anim_editor.Open(ImGuiWidget::GetGlobalWidgetHandle());
-                anim_editor.Show();
-            }
-            else
-            {
-                anim_editor.Close(anim_editor.Handle());
             }
             /*
             ImGui::Begin("Solver");
@@ -843,9 +740,6 @@ namespace Ailu
             }
             ImGui::End();
             */
-
-            if (s_show_imguinode)
-                ShowImNodeTest(&s_show_imguinode);
         }
 
         void EditorLayer::Begin()
@@ -854,7 +748,7 @@ namespace Ailu
 
         void EditorLayer::End()
         {
-            ImGuiWidget::EndFrame();
+
         }
     }// namespace Editor
 }// namespace Ailu

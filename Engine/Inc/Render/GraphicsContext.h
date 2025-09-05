@@ -10,6 +10,7 @@
 namespace Ailu
 {
     class IGPUTimer;
+    class Window;
     namespace Render
     {
         class CommandBuffer;
@@ -29,6 +30,8 @@ namespace Ailu
             virtual ~GraphicsContext() = default;
             virtual void Init() = 0;
             virtual void Present() = 0;
+            virtual void RegisterWindow(Window* window) = 0;
+            virtual void UnRegisterWindow(Window* window) = 0;
             virtual u64 GetFenceValueGPU() = 0;
             virtual u64 GetFenceValueCPU() const = 0;
             /// @brief 提交命令，帧结束时执行或者渲染线程异步执行
@@ -55,15 +58,13 @@ namespace Ailu
             virtual void CompileShaderAsync(ComputeShader *shader) = 0;
 
             virtual void TakeCapture() = 0;
-            virtual void ResizeSwapChain(const u32 width, const u32 height) = 0;
-            virtual std::tuple<u32, u32> GetSwapChainSize() const = 0;
+            virtual void ResizeSwapChain(void* window_handle,const u32 width, const u32 height) = 0;
             virtual IGPUTimer *GetTimer() = 0;
+            //主窗口的后缓index
             virtual const u32 CurBackbufIndex() const = 0;
             virtual void TryReleaseUnusedResources() = 0;
             //return mb byte/1024/1024
             virtual f32 TotalGPUMemeryUsage() = 0;
-            virtual RenderPipeline *GetPipeline() = 0;
-            virtual void RegisterPipeline(RenderPipeline *pipiline) = 0;
             virtual void ExecuteRHICommandBuffer(RHICommandBuffer *cmd) = 0;
 
         protected:

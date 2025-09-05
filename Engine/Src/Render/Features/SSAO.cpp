@@ -34,6 +34,103 @@ namespace Ailu::Render
     SSAOPass::~SSAOPass()
     {
     }
+    void SSAOPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
+    {
+        Vector4f params;
+        if (_is_half_res)
+            params = {1.0f, 1.0f, (f32) (rendering_data._width >> 1), (f32) (rendering_data._height >> 1)};
+        else
+            params = {1.0f, 1.0f, (f32) (rendering_data._width), (f32) (rendering_data._height)};
+        params.x /= params.z;
+        params.y /= params.w;
+        u16 w = (u16) params.z, h = (u16) params.w;
+        TextureDesc desc(w, h, ERenderTargetFormat::kRFloat);
+        desc._is_random_access = true;
+        desc._mip_num = 1u;
+        static RDG::RGHandle ao_result,blur_temp;
+        graph.AddPass("SSAO Compute", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
+                {
+                    ao_result = builder.AllocTexture(desc, "_OcclusionTex");
+                    builder.Read(rendering_data._rg_handles._depth_tex);
+                    builder.Read(rendering_data._rg_handles._gbuffers[0]);
+                    builder.Write(ao_result); 
+            }, 
+            [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                {
+                Vector4f params;
+                    if (_is_half_res)
+                        params = {1.0f, 1.0f, (f32) (data._width >> 1), (f32) (data._height >> 1)};
+                    else
+                        params = {1.0f, 1.0f, (f32) (data._width), (f32) (data._height)};
+                    params.x /= params.z;
+                    params.y /= params.w;
+                    u16 w = (u16) params.z, h = (u16) params.w;
+                _ssao_computer->SetVector("_AOScreenParams", params);
+                _ssao_computer->SetVector("_HBAOParams", _ao_params);
+                _ssao_computer->SetFloat("_KernelSize", 2.5f);
+                _ssao_computer->SetFloat("_Space_Sigma", 10.1f);
+                _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
+                _ssao_computer->SetTexture("_CameraNormalsTexture", graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
+                _ssao_computer->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_tex));
+                _ssao_computer->SetTexture("_AOResult", graph.Resolve<Texture>(graph.GetTexture("_OcclusionTex")));
+                {
+                    auto kernel = _ssao_computer->FindKernel("SSAOGen");
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel,_is_cbr? w >> 1 : w,_is_cbr? h >> 1 : h,1);
+                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                }
+            });
+        graph.AddPass("SSAO Blur", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
+                    {
+                        blur_temp = builder.AllocTexture(desc, "AO_BlurTemp");
+                        builder.Read(ao_result);
+                        builder.Write(blur_temp); 
+                    }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                      { 
+                _ssao_computer->SetVector("_AOScreenParams", params);
+                _ssao_computer->SetVector("_HBAOParams", _ao_params);
+                _ssao_computer->SetFloat("_KernelSize", 2.5f);
+                _ssao_computer->SetFloat("_Space_Sigma", 10.1f);
+                _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
+                {
+                    auto kernel = _ssao_computer->FindKernel("SSAOBlurX");
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel, w, h, 1);
+                    _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(graph.GetTexture("_OcclusionTex")));
+                    _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(graph.GetTexture("AO_BlurTemp")));
+                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                }
+            });
+        graph.AddPass("SSAO Final", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
+                      {
+                    builder.Read(blur_temp);
+                    builder.Write(ao_result);
+                     }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                      { 
+                _ssao_computer->SetVector("_AOScreenParams", params);
+                _ssao_computer->SetVector("_HBAOParams", _ao_params);
+                _ssao_computer->SetFloat("_KernelSize", 2.5f);
+                _ssao_computer->SetFloat("_Space_Sigma", 10.1f);
+                _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
+                {
+                    auto kernel = _ssao_computer->FindKernel("SSAOBlurY");
+                    auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel, w, h, 1);
+                    _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(graph.GetTexture("AO_BlurTemp")));
+                    _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(graph.GetTexture("_OcclusionTex")));
+                    cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
+                }
+                Shader::SetGlobalTexture("_OcclusionTex", graph.Resolve<Texture>(graph.GetTexture("_OcclusionTex"))); });
+        if (_is_debug_mode)
+        {
+            graph.AddPass("SSAO Debug", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
+                          {
+                    auto handle = builder.GetTexture("_OcclusionTex");
+                    builder.Read(handle);
+                    builder.Write(rendering_data._rg_handles._color_target);
+                }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                          { 
+                        cmd->Blit(graph.GetTexture("_OcclusionTex"), data._rg_handles._color_target);
+                    });
+        }
+    }
     void SSAOPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
         auto cmd = CommandBufferPool::Get("SSAO");

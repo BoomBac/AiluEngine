@@ -117,7 +117,7 @@ target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/rapidjson)
 # 宏定义
-target_compile_definitions(Engine PRIVATE AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX;_REVERSED_Z)
+target_compile_definitions(Engine PRIVATE AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX;_REVERSED_Z;DEAR_IMGUI)
 set_target_properties (Engine PROPERTIES
         OUTPUT_NAME_DEBUG Engine_d
         OUTPUT_NAME_RELEASE Engine

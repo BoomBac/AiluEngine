@@ -97,7 +97,7 @@ namespace Ailu
             dispater1.Dispatch<MouseButtonReleasedEvent>(
                     [this](MouseButtonReleasedEvent &e) -> bool
                     {
-                        if (e.GetButton() == AL_KEY_RBUTTON)
+                        if (e.GetButton() == EKey::kLBUTTON)
                         {
                             FirstPersonCameraController::s_inst._is_receive_input = false;
                             while (::ShowCursor(TRUE) < 0)
@@ -118,7 +118,7 @@ namespace Ailu
             dispater0.Dispatch<MouseButtonPressedEvent>(
                     [this](MouseButtonPressedEvent &e) -> bool
                     {
-                        if (e.GetButton() == AL_KEY_RBUTTON)
+                        if (e.GetButton() == EKey::kRBUTTON)
                         {
                             FirstPersonCameraController::s_inst._is_receive_input = true;
                             while (::ShowCursor(FALSE) >= 0)
@@ -128,12 +128,12 @@ namespace Ailu
                         return false;
                     });
             dispater0.Dispatch<KeyPressedEvent>([this](KeyPressedEvent& e)->bool{
-                if (e.GetKeyCode() == AL_KEY_SHIFT)
+                if (e.GetKeyCode() == EKey::kSHIFT)
                     FirstPersonCameraController::s_inst.Accelerate(true);
                 return false;
             });
             dispater0.Dispatch<KeyReleasedEvent>([this](KeyReleasedEvent& e)->bool{
-                if (e.GetKeyCode() == AL_KEY_SHIFT)
+                if (e.GetKeyCode() == EKey::kSHIFT)
                     FirstPersonCameraController::s_inst.Accelerate(false);
                 return false;
             });
@@ -181,7 +181,7 @@ namespace Ailu
                 static Vector2f pre_mouse_pos;
                 target_rotation = FirstPersonCameraController::s_inst._rotation;
                 auto cur_mouse_pos = Input::GetMousePos();
-                if (Input::IsKeyPressed(AL_KEY_RBUTTON))
+                if (Input::IsKeyPressed(EKey::kRBUTTON))
                 {
                     if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f &&
                         abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
@@ -193,31 +193,31 @@ namespace Ailu
                 }
                 pre_mouse_pos = cur_mouse_pos;
                 FirstPersonCameraController::s_inst.SetTargetRotation(target_rotation.x, target_rotation.y);
-                FirstPersonCameraController::s_inst.Accelerate(Input::IsKeyPressed(AL_KEY_SHIFT));
+                FirstPersonCameraController::s_inst.Accelerate(Input::IsKeyPressed(EKey::kSHIFT));
                 static const f32 move_distance = 1.0f;// 1 m
                 f32 final_move_distance = move_distance * FirstPersonCameraController::s_inst._cur_move_speed * FirstPersonCameraController::s_inst._cur_move_speed;
                 Vector3f move_dis{0, 0, 0};
-                if (Input::IsKeyPressed(AL_KEY_W))
+                if (Input::IsKeyPressed(EKey::kW))
                 {
                     move_dis += Camera::sCurrent->Forward();
                 }
-                if (Input::IsKeyPressed(AL_KEY_S))
+                if (Input::IsKeyPressed(EKey::kS))
                 {
                     move_dis -= Camera::sCurrent->Forward();
                 }
-                if (Input::IsKeyPressed(AL_KEY_D))
+                if (Input::IsKeyPressed(EKey::kD))
                 {
                     move_dis += Camera::sCurrent->Right();
                 }
-                if (Input::IsKeyPressed(AL_KEY_A))
+                if (Input::IsKeyPressed(EKey::kA))
                 {
                     move_dis -= Camera::sCurrent->Right();
                 }
-                if (Input::IsKeyPressed(AL_KEY_E))
+                if (Input::IsKeyPressed(EKey::kE))
                 {
                     move_dis += Camera::sCurrent->Up();
                 }
-                if (Input::IsKeyPressed(AL_KEY_Q))
+                if (Input::IsKeyPressed(EKey::kQ))
                 {
                     move_dis -= Camera::sCurrent->Up();
                 }

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __SSAO_GEN_H__
 //Class SSAO begin...........................
-#define SSAO_GEN_H_29_GENERATED_BODY \
+#define SSAO_GEN_H_30_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_SSAO_Type();\
                                 static Type* GetPrivateStaticClass();\

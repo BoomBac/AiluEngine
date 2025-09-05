@@ -34,6 +34,7 @@ namespace Ailu::Render
         kCopyCounter,
         kReadBack,
         kPresent,
+        kScissorRect,
         kCustom
     };
 #define CMD_CLASS_TYPE(type)                                                        \
@@ -57,10 +58,12 @@ namespace Ailu::Render
         Array<u16, RenderConstants::kMaxMRTNum> _color_indices;
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
         u16 _depth_index;
+        bool _is_scissor_rect;
         void Reset() final 
         {
             _depth_target= nullptr;
             _color_target_num = 0u;
+            _is_scissor_rect = false;
         }
     };
     enum EClearFlag
@@ -91,12 +94,15 @@ namespace Ailu::Render
         u32 _instance_count;
         u16 _sub_mesh;
         u32 _index_start;
+        u32 _index_num;
         GPUBuffer* _arg_buffer;
         u32 _arg_offset;
         void Reset() final 
         {
             _arg_buffer = nullptr;
             _arg_offset = 0u;
+            _index_num = 0u;
+            _index_start = 0u;
         }
     };
     struct CommandDispatch : public GfxCommand
@@ -182,6 +188,17 @@ namespace Ailu::Render
         CMD_CLASS_TYPE(kPresent);
         void Reset() final {}
     };
+
+    struct CommandScissor : public GfxCommand
+    {
+        CMD_CLASS_TYPE(kScissorRect);
+        Array<Rect, RenderConstants::kMaxMRTNum> _rects;
+        u16 _num;
+        void Reset() final {
+            _num = 0u;
+        }
+    };
+
     using ReadbackCallback = std::function<void(const u8*,u32)>;
     struct CommandReadBack : public GfxCommand
     {
@@ -257,6 +274,10 @@ namespace Ailu::Render
             {
                 return _pool_rb.Pop().value_or(nullptr);
             }
+            else if constexpr (std::is_same_v<T, CommandScissor>)
+            {
+                return _pool_scissor.Pop().value_or(nullptr);
+            }
             else {}
             return nullptr;
         }
@@ -311,6 +332,10 @@ namespace Ailu::Render
             {
                 _pool_rb.Push(static_cast<CommandReadBack*>(cmd));
             }
+            else if (cmd->GetCmdType() == EGpuCommandType::kScissorRect)
+            {
+                _pool_scissor.Push(static_cast<CommandScissor *>(cmd));
+            }
             else {}
         }
 
@@ -327,6 +352,7 @@ namespace Ailu::Render
         Core::LockFreeQueue<CommandPresent *, 32> _pool_present;
         Core::LockFreeQueue<CommandCopyCounter *, 32> _pool_cp_counter;
         Core::LockFreeQueue<CommandReadBack *, 32> _pool_rb;
+        Core::LockFreeQueue<CommandScissor *, 32> _pool_scissor;
     };
 }// namespace Ailu
 

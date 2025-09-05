@@ -122,7 +122,7 @@ namespace Ailu::Render
 			size = max_size;
 			LOG_WARNING("Try to set a larger data to index buffer! ({} > {})", size, max_size);
 		}
-		memcpy(_data, data, size * sizeof(u32));
+		memcpy(_data, data, size);
 		_count = size / sizeof(u32);
 	}
 	#pragma endregion

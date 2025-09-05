@@ -21,27 +21,6 @@ initializer._is_abstract = false;
 initializer._namespace = "Ailu::UI";
 initializer._base_name = "Ailu::SerializeObject";
 initializer._constructor = []()->Ailu::UI::UIElement* {return new Ailu::UI::UIElement;};
-Meta meta_slot;
-meta_slot.Set("Category","");
-meta_slot.Set("IsColor",false);
-meta_slot.Set("IsRange",false);
-meta_slot.Set("IsFloatRange",true);
-meta_slot.Set("RangeMin",0);
-meta_slot.Set("RangeMax",1);
-MemberBuilder builder_slot;
-builder_slot._name = "_slot";
-builder_slot._type_name = "Slot";
-builder_slot._offset = offsetof(UIElement,_slot);
-builder_slot._is_const = false;
-builder_slot._is_static = false;
-builder_slot._is_public = true;
-builder_slot._is_pointer = false;
-builder_slot._is_ref = false;
-builder_slot._is_template = false;
-builder_slot._meta = meta_slot;
-builder_slot._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Slot>);
-builder_slot._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Slot>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_slot));
 Meta meta_padding;
 meta_padding.Set("Category","");
 meta_padding.Set("IsColor",false);
@@ -63,6 +42,111 @@ builder_padding._meta = meta_padding;
 builder_padding._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Padding>);
 builder_padding._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Padding>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_padding));
+Meta meta_visibility;
+meta_visibility.Set("Category","");
+meta_visibility.Set("IsColor",false);
+meta_visibility.Set("IsRange",false);
+meta_visibility.Set("IsFloatRange",true);
+meta_visibility.Set("RangeMin",0);
+meta_visibility.Set("RangeMax",1);
+MemberBuilder builder_visibility;
+builder_visibility._name = "_visibility";
+builder_visibility._type_name = "EVisibility";
+builder_visibility._offset = offsetof(UIElement,_visibility);
+builder_visibility._is_const = false;
+builder_visibility._is_static = false;
+builder_visibility._is_public = true;
+builder_visibility._is_pointer = false;
+builder_visibility._is_ref = false;
+builder_visibility._is_template = false;
+builder_visibility._meta = meta_visibility;
+builder_visibility._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<EVisibility>);
+builder_visibility._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<EVisibility>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_visibility));
+Meta meta_slot;
+meta_slot.Set("Category","");
+meta_slot.Set("IsColor",false);
+meta_slot.Set("IsRange",false);
+meta_slot.Set("IsFloatRange",true);
+meta_slot.Set("RangeMin",0);
+meta_slot.Set("RangeMax",1);
+MemberBuilder builder_slot;
+builder_slot._name = "_slot";
+builder_slot._type_name = "Slot";
+builder_slot._offset = offsetof(UIElement,_slot);
+builder_slot._is_const = false;
+builder_slot._is_static = false;
+builder_slot._is_public = false;
+builder_slot._is_pointer = false;
+builder_slot._is_ref = false;
+builder_slot._is_template = false;
+builder_slot._meta = meta_slot;
+builder_slot._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Slot>);
+builder_slot._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Slot>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_slot));
+Meta meta_transition;
+meta_transition.Set("Category","");
+meta_transition.Set("IsColor",false);
+meta_transition.Set("IsRange",false);
+meta_transition.Set("IsFloatRange",true);
+meta_transition.Set("RangeMin",0);
+meta_transition.Set("RangeMax",1);
+MemberBuilder builder_transition;
+builder_transition._name = "_transition";
+builder_transition._type_name = "Vector2f";
+builder_transition._offset = offsetof(UIElement,_transition);
+builder_transition._is_const = false;
+builder_transition._is_static = false;
+builder_transition._is_public = false;
+builder_transition._is_pointer = false;
+builder_transition._is_ref = false;
+builder_transition._is_template = false;
+builder_transition._meta = meta_transition;
+builder_transition._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_transition._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_transition));
+Meta meta_rotation;
+meta_rotation.Set("Category","");
+meta_rotation.Set("IsColor",false);
+meta_rotation.Set("IsRange",false);
+meta_rotation.Set("IsFloatRange",true);
+meta_rotation.Set("RangeMin",0);
+meta_rotation.Set("RangeMax",1);
+MemberBuilder builder_rotation;
+builder_rotation._name = "_rotation";
+builder_rotation._type_name = "f32";
+builder_rotation._offset = offsetof(UIElement,_rotation);
+builder_rotation._is_const = false;
+builder_rotation._is_static = false;
+builder_rotation._is_public = false;
+builder_rotation._is_pointer = false;
+builder_rotation._is_ref = false;
+builder_rotation._is_template = false;
+builder_rotation._meta = meta_rotation;
+builder_rotation._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_rotation._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_rotation));
+Meta meta_scale;
+meta_scale.Set("Category","");
+meta_scale.Set("IsColor",false);
+meta_scale.Set("IsRange",false);
+meta_scale.Set("IsFloatRange",true);
+meta_scale.Set("RangeMin",0);
+meta_scale.Set("RangeMax",1);
+MemberBuilder builder_scale;
+builder_scale._name = "_scale";
+builder_scale._type_name = "Vector2f";
+builder_scale._offset = offsetof(UIElement,_scale);
+builder_scale._is_const = false;
+builder_scale._is_static = false;
+builder_scale._is_public = false;
+builder_scale._is_pointer = false;
+builder_scale._is_ref = false;
+builder_scale._is_template = false;
+builder_scale._meta = meta_scale;
+builder_scale._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<Vector2f>);
+builder_scale._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<Vector2f>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_scale));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -276,27 +360,69 @@ builder_type._meta = meta_type;
 builder_type._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ESlotType>);
 builder_type._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ESlotType>);
 initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_type));
-Meta meta_is_fill_size;
-meta_is_fill_size.Set("Category","");
-meta_is_fill_size.Set("IsColor",false);
-meta_is_fill_size.Set("IsRange",false);
-meta_is_fill_size.Set("IsFloatRange",true);
-meta_is_fill_size.Set("RangeMin",0);
-meta_is_fill_size.Set("RangeMax",1);
-MemberBuilder builder_is_fill_size;
-builder_is_fill_size._name = "_is_fill_size";
-builder_is_fill_size._type_name = "bool";
-builder_is_fill_size._offset = offsetof(Slot,_is_fill_size);
-builder_is_fill_size._is_const = false;
-builder_is_fill_size._is_static = false;
-builder_is_fill_size._is_public = false;
-builder_is_fill_size._is_pointer = false;
-builder_is_fill_size._is_ref = false;
-builder_is_fill_size._is_template = false;
-builder_is_fill_size._meta = meta_is_fill_size;
-builder_is_fill_size._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
-builder_is_fill_size._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
-initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_fill_size));
+Meta meta_size_policy;
+meta_size_policy.Set("Category","");
+meta_size_policy.Set("IsColor",false);
+meta_size_policy.Set("IsRange",false);
+meta_size_policy.Set("IsFloatRange",true);
+meta_size_policy.Set("RangeMin",0);
+meta_size_policy.Set("RangeMax",1);
+MemberBuilder builder_size_policy;
+builder_size_policy._name = "_size_policy";
+builder_size_policy._type_name = "ESizePolicy";
+builder_size_policy._offset = offsetof(Slot,_size_policy);
+builder_size_policy._is_const = false;
+builder_size_policy._is_static = false;
+builder_size_policy._is_public = false;
+builder_size_policy._is_pointer = false;
+builder_size_policy._is_ref = false;
+builder_size_policy._is_template = false;
+builder_size_policy._meta = meta_size_policy;
+builder_size_policy._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<ESizePolicy>);
+builder_size_policy._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<ESizePolicy>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_size_policy));
+Meta meta_is_size_to_content;
+meta_is_size_to_content.Set("Category","");
+meta_is_size_to_content.Set("IsColor",false);
+meta_is_size_to_content.Set("IsRange",false);
+meta_is_size_to_content.Set("IsFloatRange",true);
+meta_is_size_to_content.Set("RangeMin",0);
+meta_is_size_to_content.Set("RangeMax",1);
+MemberBuilder builder_is_size_to_content;
+builder_is_size_to_content._name = "_is_size_to_content";
+builder_is_size_to_content._type_name = "bool";
+builder_is_size_to_content._offset = offsetof(Slot,_is_size_to_content);
+builder_is_size_to_content._is_const = false;
+builder_is_size_to_content._is_static = false;
+builder_is_size_to_content._is_public = false;
+builder_is_size_to_content._is_pointer = false;
+builder_is_size_to_content._is_ref = false;
+builder_is_size_to_content._is_template = false;
+builder_is_size_to_content._meta = meta_is_size_to_content;
+builder_is_size_to_content._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_size_to_content._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_size_to_content));
+Meta meta_fill_rate;
+meta_fill_rate.Set("Category","");
+meta_fill_rate.Set("IsColor",false);
+meta_fill_rate.Set("IsRange",false);
+meta_fill_rate.Set("IsFloatRange",true);
+meta_fill_rate.Set("RangeMin",0);
+meta_fill_rate.Set("RangeMax",1);
+MemberBuilder builder_fill_rate;
+builder_fill_rate._name = "_fill_rate";
+builder_fill_rate._type_name = "f32";
+builder_fill_rate._offset = offsetof(Slot,_fill_rate);
+builder_fill_rate._is_const = false;
+builder_fill_rate._is_static = false;
+builder_fill_rate._is_public = false;
+builder_fill_rate._is_pointer = false;
+builder_fill_rate._is_ref = false;
+builder_fill_rate._is_template = false;
+builder_fill_rate._meta = meta_fill_rate;
+builder_fill_rate._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_fill_rate._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_fill_rate));
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
 }
@@ -362,4 +488,49 @@ template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::ESlotType>()
 return s_enum_type_ESlotType.get();
 }
 //Enum ESlotType end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_ESizePolicy = nullptr;
+//Enum ESizePolicy begin...........................
+const Ailu::Enum* Z_Construct_Enum_ESizePolicy_Type()
+{
+if(s_enum_type_ESizePolicy == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "ESizePolicy";
+initializer._str_to_enum_lut["kFixed"] = 0;
+initializer._str_to_enum_lut["kFill"] = 1;
+initializer._str_to_enum_lut["kAuto"] = 2;
+s_enum_type_ESizePolicy = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_ESizePolicy.get());
+}
+return s_enum_type_ESizePolicy.get();
+}
+static Ailu::EnumTypeRegister g_register_ESizePolicy(Z_Construct_Enum_ESizePolicy_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::ESizePolicy>()
+{
+return s_enum_type_ESizePolicy.get();
+}
+//Enum ESizePolicy end...........................
+
+static std::unique_ptr<Ailu::Enum> s_enum_type_EVisibility = nullptr;
+//Enum EVisibility begin...........................
+const Ailu::Enum* Z_Construct_Enum_EVisibility_Type()
+{
+if(s_enum_type_EVisibility == nullptr)
+{
+EnumInitializer initializer;
+initializer._name = "EVisibility";
+initializer._str_to_enum_lut["kVisible"] = 0;
+initializer._str_to_enum_lut["kHide"] = 1;
+s_enum_type_EVisibility = std::make_unique<Ailu::Enum>(initializer);
+Ailu::Enum::RegisterEnum(s_enum_type_EVisibility.get());
+}
+return s_enum_type_EVisibility.get();
+}
+static Ailu::EnumTypeRegister g_register_EVisibility(Z_Construct_Enum_EVisibility_Type);
+template<> const Ailu::Enum* Ailu::StaticEnum<Ailu::UI::EVisibility>()
+{
+return s_enum_type_EVisibility.get();
+}
+//Enum EVisibility end...........................
 

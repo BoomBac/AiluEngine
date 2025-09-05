@@ -13,6 +13,7 @@
 #include "Framework/Common/Path.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
+#include "Framework/Common/Application.h"
 
 
 //#define _USE_CONSOLE
@@ -171,9 +172,10 @@ namespace Ailu
         _data.Title = prop.Title;
         _data.Handler = [](Event &e)
         {
-            LOG_INFO("Default Event Handle: {}", e.ToString())
+            //LOG_INFO("Default Event Handle: {}", e.ToString())
             return true;
         };
+        _data._flags = prop._flag;
         auto hinstance = GetModuleHandle(NULL);
         LOG_INFO(L"Create window {}, ({},{})", prop.Title, prop.Width, prop.Height);
         // Initialize the window class.
@@ -185,15 +187,22 @@ namespace Ailu
         windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
         windowClass.lpszClassName = L"AiluEngineClass";
         RegisterClassEx(&windowClass);
-
+        u32 style_flags = WS_OVERLAPPEDWINDOW;
+        if (prop._flag & EWindowFlags::kWindow_NoTitleBar)
+        {
+            style_flags = WS_POPUP | WS_VISIBLE;
+        }
+        auto main_win = Application::Get().GetWindowPtr();
+        bool is_sub_window = false;//main_win != nullptr;
         RECT windowRect = {0, 0, static_cast<LONG>(prop.Width), static_cast<LONG>(prop.Height)};
-        AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+        if (style_flags & WS_OVERLAPPEDWINDOW)
+            AdjustWindowRect(&windowRect, style_flags, FALSE);
         // Create the window and store a handle to it.
         _hwnd = CreateWindowEx(
-                WS_EX_APPWINDOW,
+                is_sub_window? WS_EX_TOOLWINDOW: WS_EX_APPWINDOW,
                 windowClass.lpszClassName,
                 _data.Title.c_str(),
-                WS_OVERLAPPEDWINDOW,
+                style_flags,
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
                 windowRect.right - windowRect.left,
@@ -202,15 +211,16 @@ namespace Ailu
                 nullptr,// We aren't using menus.
                 hinstance,
                 this);
-        BOOL value = TRUE;
-        ::DwmSetWindowAttribute(_hwnd,DWMWA_USE_IMMERSIVE_DARK_MODE,&value,sizeof(value));
+        //dark mode
+        //BOOL value = TRUE;
+        //::DwmSetWindowAttribute(_hwnd,DWMWA_USE_IMMERSIVE_DARK_MODE,&value,sizeof(value));
         //移除调整窗口大小的样式
         LONG_PTR style = GetWindowLongPtr(_hwnd, GWL_STYLE);
         //style = style & ~WS_THICKFRAME;
         SetWindowLongPtr(_hwnd, GWL_STYLE, style);
         ShowWindow(_hwnd, SW_SHOW);
         UpdateWindow(_hwnd);
-        SetWindowTextA(_hwnd,"Ailu Engine");
+        SetWindowText(_hwnd, prop.Title.c_str());
         HANDLE hTitleIcon = LoadImage(0, ResourceMgr::GetResSysPath(L"Icons/app_title_icon.ico").c_str(), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         HANDLE hIcon = LoadImage(0, ResourceMgr::GetResSysPath(L"Icons/app_icon.ico").c_str(), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
         if (hTitleIcon && hIcon)
@@ -227,24 +237,37 @@ namespace Ailu
         {
             LOG_WARNING("TitleIcon or AppIcon load failed,please check out the path!")
         }
-        WinInput::Create(_hwnd);
+        Input::SetupPlatformInput(MakeScope<WinInput>(_hwnd));
         DragAcceptFiles(_hwnd, true);
         _is_focused = true;
         //关闭输入法
         DisableIME(_hwnd);
+        _reserver_area = {0.0f,0.0f,100.0f,20.0f};
     }
     void WinWindow::OnUpdate()
     {
-        MSG msg = {};
-        //while (msg.message != WM_QUIT)
+        //MSG msg = {};
+        //if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         //{
-        //    // Process any messages in the queue.
-
+        //    TranslateMessage(&msg);
+        //    DispatchMessage(&msg);
         //}
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        DWORD result = MsgWaitForMultipleObjects(
+                0,// 不等其他内核对象
+                nullptr,
+                FALSE,
+                INFINITE,  // 无限等待
+                QS_ALLINPUT// 只要有消息就唤醒
+        );
+
+        if (result == WAIT_OBJECT_0)
         {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            MSG msg;
+            if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
         }
     }
     u32 WinWindow::GetWidth() const
@@ -255,6 +278,38 @@ namespace Ailu
     {
         return _data.Height;
     }
+    void WinWindow::SetWindowSize(u16 w, u16 h)
+    {
+        SetWindowPos(_hwnd, nullptr, 0, 0, w, h,
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    void WinWindow::SetClientSize(u16 w, u16 h)
+    {
+        RECT rc = {0, 0, (LONG) w, (LONG) h};
+        DWORD style = GetWindowLong(_hwnd, GWL_STYLE);
+        DWORD exStyle = GetWindowLong(_hwnd, GWL_EXSTYLE);
+
+        AdjustWindowRectEx(&rc, style, FALSE, exStyle);
+
+        int winW = rc.right - rc.left;
+        int winH = rc.bottom - rc.top;
+
+        SetWindowPos(_hwnd, nullptr, 0, 0, winW, winH,
+                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    std::tuple<u16, u16> Ailu::WinWindow::GetWindowSize()
+    {
+        return std::tuple<u16, u16>((u16)_data.Width, (u16)_data.Height);
+    }
+    std::tuple<u16, u16> Ailu::WinWindow::GetClientSize()
+    {
+        RECT rc;
+        GetClientRect(_hwnd, &rc);
+        u16 w = static_cast<u16>(rc.right - rc.left);
+        u16 h = static_cast<u16>(rc.bottom - rc.top);
+        return {w, h};
+    }
+
     void WinWindow::SetEventHandler(const EventHandler &handler)
     {
         _data.Handler = handler;
@@ -272,18 +327,47 @@ namespace Ailu
         return static_cast<void *>(_hwnd);
     }
 
-    std::tuple<i32, i32> WinWindow::GetWindowPosition() const 
+    std::tuple<i32, i32> WinWindow::GetClientPosition() const 
     {
         POINT pt = { 0, 0 };
         ClientToScreen(_hwnd, &pt);
         return { static_cast<i32>(pt.x), static_cast<i32>(pt.y) };
     }
 
+    std::tuple<i32, i32> WinWindow::GetWindowPosition() const
+    {
+        RECT rc;
+        GetWindowRect(_hwnd, &rc);
+        return {rc.left, rc.top};// 窗口左上角在屏幕坐标的位置
+    }
 
     void WinWindow::SetTitle(const WString& title)
     {
         _data.Title = title;
         SetWindowText(_hwnd,_data.Title.c_str());
+    }
+
+    WString WinWindow::GetTitle()
+    {
+        return _data.Title;
+    }
+
+    void WinWindow::SetPosition(i32 x, i32 y)
+    {
+        SetWindowPos(_hwnd, HWND_TOP, x, y, (i32)_data.Width, (i32)_data.Height, SWP_SHOWWINDOW);
+    }
+
+    std::tuple<f32, f32, f32, f32> WinWindow::ReserveArea() const
+    {
+        return std::tuple<f32, f32, f32, f32>(_reserver_area[0], _reserver_area[1], _reserver_area[2], _reserver_area[3]);
+    }
+
+    void WinWindow::ReserveArea(f32 x, f32 y, f32 w, f32 h)
+    {
+        _reserver_area[0] = x;
+        _reserver_area[1] = y;
+        _reserver_area[2] = w;
+        _reserver_area[3] = h;
     }
 
     void WinWindow::Shutdown()
@@ -334,6 +418,7 @@ namespace Ailu
                     delete[] filePath;
                 }
                 DragFileEvent e(draged_files);
+                e._window = this;
                 _data.Handler(e);
 
                 DragFinish(hDrop);
@@ -342,12 +427,15 @@ namespace Ailu
             case WM_KEYDOWN:
             {
                 KeyPressedEvent e(static_cast<u8>(wParam), lParam & 0xFFFF);
+                e._window = this;
+                LOG_INFO("WM_KEYDOWN: {}", e.GetKeyCode());
                 _data.Handler(e);
             }
                 return 0;
             case WM_KEYUP:
             {
                 KeyReleasedEvent e(wParam);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
@@ -357,7 +445,8 @@ namespace Ailu
                 return 0;
             case WM_DESTROY:
             {
-                WindowCloseEvent e;
+                WindowCloseEvent e(_hwnd);
+                e._window = this;
                 _data.Handler(e);
                 PostQuitMessage(0);
             }
@@ -365,12 +454,14 @@ namespace Ailu
             case WM_SETFOCUS:
             {
                 WindowFocusEvent e;
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_KILLFOCUS:
             {
                 WindowLostFocusEvent e;
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
@@ -386,7 +477,8 @@ namespace Ailu
                     u32 w = static_cast<u32>(lParam & 0XFFFF), h = static_cast<u32>(lParam >> 16);
                     _data.Width = w;
                     _data.Height = h;
-                    WindowResizeEvent e(w, h);
+                    WindowResizeEvent e(hWnd, w, h);
+                    e._window = this;
                     _data.Handler(e);
                 }
             }
@@ -403,7 +495,8 @@ namespace Ailu
                     TrackMouseEvent(&tme);
                     s_is_track = true;
                 }
-                MouseMovedEvent e(static_cast<float>(HIGH_BIT(lParam, 16)), static_cast<float>(LOW_BIT(lParam, 16)));
+                MouseMovedEvent e(static_cast<float>(LOW_BIT(lParam, 16)), static_cast<float>(HIGH_BIT(lParam, 16)));
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
@@ -419,37 +512,43 @@ namespace Ailu
 			0x0002
 			The right mouse button is down.
 			*/
-                MouseButtonPressedEvent e(AL_KEY_MBUTTON);
+                MouseButtonPressedEvent e(EKey::kMBUTTON);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_MBUTTONUP:
             {
-                MouseButtonReleasedEvent e(AL_KEY_MBUTTON);
+                MouseButtonReleasedEvent e(EKey::kMBUTTON);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_LBUTTONDOWN:
             {
-                MouseButtonPressedEvent e(AL_KEY_LBUTTON);
+                MouseButtonPressedEvent e(EKey::kLBUTTON);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_LBUTTONUP:
             {
-                MouseButtonReleasedEvent e(AL_KEY_LBUTTON);
+                MouseButtonReleasedEvent e(EKey::kLBUTTON);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_RBUTTONDOWN:
             {
-                MouseButtonPressedEvent e(AL_KEY_RBUTTON);
+                MouseButtonPressedEvent e(EKey::kRBUTTON);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_RBUTTONUP:
             {
-                MouseButtonReleasedEvent e(AL_KEY_RBUTTON);
+                MouseButtonReleasedEvent e(EKey::kRBUTTON);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
@@ -457,18 +556,21 @@ namespace Ailu
             {
                 auto zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
                 MouseScrollEvent e(static_cast<float>(zDelta));
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_ENTERSIZEMOVE:
             {
                 WindowMovedEvent e(true);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_EXITSIZEMOVE:
             {
                 WindowMovedEvent e(false);
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
@@ -476,15 +578,107 @@ namespace Ailu
             {
                 s_is_track = false;
                 MouseExitWindowEvent e;
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
             case WM_MOUSEHOVER:
             {
                 MouseEnterWindowEvent e;
+                e._window = this;
                 _data.Handler(e);
             }
                 return 0;
+            case WM_NCHITTEST://无边框窗口的移动/缩放
+            {
+                static const auto is_point_inside = [](Vector2f point, Vector4f rect) {
+                    return point.x >= rect.x && point.x <= rect.x + rect.z && point.y >= rect.y && point.y <= rect.y + rect.w;
+                };
+                if (_data._flags & EWindowFlags::kWindow_NoTitleBar)
+                {
+                    Vector2f pos = Input::GetMousePos(this);
+                    if (is_point_inside(pos, {(f32) (_data.Width - _reserver_area[3]), 0.0f, (f32) _reserver_area[3], (f32) _reserver_area[3]}))
+                    {
+                        Application::Get().SetCursor(ECursorType::kArrow);
+                        return HTCLIENT;
+                    }
+                    f32 border = 4.0f;
+                    if (pos.y < border)
+                    {
+                        if (pos.x < border)
+                        {
+                            Application::Get().SetCursor(ECursorType::kSizeNWSE);
+                            return HTTOPLEFT;
+                        }
+                        else if (pos.x > _data.Width - border)
+                        {
+                            Application::Get().SetCursor(ECursorType::kSizeNWSE);
+                            return HTTOPRIGHT;
+                        }
+                        Application::Get().SetCursor(ECursorType::kSizeNS);
+                        return HTTOP;
+                    }
+                    if (pos.y > _data.Height - border)
+                    {
+                        if (pos.x < border)
+                        {
+                            Application::Get().SetCursor(ECursorType::kSizeNWSE);
+                            return HTBOTTOMLEFT;
+                        }
+                        else if (pos.x > _data.Width - border)
+                        {
+                            Application::Get().SetCursor(ECursorType::kSizeNWSE);
+                            return HTBOTTOMRIGHT;
+                        }
+                        Application::Get().SetCursor(ECursorType::kSizeNS);
+                        return HTBOTTOM;
+                    }
+                    if (pos.x < border)
+                    {
+                        Application::Get().SetCursor(ECursorType::kSizeEW);
+                        return HTLEFT;
+                    }
+                    if (pos.x > _data.Width - border)
+                    {
+                        Application::Get().SetCursor(ECursorType::kSizeEW);
+                        return HTRIGHT;
+                    }
+                    Application::Get().SetCursor(ECursorType::kArrow);
+                    //kTitleBarHeight = 20.0f = _reserver_area[3];
+                    if (pos.y > border && pos.y < _reserver_area[3] && pos.x > _reserver_area[0] + _reserver_area[2])
+                        return HTCAPTION;
+                }
+            }
+            break;
+            case WM_SETCURSOR:
+            {
+                MouseSetCursorEvent e(0u);//暂时不使用事件里的光标，dock窗口无法产生这个事件，都使用Application::Get().SetCursor的值
+                if (LOWORD(lParam) == HTCLIENT)
+                {
+                    Application::Get().SetCursor(ECursorType::kArrow);
+                }
+                else if (LOWORD(lParam) == HTLEFT || LOWORD(lParam) == HTRIGHT)
+                {
+                    Application::Get().SetCursor(ECursorType::kSizeEW);
+                }
+                else if (LOWORD(lParam) == HTTOP || LOWORD(lParam) == HTBOTTOM)
+                {
+                    Application::Get().SetCursor(ECursorType::kSizeNS);
+                }
+                else if (LOWORD(lParam) == HTTOPLEFT || LOWORD(lParam) == HTBOTTOMRIGHT)
+                {
+                    Application::Get().SetCursor(ECursorType::kSizeNESW);
+                }
+                else if (LOWORD(lParam) == HTTOPRIGHT || LOWORD(lParam) == HTBOTTOMLEFT)
+                {
+                    Application::Get().SetCursor(ECursorType::kSizeNWSE);
+                }
+                else if (LOWORD(lParam) == HTCAPTION)
+                {
+                    Application::Get().SetCursor(ECursorType::kArrow);
+                }
+                _data.Handler(e);
+            }
         }
         // Handle any messages the switch statement didn't.
         //LOG_WARNING("Unhandled message: " + std::to_string(message));

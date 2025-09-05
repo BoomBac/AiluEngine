@@ -8,10 +8,10 @@
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
 #include "UI/UIRenderer.h"
+#include "UI/UIFramework.h"
 #include "UI/UILayer.h"
 #include "pch.h"
 #include <Render/Gizmo.h>
-#include <Render/TextRenderer.h>
 #ifdef PLATFORM_WINDOWS
 //WINDOWS marco CSIDL_PROFILE
 #include <Shlobj.h>
@@ -27,6 +27,7 @@
 #include "Render/Features/VolumetricClouds.h"
 #include "Render/GraphicsContext.h"
 #include "Render/RenderPipeline.h"
+
 
 using namespace Ailu::Render;
 
@@ -82,6 +83,7 @@ namespace Ailu
         ObjectRegister::Initialize();
         Enum::InitTypeInfo();
         Core::Allocator::Init();
+        _raw_event_queue = MakeScope<Core::RawEventQueue>();
         g_pTimeMgr->Initialize();
         g_pTimeMgr->Mark();
         sp_instance = this;
@@ -103,25 +105,22 @@ namespace Ailu
         }
         _is_multi_thread_rendering = s_engine_config.isMultiThreadRender;
         //LogMgr::Get().AddAppender(new ConsoleAppender());
-        auto window_props = WindowProps();
-        window_props.Width = desc._window_width;
-        window_props.Height = desc._window_height;
-        _p_window = new WinWindow(window_props);
+        _p_window = std::move(WindowFactory::Create(s_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine", desc._window_width, desc._window_height));
         _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
-        _p_window->SetTitle(s_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine");
         _layer_stack = new LayerStack();
-        PushLayer(new UI::UILayer());
+        //PushLayer(new UI::UILayer());
 #ifdef DEAR_IMGUI
         //初始化imgui gfx时要求imgui window已经初始化
         _p_imgui_layer = new ImGUILayer();
 #endif// DEAR_IMGUI
         JobSystem::Init(6u);
         GraphicsContext::InitGlobalContext();
-        g_pGfxContext->ResizeSwapChain(desc._window_width, desc._window_height);
+        GraphicsContext::Get().RegisterWindow(_p_window.get());
+        RenderTexture::s_backbuffer = RenderTexture::WindowBackBuffer(&Application::Get().GetWindow());
+        g_pGfxContext->ResizeSwapChain(_p_window->GetNativeWindowPtr(), desc._window_width, desc._window_height);
         g_pResourceMgr->Initialize();
         Gizmo::Initialize();
-        TextRenderer::Init();
-        UI::UIRenderer::Init();
+        UI::UIManager::Init();
 #ifdef DEAR_IMGUI
         PushLayer(_p_imgui_layer);
 #endif// DEAR_IMGUI
@@ -153,15 +152,13 @@ namespace Ailu
             it.Serialize(&s_engine_config,ar);
         ar.Save(_engin_config_path);
         DESTORY_PTR(_layer_stack);
-        //DESTORY_PTR(_p_event_handle_thread);
-        DESTORY_PTR(_p_window);
-        TextRenderer::Shutdown();
-        UI::UIRenderer::Shutdown();
+        UI::UIManager::Shutdown();
         Gizmo::Shutdown();
         g_pSceneMgr->Finalize();
         g_pResourceMgr->Finalize();
         DESTORY_PTR(g_pSceneMgr);
         DESTORY_PTR(g_pResourceMgr);
+        GraphicsContext::Get().UnRegisterWindow(_p_window.get());
         GraphicsContext::FinalizeGlobalContext();
         g_pTimeMgr->Finalize();
         DESTORY_PTR(g_pTimeMgr);
@@ -174,41 +171,34 @@ namespace Ailu
     void Application::Tick(f32 delta_time)
     {
         g_pTimeMgr->Reset();
-        //std::thread logic_thread = std::thread([&]()
-        //                                       {
-        //    SetThreadName("LogicThread");
-        //    while (_state == EApplicationState::EApplicationState_Running || _state == EApplicationState::EApplicationState_Pause)
-        //    {
-        //        LogicLoop();
-        //    }
-        //    LOG_INFO("Exit Logic Thread"); });
+        std::thread logic_thread = std::thread([&]()
+                                               {
+            SetThreadName("LogicThread");
+            while (_state == EApplicationState::EApplicationState_Running || _state == EApplicationState::EApplicationState_Pause)
+            {
+                LogicLoop();
+            }
+            LOG_INFO("Exit Logic Thread"); });
         while (_state != EApplicationState::EApplicationState_Exit)
         {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            _p_window->OnUpdate();
+            _dispatcher.PumpTasks();
             if (_state == EApplicationState::EApplicationState_Pause)
-            {
-                _p_window->OnUpdate();
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            }
-            else
-            {
-                _p_window->OnUpdate();
-                LogicLoop();
-                //std::this_thread::sleep_for(std::chrono::milliseconds(2));
-            }
         }
-        //if (logic_thread.joinable())
-        //    logic_thread.join();
+
+        if (logic_thread.joinable())
+            logic_thread.join();
         LOG_INFO("Exit");
     }
     void Application::PushLayer(Layer *layer)
     {
         _layer_stack->PushLayer(layer);
-        layer->OnAttach();
     }
     void Application::PushOverLayer(Layer *layer)
     {
         _layer_stack->PushOverLayer(layer);
-        layer->OnAttach();
     }
     void Application::WaitForRender()
     {
@@ -249,16 +239,27 @@ namespace Ailu
         }
         _render_wait.notify_one();
     }
+
+    void Application::SetCursor(ECursorType type)
+    {
+        _cursor_type = type;
+    }
+
     Application &Application::Get()
     {
         return *sp_instance;
     }
     bool Application::OnWindowClose(WindowCloseEvent &e)
     {
-        _state = EApplicationState::EApplicationState_Exit;
-        _main_finished = true;
-        _is_handling_event.store(false);
-        NotifyRender();
+        if (e._window == s_focus_window)
+            s_focus_window = nullptr;
+        if (e._window == _p_window.get())
+        {
+            _state = EApplicationState::EApplicationState_Exit;
+            _main_finished = true;
+            _is_handling_event.store(false);
+            NotifyRender();
+        }
         return false;
     }
     const ObjectLayer &Application::NameToLayer(const String &name)
@@ -269,11 +270,14 @@ namespace Ailu
     }
     bool Application::OnLostFocus(WindowLostFocusEvent &e)
     {
-        s_target_lag = 1000.0f / 5.0f;
+        if (e._window == s_focus_window)
+            s_focus_window = nullptr;
+        //s_target_lag = 1000.0f / 5.0f;
         return true;
     }
     bool Application::OnGetFocus(WindowFocusEvent &e)
     {
+        s_focus_window = e._window;
         s_target_lag = kMsPerRender;
         _state = EApplicationState::EApplicationState_Running;
         return true;
@@ -290,8 +294,9 @@ namespace Ailu
         //if (_state == EApplicationState::EApplicationState_Pause)
         //	_state = EApplicationState::EApplicationState_Running;
         //LogMgr::Get().LogWarningFormat("Application state: {}", EApplicationState::ToString(_state));
-        GraphicsContext::Get().ResizeSwapChain((u32)e.GetWidth(), (u32)e.GetHeight());
+        GraphicsContext::Get().ResizeSwapChain(e._handle,(u32)e.GetWidth(), (u32)e.GetHeight());
         LOG_INFO("Window resize: {}x{}", e.GetWidth(), e.GetHeight());
+        _on_window_resize_delegate.Invoke(e._window,Vector2f{e.GetWidth(), e.GetHeight()});
         return false;
     }
     bool Application::OnWindowMove(WindowMovedEvent &e)
@@ -321,29 +326,90 @@ namespace Ailu
         dispather.Dispatch<WindowMinimizeEvent>(BIND_EVENT_HANDLER(OnWindowMinimize));
         dispather.Dispatch<WindowResizeEvent>(BIND_EVENT_HANDLER(OnWindowResize));
         dispather.Dispatch<WindowMovedEvent>(BIND_EVENT_HANDLER(OnWindowMove));
-
-        for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
-        {
-            (*--it)->OnEvent(e);
-            if (e.Handled()) break;
-        }
+        dispather.Dispatch<MouseButtonReleasedEvent>(BIND_EVENT_HANDLER(OnMouseUp));
+        dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseDown));
+        dispather.Dispatch<MouseMovedEvent>(BIND_EVENT_HANDLER(OnMouseMove));
+        dispather.Dispatch<MouseScrollEvent>(BIND_EVENT_HANDLER(OnMouseScroll));
+        dispather.Dispatch<KeyPressedEvent>(BIND_EVENT_HANDLER(OnKeyDown));
+        dispather.Dispatch<KeyReleasedEvent>(BIND_EVENT_HANDLER(OnKeyUp));
+        dispather.Dispatch<MouseSetCursorEvent>(BIND_EVENT_HANDLER(OnSetCursor));
     }
+
+    bool Application::OnMouseDown(MouseButtonPressedEvent &e)
+    {
+        _raw_event_queue->Push<MouseButtonPressedEvent>(e);
+        return true;
+    }
+
+    bool Application::OnMouseUp(MouseButtonReleasedEvent &e)
+    {
+        _raw_event_queue->Push<MouseButtonReleasedEvent>(e);
+        return true;
+    }
+
+    bool Application::OnMouseMove(MouseMovedEvent &e)
+    {
+        _raw_event_queue->Push<MouseMovedEvent>(e);
+        return true;
+    }
+
+    bool Application::OnMouseScroll(MouseScrollEvent &e)
+    {
+        _raw_event_queue->Push<MouseScrollEvent>(e);
+        return true;
+    }
+
+    bool Application::OnKeyDown(KeyPressedEvent &e)
+    {
+        _raw_event_queue->Push<KeyPressedEvent>(e);
+        return true;
+    }
+
+    bool Application::OnKeyUp(KeyReleasedEvent &e)
+    {
+        _raw_event_queue->Push<KeyReleasedEvent>(e);
+        return true;
+    }
+
+    bool Application::OnSetCursor(MouseSetCursorEvent &e)
+    {
+        //_cursor_type = static_cast<ECursorType>(e.GetCursorType());
+        SetCursorInternal();
+        return true;
+    }
+
     void Application::LogicLoop()
     {
-        f32 delta_time = 0.16f;
+        f32 delta_time = TimeMgr::s_delta_time;
         if (_state == EApplicationState::EApplicationState_Pause)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             return;
         }
-        _before_update.Invoke();
+        _before_update_delegate.Invoke();
         auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
         g_pTimeMgr->Tick(last_mark);
         _render_lag += last_mark;
         _update_lag += last_mark;
+        Input::BeginFrame();
         g_pTimeMgr->Mark();
         {
             CPUProfileBlock main_b("Application::Tick");
+            {
+                CPUProfileBlock main_b("Application::OnEvent");
+                static u8 event_mem[Core::RawEventQueue::MAX_EVENT_SIZE];
+                while (auto e = _raw_event_queue->Pop(event_mem))
+                {
+                    if (e != nullptr)
+                    {
+                        for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
+                        {
+                            (*--it)->OnEvent(*e);
+                            if (e->Handled()) break;
+                        }
+                    }
+                }
+            }
             //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
             //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误
             if (_state == EApplicationState::EApplicationState_Pause)
@@ -377,7 +443,7 @@ namespace Ailu
                 }
                 {
                     CPUProfileBlock b("RenderScene");
-                    g_pGfxContext->GetPipeline()->Render();
+                    Render::RenderPipeline::Get().Render();
                 }
 #ifdef DEAR_IMGUI
                 {
@@ -389,7 +455,7 @@ namespace Ailu
                 }
 #endif// DEAR_IMGUI
                 g_pGfxContext->Present();
-                g_pGfxContext->GetPipeline()->FrameCleanUp();
+                Render::RenderPipeline::Get().FrameCleanUp();
                 _render_lag -= s_target_lag;
             }
             //锁帧处理
@@ -402,6 +468,26 @@ namespace Ailu
                 _update_lag = 0.0;
             }
         }
-        _after_update.Invoke();
+        _after_update_delegate.Invoke();
+    }
+    
+    void Application::SetCursorInternal()
+    {
+#if PLATFORM_WINDOWS
+        HCURSOR cursor = nullptr;
+        static bool s_init = false;
+        static HashMap<ECursorType,HCURSOR> s_cursor_map{};
+        if (!s_init)
+        {
+            s_init = true;
+            s_cursor_map[ECursorType::kArrow] = LoadCursor(NULL, IDC_ARROW);
+            s_cursor_map[ECursorType::kSizeNS] = LoadCursor(NULL, IDC_SIZENS);
+            s_cursor_map[ECursorType::kSizeEW] = LoadCursor(NULL, IDC_SIZEWE);
+            s_cursor_map[ECursorType::kSizeNWSE] = LoadCursor(NULL, IDC_SIZENWSE);
+            s_cursor_map[ECursorType::kSizeNESW] = LoadCursor(NULL, IDC_SIZENESW);
+            s_cursor_map[ECursorType::kHand] = LoadCursor(NULL, IDC_HAND);
+        }
+        ::SetCursor(s_cursor_map[_cursor_type]);
+#endif// PLATFORM_WINDOWS
     }
 }// namespace Ailu

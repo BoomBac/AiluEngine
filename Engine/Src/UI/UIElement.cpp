@@ -2,30 +2,55 @@
 // Created by 22292 on 2024/10/28.
 //
 
-#include "Inc/UI/UIElement.h"
+#include "UI/UIElement.h"
 #include "UI/UIRenderer.h"
-#include <Render/TextRenderer.h>
+#include "UI/TextRenderer.h"
+#include "UI/UIFramework.h"
 
 namespace Ailu
 {
     using namespace Render;
     namespace UI
     {
+        String UIEvent::ToString() const
+        {
+            return "UIEvent{ type=" + TypeToString(_type) +
+                   ", pos=" + _mouse_position.ToString() +
+                   ", delta=" + _mouse_delta.ToString() +
+                   ", target=" + (_target ? _target->Name() : String("null")) +
+                   ", current=" + (_current_target ? _current_target->Name() : String("null")) +
+                   ", handled=" + String(_is_handled ? "true" : "false") +
+                   " }";
+        }
+
         UIElement::UIElement() : SerializeObject()
         {
             _name = std::format("ui_element_{}", _id);
             _depth = 0.0f;
+            _on_child_add += [this](UIElement* e) {
+                InvalidateLayout();
+                e->_transform._p_parent = &_transform;
+            };
+            _on_child_remove += [this](UIElement *e){ 
+                InvalidateLayout(); 
+                e->_transform._p_parent = nullptr;
+            };
         }
         UIElement::UIElement(const String &name) : UIElement()
         {
             _name = name;
+        }
+        UIElement::~UIElement()
+        {
+            UIManager::Get()->OnElementDestroying(this);
+            _children.clear();
         }
         UIElement *UIElement::AddChild(Ref<UIElement> child)
         {
             child->_parent = this;
             ++child->_hierarchy_depth;
             _children.emplace_back(child);
-            _on_child_add.Invoke(child.get());
+            _on_child_add_delegate.Invoke(child.get());
             return child.get();
         }
         void UIElement::RemoveChild(Ref<UIElement> child)
@@ -33,30 +58,88 @@ namespace Ailu
             auto it = std::find(_children.begin(), _children.end(), child);
             if (it != _children.end())
             {
-                _on_child_remove.Invoke(it->get());
+                _on_child_remove_delegate.Invoke(it->get());
                 child->_parent = nullptr;
                 --child->_hierarchy_depth;
                 _children.erase(it);
             }
         }
+        void UIElement::ClearChildren()
+        {
+            if (_children.empty())
+                return;
+            for (auto &child: _children)
+            {
+                child->_parent = nullptr;
+                --child->_hierarchy_depth;
+                _on_child_remove_delegate.Invoke(child.get());
+            }
+            _children.clear();
+        }
+        i32 UIElement::IndexOf(UIElement *child)
+        {
+            auto it = std::find_if(_children.begin(), _children.end(), [&](Ref<UIElement> c)
+                                   { return c.get() == child; });
+            if (it != _children.end())
+            {
+                return static_cast<i32>(std::distance(_children.begin(), it));
+            }
+            return -1;
+        }
+        UIElement *UIElement::ChildAt(u32 index)
+        {
+            if (index < static_cast<u32>(_children.size()))
+                return _children[index].get();
+            return nullptr;
+        }
         void UIElement::Update(f32 dt)
         {
             if (!_is_visible)
                 return;
-            for (auto &child: _children)
+            if (_is_transf_dirty)
             {
-                child->Update(dt);
+                _transform._position = _transition;
+                _transform._scale = _scale;
+                _transform._rotation = _rotation * k2Radius;
             }
+            if (_is_layout_dirty)
+            {
+                MeasureAndArrange(dt);
+                _is_layout_dirty = false;
+                _matrix = CalculateWorldMatrix();
+                _inv_matrix = MatrixInverse(_matrix);
+                _is_transf_dirty = false;
+            }
+            if (_is_transf_dirty)
+            {
+                _matrix = CalculateWorldMatrix();
+                _inv_matrix = MatrixInverse(_matrix);
+                _is_transf_dirty = false;
+            }
+            for (auto &child: _children)
+                child->Update(dt);
+        }
+
+        void UIElement::PostUpdate(f32 dt)
+        {
+            if (!_is_visible)
+                return;
+            for (auto &child: _children)
+                child->PostUpdate(dt);
         }
 
         void UIElement::Render(UIRenderer &r)
         {
             if (!_is_visible)
                 return;
+            RenderImpl(r);
+        }
+        void UIElement::PreUpdate(f32 dt)
+        {
+            if (!_is_visible)
+                return;
             for (auto &child: _children)
-            {
-                child->Render(r);
-            }
+                child->PreUpdate(dt);
         }
         void UIElement::OnEvent(UIEvent &e)
         {
@@ -102,55 +185,93 @@ namespace Ailu
                         _state._is_hovered = true;
                     _eventmap[UIEvent::EType::kMouseMove].Invoke(e);
                     break;
-
+                case UIEvent::EType::kKeyDown:
+                    _eventmap[UIEvent::EType::kKeyDown].Invoke(e);
+                    break;
+                case UIEvent::EType::kKeyUp:
+                    _eventmap[UIEvent::EType::kKeyUp].Invoke(e);
+                    break;
+                case UIEvent::EType::kMouseScroll:
+                    _eventmap[UIEvent::EType::kMouseScroll].Invoke(e);
+                    break;
                 default:
-                    AL_ASSERT(false);
+                {
+                    LOG_ERROR("UIElement::OnEvent: unhandled event type {}", static_cast<u32>(e._type))
+                }
                     break;
             }
         }
 
 
-        ElementEvent &UIElement::OnMouseEnter()
+        ElementEvent::EventView UIElement::OnMouseEnter()
         {
-            return _eventmap[UIEvent::EType::kMouseEnter];
+            return _eventmap[UIEvent::EType::kMouseEnter].GetEventView();
         }
-        ElementEvent &UIElement::OnMouseExit()
+        ElementEvent::EventView UIElement::OnMouseExit()
         {
-            return _eventmap[UIEvent::EType::kMouseExit];
+            return _eventmap[UIEvent::EType::kMouseExit].GetEventView();
         }
-        ElementEvent &UIElement::OnMouseDown()
+        ElementEvent::EventView UIElement::OnMouseDown()
         {
-            return _eventmap[UIEvent::EType::kMouseDown];
+            return _eventmap[UIEvent::EType::kMouseDown].GetEventView();
         }
-        ElementEvent &UIElement::OnMouseUp()
+        ElementEvent::EventView UIElement::OnMouseUp()
         {
-            return _eventmap[UIEvent::EType::kMouseUp];
+            return _eventmap[UIEvent::EType::kMouseUp].GetEventView();
         }
-        ElementEvent &UIElement::OnMouseDoubleClick()
+        ElementEvent::EventView UIElement::OnMouseDoubleClick()
         {
-            return _eventmap[UIEvent::EType::kMouseDoubleClick];
+            return _eventmap[UIEvent::EType::kMouseDoubleClick].GetEventView();
         }
-        ElementEvent &UIElement::OnMouseMove()
+        ElementEvent::EventView UIElement::OnMouseMove()
         {
-            return _eventmap[UIEvent::EType::kMouseMove];
+            return _eventmap[UIEvent::EType::kMouseMove].GetEventView();
         }
-        ElementEvent &UIElement::OnMouseClick()
+        ElementEvent::EventView UIElement::OnKeyDown()
         {
-            return _eventmap[UIEvent::EType::kMouseClick];
+            return _eventmap[UIEvent::EType::kKeyDown].GetEventView();
         }
-        void UIElement::SetDesiredRect(f32 x, f32 y, f32 width, f32 height)
+        ElementEvent::EventView UIElement::OnKeyUp()
         {
-            _desired_rect = {x, y, width, height};
-            _content_rect = _desired_rect;
+            return _eventmap[UIEvent::EType::kKeyUp].GetEventView();
+        }
+        ElementEvent::EventView UIElement::OnMouseScroll()
+        {
+            return _eventmap[UIEvent::EType::kMouseScroll].GetEventView();
+        }
+        ElementEvent::EventView UIElement::OnMouseClick()
+        {
+            return _eventmap[UIEvent::EType::kMouseClick].GetEventView();
+        }
+        void UIElement::Arrange(f32 x, f32 y, f32 width, f32 height)
+        {
+            _arrange_rect = {x, y, width, height};
+            _content_rect = _arrange_rect;
             _content_rect.x += _padding._l;
             _content_rect.y += _padding._t;
             _content_rect.z -= (_padding._l + _padding._r);
             _content_rect.w -= (_padding._t + _padding._b);
+            auto mat = CalculateWorldMatrix();
+            Vector3f corners[4] = {
+                {_content_rect.x, _content_rect.y, 1.0f},
+                {_content_rect.x + _content_rect.z, _content_rect.y, 1.0f},
+                {_content_rect.x + _content_rect.z, _content_rect.y + _content_rect.w, 1.0f},
+                {_content_rect.x, _content_rect.y + _content_rect.w, 1.0f}};
+            TransformCoord(corners[0],mat);
+            TransformCoord(corners[1], mat);
+            TransformCoord(corners[2], mat);
+            TransformCoord(corners[3], mat);
+            _abs_rect = {corners[0].x,
+                         corners[0].y,
+                         corners[1].x - corners[0].x,
+                         corners[3].y - corners[0].y};
+            PostArrange();
         }
-        void UIElement::SetDesiredRect(Vector4f rect)
+        void UIElement::Arrange(Vector4f rect)
         {
-            SetDesiredRect(rect.x, rect.y, rect.z, rect.w);
+            Arrange(rect.x, rect.y, rect.z, rect.w);
         }
+
         void UIElement::SetVisible(bool visible)
         {
             _is_visible = visible;
@@ -163,10 +284,7 @@ namespace Ailu
         {
             _depth = depth;
         }
-        UIElement::~UIElement()
-        {
-            _children.clear();
-        }
+
         void UIElement::Serialize(FArchive &ar)
         {
             SerializeObject::Serialize(ar);
@@ -214,18 +332,21 @@ namespace Ailu
                         }
                     }
                     _children[i].reset(child_type->CreateInstance<UIElement>());
-                    _on_child_add.Invoke(_children[i].get());
+                    _on_child_add_delegate.Invoke(_children[i].get());
                     SerializerWrapper<UIElement>::Deserialize(_children[i].get(), ar, &item_name);
                     _children[i]->SetParent(this);
                 }
                 sar->EndArray();
                 sar->EndObject();
             }
+            PostDeserialize();
         }
-        Vector4f UIElement::GetDesiredRect() const
+        
+        Vector4f UIElement::GetArrangeRect() const
         {
-            return _desired_rect;
+            return _abs_rect;
         }
+
         bool UIElement::IsPointInside(Vector2f mouse_pos) const
         {
             return IsPointInside(mouse_pos, _content_rect);
@@ -237,7 +358,8 @@ namespace Ailu
 
         UIElement *UIElement::HitTest(Vector2f pos)
         {
-            if (!IsPointInside(pos))
+            Vector2f lpos = TransformCoord(_inv_matrix, {pos, 0.0f}).xy;
+            if (!IsPointInside(lpos))
                 return nullptr;
 
             for (auto &child: _children)
@@ -245,6 +367,67 @@ namespace Ailu
                     return hit;
 
             return this;
+        }
+        void UIElement::RequestFocus()
+        {
+            if (!_state._is_enabled || !_state._is_visible)
+                return;
+            UIManager::Get()->SetFocus(this);
+        }
+        void UIElement::InvalidateLayout()
+        {
+            //这里可以添加停止策略，例如如果父的 size policy 是 Fixed，只需要局部更新，不冒泡。
+            if (!_is_layout_dirty)
+            {
+                _is_layout_dirty = true;
+                if (_parent)
+                {
+                    _parent->InvalidateLayout();// 向上传递
+                }
+            }
+        }
+        void UIElement::InvalidateTransform()
+        {
+            if (!_is_transf_dirty)
+            {
+                _is_transf_dirty = true;
+                for (auto &c: _children)
+                    c->InvalidateTransform();
+            }
+        }
+        void UIElement::SetFocusedInternal(bool v)
+        {
+            if (_state._is_focused == v)
+                return;
+            _state._is_focused = v;
+            if (v)
+                _on_focus_gained_delegate.Invoke();
+            else
+                _on_focus_lost_delegate.Invoke();
+        }
+        void UIElement::ApplyTransform()
+        {
+            
+        }
+        Vector2f UIElement::MeasureDesiredSize()
+        {
+            return _slot._size;
+        }
+        Matrix4x4f UIElement::CalculateWorldMatrix(bool is_exclude_self_offset) const
+        {
+            Math::Transform2D tmp = _transform;
+            if (!is_exclude_self_offset)
+                tmp._position.xy += _arrange_rect.xy;
+            Matrix4x4f mat = Math::Transform2D::ToMatrix(tmp);
+            if (_parent)
+            {
+                mat = _parent->CalculateWorldMatrix(false) * mat;
+            }
+            return mat;
+        }
+        void UIElement::PostDeserialize()
+        {
+            InvalidateLayout();
         }
     }// namespace UI
 }// namespace Ailu

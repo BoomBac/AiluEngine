@@ -32,7 +32,8 @@ namespace Ailu
             auto bind_heap = g_descriptor_mgr->GetBindHeap();
             auto [cpu_handle, gpu_handle] = std::make_tuple(bind_heap->GetCPUDescriptorHandleForHeapStart(), bind_heap->GetGPUDescriptorHandleForHeapStart());
             auto &d3d_ctx = static_cast<RHI::DX12::D3DContext &>(GraphicsContext::Get());
-            auto ret = ImGui_ImplDX12_Init(d3d_ctx.GetDevice(), RenderConstants::kFrameCount, d3d_ctx.BackBufferFormat(), bind_heap, cpu_handle, gpu_handle);
+            auto backbuffer_format = RenderConstants::kColorRange == EColorRange::kLDR ? ConvertToDXGIFormat(RenderConstants::kLDRFormat) : ConvertToDXGIFormat(RenderConstants::kHDRFormat);
+            auto ret = ImGui_ImplDX12_Init(d3d_ctx.GetDevice(), RenderConstants::kFrameCount, backbuffer_format, bind_heap, cpu_handle, gpu_handle);
 #endif
         }
         ImGuiRenderer::~ImGuiRenderer()

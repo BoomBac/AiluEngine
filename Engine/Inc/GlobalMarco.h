@@ -33,6 +33,17 @@
 #define BODY_MACRO_COMBINE(A, B, C, D) BODY_MACRO_COMBINE_INNER(A, B, C, D)
 #define GENERATED_BODY(...) BODY_MACRO_COMBINE(CURRENT_FILE_ID, _, __LINE__, _GENERATED_BODY)
 
+#if defined(_MSC_VER)
+    #define FORCEINLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+    #define FORCEINLINE inline __attribute__((always_inline))
+#else
+    #define FORCEINLINE inline
+#endif
+
+#undef max
+#undef min
+
 using u8 = uint8_t;
 using u16 = uint16_t;
 using u32 = uint32_t;

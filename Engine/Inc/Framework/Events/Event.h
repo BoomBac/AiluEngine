@@ -26,9 +26,10 @@ namespace Ailu
         kMouseButtonPressed,
         kMouseButtonReleased,
         kMouseMoved,
-        kMouseScrolled,
+        kMouseScroll,
         kMouseEnterWindow,
         kMouseExitWindow,
+        kMouseSetCursor,
         kDragFile
     };
 
@@ -50,6 +51,7 @@ namespace Ailu
 #define EVENT_CLASS_CATEGORY(category) \
     virtual int GetCategoryFlags() const override { return category; }
 
+    class Window;
     class AILU_API Event
     {
         friend class EventDispather;
@@ -68,7 +70,7 @@ namespace Ailu
         {
             return GetEventType() == other.GetEventType();
         }
-
+        Window *_window = nullptr;
     protected:
         bool _handled = false;
     };
@@ -106,30 +108,23 @@ namespace Ailu
         using HandlerType = std::function<void(Args...)>;
         using Handle = u32;
 
-		Handle Subscribe(HandlerType&& handler) 
-		{
-			std::lock_guard<std::mutex> lock(_mutex);
-			_handlers.emplace_back(_next_id, std::move(handler));
-			return _next_id++;
-		}
-
-        void Unsubscribe(Handle id)
+        class EventView
         {
-            std::lock_guard<std::mutex> lock(_mutex);
-            _handlers.erase(std::remove_if(_handlers.begin(), _handlers.end(),
-                                           [id](const auto &pair)
-                                           { return pair.first == id; }),
-                            _handlers.end());
-        }
+        public:
+            Handle Subscribe(HandlerType &&handler) { return _delegate->Subscribe(std::move(handler)); }
+            void Unsubscribe(Handle id) { _delegate->Unsubscribe(id); }
+            void Unsubscribe(HandlerType handler) { _delegate->Unsubscribe(std::move(handler)); }
+            Handle operator+=(HandlerType &&handler) { return Subscribe(std::move(handler)); }
+            void operator-=(Handle id) { Unsubscribe(id); }
+            void operator-=(HandlerType handler) { Unsubscribe(std::move(handler)); }
 
-        void Unsubscribe(HandlerType handler)
-        {
-            std::lock_guard<std::mutex> lock(_mutex);
-            _handlers.erase(std::remove_if(_handlers.begin(), _handlers.end(),
-                                           [&handler](const auto &pair)
-                                           { return pair.second.target<void(Args...)>() == handler.target<void(Args...)>(); }),
-                            _handlers.end());
-        }
+        private:
+            friend class Delegate;
+            explicit EventView(Delegate *d) : _delegate(d) {}
+            Delegate *_delegate;
+        };
+
+        EventView GetEventView() { return EventView(this); }
 
         void Invoke(Args... args)
         {
@@ -139,19 +134,45 @@ namespace Ailu
                 handlers_copy = _handlers;
             }
             for (auto &[id, handler]: handlers_copy)
-            {
                 handler(args...);
-            }
         }
-        Handle operator+=(HandlerType&& handler) { return Subscribe(std::move(handler)); }
-        void operator-=(Handle id) { Unsubscribe(id); }
-        void operator-=(HandlerType handler) { Unsubscribe(handler); }
 
     private:
+        Handle Subscribe(HandlerType &&handler)
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            _handlers.emplace_back(_next_id, std::move(handler));
+            return _next_id++;
+        }
+        void Unsubscribe(Handle id)
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            _handlers.erase(std::remove_if(_handlers.begin(), _handlers.end(),
+                                           [id](const auto &pair)
+                                           { return pair.first == id; }),
+                            _handlers.end());
+        }
+        void Unsubscribe(HandlerType handler)
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            _handlers.erase(std::remove_if(_handlers.begin(), _handlers.end(),
+                                           [&handler](const auto &pair)
+                                           { return pair.second.target<void(Args...)>() == handler.target<void(Args...)>(); }),
+                            _handlers.end());
+        }
+
         Vector<std::pair<Handle, HandlerType>> _handlers;
         Handle _next_id = 0;
         std::mutex _mutex;
     };
+
+#define DECLARE_DELEGATE(Name, ...)          \
+protected:                                     \
+    Delegate<__VA_ARGS__> _##Name##_delegate; \
+                                             \
+public:                                      \
+    Delegate<__VA_ARGS__>::EventView _##Name = _##Name##_delegate.GetEventView()
+
 
 }// namespace Ailu
 

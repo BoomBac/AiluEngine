@@ -200,11 +200,9 @@ namespace Ailu::SceneManagement
         ECS::Signature anim_sig;
         anim_sig.set(_register.GetComponentTypeID<ECS::CSkeletonMesh>(), true);
         _register.RegisterSystem<ECS::AnimationSystem>(anim_sig);
-        _register.RegisterOnComponentAdd<ECS::StaticMeshComponent>([](ECS::Entity entity){
-                                                          GraphicsContext::Get().GetPipeline()->OnAddRenderObject(entity);
+        _register.RegisterOnComponentAdd<ECS::StaticMeshComponent>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);
         });
-        _register.RegisterOnComponentAdd<ECS::CSkeletonMesh>([](ECS::Entity entity){
-                                                          GraphicsContext::Get().GetPipeline()->OnAddRenderObject(entity);
+        _register.RegisterOnComponentAdd<ECS::CSkeletonMesh>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);
                                                       });
     }
 

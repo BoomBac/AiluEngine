@@ -137,6 +137,7 @@ namespace Ailu
             if (auto sob = dynamic_cast<SerializeObject *>(&obj); sob != nullptr)
             {
                 sob->Deserialize(*this);
+                sob->PostDeserialize();
             }
             else
             {

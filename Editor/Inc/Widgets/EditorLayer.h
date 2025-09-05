@@ -2,7 +2,6 @@
 #ifndef __EDITOR_LAYER_H__
 #define __EDITOR_LAYER_H__
 #include "Framework/Events/Layer.h"
-#include "ImGuiWidget.h"
 #include "Render/PickPass.h"
 #include "Dock/DockManager.h"
 
@@ -15,7 +14,8 @@ namespace Ailu
 	}
 	namespace Editor
 	{
-		class SceneView;
+		class RenderView;
+        class CommonView;
 		class EditorLayer : public Layer
 		{
 		public:
@@ -33,17 +33,9 @@ namespace Ailu
 			void Begin();
 			void End();
 			Vector2f     _viewport_size;
-			ImGuiWidget* _p_scene_view;
-			ImGuiWidget* _p_preview_cam_view;
-			ImGuiWidget* _p_profiler_window;
-			ImGuiWidget *_p_rdg_debugger;
 		private:
-			ImFont* _font = nullptr;
-			Vector<Scope<ImGuiWidget>> _widgets;
-			ImGuiWidget* _p_env_setting;
 			Render::PickFeature _pick;
 			Ref<UI::Widget> _main_widget = nullptr;
-			Scope<DockManager> _dock_manager = nullptr;
 		};
 	}
 }

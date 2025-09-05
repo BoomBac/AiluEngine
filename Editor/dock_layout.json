@@ -1,0 +1,33 @@
+{
+    "_node_data": [{
+            "_type_id": "Ailu::Editor::CommonView",
+            "_split_ratio": 0.5,
+            "_window_size": [276.0, 337.0],
+            "_type": 2,
+            "_parent_id": 4294967295,
+            "_id": 1,
+            "_window_id": 999,
+            "_is_vertical_split": true,
+            "_title": "CommonView",
+            "_tab_id": "",
+            "_window_position": [1538.0, 665.0],
+            "_position": [0.0, 0.0],
+            "_size": [276.0, 337.0],
+            "_flags": 31
+        }, {
+            "_split_ratio": 0.5,
+            "_type_id": "Ailu::Editor::RenderView",
+            "_type": 2,
+            "_window_size": [1324.0, 777.0],
+            "_parent_id": 4294967295,
+            "_id": 0,
+            "_window_id": 0,
+            "_is_vertical_split": true,
+            "_title": "RenderView",
+            "_tab_id": "",
+            "_window_position": [-858993472.0, -858993472.0],
+            "_position": [152.0, 104.0],
+            "_size": [999.0, 572.0],
+            "_flags": 0
+        }]
+}

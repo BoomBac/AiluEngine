@@ -20,7 +20,7 @@ namespace Ailu::Render
         entry._frustum = cam.GetViewFrustum();
         entry._cam_hash = cam.HashCode();
         auto cam_cb_data = &entry._camera_data;
-        u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
+        u32 pixel_width = cam.OutputSize().x, pixel_height = cam.OutputSize().y;
         cam_cb_data->_ScreenParams = Vector4f(1.0f / (f32) pixel_width, 1.0f / (f32) pixel_height, (f32) pixel_width, (f32) pixel_height);
         Camera::CalculateZBUfferAndProjParams(cam, cam_cb_data->_ZBufferParams, cam_cb_data->_ProjectionParams);
         cam_cb_data->_CameraPos = cam.Position();
@@ -68,11 +68,11 @@ namespace Ailu::Render
 #pragma region RenderPipeline
     RenderPipeline::RenderPipeline()
     {
-        Init();
+        Initialize();
     }
-    void RenderPipeline::Init()
+    void RenderPipeline::Initialize()
     {
-        TIMER_BLOCK("RenderPipeline::Init()");
+        TIMER_BLOCK("RenderPipeline::Initialize()");
         _renderers.push_back(MakeScope<Renderer>());
         _renderers.back()->_p_cur_pipeline = this;
         _cameras.emplace_back(Camera::sCurrent);
@@ -106,7 +106,7 @@ namespace Ailu::Render
 
     void RenderPipeline::Render()
     {
-        /*
+        
         Setup();
         for (auto cam: _cameras)
         {
@@ -121,18 +121,22 @@ namespace Ailu::Render
             _targets.push_back(_renderers[0]->TargetTexture());
         }
         RenderTexture::ResetRenderTarget();
-        */
+        
         {
-            if (Application::Get()._is_multi_thread_rendering)
-            {
-                Application::Get().NotifyRender();
-                Application::Get().WaitForRender();
-            }
+            //if (Application::Get()._is_multi_thread_rendering)
+            //{
+            //    Application::Get().NotifyRender();
+            //    Application::Get().WaitForRender();
+            //}
             PROFILE_BLOCK_CPU(UIRender)
             auto cmd = CommandBufferPool::Get("UI");
             //强制clear一下，backbuffer load action默认为是dont care
-            cmd->SetRenderTarget(RenderTexture::s_backbuffer);
-            cmd->ClearRenderTarget(Colors::kBlack);
+            //RenderTexture *backbuffer = RenderTexture::WindowBackBuffer(Application::s_focus_window? Application::s_focus_window : &Application::Get().GetWindow());
+            for (auto &it: RenderTexture::s_window_backbuffers)
+            {
+                cmd->SetRenderTarget(it.second);
+                cmd->ClearRenderTarget(Colors::kBlack);
+            }
             UI::UIRenderer::Get()->Render(cmd.get());
             GraphicsContext::Get().ExecuteCommandBuffer(cmd);
             CommandBufferPool::Release(cmd);

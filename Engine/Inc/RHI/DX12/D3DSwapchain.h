@@ -18,7 +18,7 @@ namespace Ailu
             DXGI_SWAP_CHAIN_DESC1 _swapchain_desc;
             EALGFormat::EALGFormat _format;
             ID3D12Device *_device;
-            HWND _window_handle;
+            Window* _window;
             ID3D12CommandQueue *_command_queue;
             IDXGIFactory6 *_factory;
             bool _is_fullscreen = false;

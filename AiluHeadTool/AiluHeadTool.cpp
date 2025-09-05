@@ -112,9 +112,14 @@ static void ParserEnumValues(const std::string &line, AiluHeadTool::EnumInfo &in
     // - `(?:\s*,\s*)?`：可选的逗号和空格，用于分隔多个枚举项
     std::regex pattern(R"((\w+)(?:\s*=\s*(-?\d+))?(?:\s*,\s*)?)");
     std::smatch matches;
+    std::string line_no_comment = line;
+    if (auto pos = line_no_comment.find("//"); pos != std::string::npos)
+    {
+        line_no_comment = line_no_comment.substr(0, pos);
+    }
 
-    auto begin = line.cbegin();
-    auto end = line.cend();
+    auto begin = line_no_comment.cbegin();
+    auto end = line_no_comment.cend();
     int parser_num = 0;
     // 逐个解析枚举项
     while (std::regex_search(begin, end, matches, pattern))
@@ -411,6 +416,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
             if (!file.is_open()) { Log(std::format("AiluHeadTool::Parser {} with result open file failed", path.string())); }
             else
             {
+                _is_cur_file_engine_lib = path.string().find("Editor\\Inc") == std::string::npos;
                 std::string cur_file_id = path.stem().string();
                 cur_file_id.append("_GEN_H");
                 std::transform(cur_file_id.begin(), cur_file_id.end(), cur_file_id.begin(), ::toupper);
@@ -679,7 +685,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         out_file << "}" << std::endl;
                         out_file << "template<>" << std::endl;
                         std::string full_name = class_info._namespace + "::" + class_info._name;
-                        out_file << std::format("AILU_API class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
+                        if (_is_cur_file_engine_lib)
+                            out_file << std::format("AILU_API class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
+                        else
+                            out_file << std::format("class Ailu::Type* Ailu::StaticClass<class {}>();", full_name) << std::endl;
+                            
                         out_file << "//Class " << class_info._name << " end..........................." << std::endl;
                         out_file << std::endl;
                     }
@@ -709,7 +719,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         out_file << "}" << std::endl;
                         out_file << "template<>" << std::endl;
                         std::string full_name = struct_info._namespace + "::" + struct_info._name;
-                        out_file << std::format("AILU_API class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
+                        if (_is_cur_file_engine_lib)
+                            out_file << std::format("AILU_API class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
+                        else
+                            out_file << std::format("class Ailu::Type* Ailu::StaticClass<struct {}>();", full_name) << std::endl;
                         out_file << "//Struct " << struct_info._name << " end..........................." << std::endl;
                         out_file << std::endl;
                     }
@@ -723,7 +736,10 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         out_file << "}" << std::endl;
                         out_file << "template<>" << std::endl;
                         std::string full_name = enum_info._namespace + "::" + enum_info._name;
-                        out_file << std::format("AILU_API const Ailu::Enum* Ailu::StaticEnum<{}>();", full_name) << std::endl;
+                        if (_is_cur_file_engine_lib)
+                            out_file << std::format("AILU_API const Ailu::Enum* Ailu::StaticEnum<{}>();", full_name) << std::endl;
+                        else
+                            out_file << std::format("const Ailu::Enum* Ailu::StaticEnum<{}>();", full_name) << std::endl;
                         //out_file << " return " << std::format("Z_Construct_Enum_{}_Type()", enum_info._name) << ";" << std::endl;
                         //out_file << "}" << std::endl;
                         out_file << "//Enum " << enum_info._name << " end..........................." << std::endl;
@@ -768,11 +784,11 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                     {
                         all_enums += enum_info._name + ",";
                     }
-                    Log(std::format("AiluHeadTool::Parser file {} success({}ms) with result:"
+                    Log(std::format("AiluHeadTool::Parser file {}(is engine lib: {}) success({}ms) with result:"
                                     "       class({}):{}"
                                     "       struct({}):{}"
                                     "       enum({}):{}",
-                                    path.string(), g_Timer.ElapsedMilliseconds(), _classes.size(), all_classes, _structs.size(), all_structs, _enums.size(), all_enums));
+                                    path.string(), BOOL_STR(_is_cur_file_engine_lib), g_Timer.ElapsedMilliseconds(), _classes.size(), all_classes, _structs.size(), all_structs, _enums.size(), all_enums));
                     g_Timer.stop();
                     g_Timer.reset();
                     return;

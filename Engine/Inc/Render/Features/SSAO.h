@@ -11,6 +11,7 @@ namespace Ailu::Render
 	public:
 		SSAOPass();
 		~SSAOPass();
+        void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
 		void Execute(GraphicsContext* context, RenderingData& rendering_data) final;
 		void BeginPass(GraphicsContext* context) final;
 		void EndPass(GraphicsContext* context) final;

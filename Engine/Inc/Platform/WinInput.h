@@ -6,21 +6,17 @@
 namespace Ailu
 {
 	//https://learn.microsoft.com/zh-CN/windows/win32/api/winuser/nf-winuser-getasynckeystate
-	class WinInput : public Input
+	class WinInput : public InputPlatform
 	{
 	public:
-		static void Create();
-		static void Create(HWND hwnd);
-	public:
-		bool IsKeyPressedImpl(int keycode) final;
-		bool IsMouseButtonPressedImpl(u8 button) final;
-		float GetMouseXImpl() final;
-		float GetMouseYImpl() final;
-		Vector2f GetMousePosImpl() final;
-		Vector2f GetGlobalMousePosImpl() final;
-	private:
 		WinInput();
 		WinInput(HWND hwnd);
+	private:
+		bool IsKeyPressed(EKey keycode) final;
+        Vector2f GetMousePos(Window *w) final;
+        Vector2f GetGlobalMousePos() final;
+        WString GetCharFromKeyCode(EKey key) final;
+
 		HWND _hwnd = nullptr;
 		POINT _mouse_point;
 	};

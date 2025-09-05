@@ -1,8 +1,6 @@
 #include "EditorApp.h"
 #include "Common/Undo.h"
 #include "Widgets/InputLayer.h"
-#include "Widgets/OutputLog.h"
-#include "Widgets/SceneLayer.h"
 
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -74,30 +72,27 @@ namespace Ailu
             auto ret = Application::Initialize(desc);
             _p_input_layer = new InputLayer();
             PushLayer(_p_input_layer);
-            _p_scene_layer = new SceneLayer();
-            PushLayer(_p_scene_layer);
-            LogMgr::Get().AddAppender(new ImGuiLogAppender());
             _pipeline.reset(new CommonRenderPipeline());
-            g_pGfxContext->RegisterPipeline(_pipeline.get());
+            Render::RenderPipeline::Register(_pipeline.get());
             {
                 //g_pResourceMgr->Load<Scene>(_opened_scene_path);
                 g_pSceneMgr->OpenScene(_opened_scene_path);
             }
             LoadEditorResource();
-            JsonArchive ar;
-            ar.Load(Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/EditorStyle.json");
-            auto t = EditorStyle::StaticType();
-            auto ps = &g_editor_style;
-            for (auto &p: t->GetProperties())
-                p.Deserialize(&g_editor_style, ar);
-
+            //JsonArchive ar;
+            //ar.Load(Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/EditorStyle.json");
+            //auto t = EditorStyle::StaticType();
+            //auto ps = &g_editor_style;
+            //for (auto &p: t->GetProperties())
+            //    p.Deserialize(&g_editor_style, ar);
+            g_editor_style = DefaultDark();
             _p_editor_layer = new EditorLayer();
             PushLayer(_p_editor_layer);
             _is_playing_mode = false;
             _is_simulate_mode = false;
 
 
-            _on_file_changed_delegate += [](const fs::path &file)
+            _on_file_changed += [](const fs::path &file)
             {
                 const WString cur_path = PathUtils::FormatFilePath(file.wstring());
                 WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
@@ -124,7 +119,7 @@ namespace Ailu
                         }
                     }
                 } };
-            _on_file_changed_delegate += [](const fs::path &file) {
+            _on_file_changed += [](const fs::path &file) {
                 for (auto it = g_pResourceMgr->ResourceBegin<ComputeShader>(); it != g_pResourceMgr->ResourceEnd<ComputeShader>(); it++)
                 {
                     const WString cur_path = PathUtils::FormatFilePath(file.wstring());
@@ -136,7 +131,7 @@ namespace Ailu
                     }
                 }
             };
-            _on_file_changed_delegate += [](const fs::path &file) {
+            _on_file_changed += [](const fs::path &file) {
                 const WString cur_path = PathUtils::FormatFilePath(file.wstring());
                 WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
                 for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
@@ -152,7 +147,9 @@ namespace Ailu
                     }
                 }
             };
-            _on_file_changed_delegate += [this](const fs::path &file) {
+            _on_file_changed += [this](const fs::path &file) {
+                if (auto pos = file.filename().string().find("EditorStyle"); pos == String::npos)
+                    return;
                 JsonArchive ar;
                 ar.Load(file);
                 auto t = EditorStyle::StaticType();
@@ -237,7 +234,7 @@ namespace Ailu
         {
             Camera::sCurrent = _p_scene_camera;
             _editor_config._window_size = Vector2UInt(_p_window->GetWidth(),_p_window->GetHeight());
-            _editor_config._viewport_size = Vector2UInt((u32)_p_editor_layer->_p_scene_view->Size().x, (u32)_p_editor_layer->_p_scene_view->Size().y);
+            //_editor_config._viewport_size = Vector2UInt((u32)_p_editor_layer->_p_scene_view->Size().x, (u32)_p_editor_layer->_p_scene_view->Size().y);
             _editor_config._position = Camera::sCurrent->Position();
             _editor_config._rotation = Vector4f(Camera::sCurrent->Rotation().x, Camera::sCurrent->Rotation().y, Camera::sCurrent->Rotation().z, Camera::sCurrent->Rotation().w);
             _editor_config._fov = Camera::sCurrent->FovH();

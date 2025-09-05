@@ -11,6 +11,7 @@
 #include "Framework/Math/ALMath.hpp"
 #include "GlobalMarco.h"
 #include "GpuResource.h"
+#include "CoreType.h"
 #include <map>
 #include <stdint.h>
 
@@ -19,6 +20,7 @@
 
 namespace Ailu
 {
+    class Window;
     namespace Render
     {
         namespace TextureUtils
@@ -376,13 +378,6 @@ namespace Ailu
         {
             return ERenderTargetFormat::kShadowMap == format || ERenderTargetFormat::kDepth == format;
         }
-        enum class ELoadStoreAction
-        {
-            kLoad,
-            kStore,
-            kClear,
-            kNotCare
-        };
 
         struct TextureDesc
         {
@@ -473,6 +468,8 @@ namespace Ailu
             static bool IsValidSize(u16 w, u16 h, u16 mip, u16 in_w, u16 in_h);
             static bool IsValidSize(u16 w, u16 h, u16 d, u16 mip, u16 in_w, u16 in_h, u16 in_d);
             static u64 TotalGPUMemerySize() { return s_gpu_mem_usage; }
+
+        public:
             Texture();
             virtual void Release();
             virtual ~Texture();
@@ -496,7 +493,8 @@ namespace Ailu
             [[nodiscard]] u16 CalculateSubResIndex(ECubemapFace::ECubemapFace face, u16 mipmap, u16 depth_slice) const;
             bool IsRenderTex() const { return _is_render_tex; }
             virtual bool IsValidMipmap(u16 mipmap) const { return mipmap < _pixel_data.size(); };
-
+            u16 Width() const { return _width; }
+            u16 Height() const { return _height; }
         protected:
         protected:
             inline static u64 s_gpu_mem_usage = 0u;
@@ -506,12 +504,11 @@ namespace Ailu
             Vector<bool> _is_data_filled;
             bool _is_render_tex = false;
             Vector<u8 *> _pixel_data;
+            u16 _width, _height;
         };
 
         class AILU_API Texture2D : public Texture
         {
-            DECLARE_PROTECTED_PROPERTY_RO(width, Width, u16)
-            DECLARE_PROTECTED_PROPERTY_RO(height, Height, u16)
         public:
             static Ref<Texture2D> Create(const TextureDesc &initializer);
             static Ref<Texture2D> Create(u16 w, u16 h, ETextureFormat::ETextureFormat format, bool is_mip = false, bool is_random_access = false);
@@ -542,8 +539,6 @@ namespace Ailu
 
         class AILU_API Texture3D : public Texture
         {
-            DECLARE_PROTECTED_PROPERTY_RO(width, Width, u16)
-            DECLARE_PROTECTED_PROPERTY_RO(height, Height, u16)
             DECLARE_PROTECTED_PROPERTY_RO(depth, Depth, u16)
         public:
             static Ref<Texture3D> Create(const TextureDesc &initializer);
@@ -573,7 +568,6 @@ namespace Ailu
 
         class CubeMap : public Texture
         {
-            DECLARE_PROTECTED_PROPERTY_RO(width, Width, u16)
         public:
             static Ref<CubeMap> Create(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
             CubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
@@ -612,8 +606,6 @@ namespace Ailu
 
         class AILU_API RenderTexture : public Texture
         {
-            DECLARE_PROTECTED_PROPERTY_RO(width, Width, u16)
-            DECLARE_PROTECTED_PROPERTY_RO(height, Height, u16)
             DECLARE_PROTECTED_PROPERTY_RO(depth, Depth, u16)
         public:
             void DepthBit(const u16 &value) { _depth_bit = value; }
@@ -622,15 +614,22 @@ namespace Ailu
             u16 _depth_bit;
 
         public:
+            inline static HashMap<u64, RenderTexture *> s_window_backbuffers;
             inline static RenderTexture *s_backbuffer;
+
+            static RenderTexture *WindowBackBuffer(Window *w)
+            {
+                u64 id = reinterpret_cast<u64>(w);
+                if (s_window_backbuffers.contains(id))
+                    return s_window_backbuffers[id];
+                return nullptr;
+            }
             static u64 TotalGPUMemerySize() { return s_render_texture_gpu_mem_usage; }
             static RTHandle GetTempRT(u16 width, u16 height, String name = std::format("TempBuffer_{}", s_temp_rt_count++), ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, bool mipmap_chain = false, bool linear = false, bool random_access = false);
             static RTHandle GetTempRT(const TextureDesc &desc, String name = std::format("TempBuffer_{}", s_temp_rt_count++));
             static RTHandle GetTempRT(u16 width, u16 height, String name, ERenderTargetFormat::ERenderTargetFormat format, ELoadStoreAction load_action);
             static void ReleaseTempRT(RTHandle handle);
             static void ResetRenderTarget(RenderTexture *rt = nullptr) { s_current_rt = rt; };
-            RenderTexture(const TextureDesc &desc);
-            virtual ~RenderTexture();
             //virtual TextureHandle GetView(ECubemapFace::ECubemapFace face, u16 mimmap) { return 0; };
             //当mipmap为0时，访问srv时，返回原图分辨率，也就是mip0，当访问uav时，实际访问的是mipmap1的uav（cubemap）
             //virtual TextureHandle GetView(u16 mimmap, bool random_access = false, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown, u16 array_slice = 0) override { return 0; };
@@ -640,6 +639,9 @@ namespace Ailu
             static Ref<RenderTexture> Create(const TextureDesc &desc, String name = "");
             //cubemap array not support mipmap
             static Ref<RenderTexture> Create(u16 width, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, u16 array_slice = 1, bool linear = false, bool random_access = false);
+        public:
+            RenderTexture(const TextureDesc &desc);
+            virtual ~RenderTexture();
             void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) override {};
             TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const override { return 0; };
             void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) override {};

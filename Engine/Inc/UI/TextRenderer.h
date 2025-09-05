@@ -4,67 +4,56 @@
 #ifndef __TEXTRENDERER_H__
 #define __TEXTRENDERER_H__
 #include "GlobalMarco.h"
-#include "Buffer.h"
-#include "Material.h"
-#include "Font.h"
+#include "DrawerBlock.h"
+#include "Render/Font.h"
 
 #undef DrawText
-namespace Ailu::Render
+namespace Ailu
 {
-    class CommandBuffer;
-    struct TextVertex
+    namespace Render
     {
-        TextVertex() = default;
-        TextVertex(const Vector4f& pos, const Vector4f& color, const Vector4f& uv)
-            :_pos(pos), _color(color), _uv(uv) {}
-        //object pos and padding
-        Vector4f _pos;
-        //top left's uv and char size in tex
-        Vector4f _uv;
-        Vector4f _color;
-    };
-    class AILU_API TextRenderer
+        class CommandBuffer;
+    }
+    namespace UI
     {
-    public:
-        static void Init();
-        static void Shutdown();
-        static TextRenderer* Get();
-        static Vector2f CalculateTextSize(const String &text, Font *font = nullptr,u16 font_size = 14u, Vector2f scale = Vector2f::kOne);
-    public:
-        inline static u16 kMaxCharacters = 1024u;
-        TextRenderer();
-        void Initialize();
-        ~TextRenderer();
-        //push a text
-        void DrawText(const String &text, Vector2f pos,u16 font_size,Vector2f scale,Color color,Font *font = nullptr);
-        void Render(RenderTexture* target, CommandBuffer * cmd);
-        void Render(RenderTexture* target);
-        bool _is_draw_debug_line = true;
-        [[nodiscard]] Font* GetDefaultFont() const;
-    private:
-        Ref<Font> _default_font;
-        u16 _current_frame_index = 0u;
-        struct DrawerBlock
+        using Render::Font;
+        using Render::RenderTexture;
+        class AILU_API TextRenderer
         {
-            DISALLOW_COPY_AND_ASSIGN(DrawerBlock)
-            Ref<Material> _default_mat;
-            VertexBuffer* _vbuf;
-            IndexBuffer* _ibuf;
-            ConstantBuffer * _obj_cb;
-            Vector<Vector3f> _pos_stream;
-            Vector<Vector2f> _uv_stream;
-            Vector<Vector4f> _color_stream;
-            Vector<u32> _indices;
-            u16 _characters_count = 0;
-            explicit DrawerBlock(u32 char_num = kMaxCharacters);
-            ~DrawerBlock();
-            DrawerBlock& operator=(DrawerBlock&& other) noexcept;
-            void AppendText(Font *font, const String &text, Vector2f pos, u16 font_size = 14u,Vector2f scale = Vector2f::kOne, Vector2f padding = Vector2f::kOne, Color color = Colors::kWhite);
-            void Render(RenderTexture *target, CommandBuffer *cmd,bool is_debug);
-            void ClearBuffer();
+        public:
+            static void Init();
+            static void Shutdown();
+            static TextRenderer *Get();
+            static Vector2f CalculateTextSize(const String &text, u16 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
+
+        public:
+            inline static u16 kMaxCharacters = 1024u;
+            TextRenderer();
+            void Initialize();
+            ~TextRenderer();
+            /// <summary>
+            /// 独立绘制，用于简单gui
+            /// </summary>
+            void DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color, Font *font = nullptr);
+            /// <summary>
+            /// 外部传入drawerblock，用于UI系统中批量绘制
+            /// </summary>
+            void DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color, Font *font,DrawerBlock* block);
+            void DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color,Matrix4x4f matrix, Font *font,DrawerBlock* block);
+
+            void Render(RenderTexture *target, Render::CommandBuffer *cmd);
+            void Render(RenderTexture *target);
+            void Render(RenderTexture *target, Render::CommandBuffer *cmd, DrawerBlock *b);
+            bool _is_draw_debug_line = true;
+            [[nodiscard]] Font *GetDefaultFont() const;
+
+        private:
+            void AppendText(const String &text, Vector2f pos,Matrix4x4f matrix, u16 font_size, Vector2f scale, Color color, Vector2f padding,Font *font, DrawerBlock *block);
+        private:
+            Ref<Font> _default_font;
+            Ref<Render::Material> _default_mat;
+            DrawerBlock *_default_block = nullptr;
         };
-        using FrameDrawerBlock = Map<WString,DrawerBlock*>;
-        Array<FrameDrawerBlock,RenderConstants::kFrameCount> _drawer_blocks;
-    };
-}
+    }// namespace UI
+}// namespace Ailu::Render
 #endif//__TEXTRENDERER_H__

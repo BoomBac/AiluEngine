@@ -8,6 +8,7 @@
 #include "UI/TextRenderer.h"
 #include "Render/Gizmo.h"
 #include "UI/Widget.h"
+#include "UI/UIFramework.h"
 #include <Framework/Common/Allocator.hpp>
 #include <Framework/Common/ResourceMgr.h>
 
@@ -19,10 +20,12 @@ namespace Ailu
         static UIRenderer *s_Renderer = nullptr;
         void UIRenderer::Init()
         {
+            TextRenderer::Init();
             s_Renderer = AL_NEW(UIRenderer);
         }
         void UIRenderer::Shutdown()
         {
+            TextRenderer::Shutdown();
             AL_DELETE(s_Renderer);
         }
         UIRenderer *UIRenderer::Get()
@@ -32,6 +35,13 @@ namespace Ailu
         UIRenderer::UIRenderer()
         {
             _obj_cb.reset(ConstantBuffer::Create(Render::RenderConstants::kPerObjectDataSize));
+            _default_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_ui.alasset"), "DefaultUIMaterial");
+            _default_material->SetTexture("_MainTex", Render::Texture::s_p_default_white);
+            for (auto &frame_blocks: _drawer_blocks)
+            {
+                frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material,9600u));
+            }
+            _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial"));
         }
         UIRenderer::~UIRenderer()
         {
@@ -42,53 +52,49 @@ namespace Ailu
                     AL_DELETE(b);
                 }
             }
-            _widgets.clear();
+            AL_DELETE(_text_block);
         }
 
         void UIRenderer::Render(CommandBuffer *cmd)
         {
-            std::stable_sort(_active_widgets.begin(), _active_widgets.end(), [](Ref<Widget> a, Ref<Widget> b) -> bool
-                             { return *a < *b; });
-            _cur_widget_index = 0u;
-            for (auto &canvas: _active_widgets)
+            const f32 dt = TimeMgr::s_delta_time;
+            _cur_widget_index = 1u;
+            auto& widgets = UI::UIManager::Get()->_widgets;
+            for (auto it = widgets.begin(); it != widgets.end(); it++)
             {
-                canvas->Update();
+                auto canvas = it->get();
+                if (canvas->_visibility != EVisibility::kVisible)
+                    continue;
+                canvas->PreUpdate(dt);
+            }
+            for (auto it = widgets.begin(); it != widgets.end(); it++)
+            {
+                auto canvas = it->get();
+                if (canvas->_visibility != EVisibility::kVisible)
+                    continue;
+                canvas->Update(dt);
+            }
+            for (auto it = widgets.begin();it != widgets.end(); it++)
+            {
+                auto canvas = it->get();
+                if (canvas->_visibility != EVisibility::kVisible)
+                    continue;
                 canvas->Render(*this);
                 auto b = _drawer_blocks[_frame_index][_cur_widget_index];
-                if (b->_cur_vert_num == 0u)
+                if (b->_nodes.empty())
                     continue;
 
                 auto [color, depth] = canvas->GetOutput();
-                f32 w = (f32) color->Width();
-                f32 h = (f32) color->Height();
-                //cmd->ClearRenderTarget(color,depth,Colors::kBlack,kZFar);
-                CBufferPerCameraData cb_per_cam;
-
-                Matrix4x4f view, proj;
-                f32 aspect = w / h;
-                f32 half_width = w * 0.5f, half_height = h * 0.5f;
-                BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
-                BuildOrthographicMatrix(proj, 0.0f, w, 0.0f, h, 1.f, 200.f);
-
-                cb_per_cam._MatrixVP = view * proj;
-                cb_per_cam._ScreenParams = Vector4f(1.0f / w, 1.0f / h, w, h);
-                CBufferPerObjectData per_obj_data;
-                per_obj_data._MatrixWorld = BuildIdentityMatrix();
-                memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
-                cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &cb_per_cam, RenderConstants::kPerCameraDataSize);
-                cmd->SetRenderTarget(color, depth);
-                Color tint = Colors::kWhite;
-                b->_mat->SetVector("_Color", tint);
-                b->_vbuf->SetData((u8 *) b->_pos_buf.data(), b->_cur_vert_num * sizeof(Vector3f), 0u, 0u);
-                b->_vbuf->SetData((u8 *) b->_uv_buf.data(), b->_cur_vert_num * sizeof(Vector2f), 1u, 0u);
-                b->_vbuf->SetData((u8 *) b->_color_buf.data(), b->_cur_vert_num * sizeof(Vector4f), 2u, 0u);
-                b->_ibuf->SetData((u8 *) b->_index_buf.data(), b->_cur_index_num * sizeof(u32));
-                cmd->DrawIndexed(b->_vbuf, b->_ibuf, _obj_cb.get(), b->_mat.get());
-                b->_cur_index_num = 0u;
-                b->_cur_vert_num = 0u;
-                Render::TextRenderer::Get()->Render(color,cmd);
+                SubmitBlock(b,cmd,color,depth);
                 ++_cur_widget_index;
             }
+            //绘制全局gui
+            SubmitBlock(_drawer_blocks[_frame_index][0u],cmd,RenderTexture::s_backbuffer);
+            _cur_widget_index = 0u;
+            _drawer_blocks[_frame_index][0u]->Flush();
+            //暂时所有文本都渲染到后备缓冲区
+            //TextRenderer::Get()->Render(RenderTexture::s_backbuffer, cmd, _text_block);
+            //_text_block->Clear();
             static RenderingData data;
             data._width =  RenderTexture::s_backbuffer->Width();
             data._height = RenderTexture::s_backbuffer->Height();
@@ -96,42 +102,86 @@ namespace Ailu
             Render::Gizmo::Submit(cmd, data);
         }
 
-        void UIRenderer::DrawQuad(Vector2f position, Vector2f size, f32 depth, Color color)
+        void UIRenderer::DrawQuad(Vector4f rect, Color color, f32 depth)
         {
-            DrawerBlock *cb = GetAvailableBlock(6u);
-            cb->_pos_buf[cb->_cur_vert_num] = {position, depth};
-            cb->_pos_buf[cb->_cur_vert_num + 1] = {position.x + size.x, position.y, depth};
-            cb->_pos_buf[cb->_cur_vert_num + 2] = {position.x, position.y + size.y, depth};
-            cb->_pos_buf[cb->_cur_vert_num + 3] = {position.x + size.x, position.y + size.y, depth};
-            cb->_uv_buf[cb->_cur_vert_num] = {0.f, 0.f};
-            cb->_uv_buf[cb->_cur_vert_num + 1] = {1.f, 0.f};
-            cb->_uv_buf[cb->_cur_vert_num + 2] = {0.f, 1.f};
-            cb->_uv_buf[cb->_cur_vert_num + 3] = {1.f, 1.f};
-            cb->_color_buf[cb->_cur_vert_num] = color;
-            cb->_color_buf[cb->_cur_vert_num + 1] = color;
-            cb->_color_buf[cb->_cur_vert_num + 2] = color;
-            cb->_color_buf[cb->_cur_vert_num + 3] = color;
-            cb->_index_buf[cb->_cur_index_num] =     cb->_cur_vert_num + 0u;
-            cb->_index_buf[cb->_cur_index_num + 1] = cb->_cur_vert_num + 1u;
-            cb->_index_buf[cb->_cur_index_num + 2] = cb->_cur_vert_num + 2u;
-            cb->_index_buf[cb->_cur_index_num + 3] = cb->_cur_vert_num + 1u;
-            cb->_index_buf[cb->_cur_index_num + 4] = cb->_cur_vert_num + 3u;
-            cb->_index_buf[cb->_cur_index_num + 5] = cb->_cur_vert_num + 2u;
-            cb->_cur_vert_num += 4;
-            cb->_cur_index_num += 6;
+            DrawQuad(rect, kIdentityMatrix, color, depth);
         }
 
-        void UIRenderer::DrawQuad(Vector4f rect, f32 depth, Color color)
+        void UIRenderer::DrawQuad(Vector4f rect,Matrix4x4f matrix, Color color, f32 depth)
         {
-            DrawQuad({rect.x, rect.y}, {rect.z, rect.w}, depth, color);
+            DrawerBlock *cb = GetAvailableBlock(4u, 6u);
+            u32 cur_vert_num = cb->CurrentVertNum(), cur_index_num = cb->CurrentIndexNum();
+            cb->_pos_buf[cur_vert_num] = {rect.xy, depth};
+            cb->_pos_buf[cur_vert_num + 1] = {rect.x + rect.z, rect.y, depth};
+            cb->_pos_buf[cur_vert_num + 2] = {rect.x, rect.y + rect.w, depth};
+            cb->_pos_buf[cur_vert_num + 3] = {rect.x + rect.z, rect.y + rect.w, depth};
+            TransformCoord(cb->_pos_buf[cur_vert_num], matrix);
+            TransformCoord(cb->_pos_buf[cur_vert_num + 1], matrix);
+            TransformCoord(cb->_pos_buf[cur_vert_num + 2], matrix);
+            TransformCoord(cb->_pos_buf[cur_vert_num + 3], matrix);
+            cb->_uv_buf[cur_vert_num] = {0.f, 0.f};
+            cb->_uv_buf[cur_vert_num + 1] = {1.f, 0.f};
+            cb->_uv_buf[cur_vert_num + 2] = {0.f, 1.f};
+            cb->_uv_buf[cur_vert_num + 3] = {1.f, 1.f};
+            cb->_color_buf[cur_vert_num] = color;
+            cb->_color_buf[cur_vert_num + 1] = color;
+            cb->_color_buf[cur_vert_num + 2] = color;
+            cb->_color_buf[cur_vert_num + 3] = color;
+            cb->_index_buf[cur_index_num] = cur_vert_num + 0u;
+            cb->_index_buf[cur_index_num + 1] = cur_vert_num + 1u;
+            cb->_index_buf[cur_index_num + 2] = cur_vert_num + 2u;
+            cb->_index_buf[cur_index_num + 3] = cur_vert_num + 1u;
+            cb->_index_buf[cur_index_num + 4] = cur_vert_num + 3u;
+            cb->_index_buf[cur_index_num + 5] = cur_vert_num + 2u;
+            AppendNode(cb, 4u, 6u, _default_material.get());
         }
 
-        void UIRenderer::DrawText(const String &text, Vector2f pos,u16 font_size,Vector2f scale,Color color,Render::Font *font)
+        void UIRenderer::DrawText(const String &text, Vector2f pos, u16 font_size, Color color,Vector2f scale, Render::Font *font)
         {
-            Render::TextRenderer::Get()->DrawText(text,pos,font_size,scale,color,font);
+            TextRenderer::Get()->DrawText(text, pos, font_size, scale, color, font, GetAvailableBlock(4u, 6u));
+        }
+
+        void UIRenderer::DrawText(const String &text, Vector2f pos, Matrix4x4f matrix, u16 font_size, Color color, Vector2f scale, Render::Font *font)
+        {
+            TextRenderer::Get()->DrawText(text, pos, font_size, scale, color, matrix,font, GetAvailableBlock(4u, 6u));
+        }
+
+        void UIRenderer::DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts)
+        {
+            if (!texture)
+                return;
+            DrawerBlock *cb = GetAvailableBlock(4u, 6u);
+            u32 cur_vert_num = cb->CurrentVertNum(), cur_index_num = cb->CurrentIndexNum();
+            cb->_pos_buf[cur_vert_num] = {rect.xy, opts._depth};
+            cb->_pos_buf[cur_vert_num + 1] = {rect.x + rect.z, rect.y, opts._depth};
+            cb->_pos_buf[cur_vert_num + 2] = {rect.x, rect.y + rect.w, opts._depth};
+            cb->_pos_buf[cur_vert_num + 3] = {rect.x + rect.z, rect.y + rect.w, opts._depth};
+            TransformCoord(cb->_pos_buf[cur_vert_num], opts._transform);
+            TransformCoord(cb->_pos_buf[cur_vert_num + 1], opts._transform);
+            TransformCoord(cb->_pos_buf[cur_vert_num + 2], opts._transform);
+            TransformCoord(cb->_pos_buf[cur_vert_num + 3], opts._transform);
+            cb->_uv_buf[cur_vert_num] = {0.f, 0.f};
+            cb->_uv_buf[cur_vert_num + 1] = {1.f, 0.f};
+            cb->_uv_buf[cur_vert_num + 2] = {0.f, 1.f};
+            cb->_uv_buf[cur_vert_num + 3] = {1.f, 1.f};
+            cb->_color_buf[cur_vert_num]     = opts._tint;
+            cb->_color_buf[cur_vert_num + 1] = opts._tint;
+            cb->_color_buf[cur_vert_num + 2] = opts._tint;
+            cb->_color_buf[cur_vert_num + 3] = opts._tint;
+            cb->_index_buf[cur_index_num] = cur_vert_num + 0u;
+            cb->_index_buf[cur_index_num + 1] = cur_vert_num + 1u;
+            cb->_index_buf[cur_index_num + 2] = cur_vert_num + 2u;
+            cb->_index_buf[cur_index_num + 3] = cur_vert_num + 1u;
+            cb->_index_buf[cur_index_num + 4] = cur_vert_num + 3u;
+            cb->_index_buf[cur_index_num + 5] = cur_vert_num + 2u;
+            AppendNode(cb, 4u, 6u, _default_material.get(),texture);
         }
 
         void UIRenderer::DrawLine(Vector2f a, Vector2f b, f32 thickness, Color color, f32 depth)
+        {
+            DrawLine(a, b, kIdentityMatrix, thickness, color, depth);
+        }
+        void UIRenderer::DrawLine(Vector2f a, Vector2f b, Matrix4x4f matrix, f32 thickness, Color color, f32 depth)
         {
             // 线方向
             Vector2f dir = Normalize(b - a);
@@ -145,14 +195,18 @@ namespace Ailu
             Vector2f p2 = a + offset;
             Vector2f p3 = b + offset;
 
-            DrawerBlock *cb = GetAvailableBlock(6u);
-            auto v = cb->_cur_vert_num;
-            auto i = cb->_cur_index_num;
+            DrawerBlock *cb = GetAvailableBlock(4u, 6u);
+            auto v = cb->CurrentVertNum();
+            auto i = cb->CurrentIndexNum();
 
             cb->_pos_buf[v + 0] = {p0, depth};
             cb->_pos_buf[v + 1] = {p1, depth};
             cb->_pos_buf[v + 2] = {p2, depth};
             cb->_pos_buf[v + 3] = {p3, depth};
+            TransformCoord(cb->_pos_buf[v + 0], matrix);
+            TransformCoord(cb->_pos_buf[v + 1], matrix);
+            TransformCoord(cb->_pos_buf[v + 2], matrix);
+            TransformCoord(cb->_pos_buf[v + 3], matrix);
 
             // uv 用不到，可以全 0
             cb->_uv_buf[v + 0] = {0, 0};
@@ -171,50 +225,56 @@ namespace Ailu
             cb->_index_buf[i + 3] = v + 1;
             cb->_index_buf[i + 4] = v + 3;
             cb->_index_buf[i + 5] = v + 2;
-
-            cb->_cur_vert_num += 4;
-            cb->_cur_index_num += 6;
+            AppendNode(cb, 4u, 6u, _default_material.get());
         }
         void UIRenderer::DrawBox(Vector2f pos, Vector2f size, f32 thickness, Color color, f32 depth)
+        {
+            DrawBox(pos, size, kIdentityMatrix, thickness, color, depth);
+        }
+
+        void UIRenderer::DrawBox(Vector2f pos, Vector2f size, Matrix4x4f matrix, f32 thickness, Color color, f32 depth)
         {
             Vector2f p0 = pos;
             Vector2f p1 = {pos.x + size.x, pos.y};
             Vector2f p2 = {pos.x + size.x, pos.y + size.y};
             Vector2f p3 = {pos.x, pos.y + size.y};
 
-            DrawLine(p0, p1, thickness, color, depth);// top
-            DrawLine(p1, p2, thickness, color, depth);// right
-            DrawLine(p2, p3, thickness, color, depth);// bottom
-            DrawLine(p3, p0, thickness, color, depth);// left
-        }
-        void UIRenderer::AddWidget(Ref<Widget> w)
-        {
-            if (auto it = std::find_if(_widgets.begin(),_widgets.end(),[&](auto e)->bool {return e.get() == w.get();});it != _widgets.end())
-                return;
-            _widgets.emplace_back(w);
-            _active_widgets.emplace_back(_widgets.back());
+            DrawLine(p0, p1, matrix,thickness, color, depth);// top
+            DrawLine(p1, p2, matrix,thickness, color, depth);// right
+            DrawLine(p2, p3, matrix,thickness, color, depth);// bottom
+            DrawLine(p3, p0, matrix,thickness, color, depth);// left
         }
 
-        void UIRenderer::RemoveWidget(Widget *canvas)
+        void UIRenderer::PushScissor(Vector4f scissor)
         {
-            std::erase_if(_active_widgets, [&](Ref<Widget> &c)
-                          { return c.get() == canvas; });
+            _scissor_stack.push_back(Rect((u16) scissor.x, (u16) scissor.y, (u16) (scissor.x + scissor.z), (u16) (scissor.y + scissor.w)));
         }
 
-        void UIRenderer::DeleteWidget(Widget *canvas)
+        void UIRenderer::PopScissor()
         {
-            std::erase_if(_widgets, [&](Ref<Widget> &c)
-                          { return c.get() == canvas; });
-            RemoveWidget(canvas);
+            _scissor_stack.erase(_scissor_stack.end()-1);
         }
 
-        UIRenderer::DrawerBlock *UIRenderer::GetAvailableBlock(u32 vert_num)
+        Vector2f UIRenderer::CalculateTextSize(const String &text,u16 font_size, Vector2f scale, Render::Font *font)
+        {
+            return TextRenderer::CalculateTextSize(text, font_size, font, scale);
+        }
+
+        void UIRenderer::AppendNode(DrawerBlock *block, u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex)
+        {
+            if (!_scissor_stack.empty())
+                block->AppendNode(vert_num, index_num, mat, tex,_scissor_stack.back());
+            else
+                block->AppendNode(vert_num, index_num, mat, tex);
+        }
+
+        DrawerBlock *UIRenderer::GetAvailableBlock(u32 vert_num, u32 index_num)
         {
             DrawerBlock *available_block = nullptr;
             auto &frame_block = _drawer_blocks[_frame_index];
             if (frame_block.size() < _cur_widget_index + 1u)
             {
-                frame_block.push_back(AL_NEW(DrawerBlock));
+                frame_block.push_back(AL_NEW(DrawerBlock, _default_material));
                 available_block = frame_block.back();
             }
             else
@@ -233,54 +293,40 @@ namespace Ailu
                 //    available_block = frame_block.back();
                 //}
                 available_block = frame_block[_cur_widget_index];
-                AL_ASSERT_MSG(available_block->_cur_vert_num + vert_num <= available_block->_max_vert_num, "UI DrawerBlock index overflow!");
+                AL_ASSERT_MSG(available_block->CanAppend(vert_num,index_num), "UI DrawerBlock index overflow!");
             }
             return available_block;
         }
-
-        UIRenderer::DrawerBlock::DrawerBlock(UIRenderer::DrawerBlock &&other) noexcept
+        void UIRenderer::SubmitBlock(DrawerBlock *b, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth)
         {
-            _vbuf = other._vbuf;
-            _ibuf = other._ibuf;
-            _mat = std::move(other._mat);
-            other._vbuf = nullptr;
-            other._ibuf = nullptr;
-        }
-        UIRenderer::DrawerBlock &UIRenderer::DrawerBlock::operator=(UIRenderer::DrawerBlock &&other) noexcept
-        {
-            _vbuf = other._vbuf;
-            _ibuf = other._ibuf;
-            _mat = std::move(other._mat);
-            other._vbuf = nullptr;
-            other._ibuf = nullptr;
-            return *this;
-        }
-        UIRenderer::DrawerBlock::DrawerBlock(u32 vert_num) : _max_vert_num(vert_num)
-        {
-            Vector<VertexBufferLayoutDesc> desc_list;
-            desc_list.emplace_back("POSITION", EShaderDateType::kFloat3, 0);
-            desc_list.emplace_back("TEXCOORD", EShaderDateType::kFloat2, 1);
-            desc_list.emplace_back(RenderConstants::kSemanticColor, EShaderDateType::kFloat4, 2);
-            _vbuf = VertexBuffer::Create(desc_list, "ui_vbuf");
-            _ibuf = IndexBuffer::Create(nullptr, vert_num, "ui_ibuf", true);
-            _vbuf->SetStream(nullptr, vert_num * sizeof(Vector3f), 0, true);
-            _vbuf->SetStream(nullptr, vert_num * sizeof(Vector2f), 1, true);
-            _vbuf->SetStream(nullptr, vert_num * sizeof(Vector4f), 2, true);
-            _mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_ui.alasset"), "DefaultUIMaterial");
-            _mat->SetTexture("_MainTex", Texture::s_p_default_white);
-            _mat->SetVector("_Color", Colors::kWhite);
-            _pos_buf.resize(vert_num);
-            _uv_buf.resize(vert_num);
-            _color_buf.resize(vert_num);
-            _index_buf.resize(vert_num);
-            GraphicsContext::Get().CreateResource(_vbuf);
-            GraphicsContext::Get().CreateResource(_ibuf);
-        }
-
-        UIRenderer::DrawerBlock::~DrawerBlock()
-        {
-            DESTORY_PTR(_vbuf);
-            DESTORY_PTR(_ibuf);
+            f32 w = (f32) color->Width();
+            f32 h = (f32) color->Height();
+            CBufferPerCameraData cb_per_cam;
+            Matrix4x4f view, proj;
+            f32 aspect = w / h;
+            f32 half_width = w * 0.5f, half_height = h * 0.5f;
+            BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
+            BuildOrthographicMatrix(proj, 0.0f, w, 0.0f, h, 1.f, 200.f);
+            cb_per_cam._MatrixVP = view * proj;
+            cb_per_cam._ScreenParams = Vector4f(1.0f / w, 1.0f / h, w, h);
+            CBufferPerObjectData per_obj_data;
+            per_obj_data._MatrixWorld = BuildIdentityMatrix();
+            memcpy(_obj_cb->GetData(), &per_obj_data, RenderConstants::kPerObjectDataSize);
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &cb_per_cam, RenderConstants::kPerCameraDataSize);
+            cmd->SetRenderTarget(color, depth);
+            Color tint = Colors::kWhite;
+            b->_mat->SetVector("_Color", tint);
+            b->SubmitVertexData();
+            for (const auto& node: b->_nodes)
+            {
+                node._mat->SetTexture("_MainTex", node._main_tex? node._main_tex : Texture::s_p_default_white);
+                if (node._is_custom_scissor)
+                {
+                    cmd->SetScissorRect(node._scissor);
+                }
+                cmd->DrawIndexed(b->_vbuf, b->_ibuf, _obj_cb.get(), node._mat,0u,node._index_offset,node._index_num);
+            }
+            b->Flush();
         }
     }// namespace UI
 }// namespace Ailu

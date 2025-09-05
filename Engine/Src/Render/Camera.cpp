@@ -376,7 +376,7 @@ namespace Ailu::Render
     void Camera::CalculateZBUfferAndProjParams(const Camera &cam, Vector4f &zb, Vector4f &proj_params)
     {
         f32 f = cam.Far(), n = cam.Near();
-        u32 pixel_width = cam.Rect().x, pixel_height = cam.Rect().y;
+        u32 pixel_width = cam.OutputSize().x, pixel_height = cam.OutputSize().y;
         proj_params = Vector4f(1.0f,n,f,1.f / f);
         if (SystemInfo::kReverseZ)
         zb = Vector4f(-1.f + f/n,1.f,(-1.f + f/n) / f,1 / f);

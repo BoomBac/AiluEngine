@@ -24,7 +24,7 @@ namespace Ailu::Render::RDG
         {
             return Hash(*this) == Hash(other);
         }
-        RGHandle() : _id(0u), _version(0u), _res(nullptr) {};
+        RGHandle(u32 id = s_global_id++) : _id(id), _version(0u), _res(nullptr) {};
         RGHandle(const TextureDesc &desc, StringView name) : _id(0u), _version(0u), _tex_desc(desc), _name(name), _is_transient(true), _res(nullptr)
         {
             _is_tex = true;
@@ -41,7 +41,7 @@ namespace Ailu::Render::RDG
         {
             return std::format("{}({})", _name, _version);
         }
-
+        bool IsValid() const { return _id != 0u; }
     public:
         String _name;
         u32 _id;
@@ -66,6 +66,7 @@ namespace Ailu::Render::RDG
             };
             u32 _flag;
         };
+        inline static std::atomic<u32> s_global_id = 0u;
     };
 }// namespace Ailu::Render::RDG
 namespace std
@@ -172,31 +173,8 @@ namespace Ailu::Render::RDG
         RGHandle Import(GpuResource *external, String *name = nullptr);
         GpuResource *Export(const RGHandle &handle);
 
-        std::optional<RGHandle> GetTexture(const String &name)
-        {
-            if (_external_tex_handles.find(name) != _external_tex_handles.end())
-            {
-                return _external_tex_handles[name];
-            }
-            if (_transient_tex_handles.find(name) != _transient_tex_handles.end())
-            {
-                return _transient_tex_handles[name];
-            }
-            return std::nullopt;
-        }
-
-        std::optional<RGHandle> GetBuffer(const String &name)
-        {
-            if (_external_buffer_handles.find(name) != _external_buffer_handles.end())
-            {
-                return _external_buffer_handles[name];
-            }
-            if (_transient_buffer_handles.find(name) != _transient_buffer_handles.end())
-            {
-                return _transient_buffer_handles[name];
-            }
-            return std::nullopt;
-        }
+        RGHandle GetTexture(const String &name);
+        RGHandle GetBuffer(const String &name);
 
         // 添加一个渲染Pass
         void AddPass(const String &name, PassDesc desc, SetupFunction setup_func, ExecuteFunction executor);
@@ -274,6 +252,14 @@ namespace Ailu::Render::RDG
         void Read(const RGHandle &handle)
         {
             _pass->Read(handle);
+        }
+        RGHandle GetTexture(const String &name)
+        {
+            return _graph->GetTexture(name);
+        }
+        RGHandle GetBuffer(const String &name)
+        {
+            return _graph->GetBuffer(name);
         }
         RGHandle Read(TextureDesc desc, const String &name)
         {

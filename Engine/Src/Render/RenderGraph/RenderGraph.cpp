@@ -138,6 +138,33 @@ namespace Ailu
             LOG_WARNING("RenderGraph::Export: Handle {} is not transient!", handle._name);
             return out_res;
         }
+
+        RGHandle RenderGraph::GetTexture(const String &name)
+        {
+            if (_external_tex_handles.find(name) != _external_tex_handles.end())
+            {
+                return _external_tex_handles[name];
+            }
+            if (_transient_tex_handles.find(name) != _transient_tex_handles.end())
+            {
+                return _transient_tex_handles[name];
+            }
+            return RGHandle(0u);
+        }
+
+        RGHandle RenderGraph::GetBuffer(const String &name)
+        {
+            if (_external_buffer_handles.find(name) != _external_buffer_handles.end())
+            {
+                return _external_buffer_handles[name];
+            }
+            if (_transient_buffer_handles.find(name) != _transient_buffer_handles.end())
+            {
+                return _transient_buffer_handles[name];
+            }
+            return RGHandle(0u);
+        }
+
         void RenderGraph::AddPass(const String &name, PassDesc desc, SetupFunction setup_func, ExecuteFunction executor)
         {
             RenderPass *pass = _pass_pool.Alloc();
