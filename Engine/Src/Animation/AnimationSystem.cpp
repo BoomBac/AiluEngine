@@ -74,7 +74,7 @@ namespace Ailu
                 }
                 if (c->_anim_clip.get() != s_cross_fade_controller[mesh_id].GetcurrentClip())
                     s_cross_fade_controller[mesh_id].Play(c->_anim_clip.get());
-                u32 vert_count = c->_p_mesh->_vertex_count;
+                u32 vert_count = c->_p_mesh->GetVertexCount();
                 f32 frame_duration = c->_anim_clip->Duration() / (f32) c->_anim_clip->FrameCount();
                 f32 dt = delta_time * 0.001f * TimeMgr::s_time_scale;
                 _anim_playtime[e] += dt;

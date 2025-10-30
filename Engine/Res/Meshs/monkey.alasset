@@ -3,3 +3,4 @@ type: kMesh
 name: Monkey
 file: Meshs/src_res/monkey.fbx
 inner_file_name: Monkey
+is_combine_mesh: false

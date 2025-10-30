@@ -82,6 +82,19 @@ namespace Ailu::Render
         static Ref<Font> Create(const WString& file_path);
     };
 
+    struct GlyphRenderInfo
+    {
+        char _c;
+        Vector2f _pos;    // 左上角屏幕坐标
+        Vector2f _size;   // scaled width/height
+        Vector2f _uv;     // u,v起点
+        Vector2f _uv_size;// u,v宽高
+        u32 _page;
+        f32 _xadvance;// 光标前进量
+    };
+
+    Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Vector2f padding, Font *font);
+
 }// namespace Ailu
 
 #endif//AILU_FONT_H

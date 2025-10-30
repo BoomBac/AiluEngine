@@ -3,3 +3,4 @@ type: kMesh
 name: Plane
 file: Meshs/src_res/plane.fbx
 inner_file_name: Plane
+is_combine_mesh: false

@@ -198,59 +198,56 @@ namespace Ailu
         //		Mesh::s_p_capsule = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_capsule]);
 
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_cube);Mesh::s_p_cube = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cube]); },
+                               {mgr->Load<Mesh>(mesh_path_cube);Mesh::s_cube = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cube]); },
                                this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_sphere);Mesh::s_p_shpere = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_sphere]); },
+                                  {mgr->Load<Mesh>(mesh_path_sphere);Mesh::s_sphere = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_sphere]); },
                                this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_plane);Mesh::s_p_plane = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_plane]); },
+                               {mgr->Load<Mesh>(mesh_path_plane);Mesh::s_plane = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_plane]); },
                                this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_capsule);Mesh::s_p_capsule = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_capsule]); },
+                               {mgr->Load<Mesh>(mesh_path_capsule);Mesh::s_capsule = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_capsule]); },
                                this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_monkey);Mesh::s_p_monkey = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_monkey]); },
+                               {mgr->Load<Mesh>(mesh_path_monkey);Mesh::s_monkey = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_monkey]); },
                                this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_cone);Mesh::s_p_monkey = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cone]); },
+                               {mgr->Load<Mesh>(mesh_path_cone);Mesh::s_cone = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cone]); },
                                this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_cylinder);Mesh::s_p_cylinder = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cylinder]); },
+                               {mgr->Load<Mesh>(mesh_path_cylinder);Mesh::s_cylinder = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_cylinder]); },
                                this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
-                               {mgr->Load<Mesh>(mesh_path_torus);Mesh::s_p_torus = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_torus]); },
+                               {mgr->Load<Mesh>(mesh_path_torus);Mesh::s_torus = std::static_pointer_cast<Mesh>(_global_resources[mesh_path_torus]); },
                                this);
         JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                         {mgr->Load<Mesh>(L"Meshs/terrain_plane.alasset");},
                         this);
 
         auto FullScreenQuad = MakeRef<Mesh>("FullScreenQuad");
-        Vector3f *vertices = new Vector3f[4]{{-1.0f, 1.0f, 0.0f},
-                                             {1.0f, 1.0f, 0.0f},
-                                             {-1.0f, -1.0f, 0.0f},
-                                             {1.0f, -1.0f, 0.0f}};
-        u32 *indices = new u32[6]{0, 1, 2, 1, 3, 2};
-        Vector2f *uv0 = new Vector2f[4]{{0.f, 0.f}, {1.f, 0.f}, {0.f, 1.f}, {1.f, 1.f}};
-        FullScreenQuad->_vertex_count = 4;
-        FullScreenQuad->SetVertices(vertices);
-        FullScreenQuad->AddSubmesh(indices, 6);
-        FullScreenQuad->SetUVs(uv0, 0);
+        Vector<u32>  indices = {0, 1, 2, 1, 3, 2};
+        FullScreenQuad->SetVertices({{-1.0f, 1.0f, 0.0f},
+                                     {1.0f, 1.0f, 0.0f},
+                                     {-1.0f, -1.0f, 0.0f},
+                                     {1.0f, -1.0f, 0.0f}});
+        FullScreenQuad->AddSubmesh(indices);
+        FullScreenQuad->SetUVs({{0.f, 0.f}, {1.f, 0.f}, {0.f, 1.f}, {1.f, 1.f}}, 0);
         FullScreenQuad->Apply();
         RegisterResource(L"Runtime/Mesh/FullScreenQuad", FullScreenQuad);
         auto FullScreenTriangle = MakeRef<Mesh>("FullScreenTriangle");
-        FullScreenTriangle->_vertex_count = 3;
-        FullScreenTriangle->AddSubmesh(new u32[3]{0, 1, 2}, 3);
+        FullScreenTriangle->SetVerticesCount(3);
+        FullScreenTriangle->AddSubmesh(Vector<u32>{0, 1, 2});
         FullScreenTriangle->Apply();
         RegisterResource(L"Runtime/Mesh/FullScreenTriangle", FullScreenTriangle);
-        Mesh::s_p_quad = std::static_pointer_cast<Mesh>(_global_resources[L"Runtime/Mesh/FullScreenQuad"]);
-        Mesh::s_p_fullscreen_triangle = std::static_pointer_cast<Mesh>(_global_resources[L"Runtime/Mesh/FullScreenTriangle"]);
+        Mesh::s_quad = std::static_pointer_cast<Mesh>(_global_resources[L"Runtime/Mesh/FullScreenQuad"]);
+        Mesh::s_fullscreen_triangle = std::static_pointer_cast<Mesh>(_global_resources[L"Runtime/Mesh/FullScreenTriangle"]);
         JobSystem::Get().Wait();
         //这里所有需要的shader应该加载完毕，此时再进行预热
         {
             GraphicsPipelineStateMgr::BuildPSOCache();
             Load<Material>(L"Materials/StandardPBR.alasset");
-            Material::s_standard_lit = GetRef<Material>(L"Materials/StandardPBR.alasset");
+            Material::s_standard_defered_lit = GetRef<Material>(L"Materials/StandardPBR.alasset");
             auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name)
             {
                 RegisterResource(mat_path, MakeRef<Material>(Get<Shader>(shader_path), mat_name));
@@ -261,6 +258,9 @@ namespace Ailu
             mat_creator(L"Shaders/filter_irradiance.alasset", L"Runtime/Material/EnvmapFilter", "EnvmapFilter");
             mat_creator(L"Shaders/blit.alasset", L"Runtime/Material/Blit", "Blit");
             mat_creator(L"Shaders/gizmo.alasset", L"Runtime/Material/Gizmo", "GizmoDrawer");
+            mat_creator(L"Shaders/forwardlit.alasset", L"Runtime/Material/ForwardLit", "ForwardLit");
+            Material::s_standard_forward_lit = GetRef<Material>(L"Runtime/Material/ForwardLit");
+            Material::s_standard_forward_lit.lock()->SetVector("_AlbedoValue",Colors::kWhite);
         }
         //_default_font = Font::Create(GetResSysPath(L"Fonts/Open_Sans/Arial.fnt"));
         _default_font = Font::Create(GetResSysPath(L"Fonts/Open_Sans/open_sans_regular_65.fnt"));
@@ -584,9 +584,11 @@ namespace Ailu
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         if (FileManager::Exist(sys_path))
         {
+            auto id = reinterpret_cast<u64>(asset->_p_obj.get());
             std::wstringstream wss;
             wss << L"file: " << asset->_external_asset_path << std::endl;
             wss << L"inner_file_name: " << ToWChar(asset->_p_obj->Name().c_str()) << std::endl;
+            wss << L"is_combine_mesh: " << (_mesh_importer[id]._is_combine_mesh ? L"true" : L"false") << std::endl;
             if (FileManager::WriteFile(sys_path, true, wss.str()))
             {
                 return;
@@ -665,13 +667,8 @@ namespace Ailu
         parser->Parser(sys_path, setting);
         List<Ref<Mesh>> mesh_list{};
         parser->GetMeshes(mesh_list);
-        auto &imported_mat_infos = parser->GetImportedMaterialInfos();
         for (auto &mesh: mesh_list)
         {
-            for (auto it = imported_mat_infos.begin(); it != imported_mat_infos.end(); ++it)
-            {
-                mesh->AddCacheMaterial(*it);
-            }
             mesh->Apply();
         }
         for (auto &clip: parser->GetAnimationClips())
@@ -895,26 +892,19 @@ namespace Ailu
             MeshImportSetting setting;
             setting._import_flag |= MeshImportSetting::kImportFlagMesh;
             setting._is_import_material = false;
+            setting._mesh_name = innear_file_name;
+            setting._is_combine_mesh = c[5].substr(c[5].find_first_of(L":") + 2) == WString(L"true") ? true : false;
             //setting._import_flag |= MeshImportSetting::kImportFlagAnimation;
             auto &&mesh_list = std::move(LoadExternalMesh(file, setting, clips));
-            for (auto it = mesh_list.begin(); it != mesh_list.end(); ++it)
-            {
-                if (it->get()->Name() == innear_file_name)
-                {
-                    bool is_sk_mesh = dynamic_cast<SkeletonMesh *>(it->get()) != nullptr;
-                    auto asset = MakeScope<Asset>();
-                    asset->_asset_path = asset_path;
-                    asset->_asset_type = is_sk_mesh ? EAssetType::kSkeletonMesh : EAssetType::kMesh;
-                    asset->_external_asset_path = file;
-                    asset->_p_obj = *it;
-                    asset->_name = PathUtils::GetFileName(asset_path);
-                    return asset;
-                }
-                else
-                {
-                    LOG_WARNING("Mesh innear_file_name conflict between {} and {} when load {}!", it->get()->Name(), innear_file_name, ToChar(asset_path));
-                }
-            }
+            AL_ASSERT(mesh_list.size() <= 1);
+            bool is_sk_mesh = dynamic_cast<SkeletonMesh *>(mesh_list.front().get()) != nullptr;
+            auto asset = MakeScope<Asset>();
+            asset->_asset_path = asset_path;
+            asset->_asset_type = is_sk_mesh ? EAssetType::kSkeletonMesh : EAssetType::kMesh;
+            asset->_external_asset_path = file;
+            asset->_p_obj = mesh_list.front();
+            asset->_name = PathUtils::GetFileName(asset_path);
+            return asset;
         }
         return nullptr;
     }
@@ -1377,9 +1367,9 @@ namespace Ailu
         _file_last_load_time[sys_path] = fs::file_time_type::clock::now();
     }
 
-    Ref<void> ResourceMgr::ImportResource(const WString &sys_path, const ImportSetting &setting)
+    Ref<void> ResourceMgr::ImportResource(const WString &sys_path, const WString &target_dir, const ImportSetting &setting)
     {
-        return ImportResourceImpl(sys_path, &setting);
+        return ImportResourceImpl(sys_path, target_dir, & setting);
     }
     void ResourceMgr::SubmitTaskSync(ResourceTask task)
     {
@@ -1395,21 +1385,26 @@ namespace Ailu
         });
     }
 
-    Ref<void> ResourceMgr::ImportResourceAsync(const WString &sys_path, const ImportSetting &setting, OnResourceTaskCompleted callback)
+    Ref<void> ResourceMgr::ImportResourceAsync(const WString &sys_path, const WString &target_dir,const ImportSetting &setting, OnResourceTaskCompleted callback)
     {
         _async_tasks.push([=]()
                                   {
-			callback(ImportResourceImpl(sys_path, &setting));
+			callback(ImportResourceImpl(sys_path,target_dir,&setting));
 			return nullptr; });
         return nullptr;
     }
 
-    Ref<void> ResourceMgr::ImportResourceImpl(const WString &sys_path, const ImportSetting *setting)
+    Ref<void> ResourceMgr::ImportResourceImpl(const WString &sys_path, const WString &target_dir, const ImportSetting *setting)
     {
-        fs::path p(sys_path);
+        fs::path p(sys_path),dir(target_dir);
         if (!FileManager::Exist(sys_path))
         {
             LOG_ERROR(L"Path {} not exist on the disk!", sys_path);
+            return nullptr;
+        }
+        if (!fs::exists(dir) || !fs::is_directory(dir))
+        {
+            LOG_ERROR(L"Target dir {} is's a directory or is not exist,please provide a valid path!", target_dir);
             return nullptr;
         }
         auto ext = p.extension().string();
@@ -1423,35 +1418,20 @@ namespace Ailu
             LOG_WARNING(L"File {} is new,skip load!", sys_path);
             return nullptr;
         }
-        auto new_sys_path = FileManager::GetCurSysDirStr();
-        new_sys_path.append(L"/");
+        auto res_copy_path = dir / p.filename();
         if (setting->_is_copy)
         {
-            new_sys_path += p.filename().wstring();
-            if (sys_path.find_first_of(L".") != sys_path.npos)
-                FileManager::CopyFile(sys_path, new_sys_path);
-            else
-            {
-                LOG_ERROR(L"Path {} is not a file!", sys_path);
-            }
+            FileManager::CopyFile(sys_path, res_copy_path.wstring());
         }
-        else
-        {
-            new_sys_path = sys_path;
-        }
-        if (!FileManager::Exist(new_sys_path))
-        {
-            return nullptr;
-        }
-        PathUtils::FormatFilePathInPlace(new_sys_path);
-        WString external_asset_path = PathUtils::ExtractAssetPath(new_sys_path);
+        WString external_asset_path = PathUtils::ExtractAssetPath(PathUtils::FormatFilePath(res_copy_path.wstring()));
         TimeMgr time_mgr;
         Ref<void> ret_res = nullptr;
         Queue<std::tuple<WString, Ref<Object>>> loaded_objects;
         EAssetType::EAssetType asset_type = EAssetType::kUndefined;
         time_mgr.Mark();
-        WString created_asset_dir = FileManager::GetCurSysDirStr();
-        created_asset_dir.append(L"/");
+        WString created_asset_dir = target_dir;
+        if (!created_asset_dir.ends_with(L"/"))
+            created_asset_dir.append(L"/");
         created_asset_dir = PathUtils::ExtractAssetPath(created_asset_dir);
         if (ext == ".fbx" || ext == ".FBX")
         {
@@ -1472,13 +1452,13 @@ namespace Ailu
                         auto mat = MakeRef<StandardMaterial>("MAT_" + it->_name);
                         if (!it->_textures[0].empty())
                         {
-                            auto albedo = ImportResource(ToWChar(it->_textures[0]));
+                            auto albedo = ImportResource(ToWChar(it->_textures[0]), target_dir);
                             if (albedo != nullptr)
                                 mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, std::static_pointer_cast<Texture>(albedo).get());
                         }
                         if (!it->_textures[1].empty())
                         {
-                            auto normal = ImportResource(ToWChar(it->_textures[1]));
+                            auto normal = ImportResource(ToWChar(it->_textures[1]),target_dir);
                             if (normal != nullptr)
                                 mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());
                         }
@@ -1487,6 +1467,7 @@ namespace Ailu
                         loaded_objects.push(std::make_tuple(imported_asset_path, mat));
                     }
                 }
+                _mesh_importer[reinterpret_cast<u64>(mesh.get())] = *mesh_import_setting;
             }
             for (auto &clip: clips)
             {

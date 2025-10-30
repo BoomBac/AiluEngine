@@ -115,6 +115,19 @@ namespace Ailu
                 _matrix = CalculateWorldMatrix();
                 _inv_matrix = MatrixInverse(_matrix);
                 _is_transf_dirty = false;
+                Vector3f corners[4] = {
+                        {_arrange_rect.x, _arrange_rect.y, 1.0f},
+                        {_arrange_rect.x + _arrange_rect.z, _arrange_rect.y, 1.0f},
+                        {_arrange_rect.x + _arrange_rect.z, _arrange_rect.y + _arrange_rect.w, 1.0f},
+                        {_arrange_rect.x, _arrange_rect.y + _arrange_rect.w, 1.0f}};
+                TransformCoord(corners[0], _matrix);
+                TransformCoord(corners[1], _matrix);
+                TransformCoord(corners[2], _matrix);
+                TransformCoord(corners[3], _matrix);
+                _abs_rect = {corners[0].x,
+                             corners[0].y,
+                             corners[1].x - corners[0].x,
+                             corners[3].y - corners[0].y};
             }
             for (auto &child: _children)
                 child->Update(dt);
@@ -194,6 +207,9 @@ namespace Ailu
                 case UIEvent::EType::kMouseScroll:
                     _eventmap[UIEvent::EType::kMouseScroll].Invoke(e);
                     break;
+                case UIEvent::EType::kDropFiles:
+                        _eventmap[UIEvent::EType::kDropFiles].Invoke(e);
+                    break;
                 default:
                 {
                     LOG_ERROR("UIElement::OnEvent: unhandled event type {}", static_cast<u32>(e._type))
@@ -239,6 +255,10 @@ namespace Ailu
         {
             return _eventmap[UIEvent::EType::kMouseScroll].GetEventView();
         }
+        ElementEvent::EventView UIElement::OnFileDrop()
+        {
+            return _eventmap[UIEvent::EType::kDropFiles].GetEventView();
+        }
         ElementEvent::EventView UIElement::OnMouseClick()
         {
             return _eventmap[UIEvent::EType::kMouseClick].GetEventView();
@@ -253,10 +273,10 @@ namespace Ailu
             _content_rect.w -= (_padding._t + _padding._b);
             auto mat = CalculateWorldMatrix();
             Vector3f corners[4] = {
-                {_content_rect.x, _content_rect.y, 1.0f},
-                {_content_rect.x + _content_rect.z, _content_rect.y, 1.0f},
-                {_content_rect.x + _content_rect.z, _content_rect.y + _content_rect.w, 1.0f},
-                {_content_rect.x, _content_rect.y + _content_rect.w, 1.0f}};
+                    {_arrange_rect.x, _arrange_rect.y, 1.0f},
+                    {_arrange_rect.x + _arrange_rect.z, _arrange_rect.y, 1.0f},
+                    {_arrange_rect.x + _arrange_rect.z, _arrange_rect.y + _arrange_rect.w, 1.0f},
+                    {_arrange_rect.x, _arrange_rect.y + _arrange_rect.w, 1.0f}};
             TransformCoord(corners[0],mat);
             TransformCoord(corners[1], mat);
             TransformCoord(corners[2], mat);

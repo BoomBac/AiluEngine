@@ -37,6 +37,8 @@ namespace Ailu
             GENERATED_BODY()
             friend class DockManager;
             DECLARE_DELEGATE(on_size_change, Vector2f);
+            DECLARE_DELEGATE(on_get_focus, DockWindow*);
+            DECLARE_DELEGATE(on_lost_focus, DockWindow*);
         public:
             inline static const f32 kTitleBarHeight = 20.0f;
             inline static const f32 kBorderThickness = 5.0f;// 边缘可拖拽区域
@@ -64,8 +66,8 @@ namespace Ailu
             u32 HoverEdge(Vector2f pos) const;
             Vector4f DragArea() const;
             u32 _flags = 0u;
-            Widget *ContentWidget() { return _content.get(); };
-            Widget *TitleWidget() { return _title_bar.get(); };
+            Widget *ContentWidget() { return _content_widget.get(); };
+            Widget *TitleWidget() { return _title_widget.get(); };
             Vector2f Position() const { return _position; };
             Vector2f Size() const { return _size; };
             void SetSize(Vector2f size);
@@ -76,8 +78,8 @@ namespace Ailu
             void UpdateResizeState(Vector2f mouse_pos, bool is_mouse_down);
         protected:
             Vector2f _position, _size;
-            Ref<Widget> _title_bar;// 可拖拽
-            Ref<Widget> _content;  // Canvas / LinearBox
+            Ref<Widget> _title_widget;// 可拖拽
+            Ref<Widget> _content_widget;  // Canvas / LinearBox
             bool _is_focused;
             bool _is_dragging;
             bool _is_resizing;

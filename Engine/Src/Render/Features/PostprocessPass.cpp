@@ -2,6 +2,7 @@
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
+#include "Render/RenderGraph/RenderGraph.h"
 #include "pch.h"
 
 namespace Ailu::Render
@@ -33,7 +34,8 @@ namespace Ailu::Render
     {
         RenderTexture *scene_color = rendering_data._postprocess_input ? rendering_data._postprocess_input : g_pRenderTexturePool->Get(rendering_data._camera_color_target_handle);
         u16 iterator_count = std::min<u16>(Texture::MaxMipmapCount(rendering_data._width, rendering_data._height), _bloom_iterator_count);
-        Vector<RDG::RGHandle> bloom_mips;
+        static Vector<RDG::RGHandle> bloom_mips;
+        bloom_mips.clear();
         for (u16 i = 1; i <= iterator_count; i++)
         {
             u16 cur_mip_width = rendering_data._width >> i;
@@ -44,7 +46,7 @@ namespace Ailu::Render
             desc._format = ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::kDefaultHDR);
             desc._is_color_target = true;
             desc._load = ELoadStoreAction::kNotCare;
-            bloom_mips.emplace_back(graph.GetOrCreate(desc, std::format("BloomMip_{}", i - 1)));
+            bloom_mips.emplace_back(graph.CreateResource(desc, std::format("BloomMip_{}", i - 1)));
         }
         //down sample
         for (u16 i = 0; i < iterator_count; i++)
@@ -54,7 +56,7 @@ namespace Ailu::Render
             graph.AddPass(std::format("Downsample_{}",i), RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
             { 
                 builder.Read(input);
-                builder.Write(output);
+                output = builder.Write(output);
             }, [=,this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             { 
                 cmd->SetRenderTarget(output);
@@ -73,7 +75,7 @@ namespace Ailu::Render
             graph.AddPass(std::format("Upsample_{}", i), RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
             { 
                 builder.Read(cur_mip);
-                builder.Write(next_mip); 
+                next_mip = builder.Write(next_mip); 
             }, [=, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             { 
                 cmd->SetRenderTarget(next_mip);
@@ -87,7 +89,7 @@ namespace Ailu::Render
         { 
             builder.Read(final_input);
             builder.Read(bloom_mips[0]);
-            builder.Write(rendering_data._rg_handles._color_target); 
+            rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target); 
         }, [=, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
         { 
             cmd->SetRenderTarget(data._rg_handles._color_target);

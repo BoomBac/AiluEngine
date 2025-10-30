@@ -1371,7 +1371,7 @@ namespace Ailu::RHI::DX12
                 u16 color_num = std::min<u16>(clear_cmd->_color_target_num, d3dcmd->_color_count);
                 for (u16 i = 0; i < color_num; ++i)
                 {
-                    dxcmd->ClearRenderTargetView(*d3dcmd->_colors[i], clear_cmd->_colors[i], 0, nullptr);
+                    dxcmd->ClearRenderTargetView(*d3dcmd->_colors[i], clear_cmd->_colors[i].Data(), 0, nullptr);
                 }
             }
             if (clear_cmd->_flag & EClearFlag::kDepth)
@@ -1481,8 +1481,6 @@ namespace Ailu::RHI::DX12
                     draw_cmd->_vb->Bind(d3dcmd, params);
                 if (is_indexed_draw)
                     draw_cmd->_ib->Bind(d3dcmd, params);
-                if (draw_cmd->_per_obj_cb != nullptr)
-                    pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
                 for (auto &it: d3dcmd->_allocations)
                 {
                     auto &[name, alloc] = it;
@@ -1493,6 +1491,8 @@ namespace Ailu::RHI::DX12
                         pso->SetPipelineResource(res);
                     }
                 }
+                if (draw_cmd->_per_obj_cb != nullptr)
+                    pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
                 ++Render::RenderingStates::s_temp_draw_call;
                 u32 vertex_count = is_produced ? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
                 u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb->GetVertexCount() / 3;

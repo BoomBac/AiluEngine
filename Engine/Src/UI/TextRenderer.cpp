@@ -12,105 +12,17 @@ namespace Ailu
 {
     namespace UI
     {
-        struct GlyphRenderInfo
-        {
-            char _c;
-            Vector2f _pos;      // 左上角屏幕坐标
-            Vector2f _size;     // scaled width/height
-            Vector2f _uv;       // u,v起点
-            Vector2f _uv_size;  // u,v宽高
-            u32 _page;
-            f32 _xadvance;    // 光标前进量
-        };
-
-        static Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Vector2f padding, Font *font)
-        {
-            if (text.empty())
-                return {};
-            Vector<GlyphRenderInfo> result;
-            result.reserve(text.size());
-            scale *= (f32) font_size / (f32) font->_size;
-            f32 x = pos.x, y = pos.y;
-            f32 h_padding = (font->_left_padding + font->_right_padding) * padding.x;
-            f32 v_padding = (font->_top_padding + font->_bottom_padding) * padding.y;
-            i32 last_char = -1;
-            f32 y_adjust = 0.0f;
-            for (u32 i = 0; i < text.size(); i++)
-            {
-                char c = text[i];
-                auto &char_info = font->GetChar(c);
-                if (c == '\0')
-                    continue;
-                // 换行
-                if (c == '\n')
-                {
-                    x = pos.x;
-                    y -= (font->_line_height + v_padding) * scale.y;
-                    last_char = -1;
-                    continue;
-                }
-
-                // 如果是空格或不可见字符（宽度为0但有advance）
-                if (char_info._width == 0 && char_info._height == 0)
-                {
-                    x += char_info._xadvance * scale.x;
-                    last_char = c;
-                    continue;
-                }
-
-                f32 kerning = (last_char >= 0) ? font->GetKerning(last_char, c) : 0.f;
-                Vector4f uv_rect = Vector4f(char_info._u, char_info._v, char_info._twidth, char_info._theight);
-                Vector4f pos_rect = {
-                        x + (char_info._xoffset + kerning) * scale.x,
-                        y + char_info._yoffset * scale.y,
-                        char_info._width,
-                        char_info._height};
-                if (i == 0)
-                {
-                    auto& cc = font->GetChar('A');
-                    y_adjust = (pos.y - (y + cc._yoffset * scale.y));
-                }
-                pos_rect.y += y_adjust;
-                pos_rect.z *= scale.x;
-                pos_rect.w *= scale.y;
-                GlyphRenderInfo info;
-                info._c = c;
-                info._pos = pos_rect.xy;
-                info._size = pos_rect.zw;
-                info._uv = uv_rect.xy;
-                info._uv_size = uv_rect.zw;
-                info._page = char_info._page;
-                info._xadvance = char_info._xadvance * scale.x;
-                x += info._xadvance;
-                last_char = c;
-                result.push_back(info);
-            }
-            return result;
-        }
-
-        static TextRenderer *s_pTextRenderer = nullptr;
         const static Matrix4x4f kIdentityMatrix = Matrix4x4f::Identity();
-        void TextRenderer::Init()
-        {
-            s_pTextRenderer = new TextRenderer();
-            s_pTextRenderer->Initialize();
-        }
-        void TextRenderer::Shutdown()
-        {
-            DESTORY_PTR(s_pTextRenderer);
-        }
-        TextRenderer *TextRenderer::Get()
-        {
-            return s_pTextRenderer;
-        }
         TextRenderer::TextRenderer()
         {
+            TextRenderer::Initialize();
         }
         void TextRenderer::Initialize()
         {
             TIMER_BLOCK("TextRenderer::Init")
-            _default_font = g_pResourceMgr->_default_font;
+            s_default_font = g_pResourceMgr->_default_font.get();
             _default_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial");
+            _default_mat->SetTexture("_MainTex", s_default_font->_pages[0]._texture.get());
             _default_block = new DrawerBlock(_default_mat);
         }
         TextRenderer::~TextRenderer()
@@ -119,17 +31,17 @@ namespace Ailu
         }
         void TextRenderer::DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color, Font *font)
         {
-            font = font ? font : _default_font.get();
+            font = font ? font : s_default_font;
             AppendText(text, pos, kIdentityMatrix,font_size, scale, color, Vector2f::kZero, font, _default_block);
         }
         void TextRenderer::DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color, Font *font, DrawerBlock *block)
         {
-            font = font ? font : _default_font.get();
+            font = font ? font : s_default_font;
             AppendText(text, pos, kIdentityMatrix, font_size, scale, color, Vector2f::kZero, font, block);
         }
         void TextRenderer::DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color, Matrix4x4f matrix, Font *font, DrawerBlock *block)
         {
-            font = font ? font : _default_font.get();
+            font = font ? font : s_default_font;
             AppendText(text, pos, matrix, font_size, scale, color, Vector2f::kZero, font, block);
         }
         void TextRenderer::Render(RenderTexture *target, Render::CommandBuffer *cmd)
@@ -137,10 +49,7 @@ namespace Ailu
             Render(target, cmd, _default_block);
             _default_block->Flush();
         }
-        Font *TextRenderer::GetDefaultFont() const
-        {
-            return _default_font.get();
-        }
+
         void TextRenderer::AppendText(const String &text, Vector2f pos, Matrix4x4f matrix, u16 font_size, Vector2f scale, Color color, Vector2f padding, Font *font, DrawerBlock *block)
         {
             if (text.empty())
@@ -178,16 +87,7 @@ namespace Ailu
                 UIRenderer::Get()->AppendNode(block, 4u, 6u, _default_mat.get(), font->_pages[font->GetChar(text[0])._page]._texture.get());
             }
         }
-        void TextRenderer::Render(RenderTexture *target)
-        {
-            auto cmd = Render::CommandBufferPool::Get("Text");
-            {
-                PROFILE_BLOCK_GPU(cmd.get(), Text);
-                Render(target, cmd.get());
-            }
-            Render::GraphicsContext::Get().ExecuteCommandBuffer(cmd);
-            Render::CommandBufferPool::Release(cmd);
-        }
+
         void TextRenderer::Render(RenderTexture *target, Render::CommandBuffer *cmd, DrawerBlock *b)
         {
             if (b->_nodes.empty())
@@ -222,11 +122,25 @@ namespace Ailu
                 cmd->DrawIndexed(b->_vbuf, b->_ibuf, b->_obj_cb, node._mat, 0u, node._index_offset, node._index_num);
             }
         }
+        void TextRenderer::Render(Render::CommandBuffer *cmd)
+        {
+            if (_default_block->_nodes.empty())
+                return;
+            _default_block->SubmitVertexData();
+            Render::CBufferPerObjectData per_obj_data;
+            per_obj_data._MatrixWorld = BuildIdentityMatrix();
+            memcpy(_default_block->_obj_cb->GetData(), &per_obj_data, Render::RenderConstants::kPerObjectDataSize);
+            for (const auto &node: _default_block->_nodes)
+            {
+                cmd->DrawIndexed(_default_block->_vbuf, _default_block->_ibuf, _default_block->_obj_cb, node._mat, 0u, node._index_offset, node._index_num);
+            }
+            _default_block->Flush();
+        }
         Vector2f TextRenderer::CalculateTextSize(const String &text, u16 font_size, Font *font, Vector2f scale)
         {
             if (text.empty())
                 return Vector2f::kZero;
-            font = font ? font : Get()->GetDefaultFont();
+            font = font ? font : s_default_font;
             Vector2f pos = Vector2f::kZero, padding = Vector2f::kZero;
             auto glyphs = LayoutText(text, pos, font_size, scale, padding, font);
             Vector2f size = Vector2f::kZero;

@@ -43,7 +43,11 @@ namespace Ailu::UI
     }
     UIManager::~UIManager()
     {
-
+        for (auto& it : _widgets)
+        {
+            it->Destory();
+        }
+        _widgets.clear();
     }
 
     void UIManager::RegisterWidget(Ref<Widget> w)
@@ -69,6 +73,10 @@ namespace Ailu::UI
         if (it == _widgets.end()-1)
             return;
         Ref<Widget> current = *it;
+        if (_widgets.size() > 1)
+            _widgets.back()->_on_lost_focus_delegate.Invoke();
+        if (it == _widgets.end() - 1)
+            return;//already in front
         if (it != _widgets.end())
         {
             _widgets.erase(it);
@@ -79,7 +87,6 @@ namespace Ailu::UI
         {
             _widgets[i]->_sort_order = (u32)i;
         }
-        w->_on_get_focus_delegate.Invoke();
         w->_on_get_focus_delegate.Invoke();
     }
 
@@ -135,6 +142,8 @@ namespace Ailu::UI
             _capture_target = nullptr;
         if (_focus_target == element)
             _focus_target = nullptr;
+        if (_hover_target == element)
+            _hover_target = nullptr;
         for (auto &w: _widgets)
         {
             if (auto it = std::find_if(w->_prev_hover_path.begin(), w->_prev_hover_path.end(), [&](UIElement *e)

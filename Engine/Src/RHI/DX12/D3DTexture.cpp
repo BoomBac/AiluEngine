@@ -786,7 +786,8 @@ namespace Ailu::RHI::DX12
         D3D12_CLEAR_VALUE clear_value{};
         clear_value.Format = _tex_desc.Format;
         if (is_for_depth) clear_value.DepthStencil = {kZFar, 0};
-        else memcpy(clear_value.Color, kClearColor, sizeof(kClearColor));
+        else
+            memcpy(clear_value.Color, kClearColor.Data(), sizeof(kClearColor));
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         auto init_state = is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &_tex_desc, init_state, &clear_value, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));

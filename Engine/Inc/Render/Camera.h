@@ -75,6 +75,8 @@ namespace Ailu
                 p[2][1] -= _jitter.y;
                 return p;
             }
+            Vector3f ScreenToWorld(const Vector2f &screen_pos, f32 depth = 0.0f) const;
+            Vector2f WorldToScreen(const Vector3f& world_pos) const;
 
             const Matrix4x4f &GetView() const { return _view_matrix; }
             /// @brief 返回当前帧的透视投影矩阵（不包括抖动）

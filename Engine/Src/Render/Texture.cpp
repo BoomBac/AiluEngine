@@ -263,7 +263,7 @@ namespace Ailu::Render
         _is_data_filled[mipmap] = true;
         auto [w, h] = CalculateMipSize(_width, _height, mipmap);
         u16 row_pixel_size = w * _pixel_size;
-        memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
+        memcpy(_pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y, color.Data(), sizeof(Color));
     }
 
     void Texture2D::SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap)
@@ -362,7 +362,7 @@ namespace Ailu::Render
             return;
         u16 row_pixel_size = std::get<0>(Texture::CalculateMipSize(_width, _width, mipmap)) * _pixel_size;
         u16 face_index = face - 1;
-        memcpy(_pixel_data[face_index * _mipmap_count + mipmap] + _pixel_size * x + row_pixel_size * y, color, sizeof(Color));
+        memcpy(_pixel_data[face_index * _mipmap_count + mipmap] + _pixel_size * x + row_pixel_size * y, color.Data(), sizeof(Color));
     }
 
     void CubeMap::SetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y, Color32 color, u16 mipmap)
@@ -485,7 +485,7 @@ namespace Ailu::Render
         u32 layer_pixel_size = row_pixel_size * h;
         memcpy(
                 _pixel_data[mipmap] + _pixel_size * x + row_pixel_size * y + layer_pixel_size * z,
-                color,
+                color.Data(),
                 sizeof(Color));
     }
 

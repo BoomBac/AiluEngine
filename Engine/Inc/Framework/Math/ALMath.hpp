@@ -359,8 +359,10 @@ namespace Ailu
             Vector2D<T>() : x(0), y(0){};
             explicit Vector2D<T>(const T &v) : x(v), y(v){};
             Vector2D<T>(const T &v, const T &w) : x(v), y(w){};
-            operator T *() { return data; };
-            operator const T *() const { return static_cast<const T *>(data); };
+            //operator T *() { return data; };
+            //operator const T *() const { return static_cast<const T *>(data); };
+            T *Data() { return data; }
+            const T *Data() const { return data; }
             T &operator[](u32 index) { return data[index]; }
             const T &operator[](u32 index) const { return data[index]; }
 
@@ -616,8 +618,10 @@ namespace Ailu
                 return os;
             }
 
-            operator T *() { return data; };
-            operator const T *() const { return static_cast<const T *>(data); };
+            //operator T *() { return data; };
+            //operator const T *() const { return static_cast<const T *>(data); };
+            T *Data() { return data; }
+            const T *Data() const { return data; }
             T &operator[](u32 index) { return data[index]; }
             const T &operator[](u32 index) const { return data[index]; }
 
@@ -701,8 +705,10 @@ namespace Ailu
             Vector4D<T>(const Vector3D<T> &v3) : x(v3.x), y(v3.y), z(v3.z), w(1.0f){};
             Vector4D<T>(const Vector3D<T> &v3, const T &_w) : x(v3.x), y(v3.y), z(v3.z), w(_w){};
 
-            operator T *() { return data; };
-            operator const T *() const { return static_cast<const T *>(data); };
+            //operator T *() { return data; };
+            //operator const T *() const { return static_cast<const T *>(data); };
+            T *Data() { return data; }
+            const T *Data() const { return data; }
             T &operator[](u32 index) { return data[index]; }
             const T &operator[](u32 index) const { return data[index]; }
 
@@ -1742,7 +1748,7 @@ namespace Ailu
         {
             Vector4f temp{vector, 1.f};
             TransformVector(temp, matrix);
-            memcpy(&vector, temp, 12);
+            memcpy(&vector, temp.Data(), 12);
         }
 
         static Vector3f TransformCoord(const Matrix4x4f &matrix, const Vector3f &vector)

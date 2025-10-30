@@ -292,9 +292,21 @@ namespace Ailu::SceneManagement
         _register.AddComponent<ECS::TransformComponent>(obj);
         _register.AddComponent<ECS::CHierarchy>(obj);
         auto &comp = _register.AddComponent<ECS::StaticMeshComponent>(obj);
-        comp._p_mesh = mesh ? mesh : Mesh::s_p_plane.lock();
+        comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
-        comp._p_mats.emplace_back(mat ? mat : Material::s_standard_lit.lock());
+        comp._p_mats.emplace_back(mat ? mat : Material::s_standard_defered_lit.lock());
+        return obj;
+    }
+    ECS::Entity Scene::AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>> &mats)
+    {
+        ECS::Entity obj = _register.Create();
+        _register.AddComponent<ECS::TagComponent>(obj, AcquireName());
+        _register.AddComponent<ECS::TransformComponent>(obj);
+        _register.AddComponent<ECS::CHierarchy>(obj);
+        auto &comp = _register.AddComponent<ECS::StaticMeshComponent>(obj);
+        comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
+        comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
+        comp._p_mats = mats;
         return obj;
     }
     ECS::Entity Scene::AddObject(String name)
@@ -487,7 +499,7 @@ namespace Ailu::SceneManagement
         //        comp._type = ELightType::kDirectional;
         //        comp._light._light_color = Colors::kWhite;
         //    }
-        //    auto cube = default_scene->AddObject(Mesh::s_p_cube.lock(), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR.alasset"));
+        //    auto cube = default_scene->AddObject(Mesh::s_cube.lock(), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR.alasset"));
         //    default_scene->GetRegister().GetComponent<TagComponent>(cube)->_name = "cube";
         //    _all_scene.push_back(std::move(default_scene));
         //    _all_scene

@@ -6,7 +6,6 @@
 #include "Objects/Object.h"
 #include "PipelineState.h"
 #include "Texture.h"
-#include "RenderGraph/RenderGraph.h"
 #include <map>
 #include <set>
 #include <string>

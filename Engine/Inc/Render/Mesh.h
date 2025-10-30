@@ -9,6 +9,7 @@
 #include "Objects/Object.h"
 #include "Render/Buffer.h"
 #include <string>
+#include <span>
 #include <unordered_map>
 
 
@@ -23,65 +24,132 @@ namespace Ailu
             friend class FbxParser;
 
         public:
+            inline static constexpr u8 kMaxUVChannels = 4u;
+            //-----------------------------------------
+            // Nested Types
+            //-----------------------------------------
             struct ImportedMaterialInfo
             {
-                String _name;
-                u16 _slot;
-                Array<String, 2> _textures;
-                ImportedMaterialInfo(u16 slot = 0, String name = "") : _slot(slot), _name(name) {};
+                std::string _name;
+                u16 _slot = 0;
+                std::array<std::string, 2> _textures;
+                Color _diffuse = Color(1.0f);
+                Color _specular = Color(1.0f);
+                Color _emissive = Color(0.0f);
+                f32 _roughness = 1.0f;
+
+                ImportedMaterialInfo(u16 s = 0, std::string n = "")
+                    : _name(std::move(n)), _slot(s) {}
             };
-            inline static std::weak_ptr<Mesh> s_p_cube;
-            inline static std::weak_ptr<Mesh> s_p_shpere;
-            inline static std::weak_ptr<Mesh> s_p_plane;
-            inline static std::weak_ptr<Mesh> s_p_capsule;
-            inline static std::weak_ptr<Mesh> s_p_cylinder;
-            inline static std::weak_ptr<Mesh> s_p_cone;
-            inline static std::weak_ptr<Mesh> s_p_torus;
-            inline static std::weak_ptr<Mesh> s_p_monkey;
 
-            inline static std::weak_ptr<Mesh> s_p_quad;
-            inline static std::weak_ptr<Mesh> s_p_fullscreen_triangle;
+            struct Submesh
+            {
+                Vector<u32> _indices;
+                AABB _bounds{};
+            };
 
         public:
+            //-----------------------------------------
+            // Static Primitive Meshes
+            //-----------------------------------------
+            inline static std::weak_ptr<Mesh> s_cube;
+            inline static std::weak_ptr<Mesh> s_sphere;
+            inline static std::weak_ptr<Mesh> s_plane;
+            inline static std::weak_ptr<Mesh> s_capsule;
+            inline static std::weak_ptr<Mesh> s_cylinder;
+            inline static std::weak_ptr<Mesh> s_cone;
+            inline static std::weak_ptr<Mesh> s_torus;
+            inline static std::weak_ptr<Mesh> s_monkey;
+            inline static std::weak_ptr<Mesh> s_quad;
+            inline static std::weak_ptr<Mesh> s_fullscreen_triangle;
+
+        public:
+            //-----------------------------------------
+            // Lifecycle
+            //-----------------------------------------
             Mesh();
-            Mesh(const std::string &name);
+            explicit Mesh(String name);
             ~Mesh();
-            virtual void Clear();
             virtual void Apply();
-            void SetVertices(Vector3f *vertices);
-            void SetNormals(Vector3f *normals);
-            void SetTangents(Vector4f *tangents);
-            void SetUVs(Vector2f *uv, u8 index);
-            inline Vector3f *GetVertices() { return _vertices; };
-            inline Vector3f *GetNormals() { return _normals; };
-            inline Vector4f *GetTangents() { return _tangents; };
-            inline Vector2f *GetUVs(u8 index) { return _uv[index]; };
-            inline u32 *GetIndices(u16 submesh_index = 0) { return std::get<0>(_p_indices[submesh_index]); };
-            inline u32 GetIndicesCount(u16 submesh_index = 0) { return std::get<1>(_p_indices[submesh_index]); };
-            const Ref<VertexBuffer> &GetVertexBuffer() const;
-            const Ref<IndexBuffer> &GetIndexBuffer(u16 submesh_index = 0) const;
-            void AddSubmesh(u32 *indices, u32 indices_count);
-            const u16 SubmeshCount() const { return static_cast<u16>(_p_indices.size()); };
-            void AddCacheMaterial(ImportedMaterialInfo material) { _imported_materials.emplace_back(material); };
-            const List<ImportedMaterialInfo> &GetCacheMaterials() const { return _imported_materials; };
-            /// @brief 返回边界盒子，0为所有子网格的并集，子网格从1开始
-            /// @return 对象空间包围盒
-            const Vector<AABB> &BoundBox() const { return _bound_boxs; };
+            virtual void Clear();
+
+            Mesh(const Mesh &) = delete;
+            Mesh &operator=(const Mesh &) = delete;
+            Mesh(Mesh &&) noexcept = default;
+            Mesh &operator=(Mesh &&) noexcept = default;
 
         public:
-            u32 _vertex_count;
+            void SetVertices(std::span<const Vector3f> vertices);
+            void SetVertices(Vector<Vector3f>&& vertices);
+            void SetNormals(std::span<const Vector3f> normals);
+            void SetNormals(Vector<Vector3f> &&normals);
+            void SetTangents(std::span<const Vector4f> tangents);
+            void SetTangents(Vector<Vector4f> &&tangents);
+            void SetColors(std::span<const Color> colors);
+            void SetColors(Vector<Color> &&colors);
+            void SetUVs(std::span<const Vector2f> uv, u8 channel = 0u);
+            void SetUVs(Vector<Vector2f> &&uv, u8 channel = 0u);
+
+            void AddSubmesh(std::span<const u32> indices);
+            void SetVerticesCount(u32 count) { _vertex_count = count; }
+            //-----------------------------------------
+            // Accessors
+            //-----------------------------------------
+            [[nodiscard]] std::span<const Vector3f> GetVertices() const noexcept { return _vertices; }
+            [[nodiscard]] std::span<const Vector3f> GetNormals() const noexcept { return _normals; }
+            [[nodiscard]] std::span<const Vector4f> GetTangents() const noexcept { return _tangents; }
+            [[nodiscard]] std::span<const Color> GetColors() const noexcept { return _colors; }
+            [[nodiscard]] std::span<const Vector2f> GetUVs(uint8_t channel = 0) const noexcept { return _uvs.at(channel); }
+
+            [[nodiscard]] std::span<const u32> GetIndices(u16 submesh_index = 0) const noexcept;
+            [[nodiscard]] i32 GetIndicesCount(u16 submesh_index = 0) const noexcept;
+
+            [[nodiscard]] u16 SubmeshCount() const noexcept { return static_cast<u16>(_submeshes.size()); }
+            [[nodiscard]] const Vector<AABB> &BoundBox() const noexcept { return _bounds; }
+            [[nodiscard]] const AABB &GetBoundBox(u16 index = 0) const noexcept { return _bounds.at(index); }
+
+            [[nodiscard]] const Ref<VertexBuffer> &GetVertexBuffer() const noexcept { return _vertex_buffer; }
+            [[nodiscard]] const Ref<IndexBuffer> &GetIndexBuffer(u16 submesh_index = 0) const noexcept;
+
+            u32 GetVertexCount() const noexcept { return _vertex_count; }
+            //-----------------------------------------
+            // Imported Material Cache (Import Stage Only)
+            //-----------------------------------------
+            void AddCacheMaterial(ImportedMaterialInfo material) { _imported_taterials.emplace_back(std::move(material)); }
+            [[nodiscard]] const Vector<ImportedMaterialInfo> &GetCacheMaterials() const noexcept { return _imported_taterials; }
 
         protected:
-            Vector<AABB> _bound_boxs;
-            Ref<VertexBuffer> _p_vbuf;
-            Vector<Ref<IndexBuffer>> _p_ibufs;
-            Vector3f *_vertices;
-            Vector3f *_normals;
-            Color *_colors;
-            Vector4f *_tangents;
-            Vector2f **_uv;
-            Vector<std::tuple<u32 *, u32>> _p_indices;
-            List<ImportedMaterialInfo> _imported_materials;
+            ////-----------------------------------------
+            //// Internal Helpers
+            ////-----------------------------------------
+            //void UpdateBounds();
+            //void UploadToGPU();
+
+        protected:
+            //-----------------------------------------
+            // CPU Data
+            //-----------------------------------------
+            Vector<Vector3f> _vertices;
+            Vector<Vector3f> _normals;
+            Vector<Vector4f> _tangents;
+            Vector<Color> _colors;
+            Array<Vector<Vector2f>, kMaxUVChannels> _uvs;// up to 4 UV sets
+
+            Vector<Submesh> _submeshes;
+            Vector<AABB> _bounds;// 0 = full mesh, [1..] = per-submesh
+
+            Vector<ImportedMaterialInfo> _imported_taterials;
+
+            //-----------------------------------------
+            // GPU Data
+            //-----------------------------------------
+            Ref<VertexBuffer> _vertex_buffer;
+            Vector<Ref<IndexBuffer>> _index_buffers;
+
+            //-----------------------------------------
+            // Metadata
+            //-----------------------------------------
+            u32 _vertex_count = 0;
         };
 
         class AILU_API SkeletonMesh : public Mesh
@@ -93,19 +161,19 @@ namespace Ailu
             ~SkeletonMesh();
             void Apply() final;
             void Clear() final;
-            void SetBoneWeights(Vector4f *bone_weights);
-            void SetBoneIndices(Vector4D<u32> *bone_indices);
-            inline Vector4D<u32> *GetBoneIndices() { return _bone_indices; };
-            inline Vector4f *GetBoneWeights() { return _bone_weights; };
+            void SetBoneWeights(std::span<const Vector4f> bone_weights);
+            void SetBoneIndices(std::span<const Vector4D<u32>> bone_indices);
+            [[nodiscard]] std::span<const Vector4D<u32>> GetBoneIndices() const noexcept { return _bone_indices; };
+            [[nodiscard]] std::span<const Vector4f> GetBoneWeights() const noexcept { return _bone_weights; };
             void SetSkeleton(const Skeleton &skeleton);
             [[nodiscard]] Skeleton &GetSkeleton();
 
         private:
         private:
             Skeleton _skeleton;
-            Vector4f *_bone_weights;
-            Vector4D<u32> *_bone_indices;
-            Vector3f *_previous_vertices;
+            Vector<Vector4f> _bone_weights;
+            Vector<Vector4D<u32>> _bone_indices;
+            Vector<Vector3f> _previous_vertices;
         };
     }// namespace Render
 }// namespace Ailu::Render

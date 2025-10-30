@@ -23,7 +23,7 @@ namespace Ailu
         static Vector3f XMVecToVec3(const XMVECTOR &vec)
         {
             Vector3f ret;
-            memcpy(ret, vec.m128_f32, sizeof(Vector3f));
+            memcpy(ret.Data(), vec.m128_f32, sizeof(Vector3f));
             return ret;
         }
 

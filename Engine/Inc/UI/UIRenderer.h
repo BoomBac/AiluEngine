@@ -28,6 +28,8 @@ namespace Ailu
     namespace UI
     {
         class Widget;
+        class TextRenderer;
+
         struct ImageDrawOptions
         {
             Matrix4x4f _transform = Matrix4x4f::Identity();// 可选的世界变换
@@ -70,6 +72,7 @@ namespace Ailu
             inline static const Matrix4x4f kIdentityMatrix = Matrix4x4f::Identity();
             u16 _frame_index = 0u;
             Ref<ConstantBuffer> _obj_cb;
+            Scope<TextRenderer> _text_renderer;
             Array<Vector<DrawerBlock *>, Render::RenderConstants::kFrameCount> _drawer_blocks;
             DrawerBlock *_text_block;
             //暂时每个widget独立一个block,0保留为全局绘制

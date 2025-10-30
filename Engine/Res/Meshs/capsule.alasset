@@ -3,3 +3,4 @@ type: kMesh
 name: Capsule
 file: Meshs/src_res/capsule.fbx
 inner_file_name: Capsule
+is_combine_mesh: false

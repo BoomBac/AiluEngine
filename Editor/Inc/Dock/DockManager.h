@@ -94,6 +94,8 @@ namespace Ailu
             //将docknode 保存为docknodedata用于序列化
             void WriteNodeData(DockNode *n);
             Window *CreateNewWindow(String title,u16 w,u16 h,bool is_sync = false);
+            void RequestFocus(DockWindow *w);
+            DockNode *FindNodeByWindow(DockWindow *w);
         public:
             Vector<DockNode*> _roots;
         private:
@@ -121,6 +123,7 @@ namespace Ailu
             Vector<Scope<Window>> _float_windows;
             DockNodeDataArray _node_data_array;
             WString _dock_layout_path;
+            DockNode *_focused_node = nullptr;
         };
     }// namespace Editor
 }// namespace Ailu

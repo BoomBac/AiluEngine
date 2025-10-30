@@ -76,6 +76,13 @@ namespace Ailu
             void Tick(f32 delta_time) final;
 
         private:
+            bool OnGetFocus(WindowFocusEvent &e) final;
+            bool OnLostFocus(WindowLostFocusEvent &e) final;
+            void LoadEditorConfig(ApplicationDesc &desc);
+            void SaveEditorConfig();
+            void LoadEditorResource();
+            void WatchDirectory();
+        private:
             inline static WString s_editor_config_path;
             inline static WString s_editor_root_path;
             EditorLayer *_p_editor_layer;
@@ -85,13 +92,6 @@ namespace Ailu
             Camera *_p_scene_camera;
             WString _opened_scene_path;
             EditorConfig _editor_config;
-        private:
-            bool OnGetFocus(WindowFocusEvent &e) final;
-            bool OnLostFocus(WindowLostFocusEvent &e) final;
-            void LoadEditorConfig(ApplicationDesc &desc);
-            void SaveEditorConfig();
-            void LoadEditorResource();
-            void WatchDirectory();
         };
     }// namespace Editor
 }// namespace Ailu

@@ -39,7 +39,7 @@ namespace Ailu
         DockWindow::DockWindow(const String &title, Vector2f size) : _is_focused(false), _is_dragging(false), _size(size), _position(Vector2f::kZero)
         {
             _drag_start_mouse_pos = {-1.0f, 0.0f};
-            _title_bar = MakeRef<UI::Widget>();
+            _title_widget = MakeRef<UI::Widget>();
             auto c = MakeRef<UI::Canvas>();
             c->SlotSize(Vector2f(size.x, kTitleBarHeight));
             _title_bar_root = c->AddChild<UI::Border>();
@@ -70,7 +70,6 @@ namespace Ailu
             {
                 _is_dragging = false;
                 _drag_start_mouse_pos = {-1.0f, 0.0f};
-                SetFocus(false);
             };
             _title_drag_area->OnMouseMove() += [&](UI::UIEvent &e)
             {
@@ -86,13 +85,14 @@ namespace Ailu
             _btn_close = hb->AddChild<UI::Button>();
             _btn_close->SlotSizePolicy(UI::ESizePolicy::kFixed);
             _btn_close->SlotSize(kTitleBarHeight, kTitleBarHeight);
+            _btn_close->SetText("x");
             _btn_close->OnMouseClick() += [this](UI::UIEvent &e)
             {
                 LOG_INFO("DockWindow({}) close...", _title->GetText());
             };
-            _title_bar->AddToWidget(c);
-            _content = MakeRef<UI::Widget>();
-            _content->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
+            _title_widget->AddToWidget(c);
+            _content_widget = MakeRef<UI::Widget>();
+            _content_widget->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
             c = MakeRef<UI::Canvas>();
             c->SlotSize(Vector2f(size.x, size.y - kTitleBarHeight));
             _content_root = c->AddChild<UI::Border>();
@@ -100,10 +100,20 @@ namespace Ailu
             _content_root->_border_color = g_editor_style._window_border_color;
             _content_root->_bg_color = g_editor_style._window_bg_color;
             _content_root->SlotSizePolicy(UI::ESizePolicy::kFixed);
-            _content->AddToWidget(c);
-            _content->_on_get_focus += [this]()
+            _content_widget->AddToWidget(c);
+            _content_widget->_on_get_focus += [this]()
             {
-                UI::UIManager::Get()->BringToFront(_title_bar.get());
+                UI::UIManager::Get()->BringToFront(_title_widget.get());
+                _is_focused = true;
+                _on_get_focus_delegate.Invoke(this);
+            };
+            _title_widget->_on_lost_focus += [this]()
+            {
+                SetFocus(false);
+            };
+            _content_widget->_on_lost_focus += [this]()
+            {
+                SetFocus(false);
             };
             SetTitle(title);
         }
@@ -119,9 +129,9 @@ namespace Ailu
         {
             if (_is_dirty)
             {
-                _title_bar->SetPosition(_position);
-                _title_bar->SetSize({_size.x, kTitleBarHeight});
-                _title_bar->Root()->SlotSize(Vector2f(_size.x, kTitleBarHeight));
+                _title_widget->SetPosition(_position);
+                _title_widget->SetSize({_size.x, kTitleBarHeight});
+                _title_widget->Root()->SlotSize(Vector2f(_size.x, kTitleBarHeight));
                 _title_bar_root->SlotSize(Vector2f(_size.x, kTitleBarHeight));
                 _title_bar_root->GetChildren()[0]->SlotSize(_title_bar_root->SlotSize());
                 {
@@ -130,9 +140,9 @@ namespace Ailu
                     _title->SlotSize(s);
                 }
                 _btn_close->SlotSize(Vector2f(kTitleBarHeight, kTitleBarHeight));
-                _content->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
-                _content->SetSize({_size.x, _size.y - kTitleBarHeight});
-                _content->Root()->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
+                _content_widget->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
+                _content_widget->SetSize({_size.x, _size.y - kTitleBarHeight});
+                _content_widget->Root()->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
                 _content_root->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
                 _is_dirty = false;
             }
@@ -148,28 +158,28 @@ namespace Ailu
 
         void DockWindow::SetTitleBarVisibility(bool is_visibility, bool is_expand_content)
         {
-            _title_bar->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            _title_widget->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
             if (is_visibility)
             {
-                _content->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
-                _content->SetSize({_size.x, _size.y - kTitleBarHeight});
-                _content->Root()->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
+                _content_widget->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
+                _content_widget->SetSize({_size.x, _size.y - kTitleBarHeight});
+                _content_widget->Root()->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
                 _content_root->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
             }
             else
             {
                 if (is_expand_content)
                 {
-                    _content->SetPosition(_position);
-                    _content->SetSize({_size.x, _size.y});
-                    _content->Root()->SlotSize(Vector2f(_size.x, _size.y));
+                    _content_widget->SetPosition(_position);
+                    _content_widget->SetSize({_size.x, _size.y});
+                    _content_widget->Root()->SlotSize(Vector2f(_size.x, _size.y));
                     _content_root->SlotSize(Vector2f(_size.x, _size.y));
                 }
             }
         }
         void DockWindow::SetContentVisibility(bool is_visibility)
         {
-            _content->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            _content_widget->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
         }
         String DockWindow::GetTitle() const
         {
@@ -177,22 +187,24 @@ namespace Ailu
         }
         void DockWindow::SetTitle(String title)
         {
-            _content->Name(std::format("{}_content", title));
-            _title_bar->Name(std::format("{}_title", title));
+            _content_widget->Name(std::format("{}_content", title));
+            _title_widget->Name(std::format("{}_title", title));
             _title->SetText(title);
             _name = title;
         }
         void DockWindow::SetFocus(bool is_focus)
         {
-            //if (is_focus == _is_focused)
-            //    return;
+            if (is_focus == _is_focused)
+                return;
             _is_focused = is_focus;
             if (is_focus)
             {
-                UI::UIManager::Get()->BringToFront(_title_bar.get());
-                UI::UIManager::Get()->BringToFront(_content.get());
-                //_title_bar->_on_sort_order_changed.Invoke();
+                //UI::UIManager::Get()->BringToFront(_title_widget.get());
+                UI::UIManager::Get()->BringToFront(_content_widget.get());//事件会自动将title_widget带到前面
+                _on_get_focus_delegate.Invoke(this);
             }
+            else
+                _on_lost_focus_delegate.Invoke(this);
         };
 
         u32 DockWindow::HoverEdge(Vector2f pos) const

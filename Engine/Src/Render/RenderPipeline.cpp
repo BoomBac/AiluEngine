@@ -88,15 +88,15 @@ namespace Ailu::Render
     {
         _cur_frame_packet = &_frame_packets[Application::Application::Get().GetFrameCount() % _frame_packets.size()];
         _cur_frame_res = &_frame_res[Application::Application::Get().GetFrameCount() % _frame_res.size()];
-        ProcessPendingRenderObjects();
-        {
-            PROFILE_BLOCK_CPU(CollectView)
-            CollectViews(*g_pSceneMgr->ActiveScene());
-        }
-         auto update_render_obj_job = JobSystem::Get().CreateJob("UpdateRenderObject",&RenderPipeline::UpdateRenderObject,this, 0u, (u32)_render_objs.size());
-         auto update_vis_obj_job = JobSystem::Get().CreateJob("UpdateVisibilityObject", &RenderPipeline::UpdateVisibilityObject, this, 0u, (u32)_visiblity_objs.size());
-         JobSystem::Get().AddDependency(update_render_obj_job,update_vis_obj_job);
-         JobSystem::Get().Dispatch(update_render_obj_job);
+        //ProcessPendingRenderObjects();
+        //{
+        //    PROFILE_BLOCK_CPU(CollectView)
+        //    CollectViews(*g_pSceneMgr->ActiveScene());
+        //}
+        // auto update_render_obj_job = JobSystem::Get().CreateJob("UpdateRenderObject",&RenderPipeline::UpdateRenderObject,this, 0u, (u32)_render_objs.size());
+        // auto update_vis_obj_job = JobSystem::Get().CreateJob("UpdateVisibilityObject", &RenderPipeline::UpdateVisibilityObject, this, 0u, (u32)_visiblity_objs.size());
+        // JobSystem::Get().AddDependency(update_render_obj_job,update_vis_obj_job);
+        // JobSystem::Get().Dispatch(update_render_obj_job);
         _targets.clear();
         _cameras.clear();
         _cameras.emplace_back(Camera::sCurrent);

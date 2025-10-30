@@ -378,3 +378,81 @@ return Ailu::UI::CollapsibleView::StaticType();
 return Ailu::UI::CollapsibleView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_CollapsibleView(&Ailu::UI::CollapsibleView::StaticType, "Ailu::UI::CollapsibleView");
+Ailu::Type* Ailu::UI::Z_Construct_SplitView_Type()
+{
+Ailu::UI::UIElement::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SplitView";
+initializer._size = sizeof(Ailu::UI::SplitView);
+initializer._full_name = "Ailu::UI::SplitView";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::UI";
+initializer._base_name = "Ailu::UI::UIElement";
+initializer._constructor = []()->Ailu::UI::SplitView* {return new Ailu::UI::SplitView;};
+Meta meta_ratio;
+meta_ratio.Set("Category","");
+meta_ratio.Set("IsColor",false);
+meta_ratio.Set("IsRange",false);
+meta_ratio.Set("IsFloatRange",true);
+meta_ratio.Set("RangeMin",0);
+meta_ratio.Set("RangeMax",1);
+MemberBuilder builder_ratio;
+builder_ratio._name = "_ratio";
+builder_ratio._type_name = "f32";
+builder_ratio._offset = offsetof(SplitView,_ratio);
+builder_ratio._is_const = false;
+builder_ratio._is_static = false;
+builder_ratio._is_public = false;
+builder_ratio._is_pointer = false;
+builder_ratio._is_ref = false;
+builder_ratio._is_template = false;
+builder_ratio._meta = meta_ratio;
+builder_ratio._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<f32>);
+builder_ratio._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<f32>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_ratio));
+Meta meta_is_horizontal;
+meta_is_horizontal.Set("Category","");
+meta_is_horizontal.Set("IsColor",false);
+meta_is_horizontal.Set("IsRange",false);
+meta_is_horizontal.Set("IsFloatRange",true);
+meta_is_horizontal.Set("RangeMin",0);
+meta_is_horizontal.Set("RangeMax",1);
+MemberBuilder builder_is_horizontal;
+builder_is_horizontal._name = "_is_horizontal";
+builder_is_horizontal._type_name = "bool";
+builder_is_horizontal._offset = offsetof(SplitView,_is_horizontal);
+builder_is_horizontal._is_const = false;
+builder_is_horizontal._is_static = false;
+builder_is_horizontal._is_public = false;
+builder_is_horizontal._is_pointer = false;
+builder_is_horizontal._is_ref = false;
+builder_is_horizontal._is_template = false;
+builder_is_horizontal._meta = meta_is_horizontal;
+builder_is_horizontal._serialize_fn = static_cast<SerializeFunc>(&SerializePrimitive<bool>);
+builder_is_horizontal._deserialize_fn = static_cast<DeserializeFunc>(&DeserializePrimitive<bool>);
+initializer._properties.emplace_back(MemberBuilder::BuildProperty(builder_is_horizontal));
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::UI::SplitView::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_SplitView_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::UI::SplitView>()
+{
+return Ailu::UI::SplitView::StaticType();
+}
+    Type *Ailu::UI::SplitView::GetType()
+{
+return Ailu::UI::SplitView::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SplitView(&Ailu::UI::SplitView::StaticType, "Ailu::UI::SplitView");

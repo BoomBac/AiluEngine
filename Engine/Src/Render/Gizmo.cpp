@@ -1,6 +1,7 @@
 #include "Render/Gizmo.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"
+#include "UI/TextRenderer.h"
 #include "pch.h"
 
 namespace Ailu::Render
@@ -40,6 +41,7 @@ namespace Ailu::Render
         _draw_tex_items.resize(kMaxDrawTextureNum);
         s_color.a = 0.75f;
         _line_drawer = g_pResourceMgr->Get<Material>(L"Runtime/Material/Gizmo");
+        _text_renderer = new UI::TextRenderer();
     }
     void Gizmo::Initialize()
     {
@@ -47,6 +49,7 @@ namespace Ailu::Render
     }
     void Gizmo::Shutdown()
     {
+        DESTORY_PTR(s_pInstance->_text_renderer)
         DESTORY_PTR(s_pInstance);
     }
 
@@ -358,10 +361,19 @@ namespace Ailu::Render
         DrawLine(bottom_right, bottom_left, color);
         DrawLine(bottom_left, top_left, color);
     }
+    void Gizmo::DrawMesh(Mesh *mesh, const Matrix4x4f &matrix, Material *mat)
+    {
+        s_pInstance->_mesh_renderers.emplace_back(mesh, mat,matrix);
+    }
 
     void Gizmo::DrawTexture(const Rect &rect, Texture *tex)
     {
         s_pInstance->_draw_tex_items[s_pInstance->_tex_screen_item_num++] = {rect, tex};
+    }
+
+    void Gizmo::DrawText(const String &text, Vector2f pos, u32 font_size, Color color)
+    {
+        s_pInstance->_text_renderer->DrawText(text, pos, font_size, Vector2f::kOne, color);
     }
 
     void Gizmo::Submit(CommandBuffer *cmd, const RenderingData &data)
@@ -397,6 +409,11 @@ namespace Ailu::Render
             cmd->DrawInstanced(s_pInstance->_world_vbuf.get(), nullptr, s_pInstance->_line_drawer, 0, 1);
             s_pInstance->_world_vertex_num = 0u;
         }
+        for (auto& r: s_pInstance->_mesh_renderers)
+        {
+            cmd->DrawMesh(r._mesh, r._material,r._matrix);
+        }
+        s_pInstance->_mesh_renderers.clear();
         if (s_pInstance->_screen_vertex_num > 0)
         {
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &s_pInstance->_screen_camera_cb, RenderConstants::kPerCameraDataSize);
@@ -440,6 +457,7 @@ namespace Ailu::Render
                 cmd->DrawInstanced(s_pInstance->_tex_screen_vbufs[i].get(), nullptr, s_pInstance->_line_drawer, 1, 1);
             }
         }
+        s_pInstance->_text_renderer->Render(cmd);
     }
     //当GizmoPass未激活时，实际可能还会有数据在填充，所以将顶点偏移置空。一定要调用
     //当激活时，实际就不用调用

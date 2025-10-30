@@ -27,200 +27,206 @@ namespace Ailu
 
     namespace CollisionDetection
     {
-        namespace
+        // Returns the squared distance between point c and segment ab
+        f32 SqDistVector3fSegment(Vector3f a, Vector3f b, Vector3f c)
         {
-            // Returns the squared distance between point c and segment ab
-            static f32 SqDistVector3fSegment(Vector3f a, Vector3f b, Vector3f c)
+            Vector3f ab = b - a, ac = c - a, bc = c - b;
+            f32 e = DotProduct(ac, ab);
+            // Handle cases where c projects outside ab
+            if (e <= 0.0f) return DotProduct(ac, ac);
+            f32 f = DotProduct(ab, ab);
+            if (e >= f) return DotProduct(bc, bc);
+            // Handle cases where c projects onto ab
+            return DotProduct(ac, ac) - e * e / f;
+        }
+        f32 SqDistVector3fSegment(const Vector3f &p0, const Vector3f &p1, const Vector3f &point, Vector3f &closestPoint)
+        {
+            Vector3f segment = p1 - p0;
+            Vector3f pointToP0 = point - p0;
+
+            // 1. 计算线段的长度平方
+            f32 segmentLengthSq = DotProduct(segment, segment);
+
+            // 2. 如果线段的长度接近零，返回 p0 作为最近点
+            if (segmentLengthSq < 0.00001f)
             {
-                Vector3f ab = b - a, ac = c - a, bc = c - b;
-                f32 e = DotProduct(ac, ab);
-                // Handle cases where c projects outside ab
-                if (e <= 0.0f) return DotProduct(ac, ac);
-                f32 f = DotProduct(ab, ab);
-                if (e >= f) return DotProduct(bc, bc);
-                // Handle cases where c projects onto ab
-                return DotProduct(ac, ac) - e * e / f;
+                closestPoint = p0;
+                return DotProduct(pointToP0, pointToP0);// 距离平方
             }
-            float SqDistVector3fSegment(const Vector3f &p0, const Vector3f &p1, const Vector3f &point, Vector3f &closestPoint)
+
+            // 3. 计算点在线段上的投影
+            f32 t = DotProduct(pointToP0, segment) / segmentLengthSq;
+
+            // 4. 限制 t 在 [0, 1] 之间，确保最近点在线段上
+            t = std::clamp(t, 0.0f, 1.0f);
+
+            // 5. 计算线段上的最近点
+            closestPoint = p0 + t * segment;
+
+            // 6. 返回最近点与原点之间的距离平方
+            Vector3f diff = closestPoint - point;
+            return DotProduct(diff, diff);// 距离平方
+        }
+
+        // from Real Time Collision Detection
+        // Computes closest points C1 and C2 of S1(s)=P1+s*(Q1-P1) and
+        // S2(t)=P2+t*(Q2-P2), returning s and t. Function result is squared
+        // distance between between S1(s) and S2(t)
+        f32 ClosestPtSegmentSegment(Vector3f p1, Vector3f q1, Vector3f p2, Vector3f q2, f32 &s, f32 &t, Vector3f &c1, Vector3f &c2)
+        {
+            Vector3f d1 = q1 - p1;// Direction vector of segment S1
+            Vector3f d2 = q2 - p2;// Direction vector of segment S2
+            Vector3f r = p1 - p2;
+            f32 a = DotProduct(d1, d1);// Squared length of segment S1, always nonnegative
+            f32 e = DotProduct(d2, d2);// Squared length of segment S2, always nonnegative
+            f32 f = DotProduct(d2, r);
+            // Check if either or both segments degenerate into points
+            if (a <= kEpsilon && e <= kEpsilon)
             {
-                Vector3f segment = p1 - p0;
-                Vector3f pointToP0 = point - p0;
-
-                // 1. 计算线段的长度平方
-                float segmentLengthSq = DotProduct(segment, segment);
-
-                // 2. 如果线段的长度接近零，返回 p0 作为最近点
-                if (segmentLengthSq < 0.00001f)
-                {
-                    closestPoint = p0;
-                    return DotProduct(pointToP0, pointToP0);// 距离平方
-                }
-
-                // 3. 计算点在线段上的投影
-                float t = DotProduct(pointToP0, segment) / segmentLengthSq;
-
-                // 4. 限制 t 在 [0, 1] 之间，确保最近点在线段上
+                // Both segments degenerate into points
+                s = t = 0.0f;
+                c1 = p1;
+                c2 = p2;
+                return DotProduct(c1 - c2, c1 - c2);
+            }
+            if (a <= kEpsilon)
+            {
+                // First segment degenerates into a point
+                s = 0.0f;
+                t = f / e;// s = 0 => t = (b*s + f) / e = f / e
                 t = std::clamp(t, 0.0f, 1.0f);
-
-                // 5. 计算线段上的最近点
-                closestPoint = p0 + t * segment;
-
-                // 6. 返回最近点与原点之间的距离平方
-                Vector3f diff = closestPoint - point;
-                return DotProduct(diff, diff);// 距离平方
             }
-
-            // from Real Time Collision Detection
-            // Computes closest points C1 and C2 of S1(s)=P1+s*(Q1-P1) and
-            // S2(t)=P2+t*(Q2-P2), returning s and t. Function result is squared
-            // distance between between S1(s) and S2(t)
-            static f32 ClosestPtSegmentSegment(Vector3f p1, Vector3f q1, Vector3f p2, Vector3f q2, float &s, float &t, Vector3f &c1, Vector3f &c2)
+            else
             {
-                Vector3f d1 = q1 - p1;// Direction vector of segment S1
-                Vector3f d2 = q2 - p2;// Direction vector of segment S2
-                Vector3f r = p1 - p2;
-                float a = DotProduct(d1, d1);// Squared length of segment S1, always nonnegative
-                float e = DotProduct(d2, d2);// Squared length of segment S2, always nonnegative
-                float f = DotProduct(d2, r);
-                // Check if either or both segments degenerate into points
-                if (a <= kEpsilon && e <= kEpsilon)
+                f32 c = DotProduct(d1, r);
+                if (e <= kEpsilon)
                 {
-                    // Both segments degenerate into points
-                    s = t = 0.0f;
-                    c1 = p1;
-                    c2 = p2;
-                    return DotProduct(c1 - c2, c1 - c2);
-                }
-                if (a <= kEpsilon)
-                {
-                    // First segment degenerates into a point
-                    s = 0.0f;
-                    t = f / e;// s = 0 => t = (b*s + f) / e = f / e
-                    t = std::clamp(t, 0.0f, 1.0f);
+                    // Second segment degenerates into a point
+                    t = 0.0f;
+                    s = std::clamp(-c / a, 0.0f, 1.0f);// t = 0 => s = (b*t - c) / a = -c / a
                 }
                 else
                 {
-                    float c = DotProduct(d1, r);
-                    if (e <= kEpsilon)
+                    // The general nondegenerate case starts here
+                    f32 b = DotProduct(d1, d2);
+                    f32 denom = a * e - b * b;// Always nonnegative
+                    // If segments not parallel, compute closest point on L1 to L2 and
+                    // clamp to segment S1. Else pick arbitrary s (here 0)
+                    if (denom != 0.0f)
                     {
-                        // Second segment degenerates into a point
-                        t = 0.0f;
-                        s = std::clamp(-c / a, 0.0f, 1.0f);// t = 0 => s = (b*t - c) / a = -c / a
+                        s = std::clamp((b * f - c * e) / denom, 0.0f, 1.0f);
                     }
                     else
+                        s = 0.0f;
+                    // Compute point on L2 closest to S1(s) using
+                    // t = DotProduct((P1 + D1*s) - P2,D2) / DotProduct(D2,D2) = (b*s + f) / e
+                    t = (b * s + f) / e;
+                    // If t in [0,1] done. Else clamp t, recompute s for the new value
+                    // of t using s = DotProduct((P2 + D2*t) - P1,D1) / DotProduct(D1,D1)= (t*b - c) / a
+                    // and clamp s to [0, 1]
+                    if (t < 0.0f)
                     {
-                        // The general nondegenerate case starts here
-                        float b = DotProduct(d1, d2);
-                        float denom = a * e - b * b;// Always nonnegative
-                        // If segments not parallel, compute closest point on L1 to L2 and
-                        // clamp to segment S1. Else pick arbitrary s (here 0)
-                        if (denom != 0.0f)
-                        {
-                            s = std::clamp((b * f - c * e) / denom, 0.0f, 1.0f);
-                        }
-                        else
-                            s = 0.0f;
-                        // Compute point on L2 closest to S1(s) using
-                        // t = DotProduct((P1 + D1*s) - P2,D2) / DotProduct(D2,D2) = (b*s + f) / e
-                        t = (b * s + f) / e;
-                        // If t in [0,1] done. Else clamp t, recompute s for the new value
-                        // of t using s = DotProduct((P2 + D2*t) - P1,D1) / DotProduct(D1,D1)= (t*b - c) / a
-                        // and clamp s to [0, 1]
-                        if (t < 0.0f)
-                        {
-                            t = 0.0f;
-                            s = std::clamp(-c / a, 0.0f, 1.0f);
-                        }
-                        else if (t > 1.0f)
-                        {
-                            t = 1.0f;
-                            s = std::clamp((b - c) / a, 0.0f, 1.0f);
-                        }
+                        t = 0.0f;
+                        s = std::clamp(-c / a, 0.0f, 1.0f);
+                    }
+                    else if (t > 1.0f)
+                    {
+                        t = 1.0f;
+                        s = std::clamp((b - c) / a, 0.0f, 1.0f);
                     }
                 }
-                c1 = p1 + d1 * s;
-                c2 = p2 + d2 * t;
-                return DotProduct(c1 - c2, c1 - c2);
             }
+            c1 = p1 + d1 * s;
+            c2 = p2 + d2 * t;
+            return DotProduct(c1 - c2, c1 - c2);
+        }
 
-            static Vector3f ClosestPtOnSegment(const Vector3f &a, const Vector3f &b, const Vector3f &p)
-            {
-                Vector3f ab = b - a;
-                float t = DotProduct(p - a, ab) / DotProduct(ab, ab);
-                t = std::clamp(t, 0.0f, 1.0f);// 保证 t 在 [0, 1] 范围内
-                return a + t * ab;
-            }
+        Vector3f ClosestPtOnSegment(const Vector3f &a, const Vector3f &b, const Vector3f &p)
+        {
+            Vector3f ab = b - a;
+            f32 t = DotProduct(p - a, ab) / DotProduct(ab, ab);
+            t = std::clamp(t, 0.0f, 1.0f);// 保证 t 在 [0, 1] 范围内
+            return a + t * ab;
+        }
 
-            static Vector3f ToOBBLocalSpace(const Vector3f &point, const OBB &obb)
-            {
-                Vector3f localPoint = point - obb._center;
-                return Vector3f(
-                        DotProduct(localPoint, obb._local_axis[0]),
-                        DotProduct(localPoint, obb._local_axis[1]),
-                        DotProduct(localPoint, obb._local_axis[2]));
-            }
-            static Vector3f FromOBBLocalSpace(const Vector3f &localPoint, const OBB &obb)
-            {
-                return obb._center + localPoint.x * obb._local_axis[0] + localPoint.y * obb._local_axis[1] + localPoint.z * obb._local_axis[2];
-            }
-            static Vector3f TransformNormalFromOBBLocalSpace(const Vector3f &localNormal, const OBB &obb)
-            {
-                // 只考虑旋转，不考虑平移和缩放
-                return localNormal.x * obb._local_axis[0] + localNormal.y * obb._local_axis[1] + localNormal.z * obb._local_axis[2];
-            }
+        static Vector3f ToOBBLocalPoint(const Vector3f &point, const OBB &obb)
+        {
+            Vector3f local = point - obb._center;
+            return Vector3f(
+                    DotProduct(local, obb._local_axis[0]),
+                    DotProduct(local, obb._local_axis[1]),
+                    DotProduct(local, obb._local_axis[2]));
+        }
 
-            static f32 ProjectOBBOnAxis(const Vector3f &axis, const OBB &obb)
+        static Vector3f ToOBBLocalDir(const Vector3f &dir, const OBB &obb)
+        {
+            return Vector3f(
+                    DotProduct(dir, obb._local_axis[0]),
+                    DotProduct(dir, obb._local_axis[1]),
+                    DotProduct(dir, obb._local_axis[2]));
+        }
+
+        static Vector3f FromOBBLocalSpace(const Vector3f &localPoint, const OBB &obb)
+        {
+            return obb._center + localPoint.x * obb._local_axis[0] + localPoint.y * obb._local_axis[1] + localPoint.z * obb._local_axis[2];
+        }
+        static Vector3f TransformNormalFromOBBLocalSpace(const Vector3f &localNormal, const OBB &obb)
+        {
+            // 只考虑旋转，不考虑平移和缩放
+            return localNormal.x * obb._local_axis[0] + localNormal.y * obb._local_axis[1] + localNormal.z * obb._local_axis[2];
+        }
+
+        static f32 ProjectOBBOnAxis(const Vector3f &axis, const OBB &obb)
+        {
+            return abs(DotProduct(axis, obb._local_axis[0]) * obb._half_axis_length.x) +
+                   abs(DotProduct(axis, obb._local_axis[1]) * obb._half_axis_length.y) +
+                   abs(DotProduct(axis, obb._local_axis[2]) * obb._half_axis_length.z);
+        }
+        static Vector3f s_shadowest_depth_axis;
+        static bool TestAxis(const Vector3f &axis, const OBB &obb1, const OBB &obb2, const Vector3f &distanceVec, f32 &penetration)
+        {
+            f32 radius1 = ProjectOBBOnAxis(axis, obb1);
+            f32 radius2 = ProjectOBBOnAxis(axis, obb2);
+            f32 distance = abs(DotProduct(axis, distanceVec));
+            bool isColliding = distance <= (radius1 + radius2);
+            f32 depth = (radius1 + radius2) - distance;
+            if (isColliding && depth < penetration)
             {
-                return abs(DotProduct(axis, obb._local_axis[0]) * obb._half_axis_length.x) +
-                       abs(DotProduct(axis, obb._local_axis[1]) * obb._half_axis_length.y) +
-                       abs(DotProduct(axis, obb._local_axis[2]) * obb._half_axis_length.z);
+                penetration = depth;
+                s_shadowest_depth_axis = axis;
             }
-            static Vector3f s_shadowest_depth_axis;
-            static bool TestAxis(const Vector3f &axis, const OBB &obb1, const OBB &obb2, const Vector3f &distanceVec, f32 &penetration)
+            return isColliding;
+        }
+        //输入一个点，找其在obb上的最小穿透深度
+        static f32 TestObbAndPoint(const OBB &obb, const Vector3f &point, ContactData &contact)
+        {
+            Vector3f p = ToOBBLocalPoint(point, obb);
+            Vector3f normal;
+            f32 min_depth = obb._half_axis_length.x - abs(p.x);
+            if (min_depth < 0.0f)
+                return -1.f;
+            normal = obb._local_axis[0] * (p.x >= 0.0f ? 1.0f : -1.0f);
+            f32 depth = obb._half_axis_length.y - abs(p.y);
+            if (depth < 0.0f)
+                return -1.f;
+            else if (depth < min_depth)
             {
-                float radius1 = ProjectOBBOnAxis(axis, obb1);
-                float radius2 = ProjectOBBOnAxis(axis, obb2);
-                float distance = abs(DotProduct(axis, distanceVec));
-                bool isColliding = distance <= (radius1 + radius2);
-                f32 depth = (radius1 + radius2) - distance;
-                if (isColliding && depth < penetration)
-                {
-                    penetration = depth;
-                    s_shadowest_depth_axis = axis;
-                }
-                return isColliding;
+                min_depth = depth;
+                normal = obb._local_axis[1] * (p.y >= 0.0f ? 1.0f : -1.0f);
             }
-            //输入一个点，找其在obb上的最小穿透深度
-            static f32 TestObbAndPoint(const OBB &obb, const Vector3f &point, ContactData &contact)
+            depth = obb._half_axis_length.z - abs(p.z);
+            if (depth < 0.0f)
+                return -1.f;
+            else if (depth < min_depth)
             {
-                Vector3f p = ToOBBLocalSpace(point, obb);
-                Vector3f normal;
-                f32 min_depth = obb._half_axis_length.x - abs(p.x);
-                if (min_depth < 0.0f)
-                    return -1.f;
-                normal = obb._local_axis[0] * (p.x >= 0.0f ? 1.0f : -1.0f);
-                f32 depth = obb._half_axis_length.y - abs(p.y);
-                if (depth < 0.0f)
-                    return -1.f;
-                else if (depth < min_depth)
-                {
-                    min_depth = depth;
-                    normal = obb._local_axis[1] * (p.y >= 0.0f ? 1.0f : -1.0f);
-                }
-                depth = obb._half_axis_length.z - abs(p.z);
-                if (depth < 0.0f)
-                    return -1.f;
-                else if (depth < min_depth)
-                {
-                    min_depth = depth;
-                    normal = obb._local_axis[2] * (p.z >= 0.0f ? 1.0f : -1.0f);
-                }
-                contact._normal = Normalize(normal);
-                contact._point = point;
-                contact._penetration = min_depth;
-                return min_depth;
+                min_depth = depth;
+                normal = obb._local_axis[2] * (p.z >= 0.0f ? 1.0f : -1.0f);
             }
-        }// namespace
+            contact._normal = Normalize(normal);
+            contact._point = point;
+            contact._penetration = min_depth;
+            return min_depth;
+        }
 
         ContactData Intersect(const AABB &a, const AABB &b)
         {
@@ -250,7 +256,7 @@ namespace Ailu
             P.x = std::clamp(c._top.x, a._min.x, a._max.x);
             P.y = std::clamp(c._top.y, a._min.y, a._max.y);
             P.z = std::clamp(c._top.z, a._min.z, a._max.z);
-            float dist2 = SqDistVector3fSegment(c._top, c._bottom, P);
+            f32 dist2 = SqDistVector3fSegment(c._top, c._bottom, P);
             contact._is_collision = dist2 <= c._radius * c._radius;
             return contact;
         }
@@ -274,10 +280,10 @@ namespace Ailu
             ContactData contact;
             // 1. 计算球心到胶囊线段之间的最近点距离
             Vector3f closestPointOnCapsule;
-            float dist2 = SqDistVector3fSegment(c._top, c._bottom, s._center, closestPointOnCapsule);
+            f32 dist2 = SqDistVector3fSegment(c._top, c._bottom, s._center, closestPointOnCapsule);
 
             // 2. 判断是否发生碰撞
-            float radiusSum = s._radius + c._radius;
+            f32 radiusSum = s._radius + c._radius;
             contact._is_collision = dist2 <= radiusSum * radiusSum;
 
             if (!contact._is_collision)
@@ -287,7 +293,7 @@ namespace Ailu
 
             // 3. 计算碰撞法向量（从胶囊体到球心的方向）
             Vector3f delta = s._center - closestPointOnCapsule;
-            float dist = sqrt(dist2);// 球心与胶囊线段最近点的实际距离
+            f32 dist = sqrt(dist2);// 球心与胶囊线段最近点的实际距离
             Vector3f normal;
 
             if (dist > 0.0001f)
@@ -326,7 +332,7 @@ namespace Ailu
                 Vector3f axis = obb._local_axis[i];
 
                 // 计算球体中心在 OBB 第 i 轴上的投影
-                float distance = DotProduct(localCenter, axis);
+                f32 distance = DotProduct(localCenter, axis);
 
                 // 将投影限制在 OBB 的半轴长度范围内
                 if (distance > obb._half_axis_length[i]) distance = obb._half_axis_length[i];
@@ -359,7 +365,7 @@ namespace Ailu
             // 1. 计算两个胶囊体内核线段之间的最近点距离和对应点 c1, c2
             f32 s, t;
             Vector3f c1, c2;
-            f32 dist2 = ClosestPtSegmentSegment(a._top, a._bottom,b._top, b._bottom, s, t, c1, c2);
+            f32 dist2 = ClosestPtSegmentSegment(a._top, a._bottom, b._top, b._bottom, s, t, c1, c2);
 
             // 2. 判断是否发生碰撞
             f32 radiusSum = a._radius + b._radius;
@@ -369,7 +375,7 @@ namespace Ailu
                 return contact;
             // 3. 计算碰撞法向量（c1 到 c2 的向量）,也就是从b指向a
             Vector3f delta = c1 - c2;
-            float dist = sqrt(dist2);// 最近点之间的距离
+            f32 dist = sqrt(dist2);// 最近点之间的距离
             Vector3f normal;
             if (dist > kEpsilon)
                 normal = delta / dist;// 归一化法向量
@@ -399,8 +405,8 @@ namespace Ailu
             // 1. 将胶囊端点转换到 OBB 的局部空间
             //Vector3f top_cbb_space = ToOBBLocalSpace(a._top + capsule_axis * a._radius, b);
             //Vector3f bot_cbb_space = ToOBBLocalSpace(a._bottom - capsule_axis * a._radius, b);
-            Vector3f top_cbb_space = ToOBBLocalSpace(a._top, b);
-            Vector3f bot_cbb_space = ToOBBLocalSpace(a._bottom, b);
+            Vector3f top_cbb_space = ToOBBLocalPoint(a._top, b);
+            Vector3f bot_cbb_space = ToOBBLocalPoint(a._bottom, b);
 
             // 2. 在 OBB 的局部空间上找到最接近 top 端点的点 P（Clamp OBB 表面）
             Vector3f P;
@@ -409,7 +415,7 @@ namespace Ailu
             P.z = std::clamp(top_cbb_space.z, -b._half_axis_length.z, b._half_axis_length.z);
 
             // 3. 计算胶囊体线段与 OBB 最近点 P 的最短距离
-            float dist2 = SqDistVector3fSegment(top_cbb_space, bot_cbb_space, P);
+            f32 dist2 = SqDistVector3fSegment(top_cbb_space, bot_cbb_space, P);
 
             // 4. 判断是否碰撞
             contact._is_collision = dist2 <= a._radius * a._radius;
@@ -423,7 +429,7 @@ namespace Ailu
 
             // 6. 计算碰撞法向量（从 OBB 点到胶囊线段最近点的向量）
             Vector3f delta = P - Q;
-            float dist = sqrt(dist2);
+            f32 dist = sqrt(dist2);
             Vector3f normal;
 
             if (dist > kEpsilon)
@@ -439,7 +445,7 @@ namespace Ailu
 
             // 9. 由于 P 和 Q 在 OBB 的局部空间，所以需要将它们转换回世界空间
             contact._point = FromOBBLocalSpace(contact._point, b);
-            contact._normal = TransformNormalFromOBBLocalSpace(normal,b);
+            contact._normal = TransformNormalFromOBBLocalSpace(normal, b);
 
             return contact;
         }
@@ -663,5 +669,256 @@ namespace Ailu
         {
             return Intersect(c, o);
         }
+
+        ContactData Intersect(const Ray &ray, const AABB &aabb)
+        {
+            ContactData result;
+
+            Vector3f invDir = {
+                    1.0f / ray._dir.x,
+                    1.0f / ray._dir.y,
+                    1.0f / ray._dir.z};
+
+            Vector3f t1 = (aabb._min - ray._start) * invDir;
+            Vector3f t2 = (aabb._max - ray._start) * invDir;
+
+            Vector3f tminV = Min(t1, t2);
+            Vector3f tmaxV = Max(t1, t2);
+
+            f32 t_enter = std::max({tminV.x, tminV.y, tminV.z});
+            f32 t_exit = std::min({tmaxV.x, tmaxV.y, tmaxV.z});
+
+            if (t_enter <= t_exit && t_exit >= 0.0f)
+            {
+                result._is_collision = true;
+                result._penetration = t_enter;
+
+                Vector3f hit_point = ray._start + ray._dir * t_enter;
+                result._point = hit_point;
+
+                // 计算命中的面法线（对应最早进入的轴）
+                if (t_enter == tminV.x)
+                    result._normal = (ray._dir.x < 0) ? Vector3f::kRight : -Vector3f::kRight;
+                else if (t_enter == tminV.y)
+                    result._normal = (ray._dir.y < 0) ? Vector3f::kUp : -Vector3f::kUp;
+                else
+                    result._normal = (ray._dir.z < 0) ? Vector3f::kForward : -Vector3f::kForward;
+            }
+
+            return result;
+        }
+
+        ContactData Intersect(const Ray &ray, const OBB &obb)
+        {
+            // 转换射线到OBB局部空间
+            Ray local_ray{
+                    ToOBBLocalPoint(ray._start, obb),
+                    Normalize(ToOBBLocalDir(ray._dir, obb))};
+
+            AABB local_box(-obb._half_axis_length, obb._half_axis_length);
+            ContactData local_hit = Intersect(local_ray, local_box);
+
+            if (!local_hit._is_collision)
+                return local_hit;
+
+            // 将命中点与法线转回世界空间
+            Vector3f world_point =
+                    obb._center +
+                    obb._local_axis[0] * local_hit._point.x +
+                    obb._local_axis[1] * local_hit._point.y +
+                    obb._local_axis[2] * local_hit._point.z;
+
+            Vector3f world_normal =
+                    Normalize(obb._local_axis[0] * local_hit._normal.x +
+                              obb._local_axis[1] * local_hit._normal.y +
+                              obb._local_axis[2] * local_hit._normal.z);
+
+            ContactData result = local_hit;
+            result._point = world_point;
+            result._normal = world_normal;
+            return result;
+        }
+
+        ContactData Intersect(const Ray &ray, const Sphere &s)
+        {
+            ContactData result;
+
+            Vector3f oc = ray._start - s._center;
+            f32 a = DotProduct(ray._dir, ray._dir);
+            f32 b = 2.0f * DotProduct(oc, ray._dir);
+            f32 c = DotProduct(oc, oc) - s._radius * s._radius;
+            f32 discriminant = b * b - 4 * a * c;
+
+            if (discriminant > 0)
+            {
+                f32 t = (-b - sqrt(discriminant)) / (2.0f * a);
+                if (t > 0)
+                {
+                    result._is_collision = true;
+                    result._penetration = t;
+
+                    Vector3f hit_point = ray._start + ray._dir * t;
+                    result._point = hit_point;
+                    result._normal = Normalize(hit_point - s._center);
+                }
+            }
+
+            return result;
+        }
+        ContactData Intersect(const Ray &ray, const Capsule &c)
+        {
+            ContactData result;
+            result._is_collision = false;
+
+            const Vector3f &ro = ray._start;
+            const Vector3f &rd = Normalize(ray._dir);
+            const Vector3f &p1 = c._bottom;
+            const Vector3f &p2 = c._top;
+            const f32 radius = c._radius;
+
+            Vector3f axis = p2 - p1;
+            f32 axis_len = Magnitude(axis);
+            Vector3f axis_dir = axis_len > 1e-6f ? axis / axis_len : Vector3f::kUp;
+
+            //--------------------------------------------
+            // Step 1: Ray vs infinite cylinder around axis
+            //--------------------------------------------
+            Vector3f delta = ro - p1;
+            f32 dd = DotProduct(rd, axis_dir);
+            Vector3f rd_perp = rd - axis_dir * dd;
+            Vector3f delta_perp = delta - axis_dir * DotProduct(delta, axis_dir);
+
+            f32 A = DotProduct(rd_perp, rd_perp);
+            f32 B = 2.0f * DotProduct(rd_perp, delta_perp);
+            f32 C = DotProduct(delta_perp, delta_perp) - radius * radius;
+
+            f32 t_cylinder = FLT_MAX;
+            bool hit_cylinder = false;
+
+            if (fabs(A) > 1e-6f)
+            {
+                f32 disc = B * B - 4.0f * A * C;
+                if (disc >= 0.0f)
+                {
+                    f32 sqrt_disc = sqrtf(disc);
+                    f32 t0 = (-B - sqrt_disc) / (2.0f * A);
+                    f32 t1 = (-B + sqrt_disc) / (2.0f * A);
+
+                    // pick the nearest positive t
+                    if (t0 > 0.0f) t_cylinder = t0;
+                    else if (t1 > 0.0f)
+                        t_cylinder = t1;
+                    else
+                        t_cylinder = FLT_MAX;
+
+                    if (t_cylinder != FLT_MAX)
+                    {
+                        // check if within the finite cylinder height
+                        Vector3f hit = ro + rd * t_cylinder;
+                        f32 h = DotProduct(hit - p1, axis_dir);
+                        if (h >= 0.0f && h <= axis_len)
+                            hit_cylinder = true;
+                    }
+                }
+            }
+
+            //--------------------------------------------
+            // Step 2: Ray vs spherical caps (top & bottom)
+            //--------------------------------------------
+            auto RaySphere = [&](const Vector3f &center, f32 radius) -> f32
+            {
+                Vector3f oc = ro - center;
+                f32 b = DotProduct(oc, rd);
+                f32 c_ = DotProduct(oc, oc) - radius * radius;
+                f32 h = b * b - c_;
+                if (h < 0.0f) return FLT_MAX;
+                h = sqrtf(h);
+                f32 t0 = -b - h;
+                f32 t1 = -b + h;
+                if (t0 > 0.0f) return t0;
+                if (t1 > 0.0f) return t1;
+                return FLT_MAX;
+            };
+
+            f32 t_sphere_bottom = RaySphere(p1, radius);
+            f32 t_sphere_top = RaySphere(p2, radius);
+
+            //--------------------------------------------
+            // Step 3: Choose nearest intersection
+            //--------------------------------------------
+            f32 t_final = FLT_MAX;
+            Vector3f normal = Vector3f::kZero;
+            Vector3f hit_point = Vector3f::kZero;
+
+            if (hit_cylinder)
+                t_final = t_cylinder;
+
+            if (t_sphere_bottom < t_final)
+                t_final = t_sphere_bottom;
+            if (t_sphere_top < t_final)
+                t_final = t_sphere_top;
+
+            if (t_final == FLT_MAX)
+                return result;// no hit
+
+            // compute contact info
+            hit_point = ro + rd * t_final;
+
+            // determine which part was hit
+            if (t_final == t_cylinder)
+            {
+                // project to axis, find normal
+                Vector3f proj = p1 + axis_dir * std::clamp(DotProduct(hit_point - p1, axis_dir), 0.0f, axis_len);
+                normal = Normalize(hit_point - proj);
+            }
+            else if (t_final == t_sphere_bottom)
+            {
+                normal = Normalize(hit_point - p1);
+            }
+            else if (t_final == t_sphere_top)
+            {
+                normal = Normalize(hit_point - p2);
+            }
+
+            //--------------------------------------------
+            // Step 4: Fill ContactData
+            //--------------------------------------------
+            result._is_collision = true;
+            result._point = hit_point;
+            result._normal = normal;
+            result._penetration = t_final;
+            return result;
+        }
+
+        ContactData Intersect(const Ray &ray, const Plane &plane)
+        {
+            ContactData result;
+
+            // 射线方向与平面法线的点积
+            float denom = DotProduct(plane._normal, ray._dir);
+
+            // 若平行或几乎平行
+            if (fabs(denom) < 1e-6f)
+                return result;// _is_collision = false
+
+            // 计算交点参数 t
+            float t = -(DotProduct(plane._normal, ray._start) + plane._distance) / denom;
+
+            // 交点在射线反方向则忽略
+            if (t < 0.0f)
+                return result;
+
+            // 命中
+            result._is_collision = true;
+            result._penetration = t;
+            result._point = ray._start + ray._dir * t;
+
+            // 法线方向：若射线从背面打到平面上，则翻转法线
+            result._normal = (denom < 0.0f) ? plane._normal : -plane._normal;
+
+            return result;
+        }
+
+
     }// namespace CollisionDetection
 }// namespace Ailu

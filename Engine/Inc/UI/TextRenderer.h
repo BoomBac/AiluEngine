@@ -21,13 +21,10 @@ namespace Ailu
         class AILU_API TextRenderer
         {
         public:
-            static void Init();
-            static void Shutdown();
-            static TextRenderer *Get();
-            static Vector2f CalculateTextSize(const String &text, u16 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
-
-        public:
             inline static u16 kMaxCharacters = 1024u;
+            static Vector2f CalculateTextSize(const String &text, u16 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
+        public:
+            static Font *GetDefaultFont() { return s_default_font; };
             TextRenderer();
             void Initialize();
             ~TextRenderer();
@@ -42,15 +39,14 @@ namespace Ailu
             void DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color,Matrix4x4f matrix, Font *font,DrawerBlock* block);
 
             void Render(RenderTexture *target, Render::CommandBuffer *cmd);
-            void Render(RenderTexture *target);
             void Render(RenderTexture *target, Render::CommandBuffer *cmd, DrawerBlock *b);
+            //适用于外部设置好目标和矩阵
+            void Render(Render::CommandBuffer *cmd);
             bool _is_draw_debug_line = true;
-            [[nodiscard]] Font *GetDefaultFont() const;
-
         private:
             void AppendText(const String &text, Vector2f pos,Matrix4x4f matrix, u16 font_size, Vector2f scale, Color color, Vector2f padding,Font *font, DrawerBlock *block);
         private:
-            Ref<Font> _default_font;
+            inline static Font* s_default_font;
             Ref<Render::Material> _default_mat;
             DrawerBlock *_default_block = nullptr;
         };

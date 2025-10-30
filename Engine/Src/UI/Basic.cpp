@@ -16,6 +16,8 @@ namespace Ailu
         }
         Button::Button(const String &name) : UIElement(name)
         {
+            _text = nullptr;
+            _icon = nullptr;
         }
 
         Vector2f Button::MeasureDesiredSize()
@@ -24,9 +26,47 @@ namespace Ailu
                 return _slot._size;
             return Vector2f(80.0f,20.0f);
         }
+        void Button::SetText(const String &text)
+        {
+            if (_text == nullptr)
+                _text = AddChild<Text>(text);
+        }
+        String Button::GetText() const
+        {
+            if (_text != nullptr)
+                return _text->GetText();
+            return "button";
+        }
+        void Button::SetTexture(Render::Texture *tex)
+        {
+            if (_icon == nullptr)
+                _icon = AddChild<Image>(tex);
+            else
+                _icon->SetTexture(tex);
+        }
+        Render::Texture *Button::GetTexture() const
+        {
+            if (_icon != nullptr)
+                return _icon->GetTexture();
+            return nullptr;
+        }
         void Button::RenderImpl(UIRenderer &r)
         {
             r.DrawQuad(_content_rect, _matrix, _state._is_hovered ? Colors::kRed : Colors::kGreen);
+            for (auto& c: _children)
+                c->Render(r);
+        }
+        void Button::PostArrange()
+        {
+            InvalidateTransform();
+            if (_text != nullptr)
+            {
+                _text->Arrange(0.0f,0.0f,_content_rect.z,_content_rect.w);
+            }
+            if (_icon != nullptr)
+            {
+                _icon->Arrange(0.0f, 0.0f, _content_rect.z, _content_rect.w);
+            }
         }
 #pragma endregion
 
@@ -36,6 +76,8 @@ namespace Ailu
             _on_text_change += [this](const String &new_text)
             {
                 Vector2f new_size = TextRenderer::CalculateTextSize(new_text);
+                new_size.x += _padding._l + _padding._r;
+                new_size.y += _padding._t + _padding._b;
                 Vector2f dv = Abs(new_size - _text_size);
                 f32 tolerance = std::max(1.0f, (f32)_font_size * 0.1f);
                 if (dv.x > tolerance || dv.y > tolerance)
@@ -118,7 +160,10 @@ namespace Ailu
         {
             if (_slot._size_policy == ESizePolicy::kFixed)
                 return _slot._size;
-            return TextRenderer::CalculateTextSize(_text);
+            Vector2f text_size = TextRenderer::CalculateTextSize(_text);
+            text_size.x += _padding._l + _padding._r;
+            text_size.y += _padding._t + _padding._b;
+            return text_size;
         }
 #pragma endregion
 
@@ -149,11 +194,12 @@ namespace Ailu
             UIElement::Update(dt);
             //_value = PingPong(_value + 0.001f);
             Clamp(_value,_range.x,_range.y);
+            f32 value01 = (_value - _range.x) / (_range.y - _range.x);
             f32 bar_height = _content_rect.w * 0.33f;
             _bar_rect = {_content_rect.x, _content_rect.y + (_content_rect.w * 0.5f - bar_height * 0.5f), _content_rect.z, bar_height};
             bar_height = bar_height * 1.5f;
             _dot_rect = {_content_rect.x, _content_rect.y + (_content_rect.w * 0.5f - bar_height * 0.5f), bar_height, bar_height};
-            _dot_rect.x = Lerp(_dot_rect.x + _dot_rect.z * 0.5f, _dot_rect.x + _content_rect.z - bar_height * 0.5f, _value) - bar_height * 0.5f;
+            _dot_rect.x = Lerp(_dot_rect.x + _dot_rect.z * 0.5f, _dot_rect.x + _content_rect.z - bar_height * 0.5f, value01) - bar_height * 0.5f;
         }
         UIElement *Slider::HitTest(Vector2f pos) 
         {
@@ -273,7 +319,6 @@ namespace Ailu
                 if (_children[0]->SlotSizePolicy() == ESizePolicy::kFill)
                     desired_size = _content_rect.zw;
                 _children[0]->Arrange(_content_rect.x, _content_rect.y, desired_size.x, desired_size.y);
-                _children[0]->Update(dt);
             }
         }
         void Border::PostDeserialize()
@@ -565,6 +610,7 @@ namespace Ailu
             ImageDrawOptions opts;
             opts._transform = _matrix;
             opts._tint = _tint_color;
+            opts._size_override = _tex_size;
             r.DrawImage(_texture, _content_rect, opts);
         }
         Vector2f Image::MeasureDesiredSize()

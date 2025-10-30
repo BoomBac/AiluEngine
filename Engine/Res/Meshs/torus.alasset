@@ -3,3 +3,4 @@ type: kMesh
 name: Torus
 file: Meshs/src_res/torus.fbx
 inner_file_name: Torus
+is_combine_mesh: false

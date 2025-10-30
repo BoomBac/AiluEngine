@@ -3,3 +3,4 @@ type: kMesh
 name: terrain_plane
 file: Meshs/src_res/terrain_plane.fbx
 inner_file_name: TerrainPlane
+is_combine_mesh: false

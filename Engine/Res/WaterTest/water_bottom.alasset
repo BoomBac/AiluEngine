@@ -3,3 +3,4 @@ type: kMesh
 name: Cube
 file: WaterTest/water_bottom.fbx
 inner_file_name: Cube
+is_combine_mesh: false

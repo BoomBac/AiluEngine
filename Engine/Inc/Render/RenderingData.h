@@ -6,7 +6,7 @@
 #include "GlobalMarco.h"
 #include "RendererAPI.h"
 #include "Texture.h"
-#include "RenderGraph/RenderGraph.h"
+#include "RenderGraph/RenderGraphFwd.h"
 
 namespace Ailu::RHI::DX12
 {

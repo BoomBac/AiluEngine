@@ -28,6 +28,7 @@ namespace Ailu
             Event* Pop(u8* event_mem);
         private:
             Core::LockFreeQueue<EventData, 512> _events;
+            Vector<WString> _drop_files;
         };
     }
 }

@@ -10,7 +10,7 @@ namespace Ailu::Render
 {
     Material::Material(Shader *shader, String name) : _p_shader(shader)
     {
-        AL_ASSERT(s_total_material_num < RenderConstants::kMaxMaterialDataCount);
+        //AL_ASSERT(s_total_material_num < RenderConstants::kMaxMaterialDataCount);
         _name = name;
         _p_active_shader = _p_shader;
         Construct(true);

@@ -17,7 +17,6 @@ namespace Ailu
         FbxParser();
         virtual ~FbxParser();
         void Parser(const WString &sys_path, const MeshImportSetting &import_setting) final;
-        const List<Mesh::ImportedMaterialInfo> &GetImportedMaterialInfos() const final { return _loaded_materials; };
         const List<Ref<AnimationClip>> &GetAnimationClips() const final { return _loaded_anims; }
         void GetMeshes(List<Ref<Mesh>> &out_mesh) final
         {
@@ -25,18 +24,28 @@ namespace Ailu
         }
 
     private:
+        struct RawMeshData
+        {
+            Vector<Vector3f> _positions;
+            Vector<Vector3f> _normals;
+            Vector<Vector3f> _tangents;
+            Vector<Vector<Vector2f>> _uvs;
+            Vector<Vector4f> _bone_weights;
+            Vector<Vector4D<u32>> _bone_indices;
+        };
         void ParserImpl(WString sys_path);
 
         void ParserFbxNode(FbxNode *node, Queue<FbxNode *> &mesh_node, Queue<FbxNode *> &skeleton_node);
         void ParserSkeleton(FbxNode *node, Skeleton &sk);
         bool ParserMesh(FbxNode *node, List<Ref<Mesh>> &loaded_meshes);
         bool ParserAnimation(FbxNode *node, Skeleton &sk);
-        bool ReadNormal(const fbxsdk::FbxMesh &fbx_mesh, Mesh *mesh);
-        bool ReadVertex(fbxsdk::FbxNode *node, Mesh *mesh);
-        bool ReadUVs(const fbxsdk::FbxMesh &fbx_mesh, Mesh *mesh);
-        bool ReadTangent(const fbxsdk::FbxMesh &fbx_mesh, Mesh *mesh);
+        bool ReadNormal(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector3f> &normals);
+        bool ReadVertex(fbxsdk::FbxNode *node, Vector<Vector3f>& positions, Vector<Vector4f>& weights, Vector<Vector4D<u32>>& bone_indices);
+        bool ReadUVs(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector<Vector2f>> &uvs);
+        bool ReadTangent(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector3f>& tangents);
         bool CalculateTangant(Mesh *mesh);
         void GenerateIndexdMesh(Mesh *mesh);
+        void GenerateIndexdMesh(RawMeshData* mesh_data,Mesh *out_mesh);
         void FillCameraArray(FbxScene *pScene, FbxArray<FbxNode *> &pCameraArray);
         void FillCameraArrayRecursive(FbxNode *pNode, FbxArray<FbxNode *> &pCameraArray);
         void FillPoseArray(FbxScene *pScene, FbxArray<FbxPose *> &pPoseArray);
@@ -55,7 +64,6 @@ namespace Ailu
         FbxArray<FbxString *> _fbx_anim_stack_names;
 
         std::mutex _parser_lock;
-        List<Mesh::ImportedMaterialInfo> _loaded_materials;
         List<Ref<AnimationClip>> _loaded_anims;
         List<Ref<Mesh>> _loaded_meshes;
         WString _cur_file_sys_path;

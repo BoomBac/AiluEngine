@@ -5,11 +5,11 @@
 #include "Framework/Math/ALMath.hpp"
 #include "Material.h"
 #include "Mesh.h"
-#include "RenderGraph/RenderGraph.h"
 #include "RendererAPI.h"
 #include "Texture.h"
 #include <mutex>
 #include <tuple>
+#include "Render/RenderGraph/RenderGraphFwd.h"
 
 
 namespace Ailu

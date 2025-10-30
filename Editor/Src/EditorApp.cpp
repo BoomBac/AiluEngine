@@ -1,6 +1,7 @@
 #include "EditorApp.h"
 #include "Common/Undo.h"
 #include "Widgets/InputLayer.h"
+#include "Widgets/RenderView.h"
 
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"

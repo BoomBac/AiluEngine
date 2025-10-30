@@ -3,56 +3,10 @@
 #define __FRAME_RESOURCE_H__
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
+#include "CoreType.h"
 namespace Ailu::Render
 {
-    const static u32 kTotalSubRes = 0XFFFFFFFF;
-    enum class EResourceState
-    {
-        kCommon = 0,
-        kVertexAndConstantBuffer = 0x1,
-        kIndexBuffer = 0x2,
-        kRenderTarget = 0x4,
-        kUnorderedAccess = 0x8,
-        kDepthWrite = 0x10,
-        kDepthRead = 0x20,
-        kNonPixelShaderResource = 0x40,
-        kPixelShaderResource = 0x80,
-        kStreamOut = 0x100,
-        kIndirectArgument = 0x200,
-        kCopyDest = 0x400,
-        kCopySource = 0x800,
-        kResolveDest = 0x1000,
-        kResolveSource = 0x2000,
-        kRaytracingAccelerationStructure = 0x400000,
-        kShadingRateSource = 0x1000000,
-        kGenericRead = ((((0x1 | 0x2) | 0x40) | 0x80) | 0x200) | 0x800,
-        kAllShaderResource = (0x40 | 0x80),
-        kPresent = 0,
-        kPredication = 0x200,
-        kVideoDecodeRead = 0x10000,
-        kVideoDecodeWrite = 0x20000,
-        kVideoProcessRead = 0x40000,
-        kVideoProcessWrite = 0x80000,
-        kVideoEncodeRead = 0x200000,
-        kVideoEncodeWrite = 0x800000
-    };
-    enum class EGpuResType
-    {
-        kBuffer,
-        KRWBuffer,
-        kTexture,
-        kRenderTexture,
-        kVertexBuffer,
-        kIndexBUffer,
-        kConstBuffer,
-        kGraphicsPSO,
-    };
-    enum class EGpuResUsage
-    {
-        kRead      = 0x01,
-        kWrite     = 0x02,
-        kReadWrite = 0x03
-    };
+
     class VertexBufferLayout;
     struct BindParams
     {
@@ -85,25 +39,7 @@ namespace Ailu::Render
     {
         virtual ~UploadParams() = default;
     };
-    class GpuResUsageTrack
-    {
-    public:
-        void PushUsage(const String& name,EGpuResUsage usage,u64 fence_value)
-        {
-            _usages.emplace_back(name, usage, fence_value);
-        }
-        void Clear() {_usages.clear();}
-        const auto begin() const{return _usages.begin();}
-        const auto end() const{return _usages.end();}
-    private:
-        struct Usage
-        {
-            String _cmd_name;
-            EGpuResUsage _usage;
-            u64 _fence_value;
-        };
-        Vector<Usage> _usages;
-    };
+
     class RHICommandBuffer;
 
     class GraphicsContext;

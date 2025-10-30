@@ -5,70 +5,13 @@
 #include "Render/Buffer.h"
 #include "Render/ResourcePool.h"
 #include "Render/Texture.h"
+#include "RenderGraphFwd.h"
 
 namespace Ailu::Render
 {
     struct RenderingData;
 }
-namespace Ailu::Render::RDG
-{
-    struct RGHandle
-    {
-    public:
-        static u64 Hash(const RGHandle &handle)
-        {
-            static std::hash<String> static_hasher;
-            return handle._id ^ handle._version ^ static_hasher(handle._name);
-        }
-        bool operator==(const RGHandle &other) const
-        {
-            return Hash(*this) == Hash(other);
-        }
-        RGHandle(u32 id = s_global_id++) : _id(id), _version(0u), _res(nullptr) {};
-        RGHandle(const TextureDesc &desc, StringView name) : _id(0u), _version(0u), _tex_desc(desc), _name(name), _is_transient(true), _res(nullptr)
-        {
-            _is_tex = true;
-            _is_render_output = ((bool) desc._is_color_target) | ((bool) desc._is_depth_target);
-            _is_external = false;
-        };
-        RGHandle(const BufferDesc &desc, StringView name) : _id(0u), _version(0u), _buffer_desc(desc), _name(name), _is_transient(true), _res(nullptr)
-        {
-            _is_tex = false;
-            _is_render_output = false;
-            _is_external = false;
-        };
-        String UniqueName() const
-        {
-            return std::format("{}({})", _name, _version);
-        }
-        bool IsValid() const { return _id != 0u; }
-    public:
-        String _name;
-        u32 _id;
-        u32 _version;
-        union
-        {
-            TextureDesc _tex_desc;
-            BufferDesc _buffer_desc;
-        };
-        GpuResource *_res;
-        i16 _first_write = -1;
-        i16 _last_read = -1;
-        union
-        {
-            struct
-            {
-                u32 _is_tex : 1;
-                u32 _is_valid : 1;
-                u32 _is_render_output : 1;
-                u32 _is_transient : 1;
-                u32 _is_external : 1;
-            };
-            u32 _flag;
-        };
-        inline static std::atomic<u32> s_global_id = 0u;
-    };
-}// namespace Ailu::Render::RDG
+
 namespace std
 {
     template<>
@@ -76,7 +19,7 @@ namespace std
     {
         u64 operator()(const Ailu::Render::RDG::RGHandle &handle) const
         {
-            return Ailu::Render::RDG::RGHandle::Hash(handle);
+            return handle._id ^ handle._version;
         }
     };
 }// namespace std
@@ -88,16 +31,27 @@ namespace Ailu::Render
 
 namespace Ailu::Render::RDG
 {
-    enum class EPassType : u8
+    struct ResourceAccess
     {
-        kGraphics,
-        kCompute,
-        kAsyncCompute,
-        kCopy
-    };
-    struct AILU_API PassDesc
-    {
-        EPassType _type = EPassType::kGraphics;
+        EResourceUsage _usage;
+        ELoadStoreAction _load = ELoadStoreAction::kLoad;
+        ELoadStoreAction _store = ELoadStoreAction::kStore;
+        ClearValue _clear_value = ClearValue::Color(0.0f, 0.0f, 0.0f, 0.0f);
+        u32 _mip_level = 0u;
+        u32 _array_slice = 0u;
+
+        bool isWrite() const
+        {
+            return static_cast<uint32_t>(_usage & (EResourceUsage::kWriteUAV |
+                                                   EResourceUsage::kWriteRTV | EResourceUsage::kDSV |
+                                                   EResourceUsage::kCopyDst)) != 0;
+        }
+
+        bool isRead() const
+        {
+            return static_cast<uint32_t>(_usage & (EResourceUsage::kReadSRV |
+                                                   EResourceUsage::kCopySrc | EResourceUsage::kIndirectArgument)) != 0;
+        }
     };
 
     class RenderGraphBuilder;
@@ -157,6 +111,7 @@ namespace Ailu::Render::RDG
 
     class AILU_API RenderGraph
     {
+        friend class RenderGraphBuilder;
     public:
         RenderGraph();
         ~RenderGraph();
@@ -166,12 +121,10 @@ namespace Ailu::Render::RDG
         /// <param name="desc"></param>
         /// <param name="name"></param>
         /// <returns></returns>
-        RGHandle GetOrCreate(const TextureDesc &desc, const String &name);
-        RGHandle GetOrCreate(const BufferDesc &desc, const String &name);
-        Texture *CreatePhysicsTexture(const TextureDesc &desc, const String &name);
-        GPUBuffer *CreatePhysicsBuffer(const BufferDesc &desc, const String &name);
-        RGHandle Import(GpuResource *external, String *name = nullptr);
-        GpuResource *Export(const RGHandle &handle);
+        RGHandle CreateResource(const TextureDesc &desc, const String &name);
+        RGHandle CreateResource(const BufferDesc &desc, const String &name);
+        RGHandle Import(GpuResource *external);
+        GpuResource *Export(RGHandle handle);
 
         RGHandle GetTexture(const String &name);
         RGHandle GetBuffer(const String &name);
@@ -188,30 +141,13 @@ namespace Ailu::Render::RDG
         void Execute(GraphicsContext &context, const RenderingData &data);
 
         template<typename T>
-        T *Resolve(const RGHandle &handle)
+        T *Resolve(RGHandle handle)
         {
-            T *res{nullptr};
-            if (handle._res)
+            if (auto node = GetResourceNode(handle); node != nullptr)
             {
-                res = dynamic_cast<T *>(handle._res);
-                return res;
+                return dynamic_cast<T *>(node->GetResource());
             }
-            if constexpr (std::is_base_of<Texture, T>::value)
-            {
-                if (auto it = _transient_tex_pool_handles.find(handle._name); it != _transient_tex_pool_handles.end())
-                {
-                    res = dynamic_cast<T *>(it->second._res);
-                }
-            }
-            else if constexpr (std::is_base_of<GPUBuffer, T>::value)
-            {
-                if (auto it = _transient_buffer_pool_handles.find(handle._name); it != _transient_buffer_pool_handles.end())
-                {
-                    res = dynamic_cast<T *>(it->second._res);
-                }
-            }
-            else {}
-            return res;
+            return nullptr;
         }
 
     public:
@@ -219,28 +155,99 @@ namespace Ailu::Render::RDG
         bool _is_debug = false;
 
     private:
+        struct ResourceNode;
+        RGHandle *FindHandlePtr(RGHandle handle);
+        void CreatePhysicalResources(RGHandle handle);
+        Texture *CreatePhysicsTexture(RGHandle handle);
+        GPUBuffer *CreatePhysicsBuffer(RGHandle handle);
         // 拓扑排序Pass执行顺序
         void TopologicalSort();
 
         // 插入资源屏障
         void InsertResourceBarriers(GraphicsContext *context);
 
+        ResourceNode *GetResourceNode(RGHandle handle)
+        {
+            if (_external_resources.contains(handle._id))
+                return &_external_resources[handle._id];
+            if (_transient_resources.contains(handle._id))
+                return &_transient_resources[handle._id];
+            return nullptr;
+        }
+        //export to a .dot file for graphviz
+        void ExportToFile(const WString &filename);
     private:
     private:
         using PassPool = TResourcePool<RenderPass>;
         using TexturePool = THashableResourcePool<TextureDesc, Texture>;
         using BufferPool = THashableResourcePool<BufferDesc, GPUBuffer>;
+        struct ResourceNode
+        {
+        public:
+            ResourceNode() {}
+            ResourceNode(StringView name):_name(name) {};
+            ResourceNode(const TextureDesc &desc, StringView name) : _tex_desc(desc), _name(name), _is_transient(true)
+            {
+                _is_tex = true;
+                _is_render_output = ((bool) desc._is_color_target) | ((bool) desc._is_depth_target);
+                _is_external = false;
+            };
+            ResourceNode(const BufferDesc &desc, StringView name) :_buffer_desc(desc), _name(name), _is_transient(true)
+            {
+                _is_tex = false;
+                _is_render_output = false;
+                _is_external = false;
+            };
+            GpuResource* GetResource() const
+            {
+                if (_is_external)
+                    return _extern_raw_res;
+                if (_is_tex)
+                    return _pool_tex_handle._res;
+                else
+                    return _pool_buffer_handle._res;
+            }
+            String _name;
+            union
+            {
+                TextureDesc _tex_desc;
+                BufferDesc _buffer_desc;
+            };
+            union
+            {
+                TexturePool::PoolResourceHandle _pool_tex_handle;
+                BufferPool::PoolResourceHandle _pool_buffer_handle;
+                GpuResource * _extern_raw_res;
+            };
+            i16 _first_write = -1;
+            i16 _last_read = -1;
+            union
+            {
+                struct
+                {
+                    u32 _is_tex : 1;
+                    u32 _is_valid : 1;
+                    u32 _is_render_output : 1;
+                    u32 _is_transient : 1;
+                    u32 _is_external : 1;
+                };
+                u32 _flag;
+            };
+            bool _is_allocated = false;//是否创建了物理资源
+            RGHandle *_handle_ptr = nullptr;
+        };
+        inline static std::atomic<u32> s_next_handle_id = 0u;
+        std::mutex _mutex;
         Vector<RenderPass *> _passes;
         Vector<RenderPass *> _sorted_passes;
         //存储所有临时资源，重新编译前清空，setup阶段就分配的句柄，execute阶段直接根据句柄创建或者获取物理资源
         HashMap<String, RGHandle> _transient_tex_handles;
         HashMap<String, RGHandle> _transient_buffer_handles;
+        HashMap<u32, ResourceNode> _transient_resources;
         //外部资源句柄，通常是从外部传入的资源，RenderGraph不会管理其生命周期，新资源会覆盖旧资源
         HashMap<String, RGHandle> _external_tex_handles;
         HashMap<String, RGHandle> _external_buffer_handles;
-        //存储执行池内资源的句柄，每帧结束释放
-        HashMap<String, TexturePool::PoolResourceHandle> _transient_tex_pool_handles;
-        HashMap<String, BufferPool::PoolResourceHandle> _transient_buffer_pool_handles;
+        HashMap<u32, ResourceNode> _external_resources;
         PassPool _pass_pool{64u};
         bool _is_compiled = false;
     };
@@ -249,10 +256,42 @@ namespace Ailu::Render::RDG
     {
     public:
         RenderGraphBuilder(RenderGraph &graph, RenderPass &pass) : _graph(&graph), _pass(&pass) {};
-        void Read(const RGHandle &handle)
+        void Read(RGHandle handle,ResourceAccess accessor)
         {
             _pass->Read(handle);
         }
+
+        [[nodiscard]] RGHandle Write(RGHandle handle, ResourceAccess accessor)
+        {
+            if (auto handle_ptr = _graph->FindHandlePtr(handle); handle_ptr != nullptr)
+            {
+                handle_ptr->_version++;
+                RGHandle new_handle = *handle_ptr;
+
+                _pass->Write(new_handle);
+                return new_handle;
+            }
+            else
+            {
+                LOG_ERROR("RenderGraphBuilder::Write: Invalid handle!");
+                return RGHandle{0u};
+            }
+        }
+
+        void Read(RGHandle handle,EResourceUsage usage = EResourceUsage::kReadSRV)
+        {
+            ResourceAccess accessor;
+            accessor._usage = usage;
+            Read(handle, accessor);
+        }
+
+        [[nodiscard]] RGHandle Write(RGHandle handle, EResourceUsage usage = EResourceUsage::kWriteRTV)
+        {
+            ResourceAccess accessor;
+            accessor._usage = usage;
+            return Write(handle, accessor);
+        }
+
         RGHandle GetTexture(const String &name)
         {
             return _graph->GetTexture(name);
@@ -261,44 +300,23 @@ namespace Ailu::Render::RDG
         {
             return _graph->GetBuffer(name);
         }
-        RGHandle Read(TextureDesc desc, const String &name)
+
+        RGHandle Import(GpuResource *res)
         {
-            auto handle = _graph->GetOrCreate(desc, name);
-            _pass->Read(handle);
-            return handle;
+            return _graph->Import(res);
         }
-        RGHandle Import(GpuResource *res, String *name = nullptr)
-        {
-            return _graph->Import(res, name);
-        }
-        RGHandle Write(TextureDesc desc, const String &name)
-        {
-            auto handle = _graph->GetOrCreate(desc, name);
-            _pass->Write(handle);
-            return handle;
-        }
-        void Write(RGHandle &handle)
-        {
-            handle._version += handle._is_transient;
-            _pass->Write(handle);
-        }
-        void ReadWrite(RGHandle &handle)
-        {
-            _pass->Read(handle);
-            handle._version += handle._is_transient;
-            _pass->Write(handle);
-        }
+
         void SetCallback(ExecuteFunction callback)
         {
             _pass->SetCallback(std::move(callback));
         }
         RGHandle AllocTexture(const TextureDesc &desc, const String &name)
         {
-            return _graph->GetOrCreate(desc, name);
+            return _graph->CreateResource(desc, name);
         }
         RGHandle AllocBuffer(const BufferDesc &desc, const String &name)
         {
-            return _graph->GetOrCreate(desc, name);
+            return _graph->CreateResource(desc, name);
         }
 
     private:

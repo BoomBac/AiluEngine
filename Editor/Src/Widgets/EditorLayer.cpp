@@ -1,9 +1,11 @@
 #include "Widgets/EditorLayer.h"
 #include "Common/Selection.h"
+
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
 #include "Ext/imnodes/imnodes.h"
 #include "Ext/implot/implot.h"
+#include "Ext/ImGuizmo/ImGuizmo.h"//必须在imgui之后引入
 
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -81,7 +83,7 @@ namespace Ailu
             }
         }
 
-        UI::UILayer* g_ui_layer;
+        RenderView *render_view;
         void EditorLayer::OnAttach()
         {
             auto r = Render::RenderPipeline::Get().GetRenderer();
@@ -106,7 +108,6 @@ namespace Ailu
             //common_view->SetPosition({200.0f, 200.0f});
             //_common_view = common_view.get();
             //DockManager::Get().AddDock(common_view);
-            
             _main_widget = MakeRef<UI::Widget>();
             
             auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
@@ -231,6 +232,15 @@ namespace Ailu
                     fabrik_solver.IsApplyConstraint(s_count % 2);
                     ++s_count;
                 }
+                if (key_e.GetKeyCode() == EKey::kQ)
+                    _is_transform_gizmo_world = !_is_transform_gizmo_world;
+                else if (key_e.GetKeyCode() == EKey::kW)
+                    _transform_gizmo_type = (i16) ImGuizmo::OPERATION::TRANSLATE;
+                else if (key_e.GetKeyCode() == EKey::kE)
+                    _transform_gizmo_type = (i16) ImGuizmo::OPERATION::ROTATE;
+                else if (key_e.GetKeyCode() == EKey::kR)
+                    _transform_gizmo_type = (i16) ImGuizmo::OPERATION::SCALE;
+                else {};
             }
             else if (e.GetEventType() == EEventType::kMouseButtonPressed)
             {
@@ -545,11 +555,6 @@ namespace Ailu
             //     ImGui::SameLine();
             //     ImGui::ProgressBar(x - static_cast<int>(x), ImVec2(0.f, 0.f));
             // }
-            ImGui::End();
-            if (show)
-                ImGui::ShowDemoWindow(&show);
-            if (s_show_plot_demo)
-                ImPlot::ShowDemoWindow((&s_show_plot_demo));
             ECS::Entity e = Selection::FirstEntity();
             auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
             if (e != ECS::kInvalidEntity)
@@ -571,7 +576,20 @@ namespace Ailu
                 {
                     //g_blend_space_editor->SetTarget(&sk_comp->_blend_space);
                 }
+                if (auto sk_comp = r.GetComponent<ECS::TransformComponent>(e); sk_comp != nullptr)
+                {
+                    ImGui::DragFloat3("Position", sk_comp->_transform._position.data);
+                    Vector3f euler = Quaternion::EulerAngles(sk_comp->_transform._rotation);
+                    ImGui::DragFloat3("Rotation", euler.Data());
+                    sk_comp->_transform._rotation = Quaternion::EulerAngles(euler);
+                    ImGui::DragFloat3("Scale", sk_comp->_transform._scale.data);
+                }
             }
+            ImGui::End();
+            if (show)
+                ImGui::ShowDemoWindow(&show);
+            if (s_show_plot_demo)
+                ImPlot::ShowDemoWindow((&s_show_plot_demo));
             static RenderTexture* s_last_scene_rt = nullptr;
             auto scene_rt = Render::RenderPipeline::Get().GetTarget(0);
             if (s_last_scene_rt != scene_rt)
@@ -589,6 +607,23 @@ namespace Ailu
                 }
                 ImGui::End();
             }
+//            ImGui::Begin("SceneView");
+//            auto handle = scene_rt->ColorTexture(Texture::kMainSRVIndex);
+//            auto gameview_size = ImGui::GetContentRegionAvail();
+//#define TEXTURE_HANDLE_TO_IMGUI_TEXID(handle) reinterpret_cast<void *>(handle)
+//            if (handle == 0)
+//            {
+//                ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(Texture::s_p_default_white->GetNativeTextureHandle()), gameview_size);
+//                LOG_ERROR("SceneView::ShowImpl: handle is 0")
+//            }
+//            else
+//            {
+//                ImGui::Image(TEXTURE_HANDLE_TO_IMGUI_TEXID(handle), gameview_size);
+//            }
+//            ProcessTransformGizmo();
+//            ImGui::End();
+
+
             /*
             ImGui::Begin("Solver");
 
@@ -749,6 +784,144 @@ namespace Ailu
         void EditorLayer::End()
         {
 
+        }
+        void EditorLayer::ProcessTransformGizmo()
+        {
+            auto &selected_entities = Selection::SelectedEntities();
+            if (_transform_gizmo_type == -1 || selected_entities.empty())
+                return;
+            //snap
+            f32 snap_value = 0.5f;//50cm
+            if (_transform_gizmo_type == (i16) ImGuizmo::OPERATION::ROTATE)
+            {
+                snap_value = 22.5f;//degree
+            }
+            else if (_transform_gizmo_type == (i16) ImGuizmo::OPERATION::SCALE)
+            {
+                snap_value = 0.25f;
+            }
+            else {}
+            Vector3f snap_values = Vector3f(snap_value);
+            ImGuizmo::SetOrthographic(false);
+            ImGuizmo::SetDrawlist();
+            ImGuizmo::SetRect(_scene_vp_rect.x, _scene_vp_rect.y, _scene_vp_rect.z, _scene_vp_rect.w);
+            const auto &view = Camera::sCurrent->GetView();
+            auto proj = MatrixReverseZ(Camera::sCurrent->GetProjNoJitter());
+            _is_transform_gizmo_snap = Input::IsKeyPressed(EKey::kCONTROL);
+            bool is_pivot_point_center = true;
+            bool is_single_mode = selected_entities.size() == 1;
+            Vector3f pivot_point;
+            if (is_pivot_point_center)
+            {
+                auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                Matrix4x4f world_mat;
+                if (is_single_mode)
+                    world_mat = r.GetComponent<ECS::TransformComponent>(selected_entities.front())->_transform._world_matrix;
+                else
+                    _is_transform_gizmo_world = true;
+                ImGuizmo::Manipulate(view, proj, (ImGuizmo::OPERATION) _transform_gizmo_type, _is_transform_gizmo_world ? ImGuizmo::WORLD : ImGuizmo::LOCAL, world_mat, nullptr,
+                                     _is_transform_gizmo_snap ? snap_values.data : nullptr);
+                static bool s_can_duplicate = true;
+                if (ImGuizmo::IsUsing())
+                {
+                    if (!_is_begin_gizmo_transform)
+                    {
+                        _is_begin_gizmo_transform = true;
+                        _is_end_gizmo_transform = false;
+                        for (auto e: selected_entities)
+                        {
+                            _old_trans.push_back(r.GetComponent<ECS::TransformComponent>(e)->_transform);
+                        }
+                        if (!is_single_mode)
+                        {
+                            for (auto e: selected_entities)
+                            {
+                                pivot_point += r.GetComponent<ECS::TransformComponent>(e)->_transform._position;
+                            }
+                            pivot_point /= (f32) selected_entities.size();
+                            world_mat = MatrixTranslation(pivot_point);
+                        }
+                    }
+                    Vector3f new_pos;
+                    Vector3f new_scale;
+                    Quaternion new_rot;
+                    DecomposeMatrix(world_mat, new_pos, new_rot, new_scale);
+                    static Vector3f s_pre_tick_new_scale = new_scale;
+                    if (is_single_mode)
+                    {
+                        auto &t = r.GetComponent<ECS::TransformComponent>(selected_entities.front())->_transform;
+                        t._position = new_pos;
+                        t._rotation = new_rot;
+                        t._scale = new_scale;
+                    }
+                    else
+                    {
+                        u16 index = 0;
+                        for (auto e: selected_entities)
+                        {
+                            auto &t = r.GetComponent<ECS::TransformComponent>(e)->_transform;
+                            Vector3f rela_pos = t._position - pivot_point;
+                            t._position = rela_pos + new_pos;
+                            //rela_pos = new_rot * rela_pos;
+                            //Vector3f scaled_pos = rela_pos * (new_scale / s_pre_tick_new_scale);
+                            //Vector3f pivot_offset = new_pos - pivot_point;
+                            //t._position = pivot_point + scaled_pos + pivot_offset;
+                            //TODO
+                            //t._scale = new_scale * _old_trans[index]._scale;
+                            //t._rotation = new_rot * _old_trans[index++]._rotation;
+                        }
+                    }
+                    s_pre_tick_new_scale = new_scale;
+                    /*
+                    区分左侧和右侧的 Alt 键需要结合使用扫描码。在处理低级键盘输入时，可以通过 GetKeyState 或 GetAsyncKeyState 等函数来检测具体的按键位置。
+                    对于左侧 Alt 键，它的扫描码为：0x38(扫描码)
+                    右侧 Alt 键(也称 AltGr)：0xE038(扩展扫描码)
+                    */
+                    if (s_can_duplicate && Input::IsKeyPressed(EKey::kALT) && _transform_gizmo_type == (i16) ImGuizmo::OPERATION::TRANSLATE)
+                    {
+                        s_can_duplicate = false;
+                        List<ECS::Entity> new_entities;
+                        for (auto e: selected_entities)
+                        {
+                            new_entities.push_back(g_pSceneMgr->ActiveScene()->DuplicateEntity(e));
+                        }
+                        Selection::RemoveSlection();
+                        for (auto &e: new_entities)
+                            Selection::AddSelection(e);
+                    }
+                }
+                else
+                {
+                    if (_is_begin_gizmo_transform)
+                    {
+                        s_can_duplicate = true;
+                        _is_end_gizmo_transform = true;
+                        _is_begin_gizmo_transform = false;
+                        if (is_single_mode)
+                        {
+                            auto e = selected_entities.front();
+                            auto t = r.GetComponent<ECS::TransformComponent>(e);
+                            std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(r.GetComponent<ECS::TagComponent>(e)->_name, t, _old_trans.front());
+                            g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
+                            _old_trans.clear();
+                        }
+                        else
+                        {
+                            Vector<String> obj_names;
+                            Vector<ECS::TransformComponent *> comps;
+                            u16 index = 0u;
+                            for (auto e: selected_entities)
+                            {
+                                obj_names.emplace_back(r.GetComponent<ECS::TagComponent>(e)->_name);
+                                comps.emplace_back(r.GetComponent<ECS::TransformComponent>(e));
+                            }
+                            std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(std::move(obj_names), std::move(comps), std::move(_old_trans));
+                            g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
+                        }
+                    }
+                }
+                Selection::Active(!ImGuizmo::IsOver());
+            }
         }
     }// namespace Editor
 }// namespace Ailu

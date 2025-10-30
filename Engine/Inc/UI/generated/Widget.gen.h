@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __WIDGET_GEN_H__
 //Class Widget begin...........................
-#define WIDGET_GEN_H_36_GENERATED_BODY \
+#define WIDGET_GEN_H_37_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Widget_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Widget>();
 //Class Widget end...........................
 
 //Struct SlotItemData begin...........................
-#define WIDGET_GEN_H_21_GENERATED_BODY \
+#define WIDGET_GEN_H_22_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_SlotItemData_Type();\
                                 static Type* GetPrivateStaticClass();\

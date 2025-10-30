@@ -8,6 +8,7 @@
 using namespace Ailu;
 Ailu::Type* Ailu::Editor::Z_Construct_CommonView_Type()
 {
+Ailu::Editor::DockWindow::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -18,7 +19,7 @@ initializer._full_name = "Ailu::Editor::CommonView";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Editor";
-initializer._base_name = "";
+initializer._base_name = "Ailu::Editor::DockWindow";
 initializer._constructor = []()->Ailu::Editor::CommonView* {return new Ailu::Editor::CommonView;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());

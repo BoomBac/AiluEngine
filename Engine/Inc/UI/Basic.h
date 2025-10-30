@@ -12,6 +12,8 @@ namespace Ailu
 
     namespace UI
     {
+        class Text;
+        class Image;
         ACLASS()
         class AILU_API Button : public UIElement
         {
@@ -20,8 +22,16 @@ namespace Ailu
             Button();
             explicit Button(const String &name);
             Vector2f MeasureDesiredSize() override;
+            void SetText(const String &text);
+            String GetText() const;
+            void SetTexture(Render::Texture *tex);
+            Render::Texture *GetTexture() const;
         private:
             void RenderImpl(UIRenderer &r) override;
+            void PostArrange() override;
+        private:
+            Text *_text;
+            Image *_icon;
         };
 
         ACLASS()

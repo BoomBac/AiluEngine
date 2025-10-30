@@ -33,9 +33,20 @@ namespace Ailu
 			void Begin();
 			void End();
 			Vector2f     _viewport_size;
-		private:
 			Render::PickFeature _pick;
+            Vector4f _scene_vp_rect;
+
+        private:
+            void ProcessTransformGizmo();
+		private:
 			Ref<UI::Widget> _main_widget = nullptr;
+			//transform gizmo
+            i16 _transform_gizmo_type = -1;
+            bool _is_transform_gizmo_snap = false;
+            bool _is_transform_gizmo_world = true;
+            bool _is_begin_gizmo_transform = false;
+            bool _is_end_gizmo_transform = true;
+            Vector<Transform> _old_trans;
 		};
 	}
 }

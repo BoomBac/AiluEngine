@@ -223,6 +223,136 @@ namespace Ailu::Render
         _far_clip = fz;
     }
 
+    Vector3f Camera::ScreenToWorld(const Vector2f &screen_pos, f32 depth) const
+    {
+        Vector2f vp_size((f32) _pixel_width, (f32) _pixel_height);
+        // NDC 坐标 [-1,1]
+        float ndc_x = 2.0f * screen_pos.x / vp_size.x - 1.0f;
+        float ndc_y = 1.0f - 2.0f * screen_pos.y / vp_size.y;
+        Matrix4x4f inv_view = MatrixInverse(_view_matrix);
+
+        if (_camera_type == ECameraType::kOrthographic)
+        {
+            //--------------------------------------------
+            // 正交相机
+            //--------------------------------------------
+            // 计算视口范围（由相机参数定义）
+            f32 ortho_width = _size;
+            f32 ortho_height = _size / _aspect;
+            float left = -ortho_width * 0.5f;
+            float right = ortho_width * 0.5f;
+            float bottom = -ortho_height * 0.5f;
+            float top = ortho_height * 0.5f;
+
+            // 映射到相机局部空间
+            float x = left + (right - left) * (ndc_x * 0.5f + 0.5f);
+            float y = bottom + (top - bottom) * (ndc_y * 0.5f + 0.5f);
+            float z = -depth;
+
+            // 相机空间 → 世界空间
+            Vector3f local_point(x, y, z);
+            Vector3f world_point = TransformCoord(inv_view, local_point);
+
+            if (depth == 0.0f)
+            {
+                // depth=0 → 返回朝向世界的射线方向（即相机 -Z 方向）
+                Vector3f dir = TransformNormal(inv_view, Vector3f(0, 0, -1));
+                return Normalize(dir);
+            }
+            else
+            {
+                return world_point;
+            }
+        }
+        else
+        {
+            //--------------------------------------------
+            // 透视相机
+            //--------------------------------------------
+            Matrix4x4f inv_proj = MatrixInverse(_proj_matrix);
+
+            // 在投影空间中从 NDC 转到相机空间
+            Vector4f clip_pos(ndc_x, ndc_y, 1.0f, 1.0f);
+            Vector4f cam_pos = TransformVector(inv_proj, clip_pos);
+            cam_pos /= cam_pos.w;
+
+            // 相机空间方向
+            Vector3f ray_dir(cam_pos.x, cam_pos.y, cam_pos.z);
+            ray_dir = Normalize(ray_dir);
+
+            // 转换到世界空间
+            ray_dir = TransformNormal(inv_view, ray_dir);
+            ray_dir = Normalize(ray_dir);
+            if (depth == 0.0f)
+            {
+                return ray_dir;// 单位长度方向
+            }
+            else
+            {
+                // 从相机位置出发，沿着 ray_dir 方向前进 depth
+                Vector3f cam_world_pos = TransformCoord(inv_view,Vector3f(0, 0, 0));
+                return cam_world_pos + ray_dir * (_near_clip + Lerp(_near_clip, _far_clip, depth));
+            }
+        }
+    }
+
+    Vector2f Camera::WorldToScreen(const Vector3f &world_pos) const
+    {
+        // 屏幕像素大小
+        Vector2f vp_size((f32) _pixel_width, (f32) _pixel_height);
+
+        // 世界空间 → 视图空间
+        Vector4f view_pos = TransformVector(_view_matrix, Vector4f(world_pos, 1.0f));
+
+        // -----------------------------------------------------
+        // 正交相机
+        // -----------------------------------------------------
+        if (_camera_type == ECameraType::kOrthographic)
+        {
+            // 构造正交投影参数
+            f32 ortho_width = _size;
+            f32 ortho_height = _size / _aspect;
+            float left = -ortho_width * 0.5f;
+            float right = ortho_width * 0.5f;
+            float bottom = -ortho_height * 0.5f;
+            float top = ortho_height * 0.5f;
+
+            // 相机空间 → NDC
+            float ndc_x = (view_pos.x - left) / (right - left) * 2.0f - 1.0f;
+            float ndc_y = (view_pos.y - bottom) / (top - bottom) * 2.0f - 1.0f;
+            float ndc_z = -view_pos.z;// 深度符号方向保持一致
+
+            // NDC → 屏幕坐标
+            float screen_x = (ndc_x * 0.5f + 0.5f) * vp_size.x;
+            float screen_y = (1.0f - (ndc_y * 0.5f + 0.5f)) * vp_size.y;
+
+            return Vector2f(screen_x, screen_y);
+        }
+        // -----------------------------------------------------
+        // 透视相机
+        // -----------------------------------------------------
+        else
+        {
+            // 相机空间 → 裁剪空间
+            Vector4f clip_pos = TransformVector(_proj_matrix, view_pos);
+
+            // 透视除法 → NDC
+            if (clip_pos.w != 0.0f)
+                clip_pos /= clip_pos.w;
+
+            float ndc_x = clip_pos.x;
+            float ndc_y = clip_pos.y;
+            float ndc_z = clip_pos.z;// 可用于 depth 输出
+
+            // NDC → 屏幕像素坐标
+            float screen_x = (ndc_x * 0.5f + 0.5f) * vp_size.x;
+            float screen_y = (1.0f - (ndc_y * 0.5f + 0.5f)) * vp_size.y;
+
+            return Vector2f(screen_x, screen_y);
+        }
+    }
+
+
     void Camera::LookTo(const Vector3f &direction, const Vector3f &up)
     {
         if (g_pGfxContext)

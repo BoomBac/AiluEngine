@@ -3,3 +3,4 @@ type: kMesh
 name: Cylinder
 file: Meshs/src_res/cylinder.fbx
 inner_file_name: Cylinder
+is_combine_mesh: false

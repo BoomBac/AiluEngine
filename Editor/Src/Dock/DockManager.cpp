@@ -130,6 +130,8 @@ namespace Ailu
                         auto new_target = RenderTexture::WindowBackBuffer(w);
                         _window->ContentWidget()->BindOutput(new_target);
                         _window->TitleWidget()->BindOutput(new_target);
+                        _window->ContentWidget()->SetParent(w);
+                        _window->TitleWidget()->SetParent(w);
                     }
                 }
                 else if (_type == EType::kSplit)
@@ -141,8 +143,14 @@ namespace Ailu
                 {
                     auto new_target = RenderTexture::WindowBackBuffer(w);
                     _tab->TitleWidget()->BindOutput(new_target);
-                    _tab->ActiveTab()->ContentWidget()->BindOutput(new_target);
-                    _tab->ActiveTab()->TitleWidget()->BindOutput(new_target);
+                    _tab->TitleWidget()->SetParent(w);
+                    for (auto &t : *_tab)
+                    {
+                        t->ContentWidget()->BindOutput(new_target);
+                        t->TitleWidget()->BindOutput(new_target);
+                        t->ContentWidget()->SetParent(w);
+                        t->TitleWidget()->SetParent(w);
+                    }
                 }
             }
             void RemoveNode()
@@ -213,7 +221,23 @@ namespace Ailu
                     }
                 }
             }
-
+            bool ContainsWindow(DockWindow *w) const
+            {
+                if (_type == EType::kLeaf)
+                {
+                    return _window.get() == w;
+                }
+                else if (_type == EType::kTab)
+                {
+                    return _tab->Contains(w);
+                }
+                else if (_type == EType::kSplit)
+                {
+                    return (_left && _left->ContainsWindow(w)) ||
+                           (_right && _right->ContainsWindow(w));
+                }
+                return false;
+            }
         private:
             // 处理根节点被移除的情况
             void HandleRootRemoval()
@@ -646,9 +670,22 @@ namespace Ailu
                     w->SetTitle(n._title);
                     w->SetPosition(n._position);
                     w->SetSize(n._size);
+                    w->_on_get_focus += [this](DockWindow *w)
+                    {
+                        _focused_node = FindNodeByWindow(w);
+                        LOG_INFO("Focused dock node change to {}", _focused_node->_window ? _focused_node->_window->GetTitle() : "split/tab node");
+                    };
+                    w->_on_lost_focus += [this](DockWindow *w)
+                    {
+                        if (_focused_node && _focused_node->_window.get() == w)
+                        {
+                            _focused_node = nullptr;
+                            LOG_INFO("Focused dock node lost!");
+                        }
+                    };
                     //same with AddDock
-                    UI::UIManager::Get()->RegisterWidget(w->_title_bar);
-                    UI::UIManager::Get()->RegisterWidget(w->_content);
+                    UI::UIManager::Get()->RegisterWidget(w->_title_widget);
+                    UI::UIManager::Get()->RegisterWidget(w->_content_widget);
                     auto leaf_node = MakeRef<DockNode>(Application::Get().GetWindowPtr());
                     leaf_node->_window = w;
                     leaf_node->_position = w->_position;
@@ -687,13 +724,17 @@ namespace Ailu
         }
         void DockManager::AddDock(Ref<DockWindow> dock)
         {
-            UI::UIManager::Get()->RegisterWidget(dock->_title_bar);
-            UI::UIManager::Get()->RegisterWidget(dock->_content);
+            UI::UIManager::Get()->RegisterWidget(dock->_title_widget);
+            UI::UIManager::Get()->RegisterWidget(dock->_content_widget);
 
             auto leaf_node = MakeRef<DockNode>();
             leaf_node->_window = dock;
             leaf_node->_position = dock->_position;
             leaf_node->_size = dock->_size;
+            dock->_on_get_focus += [this](DockWindow* w) {
+                _focused_node = FindNodeByWindow(w);
+                LOG_INFO("Focused dock node changed!");
+            };
             TryAddFloatNode(leaf_node);
         }
 
@@ -1193,6 +1234,8 @@ namespace Ailu
 
         void DockManager::HandleNodeResize()
         {
+            if (Input::IsInputBlock())
+                return;
             bool can_resize = _adj_split_node == nullptr && _drag_move_node == nullptr;
             bool can_adjust_split = _resizing_node == nullptr && _drag_move_node == nullptr;
             bool can_drag_move = _resizing_node == nullptr && _adj_split_node == nullptr;
@@ -1225,7 +1268,9 @@ namespace Ailu
                 }
                 else
                 {
+                    static DockNode *s_last_edge_hover_node = nullptr;
                     DockNode *edge_hover_node = nullptr;
+                    _resizing_edge_dir = 0u;
                     for (auto &it: _float_nodes)
                     {
                         auto &[window, nodes] = it;
@@ -1236,23 +1281,23 @@ namespace Ailu
                             if (n->_flags & EDockWindowFlag::kNoResize)
                                 continue;
                             Vector2f pos = Input::GetMousePos(window);
+                            if (_focused_node && _focused_node != n.get() && _focused_node->IsHover(pos))
+                                continue;
                             _resizing_edge_dir = n->HoverEdge(pos, &edge_hover_node);
                             if (_resizing_edge_dir != 0u)
                                 break;
                         }
                     }
-                    if (edge_hover_node)
+                    if (edge_hover_node != s_last_edge_hover_node)
                     {
                         UpdateResizeMouseCursor(_resizing_edge_dir);
-                        if (Input::IsKeyPressed(EKey::kLBUTTON))
-                        {
-                            _resizing_node = edge_hover_node;
-                        }
+                        LOG_INFO("UpdateResizeMouseCursor: {}", _resizing_edge_dir);
                     }
-                    else
+                    if (edge_hover_node && Input::IsKeyPressed(EKey::kLBUTTON))
                     {
-                        UpdateResizeMouseCursor(0u);
+                        _resizing_node = edge_hover_node;
                     }
+                    s_last_edge_hover_node = edge_hover_node;
                 }
             }
             can_adjust_split = _resizing_node == nullptr && _drag_move_node == nullptr;
@@ -1298,6 +1343,8 @@ namespace Ailu
                         {
                             DockNode *tmp = nullptr;
                             Vector2f pos = Input::GetMousePos(window);
+                            if (_focused_node && _focused_node != n.get() && _focused_node->IsHover(pos))
+                                continue;
                             FindHoverSplitNode(n, pos, &tmp);
                             if (tmp)
                             {
@@ -1324,7 +1371,7 @@ namespace Ailu
                         _drag_move_node->_position = pos + _drag_start_offset;
                         //处理节点拖出窗口
                         Vector2f wsize = {(f32) _drag_move_node->_own_window->GetWidth(), (f32) _drag_move_node->_own_window->GetHeight()};
-                        if (_drag_move_node->_position.x - wsize.x > kWindowDetachThreshold || _drag_move_node->_position.x < -kWindowDetachThreshold || _drag_move_node->_position.y - wsize.y > kWindowDetachThreshold || _drag_move_node->_position.y < -kWindowDetachThreshold)
+                        if (pos.x < 0.0f || pos.y < 0.0f || pos.x > wsize.x || pos.y > wsize.y)
                         {
                             f32 dx = pos.x - _drag_move_node->_position.x;
                             u16 ww = (u16) _drag_move_node->_size.x, wh = (u16) _drag_move_node->_size.y;
@@ -1336,14 +1383,20 @@ namespace Ailu
                             _drag_move_node->_flags |= EDockWindowFlag::kNoMove | EDockWindowFlag::kNoResize | EDockWindowFlag::kFullSize;
                             _roots.push_back(_drag_move_node);
                             if (_drag_move_node->_window)
+                            {
                                 _drag_move_node->_window->SetFocus(false);
+                                _focused_node = nullptr;
+                            }
                             _drag_move_node = nullptr;
                         }
                     }
                     else
                     {
-                        if (_drag_move_node->_window)
-                            _drag_move_node->_window->SetFocus(false);
+                        //if (_drag_move_node->_window)
+                        //{
+                        //    _drag_move_node->_window->SetFocus(false);
+                        //}
+                        _focused_node = nullptr;
                         _drag_move_node = nullptr;
                     }
                 }
@@ -1359,12 +1412,17 @@ namespace Ailu
                             if (n->_flags & EDockWindowFlag::kNoMove)
                                 continue;
                             Vector2f pos = Input::GetMousePos(n->_own_window);
+                            if (_focused_node && _focused_node != n.get() && _focused_node->IsHover(pos))
+                                continue;
                             if (n->HoverDragArea(pos) && Input::IsKeyPressed(EKey::kLBUTTON))
                             {
                                 _drag_move_node = n.get();
                                 _drag_start_offset = n->_position - pos;
                                 if (n->_window)
+                                {
                                     n->_window->SetFocus(true);
+                                    _focused_node = n.get();
+                                }
                                 break;
                             }
                         }
@@ -1593,6 +1651,24 @@ namespace Ailu
             new_window->SetEventHandler(std::bind(&DockManager::WindowEventHandler, this, std::placeholders::_1));
             Render::GraphicsContext::Get().RegisterWindow(new_window);
             return new_window;
+        }
+        
+        void DockManager::RequestFocus(DockWindow *w)
+        {
+            _focused_node = FindNodeByWindow(w);
+        }
+        DockNode *DockManager::FindNodeByWindow(DockWindow *w)
+        {
+            for (auto &it: _float_nodes)
+            {
+                auto &[window, nodes] = it;
+                for (auto &n: nodes)
+                {
+                    if (n->ContainsWindow(w))
+                        return n.get();
+                }
+            }
+            return nullptr;
         }
     }// namespace Editor
 }// namespace Ailu

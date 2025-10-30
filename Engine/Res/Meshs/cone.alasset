@@ -3,3 +3,4 @@ type: kMesh
 name: Cone
 file: Meshs/src_res/cone.fbx
 inner_file_name: Cone
+is_combine_mesh: false

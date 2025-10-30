@@ -201,4 +201,68 @@ namespace Ailu::Render
         }
         return font;
     }
-}// namespace Ailu
+    Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Vector2f padding, Font *font)
+    {
+        if (text.empty())
+            return {};
+        Vector<GlyphRenderInfo> result;
+        result.reserve(text.size());
+        scale *= (f32) font_size / (f32) font->_size;
+        f32 x = pos.x, y = pos.y;
+        f32 h_padding = (font->_left_padding + font->_right_padding) * padding.x;
+        f32 v_padding = (font->_top_padding + font->_bottom_padding) * padding.y;
+        i32 last_char = -1;
+        f32 y_adjust = 0.0f;
+        for (u32 i = 0; i < text.size(); i++)
+        {
+            char c = text[i];
+            auto &char_info = font->GetChar(c);
+            if (c == '\0')
+                continue;
+            // 换行
+            if (c == '\n')
+            {
+                x = pos.x;
+                y -= (font->_line_height + v_padding) * scale.y;
+                last_char = -1;
+                continue;
+            }
+
+            // 如果是空格或不可见字符（宽度为0但有advance）
+            if (char_info._width == 0 && char_info._height == 0)
+            {
+                x += char_info._xadvance * scale.x;
+                last_char = c;
+                continue;
+            }
+
+            f32 kerning = (last_char >= 0) ? font->GetKerning(last_char, c) : 0.f;
+            Vector4f uv_rect = Vector4f(char_info._u, char_info._v, char_info._twidth, char_info._theight);
+            Vector4f pos_rect = {
+                    x + (char_info._xoffset + kerning) * scale.x,
+                    y + char_info._yoffset * scale.y,
+                    char_info._width,
+                    char_info._height};
+            if (i == 0)
+            {
+                auto &cc = font->GetChar('A');
+                y_adjust = (pos.y - (y + cc._yoffset * scale.y));
+            }
+            pos_rect.y += y_adjust;
+            pos_rect.z *= scale.x;
+            pos_rect.w *= scale.y;
+            GlyphRenderInfo info;
+            info._c = c;
+            info._pos = pos_rect.xy;
+            info._size = pos_rect.zw;
+            info._uv = uv_rect.xy;
+            info._uv_size = uv_rect.zw;
+            info._page = char_info._page;
+            info._xadvance = char_info._xadvance * scale.x;
+            x += info._xadvance;
+            last_char = c;
+            result.push_back(info);
+        }
+        return result;
+    }
+}// namespace Ailu::Render

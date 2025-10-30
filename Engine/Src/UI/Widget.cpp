@@ -4,11 +4,12 @@
 
 #include "Inc/UI/Widget.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Common/Application.h"
 #include "Framework/Events/MouseEvent.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Texture.h"
-#include "UI/UIRenderer.h"
 #include "UI/UIFramework.h"
+#include "UI/UIRenderer.h"
 
 namespace Ailu
 {
@@ -27,8 +28,10 @@ namespace Ailu
             _depth = nullptr;
             _root = nullptr;
             BindOutput(RenderTexture::s_backbuffer, nullptr);
+            ResetClickState();
+            _parent = &Application::Get().GetWindow();
         }
-        Widget::~Widget()
+        void Widget::Destory()
         {
             if (_root)
                 _root.reset();
@@ -86,7 +89,7 @@ namespace Ailu
         void Widget::AddToWidget(Ref<UIElement> root)
         {
             if (_root)
-                LOG_WARNING("Widget::AddToWidget: Root() already exists,replace to ()", _root->Name(),root->Name());
+                LOG_WARNING("Widget::AddToWidget: Root() already exists,replace to ()", _root->Name(), root->Name());
             _root = root;
             _root->Translate(_position);
             _root->Arrange(0.0f, 0.0f, _size.x, _size.y);
@@ -139,14 +142,14 @@ namespace Ailu
                 _root->Translate(position);
         }
 
-        bool Widget::DispatchEvent(UIEvent& e)
+        bool Widget::DispatchEvent(UIEvent &e)
         {
             UIElement *node = e._target;
             while (node)
             {
                 e._current_target = node;
                 node->OnEvent(e);
-                if (e._is_handled) 
+                if (e._is_handled)
                     break;// 拦截冒泡
                 node = node->GetParent();
             }
@@ -167,6 +170,7 @@ namespace Ailu
                     event._is_handled = DispatchEvent(e);
                 }
                 _prev_hover_path.clear();
+                ResetClickState();
                 return false;
             }
 
@@ -195,7 +199,7 @@ namespace Ailu
                 }
             }
             UIElement *target = nullptr;
-            for (auto& ele: *_root)
+            for (auto &ele: *_root)
             {
                 target = ele->HitTest(event._mouse_position);
                 if (target)
@@ -205,6 +209,7 @@ namespace Ailu
             {
                 UIManager::Get()->SetFocus(target);
             }
+            UIManager::Get()->_hover_target = target;
             //if (target)
             //    LOG_INFO("target is {}",target->Name());
             // 2. 构造 HoverPath
@@ -260,8 +265,17 @@ namespace Ailu
             if (target || UIManager::Get()->_capture_target)
             {
                 is_event_gen = true;
+                if (event._type == UIEvent::EType::kDropFiles)
+                {
+                    UIEvent e(event);
+                    e._type = UIEvent::EType::kDropFiles;
+                    e._mouse_position = event._mouse_position;
+                    e._target = target;
+                    e._drop_files = event._drop_files;
+                    event._is_handled = DispatchEvent(e);
+                }
                 // 鼠标移动
-                if (event._type == UIEvent::EType::kMouseMove)
+                else if (event._type == UIEvent::EType::kMouseMove)
                 {
                     UIEvent e(event);
                     e._type = UIEvent::EType::kMouseMove;
@@ -274,7 +288,7 @@ namespace Ailu
                     }
                     e._target = target;
                     event._is_handled = DispatchEvent(e);// 从 currTarget 开始冒泡
-                    //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
+                                                         //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
                 }
                 // 鼠标按下
                 else if (event._type == UIEvent::EType::kMouseDown)
@@ -299,18 +313,53 @@ namespace Ailu
                         // Up 始终交给 capture_target
                         e._target = UIManager::Get()->_capture_target;
                         event._is_handled = DispatchEvent(e);
-                        //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
+
                         // 判断 Click（按下和抬起在同一元素上）
                         if (UIManager::Get()->_capture_target == target)
                         {
-                            UIEvent click(event);
-                            click._type = UIEvent::EType::kMouseClick;
-                            click._mouse_position = event._mouse_position;
-                            click._target = UIManager::Get()->_capture_target;
-                            click._key_code = event._key_code;
-                            event._is_handled = DispatchEvent(click);
-                            //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
+                            // 双击检测
+                            const auto now = std::chrono::steady_clock::now();
+                            const bool same_target = (_last_click_target == target);
+                            const bool same_btn = (_last_click_button == event._key_code);
+                            const bool within_time = _last_click_time.time_since_epoch().count() != 0 &&
+                                                     std::chrono::duration_cast<std::chrono::milliseconds>(now - _last_click_time).count() <= _double_click_time_ms;
+                            const f32 dx = event._mouse_position.x - _last_click_pos.x;
+                            const f32 dy = event._mouse_position.y - _last_click_pos.y;
+                            const f32 dist2 = dx * dx + dy * dy;
+                            const f32 max_dist2 = _double_click_max_dist * _double_click_max_dist;
+                            const bool within_dist = dist2 <= max_dist2;
+
+                            if (same_target && same_btn && within_time && within_dist)
+                            {
+                                // 生成双击事件（第二次点击）
+                                UIEvent dbl(event);
+                                dbl._type = UIEvent::EType::kMouseDoubleClick;
+                                dbl._mouse_position = event._mouse_position;
+                                dbl._target = UIManager::Get()->_capture_target;
+                                dbl._key_code = event._key_code;
+                                event._is_handled = DispatchEvent(dbl);
+
+                                // 消费本次双击，重置点击状态，避免多次叠加
+                                ResetClickState();
+                            }
+                            else
+                            {
+                                // 第一次点击或不满足双击条件 → 普通点击
+                                UIEvent click(event);
+                                click._type = UIEvent::EType::kMouseClick;
+                                click._mouse_position = event._mouse_position;
+                                click._target = UIManager::Get()->_capture_target;
+                                click._key_code = event._key_code;
+                                event._is_handled = DispatchEvent(click);
+
+                                // 更新点击状态，等待潜在第二次点击
+                                _last_click_time = now;
+                                _last_click_pos = event._mouse_position;
+                                _last_click_target = UIManager::Get()->_capture_target;
+                                _last_click_button = event._key_code;
+                            }
                         }
+
                         UIManager::Get()->_capture_target = nullptr;// 清理捕获
                     }
                 }
@@ -325,7 +374,7 @@ namespace Ailu
                     event._is_handled = DispatchEvent(e);
                     //LOG_INFO("Event stop at widget: {},event: {}", _name, e.ToString());
                 }
-                else 
+                else
                 {
                     is_event_gen = false;
                 }
@@ -334,7 +383,7 @@ namespace Ailu
         }
         bool Widget::IsHover(Vector2f pos) const
         {
-            return UIElement::IsPointInside(pos,Vector4f{_position.x,_position.y,_size.x,_size.y});
+            return UIElement::IsPointInside(pos, Vector4f{_position.x, _position.y, _size.x, _size.y});
         }
         // namespace UI
     }// namespace UI

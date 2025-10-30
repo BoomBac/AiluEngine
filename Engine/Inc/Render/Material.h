@@ -24,7 +24,8 @@ namespace Ailu::Render
         };
 
     public:
-        inline static std::weak_ptr<Material> s_standard_lit;
+        inline static std::weak_ptr<Material> s_standard_defered_lit;
+        inline static std::weak_ptr<Material> s_standard_forward_lit;
         inline static std::weak_ptr<Material> s_checker;
 
         Material(Shader *shader, String name);

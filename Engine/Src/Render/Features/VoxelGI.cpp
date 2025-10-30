@@ -157,7 +157,7 @@ namespace Ailu::Render
             _voxel_debug_mat->SetUint("_DebugMip", rendering_data._vxgi_debug_mipmap);
             auto world_matrix = BuildIdentityMatrix();//MatrixScale(_data._grid_size / 2.0f);
             u32 inst_count = mip_grid_num_x * mip_grid_num_y * mip_grid_num_z;
-            cmd->DrawMesh(Mesh::s_p_cube.lock().get(), _voxel_debug_mat.get(), world_matrix, 0u, 0u, inst_count);
+            cmd->DrawMesh(Mesh::s_cube.lock().get(), _voxel_debug_mat.get(), world_matrix, 0u, 0u, inst_count);
         }
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);

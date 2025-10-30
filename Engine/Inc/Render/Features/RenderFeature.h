@@ -6,7 +6,7 @@
 #include "Render/Material.h"
 #include "Render/Mesh.h"
 #include "Render/RenderingData.h"
-#include "Render/RenderGraph/RenderGraph.h"
+#include "Render/RenderGraph/RenderGraphFwd.h"
 #include "generated/RenderFeature.gen.h"
 
 namespace Ailu

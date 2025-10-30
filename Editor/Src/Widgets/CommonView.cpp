@@ -4,8 +4,10 @@
 
 #include "Render/RenderPipeline.h"
 #include "Render/Renderer.h"
+#include "Render/RenderGraph/RenderGraph.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/Input.h"
+
 
 namespace Ailu
 {
@@ -40,6 +42,11 @@ namespace Ailu
             {
                 text->SlotAlignmentH(UI::EAlignment::kLeft).SlotMargin({1.0f, 1.0f, 1.0f, 1.0f});
             }
+            auto btn = _vb->AddChild<UI::Button>();
+            btn->SetText("Capture RenderGraph");
+            btn->OnMouseClick() += [](UI::UIEvent &e) {
+                RenderPipeline::Get().GetRenderer()->GetRenderGraph()._is_debug = true;
+            };
         }
         void CommonView::Update(f32 dt)
         {

@@ -387,8 +387,8 @@ namespace Ailu::Render
     void CommandBuffer::DrawFullScreenQuad(Material *mat, u16 pass_index)
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
-        cmd->_vb = Mesh::s_p_fullscreen_triangle.lock()->GetVertexBuffer().get();
-        cmd->_ib = Mesh::s_p_fullscreen_triangle.lock()->GetIndexBuffer().get();
+        cmd->_vb = Mesh::s_fullscreen_triangle.lock()->GetVertexBuffer().get();
+        cmd->_ib = Mesh::s_fullscreen_triangle.lock()->GetIndexBuffer().get();
         cmd->_mat = mat;
         cmd->_instance_count = 1u;
         cmd->_sub_mesh = 0u;
@@ -448,7 +448,7 @@ namespace Ailu::Render
         SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
-        cmd->_ib = mesh->GetIndexBuffer().get();
+        cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
         cmd->_mat = material;
         cmd->_instance_count = instance_count;
         cmd->_sub_mesh = sub_mesh;
@@ -473,7 +473,7 @@ namespace Ailu::Render
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
-        cmd->_ib = mesh->GetIndexBuffer().get();
+        cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
         cmd->_per_obj_cb = per_obj_cb;
         cmd->_mat = material;
         cmd->_instance_count = instance_count;
@@ -486,7 +486,7 @@ namespace Ailu::Render
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
-        cmd->_ib = mesh->GetIndexBuffer().get();
+        cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
         cmd->_per_obj_cb = per_obj_cb;
         cmd->_mat = material;
         cmd->_instance_count = instance_count;
@@ -502,7 +502,7 @@ namespace Ailu::Render
         SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
-        cmd->_ib = mesh->GetIndexBuffer().get();
+        cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
         cmd->_mat = material;
         cmd->_instance_count = instance_count;
         cmd->_sub_mesh = sub_mesh;
@@ -515,7 +515,7 @@ namespace Ailu::Render
         SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
-        cmd->_ib = mesh->GetIndexBuffer().get();
+        cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
         cmd->_mat = material;
         cmd->_instance_count = instance_count;
         cmd->_sub_mesh = sub_mesh;
@@ -527,7 +527,7 @@ namespace Ailu::Render
     {
         auto cmd = CommandPool::Get().Alloc<CommandDraw>();
         cmd->_vb = mesh->GetVertexBuffer().get();
-        cmd->_ib = mesh->GetIndexBuffer().get();
+        cmd->_ib = mesh->GetIndexBuffer(sub_mesh).get();
         cmd->_mat = material;
         cmd->_sub_mesh = sub_mesh;
         cmd->_pass_index = pass_index;

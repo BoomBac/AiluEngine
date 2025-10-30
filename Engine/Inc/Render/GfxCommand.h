@@ -49,6 +49,16 @@ namespace Ailu::Render
         virtual void Reset() = 0;
     };
 
+    template<typename T, typename TBase = GfxCommand>
+    inline void SafeResetCommand(T *cmd)
+    {
+        static_assert(std::is_base_of_v<TBase, T>, "T must inherit from GfxCommand");
+        std::memset(
+                reinterpret_cast<uint8_t *>(cmd) + sizeof(TBase),
+                0,
+                sizeof(T) - sizeof(TBase));
+    }
+
     struct CommandSetTarget : public GfxCommand
     {
         CMD_CLASS_TYPE(kSetTarget)
@@ -61,9 +71,7 @@ namespace Ailu::Render
         bool _is_scissor_rect;
         void Reset() final 
         {
-            _depth_target= nullptr;
-            _color_target_num = 0u;
-            _is_scissor_rect = false;
+            SafeResetCommand(this);
         }
     };
     enum EClearFlag
@@ -81,7 +89,9 @@ namespace Ailu::Render
         Array<Color, RenderConstants::kMaxMRTNum> _colors;
         f32 _depth;
         u8 _stencil;
-        void Reset() final {}
+        void Reset() final {
+            SafeResetCommand(this);
+        }
     };
     struct CommandDraw : public GfxCommand
     {
@@ -99,10 +109,7 @@ namespace Ailu::Render
         u32 _arg_offset;
         void Reset() final 
         {
-            _arg_buffer = nullptr;
-            _arg_offset = 0u;
-            _index_num = 0u;
-            _index_start = 0u;
+            SafeResetCommand(this);
         }
     };
     struct CommandDispatch : public GfxCommand
@@ -117,8 +124,7 @@ namespace Ailu::Render
         u16 _arg_offset;
         void Reset() final 
         {
-            _cs = nullptr;
-            _arg_buffer = nullptr;
+            SafeResetCommand(this);
         }
     };
     struct CommandGpuResourceUpload : public GfxCommand
@@ -130,7 +136,9 @@ namespace Ailu::Render
         {
             DESTORY_PTR(_params);
         }
-        void Reset() final {}
+        void Reset() final {
+            SafeResetCommand(this);
+        }
     };
     struct CommandTranslateState : public GfxCommand
     {
@@ -140,13 +148,17 @@ namespace Ailu::Render
         u32 _sub_res;
         CommandTranslateState() : _res(nullptr), _new_state(EResourceState::kCommon), _sub_res(UINT32_MAX) {}
         CommandTranslateState(GpuResource *res, EResourceState new_state, u32 sub_res = UINT32_MAX) : _res(res), _new_state(new_state), _sub_res(sub_res) {}
-        void Reset() final {}
+        void Reset() final {
+            SafeResetCommand(this);
+        }
     };
     struct CommandCustom : public GfxCommand
     {
         CMD_CLASS_TYPE(kCustom);
         std::function<void()> _func;
-        void Reset() final {}
+        void Reset() final {
+            SafeResetCommand(this);
+        }
     };
     struct CommandAllocConstBuffer : public GfxCommand
     {
@@ -161,6 +173,7 @@ namespace Ailu::Render
         }
         void Reset() final {
             AL_FREE(_data);
+            SafeResetCommand(this);
         }
     };
     //同时也会创建一个cpu profile
@@ -171,7 +184,12 @@ namespace Ailu::Render
         bool _is_start;
         u32 _cpu_index;//用于索引具体的profiler，处理begin事件时赋值，遇到end事件时，找最近的begin事件
         u32 _gpu_index;//用于索引具体的profiler，处理begin事件时赋值，遇到end事件时，找最近的begin事件
-        void Reset() final {}
+        void Reset() final {
+            _name.clear();
+            _is_start = false;
+            _cpu_index = 0u;
+            _gpu_index = 0u;
+        }
     };
 
     struct CommandCopyCounter : public GfxCommand
@@ -180,7 +198,9 @@ namespace Ailu::Render
         GPUBuffer* _src;
         GPUBuffer* _dst;
         u32 _dst_offset;
-        void Reset() final {}
+        void Reset() final {
+            SafeResetCommand(this);
+        }
     };
 
     struct CommandPresent : public GfxCommand
@@ -195,7 +215,7 @@ namespace Ailu::Render
         Array<Rect, RenderConstants::kMaxMRTNum> _rects;
         u16 _num;
         void Reset() final {
-            _num = 0u;
+            SafeResetCommand(this);
         }
     };
 
@@ -210,8 +230,7 @@ namespace Ailu::Render
         ReadbackCallback _callback;
         void Reset() final 
         {
-            _res = nullptr;
-            _callback = nullptr;
+            SafeResetCommand(this);
         }
     };
 

@@ -14,6 +14,7 @@ namespace Ailu
             PickPass();
             ~PickPass();
             void Setup(RenderTexture *pick_buf, RenderTexture *pick_buf_depth);
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
             void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
 
         private:

@@ -87,6 +87,8 @@ namespace Ailu
         bool _is_import_material = true;
         //1 is mesh,2 is animation
         u8 _import_flag = 1;
+        bool _is_combine_mesh = false;
+        String _mesh_name;//指定fbx的某个mesh进行导入，如果为空则导入所有mesh
     };
     struct AILU_API ShaderImportSetting : public ImportSetting
     {
@@ -104,7 +106,6 @@ namespace Ailu
     public:
         virtual ~IMeshParser() = default;
         virtual void Parser(const WString &sys_path, const MeshImportSetting &import_setting) = 0;
-        virtual const List<Mesh::ImportedMaterialInfo> &GetImportedMaterialInfos() const = 0;
         virtual const List<Ref<AnimationClip>> &GetAnimationClips() const = 0;
         virtual void GetMeshes(List<Ref<Mesh>> &out_mesh) = 0;
     };

@@ -184,6 +184,7 @@ namespace Ailu
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             _p_window->OnUpdate();
             _dispatcher.PumpTasks();
+            //SetCursorInternal();
             if (_state == EApplicationState::EApplicationState_Pause)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -313,6 +314,11 @@ namespace Ailu
     }
     bool Application::OnDragFile(DragFileEvent &e)
     {
+        if (e.GetDragedFilesPath().empty())
+            return false;
+        std::lock_guard lock(_drop_files_mtx);
+        _drop_files = e.GetDragedFilesPath();
+        _has_drop_files = true;
         return false;
     }
 
@@ -408,6 +414,19 @@ namespace Ailu
                             if (e->Handled()) break;
                         }
                     }
+                }
+                if (_has_drop_files)
+                {
+                    std::lock_guard lock(_drop_files_mtx);
+                    DragFileEvent e(_drop_files);
+                    e._window = _p_window.get();
+                    for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
+                    {
+                        (*--it)->OnEvent(e);
+                        if (e.Handled()) break;
+                    }
+                    _drop_files.clear();
+                    _has_drop_files = false;
                 }
             }
             //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，

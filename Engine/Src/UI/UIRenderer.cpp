@@ -9,6 +9,7 @@
 #include "Render/Gizmo.h"
 #include "UI/Widget.h"
 #include "UI/UIFramework.h"
+#include "UI/DragDrop.h"
 #include <Framework/Common/Allocator.hpp>
 #include <Framework/Common/ResourceMgr.h>
 
@@ -20,12 +21,10 @@ namespace Ailu
         static UIRenderer *s_Renderer = nullptr;
         void UIRenderer::Init()
         {
-            TextRenderer::Init();
             s_Renderer = AL_NEW(UIRenderer);
         }
         void UIRenderer::Shutdown()
         {
-            TextRenderer::Shutdown();
             AL_DELETE(s_Renderer);
         }
         UIRenderer *UIRenderer::Get()
@@ -42,6 +41,7 @@ namespace Ailu
                 frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material,9600u));
             }
             _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial"));
+            _text_renderer = MakeScope<TextRenderer>();
         }
         UIRenderer::~UIRenderer()
         {
@@ -58,7 +58,6 @@ namespace Ailu
         void UIRenderer::Render(CommandBuffer *cmd)
         {
             const f32 dt = TimeMgr::s_delta_time;
-            _cur_widget_index = 1u;
             auto& widgets = UI::UIManager::Get()->_widgets;
             for (auto it = widgets.begin(); it != widgets.end(); it++)
             {
@@ -74,6 +73,8 @@ namespace Ailu
                     continue;
                 canvas->Update(dt);
             }
+            DragDropManager::Get().Update();
+            _cur_widget_index = 1u;
             for (auto it = widgets.begin();it != widgets.end(); it++)
             {
                 auto canvas = it->get();
@@ -138,12 +139,12 @@ namespace Ailu
 
         void UIRenderer::DrawText(const String &text, Vector2f pos, u16 font_size, Color color,Vector2f scale, Render::Font *font)
         {
-            TextRenderer::Get()->DrawText(text, pos, font_size, scale, color, font, GetAvailableBlock(4u, 6u));
+            _text_renderer->DrawText(text, pos, font_size, scale, color, font, GetAvailableBlock(4u, 6u));
         }
 
         void UIRenderer::DrawText(const String &text, Vector2f pos, Matrix4x4f matrix, u16 font_size, Color color, Vector2f scale, Render::Font *font)
         {
-            TextRenderer::Get()->DrawText(text, pos, font_size, scale, color, matrix,font, GetAvailableBlock(4u, 6u));
+            _text_renderer->DrawText(text, pos, font_size, scale, color, matrix, font, GetAvailableBlock(4u, 6u));
         }
 
         void UIRenderer::DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts)
@@ -247,6 +248,8 @@ namespace Ailu
 
         void UIRenderer::PushScissor(Vector4f scissor)
         {
+            Clamp(scissor.x, 0.f, 65535.f);
+            Clamp(scissor.y, 0.f, 65535.f);
             _scissor_stack.push_back(Rect((u16) scissor.x, (u16) scissor.y, (u16) (scissor.x + scissor.z), (u16) (scissor.y + scissor.w)));
         }
 
@@ -257,7 +260,7 @@ namespace Ailu
 
         Vector2f UIRenderer::CalculateTextSize(const String &text,u16 font_size, Vector2f scale, Render::Font *font)
         {
-            return TextRenderer::CalculateTextSize(text, font_size, font, scale);
+            return _text_renderer->CalculateTextSize(text, font_size, font, scale);
         }
 
         void UIRenderer::AppendNode(DrawerBlock *block, u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex)
@@ -274,7 +277,7 @@ namespace Ailu
             auto &frame_block = _drawer_blocks[_frame_index];
             if (frame_block.size() < _cur_widget_index + 1u)
             {
-                frame_block.push_back(AL_NEW(DrawerBlock, _default_material));
+                frame_block.push_back(AL_NEW(DrawerBlock, _default_material,8092u));
                 available_block = frame_block.back();
             }
             else
@@ -317,14 +320,23 @@ namespace Ailu
             Color tint = Colors::kWhite;
             b->_mat->SetVector("_Color", tint);
             b->SubmitVertexData();
+            Rect full_rect(0u, 0u, (u16) w, (u16) h);
+            Rect prev_scissor = full_rect;
             for (const auto& node: b->_nodes)
             {
                 node._mat->SetTexture("_MainTex", node._main_tex? node._main_tex : Texture::s_p_default_white);
                 if (node._is_custom_scissor)
                 {
-                    cmd->SetScissorRect(node._scissor);
+                    if (prev_scissor != node._scissor)
+                        cmd->SetScissorRect(node._scissor);
+                }
+                else
+                {
+                    if (prev_scissor != full_rect)
+                        cmd->SetScissorRect(full_rect);
                 }
                 cmd->DrawIndexed(b->_vbuf, b->_ibuf, _obj_cb.get(), node._mat,0u,node._index_offset,node._index_num);
+                prev_scissor = node._is_custom_scissor ? node._scissor : full_rect;
             }
             b->Flush();
         }

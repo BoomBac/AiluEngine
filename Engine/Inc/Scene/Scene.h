@@ -26,6 +26,7 @@ namespace Ailu
             Scene(const String &name);
             ECS::Entity AddObject(String name = "");
             ECS::Entity AddObject(Ref<Mesh> mesh, Ref<Material> mat);
+            ECS::Entity AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>>& mats);
             ECS::Entity DuplicateEntity(ECS::Entity e);
             void RemoveObject(ECS::Entity entity);
             void Attach(ECS::Entity current, ECS::Entity parent);

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __BASIC_GEN_H__
 //Class Button begin...........................
-#define BASIC_GEN_H_18_GENERATED_BODY \
+#define BASIC_GEN_H_20_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Button_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Button>();
 //Class Button end...........................
 
 //Class Text begin...........................
-#define BASIC_GEN_H_31_GENERATED_BODY \
+#define BASIC_GEN_H_41_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Text_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -37,7 +37,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Text>();
 //Class Text end...........................
 
 //Class Slider begin...........................
-#define BASIC_GEN_H_59_GENERATED_BODY \
+#define BASIC_GEN_H_69_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Slider_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -53,7 +53,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Slider>();
 //Class Slider end...........................
 
 //Class CheckBox begin...........................
-#define BASIC_GEN_H_87_GENERATED_BODY \
+#define BASIC_GEN_H_97_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_CheckBox_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -69,7 +69,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::CheckBox>();
 //Class CheckBox end...........................
 
 //Class Border begin...........................
-#define BASIC_GEN_H_104_GENERATED_BODY \
+#define BASIC_GEN_H_114_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Border_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -85,7 +85,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Border>();
 //Class Border end...........................
 
 //Class InputBlock begin...........................
-#define BASIC_GEN_H_128_GENERATED_BODY \
+#define BASIC_GEN_H_138_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_InputBlock_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -101,7 +101,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::InputBlock>();
 //Class InputBlock end...........................
 
 //Class Image begin...........................
-#define BASIC_GEN_H_163_GENERATED_BODY \
+#define BASIC_GEN_H_173_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Image_Type();\
                                 static Type* GetPrivateStaticClass();\

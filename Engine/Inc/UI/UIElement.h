@@ -10,6 +10,7 @@
 #include "Objects/Serialize.h"
 #include <Render/RendererAPI.h>
 #include "Framework/Common/Allocator.hpp"
+#include "DragDrop.h"
 #include "generated/UIElement.gen.h"
 
 namespace Ailu
@@ -119,7 +120,8 @@ namespace Ailu
                 kMouseMove,
                 kMouseExitWindow,
                 kKeyDown,
-                kKeyUp
+                kKeyUp,
+                kDropFiles
             };
 
             EType _type;
@@ -130,6 +132,7 @@ namespace Ailu
             u32 _key_code = 0u;                  // 按键事件使用
             bool _is_handled = false;
             f32 _scroll_delta = 0.0f;// 滚轮滚动增量
+            Vector<WString> _drop_files;
 
             bool operator==(const UIEvent &other) const
             {
@@ -170,6 +173,8 @@ namespace Ailu
                         return "KeyDown";
                     case EType::kKeyUp:
                         return "KeyUp";
+                    case EType::kDropFiles:
+                        return "DropFiles";
                 }
                 return "Unknown";
             }
@@ -259,6 +264,7 @@ namespace Ailu
             ElementEvent::EventView OnKeyDown();
             ElementEvent::EventView OnKeyUp();
             ElementEvent::EventView OnMouseScroll();
+            ElementEvent::EventView OnFileDrop();
             //pos
             bool IsPointInside(Vector2f  mouse_pos) const;
             Vector2f GetWorldPosition() const;
@@ -386,9 +392,9 @@ namespace Ailu
                 InvalidateTransform();
             }
             Math::Transform2D GetTransform() const { return _transform; }
+            void SetDropHandler(DropHandler handler) { _drop_handler = std::move(handler); }
+            DropHandler *GetDropHandler() { return _drop_handler ? &_drop_handler.value() : nullptr; }
         public:
-            APROPERTY()
-            Padding _padding;// ltrb，元素内边距
             APROPERTY()
             EVisibility _visibility = EVisibility::kVisible;
             State _state;
@@ -407,6 +413,8 @@ namespace Ailu
         protected:
             APROPERTY()
             Slot _slot;
+            APROPERTY()
+            Padding _padding;      // ltrb，元素内边距
             Vector4f _desired_rect;//元素所需要的rect，一般而言就是slot.pos/size
             Vector4f _content_rect;//内容区域，_desired_rect受padding影响的结果,局部空间
             Vector4f _arrange_rect;//元素最终被布局分配到的rect,局部空间
@@ -431,6 +439,7 @@ namespace Ailu
             3.paint_dirty之后用来标记缓存顶点数据
             */
             bool _is_layout_dirty = true, _paint_dirty = true,_is_transf_dirty;
+            std::optional<DropHandler> _drop_handler;
         };
         /// <summary>
         /// 除了AnchorLayout之外，所有元素都使用左上角作为锚点

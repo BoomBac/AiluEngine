@@ -178,40 +178,40 @@ namespace Ailu::Render
         _rendering_data._height = pixel_height;
         if (_is_use_render_graph)
         {
-            _rendering_data._rg_handles._gbuffers[0] = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGHalf),RenderResourceName::kGBuffer0);
-            _rendering_data._rg_handles._gbuffers[1] = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer1);
-            _rendering_data._rg_handles._gbuffers[2] = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer2);
-            _rendering_data._rg_handles._gbuffers[3] = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGBAHalf), RenderResourceName::kGBuffer3);
-            _rendering_data._rg_handles._color_target = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR), RenderResourceName::kCameraColorA);
-            _rendering_data._rg_handles._depth_target = _rd_graph->GetOrCreate(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDepth), RenderResourceName::kCameraDepth);
+            _rendering_data._rg_handles._gbuffers[0] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGHalf),RenderResourceName::kGBuffer0);
+            _rendering_data._rg_handles._gbuffers[1] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer1);
+            _rendering_data._rg_handles._gbuffers[2] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer2);
+            _rendering_data._rg_handles._gbuffers[3] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGBAHalf), RenderResourceName::kGBuffer3);
+            _rendering_data._rg_handles._color_target = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR), RenderResourceName::kCameraColorA);
+            _rendering_data._rg_handles._depth_target = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDepth), RenderResourceName::kCameraDepth);
             TextureDesc desc = TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
             desc._load = ELoadStoreAction::kNotCare;
-            _rendering_data._rg_handles._color_tex = _rd_graph->GetOrCreate(desc, RenderResourceName::kCameraColorTex);
+            _rendering_data._rg_handles._color_tex = _rd_graph->CreateResource(desc, RenderResourceName::kCameraColorTex);
             desc._format = ConvertRenderTextureFormatToPixelFormat(ERenderTargetFormat::kRFloat);
-            _rendering_data._rg_handles._depth_tex = _rd_graph->GetOrCreate(desc, RenderResourceName::kCameraDepthTex);
+            _rendering_data._rg_handles._depth_tex = _rd_graph->CreateResource(desc, RenderResourceName::kCameraDepthTex);
 
             auto shadow_map_size = QuailtySetting::s_cascade_shaodw_map_resolution;
             TextureDesc sm_desc = TextureDesc(shadow_map_size, shadow_map_size, ERenderTargetFormat::kShadowMap);
             sm_desc._array_size = RenderConstants::kMaxCascadeShadowMapSplitNum;
             sm_desc._store = ELoadStoreAction::kClear;
             sm_desc._dimension = ETextureDimension::kTex2DArray;
-            _rendering_data._rg_handles._main_light_shadow_map = _rd_graph->GetOrCreate(sm_desc, RenderResourceName::kMainLightShadowMap);
+            _rendering_data._rg_handles._main_light_shadow_map = _rd_graph->CreateResource(sm_desc, RenderResourceName::kMainLightShadowMap);
             sm_desc._width = shadow_map_size >> 1;
             sm_desc._height = shadow_map_size >> 1;
             sm_desc._array_size = RenderConstants::kMaxSpotLightNum + RenderConstants::kMaxAreaLightNum;
-            _rendering_data._rg_handles._addi_shadow_maps = _rd_graph->GetOrCreate(sm_desc, RenderResourceName::kAddLightShadowMap);
+            _rendering_data._rg_handles._addi_shadow_maps = _rd_graph->CreateResource(sm_desc, RenderResourceName::kAddLightShadowMap);
             sm_desc._array_size = RenderConstants::kMaxPointLightNum;
             sm_desc._dimension = ETextureDimension::kCubeArray;
-            _rendering_data._rg_handles._point_light_shadow_maps = _rd_graph->GetOrCreate(sm_desc, RenderResourceName::kPointLightShadowMap);
+            _rendering_data._rg_handles._point_light_shadow_maps = _rd_graph->CreateResource(sm_desc, RenderResourceName::kPointLightShadowMap);
 
             auto mv_desc = TextureDesc(_rendering_data._width, _rendering_data._height, ERenderTargetFormat::kRGHalf);
-            _rendering_data._rg_handles._motion_vector_tex = _rd_graph->GetOrCreate(mv_desc, RenderResourceName::kMotionVectorTex);
+            _rendering_data._rg_handles._motion_vector_tex = _rd_graph->CreateResource(mv_desc, RenderResourceName::kMotionVectorTex);
             mv_desc = TextureDesc(_rendering_data._width, _rendering_data._height, ERenderTargetFormat::kDepth);
-            _rendering_data._rg_handles._motion_vector_depth = _rd_graph->GetOrCreate(mv_desc, RenderResourceName::kMotionVectorDepth);
+            _rendering_data._rg_handles._motion_vector_depth = _rd_graph->CreateResource(mv_desc, RenderResourceName::kMotionVectorDepth);
             auto hzb_desc = TextureDesc((_rendering_data._width + 1) >> 1, (_rendering_data._height + 1) >> 1, ERenderTargetFormat::kRFloat);
             hzb_desc._is_random_access = true;
             hzb_desc._mip_num = Texture::MaxMipmapCount(hzb_desc._width, hzb_desc._height);
-            _rendering_data._rg_handles._hzb = _rd_graph->GetOrCreate(hzb_desc, RenderResourceName::kHZB);
+            _rendering_data._rg_handles._hzb = _rd_graph->CreateResource(hzb_desc, RenderResourceName::kHZB);
         }
         else
         {

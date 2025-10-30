@@ -1,0 +1,6 @@
+guid: 798c6e92-05f5-43a3-abb0-7007caf7f3dc
+type: kShader
+name: transform_gizmo
+  file: Shaders/hlsl/transform_gizmo.hlsl
+  vs_entry: VSMain
+  ps_entry: PSMain

@@ -8,6 +8,7 @@
 using namespace Ailu;
 Ailu::Type* Ailu::Editor::Z_Construct_RenderView_Type()
 {
+Ailu::Editor::DockWindow::StaticType();
 static std::unique_ptr<Ailu::Type> cur_type = nullptr;
 if(cur_type == nullptr)
 {
@@ -18,7 +19,7 @@ initializer._full_name = "Ailu::Editor::RenderView";
 initializer._is_class = true;
 initializer._is_abstract = false;
 initializer._namespace = "Ailu::Editor";
-initializer._base_name = "";
+initializer._base_name = "Ailu::Editor::DockWindow";
 initializer._constructor = []()->Ailu::Editor::RenderView* {return new Ailu::Editor::RenderView;};
 cur_type = std::make_unique<Ailu::Type>(initializer);
 Ailu::Type::RegisterType(cur_type.get());
@@ -41,3 +42,39 @@ return Ailu::Editor::RenderView::StaticType();
 return Ailu::Editor::RenderView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_RenderView(&Ailu::Editor::RenderView::StaticType, "Ailu::Editor::RenderView");
+Ailu::Type* Ailu::Editor::Z_Construct_SceneView_Type()
+{
+Ailu::Editor::RenderView::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "SceneView";
+initializer._size = sizeof(Ailu::Editor::SceneView);
+initializer._full_name = "Ailu::Editor::SceneView";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Editor";
+initializer._base_name = "Ailu::Editor::RenderView";
+initializer._constructor = []()->Ailu::Editor::SceneView* {return new Ailu::Editor::SceneView;};
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::Editor::SceneView::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_SceneView_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::SceneView>()
+{
+return Ailu::Editor::SceneView::StaticType();
+}
+    Type *Ailu::Editor::SceneView::GetType()
+{
+return Ailu::Editor::SceneView::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_SceneView(&Ailu::Editor::SceneView::StaticType, "Ailu::Editor::SceneView");

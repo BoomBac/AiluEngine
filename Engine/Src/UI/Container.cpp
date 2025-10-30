@@ -1,5 +1,6 @@
 #include "UI/Container.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Common/Application.h"
 #include "UI/Basic.h"
 #include "UI/UIFramework.h"
 #include "UI/UIRenderer.h"
@@ -21,7 +22,20 @@ namespace Ailu
 
         Vector2f Canvas::MeasureDesiredSize()
         {
-            return Vector2f(100.0f);
+            if (_slot._size_policy == ESizePolicy::kFixed)
+                return _slot._size;
+            else
+            {
+                f32 w = 0.0f, h = 0.0f;
+                for (auto& c: _children)
+                {
+                    auto p = c->SlotPosition();
+                    auto s = c->SlotSize();
+                    w = std::max(w, p.x + s.x);
+                    h = std::max(h, p.y + s.y);
+                }
+                return {w, h};
+            }
         }
 
         void Canvas::MeasureAndArrange(f32 dt)
@@ -92,6 +106,9 @@ namespace Ailu
             for (auto &child: _children)
             {
                 child->Render(r);
+                //auto rect = child->GetArrangeRect();
+                //if (_orientation == EOrientation::kVertical)
+                //    r.DrawBox(rect.xy, rect.zw, 1.0f, Colors::kGreen);
             }
         }
         void LinearBox::MeasureAndArrange(f32 dt)
@@ -141,8 +158,8 @@ namespace Ailu
                 Vector2f child_desired_size = c->MeasureDesiredSize();
                 f32 child_w = 0.0f;
                 f32 child_h = 0.0f;
-                f32 x = _content_rect.x;
-                f32 y = _content_rect.y;
+                f32 x = _padding._l;
+                f32 y = _padding._t;
 
                 if (_orientation == EOrientation::kVertical)
                 {
@@ -164,12 +181,10 @@ namespace Ailu
                             break;
                         case EAlignment::kCenter:
                             child_w = child_desired_size.x;
-                            //x = _content_rect.x + margin._l + (available_w - child_w - margin._l - margin._r) * 0.5f;
                             x = margin._l + (available_w - child_w - margin._l - margin._r) * 0.5f;
                             break;
                         case EAlignment::kRight:
                             child_w = child_desired_size.x;
-                            //x = _content_rect.x + available_w - child_w - margin._r;
                             x = available_w - child_w - margin._r;
                             break;
                     }
@@ -331,12 +346,12 @@ namespace Ailu
         void ScrollView::RenderImpl(UIRenderer &r)
         {
             r.DrawQuad(_content_rect, _matrix, Vector4f{0.12f, 0.12f, 0.21f, 1.0f});
-            //r.PushScissor(_content_rect);
+            r.PushScissor(_abs_rect);
             for (auto &child: _children)
             {
                 child->Render(r);
             }
-            //r.PopScissor();
+            r.PopScissor();
             if (_content_size.y > _content_rect.w)
             {
                 f32 bar_height = _content_rect.w * (_content_rect.w / _content_size.y);
@@ -363,16 +378,16 @@ namespace Ailu
         }
         void ScrollView::MeasureAndArrange(f32 dt)
         {
+            _content_size = Vector2f::kZero;
             for (auto &c: _children)
             {
-                _content_size = Max(c->MeasureDesiredSize(), _content_size);
+                _content_size += c->MeasureDesiredSize();
                 const auto &p = c->SlotPosition();
                 const auto &s = c->MeasureDesiredSize();
                 c->Arrange(p.x, p.y,c->SlotSizePolicy() == ESizePolicy::kFill? _content_rect.z : s.x, s.y);
                 c->Translate(_current_offset);
                 c->MeasureAndArrange(dt);
             }
-
         }
         void ScrollView::PostArrange()
         {
@@ -572,6 +587,8 @@ namespace Ailu
             return _button->HitTest(pos) ? (UIElement *) _button : this;
         }
 #pragma endregion
+
+#pragma region CollapsibleView
         CollapsibleView::CollapsibleView() : CollapsibleView("CollapsibleView")
         {
             SlotSizePolicy(ESizePolicy::kAuto);
@@ -651,5 +668,129 @@ namespace Ailu
                 (*_content)[0]->Arrange(0.0f, 0.0f, _content_rect.z, sz.y);
             }
         }
+#pragma endregion
+#pragma region SplitView
+        SplitView::SplitView() : UIElement("SplitView")
+        {
+            _on_child_add += [this](UIElement *child) 
+            {
+                if (_children.size() > 2)
+                {
+                    LOG_WARNING("SplitView: splitview({}) can only have two child!", _name);
+                    RemoveChild(_children.back());
+                }
+            };
+            OnMouseMove() += [this](UIEvent &e)
+            {
+                Vector4f bar_rect = _abs_rect;
+                if (_is_horizontal)
+                {
+                    bar_rect.x += _abs_rect.z * _ratio - kSplitBarThickness * 0.5f;
+                    bar_rect.z = kSplitBarThickness;
+                }
+                else
+                {
+                    bar_rect.y += _abs_rect.w * _ratio - kSplitBarThickness * 0.5f;
+                    bar_rect.w = kSplitBarThickness;
+                }
+                bool is_hover_bar = IsPointInside(e._mouse_position, bar_rect);
+                if (is_hover_bar != _is_hover_bar)
+                {
+                    _is_hover_bar = is_hover_bar;
+                    if (_is_hover_bar)
+                    {
+                        // change cursor
+                        if (_is_horizontal)
+                            Application::Get().SetCursor(ECursorType::kSizeEW);
+                        else
+                            Application::Get().SetCursor(ECursorType::kSizeNS);
+                    }
+                    else
+                    {
+                        Application::Get().SetCursor(ECursorType::kArrow);
+                    }
+                }
+
+                if (_is_dragging_bar)
+                {
+                    Vector2f local_pos = e._mouse_position - _abs_rect.xy;
+                    if (_is_horizontal)
+                    {
+                        _ratio = local_pos.x / _abs_rect.z;
+                    }
+                    else
+                    {
+                        _ratio = local_pos.y / _abs_rect.w;
+                    }
+                    _ratio = std::clamp(_ratio, 0.1f, 0.9f);
+                    InvalidateLayout();
+                    e._is_handled = true;
+                }
+            };
+            OnMouseDown() += [this](UIEvent &e)
+            {
+                if (_is_hover_bar)
+                {
+                    _is_dragging_bar = true;
+                    e._is_handled = true;
+                }
+            };
+            OnMouseUp() += [this](UIEvent &e)
+            {
+                if (_is_dragging_bar)
+                {
+                    _is_dragging_bar = false;
+                    e._is_handled = true;
+                }
+            };
+        }
+        void SplitView::Update(f32 dt)
+        {
+            UIElement::Update(dt);
+
+        }
+        void SplitView::RenderImpl(UIRenderer &r)
+        {
+            for (auto &child: _children)
+            {
+                child->Render(r);
+            }
+            Vector4f bar_rect = _content_rect;
+            if (_is_horizontal)
+            {
+                bar_rect.x += _content_rect.z * _ratio - kSplitBarThickness * 0.5f;
+                bar_rect.z = kSplitBarThickness;
+            }
+            else
+            {
+                bar_rect.y += _content_rect.w * _ratio - kSplitBarThickness * 0.5f;
+                bar_rect.w = kSplitBarThickness;
+            }
+            r.DrawQuad(bar_rect,_matrix);
+        }
+        void SplitView::PostDeserialize()
+        {
+        }
+        void SplitView::MeasureAndArrange(f32 dt)
+        {
+            if (_children.size() != 2)
+                return;
+            if (_is_horizontal)
+            {
+                _children[0]->Arrange(0.0f,0.0f,_content_rect.z * _ratio,_content_rect.w);
+                _children[1]->Arrange(_content_rect.z * _ratio, 0.0f, _content_rect.z * (1.0f - _ratio), _content_rect.w);
+            }
+            else
+            {
+                _children[0]->Arrange(0.0f, 0.0f, _content_rect.z, _content_rect.w * _ratio);
+                _children[1]->Arrange(0.0f, _content_rect.w * _ratio, _content_rect.z, _content_rect.w * (1.0f - _ratio));
+            }
+            for (auto &c: _children)
+            {
+                c->InvalidateLayout();
+                c->InvalidateTransform();
+            }
+        }
+#pragma endregion
     }// namespace UI
 }// namespace Ailu

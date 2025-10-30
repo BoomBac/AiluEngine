@@ -3,3 +3,4 @@ type: kMesh
 name: node_damagedHelmet_-6514
 file: NewScene/DamagedHelmet.fbx
 inner_file_name: node_damagedHelmet_-6514
+is_combine_mesh: false

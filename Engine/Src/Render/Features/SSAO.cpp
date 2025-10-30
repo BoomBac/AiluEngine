@@ -3,6 +3,7 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
 #include "Render/Renderer.h"
+#include "Render/RenderGraph/RenderGraph.h"
 #include "pch.h"
 
 namespace Ailu::Render
@@ -36,7 +37,7 @@ namespace Ailu::Render
     }
     void SSAOPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
-        Vector4f params;
+        static Vector4f params;
         if (_is_half_res)
             params = {1.0f, 1.0f, (f32) (rendering_data._width >> 1), (f32) (rendering_data._height >> 1)};
         else
@@ -53,7 +54,7 @@ namespace Ailu::Render
                     ao_result = builder.AllocTexture(desc, "_OcclusionTex");
                     builder.Read(rendering_data._rg_handles._depth_tex);
                     builder.Read(rendering_data._rg_handles._gbuffers[0]);
-                    builder.Write(ao_result); 
+                    ao_result = builder.Write(ao_result,EResourceUsage::kWriteUAV); 
             }, 
             [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                 {
@@ -83,7 +84,7 @@ namespace Ailu::Render
                     {
                         blur_temp = builder.AllocTexture(desc, "AO_BlurTemp");
                         builder.Read(ao_result);
-                        builder.Write(blur_temp); 
+                        blur_temp = builder.Write(blur_temp); 
                     }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
                 _ssao_computer->SetVector("_AOScreenParams", params);
@@ -102,7 +103,7 @@ namespace Ailu::Render
         graph.AddPass("SSAO Final", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                       {
                     builder.Read(blur_temp);
-                    builder.Write(ao_result);
+                    ao_result = builder.Write(ao_result);
                      }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
                 _ssao_computer->SetVector("_AOScreenParams", params);
@@ -124,7 +125,7 @@ namespace Ailu::Render
                           {
                     auto handle = builder.GetTexture("_OcclusionTex");
                     builder.Read(handle);
-                    builder.Write(rendering_data._rg_handles._color_target);
+                    rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                 }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                           { 
                         cmd->Blit(graph.GetTexture("_OcclusionTex"), data._rg_handles._color_target);

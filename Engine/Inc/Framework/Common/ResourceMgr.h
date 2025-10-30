@@ -138,9 +138,9 @@ namespace Ailu
         void SubmitTaskSync(ResourceTask task);
         void SubmitTaskSync(ResourceTask task,std::function<void(bool)> callback);
         //static Material* LoadAsset(const String& asset_path);
-        Ref<void> ImportResource(const WString &sys_path, const ImportSetting &setting = ImportSetting::Default());
+        Ref<void> ImportResource(const WString &sys_path, const WString &target_dir, const ImportSetting &setting = ImportSetting::Default());
         //async editon always reutn nullptr
-        Ref<void> ImportResourceAsync(const WString &sys_path, const ImportSetting &setting = ImportSetting::Default(), OnResourceTaskCompleted callback = [](Ref<void> asset) {});
+        Ref<void> ImportResourceAsync(const WString &sys_path, const WString &target_dir, const ImportSetting &setting = ImportSetting::Default(), OnResourceTaskCompleted callback = [](Ref<void> asset) {});
 
         const WString &GetAssetPath(Object *obj) const;
         const Guid &GetAssetGuid(Object *obj) const;
@@ -247,7 +247,7 @@ namespace Ailu
         void SaveAnimClip(const WString &asset_path, const Asset *asset);
 
         //导入外部资源并创建对应的asset
-        Ref<void> ImportResourceImpl(const WString &sys_path, const ImportSetting *setting);
+        Ref<void> ImportResourceImpl(const WString &sys_path,const WString& target_dir,const ImportSetting *setting);
         void OnAssetDataBaseChanged();
 
     private:
@@ -273,6 +273,7 @@ namespace Ailu
         Queue<std::function<void()>> _sync_tasks;
         Queue<std::function<void()>> _async_tasks;
         Queue<Asset *> _pending_delete_assets;
+        HashMap<u64, MeshImportSetting> _mesh_importer;
     };
     extern AILU_API ResourceMgr *g_pResourceMgr;
 

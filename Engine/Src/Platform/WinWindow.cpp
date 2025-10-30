@@ -26,6 +26,54 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+namespace
+{
+    class MyDropTarget : public IDropTarget
+    {
+    public:
+        // Implement IUnknown methods
+        ULONG STDMETHODCALLTYPE AddRef() override { return 1; }
+        ULONG STDMETHODCALLTYPE Release() override { return 1; }
+        HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) override
+        {
+            if (riid == IID_IUnknown || riid == IID_IDropTarget)
+            {
+                *ppvObject = static_cast<IDropTarget *>(this);
+                AddRef();
+                return S_OK;
+            }
+            *ppvObject = nullptr;
+            return E_NOINTERFACE;
+        }
+
+        HRESULT DragEnter(IDataObject *, DWORD, POINTL, DWORD *pdwEffect) override
+        {
+            Ailu::Input::BlockInput(true);
+            *pdwEffect = DROPEFFECT_COPY;
+            return S_OK;
+        }
+
+        HRESULT DragLeave() override
+        {
+            Ailu::Input::BlockInput(false);
+            return S_OK;
+        }
+
+        HRESULT Drop(IDataObject *, DWORD, POINTL, DWORD *pdwEffect) override
+        {
+            Ailu::Input::BlockInput(false);
+            *pdwEffect = DROPEFFECT_COPY;
+            return S_OK;
+        }
+
+        HRESULT DragOver(DWORD, POINTL, DWORD *pdwEffect) override
+        {
+            *pdwEffect = DROPEFFECT_COPY;
+            return S_OK;
+        }
+    };
+}
+
 namespace Ailu
 {
     // static const wchar_t *kAppTitleIconPath = ToWChar(kEngineResRootPath + "Icons/app_title_icon.ico");
@@ -243,6 +291,10 @@ namespace Ailu
         //关闭输入法
         DisableIME(_hwnd);
         _reserver_area = {0.0f,0.0f,100.0f,20.0f};
+        //注册拖动事件，拖动文件时屏蔽输入
+        CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        MyDropTarget *target = new MyDropTarget();
+        RegisterDragDrop(_hwnd, target);
     }
     void WinWindow::OnUpdate()
     {
@@ -408,13 +460,13 @@ namespace Ailu
                 // Handle dropped files
                 HDROP hDrop = (HDROP) wParam;
                 UINT fileCount = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
-                List<WString> draged_files;
+                Vector<WString> draged_files(fileCount);
                 for (UINT i = 0; i < fileCount; ++i)
                 {
                     UINT pathLength = DragQueryFile(hDrop, i, NULL, 0);
                     wchar_t *filePath = new wchar_t[pathLength + 1];
                     DragQueryFile(hDrop, i, filePath, pathLength + 1);
-                    draged_files.emplace_back(filePath);
+                    draged_files[i] = filePath;
                     delete[] filePath;
                 }
                 DragFileEvent e(draged_files);
@@ -428,7 +480,7 @@ namespace Ailu
             {
                 KeyPressedEvent e(static_cast<u8>(wParam), lParam & 0xFFFF);
                 e._window = this;
-                LOG_INFO("WM_KEYDOWN: {}", e.GetKeyCode());
+                //LOG_INFO("WM_KEYDOWN: {}", e.GetKeyCode());
                 _data.Handler(e);
             }
                 return 0;
@@ -667,11 +719,11 @@ namespace Ailu
                 }
                 else if (LOWORD(lParam) == HTTOPLEFT || LOWORD(lParam) == HTBOTTOMRIGHT)
                 {
-                    Application::Get().SetCursor(ECursorType::kSizeNESW);
+                    Application::Get().SetCursor(ECursorType::kSizeNWSE);
                 }
                 else if (LOWORD(lParam) == HTTOPRIGHT || LOWORD(lParam) == HTBOTTOMLEFT)
                 {
-                    Application::Get().SetCursor(ECursorType::kSizeNWSE);
+                    Application::Get().SetCursor(ECursorType::kSizeNESW);
                 }
                 else if (LOWORD(lParam) == HTCAPTION)
                 {

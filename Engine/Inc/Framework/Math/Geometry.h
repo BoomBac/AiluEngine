@@ -10,6 +10,12 @@ namespace Ailu
 	{
 		Plane() : _normal(Vector3f::kForward), _distance(0.f) {}
 		Plane(Vector3f n, f32 d) : _normal(n), _distance(d) {}
+        Plane(Vector3f p, Vector3f n)
+        {
+            _normal = n;
+            _distance = -DotProduct(n, p);
+            _point = p;
+        }
 		Vector3f _normal;
 		f32 _distance;
         Vector3f _point;

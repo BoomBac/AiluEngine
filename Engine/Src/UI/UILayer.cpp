@@ -2,6 +2,7 @@
 #include "Framework/Common/Input.h"
 #include "Framework/Events/KeyEvent.h"
 #include "Framework/Events/MouseEvent.h"
+#include "Framework/Events/WindowEvent.h"
 #include "UI/Widget.h"
 #include "UI/UIFramework.h"
 #include "pch.h"
@@ -29,6 +30,8 @@ namespace Ailu
                     return UI::UIEvent::EType::kKeyDown;
                 case EEventType::kKeyReleased:
                     return UI::UIEvent::EType::kKeyUp;
+                case EEventType::kDragFile:
+                    return UI::UIEvent::EType::kDropFiles;
                 default:
                     return UI::UIEvent::EType::kMouseMove;
             }
@@ -73,18 +76,31 @@ namespace Ailu
             {
                 ue._scroll_delta = static_cast<MouseScrollEvent *>(&e)->GetOffsetY();
             }
+            else if (e.GetEventType() == EEventType::kDragFile)
+            {
+
+                ue._drop_files = static_cast<DragFileEvent *>(&e)->GetDragedFilesPath();
+            }
             else {}
             auto &widget = s_mgr->_widgets;
             for (i32 i = (i32)widget.size() - 1; i >= 0; i--)
             {
                 auto w = widget[i].get();
-                if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false)
+                if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
                     continue;
-                w->OnEvent(ue);
                 if (w->IsHover(ue._mouse_position))//上层已经生成了事件，下次就不再响应
                 {
+                    w->OnEvent(ue);
                     cur_hover_widget = w;
                     break;
+                }
+                else
+                {
+                    UI::UIEvent ue;
+                    ue._type = UIEvent::EType::kMouseExitWindow;
+                    ue._mouse_position = Input::GetMousePos(e._window);
+                    ue._mouse_delta = Input::GetMousePosDelta();
+                    w->OnEvent(ue);
                 }
             }
             if (s_mgr->_pre_hover_widget && cur_hover_widget && cur_hover_widget != s_mgr->_pre_hover_widget)

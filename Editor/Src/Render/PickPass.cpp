@@ -5,6 +5,7 @@
 #include <Framework/Common/ResourceMgr.h>
 #include <Render/Gizmo.h>
 #include <Render/Renderer.h>
+#include "Render/RenderGraph/RenderGraph.h"
 
 namespace Ailu
 {
@@ -25,6 +26,161 @@ namespace Ailu
         {
             _color = pick_buf;
             _depth = pick_buf_depth;
+        }
+        void PickPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
+        {
+            static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
+            static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
+            static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
+            static auto mat_area_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard");
+            static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
+            static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
+            static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
+            static RDG::RGHandle color, depth;
+            graph.AddPass("PickBuffer", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+                          {
+                            color = builder.Import(_color);
+                            depth = builder.Import(_depth);
+                            color = builder.Write(color);
+                            depth = builder.Write(depth,EResourceUsage::kDSV);
+                }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+                {
+                 cmd->SetRenderTarget(color, depth);
+                ECS::Register &r = g_pSceneMgr->ActiveScene()->GetRegister();
+             for (const auto &queue_data: *rendering_data._cull_results)
+                {
+                    auto &[queue, objs] = queue_data;
+                    for (auto &obj: objs)
+                    {
+                        cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
+                    }
+                }
+                u16 entity_index = 0;
+                for (auto &light_comp: r.View<ECS::LightComponent>())
+                {
+                    const auto &t = r.GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index);
+                    auto world_pos = t->_transform._position;
+                    CBufferPerObjectData obj_data;
+                    obj_data._ObjectID = (i32)r.GetEntity<ECS::LightComponent>(entity_index);
+                    obj_data._MatrixWorld = MatrixTranslation(world_pos);
+                    f32 scale = 2.0f;
+                    obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
+                    switch (light_comp._type)
+                    {
+                        case ECS::ELightType::kDirectional:
+                        {
+                            cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_directional_light, obj_data, 0, 1, 1);
+                        }
+                        break;
+                        case ECS::ELightType::kPoint:
+                        {
+                            cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_point_light, obj_data, 0, 1, 1);
+                        }
+                        break;
+                        case ECS::ELightType::kSpot:
+                        {
+                            cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_spot_light, obj_data, 0, 1, 1);
+                        }
+                        break;
+                        case ECS::ELightType::kArea:
+                        {
+                            cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_area_light, obj_data, 0, 1, 1);
+                        }
+                        break;
+                    }
+                    ++entity_index;
+                }
+                entity_index = 0;
+                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CLightProbe>())
+                {
+                    const auto &t = r.GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index);
+                    auto world_pos = t->_transform._position;
+                    CBufferPerObjectData obj_data;
+                    obj_data._ObjectID = (i32)r.GetEntity<ECS::CLightProbe>(entity_index);
+                    obj_data._MatrixWorld = MatrixTranslation(world_pos);
+                    f32 scale = 2.0f;
+                    obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
+                    cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
+                }
+                entity_index = 0;
+                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
+                {
+                    const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
+                    auto world_pos = t->_transform._position;
+                    CBufferPerObjectData obj_data;
+                    obj_data._ObjectID = (i32)r.GetEntity<ECS::CCamera>(entity_index);
+                    obj_data._MatrixWorld = MatrixTranslation(world_pos);
+                    f32 scale = 2.0f;
+                    obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
+                    cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_camera, obj_data, 0, 1, 1);
+                    ++entity_index;
+                }
+            });
+            static RDG::RGHandle select_buf,select_buf_blur;
+            if (Selection::SelectedEntities().size() == 0)
+                return;
+            graph.AddPass("SelectBuffer", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+                          {
+                    TextureDesc desc(_color->Width(), _color->Height(),ERenderTargetFormat::kDefault);
+                    select_buf = builder.AllocTexture(desc,"select_buffer");
+                    select_buf = builder.Write(select_buf); }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+                          {
+                if (auto &selected = Selection::SelectedEntities(); selected.size() > 0)
+                {
+                    cmd->SetRenderTarget(select_buf);
+                    ECS::Register &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    for (auto entity: selected)
+                    {
+                        const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
+                        if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
+                        {
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                        }
+                        else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
+                        {
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                            Gizmo::DrawAABB(comp->_transformed_aabbs[0], Colors::kGreen);
+                        }
+                        if (auto c = r.GetComponent<ECS::CCollider>(entity))
+                        {
+                            DebugDrawer::DebugWireframe(*c, t);
+                        }
+                    }
+                } });
+            _editor_outline->SetVector("_SelectBuffer_TexelSize", Vector4f(1.0f / _color->Width(), 1.0f / _color->Height(), (f32) _color->Width(), (f32) _color->Height()));
+
+            graph.AddPass("GenerateOutline", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+                          {
+                    TextureDesc desc(_color->Width(), _color->Height(),ERenderTargetFormat::kDefault);
+                    select_buf_blur = builder.AllocTexture(desc,"select_buffer_blur");
+                    builder.Read(select_buf);
+                    select_buf_blur = builder.Write(select_buf_blur);
+                }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data) { 
+                    _editor_outline->SetTexture("_SelectBuffer", graph.Resolve<Texture>(select_buf));
+                    cmd->SetRenderTarget(select_buf_blur);
+                    cmd->DrawFullScreenQuad(_editor_outline.get());
+                });
+            graph.AddPass("BlurOutline", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+                          {
+                    builder.Read(select_buf_blur);
+                    select_buf = builder.Write(select_buf); }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+                          { 
+                    _editor_outline->SetTexture("_SelectBuffer", graph.Resolve<Texture>(select_buf_blur));
+                    cmd->SetRenderTarget(select_buf);
+                    cmd->DrawFullScreenQuad(_editor_outline.get(),1); 
+                });
+            graph.AddPass("ApplyOutline", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
+                          {
+                    builder.Read(select_buf);
+                    builder.Read(rendering_data._rg_handles._color_target);
+                    rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target); 
+                }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
+                          { 
+                    _editor_outline->SetTexture("_SelectBuffer", graph.Resolve<Texture>(select_buf));
+                    cmd->SetRenderTarget(rendering_data._rg_handles._color_target);
+                    cmd->DrawFullScreenQuad(_editor_outline.get(),2); });
         }
         void PickPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
         {
@@ -56,7 +212,7 @@ namespace Ailu
                             //Gizmo::DrawCube(t._position, comp->_size);
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
                             Gizmo::DrawAABB(t._position - ext,t._position + ext);
-                            cmd->DrawMesh(Mesh::s_p_shpere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
+                            cmd->DrawMesh(Mesh::s_sphere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CCamera>(entity); comp != nullptr)
                         {
@@ -89,22 +245,22 @@ namespace Ailu
                     {
                         case ECS::ELightType::kDirectional:
                         {
-                            cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_directional_light, obj_data, 0, 1, 1);
+                            cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_directional_light, obj_data, 0, 1, 1);
                         }
                         break;
                         case ECS::ELightType::kPoint:
                         {
-                            cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_point_light, obj_data, 0, 1, 1);
+                            cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_point_light, obj_data, 0, 1, 1);
                         }
                         break;
                         case ECS::ELightType::kSpot:
                         {
-                            cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_spot_light, obj_data, 0, 1, 1);
+                            cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_spot_light, obj_data, 0, 1, 1);
                         }
                         break;
                         case ECS::ELightType::kArea:
                         {
-                            cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_area_light, obj_data, 0, 1, 1);
+                            cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_area_light, obj_data, 0, 1, 1);
                         }
                         break;
                     }
@@ -120,7 +276,7 @@ namespace Ailu
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
-                    cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
+                    cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
                 }
                 entity_index = 0;
                 for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
@@ -132,7 +288,7 @@ namespace Ailu
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
                     f32 scale = 2.0f;
                     obj_data._MatrixWorld = MatrixScale(scale, scale, scale) * obj_data._MatrixWorld;
-                    cmd->DrawMesh(Mesh::s_p_quad.lock().get(), mat_camera, obj_data, 0, 1, 1);
+                    cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_camera, obj_data, 0, 1, 1);
                     ++entity_index;
                 }
                 //write to select buffer and draw debug outline
@@ -323,7 +479,9 @@ namespace Ailu
                 if (_pick_buf == nullptr || _pick_buf->Width() != rendering_data._width || _pick_buf->Height() != rendering_data._height)
                 {
                     _pick_buf = RenderTexture::Create(rendering_data._width, rendering_data._height, "pick_buffer", ERenderTargetFormat::kRUint, false, false, false);
+                    _pick_buf->_store_action = ELoadStoreAction::kClear;
                     _pick_buf_depth = RenderTexture::Create(rendering_data._width, rendering_data._height, "pick_buffer_depth", ERenderTargetFormat::kDepth, false, false, false);
+                    _pick_buf_depth->_store_action = ELoadStoreAction::kClear;
                 }
                 if (_is_active)
                 {

@@ -185,6 +185,10 @@ namespace Ailu
         bool _main_finished = false;
         u64 _frame_count = 0u;
         Scope<Core::RawEventQueue> _raw_event_queue;
+        //maybe editor
+        std::atomic<bool> _has_drop_files = false;
+        std::mutex _drop_files_mtx;
+        Vector<WString> _drop_files;
     };
 }// namespace Ailu
 

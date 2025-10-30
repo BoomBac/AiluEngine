@@ -92,7 +92,7 @@ namespace Ailu::Render
         _terrain_gen =  terrain_gen;
         _plane = plane;
         _terrain_mat = terrain_mat;
-        DrawIndexedArguments draw_arg{plane->GetIndicesCount(),1u,0,0u,0u};
+        DrawIndexedArguments draw_arg{(u32)plane->GetIndicesCount(),1u,0,0u,0u};
         _draw_arg_buf->SetData((const u8*)&draw_arg,sizeof(DrawIndexedArguments));
         
         auto cmd = CommandBufferPool::Get("TerrainPassInit");
@@ -173,7 +173,7 @@ namespace Ailu::Render
             });
             if (_is_debug)
             {
-                cmd->DrawMeshIndirect(Mesh::s_p_cube.lock().get(), 0u, _terrain_mat, 1u, _draw_arg_buf.get());
+                cmd->DrawMeshIndirect(Mesh::s_cube.lock().get(), 0u, _terrain_mat, 1u, _draw_arg_buf.get());
             }
         }
         context->ExecuteCommandBuffer(cmd);

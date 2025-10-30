@@ -177,6 +177,26 @@ namespace Ailu
             f32 _anim_progress = 1.0f;// 0.0=折叠 1.0=展开
         };
 
+        ACLASS()
+        class AILU_API SplitView : public UIElement
+        {
+            GENERATED_BODY()
+        public:
+            inline static const f32 kSplitBarThickness = 2.0f;
+            SplitView();
+            void Update(f32 dt) override;
+        private:
+            void RenderImpl(UIRenderer &r) override;
+            void PostDeserialize() override;
+            void MeasureAndArrange(f32 dt) override;
+        private:
+            APROPERTY()
+            f32 _ratio = 0.5f;
+            APROPERTY()
+            bool _is_horizontal = true;
+            bool _is_dragging_bar = false;
+            bool _is_hover_bar = false;
+        };
     }
 }// namespace Ailu
 #endif// !__UI_CONTAINER_H__

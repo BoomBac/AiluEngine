@@ -41,6 +41,7 @@ namespace Ailu
         public:
             UIElement *_capture_target = nullptr;//记录按下时的目标,全局共享，element销毁时检查这个值
             UIElement *_focus_target = nullptr;  //记录按下时的目标,全局共享，element销毁时检查这个值
+            UIElement *_hover_target = nullptr;
             Widget *_pre_hover_widget = nullptr; //记录上一帧鼠标停留的控件,全局共享，widget销毁时检查这个值
             //sort order大的在后面
             Vector<Ref<Widget>> _widgets;
