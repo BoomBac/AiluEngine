@@ -55,6 +55,29 @@ namespace Ailu
                         cmd->DrawMesh(obj._mesh, _pick_gen.get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
                     }
                 }
+                if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
+                {
+                    for (auto entity: selected)
+                    {
+                        const auto t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
+                        if (auto comp = r.GetComponent<ECS::LightComponent>(entity); comp != nullptr)
+                        {
+                            DrawLightGizmo(t, comp);
+                            continue;
+                        }
+                        else if (auto comp = r.GetComponent<ECS::CLightProbe>(entity); comp != nullptr)
+                        {
+                            //Gizmo::DrawCube(t._position, comp->_size);
+                            Vector3f ext = Vector3f(comp->_size) * 0.5f;
+                            Gizmo::DrawAABB(t._position - ext, t._position + ext);
+                            cmd->DrawMesh(Mesh::s_sphere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
+                        }
+                        else if (auto comp = r.GetComponent<ECS::CCamera>(entity); comp != nullptr)
+                        {
+                            Camera::DrawGizmo(&comp->_camera, Colors::kWhite);
+                        }
+                    }
+                }
                 u16 entity_index = 0;
                 for (auto &light_comp: r.View<ECS::LightComponent>())
                 {
@@ -490,7 +513,7 @@ namespace Ailu
                 }
             }
         }
-        u32 PickFeature::GetPickID(u16 x, u16 y) const
+        void PickFeature::GetPickID(u16 x, u16 y, std::function<void(u32)> on_value_get) const
         {
             if (_is_active)
             {
@@ -500,16 +523,15 @@ namespace Ailu
                 _read_pickbuf->SetBuffer("_PickResult", _readback_buf.get());
                 _read_pickbuf->SetVector("pixel_pos", Vector4f((f32) x, (f32) y, 0.0f, 0.0f));
                 cmd->Dispatch(_read_pickbuf.get(), kernel, 1, 1, 1);
-                GraphicsContext::Get().ExecuteCommandBufferSync(cmd);
+                cmd->ReadbackBuffer(_readback_buf.get(), false, 4u, [on_value_get](const u8 *data, u32 size)
+                                    { on_value_get(*(u32 *) data);
+                    });
+                GraphicsContext::Get().ExecuteCommandBuffer(cmd);
                 CommandBufferPool::Release(cmd);
-                u8 data[256];
-                _readback_buf->ReadBack(data, 256);
-                return *reinterpret_cast<u32 *>(data);
             }
             else
             {
                 LOG_WARNING("Pick feature not active!");
-                return -1;
             }
         }
         //-----------------------------------------------------------------------PickFeature----------------------------------------------------------------------------

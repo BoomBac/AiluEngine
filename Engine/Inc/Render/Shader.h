@@ -592,12 +592,12 @@ namespace Ailu::Render
         /// @brief 预处理shader，必须在compile之前调用！
         bool Preprocess();
         bool Compile();
-        bool Compile(u16 kernel_index, ShaderVariantHash variant_hash);
         ShaderVariantHash ActiveVariant(u16 kernel_index) const { return _kernels[kernel_index]._active_variant; }
         void PushState(u16 kernel = 0u);
     public:
         std::atomic<bool> _is_compiling = false;
     protected:
+        bool Compile(u16 kernel_index, ShaderVariantHash variant_hash);
         virtual bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash);
 
     private:

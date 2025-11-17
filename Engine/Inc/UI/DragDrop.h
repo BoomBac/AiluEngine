@@ -85,6 +85,7 @@ namespace Ailu
             Render::Texture *_preview_tex = nullptr;
             DropHandler *_hover_target = nullptr;
             f32 mx = 0.0f, my = 0.0f;
+            bool _is_drag_start = false;//鼠标移动一段距离才开始
         };
 
     }// namespace UI

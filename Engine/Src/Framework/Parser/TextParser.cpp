@@ -1,7 +1,7 @@
 #include "Framework/Parser/TextParser.h"
 #include "Framework/Common/FileManager.h"
-#include "Framework/Common/Utils.h"
 #include "Framework/Common/Log.h"
+#include "Framework/Common/Utils.h"
 
 #include "pch.h"
 #include <Ext/rapidjson/inc/document.h>
@@ -140,9 +140,9 @@ namespace Ailu
         bool Save(const WString &path)
         {
             FILE *fp;
-            if (_wfopen_s(&fp,path.c_str(), L"wb"))
+            if (_wfopen_s(&fp, path.c_str(), L"wb"))
             {
-                LOG_ERROR(L"JSONParser::Impl open file({}) failed",path)
+                LOG_ERROR(L"JSONParser::Impl open file({}) failed", path)
                 return false;
             }
             if (!fp) return false;
@@ -159,14 +159,35 @@ namespace Ailu
         const rapidjson::Value *GetNode(const String &path) const
         {
             const rapidjson::Value *node = &doc;
+
             for (const auto &key: SplitPath(path))
             {
-                if (!node->IsObject() || !node->HasMember(key.c_str()))
+                if (node->IsObject())
+                {
+                    if (!node->HasMember(key.c_str()))
+                        return nullptr;
+                    node = &(*node)[key.c_str()];
+                }
+                else if (node->IsArray())
+                {
+                    // 检查key是否是数字（数组下标）
+                    char *end = nullptr;
+                    u32 index = (u32) strtol(key.c_str(), &end, 10);
+                    if (*end != '\0')// 不是纯数字
+                        return nullptr;
+                    if (index < 0 || index >= (u32)node->Size())
+                        return nullptr;
+                    node = &(*node)[static_cast<rapidjson::SizeType>(index)];
+                }
+                else
+                {
                     return nullptr;
-                node = &(*node)[key.c_str()];
+                }
             }
+
             return node;
         }
+
 
         rapidjson::Value *EnsureNode(const String &path)
         {
@@ -261,7 +282,11 @@ namespace Ailu
     {
         Map<String, String> result;
         const rapidjson::Value *node = _impl->GetNode(section);
-        if (!node || !node->IsObject()) return result;
+        if (!node || !node->IsObject())
+        {
+            LOG_WARNING("JSONParser::GetValues section '{}' not found or not an object", section)
+            return result;
+        }
 
         for (auto it = node->MemberBegin(); it != node->MemberEnd(); ++it)
         {
@@ -328,6 +353,14 @@ namespace Ailu
     void JSONParser::SetValue(const String &section, const String &key, const String &value)
     {
         _impl->SetString(section + "." + key, value);
+    }
+
+    u32 JSONParser::GetArraySize(const String &json_path) const
+    {
+        auto node = _impl->GetNode(json_path);
+        if (!node || !node->IsArray())
+            return 0;
+        return static_cast<u32>(node->Size());
     }
 
 

@@ -367,7 +367,7 @@ namespace Ailu::Render
         Core::LockFreeQueue<CommandTranslateState *, 64> _pool_resource_translate;
         Core::LockFreeQueue<CommandCustom *, 256> _pool_custom;
         Core::LockFreeQueue<CommandAllocConstBuffer *, 128> _pool_alloc_const_buffer;
-        Core::LockFreeQueue<CommandProfiler *, 256> _pool_profiler;
+        Core::LockFreeQueue<CommandProfiler *, 512> _pool_profiler;
         Core::LockFreeQueue<CommandPresent *, 32> _pool_present;
         Core::LockFreeQueue<CommandCopyCounter *, 32> _pool_cp_counter;
         Core::LockFreeQueue<CommandReadBack *, 32> _pool_rb;

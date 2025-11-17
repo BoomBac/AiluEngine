@@ -298,12 +298,7 @@ namespace Ailu
     }
     void WinWindow::OnUpdate()
     {
-        //MSG msg = {};
-        //if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-        //{
-        //    TranslateMessage(&msg);
-        //    DispatchMessage(&msg);
-        //}
+#if defined(SEPARATE_LOGIC_THREAD)
         DWORD result = MsgWaitForMultipleObjects(
                 0,// 不等其他内核对象
                 nullptr,
@@ -321,6 +316,14 @@ namespace Ailu
                 DispatchMessage(&msg);
             }
         }
+#else
+        MSG msg = {};
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+#endif
     }
     u32 WinWindow::GetWidth() const
     {

@@ -405,9 +405,9 @@ namespace Ailu::Render
                 }
             }
         }
-        Shader::SetGlobalTexture("MainLightShadowMap", _p_mainlight_shadow_map.get());
-        Shader::SetGlobalTexture("AddLightShadowMaps", _p_addlight_shadow_maps.get());
-        Shader::SetGlobalTexture("PointLightShadowMaps", _p_point_light_shadow_maps.get());
+        Shader::SetGlobalTexture(RenderResourceName::kMainLightShadowMap, _p_mainlight_shadow_map.get());
+        Shader::SetGlobalTexture(RenderResourceName::kAddLightShadowMap, _p_addlight_shadow_maps.get());
+        Shader::SetGlobalTexture(RenderResourceName::kPointLightShadowMap, _p_point_light_shadow_maps.get());
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);
     }
@@ -946,7 +946,6 @@ namespace Ailu::Render
         Vector2f half_size((f32) (rendering_data._width >> 1), (f32) (rendering_data._height >> 1));
         Vector2f viewport_size((f32) rendering_data._width, (f32) rendering_data._height);
         half_size -= s_axis_length;
-        half_size = -half_size;
         //camera_target = Vector3f::kZero;
         Vector4f cpos_camera_target = {camera_target, 1.0f};
         Vector4f cpos_y_axis = {camera_target + Vector3f::kUp * s_axis_length, 1.0f};
@@ -959,14 +958,11 @@ namespace Ailu::Render
         Vector2f screen_pos_x_axis = cpos_x_axis.xy;
         Vector2f screen_pos_y_axis = cpos_y_axis.xy;
         Vector2f screen_pos_z_axis = cpos_z_axis.xy;
-        //screen_pos_x_axis = screen_pos_x_axis / Magnitude(screen_pos_x_axis) * s_axis_length;// + half_size;
-        //screen_pos_y_axis = screen_pos_y_axis / Magnitude(screen_pos_y_axis) * s_axis_length;// + half_size;
-        //screen_pos_z_axis = screen_pos_z_axis / Magnitude(screen_pos_z_axis) * s_axis_length;// + half_size;
-        cpos_camera_target.xy += half_size;
-        screen_pos_x_axis += half_size;
-        screen_pos_y_axis += half_size;
-        screen_pos_z_axis += half_size;
-        cpos_camera_target.zw = screen_pos_y_axis;
+
+        cpos_camera_target.xy += s_axis_length;
+        screen_pos_x_axis += s_axis_length;
+        screen_pos_y_axis += s_axis_length;
+        screen_pos_z_axis += s_axis_length;
         out[0] = Vector4f(cpos_camera_target.x, cpos_camera_target.y, screen_pos_y_axis.x,screen_pos_y_axis.y);
         out[1] = Vector4f(cpos_camera_target.x, cpos_camera_target.y, screen_pos_x_axis.x, screen_pos_x_axis.y);
         out[2] = Vector4f(cpos_camera_target.x, cpos_camera_target.y, screen_pos_z_axis.x, screen_pos_z_axis.y);

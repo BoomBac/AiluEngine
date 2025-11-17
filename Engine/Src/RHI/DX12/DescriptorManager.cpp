@@ -222,7 +222,10 @@ namespace Ailu::RHI::DX12
 		{
 			u16 release_num = page.ReleaseAllStaleBlock(Application::Application::Get().GetFrameCount());
 			_page_free_space_lut[page.PageType()].emplace(std::make_pair(page.AvailableDescriptorNum(), page.PageID()));
-			LOG_WARNING("Release CPUVisibleDescripto at page{} with num {}.", page.PageID(), release_num);
+            if (release_num > 0)
+			{
+				LOG_WARNING("Release CPUVisibleDescripto at page{} with num {}.", page.PageID(), release_num);
+			}
 		}
 	}
 

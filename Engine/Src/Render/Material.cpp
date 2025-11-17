@@ -786,6 +786,9 @@ namespace Ailu::Render
     }
     StandardMaterial::StandardMaterial(String name) : Material(Shader::s_p_defered_standart_lit.lock().get(), name)
     {
+        SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, Colors::kWhite);
+        SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, 1.0f);
+        SetFloat(StandardMaterial::StandardPropertyName::kMetallic._value_name, 0.0f);
     }
     StandardMaterial::~StandardMaterial()
     {

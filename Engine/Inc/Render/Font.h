@@ -54,9 +54,12 @@ namespace Ailu::Render
         f32 _right_padding;
         f32 _top_padding;
         f32 _bottom_padding;
+        f32 _ascent;
+        f32 _descent;
         bool _is_bold;
         bool _is_italic;
         bool _is_packed;
+        bool _is_msdf = false;
         [[nodiscard]] f32 GetKerning(char first, char second) const
         {
             auto it = _kerning_list.find(first);
@@ -80,6 +83,8 @@ namespace Ailu::Render
             return _char_list.at(replace_char);
         }
         static Ref<Font> Create(const WString& file_path);
+        //create from msdf
+        static Ref<Font> Create(const Path &bitmap_path, const Path &json_path);
     };
 
     struct GlyphRenderInfo
@@ -93,7 +98,7 @@ namespace Ailu::Render
         f32 _xadvance;// 光标前进量
     };
 
-    Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Vector2f padding, Font *font);
+    Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos,f32 font_size, Vector2f scale, Vector2f padding, Font *font);
 
 }// namespace Ailu
 

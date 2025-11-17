@@ -9,7 +9,6 @@
     "_position": [0.0, 0.0],
     "_scale": [1.0, 1.0],
     "_hash": 956,
-    "_guid": {},
     "_root": {
         "_type_name": "Ailu::UI::Canvas",
         "_visibility": "kVisible",
@@ -21,7 +20,8 @@
             "_type": "kCanvas",
             "_alignment_v": "kCenter",
             "_margin": [0.0, 0.0, 0.0, 0.0],
-            "_size_policy": "kFill",
+            "_size_policy_h": "ErrorEnumValue",
+            "_size_policy_v": "ErrorEnumValue",
             "_is_size_to_content": false,
             "_fill_rate": 1.0
         },
@@ -32,7 +32,6 @@
         "_rotation": 0.0,
         "_id": 957,
         "_hash": 957,
-        "_guid": {},
         "_children": [{
                 "_type_name": "Ailu::UI::ScrollView",
                 "_visibility": "kVisible",
@@ -44,7 +43,8 @@
                     "_type": "kCanvas",
                     "_alignment_v": "kCenter",
                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                    "_size_policy": "kFixed",
+                    "_size_policy_h": "ErrorEnumValue",
+                    "_size_policy_v": "ErrorEnumValue",
                     "_is_size_to_content": false,
                     "_fill_rate": 1.0
                 },
@@ -55,7 +55,6 @@
                 "_rotation": 0.0,
                 "_id": 957,
                 "_hash": 957,
-                "_guid": {},
                 "_children": [{
                         "_type_name": "Ailu::UI::VerticalBox",
                         "_visibility": "kVisible",
@@ -67,7 +66,8 @@
                             "_type": "kCanvas",
                             "_alignment_v": "kCenter",
                             "_margin": [0.0, 0.0, 0.0, 0.0],
-                            "_size_policy": "kAuto",
+                            "_size_policy_h": "ErrorEnumValue",
+                            "_size_policy_v": "ErrorEnumValue",
                             "_is_size_to_content": true,
                             "_fill_rate": 1.0
                         },
@@ -78,7 +78,6 @@
                         "_rotation": 0.0,
                         "_id": 958,
                         "_hash": 958,
-                        "_guid": {},
                         "_children": [{
                                 "_type_name": "Ailu::UI::Button",
                                 "_visibility": "kVisible",
@@ -90,7 +89,8 @@
                                     "_type": "kCanvas",
                                     "_alignment_v": "kCenter",
                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                    "_size_policy": "kFixed",
+                                    "_size_policy_h": "ErrorEnumValue",
+                                    "_size_policy_v": "ErrorEnumValue",
                                     "_is_size_to_content": false,
                                     "_fill_rate": 1.0
                                 },
@@ -101,12 +101,11 @@
                                 "_rotation": 0.0,
                                 "_id": 959,
                                 "_hash": 959,
-                                "_guid": {},
                                 "_children": []
                             }, {
                                 "_type_name": "Ailu::UI::Text",
+                                "_font_size": 14.0,
                                 "_color": [1.0, 1.0, 1.0, 1.0],
-                                "_font_size": 14,
                                 "_horizontal_align": "kCenter",
                                 "_slot": {
                                     "_anchor": [0.0, 0.0],
@@ -116,7 +115,8 @@
                                     "_type": "kCanvas",
                                     "_alignment_v": "kCenter",
                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                    "_size_policy": "kFill",
+                                    "_size_policy_h": "ErrorEnumValue",
+                                    "_size_policy_v": "ErrorEnumValue",
                                     "_is_size_to_content": false,
                                     "_fill_rate": 1.0
                                 },
@@ -130,12 +130,10 @@
                                 "_scale": [1.0, 1.0],
                                 "_id": 960,
                                 "_hash": 960,
-                                "_guid": {},
                                 "_children": []
                             }, {
                                 "_type_name": "Ailu::UI::Slider",
                                 "_range": [0.0, 1.0],
-                                "_font_size": 12,
                                 "_padding": [0.0, 0.0, 0.0, 0.0],
                                 "_value": 0.0,
                                 "_visibility": "kVisible",
@@ -147,7 +145,8 @@
                                     "_type": "kCanvas",
                                     "_alignment_v": "kCenter",
                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                    "_size_policy": "kFill",
+                                    "_size_policy_h": "ErrorEnumValue",
+                                    "_size_policy_v": "ErrorEnumValue",
                                     "_is_size_to_content": false,
                                     "_fill_rate": 1.0
                                 },
@@ -157,7 +156,6 @@
                                 "_name": "ui_element_961",
                                 "_id": 961,
                                 "_hash": 961,
-                                "_guid": {},
                                 "_children": []
                             }, {
                                 "_is_collapsed": false,
@@ -172,7 +170,8 @@
                                     "_type": "kCanvas",
                                     "_alignment_v": "kCenter",
                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                    "_size_policy": "kAuto",
+                                    "_size_policy_h": "ErrorEnumValue",
+                                    "_size_policy_v": "ErrorEnumValue",
                                     "_is_size_to_content": false,
                                     "_fill_rate": 1.0
                                 },
@@ -183,7 +182,6 @@
                                 "_name": "ui_element_961",
                                 "_id": 961,
                                 "_hash": 961,
-                                "_guid": {},
                                 "_children": [{
                                         "_type_name": "Ailu::UI::HorizontalBox",
                                         "_visibility": "kVisible",
@@ -195,7 +193,8 @@
                                             "_type": "kCanvas",
                                             "_alignment_v": "kCenter",
                                             "_margin": [0.0, 0.0, 0.0, 0.0],
-                                            "_size_policy": "kAuto",
+                                            "_size_policy_h": "ErrorEnumValue",
+                                            "_size_policy_v": "ErrorEnumValue",
                                             "_is_size_to_content": true,
                                             "_fill_rate": 1.0
                                         },
@@ -206,11 +205,10 @@
                                         "_rotation": 0.0,
                                         "_id": 958,
                                         "_hash": 958,
-                                        "_guid": {},
                                         "_children": [{
                                                 "_type_name": "Ailu::UI::Text",
+                                                "_font_size": 14.0,
                                                 "_color": [1.0, 1.0, 1.0, 1.0],
-                                                "_font_size": 14,
                                                 "_horizontal_align": "kLeft",
                                                 "_slot": {
                                                     "_anchor": [0.0, 0.0],
@@ -220,7 +218,8 @@
                                                     "_type": "kCanvas",
                                                     "_alignment_v": "kCenter",
                                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                                    "_size_policy": "kFill",
+                                                    "_size_policy_h": "ErrorEnumValue",
+                                                    "_size_policy_v": "ErrorEnumValue",
                                                     "_is_size_to_content": false,
                                                     "_fill_rate": 1.0
                                                 },
@@ -234,7 +233,6 @@
                                                 "_scale": [1.0, 1.0],
                                                 "_id": 960,
                                                 "_hash": 960,
-                                                "_guid": {},
                                                 "_children": []
                                             }]
                                     }, {
@@ -248,7 +246,8 @@
                                             "_type": "kCanvas",
                                             "_alignment_v": "kCenter",
                                             "_margin": [0.0, 0.0, 0.0, 0.0],
-                                            "_size_policy": "kFill",
+                                            "_size_policy_h": "ErrorEnumValue",
+                                            "_size_policy_v": "ErrorEnumValue",
                                             "_is_size_to_content": false,
                                             "_fill_rate": 1.0
                                         },
@@ -259,7 +258,6 @@
                                         "_rotation": 0.0,
                                         "_id": 957,
                                         "_hash": 957,
-                                        "_guid": {},
                                         "_children": [{
                                                 "_type_name": "Ailu::UI::VerticalBox",
                                                 "_visibility": "kVisible",
@@ -271,7 +269,8 @@
                                                     "_type": "kCanvas",
                                                     "_alignment_v": "kCenter",
                                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                                    "_size_policy": "kAuto",
+                                                    "_size_policy_h": "ErrorEnumValue",
+                                                    "_size_policy_v": "ErrorEnumValue",
                                                     "_is_size_to_content": true,
                                                     "_fill_rate": 1.0
                                                 },
@@ -282,7 +281,6 @@
                                                 "_rotation": 0.0,
                                                 "_id": 958,
                                                 "_hash": 958,
-                                                "_guid": {},
                                                 "_children": [{
                                                         "_type_name": "Ailu::UI::Button",
                                                         "_visibility": "kVisible",
@@ -294,7 +292,8 @@
                                                             "_type": "kCanvas",
                                                             "_alignment_v": "kCenter",
                                                             "_margin": [0.0, 0.0, 0.0, 0.0],
-                                                            "_size_policy": "kFixed",
+                                                            "_size_policy_h": "ErrorEnumValue",
+                                                            "_size_policy_v": "ErrorEnumValue",
                                                             "_is_size_to_content": false,
                                                             "_fill_rate": 1.0
                                                         },
@@ -305,12 +304,11 @@
                                                         "_rotation": 0.0,
                                                         "_id": 959,
                                                         "_hash": 959,
-                                                        "_guid": {},
                                                         "_children": []
                                                     }, {
                                                         "_type_name": "Ailu::UI::Text",
+                                                        "_font_size": 14.0,
                                                         "_color": [1.0, 1.0, 1.0, 1.0],
-                                                        "_font_size": 14,
                                                         "_horizontal_align": "kCenter",
                                                         "_slot": {
                                                             "_anchor": [0.0, 0.0],
@@ -320,7 +318,8 @@
                                                             "_type": "kCanvas",
                                                             "_alignment_v": "kCenter",
                                                             "_margin": [0.0, 0.0, 0.0, 0.0],
-                                                            "_size_policy": "kFill",
+                                                            "_size_policy_h": "ErrorEnumValue",
+                                                            "_size_policy_v": "ErrorEnumValue",
                                                             "_is_size_to_content": false,
                                                             "_fill_rate": 1.0
                                                         },
@@ -334,12 +333,10 @@
                                                         "_scale": [1.0, 1.0],
                                                         "_id": 960,
                                                         "_hash": 960,
-                                                        "_guid": {},
                                                         "_children": []
                                                     }, {
                                                         "_type_name": "Ailu::UI::Slider",
                                                         "_range": [0.0, 1.0],
-                                                        "_font_size": 12,
                                                         "_padding": [2.0, 2.0, 2.0, 2.0],
                                                         "_value": 0.0,
                                                         "_visibility": "kVisible",
@@ -351,7 +348,8 @@
                                                             "_type": "kCanvas",
                                                             "_alignment_v": "kCenter",
                                                             "_margin": [0.0, 0.0, 0.0, 0.0],
-                                                            "_size_policy": "kFill",
+                                                            "_size_policy_h": "ErrorEnumValue",
+                                                            "_size_policy_v": "ErrorEnumValue",
                                                             "_is_size_to_content": false,
                                                             "_fill_rate": 1.0
                                                         },
@@ -361,7 +359,6 @@
                                                         "_name": "ui_element_961",
                                                         "_id": 961,
                                                         "_hash": 961,
-                                                        "_guid": {},
                                                         "_children": []
                                                     }]
                                             }]
@@ -377,7 +374,8 @@
                                     "_type": "kCanvas",
                                     "_alignment_v": "kCenter",
                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                    "_size_policy": "kFixed",
+                                    "_size_policy_h": "ErrorEnumValue",
+                                    "_size_policy_v": "ErrorEnumValue",
                                     "_is_size_to_content": false,
                                     "_fill_rate": 1.0
                                 },
@@ -388,13 +386,11 @@
                                 "_rotation": 0.0,
                                 "_id": 959,
                                 "_hash": 959,
-                                "_guid": {},
                                 "_children": []
                             }, {
                                 "_type_name": "Ailu::UI::Image",
                                 "_padding": [0.0, 0.0, 0.0, 0.0],
                                 "_tint_color": [1.0, 1.0, 1.0, 1.0],
-                                "_guid": {},
                                 "_texture_guid": "0f4943a3-8df4-4917-8730-92c9de6ef6ce",
                                 "_visibility": "kVisible",
                                 "_slot": {
@@ -405,7 +401,8 @@
                                     "_type": "kCanvas",
                                     "_alignment_v": "kCenter",
                                     "_margin": [0.0, 0.0, 0.0, 0.0],
-                                    "_size_policy": "kFixed",
+                                    "_size_policy_h": "ErrorEnumValue",
+                                    "_size_policy_v": "ErrorEnumValue",
                                     "_is_size_to_content": false,
                                     "_fill_rate": 1.0
                                 },

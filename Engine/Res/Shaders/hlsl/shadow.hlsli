@@ -2,11 +2,11 @@
 #define __SHADOW_H__
 #include "common.hlsli"
 
-Texture2DArray MainLightShadowMap : register(t10);
+Texture2DArray _MainLightShadowMap : register(t10);
 //Texture2D AddLightShadowMap : register(t11);
-Texture2DArray AddLightShadowMaps : register(t11);
+Texture2DArray _AddLightShadowMaps : register(t11);
 //TextureCube PointLightShadowMap : register(t12);
-TextureCubeArray PointLightShadowMaps : register(t12);
+TextureCubeArray _PointLightShadowMaps : register(t12);
 
 float Random(float4 seed4)
 {
@@ -126,7 +126,7 @@ static const float2 poissonDisk[64] =
 // 	{
 // 		uint random_index = uint(8.0 * Random(float4(world_pos.xyy, i))) % 8;
 // 		//uint random_index = i;
-// 		shadow_factor += lerp(0.0, 0.125, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadow_uv.xy + poissonDisk[random_index] * 0.00048828125, depth - z_bias).r);
+// 		shadow_factor += lerp(0.0, 0.125, _MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, shadow_uv.xy + poissonDisk[random_index] * 0.00048828125, depth - z_bias).r);
 // 	}
 // 	shadow_factor =  (1.0 - shadow_factor) * ShadowDistaanceAtten(dis,shadow_distance);
 // 	return 1.0 - shadow_factor;// *= lerp(1,0.0,saturate(dis/_MainLightShadowDistance));
@@ -169,9 +169,9 @@ float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 			for (int i = 0; i < _SOFT_SAMPLE_COUNT; i++)
 			{
 				//uint random_index = uint(8.0 * Random(float4(world_pos.xyy, i))) % 8;
-				// shadow_factor += lerp(0.0, 0.125, MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
+				// shadow_factor += lerp(0.0, 0.125, _MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
 				// 	float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth - z_bias).r);
-				shadow_factor += 1 - MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
+				shadow_factor += 1 - _MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, 
 					float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth).r;
 			}
 			shadow_factor /= _SOFT_SAMPLE_COUNT;
@@ -203,7 +203,7 @@ float ApplyShadowAddLight(float4 shadow_coord,float nl, float3 world_pos,int sha
 	{
 		uint random_index = uint(16.0 * Random(float4(world_pos.xyy, i))) % 16;
 		//uint random_index = i;
-		shadow_factor += lerp(0.0, 0.0625, 1 - AddLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float3(shadow_uv.xy + 
+		shadow_factor += lerp(0.0, 0.0625, 1 - _AddLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float3(shadow_uv.xy + 
 			poissonDisk[random_index] * 0.0009765625,shadowmap_index), depth).r);
 	}
 	shadow_factor =  (1.0 - shadow_factor);// * ShadowDistaanceAtten(dis,shadow_distance);
@@ -231,7 +231,7 @@ float ApplyShadowPointLight(float shadow_near,float shadow_far ,float nl, float3
 	{
 		uint random_index = uint(16.0 * Random(float4(floor(world_pos.xyy), q))) % 16;
 		shaodw_dir.xz += poissonDisk[random_index] * 0.0009765625;
-		float cur_sample = PointLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float4(shaodw_dir,(float)shadow_index),linear_z);
+		float cur_sample = _PointLightShadowMaps.SampleCmpLevelZero(g_ShadowSampler, float4(shaodw_dir,(float)shadow_index),linear_z);
 	#if defined(_REVERSED_Z)
 		cur_sample = 1 - cur_sample;
 	#endif

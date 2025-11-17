@@ -5,6 +5,7 @@
 #include "Render/Font.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Framework/Parser/TextParser.h"
 
 namespace Ailu::Render
 {
@@ -201,6 +202,78 @@ namespace Ailu::Render
         }
         return font;
     }
+    Ref<Font> Font::Create(const Path &bitmap_path, const Path &json_path)
+    {
+        if (!fs::exists(bitmap_path) || !fs::exists(json_path))
+        {
+            LOG_ERROR("Font::Create: bitmap_path({}) or json_path({}) does not exist!", bitmap_path, json_path)
+            return nullptr;
+        }
+        auto font = MakeRef<Font>();
+        JSONParser parser;
+        parser.Load(json_path.wstring());
+        u32 glyphs_num = parser.GetArraySize("glyphs");
+        String y_origin = parser.GetString("atlas.yOrigin", "bottom");
+        f32 tex_w = (f32) parser.GetInt("atlas.width");
+        f32 tex_h = (f32) parser.GetInt("atlas.height");
+        // --- metrics (values are in ems; typically emSize == 1)
+        f32 em_size = 1.0f;
+        em_size = (f32)parser.GetFloat("metrics.emSize");
+        font->_line_height = (f32)parser.GetFloat("metrics.lineHeight") / em_size;
+        font->_base_height = (f32)parser.GetFloat("metrics.ascender") / em_size;
+        font->_ascent = (f32) parser.GetFloat("metrics.ascender") / em_size;
+        font->_descent = (f32) parser.GetFloat("metrics.descender") / em_size;
+        for (u32 i = 0; i < glyphs_num; i++)
+        {
+            FontChar font_char;
+            font_char._id = parser.GetInt("glyphs." + std::to_string(i) + ".unicode");
+            font_char._xadvance = (f32) (f32)parser.GetFloat("glyphs." + std::to_string(i) + ".advance");
+            font_char._page = 0u;
+
+            Vector4f plane_bounds;
+            plane_bounds.x = (f32)parser.GetFloat("glyphs." + std::to_string(i) + ".planeBounds.left");
+            plane_bounds.y = (f32)parser.GetFloat("glyphs." + std::to_string(i) + ".planeBounds.top");
+            plane_bounds.z = (f32)parser.GetFloat("glyphs." + std::to_string(i) + ".planeBounds.right");
+            plane_bounds.w = (f32)parser.GetFloat("glyphs." + std::to_string(i) + ".planeBounds.bottom");
+            font_char._xoffset = plane_bounds.x;
+            font_char._yoffset = plane_bounds.y;
+            font_char._width = plane_bounds.z - plane_bounds.x;
+            font_char._height = plane_bounds.w - plane_bounds.y;
+
+            Vector4f atlas_bounds;
+            f32 a_left = (f32)(f32)parser.GetFloat("glyphs." + std::to_string(i) + ".atlasBounds.left");
+            f32 a_bottom = (f32) (f32)parser.GetFloat("glyphs." + std::to_string(i) + ".atlasBounds.bottom");
+            f32 a_top = (f32) (f32)parser.GetFloat("glyphs." + std::to_string(i) + ".atlasBounds.top");
+            f32 a_right = (f32) (f32)parser.GetFloat("glyphs." + std::to_string(i) + ".atlasBounds.right");
+            f32 pixel_w = a_right - a_left;
+            f32 pixel_h = a_top - a_bottom;
+            // normalized UVs (注意 yOrigin)
+            // we will set u = left / tex_w, v = bottom / tex_h if yOrigin == "bottom"
+            if (y_origin == "bottom")
+            {
+                font_char._u = a_left / tex_w;
+                font_char._v = (tex_h - a_top) / tex_h;
+            }
+            else// assume "top"
+            {
+                AL_ASSERT(false);
+                // if top-origin, atlas y=0 is top; you may want to flip v accordingly when sampling
+                font_char._u = a_left / tex_w;
+                // convert top-origin to bottom-origin normalized v:
+                font_char._v = (tex_h - a_top) / tex_h;
+            }
+            font_char._twidth = pixel_w / tex_w;
+            font_char._theight = pixel_h / tex_h;
+            font->_char_list[(char) font_char._id] = font_char;
+        }
+        Page p;
+        p._id = 0u;
+        p._file = bitmap_path.wstring();
+        font->_pages.push_back(p);
+        font->_is_msdf = true;
+        return font;
+    }
+    /*
     Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Vector2f padding, Font *font)
     {
         if (text.empty())
@@ -265,4 +338,75 @@ namespace Ailu::Render
         }
         return result;
     }
+    */
+    Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Vector2f padding, Font *font)
+    {
+        if (text.empty())
+            return {};
+
+        Vector<GlyphRenderInfo> result;
+        result.reserve(text.size());
+
+        f32 x = pos.x;
+        f32 dy = font_size * scale.y / font->_line_height;
+        f32 baseline_y = dy * font->_ascent + pos.y;
+
+        f32 h_padding = (font->_left_padding + font->_right_padding) * padding.x;
+        f32 v_padding = (font->_top_padding + font->_bottom_padding) * padding.y;
+
+        i32 last_char = -1;
+
+        for (u32 i = 0; i < text.size(); i++)
+        {
+            char c = text[i];
+            if (c == '\0')
+                continue;
+
+            auto &char_info = font->GetChar(c);
+
+            // 换行
+            if (c == '\n')
+            {
+                x = pos.x;
+                // 向下移一行（line_height 包含 ascent + descent）
+                baseline_y += (font->_line_height + v_padding) * scale.y * font_size;
+                last_char = -1;
+                continue;
+            }
+
+            // 空格或不可见字符
+            if (char_info._width == 0 && char_info._height == 0)
+            {
+                x += char_info._xadvance * scale.x * font_size;
+                last_char = c;
+                continue;
+            }
+
+            f32 kerning = (last_char >= 0) ? font->GetKerning(last_char, c) : 0.f;
+
+            // 注意：yoffset 通常相对于 baseline（向下为正），所以这里可以直接加
+            Vector4f uv_rect = Vector4f(char_info._u, char_info._v, char_info._twidth, char_info._theight);
+            Vector4f pos_rect = {
+                    x + (char_info._xoffset + kerning) * scale.x * font_size,
+                    baseline_y - char_info._yoffset * scale.y * font_size,
+                    char_info._width * font_size * scale.x,
+                    abs(char_info._height) * font_size * scale.y};
+
+            GlyphRenderInfo info;
+            info._c = c;
+            info._pos = pos_rect.xy;
+            info._size = pos_rect.zw;
+            info._uv = uv_rect.xy;
+            info._uv_size = uv_rect.zw;
+            info._page = char_info._page;
+            info._xadvance = char_info._xadvance * scale.x;
+
+            x += info._xadvance * font_size;
+            last_char = c;
+            result.push_back(info);
+        }
+
+        return result;
+    }
+
 }// namespace Ailu::Render

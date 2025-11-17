@@ -28,6 +28,7 @@
 #include "Render/GraphicsContext.h"
 #include "Render/RenderPipeline.h"
 
+//#define SEPARATE_LOGIC_THREAD 1
 
 using namespace Ailu::Render;
 
@@ -107,6 +108,7 @@ namespace Ailu
         //LogMgr::Get().AddAppender(new ConsoleAppender());
         _p_window = std::move(WindowFactory::Create(s_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine", desc._window_width, desc._window_height));
         _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
+        s_focus_window = _p_window.get();
         _layer_stack = new LayerStack();
         //PushLayer(new UI::UILayer());
 #ifdef DEAR_IMGUI
@@ -171,6 +173,7 @@ namespace Ailu
     void Application::Tick(f32 delta_time)
     {
         g_pTimeMgr->Reset();
+#if defined(SEPARATE_LOGIC_THREAD)
         std::thread logic_thread = std::thread([&]()
                                                {
             SetThreadName("LogicThread");
@@ -184,14 +187,26 @@ namespace Ailu
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             _p_window->OnUpdate();
             _dispatcher.PumpTasks();
-            //SetCursorInternal();
+            SetCursorInternal();
             if (_state == EApplicationState::EApplicationState_Pause)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
 
         if (logic_thread.joinable())
             logic_thread.join();
+#else
+        while (_state != EApplicationState::EApplicationState_Exit)
+        {
+            _p_window->OnUpdate();
+            LogicLoop();
+            _dispatcher.PumpTasks();
+            SetCursorInternal();
+            if (_state == EApplicationState::EApplicationState_Pause)
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+#endif
         LOG_INFO("Exit");
+
     }
     void Application::PushLayer(Layer *layer)
     {
@@ -332,6 +347,7 @@ namespace Ailu
         dispather.Dispatch<WindowMinimizeEvent>(BIND_EVENT_HANDLER(OnWindowMinimize));
         dispather.Dispatch<WindowResizeEvent>(BIND_EVENT_HANDLER(OnWindowResize));
         dispather.Dispatch<WindowMovedEvent>(BIND_EVENT_HANDLER(OnWindowMove));
+#if defined(SEPARATE_LOGIC_THREAD)
         dispather.Dispatch<MouseButtonReleasedEvent>(BIND_EVENT_HANDLER(OnMouseUp));
         dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseDown));
         dispather.Dispatch<MouseMovedEvent>(BIND_EVENT_HANDLER(OnMouseMove));
@@ -339,6 +355,13 @@ namespace Ailu
         dispather.Dispatch<KeyPressedEvent>(BIND_EVENT_HANDLER(OnKeyDown));
         dispather.Dispatch<KeyReleasedEvent>(BIND_EVENT_HANDLER(OnKeyUp));
         dispather.Dispatch<MouseSetCursorEvent>(BIND_EVENT_HANDLER(OnSetCursor));
+#else
+        for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
+        {
+            (*--it)->OnEvent(e);
+            if (e.Handled()) break;
+        }
+#endif
     }
 
     bool Application::OnMouseDown(MouseButtonPressedEvent &e)
@@ -402,6 +425,8 @@ namespace Ailu
         {
             CPUProfileBlock main_b("Application::Tick");
             {
+                UI::UIManager::Get()->Update(delta_time);
+#if defined(SEPARATE_LOGIC_THREAD)
                 CPUProfileBlock main_b("Application::OnEvent");
                 static u8 event_mem[Core::RawEventQueue::MAX_EVENT_SIZE];
                 while (auto e = _raw_event_queue->Pop(event_mem))
@@ -428,6 +453,7 @@ namespace Ailu
                     _drop_files.clear();
                     _has_drop_files = false;
                 }
+#endif// defined
             }
             //处理窗口信息之后，才会进入暂停状态，也就是说暂停状态后的第一帧还是会执行，
             //这样会导致计时器会留下最后一个时间戳，再次回到渲染时，会有一个非常大的lag使得update错误

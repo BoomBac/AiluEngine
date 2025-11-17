@@ -50,6 +50,7 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	surface_data.emssive = emssion.rgb;
 	OrthonormalBasis(surface_data.wnormal,surface_data.tangent,surface_data.bitangent);
 	uint material_id = (uint)gbuf2.r;
+	return float4(surface_data.wnormal,1); 
 #ifdef DEBUG_NORMAL
 	return float4(surface_data.wnormal,1); 
 #elif DEBUG_ALBEDO

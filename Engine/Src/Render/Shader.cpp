@@ -1385,6 +1385,7 @@ namespace Ailu::Render
         }
         return false;
     }
+    HashMap<String, ShaderBindResourceInfo> s_old_bind_infos;
 
     bool ComputeShader::Compile()
     {
@@ -1394,12 +1395,24 @@ namespace Ailu::Render
             LOG_ERROR(L"ComputeShader::Compile: source:{} not exist!", _src_file_path);
             return false;
         }
-        Preprocess();
+        //Preprocess();
         bool is_succeed = true;
-        for (auto k: _kernels)
+        for (auto& k: _kernels)
         {
             for (auto &v: k._variants)
+            {
                 is_succeed &= Compile(k._id, v.first);
+                //将之前绑定的资源重新绑定上去
+                if (is_succeed)
+                {
+                    for (auto &it: v.second._bind_res_infos)
+                    {
+                        auto &[name, info] = it;
+                        if (s_old_bind_infos.contains(name) && s_old_bind_infos[name]._p_res != nullptr)
+                            info._p_res = s_old_bind_infos[name]._p_res;
+                    }
+                }
+            }
         }
         _is_compiling.store(false);
         return is_succeed;
@@ -1492,14 +1505,25 @@ namespace Ailu::Render
         return false;
     }
 
-
     bool ComputeShader::Preprocess()
     {
         String data;
         FileManager::ReadFile(_src_file_path, data);
         auto lines = su::Split(data, "\n");
-        HashMap<String, Vector<std::set<String>>> kernels;
+        s_old_bind_infos.clear();
+        for (auto &k: _kernels)
+        {
+            for (auto &v: k._variants)
+            {
+                for (auto &it: v.second._bind_res_infos)
+                {
+                    auto &[name, info] = it;
+                    s_old_bind_infos.insert(std::make_pair(name, info));
+                }
+            }
+        }
         _kernels.clear();
+        HashMap<String, Vector<std::set<String>>> kernels;
         for (auto &line: lines)
         {
             if (su::BeginWith(line, "#pragma kernel"))

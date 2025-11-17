@@ -90,54 +90,15 @@ namespace Ailu
             r->AddFeature(&_pick);
             r->SetShadingMode(EShadingMode::kLit);
 
-            //auto root = MakeRef<UI::Canvas>();
-            //auto vb = MakeRef<UI::VerticalBox>();
-            //vb->AddChild(MakeRef<UI::Button>())->OnMouseClick() += [](UI::UIEvent &e)
-            //{ LOG_INFO("Clicked!"); };
-            //dynamic_cast<UI::Text*>(root->AddChild(MakeRef<UI::Text>()))->_text = "This is a text";
-            //vb->AddChild(MakeRef<UI::Slider>());
-            //root->AddChild(vb);
-            //_main_widget->AddToWidget(root);
+
             DockManager::Init();
 
-            //auto testw = MakeRef<RenderView>();
-            //testw->SetPosition({200.0f, 200.0f});
-            //_scene_view = testw.get();
-            //DockManager::Get().AddDock(testw);
-            //auto common_view = MakeRef<CommonView>();
-            //common_view->SetPosition({200.0f, 200.0f});
-            //_common_view = common_view.get();
-            //DockManager::Get().AddDock(common_view);
             _main_widget = MakeRef<UI::Widget>();
             
             auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
             JsonArchive ar;
             ar.Load(p);
             ar >> *_main_widget;
-
-            //auto root = MakeRef<UI::Canvas>();
-            //auto vb = MakeRef<UI::VerticalBox>();
-            //vb->AddChild(MakeRef<UI::Button>())->OnMouseClick() += [](UI::UIEvent &e)
-            //{ LOG_INFO("Clicked!"); };
-            //vb->AddChild<UI::Text>()->SetText("This is a text");
-            //vb->AddChild(MakeRef<UI::Slider>());
-            //auto cv = vb->AddChild<UI::CollapsibleView>("CollapsibleView");
-            //{
-            //    auto cvb = MakeRef<UI::VerticalBox>();
-            //    cvb->AddChild<UI::Button>();
-            //    cvb->AddChild<UI::Text>()->SetText("CVB: This is a text");
-            //    cvb->AddChild(MakeRef<UI::Slider>());
-            //    cv->GetContent()->AddChild(cvb);
-            //}
-            //root->AddChild(vb);
-            //_main_widget->AddToWidget(root);
-            //JsonArchive ar;
-            //ar << *_main_widget;
-            //auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
-            //LOG_INFO(L"Save widget to ", p);
-            //ar.Save(p);
-
-            //UI::UIManager::Get()->RegisterWidget(_main_widget);
             FindFirstText(_main_widget.get());
             dynamic_cast<EditorApp &>(Application::Get())._on_file_changed += [&](const fs::path &file)
             {
@@ -271,6 +232,7 @@ namespace Ailu
         void EditorLayer::OnUpdate(f32 dt)
         {
             DockManager::Get().Update(dt);
+            //Gizmo::DrawLine(Vector2f::kZero, Vector2f{200, 200}, Colors::kRed);
             //LOG_INFO("--------------------------------------");
             //LOG_INFO("EditorLayer::OnUpdate: mpos({})", Input::GetMousePos().ToString());
             ccd_solver.Resize(3);

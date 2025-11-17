@@ -7,6 +7,7 @@
 #include "Widgets/EditorLayer.h"
 #include "Common/Selection.h"
 #include "Framework/Common/Input.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Common/Undo.h"
 #include "Common/TransformGizmo.h"
 #include "UI/DragDrop.h"
@@ -14,6 +15,8 @@
 #include "Render/Gizmo.h"
 #include "Render/Material.h"
 #include "Physics/Collision.h"
+
+#include "Render/Features/RayTraceGI.h"
 
 using namespace Ailu::UI;
 
@@ -60,7 +63,7 @@ namespace Ailu
             Vector3f new_camera_right = new_quat_y * Vector3f::kRight;
             auto new_quat_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
             _rot_object_x = Quaternion::NLerp(_rot_object_x, new_quat_x, speed);
-            _rot_world_y = Quaternion::NLerp(_rot_world_y, new_quat_y, speed);
+            _rot_world_y  = Quaternion::NLerp(_rot_world_y, new_quat_y, speed);
             _p_camera->Position(Lerp(_p_camera->Position(), _target_pos, speed));
             auto r = _rot_world_y * _rot_object_x;
             _p_camera->Rotation(r);
@@ -167,6 +170,15 @@ namespace Ailu
                     SetCursor(NULL);
                 }
             };
+            static Render::RayTraceGI *ray_trace = nullptr;
+            for (auto f : Render::RenderPipeline::Get().GetRenderer()->GetFeatures())
+            {
+                if (f->GetType() == Render::RayTraceGI::StaticType())
+                {
+                    ray_trace = dynamic_cast<Render::RayTraceGI *>(f);
+                    break;
+                }
+            }
             // 新增：抬起结束拖拽
             _source->OnMouseUp() += [this](UI::UIEvent &e)
             {
@@ -180,11 +192,14 @@ namespace Ailu
                     {
                         Vector4f rect = e._current_target->GetArrangeRect();
                         Vector2f local_pos = e._mouse_position - rect.xy;
-                        ECS::Entity closest_entity = s_editor_layer->_pick.GetPickID((u16) local_pos.x, (u16) local_pos.y);
-                        LOG_INFO("Pick entity: {} on pos {}", closest_entity, local_pos.ToString());
+                        s_editor_layer->_pick.GetPickID((u16) local_pos.x, (u16) local_pos.y, [this, local_pos](u32 closest_entity)
+                                                        {
+                                                    LOG_INFO("Pick entity: {} on pos {}", closest_entity, local_pos.ToString());
                         Selection::AddAndRemovePreSelection(closest_entity);
                         auto tcomp = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(closest_entity);
                         _transform_gizmo->SetTarget(&tcomp->_transform);
+                        ray_trace->_debug_pos = local_pos;
+                            });
                     }
                 }
                 else if (e._key_code == EKey::kRBUTTON)
@@ -229,13 +244,18 @@ namespace Ailu
             {
                 LOG_INFO("SceneView {} drop", StaticEnum<EDragType>()->GetNameByEnum(payload._type));
                 Vector<Ref<Render::Material>> mats;
-                for (auto &m: _drag_preview_mesh->GetCacheMaterials())
+                for (u16 i = 0; i < _drag_preview_mesh->SubmeshCount(); i++)
                 {
-                    auto cur_mat = MakeRef<Render::StandardMaterial>(m._name);
-                    cur_mat->SetVector(Render::StandardMaterial::StandardPropertyName::kAlbedo._value_name, m._diffuse);
-                    mats.push_back(cur_mat);
+                    auto mat = g_pResourceMgr->GetEmbeddedMaterial(_drag_preview_mesh.get(), i);
+                    if (mat)
+                    {
+                        mats.push_back(mat);
+                    }
+                    else
+                        LOG_WARNING("GetEmbeddedMaterial: mesh {},slot {} failed!", _drag_preview_mesh->Name(), i);
                 }
-                g_pSceneMgr->ActiveScene()->AddObject(_drag_preview_mesh, mats);
+                auto new_entity = g_pSceneMgr->ActiveScene()->AddObject(_drag_preview_mesh, mats);
+                g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_transform._position = _drag_preview_pos;
             };
             _source->SetDropHandler(handler);
         }

@@ -7,7 +7,6 @@
 //Blend: Src,OneMinusSrc
 //Queue: Transparent
 //ZWrite: Off
-//ZTest: Always
 //pass end::
 //pass begin::
 //name: billboard_pickbuffer

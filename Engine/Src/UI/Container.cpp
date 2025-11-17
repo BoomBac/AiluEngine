@@ -1,6 +1,6 @@
 #include "UI/Container.h"
-#include "Framework/Common/Input.h"
 #include "Framework/Common/Application.h"
+#include "Framework/Common/Input.h"
 #include "UI/Basic.h"
 #include "UI/UIFramework.h"
 #include "UI/UIRenderer.h"
@@ -22,12 +22,12 @@ namespace Ailu
 
         Vector2f Canvas::MeasureDesiredSize()
         {
-            if (_slot._size_policy == ESizePolicy::kFixed)
+            if (_slot._size_policy_h == ESizePolicy::kFixed)
                 return _slot._size;
             else
             {
                 f32 w = 0.0f, h = 0.0f;
-                for (auto& c: _children)
+                for (auto &c: _children)
                 {
                     auto p = c->SlotPosition();
                     auto s = c->SlotSize();
@@ -44,6 +44,10 @@ namespace Ailu
             {
                 Vector2f pos = c->SlotPosition();
                 Vector2f s = c->MeasureDesiredSize();
+                if (c->SlotSizePolicy() == ESizePolicy::kFill)
+                    s.x = _content_rect.z - pos.x;
+                if (c->SlotSizePolicy(false) == ESizePolicy::kFill)
+                    s.y = _content_rect.w - pos.y;
                 c->Arrange(pos.x, pos.y, s.x, s.y);
             }
         }
@@ -65,7 +69,7 @@ namespace Ailu
         }
         Vector2f LinearBox::MeasureDesiredSize()
         {
-            if (_slot._size_policy != ESizePolicy::kAuto)
+            if (_slot._size_policy_h == ESizePolicy::kFixed && _slot._size_policy_v == ESizePolicy::kFixed)
                 return _slot._size;
             f32 total_len = 0.0f;
             f32 max_cross = 0.0f;
@@ -127,35 +131,50 @@ namespace Ailu
             // 统计 fill 元素
             f32 fixed_total = 0.0f;
             f32 fill_rate_total = 0.0f;
-
+            f32 margin_total = 0.0f;
             for (auto &c: _children)
             {
                 Vector2f child_desired_size = c->MeasureDesiredSize();
                 const auto &margin = c->SlotMargin();
-
-                if (c->SlotSizePolicy() == ESizePolicy::kFill)
+                if (_orientation == EOrientation::kVertical)
                 {
-                    fill_rate_total += std::max(0.0f, c->SlotFillRate());
+                    if (c->SlotSizePolicy(false) == ESizePolicy::kFill)
+                    {
+                        fill_rate_total += std::max(0.0f, c->SlotFillRate());
+                    }
+                    else
+                    {
+                        fixed_total += margin._t + child_desired_size.y + margin._b;
+                    }
+                    margin_total += margin._t + margin._b;
                 }
                 else
                 {
-                    if (_orientation == EOrientation::kVertical)
-                        fixed_total += margin._t + child_desired_size.y + margin._b;
+                    if (c->SlotSizePolicy(true) == ESizePolicy::kFill)
+                    {
+                        fill_rate_total += std::max(0.0f, c->SlotFillRate());
+                    }
                     else
+                    {
                         fixed_total += margin._l + child_desired_size.x + margin._r;
+                    }
+                    margin_total += margin._l + margin._r;
                 }
             }
 
             f32 remaining_h = available_h - fixed_total;
             f32 remaining_w = available_w - fixed_total;
-
+            if (_orientation == EOrientation::kHorizontal)
+                remaining_w -= margin_total;
+            else
+                remaining_h -= margin_total;
             // ---------- 子元素布局 ----------
             f32 offset = 0.0f;
 
             for (auto &c: _children)
             {
                 const auto &margin = c->SlotMargin();
-                Vector2f child_desired_size = c->MeasureDesiredSize();
+                Vector2f desired = c->MeasureDesiredSize();
                 f32 child_w = 0.0f;
                 f32 child_h = 0.0f;
                 f32 x = _padding._l;
@@ -163,68 +182,114 @@ namespace Ailu
 
                 if (_orientation == EOrientation::kVertical)
                 {
-                    if (c->SlotSizePolicy() == ESizePolicy::kFill)
-                        child_h = (fill_rate_total > 0.0f) ? remaining_h * (c->SlotFillRate() / fill_rate_total) : 0.0f;
-                    else
-                        child_h = child_desired_size.y;
-                    child_w = available_w - margin._l - margin._r;
-                    y += offset + margin._t;
-                    x += margin._l;
+                    const auto &margin = c->SlotMargin();
+                    f32 inner_w = available_w - _padding._l - _padding._r;
 
-                    // 横向对齐
+                    // --- SizePolicy (决定尺寸) ---
+                    switch (c->SlotSizePolicy(false))
+                    {
+                        case ESizePolicy::kFixed:
+                        case ESizePolicy::kAuto:
+                            child_h = desired.y;
+                            break;
+                        case ESizePolicy::kFill:
+                            child_h = (fill_rate_total > 0.0f) ? remaining_h * (c->SlotFillRate() / fill_rate_total) : 0.0f;
+                            break;
+                    }
+                    switch (c->SlotSizePolicy(true))
+                    {
+                        case ESizePolicy::kFixed:
+                        case ESizePolicy::kAuto:
+                            child_w = desired.x;
+                            break;
+                        case ESizePolicy::kFill:
+                            child_w = std::max(0.0f, inner_w - margin._l - margin._r);
+                            break;
+                    }
+
+                    // --- Alignment (决定位置) ---
                     switch (c->SlotAlignmentH())
                     {
                         case EAlignment::kFill:
-                            break;
                         case EAlignment::kLeft:
-                            child_w = child_desired_size.x;
+                            x = _padding._l + margin._l;
                             break;
                         case EAlignment::kCenter:
-                            child_w = child_desired_size.x;
-                            x = margin._l + (available_w - child_w - margin._l - margin._r) * 0.5f;
+                            x = _padding._l + margin._l + (inner_w - child_w - margin._l - margin._r) * 0.5f;
                             break;
                         case EAlignment::kRight:
-                            child_w = child_desired_size.x;
-                            x = available_w - child_w - margin._r;
+                            x = _padding._l + inner_w - child_w - margin._r;
                             break;
                     }
 
+                    y = _padding._t + offset + margin._t;
                     c->Arrange(x, y, child_w, child_h);
+
                     offset += margin._t + child_h + margin._b;
                 }
-                else// Horizontal
+                else
                 {
-                    if (c->SlotSizePolicy() == ESizePolicy::kFill)
-                        child_w = (fill_rate_total > 0.0f) ? remaining_w * (c->SlotFillRate() / fill_rate_total) : 0.0f;
-                    else
-                        child_w = child_desired_size.x;
-                    child_h = available_h - margin._t - margin._b;
-                    x += offset + margin._l;
-                    y += margin._t;
+                    const auto &margin = c->SlotMargin();
+                    f32 inner_h = available_h - _padding._t - _padding._b;
+                    f32 child_w = 0.0f;
+                    f32 child_h = 0.0f;
+                    f32 x = 0.0f;
+                    f32 y = 0.0f;
 
-                    // 纵向对齐
+                    // ---------------- 宽度（主轴方向）SizePolicy ----------------
+                    switch (c->SlotSizePolicy(true))// true = horizontal
+                    {
+                        case ESizePolicy::kFixed:
+                        case ESizePolicy::kAuto:
+                            child_w = desired.x;
+                            break;
+
+                        case ESizePolicy::kFill:
+                            child_w = (fill_rate_total > 0.0f)
+                                              ? remaining_w * (c->SlotFillRate() / fill_rate_total)
+                                              : 0.0f;
+                            break;
+                    }
+
+                    // ---------------- 高度（交叉方向）SizePolicy ----------------
+                    switch (c->SlotSizePolicy(false))// false = vertical
+                    {
+                        case ESizePolicy::kFixed:
+                        case ESizePolicy::kAuto:
+                            child_h = desired.y;
+                            break;
+
+                        case ESizePolicy::kFill:
+                            child_h = std::max(0.0f, inner_h - margin._t - margin._b);
+                            break;
+                    }
+
+                    // ---------------- 对齐（纵向）AlignmentV ----------------
                     switch (c->SlotAlignmentV())
                     {
                         case EAlignment::kFill:
-                            break;
                         case EAlignment::kTop:
-                            child_h = child_desired_size.y;
+                            y = _padding._t + margin._t;
                             break;
+
                         case EAlignment::kCenter:
-                            child_h = child_desired_size.y;
-                            //y = _content_rect.y + margin._t + (available_h - child_h - margin._t - margin._b) * 0.5f;
-                            y = margin._t + (available_h - child_h - margin._t - margin._b) * 0.5f;
+                            y = _padding._t + margin._t +
+                                (inner_h - child_h - margin._t - margin._b) * 0.5f;
                             break;
+
                         case EAlignment::kBottom:
-                            child_h = child_desired_size.y;
-                            //y = _content_rect.y + available_h - child_h - margin._b;
-                            y = available_h - child_h - margin._b;
+                            y = _padding._t + inner_h - child_h - margin._b;
                             break;
                     }
 
+                    // ---------------- 主轴位置 ----------------
+                    x = _padding._l + offset + margin._l;
+
+                    // ---------------- 布局与累计 ----------------
                     c->Arrange(x, y, child_w, child_h);
                     offset += margin._l + child_w + margin._r;
                 }
+
 
                 c->Update(dt);
             }
@@ -306,10 +371,10 @@ namespace Ailu
                 {
                     f32 delta = mpos.y - _drag_start_mouse.y;
                     // 根据滚动条比例转换到内容偏移
-                    f32 scrollable_height = _content_size.y - _slot._size.y;
+                    f32 scrollable_height = _content_size.y - _arrange_rect.w;
                     if (scrollable_height > 0.0f)
                     {
-                        f32 bar_movable_height = _slot._size.y - _vbar_rect.w;// _bar_rect.w = 滚动条高度
+                        f32 bar_movable_height = _arrange_rect.w - _vbar_rect.w;// _bar_rect.w = 滚动条高度
                         f32 offset_delta = -(delta * (scrollable_height / bar_movable_height));
                         _target_offset.y = std::clamp(_drag_start_offset + offset_delta, -scrollable_height, 0.0f);
                     }
@@ -317,10 +382,10 @@ namespace Ailu
                 else
                 {
                     f32 delta = mpos.x - _drag_start_mouse.x;
-                    f32 scrollable_width = _content_size.x - _slot._size.x;
+                    f32 scrollable_width = _content_size.x - _arrange_rect.z;
                     if (scrollable_width > 0.0f)
                     {
-                        f32 bar_movable_width = _slot._size.x - _hbar_rect.z;// _bar_rect.z = 滚动条宽度
+                        f32 bar_movable_width = _arrange_rect.z - _hbar_rect.z;// _bar_rect.z = 滚动条宽度
                         f32 offset_delta = -(delta * (scrollable_width / bar_movable_width));
                         _target_offset.x = std::clamp(_drag_start_offset + offset_delta, -scrollable_width, 0.0f);
                     }
@@ -336,7 +401,7 @@ namespace Ailu
                     }
                 }
             }
-            _current_offset = Lerp(_current_offset, _target_offset, std::clamp(dt * _scroll_speed,0.0f,1.0f));
+            _current_offset = Lerp(_current_offset, _target_offset, std::clamp(dt * _scroll_speed, 0.0f, 1.0f));
             for (auto &c: _children)
             {
                 c->Translate(_current_offset);
@@ -381,10 +446,10 @@ namespace Ailu
             _content_size = Vector2f::kZero;
             for (auto &c: _children)
             {
-                _content_size += c->MeasureDesiredSize();
                 const auto &p = c->SlotPosition();
                 const auto &s = c->MeasureDesiredSize();
-                c->Arrange(p.x, p.y,c->SlotSizePolicy() == ESizePolicy::kFill? _content_rect.z : s.x, s.y);
+                _content_size += s;
+                c->Arrange(p.x, p.y, c->SlotSizePolicy(_is_vertical) == ESizePolicy::kFill ? _content_rect.z : s.x, s.y);
                 c->Translate(_current_offset);
                 c->MeasureAndArrange(dt);
             }
@@ -415,7 +480,8 @@ namespace Ailu
         ListView::ListView()
         {
             _content_box = AddChild<VerticalBox>();
-            _content_box->SlotSizeToContent(true);
+            _content_box->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
+            //_content_box->SlotSizeToContent(true);
             OnMouseMove() += [this](UIEvent &e)
             {
                 _hovered_item = nullptr;
@@ -435,26 +501,27 @@ namespace Ailu
                 _hovered_item = nullptr;
             };
 
-            OnMouseClick() += [this](UIEvent &e)
-            {
-                if (_hovered_item)
-                {
-                    _selected_item = _hovered_item;
-                    if (i32 index = _content_box->IndexOf(_selected_item); index != -1)
-                        _on_item_clicked_delegate.Invoke(_selected_item, index);
-                    e._is_handled = true;
-                }
-            };
+            //OnMouseClick() += [this](UIEvent &e)
+            //{
+            //    if (_hovered_item)
+            //    {
+            //        _selected_item = _hovered_item;
+            //        if (i32 index = _content_box->IndexOf(_selected_item); index != -1)
+            //            _on_item_clicked_delegate.Invoke(_selected_item, index);
+            //        e._is_handled = true;
+            //    }
+            //};
         }
         void ListView::AddItem(Ref<UIElement> item)
         {
             _content_box->AddChild(item);
-            Vector2f desired_size = _content_box->MeasureDesiredSize();
-            if (_is_size_to_content)
-                _slot._size = desired_size;
-            _slot._size.x = desired_size.x + kScrollBarWidth;
-            _content_size.y = desired_size.y;
-            _max_offset.y = std::min(0.0f, _slot._size.y - _content_size.y);
+            //Vector2f desired_size = _content_box->MeasureDesiredSize();
+            //desired_size.x = _content_box->SlotSizePolicy() == ESizePolicy::kFill ? _slot._size.x - kScrollBarWidth : desired_size.x;
+            //if (_is_size_to_content)
+            //    _slot._size = desired_size;
+            //_slot._size.x = desired_size.x + kScrollBarWidth;
+            //_content_size.y = desired_size.y;
+            //_max_offset.y = std::min(0.0f, _slot._size.y - _content_size.y);
         }
         void ListView::ClearItems()
         {
@@ -462,63 +529,69 @@ namespace Ailu
         }
         void ListView::SizeToContent(bool enable)
         {
-            _is_size_to_content = enable;
-            if (_is_size_to_content)
-            {
-                _slot._size = MeasureDesiredSize();
-                _slot._size += kScrollBarWidth;
-                _content_size = _slot._size;
-                _max_offset = Min(Vector2f::kZero, _slot._size - _content_size);
-            }
-            else
-            {
-                _slot._size = {100.0f, 100.0f};
-                _content_size = _content_box->MeasureDesiredSize();
-                _max_offset = Min(Vector2f::kZero, _slot._size - _content_size);
-            }
+            //_is_size_to_content = enable;
+            //if (_is_size_to_content)
+            //{
+            //    _slot._size = MeasureDesiredSize();
+            //    _slot._size += kScrollBarWidth;
+            //    _content_size = _slot._size;
+            //    _max_offset = Min(Vector2f::kZero, _slot._size - _content_size);
+            //}
+            //else
+            //{
+            //    _slot._size = {100.0f, 100.0f};
+            //    _content_size = _content_box->MeasureDesiredSize();
+            //    _max_offset = Min(Vector2f::kZero, _slot._size - _content_size);
+            //}
         }
         Vector2f ListView::MeasureDesiredSize()
         {
-            if (_slot._size_policy == ESizePolicy::kAuto)
-            {
-                Vector2f desired_size = _content_box->MeasureDesiredSize();
-                desired_size.x += kScrollBarWidth;
-                return desired_size;
-            }
-            else
-            {
-                return UIElement::MeasureDesiredSize();
-            }
+            return ScrollView::MeasureDesiredSize();
+            //if (_slot._size_policy_v == ESizePolicy::kAuto)
+            //{
+            //    Vector2f desired_size = _content_box->MeasureDesiredSize();
+            //    desired_size.x += kScrollBarWidth;
+            //    return desired_size;
+            //}
+            //else
+            //{
+            //    return UIElement::MeasureDesiredSize();
+            //}
         }
 
         void ListView::RenderImpl(UIRenderer &r)
         {
             ScrollView::RenderImpl(r);
 
-            //for (auto &c: _content_box->GetChildren())
-            //{
-            //    // hover 高亮
-            //    if (c.get() == _hovered_item)
-            //    {
-            //        r.DrawQuad(c->GetArrangeRect(), _transform, {0.2f, 0.2f, 0.4f, 0.5f});
-            //    }
-            //    // selected 高亮
-            //    if (c.get() == _selected_item)
-            //    {
-            //        r.DrawQuad(c->GetArrangeRect(), _transform, {0.3f, 0.3f, 0.6f, 0.8f});
-            //    }
-            //}
+            for (auto &c: _content_box->GetChildren())
+            {
+                // hover 高亮
+                if (c.get() == _hovered_item)
+                {
+                    r.DrawQuad(c->GetArrangeRect(), _matrix, {0.2f, 0.2f, 0.4f, 0.5f});
+                }
+                // selected 高亮
+                if (c.get() == _selected_item)
+                {
+                    r.DrawQuad(c->GetArrangeRect(), _matrix, {0.3f, 0.3f, 0.6f, 0.8f});
+                }
+            }
         }
 
 #pragma endregion
 
 #pragma region Dropdown
-        Dropdown::Dropdown() : UIElement("Dropdown")
+        Dropdown::Dropdown() : Dropdown(Vector<String>())
         {
-            _root = MakeRef<HorizontalBox>();
+        }
+        Dropdown::Dropdown(const Vector<String> &items) : UIElement("Dropdown")
+        {
+            _root = AddChild<HorizontalBox>()->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto).As<HorizontalBox>();
             _text = _root->AddChild<Text>();
-            _text->SlotSizePolicy(ESizePolicy::kFill);
+            _text->SlotSizePolicy(ESizePolicy::kFill, ESizePolicy::kAuto);
             _button = _root->AddChild<Button>();
+            _button->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFill).SlotSize({20.0f, 20.0f});
+            _items = items;
             _button->OnMouseClick() += [this](UIEvent &e)
             {
                 if (_is_dropdown_open)
@@ -528,10 +601,20 @@ namespace Ailu
                     return;
                 }
                 auto list_view = MakeRef<ListView>();
+                list_view->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kAuto);
                 list_view->Name(std::format("Dropdown_{}", _name));
-                for (auto &s: _items)
+                auto abs_rect = _text->GetArrangeRect();
+                list_view->SlotSize(abs_rect.z, list_view->SlotSize().y);
+                for (u16 i = 0; i < (u16) _items.size(); i++)
                 {
-                    list_view->AddItem(MakeRef<Text>(s));
+                    auto text = MakeRef<Text>(_items[i]);
+                    text->OnMouseClick() += [this, i](UIEvent &e)
+                    {
+                        LOG_INFO("Dropdown item clicked: {}", _items[i]);
+                        SetSelectedIndex(i);
+                        UIManager::Get()->HidePopup();
+                    };
+                    list_view->AddItem(text);
                 }
                 Vector2f size = list_view->MeasureDesiredSize();
                 if (size.y > 200.0f)
@@ -540,14 +623,7 @@ namespace Ailu
                 }
                 else
                     list_view->SizeToContent(true);
-                list_view->SlotSize(_slot._size.x, list_view->SlotSize().y);
-                list_view->_on_item_clicked += [&](UI::UIElement *ele, i32 index)
-                {
-                    LOG_INFO("Dropdown click {}", ele ? ele->As<UI::Text>()->GetText() : "null");
-                    SetSelectedIndex(index);
-                    UIManager::Get()->HidePopup();
-                };
-                UIManager::Get()->ShowPopupAt(_arrange_rect.x, _arrange_rect.y + _arrange_rect.w, list_view, [this]()
+                UIManager::Get()->ShowPopupAt(abs_rect.x, abs_rect.y + abs_rect.w, list_view, [this]()
                                               { _is_dropdown_open = false; });
                 _is_dropdown_open = true;
             };
@@ -568,6 +644,31 @@ namespace Ailu
                 return _items[_selected_index];
             return _items.empty() ? "null" : _items[0];
         }
+        Vector2f Dropdown::MeasureDesiredSize()
+        {
+            Vector2f size = _slot._size;
+            if (_slot._size_policy_h == ESizePolicy::kAuto)
+            {
+                size.x = 0.0f;
+                for (auto &c: _children)
+                {
+                    auto margin = c->SlotMargin();
+                    auto c_size = c->MeasureDesiredSize();
+                    size.x += c_size.x + margin._l + margin._r;
+                }
+            }
+            if (_slot._size_policy_v == ESizePolicy::kAuto)
+            {
+                size.y = 0.0f;
+                for (auto &c: _children)
+                {
+                    auto margin = c->SlotMargin();
+                    auto c_size = c->MeasureDesiredSize();
+                    size.y = std::max(size.y, c_size.y + margin._t + margin._b);
+                }
+            }
+            return size;
+        }
         void Dropdown::RenderImpl(UIRenderer &r)
         {
             _root->Render(r);
@@ -581,10 +682,18 @@ namespace Ailu
         }
         UIElement *Dropdown::HitTest(Vector2f pos)
         {
+            Vector2f lpos = TransformCoord(_inv_matrix, Vector3f{pos, 0.0f}).xy;
             //test text and button
-            if (!IsPointInside(pos))
+            if (!IsPointInside(lpos))
                 return nullptr;
+            if (_text->HitTest(pos))
+                return _text;
             return _button->HitTest(pos) ? (UIElement *) _button : this;
+        }
+        void Dropdown::PostArrange()
+        {
+            InvalidateTransform();
+            _root->Arrange(0.0f, 0.0f, _content_rect.z, _content_rect.w);
         }
 #pragma endregion
 
@@ -660,7 +769,7 @@ namespace Ailu
         }
         void CollapsibleView::MeasureAndArrange(f32 dt)
         {
-            _header->Arrange(0.0f,0.0f, _content_rect.z, s_header_height);
+            _header->Arrange(0.0f, 0.0f, _content_rect.z, s_header_height);
             if (!_is_collapsed)
             {
                 Vector2f sz = (*_content)[0]->MeasureDesiredSize();
@@ -672,7 +781,7 @@ namespace Ailu
 #pragma region SplitView
         SplitView::SplitView() : UIElement("SplitView")
         {
-            _on_child_add += [this](UIElement *child) 
+            _on_child_add += [this](UIElement *child)
             {
                 if (_children.size() > 2)
                 {
@@ -747,7 +856,6 @@ namespace Ailu
         void SplitView::Update(f32 dt)
         {
             UIElement::Update(dt);
-
         }
         void SplitView::RenderImpl(UIRenderer &r)
         {
@@ -766,7 +874,7 @@ namespace Ailu
                 bar_rect.y += _content_rect.w * _ratio - kSplitBarThickness * 0.5f;
                 bar_rect.w = kSplitBarThickness;
             }
-            r.DrawQuad(bar_rect,_matrix);
+            r.DrawQuad(bar_rect, _matrix);
         }
         void SplitView::PostDeserialize()
         {
@@ -777,7 +885,7 @@ namespace Ailu
                 return;
             if (_is_horizontal)
             {
-                _children[0]->Arrange(0.0f,0.0f,_content_rect.z * _ratio,_content_rect.w);
+                _children[0]->Arrange(0.0f, 0.0f, _content_rect.z * _ratio, _content_rect.w);
                 _children[1]->Arrange(_content_rect.z * _ratio, 0.0f, _content_rect.z * (1.0f - _ratio), _content_rect.w);
             }
             else

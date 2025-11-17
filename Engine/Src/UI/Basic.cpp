@@ -22,7 +22,7 @@ namespace Ailu
 
         Vector2f Button::MeasureDesiredSize()
         {
-            if (_slot._size_policy == ESizePolicy::kFixed)
+            if (_slot._size_policy_h == ESizePolicy::kFixed)
                 return _slot._size;
             return Vector2f(80.0f,20.0f);
         }
@@ -75,7 +75,7 @@ namespace Ailu
         {
             _on_text_change += [this](const String &new_text)
             {
-                Vector2f new_size = TextRenderer::CalculateTextSize(new_text);
+                Vector2f new_size = TextRenderer::CalculateTextSize(new_text,_font_size);
                 new_size.x += _padding._l + _padding._r;
                 new_size.y += _padding._t + _padding._b;
                 Vector2f dv = Abs(new_size - _text_size);
@@ -158,12 +158,17 @@ namespace Ailu
 
         Vector2f Text::MeasureDesiredSize()
         {
-            if (_slot._size_policy == ESizePolicy::kFixed)
+            if (_slot._size_policy_h == ESizePolicy::kFixed)
                 return _slot._size;
             Vector2f text_size = TextRenderer::CalculateTextSize(_text);
             text_size.x += _padding._l + _padding._r;
             text_size.y += _padding._t + _padding._b;
             return text_size;
+        }
+        void Text::FontSize(f32 size)
+        {
+            _font_size = size;
+            _on_text_change_delegate.Invoke(_text);
         }
 #pragma endregion
 
@@ -180,10 +185,17 @@ namespace Ailu
                 }
             };
         }
-        Slider::Slider(const String &name)
+        Slider::Slider(const String &name) : UIElement(name)
         {
 
         }
+
+        Slider::Slider(f32 min, f32 max, f32 value) : Slider()
+        {
+            _range = Vector2f(min, max);
+            SetValue(value);
+        }
+
         f32 static PingPong(f32 v)
         {
             f32 t = v - (i32)v;
@@ -208,14 +220,12 @@ namespace Ailu
         }
         void Slider::RenderImpl(UIRenderer &r)
         {
-            //r.DrawBox(_content_rect.xy, _content_rect.zw,_matrix);
             r.DrawQuad(_bar_rect, _matrix, Colors::kGray);
             r.DrawQuad(_dot_rect, _matrix, _state._is_pressed ? Colors::kBlue : Colors::kWhite);
-            r.DrawText(_value_str, {_content_rect.x + _content_rect.z + 5.0f, _content_rect.y + _content_rect.w * 0.5f - _font_size * 0.5f}, _matrix,_font_size);
         }
         Vector2f Slider::MeasureDesiredSize()
         {
-            if (_slot._size_policy == ESizePolicy::kFixed)
+            if (_slot._size_policy_h == ESizePolicy::kFixed)
                 return _slot._size;
             return Vector2f(100.0f,20.0f);
         }
@@ -226,7 +236,6 @@ namespace Ailu
             _value = v;
             Clamp(_value,_range.x,_range.y);
             _on_value_change_delegate.Invoke(_value);
-            _value_str = std::format("{:.2f}", _value);
         }
         #pragma endregion
 
@@ -306,7 +315,7 @@ namespace Ailu
 
         Vector2f Border::MeasureDesiredSize()
         {
-            if (_slot._size_policy == ESizePolicy::kFixed)
+            if (_slot._size_policy_h == ESizePolicy::kFixed)
                 return _slot._size;
             return Vector2f(40.0f,20.0f);
         }
@@ -319,6 +328,7 @@ namespace Ailu
                 if (_children[0]->SlotSizePolicy() == ESizePolicy::kFill)
                     desired_size = _content_rect.zw;
                 _children[0]->Arrange(_content_rect.x, _content_rect.y, desired_size.x, desired_size.y);
+                _children[0]->InvalidateLayout();
             }
         }
         void Border::PostDeserialize()
@@ -328,15 +338,7 @@ namespace Ailu
 #pragma endregion
 
 #pragma region InputBlock
-        static bool IsNumeric(const String &str)
-        {
-            if (str.empty()) return false;
-
-            char *endptr = nullptr;
-            std::strtod(str.c_str(), &endptr);
-            return (*endptr == '\0');// 成功转为 double 并且没有剩余字符
-        }
-        InputBlock::InputBlock() : UIElement("InputBlock")
+        InputBlock::InputBlock(const String &content) : UIElement("InputBlock")
         {
             _on_content_changed += [this](String content) {
                 FillCursorOffsetTable();
@@ -345,7 +347,7 @@ namespace Ailu
             {
                 FillCursorOffsetTable();
             };
-            SetContent(_content);
+            SetContent(content);
             OnKeyDown() += [this](UIEvent &e)
             {
                 if (!_state._is_focused)
@@ -362,14 +364,13 @@ namespace Ailu
                         _content.erase(sb, se - sb);
                         _cursor_pos = sb;
                         ClearSelection();
-                        SetContent(_content);
                     }
                     else if (_cursor_pos > 0 && !_content.empty())
                     {
                         _content.erase(_cursor_pos - 1, 1);
                         _cursor_pos--;
-                        SetContent(_content);
                     }
+                    CommitEdit(false);
                 }
                 else if (e._key_code == EKey::kDELETE)
                 {
@@ -378,16 +379,17 @@ namespace Ailu
                         _content.erase(sb, se - sb);
                         _cursor_pos = sb;
                         ClearSelection();
-                        SetContent(_content);
                     }
                     else if (_cursor_pos < _content.size() && !_content.empty())
                     {
                         _content.erase(_cursor_pos, 1);
-                        SetContent(_content);
                     }
+                    CommitEdit(false);
                 }
                 else if (e._key_code == EKey::kLEFT)
                 {
+                    if (!_is_editing)
+                        return;
                     if (has_selection)
                     {
                         // 光标跳到选区起点，并清除选区
@@ -401,6 +403,8 @@ namespace Ailu
                 }
                 else if (e._key_code == EKey::kRIGHT)
                 {
+                    if (!_is_editing)
+                        return;
                     if (has_selection)
                     {
                         _cursor_pos = se;
@@ -410,6 +414,13 @@ namespace Ailu
                     {
                         _cursor_pos++;
                     }
+                }
+                else if (e._key_code == EKey::kRETURN)
+                {
+                    CommitEdit();
+                    _is_selecting = false;
+                    _is_drag_adjusting = false;
+                    Application::Get().SetCursor(ECursorType::kArrow);
                 }
                 else
                 {
@@ -426,7 +437,7 @@ namespace Ailu
 
                         _content.insert(_cursor_pos, 1, c);
                         _cursor_pos++;
-                        SetContent(_content);
+                        CommitEdit(false);
                     }
                 }
 
@@ -437,7 +448,7 @@ namespace Ailu
             {
                 if (e._key_code == EKey::kLBUTTON)
                 {
-                    if (abs(e._mouse_position.x - _content_rect.x - _content_rect.z) < 6.0f && _is_numeric)
+                    if (abs(e._mouse_position.x - _abs_rect.x - _abs_rect.z) < 6.0f && _is_numeric)
                     {
                         LOG_INFO("begin drag adjust...");
                         _is_drag_adjusting = true;
@@ -451,6 +462,7 @@ namespace Ailu
                     _select_end = _select_start;
                     _cursor_pos = _select_end;
                 }
+                _is_editing = true;
             };
             OnMouseClick() += [this](UIEvent &e)
             {
@@ -473,7 +485,7 @@ namespace Ailu
                     _select_end = IndexFromMouseX(e._mouse_position.x);
                     // 这里可以触发 UI 重绘，让选区高亮
                 }
-                if (abs(e._mouse_position.x - _content_rect.x - _content_rect.z) < 6.0f && _is_numeric)
+                if (abs(e._mouse_position.x - _abs_rect.x - _abs_rect.z) < 6.0f && _is_numeric)
                 {
                     Application::Get().SetCursor(ECursorType::kSizeEW);
                 }
@@ -482,6 +494,15 @@ namespace Ailu
             {
                 Application::Get().SetCursor(ECursorType::kArrow);
             };
+            _on_focus_lost += [this]()
+            {
+                CommitEdit();
+            };
+        }
+
+        InputBlock::InputBlock() : InputBlock("placeholder")
+        {
+            
         }
         void InputBlock::Update(f32 dt)
         {
@@ -532,13 +553,13 @@ namespace Ailu
 
         void InputBlock::RenderImpl(UIRenderer &r)
         {
-            f32 font_height = _slot._size.y - 4.0f;
-            r.DrawQuad(_content_rect, _matrix, Colors::kWhite);
+            f32 font_height = _content_rect.w - 4.0f;
+            r.DrawQuad(_content_rect, _matrix, Color{0.2f,0.2f,0.2f,0.2f});
             if (_state._is_focused && _select_start != _select_end)
             {
                 f32 start_offset = _select_start == 0u? 0.0f :_cursor_offsets [_select_start];
                 f32 end_offset = _select_end == 0u ? 0.0f : _cursor_offsets[_select_end];
-                r.DrawQuad({_content_rect.x + start_offset, _content_rect.y,end_offset - start_offset, _content_rect.w}, _matrix, Colors::kYellow);
+                r.DrawQuad({_content_rect.x + start_offset, _content_rect.y,end_offset - start_offset, _content_rect.w}, _matrix, Color{1.0f,1.0f,0.0f,0.4f});
             }
             r.DrawText(_content, _content_rect.xy,_matrix, (u16) font_height,Colors::kBlack);
             auto text_size = r.CalculateTextSize(_content, (u16) font_height);
@@ -551,7 +572,7 @@ namespace Ailu
             _cursor_offsets.clear();
             _cursor_offsets.reserve(_content.size() + 1);
             _cursor_offsets.push_back(1.0f);
-            f32 font_height = _slot._size.y - 4.0f;
+            f32 font_height = _content_rect.w - 4.0f;
             for (u64 i = 0; i < _content.size(); i++)
             {
                 Vector2f size = TextRenderer::CalculateTextSize(_content.substr(0u, i + 1), (u16)font_height);
@@ -560,11 +581,12 @@ namespace Ailu
             if (_cursor_offsets.size() > 1)
                 _cursor_offsets[0] = _cursor_offsets[1] * 0.5f;
             _text_rect_size = TextRenderer::CalculateTextSize(_content, (u16) font_height);
-            _is_numeric = IsNumeric(_content);
+            _is_numeric = StringUtils::IsNumeric(_content);
+            _select_start = _select_end = _cursor_pos;
         }
         u32 InputBlock::IndexFromMouseX(f32 x)
         {
-            f32 localX = x - _arrange_rect.x;
+            f32 localX = x - _abs_rect.x;
 
             if (_cursor_offsets.empty())
                 return 0u;
@@ -588,9 +610,16 @@ namespace Ailu
             return ((localX - left) <= (right - localX)) ? static_cast<u32>(lo) : static_cast<u32>(hi);
         }
 
+        void InputBlock::CommitEdit(bool is_finish_edit)
+        {
+            _is_editing = !is_finish_edit;
+            SetContent(_content);
+            LOG_INFO("Committed edit({}): {}",_name, _content);
+        }
+
         Vector2f InputBlock::MeasureDesiredSize()
         {
-            if (_slot._size_policy == ESizePolicy::kFixed)
+            if (_slot._size_policy_h == ESizePolicy::kFixed)
                 return _slot._size;
             return Vector2f(100.0f,20.0f);
         }
@@ -615,7 +644,7 @@ namespace Ailu
         }
         Vector2f Image::MeasureDesiredSize()
         {
-            if (_slot._size_policy == ESizePolicy::kFixed)
+            if (_slot._size_policy_h == ESizePolicy::kFixed)
                 return _slot._size;
             return Max(_tex_size,{32.0f,32.0f});
         }

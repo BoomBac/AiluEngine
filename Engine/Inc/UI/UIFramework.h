@@ -26,6 +26,7 @@ namespace Ailu
         public:
             UIManager();
             ~UIManager();
+            void Update(f32 dt);
             void RegisterWidget(Ref<Widget> w);
             void UnRegisterWidget(Widget *w);
             void BringToFront(Widget *w);
@@ -37,6 +38,7 @@ namespace Ailu
             void ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close = nullptr, Window *win = nullptr);
             void HidePopup();
             Widget *GetPopupWidget() const { return _popup_widget; }
+            void Destroy(Ref<UIElement> element);
             void OnElementDestroying(UIElement *element);
         public:
             UIElement *_capture_target = nullptr;//记录按下时的目标,全局共享，element销毁时检查这个值
@@ -54,6 +56,7 @@ namespace Ailu
             UIRenderer *_renderer;
             Widget *_popup_widget;
             std::function<void()> _on_popup_close;
+            Vector<Ref<UIElement>> _pending_destroy;
         };
     }// namespace UI
 

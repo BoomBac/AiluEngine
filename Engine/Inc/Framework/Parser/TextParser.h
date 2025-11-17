@@ -42,10 +42,11 @@ namespace Ailu
         bool Load(const WString &sys_path) final;
         bool Save(const WString &sys_path) final;
         String GetValue(const String &section, const String &key, const String &default_value) const final;
+        //object only
         Map<String, String> GetValues(const String &section) const final;
         Map<String, String> GetValues() const final;
         void SetValue(const String &section, const String &key, const String &value) final;
-
+        u32 GetArraySize(const String &json_path) const;
         String GetString(const String &json_path, const String &default_value = "") const;
         i32 GetInt(const String &json_path, i32 default_value = 0) const;
         bool GetBool(const String &json_path, bool default_value = false) const;

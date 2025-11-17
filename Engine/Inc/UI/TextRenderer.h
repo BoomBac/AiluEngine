@@ -22,7 +22,7 @@ namespace Ailu
         {
         public:
             inline static u16 kMaxCharacters = 1024u;
-            static Vector2f CalculateTextSize(const String &text, u16 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
+            static Vector2f CalculateTextSize(const String &text, f32 font_size = 14u, Font *font = nullptr, Vector2f scale = Vector2f::kOne);
         public:
             static Font *GetDefaultFont() { return s_default_font; };
             TextRenderer();
@@ -31,12 +31,12 @@ namespace Ailu
             /// <summary>
             /// 独立绘制，用于简单gui
             /// </summary>
-            void DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color, Font *font = nullptr);
+            void DrawText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Color color, Font *font = nullptr);
             /// <summary>
             /// 外部传入drawerblock，用于UI系统中批量绘制
             /// </summary>
-            void DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color, Font *font,DrawerBlock* block);
-            void DrawText(const String &text, Vector2f pos, u16 font_size, Vector2f scale, Color color,Matrix4x4f matrix, Font *font,DrawerBlock* block);
+            void DrawText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Color color, Font *font,DrawerBlock* block);
+            void DrawText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Color color,Matrix4x4f matrix, Font *font,DrawerBlock* block);
 
             void Render(RenderTexture *target, Render::CommandBuffer *cmd);
             void Render(RenderTexture *target, Render::CommandBuffer *cmd, DrawerBlock *b);
@@ -44,10 +44,10 @@ namespace Ailu
             void Render(Render::CommandBuffer *cmd);
             bool _is_draw_debug_line = true;
         private:
-            void AppendText(const String &text, Vector2f pos,Matrix4x4f matrix, u16 font_size, Vector2f scale, Color color, Vector2f padding,Font *font, DrawerBlock *block);
+            void AppendText(const String &text, Vector2f pos,Matrix4x4f matrix, f32 font_size, Vector2f scale, Color color, Vector2f padding,Font *font, DrawerBlock *block);
         private:
             inline static Font* s_default_font;
-            Ref<Render::Material> _default_mat;
+            Ref<Render::Material> _bitmap_mat,_msdf_mat;
             DrawerBlock *_default_block = nullptr;
         };
     }// namespace UI

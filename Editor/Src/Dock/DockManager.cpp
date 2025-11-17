@@ -1453,7 +1453,12 @@ namespace Ailu
             auto parent = n->_parent;
             if (parent == nullptr)//悬浮节点，标记移除即可
             {
-                MarkDeleteNode(n);
+                if (auto it = std::find_if(_roots.begin(), _roots.end(), [=](DockNode* item){return item == n;}); it != _roots.end())
+                {
+                    n->_flags &= ~EDockWindowFlag::kFullSize;
+                    _roots.erase(it);
+                }
+                //MarkDeleteNode(n);
             }
             else
             {

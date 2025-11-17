@@ -50,6 +50,16 @@ namespace Ailu::UI
         _widgets.clear();
     }
 
+    void UIManager::Update(f32 dt)
+    {
+        // 处理待销毁的元素
+        for (auto &e: _pending_destroy)
+        {
+            e.reset();
+        }
+        _pending_destroy.clear();
+    }
+
     void UIManager::RegisterWidget(Ref<Widget> w)
     {
 
@@ -88,6 +98,7 @@ namespace Ailu::UI
             _widgets[i]->_sort_order = (u32)i;
         }
         w->_on_get_focus_delegate.Invoke();
+        LOG_INFO("{}: BringToFront", GetThreadName());
     }
 
     void UIManager::SetFocus(UIElement *element)
@@ -134,6 +145,13 @@ namespace Ailu::UI
                 _on_popup_close();
                 _on_popup_close = nullptr;
             }
+        }
+    }
+    void UIManager::Destroy(Ref<UIElement> element)
+    {
+        if (element)
+        {
+            _pending_destroy.push_back(element);
         }
     }
     void UIManager::OnElementDestroying(UIElement *element)

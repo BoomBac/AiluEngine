@@ -5,6 +5,7 @@
 #include "UI/UIRenderer.h"
 #include "UI/DragDrop.h"
 #include "Render/AssetPreviewGenerator.h"
+#include "Framework/Common/Input.h"
 
 namespace Ailu
 {
@@ -27,6 +28,7 @@ namespace Ailu
             };
             _current_path = g_pResourceMgr->EngineResRootPath();
             auto hb = _right->AddChild<UI::HorizontalBox>();
+            hb->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             hb->SlotAlignmentH(UI::EAlignment::kFill);
             auto back_btn = hb->AddChild<UI::Button>();
             back_btn->SlotSizePolicy(UI::ESizePolicy::kFixed);
@@ -70,7 +72,7 @@ namespace Ailu
                     LOG_INFO(L"Drop file {}",(f));
                     MeshImportSetting settings;
                     settings._is_combine_mesh = true;
-                    settings._is_import_material = true;
+                    settings._is_import_material = false;
                     g_pResourceMgr->ImportResource(f, _current_path.wstring(), settings);
                     //fs::path dest_path = _current_path / fs::path(f).filename();
                     //fs::copy_file(fs::path(f), dest_path, fs::copy_options::overwrite_existing);
@@ -117,7 +119,7 @@ namespace Ailu
                         text->SlotAlignmentH(UI::EAlignment::kFill);
                         text->_vertical_align = UI::EAlignment::kCenter;
                         text->SlotPadding(6.0f);
-                        text->_font_size = 9u;
+                        text->FontSize(14.0f);
                         return std::make_tuple(vb, icon, text);
                     };
                     for (auto &dir_it: curdir_it)
@@ -148,11 +150,12 @@ namespace Ailu
                             _current_path = item_path;
                             _is_dirty = true;
                         };
-                        icon->OnMouseDown() += [this, icon](UI::UIEvent &e)
-                        {
-                            auto payload = DragPayload{EDragType::kFolder, nullptr};
-                            DragDropManager::Get().BeginDrag(payload, "folder");
-                        };
+                        //icon->OnMouseDown() += [this, icon](UI::UIEvent &e)
+                        //{
+                        //    s_is_drag_start = true;
+                        //    auto payload = DragPayload{EDragType::kFolder, nullptr};
+                        //    DragDropManager::Get().BeginDrag(payload, "folder");
+                        //};
                         _icon_content->AddChild(vb);
                     }
                     for (auto asset: _cur_dir_assets)
@@ -239,9 +242,26 @@ namespace Ailu
                         {
                             icon->OnMouseDown() += [this, icon, asset](UI::UIEvent &e)
                             {
-                                auto payload = DragPayload{EDragType::kMesh, asset};
-                                DragDropManager::Get().BeginDrag(payload, "folder");
+                                _is_dragging = false;
+                                _drag_start_pos = e._mouse_position;
                             };
+                            icon->OnMouseMove() += [this, icon, asset](UI::UIEvent &e)
+                            {
+                                if (Input::IsKeyPressed(EKey::kLBUTTON))
+                                {
+                                    if (!_is_dragging)
+                                    {
+                                        f32 dist = Magnitude(e._mouse_position - _drag_start_pos);
+                                        if (dist > kDragThreshold)
+                                        {
+                                            _is_dragging = true;
+                                            auto payload = DragPayload{EDragType::kMesh, asset};
+                                            DragDropManager::Get().BeginDrag(payload, "mesh");
+                                        }
+                                    }
+                                }
+                            };
+
                         }
                     }
                 }

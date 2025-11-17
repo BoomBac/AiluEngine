@@ -19,6 +19,7 @@ namespace Ailu
     {
         using namespace Render;
         static UIRenderer *s_Renderer = nullptr;
+
         void UIRenderer::Init()
         {
             s_Renderer = AL_NEW(UIRenderer);
@@ -57,6 +58,7 @@ namespace Ailu
 
         void UIRenderer::Render(CommandBuffer *cmd)
         {
+            DrawDebugPannel();
             const f32 dt = TimeMgr::s_delta_time;
             auto& widgets = UI::UIManager::Get()->_widgets;
             for (auto it = widgets.begin(); it != widgets.end(); it++)
@@ -137,12 +139,12 @@ namespace Ailu
             AppendNode(cb, 4u, 6u, _default_material.get());
         }
 
-        void UIRenderer::DrawText(const String &text, Vector2f pos, u16 font_size, Color color,Vector2f scale, Render::Font *font)
+        void UIRenderer::DrawText(const String &text, Vector2f pos, f32 font_size, Color color,Vector2f scale, Render::Font *font)
         {
             _text_renderer->DrawText(text, pos, font_size, scale, color, font, GetAvailableBlock(4u, 6u));
         }
 
-        void UIRenderer::DrawText(const String &text, Vector2f pos, Matrix4x4f matrix, u16 font_size, Color color, Vector2f scale, Render::Font *font)
+        void UIRenderer::DrawText(const String &text, Vector2f pos, Matrix4x4f matrix, f32 font_size, Color color, Vector2f scale, Render::Font *font)
         {
             _text_renderer->DrawText(text, pos, font_size, scale, color, matrix, font, GetAvailableBlock(4u, 6u));
         }
@@ -339,6 +341,32 @@ namespace Ailu
                 prev_scissor = node._is_custom_scissor ? node._scissor : full_rect;
             }
             b->Flush();
+        }
+
+        void UIRenderer::DrawDebugPannel()
+        {
+            Vector2f pen = {10.f, 10.f};
+            f32 font_size = 14.f;
+            if (auto hover = UIManager::Get()->_hover_target)
+            {
+                const f32 line_height = _text_renderer->GetDefaultFont()->_line_height * font_size;
+                auto abs_rect = hover->GetArrangeRect();
+                DrawText(std::format("Name: {},type: {}", hover->Name(), hover->GetType()->Name()), pen, font_size);
+                pen.y += line_height;
+                DrawText(std::format("Pos: {},Size: {}", Vector2f(abs_rect.xy).ToString(), Vector2f(abs_rect.zw).ToString()), pen, font_size);
+                pen.y += line_height;
+                DrawText(std::format("Padding: {},Margin: {}", hover->SlotPadding().ToString(), hover->SlotMargin().ToString()),pen,font_size);
+                pen.y += line_height;
+                DrawText(std::format("SizePolicyH: {},SizePolicyV: {}", StaticEnum<UI::ESizePolicy>()->GetNameByEnum(hover->SlotSizePolicy(true)),
+                                     StaticEnum<UI::ESizePolicy>()->GetNameByEnum(hover->SlotSizePolicy(false))), pen, font_size);
+                pen.y += line_height;
+                DrawText(std::format("AlighH: {},AlighV: {}", StaticEnum<UI::EAlignment>()->GetNameByEnum(hover->SlotAlignmentH()),
+                                     StaticEnum<UI::EAlignment>()->GetNameByEnum(hover->SlotAlignmentV())),
+                         pen, font_size);
+                pen.y += line_height;
+                DrawText(std::format("IsFocused: {},IsHover: {},IsPressed: {}", hover->_state._is_focused, hover->_state._is_hovered, hover->_state._is_pressed), pen, font_size);
+                DrawBox(hover->GetArrangeRect().xy, hover->GetArrangeRect().zw, 1.0f, Color(1.0f, 0.5f, 0.0f, 1.0f));
+            }
         }
     }// namespace UI
 }// namespace Ailu

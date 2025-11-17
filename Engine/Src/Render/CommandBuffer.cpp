@@ -537,6 +537,20 @@ namespace Ailu::Render
         _commands.emplace_back(cmd);
     }
 
+    void CommandBuffer::DrawProceduralIndirect(Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset)
+    {
+        auto cmd = CommandPool::Get().Alloc<CommandDraw>();
+        cmd->_vb = nullptr;
+        cmd->_ib = nullptr;
+        cmd->_mat = material;
+        cmd->_sub_mesh = 0;
+        cmd->_pass_index = pass_index;
+        cmd->_arg_buffer = arg_buffer;
+        cmd->_arg_offset = arg_offset;
+        cmd->_mat->PushState(cmd->_pass_index);
+        _commands.emplace_back(cmd);
+    }
+
     void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y)
     {
         Dispatch(cs, kernel, thread_group_x, thread_group_y, 1u);

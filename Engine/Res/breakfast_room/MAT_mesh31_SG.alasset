@@ -1,0 +1,25 @@
+guid: 5e7a7caf-5f25-477d-afde-1f1e70abc2f2
+type: kMaterial
+name: MAT_mesh31_SG
+shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
+keywords: 
+  prop_type: Uint
+    _cull: 2
+  prop_type: Float
+    _AlphaCulloff: 0
+    _Anisotropy: 0
+    _MaterialID: 0
+    _MetallicValue: 0
+    _RoughnessValue: 0
+    _SamplerMask: 0
+  prop_type: Vector
+    _AlbedoValue: 0.976471,0.176471,0.168627,1
+    _EmissionValue: 0,0,0,0
+    _SpecularValue: 0,0,0,0
+  prop_type: IntVector
+  prop_type: Texture2D
+    _AlbedoTex: null
+    _EmissionTex: null
+    _NormalTex: null
+    _RoughnessMetallicTex: null
+    _SpecularTex: null

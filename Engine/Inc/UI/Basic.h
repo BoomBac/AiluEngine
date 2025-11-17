@@ -45,19 +45,21 @@ namespace Ailu
             void SetText(const String &text);
             const String &GetText() const { return _text; }
             Vector2f MeasureDesiredSize() override;
+            f32 FontSize() const { return _font_size; }
+            void FontSize(f32 size);
         private:
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
         public:
             APROPERTY()
-            u16 _font_size = 14u;
-            APROPERTY()
             Color _color = Colors::kWhite;
             APROPERTY()
-            EAlignment _horizontal_align = EAlignment::kCenter;
+            EAlignment _horizontal_align = EAlignment::kLeft;
             APROPERTY()
             EAlignment _vertical_align = EAlignment::kCenter;
         private:
+            APROPERTY()
+            f32 _font_size = 14.0f;
             APROPERTY()
             String _text;
             Vector2f _text_size;
@@ -71,6 +73,7 @@ namespace Ailu
         public:
             Slider();
             explicit Slider(const String &name);
+            Slider(f32 min, f32 max, f32 value);
             void Update(f32 dt) override;
             UIElement *HitTest(Vector2f pos) final;
             Vector2f MeasureDesiredSize() override;
@@ -81,14 +84,11 @@ namespace Ailu
         public:
             APROPERTY()
             Vector2f _range = Vector2f(0.0f, 1.0f);
-            APROPERTY()
-            u32 _font_size = 12u;
-            Vector4f _bar_rect,_dot_rect;
 
         private:
+            Vector4f _bar_rect,_dot_rect;
             APROPERTY()
             f32 _value = 0.0f;
-            String _value_str;
         };
 
         ACLASS()
@@ -139,14 +139,17 @@ namespace Ailu
             DECLARE_DELEGATE(on_content_changed, String);
         public:
             InputBlock();
+            InputBlock(const String &content);
             void Update(f32 dt) final;
             void SetContent(String content);
             Vector2f MeasureDesiredSize() override;
+            bool IsEditing() const { return _is_editing; }
         private:
             void RenderImpl(UIRenderer &r) final;
             void FillCursorOffsetTable();
             u32 IndexFromMouseX(f32 x);
             void ClearSelection(){_select_start = _select_end = _cursor_pos;}
+            void CommitEdit(bool is_finish_edit = true);
         private:
             inline static f32 kCursorXOffset = 4.0f;
             inline static f32 kCursorWidth = 2.0f;
@@ -165,6 +168,7 @@ namespace Ailu
             f32 _blink_interval = 0.5f; // 闪烁周期
             Vector<f32> _cursor_offsets;
             Vector2f _text_rect_size;
+            bool _is_editing = false;
         };
 
         ACLASS()

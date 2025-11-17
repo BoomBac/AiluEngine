@@ -55,15 +55,34 @@ namespace Ailu
         }
         void UIElement::RemoveChild(Ref<UIElement> child)
         {
+            if (child == nullptr)
+                return;
             auto it = std::find(_children.begin(), _children.end(), child);
             if (it != _children.end())
             {
                 _on_child_remove_delegate.Invoke(it->get());
                 child->_parent = nullptr;
                 --child->_hierarchy_depth;
+                UI::UIManager::Get()->Destroy(*it);
                 _children.erase(it);
             }
         }
+        void UIElement::RemoveChild(UIElement *child)
+        {
+            if (child == nullptr)
+                return;
+            auto it = std::find_if(_children.begin(), _children.end(), [&](Ref<UIElement> c)
+                                   { return c.get() == child; });
+            if (it != _children.end())
+            {
+                _on_child_remove_delegate.Invoke(it->get());
+                (*it)->_parent = nullptr;
+                --(*it)->_hierarchy_depth;
+                UI::UIManager::Get()->Destroy(*it);
+                _children.erase(it);
+            }
+        }
+
         void UIElement::ClearChildren()
         {
             if (_children.empty())
@@ -73,6 +92,7 @@ namespace Ailu
                 child->_parent = nullptr;
                 --child->_hierarchy_depth;
                 _on_child_remove_delegate.Invoke(child.get());
+                UI::UIManager::Get()->Destroy(child);
             }
             _children.clear();
         }
@@ -285,6 +305,7 @@ namespace Ailu
                          corners[0].y,
                          corners[1].x - corners[0].x,
                          corners[3].y - corners[0].y};
+            InvalidateLayout(true);
             PostArrange();
         }
         void UIElement::Arrange(Vector4f rect)
@@ -299,6 +320,15 @@ namespace Ailu
         bool UIElement::IsVisible() const
         {
             return _is_visible;
+        }
+        Vector4f UIElement::GetContentRect() const
+        {
+            Vector4f rect = _abs_rect;
+            rect.x += _padding._l * _scale.x;
+            rect.y += _padding._t * _scale.y;
+            rect.z -= (_padding._l + _padding._r) * _scale.x;
+            rect.w -= (_padding._t + _padding._b) * _scale.y;
+            return rect;
         }
         void UIElement::SetDepth(f32 depth)
         {
@@ -394,15 +424,21 @@ namespace Ailu
                 return;
             UIManager::Get()->SetFocus(this);
         }
-        void UIElement::InvalidateLayout()
+        void UIElement::InvalidateLayout(bool propagate_down)
         {
             //这里可以添加停止策略，例如如果父的 size policy 是 Fixed，只需要局部更新，不冒泡。
             if (!_is_layout_dirty)
             {
                 _is_layout_dirty = true;
-                if (_parent)
+                if (propagate_down)
                 {
-                    _parent->InvalidateLayout();// 向上传递
+                    for (auto &c: _children)
+                        c->InvalidateLayout(true);
+                }
+                else
+                {
+                    if (_parent)
+                        _parent->InvalidateLayout();// 向上传递
                 }
             }
         }

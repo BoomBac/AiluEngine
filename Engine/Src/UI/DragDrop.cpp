@@ -10,6 +10,7 @@ namespace Ailu
 	namespace UI
     {
         static Scope<DragDropManager> s_DragDropMgr = nullptr;
+        static Vector2f s_start_mouse_pos;
         DragDropManager &DragDropManager::Get()
         {
             if (!s_DragDropMgr)
@@ -25,6 +26,7 @@ namespace Ailu
             _payload = payload;
             _display_name = std::move(_display_name);
             _preview_tex = preview_tex;
+            s_start_mouse_pos = Input::GetGlobalMousePos();
         }
         void DragDropManager::EndDrag()
         {
@@ -35,10 +37,15 @@ namespace Ailu
             _payload.reset();
             _display_name.clear();
             _preview_tex = nullptr;
+            _is_drag_start = false;
         }
         void DragDropManager::Update()
         {
             if (!_payload)
+                return;
+            if (!_is_drag_start && Magnitude(Input::GetGlobalMousePos() - s_start_mouse_pos) > 5.0f)
+                _is_drag_start = true;
+            if (!_is_drag_start)
                 return;
             Input::IsKeyPressed(EKey::kLBUTTON);
             Input::BlockInput(true);

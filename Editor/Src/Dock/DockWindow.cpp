@@ -47,7 +47,8 @@ namespace Ailu
             _title_bar_root->Thickness(0.0f);
             auto hb = _title_bar_root->AddChild<UI::HorizontalBox>();
             hb->SlotSizePolicy(UI::ESizePolicy::kFill);
-            _title = hb->AddChild<UI::Text>();
+            _title = hb->AddChild<UI::Text>()->SlotSizePolicy(UI::ESizePolicy::kAuto,UI::ESizePolicy::kFill).As<UI::Text>();
+            _title->FontSize(kTitleBarHeight * 0.7f);
             _title->OnMouseMove() += [&](UI::UIEvent &e)
             {
                 if (e._current_target->_state._is_pressed)
@@ -210,19 +211,19 @@ namespace Ailu
         u32 DockWindow::HoverEdge(Vector2f pos) const
         {
             // 首先检查鼠标是否在窗口范围内
-            if (pos.x < _position.x || pos.x > _position.x + _size.x ||
-                pos.y < _position.y || pos.y > _position.y + _size.y)
+            if (pos.x < _position.x - kBorderThickness || pos.x > _position.x + _size.x + kBorderThickness ||
+                pos.y < _position.y - kBorderThickness || pos.y > _position.y + _size.y + kBorderThickness)
                 return 0;
 
             u32 resize_dir = 0;
             // 判断边缘
-            if (pos.x >= _position.x && pos.x <= _position.x + kBorderThickness)
+            if (pos.x <= _position.x && pos.x >= _position.x - kBorderThickness)
                 resize_dir |= 1;// 左
-            if (pos.x >= _position.x + _size.x - kBorderThickness && pos.x <= _position.x + _size.x)
+            if (pos.x <= _position.x + _size.x + kBorderThickness && pos.x >= _position.x + _size.x)
                 resize_dir |= 4;// 右
-            if (pos.y >= _position.y && pos.y <= _position.y + kBorderThickness && (pos.x - _position.x) < (_size.x - kTitleBarHeight))
+            if (pos.y <= _position.y && pos.y >= _position.y - kBorderThickness && (pos.x - _position.x) < (_size.x - kTitleBarHeight))
                 resize_dir |= 2;// 上
-            if (pos.y >= _position.y + _size.y - kBorderThickness && pos.y <= _position.y + _size.y)
+            if (pos.y >= _position.y + _size.y && pos.y <= _position.y + _size.y + kBorderThickness)
                 resize_dir |= 8;// 下
             return resize_dir;
         }

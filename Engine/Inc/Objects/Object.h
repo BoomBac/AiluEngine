@@ -27,7 +27,6 @@ namespace Ailu
         void ID(const u32 &value) { _id = value; }
         [[nodiscard]] const u32 &ID() const { return _id; }
         [[nodiscard]] const u64 HashCode() const { return _hash; };
-        [[nodiscard]] const Guid GetGuid() const { return _guid; };
 
     protected:
         APROPERTY()
@@ -36,8 +35,6 @@ namespace Ailu
         u32 _id;
         APROPERTY()
         u64 _hash;
-        APROPERTY()
-        Guid _guid;
 
     private:
         //0~64 reserve for shader, shader id hash only hash 6bit

@@ -232,6 +232,16 @@ namespace Ailu
         }
     }
 
+    static FbxAMatrix GetNodeGlobalTransformAtTime(FbxNode *node, FbxTime time = 0u)
+    {
+        FbxAMatrix global_transform = node->EvaluateGlobalTransform(time);
+        FbxVector4 t, r, s;
+        GetGeometry(node, t, r, s);
+        FbxAMatrix geometry_transform;
+        geometry_transform.SetTRS(t, r, s);
+        global_transform *= geometry_transform;
+        return global_transform;
+    }
 
     FbxParser::FbxParser()
     {
@@ -240,8 +250,6 @@ namespace Ailu
         fbx_manager_->SetIOSettings(fbx_ios_);
         fbx_importer_ = FbxImporter::Create(fbx_manager_, "");
     }
-
-    static Vector3f scale_factor{};
 
     Ailu::FbxParser::~FbxParser()
     {
@@ -273,11 +281,6 @@ namespace Ailu
             if (attribute)
             {
                 auto type = attribute->GetAttributeType();
-                FbxAMatrix transformMatrix = node->EvaluateGlobalTransform();
-                FbxVector4 scale = transformMatrix.GetS();
-                scale_factor.x = scale[0];
-                scale_factor.y = scale[1];
-                scale_factor.z = scale[2];
                 if (type == FbxNodeAttribute::eMesh)
                 {
                     mesh_node.emplace(node);
@@ -347,6 +350,7 @@ namespace Ailu
         struct FbxTextureInfo
         {
             Vector3f color{1.0f, 1.0f, 1.0f};
+            f32 factor;
             String texture_path;
             bool has_texture = false;
         };
@@ -359,15 +363,22 @@ namespace Ailu
             if (prop.IsValid())
             {
                 FbxDataType type = prop.GetPropertyDataType();
-                if (type.Is(FbxDouble3DT))
+                auto type_name = type.GetName();
+                if (type.Is(FbxColor3DT))
                 {
                     FbxDouble3 color = prop.Get<FbxDouble3>();
+                    info.color = {(float) color[0], (float) color[1], (float) color[2]};
+                }
+                else if (type.Is(FbxColor4DT))
+                {
+                    FbxDouble4 color = prop.Get<FbxDouble4>();
                     info.color = {(float) color[0], (float) color[1], (float) color[2]};
                 }
                 else if (type.Is(FbxDoubleDT))
                 {
                     double value = prop.Get<FbxDouble>();
                     info.color = {(float) value, (float) value, (float) value};
+                    info.factor = (f32) value;
                 }
             }
 
@@ -405,7 +416,7 @@ namespace Ailu
 
             return info;
         };
-
+        _cur_node_transform = GetNodeGlobalTransformAtTime(node);
         Vector<std::future<bool>> rets;
         //_time_mgr.Mark();
         if (_import_setting._import_flag & MeshImportSetting::kImportFlagMesh)
@@ -434,6 +445,13 @@ namespace Ailu
             }
             GenerateIndexdMesh(mesh.get());
             CalculateTangant(mesh.get());
+            auto const ShininessToRoughness = [](f32 shininess)
+            {
+                shininess = std::max(shininess, 0.0001f);
+                f32 roughness = std::sqrt(2.0f / (shininess + 2.0f));
+                return std::clamp(roughness, 0.0f, 1.0f);
+            };
+
             //LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
             if (is_skined)
             {
@@ -461,6 +479,18 @@ namespace Ailu
                             tex_info = fill_tex(prop);
                             if (tex_info.has_texture)
                                 mat_info._textures[1] = tex_info.texture_path;
+                        }
+                        if (auto prop = mat->FindProperty(FbxSurfaceMaterial::sEmissive); prop.IsValid())
+                        {
+                            FbxTextureInfo tex_info;
+                            tex_info = fill_tex(prop);
+                            mat_info._emissive = tex_info.color;
+                        }
+                        if (auto prop = mat->FindProperty(FbxSurfaceMaterial::sShininess); prop.IsValid())
+                        {
+                            FbxTextureInfo tex_info;
+                            tex_info = fill_tex(prop);
+                            mat_info._roughness = ShininessToRoughness(tex_info.factor);
                         }
                         mesh->AddCacheMaterial(mat_info);
                     }
@@ -591,11 +621,11 @@ namespace Ailu
 
     bool FbxParser::ReadNormal(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector3f> &normals)
     {
-        if (fbx_mesh.GetElementNormalCount() < 1) return false;
+        if (fbx_mesh.GetElementNormalCount() < 1) 
+            return false;
         auto *fbx_normals = fbx_mesh.GetElementNormal(0);
         int vertex_count = fbx_mesh.GetControlPointsCount(), data_size = 0;
         normals.clear();
-        //void* data = nullptr;
         if (fbx_normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByControlPoint)
         {
             _b_normal_by_controlpoint = true;
@@ -609,10 +639,8 @@ namespace Ailu
                 else if (fbx_normals->GetReferenceMode() == fbxsdk::FbxLayerElement::EReferenceMode::eIndexToDirect)
                     normal_index = fbx_normals->GetIndexArray().GetAt(i);
                 auto normal = fbx_normals->GetDirectArray().GetAt(normal_index);
+                normal.Normalize();
                 normals.emplace_back(normal[0], normal[1], normal[2]);
-                //reinterpret_cast<float*>(data)[i * 3] = normal[0];
-                //reinterpret_cast<float*>(data)[i * 3 + 1] = normal[1];
-                //reinterpret_cast<float*>(data)[i * 3 + 2] = normal[2];
             }
         }
         else if (fbx_normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByPolygonVertex)
@@ -621,7 +649,6 @@ namespace Ailu
             int trangle_count = fbx_mesh.GetPolygonCount();
             vertex_count = trangle_count * 3;
             normals.reserve(vertex_count);
-            //data = new float[vertex_count * 3];
             int cur_vertex_id = 0;
             for (int i = 0; i < trangle_count; ++i)
             {
@@ -633,15 +660,12 @@ namespace Ailu
                     else if (fbx_normals->GetReferenceMode() == fbxsdk::FbxLayerElement::EReferenceMode::eIndexToDirect)
                         normal_index = fbx_normals->GetIndexArray().GetAt(cur_vertex_id);
                     auto normal = fbx_normals->GetDirectArray().GetAt(normal_index);
+                    normal.Normalize();
                     normals.emplace_back(normal[0], normal[1], normal[2]);
-                    //reinterpret_cast<float*>(data)[cur_vertex_id * 3] = normal[0];
-                    //reinterpret_cast<float*>(data)[cur_vertex_id * 3 + 1] = normal[1];
-                    //reinterpret_cast<float*>(data)[cur_vertex_id * 3 + 2] = normal[2];
                     ++cur_vertex_id;
                 }
             }
         }
-        //mesh->SetNormals(std::move(reinterpret_cast<Vector3f*>(data)));
         return true;
     }
 
@@ -690,6 +714,10 @@ namespace Ailu
         u32 cur_index_count = 0u;
         i32 trangle_count = fbx_mesh->GetPolygonCount();
         auto mat_element = fbx_mesh->GetElementMaterial();
+
+
+        FbxAMatrix final_transform = GetNodeGlobalTransformAtTime(node);
+
         if (mat_element)
         {
             auto material_indices = mat_element->GetIndexArray();
@@ -702,6 +730,7 @@ namespace Ailu
                     {
                         auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
                         auto p = points[cur_control_point_index];
+                        p = final_transform.MultT(p);
                         Vector3f position{(float) p[0], (float) p[1], (float) p[2]};
                         //position *= scale_factor;
                         _positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
@@ -736,10 +765,10 @@ namespace Ailu
                     {
                         auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
                         auto p = points[cur_control_point_index];
+                        p = final_transform.MultT(p);
                         Vector3f position{(float) p[0], (float) p[1], (float) p[2]};
                         _positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
                         _positon_material_index_mapper[positions.size()] = cur_mat_index;
-                        position *= scale_factor;
                         positions.emplace_back(position);
                     }
                 }
@@ -755,6 +784,7 @@ namespace Ailu
                     {
                         auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
                         auto p = points[cur_control_point_index];
+                        p = final_transform.MultT(p);
                         Vector3f position{(float) p[0], (float) p[1], (float) p[2]};
                         //position *= scale_factor;
                         _positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
@@ -789,10 +819,10 @@ namespace Ailu
                     {
                         auto cur_control_point_index = fbx_mesh->GetPolygonVertex(i, j);
                         auto p = points[cur_control_point_index];
+                        p = final_transform.MultT(p);
                         Vector3f position{(float) p[0], (float) p[1], (float) p[2]};
                         _positon_conrtol_index_mapper[positions.size()] = cur_control_point_index;
                         _positon_material_index_mapper[positions.size()] = 0;
-                        position *= scale_factor;
                         positions.emplace_back(position);
                     }
                 }
@@ -1276,9 +1306,7 @@ namespace Ailu
 
     void FbxParser::ParserImpl(WString sys_path)
     {
-        //return ParserImpl(sys_path, false);
         _cur_file_sys_path = sys_path;
-        scale_factor = Vector3f::kOne;
         String path = ToChar(sys_path.data());
         _p_cur_fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");
         if (fbx_importer_ != nullptr && !fbx_importer_->Initialize(path.c_str(), -1, fbx_manager_->GetIOSettings()))
@@ -1352,7 +1380,7 @@ namespace Ailu
             }
             while (!mesh_node.empty())
             {
-                if (!_import_setting._mesh_name.empty())
+                if (!_import_setting._mesh_name.empty() && !_import_setting._is_combine_mesh)
                 {
                     auto node_name = String(mesh_node.front()->GetName());
                     if (node_name != _import_setting._mesh_name)

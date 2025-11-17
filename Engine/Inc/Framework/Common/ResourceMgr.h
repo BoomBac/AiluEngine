@@ -204,6 +204,8 @@ namespace Ailu
         template<typename T>
         static Ref<T> IterToRefPtr(const Vector<ResourcePoolContainer::iterator>::iterator &iter);
 
+        Ref<Material> GetEmbeddedMaterial(Mesh *mesh,u16 slot);
+
     public:
         Ref<Font> _default_font;
 
@@ -222,6 +224,8 @@ namespace Ailu
 
         void LoadAssetDB();
         void SaveAssetDB();
+
+        void CreateAndRegisterEmbeddedMaterial(Mesh* mesh);
 
         //加载引擎处理后的资产
         Scope<Asset> LoadMaterial(const WString &asset_path,const ImportSetting& settings);

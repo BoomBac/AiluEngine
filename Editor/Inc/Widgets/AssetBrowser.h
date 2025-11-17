@@ -31,6 +31,7 @@ namespace Ailu
             void Update(f32 dt) final;
 
         private:
+            inline static const f32 kDragThreshold = 5.0f;
             UI::SplitView *_sv = nullptr;
             UI::VerticalBox *_right = nullptr;
             UI::ScrollView *_icon_area = nullptr;
@@ -43,6 +44,8 @@ namespace Ailu
             fs::path _current_path;
             Vector<Asset *> _cur_dir_assets;
             HashMap<Render::Mesh *, Ref<Render::RenderTexture>> _mesh_preview_icons;
+            bool _is_dragging = false;
+            Vector2f _drag_start_pos;
         };
     }// namespace Editor
 }// namespace Ailu

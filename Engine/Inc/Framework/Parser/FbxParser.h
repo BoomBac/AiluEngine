@@ -76,6 +76,7 @@ namespace Ailu
         bool _b_normal_by_controlpoint = false;
         FbxTime _start_time;
         FbxTime _end_time;
+        FbxAMatrix _cur_node_transform;
 
         inline static TimeMgr _time_mgr{};
     };

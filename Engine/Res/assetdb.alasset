@@ -47,7 +47,7 @@
 61719aa4-e2e6-4ba7-bab7-5d6e6b78935f,WaterTest/Alpha_Joints.alasset,kSkeletonMesh
 687dd7a6-c8d4-40f1-8a33-694707d9c423,Icons/directional_light.alasset,kTexture2D
 6abca545-d271-4c76-b214-913472735574,WaterTest/empty_scene.almap,kScene
-6b616d87-aefe-4b8d-9914-531b11a6efc5,NewScene/Palace/textures/sponza_column_a_baseColor.alasset,kTexture2D
+6b616d87-aefe-4b8d-9914-531b11a6efc5,Shaders/raytrace_debug_draw.alasset,kShader
 6d1148fb-00a4-4720-8ca0-7dd877b0da55,NewScene/Palace/textures/sponza_arch_baseColor.alasset,kTexture2D
 6fd672ec-676e-41b4-9da8-b367d6ab6d2b,WaterTest/Grass_Wildgrass08_N.alasset,kTexture2D
 7182a502-ba5e-4de5-a517-ed226a6b7805,Shaders/gpu_terrain.alasset,kComputeShader
@@ -87,6 +87,7 @@ a5ad5353-4bed-47b7-a4c2-aa26036f7ac2,Materials/MAT_Cloud.alasset,kMaterial
 a5e4a76d-c915-48a4-a940-5dba8a0c936e,WaterTest/Grass_Wildgrass08_D.alasset,kTexture2D
 a5e5ce06-3542-4eb0-8087-5b4034c4dcf6,NewScene/Default_albedo.alasset,kTexture2D
 aaa391ce-746b-445d-9dda-c678ad8b41b7,AnimClips/anim_run.alasset,kAnimClip
+aab1797f-d730-4302-8982-7fc075364eba,breakfast_room/conference.alasset,kMesh
 aaf13c3a-39fa-4ca3-b221-d0f1671474f7,NewScene/Palace/textures/sponza_bricks_a_normal.alasset,kTexture2D
 abcb7c17-1767-4b43-9850-f7a36a428b96,WaterTest/M_Water.alasset,kMaterial
 acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c,Icons/point_light.alasset,kTexture2D
@@ -112,7 +113,7 @@ caddc1fd-d0c7-401a-98f3-2eca7b25a59d,NewScene/Palace/MAT_fabric_g.alasset,kMater
 cf40ec2f-ceb8-4cc7-b21f-8ec31d0995ea,Shaders/taa.alasset,kComputeShader
 cffbfce1-eb20-4319-aa0e-20a68eb19f22,Textures/small_cave_1k.alasset,kTexture2D
 d137d2a7-0d2b-40bc-9c76-6d2708923869,Meshs/cube.alasset,kMesh
-d3075919-313e-45b5-8de1-fdf4247232dd,NewScene/Palace/textures/chain_texture_baseColor.alasset,kTexture2D
+d3075919-313e-45b5-8de1-fdf4247232dd,Shaders/raytrace_gi.alasset,kComputeShader
 d7e07be5-55ed-4b47-ad7f-107a64cda4bf,Icons/spot_light.alasset,kTexture2D
 d81ef7da-3ba3-432b-9e15-397e0f8dd446,NewScene/Palace/textures/vase_hanging_normal.alasset,kTexture2D
 da893f79-e318-4de1-8a73-68c4a51b6892,Shaders/motion_vector.alasset,kShader

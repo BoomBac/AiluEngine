@@ -37,7 +37,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::Text>();
 //Class Text end...........................
 
 //Class Slider begin...........................
-#define BASIC_GEN_H_69_GENERATED_BODY \
+#define BASIC_GEN_H_71_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Slider_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -101,7 +101,7 @@ AILU_API class Ailu::Type* Ailu::StaticClass<class Ailu::UI::InputBlock>();
 //Class InputBlock end...........................
 
 //Class Image begin...........................
-#define BASIC_GEN_H_173_GENERATED_BODY \
+#define BASIC_GEN_H_177_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Image_Type();\
                                 static Type* GetPrivateStaticClass();\

@@ -94,14 +94,14 @@ namespace Ailu
                     cur_hover_widget = w;
                     break;
                 }
-                else
-                {
-                    UI::UIEvent ue;
-                    ue._type = UIEvent::EType::kMouseExitWindow;
-                    ue._mouse_position = Input::GetMousePos(e._window);
-                    ue._mouse_delta = Input::GetMousePosDelta();
-                    w->OnEvent(ue);
-                }
+                //else
+                //{
+                //    UI::UIEvent ue;
+                //    ue._type = UIEvent::EType::kMouseExitWindow;
+                //    ue._mouse_position = Input::GetMousePos(e._window);
+                //    ue._mouse_delta = Input::GetMousePosDelta();
+                //    w->OnEvent(ue);
+                //}
             }
             if (s_mgr->_pre_hover_widget && cur_hover_widget && cur_hover_widget != s_mgr->_pre_hover_widget)
             {
@@ -111,6 +111,17 @@ namespace Ailu
                 ue._mouse_delta = Input::GetMousePosDelta();
                 s_mgr->_pre_hover_widget->OnEvent(ue);
             }
+            //else
+            //{
+            //    if (s_mgr->_pre_hover_widget && cur_hover_widget == nullptr)
+            //    {
+            //        UI::UIEvent ue;
+            //        ue._type = UIEvent::EType::kMouseExitWindow;
+            //        ue._mouse_position = Input::GetMousePos(e._window);
+            //        ue._mouse_delta = Input::GetMousePosDelta();
+            //        s_mgr->_pre_hover_widget->OnEvent(ue);
+            //    }
+            //}
             s_mgr->_pre_hover_widget = cur_hover_widget;
         }
     }// namespace UI

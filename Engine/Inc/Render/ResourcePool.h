@@ -187,7 +187,10 @@ namespace Ailu::Render
                     ++it;
                 }
             }
-            LOG_INFO("THashableResourcePool: Released {} unused resources", released_rt_num);
+            if (released_rt_num > 0)
+            {
+                LOG_INFO("THashableResourcePool: Released {} unused resources", released_rt_num);
+            }
         }
 
         auto begin() { return _pool.begin(); }

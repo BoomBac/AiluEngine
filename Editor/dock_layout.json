@@ -1,24 +1,24 @@
 {
     "_node_data": [{
-            "_split_ratio": 0.5,
             "_type_id": "Ailu::Editor::CommonView",
+            "_split_ratio": 0.5,
+            "_window_size": [286.0, 677.0],
             "_type": 2,
-            "_window_size": [325.0, 213.0],
             "_parent_id": 4294967295,
             "_id": 0,
             "_window_id": 999,
             "_is_vertical_split": true,
             "_title": "CommonView",
             "_tab_id": "",
-            "_window_position": [1948.0, 755.0],
+            "_window_position": [1979.0, 282.0],
             "_position": [0.0, 0.0],
-            "_size": [325.0, 213.0],
+            "_size": [286.0, 677.0],
             "_flags": 31
         }, {
-            "_type_id": "Ailu::Editor::SceneView",
             "_split_ratio": 0.5,
-            "_window_size": [1324.0, 777.0],
+            "_type_id": "Ailu::Editor::SceneView",
             "_type": 2,
+            "_window_size": [1324.0, 777.0],
             "_parent_id": 4294967295,
             "_id": 1,
             "_window_id": 0,
@@ -26,14 +26,14 @@
             "_title": "SceneView",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [257.0, 72.0],
+            "_position": [285.0, 29.0],
             "_size": [999.0, 587.0],
             "_flags": 0
         }, {
-            "_split_ratio": 0.5,
             "_type_id": "Ailu::Editor::AssetBrowser",
-            "_type": 2,
+            "_split_ratio": 0.5,
             "_window_size": [1324.0, 777.0],
+            "_type": 2,
             "_parent_id": 4294967295,
             "_id": 2,
             "_window_id": 0,
@@ -41,8 +41,23 @@
             "_title": "AssetBrowser",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [-395.0, 675.0],
+            "_position": [-582.0, 666.0],
             "_size": [903.0, 513.0],
+            "_flags": 0
+        }, {
+            "_split_ratio": 0.5,
+            "_type_id": "Ailu::Editor::ObjectDetail",
+            "_type": 2,
+            "_window_size": [1324.0, 777.0],
+            "_parent_id": 4294967295,
+            "_id": 3,
+            "_window_id": 0,
+            "_is_vertical_split": true,
+            "_title": "ObjectDetail",
+            "_tab_id": "",
+            "_window_position": [-858993472.0, -858993472.0],
+            "_position": [789.0, 690.0],
+            "_size": [377.0, 493.0],
             "_flags": 0
         }]
 }

@@ -879,7 +879,10 @@ namespace Ailu::Render
         {
             _lut_pool.emplace(std::make_pair(it->second._id, it));
         }
-        LOG_INFO("RT pool release {} rt", released_rt_num);
+        if (released_rt_num > 0)
+        {
+            LOG_INFO("RT pool release {} rt", released_rt_num);
+        }
     }
     void RenderTexturePool::Register(RenderTexture *rt)
     {

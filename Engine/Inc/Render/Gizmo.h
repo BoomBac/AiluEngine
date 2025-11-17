@@ -44,7 +44,7 @@ namespace Ailu
             static void DrawRect(const Vector2f &top_left, const Vector2f &bottom_right, Color color = Gizmo::s_color);
             static void DrawMesh(Mesh *mesh, const Matrix4x4f &matrix, Material *mat);
             static void DrawTexture(const Rect &rect, Texture *tex);
-            static void DrawText(const String &text, Vector2f pos, u32 font_size = 10u, Color color = Gizmo::s_color);
+            static void DrawText(const String &text, Vector2f pos, f32 font_size = 10.0f, Color color = Gizmo::s_color);
 
             static void Submit(CommandBuffer *cmd, const RenderingData &data);
 

@@ -52,8 +52,8 @@ namespace Ailu
             void Render(CommandBuffer* cmd);
             void DrawQuad(Vector4f rect, Color color = Colors::kWhite, f32 depth = 0.0f);
             void DrawQuad(Vector4f rect, Matrix4x4f matrix, Color color = Colors::kWhite, f32 depth = 0.0f);
-            void DrawText(const String &text, Vector2f pos, u16 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
-            void DrawText(const String &text, Vector2f pos, Matrix4x4f matrix,u16 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
+            void DrawText(const String &text, Vector2f pos, f32 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
+            void DrawText(const String &text, Vector2f pos, Matrix4x4f matrix,f32 font_size = 14u, Color color = Colors::kWhite,Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             void DrawImage(Render::Texture *texture, Vector4f rect, const ImageDrawOptions &opts = {});
             void DrawLine(Vector2f a, Vector2f b, f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
             void DrawLine(Vector2f a, Vector2f b, Matrix4x4f matrix,f32 thickness = 1.0f, Color color = Colors::kWhite, f32 depth = 0.0f);
@@ -65,6 +65,7 @@ namespace Ailu
             //统一走这个接口方便设置裁切矩形
             void AppendNode(DrawerBlock* block,u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex = nullptr);
         private:
+            void DrawDebugPannel();
             Vector<struct DrawerBlock *> &FrameBlocks() {return _drawer_blocks[_frame_index];};
             DrawerBlock *GetAvailableBlock(u32 vert_num,u32 index_num);
             void SubmitBlock(DrawerBlock *block, CommandBuffer *cmd,RenderTexture* color,RenderTexture* depth = nullptr);

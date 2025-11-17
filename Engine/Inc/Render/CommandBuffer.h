@@ -153,6 +153,7 @@ namespace Ailu
         void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count);
         void DrawMesh(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count);
         void DrawMeshIndirect(Mesh *mesh,u16 sub_mesh, Material *material ,u16 pass_index,GPUBuffer* arg_buffer,u32 arg_offset = 0u);
+        void DrawProceduralIndirect(Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset = 0u);
 
         void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y);
         void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);

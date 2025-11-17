@@ -371,7 +371,7 @@ namespace Ailu::Render
         s_pInstance->_draw_tex_items[s_pInstance->_tex_screen_item_num++] = {rect, tex};
     }
 
-    void Gizmo::DrawText(const String &text, Vector2f pos, u32 font_size, Color color)
+    void Gizmo::DrawText(const String &text, Vector2f pos, f32 font_size, Color color)
     {
         s_pInstance->_text_renderer->DrawText(text, pos, font_size, Vector2f::kOne, color);
     }
@@ -411,7 +411,10 @@ namespace Ailu::Render
         }
         for (auto& r: s_pInstance->_mesh_renderers)
         {
-            cmd->DrawMesh(r._mesh, r._material,r._matrix);
+            for (u16 i = 0; i < r._mesh->SubmeshCount(); ++i)
+            {
+                cmd->DrawMesh(r._mesh, r._material, r._matrix, i);
+            }
         }
         s_pInstance->_mesh_renderers.clear();
         if (s_pInstance->_screen_vertex_num > 0)
@@ -423,7 +426,7 @@ namespace Ailu::Render
             f32 w = (f32)data._width,h = (f32)data._height;
             f32 half_width = w * 0.5f, half_height = h * 0.5f;
             BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
-            BuildOrthographicMatrix(proj, 0.0f, w, 0.0f, h, 1.f, 200.f);
+            BuildOrthographicMatrix(proj, 0.0f, w, h,0.0f, 1.f, 200.f);
             s_pInstance->_screen_camera_cb._MatrixVP = view * proj;
             s_pInstance->_screen_camera_cb._MatrixVP_NoJitter = s_pInstance->_screen_camera_cb._MatrixVP;
             cmd->DrawInstanced(s_pInstance->_screen_vbuf.get(), nullptr, s_pInstance->_line_drawer, 0, 1);

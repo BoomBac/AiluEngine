@@ -97,7 +97,7 @@ namespace Ailu::Render
         if (submesh_index >= (u16) _index_buffers.size())
         {
             LOG_ERROR("Mesh::GetIndicesCount: mesh({}) submesh({}) is invalid!", _name, submesh_index);
-            return nullptr;
+            return _index_buffers[0];
         }
         return _index_buffers[submesh_index];
     }

@@ -225,6 +225,103 @@ namespace Ailu
             if (end < begin) return s;
             return s.substr(begin, end - begin + 1);
         }
+
+        static inline String ToLower(const String& s)
+        {
+            String result = s;
+            std::transform(result.begin(), result.end(), result.begin(),
+                [](unsigned char c) { return std::tolower(c); });
+            return result;
+        }
+
+        static inline String ToUpper(const String& s)
+        {
+            String result = s;
+            std::transform(result.begin(), result.end(), result.begin(),
+                [](unsigned char c) { return std::toupper(c); });
+            return result;
+        }
+#undef max
+#undef min
+        static std::optional<u32> ParseUInt32(const String &str)
+        {
+            try
+            {
+                size_t idx;
+                unsigned long value = std::stoul(str, &idx, 10);
+                if (idx != str.size() || value > std::numeric_limits<u32>::max())
+                {
+                    return std::nullopt;
+                }
+                return static_cast<u32>(value);
+            }
+            catch (const std::exception&)
+            {
+                return std::nullopt;
+            }
+        }
+
+        static std::optional<i32> ParseInt32(const String &str)
+        {
+            try
+            {
+                size_t idx;
+                long value = std::stol(str, &idx, 10);
+                if (idx != str.size() || value < std::numeric_limits<i32>::min() || value > std::numeric_limits<i32>::max())
+                {
+                    return std::nullopt;
+                }
+                return static_cast<i32>(value);
+            }
+            catch (const std::exception&)
+            {
+                return std::nullopt;
+            }
+        }
+
+        static std::optional<f32> ParseFloat(const String &str)
+        {
+            try
+            {
+                size_t idx;
+                float value = std::stof(str, &idx);
+                if (idx != str.size())
+                {
+                    return std::nullopt;
+                }
+                return value;
+            }
+            catch (const std::exception&)
+            {
+                return std::nullopt;
+            }
+        }
+
+        static std::optional<f64> ParseDouble(const String &str)
+        {
+            try
+            {
+                size_t idx;
+                double value = std::stod(str, &idx);
+                if (idx != str.size())
+                {
+                    return std::nullopt;
+                }
+                return value;
+            }
+            catch (const std::exception&)
+            {
+                return std::nullopt;
+            }
+        }
+
+        static bool IsNumeric(const String &str)
+        {
+            if (str.empty()) return false;
+            char *endptr = nullptr;
+            std::strtod(str.c_str(), &endptr);
+            return (*endptr == '\0');// 成功转为 double 并且没有剩余字符
+        }
     }
     namespace su = StringUtils;
 

@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <array>
 
 using namespace std;
 struct Config
@@ -90,6 +91,65 @@ std::chrono::system_clock::time_point StringToTimePoint(const std::string &timeS
     return std::chrono::system_clock::from_time_t(timeT);
 }
 
+uint32_t murmur3_32(const uint8_t *key, size_t len, uint32_t seed = 0)
+{
+    uint32_t h = seed;
+    if (len > 3)
+    {
+        const uint32_t *key_x4 = (const uint32_t *) key;
+        size_t i = len >> 2;
+        do {
+            uint32_t k = *key_x4++;
+            k *= 0xcc9e2d51;
+            k = (k << 15) | (k >> 17);
+            k *= 0x1b873593;
+            h ^= k;
+            h = (h << 13) | (h >> 19);
+            h = h * 5 + 0xe6546b64;
+        } while (--i);
+        key = (const uint8_t *) key_x4;
+    }
+    if (len & 3)
+    {
+        size_t i = len & 3;
+        uint32_t k = 0;
+        key = &key[i - 1];
+        do {
+            k <<= 8;
+            k |= *key--;
+        } while (--i);
+        k *= 0xcc9e2d51;
+        k = (k << 15) | (k >> 17);
+        k *= 0x1b873593;
+        h ^= k;
+    }
+    h ^= len;
+    h ^= (h >> 16);
+    h *= 0x85ebca6b;
+    h ^= (h >> 13);
+    h *= 0xc2b2ae35;
+    h ^= (h >> 16);
+    return h;
+}
+
+uint32_t calc_file_murmur3(const std::filesystem::path &path)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file)
+        throw std::runtime_error("Failed to open file: " + path.string());
+
+    std::array<uint8_t, 8192> buffer;
+    uint32_t hash = 0;
+    while (file)
+    {
+        file.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
+        auto bytes = file.gcount();
+        if (bytes > 0)
+            hash ^= murmur3_32(buffer.data(), bytes, hash);
+    }
+    return hash;
+}
+
 int main(int argc, char **argv)
 {
     bool is_debug = false, is_rebuild_all = false;
@@ -134,7 +194,7 @@ int main(int argc, char **argv)
     auto class_ns_path = tool_dir / "class_ns_map.txt";
     Config config;
     LoadConfig(config_dir, config);
-    map<string, long long> cache_file_times;
+    map<string, uint32_t> cache_file_hashes;
     if (fs::exists(cache_dir))
     {
         std::ifstream file(cache_dir.string());
@@ -145,8 +205,8 @@ int main(int argc, char **argv)
             if (pos != std::string::npos)
             {
                 string path = line.substr(0, pos);
-                string last_write_time = line.substr(pos + 1);
-                cache_file_times[path] = std::stoll(last_write_time);
+                string file_hash = line.substr(pos + 1);
+                cache_file_hashes[path] = std::stoll(file_hash);
             }
         }
         file.close();
@@ -174,13 +234,13 @@ int main(int argc, char **argv)
         TraverseDirectory(dir, all_inc_sys_path);
     }
     vector<fs::path> all_inc_rela_path;
-    map<string, long long> current_file_times;
+    map<string, uint32_t> current_file_hashes;
     for (auto &inc_file: all_inc_sys_path)
     {
         all_inc_rela_path.push_back(fs::relative(inc_file, proj_dir));
         if (is_debug)
             std::cout << all_inc_rela_path.back().string() << std::endl;
-        current_file_times[all_inc_rela_path.back().string()] = fs::last_write_time(inc_file).time_since_epoch().count();
+        current_file_hashes[all_inc_rela_path.back().string()] = calc_file_murmur3(inc_file);
     }
     set<fs::path> work_files;
     set<fs::path> class_ns_update_files;
@@ -189,10 +249,10 @@ int main(int argc, char **argv)
     for (auto &p: all_inc_rela_path)
     {
         auto sys_path = proj_dir / p;
-        auto cur_time = fs::last_write_time(sys_path).time_since_epoch().count();
-        if (cache_file_times.contains(p.string()))
+        uint32_t file_hash = calc_file_murmur3(sys_path);
+        if (cache_file_hashes.contains(p.string()))
         {
-            if (cur_time > cache_file_times[p.string()])
+            if (current_file_hashes[p.string()] != cache_file_hashes[p.string()])
             {
                 cout << "File changed: " << p.string() << endl;
                 work_files.insert(sys_path);
@@ -205,12 +265,12 @@ int main(int argc, char **argv)
             class_ns_update_files.insert(sys_path);
             cout << "New file: " << p.string() << endl;
         }
-        cache_file_times[p.string()] = cur_time;
+        cache_file_hashes[p.string()] = file_hash;
         if (is_rebuild_all)
             work_files.insert(sys_path);
     }
     ofstream cache_file(cache_dir.string());
-    for (auto &p: cache_file_times)
+    for (auto &p: cache_file_hashes)
     {
         cache_file << p.first << "," << p.second << std::endl;
     }

@@ -67,6 +67,10 @@ namespace Ailu
                 DeserializePrimitive<Vector4f>(&v, ar);
                 memcpy(this, &v, sizeof(Padding));
             };
+            String ToString() const
+            {
+                return std::format("{},{},{},{}", _l, _t, _r, _b);
+            }
         };
 
         ASTRUCT()
@@ -90,7 +94,9 @@ namespace Ailu
             APROPERTY()
             ESlotType _type = ESlotType::kCanvas;
             APROPERTY()
-            ESizePolicy _size_policy = ESizePolicy::kAuto;//用于linear box slot
+            ESizePolicy _size_policy_h = ESizePolicy::kFill;//用于linear box slot
+            APROPERTY()
+            ESizePolicy _size_policy_v = ESizePolicy::kAuto;//用于linear box slot
             APROPERTY()
             bool _is_size_to_content = false;//用于canvas slot
             APROPERTY()
@@ -227,6 +233,7 @@ namespace Ailu
                 return dynamic_cast<T *>(this);
             }
             void RemoveChild(Ref<UIElement> child);
+            void RemoveChild(UIElement* child);
             void ClearChildren();
             i32 IndexOf(UIElement *child);
             UIElement *ChildAt(u32 index);
@@ -253,6 +260,11 @@ namespace Ailu
             /// </summary>
             /// <returns>ltwh</returns>
             [[nodiscard]] Vector4f GetArrangeRect() const;
+            /// <summary>
+            /// 返回所分配内容区rect，基于屏幕空间,有旋转的话这个值就是无效的
+            /// </summary>
+            /// <returns>ltwh</returns>
+            [[nodiscard]] Vector4f GetContentRect() const;
             void SetDepth(f32 depth);
             ElementEvent::EventView OnMouseEnter();
             ElementEvent::EventView OnMouseExit();
@@ -280,7 +292,8 @@ namespace Ailu
             //焦点管理
             void RequestFocus();// 主动请求焦点
             bool IsFocused() const { return _state._is_focused; }
-            void InvalidateLayout();
+            //默认向上传递dirty,true则只标记子元素
+            void InvalidateLayout(bool propagate_down = false);
             void InvalidateTransform();
             //插槽属性
             FORCEINLINE UIElement& SlotPosition(Vector2f pos)
@@ -325,9 +338,17 @@ namespace Ailu
                 InvalidateLayout();
                 return *this;
             }
-            FORCEINLINE UIElement& SlotSizePolicy(ESizePolicy policy)
+            FORCEINLINE UIElement& SlotSizePolicy(ESizePolicy policy_h,ESizePolicy policy_v)
             {
-                _slot._size_policy = policy;
+                _slot._size_policy_h = policy_h;
+                _slot._size_policy_v = policy_v;
+                InvalidateLayout();
+                return *this;
+            }
+            FORCEINLINE UIElement &SlotSizePolicy(ESizePolicy policy)
+            {
+                _slot._size_policy_h = policy;
+                _slot._size_policy_v = policy;
                 InvalidateLayout();
                 return *this;
             }
@@ -356,7 +377,7 @@ namespace Ailu
             EAlignment SlotAlignmentH() const { return _slot._alignment_h; }
             EAlignment SlotAlignmentV() const { return _slot._alignment_v; }
             Padding SlotMargin() const { return _slot._margin; }
-            ESizePolicy SlotSizePolicy() const { return _slot._size_policy; }
+            ESizePolicy SlotSizePolicy(bool is_h = true) const { return is_h ? _slot._size_policy_h : _slot._size_policy_v; }
             bool SlotSizeToContent() const { return _slot._is_size_to_content; }
             f32 SlotFillRate() const { return _slot._fill_rate; }
             Padding SlotPadding() const { return _padding; }

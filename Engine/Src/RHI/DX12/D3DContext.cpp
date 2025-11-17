@@ -1495,7 +1495,7 @@ namespace Ailu::RHI::DX12
                     pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
                 ++Render::RenderingStates::s_temp_draw_call;
                 u32 vertex_count = is_produced ? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
-                u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb->GetVertexCount() / 3;
+                u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb? draw_cmd->_vb->GetVertexCount() / 3 : 0u;
                 triangle_count *= draw_cmd->_instance_count;
                 Render::RenderingStates::s_temp_triangle_num += triangle_count;
                 Render::RenderingStates::s_temp_vertex_num += vertex_count;

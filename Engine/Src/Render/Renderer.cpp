@@ -11,6 +11,7 @@
 #include "Render/Features/VolumetricClouds.h"
 #include "Render/Features/VoxelGI.h"
 #include "Render/Features/GpuTerrain.h"
+#include "Render/Features/RayTraceGI.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
 
@@ -55,10 +56,13 @@ namespace Ailu::Render
         _ssao = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new GpuTerrain())));
         _gpu_terrain = _owned_features.back().get();
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new RayTraceGI())));
+        _raytrace_gi = _owned_features.back().get();
         //_features.push_back(_vxgi);
         //_features.push_back(_cloud);
         //_features.push_back(_taa);
         _features.push_back(_ssao);
+        _features.push_back(_raytrace_gi);
         //_features.push_back(_gpu_terrain);
         //_features.push_back(_taa);
 
@@ -182,8 +186,10 @@ namespace Ailu::Render
             _rendering_data._rg_handles._gbuffers[1] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer1);
             _rendering_data._rg_handles._gbuffers[2] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefault), RenderResourceName::kGBuffer2);
             _rendering_data._rg_handles._gbuffers[3] = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kRGBAHalf), RenderResourceName::kGBuffer3);
-            _rendering_data._rg_handles._color_target = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR), RenderResourceName::kCameraColorA);
-            _rendering_data._rg_handles._depth_target = _rd_graph->CreateResource(TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDepth), RenderResourceName::kCameraDepth);
+            auto cam_color_desc = _rendering_data._camera_data._camera_color_target_desc = TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
+            _rendering_data._rg_handles._color_target = _rd_graph->CreateResource(cam_color_desc, RenderResourceName::kCameraColorA);
+            auto cam_depth_desc = _rendering_data._camera_data._camera_depth_target_desc = TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDepth);
+            _rendering_data._rg_handles._depth_target = _rd_graph->CreateResource(cam_depth_desc, RenderResourceName::kCameraDepth);
             TextureDesc desc = TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
             desc._load = ELoadStoreAction::kNotCare;
             _rendering_data._rg_handles._color_tex = _rd_graph->CreateResource(desc, RenderResourceName::kCameraColorTex);

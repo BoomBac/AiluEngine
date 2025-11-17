@@ -116,28 +116,31 @@ namespace Ailu
         class Text;
         class Button;
         ACLASS()
-        class Dropdown : public UIElement
+        class AILU_API Dropdown : public UIElement
         {
             GENERATED_BODY()
             DECLARE_DELEGATE(on_selected_changed, i32);
 
         public:
             Dropdown();
+            Dropdown(const Vector<String> &items);
+            ~Dropdown() = default;
             void SetSelectedIndex(i32 index);
             int GetSelectedIndex() const { return _selected_index; }
             String GetSelectedText() const;
-
+            void SetItems(const Vector<String> &items) { _items = items; }
+            Vector2f MeasureDesiredSize() final;
         private:
             void RenderImpl(UIRenderer &r) final;
             void PostDeserialize() final;
             UIElement *HitTest(Vector2f pos) final;
-
+            void PostArrange() final;
         private:
             APROPERTY()
             Vector<String> _items;
             i32 _selected_index = -1;
             Vector4f _button_rect;
-            Ref<HorizontalBox> _root;
+            HorizontalBox* _root;
             Text *_text;
             Button *_button;
             bool _is_dropdown_open = false;
@@ -157,7 +160,7 @@ namespace Ailu
             void SetCollapsed(bool collapsed, bool animated = false);
             bool IsCollapsed() const { return _is_collapsed; }
             Vector2f MeasureDesiredSize() override;
-            // 子容器，用于放置用户内容
+            // 子容器(Canvas)，用于放置用户内容
             UIElement* GetContent() { return _content; }
             void SetTitle(const String &title);
             String GetTitle() const;

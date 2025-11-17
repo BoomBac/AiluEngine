@@ -156,11 +156,15 @@ namespace Ailu
             bool is_tex = res_type == EGpuResType::kTexture || res_type == EGpuResType::kRenderTexture;
             auto& external_pool = is_tex ? _external_tex_handles : _external_buffer_handles;
             std::lock_guard lock(_mutex);
-            if (external_pool.contains(external->Name()))
+            if (auto it = external_pool.find(external->Name()); it != external_pool.end())
             {
-                //LOG_WARNING("RenderGraph::Import: External resource {} already exists!", external_name);
-                return external_pool.at(external->Name());
+                auto &existing = _external_resources[it->second._id];
+                if (existing._extern_raw_res != external)
+                    LOG_WARNING("RenderGraph::Import: External resource name conflict, re-binding [{}]", external->Name());
+                existing._extern_raw_res = external;
+                return it->second;
             }
+
             RGHandle handle(s_next_handle_id++);
             ResourceNode node(external->Name());
             node._extern_raw_res = external;
@@ -425,7 +429,7 @@ namespace Ailu
             buffer.append("}\n");
 
             FileManager::WriteFile(filename, false, buffer);
-            LOG_INFO(L"CRenderGraph::ExportToFile: Output to {}", filename);
+            LOG_INFO(L"CRenderGraph::ExportToFile: Output to {},go https://dreampuf.github.io/GraphvizOnline/ to have a view", filename);
         }
 
     }// namespace ::Render::RDG
