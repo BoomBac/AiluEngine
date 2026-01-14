@@ -2,6 +2,7 @@
 #define __DOCK_WINDOW_H__
 #include "UI/Widget.h"
 #include "Objects/Object.h"
+#include "UI/InteractionZone.h"
 #include "generated/DockWindow.gen.h"
 namespace Ailu
 {
@@ -93,6 +94,7 @@ namespace Ailu
             Vector2f _drag_start_offset;
             Vector2f _pre_mouse_pos;
             bool _is_dirty = true;
+            Vector<Ailu::UI::ZoneHandle> _resize_zone_handles;
         };
 
         class DockTab

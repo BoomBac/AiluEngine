@@ -34,72 +34,86 @@ namespace Ailu::RHI::DX12
             res_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
         if (_desc._target & EGPUBufferTarget::kAppend || _desc._target & EGPUBufferTarget::kIndirectArguments)
             _desc._target = (EGPUBufferTarget)(_desc._target | EGPUBufferTarget::kCounter);
-        auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-        D3D12_RESOURCE_STATES init_state = D3D12_RESOURCE_STATE_COMMON;//Buffer类型起始状态一律为common
-        init_state = _desc._target & EGPUBufferTarget::kIndirectArguments? D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT : init_state;
-        ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, init_state,nullptr, IID_PPV_ARGS(_p_d3d_res.GetAddressOf())));
-        _state_guard = std::move(D3DResourceStateGuard(_p_d3d_res.Get(),init_state,1u));
-        if (_data)
-        {
-            d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res.Get(), _state_guard);
-        }
-        auto p_device = d3d_conetxt->GetDevice();
         bool is_with_counter = _desc._target & EGPUBufferTarget::kCounter;
         bool is_structured = _desc._target & EGPUBufferTarget::kStructured || is_with_counter;
+        auto p_device = d3d_conetxt->GetDevice();
+        if (_desc._target & EGPUBufferTarget::kConstant)
         {
-            _srv_alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
-            auto [cpu_handle, gpu_handle] = _srv_alloc.At(0);
-            D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
-            srv_desc.Format = is_structured? DXGI_FORMAT_UNKNOWN : ConvertToDXGIFormat(_desc._format);
-            srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-            srv_desc.Buffer.FirstElement = 0;
-            srv_desc.Buffer.NumElements = _desc._element_num;
-            srv_desc.Buffer.StructureByteStride = is_structured || is_with_counter? _desc._element_size : 0u;
-            srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            if (is_with_counter)
-                AL_ASSERT(srv_desc.Buffer.StructureByteStride>0);
-            p_device->CreateShaderResourceView(_p_d3d_res.Get(),&srv_desc, cpu_handle);
+            u64 unaligned_size = _mem_size;
+            _mem_size = ALIGN_TO_256(_mem_size);
+            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+            auto res_desc = CD3DX12_RESOURCE_DESC::Buffer(_mem_size);
+            ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
+                                                            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(_p_d3d_res.GetAddressOf())));
+            _p_d3d_res->Map(0, nullptr, reinterpret_cast<void **>(&_mapped_data));
+            _gpu_ptr = _p_d3d_res->GetGPUVirtualAddress();
+            if (_data)
+                memcpy(_mapped_data, _data, unaligned_size);
         }
-        if (_desc._is_random_write)
+        else
         {
-            _uav_alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
-            if (is_with_counter)
+            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+            D3D12_RESOURCE_STATES init_state = D3D12_RESOURCE_STATE_COMMON;//Buffer类型起始状态一律为common
+            init_state = _desc._target & EGPUBufferTarget::kIndirectArguments ? D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT : init_state;
+            ThrowIfFailed(d3d_conetxt->GetDevice()->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc, init_state, nullptr, IID_PPV_ARGS(_p_d3d_res.GetAddressOf())));
+            _state_guard = std::move(D3DResourceStateGuard(_p_d3d_res.Get(), init_state, 1u));
+            if (_data)
             {
-                // Counter buffer (必须是 4 字节大小的 buffer)
-                D3D12_RESOURCE_DESC counterDesc = res_desc;
-                counterDesc.Width = sizeof(UINT);// 4 bytes
-                counterDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-                auto default_heap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-                p_device->CreateCommittedResource(
-                        &default_heap,
-                        D3D12_HEAP_FLAG_NONE,
-                        &counterDesc,
-                        D3D12_RESOURCE_STATE_COMMON,
-                        nullptr,
-                        IID_PPV_ARGS(_counter_buffer.GetAddressOf()));
-                _counter_state_guard = std::move(D3DResourceStateGuard(_counter_buffer.Get(),D3D12_RESOURCE_STATE_COMMON,1u));
-                d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
-                _counter_buffer->SetName(ToWChar(std::format("{}_counter",_name)).c_str());
-                if (_desc._target & EGPUBufferTarget::kIndirectArguments)
-                    _counter_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(),D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+                d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res.Get(), _state_guard);
             }
-            auto [cpu_handle, gpu_handle] = _uav_alloc.At(0);
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
-            uav_desc.Format = is_structured? DXGI_FORMAT_UNKNOWN : ConvertToDXGIFormat(_desc._format);
-            uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-            uav_desc.Buffer.FirstElement = 0;
-            uav_desc.Buffer.NumElements = _desc._element_num;
-            uav_desc.Buffer.StructureByteStride = is_structured || is_with_counter? _desc._element_size : 0u;
-            if (is_with_counter)
-                AL_ASSERT(uav_desc.Buffer.StructureByteStride>0);
-            p_device->CreateUnorderedAccessView(_p_d3d_res.Get(), is_with_counter? _counter_buffer.Get() : nullptr, &uav_desc, cpu_handle);
+            if (_desc._is_random_write)
+            {
+                _uav_alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
+                if (is_with_counter)
+                {
+                    // Counter buffer (必须是 4 字节大小的 buffer)
+                    D3D12_RESOURCE_DESC counterDesc = res_desc;
+                    counterDesc.Width = sizeof(UINT);// 4 bytes
+                    counterDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+                    auto default_heap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+                    p_device->CreateCommittedResource(
+                            &default_heap,
+                            D3D12_HEAP_FLAG_NONE,
+                            &counterDesc,
+                            D3D12_RESOURCE_STATE_COMMON,
+                            nullptr,
+                            IID_PPV_ARGS(_counter_buffer.GetAddressOf()));
+                    _counter_state_guard = std::move(D3DResourceStateGuard(_counter_buffer.Get(), D3D12_RESOURCE_STATE_COMMON, 1u));
+                    d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
+                    _counter_buffer->SetName(ToWChar(std::format("{}_counter", _name)).c_str());
+                    if (_desc._target & EGPUBufferTarget::kIndirectArguments)
+                        _counter_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+                }
+                auto [cpu_handle, gpu_handle] = _uav_alloc.At(0);
+                D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
+                uav_desc.Format = is_structured ? DXGI_FORMAT_UNKNOWN : ConvertToDXGIFormat(_desc._format);
+                uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+                uav_desc.Buffer.FirstElement = 0;
+                uav_desc.Buffer.NumElements = _desc._element_num;
+                uav_desc.Buffer.StructureByteStride = is_structured || is_with_counter ? _desc._element_size : 0u;
+                if (is_with_counter)
+                    AL_ASSERT(uav_desc.Buffer.StructureByteStride > 0);
+                p_device->CreateUnorderedAccessView(_p_d3d_res.Get(), is_with_counter ? _counter_buffer.Get() : nullptr, &uav_desc, cpu_handle);
+            }
         }
+        _srv_alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
+        auto [cpu_handle, gpu_handle] = _srv_alloc.At(0);
+        D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+        srv_desc.Format = is_structured ? DXGI_FORMAT_UNKNOWN : ConvertToDXGIFormat(_desc._format);
+        srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        srv_desc.Buffer.FirstElement = 0;
+        srv_desc.Buffer.NumElements = _desc._element_num;
+        srv_desc.Buffer.StructureByteStride = is_structured || is_with_counter ? _desc._element_size : 0u;
+        srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        if (is_with_counter)
+            AL_ASSERT(srv_desc.Buffer.StructureByteStride > 0);
+        p_device->CreateShaderResourceView(_p_d3d_res.Get(), &srv_desc, cpu_handle);
     }
     void D3DGPUBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {
         GpuResource::BindImpl(rhi_cmd, params);
         auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(rhi_cmd);
-        GPUVisibleDescriptorAllocation* alloc = params._is_random_access? &_uav_alloc : &_srv_alloc;
+        GPUVisibleDescriptorAllocation *alloc = params._is_random_access ? &_uav_alloc : &_srv_alloc;
         auto [ch, gh] = alloc->At(0);
         if (params._is_compute_pipeline)
             alloc->CommitDescriptorsForDispatch(d3dcmd, params._slot);
@@ -117,13 +131,22 @@ namespace Ailu::RHI::DX12
     {
         if (_is_ready_for_rendering)
         {
-            auto cmd = RHICommandBufferPool::Get("ChangeData");
-            auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(cmd.get());
-            d3dcmd->UploadDataToBuffer(_data, _mem_size, _p_d3d_res.Get(), _state_guard);
-            d3dcmd->UploadDataToBuffer(&_counter,sizeof(u32),_counter_buffer.Get(),_counter_state_guard);
-            GraphicsContext::Get().ExecuteRHICommandBuffer(cmd.get());
-            RHICommandBufferPool::Release(cmd);
+            if (_mapped_data)//upload buffer
+            {
+                memcpy(_mapped_data, _data, _mem_size);
+            }
+            else
+            {
+                auto cmd = RHICommandBufferPool::Get("ChangeData");
+                auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(cmd.get());
+                d3dcmd->UploadDataToBuffer(_data, _mem_size, _p_d3d_res.Get(), _state_guard);
+                d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
+                GraphicsContext::Get().ExecuteRHICommandBuffer(cmd.get());
+                RHICommandBufferPool::Release(cmd);
+            }
         }
+        else
+            LOG_WARNING("D3DGPUBuffer::OnDataChanged: buffer({}) not ready for rendering!",_name);
     }
 
     void D3DGPUBuffer::ReadBack(u8 *dst, u32 size)

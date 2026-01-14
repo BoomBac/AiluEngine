@@ -76,6 +76,38 @@ namespace Ailu::Render
         float4x4 _shadow_matrix;
     };
 
+    struct ObjectInstanceData
+    {
+        float4x4 _local_to_world;
+        float4x4 _world_to_local;
+        uint _object_id;
+        uint _material_id;
+        uint _global_triangle_offset;
+        uint _blas_node_start;
+        uint _blas_node_count;
+    };
+
+    struct TriangleData
+    {
+        float3 v0;
+        float3 v1;
+        float3 v2;
+        float3 n0;
+        float3 n1;
+        float3 n2;
+        float2 uv0;
+        float2 uv1;
+        float2 uv2;
+    };
+    
+    struct LBVHNode
+    {
+        float3 _min;
+        float _left_or_tri_offset_or_inst_idx;
+        float3 _max;
+        float _neg_right_or_tri_count;
+    };
+
 #ifdef __cplusplus
     struct CBufferPerObjectData
 #else

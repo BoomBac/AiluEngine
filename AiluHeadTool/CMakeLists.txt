@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 4.1)
 project (AiluHeadTool)
 set(AHT_ROOT_PATH ${CMAKE_SOURCE_DIR}/AiluHeadTool)
 #set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)

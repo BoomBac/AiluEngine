@@ -154,7 +154,7 @@ namespace Ailu::Render
             _voxel_debug_mat->SetVector("_GridNum", Vector4Int(mip_grid_num_x, mip_grid_num_y, mip_grid_num_z, 1));
             _voxel_debug_mat->SetVector("_GridSize", _data._grid_size * powf(2.f, (f32) mip));
             _voxel_debug_mat->SetTexture("_VoxelSrc", _voxel_tex);
-            _voxel_debug_mat->SetUint("_DebugMip", rendering_data._vxgi_debug_mipmap);
+            _voxel_debug_mat->SetInt("_DebugMip", rendering_data._vxgi_debug_mipmap);
             auto world_matrix = BuildIdentityMatrix();//MatrixScale(_data._grid_size / 2.0f);
             u32 inst_count = mip_grid_num_x * mip_grid_num_y * mip_grid_num_z;
             cmd->DrawMesh(Mesh::s_cube.lock().get(), _voxel_debug_mat.get(), world_matrix, 0u, 0u, inst_count);

@@ -54,6 +54,7 @@ namespace Ailu
             slider->_on_value_change += [&](f32 value)
             {
                 _icon_size = value;
+                _is_dirty = true;
             };
             DropHandler handler;
             handler._can_drop = [](const DragPayload &payload) -> bool
@@ -265,33 +266,26 @@ namespace Ailu
                         }
                     }
                 }
+                f32 x = 0.0f, y = 0.0f;
+                u32 num_per_row = (u32) (parent_size.x / _icon_size);
+                if (num_per_row == 0) num_per_row = 1;
+                for (u32 i = 0; i < (u32) _icon_content->GetChildren().size(); i++)
+                {
+                    auto child = _icon_content->ChildAt(i);
+                    child->SlotPosition({x, y});
+                    child->SlotSize({_icon_size, _icon_size + 20.0f});
+                    if ((i + 1) % num_per_row == 0)
+                    {
+                        x = 0.0f;
+                        y += _icon_size + 20.0f;
+                    }
+                    else
+                    {
+                        x += _icon_size;
+                    }
+                }
                 _is_dirty = false;
             }
-            f32 x = 0.0f, y = 0.0f;
-            u32 num_per_row = (u32) (parent_size.x / _icon_size);
-            if (num_per_row == 0) num_per_row = 1;
-            for (u32 i = 0; i < (u32)_icon_content->GetChildren().size(); i++)
-            {
-                auto child = _icon_content->ChildAt(i);
-                child->SlotPosition({x, y});
-                child->SlotSize({_icon_size, _icon_size + 20.0f});
-                if ((i + 1) % num_per_row == 0)
-                {
-                    x = 0.0f;
-                    y += _icon_size + 20.0f;
-                }
-                else
-                {
-                    x += _icon_size;
-                }
-            }
-            auto r = UI::UIRenderer::Get();
-            //if (_hover_item)
-            //{
-            //    r->PushScissor(_icon_area->GetArrangeRect());
-            //    r->DrawQuad(_hover_item->GetArrangeRect(), Colors::kOrange);
-            //    r->PopScissor();
-            //}
         }
     }// namespace Editor
 }// namespace Ailu

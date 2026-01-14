@@ -1054,7 +1054,7 @@ namespace Ailu::Render
                         memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                         cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_camera, _p_cbuffers[index++].get(), 0, 0, 1);
                     }
-                    Gizmo::Submit(cmd, rendering_data); 
+                    Gizmo::Submit(cmd, &rendering_data); 
                 });
     }
 
@@ -1143,7 +1143,7 @@ namespace Ailu::Render
                 memcpy(_p_cbuffers[index]->GetData(), &m, sizeof(Matrix4x4f));
                 cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_camera, _p_cbuffers[index++].get(), 0, 0, 1);
             }
-            Gizmo::Submit(cmd.get(), rendering_data);
+            Gizmo::Submit(cmd.get(), &rendering_data);
         }
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);

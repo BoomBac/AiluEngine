@@ -33,7 +33,7 @@ namespace Ailu::RHI::DX12
         std::set<WString> _include_files;
 
     private:
-        List<WString> _addi_include_pathes = {
+        std::set<WString> _addi_include_pathes = {
                 L"Shaders/",
                 L"Shaders/hlsl/",
                 L"Shaders/hlsl/Compute/",
@@ -43,6 +43,8 @@ namespace Ailu::RHI::DX12
     };
     HRESULT D3DShaderInclude::Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes)
     {
+        auto pwd = PathUtils::ExtractAssetPath(PathUtils::Parent(_cur_source_file_path));
+        _addi_include_pathes.insert(pwd);
         for (auto &include_path: _addi_include_pathes)
         {
             std::lock_guard<std::mutex> l(s_compile_lock);
@@ -64,6 +66,10 @@ namespace Ailu::RHI::DX12
                 _include_files.insert(p);
                 return S_OK;
             }
+            //else
+            //{
+            //    LOG_ERROR(L"D3DShaderInclude::Open: include file:{} not exist!", p);
+            //}
             //AL_ASSERT(true);
         }
         AL_ASSERT(true);
@@ -201,7 +207,7 @@ namespace Ailu::RHI::DX12
 #if defined(_DEBUG)
             if (pTarget == RenderConstants::kCSModel_5_0)
             {
-                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;// | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
+                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
             }
             else
             {

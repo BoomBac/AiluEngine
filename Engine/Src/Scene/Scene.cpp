@@ -5,8 +5,11 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Physics/PhysicsSystem.h"
 #include "Scene/RenderSystem.h"
-#include "pch.h"
+//#include "pch.h"
 #include <regex>
+
+#include "Render/ShaderInterop.h"//lbvh
+#include "Render/Gizmo.h"
 
 using namespace Ailu::Render;
 
@@ -173,6 +176,73 @@ namespace Ailu::SceneManagement
             {
                 AL_ASSERT_MSG(true, "Unkown Component");
             };
+        }
+        _triangle_count = 0u;
+        u64 mesh_bvh_node_count = 0u;
+        for (auto& c: _register.View<ECS::StaticMeshComponent>())
+        {
+            _triangle_count += c._p_mesh->GetTriangleCount();
+            mesh_bvh_node_count += c._p_mesh->GetBVHNodes().size();
+        }
+        if (_triangle_count > 0)
+        {
+            u64 entity_idx = 0u;
+            Vector<Render::TriangleData> triangles;
+            triangles.reserve(_triangle_count);
+            Vector<BVHNode> mesh_bvh_nodes;
+            mesh_bvh_nodes.reserve(mesh_bvh_node_count);
+            u64 triangle_offset = 0u,bvh_offset = 0u;
+            for (auto &c: _register.View<ECS::StaticMeshComponent>())
+            {
+                auto current_entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
+                auto current_tri_count = c._p_mesh->GetTriangleCount();
+                auto cur_bvh_node_count = c._p_mesh->GetBVHNodes().size();
+                triangles.insert(triangles.end(),c._p_mesh->GetTriangleData().begin(),c._p_mesh->GetTriangleData().end());
+                mesh_bvh_nodes.insert(mesh_bvh_nodes.end(), c._p_mesh->GetBVHNodes().begin(), c._p_mesh->GetBVHNodes().end());
+                _bvh_nodes_range[current_entity] = Vector2UInt{(u32) bvh_offset, (u32) (cur_bvh_node_count)};
+                _mesh_bvh_node_triangle_offset[current_entity] = (u32)triangle_offset;
+                triangle_offset += current_tri_count;
+                bvh_offset += cur_bvh_node_count;
+            }
+            BufferDesc buf_desc;
+            buf_desc._element_num = _triangle_count;
+            buf_desc._element_size = sizeof(TriangleData);
+            buf_desc._is_random_write = false;
+            buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
+            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+            _scene_mesh_data = GPUBuffer::Create(buf_desc);
+            _scene_mesh_data->Name(std::format("{}_mesh_data_buffer", Name()));
+            _scene_mesh_data->SetData(reinterpret_cast<const u8 *>(triangles.data()), _triangle_count * sizeof(Render::TriangleData));
+
+            buf_desc._element_num = (u32) mesh_bvh_nodes.size();
+            buf_desc._element_size = sizeof(LBVHNode);
+            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+            /*
+                struct LBVHNode
+                {
+                    float3 _min;
+                    float _left_or_offset;
+                    float3 _max;
+                    float _neg_right_or_count_or_inst_idx;
+                };
+            */
+            Vector<LBVHNode> gpu_nodes;
+            gpu_nodes.reserve(mesh_bvh_nodes.size());
+            for (u64 i = 0; i < mesh_bvh_nodes.size(); i++)
+            {
+                const auto &node = mesh_bvh_nodes[i];
+                gpu_nodes.emplace_back(node._aabb._min,(f32)node._child_index_or_first, node._aabb._max, (f32)node._count_or_flag);
+            }
+            _blas_buffer = GPUBuffer::Create(buf_desc);
+            _blas_buffer->Name(std::format("{}_blas_buffer", Name()));
+            _blas_buffer->SetData(reinterpret_cast<const u8 *>(gpu_nodes.data()), static_cast<u32>(gpu_nodes.size() * sizeof(LBVHNode)));
+            _blas_node_count = (u32)gpu_nodes.size();
+
+            buf_desc._element_num = RenderConstants::kMaxRenderObjectCount * 4;
+            buf_desc._element_size = sizeof(LBVHNode);
+            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+            _tlas_buffer = GPUBuffer::Create(buf_desc);
+            _tlas_buffer->Name(std::format("{}_tlas_buffer", Name()));
         }
     }
 
@@ -402,6 +472,92 @@ namespace Ailu::SceneManagement
         LOG_WARNING("Scene::Clear: TODO");
     }
 
+    void Scene::Update(f32 dt)
+    {
+        auto &r = _register;
+        for (auto &comp: r.View<ECS::TransformComponent>())
+        {
+            comp._transform._world_matrix = Transform::GetWorldMatrix(comp._transform);
+            //Transform::ToMatrix(comp._transform, comp._transform._world_matrix);
+        }
+        u32 index = 0;
+        for (auto &comp: r.View<ECS::StaticMeshComponent>())
+        {
+            if (comp._p_mesh)
+            {
+                const auto &transf = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(index)->_transform;
+                auto &bound_box = comp._p_mesh->BoundBox();
+                for (int i = 0; i < bound_box.size(); i++)
+                {
+                    comp._transformed_aabbs[i] = bound_box[i] * transf._world_matrix;
+                }
+            }
+            ++index;
+        }
+        index = 0;
+        for (auto &comp: r.View<ECS::CSkeletonMesh>())
+        {
+            if (comp._p_mesh)
+            {
+                const auto &transf = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(index)->_transform;
+                auto &bound_box = comp._p_mesh->BoundBox();
+                for (int i = 0; i < bound_box.size(); i++)
+                {
+                    comp._transformed_aabbs[i] = bound_box[i] * transf._world_matrix;
+                }
+            }
+            ++index;
+        }
+        index = 0;
+        for (auto &comp: r.View<ECS::CCamera>())
+        {
+            auto t = r.GetComponent<ECS::CCamera, ECS::TransformComponent>(index);
+            comp._camera.Position(t->_transform._position);
+            comp._camera.Rotation(t->_transform._rotation);
+            comp._camera.RecalculateMatrix(true);
+        }
+        for (auto &it: _register.SystemView())
+        {
+            auto &[type, sys] = it;
+            sys->Update(_register, dt);
+        }
+        RebuildBVHTree();
+        DeletePendingEntities();
+    }
+
+    static Vector<LBVHNode> s_temp_tlas_gpu_data(RenderConstants::kMaxRenderObjectCount*2);
+
+    void Scene::RebuildBVHTree()
+    {
+        PROFILE_BLOCK_CPU(Scene_RebuildBVHTree)
+        u32 index = 0;
+        Vector<AABB> aabbs;
+        for (auto &comp: _register.View<ECS::StaticMeshComponent>())
+        {
+            if (comp._p_mesh)
+            {
+                auto &bound_box = comp._transformed_aabbs;
+                for (int i = 1; i < bound_box.size(); i++)
+                {
+                    aabbs.push_back(bound_box[i]);
+                }
+            }
+        }
+        BVHBuilder builder(aabbs);
+        auto ret = builder.Build(1);
+        u64 node_size = ret._nodes.size();
+        _tlas_nodes = std::move(ret._nodes);
+        AL_ASSERT(_tlas_nodes.size() < RenderConstants::kMaxRenderObjectCount * 2);
+        for (u64 i = 0; i < node_size; i++)
+        {
+            if (_tlas_nodes[i].IsLeaf())
+                _tlas_nodes[i]._child_index_or_first = ret._reordered_indices[_tlas_nodes[i]._child_index_or_first];
+            const auto &node = _tlas_nodes[i];
+            s_temp_tlas_gpu_data[i] = {node._aabb._min, (f32) node._child_index_or_first, node._aabb._max, (f32) node._count_or_flag};
+        }
+        _tlas_buffer->SetData(reinterpret_cast<const u8 *>(s_temp_tlas_gpu_data.data()), (u32) (node_size * sizeof(LBVHNode)));
+    }
+
     //-----------------------------------------------------------------------SceneMgr----------------------------------------------------------------------------
     int SceneMgr::Initialize()
     {
@@ -424,54 +580,7 @@ namespace Ailu::SceneManagement
     {
         if (_p_current)
         {
-            auto& r = _p_current->_register;
-            for (auto &comp: r.View<ECS::TransformComponent>())
-            {
-                comp._transform._world_matrix = Transform::GetWorldMatrix(comp._transform);
-                //Transform::ToMatrix(comp._transform, comp._transform._world_matrix);
-            }
-            u32 index = 0;
-            for (auto& comp : r.View<ECS::StaticMeshComponent>())
-            {
-                if (comp._p_mesh)
-                {
-                    const auto& transf = r.GetComponent<ECS::StaticMeshComponent,ECS::TransformComponent>(index)->_transform;
-                    auto& bound_box = comp._p_mesh->BoundBox();
-                    for (int i = 0; i < bound_box.size(); i++)
-                    {
-                        comp._transformed_aabbs[i] = bound_box[i] * transf._world_matrix;
-                    }
-                }
-                ++index;
-            }
-            index = 0;
-            for (auto& comp : r.View<ECS::CSkeletonMesh>())
-            {
-                if (comp._p_mesh)
-                {
-                    const auto& transf = r.GetComponent<ECS::CSkeletonMesh,ECS::TransformComponent>(index)->_transform;
-                    auto& bound_box = comp._p_mesh->BoundBox();
-                    for (int i = 0; i < bound_box.size(); i++)
-                    {
-                        comp._transformed_aabbs[i] = bound_box[i] * transf._world_matrix;
-                    }
-                }
-                ++index;
-            }
-            index = 0;
-            for (auto &comp: r.View<ECS::CCamera>())
-            {
-                auto t = r.GetComponent<ECS::CCamera, ECS::TransformComponent>(index);
-                comp._camera.Position(t->_transform._position);
-                comp._camera.Rotation(t->_transform._rotation);
-                comp._camera.RecalculateMatrix(true);
-            }
-            for (auto &it: _p_current->GetRegister().SystemView())
-            {
-                auto &[type, sys] = it;
-                sys->Update(_p_current->GetRegister(), delta_time);
-            }
-            _p_current->DeletePendingEntities();
+            _p_current->Update(delta_time);
         }
     }
 

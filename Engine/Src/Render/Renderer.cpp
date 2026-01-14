@@ -14,6 +14,7 @@
 #include "Render/Features/RayTraceGI.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
+#include "Render/CommandBuffer.h"
 
 #include "Render/RenderGraph/RenderGraph.h"
 
@@ -63,6 +64,7 @@ namespace Ailu::Render
         //_features.push_back(_taa);
         _features.push_back(_ssao);
         _features.push_back(_raytrace_gi);
+        _raytrace_gi->SetActive(false);
         //_features.push_back(_gpu_terrain);
         //_features.push_back(_taa);
 
@@ -392,11 +394,14 @@ namespace Ailu::Render
     //	_events_after_tick.remove(e);
     //}
 
+    Vector<ObjectInstanceData> s_instance_data(RenderConstants::kMaxRenderObjectCount);
+
     void Renderer::PrepareScene(const Scene &s)
     {
         u16 obj_index = 0;
         u64 entity_index = 0;
         auto &r = s.GetRegister();
+
         for (auto &static_mesh: s.GetRegister().View<ECS::StaticMeshComponent>())
         {
             if (static_mesh._p_mesh)
@@ -405,20 +410,40 @@ namespace Ailu::Render
                 Vector3f center;
                 u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
                 auto &materials = static_mesh._p_mats;
+                auto entity = r.GetEntity<ECS::StaticMeshComponent>(entity_index);
+                const auto &t = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index)->_transform;
+                auto world_to_local = MatrixInverse(t._world_matrix);
                 for (int i = 0; i < submesh_count; i++)
                 {
                     auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
-                    const auto &t = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index)->_transform;
                     obj_cb->_MatrixWorld = t._world_matrix;
-                    obj_cb->_MatrixInvWorld = MatrixInverse(t._world_matrix);
-                    obj_cb->_ObjectID = (i32)r.GetEntity<ECS::StaticMeshComponent>(entity_index);
+                    obj_cb->_MatrixInvWorld = world_to_local;
+                    obj_cb->_ObjectID = (i32) entity;
                     obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == ECS::EMotionVectorType::kPerObject? 1.0f : 0.0f; //dynamic object
                     obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == ECS::EMotionVectorType::kForceZero? 1.0f : 0.0f; //force off
+                    s_instance_data[obj_index]._local_to_world = t._world_matrix;
+                    s_instance_data[obj_index]._world_to_local = world_to_local;
+                    s_instance_data[obj_index]._object_id = obj_index;
+                    s_instance_data[obj_index]._material_id = 0u;
+                    s_instance_data[obj_index]._global_triangle_offset = s.GetTriangleBufferOffset(entity);
+                    auto range = s.GetBVHNodeRange(entity);
+                    s_instance_data[obj_index]._blas_node_start = range.x;
+                    s_instance_data[obj_index]._blas_node_count = range.y;
                     ++obj_index;
                 }
             }
             ++entity_index;
         }
+        auto inst_buffer = _cur_fs->GetSceneInstanceBuffer(s.HashCode());
+        inst_buffer->SetData(reinterpret_cast<const u8 *>(s_instance_data.data()), (u32) (s_instance_data.size() * sizeof(ObjectInstanceData)));
+        ComputeShader::SetGlobalBuffer("g_instance_data", inst_buffer);
+        ComputeShader::SetGlobalBuffer("g_scene", s.GetSceneMeshDataBuffer());
+        ComputeShader::SetGlobalBuffer("g_tlas_buffer", s.GetTLASBuffer());
+        ComputeShader::SetGlobalBuffer("g_blas_buffer", s.GetBLASBuffer());
+        ComputeShader::SetGlobalInt("_tlas_count", s.GetTLASNodeCount());
+        ComputeShader::SetGlobalInt("_blas_count", s.GetBLASNodeCount());
+        ComputeShader::SetGlobalInt("_inst_count", obj_index);
+        ComputeShader::SetGlobalInt("_tri_count", s.TriangleCount());
         entity_index = 0u;
         for (auto &static_mesh: s.GetRegister().View<ECS::CSkeletonMesh>())
         {

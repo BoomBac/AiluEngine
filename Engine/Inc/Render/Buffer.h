@@ -38,6 +38,15 @@ namespace Ailu
             kIndirectArguments = 0x100,
             kConstant = 0x200
         };
+        static EGPUBufferTarget operator|(EGPUBufferTarget a, EGPUBufferTarget b)
+        {
+            return static_cast<EGPUBufferTarget>(static_cast<u32>(a) | static_cast<u32>(b));
+        }
+        static EGPUBufferTarget &operator|=(EGPUBufferTarget &a, EGPUBufferTarget b)
+        {
+            a = a | b;
+            return a;
+        }
 
         struct DispatchArguments
         {

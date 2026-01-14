@@ -11,6 +11,7 @@
 #include <string>
 #include <span>
 #include <unordered_map>
+#include "Framework/Math/BVHBuilder.h"
 
 
 namespace Ailu
@@ -111,7 +112,12 @@ namespace Ailu
             [[nodiscard]] const Ref<VertexBuffer> &GetVertexBuffer() const noexcept { return _vertex_buffer; }
             [[nodiscard]] const Ref<IndexBuffer> &GetIndexBuffer(u16 submesh_index = 0) const noexcept;
 
+            [[nodiscard]] std::span<const AABB> GetTriangleBounds() const noexcept { return _triangle_bounds; }
+            [[nodiscard]] std::span<const TriangleData> GetTriangleData() const noexcept { return _triangle_data; }
+            [[nodiscard]] std::span<const BVHNode> GetBVHNodes() const noexcept { return _bvh_nodes; }
+
             u32 GetVertexCount() const noexcept { return _vertex_count; }
+            u32 GetTriangleCount() const noexcept { return _triangle_count; }
             //-----------------------------------------
             // Imported Material Cache (Import Stage Only)
             //-----------------------------------------
@@ -124,7 +130,7 @@ namespace Ailu
             ////-----------------------------------------
             //void UpdateBounds();
             //void UploadToGPU();
-
+            void GenerateTriangleBounds();
         protected:
             //-----------------------------------------
             // CPU Data
@@ -137,7 +143,9 @@ namespace Ailu
 
             Vector<Submesh> _submeshes;
             Vector<AABB> _bounds;// 0 = full mesh, [1..] = per-submesh
-
+            Vector<AABB> _triangle_bounds;// per-triangle bounds
+            Vector<TriangleData> _triangle_data;
+            Vector<BVHNode> _bvh_nodes;
             Vector<ImportedMaterialInfo> _imported_taterials;
 
             //-----------------------------------------
@@ -149,7 +157,8 @@ namespace Ailu
             //-----------------------------------------
             // Metadata
             //-----------------------------------------
-            u32 _vertex_count = 0;
+            u32 _vertex_count = 0u;
+            u32 _triangle_count = 0u;
         };
 
         class AILU_API SkeletonMesh : public Mesh

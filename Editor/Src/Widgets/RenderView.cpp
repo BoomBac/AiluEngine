@@ -233,6 +233,12 @@ namespace Ailu
                     FirstPersonCameraController::s_inst.Accelerate(false);
                 }
             };
+            _source->OnMouseScroll() += [this](UI::UIEvent &e)
+            {
+                f32 d = FirstPersonCameraController::s_inst._base_camera_move_speed * 0.1f;
+                FirstPersonCameraController::s_inst._base_camera_move_speed += e._scroll_delta>0.0f? d : -d;
+                LOG_INFO("Camera move speed: {}", FirstPersonCameraController::s_inst._base_camera_move_speed);
+            };
 
             _transform_gizmo = MakeScope<TransformGizmo>();
             DropHandler handler;

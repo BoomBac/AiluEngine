@@ -65,7 +65,7 @@ namespace Ailu::Render
         static Camera cam(16.0F / 9.0F);
         cam.Position(Vector3f::kZero);
         cam.Rotation(Quaternion());
-        cam.SetLens(1.57f, 16.f / 9.f, 1.f, 5000.f);
+        cam.SetLens(1.57f, 16.f / 9.f, 0.01f, 5000.f);
         Camera::sCurrent = &cam;
         return &cam;
     }

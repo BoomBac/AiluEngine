@@ -112,6 +112,7 @@ namespace Ailu
     {
         job->SetJobSystem(this);
         size_t index = _thread_index++ % _queues.size();
+        AL_ASSERT(job->Index() < kMaxJobPoolSize);
         u64 fence_value = _job_fence[job->Index()].load();
         auto fu = job->GetFuture();
         _queues[index]->Enqueue(job);
@@ -139,15 +140,46 @@ namespace Ailu
         return job;
     }
 
+    bool JobSystem::WorkOnce()
+    {
+        Job *job = nullptr;
+        size_t index = _thread_index % _queues.size();
+
+        if (_queues[index]->Dequeue(job) || TrySteal(job, 0))//任意队列偷取
+        {
+            AL_ASSERT(job->IsValid());
+            //LOG_INFO("JobSystem::WorkerThread: job {}-{} executed by {}", job->Index(), job->Name(), _thread_names[std::this_thread::get_id()])
+            job->Execute();
+            job->OnComplete();
+            AL_ASSERT(job->Index() < kMaxJobPoolSize);
+            ++_job_fence[job->Index()];
+            //LOG_INFO("JobSystem::WorkerThread: job {}-{} completed,fence value {}", job->Index(),job->Name(),_job_fence[job->Index()].load());
+            _fence_cv.notify_all();
+            {
+                std::lock_guard<std::mutex> lock(_all_job_mutex);
+                _temp_jobs.erase(job->Index());
+                if (_temp_jobs.empty())
+                    _all_job_cv.notify_all();
+            }
+            _pool->Release(job);
+            return true;
+        }
+        return false;
+    }
+
+    thread_local static size_t s_worker_thread_id;
+
     void JobSystem::WorkerThread(size_t index)
     {
         SetThreadName(std::format("JobWorker_{0}", index));
+        s_worker_thread_id = index;
         while (!_stop)
         {
             Job *job = nullptr;
             if (_queues[index]->Dequeue(job) || TrySteal(job, index))
             {
                 //LOG_INFO("JobSystem::WorkerThread: job {}-{} executed by {}", job->Index(), job->Name(), _thread_names[std::this_thread::get_id()])
+                AL_ASSERT(job->Index() < kMaxJobPoolSize);
                 job->Execute();
                 job->OnComplete();
                 ++_job_fence[job->Index()];
@@ -165,6 +197,9 @@ namespace Ailu
             {
                 std::unique_lock<std::mutex> lock(_mutex);
                 _cv.wait(lock);
+                //std::this_thread::yield();
+                //if (WorkOnce()) 
+                //    continue;
             }
         }
     }
@@ -172,7 +207,7 @@ namespace Ailu
     {
         for (size_t i = 0; i < _queues.size(); ++i)
         {
-            if (i == current_index) continue;
+            //if (i == current_index) continue;
             auto stolen_job = _queues[i]->Steal();
             if (stolen_job.has_value())
             {
@@ -184,12 +219,13 @@ namespace Ailu
         return false;
     }
 
-    void JobSystem::Wait(const WaitHandle& handle) const
+    void JobSystem::Wait(const WaitHandle& handle)
     {
-        handle.Wait();
-        // std::unique_lock<std::mutex> lock(_fence_mutex);
-        // while (_job_fence[handle._job_index] < handle._fence_value)
-        //    std::this_thread::yield();
+        while (!handle.IsReady())
+        {
+            if (!WorkOnce())// RunOnePendingJob
+                std::this_thread::yield();
+        }
     }
 
     void JobSystem::Wait()

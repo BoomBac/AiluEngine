@@ -418,32 +418,16 @@ namespace Ailu
         };
         _cur_node_transform = GetNodeGlobalTransformAtTime(node);
         Vector<std::future<bool>> rets;
-        //_time_mgr.Mark();
         if (_import_setting._import_flag & MeshImportSetting::kImportFlagMesh)
         {
-            Vector<Vector3f> positions, normals;
-            Vector<Vector4f> bone_weights;
-            Vector<Vector4D<u32>> bone_indices;
-            Vector<Vector<Vector2f>> uvs;
-            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, std::ref(positions), std::ref(bone_weights), std::ref(bone_indices)));
-            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, std::ref(*fbx_mesh), std::ref(normals)));
-            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), std::ref(uvs)));
+            RawMeshData mesh_data;
+            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, std::ref(mesh_data._positions), std::ref(mesh_data._bone_weights), std::ref(mesh_data._bone_indices)));
+            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, node, std::ref(mesh_data._normals)));
+            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), std::ref(mesh_data._uvs)));
             rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, node, std::ref(_cur_skeleton)));
             for (auto &ret: rets)
                 ret.get();
-            //LOG_INFO("Read mesh data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
-            //_time_mgr.Mark();
-            mesh->SetVertices({positions.data(), positions.size()});
-            mesh->SetNormals({normals.data(), normals.size()});
-            if (uvs.size())
-                mesh->SetUVs({uvs[0].data(), uvs[0].size()}, 0u);
-            if (!bone_weights.empty())
-            {
-                auto sk_mesh = dynamic_cast<SkeletonMesh *>(mesh.get());
-                sk_mesh->SetBoneIndices({bone_indices.data(), bone_indices.size()});
-                sk_mesh->SetBoneWeights({bone_weights.data(), bone_weights.size()});
-            }
-            GenerateIndexdMesh(mesh.get());
+            GenerateIndexdMesh(&mesh_data,mesh.get());
             CalculateTangant(mesh.get());
             auto const ShininessToRoughness = [](f32 shininess)
             {
@@ -451,13 +435,10 @@ namespace Ailu
                 f32 roughness = std::sqrt(2.0f / (shininess + 2.0f));
                 return std::clamp(roughness, 0.0f, 1.0f);
             };
-
-            //LOG_INFO("Generate indices and tangent data takes {}ms", _time_mgr.GetElapsedSinceLastMark());
             if (is_skined)
             {
                 dynamic_cast<SkeletonMesh *>(mesh.get())->SetSkeleton(_cur_skeleton);
             }
-            //if (_import_setting._is_import_material)
             {
                 for (int i = 0; i < mat_count; ++i)
                 {
@@ -619,13 +600,20 @@ namespace Ailu
         return true;
     }
 
-    bool FbxParser::ReadNormal(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector3f> &normals)
+    bool FbxParser::ReadNormal(fbxsdk::FbxNode *node, Vector<Vector3f> &normals)
     {
-        if (fbx_mesh.GetElementNormalCount() < 1) 
+        FbxMesh* fbx_mesh = node->GetMesh();
+        if (!fbx_mesh || fbx_mesh->GetElementNormalCount() < 1) 
             return false;
-        auto *fbx_normals = fbx_mesh.GetElementNormal(0);
-        int vertex_count = fbx_mesh.GetControlPointsCount(), data_size = 0;
+        auto *fbx_normals = fbx_mesh->GetElementNormal(0);
+        int vertex_count = fbx_mesh->GetControlPointsCount(), data_size = 0;
         normals.clear();
+        FbxAMatrix final_transform = GetNodeGlobalTransformAtTime(node);
+        // 法线矩阵 = (final_transform 的 3x3 部分) 的 逆转置
+        FbxAMatrix normal_matrix = final_transform.Inverse();
+        normal_matrix = normal_matrix.Transpose();
+
+
         if (fbx_normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByControlPoint)
         {
             _b_normal_by_controlpoint = true;
@@ -639,14 +627,16 @@ namespace Ailu
                 else if (fbx_normals->GetReferenceMode() == fbxsdk::FbxLayerElement::EReferenceMode::eIndexToDirect)
                     normal_index = fbx_normals->GetIndexArray().GetAt(i);
                 auto normal = fbx_normals->GetDirectArray().GetAt(normal_index);
+                normal[3] = 0.0;
+                normal = normal_matrix.MultT(normal);
                 normal.Normalize();
-                normals.emplace_back(normal[0], normal[1], normal[2]);
+                normals.emplace_back(Vector3f{(f32) normal[0], (f32) normal[1], (f32) normal[2]});
             }
         }
         else if (fbx_normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByPolygonVertex)
         {
             _b_normal_by_controlpoint = false;
-            int trangle_count = fbx_mesh.GetPolygonCount();
+            int trangle_count = fbx_mesh->GetPolygonCount();
             vertex_count = trangle_count * 3;
             normals.reserve(vertex_count);
             int cur_vertex_id = 0;
@@ -660,8 +650,10 @@ namespace Ailu
                     else if (fbx_normals->GetReferenceMode() == fbxsdk::FbxLayerElement::EReferenceMode::eIndexToDirect)
                         normal_index = fbx_normals->GetIndexArray().GetAt(cur_vertex_id);
                     auto normal = fbx_normals->GetDirectArray().GetAt(normal_index);
+                    normal[3] = 0.0;
+                    normal = normal_matrix.MultT(normal);
                     normal.Normalize();
-                    normals.emplace_back(normal[0], normal[1], normal[2]);
+                    normals.emplace_back(Vector3f{(f32) normal[0], (f32) normal[1], (f32) normal[2]});
                     ++cur_vertex_id;
                 }
             }
@@ -993,162 +985,52 @@ namespace Ailu
         return true;
     }
 
-    void FbxParser::GenerateIndexdMesh(Mesh *mesh)
+    void CheckQuantizedPositionCollision(
+            const HashMap<u64, Vector<Vector3f>> &hash_pos_map,
+            float eps = 1e-4f,
+            float error_factor = 2.0f// >1 即可
+    )
     {
-        if (!mesh)
-        {
-            LOG_ERROR("mesh is null");
-            return;
-        }
-        SkeletonMesh *skined_mesh = dynamic_cast<SkeletonMesh *>(mesh);
+        float eps2 = eps * eps * error_factor * error_factor;
 
-        u32 vertex_count = mesh->_vertex_count;
-        std::unordered_map<uint64_t, u32> vertex_map{};
-        std::vector<Vector3f> normals{};
-        std::vector<Vector3f> positions{};
-        std::vector<Vector2f> uv0s{};
-        std::vector<u32> indices{};
-        std::map<u16, Vector<u32>> submesh_indices{};
-        u32 cur_index_count = 0u;
-        auto raw_normals = mesh->GetNormals();
-        auto raw_uv0 = mesh->GetUVs(0u);
-        auto raw_pos = mesh->GetVertices();
-        //for skined mesh
-        std::vector<Vector4D<u32>> bone_indices{};
-        std::vector<Vector4f> bone_weights{};
-
-        Math::ALHash::Vector3fHash v3hash{};
-        Math::ALHash::Vector2fHash v2hash{};
-        Math::ALHash::VectorHash<Vector4D, float> v4fhash{};
-        Math::ALHash::VectorHash<Vector4D, u32> u4fhash{};
-        TimeMgr mgr;
-        mgr.Mark();
-        constexpr float minf = std::numeric_limits<float>::lowest();
-        constexpr float maxf = std::numeric_limits<float>::max();
-        Vector3f vertex_min{maxf, maxf, maxf};
-        Vector3f vertex_max{minf, minf, minf};
-        Vector3f mesh_vmin = vertex_min;
-        Vector3f mesh_vmax = vertex_max;
-        Map<u32, std::tuple<Vector3f, Vector3f>> subemesh_aabbs;
-        if (skined_mesh)
+        for (const auto &[hash, positions]: hash_pos_map)
         {
-            auto raw_bonei = skined_mesh->GetBoneIndices();
-            auto raw_bonew = skined_mesh->GetBoneWeights();
-            for (size_t i = 0; i < vertex_count; i++)
+            if (positions.size() <= 1)
+                continue;
+
+            for (size_t i = 0; i < positions.size(); ++i)
             {
-                u32 submesh_index = _positon_material_index_mapper[i];
-                auto p = raw_pos[i];
-                auto n = raw_normals[_b_normal_by_controlpoint ? _positon_conrtol_index_mapper[i] : i];
-                auto uv = raw_uv0[i];
-                auto hash0 = v3hash(n), hash1 = v2hash(uv);
-                auto vertex_hash = hash1;//Math::ALHash::CombineHashes(hash0, hash1);
-                auto bi = raw_bonei[i];
-                auto bw = raw_bonew[i];
-                auto it = vertex_map.find(vertex_hash);
-                if (it == vertex_map.end())
+                for (size_t j = i + 1; j < positions.size(); ++j)
                 {
-                    vertex_map[vertex_hash] = cur_index_count;
-                    submesh_indices[submesh_index].emplace_back(cur_index_count);
-                    indices.emplace_back(cur_index_count);
-                    normals.emplace_back(n);
-                    positions.emplace_back(p);
-                    uv0s.emplace_back(uv);
-                    bone_indices.emplace_back(bi);
-                    bone_weights.emplace_back(bw);
-                    if (subemesh_aabbs.contains(submesh_index))
+                    Vector3f d = positions[i] - positions[j];
+                    float dist2 = DotProduct(d, d);
+
+                    if (dist2 > eps2)
                     {
-                        auto &[exist_min, exist_max] = subemesh_aabbs[submesh_index];
-                        exist_min = Min(exist_min, p);
-                        exist_max = Max(exist_max, p);
+                        LOG_WARNING(
+                                "QuantizePosition collision detected: hash={} count={} dist={}",
+                                hash,
+                                positions.size(),
+                                std::sqrt(dist2));
+
+                        LOG_WARNING(
+                                "  p0 = ({}, {}, {})",
+                                positions[i].x, positions[i].y, positions[i].z);
+
+                        LOG_WARNING(
+                                "  p1 = ({}, {}, {})",
+                                positions[j].x, positions[j].y, positions[j].z);
+
+                        goto next_hash;// 一个 hash 报一次就够了
                     }
-                    else
-                    {
-                        subemesh_aabbs[submesh_index] = std::make_tuple(vertex_min, vertex_max);
-                    }
-                    ++cur_index_count;
-                }
-                else
-                {
-                    indices.emplace_back(it->second);
-                    submesh_indices[submesh_index].emplace_back(it->second);
                 }
             }
-        }
-        else
-        {
-            for (size_t i = 0; i < vertex_count; i++)
-            {
-                int submesh_index = _positon_material_index_mapper[i];
-                auto p = raw_pos[i];
-                //auto n = raw_normals[i];
-                auto n = raw_normals[_b_normal_by_controlpoint ? _positon_conrtol_index_mapper[i] : i];
-                auto uv = raw_uv0[i];
-                auto hash0 = v3hash(n), hash1 = v2hash(uv);
-                auto vertex_hash = hash1;//Math::ALHash::CombineHashes(hash0, hash1);
-                auto it = vertex_map.find(vertex_hash);
-                if (it == vertex_map.end())
-                {
-                    vertex_map[vertex_hash] = cur_index_count;
-                    submesh_indices[submesh_index].emplace_back(cur_index_count);
-                    indices.emplace_back(cur_index_count);
-                    normals.emplace_back(n);
-                    positions.emplace_back(p);
-                    uv0s.emplace_back(uv);
-                    if (subemesh_aabbs.contains(submesh_index))
-                    {
-                        auto &[exist_min, exist_max] = subemesh_aabbs[submesh_index];
-                        exist_min = Min(exist_min, p);
-                        exist_max = Max(exist_max, p);
-                    }
-                    else
-                    {
-                        subemesh_aabbs[submesh_index] = std::make_tuple(vertex_min, vertex_max);
-                    }
-                    ++cur_index_count;
-                }
-                else
-                {
-                    indices.emplace_back(it->second);
-                    submesh_indices[submesh_index].emplace_back(it->second);
-                }
-            }
-        }
 
-        //LOG_INFO("indices gen takes {}ms", mgr.GetElapsedSinceLastMark());
-        mesh->Clear();
-        f32 aabb_space = 0.01f;
-        mesh->_bounds.emplace_back(AABB(mesh_vmin, mesh_vmax));
-        for (auto &it: subemesh_aabbs)
-        {
-            auto &[exist_min, exist_max] = it.second;
-            mesh_vmin = Min(mesh_vmin, exist_min);
-            mesh_vmax = Max(mesh_vmax, exist_max);
-            mesh->_bounds.emplace_back(AABB(exist_min, exist_max));
-        }
-        mesh->_bounds[0] = AABB(mesh_vmin, mesh_vmax);
-        for (auto &box: mesh->_bounds)
-        {
-            box._min -= aabb_space;
-            box._max += aabb_space;
-        }
-        vertex_count = (u32) positions.size();
-        mesh->_vertex_count = vertex_count;
-        mesh->SetVertices({positions.data(), positions.size()});
-        mesh->SetUVs({uv0s.data(), uv0s.size()}, 0u);
-        mesh->SetNormals({normals.data(), normals.size()});
-
-        for (int i = 0; i < submesh_indices.size(); ++i)
-        {
-            auto &submesh_indices_i = submesh_indices[i];
-            mesh->AddSubmesh({submesh_indices_i.data(), submesh_indices_i.size()});
-        }
-        if (skined_mesh)
-        {
-            skined_mesh->SetBoneIndices({bone_indices.data(), bone_indices.size()});
-            skined_mesh->SetBoneWeights({bone_weights.data(), bone_weights.size()});
+        next_hash:
+            continue;
         }
     }
-
+    
     void FbxParser::GenerateIndexdMesh(RawMeshData *mesh_data, Mesh *out_mesh)
     {
         if (!mesh_data)
@@ -1184,6 +1066,8 @@ namespace Ailu
         Vector3f mesh_vmin = vertex_min;
         Vector3f mesh_vmax = vertex_max;
         Map<u32, std::tuple<Vector3f, Vector3f>> subemesh_aabbs;
+        const auto process_vert = [&](u64 raw_vert_index) {};
+
         if (mesh_data->_bone_weights.size())
         {
             auto &raw_bonei = mesh_data->_bone_indices;
@@ -1304,6 +1188,23 @@ namespace Ailu
         }
     }
 
+    static Vector3f AxisToVector(int axis, int sign)
+    {
+        switch (axis)
+        {
+            case FbxAxisSystem::eXAxis:
+                return Vector3f(sign, 0.0f, 0.0f);
+            case FbxAxisSystem::eYAxis:
+                return Vector3f(0.0f, sign, 0.0f);
+            case FbxAxisSystem::eZAxis:
+                return Vector3f(0.0f, 0.f, sign);
+            default:
+                return Vector3f::kZero;
+        }
+    }
+
+
+
     void FbxParser::ParserImpl(WString sys_path)
     {
         _cur_file_sys_path = sys_path;
@@ -1340,9 +1241,29 @@ namespace Ailu
                 //}
                 //LOG_ERROR("********************************************************************************");
             }
+            auto& global_settings = _p_cur_fbx_scene->GetGlobalSettings();
             FbxNode *fbx_rt = _p_cur_fbx_scene->GetRootNode();
-            fbxsdk::FbxAxisSystem::DirectX.DeepConvertScene(_p_cur_fbx_scene);
-            if (_p_cur_fbx_scene->GetGlobalSettings().GetSystemUnit() != fbxsdk::FbxSystemUnit::m)
+            auto axis_sys = global_settings.GetAxisSystem();
+            if (axis_sys != FbxAxisSystem::DirectX)
+                FbxAxisSystem::DirectX.DeepConvertScene(_p_cur_fbx_scene);
+            axis_sys = global_settings.GetAxisSystem();
+            i32 up_sign = 0, front_sign = 0;
+            FbxAxisSystem::EUpVector up_axis = axis_sys.GetUpVector(up_sign);
+            FbxAxisSystem::EFrontVector front_axis = axis_sys.GetFrontVector(front_sign);
+            FbxAxisSystem::ECoordSystem coord_system = axis_sys.GetCoorSystem();
+            //EUpVector 1,2,3 xyz
+            const static Vector3f kAxisDir[3] = {Vector3f::kRight, Vector3f::kUp, Vector3f::kForward};
+            Vector3f up_vector = AxisToVector(up_axis, up_sign);
+            Vector3f front_vector;
+            if (up_axis == FbxAxisSystem::EUpVector::eXAxis)
+                front_vector = FbxAxisSystem::EFrontVector::eParityEven ? Vector3f::kUp : Vector3f::kForward;
+            else if (up_axis == FbxAxisSystem::EUpVector::eYAxis)
+                front_vector = FbxAxisSystem::EFrontVector::eParityEven ? Vector3f::kRight : Vector3f::kForward;
+            else//z up
+                front_vector = FbxAxisSystem::EFrontVector::eParityEven ? Vector3f::kRight : Vector3f::kUp;
+            Vector3f right_vector = coord_system == FbxAxisSystem::eRightHanded ? CrossProduct(front_vector, up_vector) : -CrossProduct(front_vector, up_vector);
+
+            if (global_settings.GetSystemUnit() != fbxsdk::FbxSystemUnit::m)
             {
                 const fbxsdk::FbxSystemUnit::ConversionOptions lConversionOptions = {
                         false, /* mConvertRrsNodes */

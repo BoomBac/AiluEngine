@@ -1166,7 +1166,7 @@ namespace Ailu::Render
                 else if (it->second._res_type & EBindResDescType::kCBufferUInt)
                 {
                     u32 v = (u32)value;
-                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &v, sizeof(i32));
+                    memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), &v, sizeof(u32));
                 }
                 else {}
             }
@@ -1456,7 +1456,7 @@ namespace Ailu::Render
             }
             cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot,bind_info._bind_slot);
         }
-        for (auto &it: s_global_buffer_bind_info)
+        for (auto &it: s_global_cbuffer_bind_info)
         {
             if (const auto& itt = cs_ele._bind_res_infos.find(it.first);itt != cs_ele._bind_res_infos.end())
             {
@@ -1467,6 +1467,20 @@ namespace Ailu::Render
                     cur_state._bind_params[bind_info._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
                     cur_state._bind_res_priority[bind_info._bind_slot] = PipelineResource::kPriorityGlobal;
                     cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot,bind_info._bind_slot);
+                }
+            }
+        }
+        for (auto &it: s_global_buffer_bind_info)
+        {
+            if (const auto &itt = cs_ele._bind_res_infos.find(it.first); itt != cs_ele._bind_res_infos.end())
+            {
+                const auto &bind_info = itt->second;
+                if (cur_state._bind_res_priority[bind_info._bind_slot] <= PipelineResource::kPriorityGlobal)
+                {
+                    cur_state._bind_res[bind_info._bind_slot] = it.second;
+                    cur_state._bind_params[bind_info._bind_slot] = ComputeBindParams{ECubemapFace::kUnknown, 0, 0, UINT32_MAX, 0};
+                    cur_state._bind_res_priority[bind_info._bind_slot] = PipelineResource::kPriorityGlobal;
+                    cur_state._max_bind_slot = std::max<u16>(cur_state._max_bind_slot, bind_info._bind_slot);
                 }
             }
         }
@@ -1487,6 +1501,15 @@ namespace Ailu::Render
                 }
             }
         }
+        for (auto &it: s_global_floats)
+        {
+            SetFloat(it.first, it.second);
+        }
+        for (auto &it: s_global_ints)
+        {
+            SetInt(it.first, it.second);
+        }
+        
         std::unique_lock lock(_state_mutex);
         _bind_state.push(cur_state);
     }

@@ -15,6 +15,7 @@ namespace Ailu::Render
     GpuResource::~GpuResource()
     {
         s_total_mem_size -= _mem_size;
+        LOG_INFO("GpuResource::~GpuResource: {} released,mem size {}", _name, _mem_size);
     }
     void GpuResource::Apply()
     {

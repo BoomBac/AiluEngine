@@ -30,6 +30,9 @@ namespace Ailu
             Array<UI::InputBlock*,3> _rot_block;
             Array<UI::InputBlock*,3> _scale_block;
             UI::CollapsibleView *_light_block = nullptr;
+            UI::CollapsibleView *_static_mesh_block = nullptr;
+            UI::CollapsibleView *_light_probe_block = nullptr;
+            UI::UIElement *_prev_comp_block = nullptr;
         };
     }// namespace Editor
 }// namespace Ailu

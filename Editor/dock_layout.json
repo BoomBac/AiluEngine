@@ -1,20 +1,5 @@
 {
     "_node_data": [{
-            "_type_id": "Ailu::Editor::CommonView",
-            "_split_ratio": 0.5,
-            "_window_size": [286.0, 677.0],
-            "_type": 2,
-            "_parent_id": 4294967295,
-            "_id": 0,
-            "_window_id": 999,
-            "_is_vertical_split": true,
-            "_title": "CommonView",
-            "_tab_id": "",
-            "_window_position": [1979.0, 282.0],
-            "_position": [0.0, 0.0],
-            "_size": [286.0, 677.0],
-            "_flags": 31
-        }, {
             "_split_ratio": 0.5,
             "_type_id": "Ailu::Editor::SceneView",
             "_type": 2,
@@ -41,7 +26,7 @@
             "_title": "AssetBrowser",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [-582.0, 666.0],
+            "_position": [-372.0, 636.0],
             "_size": [903.0, 513.0],
             "_flags": 0
         }, {
@@ -56,7 +41,7 @@
             "_title": "ObjectDetail",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [789.0, 690.0],
+            "_position": [824.0, 473.0],
             "_size": [377.0, 493.0],
             "_flags": 0
         }]

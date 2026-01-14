@@ -2,3 +2,23 @@ guid: 6abca545-d271-4c76-b214-913472735574
 type: kScene
 name: empty_scene
 scene_register:
+Entity:1
+        _tag_component:
+            _name:cube
+_layer_mask:1
+        _transform_component:
+            _transform:
+                _position:0.000000000,0.000000000,0.000000000
+                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
+                _scale:1.000000000,1.000000000,1.000000000
+        _static_mesh_component:
+            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
+            _material_num:1
+            _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0

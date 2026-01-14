@@ -70,7 +70,7 @@ Entity:4
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:3.344201565,-8.513183594,-4.988891602
+                _position:3.344202042,-8.489746094,-4.988892078
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:163.044464111,163.044464111,163.044464111
         _static_mesh_component:
@@ -222,11 +222,11 @@ Entity:10
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:2.635400772,-5.781131268,-10.013072968
+                _position:2.635401011,-5.781130791,-10.013072968
                 _rotation:-0.000000037,0.000000068,-0.000000000,1.000000000
                 _scale:3.724302053,2.646023512,0.101077698
         _static_mesh_component:
-            _p_mesh:7baa598b-7eb4-478d-91ae-bf758da25d3b
+            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
             _material_num:1
             _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         _hierarchy_component:

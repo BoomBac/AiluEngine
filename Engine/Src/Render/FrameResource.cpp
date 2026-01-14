@@ -61,6 +61,25 @@ namespace Ailu::Render
         }
         return _scene_cbs[_scene_cb_lut[hash]];
     }
+    GPUBuffer *FrameResource::GetSceneInstanceBuffer(u64 hash)
+    {
+        if (!_scene_inst_buffer_lut.contains(hash))
+        {
+            BufferDesc desc;
+            desc._element_num = RenderConstants::kMaxRenderObjectCount;
+            desc._element_size = sizeof(ObjectInstanceData);
+            desc._is_random_write = false;
+            desc._size = desc._element_size * desc._element_num;
+            desc._target = EGPUBufferTarget::kConstant | EGPUBufferTarget::kStructured;
+            auto buf = GPUBuffer::Create(desc);
+            buf->Name(std::format("SceneInstanceBuffer_{}", hash));
+            _scene_instance_buffers.push_back(buf);
+            _scene_inst_buffer_lut[hash] = _scene_instance_buffers.size() - 1;
+
+            return &*_scene_instance_buffers.back();
+        }
+        return &*_scene_instance_buffers[_scene_inst_buffer_lut[hash]];
+    }
 #pragma endregion
 
 #pragma region FrameResourceManager

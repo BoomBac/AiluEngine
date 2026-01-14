@@ -1,12 +1,20 @@
 #include "Render/Gizmo.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"
+#include "Render/CommandBuffer.h"
 #include "UI/TextRenderer.h"
+#include "Render/Camera.h"
+#include "Render/Material.h"
+#include "Render/Mesh.h"
+#include "Render/Buffer.h"
+#include "Render/RenderingData.h"
 #include "pch.h"
 
 namespace Ailu::Render
 {
     static Gizmo *s_pInstance = nullptr;
+    static CBufferPerCameraData s_screen_camera_cb;
+
     Gizmo::Gizmo()
     {
         VertexBufferLayout layout = {
@@ -170,7 +178,7 @@ namespace Ailu::Render
     void Gizmo::DrawLine(const Vector3f &from, const Vector3f &to, const Color &color_from, const Color &color_to)
     {
         if (Gizmo::s_color.a < 0.1f) return;
-        if (s_pInstance->_world_vertex_num + 2 >= RenderConstants::KMaxDynamicVertexNum)
+        if (s_pInstance->_world_vertex_num + 2 >= kMaxVertexNum)
         {
             LOG_WARNING("Gizmo vertex buffer is full, some lines may not be drawn. Please increase the size of the vertex buffer.")
             return;
@@ -340,7 +348,7 @@ namespace Ailu::Render
     void Gizmo::DrawLine(const Vector2f &from, const Vector2f &to, Color color)
     {
         if (Gizmo::s_color.a < 0.1f) return;
-        if (s_pInstance->_screen_vertex_num + 2 >= RenderConstants::KMaxDynamicVertexNum)
+        if (s_pInstance->_screen_vertex_num + 2 >= kMaxVertexNum)
         {
             LOG_WARNING("Gizmo vertex buffer is full, some lines may not be drawn. Please increase the size of the vertex buffer.")
             return;
@@ -376,22 +384,22 @@ namespace Ailu::Render
         s_pInstance->_text_renderer->DrawText(text, pos, font_size, Vector2f::kOne, color);
     }
 
-    void Gizmo::Submit(CommandBuffer *cmd, const RenderingData &data)
+    void Gizmo::Submit(CommandBuffer *cmd, const RenderingData *data)
     {
         //auto line_pso = GraphicsPipelineStateMgr::Get().GetLineGizmoPSO();
         //line_pso->BindImpl(cmd);
         //u8 camera_buf_slot = line_pso->NameToSlot(RenderConstants::kCBufNamePerCamera);
         //line_pso->SetPipelineResource(cmd, data._p_per_camera_cbuf, EBindResDescType::kConstBuffer, camera_buf_slot);
-        if (s_pInstance->_world_vertex_num > RenderConstants::KMaxDynamicVertexNum)
+        if (s_pInstance->_world_vertex_num > kMaxVertexNum)
         {
-            LOG_WARNING("[Gizmo] vertex num > KMaxDynamicVertexNum {},draw nothing", RenderConstants::KMaxDynamicVertexNum);
+            LOG_WARNING("[Gizmo] vertex num > KMaxDynamicVertexNum {},draw nothing", kMaxVertexNum);
             s_pInstance->_world_vertex_num = 0;
             return;
         }
 
         if (s_pInstance->_world_vertex_num > 0)
         {
-            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,data._p_per_camera_cbuf);
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera,data->_p_per_camera_cbuf);
             auto cur_time = std::chrono::system_clock::now();
             s_geometry_draw_list.erase(std::remove_if(s_geometry_draw_list.begin(), s_geometry_draw_list.end(),
                                                       [&](const auto &it) -> bool
@@ -419,16 +427,16 @@ namespace Ailu::Render
         s_pInstance->_mesh_renderers.clear();
         if (s_pInstance->_screen_vertex_num > 0)
         {
-            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &s_pInstance->_screen_camera_cb, RenderConstants::kPerCameraDataSize);
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &s_screen_camera_cb, RenderConstants::kPerCameraDataSize);
             s_pInstance->_screen_vbuf->SetData((u8 *) s_pInstance->_screen_pos.data(), s_pInstance->_screen_vertex_num * sizeof(Vector3f), 0u, 0);
             s_pInstance->_screen_vbuf->SetData((u8 *) s_pInstance->_screen_color.data(), s_pInstance->_screen_vertex_num * sizeof(Color), 1u, 0);
             Matrix4x4f view, proj;
-            f32 w = (f32)data._width,h = (f32)data._height;
+            f32 w = (f32) data->_width, h = (f32) data->_height;
             f32 half_width = w * 0.5f, half_height = h * 0.5f;
             BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
             BuildOrthographicMatrix(proj, 0.0f, w, h,0.0f, 1.f, 200.f);
-            s_pInstance->_screen_camera_cb._MatrixVP = view * proj;
-            s_pInstance->_screen_camera_cb._MatrixVP_NoJitter = s_pInstance->_screen_camera_cb._MatrixVP;
+            s_screen_camera_cb._MatrixVP = view * proj;
+            s_screen_camera_cb._MatrixVP_NoJitter = s_screen_camera_cb._MatrixVP;
             cmd->DrawInstanced(s_pInstance->_screen_vbuf.get(), nullptr, s_pInstance->_line_drawer, 0, 1);
             s_pInstance->_screen_vertex_num = 0u;
         }
@@ -444,8 +452,8 @@ namespace Ailu::Render
                     ret.y = 1.0f - (f32)y / (f32)vp_h * 2.0f;
                     return ret;
                 };
-                Vector2f lt = screen_pos_to_ndc(item._rect.left, item._rect.top, data._width, data._height);
-                Vector2f rb = screen_pos_to_ndc(item._rect.left + item._rect.width, item._rect.top + item._rect.height, data._width, data._height);
+                Vector2f lt = screen_pos_to_ndc(item._rect.left, item._rect.top, data->_width, data->_height);
+                Vector2f rb = screen_pos_to_ndc(item._rect.left + item._rect.width, item._rect.top + item._rect.height, data->_width, data->_height);
                 Vector2f rt = Vector2f{rb.x, lt.y};
                 Vector2f lb = Vector2f{lt.x, rb.y};
                 Vector2f buf[6];

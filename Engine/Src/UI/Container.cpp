@@ -453,10 +453,12 @@ namespace Ailu
                 c->Translate(_current_offset);
                 c->MeasureAndArrange(dt);
             }
+            _max_offset = Min(Vector2f::kZero, _arrange_rect.zw - _content_size);
         }
         void ScrollView::PostArrange()
         {
-            _max_offset = Min(Vector2f::kZero, _arrange_rect.zw - _content_size);
+            //_max_offset = Min(Vector2f::kZero, _arrange_rect.zw - _content_size);
+            //_max_offset = Min(Vector2f::kZero, _arrange_rect.zw - _content_size);
             //LOG_INFO("ScrollView::PostArrange: view{} update max_offset, y is {}",_name, _max_offset.y);
         }
         Vector2f ScrollView::MeasureDesiredSize()

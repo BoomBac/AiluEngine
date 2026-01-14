@@ -5,7 +5,7 @@
 namespace Ailu
 {
     ACLASS()
-    class EngineConfig : public Object
+    class AILU_API EngineConfig : public Object
     {
         GENERATED_BODY()
     public:

@@ -18,6 +18,8 @@ namespace Ailu
             void AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data);
             //temp
             Vector2f _debug_pos;
+            APROPERTY(Range(0,20))
+            u32 _debug_hit_box = 0u;
         private:
             Scope<GIPass> _gi_pass;
             Ref<ComputeShader> _gi_compute_shader;
@@ -25,6 +27,7 @@ namespace Ailu
 
         class GIPass : public RenderPass
         {
+            friend class RayTraceGI;
         public:
             GIPass(ComputeShader* cs);
             ~GIPass() = default;

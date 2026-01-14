@@ -1236,7 +1236,7 @@ namespace Ailu
         {
             if (Input::IsInputBlock())
                 return;
-            bool can_resize = _adj_split_node == nullptr && _drag_move_node == nullptr;
+            bool can_resize = _adj_split_node == nullptr && _drag_move_node == nullptr && UI::UIManager::Get()->_capture_target == nullptr;
             bool can_adjust_split = _resizing_node == nullptr && _drag_move_node == nullptr;
             bool can_drag_move = _resizing_node == nullptr && _adj_split_node == nullptr;
             const Vector2f mouse_global_pos = Input::GetGlobalMousePos();

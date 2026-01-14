@@ -6,7 +6,6 @@
 #include "Framework/Common/Profiler.h"
 #include "Render/CommandBuffer.h"
 #include "UI/TextRenderer.h"
-#include "Render/Gizmo.h"
 #include "UI/Widget.h"
 #include "UI/UIFramework.h"
 #include "UI/DragDrop.h"
@@ -98,11 +97,6 @@ namespace Ailu
             //暂时所有文本都渲染到后备缓冲区
             //TextRenderer::Get()->Render(RenderTexture::s_backbuffer, cmd, _text_block);
             //_text_block->Clear();
-            static RenderingData data;
-            data._width =  RenderTexture::s_backbuffer->Width();
-            data._height = RenderTexture::s_backbuffer->Height();
-            //TODO:remove
-            Render::Gizmo::Submit(cmd, data);
         }
 
         void UIRenderer::DrawQuad(Vector4f rect, Color color, f32 depth)

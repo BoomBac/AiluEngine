@@ -23,13 +23,16 @@ namespace Ailu::Render
         ConstantBuffer * GetMatCB(u32 index);
         ConstantBuffer * GetCameraCB(u64 hash);
         ConstantBuffer * GetSceneCB(u64 hash);
+        GPUBuffer *GetSceneInstanceBuffer(u64 hash);
     private:
         Vector<ConstantBuffer *> _obj_cbs;
         Vector<ConstantBuffer *> _mat_cbs;
         Vector<ConstantBuffer *> _camera_cbs;
         Vector<ConstantBuffer *> _scene_cbs;
+        Vector<Ref<GPUBuffer>> _scene_instance_buffers;
         Map<u64,u64> _camera_cb_lut;
         Map<u64,u64> _scene_cb_lut;
+        Map<u64, u64> _scene_inst_buffer_lut;
     };
 
     class FrameResourceManager

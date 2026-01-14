@@ -509,27 +509,39 @@ namespace Ailu::Render
         };
 
     public:
-        inline static void EnableGlobalKeywords(const String& kw) 
+        FORCEINLINE static void EnableGlobalKeywords(const String &kw) 
         {
             s_global_active_keywords.insert(kw);
             for(auto& it : s_global_variant_update_map)
                 it.second = true;
         };
-        inline static void DisableGlobalKeywords(const String& kw) 
+        FORCEINLINE static void DisableGlobalKeywords(const String &kw) 
         {
             s_global_active_keywords.erase(kw);
             for(auto& it : s_global_variant_update_map)
                 it.second = true;
         };
-        inline static void SetGlobalBuffer(const String &name, ConstantBuffer * buf)
+        FORCEINLINE static void SetGlobalBuffer(const String &name, ConstantBuffer *buf)
+        {
+            s_global_cbuffer_bind_info[name] = buf;
+        };
+        FORCEINLINE static void SetGlobalBuffer(const String &name, GPUBuffer *buf)
         {
             s_global_buffer_bind_info[name] = buf;
         };
-        inline static void SetGlobalTexture(const String &name, Texture* texture)
+        FORCEINLINE static void SetGlobalTexture(const String &name, Texture *texture)
         {
             s_global_textures_bind_info[name] = texture;
         };
         static void SetGlobalTexture(const String &name, RTHandle texture);
+        FORCEINLINE static void SetGlobalFloat(const String &name, f32 value)
+        {
+            s_global_floats[name] = value;
+        };
+        FORCEINLINE static void SetGlobalInt(const String &name, i32 value)
+        {
+            s_global_ints[name] = value;
+        };
     public:
         static Ref<ComputeShader> Create(const WString &sys_path);
         ComputeShader(const WString &sys_path);
@@ -624,8 +636,11 @@ namespace Ailu::Render
         };
         inline static std::set<String> s_global_active_keywords;
         inline static HashMap<u32,bool> s_global_variant_update_map{};
-        inline static Map<String, ConstantBuffer *> s_global_buffer_bind_info{};
+        inline static Map<String, ConstantBuffer *> s_global_cbuffer_bind_info{};
+        inline static Map<String, GPUBuffer *> s_global_buffer_bind_info{};
         inline static Map<String, Texture *> s_global_textures_bind_info{};
+        inline static Map<String, f32> s_global_floats{};
+        inline static Map<String, i32> s_global_ints{};
         Vector<KernelElement> _kernels;
         std::set<String> _local_active_keywords;
         WString _src_file_path;

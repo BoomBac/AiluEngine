@@ -489,6 +489,7 @@ namespace Ailu
             desc._is_readable = true;
             desc._format = EALGFormat::kALGFormatR32_UINT;
             desc._is_random_write = true;
+            desc._target = EGPUBufferTarget::kCopyDestination;
             _readback_buf = GPUBuffer::Create(desc);
         }
         PickFeature::~PickFeature()

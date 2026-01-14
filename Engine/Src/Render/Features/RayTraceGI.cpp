@@ -19,7 +19,9 @@ namespace Ailu
         {
             _gi_pass->_debug_pos = _debug_pos;
             _gi_compute_shader->SetInts("_PickPixel", {(i32)_debug_pos.x, (i32)_debug_pos.y});
+            _gi_compute_shader->SetInt("_debug_hit_box_idx", _debug_hit_box);
             _debug_pos = {-1.0f, -1.0f};
+            _gi_pass->_debug_line_mat->SetInt("_debug_hit_box_idx", _debug_hit_box);
             renderer.EnqueuePass(_gi_pass.get());
         }
 #pragma endregion
@@ -30,17 +32,12 @@ namespace Ailu
             _debug_line_mat = MakeRef<Material>(g_pResourceMgr->Load<Shader>(L"Shaders/raytrace_debug_draw.alasset").get(), "RayDebugLineMat");
             _kernel_ray_gen = cs->FindKernel("RayGen");
             _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kAfterTransparent - 5);//before copy color
-            struct DebugRay
-            {
-                Vector3f _pos;
-                u32 _data;
-            };
             BufferDesc desc;
             desc._is_random_write = true;
             desc._is_readable = false;
             desc._format = EALGFormat::kALGFormatUNKOWN;
             desc._element_num = 5000;
-            desc._element_size = sizeof(DebugRay);
+            desc._element_size = 32u;//rt_common.hlsli  sizeof(DebugRay)
             desc._size = desc._element_size * desc._element_num;
             desc._target = EGPUBufferTarget::kAppend;
             _debug_buffer = GPUBuffer::Create(desc);

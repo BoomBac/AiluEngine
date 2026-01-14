@@ -6,6 +6,8 @@
 #define AILU_UIFRAMEWORK_H
 
 #include "GlobalMarco.h"
+#include "InteractionZone.h"
+#include <span>
 
 namespace Ailu
 {
@@ -40,6 +42,10 @@ namespace Ailu
             Widget *GetPopupWidget() const { return _popup_widget; }
             void Destroy(Ref<UIElement> element);
             void OnElementDestroying(UIElement *element);
+            [[nodiscard]] std::span<const InteractionZone> GetInteractionZones() const noexcept { return _interaction_zones; };
+            ZoneHandle RegisterInteractionZone(Vector4f rect);
+            void UnRegisterInteractionZone(ZoneHandle handle);
+            void UpdateInteractionZone(ZoneHandle handle, Vector4f rect);
         public:
             UIElement *_capture_target = nullptr;//记录按下时的目标,全局共享，element销毁时检查这个值
             UIElement *_focus_target = nullptr;  //记录按下时的目标,全局共享，element销毁时检查这个值
@@ -57,6 +63,10 @@ namespace Ailu
             Widget *_popup_widget;
             std::function<void()> _on_popup_close;
             Vector<Ref<UIElement>> _pending_destroy;
+
+            Vector<InteractionZone> _interaction_zones;
+            Vector<u32> _free_indices;
+
         };
     }// namespace UI
 

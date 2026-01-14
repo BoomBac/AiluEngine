@@ -1,6 +1,5 @@
 # https://blog.csdn.net/weixin_43717839/article/details/128032486
-cmake_minimum_required (VERSION 3.8)
-
+cmake_minimum_required(VERSION 4.1)
 project (AiluEngine)
 # 设置输出目录的根目录
 set(OUTPUT_ROOT "${AiluBuildPath}/out/engine/lib/x64")
@@ -126,7 +125,7 @@ set_target_properties (Engine PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>")
 # 编译器参数
 # if(MSVC)
-    target_compile_options(Engine PRIVATE /MP)
+    target_compile_options(Engine PRIVATE /MP /bigobj)
     # MSVC 编译器的警告选项不同，以下是一个示例
     target_compile_options(Engine PRIVATE /D_UNICODE /DUNICODE /wd4819 /wd4251) # /wd4100 禁用未使用的参数警告
 if (MSVC)

@@ -157,18 +157,23 @@ namespace Ailu::Render
         }
     }
 
-    void Material::SetUint(const String &name, const u32 &value)
+    void Material::SetInt(const String &name, i32 value)
     {
         u16 pass_index = 0;
         for (auto &pass: _p_shader->_passes)
         {
             auto &res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
-            auto it = res_info.find(name);
-            if (it != res_info.end())
+            if (auto it = res_info.find(name); it != res_info.end())
             {
-                memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(value));
-                auto offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
-                //LOG_WARNING("set uint {} value to {} at address {}", name, *reinterpret_cast<u32 *>(_p_cbufs[pass._index]->GetData() + offset), (u64)(_p_cbufs[pass._index]->GetData() + offset));
+                if (it->second._res_type & EBindResDescType::kCBufferInt)
+                {
+                    memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(value));
+                }
+                else
+                {
+                    u32 tmp = static_cast<u32>(value);
+                    memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &tmp, sizeof(tmp));
+                }
             }
             else
             {

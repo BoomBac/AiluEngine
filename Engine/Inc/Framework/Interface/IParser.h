@@ -86,6 +86,7 @@ namespace Ailu
         }
         //此项为true时会导入fbx中的材质信息并生成材质资产,false只会导入材质信息，并在运行时生成材质
         bool _is_import_material = false;
+        bool _is_recalculate_normals = false;
         //1 is mesh,2 is animation
         u8 _import_flag = 1;
         bool _is_combine_mesh = false;

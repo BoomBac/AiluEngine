@@ -176,13 +176,11 @@ namespace Ailu::RHI::DX12
         while (!_cmd_queue.Empty())
         {
             auto &&group_opt = _cmd_queue.Pop();
+            CPUProfileBlock b(group_opt.value()._params._name + "_Execute");
             auto cmd = RHICommandBufferPool::Get(group_opt.value()._params._name);
             for (auto *task: group_opt.value()._cmds)
                 _ctx->ProcessGpuCommand(task, cmd.get());
-            {
-                CPUProfileBlock b(group_opt.value()._params._name + "_Execute");
-                _ctx->ExecuteRHICommandBuffer(cmd.get());
-            }
+            _ctx->ExecuteRHICommandBuffer(cmd.get());
             RenderTexture::ResetRenderTarget();
             RHICommandBufferPool::Release(cmd);
         }
@@ -621,13 +619,13 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::ExecuteCommandBuffer(Ref<CommandBuffer> &cmd)
     {
-        _cmd_worker->Push(std::move(cmd->_commands), SubmitParams{cmd->Name()});
+        _cmd_worker->Push(cmd->TakeCommands(), SubmitParams{cmd->Name()});
     }
 
     void D3DContext::ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd)
     {
         auto rhi_cmd = RHICommandBufferPool::Get(cmd->Name());
-        for (auto *gfx_cmd: cmd->_commands)
+        for (auto *gfx_cmd: cmd->GetCommands())
         {
             ProcessGpuCommand(gfx_cmd, rhi_cmd.get());
         }
@@ -1355,6 +1353,7 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::ProcessGpuCommand(GfxCommand *cmd, RHICommandBuffer *cmd_buffer)
     {
+        CPUProfileBlock _CPU(cmd->GetName());
         D3DCommandBuffer *d3dcmd = static_cast<D3DCommandBuffer *>(cmd_buffer);
         auto dxcmd = d3dcmd->NativeCmdList();
         static std::stack<CommandProfiler *> s_begin_profiler_stack{};

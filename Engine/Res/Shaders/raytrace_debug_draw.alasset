@@ -1,6 +1,6 @@
 guid: 6b616d87-aefe-4b8d-9914-531b11a6efc5
 type: kShader
 name: RayTraceDebugDraw
-  file: Shaders/hlsl/raytrace_debug_draw.hlsl
+  file: Shaders/hlsl/ray_trace/raytrace_debug_draw.hlsl
   vs_entry: VSMain
   ps_entry: PSMain

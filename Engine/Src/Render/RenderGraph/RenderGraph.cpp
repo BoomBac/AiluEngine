@@ -245,6 +245,7 @@ namespace Ailu
 
         bool RenderGraph::Compile()
         {
+            PROFILE_BLOCK_CPU(RenderGraph_Compile)
             //if (_is_compiled)
             //    return true;
             _sorted_passes.clear();
@@ -353,6 +354,7 @@ namespace Ailu
         {
             if (!_is_compiled && !Compile())
                 return;
+            PROFILE_BLOCK_CPU(RenderGraph_Execute)
             for (auto *pass: _sorted_passes)
             {
                 {

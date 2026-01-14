@@ -1,5 +1,5 @@
 # https://blog.csdn.net/weixin_43717839/article/details/128032486
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required(VERSION 4.1)
 
 project (AiluEditor)
 set(EDITOR_ROOT_PATH ${CMAKE_SOURCE_DIR}/Editor)

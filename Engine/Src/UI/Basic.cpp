@@ -30,6 +30,7 @@ namespace Ailu
         {
             if (_text == nullptr)
                 _text = AddChild<Text>(text);
+            _text->SetText(text);
         }
         String Button::GetText() const
         {
@@ -493,6 +494,16 @@ namespace Ailu
             OnMouseExit() += [this](UIEvent &e)
             {
                 Application::Get().SetCursor(ECursorType::kArrow);
+            };
+            OnMouseDoubleClick() += [this](UIEvent &e)
+            {
+                if (e._key_code == EKey::kLBUTTON)
+                {
+                    _select_start = 0u;
+                    _select_end = (u32) _content.size();
+                    _cursor_pos = _select_end;
+                    _is_selecting = false;
+                }
             };
             _on_focus_lost += [this]()
             {

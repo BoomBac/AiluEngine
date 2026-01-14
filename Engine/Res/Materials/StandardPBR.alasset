@@ -10,9 +10,9 @@ keywords:
     _surface: 0
   prop_type: Float
     _AlphaCulloff: 0
-    _Anisotropy: 0
+    _Anisotropy: 0.344141
     _MaterialID: 0
-    _MetallicValue: 0
+    _MetallicValue: 0.243193
     _RoughnessValue: 1
     _SamplerMask: 0
   prop_type: Vector

@@ -63,7 +63,7 @@ namespace Ailu
         }
         //https://tavianator.com/2022/ray_box_boundary.html, slob method
         // max(t_enter) < min(t_exit)
-        bool static Intersect(const AABB& aabb, Vector3f origin, Vector3f dir)
+        static bool Intersect(const AABB &aabb, Vector3f origin, Vector3f dir)
         {
             Vector3f invDir;
             invDir.x = 1.0f / dir.x;
@@ -79,10 +79,51 @@ namespace Ailu
             }
             return t_enter < t_exit;
         }
+        static void Encapsulate(AABB& aabb, const Vector3f& point)
+        {
+            aabb._min.x = std::min(aabb._min.x, point.x);
+            aabb._min.y = std::min(aabb._min.y, point.y);
+            aabb._min.z = std::min(aabb._min.z, point.z);
+            aabb._max.x = std::max(aabb._max.x, point.x);
+            aabb._max.y = std::max(aabb._max.y, point.y);
+            aabb._max.z = std::max(aabb._max.z, point.z);
+        }
+        static void Encapsulate(AABB& aabb, const AABB& other)
+        {
+            aabb._min.x = std::min(aabb._min.x, other._min.x);
+            aabb._min.y = std::min(aabb._min.y, other._min.y);
+            aabb._min.z = std::min(aabb._min.z, other._min.z);
+            aabb._max.x = std::max(aabb._max.x, other._max.x);
+            aabb._max.y = std::max(aabb._max.y, other._max.y);
+            aabb._max.z = std::max(aabb._max.z, other._max.z);
+        }
         bool static Intersect(const AABB &aabb, const Ray& ray)
         {
             return Intersect(aabb,ray._start,ray._dir);
         }
+        static AABB Infinity()
+        {
+            AABB aabb;
+            aabb._min = Vector3f(std::numeric_limits<f32>::max());
+            aabb._max = Vector3f(std::numeric_limits<f32>::lowest());
+            return aabb;
+        }
+        i32 LongestAxis() const
+        {
+            Vector3f size = _max - _min;
+            if (size.x >= size.y && size.x >= size.z)
+                return 0;
+            else if (size.y >= size.x && size.y >= size.z)
+                return 1;
+            else
+                return 2;
+        }
+        f32 Area() const
+        {
+            Vector3f size = _max - _min;
+            return 2.0f * (size.x * size.y + size.y * size.z + size.z * size.x);
+        }
+
         AABB operator*(const Matrix4x4f &mat) const;
 
         static Vector3f MaxAABB()

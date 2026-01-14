@@ -504,14 +504,14 @@ namespace Ailu
                 _render_lag -= s_target_lag;
             }
             //锁帧处理
-            {
-                f64 remaining = s_target_lag - _update_lag;
-                if (remaining > 0.0)
-                {
-                    std::this_thread::sleep_for(std::chrono::microseconds((i64) (remaining * 1000.0)));
-                }
-                _update_lag = 0.0;
-            }
+            //{
+            //    f64 remaining = s_target_lag - _update_lag;
+            //    if (remaining > 0.0)
+            //    {
+            //        std::this_thread::sleep_for(std::chrono::microseconds((i64) (remaining * 1000.0)));
+            //    }
+            //    _update_lag = 0.0;
+            //}
         }
         _after_update_delegate.Invoke();
     }

@@ -117,6 +117,10 @@ namespace Ailu
                 SetFocus(false);
             };
             SetTitle(title);
+            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero));
+            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero));
+            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero));
+            _resize_zone_handles.push_back(UI::UIManager::Get()->RegisterInteractionZone(Vector4f::kZero));
         }
         DockWindow::~DockWindow()
         {
@@ -145,6 +149,23 @@ namespace Ailu
                 _content_widget->SetSize({_size.x, _size.y - kTitleBarHeight});
                 _content_widget->Root()->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
                 _content_root->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
+                auto ui_mgr = UI::UIManager::Get();
+                const f32 t = kBorderThickness;
+                const Vector2f &p = _position;
+                const Vector2f &s = _size;
+                ui_mgr->UpdateInteractionZone(
+                        _resize_zone_handles[0],
+                        Vector4f(p.x - t, p.y - t, s.x + t * 2.0f, t));// Top
+                ui_mgr->UpdateInteractionZone(
+                        _resize_zone_handles[1],
+                        Vector4f(p.x - t, p.y + s.y, s.x + t * 2.0f, t));// Bottom
+                ui_mgr->UpdateInteractionZone(
+                        _resize_zone_handles[2],
+                        Vector4f(p.x - t, p.y, t, s.y));// Left
+                ui_mgr->UpdateInteractionZone(
+                        _resize_zone_handles[3],
+                        Vector4f(p.x + s.x, p.y, t, s.y));// Right
+
                 _is_dirty = false;
             }
             _title_bar_root->_bg_color = _is_focused ? Colors::kBlue : g_editor_style._window_title_bar_color;

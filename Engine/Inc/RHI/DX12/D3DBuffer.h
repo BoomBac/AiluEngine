@@ -50,6 +50,7 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3D12Resource> _p_d3d_res;
         ComPtr<ID3D12Resource> _counter_buffer;
         D3D12_GPU_VIRTUAL_ADDRESS _gpu_ptr;
+        void *_mapped_data = nullptr;
     };
 
 	class D3DVertexBuffer : public VertexBuffer

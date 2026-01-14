@@ -38,7 +38,7 @@ namespace Ailu::Render
         ~Material();
         void ChangeShader(Shader *shader);
         void SetFloat(const String &name, const float &f);
-        void SetUint(const String &name, const u32 &value);
+        void SetInt(const String &name, i32 value);
         void SetVector(const String &name, const Vector4f &vector);
         void SetVector(const String &name, const Vector4Int &vector);
         void SetMatrix(const String &name, const Matrix4x4f &matrix);

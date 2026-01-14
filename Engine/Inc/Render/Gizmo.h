@@ -1,9 +1,6 @@
 #pragma once
 #ifndef __GIZMO_H__
 #define __GIZMO_H__
-#include "Buffer.h"
-#include "Camera.h"
-#include "CommandBuffer.h"
 #include "Framework/Math/Geometry.h"
 #undef DrawText
 namespace Ailu
@@ -14,6 +11,14 @@ namespace Ailu
     }
     namespace Render
     {
+        class Mesh;
+        class Material;
+        class Texture;
+        class CommandBuffer;
+        class Buffer;
+        class VertexBuffer;
+        struct RenderingData;
+
         class AILU_API Gizmo
         {
         private:
@@ -46,7 +51,7 @@ namespace Ailu
             static void DrawTexture(const Rect &rect, Texture *tex);
             static void DrawText(const String &text, Vector2f pos, f32 font_size = 10.0f, Color color = Gizmo::s_color);
 
-            static void Submit(CommandBuffer *cmd, const RenderingData &data);
+            static void Submit(CommandBuffer *cmd, const RenderingData* data);
 
             //当GizmoPass未激活时，实际可能还会有数据在填充，所以将顶点偏移置空。一定要调用
             //当激活时，实际就不用调用
@@ -56,7 +61,7 @@ namespace Ailu
 
         public:
             inline static Color s_color = Colors::kGray;
-            inline static u32 kMaxVertexNum = 4096u;
+            inline static u32 kMaxVertexNum = 20000u;
             inline static u32 kMaxDrawTextureNum = 32u;
             inline static const int kSegments = 24;
 
@@ -70,7 +75,6 @@ namespace Ailu
             Ref<VertexBuffer> _world_vbuf = nullptr;
             Ref<VertexBuffer> _screen_vbuf = nullptr;
             Vector<Ref<VertexBuffer>> _tex_screen_vbufs;
-            CBufferPerCameraData _screen_camera_cb;
             Material *_line_drawer;
             Vector<Vector3f> _world_pos;
             Vector<Vector4f> _world_color;

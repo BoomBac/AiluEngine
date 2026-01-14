@@ -837,7 +837,7 @@ namespace Ailu
             {
                 uint32_t u;
                 if (sscanf_s(v.c_str(), "%u", &u) == 1)
-                    mat->SetUint(k, u);
+                    mat->SetInt(k, u);
                 else
                     LOG_WARNING("Load material: {}, property {} failed!", mat->_name, k);
             }

@@ -4,5 +4,5 @@
     "ShadowCaster": 65536,
     "All": 4294967295,
     "MaxRenderObjectPerTask": 0,
-    "isMultiThreadRender": true
+    "isMultiThreadRender": false
 }

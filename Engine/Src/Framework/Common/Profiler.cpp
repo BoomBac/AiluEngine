@@ -217,7 +217,7 @@ namespace Ailu
             }
             ProfileFrameData frame_data;
             frame_data._frame_index = Application::Get().GetFrameCount();
-            frame_data._start_time = g_pTimeMgr->TickTimeSinceLoad;
+            frame_data._start_time = g_pTimeMgr->TickTimeSinceLoad * 1000;//s->ms
             frame_data._end_time = 1.0f;
             {
                 std::lock_guard<std::mutex> lock(_lock);
@@ -230,7 +230,7 @@ namespace Ailu
                         call_depth = block._is_start ? call_depth + 1 : call_depth - 1;
                         if (!block._is_start)
                         {
-                            AL_ASSERT(profile_data._record.size() < 3);
+                            //AL_ASSERT(profile_data._record.size() < 3);
                             if (auto record = profile_data.PopRecord();record.has_value())
                             {
                                 if (tid == s_main_thread_id)
@@ -244,7 +244,7 @@ namespace Ailu
                         }
                     }
                 }
-                frame_data._end_time += TimeMgr::TickTimeSinceLoad;
+                frame_data._end_time += g_pTimeMgr->TickTimeSinceLoad * 1000;//s->ms
                 _cache_data.push_back(frame_data);
                 for(auto& it : _cpu_profiler_queue)
                 {

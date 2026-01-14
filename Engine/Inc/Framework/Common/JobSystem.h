@@ -58,6 +58,7 @@ namespace Ailu
         {
             return MakeRef<std::future<void>>(_promise->get_future());
         }
+        bool IsValid() const { return _function != nullptr; }
 
     private:
         void AddDependency() { _remaining_dependencies.fetch_add(1, std::memory_order_relaxed); }
@@ -98,10 +99,10 @@ namespace Ailu
         {
             _future = std::move(other._future);
         }
-        void Wait() const
-        {
-            _future->wait();
-        }
+        //void Wait() const
+        //{
+        //    _future->wait();
+        //}
         bool IsReady() const
         {
             return _future->wait_for(std::chrono::seconds(0)) == std::future_status::ready;
@@ -214,9 +215,10 @@ namespace Ailu
             return Dispatch(job);
         }
         void Wait();
-        void Wait(const WaitHandle &handle) const;
+        void Wait(const WaitHandle &handle);
 
     private:
+        bool WorkOnce();
         void WorkerThread(size_t index);
         bool TrySteal(Job *&job, size_t current_index);
 

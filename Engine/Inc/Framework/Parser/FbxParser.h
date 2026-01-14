@@ -39,12 +39,11 @@ namespace Ailu
         void ParserSkeleton(FbxNode *node, Skeleton &sk);
         bool ParserMesh(FbxNode *node, List<Ref<Mesh>> &loaded_meshes);
         bool ParserAnimation(FbxNode *node, Skeleton &sk);
-        bool ReadNormal(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector3f> &normals);
+        bool ReadNormal(fbxsdk::FbxNode *node, Vector<Vector3f> &normals);
         bool ReadVertex(fbxsdk::FbxNode *node, Vector<Vector3f>& positions, Vector<Vector4f>& weights, Vector<Vector4D<u32>>& bone_indices);
         bool ReadUVs(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector<Vector2f>> &uvs);
         bool ReadTangent(const fbxsdk::FbxMesh &fbx_mesh, Vector<Vector3f>& tangents);
         bool CalculateTangant(Mesh *mesh);
-        void GenerateIndexdMesh(Mesh *mesh);
         void GenerateIndexdMesh(RawMeshData* mesh_data,Mesh *out_mesh);
         void FillCameraArray(FbxScene *pScene, FbxArray<FbxNode *> &pCameraArray);
         void FillCameraArrayRecursive(FbxNode *pNode, FbxArray<FbxNode *> &pCameraArray);

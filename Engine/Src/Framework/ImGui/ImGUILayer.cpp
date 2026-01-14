@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "Framework/ImGui/ImGuiLayer.h"
+#include "Framework/Common/ResourceMgr.h"
 #include "Platform/WinWindow.h"
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/backends/imgui_impl_win32.h"
@@ -62,6 +63,9 @@ namespace Ailu
 			style.FrameRounding = 0.0f;
 			style.Colors[ImGuiCol_WindowBg].w = 0.8f;
 		}
+        //_font = io.Fonts->AddFontFromFileTTF(ResourceMgr::GetResSysPath("Fonts/VictorMono-Regular.ttf").c_str(), 13.0f);
+        io.Fonts->AddFontFromFileTTF(ResourceMgr::GetResSysPath("Fonts/Open_Sans/static/OpenSans-Regular.ttf").c_str(), 14.0f);
+        io.Fonts->Build();
         style.WindowMinSize.y = 16.0f;
         ImVec4* colors = ImGui::GetStyle().Colors;
         colors[ImGuiCol_WindowBg]               = ImVec4(0.06f, 0.06f, 0.06f, 0.99f);

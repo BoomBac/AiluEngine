@@ -173,6 +173,42 @@ namespace Ailu::UI
             }
         }
     }
+    ZoneHandle UIManager::RegisterInteractionZone(Vector4f rect)
+    {
+        u32 index;
+        if (!_free_indices.empty())
+        {
+            index = _free_indices.back();
+            _free_indices.pop_back();
+            _interaction_zones[index]._rect = rect;
+        }
+        else
+        {
+            index = _interaction_zones.size();
+            _interaction_zones.push_back({rect, 0});
+        }
+
+        return {index, _interaction_zones[index]._generation};
+    }
+    void UIManager::UnRegisterInteractionZone(ZoneHandle h)
+    {
+        if (h._index >= _interaction_zones.size())
+            return;
+
+        if (_interaction_zones[h._index]._generation != h._generation)
+            return;// stale handle
+
+        _interaction_zones[h._index]._generation++;
+        _free_indices.push_back(h._index);
+    }
+    void UIManager::UpdateInteractionZone(ZoneHandle h, Vector4f rect)
+    {
+        if (h._index < _interaction_zones.size() &&
+            _interaction_zones[h._index]._generation == h._generation)
+        {
+            _interaction_zones[h._index]._rect = rect;
+        }
+    }
     void UIManager::ApplyFocusChange(UIElement *old_f, UIElement *new_f)
     {
         if (old_f)

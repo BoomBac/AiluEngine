@@ -85,7 +85,7 @@ namespace Ailu
 
     public:
         CommandBuffer(String name);
-        ~CommandBuffer() override = default;
+        ~CommandBuffer() override;
         void SetRenderGraph(RDG::RenderGraph *render_graph);
         void Clear();
         void ClearRenderTarget(Color color, f32 depth, u8 stencil);
@@ -171,10 +171,14 @@ namespace Ailu
 
         void ReadbackBuffer(GPUBuffer* buffer,bool is_counter,u32 size,ReadbackCallback callback);
 
+        // Move-out the internal command list for submission.
+        Vector<GfxCommand *> TakeCommands();
+        // Read-only access to internal commands (for synchronous processing).
+        const Vector<GfxCommand *> &GetCommands() const;
+
     private:
-        Vector<GfxCommand *> _commands;
-        Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
-        RDG::RenderGraph *_render_graph = nullptr;
+        struct Impl;
+        Impl *_impl;
     };
 
     class AILU_API CommandBufferPool
