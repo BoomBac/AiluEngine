@@ -11,63 +11,45 @@
 
 static Timer g_Timer;
 
-static void ParserClassInfo(const std::string &line, AiluHeadTool::ClassInfo &info, AiluHeadTool &aht)
+static void ParserClassOrStructInfo(const std::string& line,AiluHeadTool::ClassInfo& info,AiluHeadTool& aht)
 {
-    std::regex pattern(R"(class\s+((\w*_API)\s+)?(\w+)(?:\s*:\s*public\s+(\w+))?)");
+    // 支持：
+    // class / struct
+    // 可选导出宏
+    // 可选 public 继承
+    // 命名空间父类（A::B::C）
+    std::regex pattern(
+        R"((class|struct)\s+((\w*_API)\s+)?(\w+)(?:\s*:\s*public\s+([\w:]+))?)"
+    );
+
     std::smatch matches;
-    if (std::regex_search(line, matches, pattern))
+    if (!std::regex_search(line, matches, pattern))
     {
-        if (matches[2].matched)
-        {
-            info._export_id = matches[2].str();// 导出符号（如 EXPORT_API）
-        }
-        else
-        {
-            info._export_id = "";// 如果没有导出符号，设置为空字符串
-        }
-        info._name = matches[3].str();// 类名
-        if (matches[4].matched)
-        {
-            info._parent = matches[4].str();// 父类名
-        }
-        else
-        {
-            info._parent = "";// 如果没有父类，设置为空字符串
-        }
-        info.is_export = !info._export_id.empty();
-        info._is_struct = false;
+        aht.Log(std::format("ParserClassInfo failed with line: {}", line));
+        return;
     }
-    else { aht.Log(std::format("ParserClassInfo failed with line: {}", line)); }
+
+    // class / struct
+    info._is_struct = (matches[1] == "struct");
+
+    // export macro
+    if (matches[3].matched)
+        info._export_id = matches[3].str();
+    else
+        info._export_id.clear();
+
+    // class / struct name
+    info._name = matches[4].str();
+
+    // parent class
+    if (matches[5].matched)
+        info._parent = matches[5].str();
+    else
+        info._parent.clear();
+
+    info.is_export = !info._export_id.empty();
 }
 
-static void ParserStructInfo(const std::string &line, AiluHeadTool::ClassInfo &info, AiluHeadTool &aht)
-{
-    std::regex pattern(R"(struct\s+((\w*_API)\s+)?(\w+)(?:\s*:\s*public\s+(\w+))?)");
-    std::smatch matches;
-    if (std::regex_search(line, matches, pattern))
-    {
-        if (matches[2].matched)
-        {
-            info._export_id = matches[2].str();// 导出符号（如 EXPORT_API）
-        }
-        else
-        {
-            info._export_id = "";// 如果没有导出符号，设置为空字符串
-        }
-        info._name = matches[3].str();// 类名
-        if (matches[4].matched)
-        {
-            info._parent = matches[4].str();// 父类名
-        }
-        else
-        {
-            info._parent = "";// 如果没有父类，设置为空字符串
-        }
-        info.is_export = !info._export_id.empty();
-        info._is_struct = true;
-    }
-    else { aht.Log(std::format("ParserClassInfo failed with line: {}", line)); }
-}
 
 static void ParserEnumClass(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
 {
@@ -502,7 +484,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         if (line.find("class") != std::string::npos)
                         {
                             ClassInfo class_info;
-                            ParserClassInfo(line, class_info, *this);
+                            ParserClassOrStructInfo(line, class_info, *this);
                             class_info._namespace = cur_namespace;
                             has_class_marked = false;
                             is_process_class = true;
@@ -516,7 +498,7 @@ void AiluHeadTool::Parser(const Path &path, const Path &out_dir, std::string wor
                         if (line.find("struct") != std::string::npos)
                         {
                             ClassInfo struct_info;
-                            ParserStructInfo(line, struct_info, *this);
+                            ParserClassOrStructInfo(line, struct_info, *this);
                             struct_info._namespace = cur_namespace;
                             has_struct_marked = false;
                             is_process_class = false;

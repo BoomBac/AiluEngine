@@ -10,12 +10,13 @@
 namespace Ailu
 {
     class Type;
+    class PropertyInfo;
     ACLASS()
     class AILU_API Object
     {
         GENERATED_BODY();
         friend class ResourceMgr;
-
+        friend class PropertyInfo;
     public:
         Object();
         explicit Object(const String &name);
@@ -28,6 +29,8 @@ namespace Ailu
         [[nodiscard]] const u32 &ID() const { return _id; }
         [[nodiscard]] const u64 HashCode() const { return _hash; };
 
+    protected:
+        virtual void OnPropertyChanged(const PropertyInfo& prop);
     protected:
         APROPERTY()
         String _name;

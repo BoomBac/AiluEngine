@@ -1,0 +1,5 @@
+guid: 4eac1bdc-8122-4414-809e-80d7fd4b8fbf
+type: kComputeShader
+name: volumetric_light
+  file: Shaders/hlsl/Compute/volumetric_light.hlsl
+  kernel: Noname

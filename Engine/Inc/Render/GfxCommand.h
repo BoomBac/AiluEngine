@@ -96,6 +96,11 @@ namespace Ailu::Render
     struct CommandDraw : public GfxCommand
     {
         CMD_CLASS_TYPE(kDraw);
+        struct
+        {
+            u8* _data;
+            u32 _size;
+        } _material_property_block;
         VertexBuffer *_vb;
         IndexBuffer *_ib;
         Material *_mat;
@@ -107,6 +112,7 @@ namespace Ailu::Render
         u32 _index_num;
         GPUBuffer* _arg_buffer;
         u32 _arg_offset;
+
         void Reset() final 
         {
             SafeResetCommand(this);

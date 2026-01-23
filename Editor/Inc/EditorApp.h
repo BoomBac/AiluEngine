@@ -61,20 +61,25 @@ namespace Ailu
 
         class InputLayer;
         class SceneLayer;
+        class FirstPersonCameraController;
         class EditorApp : public Ailu::Application
         {
-            DECLARE_DELEGATE(on_file_changed,const fs::path &);
+            DECLARE_DELEGATE(on_file_changed, const fs::path &);
+
         public:
             static EditorApp *GetEditor() { return static_cast<EditorApp *>(&Application::Get()); }
             //return  AiluEngine/Editor/EditorConfig.json
             static const WString &GetEditorConfigPath() { return s_editor_config_path; }
             //return  AiluEngine/Editor/
             static const WString &GetEditorRootPath() { return s_editor_root_path; }
+
         public:
+            EditorApp();
+            ~EditorApp();
             int Initialize() final;
             void Finalize() final;
             void Tick(f32 delta_time) final;
-
+            FirstPersonCameraController &GetSceneCameraController() { return *_camera_controller; }
         private:
             bool OnGetFocus(WindowFocusEvent &e) final;
             bool OnLostFocus(WindowLostFocusEvent &e) final;
@@ -82,6 +87,7 @@ namespace Ailu
             void SaveEditorConfig();
             void LoadEditorResource();
             void WatchDirectory();
+
         private:
             inline static WString s_editor_config_path;
             inline static WString s_editor_root_path;
@@ -92,8 +98,8 @@ namespace Ailu
             Camera *_p_scene_camera;
             WString _opened_scene_path;
             EditorConfig _editor_config;
-        };
+            Scope<FirstPersonCameraController> _camera_controller;
+        };// namespace Editor
     }// namespace Editor
 }// namespace Ailu
-
 #endif// !EDITOR_APP__

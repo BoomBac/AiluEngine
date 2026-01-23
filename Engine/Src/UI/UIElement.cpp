@@ -43,6 +43,7 @@ namespace Ailu
         UIElement::~UIElement()
         {
             UIManager::Get()->OnElementDestroying(this);
+            _property_observers.clear();
             _children.clear();
         }
         UIElement *UIElement::AddChild(Ref<UIElement> child)

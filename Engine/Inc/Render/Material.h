@@ -24,6 +24,16 @@ namespace Ailu::Render
         };
 
     public:
+        struct PropertyBlock
+        {
+            u8* _data = nullptr;
+            u32 _size = 0u;
+            ~PropertyBlock()
+            {
+                if (_data)
+                    delete[] _data;
+            }
+        };
         inline static std::weak_ptr<Material> s_standard_defered_lit;
         inline static std::weak_ptr<Material> s_standard_forward_lit;
         inline static std::weak_ptr<Material> s_checker;
@@ -70,8 +80,13 @@ namespace Ailu::Render
         ShaderPropertyInfo *GetShaderProperty(const String &name);
         //根据材质存储的关键字和传入shader的关键字，为每个Pass构建合法的关键字序列
         void ConstructKeywords(Shader *shader);
-        /// 构造 drawcmd时调用，将当前状态推入队列
-        void PushState(u16 pass_index = 0u);
+        /// 构造 drawcmd时调用，将当前状态推入队列,返回材质cbuf的绑定槽
+        i16 PushState(u16 pass_index = 0u);
+        PropertyBlock* GetPropertyBlock(u16 block_index)
+        {
+            AL_ASSERT(block_index < _property_blocks.size());
+            return &_property_blocks[block_index];
+        }
     protected:
         virtual void Construct(bool first_time);
 
@@ -105,7 +120,7 @@ namespace Ailu::Render
         std::set<String> _all_keywords;
         Map<String, ShaderPropertyInfo> _properties;
         Vector<ShaderPropertyInfo *> _prop_views;
-        Vector<Scope<ConstantBuffer>> _p_cbufs;
+        Vector<PropertyBlock> _property_blocks;
         Map<String,Texture *> _bind_textures{};
         //非shader使用的变量
         Map<String, u32> _common_uint_property;

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __OBJECT_GEN_H__
 //Class Object begin...........................
-#define OBJECT_GEN_H_16_GENERATED_BODY \
+#define OBJECT_GEN_H_17_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_Object_Type();\
                                 static Type* GetPrivateStaticClass();\

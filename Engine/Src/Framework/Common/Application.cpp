@@ -500,7 +500,7 @@ namespace Ailu
                 }
 #endif// DEAR_IMGUI
                 g_pGfxContext->Present();
-                Render::RenderPipeline::Get().FrameCleanUp();
+                Render::RenderPipeline::Get().FrameCleanup();
                 _render_lag -= s_target_lag;
             }
             //锁帧处理

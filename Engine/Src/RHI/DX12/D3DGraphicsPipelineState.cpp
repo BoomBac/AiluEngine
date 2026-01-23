@@ -181,6 +181,16 @@ namespace Ailu::RHI::DX12
                 res._p_resource->Bind(cmd, params);
             }
             break;
+            case EBindResDescType::kTexture3D:
+            {
+                BindParams params;
+                params._is_compute_pipeline = false;
+                params._slot = res._slot;
+                params._params._texture_binder._sub_res = res._addi_info._sub_res;
+                params._params._texture_binder._view_idx = res._addi_info._view_index;
+                res._p_resource->Bind(cmd, params);
+            }
+            break;
             case EBindResDescType::kSampler:
                 break;
             case EBindResDescType::kCBufferAttribute:

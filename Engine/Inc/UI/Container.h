@@ -188,6 +188,9 @@ namespace Ailu
             inline static const f32 kSplitBarThickness = 2.0f;
             SplitView();
             void Update(f32 dt) override;
+        public:
+            APROPERTY()
+            bool _is_horizontal = true;
         private:
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
@@ -195,8 +198,6 @@ namespace Ailu
         private:
             APROPERTY()
             f32 _ratio = 0.5f;
-            APROPERTY()
-            bool _is_horizontal = true;
             bool _is_dragging_bar = false;
             bool _is_hover_bar = false;
         };

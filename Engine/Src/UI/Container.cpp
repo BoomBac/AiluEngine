@@ -884,7 +884,10 @@ namespace Ailu
         void SplitView::MeasureAndArrange(f32 dt)
         {
             if (_children.size() != 2)
+            {
+                LOG_WARNING("SplitView: splitview({}) must have exactly two children!", _name);
                 return;
+            }
             if (_is_horizontal)
             {
                 _children[0]->Arrange(0.0f, 0.0f, _content_rect.z * _ratio, _content_rect.w);

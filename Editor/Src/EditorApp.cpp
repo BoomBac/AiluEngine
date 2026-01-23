@@ -16,6 +16,7 @@
 #include "UI/Widget.h"
 #include "UI/Container.h"
 #include "Common/EditorStyle.h"
+#include "Common/CameraControllers.h"
 
 using namespace Ailu;
 
@@ -45,6 +46,16 @@ namespace Ailu
         CommandManager *g_pCommandMgr = new CommandManager;
 
         EditorStyle g_editor_style = {};
+
+        EditorApp::EditorApp()
+        {
+
+        }
+
+        EditorApp::~EditorApp()
+        {
+
+        }
         int EditorApp::Initialize()
         {
             LogMgr::Init();
@@ -69,6 +80,7 @@ namespace Ailu
             desc._window_height = 900;
             desc._gameview_width = 1600;
             desc._gameview_height = 900;
+            _camera_controller = MakeScope<FirstPersonCameraController>();
             LoadEditorConfig(desc);
             auto ret = Application::Initialize(desc);
             _p_input_layer = new InputLayer();
@@ -222,8 +234,8 @@ namespace Ailu
             _p_scene_camera->Near(_editor_config._near);
             _p_scene_camera->Far(_editor_config._far);
             Camera::sCurrent = _p_scene_camera;
-            FirstPersonCameraController::s_inst._rotation = _editor_config._controller_rot;
-            FirstPersonCameraController::s_inst._base_camera_move_speed = _editor_config._move_speed;
+            _camera_controller->_rotation = _editor_config._controller_rot;
+            _camera_controller->_base_camera_move_speed = _editor_config._move_speed;
             _p_scene_camera->RecalculateMatrix(true);
             _opened_scene_path = ToWChar(_editor_config._scene_path);
             desc._window_width = _editor_config._window_size.x;
@@ -242,15 +254,15 @@ namespace Ailu
             _editor_config._aspect = Camera::sCurrent->Aspect();
             _editor_config._near = Camera::sCurrent->Near();
             _editor_config._far = Camera::sCurrent->Far();
-            _editor_config._move_speed = FirstPersonCameraController::s_inst._base_camera_move_speed;
-            _editor_config._controller_rot = FirstPersonCameraController::s_inst._rotation;
+            _editor_config._move_speed =     _camera_controller->_base_camera_move_speed;
+            _editor_config._controller_rot = _camera_controller->_rotation;
             _editor_config._scene_path = ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->ActiveScene()));
 
             JsonArchive ar;
             Type *type = EditorConfig::StaticType();
             for (auto &it: type->GetProperties())
                 it.Serialize(&_editor_config, ar);
-            ar.Load(s_editor_config_path);
+            ar.Save(s_editor_config_path);
 
             //INIParser ini_parser;
             //

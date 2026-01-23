@@ -275,6 +275,9 @@ namespace Ailu::Render
             Shader::SetGlobalTexture(RenderResourceName::kMainLightShadowMap, _p_mainlight_shadow_map.get());
             Shader::SetGlobalTexture(RenderResourceName::kAddLightShadowMap, _p_addlight_shadow_maps.get());
             Shader::SetGlobalTexture(RenderResourceName::kPointLightShadowMap, _p_point_light_shadow_maps.get());
+            ComputeShader::SetGlobalTexture(RenderResourceName::kMainLightShadowMap, _p_mainlight_shadow_map.get());
+            ComputeShader::SetGlobalTexture(RenderResourceName::kAddLightShadowMap, _p_addlight_shadow_maps.get());
+            ComputeShader::SetGlobalTexture(RenderResourceName::kPointLightShadowMap, _p_point_light_shadow_maps.get());
         });
     }
 

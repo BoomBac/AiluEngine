@@ -734,6 +734,8 @@ namespace Ailu::Render
         s_render_texture_gpu_mem_usage += _mem_size;
         g_pRenderTexturePool->Register(this);
         _res_type = EGpuResType::kRenderTexture;
+        _clear_color = desc._clear_color;
+        _clear_depth = desc._clear_depth;
     }
 
     void RenderTexture::CreateView()

@@ -95,13 +95,15 @@ namespace Ailu
         class AILU_API CheckBox : public UIElement
         {
             GENERATED_BODY()
+            DECLARE_DELEGATE(on_click, bool);
         public:
             CheckBox();
             Vector2f MeasureDesiredSize() override;
-
+            void SetChecked(bool is_checked);
+            bool IsChecked() const { return _is_checked; }
         private:
             void RenderImpl(UIRenderer &r) override;
-        public:
+        private:
             APROPERTY()
             bool _is_checked = false;
         };

@@ -36,7 +36,7 @@
 4428ffdf-97de-4732-b74b-240a0bce3872,Icons/dark/skeleton.alasset,kTexture2D
 46601513-96ea-4cc4-86db-0400c8824ec1,Materials/MAT_Red.alasset,kMaterial
 4c66b646-9e1a-489c-8344-133b5036bf17,NewScene/Default_emissive.alasset,kTexture2D
-4eac1bdc-8122-4414-809e-80d7fd4b8fbf,NewScene/Palace/textures/sponza_column_b_baseColor.alasset,kTexture2D
+4eac1bdc-8122-4414-809e-80d7fd4b8fbf,Shaders/volumetric_light.alasset,kComputeShader
 4f376455-17b9-4a39-b9ad-c9dbac0a939f,Shaders/transform_gizmo.alasset,kShader
 4f6e2fa4-c9af-4800-9ff9-70874abfbd50,Materials/StandardPBR.alasset,kMaterial
 5259f495-57c8-4891-83eb-85366126db1d,NewScene/Palace/textures/background.alasset,kTexture2D
@@ -103,6 +103,7 @@ b7af84e2-5516-422b-a44e-29b1f5fe4ad4,NewScene/Palace/MAT_fabric_c.alasset,kMater
 ba72a052-73f7-46e9-88de-fda64250e8ea,NewScene/Palace/MAT_vase.alasset,kMaterial
 bbc9ad8e-1533-47f1-ac06-886158e971a9,WaterTest/MAT_Green.alasset,kMaterial
 bc4f3fe3-74c3-43bd-bf06-05bc9041f1a1,NewScene/Palace/textures/sponza_fabric_green_baseColor.alasset,kTexture2D
+beccf997-dcb3-4217-b213-42059ec71ce8,breakfast_room/Plane.alasset,kMesh
 c25690e1-8fed-4cae-9073-0231d02dc2be,NewScene/Palace/textures/vase_round_normal.alasset,kTexture2D
 c3315e03-1052-4825-98f7-a676beae0615,Meshs/plane.alasset,kMesh
 c3e2c66c-9957-4057-b799-4e1767bf5028,NewScene/Palace/textures/sponza_thorn.alasset,kTexture2D

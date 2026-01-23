@@ -36,6 +36,7 @@ namespace Ailu::RHI::DX12
         _cur_cbv_heap_id = -1;
         _is_cmd_closed = false;
         _allocations.clear();
+        _temp_allocs.clear();
         _upload_buf->Reset();
         _used_res.clear();
         _is_executed = false;
@@ -64,6 +65,14 @@ namespace Ailu::RHI::DX12
         auto alloc = _upload_buf->Allocate(size,256);
         alloc.SetData(data,size);
         _allocations[name] = alloc;
+    }
+
+    UploadBuffer::Allocation D3DCommandBuffer::AllocConstBuffer(const u8* data, u32 size)
+    {
+        auto alloc = _upload_buf->Allocate(size,256);
+        alloc.SetData(data,size);
+        _temp_allocs.emplace_back(alloc);
+        return _temp_allocs.back();
     }
     void D3DCommandBuffer::PostExecute()
     {

@@ -260,6 +260,7 @@ namespace Ailu
             mat_creator(L"Shaders/blit.alasset", L"Runtime/Material/Blit", "Blit");
             mat_creator(L"Shaders/gizmo.alasset", L"Runtime/Material/Gizmo", "GizmoDrawer");
             mat_creator(L"Shaders/forwardlit.alasset", L"Runtime/Material/ForwardLit", "ForwardLit");
+            mat_creator(L"Shaders/texture3d_drawer.alasset", L"Runtime/Material/Texture3dDrawer", "Texture3dDrawer");
             Material::s_standard_forward_lit = GetRef<Material>(L"Runtime/Material/ForwardLit");
             Material::s_standard_forward_lit.lock()->SetVector("_AlbedoValue",Colors::kWhite);
         }

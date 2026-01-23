@@ -28,6 +28,55 @@ TEXTURE2D(_GBuffer2)
 TEXTURE2D(_GBuffer3)
 TEXTURE2D(_CameraDepthTexture)
 
+TEXTURE3D(_VolumetricLightTexture)
+
+float3 GetViewRay(float2 uv)
+{
+    float2 ndc = uv * 2.0 - 1.0;
+    float3 ray;
+    ray.x = ndc.x / _MatrixP._11;
+    ray.y = ndc.y / _MatrixP._22;
+    ray.z = 1.0;
+    return normalize(ray);
+}
+
+float3 RaymarchVolumetric(float2 uv)
+{
+    float3 rayDir = GetViewRay(uv);
+
+    float maxZ = 1.0;
+
+    const int STEP_COUNT = 16;
+    float stepSize = maxZ / STEP_COUNT;
+
+    float3 result = 0;
+    float t = 0;
+
+    for (int i = 0; i < STEP_COUNT; ++i)
+    {
+        t += stepSize;
+
+        float3 viewPos = rayDir * t;
+
+        // —— 关键：View → Fog Grid UVW ——
+        float3 fogUVW;
+        fogUVW.xy = uv;
+        fogUVW.z = t;
+
+        float3 fog = _VolumetricLightTexture.SampleLevel(
+            g_LinearClampSampler,
+            fogUVW,
+            0
+        ).rgb;
+
+        result += fog * stepSize;
+    }
+
+    return result;
+}
+
+
+
 FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
 
 float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
@@ -60,6 +109,7 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 #else
 	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz,input.uv));
 	light += surface_data.emssive;
+	light += 0.00001*RaymarchVolumetric(input.uv);
 	return float4(light, 1.0); 
 #endif 
 }

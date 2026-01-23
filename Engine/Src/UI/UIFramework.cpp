@@ -184,7 +184,7 @@ namespace Ailu::UI
         }
         else
         {
-            index = _interaction_zones.size();
+            index = (u32)_interaction_zones.size();
             _interaction_zones.push_back({rect, 0});
         }
 

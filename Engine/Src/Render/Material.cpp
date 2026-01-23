@@ -25,11 +25,13 @@ namespace Ailu::Render
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
         _p_shader = other._p_shader;
         _p_active_shader = other._p_active_shader;
-        for (auto &cbuf: other._p_cbufs)
+        for (auto &cbuf: other._property_blocks)
         {
-            u32 buffer_size = (u32)cbuf->GetSize();
-            _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
-            memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
+            u32 buffer_size = cbuf._size;
+            _property_blocks.emplace_back(PropertyBlock());
+            _property_blocks.back()._data = new u8[buffer_size];
+            _property_blocks.back()._size = buffer_size;
+            memcpy(_property_blocks.back()._data, cbuf._data, buffer_size);
         }
         _bind_textures = other._bind_textures;
         return *this;
@@ -43,8 +45,8 @@ namespace Ailu::Render
         _p_active_shader = other._p_active_shader;
         _standard_pass_index = other._standard_pass_index;
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
-        _p_cbufs = std::move(other._p_cbufs);
-        other._p_cbufs.clear();
+        _property_blocks = std::move(other._property_blocks);
+        other._property_blocks.clear();
         _bind_textures = std::move(other._bind_textures);
         other._bind_textures.clear();
         return *this;
@@ -57,11 +59,13 @@ namespace Ailu::Render
         _p_active_shader = other._p_active_shader;
         _standard_pass_index = other._standard_pass_index;
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
-        for (auto &cbuf: other._p_cbufs)
+        for (auto &cbuf: other._property_blocks)
         {
-            u32 buffer_size = (u32)cbuf->GetSize();
-            _p_cbufs.emplace_back(ConstantBuffer::Create(buffer_size));
-            memcpy(_p_cbufs.back()->GetData(), cbuf->GetData(), buffer_size);
+            u32 buffer_size = cbuf._size;
+            _property_blocks.emplace_back(PropertyBlock());
+            _property_blocks.back()._data = new u8[buffer_size];
+            _property_blocks.back()._size = buffer_size;
+            memcpy(_property_blocks.back()._data, cbuf._data, buffer_size);
         }
         _bind_textures = other._bind_textures;
     }
@@ -71,8 +75,8 @@ namespace Ailu::Render
         _p_active_shader = other._p_active_shader;
         _standard_pass_index = other._standard_pass_index;
         _mat_cbuf_per_pass_size = other._mat_cbuf_per_pass_size;
-        _p_cbufs = std::move(other._p_cbufs);
-        other._p_cbufs.clear();
+        _property_blocks = std::move(other._property_blocks);
+        other._property_blocks.clear();
         _bind_textures = std::move(other._bind_textures);
         other._bind_textures.clear();
     }
@@ -93,17 +97,25 @@ namespace Ailu::Render
                 return;
             _p_active_shader->SetCullMode((ECullMode) _common_uint_property[kCullModeKey]);
             _p_active_shader->Bind(pass_index, cur_state._variant_hash);
-            if (cur_state._cbuf_bind_slot != -1)
-            {
-                GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(_p_cbufs[pass_index].get(), EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerMaterial, PipelineResource::kPriorityLocal));
-            }
+            // if (cur_state._cbuf_bind_slot != -1)
+            // {
+            //     GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(&_property_blocks[pass_index], EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerMaterial, PipelineResource::kPriorityLocal));
+            // }
             for (u16 i = 0; i <= cur_state._max_bind_slot; i++)
             {
                 if (GpuResource* res = cur_state._bind_res[i];res != nullptr)
                 {
                     if (res->GetResourceType() == EGpuResType::kTexture || res->GetResourceType() == EGpuResType::kRenderTexture)
                     {
-                        GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(res, EBindResDescType::kTexture2D, i, cur_state._bind_res_priority[i]));
+                        bool is_3d_texture = static_cast<Texture*>(res)->Dimension() == ETextureDimension::kTex3D;
+                        if (is_3d_texture)
+                        {
+                            GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(res, EBindResDescType::kTexture3D, i, cur_state._bind_res_priority[i]));
+                        }
+                        else
+                        {
+                            GraphicsPipelineStateMgr::SubmitBindResource(PipelineResource(res, EBindResDescType::kTexture2D, i, cur_state._bind_res_priority[i]));
+                        }
                     }
                     else if (res->GetResourceType() == EGpuResType::kConstBuffer)
                     {
@@ -146,7 +158,7 @@ namespace Ailu::Render
             auto it = res_info.find(name);
             if (it != res_info.end())
             {
-                memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &f, sizeof(f));
+                memcpy(_property_blocks[pass._index]._data + ShaderBindResourceInfo::GetVariableOffset(it->second), &f, sizeof(f));
                 //LOG_WARNING("float value{}", *reinterpret_cast<float*>(_p_cbuf->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second)));
             }
             else
@@ -167,12 +179,12 @@ namespace Ailu::Render
             {
                 if (it->second._res_type & EBindResDescType::kCBufferInt)
                 {
-                    memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(value));
+                    memcpy(_property_blocks[pass._index]._data + ShaderBindResourceInfo::GetVariableOffset(it->second), &value, sizeof(value)); 
                 }
                 else
                 {
                     u32 tmp = static_cast<u32>(value);
-                    memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &tmp, sizeof(tmp));
+                    memcpy(_property_blocks[pass._index]._data + ShaderBindResourceInfo::GetVariableOffset(it->second), &tmp, sizeof(tmp));
                 }
             }
             else
@@ -195,7 +207,7 @@ namespace Ailu::Render
             {
                 u16 offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
                 u16 size = ShaderBindResourceInfo::GetVariableSize(it->second);
-                memcpy(_p_cbufs[pass._index]->GetData() + offset, &vector, size);
+                memcpy(_property_blocks[pass._index]._data + offset, &vector, size);
             }
             else
             {
@@ -218,10 +230,10 @@ namespace Ailu::Render
                 if (it->second._res_type & EBindResDescType::kCBufferUInts)
                 {
                     Vector4UInt vector_uint = {(u32) vector.x, (u32) vector.y, (u32) vector.z, (u32) vector.w};
-                    memcpy(_p_cbufs[pass._index]->GetData() + offset, &vector_uint, size);
+                    memcpy(_property_blocks[pass._index]._data + offset, &vector_uint, size);
                 }
                 else
-                    memcpy(_p_cbufs[pass._index]->GetData() + offset, &vector, size);
+                    memcpy(_property_blocks[pass._index]._data + offset, &vector, size);
             }
             else
             {
@@ -241,7 +253,7 @@ namespace Ailu::Render
             auto it = res_info.find(name);
             if (it != res_info.end())
             {
-                memcpy(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second), &matrix, sizeof(matrix));
+                memcpy(_property_blocks[pass._index]._data + ShaderBindResourceInfo::GetVariableOffset(it->second), &matrix, sizeof(matrix));
             }
             else
             {
@@ -258,7 +270,7 @@ namespace Ailu::Render
             auto &res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
             auto it = res_info.find(name);
             if (it != res_info.end())
-                return *reinterpret_cast<float *>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
+                return *reinterpret_cast<float *>(_property_blocks[pass._index]._data + ShaderBindResourceInfo::GetVariableOffset(it->second));
             ++pass_index;
         }
         return 0.0f;
@@ -293,7 +305,7 @@ namespace Ailu::Render
             if (it != res_info.end())
             {
                 auto offset = ShaderBindResourceInfo::GetVariableOffset(it->second);
-                u32 value = *reinterpret_cast<u32 *>(_p_cbufs[pass._index]->GetData() + offset);
+                u32 value = *reinterpret_cast<u32 *>(_property_blocks[pass._index]._data + offset);
                 //LOG_WARNING("get uint {} value {} at address {}", name, value, (u64) (_p_cbufs[pass._index]->GetData() + offset));
                 return value;
             }
@@ -314,7 +326,7 @@ namespace Ailu::Render
             auto &res_info = pass._variants[_pass_variants[pass_index]._variant_hash]._bind_res_infos;
             auto it = res_info.find(name);
             if (it != res_info.end())
-                return *reinterpret_cast<Vector4f *>(_p_cbufs[pass._index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(it->second));
+                return *reinterpret_cast<Vector4f *>(_property_blocks[pass._index]._data + ShaderBindResourceInfo::GetVariableOffset(it->second));
             ++pass_index;
         }
         return Vector4f::kZero;
@@ -420,7 +432,7 @@ namespace Ailu::Render
                 if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferFloat && ShaderBindResourceInfo::GetVariableSize(bind_info) == 4 && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
                     if (!value_map.contains((name)))
-                        value_map[name] = *reinterpret_cast<f32 *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                        value_map[name] = *reinterpret_cast<f32 *>(_property_blocks[pass_index]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info));
                 }
             }
             ++pass_index;
@@ -447,12 +459,12 @@ namespace Ailu::Render
                     Vector4f buf{};
                     if (three_dim)
                     {
-                        auto value = *reinterpret_cast<Vector3f *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                        auto value = *reinterpret_cast<Vector3f *>(_property_blocks[pass_index]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info));
                         buf = Vector4f(value.x, value.y, value.z, 1.0f);
                     }
                     else
                     {
-                        buf = *reinterpret_cast<Vector4f *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                        buf = *reinterpret_cast<Vector4f *>(_property_blocks[pass_index]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info));
                     }
                     if (!value_map.contains((name)))
                         value_map[name] = buf;
@@ -483,7 +495,7 @@ namespace Ailu::Render
                         Vector4Int v;
                         if (bind_info._res_type & EBindResDescType::kCBufferUInts)
                         {
-                            auto value = *reinterpret_cast<Vector4UInt *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                            auto value = *reinterpret_cast<Vector4UInt *>(_property_blocks[pass_index]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info));
                             v.x = (i32) value.x;
                             v.y = (i32) value.y;
                             v.z = (i32) value.z;
@@ -492,7 +504,7 @@ namespace Ailu::Render
                         }
                         else if (bind_info._res_type & EBindResDescType::kCBufferInts)
                         {
-                            v = *reinterpret_cast<Vector4Int *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                            v = *reinterpret_cast<Vector4Int *>(_property_blocks[pass_index]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info));
                             value_map[name] = v;
                         }
                     }
@@ -519,7 +531,7 @@ namespace Ailu::Render
                 if (!ShaderBindResourceInfo::s_reversed_res_name.contains(name) && bind_info._res_type & EBindResDescType::kCBufferUInt && bind_info._bind_flag == ShaderBindResourceInfo::kBindFlagPerMaterial)
                 {
                     if (!value_map.contains((name)))
-                        value_map[name] = *reinterpret_cast<u32 *>(_p_cbufs[pass_index]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info));
+                        value_map[name] = *reinterpret_cast<u32 *>(_property_blocks[pass_index]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info));
                 }
             }
             ++pass_index;
@@ -554,12 +566,11 @@ namespace Ailu::Render
         else
         {
             _mat_cbuf_per_pass_size.resize(pass_count);
-            _p_cbufs.resize(pass_count);
         }
         _prop_views.clear();
         _properties.clear();
         _mat_cbuf_per_pass_size.resize(pass_count);
-        _p_cbufs.resize(pass_count);
+        _property_blocks.resize(pass_count);
         Vector<Map<String, std::tuple<u8, Texture *>>> _tmp_textures_all_passes(pass_count);
         for (int i = 0; i < pass_count; i++)
         {
@@ -585,8 +596,11 @@ namespace Ailu::Render
             if (first_time)
             {
                 _mat_cbuf_per_pass_size[i] = cbuf_size_per_passes[i];
-                _p_cbufs[i].reset(ConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
-                memset(_p_cbufs[i]->GetData(), 0, _mat_cbuf_per_pass_size[i]);
+                //_p_cbufs[i].reset(ConstantBuffer::Create(_mat_cbuf_per_pass_size[i]));
+                //memset(_p_cbufs[i]->GetData(), 0, _mat_cbuf_per_pass_size[i]);
+                _property_blocks[i]._size = _mat_cbuf_per_pass_size[i];
+                _property_blocks[i]._data = new u8[_mat_cbuf_per_pass_size[i]];
+                memset(_property_blocks[i]._data, 0, _mat_cbuf_per_pass_size[i]);
             }
             else if (_mat_cbuf_per_pass_size[i] != cbuf_size_per_passes[i])
             {
@@ -619,7 +633,7 @@ namespace Ailu::Render
                     if (auto it = bind_info.find(prop_info._value_name); it != bind_info.end())
                     {
                         cur_prop = prop_info;
-                        cur_prop._value_ptr = (void *) (_p_cbufs[i]->GetData() + ShaderBindResourceInfo::GetVariableOffset(bind_info.find(prop_info._value_name)->second));
+                        cur_prop._value_ptr = (void *) (_property_blocks[i]._data + ShaderBindResourceInfo::GetVariableOffset(bind_info.find(prop_info._value_name)->second));
                     }
                     else
                     {
@@ -695,7 +709,7 @@ namespace Ailu::Render
         return nullptr;
     }
 
-    void Material::PushState(u16 pass_index)
+    i16 Material::PushState(u16 pass_index)
     {
         BindState cur_state;
         cur_state._pass_index = pass_index;
@@ -733,7 +747,8 @@ namespace Ailu::Render
             const auto& bind_it = bind_infos.find(it.first);
             if (bind_it != bind_infos.end())
             {
-                if (bind_it->second._res_type == EBindResDescType::kCubeMap || bind_it->second._res_type == EBindResDescType::kTexture2DArray || bind_it->second._res_type == EBindResDescType::kTexture2D)
+                if (bind_it->second._res_type == EBindResDescType::kCubeMap || bind_it->second._res_type == EBindResDescType::kTexture2DArray 
+                    || bind_it->second._res_type == EBindResDescType::kTexture2D || bind_it->second._res_type == EBindResDescType::kTexture3D)
                 {
                     AL_ASSERT(bind_it->second._bind_slot < 32);
                     if (cur_state._bind_res_priority[bind_it->second._bind_slot] <= PipelineResource::kPriorityGlobal)
@@ -762,6 +777,7 @@ namespace Ailu::Render
         cur_state._cbuf_bind_slot = _p_active_shader->_passes[pass_index]._variants[cur_state._variant_hash]._per_mat_buf_bind_slot;
         std::unique_lock lock(_state_mutex);
         _states.push(cur_state);
+        return cur_state._cbuf_bind_slot;
     }
 
     //-------------------------------------------StandardMaterial--------------------------------------------------------
@@ -801,7 +817,7 @@ namespace Ailu::Render
     void StandardMaterial::MarkTextureUsed(std::initializer_list<ETextureUsage> use_infos, bool b_use)
     {
         //40 根据shader中MaterialBuf计算，可能会有变动
-        u32 *sampler_mask = reinterpret_cast<u32 *>(_p_cbufs[_standard_pass_index]->GetData() + _sampler_mask_offset);
+        u32 *sampler_mask = reinterpret_cast<u32 *>(_property_blocks[_standard_pass_index]._data + _sampler_mask_offset);
         //*sampler_mask = 0;
         for (auto &usage: use_infos)
         {
@@ -811,7 +827,7 @@ namespace Ailu::Render
 
     bool StandardMaterial::IsTextureUsed(ETextureUsage use_info)
     {
-        u32 sampler_mask = *reinterpret_cast<u32 *>(_p_cbufs[_standard_pass_index]->GetData() + _sampler_mask_offset);
+        u32 sampler_mask = *reinterpret_cast<u32 *>(_property_blocks[_standard_pass_index]._data + _sampler_mask_offset);
         switch (use_info)
         {
             case ETextureUsage::kAlbedo:
@@ -837,11 +853,11 @@ namespace Ailu::Render
             if (_material_id == EMaterialID::kChecker)
             {
                 u32 id = (u32) _material_id;
-                memcpy(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, &id, sizeof(u32));
+                memcpy(_property_blocks[_standard_pass_index]._data + _material_id_offset, &id, sizeof(u32));
             }
-            //memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, 2.0f, sizeof(u32));
+            //memset(_property_blocks[_standard_pass_index]._data + _material_id_offset, 2.0f, sizeof(u32));
             else
-                memset(_p_cbufs[_standard_pass_index]->GetData() + _material_id_offset, 0, sizeof(u32));
+                memset(_property_blocks[_standard_pass_index]._data + _material_id_offset, 0, sizeof(u32));
         }
     }
     void StandardMaterial::MaterialID(const EMaterialID::EMaterialID &value)

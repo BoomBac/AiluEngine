@@ -407,78 +407,100 @@ bool TraverseTLAS(float3 ray_origin, float3 ray_dir,out int hit_instance)
 //对象空间bvh查找
 bool TraverseBLAS(float3 ray_origin,float3 ray_dir,int start,int count,bool is_debug,out int hit_node)
 {
-    int n = max(_blas_count,900);
-    [loop]
-    for(int i = 0; i < n; ++i)
+    hit_node = -1;
+
+    float3 inv_dir = 1.0 / ray_dir;
+    int3 sign = int3(ray_dir.x < 0, ray_dir.y < 0, ray_dir.z < 0);
+
+    float hit_t = 1e20;
+
+    uint stack[MAX_STACK];
+    int stack_ptr = 0;
+
+    stack[stack_ptr++] = start;
+
+    while (stack_ptr > 0)
     {
-        LBVHNode leaf_node = g_blas_buffer[i];
-        if (leaf_node._neg_right_or_tri_count <= 0)
-            continue; //
-        int tri_start = leaf_node._left_or_tri_offset_or_inst_idx;
-        int tri_count = leaf_node._neg_right_or_tri_count;
-        [loop]
-        for(int tri_idx = tri_start; tri_idx < tri_start + tri_count; ++tri_idx)
+        uint node_idx = stack[--stack_ptr];
+        if (node_idx >= start + count)
+            continue;
+
+        LBVHNode node = g_blas_buffer[node_idx];
+
+        float tmin, tmax;
+        if (!AABBHitFast(node._min, node._max,
+                          ray_origin, inv_dir, sign,
+                          tmin, tmax))
+            continue;
+
+        // 当前节点已经比已有命中更远，直接剪枝
+        if (tmin >= hit_t)
+            continue;
+
+        bool is_leaf = node._neg_right_or_tri_count > 0;
+
+        if (is_leaf)
         {
-            TriangleData tri = g_scene[tri_idx];
-            float local_t, u, v;
-            if (TriangleHitFast(ray_origin, ray_dir, tri, local_t, u, v,CULL_NONE))
+            // 真实几何体测试（或直接认为 leaf 命中）
+            hit_t = tmin;
+            hit_node = node_idx;
+            continue;
+        }
+
+        // --- 内部节点：对子节点按距离排序 ---
+        uint left  = uint(node._left_or_tri_offset_or_inst_idx) + start;
+        uint right = uint(-node._neg_right_or_tri_count) + start;
+
+        float tminL, tmaxL;
+        float tminR, tmaxR;
+
+        bool hitL = AABBHitFast(
+            g_blas_buffer[left]._min,
+            g_blas_buffer[left]._max,
+            ray_origin, inv_dir, sign,
+            tminL, tmaxL);
+
+        bool hitR = AABBHitFast(
+            g_blas_buffer[right]._min,
+            g_blas_buffer[right]._max,
+            ray_origin, inv_dir, sign,
+            tminR, tmaxR);
+
+        if (hitL && hitR)
+        {
+            float dt = abs(tminL - tminR);
+
+            if (dt < 1e-5)
             {
-                hit_node = i;
-                return true;
+                // 共面 / 重叠，不能赌顺序
+                stack[stack_ptr++] = left;
+                stack[stack_ptr++] = right;
+            }
+            else if (tminL < tminR)
+            {
+                stack[stack_ptr++] = right;
+                stack[stack_ptr++] = left;
+            }
+            else
+            {
+                stack[stack_ptr++] = left;
+                stack[stack_ptr++] = right;
             }
         }
+
+        else if (hitL)
+        {
+            stack[stack_ptr++] = left;
+        }
+        else if (hitR)
+        {
+            stack[stack_ptr++] = right;
+        }
     }
-    return false;
-    // hit_node = -1;
-    // uint stack[MAX_STACK];
-    // int stack_ptr = 0;
-    // float3 inv_dir = 1.0f / ray_dir;
-    // int3 sign = int3(ray_dir.x < 0, ray_dir.y < 0, ray_dir.z < 0);
-    // float hit_t = 1e20;
-    // // 从 start 节点开始
-    // stack[stack_ptr++] = start;
-    // int index = -1;
-    // [loop]
-    // while(stack_ptr > 0)
-    // {
-    //     // pop
-    //     uint node_idx = stack[--stack_ptr];
-    //     if (node_idx >= start + count)
-    //         return false;
-    //     LBVHNode node = g_blas_buffer[node_idx];
-    //     float tmin, tmax;
-    //     // AABB 检测
-    //     if(!AABBHitFast(node._min, node._max, ray_origin, inv_dir, sign, tmin, tmax))
-    //         continue;
-    //     // if (tmin > hit_t)
-    //     //     continue;
-    //     ++index;
-    //     hit_t = tmin;
-    //     if (is_debug)
-    //     {
-    //         DebugDrawAABB(node._min,node._max,1.0f,index,1.0.xxxx);
-    //     }
-    //     // 判断叶子
-    //     bool is_leaf = node._neg_right_or_tri_count > 0;
 
-    //     if(is_leaf)
-    //     {
-    //         hit_node = node_idx;
-    //         return true; // 找到第一个命中实例，或者累积多个
-    //     }
-    //     else
-    //     {
-    //         // 内部节点，push children
-    //         uint left_idx = uint(node._left_or_tri_offset_or_inst_idx) + start;
-    //         uint right_idx = uint(-node._neg_right_or_tri_count) + start;
-
-    //         // 注意顺序，可先 push 右再左，保证 stack 后序访问左子树 
-    //         stack[stack_ptr++] = right_idx; 
-    //         stack[stack_ptr++] = left_idx;
-    //     }
-    // }
-    // return false; // 没有命中任何实例
+    return hit_node != -1;
 }
+
 
 float3 random(uint seed)
 {
@@ -517,11 +539,11 @@ bool HitWorld(float3 ray_dir,float3 ray_origin,bool is_debug, out HitRecord rec,
         if (TraverseBLAS(obj_ro,obj_rd,inst_data._blas_node_start,inst_data._blas_node_count,is_debug,node_hit))
         {
             LBVHNode leaf_node = g_blas_buffer[node_hit];
-            //int tri_start = 0;//leaf_node._left_or_tri_offset_or_inst_idx + inst_data._global_triangle_offset;
+            //int tri_start = 0;
             //int tri_count = _tri_count;//leaf_node._neg_right_or_tri_count;
             int tri_start = leaf_node._left_or_tri_offset_or_inst_idx + inst_data._global_triangle_offset;
             int tri_count = leaf_node._neg_right_or_tri_count;
-            //debug_color = random(node_hit);
+            //debug_color = node_hit == 0? float3(1,0,0) : float3(0,0,0);
             [loop]
             for(int tri_idx = tri_start; tri_idx < tri_start + tri_count; ++tri_idx)
             {
@@ -553,7 +575,7 @@ bool HitWorld(float3 ray_dir,float3 ray_origin,bool is_debug, out HitRecord rec,
                         if (dot(n_world, ray_dir) > 0) n_world = -n_world;
                         rec.normal = n_world;
                         rec.material_type = 0;
-                        debug_color = n_world;
+                        //debug_color = n_world;
                         debug_color = n_model;//random(tri_idx);
                         rec.t = t;
                         rec.front_face = dot(ray_dir, rec.normal) < 0;

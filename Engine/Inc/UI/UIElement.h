@@ -415,6 +415,10 @@ namespace Ailu
             Math::Transform2D GetTransform() const { return _transform; }
             void SetDropHandler(DropHandler handler) { _drop_handler = std::move(handler); }
             DropHandler *GetDropHandler() { return _drop_handler ? &_drop_handler.value() : nullptr; }
+            void AddPropertyObserver(PropertyObserverHandle&& handle)
+            {
+                _property_observers.emplace_back(std::move(handle));
+            }
         public:
             APROPERTY()
             EVisibility _visibility = EVisibility::kVisible;
@@ -461,6 +465,7 @@ namespace Ailu
             */
             bool _is_layout_dirty = true, _paint_dirty = true,_is_transf_dirty;
             std::optional<DropHandler> _drop_handler;
+            Vector<PropertyObserverHandle> _property_observers;
         };
         /// <summary>
         /// 除了AnchorLayout之外，所有元素都使用左上角作为锚点

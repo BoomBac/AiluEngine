@@ -378,6 +378,14 @@ namespace Ailu
         {
             return ERenderTargetFormat::kShadowMap == format || ERenderTargetFormat::kDepth == format;
         }
+//sync with ShaderInterop.h
+#if defined(_REVERSED_Z)
+    #define kZFar  0.0f
+    #define kZNear 1.0f
+#else
+    #define kZFar  1.0f
+    #define kZNear 0.0f
+#endif
 
         struct TextureDesc
         {
@@ -414,6 +422,8 @@ namespace Ailu
             //for render buffer
             ELoadStoreAction _load;
             ELoadStoreAction _store;
+            Vector4f _clear_color = Colors::kBlack;
+            f32 _clear_depth = kZFar;
             TextureDesc() : _width(4u), _height(4u), _depth(1u), _format(EALGFormat::kALGFormatUNKOWN), _dimension(ETextureDimension::kTex2D),
                             _mip_num(1u), _array_size(0u), _flags(0u), _load(ELoadStoreAction::kClear), _store(ELoadStoreAction::kStore) {}
             TextureDesc(u16 w, u16 h, ERenderTargetFormat::ERenderTargetFormat rt_format, ETextureDimension::ETextureDimension dimension = ETextureDimension::kTex2D) 
@@ -686,6 +696,8 @@ namespace Ailu
             u16 _slice_num;
             Vector4f _texel_size;
             bool _is_swapchain = false;
+            Color _clear_color = Colors::kBlack;
+            f32 _clear_depth = kZFar;
         };
 
         class SwapchainTexture : public RenderTexture

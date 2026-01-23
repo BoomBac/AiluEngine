@@ -11,9 +11,12 @@
 #include "Common/Undo.h"
 #include "Common/TransformGizmo.h"
 #include "UI/DragDrop.h"
+#include "UI/Composite.h"
+#include <cmath>
 
 #include "Render/Gizmo.h"
 #include "Render/Material.h"
+#include "Render/Features/MiscPasses.h"
 #include "Physics/Collision.h"
 
 #include "Render/Features/RayTraceGI.h"
@@ -26,57 +29,7 @@ namespace Ailu
     Render::Renderer *s_renderer = nullptr;
     namespace Editor
     {
-#pragma region FirstPersonCameraController
-        FirstPersonCameraController FirstPersonCameraController::s_inst;
-
-        FirstPersonCameraController::FirstPersonCameraController()
-            : FirstPersonCameraController(nullptr) {}
-
-        FirstPersonCameraController::FirstPersonCameraController(Render::Camera *camera)
-            : _p_camera(camera) {}
-        void FirstPersonCameraController::Attach(Render::Camera *camera)
-        {
-            _p_camera = camera;
-            _rot_world_y = Quaternion::AngleAxis(_rotation.y, Vector3f::kUp);
-            Vector3f new_camera_right = _rot_world_y * Vector3f::kRight;
-            _rot_object_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
-            _target_pos = camera->Position();
-        }
-
-        void FirstPersonCameraController::Move(const Vector3f &d)
-        {
-            if (!_is_receive_input)
-                return;
-            _p_camera->Position(d);
-        }
-        void FirstPersonCameraController::SetTargetRotation(f32 x, f32 y, bool is_force)
-        {
-            if (!_is_receive_input && !is_force)
-                return;
-            _rotation.x = x;
-            _rotation.y = y;
-        }
-        void FirstPersonCameraController::Interpolate(float speed)
-        {
-            _fast_camera_move_speed = _base_camera_move_speed * 3.0f;
-            Quaternion new_quat_y = Quaternion::AngleAxis(_rotation.y, Vector3f::kUp);
-            Vector3f new_camera_right = new_quat_y * Vector3f::kRight;
-            auto new_quat_x = Quaternion::AngleAxis(_rotation.x, new_camera_right);
-            _rot_object_x = Quaternion::NLerp(_rot_object_x, new_quat_x, speed);
-            _rot_world_y  = Quaternion::NLerp(_rot_world_y, new_quat_y, speed);
-            _p_camera->Position(Lerp(_p_camera->Position(), _target_pos, speed));
-            auto r = _rot_world_y * _rot_object_x;
-            _p_camera->Rotation(r);
-            _p_camera->RecalculateMatrix(true);
-        }
-        void FirstPersonCameraController::SetTargetPosition(const Vector3f &position, bool is_force)
-        {
-            if (!_is_receive_input && !is_force)
-                return;
-            _target_pos = position;
-        }
-        #pragma endregion
-
+        #pragma region RenderView
         static class EditorLayer* s_editor_layer;
         RenderView::RenderView() : DockWindow("RenderView")
         {
@@ -86,6 +39,37 @@ namespace Ailu
             _source = _vb->AddChild<UI::Image>();
             _source->SlotSizePolicy(UI::ESizePolicy::kFill);
             _source->SlotAlignmentH(UI::EAlignment::kFill);
+        }
+        void RenderView::Update(f32 dt)
+        {
+            DockWindow::Update(dt);
+        }
+        void RenderView::SetSource(Render::Texture *tex)
+        {
+            if (tex)
+            {
+                _source->SetTexture(tex);
+            }
+        }
+        #pragma endregion
+
+        #pragma region SceneView
+        SceneView::SceneView()
+        {
+            if (Camera::sCurrent == nullptr)
+            {
+                LOG_WARNING("Current Camera is null");
+                Camera::GetDefaultCamera();
+                Camera::sCurrent->_anti_aliasing = Render::EAntiAliasing::kNone;
+            }
+            _camera_controller = &Editor::EditorApp::GetEditor()->GetSceneCameraController();
+            _camera_controller->Attach(Camera::sCurrent);
+            _camera_controller->_is_receive_input = true;
+            _camera_controller->_camera_near = Camera::sCurrent->Near();
+            _camera_controller->_camera_far = Camera::sCurrent->Far();
+            Camera::sCurrent->_is_scene_camera = true;
+            Camera::sCurrent->_is_gen_voxel = true;
+            Camera::sCurrent->_is_enable = true;
             _on_size_change += [this](Vector2f new_size)
             {
                 auto t = _content_root->Thickness();
@@ -102,35 +86,6 @@ namespace Ailu
                     break;
                 }
             }
-        }
-        void RenderView::Update(f32 dt)
-        {
-            DockWindow::Update(dt);
-            _source->SetTexture(s_renderer->TargetTexture());
-        }
-        void RenderView::SetSource(Render::Texture *tex)
-        {
-            if (tex)
-            {
-                _source->SetTexture(tex);
-            }
-        }
-        SceneView::SceneView()
-        {
-            if (Camera::sCurrent == nullptr)
-            {
-                LOG_WARNING("Current Camera is null");
-                Camera::GetDefaultCamera();
-                Camera::sCurrent->_anti_aliasing = Render::EAntiAliasing::kNone;
-            }
-            FirstPersonCameraController::s_inst.Attach(Camera::sCurrent);
-            FirstPersonCameraController::s_inst._is_receive_input = true;
-            FirstPersonCameraController::s_inst._camera_near = Camera::sCurrent->Near();
-            FirstPersonCameraController::s_inst._camera_far = Camera::sCurrent->Far();
-            Camera::sCurrent->_is_scene_camera = true;
-            Camera::sCurrent->_is_gen_voxel = true;
-            Camera::sCurrent->_is_enable = true;
-
             _source->OnMouseMove() += [this](UI::UIEvent &e) {
                 Vector4f rect = e._current_target->GetArrangeRect();
                 _mouse_pos = e._mouse_position - rect.xy;
@@ -166,7 +121,7 @@ namespace Ailu
                 }
                 else if (e._key_code == EKey::kRBUTTON)
                 {
-                    FirstPersonCameraController::s_inst._is_receive_input = true;
+                    _camera_controller->_is_receive_input = true;
                     SetCursor(NULL);
                 }
             };
@@ -204,7 +159,7 @@ namespace Ailu
                 }
                 else if (e._key_code == EKey::kRBUTTON)
                 {
-                    FirstPersonCameraController::s_inst._is_receive_input = false;
+                    _camera_controller->_is_receive_input = false;
                     while (::ShowCursor(TRUE) < 0);
                 }
             };
@@ -224,20 +179,20 @@ namespace Ailu
                 }
                 else if (e._key_code == EKey::kSHIFT)
                 {
-                    FirstPersonCameraController::s_inst.Accelerate(true);
+                    _camera_controller->Accelerate(true);
                 }
             };
             _source->OnKeyUp() += [this](UI::UIEvent &e) {
                 if (e._key_code == EKey::kSHIFT)
                 {
-                    FirstPersonCameraController::s_inst.Accelerate(false);
+                    _camera_controller->Accelerate(false);
                 }
             };
             _source->OnMouseScroll() += [this](UI::UIEvent &e)
             {
-                f32 d = FirstPersonCameraController::s_inst._base_camera_move_speed * 0.1f;
-                FirstPersonCameraController::s_inst._base_camera_move_speed += e._scroll_delta>0.0f? d : -d;
-                LOG_INFO("Camera move speed: {}", FirstPersonCameraController::s_inst._base_camera_move_speed);
+                f32 d = _camera_controller->_base_camera_move_speed * 0.1f;
+                _camera_controller->_base_camera_move_speed += e._scroll_delta>0.0f? d : -d;
+                LOG_INFO("Camera move speed: {}", _camera_controller->_base_camera_move_speed);
             };
 
             _transform_gizmo = MakeScope<TransformGizmo>();
@@ -268,6 +223,7 @@ namespace Ailu
         void SceneView::Update(f32 dt)
         {
             RenderView::Update(dt);
+            SetSource(s_renderer->TargetTexture());
             if (Render::Camera::sCurrent)
             {
                 auto rect = _source->GetArrangeRect();
@@ -284,30 +240,30 @@ namespace Ailu
         }
         void SceneView::ProcessCameraInput(f32 dt)
         {
-            Camera::sCurrent->FovH(FirstPersonCameraController::s_inst._camera_fov_h);
-            Camera::sCurrent->Near(FirstPersonCameraController::s_inst._camera_near);
-            Camera::sCurrent->Far(FirstPersonCameraController::s_inst._camera_far);
+            Camera::sCurrent->FovH(_camera_controller->_camera_fov_h);
+            Camera::sCurrent->Near(_camera_controller->_camera_near);
+            Camera::sCurrent->Far(_camera_controller->_camera_far);
             if (Camera::sCurrent && !Input::IsInputBlock())
             {
                 static Vector2f target_rotation = {0.f, 0.f};
                 static Vector2f pre_mouse_pos;
-                target_rotation = FirstPersonCameraController::s_inst._rotation;
+                target_rotation = _camera_controller->_rotation;
                 auto cur_mouse_pos = Input::GetMousePos();
                 if (Input::IsKeyPressed(EKey::kRBUTTON))
                 {
                     if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f &&
                         abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
                     {
-                        float angle_offset = FirstPersonCameraController::s_inst._camera_wander_speed * FirstPersonCameraController::s_inst._camera_wander_speed;
+                        float angle_offset = _camera_controller->_camera_wander_speed * _camera_controller->_camera_wander_speed;
                         target_rotation.y += (cur_mouse_pos.x - pre_mouse_pos.x) * angle_offset;
                         target_rotation.x += (cur_mouse_pos.y - pre_mouse_pos.y) * angle_offset;
                     }
                 }
                 pre_mouse_pos = cur_mouse_pos;
-                FirstPersonCameraController::s_inst.SetTargetRotation(target_rotation.x, target_rotation.y);
-                FirstPersonCameraController::s_inst.Accelerate(Input::IsKeyPressed(EKey::kSHIFT));
+                _camera_controller->SetTargetRotation(target_rotation.x, target_rotation.y);
+                _camera_controller->Accelerate(Input::IsKeyPressed(EKey::kSHIFT));
                 static const f32 move_distance = 1.0f;// 1 m
-                f32 final_move_distance = move_distance * FirstPersonCameraController::s_inst._cur_move_speed * FirstPersonCameraController::s_inst._cur_move_speed;
+                f32 final_move_distance = move_distance * _camera_controller->_cur_move_speed * _camera_controller->_cur_move_speed;
                 Vector3f move_dis{0, 0, 0};
                 if (Input::IsKeyPressed(EKey::kW))
                 {
@@ -333,15 +289,89 @@ namespace Ailu
                 {
                     move_dis -= Camera::sCurrent->Up();
                 }
-                auto target_pos = FirstPersonCameraController::s_inst._target_pos;
+                auto target_pos = _camera_controller->_target_pos;
                 target_pos += move_dis * final_move_distance;
                 //LOG_INFO("{}", target_pos.ToString());
-                FirstPersonCameraController::s_inst.SetTargetPosition(target_pos);
+                _camera_controller->SetTargetPosition(target_pos);
             }
-            f32 lerp_factor = std::clamp(dt * FirstPersonCameraController::s_inst._lerp_speed_multifactor, 0.0f, 1.0f);
-            lerp_factor = dt * FirstPersonCameraController::s_inst._lerp_speed_multifactor * FirstPersonCameraController::s_inst._lerp_speed_multifactor;
+            f32 lerp_factor = std::clamp(dt * _camera_controller->_lerp_speed_multifactor, 0.0f, 1.0f);
+            lerp_factor = dt * _camera_controller->_lerp_speed_multifactor * _camera_controller->_lerp_speed_multifactor;
             lerp_factor = std::clamp(lerp_factor, 0.0f, 1.5f);
-            FirstPersonCameraController::s_inst.Interpolate(lerp_factor);
+            _camera_controller->Interpolate(lerp_factor);
         }
+        #pragma endregion
+
+        #pragma region Texture3DView
+        Texture3DView::Texture3DView() : DockWindow("Texture3DView")
+        {
+            _split_view = _content_root->AddChild<UI::SplitView>();
+            _split_view->_is_horizontal = true;
+            _left_preview = _split_view->AddChild<UI::Image>();
+            _left_preview->SlotSizePolicy(UI::ESizePolicy::kFill);
+            _left_preview->SlotAlignmentH(UI::EAlignment::kFill);
+            _right_menu = _split_view->AddChild<UI::VerticalBox>();
+            _right_menu->SlotSizePolicy(UI::ESizePolicy::kFixed);
+            _right_menu->SlotPadding(_content_root->Thickness());
+            _pass = new Render::VolumeTexturePreviewPass();
+            _orbit_controller.Attach(_pass);
+            auto pass_type = _pass->GetType();
+            _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("CameraPos", pass_type->FindPropertyByName("_camera_pos"), _pass));
+            UI::FloatFieldParams fparams;
+            fparams._range = Vector2f{0.0f, 1.0f};
+            _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("IsSliceMode", pass_type->FindPropertyByName("_is_slice_mode"), _pass));
+            _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("SliceX", pass_type->FindPropertyByName("_slice_x"), _pass,&fparams));
+            _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("SliceY", pass_type->FindPropertyByName("_slice_y"), _pass,&fparams));
+            _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("SliceZ", pass_type->FindPropertyByName("_slice_z"), _pass,&fparams));
+            _pass->_on_target_ready = [this](Render::RenderTexture* rt)
+            {
+                _left_preview->SetTexture(rt);
+            };
+            _left_preview->OnMouseDown() += [this](UI::UIEvent &e)
+            {
+                if (e._key_code == EKey::kLBUTTON)
+                {
+                    Vector4f rect = e._current_target->GetArrangeRect();
+                    Vector2f local_pos = e._mouse_position - rect.xy;
+                    _orbit_controller.BeginDrag(local_pos);
+                }
+            };
+            _left_preview->OnMouseUp() += [this](UI::UIEvent &e)
+            {
+                if (e._key_code == EKey::kLBUTTON)
+                {
+                    _orbit_controller.EndDrag();
+                }
+            };
+            _left_preview->OnMouseMove() += [this](UI::UIEvent &e)
+            {
+                Vector4f rect = e._current_target->GetArrangeRect();
+                Vector2f local_pos = e._mouse_position - rect.xy;
+                _orbit_controller.Drag(local_pos);
+            };
+            _left_preview->OnMouseScroll() += [this](UI::UIEvent &e)
+            {
+                _orbit_controller.Zoom(e._scroll_delta);
+            };
+        }
+
+        Texture3DView::~Texture3DView()
+        {
+            DESTORY_PTR(_pass);
+            //Render::RenderPipeline::Get().GetRenderer()->RemoveTaskPass(_pass);
+        }
+        void Texture3DView::Update(f32 dt)
+        {
+            _pass->_view_size.x = (i32)_left_preview->GetArrangeRect().z;
+            _pass->_view_size.y = (i32)_left_preview->GetArrangeRect().w;
+            Render::RenderPipeline::Get().GetRenderer()->SubmitTaskPass(_pass);
+            DockWindow::Update(dt);
+        }
+
+        void Texture3DView::SetSource3D(Render::Texture *tex)
+        {
+            _pass->_slice_mat->SetTexture("_MainTex", tex);
+        }
+        
+        #pragma endregion
     }// namespace Editor
 }

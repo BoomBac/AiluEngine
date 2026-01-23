@@ -27,6 +27,7 @@ namespace Ailu
             bool IsReady() const final;
             ID3D12GraphicsCommandList *NativeCmdList() { return _p_cmd.Get(); };
             void AllocConstBuffer(const String &name, u32 size, u8 *data);
+            UploadBuffer::Allocation AllocConstBuffer(const u8* data, u32 size);
             void Name(const String &name) final;
             void Clear() final;
             void ResetRenderTarget();
@@ -48,6 +49,8 @@ namespace Ailu
             Scope<UploadBuffer> _upload_buf;
             //存储用于管线资源的uploadbuffer，需要名字来绑定
             HashMap<String, UploadBuffer::Allocation> _allocations;
+            //存储临时buffer，不需要名称，即刻返回
+            Vector<UploadBuffer::Allocation> _temp_allocs;
             Array<D3D12_CPU_DESCRIPTOR_HANDLE *, Render::RenderConstants::kMaxMRTNum> _colors;
             u16 _color_count;
             D3D12_CPU_DESCRIPTOR_HANDLE *_depth;

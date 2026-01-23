@@ -1490,8 +1490,17 @@ namespace Ailu::RHI::DX12
                         pso->SetPipelineResource(res);
                     }
                 }
+                if (draw_cmd->_material_property_block._data != nullptr && draw_cmd->_material_property_block._size > 0)
+                {
+                    auto res = PipelineResource(d3dcmd->_upload_buf.get(), EBindResDescType::kConstBufferRaw, RenderConstants::kCBufNamePerMaterial, PipelineResource::kPriorityCmd);
+                    auto mat_prop_alloc = d3dcmd->AllocConstBuffer(draw_cmd->_material_property_block._data, draw_cmd->_material_property_block._size);
+                    res._addi_info._gpu_handle = mat_prop_alloc.GPU;
+                    pso->SetPipelineResource(res);
+                }
+                
                 if (draw_cmd->_per_obj_cb != nullptr)
                     pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
+                
                 ++Render::RenderingStates::s_temp_draw_call;
                 u32 vertex_count = is_produced ? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
                 u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb? draw_cmd->_vb->GetVertexCount() / 3 : 0u;

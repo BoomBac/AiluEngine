@@ -276,7 +276,7 @@ Entity:12
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:5029.674316406,18.776170731,-13.724078178
+                _position:-65.673095703,13.798629761,-13.724078178
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:2.369345427,2.369282007,2.369345427
         _static_mesh_component:
@@ -303,7 +303,7 @@ Entity:13
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:-0.000071335,172.796417236,-528.007385254
+                _position:4.840332031,-2.685547113,-33.629882812
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:0.999922395,0.999932170,0.999934077
         _hierarchy_component:
@@ -317,7 +317,7 @@ _layer_mask:1
             _camera:
                 _type:kPerspective
                 _aspect:1.875
-                _far:2000
+                _far:164.632
                 _near:3
                 _fovh:41.269
                 _size:15.651

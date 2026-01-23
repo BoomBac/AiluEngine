@@ -34,7 +34,7 @@ namespace Ailu::Render
         Map<u64,u64> _scene_cb_lut;
         Map<u64, u64> _scene_inst_buffer_lut;
     };
-
+    class FrameAllocator;
     class FrameResourceManager
     {
     public:
@@ -42,22 +42,26 @@ namespace Ailu::Render
         using BufferPool = THashableResourcePool<BufferDesc,GPUBuffer>;
         using TextureHandle = TexturePool::PoolResourceHandle;
         using BufferHandle = BufferPool::PoolResourceHandle;
-        inline static constexpr u32 kMaxResourceStaleFrame = 3u;
+        inline static constexpr u32 kMaxResourceStaleFrame = 15u;
     public:
         static FrameResourceManager &Get();
         static void Init();
         static void Shutdown();
         FrameResourceManager();
         ~FrameResourceManager();
-        void Tick();
+        void NewFrame();
+        void FrameCleanup();
         TextureHandle AllocTexture(TextureDesc desc);
         BufferHandle AllocBuffer(BufferDesc desc);
         void FreeTexture(TextureHandle handle);
         void FreeBuffer(BufferHandle handle);
         void CleanupStaleResources();
+        FrameAllocator* GetActiveFrameAllocator() const { return _active_allocator; }
     private:
         TexturePool _texture_pool;
         BufferPool _buffer_pool;
+        Array<Scope<FrameAllocator>, 2> _frame_allocators{};
+        FrameAllocator* _active_allocator = nullptr;
     };
 
 }// namespace Ailu

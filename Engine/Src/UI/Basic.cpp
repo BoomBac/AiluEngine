@@ -246,6 +246,7 @@ namespace Ailu
             OnMouseClick() += [this](UIEvent &e)
             {
                 _is_checked = !_is_checked;
+                _on_click_delegate.Invoke(_is_checked);
             };
         }
 
@@ -262,6 +263,13 @@ namespace Ailu
         Vector2f CheckBox::MeasureDesiredSize()
         {
             return Vector2f(20.0f,20.0f);
+        }
+        void CheckBox::SetChecked(bool is_checked)
+        {
+            if (_is_checked == is_checked)
+                return;
+            _is_checked = is_checked;
+            _on_click_delegate.Invoke(_is_checked);
         }
 #pragma endregion
 

@@ -12,6 +12,7 @@
 #include "Render/Features/VoxelGI.h"
 #include "Render/Features/GpuTerrain.h"
 #include "Render/Features/RayTraceGI.h"
+#include "Render/Features/VolumetricFog.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
 #include "Render/CommandBuffer.h"
@@ -59,12 +60,16 @@ namespace Ailu::Render
         _gpu_terrain = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new RayTraceGI())));
         _raytrace_gi = _owned_features.back().get();
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VolumetricFog())));
+        _fog = _owned_features.back().get();
         //_features.push_back(_vxgi);
         //_features.push_back(_cloud);
         //_features.push_back(_taa);
         _features.push_back(_ssao);
         _features.push_back(_raytrace_gi);
         _raytrace_gi->SetActive(false);
+        _features.push_back(_fog);
+        _fog->SetActive(true);
         //_features.push_back(_gpu_terrain);
         //_features.push_back(_taa);
 
@@ -368,6 +373,10 @@ namespace Ailu::Render
     void Renderer::SubmitTaskPass(RenderPass *task)
     {
         _p_task_render_passes.emplace_back(task);
+    }
+    void Renderer::RemoveTaskPass(RenderPass *task)
+    {
+        _p_task_render_passes.remove(task);
     }
     void Renderer::ResizeBuffer(u32 width, u32 height)
     {

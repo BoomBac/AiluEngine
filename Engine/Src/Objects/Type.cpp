@@ -78,6 +78,33 @@ namespace Ailu
         return ParseTemplate(full_type, pos);
     }
 
+    Ailu::PropertyObserverHandle::~PropertyObserverHandle()
+    {
+        if (_prop)
+            _prop->RemoveObserver(_inst);
+    }
+
+    void PropertyInfo::Notify(void *instance, EPropertyChangeSource source) const
+    {
+        if (!instance)
+            return;
+        for (auto& obs : _observers)
+        {
+            if (obs._instance && obs._instance == instance)
+                obs._callback(instance);
+        }
+        if (auto obj = dynamic_cast<Object*>(static_cast<Object*>(instance));obj != nullptr)
+            obj->OnPropertyChanged(*this);
+    }
+
+    void PropertyInfo::NotifyObject(Object *obj, EPropertyChangeSource source) const
+    {
+        if (!obj)
+            return;
+        Notify(reinterpret_cast<void*>(obj), source);
+        obj->OnPropertyChanged(*this);
+    }
+
     void PropertyInfo::Serialize(void *instance, FArchive &ar) const
     {
         AL_ASSERT(_serialize_fn != nullptr);

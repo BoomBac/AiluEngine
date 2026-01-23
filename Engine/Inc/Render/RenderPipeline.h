@@ -132,7 +132,7 @@ namespace Ailu::Render
         virtual void Setup();
         Renderer *GetRenderer(u16 index = 0) { return index < _renderers.size() ? _renderers[index].get() : nullptr; };
         RenderTexture *GetTarget(u16 index = 0);
-        void FrameCleanUp();
+        void FrameCleanup();
         FrameResource *CurFrameResource() { return _cur_frame_res; }
         //新添加网格组件时mesh不能为空
         void OnAddRenderObject(ECS::Entity e);

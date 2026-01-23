@@ -1,52 +1,26 @@
 #ifndef __RENDER_VIEW__
 #define __RENDER_VIEW__
 #include "Dock/DockWindow.h"
-#include "Framework/Math/Transform.h"
+#include "Common/CameraControllers.h"
 #include "generated/RenderView.gen.h"
+
 namespace Ailu
 {
+    class PropertyInfo;
     namespace Render
     {
         class Mesh;
         class Camera;
+        class VolumeTexturePreviewPass;
     }// namespace Render
     namespace UI
     {
         class Image;
         class VerticalBox;
+        class SplitView;
     }
     namespace Editor
     {
-        class FirstPersonCameraController
-        {
-        public:
-            static FirstPersonCameraController s_inst;
-            FirstPersonCameraController();
-            explicit FirstPersonCameraController(Render::Camera *camera);
-            void Attach(Render::Camera *camera);
-            void SetTargetPosition(const Vector3f &position, bool is_force = false);
-            void SetTargetRotation(f32 x, f32 y, bool is_force = false);
-            void Move(const Vector3f &d);
-            void Interpolate(float speed);
-            void Accelerate(bool faster) { _cur_move_speed = faster ? _fast_camera_move_speed : _base_camera_move_speed; };
-            Vector2f _rotation;
-            Vector3f _target_pos;
-            bool _is_receive_input = true;
-            f32 _base_camera_move_speed = 0.6f;
-            f32 _fast_camera_move_speed = _base_camera_move_speed * 3.0f;
-            f32 _cur_move_speed = _base_camera_move_speed;
-            f32 _camera_wander_speed = 0.6f;
-            f32 _lerp_speed_multifactor = 0.75f;
-            f32 _camera_fov_h = 60.0f;
-            f32 _camera_near = 0.01f;
-            f32 _camera_far = 1000.0f;
-
-        private:
-            Render::Camera *_p_camera;
-            Quaternion _rot_object_x;
-            Quaternion _rot_world_y;
-        };
-
         ACLASS()
         class RenderView : public DockWindow
         {
@@ -71,10 +45,32 @@ namespace Ailu
         private:
             void ProcessCameraInput(f32 dt);
         private:
+            FirstPersonCameraController *_camera_controller;
             Scope<TransformGizmo> _transform_gizmo;
             Vector2f _mouse_pos;
             Vector3f _drag_preview_pos;
             Ref<Render::Mesh> _drag_preview_mesh = nullptr;
+        };
+        ACLASS()
+        class Texture3DView : public DockWindow
+        {
+            GENERATED_BODY()
+        public:
+            Texture3DView();
+            ~Texture3DView();
+            void Update(f32 dt) final;
+            void SetSource3D(Render::Texture* tex); // 3D 纹理源
+        private:
+            UI::SplitView* _split_view = nullptr;
+            UI::Image* _left_preview = nullptr;          // 2D 预览
+            UI::VerticalBox* _right_menu = nullptr;
+            Render::Texture* _source_3d = nullptr;
+            Render::Texture* _preview_2d = nullptr; // 2D 预览 RT
+            f32 _slice = 0.0f;                      // [0,1]
+            i32 _axis = 2;                          // 0=X,1=Y,2=Z
+            i32 _mip = 0;
+            Render::VolumeTexturePreviewPass *_pass;
+            OrbitCameraController _orbit_controller;
         };
     }
 }

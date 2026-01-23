@@ -169,35 +169,102 @@ namespace Ailu
         Meta _meta;       // 附加元信息
     };
 
+    class PropertyInfo;
+    class Object;
+    class AILU_API PropertyObserverHandle
+    {
+    public:
+        DISALLOW_COPY_AND_ASSIGN(PropertyObserverHandle)
+        PropertyObserverHandle() : _prop(nullptr), _inst(nullptr) {}
+        PropertyObserverHandle(PropertyInfo* prop, void* inst)
+            : _prop(prop), _inst(inst) {}
+
+        ~PropertyObserverHandle();
+        PropertyObserverHandle(PropertyObserverHandle&& other) noexcept
+            : _prop(std::exchange(other._prop, nullptr)),
+            _inst(std::exchange(other._inst, nullptr))
+        {}
+
+    private:
+        PropertyInfo* _prop;
+        void* _inst;
+    };
+
     class AILU_API PropertyInfo : public MemberInfo
     {
     public:
+        enum class EPropertyChangeSource
+        {
+            kDefault,
+            kUI,
+            kScript,
+            kDeserialize,
+            kUndo,
+        };
+
+        using Observer = std::function<void(void* instance)>;
         friend struct MemberBuilder;
         const Type *GetType();
         const String &TypeName() const { return _type_name; }
         void Serialize(void *instance, FArchive &ar) const;
         void Deserialize(void *instance, FArchive &ar) const;
         template<typename T, typename ClassType>
-        T &Get(ClassType &instance)
+        T &Get(ClassType* instance)
         {
-            return *reinterpret_cast<T *>(reinterpret_cast<u8 *>(&instance) + _offset);
+            return *reinterpret_cast<T *>(reinterpret_cast<u8 *>(instance) + _offset);
         }
         template<typename T, typename ClassType>
-        void Set(ClassType &instance, const T &value) const
+        void Set(ClassType* instance, const T &value, EPropertyChangeSource source = EPropertyChangeSource::kDefault) const
         {
-            T *value_ptr = reinterpret_cast<T *>(reinterpret_cast<u8 *>(&instance) + _offset);
-            *value_ptr = value;
+            T *value_ptr = reinterpret_cast<T *>(reinterpret_cast<u8 *>(instance) + _offset);
+            if constexpr (std::is_trivially_copyable_v<T>)
+            {
+                if (memcmp(value_ptr, &value, sizeof(T)) == 0)
+                    return;
+                memcpy(value_ptr, &value, sizeof(T));
+
+            }
+            else
+            {
+                if (*value_ptr == value) 
+                    return;
+                *value_ptr = value;
+            }
+            if constexpr (std::is_base_of_v<Object, ClassType>)
+                NotifyObject(reinterpret_cast<Object*>(instance), source);
+            else
+                Notify(reinterpret_cast<void*>(instance), source);
+        }
+        PropertyObserverHandle AddObserver(void* instance, Observer cb)
+        {
+            _observers.emplace_back(instance, std::move(cb));
+            return std::move(PropertyObserverHandle{this, instance});
         }
 
+        void RemoveObserver(void* instance)
+        {
+            std::erase_if(_observers,[instance](const auto &entry)->bool{ return entry._instance == instance; });
+        }
     public:
         SerializeFunc _serialize_fn = nullptr;
         DeserializeFunc _deserialize_fn = nullptr;
 
     private:
+        void Notify(void* instance, EPropertyChangeSource source) const;
+        void NotifyObject(Object* obj, EPropertyChangeSource source) const;
+    private:
         String _type_name;               // 原始类型名（可含模板）：std::vector<int>
         TemplateParamInfo _template_info;// 模板结构树（非模板则 name=基名，subParams空）
         const Type *_type = nullptr;
+        struct ObserverEntry
+        {
+            void* _instance;
+            Observer _callback;
+        };
+
+        mutable Vector<ObserverEntry> _observers;
     };
+
 
     class AILU_API FunctionInfo : public MemberInfo
     {

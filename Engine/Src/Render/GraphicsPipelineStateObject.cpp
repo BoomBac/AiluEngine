@@ -386,31 +386,37 @@ namespace Ailu::Render
             AL_ASSERT(pso->StateDescriptor()._p_vertex_shader == new_shader);
             pso->SetTopology(new_shader->GetTopology());
             pso->SetStencilRef(new_shader->_stencil_ref);
-            std::map<i16, std::set<PipelineResource>> c;
-            for (auto res_it = g_pPSOMgr->_bind_resource_list.begin(); res_it != g_pPSOMgr->_bind_resource_list.end();)
+
+            std::array<PipelineResource*, 32> best{};
+            std::bitset<32> has{};
+
+            for (auto res_it = g_pPSOMgr->_bind_resource_list.begin();
+                 res_it != g_pPSOMgr->_bind_resource_list.end();)
             {
                 if (!res_it->_name.empty())
                     res_it->_slot = pso->NameToSlot(res_it->_name);
+
                 if (res_it->_slot < 0)
                 {
-                    res_it = g_pPSOMgr->_bind_resource_list.erase(res_it);// 删除元素并更新迭代器
-                }
-                else
-                {
-                    if (!c.contains(res_it->_slot))
-                    {
-                        c[res_it->_slot] = std::set<PipelineResource>();
-                    }
-                    c[res_it->_slot].insert(*res_it);
-                    ++res_it;// 只有在不删除元素的情况下递增迭代器
-                }
-            }
-            for (auto &[slot, res_list]: c)
-            {
-                if (slot == -1)
+                    res_it = g_pPSOMgr->_bind_resource_list.erase(res_it);
                     continue;
-                auto &res_info = *res_list.begin();
-                pso->SetPipelineResource(res_info);
+                }
+
+                const i16 slot = res_it->_slot;
+                if (!has[slot] || res_it->_priority >= best[slot]->_priority)
+                {
+                    best[slot] = &(*res_it);
+                    best[slot]->_slot = slot;
+                    has.set(slot);
+                }
+
+                ++res_it;
+            }
+
+            for (i16 slot = 0; slot < 32; ++slot)
+            {
+                if (!has[slot]) continue;
+                pso->SetPipelineResource(*best[slot]);
             }
         }
         g_pPSOMgr->_bind_resource_list.clear();

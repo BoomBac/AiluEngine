@@ -4,6 +4,7 @@
 #include "Framework/Common/Profiler.h"
 #include "Render/CommandBuffer.h"
 #include "UI/UIRenderer.h"
+#include "Render/FrameAllocator.h"
 #include "pch.h"
 
 #ifdef _PIX_DEBUG
@@ -106,7 +107,7 @@ namespace Ailu::Render
 
     void RenderPipeline::Render()
     {
-        
+        _frame_res_manager->NewFrame();
         Setup();
         for (auto cam: _cameras)
         {
@@ -152,7 +153,7 @@ namespace Ailu::Render
     {
         renderer.Render(cam, *g_pSceneMgr->ActiveScene());
     }
-    void RenderPipeline::FrameCleanUp()
+    void RenderPipeline::FrameCleanup()
     {
         g_pRenderTexturePool->RelesaeUnusedRT();
         for (auto &r: _renderers)
@@ -160,8 +161,7 @@ namespace Ailu::Render
         if (_cur_frame_packet)
             _cur_frame_packet->ClearView();
         _is_need_wait_for_render_thread = true;
-        _frame_res_manager->Tick();
-        //LOG_INFO("FrameCleanup");
+        _frame_res_manager->FrameCleanup();
     }
     void RenderPipeline::OnRenderObjectSubmeshCountChanged(u32 render_obj_id, u16 old_mesh_count, u32 new_mesh_count)
     {

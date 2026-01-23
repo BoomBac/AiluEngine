@@ -4,6 +4,7 @@
 
 #include "Inc/Render/FrameResource.h"
 #include "Inc/Render/GraphicsContext.h"
+#include "Inc/Render/FrameAllocator.h"
 
 namespace Ailu::Render
 {
@@ -101,11 +102,19 @@ namespace Ailu::Render
     }
     FrameResourceManager::FrameResourceManager()
     {
+        _frame_allocators[0] = MakeScope<FrameAllocator>();
+        _frame_allocators[1] = MakeScope<FrameAllocator>();
     }
     FrameResourceManager::~FrameResourceManager()
     {
     }
-    void FrameResourceManager::Tick()
+    void FrameResourceManager::NewFrame()
+    {
+        const u64 cur_frame = GraphicsContext::Get().GetFrameCount();
+        _active_allocator = _frame_allocators[cur_frame % 2].get();
+        _active_allocator->NewFrame(cur_frame);
+    }
+    void FrameResourceManager::FrameCleanup()
     {
         const u64 cur_frame = GraphicsContext::Get().GetFrameCount();
         u32 released_count = 0;
@@ -140,6 +149,7 @@ namespace Ailu::Render
         {
             CleanupStaleResources();
         }
+        _active_allocator->Reset();
     }
 
     FrameResourceManager::TextureHandle FrameResourceManager::AllocTexture(TextureDesc desc)

@@ -62,6 +62,7 @@ namespace Ailu
             void FrameCleanup();
             void EnqueuePass(RenderPass *pass);
             void SubmitTaskPass(RenderPass *task);
+            void RemoveTaskPass(RenderPass *task);
             Vector<RenderPass *> &GetRenderPasses() { return _render_passes; };
             Vector<RenderFeature *> GetFeatures();
             void ResizeBuffer(u32 width, u32 height);
@@ -125,6 +126,7 @@ namespace Ailu
             RenderFeature *_ssao;
             RenderFeature *_gpu_terrain;
             RenderFeature *_raytrace_gi;
+            RenderFeature *_fog;
             u64 _active_camera_hash;
 
             RenderingData _rendering_data;

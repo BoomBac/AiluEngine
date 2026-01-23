@@ -22,6 +22,10 @@ namespace Ailu
         ObjectRegister::Get().Unregister(this);
     }
 
+    void Object::OnPropertyChanged(const PropertyInfo &prop)
+    {
+    }
+
     #pragma endregion
 
     #pragma region ObjectRegister

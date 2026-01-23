@@ -12,6 +12,7 @@
 #include "Framework/Common/TimeMgr.h"
 #include "Render/Features/PostprocessPass.h"
 #include "Render/Features/VolumetricClouds.h"
+#include "Render/Features/VolumetricFog.h"
 #include "Render/Gizmo.h"
 #include "Render/RenderingData.h"
 #include "UI/TextRenderer.h"
@@ -241,11 +242,10 @@ namespace Ailu
                                 ImU32 color = IM_COL32(c.r * 255, c.g * 255, c.b * 255, 255);
                                 draw_list->AddRectFilled(ImVec2(x_start, y_start), ImVec2(x_end, y_end), color);
                                 // 显示文本
-                                char label[64];
-                                snprintf(label, sizeof(label), "%s (%.2f ms)", data._name.c_str(), data._duration);
-                                auto label_size = ImGui::CalcTextSize(label);
+                                String label = std::format("{} ({:.2f} ms)", data._name,data._duration);
+                                auto label_size = ImGui::CalcTextSize(label.c_str());
                                 if (label_size.x < (x_end - x_start))
-                                    draw_list->AddText(ImVec2(x_start + 5, y_start + 3), IM_COL32(0, 0, 0, 255), label);
+                                    draw_list->AddText(ImVec2(x_start + 5, y_start + 3), IM_COL32(0, 0, 0, 255), label.c_str());
                                 if (mouse_pos.x >= x_start && mouse_pos.x <= x_end &&
                                     mouse_pos.y >= y_start && mouse_pos.y <= y_end)
                                 {
@@ -280,16 +280,16 @@ namespace Ailu
             {
                 if (prop_info.GetType() == StaticClass<bool>())
                 {
-                    bool old_value = prop_info.Get<bool>(obj);
+                    bool old_value = prop_info.Get<bool>(&obj);
                     bool new_value = old_value;
                     if (ImGui::Checkbox(prop_info.Name().c_str(), &new_value))
                     {
-                        prop_info.Set<bool>(obj, new_value);
+                        prop_info.Set<bool>(&obj, new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<f32>())
                 {
-                    f32 old_value = prop_info.Get<f32>(obj);
+                    f32 old_value = prop_info.Get<f32>(&obj);
                     f32 new_value = old_value;
                     if (meta_info.GetBool("IsRange"))
                     {
@@ -299,12 +299,12 @@ namespace Ailu
                         ImGui::InputFloat(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.Set<f32>(obj, new_value);
+                        prop_info.Set<f32>(&obj, new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<i8>())
                 {
-                    i32 old_value = prop_info.Get<i8>(obj);
+                    i32 old_value = prop_info.Get<i8>(&obj);
                     i32 new_value = old_value;
                     if (meta_info.GetBool("IsRange"))
                     {
@@ -314,12 +314,12 @@ namespace Ailu
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.Set<i8>(obj, (i8) new_value);
+                        prop_info.Set<i8>(&obj, (i8) new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<i16>())
                 {
-                    i32 old_value = prop_info.Get<i16>(obj);
+                    i32 old_value = prop_info.Get<i16>(&obj);
                     i32 new_value = old_value;
                     if (meta_info.GetBool("IsRange"))
                     {
@@ -329,12 +329,12 @@ namespace Ailu
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.Set<i16>(obj, (i16) new_value);
+                        prop_info.Set<i16>(&obj, (i16) new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<i32>())
                 {
-                    i32 old_value = prop_info.Get<i32>(obj);
+                    i32 old_value = prop_info.Get<i32>(&obj);
                     i32 new_value = old_value;
                     if (meta_info.GetBool("IsRange"))
                     {
@@ -344,12 +344,12 @@ namespace Ailu
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.Set<i32>(obj, new_value);
+                        prop_info.Set<i32>(&obj, new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<u8>())
                 {
-                    i32 old_value = prop_info.Get<u8>(obj);
+                    i32 old_value = prop_info.Get<u8>(&obj);
                     i32 new_value = old_value;
                     if (meta_info.GetBool("IsRange"))
                     {
@@ -359,12 +359,12 @@ namespace Ailu
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.Set<u8>(obj, (u8) new_value);
+                        prop_info.Set<u8>(&obj, (u8) new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<u16>())
                 {
-                    i32 old_value = prop_info.Get<u16>(obj);
+                    i32 old_value = prop_info.Get<u16>(&obj);
                     i32 new_value = old_value;
                     if (meta_info.GetBool("IsRange"))
                     {
@@ -374,12 +374,12 @@ namespace Ailu
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.Set<u16>(obj, (u16) new_value);
+                        prop_info.Set<u16>(&obj, (u16) new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<u32>())
                 {
-                    i32 old_value = prop_info.Get<u32>(obj);
+                    i32 old_value = prop_info.Get<u32>(&obj);
                     i32 new_value = old_value;
                     if (meta_info.GetBool("IsRange"))
                     {
@@ -389,81 +389,81 @@ namespace Ailu
                         ImGui::InputInt(prop_info.Name().c_str(), &new_value);
                     if (old_value != new_value)
                     {
-                        prop_info.Set<u32>(obj, (u32) new_value);
+                        prop_info.Set<u32>(&obj, (u32) new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<String>())
                 {
-                    String old_value = prop_info.Get<String>(obj);
+                    String old_value = prop_info.Get<String>(&obj);
                     auto str_len = old_value.size();
                     char buf[256];
                     memcpy(buf, old_value.c_str(), str_len);
                     buf[str_len] = '\0';
                     if (ImGui::InputText(prop_info.Name().c_str(), buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
                     {
-                        prop_info.Set<String>(obj, buf);
+                        prop_info.Set<String>(&obj, buf);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<Vector2f>())
                 {
-                    Vector2f old_value = prop_info.Get<Vector2f>(obj);
+                    Vector2f old_value = prop_info.Get<Vector2f>(&obj);
                     Vector2f new_value = old_value;
                     if (ImGui::InputFloat2(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.Set<Vector2f>(obj, new_value);
+                        prop_info.Set<Vector2f>(&obj, new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<Vector3f>())
                 {
-                    Vector3f old_value = prop_info.Get<Vector3f>(obj);
+                    Vector3f old_value = prop_info.Get<Vector3f>(&obj);
                     Vector3f new_value = old_value;
                     if (ImGui::InputFloat3(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.Set<Vector3f>(obj, new_value);
+                        prop_info.Set<Vector3f>(&obj, new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<Vector4f>())
                 {
-                    Vector4f old_value = prop_info.Get<Vector4f>(obj);
+                    Vector4f old_value = prop_info.Get<Vector4f>(&obj);
                     Vector4f new_value = old_value;
                     if (meta_info.GetBool("IsColor"))
                     {
                         ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-                        prop_info.Set<Vector4f>(obj, new_value);
+                        prop_info.Set<Vector4f>(&obj, new_value);
                     }
                     else
                     {
                         if (ImGui::InputFloat4(prop_info.Name().c_str(), new_value.data))
                         {
-                            prop_info.Set<Vector4f>(obj, new_value);
+                            prop_info.Set<Vector4f>(&obj, new_value);
                         }
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<Vector2Int>())
                 {
-                    Vector2Int old_value = prop_info.Get<Vector2Int>(obj);
+                    Vector2Int old_value = prop_info.Get<Vector2Int>(&obj);
                     Vector2Int new_value = old_value;
                     if (ImGui::InputInt2(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.Set<Vector2Int>(obj, new_value);
+                        prop_info.Set<Vector2Int>(&obj, new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<Vector3Int>())
                 {
-                    Vector3Int old_value = prop_info.Get<Vector3Int>(obj);
+                    Vector3Int old_value = prop_info.Get<Vector3Int>(&obj);
                     Vector3Int new_value = old_value;
                     if (ImGui::InputInt3(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.Set<Vector3Int>(obj, new_value);
+                        prop_info.Set<Vector3Int>(&obj, new_value);
                     }
                 }
                 else if (prop_info.GetType() == StaticClass<Vector4Int>())
                 {
-                    Vector4Int old_value = prop_info.Get<Vector4Int>(obj);
+                    Vector4Int old_value = prop_info.Get<Vector4Int>(&obj);
                     Vector4Int new_value = old_value;
                     if (ImGui::InputInt4(prop_info.Name().c_str(), new_value.data))
                     {
-                        prop_info.Set<Vector4Int>(obj, new_value);
+                        prop_info.Set<Vector4Int>(&obj, new_value);
                     }
                 }
                 else
@@ -1008,16 +1008,16 @@ namespace Ailu
                         {
                             const auto &nodes = sk_comp->_p_mesh->GetBVHNodes();
                             static i32 draw_idx = -1;
-                            ImGui::SliderInt("MeshBVH Index", &draw_idx, -1, nodes.size() - 1);
+                            ImGui::SliderInt("MeshBVH Index", &draw_idx, -1, (i32)nodes.size() - 1);
                             if (draw_idx == -1)
                             {
                                 const auto &tri_data = sk_comp->_p_mesh->GetTriangleData();
-                                Matrix4x4f scale = MatrixScale(0.9f, 0.9f, 0.9);
+                                Matrix4x4f scale = MatrixScale(0.9f, 0.9f, 0.9f);
                                 for (const auto &n: nodes)
                                 {
                                     if (!n.IsLeaf())
                                         continue;
-                                    for (u32 i = n._child_index_or_first; i < n._child_index_or_first + n._count_or_flag; i++)
+                                    for (i32 i = n._child_index_or_first; i < n._child_index_or_first + n._count_or_flag; i++)
                                     {
                                         Vector3f v0 = TransformCoord(scale, tri_data[i].v0);
                                         Vector3f v1 = TransformCoord(scale, tri_data[i].v1);
@@ -1032,9 +1032,9 @@ namespace Ailu
                                 Render::Gizmo::DrawAABB(n._aabb);
                                 if (n.IsLeaf())
                                 {
-                                    Matrix4x4f scale = MatrixScale(0.9f, 0.9f, 0.9);
+                                    Matrix4x4f scale = MatrixScale(0.9f, 0.9f, 0.9f);
                                     const auto &tri_data = sk_comp->_p_mesh->GetTriangleData();
-                                    for (u32 i = n._child_index_or_first; i < n._child_index_or_first + n._count_or_flag; i++)
+                                    for (i32 i = n._child_index_or_first; i < n._child_index_or_first + n._count_or_flag; i++)
                                     {
                                         Vector3f v0 = TransformCoord(scale, tri_data[i].v0);
                                         Vector3f v1 = TransformCoord(scale, tri_data[i].v1);
@@ -1054,7 +1054,7 @@ namespace Ailu
                             static i32 draw_idx = -1;
                             const auto &tri = sk_comp->_p_mesh->GetTriangleData();
                             const auto &tri_bounds = sk_comp->_p_mesh->GetTriangleBounds();
-                            ImGui::SliderInt("Tri Index", &draw_idx, -1, tri.size() - 1);
+                            ImGui::SliderInt("Tri Index", &draw_idx, -1, (i32)tri.size() - 1);
                             if (draw_idx != -1)
                             {
                                 Render::Gizmo::DrawAABB(tri_bounds[draw_idx], Colors::kGreen);
@@ -1066,8 +1066,22 @@ namespace Ailu
             }
             if (ImGui::Button("ProfileWindow"))
                 s_prifile_wd->_is_show = !s_prifile_wd->_is_show;
-            static Vector4f color;
-            ImGui::ColorEdit4("Color", color.Data());
+            if (ImGui::Button("Show3DTexture"))
+            {
+                VolumetricFog* fog;
+                auto renderer = Render::RenderPipeline::Get().GetRenderer();
+                for (auto& feature : renderer->GetFeatures())
+                {
+                    if (feature->GetType() == VolumetricFog::StaticType())
+                    {
+                        fog = dynamic_cast<VolumetricFog*>(feature);
+                        break;
+                    }
+                }
+                auto tex_view = MakeRef<Texture3DView>();
+                tex_view->SetSource3D(fog->GetFogTexture());
+                DockManager::Get().AddDock(tex_view);
+            }
             ImGui::End();
             if (show)
                 ImGui::ShowDemoWindow(&show);

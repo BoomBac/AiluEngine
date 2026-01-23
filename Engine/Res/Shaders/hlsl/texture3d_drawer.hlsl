@@ -3,7 +3,7 @@
 //name: Hidden/Texture3dDrawer
 //vert: VSMain
 //pixel: PSMain
-//Cull: Back
+//Cull: Off
 //ZWrite: Off
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
@@ -16,6 +16,7 @@
 //  _Speed("Speed",Range(0,0.5)) = 1
 //  _Scale("Scale",Range(0,10)) = 1
 //  _Slice("Slice",Range(0,1)) = 0
+//  _SliceAxis("SliceAxis",Range(0,2)) = 2
 //  [Enum(Slice,0,Volume,1)] _DrawMode("DrawMode",Float) = 0
 //}
 //info end
@@ -28,6 +29,8 @@ PerMaterialCBufferBegin
     float _Speed;
     float _Scale;
     float _Slice;
+    float _SliceAxis;
+    float3 _camera_pos;
 PerMaterialCBufferEnd
 
 TEXTURE3D(_MainTex)
@@ -67,7 +70,7 @@ struct AABB
     float3 min;
     float3 max;
 };
-#define ITERATIONS 20
+#define ITERATIONS 16
 
 bool intersect(Ray r, AABB aabb, out float t0, out float t1)
 {
@@ -89,57 +92,61 @@ float3 get_uv(float3 p)
     return (p+1) * 0.5;
 }
 
+float Flux(float3 c)
+{
+    return saturate(dot(c, float3(0.299, 0.587, 0.114)));
+}
+
 float4 PSMain(PSInput i) : SV_Target
 {
     float4 dst = float4(0, 0, 0, 0);
-    // float2 uv = i.uv;
-    // uv *= _Scale;
-    // uv.x += _Time.x * _Speed;
-    // dst = SAMPLE_TEXTURE2D_LOD(_MainTex,g_LinearWrapSampler,uv,_Mipmap);
-    // dst.a=1; 
 #if defined(_DrawMode_Slice)
-    float3 uvw =  float3(i.uv,_Slice);
+    float3 uvw;
+    // _SliceAxis: 0 = X, 1 = Y, 2 = Z
+    if (_SliceAxis < 0.5)
+        uvw = float3(_Slice, i.uv.x, i.uv.y);
+    else if (_SliceAxis < 1.5)
+        uvw = float3(i.uv.x, _Slice, i.uv.y);
+    else
+        uvw = float3(i.uv, _Slice);
     dst = SAMPLE_TEXTURE3D_LOD(_MainTex,g_LinearWrapSampler,uvw,_Mipmap);
-    dst.a = 1.0;
+    dst.a = max(Flux(dst.rgb),0.2f);
+    //dst.rgb = uvw.xyz;
 #else
     Ray ray;
-    ray.origin = i.local_pos;
-    // world space direction to object space
-    float3 dir = normalize(i.world_pos - GetCameraPositionWS());
-    ray.dir = normalize(mul(_MatrixInvWorld, float4(dir,0)));
-    float ext = 1;
+    ray.origin = mul(_MatrixInvWorld, float4(_camera_pos,1)).xyz;
+    ray.dir = normalize(i.local_pos - ray.origin);
+    float ext = 1.0;
     AABB aabb;
     aabb.min = float3(-ext,-ext,-ext);
-    aabb.max = float3(ext,ext,ext);
+    aabb.max = float3( ext, ext, ext);
 
-    float tnear;
-    float tfar;
-    intersect(ray, aabb, tnear, tfar);
-    tnear = max(0.0, tnear);
+    float t0, t1;
+    if (!intersect(ray, aabb, t0, t1))
+        return 0;
 
-    // float3 start = ray.origin + ray.dir * tnear;
-    float3 start = ray.origin;
-    float3 end = ray.origin + ray.dir * tfar;
-    float dist = length(tfar - tnear);
-    float step_size = dist / float(ITERATIONS);
-    float3 ds = normalize(end - start) * step_size;
-    float3 p = start;
+    t0 = max(t0, 0.0);
 
-    [loop]
-    for (int iter = 0; iter < ITERATIONS; iter++)
+    float dist = t1 - t0;
+    float step = dist / ITERATIONS;
+
+    float3 p = ray.origin + ray.dir * t0;
+
+    for (int i = 0; i < ITERATIONS; i++)
     {
-        float3 uv = get_uv(p) * _Scale;
-        uv.x += _Time.x * _Speed * _Speed;
-        float4 src = SAMPLE_TEXTURE3D_LOD(_MainTex,g_LinearWrapSampler,uv,_Mipmap);
+        float3 uv = (p - aabb.min) / (aabb.max - aabb.min);
+        float4 src = SAMPLE_TEXTURE3D(_MainTex, g_LinearClampSampler, uv);
+        float density = src.a;
+        float alpha = 1 - exp(-density * step * 2); // 关键
+        src.rgb *= alpha;
+        src.a = alpha;
 
-        src.a *= 0.5;
-        src.rgb *= src.a;
+        dst.rgb += (1 - dst.a) * src.rgb;
+        dst.a   += (1 - dst.a) * src.a;
+        if (dst.a > 0.95)
+            break;
 
-        // blend
-        dst = (1.0 - dst.a) * src + dst;
-        p += ds;
-        // if(src.a > 0.75)
-        //     break;
+        p += ray.dir * step;
     }
 #endif
     dst *= _Color;

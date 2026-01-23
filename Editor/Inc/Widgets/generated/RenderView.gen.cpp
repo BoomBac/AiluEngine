@@ -78,3 +78,39 @@ return Ailu::Editor::SceneView::StaticType();
 return Ailu::Editor::SceneView::GetPrivateStaticClass();
 }
 ClassTypeRegister s_register_SceneView(&Ailu::Editor::SceneView::StaticType, "Ailu::Editor::SceneView");
+Ailu::Type* Ailu::Editor::Z_Construct_Texture3DView_Type()
+{
+Ailu::Editor::DockWindow::StaticType();
+static std::unique_ptr<Ailu::Type> cur_type = nullptr;
+if(cur_type == nullptr)
+{
+TypeInitializer initializer;
+initializer._name = "Texture3DView";
+initializer._size = sizeof(Ailu::Editor::Texture3DView);
+initializer._full_name = "Ailu::Editor::Texture3DView";
+initializer._is_class = true;
+initializer._is_abstract = false;
+initializer._namespace = "Ailu::Editor";
+initializer._base_name = "Ailu::Editor::DockWindow";
+initializer._constructor = []()->Ailu::Editor::Texture3DView* {return new Ailu::Editor::Texture3DView;};
+cur_type = std::make_unique<Ailu::Type>(initializer);
+Ailu::Type::RegisterType(cur_type.get());
+}
+return cur_type.get();
+}
+
+Ailu::Type* Ailu::Editor::Texture3DView::GetPrivateStaticClass()
+{
+	static Ailu::Type* type = Z_Construct_Texture3DView_Type();
+	return type;
+}
+
+template<> Ailu::Type* Ailu::StaticClass<Ailu::Editor::Texture3DView>()
+{
+return Ailu::Editor::Texture3DView::StaticType();
+}
+    Type *Ailu::Editor::Texture3DView::GetType()
+{
+return Ailu::Editor::Texture3DView::GetPrivateStaticClass();
+}
+ClassTypeRegister s_register_Texture3DView(&Ailu::Editor::Texture3DView::StaticType, "Ailu::Editor::Texture3DView");

@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RENDERVIEW_GEN_H__
 //Class RenderView begin...........................
-#define RENDERVIEW_GEN_H_53_GENERATED_BODY \
+#define RENDERVIEW_GEN_H_27_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_RenderView_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -21,7 +21,7 @@ class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::RenderView>();
 //Class RenderView end...........................
 
 //Class SceneView begin...........................
-#define RENDERVIEW_GEN_H_67_GENERATED_BODY \
+#define RENDERVIEW_GEN_H_41_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_SceneView_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -35,6 +35,22 @@ class SceneView ;
 template<>
 class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::SceneView>();
 //Class SceneView end...........................
+
+//Class Texture3DView begin...........................
+#define RENDERVIEW_GEN_H_57_GENERATED_BODY \
+                            private: \
+                                friend Type* Z_Construct_Texture3DView_Type();\
+                                static Type* GetPrivateStaticClass();\
+                            public:\
+                                static Type *StaticType() {return GetPrivateStaticClass();};\
+                                virtual Type  *GetType() override;
+                            namespace Ailu {class Type;}
+namespace Ailu::Editor{
+class Texture3DView ;
+}
+template<>
+class Ailu::Type* Ailu::StaticClass<class Ailu::Editor::Texture3DView>();
+//Class Texture3DView end...........................
 
 #undef CURRENT_FILE_ID
 #define CURRENT_FILE_ID RENDERVIEW_GEN_H

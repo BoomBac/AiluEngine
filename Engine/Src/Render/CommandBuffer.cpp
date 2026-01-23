@@ -10,6 +10,8 @@
 #include <Render/GraphicsPipelineStateObject.h>
 #include "Framework/Common/Profiler.h"
 #include "Render/RenderGraph/RenderGraph.h"
+#include "Render/FrameResource.h"
+#include "Render/FrameAllocator.h"
 
 namespace Ailu::Render
 {
@@ -89,6 +91,20 @@ namespace Ailu::Render
     public:
         Impl(): _commands(){}
         ~Impl() = default;
+
+    private:
+        void PushMaterialState(CommandDraw *cmd, bool copy_material_property_block)
+        {
+            i16 mat_cbuf_bind_slot = cmd->_mat->PushState(cmd->_pass_index);
+            if (!copy_material_property_block || mat_cbuf_bind_slot < 0)
+                return;
+            auto block = cmd->_mat->GetPropertyBlock(cmd->_pass_index);
+            cmd->_material_property_block._data = FrameResourceManager::Get().GetActiveFrameAllocator()->Allocate<u8>(block->_size);
+            cmd->_material_property_block._size = block->_size;
+            memcpy(cmd->_material_property_block._data, block->_data, block->_size);
+        }
+
+    public:
         void SetRenderGraph(RDG::RenderGraph *render_graph)
         {
             _render_graph = render_graph;
@@ -278,7 +294,7 @@ namespace Ailu::Render
             cmd->_mat = mat;
             cmd->_pass_index = pass_index;
             cmd->_instance_count = 1u;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             cmd->_index_start = index_start;
             cmd->_index_num = index_num;
             _commands.push_back(cmd);
@@ -291,8 +307,8 @@ namespace Ailu::Render
             cmd->_per_obj_cb = per_obj_cb;
             cmd->_mat = mat;
             cmd->_pass_index = pass_index;
-            cmd->_instance_count = 1u;
-            cmd->_mat->PushState(cmd->_pass_index);
+            cmd->_instance_count = instance_count;
+            PushMaterialState(cmd, true);
             _commands.push_back(cmd);
         }
         void SetViewport(Rect viewport)
@@ -394,7 +410,7 @@ namespace Ailu::Render
             cmd->_instance_count = 1u;
             cmd->_sub_mesh = 0u;
             cmd->_pass_index = pass_index;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
         void SetGlobalBuffer(const String &name, void *data, u64 data_size)
@@ -446,6 +462,8 @@ namespace Ailu::Render
         {
             CBufferPerObjectData per_obj_data;
             per_obj_data._MatrixWorld = world_matrix;
+            per_obj_data._MatrixInvWorld = MatrixInverse(world_matrix);
+            per_obj_data._MatrixWorld_Pre = per_obj_data._MatrixWorld;
             SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
             cmd->_vb = mesh->GetVertexBuffer().get();
@@ -454,7 +472,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = 0u;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u32 instance_count)
@@ -467,7 +485,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = 0u;
             cmd->_pass_index = 0u;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u32 instance_count)
@@ -480,7 +498,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = 0u;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count)
@@ -493,13 +511,15 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count)
         {
             CBufferPerObjectData per_obj_data;
             per_obj_data._MatrixWorld = world_mat;
+            per_obj_data._MatrixInvWorld = MatrixInverse(world_mat);
+            per_obj_data._MatrixWorld_Pre = per_obj_data._MatrixWorld;
             SetGlobalBuffer(RenderConstants::kCBufNamePerObject, (u8 *) (&per_obj_data), RenderConstants::kPerObjectDataSize);
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
             cmd->_vb = mesh->GetVertexBuffer().get();
@@ -508,7 +528,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
         void DrawMesh(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count)
@@ -521,7 +541,7 @@ namespace Ailu::Render
             cmd->_instance_count = instance_count;
             cmd->_sub_mesh = sub_mesh;
             cmd->_pass_index = pass_index;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
         void DrawMeshIndirect(Mesh *mesh, u16 sub_mesh, Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset)
@@ -534,7 +554,7 @@ namespace Ailu::Render
             cmd->_pass_index = pass_index;
             cmd->_arg_buffer = arg_buffer;
             cmd->_arg_offset = arg_offset;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
 
@@ -548,7 +568,7 @@ namespace Ailu::Render
             cmd->_pass_index = pass_index;
             cmd->_arg_buffer = arg_buffer;
             cmd->_arg_offset = arg_offset;
-            cmd->_mat->PushState(cmd->_pass_index);
+            PushMaterialState(cmd, true);
             _commands.emplace_back(cmd);
         }
 

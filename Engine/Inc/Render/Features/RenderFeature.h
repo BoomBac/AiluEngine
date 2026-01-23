@@ -43,7 +43,7 @@ namespace Ailu
             virtual void OnRecordRenderGraph(RDG::RenderGraph& graph, RenderingData& rendering_data) override {};
             virtual void Execute(GraphicsContext *context, RenderingData &rendering_data) override {};
             virtual void BeginPass(GraphicsContext *context) override {};
-            virtual void EndPass(GraphicsContext *context)
+            virtual void EndPass(GraphicsContext *context) override
             {
                 RenderTexture::ResetRenderTarget();
             };

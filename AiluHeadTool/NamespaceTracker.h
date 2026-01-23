@@ -43,6 +43,32 @@ public:
             return GetCurrentNamespace();
         }
 
+        // 匹配 class/struct（用于追踪类作用域），允许导出宏等修饰符
+        // 示例：class AILU_API CompositeBuilder
+        if (std::regex_search(clean_line, match, std::regex(R"(\b(class|struct)\s+(?:[A-Z_][A-Z0-9_]*\s+)*([a-zA-Z_][a-zA-Z0-9_]*)\b)")))
+        {
+            // 过滤前向声明：class Foo; 或 struct Bar;
+            if (clean_line.find('{') == std::string::npos && clean_line.find(';') != std::string::npos)
+            {
+                return GetCurrentNamespace();
+            }
+
+            Frame cls{.name = match[2].str(), .is_namespace = false, .is_type = true};
+
+            if (clean_line.find('{') != std::string::npos)
+            {
+                _stack.emplace_back(cls);
+                _waiting_brace += 1;
+            }
+            else
+            {
+                _pending_frames.emplace_back(cls);
+                _waiting_brace += 1;
+            }
+
+            return GetCurrentNamespace();
+        }
+
         // 处理 { 和 }
         for (char c: clean_line)
         {
@@ -51,11 +77,16 @@ public:
                 if (_waiting_brace > 0)
                 {
                     _waiting_brace--;
+                    if (!_pending_frames.empty())
+                    {
+                        _stack.emplace_back(_pending_frames.back());
+                        _pending_frames.pop_back();
+                    }
                 }
                 else
                 {
                     // 非命名空间的大括号
-                    _stack.emplace_back(Frame{.name = "", .is_namespace = false});
+                    _stack.emplace_back(Frame{.name = "", .is_namespace = false, .is_type = false});
                 }
             }
             else if (c == '}')
@@ -116,9 +147,11 @@ private:
     {
         std::string name;
         bool is_namespace;
+        bool is_type;
     };
 
     std::vector<Frame> _stack;
+    std::vector<Frame> _pending_frames;
     int _waiting_brace = 0;
 
     std::string GetCurrentNamespace() const
@@ -127,7 +160,7 @@ private:
         bool first = true;
         for (const auto &f: _stack)
         {
-            if (f.is_namespace && !f.name.empty())
+            if ((f.is_namespace || f.is_type) && !f.name.empty())
             {
                 if (!first) oss << "::";
                 oss << f.name;

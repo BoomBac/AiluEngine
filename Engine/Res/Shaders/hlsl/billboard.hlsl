@@ -60,7 +60,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 
 uint PSMainPickBuffer(PSInput input) : SV_TARGET
 {
-    float alpha = SAMPLE_TEXTURE2D(_MainTex,g_LinearClampSampler,input.uv).a;
-    clip(alpha - 0.5f);
+    //float alpha = SAMPLE_TEXTURE2D(_MainTex,g_LinearClampSampler,input.uv).a;
+    //clip(alpha - 0.5f);
 	return uint(_ObjectID);
 }
