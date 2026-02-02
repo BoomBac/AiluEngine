@@ -558,6 +558,20 @@ namespace Ailu::Render
             _commands.emplace_back(cmd);
         }
 
+        void DrawProcedural(Material *material, u16 pass_index, u32 vertex_count, u32 instance_count)
+        {
+            auto cmd = CommandPool::Get().Alloc<CommandDraw>();
+            cmd->_vb = nullptr;
+            cmd->_ib = nullptr;
+            cmd->_mat = material;
+            cmd->_sub_mesh = 0;
+            cmd->_pass_index = pass_index;
+            cmd->_vertex_count = vertex_count;
+            cmd->_instance_count = instance_count;
+            PushMaterialState(cmd, true);
+            _commands.emplace_back(cmd);
+        }
+
         void DrawProceduralIndirect(Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset)
         {
             auto cmd = CommandPool::Get().Alloc<CommandDraw>();
@@ -838,6 +852,7 @@ namespace Ailu::Render
     {
         _impl->DrawMesh(mesh,material,per_obj_data,sub_mesh,pass_index,instance_count);
     }
+    
     void CommandBuffer::DrawMeshIndirect(Mesh *mesh,u16 sub_mesh, Material *material ,u16 pass_index,GPUBuffer* arg_buffer,u32 arg_offset)
     {
         _impl->DrawMeshIndirect(mesh, sub_mesh, material, pass_index, arg_buffer, arg_offset);
@@ -846,6 +861,11 @@ namespace Ailu::Render
     void CommandBuffer::DrawProceduralIndirect(Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset)
     {
         _impl->DrawProceduralIndirect(material, pass_index, arg_buffer, arg_offset);
+    }
+
+    void CommandBuffer::DrawProcedural(Material *material, u16 pass_index, u32 vertex_count, u32 instance_count)
+    {
+        _impl->DrawProcedural(material, pass_index, vertex_count, instance_count);
     }
 
     void CommandBuffer::Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y)

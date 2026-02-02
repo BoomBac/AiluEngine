@@ -666,12 +666,8 @@ namespace Ailu::Render
                       },
                       [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                       {
-                        cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._gbuffers[0], ELoadStoreAction::kClear);
-                        cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._gbuffers[1], ELoadStoreAction::kClear);
-                        cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._gbuffers[2], ELoadStoreAction::kClear);
-                        cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._gbuffers[3], ELoadStoreAction::kClear);
-                        cmd->SetRenderTargetLoadAction(rendering_data._rg_handles._depth_target, ELoadStoreAction::kClear);
-                        cmd->SetRenderTargets(rendering_data._rg_handles._gbuffers, rendering_data._rg_handles._depth_target);
+                          cmd->SetRenderTargets(rendering_data._rg_handles._gbuffers, rendering_data._rg_handles._depth_target);
+                        cmd->ClearRenderTarget(kZFar, 0u);
                         u32 obj_index = 0;
                         for (auto &it: *rendering_data._cull_results)
                         {

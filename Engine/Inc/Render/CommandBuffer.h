@@ -152,6 +152,7 @@ namespace Ailu
         void DrawMesh(Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 sub_mesh, u16 pass_index, u32 instance_count);
         void DrawMesh(Mesh *mesh, Material *material, const Matrix4x4f &world_mat, u16 sub_mesh, u16 pass_index, u32 instance_count);
         void DrawMesh(Mesh *mesh, Material *material, const CBufferPerObjectData &per_obj_data, u16 sub_mesh, u16 pass_index, u32 instance_count);
+        void DrawProcedural(Material *material, u16 pass_index, u32 vertex_count, u32 instance_count = 1u);
         void DrawMeshIndirect(Mesh *mesh,u16 sub_mesh, Material *material ,u16 pass_index,GPUBuffer* arg_buffer,u32 arg_offset = 0u);
         void DrawProceduralIndirect(Material *material, u16 pass_index, GPUBuffer *arg_buffer, u32 arg_offset = 0u);
 

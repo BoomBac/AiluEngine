@@ -33,7 +33,7 @@ namespace Ailu
             Texture3D *_src_tex = nullptr;
             Vector2Int _view_size = Vector2Int{400, 400};
             APROPERTY()
-            Vector3f _camera_pos = Vector3f(0.0f,2.0f,-2.0f);
+            Vector3f _camera_pos = Vector3f(-5.0f,3.38f,7.48f);
             Ref<RenderTexture> _color_buffer = nullptr;
             Ref<RenderTexture> _depth_buffer = nullptr;
             Ref<Material> _slice_mat;

@@ -298,8 +298,8 @@ static void GenerateClassTypeInfo(const AiluHeadTool::ClassInfo &class_info, std
             file << std::format("{}.Set(\"IsFloatRange\",{});", cur_meta, BOOL_STR(mem._meta._is_float_range)) << std::endl;
             if (mem._meta._is_float_range)
             {
-                file << std::format("{}.Set(\"RangeMin\",{});", cur_meta, mem._meta._min) << std::endl;
-                file << std::format("{}.Set(\"RangeMax\",{});", cur_meta, mem._meta._max) << std::endl;
+                file << std::format("{}.Set(\"RangeMin\",(f32){});", cur_meta, mem._meta._min) << std::endl;
+                file << std::format("{}.Set(\"RangeMax\",(f32){});", cur_meta, mem._meta._max) << std::endl;
             }
             else
             {

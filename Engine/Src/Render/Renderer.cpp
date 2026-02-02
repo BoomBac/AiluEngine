@@ -196,6 +196,7 @@ namespace Ailu::Render
             auto cam_color_desc = _rendering_data._camera_data._camera_color_target_desc = TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
             _rendering_data._rg_handles._color_target = _rd_graph->CreateResource(cam_color_desc, RenderResourceName::kCameraColorA);
             auto cam_depth_desc = _rendering_data._camera_data._camera_depth_target_desc = TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDepth);
+            cam_depth_desc._load = ELoadStoreAction::kNotCare;
             _rendering_data._rg_handles._depth_target = _rd_graph->CreateResource(cam_depth_desc, RenderResourceName::kCameraDepth);
             TextureDesc desc = TextureDesc(pixel_width, pixel_height, ERenderTargetFormat::kDefaultHDR);
             desc._load = ELoadStoreAction::kNotCare;

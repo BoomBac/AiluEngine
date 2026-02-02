@@ -106,14 +106,31 @@ namespace Ailu
                     }
                 }
             }
-            
-            if (s_mgr->_pre_hover_widget && cur_hover_widget && cur_hover_widget != s_mgr->_pre_hover_widget)
+            else
             {
-                UI::UIEvent ue;
-                ue._type = UIEvent::EType::kMouseExitWindow;
-                ue._mouse_position = Input::GetMousePos(e._window);
-                ue._mouse_delta = Input::GetMousePosDelta();
-                s_mgr->_pre_hover_widget->OnEvent(ue);
+                auto &widget = s_mgr->_widgets;
+                for (i32 i = (i32) widget.size() - 1; i >= 0; i--)
+                {
+                    auto w = widget[i].get();
+                    if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
+                        continue;
+                    if (w->IsHover(ue._mouse_position))//上层已经生成了事件，下次就不再响应
+                    {
+                        cur_hover_widget = w;
+                        break;
+                    }
+                }
+            }
+            if (s_mgr->_pre_hover_widget)
+            {
+                if (cur_hover_widget && cur_hover_widget != s_mgr->_pre_hover_widget || cur_hover_widget == nullptr)
+                {
+                    UI::UIEvent ue;
+                    ue._type = UIEvent::EType::kMouseExit;
+                    ue._mouse_position = Input::GetMousePos(e._window);
+                    ue._mouse_delta = Input::GetMousePosDelta();
+                    s_mgr->_pre_hover_widget->OnEvent(ue);
+                }
             }
             s_mgr->_pre_hover_widget = cur_hover_widget;
         }

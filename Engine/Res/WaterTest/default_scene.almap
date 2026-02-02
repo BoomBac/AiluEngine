@@ -45,8 +45,8 @@ _layer_mask:1
         _transform_component:
             _transform:
                 _position:14.517980576,3.078702927,8.787034988
-                _rotation:0.386361241,0.170422658,-0.078974023,0.903019488
-                _scale:0.999831676,0.999866247,0.999835551
+                _rotation:0.360687047,-0.185371488,0.073382407,0.911129653
+                _scale:0.999831975,0.999866009,0.999836028
         _light_component:
             _type:kDirectional
             _light:
@@ -70,7 +70,7 @@ Entity:4
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:3.344202042,-8.489746094,-4.988892078
+                _position:0.000000000,-24.367187500,-3.650000095
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:163.044464111,163.044464111,163.044464111
         _static_mesh_component:
@@ -98,7 +98,7 @@ _layer_mask:1
         _transform_component:
             _transform:
                 _position:21.469730377,23.685842514,0.000000000
-                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
+                _rotation:0.000000000,0.000000038,0.000000000,1.000000000
                 _scale:1.000000000,1.000000000,1.000000000
         _hierarchy_component:
             _first_child:0
@@ -195,11 +195,11 @@ Entity:9
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:13.762855530,-3.170633554,11.022795677
-                _rotation:-0.000000003,0.243711591,-0.000000012,0.969847739
-                _scale:2.091190815,2.091190815,2.091190815
+                _position:54.000000000,13.082031250,13.000000000
+                _rotation:-0.707107127,0.000000048,0.000000048,0.707106411
+                _scale:3.000000000,3.000000000,3.000000000
         _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
+            _p_mesh:beccf997-dcb3-4217-b213-42059ec71ce8
             _material_num:1
             _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         _hierarchy_component:
@@ -303,9 +303,9 @@ Entity:13
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:4.840332031,-2.685547113,-33.629882812
-                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:0.999922395,0.999932170,0.999934077
+                _position:54.000000000,31.000000000,-1.341308951
+                _rotation:-0.025419002,0.000000038,0.000000001,0.999676883
+                _scale:0.999921978,0.999931991,0.999934018
         _hierarchy_component:
             _first_child:0
             _prev_sibling:0
@@ -317,8 +317,8 @@ _layer_mask:1
             _camera:
                 _type:kPerspective
                 _aspect:1.875
-                _far:164.632
-                _near:3
+                _far:50
+                _near:0.1
                 _fovh:41.269
                 _size:15.651
 Entity:14
@@ -429,3 +429,22 @@ _layer_mask:1
             _is_trigger:1
             _center:0.00,0.00,0.00
             _param:1.00,1.00,1.00
+Entity:18
+        _tag_component:
+            _name:new_object_18
+_layer_mask:0
+        _transform_component:
+            _transform:
+                _position:44.281826019,-5.349302292,-20.597919464
+                _rotation:0.000000000,0.000000000,0.000000000,1.000000000
+                _scale:1.000000000,1.000000000,1.000000000
+        _static_mesh_component:
+            _p_mesh:beccf997-dcb3-4217-b213-42059ec71ce8
+            _material_num:0
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0

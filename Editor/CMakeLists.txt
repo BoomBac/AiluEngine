@@ -38,6 +38,7 @@ target_include_directories(Editor PUBLIC ${EDITOR_ROOT_PATH}/Inc)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH})
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Inc)
+target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/tracy/public)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/imgui)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 
@@ -45,6 +46,13 @@ target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 # 宏定义
 target_compile_definitions(Editor PUBLIC _DEBUG;Editor_EXPORTS;_WINDOWS;_REVERSED_Z)
+
+if (AILU_ENABLE_TRACY)
+    target_compile_definitions(Editor PUBLIC TRACY_ENABLE TRACY_IMPORTS)
+    if (AILU_TRACY_ON_DEMAND)
+        target_compile_definitions(Editor PUBLIC TRACY_ON_DEMAND)
+    endif()
+endif()
 set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 # 编译器参数
 # if(MSVC)

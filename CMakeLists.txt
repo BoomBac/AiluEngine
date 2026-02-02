@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 set(AiluBuildPath F://AiluBuild)
 
+option(AILU_ENABLE_TRACY "Enable Tracy profiler instrumentation" ON)
+option(AILU_TRACY_ON_DEMAND "Tracy connects only when profiler is attached" ON)
+
 # 添加engine子目录
 add_subdirectory(Engine)
 

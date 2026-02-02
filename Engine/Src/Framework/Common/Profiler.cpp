@@ -86,7 +86,7 @@ namespace Ailu
         {
             AL_ASSERT(numCPUProfiles < kMaxProfileNum);
             profileIdx = numCPUProfiles++;
-            _gpu_profiles[profileIdx].Name = name;
+            _cpu_profiles[profileIdx].Name = name;
         }
         ProfileData &profile_data = _cpu_profiles[profileIdx];
         AL_ASSERT(profile_data._is_start != true);
@@ -264,6 +264,10 @@ namespace Ailu
     //----------------------------------------------------------------------------------GpuProfileBlock------------------------------------------------------------------------------
     GpuProfileBlock::GpuProfileBlock(CommandBuffer *cmdList, const String &name) : _cmdList(cmdList), _name(name)
     {
+// #if defined(TRACY_ENABLE)
+//         TracyCZone(_tracy_ctx, true);
+//         TracyCZoneName(_tracy_ctx, _name.c_str(), _name.size());
+// #endif
         cmdList->BeginProfiler(name);
         //		idx = Profiler::Get().StartGpuProfile(cmdList, name);
         //		Profiler::Get().AddGPUProfilerHierarchy(true, idx);
@@ -273,21 +277,40 @@ namespace Ailu
         _cmdList->EndProfiler();
         //		Profiler::Get().EndGpuProfile(cmdList, idx);
         //		Profiler::Get().AddGPUProfilerHierarchy(false, idx);
+
+// #if defined(TRACY_ENABLE)
+//         TracyCZoneEnd(_tracy_ctx);
+// #endif
     }
     //----------------------------------------------------------------------------------GpuProfileBlock------------------------------------------------------------------------------
 
     //----------------------------------------------------------------------------------CPUProfileBlock------------------------------------------------------------------------------
     CPUProfileBlock::CPUProfileBlock(const String &name)
     {
+#if defined(TRACY_ENABLE)
+        _owner_thread_id = std::this_thread::get_id();
+        static const tracy::SourceLocationData tracy_cpu_profileblock_srcloc{ "CPUProfileBlock", "CPUProfileBlock", __FILE__, (uint32_t)__LINE__, 0 };
+        _tracy_zone.emplace(&tracy_cpu_profileblock_srcloc, true);
+        _tracy_zone->Name(name.c_str(), name.size());
+#endif
         std::lock_guard<std::mutex> lock(_mutex);
         idx = Profiler::Get().StartCPUProfile(name);
         Profiler::Get().AddCPUProfilerHierarchy(true, idx);
     }
     CPUProfileBlock::~CPUProfileBlock()
     {
+    #if defined(TRACY_ENABLE)
+        // Tracy requires zone begin/end on the same thread.
+        AL_ASSERT(_owner_thread_id == std::this_thread::get_id());
+    #endif
         std::lock_guard<std::mutex> lock(_mutex);
         Profiler::Get().EndCPUProfile(idx);
         Profiler::Get().AddCPUProfilerHierarchy(false, idx);
+
+    #if defined(TRACY_ENABLE)
+        // End the zone after CPU profiler bookkeeping.
+        _tracy_zone.reset();
+    #endif
     }
     //----------------------------------------------------------------------------------CPUProfileBlock------------------------------------------------------------------------------
 }// namespace Ailu

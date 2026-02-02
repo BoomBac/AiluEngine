@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __VOLUMETRICFOG_GEN_H__
 //Class VolumetricFog begin...........................
-#define VOLUMETRICFOG_GEN_H_28_GENERATED_BODY \
+#define VOLUMETRICFOG_GEN_H_14_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_VolumetricFog_Type();\
                                 static Type* GetPrivateStaticClass();\

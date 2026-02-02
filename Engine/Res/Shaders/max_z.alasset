@@ -1,0 +1,5 @@
+guid: 6d1148fb-00a4-4720-8ca0-7dd877b0da55
+type: kComputeShader
+name: MaxZ
+  file: Shaders/hlsl/Compute/max_z.hlsl
+  kernel: Noname

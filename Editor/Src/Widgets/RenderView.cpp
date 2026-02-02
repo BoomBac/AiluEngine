@@ -322,6 +322,12 @@ namespace Ailu
             _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("SliceX", pass_type->FindPropertyByName("_slice_x"), _pass,&fparams));
             _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("SliceY", pass_type->FindPropertyByName("_slice_y"), _pass,&fparams));
             _right_menu->AddChild(UI::CompositeBuilder::BuildPropertyElement("SliceZ", pass_type->FindPropertyByName("_slice_z"), _pass,&fparams));
+            auto z_slice_prop = pass_type->FindPropertyByName("_slice_z");
+            z_slice_prop->AddObserver(_pass, [this, z_slice_prop](void* instance)
+            {
+                auto z = z_slice_prop->Get<f32>(instance);
+                LOG_INFO("Slice Z changed: {}", round(z * 96 - 0.5));
+            });
             _pass->_on_target_ready = [this](Render::RenderTexture* rt)
             {
                 _left_preview->SetTexture(rt);

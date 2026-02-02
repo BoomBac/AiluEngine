@@ -14,6 +14,126 @@ namespace Ailu
     using namespace UI;
     namespace Editor
     {
+        namespace
+        {
+            inline const Vector4f kPropLabelMargin = {2.0f, 0.0f, 2.0f, 2.0f};
+            inline const Vector4f kPropValueMargin = {10.0f, 0.0f, 2.0f, 2.0f};
+            inline const Vector4f kPropInnerMargin = {2.0f, 0.0f, 2.0f, 2.0f};
+            inline constexpr f32 kPropLabelFill = 1.0f;
+            inline constexpr f32 kPropValueFill = 3.0f;
+
+            inline UI::HorizontalBox *AddPropertyRow(UI::UIElement *parent, const String &label, UI::HorizontalBox **out_value_box = nullptr)
+            {
+                auto row = parent->AddChild<UI::HorizontalBox>();
+                row->AddChild<UI::Text>(label)
+                        ->SlotMargin(kPropLabelMargin)
+                        .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                        .SlotFillRate(kPropLabelFill);
+
+                auto value_box = row->AddChild<UI::HorizontalBox>()
+                                         ->SlotMargin(kPropValueMargin)
+                                         .SlotAlignmentH(UI::EAlignment::kRight)
+                                         .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                         .SlotFillRate(kPropValueFill)
+                                         .As<UI::HorizontalBox>();
+
+                if (out_value_box != nullptr)
+                    *out_value_box = value_box;
+                return row;
+            }
+
+            inline UI::InputBlock *AddFloatInputRow(UI::UIElement *parent, const String &label, const String &initial_text, const std::function<void(f32)> &on_value_changed)
+            {
+                UI::HorizontalBox *value_box = nullptr;
+                AddPropertyRow(parent, label, &value_box);
+
+                auto input = value_box->AddChild<UI::InputBlock>(initial_text)
+                                     ->SlotMargin(kPropInnerMargin)
+                                     .SlotAlignmentH(UI::EAlignment::kRight)
+                                     .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                     .SlotFillRate(1.0f)
+                                     .As<UI::InputBlock>();
+                if (on_value_changed)
+                {
+                    input->_on_content_changed += [on_value_changed](String content)
+                    {
+                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                            on_value_changed(opt.value());
+                    };
+                }
+                return input;
+            }
+
+            inline UI::Slider *AddFloatSliderRow(UI::UIElement *parent, const String &label, f32 min_value, f32 max_value, f32 value, const std::function<void(f32)> &on_value_changed)
+            {
+                UI::HorizontalBox *value_box = nullptr;
+                AddPropertyRow(parent, label, &value_box);
+
+                auto slider = value_box->AddChild<UI::Slider>(min_value, max_value, value)
+                                      ->SlotMargin(kPropInnerMargin)
+                                      .SlotAlignmentH(UI::EAlignment::kRight)
+                                      .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                      .SlotFillRate(1.0f)
+                                      .As<UI::Slider>();
+                if (on_value_changed)
+                    slider->_on_value_change += [on_value_changed](f32 v) { on_value_changed(v); };
+                return slider;
+            }
+
+            inline Array<UI::InputBlock *, 3> AddVec3InputRow(UI::UIElement *parent, const String &label,
+                                                              const String &x_text = String{}, const String &y_text = String{}, const String &z_text = String{},
+                                                              const std::function<void(int, f32)> &on_axis_value_changed = {})
+            {
+                UI::HorizontalBox *value_box = nullptr;
+                AddPropertyRow(parent, label, &value_box);
+
+                Array<UI::InputBlock *, 3> blocks{};
+                const Array<String, 3> texts = {x_text, y_text, z_text};
+                for (int axis = 0; axis < 3; ++axis)
+                {
+                    blocks[axis] = value_box->AddChild<UI::InputBlock>(texts[axis])
+                                           ->SlotMargin(kPropInnerMargin)
+                                           .SlotAlignmentH(UI::EAlignment::kRight)
+                                           .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                           .SlotFillRate(1.0f)
+                                           .As<UI::InputBlock>();
+                    if (on_axis_value_changed)
+                    {
+                        blocks[axis]->_on_content_changed += [axis, on_axis_value_changed](String content)
+                        {
+                            if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                                on_axis_value_changed(axis, opt.value());
+                        };
+                    }
+                }
+                return blocks;
+            }
+
+            inline UI::Button *AddButtonRow(UI::UIElement *parent, const String &label, const String &button_text)
+            {
+                UI::HorizontalBox *value_box = nullptr;
+                AddPropertyRow(parent, label, &value_box);
+                auto btn = value_box->AddChild<UI::Button>()
+                                   ->SlotMargin(kPropInnerMargin)
+                                   .SlotAlignmentH(UI::EAlignment::kRight)
+                                   .As<UI::Button>();
+                btn->SetText(button_text);
+                return btn;
+            }
+
+            inline UI::Dropdown *AddDropdownRow(UI::UIElement *parent, const String &label, const Vector<String> &items)
+            {
+                UI::HorizontalBox *value_box = nullptr;
+                AddPropertyRow(parent, label, &value_box);
+                return value_box->AddChild<UI::Dropdown>(items)
+                        ->SlotMargin(kPropInnerMargin)
+                        .SlotAlignmentH(UI::EAlignment::kRight)
+                        .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                        .SlotFillRate(1.0f)
+                        .As<UI::Dropdown>();
+            }
+        }// namespace
+
         inline void ShowPopupListView(UI::UIElement *anchor, float viewport_height, const std::function<void(const Ref<UI::ListView> &)> &fill_fn)
         {
             auto list_view = MakeRef<UI::ListView>();
@@ -36,22 +156,29 @@ namespace Ailu
 
         static void CreateMaterialPropWidget(UI::UIElement *root, Render::ShaderPropertyInfo &prop, Material *obj)
         {
-            auto hb = root->AddChild<UI::HorizontalBox>();
-            hb->AddChild<UI::Text>(prop._prop_name)->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
+            UI::HorizontalBox *value_box = nullptr;
+            AddPropertyRow(root, prop._prop_name, &value_box);
 
             if (prop._type == Render::EShaderPropertyType::kRange)
             {
-                auto slider = hb->AddChild<UI::Slider>();
-                slider->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotFillRate(3.0f);
+                auto slider = value_box->AddChild<UI::Slider>()
+                                      ->SlotMargin(kPropInnerMargin)
+                                      .SlotAlignmentH(UI::EAlignment::kRight)
+                                      .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                      .SlotFillRate(1.0f)
+                                      .As<UI::Slider>();
                 slider->_range = {prop._default_value[0], prop._default_value[1]};
-                slider->_on_value_change += [&prop, obj](f32 v)
-                {
-                    prop.SetValue<f32>(v);
-                };
+                slider->_on_value_change += [&prop](f32 v) { prop.SetValue<f32>(v); };
             }
             else if (prop._type == Render::EShaderPropertyType::kFloat)
             {
-                hb->AddChild<UI::InputBlock>()->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotFillRate(3.0f).As<UI::InputBlock>()->_on_content_changed += [&](String content)
+                auto input = value_box->AddChild<UI::InputBlock>()
+                                     ->SlotMargin(kPropInnerMargin)
+                                     .SlotAlignmentH(UI::EAlignment::kRight)
+                                     .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                     .SlotFillRate(1.0f)
+                                     .As<UI::InputBlock>();
+                input->_on_content_changed += [&](String content)
                 {
                     if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
                         prop.SetValue<f32>(opt.value());
@@ -59,8 +186,13 @@ namespace Ailu
             }
             else if (prop._type == Render::EShaderPropertyType::kColor)
             {
-                auto btn = hb->AddChild<UI::Button>();
-                btn->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotFillRate(3.0f).As<UI::Button>()->OnMouseClick() += [&prop](UI::UIEvent &e)
+                auto btn = value_box->AddChild<UI::Button>()
+                                   ->SlotMargin(kPropInnerMargin)
+                                   .SlotAlignmentH(UI::EAlignment::kRight)
+                                   .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                   .SlotFillRate(1.0f)
+                                   .As<UI::Button>();
+                btn->OnMouseClick() += [&prop](UI::UIEvent &e)
                 {
                     auto color_picker = MakeRef<UI::ColorPicker>(prop.GetValue<Vector4f>());
                     color_picker->Name(std::format("ColorPicker_{}", prop._prop_name));
@@ -78,8 +210,13 @@ namespace Ailu
             }
             else if (prop._type == Render::EShaderPropertyType::kTexture2D)
             {
-                auto btn = hb->AddChild<UI::Button>();
-                btn->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotFillRate(3.0f).As<UI::Button>()->OnMouseClick() += [&prop, obj](UI::UIEvent &e)
+                auto btn = value_box->AddChild<UI::Button>()
+                                   ->SlotMargin(kPropInnerMargin)
+                                   .SlotAlignmentH(UI::EAlignment::kRight)
+                                   .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                   .SlotFillRate(1.0f)
+                                   .As<UI::Button>();
+                btn->OnMouseClick() += [&prop, obj](UI::UIEvent &e)
                 {
                     ShowPopupListView(e._current_target, 200.0f, [&prop, obj](const Ref<UI::ListView> &list_view)
                                       {
@@ -122,21 +259,9 @@ namespace Ailu
             _vb->AddChild<UI::Text>("Name");
             _vb->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             auto transf_block = _vb->AddChild<UI::CollapsibleView>("Transform")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>()->GetContent()->AddChild<UI::VerticalBox>();
-            auto pos_hb = transf_block->AddChild<UI::HorizontalBox>();
-            pos_hb->AddChild<UI::Text>("Position");
-            _pos_block[0] = pos_hb->AddChild<UI::InputBlock>("0000")->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
-            _pos_block[1] = pos_hb->AddChild<UI::InputBlock>()->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
-            _pos_block[2] = pos_hb->AddChild<UI::InputBlock>()->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
-            auto rot_hb = transf_block->AddChild<UI::HorizontalBox>();
-            rot_hb->AddChild<UI::Text>("Rotation");
-            _rot_block[0] = rot_hb->AddChild<UI::InputBlock>()->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
-            _rot_block[1] = rot_hb->AddChild<UI::InputBlock>()->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
-            _rot_block[2] = rot_hb->AddChild<UI::InputBlock>()->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
-            auto scale_hb = transf_block->AddChild<UI::HorizontalBox>();
-            scale_hb->AddChild<UI::Text>("Scale");
-            _scale_block[0] = scale_hb->AddChild<UI::InputBlock>()->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
-            _scale_block[1] = scale_hb->AddChild<UI::InputBlock>()->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
-            _scale_block[2] = scale_hb->AddChild<UI::InputBlock>()->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>();
+            _pos_block = AddVec3InputRow(transf_block, "Position", "0000");
+            _rot_block = AddVec3InputRow(transf_block, "Rotation");
+            _scale_block = AddVec3InputRow(transf_block, "Scale");
             _pos_block[0]->_on_content_changed += [this](String content)
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
@@ -174,6 +299,92 @@ namespace Ailu
                 }
             };
 
+            _rot_block[0]->_on_content_changed += [this](String content)
+            {
+                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                {
+                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    {
+                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                        {
+                            Vector3f euler = Quaternion::EulerAngles(comp->_transform._rotation);
+                            euler.x = opt.value();
+                            comp->_transform._rotation = Quaternion::EulerAngles(euler);
+                        }
+                    }
+                }
+            };
+            _rot_block[1]->_on_content_changed += [this](String content)
+            {
+                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                {
+                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    {
+                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                        {
+                            Vector3f euler = Quaternion::EulerAngles(comp->_transform._rotation);
+                            euler.y = opt.value();
+                            comp->_transform._rotation = Quaternion::EulerAngles(euler);
+                        }
+                    }
+                }
+            };
+            _rot_block[2]->_on_content_changed += [this](String content)
+            {
+                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                {
+                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    {
+                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                        {
+                            Vector3f euler = Quaternion::EulerAngles(comp->_transform._rotation);
+                            euler.z = opt.value();
+                            comp->_transform._rotation = Quaternion::EulerAngles(euler);
+                        }
+                    }
+                }
+            };
+
+            _scale_block[0]->_on_content_changed += [this](String content)
+            {
+                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                {
+                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    {
+                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                            comp->_transform._scale.x = opt.value();
+                    }
+                }
+            };
+            _scale_block[1]->_on_content_changed += [this](String content)
+            {
+                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                {
+                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    {
+                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                            comp->_transform._scale.y = opt.value();
+                    }
+                }
+            };
+            _scale_block[2]->_on_content_changed += [this](String content)
+            {
+                if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
+                {
+                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
+                    {
+                        if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                            comp->_transform._scale.z = opt.value();
+                    }
+                }
+            };
+
             //auto color_picker = _vb->AddChild<UI::ColorPicker>(Colors::kBlue);
             //color_picker->OnValueChanged() += [](Vector4f color)
             //{
@@ -207,9 +418,10 @@ namespace Ailu
                     set_block(_pos_block[0], comp->_transform._position.x);
                     set_block(_pos_block[1], comp->_transform._position.y);
                     set_block(_pos_block[2], comp->_transform._position.z);
-                    set_block(_rot_block[0], comp->_transform._rotation.x);
-                    set_block(_rot_block[1], comp->_transform._rotation.y);
-                    set_block(_rot_block[2], comp->_transform._rotation.z);
+                    Vector3f euler = Quaternion::EulerAngles(comp->_transform._rotation);
+                    set_block(_rot_block[0], euler.x);
+                    set_block(_rot_block[1], euler.y);
+                    set_block(_rot_block[2], euler.z);
                     set_block(_scale_block[0], comp->_transform._scale.x);
                     set_block(_scale_block[1], comp->_transform._scale.y);
                     set_block(_scale_block[2], comp->_transform._scale.z);
@@ -222,37 +434,28 @@ namespace Ailu
                         _light_block = _vb->AddChild<UI::CollapsibleView>("LightComp")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
                         auto content = _light_block->GetContent()->AddChild<UI::VerticalBox>();
                         auto items = Vector<String>{"Directional", "Point", "Spot", "Area"};
-                        content->AddChild<UI::Dropdown>(items);
+                        AddDropdownRow(content, "Type", items);
                         {
-                            auto hb = content->AddChild<UI::HorizontalBox>();
-                            hb->AddChild<UI::Text>("Intensity")->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
-                            auto ints = hb->AddChild<UI::Slider>(0.0f, 100.0f, comp->_light._light_color.a)->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotMargin({10.0f, 0.0f, 0.0f, 0.0f}).As<UI::Slider>();
-                            ints->_on_value_change += [=](f32 value)
-                            {
-                                comp->_light._light_color.a = value;
-                            };
+                            AddFloatSliderRow(content, "Intensity", 0.0f, 100.0f, comp->_light._light_color.a, [=](f32 value)
+                                              { comp->_light._light_color.a = value; });
                         }
                         {
-                            auto hb = content->AddChild<UI::HorizontalBox>();
-                            hb->AddChild<UI::Text>("Color")->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
-                            hb->AddChild<UI::InputBlock>(std::format("{}", comp->_light._light_color.r))->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>()->_on_content_changed += [=](String content)
-                            {
-                                if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                                    comp->_light._light_color.r = opt.value();
-                                Clamp(comp->_light._light_color.r, 0.0f, 1.0f);
-                            };
-                            hb->AddChild<UI::InputBlock>(std::format("{}", comp->_light._light_color.g))->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>()->_on_content_changed += [=](String content)
-                            {
-                                if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                                    comp->_light._light_color.g = opt.value();
-                                Clamp(comp->_light._light_color.g, 0.0f, 1.0f);
-                            };
-                            hb->AddChild<UI::InputBlock>(std::format("{}", comp->_light._light_color.b))->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).As<UI::InputBlock>()->_on_content_changed += [=](String content)
-                            {
-                                if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                                    comp->_light._light_color.b = opt.value();
-                                Clamp(comp->_light._light_color.b, 0.0f, 1.0f);
-                            };
+                            AddVec3InputRow(content, "Color",
+                                            std::format("{}", comp->_light._light_color.r),
+                                            std::format("{}", comp->_light._light_color.g),
+                                            std::format("{}", comp->_light._light_color.b),
+                                            [=](int axis, f32 v)
+                                            {
+                                                if (axis == 0)
+                                                    comp->_light._light_color.r = v;
+                                                else if (axis == 1)
+                                                    comp->_light._light_color.g = v;
+                                                else
+                                                    comp->_light._light_color.b = v;
+                                                Clamp(comp->_light._light_color.r, 0.0f, 1.0f);
+                                                Clamp(comp->_light._light_color.g, 0.0f, 1.0f);
+                                                Clamp(comp->_light._light_color.b, 0.0f, 1.0f);
+                                            });
                         }
                     }
                     _prev_comp_block = _light_block;
@@ -266,11 +469,7 @@ namespace Ailu
                         auto content = _static_mesh_block->GetContent()->AddChild<UI::VerticalBox>();
                         //mesh
                         {
-                            auto hb = content->AddChild<UI::HorizontalBox>();
-                            hb->AddChild<UI::Text>("Mesh: ")->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
-                            auto btn = hb->AddChild<UI::Button>();
-                            btn->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight);
-                            btn->SetText(std::format("Mesh: {}", comp->_p_mesh->Name()));
+                            auto btn = AddButtonRow(content, "Mesh", comp->_p_mesh != nullptr ? comp->_p_mesh->Name() : "None");
                             btn->OnMouseClick() += [comp, btn](UI::UIEvent &e)
                             {
                                 ShowPopupListView(e._current_target, 200.0f, [comp, btn](const Ref<UI::ListView> &list_view)
@@ -292,11 +491,7 @@ namespace Ailu
                         }
                         //material
                         {
-                            auto hb = content->AddChild<UI::HorizontalBox>();
-                            hb->AddChild<UI::Text>("Material: ")->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto);
-                            auto btn = hb->AddChild<UI::Button>();
-                            btn->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight);
-                            btn->SetText(std::format("Material: {}", comp->_p_mats[0]->Name()));
+                            auto btn = AddButtonRow(content, "Material", (comp->_p_mats[0] != nullptr) ? comp->_p_mats[0]->Name() : "None");
                             btn->OnMouseClick() += [comp, btn](UI::UIEvent &e)
                             {
                                 ShowPopupListView(e._current_target, 200.0f, [comp, btn](const Ref<UI::ListView> &list_view)
@@ -317,6 +512,12 @@ namespace Ailu
                             };
                             if (auto mat = comp->_p_mats[0]; mat != nullptr)
                             {
+                                auto dropdown = AddDropdownRow(content, "CullMode", Vector<String>{"Off", "Front", "Back"});
+                                dropdown->SetSelectedIndex(static_cast<i32>(mat->GetCullMode()));
+                                dropdown->_on_selected_changed += [mat](i32 idx)
+                                {
+                                    mat->SetCullMode(static_cast<Render::ECullMode>(idx));
+                                };
                                 for (auto &prop: mat->GetShaderProperty())
                                 {
                                     CreateMaterialPropWidget(content, *prop, mat.get());
@@ -353,38 +554,18 @@ namespace Ailu
                         auto content = _cam_block->GetContent()->AddChild<UI::VerticalBox>();
                         //camera type
                         auto items = Vector<String>{"Perspective", "Orthographic"};
-                        content->AddChild<UI::Dropdown>(items);
+                        AddDropdownRow(content, "Type", items);
                         {
-                            auto hb = content->AddChild<UI::HorizontalBox>();
-                            hb->AddChild<UI::Text>("Near")->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
-                            hb->AddChild<UI::InputBlock>(std::format("{}", comp->_camera.Near()))->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                            .SlotFillRate(3.0f).As<UI::InputBlock>()->_on_content_changed += [=](String content)
-                            {
-                                if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                                    comp->_camera.Near(opt.value());
-                            };
+                            AddFloatInputRow(content, "Near", std::format("{}", comp->_camera.Near()), [=](f32 v)
+                                             { comp->_camera.Near(v); });
                         }
                         {
-                            auto hb = content->AddChild<UI::HorizontalBox>();
-                            hb->AddChild<UI::Text>("Far")->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
-                            hb->AddChild<UI::InputBlock>(std::format("{}", comp->_camera.Far()))->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                            .SlotFillRate(3.0f).As<UI::InputBlock>()->_on_content_changed += [=](String content)
-                            {
-                                if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                                    comp->_camera.Far(opt.value());
-                            };
+                            AddFloatInputRow(content, "Far", std::format("{}", comp->_camera.Far()), [=](f32 v)
+                                             { comp->_camera.Far(v); });
                         }
                         {
-                            auto hb = content->AddChild<UI::HorizontalBox>();
-                            hb->AddChild<UI::Text>("Aspect")->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
-                            hb->AddChild<UI::InputBlock>(std::format("{}", comp->_camera.Aspect()))->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                            .SlotFillRate(3.0f).As<UI::InputBlock>()->_on_content_changed += [=](String content)
-                            {
-                                if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                                {
-                                    comp->_camera.Aspect(opt.value());
-                                }
-                            };
+                            AddFloatInputRow(content, "Aspect", std::format("{}", comp->_camera.Aspect()), [=](f32 v)
+                                             { comp->_camera.Aspect(v); });
                         }
                     }
                     _prev_comp_block = _cam_block;

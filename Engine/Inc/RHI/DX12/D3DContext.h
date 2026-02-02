@@ -5,6 +5,9 @@
 #include <d3dx12.h>
 #include <dxgi1_6.h>
 
+// Tracy GPU profiling (D3D12). This header is lightweight when TRACY_ENABLE is not defined.
+#include "tracy/TracyD3D12.hpp"
+
 
 #ifdef _DIRECT_WRITE
 #include <dwrite.h>
@@ -168,6 +171,8 @@ namespace Ailu::RHI::DX12
         // Pipeline objects.
         ComPtr<ID3D12Device> m_device;
         ComPtr<ID3D12CommandQueue> m_commandQueue;
+
+        TracyD3D12Ctx _tracy_d3d12_ctx = nullptr;
         ComPtr<IDXGIAdapter4> _p_adapter;
         DXGI_QUERY_VIDEO_MEMORY_INFO _local_video_memory_info;
         DXGI_QUERY_VIDEO_MEMORY_INFO _non_local_video_memory_info;

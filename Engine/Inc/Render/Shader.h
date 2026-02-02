@@ -509,6 +509,8 @@ namespace Ailu::Render
         };
 
     public:
+        inline static const u32 kCBufferSize = 1024u;
+    public:
         FORCEINLINE static void EnableGlobalKeywords(const String &kw) 
         {
             s_global_active_keywords.insert(kw);
@@ -650,7 +652,8 @@ namespace Ailu::Render
         //bind_slot:cubemapface,mipmap
         std::unordered_map<u16, ComputeBindParams> _bind_params{};
         bool _is_valid;
-        u8 _cbuf_data[256];
+        u8 _cbuf_data[kCBufferSize];
+        u8 _cache_cbuf_data[kCBufferSize];//重编译之前复制一份缓存，用于恢复已有的数据
         String _internal_cbuf_name="";
         Queue<BindState> _bind_state;
         std::mutex _state_mutex;

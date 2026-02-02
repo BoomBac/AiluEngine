@@ -983,6 +983,7 @@ namespace Ailu::Render
     {
         _name = ToChar(PathUtils::GetFileName(sys_path));
         Preprocess();
+        memset(_cbuf_data, 0, sizeof(_cbuf_data));
     }
     void ComputeShader::SetGlobalTexture(const String &name, RTHandle texture)
     {
@@ -1397,6 +1398,7 @@ namespace Ailu::Render
         }
         //Preprocess();
         bool is_succeed = true;
+        memcpy( _cache_cbuf_data, _cbuf_data, sizeof(u8) * kCBufferSize);
         for (auto& k: _kernels)
         {
             for (auto &v: k._variants)

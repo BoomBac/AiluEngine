@@ -4,7 +4,7 @@
 //vert: VSMain
 //pixel: PSMain
 //Cull: Off
-//ZWrite: Off
+//ZWrite: On
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
 //multi_compile _ _DrawMode_Slice _DrawMode_Volume
@@ -70,7 +70,7 @@ struct AABB
     float3 min;
     float3 max;
 };
-#define ITERATIONS 16
+#define ITERATIONS 32
 
 bool intersect(Ray r, AABB aabb, out float t0, out float t1)
 {
@@ -109,8 +109,8 @@ float4 PSMain(PSInput i) : SV_Target
         uvw = float3(i.uv.x, _Slice, i.uv.y);
     else
         uvw = float3(i.uv, _Slice);
-    dst = SAMPLE_TEXTURE3D_LOD(_MainTex,g_LinearWrapSampler,uvw,_Mipmap);
-    dst.a = max(Flux(dst.rgb),0.2f);
+    dst = SAMPLE_TEXTURE3D_LOD(_MainTex,g_PointClampSampler,uvw,_Mipmap);
+    dst.a = 1.0;//max(Flux(dst.rgb),0.2f);
     //dst.rgb = uvw.xyz;
 #else
     Ray ray;

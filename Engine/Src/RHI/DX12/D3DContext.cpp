@@ -19,6 +19,9 @@
 #include "pch.h"
 #include <dxgidebug.h>
 #include <limits>
+#include <memory>
+#include <stack>
+#include <cstring>
 
 #include "RHI/DX12/D3DBuffer.h"
 #include "RHI/DX12/D3DGraphicsPipelineState.h"
@@ -658,6 +661,14 @@ namespace Ailu::RHI::DX12
         // Ensure that the GPU is no longer referencing resources that are about to be
         // cleaned up by the destructor.
         WaitForGpu();
+
+// #if defined(TRACY_ENABLE)
+//         if (_tracy_d3d12_ctx)
+//         {
+//             TracyD3D12Destroy(_tracy_d3d12_ctx);
+//             _tracy_d3d12_ctx = nullptr;
+//         }
+// #endif
         //CloseHandle(m_fenceEvent);
         if (Application::Get()._is_multi_thread_rendering)
             _cmd_worker->Stop();
@@ -726,6 +737,15 @@ namespace Ailu::RHI::DX12
         queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
         queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
         ThrowIfFailed(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+
+    // #if defined(TRACY_ENABLE)
+    //     _tracy_d3d12_ctx = TracyD3D12Context(m_device.Get(), m_commandQueue.Get());
+    //     if (_tracy_d3d12_ctx)
+    //     {
+    //         static const char kQueueName[] = "D3D12 Graphics Queue";
+    //         TracyD3D12ContextName(_tracy_d3d12_ctx, kQueueName, (uint16_t) (sizeof(kQueueName) - 1));
+    //     }
+    // #endif
 
         //m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
         //m_frameIndex = _swapchain->GetCurrentBackBufferIndex();
@@ -1056,6 +1076,14 @@ namespace Ailu::RHI::DX12
         ++_frame_count;
         _p_gpu_timer->EndFrame();
         Profiler::Get().CollectGPUTimeData();
+
+// #if defined(TRACY_ENABLE)
+//         if (_tracy_d3d12_ctx)
+//         {
+//             TracyD3D12NewFrame(_tracy_d3d12_ctx);
+//             TracyD3D12Collect(_tracy_d3d12_ctx);
+//         }
+// #endif
         //CommandBufferPool::ReleaseAll();
         if (_is_next_frame_capture)
         {
@@ -1503,6 +1531,7 @@ namespace Ailu::RHI::DX12
                 
                 ++Render::RenderingStates::s_temp_draw_call;
                 u32 vertex_count = is_produced ? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
+                vertex_count = draw_cmd->_vertex_count > 0 ? draw_cmd->_vertex_count : vertex_count;
                 u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb? draw_cmd->_vb->GetVertexCount() / 3 : 0u;
                 triangle_count *= draw_cmd->_instance_count;
                 Render::RenderingStates::s_temp_triangle_num += triangle_count;
@@ -1523,7 +1552,7 @@ namespace Ailu::RHI::DX12
                         dxcmd->DrawIndexedInstanced(index_count, draw_cmd->_instance_count, draw_cmd->_index_start, 0, 0);
                     }
                     else
-                        dxcmd->DrawInstanced(draw_cmd->_vb->GetVertexCount(), draw_cmd->_instance_count, 0, 0);
+                        dxcmd->DrawInstanced(draw_cmd->_vb? draw_cmd->_vb->GetVertexCount() : draw_cmd->_vertex_count, draw_cmd->_instance_count, 0, 0);
                 }
             }
         }
@@ -1570,6 +1599,12 @@ namespace Ailu::RHI::DX12
         else if (cmd->GetCmdType() == EGpuCommandType::kCommandProfiler)
         {
             auto cmd_profiler = static_cast<CommandProfiler *>(cmd);
+
+// #if defined(TRACY_ENABLE)
+//             static std::stack<std::unique_ptr<tracy::D3D12ZoneScope>> s_tracy_gpu_zone_stack{};
+//             const bool tracy_active = _tracy_d3d12_ctx != nullptr;
+// #endif
+
             if (cmd_profiler->_is_start)
             {
                 cmd_profiler->_gpu_index = Profiler::Get().StartGpuProfile(cmd_buffer, cmd_profiler->_name);
@@ -1577,6 +1612,25 @@ namespace Ailu::RHI::DX12
                 cmd_profiler->_cpu_index = Profiler::Get().StartCPUProfile(cmd_profiler->_name + "_Submit");
                 Profiler::Get().AddCPUProfilerHierarchy(true, (u32) cmd_profiler->_cpu_index);
                 s_begin_profiler_stack.push(cmd_profiler);
+
+// #if defined(TRACY_ENABLE)
+//                 if (tracy_active)
+//                 {
+//                     // Dynamic-name GPU zone bound to the currently recording command list.
+//                     // This zone spans from BeginProfiler() to EndProfiler() in the command stream.
+//                     const char* file = __FILE__;
+//                     const char* function = __FUNCTION__;
+//                     auto zone = std::make_unique<tracy::D3D12ZoneScope>(
+//                         _tracy_d3d12_ctx,
+//                         (uint32_t)__LINE__,
+//                         file, std::strlen(file),
+//                         function, std::strlen(function),
+//                         cmd_profiler->_name.c_str(), cmd_profiler->_name.size(),
+//                         dxcmd,
+//                         true);
+//                     s_tracy_gpu_zone_stack.push(std::move(zone));
+//                 }
+// #endif
             }
             else
             {
@@ -1585,6 +1639,14 @@ namespace Ailu::RHI::DX12
                 Profiler::Get().EndCPUProfile(s_begin_profiler_stack.top()->_cpu_index);
                 Profiler::Get().AddCPUProfilerHierarchy(false, (u32) s_begin_profiler_stack.top()->_cpu_index);
                 s_begin_profiler_stack.pop();
+
+// #if defined(TRACY_ENABLE)
+//                 if (tracy_active && !s_tracy_gpu_zone_stack.empty())
+//                 {
+//                     // Destroying the scope writes end timestamp and resolves query data.
+//                     s_tracy_gpu_zone_stack.pop();
+//                 }
+// #endif
             }
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kReadBack)

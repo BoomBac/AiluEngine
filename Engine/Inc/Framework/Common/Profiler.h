@@ -8,6 +8,11 @@
 #include <optional>
 #include <queue>
 
+#if defined(TRACY_ENABLE)
+// Use Tracy C++ API so we can keep a zone object as a class member.
+#include "tracy/Tracy.hpp"
+#endif
+
 namespace Ailu
 {
     struct ProfileData
@@ -149,17 +154,25 @@ namespace Ailu
     private:
         Render::CommandBuffer *_cmdList = nullptr;
         String _name;
+    #if defined(TRACY_ENABLE)
+        std::optional<tracy::ScopedZone> _tracy_zone;
+    #endif
     };
 
     class AILU_API CPUProfileBlock
     {
     public:
+        DISALLOW_COPY_AND_ASSIGN(CPUProfileBlock)
         explicit CPUProfileBlock(const String &name);
         ~CPUProfileBlock();
-
     private:
         u32 idx = u32(-1);
         inline static std::mutex _mutex;
+
+    #if defined(TRACY_ENABLE)
+        std::thread::id _owner_thread_id;
+        std::optional<tracy::ScopedZone> _tracy_zone;
+    #endif
     };
 #define PROFILE_BLOCK_GPU(cmd, block_name) GpuProfileBlock block_name##_GPU(cmd, #block_name);
 #define PROFILE_BLOCK_CPU(block_name) CPUProfileBlock block_name##_CPU(#block_name);

@@ -87,6 +87,7 @@ float3 GetCameraPositionWS()
 {
 	return _CameraPos.xyz;
 }
+/*
 // Z buffer to linear depth.
 // Does NOT correctly handle oblique view frustums.
 // Does NOT work with orthographic projection.
@@ -104,14 +105,30 @@ float Linear01Depth(float depth, float4 zBufferParam)
 {
     return 1.0 / (zBufferParam.x * depth + zBufferParam.y);
 }
-// float4x4 GetViewToWorldMatrix()
-// {
-//     return _Matrix_I_V;
-// }
+*/
+
+float LinearEyeDepth(float depth, float near, float far)
+{
+#if defined(_REVERSED_Z)
+    return (near * far) / (near - depth * (near - far));
+#else
+    return (near * far) / (far - depth * (far - near));
+#endif
+}
+float Linear01Depth(float depth,float near, float far)
+{
+    float viewZ = LinearEyeDepth(depth, near, far);
+#if defined(_REVERSED_Z)
+    return saturate((viewZ - far) / (near - far));
+#else
+    return saturate((viewZ - near) / (far - near));
+#endif
+}
+
 
 float3 TransformToViewSpace(float3 obj_pos)
 {
-    return mul(_MatrixV,float4(obj_pos,1.0f));
+    return mul(_MatrixV,float4(obj_pos,1.0f)).xyz;
 }
 
 float3 GetObjectWorldPos()
@@ -220,14 +237,14 @@ float3 Unproject(float2 screen_pos,float depth)
 	return world_pos.xyz;
 }
 //reconstruct world pos from camera corners
-float3 UnprojectByCameraRay(float2 screen_pos,float depth)
-{
-	float linear_z = Linear01Depth(depth, _ZBufferParams);
-    float3 top = lerp(_LT, _RT, screen_pos.x);
-    float3 bottom = lerp(_LB, _RB, screen_pos.x);
-	float3 dir = lerp(top, bottom, screen_pos.y);
-	return dir * linear_z;
-}
+// float3 UnprojectByCameraRay(float2 screen_pos,float depth)
+// {
+// 	float linear_z = Linear01Depth(depth);
+//     float3 top = lerp(_LT, _RT, screen_pos.x);
+//     float3 bottom = lerp(_LB, _RB, screen_pos.x);
+// 	float3 dir = lerp(top, bottom, screen_pos.y);
+// 	return dir * linear_z;
+// }
 
 //-----------------------------------------------------------------------------
 //-- Orthonormal Basis Function -----------------------------------------------

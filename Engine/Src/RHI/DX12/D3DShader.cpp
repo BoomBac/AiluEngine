@@ -1281,7 +1281,7 @@ namespace Ailu::RHI::DX12
                             cbuffer_size += ShaderBindResourceInfo::GetVariableSize(it->second);
                     }
                 }
-                AL_ASSERT_MSG(cbuffer_size <= 256, "ComputeBuffer size must be less than 256");
+                AL_ASSERT_MSG(cbuffer_size <= ComputeShader::kCBufferSize, "ComputeBuffer size must be less than 1024");
                 cbuffer_size = ALIGN_TO_256(cbuffer_size);
                 //这里暂时只支持一个cbuffer，以后按需修改
                 auto cbuf_it = std::find_if(cs_ele._temp_bind_res_infos.begin(), cs_ele._temp_bind_res_infos.end(), [this](auto it)
@@ -1290,38 +1290,15 @@ namespace Ailu::RHI::DX12
 					return desc._res_type == EBindResDescType::kConstBuffer; });
                 if (cbuf_it != cs_ele._temp_bind_res_infos.end())
                 {
-                    u8 data[256];
                     for (auto it = cbuffer_bind_info.begin(); it != cbuffer_bind_info.end(); it++)
                     {
                         auto old_variable_it = cs_ele._bind_res_infos.find(it->first);
                         if (old_variable_it != cs_ele._bind_res_infos.end())
                         {
-                            memcpy(data, _cbuf_data + ShaderBindResourceInfo::GetVariableOffset(old_variable_it->second),
+                            memcpy(_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(it->second), _cache_cbuf_data + ShaderBindResourceInfo::GetVariableOffset(old_variable_it->second),
                                    ShaderBindResourceInfo::GetVariableSize(it->second));
                         }
-                        memcpy(_cbuf_data, data, 256);
                     }
-                    // if (_p_cbuffer == nullptr)
-                    // {
-                    //     //_p_cbuffer.reset(ConstantBuffer::Create(cbuffer_size, true));
-                    // }
-                    // else
-                    // {
-                    //     u8 *data = new u8[cbuffer_size];
-                    //     for (auto it = cbuffer_bind_info.begin(); it != cbuffer_bind_info.end(); it++)
-                    //     {
-                    //         auto old_variable_it = cs_ele._bind_res_infos.find(it->first);
-                    //         if (old_variable_it != cs_ele._bind_res_infos.end())
-                    //         {
-                    //             memcpy(data + ShaderBindResourceInfo::GetVariableOffset(it->second), _p_cbuffer->GetData() + ShaderBindResourceInfo::GetVariableOffset(old_variable_it->second),
-                    //                    ShaderBindResourceInfo::GetVariableSize(it->second));
-                    //         }
-                    //     }
-                    //    //memcpy(_p_cbuffer->GetData(), data, cbuffer_size);
-                    //     memcpy(_cbuf_data, data, cbuffer_size);
-                    //     DESTORY_PTRARR(data);
-                    // }
-                    // cbuf_it->second._p_res = _p_cbuffer.get();
                 }
                 cs_ele._bind_res_infos = std::move(cs_ele._temp_bind_res_infos);
                 _is_valid = true;

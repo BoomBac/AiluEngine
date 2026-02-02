@@ -28,6 +28,10 @@
 #include "Render/GraphicsContext.h"
 #include "Render/RenderPipeline.h"
 
+#if defined(TRACY_ENABLE)
+#include "tracy/Tracy.hpp"
+#endif
+
 //#define SEPARATE_LOGIC_THREAD 1
 
 using namespace Ailu::Render;
@@ -128,6 +132,9 @@ namespace Ailu
 #endif// DEAR_IMGUI
         g_pSceneMgr->Initialize();
         SetThreadName("MainThread");
+    #if defined(TRACY_ENABLE)
+        tracy::SetThreadName("MainThread");
+    #endif
         _state = EApplicationState::EApplicationState_Running;
         _render_lag = s_target_lag;
         _update_lag = s_target_lag;
@@ -177,6 +184,9 @@ namespace Ailu
         std::thread logic_thread = std::thread([&]()
                                                {
             SetThreadName("LogicThread");
+#if defined(TRACY_ENABLE)
+            tracy::SetThreadName("LogicThread");
+#endif
             while (_state == EApplicationState::EApplicationState_Running || _state == EApplicationState::EApplicationState_Pause)
             {
                 LogicLoop();
@@ -409,6 +419,9 @@ namespace Ailu
 
     void Application::LogicLoop()
     {
+#if defined(TRACY_ENABLE)
+        ZoneScopedN("Application::LogicLoop");
+#endif
         f32 delta_time = TimeMgr::s_delta_time;
         if (_state == EApplicationState::EApplicationState_Pause)
         {
@@ -425,6 +438,9 @@ namespace Ailu
         {
             CPUProfileBlock main_b("Application::Tick");
             {
+#if defined(TRACY_ENABLE)
+                ZoneScopedN("UI::Update + Events");
+#endif
                 UI::UIManager::Get()->Update(delta_time);
 #if defined(SEPARATE_LOGIC_THREAD)
                 CPUProfileBlock main_b("Application::OnEvent");
@@ -467,6 +483,9 @@ namespace Ailu
             //if (_update_lag >= s_target_lag)
             {
                 CPUProfileBlock b("LayerUpdate");
+#if defined(TRACY_ENABLE)
+                ZoneScopedN("LayerUpdate");
+#endif
                 //if (_update_lag >= s_target_lag)
                 {
                     g_pResourceMgr->Tick(delta_time);
@@ -484,15 +503,24 @@ namespace Ailu
             {
                 {
                     CPUProfileBlock b("SceneTick");
+#if defined(TRACY_ENABLE)
+                    ZoneScopedN("SceneTick");
+#endif
                     g_pSceneMgr->Tick(delta_time);
                 }
                 {
                     CPUProfileBlock b("RenderScene");
+#if defined(TRACY_ENABLE)
+                    ZoneScopedN("RenderScene");
+#endif
                     Render::RenderPipeline::Get().Render();
                 }
 #ifdef DEAR_IMGUI
                 {
                     CPUProfileBlock b("RenderImGui");
+#if defined(TRACY_ENABLE)
+                    ZoneScopedN("RenderImGui");
+#endif
                     _p_imgui_layer->Begin();
                     for (Layer *layer: *_layer_stack)
                         layer->OnImguiRender();
@@ -514,6 +542,10 @@ namespace Ailu
             //}
         }
         _after_update_delegate.Invoke();
+
+    #if defined(TRACY_ENABLE)
+        FrameMark;
+    #endif
     }
     
     void Application::SetCursorInternal()

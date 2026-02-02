@@ -20,6 +20,7 @@
 #include "lighting.hlsli"
 #include "shadow.hlsli"
 #include "fullscreen_quad.hlsli"
+#include "froxel_common.hlsli"
 
 
 TEXTURE2D(_GBuffer0)
@@ -30,52 +31,32 @@ TEXTURE2D(_CameraDepthTexture)
 
 TEXTURE3D(_VolumetricLightTexture)
 
-float3 GetViewRay(float2 uv)
+// float3 GetViewRay(float2 uv)
+// {
+//     float2 ndc = uv * 2.0 - 1.0;
+//     float3 ray;
+//     ray.x = ndc.x / _MatrixP._11;
+//     ray.y = ndc.y / _MatrixP._22;
+//     ray.z = 1.0;
+//     return normalize(ray);
+// }
+
+float4 RaymarchVolumetric(float3 uvw,float scene_depth)
 {
-    float2 ndc = uv * 2.0 - 1.0;
-    float3 ray;
-    ray.x = ndc.x / _MatrixP._11;
-    ray.y = ndc.y / _MatrixP._22;
-    ray.z = 1.0;
-    return normalize(ray);
+    if (any(uvw < 0) || any(uvw > 1))
+        return 0;
+	uint w, h, d;
+	_VolumetricLightTexture.GetDimensions(w, h, d);
+	uint z = (uint)(uvw.z * d);
+	float slice_far = SliceDistance(z+1,_ProjectionParams.y,_ProjectionParams.z);
+	float slice_near = SliceDistance(z,_ProjectionParams.y,_ProjectionParams.z);
+	float view_z = LinearEyeDepth(scene_depth,_ProjectionParams.y,_ProjectionParams.z);
+	float fade = saturate((view_z - slice_near) / (slice_far - slice_near));
+	// if (slice_far > view_z)
+	// 	return 0;
+	float4 light_and_slice_far = _VolumetricLightTexture.SampleLevel(g_PointClampSampler, uvw, 0);
+    return _VolumetricLightTexture.SampleLevel(g_LinearClampSampler, uvw, 0);
 }
-
-float3 RaymarchVolumetric(float2 uv)
-{
-    float3 rayDir = GetViewRay(uv);
-
-    float maxZ = 1.0;
-
-    const int STEP_COUNT = 16;
-    float stepSize = maxZ / STEP_COUNT;
-
-    float3 result = 0;
-    float t = 0;
-
-    for (int i = 0; i < STEP_COUNT; ++i)
-    {
-        t += stepSize;
-
-        float3 viewPos = rayDir * t;
-
-        // —— 关键：View → Fog Grid UVW ——
-        float3 fogUVW;
-        fogUVW.xy = uv;
-        fogUVW.z = t;
-
-        float3 fog = _VolumetricLightTexture.SampleLevel(
-            g_LinearClampSampler,
-            fogUVW,
-            0
-        ).rgb;
-
-        result += fog * stepSize;
-    }
-
-    return result;
-}
-
-
 
 FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
 
@@ -109,7 +90,13 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 #else
 	float3 light = max(0.0, CalculateLightPBR(surface_data, world_pos.xyz,input.uv));
 	light += surface_data.emssive;
-	light += 0.00001*RaymarchVolumetric(input.uv);
+    float3 vol_light_uvw = WorldToVolumetricVoxelUVW(world_pos.xyz,_MatrixV,_MatrixP,_ProjectionParams.y,_ProjectionParams.z);
+	float4 vol_light = RaymarchVolumetric(vol_light_uvw,depth);
+	//light = vol_light.r == 19.5? float3(0,1,0) : float3(1,0,0);
+	light += vol_light.rgb;
+	//light = LinearEyeDepth(depth,_ProjectionParams.z,_ProjectionParams.y).xxxx;
+    //light = Linear01Depth(depth,_ZBufferParams).xxxx;
+    //light = Linear01DepthNew(depth,100.0f,1.0f).xxxx;
 	return float4(light, 1.0); 
 #endif 
 }

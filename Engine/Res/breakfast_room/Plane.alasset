@@ -3,4 +3,4 @@ type: kMesh
 name: Plane
 file: breakfast_room/untitled.fbx
 inner_file_name: Plane
-is_combine_mesh: true
+is_combine_mesh: false

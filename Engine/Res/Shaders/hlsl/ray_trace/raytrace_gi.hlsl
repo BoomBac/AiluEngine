@@ -434,68 +434,39 @@ bool TraverseBLAS(float3 ray_origin,float3 ray_dir,int start,int count,bool is_d
             continue;
 
         // 当前节点已经比已有命中更远，直接剪枝
-        if (tmin >= hit_t)
+        if (tmin > hit_t)
             continue;
 
         bool is_leaf = node._neg_right_or_tri_count > 0;
 
         if (is_leaf)
         {
-            // 真实几何体测试（或直接认为 leaf 命中）
-            hit_t = tmin;
-            hit_node = node_idx;
+            int tri_start = node._left_or_tri_offset_or_inst_idx;
+            int tri_count = node._neg_right_or_tri_count;
+
+            for (int tri_idx = tri_start; tri_idx < tri_start + tri_count; ++tri_idx)
+            {
+                TriangleData tri = g_scene[tri_idx];
+
+                float local_t, u, v;
+                if (TriangleHitFast(ray_origin, ray_dir, tri, local_t, u, v, CULL_BACK_FACE))
+                {
+                    if (local_t < hit_t)
+                    {
+                        hit_t = local_t;
+                        hit_node = node_idx;
+                    }
+                }
+            }
             continue;
         }
+
 
         // --- 内部节点：对子节点按距离排序 ---
         uint left  = uint(node._left_or_tri_offset_or_inst_idx) + start;
         uint right = uint(-node._neg_right_or_tri_count) + start;
-
-        float tminL, tmaxL;
-        float tminR, tmaxR;
-
-        bool hitL = AABBHitFast(
-            g_blas_buffer[left]._min,
-            g_blas_buffer[left]._max,
-            ray_origin, inv_dir, sign,
-            tminL, tmaxL);
-
-        bool hitR = AABBHitFast(
-            g_blas_buffer[right]._min,
-            g_blas_buffer[right]._max,
-            ray_origin, inv_dir, sign,
-            tminR, tmaxR);
-
-        if (hitL && hitR)
-        {
-            float dt = abs(tminL - tminR);
-
-            if (dt < 1e-5)
-            {
-                // 共面 / 重叠，不能赌顺序
-                stack[stack_ptr++] = left;
-                stack[stack_ptr++] = right;
-            }
-            else if (tminL < tminR)
-            {
-                stack[stack_ptr++] = right;
-                stack[stack_ptr++] = left;
-            }
-            else
-            {
-                stack[stack_ptr++] = left;
-                stack[stack_ptr++] = right;
-            }
-        }
-
-        else if (hitL)
-        {
-            stack[stack_ptr++] = left;
-        }
-        else if (hitR)
-        {
-            stack[stack_ptr++] = right;
-        }
+        stack[stack_ptr++] = left;
+        stack[stack_ptr++] = right;
     }
 
     return hit_node != -1;
@@ -543,7 +514,6 @@ bool HitWorld(float3 ray_dir,float3 ray_origin,bool is_debug, out HitRecord rec,
             //int tri_count = _tri_count;//leaf_node._neg_right_or_tri_count;
             int tri_start = leaf_node._left_or_tri_offset_or_inst_idx + inst_data._global_triangle_offset;
             int tri_count = leaf_node._neg_right_or_tri_count;
-            //debug_color = node_hit == 0? float3(1,0,0) : float3(0,0,0);
             [loop]
             for(int tri_idx = tri_start; tri_idx < tri_start + tri_count; ++tri_idx)
             {
@@ -576,7 +546,7 @@ bool HitWorld(float3 ray_dir,float3 ray_origin,bool is_debug, out HitRecord rec,
                         rec.normal = n_world;
                         rec.material_type = 0;
                         //debug_color = n_world;
-                        debug_color = n_model;//random(tri_idx);
+                        debug_color = random(tri_idx);
                         rec.t = t;
                         rec.front_face = dot(ray_dir, rec.normal) < 0;
                     }
@@ -747,12 +717,12 @@ void RayGen(CSInput input)
     // float3 far_point = lerp(bottom, top, uv.y);
 
     float3 ray_origin = _CameraPos.xyz;
-    uint depth = 1;
+    uint depth = 2;
     float3 ray_dir = normalize(Unproject(uv,1.0f) - ray_origin);
     bool is_debug = (input.DispatchThreadID.x == _PickPixel.x && input.DispatchThreadID.y == _PickPixel.y);
     //bool is_debug = (input.DispatchThreadID.x == 200 && input.DispatchThreadID.y == 200);
     float4 debug_color = float4(1, 1, 1, 0);
     float3 color = Trace(ray_dir, ray_origin,depth,is_debug, debug_color);
-    _GI_Texture[input.DispatchThreadID.xy] = float4(pow(debug_color.rgb,1.0), 0.2);
+    _GI_Texture[input.DispatchThreadID.xy] = float4(color.rgb, 0.2);
     //_GI_Texture[input.DispatchThreadID.xy] = 0.0.xxxx;
 }

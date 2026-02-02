@@ -9,6 +9,15 @@
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
 //pass end::
+//pass begin::
+//name: voxel_ray_drawer
+//vert: RayVoxelVSMain
+//pixel: RayVoxelPSMain
+//ZWrite: On
+//Topology: Line
+//Queue: Transparent
+//Blend: Src,OneMinusSrc
+//pass end::
 //info end
 
 #include "common.hlsli"
@@ -26,6 +35,7 @@ PerMaterialCBufferEnd
 struct VSInput
 {
 	float3 position : POSITION;
+	uint _vert_id : SV_VertexID;
 	uint inst_id : SV_INSTANCEID;
 };
 struct PSInput
@@ -58,4 +68,18 @@ VoxelOut ForwardPSMain(PSInput input)
 	clip(ret.color.a - 0.2);
 	//ret.depth = input.color.a > 0.5f? input.position.z : 1.0f;
 	return ret;
+}
+
+PSInput RayVoxelVSMain(VSInput v)
+{
+	PSInput result;
+	uint3 voxel_index = (float3)FromLinearIndex(v.inst_id,_GridNum.xyz);
+	float3 world_pos = v._vert_id == 0 ? 0.0.xxx : LOAD_TEXTURE3D_LOD(_VoxelSrc,voxel_index,0);
+	result.position =  TransformWorldToHClipNoJitter(world_pos);
+	return result;
+}
+
+float4 RayVoxelPSMain(PSInput input) : SV_Target0
+{
+	return 1.0.xxxx;
 }

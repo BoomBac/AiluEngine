@@ -108,6 +108,7 @@ namespace Ailu::Render
         ConstantBuffer *_per_obj_cb;
         u32 _instance_count;
         u16 _sub_mesh;
+        u32 _vertex_count;
         u32 _index_start;
         u32 _index_num;
         GPUBuffer* _arg_buffer;

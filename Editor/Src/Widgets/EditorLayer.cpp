@@ -47,6 +47,7 @@
 #include "Widgets/RenderView.h"
 
 #include "Framework/Parser/TextParser.h"
+#include "Platform/Process.h"
 
 namespace Ailu
 {
@@ -972,6 +973,15 @@ namespace Ailu
                     ImGui::DragFloat3("Scale", sk_comp->_transform._scale.data);
                 }
             }
+            auto& cam_controller = dynamic_cast<EditorApp &>(Application::Get()).GetSceneCameraController();
+            ImGui::SliderFloat("CameraNear", &cam_controller._camera_near, 0.0f, 10.0f);
+            ImGui::SliderFloat("CameraFar", &cam_controller._camera_far, cam_controller._camera_near, 10000.0f);
+            Vector3f cam_pos = cam_controller._target_pos;
+            Vector2f cam_rot = cam_controller._rotation;
+            ImGui::DragFloat3("CameraPos", cam_pos.data, 0.1f);
+            ImGui::DragFloat2("CameraRot", cam_rot.data, 0.1f);
+            cam_controller.SetTargetPosition(cam_pos,true);
+            cam_controller.SetTargetRotation(cam_rot.x, cam_rot.y, true);
             static bool s_draw_scene_bvh = false;
             static bool s_draw_mesh_bvh = false;
             //bvh debug
@@ -1079,8 +1089,16 @@ namespace Ailu
                     }
                 }
                 auto tex_view = MakeRef<Texture3DView>();
-                tex_view->SetSource3D(fog->GetFogTexture());
+                tex_view->SetSource3D(fog->GetAccTexture());
                 DockManager::Get().AddDock(tex_view);
+            }
+            if (ImGui::Button("Tracy Profiler"))
+            {
+                auto tarcy_path = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Tools/Tracy/tracy-profiler.exe";
+                ProcessStartInfo psi(tarcy_path);
+                auto p = ProcessFactory::Create();
+                if (p)
+                    p->Start(psi);
             }
             ImGui::End();
             if (show)

@@ -7,3 +7,6 @@
 [submodule "Engine/Ext/implot"]
 	path = Engine/Ext/implot
 	url = https://github.com/BoomBac/implot.git
+[submodule "Engine/Ext/tracy"]
+	path = Engine/Ext/tracy
+	url = https://github.com/wolfpld/tracy.git

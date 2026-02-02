@@ -119,19 +119,19 @@ namespace Ailu
                         // Y slice (base plane assumed to be XZ, normal +Y)
                         _slice_mat->SetFloat("_Slice", _slice_y);
                         _slice_mat->SetFloat("_SliceAxis", 1.0f);
-                        world_mat = MatrixTranslation(Vector3f{0.0f, slice_to_world(_slice_y), 0.0f});
+                        world_mat = MatrixTranslation(Vector3f{0.0f, slice_to_world(1.0f - _slice_y), 0.0f});
                         cmd->DrawMesh(Mesh::s_plane.lock().get(), _slice_mat.get(), world_mat, 0, 0, 1);
 
                         // Z slice
                         _slice_mat->SetFloat("_Slice", _slice_z);
                         _slice_mat->SetFloat("_SliceAxis", 2.0f);
-                        world_mat = MatrixMultiplyNew(MatrixTranslation(Vector3f{0.0f, 0.0f, slice_to_world(_slice_z)}),MatrixRotationX(k2Radius * 90.0f));
+                        world_mat = MatrixMultiplyNew(MatrixTranslation(Vector3f{0.0f, 0.0f, slice_to_world(1.0f - _slice_z)}),MatrixRotationX(k2Radius * 90.0f));
                         cmd->DrawMesh(Mesh::s_plane.lock().get(), _slice_mat.get(), world_mat, 0, 0, 1);
 
                         // X slice
                         _slice_mat->SetFloat("_Slice", _slice_x);
                         _slice_mat->SetFloat("_SliceAxis", 0.0f);
-                        world_mat = MatrixMultiplyNew(MatrixTranslation(Vector3f{slice_to_world(_slice_x), 0.0f, 0.0f}), MatrixRotationZ(k2Radius * 90.0f));
+                        world_mat = MatrixMultiplyNew(MatrixTranslation(Vector3f{slice_to_world(1.0f - _slice_x), 0.0f, 0.0f}), MatrixRotationZ(k2Radius * 90.0f));
                         cmd->DrawMesh(Mesh::s_plane.lock().get(), _slice_mat.get(), world_mat, 0, 0, 1);
                     #else
                         // Y slice (base plane assumed to be XZ, normal +Y)

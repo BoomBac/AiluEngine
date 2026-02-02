@@ -80,6 +80,7 @@ namespace Ailu
             void Finalize() final;
             void Tick(f32 delta_time) final;
             FirstPersonCameraController &GetSceneCameraController() { return *_camera_controller; }
+            Camera *GetSceneCamera() { return _p_scene_camera; }
         private:
             bool OnGetFocus(WindowFocusEvent &e) final;
             bool OnLostFocus(WindowLostFocusEvent &e) final;

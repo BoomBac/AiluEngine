@@ -204,11 +204,11 @@ namespace Ailu
                             const XMMATRIX lightViewInv = XMMatrixInverse(nullptr, lightView);
                             const float farPlane = selected_cam.Far();
                             f32 origin_near = selected_cam.Near();
-                            selected_cam.Near(1.0f);
+                            //selected_cam.Near(1.0f);
                             selected_cam.RecalculateMatrix(true);
                             // Unproject main frustum corners into world space (notice the reversed Z projection!):
                             auto unproj_mat = MatrixInverse(selected_cam.GetView() * MatrixReverseZ(selected_cam.GetProj()));//这里如果near-clip过小的话，也会造成抖动的情况
-                            selected_cam.Near(origin_near);
+                            //selected_cam.Near(origin_near);
                             selected_cam.RecalculateMatrix(true);
                             XMMATRIX unproj;
                             memcpy(unproj.r, unproj_mat, sizeof(XMMATRIX));

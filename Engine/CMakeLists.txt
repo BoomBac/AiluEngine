@@ -99,7 +99,7 @@ add_custom_target(pre_build_cmd ALL
 #         Ext/imnodes/imnodes.cpp
 #         Src/Render/Font.cpp)
 set(SOURCE_LIST ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
-${HDR_LOADER} ${IMNODE})
+${HDR_LOADER} ${IMNODE} "Ext/tracy/public/TracyClient.cpp")
 
 add_library (Engine SHARED ${SOURCE_LIST})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
@@ -109,6 +109,7 @@ add_dependencies(Engine pre_build_cmd)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Inc)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext)
+target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/tracy/public)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/imgui)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
@@ -117,6 +118,15 @@ target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/rapidjson)
 # 宏定义
 target_compile_definitions(Engine PRIVATE AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX;_REVERSED_Z;DEAR_IMGUI)
+
+if (AILU_ENABLE_TRACY)
+        target_compile_definitions(Engine PRIVATE TRACY_ENABLE)
+        # Engine is a DLL, so it hosts the Tracy client and exports symbols for other modules.
+        target_compile_definitions(Engine PRIVATE TRACY_EXPORTS)
+        if (AILU_TRACY_ON_DEMAND)
+                target_compile_definitions(Engine PRIVATE TRACY_ON_DEMAND)
+        endif()
+endif()
 set_target_properties (Engine PROPERTIES
         OUTPUT_NAME_DEBUG Engine_d
         OUTPUT_NAME_RELEASE Engine
@@ -143,6 +153,10 @@ target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRunti
 d2d1.lib;dwrite.lib;d3d11.lib;
 imm32.lib;
         ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib) # ;msvcrtd.lib
+
+if (WIN32 AND AILU_ENABLE_TRACY)
+        target_link_libraries(Engine PRIVATE ws2_32 dbghelp)
+endif()
 
 
 # 添加自定义命令

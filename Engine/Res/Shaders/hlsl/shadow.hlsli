@@ -136,9 +136,9 @@ static const float2 poissonDisk[64] =
 #define _SOFT_SAMPLE_COUNT 16
 
 
-float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
+float ApplyCascadeShadow(float nl,float3 cam_pos, float3 world_pos,float shadow_distance)
 {
-	float dis = distance(_CameraPos.xyz,world_pos);
+	float dis = distance(cam_pos.xyz,world_pos);
 	// if(dis > shadow_distance)
 	// 	return 1.0;	
 	// float z_bias = 0.025 * tan(acos(nl));
@@ -175,6 +175,37 @@ float ApplyCascadeShadow(float nl, float3 world_pos,float shadow_distance)
 					float3(shadow_uv.xy + poissonDisk[i] * _ShadowMapTexelSize,cascade_index), depth).r;
 			}
 			shadow_factor /= _SOFT_SAMPLE_COUNT;
+			shadow_factor =  (1.0 - shadow_factor);
+			return 1.0 - shadow_factor * atten;
+		}
+	}
+	return 1.0;
+}
+
+float ApplyCascadeShadowHard(float nl,float3 cam_pos, float3 world_pos,float shadow_distance)
+{
+	float dis = distance(cam_pos.xyz,world_pos);
+	float z_bias = GetShadowDepthBias(nl,_DirectionalLights[0]._constant_bias,_DirectionalLights[0]._slope_bias);
+	float atten = saturate((_CascadeShadowParams.y * (1.0 - dis * _CascadeShadowParams.z)));
+	int cascade_count = (int)_CascadeShadowParams.x;
+	for(int cascade_index = 0;cascade_index < cascade_count;cascade_index++)
+	{
+		if(SqrDistance(world_pos,_CascadeShadowSplit[cascade_index].xyz) <= _CascadeShadowSplit[cascade_index].w)
+		{
+			float4 shadow_coord = mul(_CascadeShadowMatrix[cascade_index],float4(world_pos,1.0));
+			if (shadow_coord.x < -1 || shadow_coord.x > 1 || shadow_coord.y < -1 || shadow_coord.y > 1)
+				return 1.0f;
+			shadow_coord.xyz /= shadow_coord.w;
+			float depth = saturate(shadow_coord.z);
+		#if defined(_REVERSED_Z)
+			depth += z_bias;
+		#else
+			depth -= z_bias;
+		#endif
+			float2 shadow_uv;
+			shadow_uv.x = shadow_coord.x * 0.5f + 0.5f;
+			shadow_uv.y = shadow_coord.y * -0.5f + 0.5f;
+			float shadow_factor = 1 - _MainLightShadowMap.SampleCmpLevelZero(g_ShadowSampler, float3(shadow_uv.xy,cascade_index), depth).r;
 			shadow_factor =  (1.0 - shadow_factor);
 			return 1.0 - shadow_factor * atten;
 		}

@@ -48,7 +48,7 @@
 687dd7a6-c8d4-40f1-8a33-694707d9c423,Icons/directional_light.alasset,kTexture2D
 6abca545-d271-4c76-b214-913472735574,WaterTest/empty_scene.almap,kScene
 6b616d87-aefe-4b8d-9914-531b11a6efc5,Shaders/raytrace_debug_draw.alasset,kShader
-6d1148fb-00a4-4720-8ca0-7dd877b0da55,NewScene/Palace/textures/sponza_arch_baseColor.alasset,kTexture2D
+6d1148fb-00a4-4720-8ca0-7dd877b0da55,Shaders/max_z.alasset,kComputeShader
 6fd672ec-676e-41b4-9da8-b367d6ab6d2b,WaterTest/Grass_Wildgrass08_N.alasset,kTexture2D
 7182a502-ba5e-4de5-a517-ed226a6b7805,Shaders/gpu_terrain.alasset,kComputeShader
 731c4c95-0f59-48a9-9fc9-5411ed7c2ae4,NewScene/Material_MR.alasset,kMaterial

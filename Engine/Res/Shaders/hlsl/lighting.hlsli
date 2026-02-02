@@ -178,7 +178,7 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 		InitShadingData(light_data,surface,shading_data);
 		if(_DirectionalLights[i]._shadowmap_index != -1)
 		{
-			shadow_factor = ApplyCascadeShadow(nl, world_pos.xyz,_DirectionalLights[i]._ShadowDistance);
+			shadow_factor = ApplyCascadeShadowHard(nl, _CameraPos.xyz, world_pos, _DirectionalLights[i]._ShadowDistance);
 		}
 		light_data.shadow_atten = shadow_factor;
 		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
