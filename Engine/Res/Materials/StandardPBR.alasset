@@ -6,7 +6,7 @@ keywords:
   prop_type: Uint
     _MaterialID: 0
     _SamplerMask: 0
-    _cull: 2
+    _cull: 0
     _surface: 0
   prop_type: Float
     _AlphaCulloff: 0

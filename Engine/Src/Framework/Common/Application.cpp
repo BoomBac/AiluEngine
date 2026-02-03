@@ -40,7 +40,6 @@ namespace Ailu
 {
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f, this, std::placeholders::_1)
     TimeMgr *g_pTimeMgr = new TimeMgr();
-    SceneManagement::SceneMgr *g_pSceneMgr = new SceneManagement::SceneMgr();
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     Scope<Core::ThreadPool> g_pThreadTool = MakeScope<Core::ThreadPool>(6u, "GlobalThreadPool");
 
@@ -127,10 +126,10 @@ namespace Ailu
         g_pResourceMgr->Initialize();
         Gizmo::Initialize();
         UI::UIManager::Init();
+        SceneManagement::SceneMgr::Init();
 #ifdef DEAR_IMGUI
         PushLayer(_p_imgui_layer);
 #endif// DEAR_IMGUI
-        g_pSceneMgr->Initialize();
         SetThreadName("MainThread");
     #if defined(TRACY_ENABLE)
         tracy::SetThreadName("MainThread");
@@ -163,9 +162,8 @@ namespace Ailu
         DESTORY_PTR(_layer_stack);
         UI::UIManager::Shutdown();
         Gizmo::Shutdown();
-        g_pSceneMgr->Finalize();
+        SceneManagement::SceneMgr::Shutdown();
         g_pResourceMgr->Finalize();
-        DESTORY_PTR(g_pSceneMgr);
         DESTORY_PTR(g_pResourceMgr);
         GraphicsContext::Get().UnRegisterWindow(_p_window.get());
         GraphicsContext::FinalizeGlobalContext();
@@ -506,7 +504,7 @@ namespace Ailu
 #if defined(TRACY_ENABLE)
                     ZoneScopedN("SceneTick");
 #endif
-                    g_pSceneMgr->Tick(delta_time);
+                    SceneManagement::SceneMgr::Get().Tick(delta_time);
                 }
                 {
                     CPUProfileBlock b("RenderScene");

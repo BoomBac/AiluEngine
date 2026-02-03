@@ -21,24 +21,44 @@
 float3 ApplySRGBCurve( float3 x )
 {
     // Approximately pow(x, 1.0 / 2.2)
-    return x < 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
+    //return x < 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
+    #if defined(SHADER_DXC)
+        return select(12.92 * x, 1.055 * pow(x, 1.0 / 2.4) - 0.055, x >= 0.0031308);
+    #else
+        return x < 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
+    #endif
 }
 
 float3 RemoveSRGBCurve( float3 x )
 {
     // Approximately pow(x, 2.2)
-    return x < 0.04045 ? x / 12.92 : pow( (x + 0.055) / 1.055, 2.4 );
+    //return x < 0.04045 ? x / 12.92 : pow( (x + 0.055) / 1.055, 2.4 );
+    #if defined(SHADER_DXC)
+        return select(x / 12.92, pow( (x + 0.055) / 1.055, 2.4 ), x >= 0.04045);
+    #else
+        return x < 0.04045 ? x / 12.92 : pow( (x + 0.055) / 1.055, 2.4 );
+    #endif
 }
 
 // These functions avoid pow() to efficiently approximate sRGB with an error < 0.4%.
 float3 ApplySRGBCurve_Fast( float3 x )
 {
-    return x < 0.0031308 ? 12.92 * x : 1.13005 * sqrt(x - 0.00228) - 0.13448 * x + 0.005719;
+    //return x < 0.0031308 ? 12.92 * x : 1.13005 * sqrt(x - 0.00228) - 0.13448 * x + 0.005719;
+    #if defined(SHADER_DXC)
+        return select(12.92 * x, 1.13005 * sqrt(x - 0.00228) - 0.13448 * x + 0.005719, x >= 0.0031308);
+    #else
+        return x < 0.0031308 ? 12.92 * x : 1.13005 * sqrt(x - 0.00228) - 0.13448 * x + 0.005719;
+    #endif
 }
 
 float3 RemoveSRGBCurve_Fast( float3 x )
 {
-    return x < 0.04045 ? x / 12.92 : -7.43605 * x - 31.24297 * sqrt(-0.53792 * x + 1.279924) + 35.34864;
+    //return x < 0.04045 ? x / 12.92 : -7.43605 * x - 31.24297 * sqrt(-0.53792 * x + 1.279924) + 35.34864;
+    #if defined(SHADER_DXC)
+        return select(x / 12.92, -7.43605 * x - 31.24297 * sqrt(-0.53792 * x + 1.279924) + 35.34864, x >= 0.04045);
+    #else
+        return x < 0.04045 ? x / 12.92 : -7.43605 * x - 31.24297 * sqrt(-0.53792 * x + 1.279924) + 35.34864;
+    #endif
 }
 
 // The OETF recommended for content shown on HDTVs.  This "gamma ramp" may increase contrast as
@@ -46,12 +66,22 @@ float3 RemoveSRGBCurve_Fast( float3 x )
 // used in conjunction with HDTVs.
 float3 ApplyREC709Curve( float3 x )
 {
-    return x < 0.0181 ? 4.5 * x : 1.0993 * pow(x, 0.45) - 0.0993;
+    //return x < 0.0181 ? 4.5 * x : 1.0993 * pow(x, 0.45) - 0.0993;
+    #if defined(SHADER_DXC)
+        return select(4.5 * x, 1.0993 * pow(x, 0.45) - 0.0993, x >= 0.0181);
+    #else
+        return x < 0.0181 ? 4.5 * x : 1.0993 * pow(x, 0.45) - 0.0993;
+    #endif
 }
 
 float3 RemoveREC709Curve( float3 x )
 {
-    return x < 0.08145 ? x / 4.5 : pow((x + 0.0993) / 1.0993, 1.0 / 0.45);
+    //return x < 0.08145 ? x / 4.5 : pow((x + 0.0993) / 1.0993, 1.0 / 0.45);
+    #if defined(SHADER_DXC)
+        return select(x / 4.5, pow((x + 0.0993) / 1.0993, 1.0 / 0.45), x >= 0.08145);
+    #else
+        return x < 0.08145 ? x / 4.5 : pow((x + 0.0993) / 1.0993, 1.0 / 0.45);
+    #endif
 }
 
 // This is the new HDR transfer function, also called "PQ" for perceptual quantizer.  Note that REC2084

@@ -216,7 +216,13 @@ namespace Ailu::RHI::DX12
 	{
 		friend class D3DDescriptorMgr;
 	public:
+		// Staging pages are CPU-visible descriptor heaps used to build SRV/UAV descriptors.
+		// The shader-visible heap used for binding is a separate heap (MainHeap).
 		inline static const u16 kMaxDescriptorNumPerPage = 1024;
+		inline static const u32 kMainHeapDescriptorNum = 8192;
+		// Bindless region configuration (default enabled).
+		inline static const u32 kBindlessSRVCapacity = 512;
+		inline static const u32 kBindlessUAVCapacity = 512;
 		GPUVisibleDescriptorAllocator();
 		~GPUVisibleDescriptorAllocator();
 		GPUVisibleDescriptorAllocation Allocate(u16 num = 1u, D3D12_DESCRIPTOR_HEAP_TYPE type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -226,6 +232,25 @@ namespace Ailu::RHI::DX12
 		D3D12_GPU_DESCRIPTOR_HANDLE GetBindGpuHandle(const GPUVisibleDescriptorAllocation& alloc);
 		std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE,D3D12_GPU_DESCRIPTOR_HANDLE> GetBindHandle(const GPUVisibleDescriptorAllocation& alloc);
 		ID3D12DescriptorHeap* GetBindHeap() {return _main_heap.Get();}
+		// Bindless (persistent) region helpers.
+		u32 BindlessSRVCapacity() const { return _bindless_srv_capacity; }
+		u32 BindlessUAVCapacity() const { return _bindless_uav_capacity; }
+		u32 BindlessSRVBaseIndex() const { return _bindless_srv_base_index; }
+		u32 BindlessUAVBaseIndex() const { return _bindless_uav_base_index; }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSRVBaseGpuHandle() const;
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessUAVBaseGpuHandle() const;
+		// Allocate a stable index into the bindless region. Returned index is 0..Capacity-1.
+		u32 AllocBindlessSRVIndex(u32 count = 1);
+		u32 AllocBindlessUAVIndex(u32 count = 1);
+		// Release a previously allocated bindless index for reuse.
+		void ReleaseBindlessSRVIndex(u32 bindless_index);
+		void ReleaseBindlessUAVIndex(u32 bindless_index);
+		// Get CPU handle for writing descriptors directly into the shader-visible MainHeap bindless region.
+		D3D12_CPU_DESCRIPTOR_HANDLE GetBindlessSRVCpuHandle(u32 bindless_index) const;
+		D3D12_CPU_DESCRIPTOR_HANDLE GetBindlessUAVCpuHandle(u32 bindless_index) const;
+		// Direct access to MainHeap descriptor handles.
+		D3D12_CPU_DESCRIPTOR_HANDLE GetMainHeapCpuHandle(u32 heap_index) const;
+		D3D12_GPU_DESCRIPTOR_HANDLE GetMainHeapGpuHandle(u32 heap_index) const;
 	private:
 		void CommitDescriptorsForDraw(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc);
 		void CommitDescriptorsForDispatch(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc);
@@ -237,10 +262,26 @@ namespace Ailu::RHI::DX12
 		//page_available_desc_num,_page_id
 		Map<D3D12_DESCRIPTOR_HEAP_TYPE, std::multimap<u16, u16>> _page_free_space_lut;
 		std::mutex _mutex;
+		std::mutex _mainheap_mutex;
 		//hash to gpu page index
 		HashMap<u32,u16> _desc_lut;
-		//Reserved index 0 for imgui 
-		u16 _main_page_index = 1u;
+		// MainHeap layout (shader visible):
+		//  - index 0: reserved for ImGui
+		//  - [BindlessSRVBaseIndex, BindlessSRVBaseIndex + BindlessSRVCapacity): persistent SRVs
+		//  - [BindlessUAVBaseIndex, BindlessUAVBaseIndex + BindlessUAVCapacity): persistent UAVs
+		//  - [RingBaseIndex, kMainHeapDescriptorNum): ring space for per-draw/dispatch descriptor copies
+		u32 _bindless_srv_capacity = kBindlessSRVCapacity;
+		u32 _bindless_uav_capacity = kBindlessUAVCapacity;
+		u32 _bindless_srv_base_index = 1u;
+		u32 _bindless_uav_base_index = 1u + kBindlessSRVCapacity;
+		u32 _ring_base_index = 1u + kBindlessSRVCapacity + kBindlessUAVCapacity;
+		u32 _ring_cursor = 1u + kBindlessSRVCapacity + kBindlessUAVCapacity;
+		u32 _bindless_srv_cursor = 0u;
+		u32 _bindless_uav_cursor = 0u;
+		Vector<u32> _bindless_srv_free;
+		Vector<u32> _bindless_uav_free;
+		Vector<u8> _bindless_srv_inuse;
+		Vector<u8> _bindless_uav_inuse;
 		ID3D12Device* _device;
 	};
 
@@ -276,6 +317,19 @@ namespace Ailu::RHI::DX12
 		/// @return 
 		std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE,D3D12_GPU_DESCRIPTOR_HANDLE> GetBindHandle(const GPUVisibleDescriptorAllocation& alloc) {return _gpu_alloc->GetBindHandle(alloc);};
 		ID3D12DescriptorHeap* GetBindHeap() {return _gpu_alloc->GetBindHeap();}
+		// Bindless APIs (stable indices in the MainHeap).
+		u32 AllocBindlessSRVIndex(u32 count = 1) { return _gpu_alloc->AllocBindlessSRVIndex(count); }
+		u32 AllocBindlessUAVIndex(u32 count = 1) { return _gpu_alloc->AllocBindlessUAVIndex(count); }
+		void ReleaseBindlessSRVIndex(u32 bindless_index) { _gpu_alloc->ReleaseBindlessSRVIndex(bindless_index); }
+		void ReleaseBindlessUAVIndex(u32 bindless_index) { _gpu_alloc->ReleaseBindlessUAVIndex(bindless_index); }
+		u32 BindlessSRVCapacity() const { return _gpu_alloc->BindlessSRVCapacity(); }
+		u32 BindlessUAVCapacity() const { return _gpu_alloc->BindlessUAVCapacity(); }
+		u32 BindlessSRVBaseIndex() const { return _gpu_alloc->BindlessSRVBaseIndex(); }
+		u32 BindlessUAVBaseIndex() const { return _gpu_alloc->BindlessUAVBaseIndex(); }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessSRVBaseGpuHandle() const { return _gpu_alloc->GetBindlessSRVBaseGpuHandle(); }
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBindlessUAVBaseGpuHandle() const { return _gpu_alloc->GetBindlessUAVBaseGpuHandle(); }
+		D3D12_CPU_DESCRIPTOR_HANDLE GetBindlessSRVCpuHandle(u32 bindless_index) const { return _gpu_alloc->GetBindlessSRVCpuHandle(bindless_index); }
+		D3D12_CPU_DESCRIPTOR_HANDLE GetBindlessUAVCpuHandle(u32 bindless_index) const { return _gpu_alloc->GetBindlessUAVCpuHandle(bindless_index); }
 		void CommitDescriptorsForDraw(D3DCommandBuffer* cmd,u16 slot,const GPUVisibleDescriptorAllocation& alloc) {
 			_gpu_alloc->CommitDescriptorsForDraw(cmd,slot,alloc);
 		}

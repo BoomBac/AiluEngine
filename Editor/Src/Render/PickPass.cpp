@@ -12,6 +12,7 @@ namespace Ailu
     using namespace Editor;
     namespace Render
     {
+        using SceneManagement::SceneMgr;
         PickPass::PickPass() : RenderPass("PickPass")
         {
             _pick_gen = MakeScope<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/pick_buffer.hlsl"), "Runtime/PickGen");
@@ -46,7 +47,7 @@ namespace Ailu
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
                  cmd->SetRenderTarget(color, depth);
-                ECS::Register &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
              for (const auto &queue_data: *rendering_data._cull_results)
                 {
                     auto &[queue, objs] = queue_data;
@@ -114,7 +115,7 @@ namespace Ailu
                     ++entity_index;
                 }
                 entity_index = 0;
-                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CLightProbe>())
+                for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CLightProbe>())
                 {
                     const auto &t = r.GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
@@ -126,9 +127,9 @@ namespace Ailu
                     cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
                 }
                 entity_index = 0;
-                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
+                for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CCamera>())
                 {
-                    const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
+                    const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
                     CBufferPerObjectData obj_data;
                     obj_data._ObjectID = (i32)r.GetEntity<ECS::CCamera>(entity_index);
@@ -151,7 +152,7 @@ namespace Ailu
                 if (auto &selected = Selection::SelectedEntities(); selected.size() > 0)
                 {
                     cmd->SetRenderTarget(select_buf);
-                    ECS::Register &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     for (auto entity: selected)
                     {
                         const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
@@ -218,7 +219,7 @@ namespace Ailu
             auto cmd = CommandBufferPool::Get(_name);
             {
                 PROFILE_BLOCK_GPU(cmd.get(), PickPass);
-                ECS::Register &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
                 cmd->SetRenderTarget(rendering_data._camera_color_target_handle, rendering_data._camera_depth_target_handle);
                 if (auto &selected = Editor::Selection::SelectedEntities(); selected.size() > 0)
                 {
@@ -290,7 +291,7 @@ namespace Ailu
                     ++entity_index;
                 }
                 entity_index = 0;
-                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CLightProbe>())
+                for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CLightProbe>())
                 {
                     const auto &t = r.GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
@@ -302,9 +303,9 @@ namespace Ailu
                     cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_lightprobe, obj_data, 0, 1, 1);
                 }
                 entity_index = 0;
-                for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
+                for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CCamera>())
                 {
-                    const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
+                    const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
                     auto world_pos = t->_transform._position;
                     CBufferPerObjectData obj_data;
                     obj_data._ObjectID = (i32)r.GetEntity<ECS::CCamera>(entity_index);

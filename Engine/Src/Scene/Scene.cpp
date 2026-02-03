@@ -15,6 +15,7 @@ using namespace Ailu::Render;
 
 namespace Ailu::SceneManagement
 {
+    #pragma region Scene----------------------------------------------------------------------------
     void Scene::Serialize(Archive &arch)
     {
         u64 index = 0;
@@ -177,73 +178,7 @@ namespace Ailu::SceneManagement
                 AL_ASSERT_MSG(true, "Unkown Component");
             };
         }
-        _triangle_count = 0u;
-        u64 mesh_bvh_node_count = 0u;
-        for (auto& c: _register.View<ECS::StaticMeshComponent>())
-        {
-            _triangle_count += c._p_mesh->GetTriangleCount();
-            mesh_bvh_node_count += c._p_mesh->GetBVHNodes().size();
-        }
-        if (_triangle_count > 0)
-        {
-            u64 entity_idx = 0u;
-            Vector<Render::TriangleData> triangles;
-            triangles.reserve(_triangle_count);
-            Vector<BVHNode> mesh_bvh_nodes;
-            mesh_bvh_nodes.reserve(mesh_bvh_node_count);
-            u64 triangle_offset = 0u,bvh_offset = 0u;
-            for (auto &c: _register.View<ECS::StaticMeshComponent>())
-            {
-                auto current_entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
-                auto current_tri_count = c._p_mesh->GetTriangleCount();
-                auto cur_bvh_node_count = c._p_mesh->GetBVHNodes().size();
-                triangles.insert(triangles.end(),c._p_mesh->GetTriangleData().begin(),c._p_mesh->GetTriangleData().end());
-                mesh_bvh_nodes.insert(mesh_bvh_nodes.end(), c._p_mesh->GetBVHNodes().begin(), c._p_mesh->GetBVHNodes().end());
-                _bvh_nodes_range[current_entity] = Vector2UInt{(u32) bvh_offset, (u32) (cur_bvh_node_count)};
-                _mesh_bvh_node_triangle_offset[current_entity] = (u32)triangle_offset;
-                triangle_offset += current_tri_count;
-                bvh_offset += cur_bvh_node_count;
-            }
-            BufferDesc buf_desc;
-            buf_desc._element_num = _triangle_count;
-            buf_desc._element_size = sizeof(TriangleData);
-            buf_desc._is_random_write = false;
-            buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
-            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
-            _scene_mesh_data = GPUBuffer::Create(buf_desc);
-            _scene_mesh_data->Name(std::format("{}_mesh_data_buffer", Name()));
-            _scene_mesh_data->SetData(reinterpret_cast<const u8 *>(triangles.data()), _triangle_count * sizeof(Render::TriangleData));
-
-            buf_desc._element_num = (u32) mesh_bvh_nodes.size();
-            buf_desc._element_size = sizeof(LBVHNode);
-            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
-            /*
-                struct LBVHNode
-                {
-                    float3 _min;
-                    float _left_or_offset;
-                    float3 _max;
-                    float _neg_right_or_count_or_inst_idx;
-                };
-            */
-            Vector<LBVHNode> gpu_nodes;
-            gpu_nodes.reserve(mesh_bvh_nodes.size());
-            for (u64 i = 0; i < mesh_bvh_nodes.size(); i++)
-            {
-                const auto &node = mesh_bvh_nodes[i];
-                gpu_nodes.emplace_back(node._aabb._min,(f32)node._child_index_or_first, node._aabb._max, (f32)node._count_or_flag);
-            }
-            _blas_buffer = GPUBuffer::Create(buf_desc);
-            _blas_buffer->Name(std::format("{}_blas_buffer", Name()));
-            _blas_buffer->SetData(reinterpret_cast<const u8 *>(gpu_nodes.data()), static_cast<u32>(gpu_nodes.size() * sizeof(LBVHNode)));
-            _blas_node_count = (u32)gpu_nodes.size();
-
-            buf_desc._element_num = RenderConstants::kMaxRenderObjectCount * 4;
-            buf_desc._element_size = sizeof(LBVHNode);
-            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
-            _tlas_buffer = GPUBuffer::Create(buf_desc);
-            _tlas_buffer->Name(std::format("{}_tlas_buffer", Name()));
-        }
+        MarkDirty();
     }
 
     Scene::Scene(const String &name) : Object(name)
@@ -272,8 +207,16 @@ namespace Ailu::SceneManagement
         _register.RegisterSystem<ECS::AnimationSystem>(anim_sig);
         _register.RegisterOnComponentAdd<ECS::StaticMeshComponent>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);
         });
-        _register.RegisterOnComponentAdd<ECS::CSkeletonMesh>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);
-                                                      });
+        _register.RegisterOnComponentAdd<ECS::CSkeletonMesh>([](ECS::Entity entity){ RenderPipeline::Get().OnAddRenderObject(entity);});
+        BufferDesc buf_desc;
+        buf_desc._is_random_write = false;
+        buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
+        buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+        buf_desc._element_num = RenderConstants::kMaxRenderObjectCount * 4;
+        buf_desc._element_size = sizeof(LBVHNode);
+        buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+        _tlas_buffer = GPUBuffer::Create(buf_desc);
+        _tlas_buffer->Name(std::format("{}_tlas_buffer", Name()));
     }
 
     void Scene::Attach(ECS::Entity current, ECS::Entity parent)
@@ -318,6 +261,7 @@ namespace Ailu::SceneManagement
                 cur_transf->_transform._p_parent = &parent_transf->_transform;
             }
         }
+        MarkDirty();
     }
     void Scene::Detach(ECS::Entity current)
     {
@@ -349,6 +293,7 @@ namespace Ailu::SceneManagement
         {
             cur_transf->_transform._p_parent = nullptr;
         }
+        MarkDirty();
     }
     const Vector<ECS::Entity> &Scene::EntityView() const
     {
@@ -365,6 +310,7 @@ namespace Ailu::SceneManagement
         comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
         comp._p_mats.emplace_back(mat ? mat : Material::s_standard_defered_lit.lock());
+        MarkDirty();
         return obj;
     }
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>> &mats)
@@ -377,6 +323,7 @@ namespace Ailu::SceneManagement
         comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
         comp._p_mats = mats;
+        MarkDirty();
         return obj;
     }
     ECS::Entity Scene::AddObject(String name)
@@ -386,6 +333,7 @@ namespace Ailu::SceneManagement
         _register.AddComponent<ECS::TagComponent>(obj, name);
         _register.AddComponent<ECS::TransformComponent>(obj);
         _register.AddComponent<ECS::CHierarchy>(obj);
+        MarkDirty();
         return obj;
     }
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
@@ -425,6 +373,7 @@ namespace Ailu::SceneManagement
         if (_register.HasComponent<ECS::CCollider>(e))
             _register.AddComponent<ECS::CCollider>(new_one, *_register.GetComponent<ECS::CCollider>(e));
         LOG_INFO("Duplicate entity {}", e);
+        MarkDirty();
         return new_one;
     }
     ECS::Entity Scene::Pick(const Ray &ray)
@@ -459,12 +408,15 @@ namespace Ailu::SceneManagement
     }
     void Scene::DeletePendingEntities()
     {
+        if (_pending_delete_entities.empty())
+            return;
         while (!_pending_delete_entities.empty())
         {
             auto actor = _pending_delete_entities.front();
             _pending_delete_entities.pop();
             _register.Destory(actor);
         }
+        MarkDirty();
     }
 
     void Scene::Clear()
@@ -523,6 +475,11 @@ namespace Ailu::SceneManagement
         }
         RebuildBVHTree();
         DeletePendingEntities();
+        if (_dirty)
+        {
+            UpdateGpuScene();
+            _dirty = false;
+        }
     }
 
     static Vector<LBVHNode> s_temp_tlas_gpu_data(RenderConstants::kMaxRenderObjectCount*2);
@@ -558,13 +515,92 @@ namespace Ailu::SceneManagement
         _tlas_buffer->SetData(reinterpret_cast<const u8 *>(s_temp_tlas_gpu_data.data()), (u32) (node_size * sizeof(LBVHNode)));
     }
 
-    //-----------------------------------------------------------------------SceneMgr----------------------------------------------------------------------------
-    int SceneMgr::Initialize()
+    void Scene::UpdateGpuScene()
+    {
+        _triangle_count = 0u;
+        u64 mesh_bvh_node_count = 0u;
+        for (auto& c: _register.View<ECS::StaticMeshComponent>())
+        {
+            _triangle_count += c._p_mesh->GetTriangleCount();
+            mesh_bvh_node_count += c._p_mesh->GetBVHNodes().size();
+        }
+        if (_triangle_count > 0)
+        {
+            u64 entity_idx = 0u;
+            Vector<Render::TriangleData> triangles;
+            triangles.reserve(_triangle_count);
+            Vector<BVHNode> mesh_bvh_nodes;
+            mesh_bvh_nodes.reserve(mesh_bvh_node_count);
+            u64 triangle_offset = 0u,bvh_offset = 0u;
+            for (auto &c: _register.View<ECS::StaticMeshComponent>())
+            {
+                auto current_entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
+                auto current_tri_count = c._p_mesh->GetTriangleCount();
+                auto cur_bvh_node_count = c._p_mesh->GetBVHNodes().size();
+                triangles.insert(triangles.end(),c._p_mesh->GetTriangleData().begin(),c._p_mesh->GetTriangleData().end());
+                mesh_bvh_nodes.insert(mesh_bvh_nodes.end(), c._p_mesh->GetBVHNodes().begin(), c._p_mesh->GetBVHNodes().end());
+                _bvh_nodes_range[current_entity] = Vector2UInt{(u32) bvh_offset, (u32) (cur_bvh_node_count)};
+                _mesh_bvh_node_triangle_offset[current_entity] = (u32)triangle_offset;
+                triangle_offset += current_tri_count;
+                bvh_offset += cur_bvh_node_count;
+            }
+            if (_scene_mesh_data)
+            {
+                _scene_mesh_data.reset();
+                _blas_buffer.reset();
+            }
+            BufferDesc buf_desc;
+            buf_desc._element_num = _triangle_count;
+            buf_desc._element_size = sizeof(TriangleData);
+            buf_desc._is_random_write = false;
+            buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
+            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+            _scene_mesh_data = GPUBuffer::Create(buf_desc);
+            _scene_mesh_data->Name(std::format("{}_mesh_data_buffer", Name()));
+
+            _scene_mesh_data->SetData(reinterpret_cast<const u8 *>(triangles.data()), _triangle_count * sizeof(Render::TriangleData));
+            buf_desc._element_num = (u32) mesh_bvh_nodes.size();
+            buf_desc._element_size = sizeof(LBVHNode);
+            buf_desc._size = buf_desc._element_size * buf_desc._element_num;
+            Vector<LBVHNode> gpu_nodes;
+            gpu_nodes.reserve(mesh_bvh_nodes.size());
+            for (u64 i = 0; i < mesh_bvh_nodes.size(); i++)
+            {
+                const auto &node = mesh_bvh_nodes[i];
+                gpu_nodes.emplace_back(node._aabb._min,(f32)node._child_index_or_first, node._aabb._max, (f32)node._count_or_flag);
+            }
+            _blas_buffer = GPUBuffer::Create(buf_desc);
+            _blas_buffer->Name(std::format("{}_blas_buffer", Name()));
+            _blas_buffer->SetData(reinterpret_cast<const u8 *>(gpu_nodes.data()), static_cast<u32>(gpu_nodes.size() * sizeof(LBVHNode)));
+            _blas_node_count = (u32)gpu_nodes.size();
+        }
+    }
+    #pragma endregion
+
+    #pragma region SceneMgr---------------------------------------------------------------------------- 
+
+    static SceneMgr* s_scene_mgr;
+    SceneMgr& SceneMgr::Get()
+    {
+        return *s_scene_mgr;
+    }
+    void SceneMgr::Init()
+    {
+        if (!s_scene_mgr)
+        {
+            s_scene_mgr = new SceneMgr();
+        }
+    }
+    void SceneMgr::Shutdown()
+    {
+
+    }
+
+    SceneMgr::SceneMgr()
     {
         TIMER_BLOCK("-----------------------------------------------------------SceneMgr::Initialize")
-        return 0;
     }
-    void SceneMgr::Finalize()
+    SceneMgr::~SceneMgr()
     {
         //std::ostringstream oss;
         //TextOArchive ar(&oss);
@@ -657,5 +693,6 @@ namespace Ailu::SceneManagement
         Application::Get()._is_simulate_mode = false;
         _transform_cache.clear();
     }
+    #pragma endregion
     //-----------------------------------------------------------------------SceneMgr----------------------------------------------------------------------------
 }// namespace Ailu

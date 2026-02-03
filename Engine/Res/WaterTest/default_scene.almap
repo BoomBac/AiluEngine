@@ -72,7 +72,7 @@ _layer_mask:1
             _transform:
                 _position:0.000000000,-24.367187500,-3.650000095
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:163.044464111,163.044464111,163.044464111
+                _scale:163.044464111,1.000000000,163.044464111
         _static_mesh_component:
             _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
             _material_num:1
@@ -195,8 +195,8 @@ Entity:9
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:54.000000000,13.082031250,13.000000000
-                _rotation:-0.707107127,0.000000048,0.000000048,0.707106411
+                _position:51.185043335,-18.155273438,-91.594482422
+                _rotation:-0.959146321,0.000000078,0.000000048,0.282910556
                 _scale:3.000000000,3.000000000,3.000000000
         _static_mesh_component:
             _p_mesh:beccf997-dcb3-4217-b213-42059ec71ce8
@@ -276,11 +276,11 @@ Entity:12
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:-65.673095703,13.798629761,-13.724078178
+                _position:-20.637634277,-21.727737427,-1.892302990
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:2.369345427,2.369282007,2.369345427
+                _scale:2.369344950,2.369282007,2.369344950
         _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
+            _p_mesh:2ff30e48-6661-479b-a90c-863e606734f6
             _material_num:1
             _p_mats[0]:58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5
         _hierarchy_component:
@@ -429,22 +429,3 @@ _layer_mask:1
             _is_trigger:1
             _center:0.00,0.00,0.00
             _param:1.00,1.00,1.00
-Entity:18
-        _tag_component:
-            _name:new_object_18
-_layer_mask:0
-        _transform_component:
-            _transform:
-                _position:44.281826019,-5.349302292,-20.597919464
-                _rotation:0.000000000,0.000000000,0.000000000,1.000000000
-                _scale:1.000000000,1.000000000,1.000000000
-        _static_mesh_component:
-            _p_mesh:beccf997-dcb3-4217-b213-42059ec71ce8
-            _material_num:0
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0

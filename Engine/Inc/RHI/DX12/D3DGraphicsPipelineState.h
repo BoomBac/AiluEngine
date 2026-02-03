@@ -113,6 +113,7 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3D12PipelineState> _p_plstate;
         ComPtr<ID3D12RootSignature> _p_sig;
         ID3D12GraphicsCommandList *_p_cmd;
+        Vector<CD3DX12_ROOT_PARAMETER1> _root_parameters;
     };
 }// namespace Ailu::RHI::DX12
 

@@ -38,7 +38,7 @@ PerMaterialCBufferEnd
 #define MESH_WIDTH 8.0f
 #define MESH_SECTION 16
 
-StructuredBuffer<RenderPatch> PatchList;
+StructuredBuffer<RenderPatch> PatchList : register(t0,space1);
 struct VSIn
 {
     float3 vertex : POSITION;

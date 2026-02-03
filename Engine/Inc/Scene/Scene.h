@@ -71,6 +71,7 @@ namespace Ailu
             void Clear();
             void Update(f32 dt);
             void RebuildBVHTree();
+            void UpdateGpuScene();
         private:
             bool _dirty = true;
             u16 _total_renderable_count = 0u;
@@ -86,15 +87,17 @@ namespace Ailu
             Vector<BVHNode> _tlas_nodes;
         };
 
-        class AILU_API SceneMgr : public IRuntimeModule
+        class AILU_API SceneMgr
         {
         public:
+            static SceneMgr& Get();
+            static void Init();
+            static void Shutdown();
+        public:
             DISALLOW_COPY_AND_ASSIGN(SceneMgr)
-            SceneMgr() = default;
-            int Initialize();
-            void Finalize();
+            SceneMgr();
+            ~SceneMgr();
             void Tick(f32 delta_time);
-
             void MarkCurSceneDirty() { _p_current->MarkDirty(); };
             Ref<Scene> Create(String name);
             Ref<Scene> OpenScene(const WString &scene_path);
@@ -112,6 +115,5 @@ namespace Ailu
             Vector<Transform> _transform_cache;
         };
     }
-    extern AILU_API SceneManagement::SceneMgr *g_pSceneMgr;
 }// namespace Ailu
 #endif// !SCENE_H__

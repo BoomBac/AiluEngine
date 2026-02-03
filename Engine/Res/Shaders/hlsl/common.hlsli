@@ -159,13 +159,13 @@ float4 TransformPreviousWorldToHClip(float3 world_pos)
 	return mul(_MatrixVP_Pre, float4(world_pos, 1.0f));
 }
 
-float4 TransformObjectToWorld(float3 object_pos)
+float3 TransformObjectToWorld(float3 object_pos)
 {
-	return mul(_MatrixWorld, float4(object_pos, 1.0f));
+	return mul(_MatrixWorld, float4(object_pos, 1.0f)).xyz;
 }
-float4 TransformPreviousObjectToWorld(float3 object_pos)
+float3 TransformPreviousObjectToWorld(float3 object_pos)
 {
-	return mul(_MatrixWorld_Pre, float4(object_pos, 1.0f));
+	return mul(_MatrixWorld_Pre, float4(object_pos, 1.0f)).xyz;
 }
 
 float3 TransformNormal(float3 object_normal)
@@ -190,8 +190,12 @@ inline void GammaCorrect(inout float3 color, float gamma)
 //https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
 float2 OctWrap(float2 v)
 {
-	return (1.0 - abs(v.yx)) * (v.xy >= 0.0 ? 1.0 : -1.0);
+    float2 sign;// = (v.xy >= 0.0) ? float2(1.0, 1.0) : float2(-1.0, -1.0);
+    sign.x = v.x >= 0.0 ? 1.0 : -1.0;
+    sign.y = v.y >= 0.0 ? 1.0 : -1.0;
+    return (1.0 - abs(v.yx)) * sign;
 }
+
  
 float2 PackNormal(float3 n)
 {
@@ -207,7 +211,8 @@ float3 UnpackNormal(float2 f)
 // https://twitter.com/Stubbesaurus/status/937994790553227264
 	float3 n = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
 	float t = saturate(-n.z);
-	n.xy += n.xy >= 0.0 ? -t : t;
+    n.x += n.x >= 0.0 ? -t : t;
+    n.y += n.y >= 0.0 ? -t : t;
 	return normalize(n);
 }
 

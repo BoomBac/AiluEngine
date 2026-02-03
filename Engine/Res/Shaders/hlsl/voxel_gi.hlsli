@@ -38,7 +38,6 @@ bool IsInsideCube(const float3 p, float e)
 }
 
 
-#define ToRadius 0.0072
 #define _StepCount 32
 #define _Mipmap 0
 #define _ONE_RAY_ON

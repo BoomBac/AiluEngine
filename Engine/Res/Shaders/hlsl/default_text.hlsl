@@ -7,7 +7,7 @@
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
 //ZTest: Always
-//multi_compile: _ _MSDF
+//multi_compile _ _MSDF
 //ColorMask: RGB
 //pass end::
 //info end

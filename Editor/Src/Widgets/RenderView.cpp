@@ -29,6 +29,7 @@ namespace Ailu
     Render::Renderer *s_renderer = nullptr;
     namespace Editor
     {
+        using SceneManagement::SceneMgr;
         #pragma region RenderView
         static class EditorLayer* s_editor_layer;
         RenderView::RenderView() : DockWindow("RenderView")
@@ -94,9 +95,9 @@ namespace Ailu
                     auto &payload = DragDropManager::Get().GetPayload();
                     _drag_preview_mesh = reinterpret_cast<Asset*>(payload->_data)->AsRef<Render::Mesh>();
                     Ray ray{Camera::sCurrent->Position(), Camera::sCurrent->ScreenToWorld(_mouse_pos)};
-                    if (auto hit = g_pSceneMgr->ActiveScene()->Pick(ray); hit != ECS::kInvalidEntity)
+                    if (auto hit = SceneMgr::Get().ActiveScene()->Pick(ray); hit != ECS::kInvalidEntity)
                     {
-                        auto &box = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::StaticMeshComponent>(hit)->_transformed_aabbs[0];
+                        auto &box = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::StaticMeshComponent>(hit)->_transformed_aabbs[0];
                         Vector3f p = box.Center();
                         p.y += box.GetHalfAxisLength().y;
                         Plane plane{p, Vector3f::kUp};
@@ -151,7 +152,7 @@ namespace Ailu
                                                         {
                                                     LOG_INFO("Pick entity: {} on pos {}", closest_entity, local_pos.ToString());
                         Selection::AddAndRemovePreSelection(closest_entity);
-                        auto tcomp = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(closest_entity);
+                        auto tcomp = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(closest_entity);
                         _transform_gizmo->SetTarget(&tcomp->_transform);
                         ray_trace->_debug_pos = local_pos;
                             });
@@ -208,15 +209,10 @@ namespace Ailu
                 for (u16 i = 0; i < _drag_preview_mesh->SubmeshCount(); i++)
                 {
                     auto mat = g_pResourceMgr->GetEmbeddedMaterial(_drag_preview_mesh.get(), i);
-                    if (mat)
-                    {
-                        mats.push_back(mat);
-                    }
-                    else
-                        LOG_WARNING("GetEmbeddedMaterial: mesh {},slot {} failed!", _drag_preview_mesh->Name(), i);
+                    mats.push_back(mat? mat : Render::Material::s_checker.lock());
                 }
-                auto new_entity = g_pSceneMgr->ActiveScene()->AddObject(_drag_preview_mesh, mats);
-                g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_transform._position = _drag_preview_pos;
+                auto new_entity = SceneMgr::Get().ActiveScene()->AddObject(_drag_preview_mesh, mats);
+                SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_transform._position = _drag_preview_pos;
             };
             _source->SetDropHandler(handler);
         }

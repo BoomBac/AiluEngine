@@ -81,7 +81,7 @@ TEXTURE2D(_CameraDepthTexture)
 float2 CameraMotionVectorPSMain(FullScreenPSInput input) : SV_TARGET
 {
     float2 uv = input.uv;
-    float depth = LOAD_TEXTURE2D(_CameraDepthTexture,input.uv * _ScreenParams.zw);
+    float depth = LOAD_TEXTURE2D(_CameraDepthTexture,input.uv * _ScreenParams.zw).r;
     float3 world_pos = ComputeWorldSpacePosition(uv,depth,_MatrixIVP);
     float4 cur_clip_pos = mul(_MatrixVP_NoJitter, float4(world_pos,1.0f));
     float4 pre_clip_pos = mul(_MatrixVP_Pre, float4(world_pos,1.0f));

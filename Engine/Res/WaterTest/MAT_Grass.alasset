@@ -12,7 +12,7 @@ keywords:
     _Anisotropy: 0
     _MaterialID: 0
     _MetallicValue: 0
-    _RoughnessValue: 1
+    _RoughnessValue: 0.154674
     _SamplerMask: 0
   prop_type: Vector
     _AlbedoValue: 1,0,0,1

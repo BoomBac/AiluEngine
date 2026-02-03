@@ -51,5 +51,50 @@ struct LightData
     float3 light_color;
 	float  shadow_atten;
 };
+SurfaceData SurfaceData_Constructor(
+	float3 wnormal,
+	float roughness,
+	float4 albedo,
+	float3 emssive,
+	float metallic,
+	float3 specular,
+	float anisotropy,
+	float3 tangent,
+	float3 bitangent)
+{
+	SurfaceData data;
+	data.wnormal = wnormal;
+	data.roughness = roughness;
+	data.albedo = albedo;
+	data.emssive = emssive;
+	data.metallic = metallic;
+	data.specular = specular;
+	data.anisotropy = anisotropy;
+	data.tangent = tangent;
+	data.bitangent = bitangent;
+	return data;
+}
+
+ShadingData ShadingData_Constructor(
+	float3 view_dir,
+	float nl,
+	float nv,
+	float vh,
+	float lh,
+	float nh,
+	float th,
+	float bh)
+{
+	ShadingData data;
+	data.view_dir = view_dir;
+	data.nl = nl;
+	data.nv = nv;
+	data.vh = vh;
+	data.lh = lh;
+	data.nh = nh;
+	data.th = th;
+	data.bh = bh;
+	return data;
+}
 
 #endif //__INPUT_H__

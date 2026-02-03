@@ -13,7 +13,7 @@
 #include "common.hlsli"
 #include "fullscreen_quad.hlsli"
 
-FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
+FullScreenPSInput FullscreenVSMain(FullScreenVSInput i);
 float4 PSMain(FullScreenPSInput IN);
 
 
@@ -99,15 +99,15 @@ float2 GetClosestFragment(float2 uv)
 
 void GetCurColorSamples(float2 uv, out float3 samples[9])
 {
-    samples[0] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2(-1, -1));
-    samples[1] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 0, -1));
-    samples[2] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 1, -1));
-    samples[3] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2(-1,  0));
-    samples[4] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv);
-    samples[5] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 1,  0));
-    samples[6] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2(-1,  1));
-    samples[7] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 0,  1));
-    samples[8] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 1,  1));
+    samples[0] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2(-1, -1)).rgb;
+    samples[1] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 0, -1)).rgb;
+    samples[2] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 1, -1)).rgb;
+    samples[3] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2(-1,  0)).rgb;
+    samples[4] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv).rgb;
+    samples[5] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 1,  0)).rgb;
+    samples[6] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2(-1,  1)).rgb;
+    samples[7] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 0,  1)).rgb;
+    samples[8] = SAMPLE_TEXTURE2D(_CurFrameColor, g_LinearClampSampler, uv + _CurFrameColor_TexelSize.xy * float2( 1,  1)).rgb;
 }
 
 float3 Filter(float3 samples[9]) 
@@ -132,7 +132,7 @@ void Clip(float3 samples[9],inout float4 cliped_color)
 {
     float3 AABBMin, AABBMax;
     cliped_color.rgb = RGBToYCoCg(cliped_color.rgb);
-    AABBMax = AABBMin = cliped_color;
+    AABBMax = AABBMin = cliped_color.rgb;
     for(int i = 0; i < 9; i++)
     {
         float3 C = RGBToYCoCg(samples[i]);

@@ -58,7 +58,7 @@ float4 RaymarchVolumetric(float3 uvw,float scene_depth)
     return _VolumetricLightTexture.SampleLevel(g_LinearClampSampler, uvw, 0);
 }
 
-FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
+FullScreenPSInput FullscreenVSMain(FullScreenVSInput i);
 
 float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 {
@@ -67,7 +67,7 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	float4 gbuf1 = _GBuffer1.Sample(g_LinearWrapSampler,input.uv);
 	float4 gbuf2 = _GBuffer2.Sample(g_LinearWrapSampler,input.uv);
 	half4 emssion = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, input.uv,0);
-	float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearWrapSampler,input.uv,0);
+	float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearWrapSampler,input.uv,0).r;
 	float3 world_pos = ComputeWorldSpacePosition(input.uv,depth,_MatrixIVP);
 	//float3 world_pos = _CameraPos.xyz + UnprojectByCameraRay(input.uv,depth);
 	SurfaceData surface_data;
@@ -80,9 +80,9 @@ float4 DeferredLightingPSMain(FullScreenPSInput input) : SV_TARGET
 	surface_data.emssive = emssion.rgb;
 	OrthonormalBasis(surface_data.wnormal,surface_data.tangent,surface_data.bitangent);
 	uint material_id = (uint)gbuf2.r;
-	//return float4(surface_data.wnormal,1); 
+	//return float4(surface_data.wnormal,1);
 #ifdef DEBUG_NORMAL
-	return float4(surface_data.wnormal,1); 
+	return float4(surface_data.wnormal,1);
 #elif DEBUG_ALBEDO
 	return surface_data.albedo;
 #elif DEBUG_WORLDPOS

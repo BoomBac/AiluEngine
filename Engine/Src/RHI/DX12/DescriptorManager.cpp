@@ -244,12 +244,28 @@ namespace Ailu::RHI::DX12
 		AL_ASSERT(p_device != nullptr);
 		_desc_size = p_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		D3D12_DESCRIPTOR_HEAP_DESC desc{};
-		desc.NumDescriptors = kMaxDescriptorNumPerPage;
+		desc.NumDescriptors = kMainHeapDescriptorNum;
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		ThrowIfFailed(p_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&_main_heap)));
 		_main_heap->SetName(L"MainHeap");
 		_device = p_device;
+		// Initialize region layout in MainHeap.
+		_bindless_srv_base_index = 1u;
+		_bindless_uav_base_index = _bindless_srv_base_index + _bindless_srv_capacity;
+		_ring_base_index = _bindless_uav_base_index + _bindless_uav_capacity;
+		_ring_cursor = _ring_base_index;
+		_bindless_srv_cursor = 0u;
+		_bindless_uav_cursor = 0u;
+		_bindless_srv_free.clear();
+		_bindless_uav_free.clear();
+		_bindless_srv_inuse.resize(_bindless_srv_capacity);
+		for (auto& v : _bindless_srv_inuse)
+			v = 0u;
+		_bindless_uav_inuse.resize(_bindless_uav_capacity);
+		for (auto& v : _bindless_uav_inuse)
+			v = 0u;
+		AL_ASSERT_MSG(_ring_base_index < kMainHeapDescriptorNum, "MainHeap too small for bindless region configuration!");
 	}
 	GPUVisibleDescriptorAllocator::~GPUVisibleDescriptorAllocator()
 	{
@@ -350,39 +366,149 @@ namespace Ailu::RHI::DX12
 			cmd->SetDescriptorHeapId(_p_page->PageID());
 		}
 	}
-	std::mutex g_mutex;
+	D3D12_GPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetBindlessSRVBaseGpuHandle() const
+	{
+		D3D12_GPU_DESCRIPTOR_HANDLE h = _main_heap->GetGPUDescriptorHandleForHeapStart();
+		h.ptr += (SIZE_T)_desc_size * (SIZE_T)_bindless_srv_base_index;
+		return h;
+	}
+	D3D12_GPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetBindlessUAVBaseGpuHandle() const
+	{
+		D3D12_GPU_DESCRIPTOR_HANDLE h = _main_heap->GetGPUDescriptorHandleForHeapStart();
+		h.ptr += (SIZE_T)_desc_size * (SIZE_T)_bindless_uav_base_index;
+		return h;
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetMainHeapCpuHandle(u32 heap_index) const
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE h = _main_heap->GetCPUDescriptorHandleForHeapStart();
+		h.ptr += (SIZE_T)_desc_size * (SIZE_T)heap_index;
+		return h;
+	}
+	D3D12_GPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetMainHeapGpuHandle(u32 heap_index) const
+	{
+		D3D12_GPU_DESCRIPTOR_HANDLE h = _main_heap->GetGPUDescriptorHandleForHeapStart();
+		h.ptr += (SIZE_T)_desc_size * (SIZE_T)heap_index;
+		return h;
+	}
+
+	u32 GPUVisibleDescriptorAllocator::AllocBindlessSRVIndex(u32 count)
+	{
+		std::lock_guard lock(_mainheap_mutex);
+		AL_ASSERT_MSG(count > 0, "AllocBindlessSRVIndex count must be > 0");
+		if (count == 1 && !_bindless_srv_free.empty())
+		{
+			u32 ret = _bindless_srv_free.back();
+			_bindless_srv_free.pop_back();
+			AL_ASSERT_MSG(ret < _bindless_srv_capacity, "Bindless SRV freelist corrupted");
+			AL_ASSERT_MSG(!_bindless_srv_inuse.empty(), "Bindless SRV tracking not initialized");
+			AL_ASSERT_MSG(_bindless_srv_inuse[ret] == 0u, "Bindless SRV index already in use (double-alloc)");
+			_bindless_srv_inuse[ret] = 1u;
+			return ret;
+		}
+		AL_ASSERT_MSG(_bindless_srv_cursor + count <= _bindless_srv_capacity, "Bindless SRV region exhausted");
+		u32 ret = _bindless_srv_cursor;
+		_bindless_srv_cursor += count;
+		if (!_bindless_srv_inuse.empty())
+		{
+			for (u32 i = 0; i < count; ++i)
+			{
+				AL_ASSERT_MSG((ret + i) < _bindless_srv_capacity, "Bindless SRV allocation out of range");
+				AL_ASSERT_MSG(_bindless_srv_inuse[ret + i] == 0u, "Bindless SRV index already in use (double-alloc)");
+				_bindless_srv_inuse[ret + i] = 1u;
+			}
+		}
+		return ret;
+	}
+	u32 GPUVisibleDescriptorAllocator::AllocBindlessUAVIndex(u32 count)
+	{
+		std::lock_guard lock(_mainheap_mutex);
+		AL_ASSERT_MSG(count > 0, "AllocBindlessUAVIndex count must be > 0");
+		if (count == 1 && !_bindless_uav_free.empty())
+		{
+			u32 ret = _bindless_uav_free.back();
+			_bindless_uav_free.pop_back();
+			AL_ASSERT_MSG(ret < _bindless_uav_capacity, "Bindless UAV freelist corrupted");
+			AL_ASSERT_MSG(!_bindless_uav_inuse.empty(), "Bindless UAV tracking not initialized");
+			AL_ASSERT_MSG(_bindless_uav_inuse[ret] == 0u, "Bindless UAV index already in use (double-alloc)");
+			_bindless_uav_inuse[ret] = 1u;
+			return ret;
+		}
+		AL_ASSERT_MSG(_bindless_uav_cursor + count <= _bindless_uav_capacity, "Bindless UAV region exhausted");
+		u32 ret = _bindless_uav_cursor;
+		_bindless_uav_cursor += count;
+		if (!_bindless_uav_inuse.empty())
+		{
+			for (u32 i = 0; i < count; ++i)
+			{
+				AL_ASSERT_MSG((ret + i) < _bindless_uav_capacity, "Bindless UAV allocation out of range");
+				AL_ASSERT_MSG(_bindless_uav_inuse[ret + i] == 0u, "Bindless UAV index already in use (double-alloc)");
+				_bindless_uav_inuse[ret + i] = 1u;
+			}
+		}
+		return ret;
+	}
+	void GPUVisibleDescriptorAllocator::ReleaseBindlessSRVIndex(u32 bindless_index)
+	{
+		std::lock_guard lock(_mainheap_mutex);
+		AL_ASSERT_MSG(bindless_index < _bindless_srv_capacity, "Bindless SRV index out of range");
+		AL_ASSERT_MSG(!_bindless_srv_inuse.empty(), "Bindless SRV tracking not initialized");
+		AL_ASSERT_MSG(_bindless_srv_inuse[bindless_index] == 1u, "Bindless SRV index double free or never allocated");
+		_bindless_srv_inuse[bindless_index] = 0u;
+		_bindless_srv_free.push_back(bindless_index);
+	}
+	void GPUVisibleDescriptorAllocator::ReleaseBindlessUAVIndex(u32 bindless_index)
+	{
+		std::lock_guard lock(_mainheap_mutex);
+		AL_ASSERT_MSG(bindless_index < _bindless_uav_capacity, "Bindless UAV index out of range");
+		AL_ASSERT_MSG(!_bindless_uav_inuse.empty(), "Bindless UAV tracking not initialized");
+		AL_ASSERT_MSG(_bindless_uav_inuse[bindless_index] == 1u, "Bindless UAV index double free or never allocated");
+		_bindless_uav_inuse[bindless_index] = 0u;
+		_bindless_uav_free.push_back(bindless_index);
+	}
+	D3D12_CPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetBindlessSRVCpuHandle(u32 bindless_index) const
+	{
+		AL_ASSERT_MSG(bindless_index < _bindless_srv_capacity, "Bindless SRV index out of range");
+		return GetMainHeapCpuHandle(_bindless_srv_base_index + bindless_index);
+	}
+	D3D12_CPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetBindlessUAVCpuHandle(u32 bindless_index) const
+	{
+		AL_ASSERT_MSG(bindless_index < _bindless_uav_capacity, "Bindless UAV index out of range");
+		return GetMainHeapCpuHandle(_bindless_uav_base_index + bindless_index);
+	}
+
 	D3D12_GPU_DESCRIPTOR_HANDLE GPUVisibleDescriptorAllocator::GetBindGpuHandle(const GPUVisibleDescriptorAllocation& alloc)
 	{
-		std::lock_guard lock(g_mutex);
-		if (_main_page_index + alloc.DescriptorNum() > kMaxDescriptorNumPerPage)
+		std::lock_guard lock(_mainheap_mutex);
+		if (_ring_cursor + alloc.DescriptorNum() > kMainHeapDescriptorNum)
 		{
-			_main_page_index = 1u;
+			_ring_cursor = _ring_base_index;
 		}
 		D3D12_CPU_DESCRIPTOR_HANDLE dst_handle = _main_heap->GetCPUDescriptorHandleForHeapStart();
-		dst_handle.ptr += _desc_size * _main_page_index;
+		dst_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
 		auto[src_handle,gh] = alloc.At(0u);
 		_device->CopyDescriptorsSimple(alloc.DescriptorNum(), dst_handle, src_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		D3D12_GPU_DESCRIPTOR_HANDLE ret_handle = _main_heap->GetGPUDescriptorHandleForHeapStart();
-		ret_handle.ptr += _desc_size * _main_page_index;
-		_main_page_index += alloc.DescriptorNum();
+		ret_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
+		_ring_cursor += alloc.DescriptorNum();
 		return ret_handle;
 	}
 	std::tuple<D3D12_CPU_DESCRIPTOR_HANDLE,D3D12_GPU_DESCRIPTOR_HANDLE> GPUVisibleDescriptorAllocator::GetBindHandle(const GPUVisibleDescriptorAllocation& alloc)
 	{
-		std::lock_guard lock(g_mutex);
-		if (_main_page_index + alloc.DescriptorNum() > kMaxDescriptorNumPerPage)
+		std::lock_guard lock(_mainheap_mutex);
+		if (_ring_cursor + alloc.DescriptorNum() > kMainHeapDescriptorNum)
 		{
-			_main_page_index = 1u;
+			_ring_cursor = _ring_base_index;
 		}
 		D3D12_CPU_DESCRIPTOR_HANDLE dst_handle = _main_heap->GetCPUDescriptorHandleForHeapStart();
-		dst_handle.ptr += _desc_size * _main_page_index;
+		dst_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
 		auto[src_handle,gh] = alloc.At(0u);
 		_device->CopyDescriptorsSimple(alloc.DescriptorNum(), dst_handle, src_handle, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		D3D12_CPU_DESCRIPTOR_HANDLE ret_cpu_handle = _main_heap->GetCPUDescriptorHandleForHeapStart();
-		ret_cpu_handle.ptr += _desc_size * _main_page_index;
+		ret_cpu_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
 		D3D12_GPU_DESCRIPTOR_HANDLE ret_gpu_handle = _main_heap->GetGPUDescriptorHandleForHeapStart();
-		ret_gpu_handle.ptr += _desc_size * _main_page_index;
-		_main_page_index += alloc.DescriptorNum();
+		ret_gpu_handle.ptr += (SIZE_T)_desc_size * (SIZE_T)_ring_cursor;
+		_ring_cursor += alloc.DescriptorNum();
 		return std::make_tuple(ret_cpu_handle,ret_gpu_handle);
 	}
 

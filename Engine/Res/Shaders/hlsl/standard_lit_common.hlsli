@@ -43,7 +43,7 @@ void InitSurfaceData(StandardPSInput input,out SurfaceData surface)
 		surface.emssive = _EmissionTex.Sample(g_LinearWrapSampler, input.uv0).rgb;
 	}
 	else 
-		surface.emssive = _EmissionValue;
+		surface.emssive = _EmissionValue.rgb;
 	if(_SamplerMask & 8)
 	{
 		float2 roughness_and_metallic = _RoughnessMetallicTex.Sample(g_LinearWrapSampler, input.uv0).rg;
@@ -58,7 +58,7 @@ void InitSurfaceData(StandardPSInput input,out SurfaceData surface)
 	if (_SamplerMask & 16)
 		surface.specular = _SpecularTex.Sample(g_LinearWrapSampler, input.uv0).rgb;
 	else
-	surface.specular = _SpecularValue;
+	surface.specular = _SpecularValue.rgb;
 	surface.anisotropy = _Anisotropy; 
 	surface.tangent =   normalize(input.btn[2]);
 	surface.bitangent = normalize(input.btn[1]);
@@ -78,7 +78,7 @@ void InitSurfaceDataCheckboard(StandardPSInput input,out SurfaceData surface)
 	surface.wnormal = lerp(float3(0,0,1),surface.wnormal,camera_fadeout);
 	surface.wnormal = normalize(mul(surface.wnormal,input.btn));
 	surface.emssive = 0.0.rrr;
-	surface.roughness = lerp(0,1,c0);
+	surface.roughness = lerp(0,1,c0.r);
 	surface.metallic = 0;
 	surface.specular = 0.0.xxx;
 	surface.anisotropy = 0;

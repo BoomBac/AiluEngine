@@ -112,7 +112,7 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 
 //---------------------shadow caster-------------------------
 PSInput VSMain(VSInput v);
-void PSMain(PSInput input);
+float PSMain(PSInput input);
 
 //---------------------voxel light---------------------------
 #include "lighting.hlsli"

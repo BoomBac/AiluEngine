@@ -84,7 +84,7 @@ namespace Ailu
                         auto renderer = Render::RenderPipeline::Get().GetRenderer();
                         renderer->_is_render_light_probe = true;
                         renderer->SubmitTaskPass(comp._pass.get());
-                        renderer->Render(cam, *g_pSceneMgr->ActiveScene());
+                        renderer->Render(cam, *SceneManagement::SceneMgr::Get().ActiveScene());
                         renderer->_is_render_light_probe = false;
                         comp._is_dirty = false;
                         /*

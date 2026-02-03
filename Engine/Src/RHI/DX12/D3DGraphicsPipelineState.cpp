@@ -72,7 +72,7 @@ namespace Ailu::RHI::DX12
             for (u32 i = 0; i < _d3d_pso_desc.InputLayout.NumElements; i++)
             {
                 D3D12_INPUT_ELEMENT_DESC desc = *(_d3d_pso_desc.InputLayout.pInputElementDescs + i);
-                desc.SemanticName = layout_descs[i].Name.data();
+                desc.SemanticName = layout_descs[i].Name.c_str();
                 desc.SemanticIndex = (u32) layout_descs[i]._semantic_index;
                 v.push_back(desc);
             }
@@ -102,6 +102,7 @@ namespace Ailu::RHI::DX12
             //{
             //	LogMgr::Get().LogErrorFormat("PSO {}: _state_desc._raster_state.Hash() != raster_state",_name);
             //}
+            _root_parameters = d3dshader->GetRootParameters(pass_index, variant_hash);
             _defines = _state_desc._p_vertex_shader->ActiveKeywords(pass_index, variant_hash);
             _pass_name = _state_desc._p_vertex_shader->GetPassInfo(pass_index)._name;
             WString debug_name = ToWChar(std::format("{}_{}_{}", d3dshader->Name(), pass_index, variant_hash));

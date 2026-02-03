@@ -46,7 +46,7 @@ Texture2D _BloomTex : register(t1);
 #include "../fullscreen_quad.hlsli"
 #include "../color_space_utils.hlsli"
 
-FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
+FullScreenPSInput FullscreenVSMain(FullScreenVSInput i);
 
 float4 PSMain(FullScreenPSInput input) : SV_TARGET
 {
@@ -106,8 +106,8 @@ float3 UpSample(float2 center,float2 filter_radius)
 	// The filter kernel is applied with a radius, specified in texture
     // coordinates, so that the radius will vary across mip resolutions.
 	float3 result = 0.0.xxx;
-	float x = filter_radius;
-	float y = filter_radius;
+	float x = filter_radius.x;
+	float y = filter_radius.y;
 
     // Take 9 samples around current texel:
     // a - b - c

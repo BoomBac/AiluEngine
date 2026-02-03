@@ -15,6 +15,14 @@ namespace Ailu::Render
         {
             _obj_cbs.push_back(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
         }
+        BufferDesc desc;
+        desc._element_num = RenderConstants::kMaxMaterialDataCount;
+        desc._element_size = sizeof(MaterialData);
+        desc._is_random_write = false;
+        desc._size = desc._element_size * desc._element_num;
+        desc._target = EGPUBufferTarget::kConstant | EGPUBufferTarget::kStructured;
+        _material_buffer = GPUBuffer::Create(desc);
+        _material_buffer->Name(std::format("GlobalMaterialBuffer"));
     }
     FrameResource::~FrameResource()
     {

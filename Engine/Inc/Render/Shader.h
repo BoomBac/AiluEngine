@@ -21,7 +21,7 @@ namespace Ailu::Render
         kGeometry,
         kHull,
         kDomain,
-        kComputry
+        kCompute
     };
 
     struct ShaderPropertyType

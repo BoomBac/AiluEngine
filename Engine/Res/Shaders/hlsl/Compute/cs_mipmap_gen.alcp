@@ -16,7 +16,7 @@
 #define ALPHA_TYPE_NORMAL 0
 #define ALPHA_TYPE_INGORE 1
 #define ALPHA_TYPE_MAX    2
-cbuffer GenerateMipsCB : register(b0)
+cbuffer GenerateMipsCB
 {
     uint SrcMipLevel;	// Texture level of source mip
     uint NumMipLevels;	// Number of OutMips to write: [1-4]
@@ -74,12 +74,22 @@ float4 LoadColor3D( uint Index )
 // Source: https://en.wikipedia.org/wiki/SRGB#The_reverse_transformation
 float3 ConvertToLinear(float3 x)
 {
-    return x < 0.04045f ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4);
+    //return x < 0.04045f ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4);
+    #if defined(SHADER_DXC)
+        return select(x / 12.92, pow((x + 0.055) / 1.055, 2.4), x >= 0.04045);
+    #else
+        return x < 0.04045 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4);
+    #endif
 }
 // Source: https://en.wikipedia.org/wiki/SRGB#The_forward_transformation_(CIE_XYZ_to_sRGB)
 float3 ConvertToSRGB( float3 x )
 {
-    return x < 0.0031308 ? 12.92 * x : 1.055 * pow(abs(x), 1.0 / 2.4) - 0.055;
+    //return x < 0.0031308 ? 12.92 * x : 1.055 * pow(abs(x), 1.0 / 2.4) - 0.055;
+    #if defined(SHADER_DXC)
+        return select(12.92 * x, 1.055 * pow(abs(x), 1.0 / 2.4) - 0.055, x >= 0.0031308);
+    #else
+        return x < 0.0031308 ? 12.92 * x : 1.055 * pow(abs(x), 1.0 / 2.4) - 0.055;
+    #endif
 }
 // Convert linear color to sRGB before storing if the original source is 
 // an sRGB texture.

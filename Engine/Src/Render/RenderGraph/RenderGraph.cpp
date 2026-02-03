@@ -136,7 +136,7 @@ namespace Ailu
                 if (!node._is_allocated)
                 {
                     node._pool_buffer_handle = FrameResourceManager::Get().AllocBuffer(it->second._buffer_desc);
-                    node._pool_tex_handle._res->Name(node._name);
+                    node._pool_buffer_handle._res->Name(node._name);
                     node._is_allocated = true;
                 }
                 return node._pool_buffer_handle._res;

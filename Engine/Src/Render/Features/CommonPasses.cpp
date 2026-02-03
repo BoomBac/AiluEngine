@@ -966,6 +966,7 @@ namespace Ailu::Render
         out[1] = Vector4f(cpos_camera_target.x, cpos_camera_target.y, screen_pos_x_axis.x, screen_pos_x_axis.y);
         out[2] = Vector4f(cpos_camera_target.x, cpos_camera_target.y, screen_pos_z_axis.x, screen_pos_z_axis.y);
     }
+    using SceneManagement::SceneMgr;
 
     void Ailu::Render::GizmoPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
@@ -976,7 +977,6 @@ namespace Ailu::Render
         static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
         static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
         static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
-
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                 { 
                     builder.Read(rendering_data._rg_handles._color_target);
@@ -995,11 +995,11 @@ namespace Ailu::Render
                     cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
                     u16 index = 1;
                     u16 entity_index = 0;
-                    for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::LightComponent>())
+                    for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::LightComponent>())
                     {
                         if (index >= 20)
                             break;
-                        const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
+                        const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
                         auto world_pos = t->_transform._position;
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
@@ -1030,11 +1030,11 @@ namespace Ailu::Render
                         }
                     }
                     entity_index = 0;
-                    for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CLightProbe>())
+                    for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CLightProbe>())
                     {
                         if (index >= 20)
                             break;
-                        const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
+                        const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
                         auto world_pos = t->_transform._position;
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
@@ -1043,9 +1043,9 @@ namespace Ailu::Render
                         cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_lightprobe, m);
                     }
                     entity_index = 0;
-                    for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
+                    for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CCamera>())
                     {
-                        const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index++);
+                        const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index++);
                         auto world_pos = t->_transform._position;
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
@@ -1084,11 +1084,11 @@ namespace Ailu::Render
             cmd->DrawMesh(Mesh::s_plane.lock().get(), mat_gird_plane, _p_cbuffers[0].get(), 0, 0, 1);
             u16 index = 1;
             u16 entity_index = 0;
-            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::LightComponent>())
+            for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::LightComponent>())
             {
                 if (index >= 20)
                     break;
-                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
+                const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
                 auto world_pos = t->_transform._position;
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
@@ -1119,11 +1119,11 @@ namespace Ailu::Render
                 }
             }
             entity_index = 0;
-            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CLightProbe>())
+            for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CLightProbe>())
             {
                 if (index >= 20)
                     break;
-                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
+                const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
                 auto world_pos = t->_transform._position;
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
@@ -1132,9 +1132,9 @@ namespace Ailu::Render
                 cmd->DrawMesh(Mesh::s_quad.lock().get(), mat_lightprobe, m);
             }
             entity_index = 0;
-            for (auto &light_comp: g_pSceneMgr->ActiveScene()->GetRegister().View<ECS::CCamera>())
+            for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CCamera>())
             {
-                const auto &t = g_pSceneMgr->ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index++);
+                const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index++);
                 auto world_pos = t->_transform._position;
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;

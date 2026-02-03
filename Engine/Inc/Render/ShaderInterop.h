@@ -80,6 +80,7 @@ namespace Ailu::Render
     {
         float4x4 _local_to_world;
         float4x4 _world_to_local;
+        float _max_inv_scale;
         uint _object_id;
         uint _material_id;
         uint _global_triangle_offset;
@@ -99,6 +100,39 @@ namespace Ailu::Render
         float2 uv1;
         float2 uv2;
     };
+
+    struct MaterialData
+    {
+        // -------------------------------------------------
+        // Base parameters
+        // -------------------------------------------------
+
+        float3 _base_color;          // albedo / baseColor
+        float  _metallic;            // [0,1]
+
+        float3 _emission;            // radiance (W·sr⁻¹·m⁻²)
+        float  _emission_strength;
+
+        float  _roughness;           // perceptual roughness [0,1]
+        float  _specular;            // specular weight (dielectric F0 control)
+        float  _ior;                 // index of refraction (1.0 ~ 2.5)
+        float  _opacity;             // 1 = opaque, <1 transmission
+
+        // -------------------------------------------------
+        // Texture indices (bindless / array)
+        // -------------------------------------------------
+
+        uint _base_color_tex;
+        uint _normal_tex;
+        uint _metallic_roughness_tex;
+        uint _emission_tex;
+
+        uint _opacity_tex;
+        uint _reserved0;
+        uint _reserved1;
+        uint _flags;                 // MaterialFlags
+    };
+
     
     struct LBVHNode
     {

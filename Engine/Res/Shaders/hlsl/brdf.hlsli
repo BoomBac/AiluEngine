@@ -247,23 +247,55 @@ float3 EnvBRDF(float metallic, float3 base_color, float2 lut)
 }
 //--------------------------------------------------Env----------------------------------------------------------
 
-float3 CookTorranceBRDF(SurfaceData surface,ShadingData shading_data)
+float3 CookTorranceBRDF(SurfaceData surface,ShadingData s)
 {
-	float3 diffuse_color = surface.albedo.rgb * (1 - DIELECTRIC_SPECULAR) * (1.0 - surface.metallic);
-	float3 diffuse = Diffuse_Lambert(diffuse_color);
-	//float3 diffuse = Diffuse_Burley(surface.albedo.rgb,surface.roughness,shading_data.nv,shading_data.nl,shading_data.vh);
-	float D1 = D_GTR2(lerp(0.0002,1.0,surface.roughness),shading_data.nh);
-	float ax,ay;
-	GetAnisotropicRoughness(surface.roughness,surface.anisotropy,ax,ay);
-	float D2 = saturate(D_GGXaniso(ax,ay,shading_data.nh,shading_data.th,shading_data.bh));
-	float D = lerp(D1,D2,surface.anisotropy);
-	//float G = Vis_Schlick(Pow2(0.5 + surface.roughness/2),shading_data.nv,shading_data.nl);
-	float G = V_SmithGGXCorrelated(shading_data.nv,shading_data.nl,surface.roughness);
-	float3 F = F_Schlick(lerp(DIELECTRIC_SPECULAR.xxx,surface.albedo.rgb,surface.metallic),shading_data.vh);
-	float3 specular = D * G * F;
-	float3 kd = (F3_WHITE - F) * (1 - surface.metallic);
-	return diffuse * kd + specular;
+    if (s.nl <= 0.0 || s.nv <= 0.0)
+        return 0.0.xxx;
+
+    // -------------------------
+    // Diffuse term
+    // -------------------------
+    float3 diffuse_color =surface.albedo.rgb *(1.0 - surface.metallic);
+
+    float3 diffuse = Diffuse_Lambert(diffuse_color);
+
+    // -------------------------
+    // Specular term
+    // -------------------------
+
+    // Roughness remap (Disney / UE 风格)
+    float alpha = max(surface.roughness * surface.roughness, 1e-4);
+
+    // Isotropic / Anisotropic D
+    float D_iso = D_GTR2(alpha, s.nh);
+
+    float ax, ay;
+    GetAnisotropicRoughness(alpha, surface.anisotropy, ax, ay);
+
+    float D_aniso = D_GGXaniso(ax, ay, s.nh, s.th, s.bh);
+
+    float D = lerp(D_iso, D_aniso, abs(surface.anisotropy));
+
+    // Geometry (correlated Smith)
+    float G = V_SmithGGXCorrelated(s.nv, s.nl, alpha);
+
+    // Fresnel
+    float3 f0 =lerp(DIELECTRIC_SPECULAR.xxx,surface.albedo.rgb,surface.metallic.xxx);
+
+    float3 F =F_Schlick(f0, s.vh);
+    // -------------------------
+    // Energy conservation
+    // -------------------------
+    float3 kd = (1.0.xxx - F) * (1.0 - surface.metallic);
+
+    // -------------------------
+    // Final BRDF (IMPORTANT)
+    // -------------------------
+    float3 specular = (D * G) * F;
+
+    return diffuse * kd + specular;
 }
+
 
 
 #endif

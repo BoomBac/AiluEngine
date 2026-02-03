@@ -99,9 +99,10 @@ namespace Ailu::RHI::DX12
             _state_guard.MakesureResourceState(p_cmdlist, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             d3d_ctx->TrackResource(pTextureUpload);
         }
+        auto& desc_mgr = D3DDescriptorMgr::Get();
         {
             D3DTextureViewInfo view_info(ETextureViewType::kSRV, false);
-            GPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocGPU(1u);
+            GPUVisibleDescriptorAllocation alloc = desc_mgr.AllocGPU(1u);
             auto [cpu_handle, gpu_handle] = alloc.At(0);
             D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
             srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -113,9 +114,19 @@ namespace Ailu::RHI::DX12
             view_info._gpu_handle = gpu_handle;
             view_info._gpu_alloc = std::move(alloc);
             _views[kMainSRVIndex] = std::move(view_info);
+
+            _bindless_srv_index = desc_mgr.AllocBindlessSRVIndex();
+            p_device->CreateShaderResourceView(_p_d3dres.Get(), &srv_desc, desc_mgr.GetBindlessSRVCpuHandle(_bindless_srv_index));
         }
         CreateView(ETextureViewType::kSRV, 0);
-        if (_is_random_access) CreateView(ETextureViewType::kUAV, 0);
+        if (_is_random_access)
+        {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC slice_uav_desc{};
+            slice_uav_desc.Format = ConvertToDXGIFormat(_pixel_format);
+            slice_uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+            _bindless_uav_index = desc_mgr.AllocBindlessUAVIndex();
+            p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, desc_mgr.GetBindlessUAVCpuHandle(_bindless_uav_index));
+        }
         _p_d3dres->SetName(ToWChar(_name).c_str());
         _is_ready_for_rendering = true;
         Texture2D::CreateView();
@@ -127,6 +138,16 @@ namespace Ailu::RHI::DX12
         if (g_pGfxContext) g_pGfxContext->WaitForFence(_fence_value);
         _p_d3dres.Reset();
         _views.clear();
+        if (_bindless_srv_index >= 0)
+        {
+            D3DDescriptorMgr::Get().ReleaseBindlessSRVIndex(_bindless_srv_index);
+            _bindless_srv_index = -1;
+        }
+        if (_bindless_uav_index >= 0)
+        {
+            D3DDescriptorMgr::Get().ReleaseBindlessUAVIndex(_bindless_uav_index);
+            _bindless_uav_index = -1;
+        }
     }
 
     void D3DTexture2D::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)

@@ -178,12 +178,12 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 		InitShadingData(light_data,surface,shading_data);
 		if(_DirectionalLights[i]._shadowmap_index != -1)
 		{
-			shadow_factor = ApplyCascadeShadowHard(nl, _CameraPos.xyz, world_pos, _DirectionalLights[i]._ShadowDistance);
+			shadow_factor = ApplyCascadeShadow(nl, _CameraPos.xyz, world_pos, _DirectionalLights[i]._ShadowDistance);
 		}
 		light_data.shadow_atten = shadow_factor;
-		light += light_data.shadow_atten * CookTorranceBRDF(surface, shading_data) * shading_data.nl * _DirectionalLights[i]._LightColor;
+		float3 f = CookTorranceBRDF(surface, shading_data);
+		light += light_data.shadow_atten * f * shading_data.nl * _DirectionalLights[i]._LightColor;
 	}
-
 	shadow_factor = 1.0;
 	for (uint j = 0; j < GetGlobalPointLightCount(); j++)
 	{
@@ -242,8 +242,8 @@ float3 CalculateLightPBR(SurfaceData surface,float3 world_pos,float2 screen_uv)
 	//indirect light
 
 	float lod = surface.roughness * PREFILTER_CUBEMAP_NUM;
-	float3 irradiance = SAMPLE_TEXTURECUBE_LOD(RadianceTex,g_LinearWrapSampler,surface.wnormal,0.0);
-	float3 radiance = SAMPLE_TEXTURECUBE_LOD(PrefilterEnvTex,g_AnisotropicClampSampler, reflect(shading_data.view_dir,surface.wnormal),lod);
+	float3 irradiance = SAMPLE_TEXTURECUBE_LOD(RadianceTex,g_LinearWrapSampler,surface.wnormal,0.0).rgb;
+	float3 radiance = SAMPLE_TEXTURECUBE_LOD(PrefilterEnvTex,g_AnisotropicClampSampler, reflect(shading_data.view_dir,surface.wnormal),lod).rgb;
 	float2 lut = SAMPLE_TEXTURE2D_LOD(IBLLut,g_LinearClampSampler,float2(shading_data.nv,surface.roughness),0.0).xy;
 	float ao = SAMPLE_TEXTURE2D(_OcclusionTex,g_LinearClampSampler,screen_uv).r;// * g_IndirectLightingIntensity;
 	float voxel_shadow = 1.0;//ConeTraceShadow(world_pos + surface.wnormal * 0.05,-_DirectionalLights[0]._LightPosOrDir);
@@ -321,7 +321,7 @@ float3 CalculateLightSimple(SurfaceData surface,float3 world_pos,float2 screen_u
 		rect[2] = _AreaLights[z]._points[2].xyz;
 		rect[3] = _AreaLights[z]._points[3].xyz;
 		float3 diffuse = LTC_Evaluate(surface.wnormal, view_dir, world_pos, Identity(), rect, _AreaLights[z]._is_twosided);
-		diffuse *= (1.0 - surface.metallic) * surface.albedo;
+		diffuse *= (1.0 - surface.metallic) * surface.albedo.rgb;
 		if(_AreaLights[z]._shadowmap_index != -1)
 		{ 
 			float4 shadow_pos = mul(_AreaLights[z]._shadow_matrix,float4(world_pos,1.0));

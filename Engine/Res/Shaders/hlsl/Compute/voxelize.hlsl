@@ -7,7 +7,7 @@
 RWStructuredBuffer<uint> _VoxelBuffer;
 RWTexture3D<float4> _VoxelTex;
 
-cbuffer VoxelCB : register(b0)
+cbuffer VoxelCB// : register(b0)
 {
     uint4 _grid_num;
 };

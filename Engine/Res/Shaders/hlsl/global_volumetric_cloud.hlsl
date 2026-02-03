@@ -54,7 +54,7 @@ TEXTURECUBE(RadianceTex)
 #define MAX_CLOUD_DIST 200000
 #define INV_CLOUD_THINKNESS 5e-05
 
-FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID);
+FullScreenPSInput FullscreenVSMain(FullScreenVSInput i);
 
 struct AABB
 {
@@ -102,7 +102,7 @@ float EvalDensity(float3 pos,float atten=1.0f)
     atten *= _DensityMultply;
     return cloud * atten;
 }
-float BeerLambert(float3 sigma_a,float d)
+float3 BeerLambert(float3 sigma_a,float d)
 {
     return exp(-sigma_a * d);
 }
@@ -172,7 +172,7 @@ float3 LightMarch(float3 p,float cos_theta,float3 light_dir,float dist,float3 si
     float3 transmittance = MultipleOctaves(density, cos_theta, light_step_size * MAX_STEPS_LIGHTS * INV_CLOUD_THINKNESS, sigma_t);
     // Return product of Beer'is law and powder effect depending on the 
     // view direction angle with the light direction.
-	return lerp(transmittance * 2.0 * (1.0 - (BeerLambert(density * 2.0 * sigma_t,light_step_size * INV_CLOUD_THINKNESS))), 
+	return lerp(transmittance * 2.0 * (1.0 - (BeerLambert(density * 2.0 * sigma_t,light_step_size * INV_CLOUD_THINKNESS).x)), 
                transmittance, 
                0.5 + 0.5 * cos_theta);
 }
@@ -203,7 +203,7 @@ float4 ComputePSMain(FullScreenPSInput input) : SV_Target
         float3 total_transmittance = float3(1,1,1);
         float3 accumulated_color = float3(0, 0, 0);
         //t same as e
-        float sigma_t = max(_Absorption + _Scattering, 1e-6);
+        float3 sigma_t = max(_Absorption + _Scattering, 1e-6);
         float3 light_dir = _MainlightWorldPosition.xyz;
         float3 light_color = _DirectionalLights[0]._LightColor * SUN_LIGHT_POWER;
         float noise = SAMPLE_TEXTURE2D(_NoiseTex,g_LinearWrapSampler,input.uv).r;
@@ -224,7 +224,7 @@ float4 ComputePSMain(FullScreenPSInput input) : SV_Target
             float3 sample_sigma_s = density * _Scattering;
             if (density > DENSITY_THRESHOLD)
             {
-                float3 ambient = SAMPLE_TEXTURECUBE_LOD(RadianceTex,g_LinearWrapSampler,normalize(sample_pos - virtual_center),0);
+                float3 ambient = SAMPLE_TEXTURECUBE_LOD(RadianceTex,g_LinearWrapSampler,normalize(sample_pos - virtual_center),0).rgb;
                 //In-Scattering
                 float3 in_scattering = float3(0,0,0);
                 Ray light_ray;

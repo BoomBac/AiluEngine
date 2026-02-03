@@ -28,6 +28,7 @@
 #include <RHI/DX12/D3DShader.h>
 #include <RHI/DX12/D3DTexture.h>
 #include <d3d11.h>
+#include <d3d12sdklayers.h>
 
 #ifdef _PIX_DEBUG
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
@@ -703,6 +704,20 @@ namespace Ailu::RHI::DX12
         }
         //https://learn.microsoft.com/zh-cn/windows/win32/direct3d12/using-d3d12-debug-layer-gpu-based-validation
         //EnableShaderBasedValidation();
+#if defined(CLSID_D3D12DeviceConfiguration)
+        ComPtr<ID3D12DeviceConfiguration> config;
+        if (SUCCEEDED(D3D12GetInterface(
+                    CLSID_D3D12DeviceConfiguration,
+                    IID_PPV_ARGS(&config))) && config)
+        {
+            config->SetEnabledExperimentalFeatures(
+                    1,
+                    &D3D12ExperimentalShaderModels,
+                    nullptr,
+                    nullptr);
+        }
+#endif
+
 #endif
 
         ComPtr<IDXGIFactory6> factory;

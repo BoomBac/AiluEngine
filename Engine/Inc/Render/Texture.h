@@ -505,6 +505,8 @@ namespace Ailu
             virtual bool IsValidMipmap(u16 mipmap) const { return mipmap < _pixel_data.size(); };
             u16 Width() const { return _width; }
             u16 Height() const { return _height; }
+            i32 GetBindlessSRVIndex() const { return _bindless_srv_index; }
+            i32 GetBindlessUAVIndex() const { return _bindless_uav_index; }
         protected:
         protected:
             inline static u64 s_gpu_mem_usage = 0u;
@@ -515,6 +517,7 @@ namespace Ailu
             bool _is_render_tex = false;
             Vector<u8 *> _pixel_data;
             u16 _width, _height;
+            i32 _bindless_srv_index = -1, _bindless_uav_index = -1;
         };
 
         class AILU_API Texture2D : public Texture

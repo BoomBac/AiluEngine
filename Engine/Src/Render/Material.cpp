@@ -765,7 +765,8 @@ namespace Ailu::Render
             const auto& bind_it = bind_infos.find(it.first);
             if (bind_it != bind_infos.end())
             {
-                AL_ASSERT(bind_it->second._bind_slot < 32);
+                if (bind_it->second._bind_slot >= 32)
+                    continue;
                 if (cur_state._bind_res_priority[bind_it->second._bind_slot] <= PipelineResource::kPriorityGlobal)
                 {
                     cur_state._bind_res[bind_it->second._bind_slot] = it.second;

@@ -369,7 +369,7 @@ namespace Ailu::Render
         {
             Blit(g_pRenderTexturePool->Get(src), g_pRenderTexturePool->Get(dst), mat, pass_index);
         }
-        void Blit(RenderTexture *src, RenderTexture *dst, Material *mat, u16 pass_index)
+        void Blit(Texture *src, RenderTexture *dst, Material *mat, u16 pass_index)
         {
             static const auto blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
             mat = mat ? mat : blit_mat;
@@ -379,7 +379,7 @@ namespace Ailu::Render
             mat->SetTexture("_SourceTex", src);
             DrawFullScreenQuad(mat, pass_index);
         }
-        void Blit(RenderTexture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat, u16 pass_index)
+        void Blit(Texture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat, u16 pass_index)
         {
             static const auto blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
             mat = mat ? mat : blit_mat;
@@ -393,13 +393,13 @@ namespace Ailu::Render
         {
             Blit(g_pRenderTexturePool->Get(src), dst, mat, pass_index);
         }
-        void Blit(RenderTexture *src, RTHandle dst, Material *mat, u16 pass_index)
+        void Blit(Texture *src, RTHandle dst, Material *mat, u16 pass_index)
         {
             Blit(src, g_pRenderTexturePool->Get(dst), mat, pass_index);
         }
         void Blit(const RDG::RGHandle &src, const RDG::RGHandle &dst, Material *mat, u16 pass_index)
         {
-            Blit(_render_graph->Resolve<RenderTexture>(src), _render_graph->Resolve<RenderTexture>(dst), mat, pass_index);
+            Blit(_render_graph->Resolve<Texture>(src), _render_graph->Resolve<RenderTexture>(dst), mat, pass_index);
         }
         void DrawFullScreenQuad(Material *mat, u16 pass_index)
         {
@@ -783,11 +783,11 @@ namespace Ailu::Render
     {
         _impl->Blit(src, dst, mat, pass_index);
     }
-    void CommandBuffer::Blit(RenderTexture *src, RenderTexture *dst, Material *mat, u16 pass_index)
+    void CommandBuffer::Blit(Texture *src, RenderTexture *dst, Material *mat, u16 pass_index)
     {
         _impl->Blit(src, dst, mat, pass_index);
     }
-    void CommandBuffer::Blit(RenderTexture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat, u16 pass_index)
+    void CommandBuffer::Blit(Texture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat, u16 pass_index)
     {
         _impl->Blit(src, dst, src_view_index, dst_view_index, mat, pass_index);
     }
@@ -795,7 +795,7 @@ namespace Ailu::Render
     {
         _impl->Blit(src, dst, mat, pass_index);
     }
-    void CommandBuffer::Blit(RenderTexture *src, RTHandle dst, Material *mat, u16 pass_index)
+    void CommandBuffer::Blit(Texture *src, RTHandle dst, Material *mat, u16 pass_index)
     {
         _impl->Blit(src, dst, mat, pass_index);
     }

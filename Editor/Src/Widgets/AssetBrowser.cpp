@@ -227,7 +227,7 @@ namespace Ailu
                         {
                             if (asset->_asset_type == EAssetType::kScene)
                             {
-                                g_pSceneMgr->OpenScene(asset->_asset_path);
+                                SceneManagement::SceneMgr::Get().OpenScene(asset->_asset_path);
                             }
                             else if (asset->_asset_type == EAssetType::kMesh)
                             {

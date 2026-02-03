@@ -13,6 +13,8 @@
 
 namespace Ailu::Render
 {
+    using SceneManagement::SceneMgr;
+    
 #pragma region FramePacket
     void ViewEntity::FormCamera(const Camera &cam, ViewEntity &entry)
     {
@@ -92,7 +94,7 @@ namespace Ailu::Render
         //ProcessPendingRenderObjects();
         //{
         //    PROFILE_BLOCK_CPU(CollectView)
-        //    CollectViews(*g_pSceneMgr->ActiveScene());
+        //    CollectViews(*SceneMgr::Get().ActiveScene());
         //}
         // auto update_render_obj_job = JobSystem::Get().CreateJob("UpdateRenderObject",&RenderPipeline::UpdateRenderObject,this, 0u, (u32)_render_objs.size());
         // auto update_vis_obj_job = JobSystem::Get().CreateJob("UpdateVisibilityObject", &RenderPipeline::UpdateVisibilityObject, this, 0u, (u32)_visiblity_objs.size());
@@ -151,7 +153,7 @@ namespace Ailu::Render
     }
     void RenderPipeline::RenderSingleCamera(const Camera &cam, Renderer &renderer)
     {
-        renderer.Render(cam, *g_pSceneMgr->ActiveScene());
+        renderer.Render(cam, *SceneMgr::Get().ActiveScene());
     }
     void RenderPipeline::FrameCleanup()
     {
@@ -186,7 +188,7 @@ namespace Ailu::Render
     void RenderPipeline::UpdateRenderObject(u32 start, u32 end)
     {
         PROFILE_BLOCK_CPU(UpdateRenderObject)
-        const auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+        const auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
         for (u32 i = start; i < end; i++)
         {
             auto &obj = _render_objs[i];
@@ -270,7 +272,7 @@ namespace Ailu::Render
     }
     void RenderPipeline::ProcessPendingRenderObjects()
     {
-        const auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+        const auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
         while (!_pending_add_render_objs.empty())
         {
             auto e = _pending_add_render_objs.front();

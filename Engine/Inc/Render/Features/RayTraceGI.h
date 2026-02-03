@@ -20,6 +20,8 @@ namespace Ailu
             Vector2f _debug_pos;
             APROPERTY(Range(0,20))
             u32 _debug_hit_box = 0u;
+            APROPERTY()
+            bool _is_temporal_denoise = false;
         private:
             Scope<GIPass> _gi_pass;
             Ref<ComputeShader> _gi_compute_shader;
@@ -34,13 +36,19 @@ namespace Ailu
             void OnRecordRenderGraph(RDG::RenderGraph& graph, RenderingData& rendering_data) final;
         public:
             Vector2f _debug_pos;
+            bool _is_temporal_denoise = false;
+        private:
+            void MakesureTarget(const RenderingData& rendering_data);
         private:
             ComputeShader *_gi_compute_shader;
-            u32 _kernel_ray_gen = 0u;
+            u32 _kernel_ray_gen = 0u,_kernel_denoise = 0u;
             Ref<GPUBuffer> _debug_buffer = nullptr;
             Ref<GPUBuffer> _debug_index_buffer = nullptr;
             Ref<GPUBuffer> _arg_buffer = nullptr;
             Ref<Material> _debug_line_mat;
+            Ref<Texture2D> _gi_texture_a;
+            Ref<Texture2D> _gi_texture_b;
+            bool _is_cur_a = true;
         };
     }
 } // namespace Ailu

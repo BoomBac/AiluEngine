@@ -8,13 +8,59 @@ Entity:1
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:0.000000000,0.000000000,0.000000000
+                _position:0.000000000,0.824218988,0.000000000
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:1.000000000,1.000000000,1.000000000
         _static_mesh_component:
             _p_mesh:2ff30e48-6661-479b-a90c-863e606734f6
             _material_num:1
             _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
+Entity:2
+        _tag_component:
+            _name:directional_light
+_layer_mask:1
+        _transform_component:
+            _transform:
+                _position:14.517980576,3.078702927,8.787034988
+                _rotation:0.360687047,-0.185371488,0.073382407,0.911129653
+                _scale:0.999831975,0.999866009,0.999836028
+        _light_component:
+            _type:kDirectional
+            _light:
+                _light_color:1,1,1,2
+                _light_param:10,4.9,5,0
+                _is_two_side:0
+            _shadow:
+                _is_cast_shadow:1
+                _constant_bias:0.243
+                _slope_bias:0.214
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
+Entity:3
+        _tag_component:
+            _name:new_object_3
+_layer_mask:0
+        _transform_component:
+            _transform:
+                _position:0.000000000,0.000000000,0.000000000
+                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
+                _scale:14.933902740,14.933902740,14.933902740
+        _static_mesh_component:
+            _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
+            _material_num:1
+            _p_mats[0]:e3891c79-694a-4968-bb84-49c409a611ce
         _hierarchy_component:
             _first_child:0
             _prev_sibling:0

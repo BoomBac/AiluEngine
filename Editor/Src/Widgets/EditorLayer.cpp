@@ -54,6 +54,8 @@ namespace Ailu
     using namespace Render;
     namespace Editor
     {
+        using SceneManagement::SceneMgr;
+        
         class ProfileWindow
         {
         public:
@@ -603,7 +605,7 @@ namespace Ailu
                         List<ECS::Entity> new_entities;
                         for (auto e: Selection::SelectedEntities())
                         {
-                            new_entities.push_back(g_pSceneMgr->ActiveScene()->DuplicateEntity(e));
+                            new_entities.push_back(SceneMgr::Get().ActiveScene()->DuplicateEntity(e));
                         }
                         Selection::RemoveSlection();
                         for (auto &e: new_entities)
@@ -808,7 +810,7 @@ namespace Ailu
 
                     if (ImGui::Button("Stop", ImVec2(button_width, 0)))
                     {
-                        g_pSceneMgr->ExitPlayMode();
+                        SceneMgr::Get().ExitPlayMode();
                     }
                 }
                 if (app->_is_simulate_mode)
@@ -818,7 +820,7 @@ namespace Ailu
 
                     if (ImGui::Button("Stop", ImVec2(button_width, 0)))
                     {
-                        g_pSceneMgr->ExitSimulateMode();
+                        SceneMgr::Get().ExitSimulateMode();
                     }
                 }
             }
@@ -830,12 +832,12 @@ namespace Ailu
 
                 if (ImGui::Button("Play", ImVec2(button_width, 0)))
                 {
-                    g_pSceneMgr->EnterPlayMode();
+                    SceneMgr::Get().EnterPlayMode();
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Simulate", ImVec2(button_width, 0)))
                 {
-                    g_pSceneMgr->EnterSimulateMode();
+                    SceneMgr::Get().EnterSimulateMode();
                 }
             }
             ImGui::End();
@@ -944,7 +946,7 @@ namespace Ailu
             //     ImGui::ProgressBar(x - static_cast<int>(x), ImVec2(0.f, 0.f));
             // }
             ECS::Entity e = Selection::FirstEntity();
-            auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+            auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
             if (e != ECS::kInvalidEntity)
             {
                 if (r.HasComponent<ECS::CCamera>(e))
@@ -989,7 +991,7 @@ namespace Ailu
                 ImGui::Checkbox("ShowSceneBVH", &s_draw_scene_bvh);
                 if (s_draw_scene_bvh)
                 {
-                    for (const auto &n: g_pSceneMgr->ActiveScene()->GetBVHNodes())
+                    for (const auto &n: SceneMgr::Get().ActiveScene()->GetBVHNodes())
                         Render::Gizmo::DrawAABB(n._aabb);
                 }
                 if (e != ECS::kInvalidEntity)
@@ -1162,7 +1164,7 @@ namespace Ailu
             //Vector3f pivot_point;
             //if (is_pivot_point_center)
             //{
-            //    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+            //    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
             //    Matrix4x4f world_mat;
             //    if (is_single_mode)
             //        world_mat = r.GetComponent<ECS::TransformComponent>(selected_entities.front())->_transform._world_matrix;
@@ -1232,7 +1234,7 @@ namespace Ailu
             //            List<ECS::Entity> new_entities;
             //            for (auto e: selected_entities)
             //            {
-            //                new_entities.push_back(g_pSceneMgr->ActiveScene()->DuplicateEntity(e));
+            //                new_entities.push_back(SceneMgr::Get().ActiveScene()->DuplicateEntity(e));
             //            }
             //            Selection::RemoveSlection();
             //            for (auto &e: new_entities)

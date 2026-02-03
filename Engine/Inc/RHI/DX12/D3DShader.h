@@ -338,6 +338,7 @@ namespace Ailu::RHI::DX12
             {
                 Vector<D3D_SHADER_MACRO> _keyword_defines;
                 ComPtr<ID3D12RootSignature> _p_sig;
+                Vector<CD3DX12_ROOT_PARAMETER1> _root_parameters;
                 ComPtr<ID3DBlob> _p_vblob = nullptr;
                 ComPtr<ID3DBlob> _p_pblob = nullptr;
                 ComPtr<ID3DBlob> _p_gblob = nullptr;
@@ -356,6 +357,7 @@ namespace Ailu::RHI::DX12
         void Bind(u16 pass_index, ShaderVariantHash variant_hash) final;
         void *GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash) final;
         ID3D12RootSignature *GetSignature(u16 pass_index, ShaderVariantHash variant_hash);
+        Vector<CD3DX12_ROOT_PARAMETER1>& GetRootParameters(u16 pass_index, ShaderVariantHash variant_hash);
         std::pair<D3D12_INPUT_ELEMENT_DESC *, u8> GetVertexInputLayout(u16 pass_index, ShaderVariantHash variant_hash);
 
     private:
@@ -378,6 +380,7 @@ namespace Ailu::RHI::DX12
             ComPtr<ID3D12ShaderReflection> _p_c_reflection = nullptr;
             ComPtr<ID3D12RootSignature> _p_sig = nullptr;
             ComPtr<ID3D12PipelineState> _pso = nullptr;
+            bool _has_bindless_texture2d = false;
         };
         struct D3DKernelElement
         {

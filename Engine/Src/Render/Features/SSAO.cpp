@@ -85,7 +85,7 @@ namespace Ailu::Render
                         blur_temp = builder.AllocTexture(desc, "AO_BlurTemp");
                         builder.Read(ao_result);
                         blur_temp = builder.Write(blur_temp); 
-                    }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                    }, [w,h, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
                 _ssao_computer->SetVector("_AOScreenParams", params);
                 _ssao_computer->SetVector("_HBAOParams", _ao_params);

@@ -85,6 +85,7 @@ namespace Ailu
             void PrepareScene(const Scene &s);
             void PrepareLight(const Scene &s);
             void PrepareCamera(const Camera &cam);
+            void PrepareMaterial(const Scene& s);
             void DoRender(const Camera &cam, const Scene &s);
             void Cull(const Scene &s, const Camera &cam);
             static void StableSort(Vector<RenderPass *> list);
@@ -140,6 +141,8 @@ namespace Ailu
             List<BeforeTickEvent> _events_before_tick;
             List<AfterTickEvent> _events_after_tick;
             RenderTexture *_target_tex;
+            Vector<MaterialData> _material_data_cache;
+            Map<u64, u32> _material_data_lut;
         };
     }
 }// namespace Ailu

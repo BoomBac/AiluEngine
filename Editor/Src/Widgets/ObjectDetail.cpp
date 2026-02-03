@@ -12,6 +12,7 @@
 namespace Ailu
 {
     using namespace UI;
+    using SceneManagement::SceneMgr;
     namespace Editor
     {
         namespace
@@ -158,7 +159,7 @@ namespace Ailu
         {
             UI::HorizontalBox *value_box = nullptr;
             AddPropertyRow(root, prop._prop_name, &value_box);
-
+            String prop_name = prop._prop_name;//保存名称，这里传入的prop引用可能会失效当shader重载时
             if (prop._type == Render::EShaderPropertyType::kRange)
             {
                 auto slider = value_box->AddChild<UI::Slider>()
@@ -168,7 +169,11 @@ namespace Ailu
                                       .SlotFillRate(1.0f)
                                       .As<UI::Slider>();
                 slider->_range = {prop._default_value[0], prop._default_value[1]};
-                slider->_on_value_change += [&prop](f32 v) { prop.SetValue<f32>(v); };
+                slider->_on_value_change += [prop_name,obj](f32 v) {
+                    auto p = obj->GetShaderProperty(prop_name);
+                    if (p)
+                        p->SetValue<f32>(v);
+                };
             }
             else if (prop._type == Render::EShaderPropertyType::kFloat)
             {
@@ -178,10 +183,14 @@ namespace Ailu
                                      .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                                      .SlotFillRate(1.0f)
                                      .As<UI::InputBlock>();
-                input->_on_content_changed += [&](String content)
+                input->_on_content_changed += [prop_name,obj](String content)
                 {
                     if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                        prop.SetValue<f32>(opt.value());
+                    {
+                        auto p = obj->GetShaderProperty(prop_name);
+                        if (p)
+                            p->SetValue<f32>(opt.value());
+                    }
                 };
             }
             else if (prop._type == Render::EShaderPropertyType::kColor)
@@ -192,15 +201,17 @@ namespace Ailu
                                    .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                                    .SlotFillRate(1.0f)
                                    .As<UI::Button>();
-                btn->OnMouseClick() += [&prop](UI::UIEvent &e)
+                btn->OnMouseClick() += [prop_name,obj](UI::UIEvent &e)
                 {
-                    auto color_picker = MakeRef<UI::ColorPicker>(prop.GetValue<Vector4f>());
-                    color_picker->Name(std::format("ColorPicker_{}", prop._prop_name));
+                    auto color_picker = MakeRef<UI::ColorPicker>(obj->GetShaderProperty(prop_name)->GetValue<Vector4f>());
+                    color_picker->Name(std::format("ColorPicker_{}", prop_name));
                     color_picker->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
                     color_picker->SlotSize(260.0f, 220.0f);
-                    color_picker->OnValueChanged() += [&prop](Vector4f color)
+                    color_picker->OnValueChanged() += [prop_name,obj](Vector4f color)
                     {
-                        prop.SetValue<Vector4f>(color);
+                        auto p = obj->GetShaderProperty(prop_name);
+                        if (p)
+                            p->SetValue<Vector4f>(color);
                     };
                     auto abs_rect = e._current_target->GetArrangeRect();
                     Vector2f show_pos = abs_rect.xy;
@@ -216,16 +227,16 @@ namespace Ailu
                                    .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                                    .SlotFillRate(1.0f)
                                    .As<UI::Button>();
-                btn->OnMouseClick() += [&prop, obj](UI::UIEvent &e)
+                btn->OnMouseClick() += [prop_name,obj](UI::UIEvent &e)
                 {
-                    ShowPopupListView(e._current_target, 200.0f, [&prop, obj](const Ref<UI::ListView> &list_view)
+                    ShowPopupListView(e._current_target, 200.0f, [prop_name,obj](const Ref<UI::ListView> &list_view)
                                       {
                         auto none_item = MakeRef<UI::Text>("None");
                         none_item->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
                         none_item->SlotSize(64.0f, 64.0f);
-                        none_item->OnMouseClick() += [&prop, obj](UI::UIEvent &e)
+                        none_item->OnMouseClick() += [prop_name,obj](UI::UIEvent &e)
                         {
-                            obj->SetTexture(prop._value_name,nullptr);
+                            obj->SetTexture(prop_name,nullptr);
                             UIManager::Get()->HidePopup();
                         };
                         list_view->AddItem(none_item);
@@ -236,9 +247,9 @@ namespace Ailu
                             auto img = item_hb->AddChild<UI::Image>(tex);
                             img->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
                             img->SlotSize(64.0f, 64.0f);
-                            img->OnMouseClick() += [&prop, tex, obj](UI::UIEvent &e)
+                            img->OnMouseClick() += [prop_name, tex, obj](UI::UIEvent &e)
                             {
-                                obj->SetTexture(prop._value_name,tex);
+                                obj->SetTexture(prop_name,tex);
                                 //prop.SetValue<Texture2D*>(tex);
                                 UIManager::Get()->HidePopup();
                             };
@@ -266,7 +277,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -278,7 +289,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -290,7 +301,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -303,7 +314,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -319,7 +330,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -335,7 +346,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -352,7 +363,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -364,7 +375,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -376,7 +387,7 @@ namespace Ailu
             {
                 if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
                 {
-                    auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
@@ -403,7 +414,7 @@ namespace Ailu
             if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
             {
                 static ECS::Entity s_prev_selected = ECS::kInvalidEntity;
-                auto &r = g_pSceneMgr->ActiveScene()->GetRegister();
+                auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                 if (auto comp = r.GetComponent<ECS::TagComponent>(selected); comp != nullptr)
                 {
                     _vb->ChildAt(0)->As<UI::Text>()->SetText(comp->_name);
@@ -481,9 +492,12 @@ namespace Ailu
                                         text->OnMouseClick() += [mesh, comp, btn](UIEvent &e)
                                         {
                                             LOG_INFO("StaticMesh item clicked: {}", mesh->Name());
+                                            if (comp->_p_mesh == mesh)
+                                                return;
                                             comp->_p_mesh = mesh;
                                             btn->SetText(comp->_p_mesh->Name());
                                             UIManager::Get()->HidePopup();
+                                            SceneMgr::Get().MarkCurSceneDirty();
                                         };
                                         list_view->AddItem(text);
                                     } });
@@ -502,7 +516,9 @@ namespace Ailu
                                             auto text = MakeRef<Text>(mat->Name());
                                             text->OnMouseClick() += [mat, comp, btn](UIEvent &e)
                                             {
-                                                LOG_INFO("StaticMesh item clicked: {}", mat->Name());
+                                                LOG_INFO("Material item clicked: {}", mat->Name());
+                                                if (comp->_p_mats[0] == mat)
+                                                    return;
                                                 comp->_p_mats[0] = mat;
                                                 btn->SetText(comp->_p_mats[0]->Name());
                                                 UIManager::Get()->HidePopup();

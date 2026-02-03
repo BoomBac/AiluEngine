@@ -3,8 +3,7 @@
 
 struct FullScreenVSInput
 {
-	float3 position : POSITION;
-	float2 uv : TEXCOORD;
+	uint vertex_id : SV_VERTEXID;
 };
 
 struct FullScreenPSInput
@@ -24,11 +23,11 @@ const static float2 uvs[3] = {
 	float2(2,1)
 };
 
-FullScreenPSInput FullscreenVSMain(uint vertex_id : SV_VERTEXID)
+FullScreenPSInput FullscreenVSMain(FullScreenVSInput v)
 {
 	FullScreenPSInput result;
-	result.position = fullscreen_triangle[vertex_id];
-	result.uv = uvs[vertex_id];
+	result.position = fullscreen_triangle[v.vertex_id];
+	result.uv = uvs[v.vertex_id];
 	return result;
 }
 

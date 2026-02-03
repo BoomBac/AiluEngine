@@ -25,6 +25,7 @@
 
 namespace Ailu::Render
 {
+    using SceneManagement::SceneMgr;
     Renderer::Renderer() : _cur_fs(nullptr)
     {
         _p_context = g_pGfxContext;
@@ -70,6 +71,17 @@ namespace Ailu::Render
         _raytrace_gi->SetActive(false);
         _features.push_back(_fog);
         _fog->SetActive(true);
+        _material_data_lut[0] = 0; //default material
+        MaterialData miss_mat{};
+        miss_mat._base_color = float3(1.0f, 0.0f, 1.0f);//洋红色
+        miss_mat._base_color_tex = RenderConstants::kInvalidBindlessHandle;
+        miss_mat._normal_tex = RenderConstants::kInvalidBindlessHandle;
+        miss_mat._emission = float3(0.0f, 0.0f, 0.0f);
+        miss_mat._emission_tex = RenderConstants::kInvalidBindlessHandle;
+        miss_mat._metallic = 0.0f;
+        miss_mat._roughness = 1.0f;
+        miss_mat._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        _material_data_cache.push_back(miss_mat);
         //_features.push_back(_gpu_terrain);
         //_features.push_back(_taa);
 
@@ -252,10 +264,11 @@ namespace Ailu::Render
             _rendering_data._gbuffers[3] = RenderTexture::GetTempRT(pixel_width, pixel_height, "GBuffer3", ERenderTargetFormat::kRGBAHalf);
         }
         
-        Cull(*g_pSceneMgr->ActiveScene(),cam);
+        Cull(*SceneMgr::Get().ActiveScene(),cam);
         PrepareCamera(cam);
-        PrepareScene(*g_pSceneMgr->ActiveScene());
-        PrepareLight(*g_pSceneMgr->ActiveScene());
+        PrepareMaterial(*SceneMgr::Get().ActiveScene());//不需要tick，之后再优化
+        PrepareScene(*SceneMgr::Get().ActiveScene());
+        PrepareLight(*SceneMgr::Get().ActiveScene());
         if (_rendering_data._pre_width != pixel_width || _rendering_data._pre_height != pixel_height)
         {
             _rendering_data._is_res_changed = true;
@@ -360,7 +373,7 @@ namespace Ailu::Render
         //RENDER GRAPH
         if (_is_use_render_graph)
         {
-            _target_tex = static_cast<RenderTexture *>(_rd_graph->Export(_rendering_data._rg_handles._color_target));
+            _target_tex = _rd_graph->Resolve<RenderTexture>(_rendering_data._rg_handles._color_target);
             _rd_graph->EndFrame();
         }
         Gizmo::EndFrame();
@@ -434,11 +447,13 @@ namespace Ailu::Render
                     s_instance_data[obj_index]._local_to_world = t._world_matrix;
                     s_instance_data[obj_index]._world_to_local = world_to_local;
                     s_instance_data[obj_index]._object_id = obj_index;
-                    s_instance_data[obj_index]._material_id = 0u;
+                    s_instance_data[obj_index]._material_id = materials.size() > i ? _material_data_lut[materials[i]->HashCode()] : 0u;
                     s_instance_data[obj_index]._global_triangle_offset = s.GetTriangleBufferOffset(entity);
                     auto range = s.GetBVHNodeRange(entity);
                     s_instance_data[obj_index]._blas_node_start = range.x;
                     s_instance_data[obj_index]._blas_node_count = range.y;
+                    Vector3f inv_scale = Vector3f::kOne / t._scale;
+                    s_instance_data[obj_index]._max_inv_scale = std::max(inv_scale.x,std::max(inv_scale.y,inv_scale.z));
                     ++obj_index;
                 }
             }
@@ -450,6 +465,7 @@ namespace Ailu::Render
         ComputeShader::SetGlobalBuffer("g_scene", s.GetSceneMeshDataBuffer());
         ComputeShader::SetGlobalBuffer("g_tlas_buffer", s.GetTLASBuffer());
         ComputeShader::SetGlobalBuffer("g_blas_buffer", s.GetBLASBuffer());
+        ComputeShader::SetGlobalBuffer("g_material_buffer", _cur_fs->GetMaterialBuffer());
         ComputeShader::SetGlobalInt("_tlas_count", s.GetTLASNodeCount());
         ComputeShader::SetGlobalInt("_blas_count", s.GetBLASNodeCount());
         ComputeShader::SetGlobalInt("_inst_count", obj_index);
@@ -520,7 +536,7 @@ namespace Ailu::Render
                     for (int cascade_index = 0; cascade_index < QuailtySetting::s_cascade_shadow_map_count; cascade_index++)
                     {
                         auto &shadow_cam = comp._shadow_cameras[cascade_index];
-                        Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                        Cull(*SceneMgr::Get().ActiveScene(), shadow_cam);
                         per_scene_cbuf_data->_DirectionalLights[direction_light_index]._shadowmap_index = 0;
                         per_scene_cbuf_data->_DirectionalLights[direction_light_index]._ShadowDistance = QuailtySetting::s_main_light_shaodw_distance;
                         per_scene_cbuf_data->_CascadeShadowMatrix[cascade_index] = shadow_cam.GetView() * shadow_cam.GetProj();
@@ -558,7 +574,7 @@ namespace Ailu::Render
                     for (int i = 0; i < 6; i++)
                     {
                         auto &shadow_cam = comp._shadow_cameras[i];
-                        Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                        Cull(*SceneMgr::Get().ActiveScene(), shadow_cam);
                         _rendering_data._point_shadow_data[point_light_index]._shadowmap_index = point_light_index;
                         _rendering_data._point_shadow_data[point_light_index]._shadow_matrices[i] = shadow_cam.GetView() * shadow_cam.GetProj();
                         _rendering_data._point_shadow_data[point_light_index]._cull_results[i] = &_cull_results[shadow_cam.HashCode()];
@@ -584,7 +600,7 @@ namespace Ailu::Render
                 if (comp._shadow._is_cast_shadow)
                 {
                     auto &shadow_cam = comp._shadow_cameras[0];
-                    Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                    Cull(*SceneMgr::Get().ActiveScene(), shadow_cam);
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._shadowmap_index = _rendering_data._addi_shadow_num;
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
                     per_scene_cbuf_data->_SpotLights[spot_light_index]._constant_bias = comp._shadow._constant_bias * comp._shadow._constant_bias * s_shadow_bias_factor;
@@ -618,7 +634,7 @@ namespace Ailu::Render
                 {
                     auto &shadow_cam = comp._shadow_cameras[0];
                     Matrix4x4f shaodw_matrix = shadow_cam.GetView() * shadow_cam.GetProj();
-                    Cull(*g_pSceneMgr->ActiveScene(), shadow_cam);
+                    Cull(*SceneMgr::Get().ActiveScene(), shadow_cam);
                     per_scene_cbuf_data->_AreaLights[area_light_index]._shadowmap_index = _rendering_data._addi_shadow_num;
                     per_scene_cbuf_data->_AreaLights[area_light_index]._ShadowDistance = light_data._light_param.x * 1.5f;
                     per_scene_cbuf_data->_AreaLights[area_light_index]._constant_bias = comp._shadow._constant_bias * comp._shadow._constant_bias * s_shadow_bias_factor;
@@ -695,6 +711,80 @@ namespace Ailu::Render
         _rendering_data._camera = &cam;
         _rendering_data._p_per_camera_cbuf = _cur_fs->GetCameraCB(cam.HashCode());
     }
+
+    static void FillMaterialData(Material* src, MaterialData& dst)
+    {
+        dst._base_color_tex         = RenderConstants::kInvalidBindlessHandle;
+        dst._normal_tex             = RenderConstants::kInvalidBindlessHandle;
+        dst._metallic_roughness_tex = RenderConstants::kInvalidBindlessHandle;
+        dst._emission_tex           = RenderConstants::kInvalidBindlessHandle;
+        if (auto std_mat = dynamic_cast<StandardMaterial*>(src); std_mat != nullptr)
+        {
+            auto prop = std_mat->MainProperty(ETextureUsage::kAlbedo);
+            dst._base_color        = prop.GetValue<Vector4f>().xyz;
+            if (auto base_color_tex = std_mat->MainTex(ETextureUsage::kAlbedo); base_color_tex)
+            {
+                dst._base_color_tex = base_color_tex->GetBindlessSRVIndex();
+            }
+            prop = std_mat->MainProperty(ETextureUsage::kMetallic);
+            dst._metallic          = prop.GetValue<f32>();
+            prop = std_mat->MainProperty(ETextureUsage::kRoughness);
+            dst._roughness         = prop.GetValue<f32>();
+            if (auto normal_tex = std_mat->MainTex(ETextureUsage::kNormal); normal_tex)
+            {
+                dst._normal_tex = normal_tex->GetBindlessSRVIndex();
+            }
+            if (auto mr_tex = std_mat->MainTex(ETextureUsage::kRoughness); mr_tex)
+            {
+                dst._metallic_roughness_tex = mr_tex->GetBindlessSRVIndex();
+            }
+            prop = std_mat->MainProperty(ETextureUsage::kEmission);
+            dst._emission          = prop.GetValue<Color>().xyz;
+        }
+        //dst._base_color        = Vector3f::kOne;
+        //dst._metallic          = src.metallic;
+        //dst._roughness         = src.roughness;
+        //dst._specular          = src.specular;
+        //dst._ior               = src.ior;
+        //dst._opacity           = src.opacity;
+
+        // dst._emission          = src.emission_color;
+        // dst._emission_strength = src.emission_intensity;
+
+        // dst._base_color_tex    = src.base_color_tex ? src.base_color_tex->BindlessIndex() : kInvalidTex;
+        // dst._normal_tex        = src.normal_tex     ? src.normal_tex->BindlessIndex()     : kInvalidTex;
+        // dst._metallic_roughness_tex = src.mr_tex ? src.mr_tex->BindlessIndex() : kInvalidTex;
+        // dst._emission_tex      = src.emission_tex ? src.emission_tex->BindlessIndex() : kInvalidTex;
+
+        // dst._flags = 0;
+        // if (src.is_metallic)   dst._flags |= kMaterial_Metallic;
+        // if (src.is_emissive)   dst._flags |= kMaterial_Emissive;
+        // if (src.is_thin)       dst._flags |= kMaterial_Thin;
+    }
+
+
+    void Renderer::PrepareMaterial(const Scene &s)
+    {
+        PROFILE_BLOCK_CPU(Renderer_PrepareMaterial)
+
+        for (auto& static_mesh : s.GetRegister().View<ECS::StaticMeshComponent>())
+        {
+            for (auto& mat : static_mesh._p_mats)
+            {
+                if (!_material_data_lut.contains(mat->HashCode()))
+                {
+                    u32 idx = (u32)_material_data_cache.size();
+                    _material_data_lut[mat->HashCode()] = idx;
+                    _material_data_cache.push_back(MaterialData());
+                }
+                FillMaterialData(mat.get(), _material_data_cache[_material_data_lut[mat->HashCode()]]);
+            }
+        }
+        _cur_fs->GetMaterialBuffer()->SetData(
+            (u8*)_material_data_cache.data(),
+            (u32)(_material_data_cache.size() * sizeof(MaterialData)));
+    }
+
     RenderTexture *Renderer::TargetTexture()
     {
         return _target_tex;

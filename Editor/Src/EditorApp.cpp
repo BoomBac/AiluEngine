@@ -89,7 +89,7 @@ namespace Ailu
             Render::RenderPipeline::Register(_pipeline.get());
             {
                 //g_pResourceMgr->Load<Scene>(_opened_scene_path);
-                g_pSceneMgr->OpenScene(_opened_scene_path);
+                SceneManagement::SceneMgr::Get().OpenScene(_opened_scene_path);
             }
             LoadEditorResource();
             //JsonArchive ar;
@@ -256,7 +256,7 @@ namespace Ailu
             _editor_config._far = Camera::sCurrent->Far();
             _editor_config._move_speed =     _camera_controller->_base_camera_move_speed;
             _editor_config._controller_rot = _camera_controller->_rotation;
-            _editor_config._scene_path = ToChar(g_pResourceMgr->GetAssetPath(g_pSceneMgr->ActiveScene()));
+            _editor_config._scene_path = ToChar(g_pResourceMgr->GetAssetPath(SceneManagement::SceneMgr::Get().ActiveScene()));
 
             JsonArchive ar;
             Type *type = EditorConfig::StaticType();
@@ -424,8 +424,9 @@ namespace Ailu
                     if (cur_files_time[file] != last_write_time)
                     {
                         //ReloadAsset(file,record);
-                        LOG_INFO("file {} changed", file.string());
-                        _on_file_changed_delegate.Invoke(file);
+                        WString formated_path = PathUtils::FormatFilePath(file.wstring());
+                        LOG_INFO(L"file {} changed", formated_path);
+                        _on_file_changed_delegate.Invoke(fs::path(formated_path));
                         s_cache_files_time[file] = cur_files_time[file];
                     }
                 }

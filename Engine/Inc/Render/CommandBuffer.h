@@ -131,10 +131,10 @@ namespace Ailu
         void ReleaseTempRT(RTHandle handle);
 
         void Blit(RTHandle src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u);
-        void Blit(RenderTexture *src, RenderTexture *dst, Material *mat = nullptr, u16 pass_index = 0u);
-        void Blit(RenderTexture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat = nullptr, u16 pass_index = 0u);
+        void Blit(Texture *src, RenderTexture *dst, Material *mat = nullptr, u16 pass_index = 0u);
+        void Blit(Texture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat = nullptr, u16 pass_index = 0u);
         void Blit(RTHandle src, RenderTexture *dst, Material *mat = nullptr, u16 pass_index = 0u);
-        void Blit(RenderTexture *src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u);
+        void Blit(Texture *src, RTHandle dst, Material *mat = nullptr, u16 pass_index = 0u);
         void Blit(const RDG::RGHandle& src, const RDG::RGHandle& dst, Material *mat = nullptr, u16 pass_index = 0u);
 
         void DrawFullScreenQuad(Material *mat, u16 pass_index = 0u);
