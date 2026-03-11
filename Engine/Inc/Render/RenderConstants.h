@@ -13,12 +13,12 @@ namespace Ailu::Render
     {
         constexpr static u8 kFrameCount = 2u;
         constexpr static u16 kMaxMaterialDataCount = 512u;
-        constexpr static u32 kMaxRenderObjectCount = 50u;
+        constexpr static u32 kMaxRenderObjectCount = 2000u;
         constexpr static u32 kMaxPassDataCount = 10u;
-        constexpr static u32 kMaxTextureCount = 128u;
+        constexpr static u32 kMaxTextureCount = 512u;
         constexpr static u8 kMaxUAVTextureCount = 10U;
-        constexpr static u32 kMaxRenderTextureCount = 32u;
-        constexpr static u32 KMaxDynamicVertexNum = 4096u;
+        constexpr static u32 kMaxRenderTextureCount = 128u;
+        constexpr static u32 KMaxDynamicVertexNum = 8192u;
         constexpr static u8 kMaxVertexAttrNum = 10u;
         constexpr static u16 kMaxDirectionalLightNum = kMaxDirectionalLight;
         constexpr static u16 kMaxPointLightNum = kMaxPointLight;
@@ -45,6 +45,8 @@ namespace Ailu::Render
         inline const static String kPSModel_6_1 = "ps_6_1";
         inline const static String kCSModel_6_1 = "cs_6_1";
         inline const static String kGSModel_6_1 = "gs_6_1";
+        inline const static String kLibModel_6_3 = "lib_6_3";
+        inline const static String kLibModel_6_6 = "lib_6_6";
 
         inline const static String kSemanticPosition = "POSITION";
         inline const static String kSemanticColor = "COLOR";

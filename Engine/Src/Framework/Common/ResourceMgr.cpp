@@ -39,15 +39,51 @@ namespace Ailu
             path = path.substr(2);
         return s_engine_res_root_pathw + path;
     }
+
+    WString ResourceMgr::GetAssetTypeName(const Type *type)
+    {
+        return type ? ToWChar(type->FullName().c_str()) : L"null";
+    }
+
+    const Type *ResourceMgr::FindAssetType(const WString &type_name)
+    {
+        if (type_name.empty())
+            return nullptr;
+        return Type::Find(ToChar(type_name));
+    }
+    ResourceMgr::Loader ResourceMgr::GetAssetLoader(const Type *type)
+    {
+        if (type == Material::StaticType())
+            return &ResourceMgr::LoadMaterial;
+        if (type == Texture2D::StaticType())
+            return &ResourceMgr::LoadTexture;
+        if (type == Mesh::StaticType() || type == SkeletonMesh::StaticType())
+            return &ResourceMgr::LoadMesh;
+        if (type == Shader::StaticType())
+            return &ResourceMgr::LoadShader;
+        if (type == ComputeShader::StaticType())
+            return &ResourceMgr::LoadComputeShader;
+        if (type == SceneManagement::Scene::StaticType())
+            return &ResourceMgr::LoadScene;
+        if (type == AnimationClip::StaticType())
+            return &ResourceMgr::LoadAnimClip;
+        return nullptr;
+    }
+
     int ResourceMgr::Initialize()
     {
         TimerBlock b("-----------------------------------------------------------ResourceMgr::Initialize");
         AL_ASSERT(!s_engine_res_root_pathw.empty());
         FileManager::SetCurPath(s_engine_res_root_pathw);
-        for (int i = 0; i < EAssetType::COUNT; i++)
-        {
-            _lut_global_resources_by_type[EAssetType::FromString(EAssetType::_Strings[i])] = Vector<ResourcePoolContainer::iterator>();
-        }
+        _lut_global_resources_by_type[Material::StaticType()] = {};
+        _lut_global_resources_by_type[Texture2D::StaticType()] = {};
+        _lut_global_resources_by_type[Texture3D::StaticType()] = {};
+        _lut_global_resources_by_type[Mesh::StaticType()] = {};
+        _lut_global_resources_by_type[SkeletonMesh::StaticType()] = {};
+        _lut_global_resources_by_type[Shader::StaticType()] = {};
+        _lut_global_resources_by_type[ComputeShader::StaticType()] = {};
+        _lut_global_resources_by_type[Scene::StaticType()] = {};
+        _lut_global_resources_by_type[AnimationClip::StaticType()] = {};
         _project_root_path = s_engine_res_root_pathw.substr(0, s_engine_res_root_pathw.find_last_of(L"/"));
         LoadAssetDB();
         Vector<WString> shader_asset_pathes = {
@@ -160,6 +196,7 @@ namespace Ailu
             Texture::s_p_default_normal = default_normal.get();
             //Load<Texture2D>(EnginePath::kEngineTexturePathW + L"small_cave_1k.alasset");
             TextureImportSetting setting;
+            setting._is_sRGB = false;
             setting._generate_mipmap = false;
             auto lut1 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_1.dds",setting);
             auto lut2 = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"ltc_2.dds",setting);
@@ -170,10 +207,14 @@ namespace Ailu
             JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
                                    { mgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset",&TextureImportSetting::Default()); },
                                    this);
-            JobSystem::Get().Dispatch([&](ResourceMgr *mgr)
+            JobSystem::Get().Dispatch([this](ResourceMgr *mgr)
                                       { 
+                                          auto setting = TextureImportSetting::Default();
+                                          setting._is_sRGB = false;
+                                          setting._generate_mipmap = false;
                                           auto terrain_map = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"terrain_height.png", setting); 
                                           RegisterResource(L"Textures/TerrainHeight", terrain_map);
+                                          setting._is_sRGB = true;
                                           setting._generate_mipmap = true;
                                           terrain_map = LoadExternalTexture(EnginePath::kEngineTexturePathW + L"terrain_color.png", setting); 
                                           RegisterResource(L"Textures/TerrainDiffuse", terrain_map);
@@ -268,7 +309,10 @@ namespace Ailu
         _default_font = Font::Create(GetResSysPath(L"Fonts/msdf/Open_Sans/atlas.png"), GetResSysPath(L"Fonts/msdf/Open_Sans/atlas.json"));
         for (auto &p: _default_font->_pages)
         {
-            p._texture = LoadExternalTexture(p._file,TextureImportSetting::Default());
+            auto setting = TextureImportSetting::Default();
+            setting._is_sRGB = false;
+            setting._generate_mipmap = false;
+            p._texture = LoadExternalTexture(p._file, setting);
             RegisterResource(PathUtils::ExtractAssetPath(p._file), p._texture);
         }
         //g_pThreadTool->Enqueue("ResourceMgr::WatchDirectory", &ResourceMgr::WatchDirectory, this);
@@ -285,7 +329,7 @@ namespace Ailu
         _is_watching_directory = false;
         for (auto &[guid, asset]: _asset_db)
         {
-            if (asset->_asset_type == EAssetType::kScene || asset->_asset_type == EAssetType::kMaterial)
+            if (asset->_asset_type == Scene::StaticType() || asset->_asset_type == Material::StaticType())
                 SaveAsset(asset.get());
         }
         SaveAssetDB();
@@ -354,53 +398,44 @@ namespace Ailu
         std::wofstream out_asset_file(sys_path, std::ios::out | std::ios::trunc);
         AL_ASSERT(out_asset_file.is_open());
         out_asset_file << "guid: " << ToWChar(asset->GetGuid().ToString()) << endl;
-        out_asset_file << "type: " << EAssetType::ToString(asset->_asset_type) << endl;
+        out_asset_file << "type: " << GetAssetTypeName(asset->_asset_type) << endl;
         out_asset_file << "name: " << asset->_name << endl;
         out_asset_file.close();
 
-        switch (asset->_asset_type)
+        if (asset->_asset_type == Mesh::StaticType() || asset->_asset_type == SkeletonMesh::StaticType())
         {
-            case Ailu::EAssetType::kMesh:
-            {
-                SaveMesh(sys_path, asset);
-            }
-                return;
-            case Ailu::EAssetType::kShader:
-            {
-                SaveShader(sys_path, asset);
-            }
-                return;
-            case Ailu::EAssetType::kComputeShader:
-            {
-                SaveComputeShader(sys_path, asset);
-            }
-                return;
-            case Ailu::EAssetType::kMaterial:
-            {
-                SaveMaterial(sys_path, asset->As<Material>());
-            }
-                return;
-            case Ailu::EAssetType::kTexture2D:
-            {
-                SaveTexture2D(sys_path, asset);
-            }
-                return;
-            case Ailu::EAssetType::kScene:
-            {
-                SaveScene(sys_path, asset);
-                return;
-            }
-            case Ailu::EAssetType::kSkeletonMesh:
-            {
-                SaveMesh(sys_path, asset);
-                return;
-            }
-            case Ailu::EAssetType::kAnimClip:
-            {
-                SaveAnimClip(sys_path, asset);
-                return;
-            }
-                return;
+            SaveMesh(sys_path, asset);
+            return;
+        }
+        if (asset->_asset_type == Shader::StaticType())
+        {
+            SaveShader(sys_path, asset);
+            return;
+        }
+        if (asset->_asset_type == ComputeShader::StaticType())
+        {
+            SaveComputeShader(sys_path, asset);
+            return;
+        }
+        if (asset->_asset_type == Material::StaticType())
+        {
+            SaveMaterial(sys_path, asset->As<Material>());
+            return;
+        }
+        if (asset->_asset_type == Texture2D::StaticType())
+        {
+            SaveTexture2D(sys_path, asset);
+            return;
+        }
+        if (asset->_asset_type == Scene::StaticType())
+        {
+            SaveScene(sys_path, asset);
+            return;
+        }
+        if (asset->_asset_type == AnimationClip::StaticType())
+        {
+            SaveAnimClip(sys_path, asset);
+            return;
         }
         AL_ASSERT(false);
     }
@@ -501,7 +536,7 @@ namespace Ailu
             setting._ps_entry = ToChar(ps_entry);
             auto asset = MakeScope<Asset>();
             asset->_asset_path = asset_path;
-            asset->_asset_type = EAssetType::kShader;
+            asset->_asset_type = Shader::StaticType();
             asset->_external_asset_path = file;
             asset->_p_obj = LoadExternalShader(file);
             return asset;
@@ -563,7 +598,7 @@ namespace Ailu
                 if (tex)
                 {
                     Asset *lined_asset = GetLinkedAsset(tex);
-                    if (lined_asset && lined_asset->_asset_type == EAssetType::kTexture2D)
+                    if (lined_asset && lined_asset->_asset_type == Texture2D::StaticType())
                         tex_guid = lined_asset->GetGuid();
                     else
                     {
@@ -586,11 +621,11 @@ namespace Ailu
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         if (FileManager::Exist(sys_path))
         {
-            auto id = reinterpret_cast<u64>(asset->_p_obj.get());
+            auto addr = reinterpret_cast<u64>(asset);
             std::wstringstream wss;
             wss << L"file: " << asset->_external_asset_path << std::endl;
             wss << L"inner_file_name: " << ToWChar(asset->_p_obj->Name().c_str()) << std::endl;
-            wss << L"is_combine_mesh: " << (_mesh_importer[id]._is_combine_mesh ? L"true" : L"false") << std::endl;
+            wss << L"is_combine_mesh: " << (dynamic_cast<const MeshImportSetting *>(_importers[addr])->_is_combine_mesh ? L"true" : L"false") << std::endl;
             if (FileManager::WriteFile(sys_path, true, wss.str()))
             {
                 return;
@@ -607,6 +642,7 @@ namespace Ailu
             std::wstringstream wss;
             WString indent = L"  ";
             wss << indent << L"file: " << asset->_external_asset_path << std::endl;
+            wss << indent << L"sRGB: " << dynamic_cast<const TextureImportSetting *>(_importers[reinterpret_cast<u64>(asset)])->_is_sRGB << std::endl;
             if (FileManager::WriteFile(sys_path, true, wss.str()))
             {
                 return;
@@ -661,10 +697,12 @@ namespace Ailu
         }
         LOG_INFO(L"Save animclip to {}", sys_path);
     }
-
+    //TODO:移除
+    std::mutex g_mesh_load_mutex;
     List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting, List<Ref<AnimationClip>> &clips)
     {
-        static auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+        std::unique_lock<std::mutex> lock(g_mesh_load_mutex);
+        auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         parser->Parser(sys_path, setting);
         List<Ref<Mesh>> mesh_list{};
@@ -731,16 +769,19 @@ namespace Ailu
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
+        auto setting = dynamic_cast<const TextureImportSetting&>(settings);
         if (FileManager::ReadFile(sys_path, data))
         {
             auto c = StringUtils::Split(data, L"\n");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+            bool is_srgb = StringUtils::ParseUInt32(ToChar(c[4].substr(c[4].find_first_of(L":") + 2))).value_or(1) == 1;
+            setting._is_sRGB = is_srgb;
             if (!IsAssetLoaded(asset_path))
             {
-                auto tex = LoadExternalTexture(file,dynamic_cast<const TextureImportSetting&>(settings));
+                auto tex = LoadExternalTexture(file,setting);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
-                asset->_asset_type = EAssetType::kTexture2D;
+                asset->_asset_type = Texture2D::StaticType();
                 asset->_external_asset_path = file;
                 asset->_p_obj = tex;
                 return asset;
@@ -749,10 +790,10 @@ namespace Ailu
             {
                 auto exist_asset = GetAsset(asset_path);
                 auto tex = exist_asset->AsRef<Texture2D>();
-                LoadExternalTexture(file,tex,dynamic_cast<const TextureImportSetting&>(settings));
+                LoadExternalTexture(file,tex,setting);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
-                asset->_asset_type = EAssetType::kTexture2D;
+                asset->_asset_type = Texture2D::StaticType();
                 asset->_external_asset_path = file;
                 asset->_p_obj = tex;
                 return asset;
@@ -876,7 +917,7 @@ namespace Ailu
         }
         auto asset = MakeScope<Asset>();
         asset->_asset_path = asset_path;
-        asset->_asset_type = EAssetType::kMaterial;
+        asset->_asset_type = Material::StaticType();
         asset->_p_obj = mat;
         return asset;
     }
@@ -902,7 +943,7 @@ namespace Ailu
             bool is_sk_mesh = dynamic_cast<SkeletonMesh *>(mesh_list.front().get()) != nullptr;
             auto asset = MakeScope<Asset>();
             asset->_asset_path = asset_path;
-            asset->_asset_type = is_sk_mesh ? EAssetType::kSkeletonMesh : EAssetType::kMesh;
+            asset->_asset_type = is_sk_mesh ? SkeletonMesh::StaticType() : Mesh::StaticType();
             asset->_external_asset_path = file;
             asset->_p_obj = mesh_list.front();
             asset->_name = PathUtils::GetFileName(asset_path);
@@ -924,7 +965,7 @@ namespace Ailu
             String kernel = ToChar(c[4].substr(c[4].find_first_of(L":") + 2));
             auto asset = MakeScope<Asset>();
             asset->_asset_path = asset_path;
-            asset->_asset_type = EAssetType::kComputeShader;
+            asset->_asset_type = ComputeShader::StaticType();
             asset->_external_asset_path = file;
             asset->_p_obj = LoadExternalComputeShader(file);
             return asset;
@@ -951,7 +992,7 @@ namespace Ailu
         loaded_scene->Deserialize(arch);
         auto asset = MakeScope<Asset>();
         asset->_asset_path = asset_path;
-        asset->_asset_type = EAssetType::kScene;
+        asset->_asset_type = Scene::StaticType();
         asset->_p_obj = loaded_scene;
         return asset;
     }
@@ -974,7 +1015,7 @@ namespace Ailu
         loaded_clip->Deserialize(arch);
         auto asset = MakeScope<Asset>();
         asset->_asset_path = asset_path;
-        asset->_asset_type = EAssetType::kAnimClip;
+        asset->_asset_type = AnimationClip::StaticType();
         asset->_p_obj = loaded_clip;
         AnimationClipLibrary::AddClip(loaded_clip);
         return asset;
@@ -996,18 +1037,16 @@ namespace Ailu
                 new_guid = Guid::Generate();
             }
         }
-        EAssetType::EAssetType asset_type = GetObjectAssetType(obj.get());
+        const Type *asset_type = GetObjectResourceType(obj.get());
         new_asset = MakeScope<Asset>(new_guid, asset_type, asset_path);
-        if (asset_type == EAssetType::kMesh || asset_type == EAssetType::kSkeletonMesh)
+        if (asset_type == Mesh::StaticType() || asset_type == SkeletonMesh::StaticType())
         {
-            //new_asset = MakeScope<Asset>(new_guid, EAssetType::kMesh, asset_path);
             new_asset->_addi_info = std::format(L"_{}", ToWChar(obj->Name().c_str()));
         }
-        if (asset_type == EAssetType::kShader)
+        if (asset_type == Shader::StaticType())
         {
             Shader *shader = dynamic_cast<Shader *>(obj.get());
             auto [vs, ps] = shader->GetShaderEntry();
-            //new_asset = MakeScope<Asset>(new_guid, EAssetType::kShader, asset_path);
             new_asset->_addi_info = std::format(L"_{}_{}", ToWChar(vs.c_str()), ToWChar(ps.c_str()));
         }
         AL_ASSERT(new_asset != nullptr);
@@ -1158,16 +1197,11 @@ namespace Ailu
                 tokens.push_back(token);
             String guid = ToChar(tokens[0]);
             WString asset_path = tokens[1];
-            EAssetType::EAssetType asset_type = EAssetType::FromString(ToChar(tokens[2]));
-            //			if (asset_type == EAssetType::kTexture2D)
-            //			{
-            //				Load<Texture2D>(asset_path);
-            //			}
-            //			else
-            {
-                //先占位，不进行资源加载，实际有使用时才加载。
-                RegisterAsset(MakeScope<Asset>(Guid(guid), asset_type, asset_path));
-            }
+            const Type *asset_type = FindAssetType(tokens[2]);
+            auto asset = MakeScope<Asset>(Guid(guid), asset_type, asset_path);
+            asset->Name(ToChar(PathUtils::GetFileName(asset_path).c_str()));
+            //先占位，不进行资源加载，实际有使用时才加载。
+            RegisterAsset(std::move(asset));
         }
         file.close();
     }
@@ -1179,9 +1213,9 @@ namespace Ailu
         for (auto &[guid, asset]: _asset_db)
         {
             if (cur_count != db_size)
-                file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type) << std::endl;
+                file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << GetAssetTypeName(asset->_asset_type) << std::endl;
             else
-                file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << EAssetType::ToString(asset->_asset_type);
+                file << ToWChar(guid.ToString()) << "," << asset->_asset_path << "," << GetAssetTypeName(asset->_asset_type);
             ++cur_count;
         }
         //_asset_db.clear();
@@ -1207,23 +1241,30 @@ namespace Ailu
             auto mat = MakeRef<StandardMaterial>("MAT_" + it->_name);
             if (!it->_textures[0].empty())
             {
-                if (Ref<Texture2D> texture = LoadExternalTexture(ToWChar(it->_textures[0]), TextureImportSetting::Default()); texture != nullptr)
+                String tex_file_name = PathUtils::GetFileName(it->_textures[0]);
+                auto asset_path = ToWChar(std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index, tex_file_name));
+                auto tex = GetRef<Texture2D>(asset_path);
+                if (!tex)
                 {
-                    String tex_file_name = PathUtils::GetFileName(it->_textures[0]);
-                    mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, texture.get());
-                    String id = std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index, tex_file_name);
-                    RegisterResource(ToWChar(id), texture);
+                    auto setting = TextureImportSetting::Default();
+                    tex = LoadExternalTexture(ToWChar(it->_textures[0]), setting);
+                    RegisterResource(asset_path, tex);
                 }
+                mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, tex.get());
             }
             if (!it->_textures[1].empty())
             {
-                if (Ref<Texture2D> texture = LoadExternalTexture(ToWChar(it->_textures[1]), TextureImportSetting::Default()); texture != nullptr)
+                String tex_file_name = PathUtils::GetFileName(it->_textures[1]);
+                auto asset_path = ToWChar(std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index, tex_file_name));
+                auto tex = GetRef<Texture2D>(asset_path);
+                if (!tex)
                 {
-                    String tex_file_name = PathUtils::GetFileName(it->_textures[1]);
-                    mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, texture.get());
-                    String id = std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index, tex_file_name);
-                    RegisterResource(ToWChar(id), texture);
+                    auto setting = TextureImportSetting::Default();
+                    setting._is_sRGB = false;
+                    tex = LoadExternalTexture(ToWChar(it->_textures[1]), setting);
+                    RegisterResource(asset_path, tex);
                 }
+                mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, tex.get());
             }
             mat->SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, it->_diffuse);
             mat->SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, it->_roughness);
@@ -1306,7 +1347,9 @@ namespace Ailu
         {
             _global_resources[asset_path] = obj;
             _lut_global_resources[obj->ID()] = _global_resources.find(asset_path);
-            auto &v = _lut_global_resources_by_type[GetObjectAssetType(obj.get())];
+            auto resource_type = GetObjectResourceType(obj.get());
+            AL_ASSERT(resource_type != nullptr);
+            auto &v = _lut_global_resources_by_type[resource_type];
             auto it = std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter iter) -> bool
                                    { return iter->first == asset_path; });
             if (it != v.end())
@@ -1326,7 +1369,9 @@ namespace Ailu
         {
             auto &obj = _global_resources[asset_path];
             u32 ref_count = obj.use_count();
-            auto &v = _lut_global_resources_by_type[GetObjectAssetType(obj.get())];
+            auto resource_type = GetObjectResourceType(obj.get());
+            AL_ASSERT(resource_type != nullptr);
+            auto &v = _lut_global_resources_by_type[resource_type];
             v.erase(std::find_if(v.begin(), v.end(), [&](ResourcePoolContainerIter it) -> bool
                                  { return it->second.get() == obj.get(); }));
             _object_to_asset.erase(obj->ID());
@@ -1334,6 +1379,15 @@ namespace Ailu
             _global_resources.erase(asset_path);
             LOG_WARNING(L"UnRegisterResource: {} ref count is {}", asset_path, ref_count - 1);
         }
+    }
+
+    Ref<Texture2D> ResourceMgr::GetDefaultResourceRef(const Texture2D*)
+    {
+        if (g_pResourceMgr == nullptr || Texture::s_p_default_white == nullptr)
+            return nullptr;
+        if (g_pResourceMgr->_lut_global_resources.contains(Texture::s_p_default_white->ID()))
+            return std::static_pointer_cast<Texture2D>(g_pResourceMgr->_lut_global_resources[Texture::s_p_default_white->ID()]->second);
+        return nullptr;
     }
 
     void ResourceMgr::FormatLine(const String &line, String &key, String &value)
@@ -1348,7 +1402,7 @@ namespace Ailu
         }
     }
 
-    void ResourceMgr::ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, EAssetType::EAssetType &type)
+    void ResourceMgr::ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, const Type *&type)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
@@ -1357,41 +1411,37 @@ namespace Ailu
             auto c = StringUtils::Split(data, L"\n");
             guid = Guid(ToChar(c[0].substr(c[0].find_first_of(L":") + 2)));
             name = c[2].substr(c[2].find_first_of(L":") + 2);
-            type = EAssetType::FromString(ToChar(c[1].substr(c[1].find_first_of(L":") + 2)));
+            type = FindAssetType(c[1].substr(c[1].find_first_of(L":") + 2));
         }
     }
 
-    EAssetType::EAssetType ResourceMgr::GetObjectAssetType(Object *obj)
+    const Type *ResourceMgr::GetObjectResourceType(Object *obj)
     {
-        if (dynamic_cast<Material *>(obj))
+        if (obj == nullptr)
+            return nullptr;
+
+        for (auto *type = obj->GetType(); type != nullptr; type = type->BaseType())
         {
-            return EAssetType::kMaterial;
+            if (type == SkeletonMesh::StaticType())
+                return SkeletonMesh::StaticType();
+            if (type == Mesh::StaticType())
+                return Mesh::StaticType();
+            if (type == Material::StaticType())
+                return Material::StaticType();
+            if (type == Texture2D::StaticType())
+                return Texture2D::StaticType();
+            if (type == Texture3D::StaticType())
+                return Texture3D::StaticType();
+            if (type == Shader::StaticType())
+                return Shader::StaticType();
+            if (type == ComputeShader::StaticType())
+                return ComputeShader::StaticType();
+            if (type == SceneManagement::Scene::StaticType())
+                return SceneManagement::Scene::StaticType();
+            if (type == AnimationClip::StaticType())
+                return AnimationClip::StaticType();
         }
-        else if (dynamic_cast<Texture2D *>(obj))
-        {
-            return EAssetType::kTexture2D;
-        }
-        else if (dynamic_cast<Texture3D *>(obj))
-        {
-            return EAssetType::kTexture3D;
-        }
-        else if (dynamic_cast<Mesh *>(obj))
-        {
-            if (dynamic_cast<SkeletonMesh *>(obj))
-                return EAssetType::kSkeletonMesh;
-            return EAssetType::kMesh;
-        }
-        else if (dynamic_cast<Shader *>(obj))
-        {
-            return EAssetType::kShader;
-        }
-        else if (dynamic_cast<ComputeShader *>(obj))
-        {
-            return EAssetType::kComputeShader;
-        }
-        else if (dynamic_cast<AnimationClip *>(obj))
-            return EAssetType::kAnimClip;
-        return EAssetType::kUndefined;
+        return nullptr;
     }
 
     bool ResourceMgr::IsFileOnDiskUpdated(const WString &sys_path)
@@ -1473,15 +1523,18 @@ namespace Ailu
         TimeMgr time_mgr;
         Ref<void> ret_res = nullptr;
         Queue<std::tuple<WString, Ref<Object>>> loaded_objects;
-        EAssetType::EAssetType asset_type = EAssetType::kUndefined;
         time_mgr.Mark();
         WString created_asset_dir = target_dir;
         if (!created_asset_dir.ends_with(L"/"))
             created_asset_dir.append(L"/");
         created_asset_dir = PathUtils::ExtractAssetPath(created_asset_dir);
+        if (ExistInAssetDB(external_asset_path))
+        {
+            LOG_WARNING(L"Asset with path {} already exist in database,skip import!", external_asset_path);
+            return nullptr;
+        }
         if (ext == ".fbx" || ext == ".FBX")
         {
-            asset_type = EAssetType::kMesh;
             auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(setting);
             mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
             List<Ref<AnimationClip>> clips;
@@ -1517,7 +1570,6 @@ namespace Ailu
                 }
                 else
                     CreateAndRegisterEmbeddedMaterial(mesh.get());
-                _mesh_importer[reinterpret_cast<u64>(mesh.get())] = *mesh_import_setting;
             }
             for (auto &clip: clips)
             {
@@ -1529,7 +1581,6 @@ namespace Ailu
         }
         else if (kHDRImageExt.contains(ext) || kLDRImageExt.contains(ext))
         {
-            asset_type = EAssetType::kTexture2D;
             auto tex = LoadExternalTexture(external_asset_path,dynamic_cast<const TextureImportSetting&>(*setting));
             WString imported_asset_path = created_asset_dir;
             imported_asset_path.append(std::format(L"{}.alasset", ToWChar(tex->Name().c_str())));
@@ -1539,7 +1590,13 @@ namespace Ailu
         while (!loaded_objects.empty())
         {
             auto &[path, obj] = loaded_objects.front();
-            CreateAsset(path, obj)->_external_asset_path = external_asset_path;
+            auto new_asset = CreateAsset(path, obj);
+            new_asset->_external_asset_path = external_asset_path;
+            u64 addr = (u64)new_asset;
+            if (obj->GetType() == Mesh::StaticType() || obj->GetType() == SkeletonMesh::StaticType())
+                _importers[addr] = AL_NEW(MeshImportSetting,(*dynamic_cast<const MeshImportSetting *>(setting)));
+            else if (obj->GetType() == Texture2D::StaticType() || obj->GetType() == Texture3D::StaticType())
+                _importers[addr] = AL_NEW(TextureImportSetting,(*dynamic_cast<const TextureImportSetting *>(setting)));
             LOG_INFO(L"Create asset at path {}", path);
             loaded_objects.pop();
         }

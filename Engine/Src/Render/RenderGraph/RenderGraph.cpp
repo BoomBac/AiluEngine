@@ -149,7 +149,7 @@ namespace Ailu
         RGHandle RenderGraph::Import(GpuResource *external)
         {
             auto res_type = external->GetResourceType();
-            if (res_type == EGpuResType::kVertexBuffer || res_type == EGpuResType::kIndexBUffer || res_type == EGpuResType::kConstBuffer || res_type == EGpuResType::kGraphicsPSO)
+            if (res_type == EGpuResType::kVertexBuffer || res_type == EGpuResType::kIndexBuffer || res_type == EGpuResType::kConstBuffer || res_type == EGpuResType::kGraphicsPSO)
             {
                 AL_ASSERT_MSG(false, "RenderGraph::Import: Unsupported resource type!");
             }

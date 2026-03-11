@@ -1,4 +1,5 @@
 guid: 1b5c8e8f-c721-4c6a-b678-59ec49f4ebae
-type: kTexture2D
+type: Ailu::Render::Texture2D
 name: area_light
   file: Icons/area_light.png
+  sRGB: 1

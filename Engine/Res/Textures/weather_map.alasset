@@ -1,4 +1,5 @@
 guid: 0c23d3c1-67bc-4fbe-a617-b96e82538e6c
-type: kTexture2D
+type: Ailu::Render::Texture2D
 name: weather_map
   file: Textures/weather_map.png
+  sRGB: 1

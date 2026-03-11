@@ -49,9 +49,9 @@ namespace Ailu
         TextureDesc desc;
         desc._width = load_data._width;
         desc._height = load_data._height;
-        desc._is_linear = import_settings._is_srgb;
+        desc._is_linear = !import_settings._is_sRGB;
         desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
-        desc._is_readable = import_settings._is_readble;
+        desc._is_readable = import_settings._is_readable;
         desc._format = ConvertTextureFormatToPixelFormat(load_data._format);
         auto tex = Texture2D::Create(desc);
         tex->SetPixelData(load_data._data[0],0);
@@ -252,9 +252,9 @@ namespace Ailu
             TextureDesc desc;
             desc._width = load_data._width;
             desc._height = load_data._height;
-            desc._is_linear = import_settings._is_srgb;
+            desc._is_linear = !import_settings._is_sRGB;
             desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
-            desc._is_readable = import_settings._is_readble;
+            desc._is_readable = import_settings._is_readable;
             desc._format = ConvertTextureFormatToPixelFormat(load_data._format);
             texture->ReCreate(desc);
             for(u16 i = 0; i < load_data._data.size(); ++i)

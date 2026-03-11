@@ -84,9 +84,9 @@ namespace Ailu
 		String _msg;
     };
 #ifdef _DEBUG
-	#define TIMER_BLOCK(msg) TimerBlock tb(msg);
+	#define TIMER_BLOCK(...) TimerBlock tb(__VA_ARGS__);
 #else
-	#define TIMER_BLOCK() 
+	#define TIMER_BLOCK(...)
 #endif// _DEBUG
 
     namespace Render{class RHICommandBuffer;}
@@ -106,7 +106,7 @@ namespace Ailu
 
         // Indicate beginning & end of frame
         virtual void BeginFrame(RHICommandBuffer * cmd) = 0;
-        virtual void EndFrame() = 0;
+		virtual void EndFrame() = 0;
         // Start/stop a particular performance timer (don't start same index more than once in a single frame)
         virtual void Start(RHICommandBuffer * commandList, u32 timerid = 0) = 0;
         virtual void Stop(RHICommandBuffer * commandList, u32 timerid = 0) = 0;

@@ -5,8 +5,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AiluBuildPath}/out/test/bin/x64)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${AiluBuildPath}/out/test/bin/x64/debug)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${AiluBuildPath}/out/test/bin/x64/release)
-
-set(ENGINE_LIB_ROOT ${ENGINE_ROOT_PATH}/lib/x64)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${AiluBuildPath}/out/test/bin/x64/relwithdebinfo)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${AiluBuildPath}/out/test/bin/x64/minsizerel)
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -43,7 +43,10 @@ target_include_directories(Test PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Test PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
 target_include_directories(Test PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 # 宏定义
-target_compile_definitions(Test PUBLIC _DEBUG;Editor_EXPORTS;_WINDOWS)
+target_compile_definitions(Test PUBLIC
+    Editor_EXPORTS
+    _WINDOWS
+    $<$<CONFIG:Debug>:_DEBUG>)
 
 if (AILU_ENABLE_TRACY)
     target_compile_definitions(Test PUBLIC TRACY_ENABLE TRACY_IMPORTS)
@@ -66,5 +69,5 @@ set_target_properties (Test PROPERTIES OUTPUT_NAME "Test")
 #        )
 
 target_link_libraries(Test PRIVATE
-        $<$<CONFIG:Debug>:${AiluBuildPath}/out/engine/lib/x64/Debug/Engine_d.lib>
-        $<$<CONFIG:Release>:${AiluBuildPath}/out/engine/lib/x64/Release/Engine_d.lib> ${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib)
+    ${AILU_ENGINE_IMPORT_LIB}
+    ${AILU_FBXSDK_LINK_LIB})

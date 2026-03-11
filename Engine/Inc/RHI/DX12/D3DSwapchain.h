@@ -30,9 +30,11 @@ namespace Ailu
         public:
             D3DSwapchainTexture(D3DSwapchainInitializer &initializer);
             virtual ~D3DSwapchainTexture();
+            Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _back_buffers.empty() ? nullptr : _back_buffers[_cur_backbuf_index].Get()}; }
             void Resize(u16 w, u16 h) final;
             void PreparePresent(RHICommandBuffer *cmd) final;
             void Present() final;
+            void StateTranslation(RHICommandBuffer* rhi_cmd,Render::EResourceState new_state,u32 sub_res) final;
             D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(RHICommandBuffer *cmd);
             u8 GetCurrentBackBufferIndex() final
             { 

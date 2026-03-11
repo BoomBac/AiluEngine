@@ -45,6 +45,8 @@ namespace Ailu
             virtual u64 GetFrameCount() const = 0;
             virtual void CreateResource(GpuResource *res) = 0;
             virtual void CreateResource(GpuResource *res, UploadParams *params) = 0;
+            virtual void CreateResourceSync(GpuResource *res) = 0;
+            virtual void CreateResourceSync(GpuResource *res, UploadParams *params) = 0;
             virtual void ReadBack(GpuResource *res, u8 *data, u32 size) = 0;
             virtual void ReadBackAsync(GpuResource *res, std::function<void(u8 *)> callback) = 0;
             virtual void ProcessGpuCommand(GfxCommand *cmd, RHICommandBuffer *cmd_buffer) = 0;
@@ -66,6 +68,8 @@ namespace Ailu
             //return mb byte/1024/1024
             virtual f32 TotalGPUMemeryUsage() = 0;
             virtual void ExecuteRHICommandBuffer(RHICommandBuffer *cmd) = 0;
+
+            virtual bool IsHardwareRayTracingSupported() const = 0;
 
         protected:
         };

@@ -1,5 +1,5 @@
 guid: 949381d0-6c70-457a-ac9b-afcb1eab3547
-type: kAnimClip
+type: Ailu::AnimationClip
 name: ik_test_leg_mesh.alasset
 _name:ik_test_leg_mesh
 _frame_count:120

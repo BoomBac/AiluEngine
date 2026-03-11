@@ -14,6 +14,10 @@
 
 //https://github.com/EpicGames/UnrealEngine/blob/release/Engine/Shaders/Private/BRDF.ush
 
+float RoughnessToAlpha(float roughness)
+{
+    return max(roughness * roughness, 1e-6);
+}
 
 //----------Specular D,Normal Distribution Function（法线分布）--------------------------------------------
 // Generalized-Trowbridge-Reitz distribution
@@ -183,13 +187,15 @@ float V_SmithGGXCorrelated(float NoV, float NoL, float roughness)
     // clamp to the maximum value representable in mediump
     return min(v,MEDIUMP_FLT_MAX);
 }
-float GeometrySchlickGGX(float NdotV, float roughness)
+//SchlickGGX近似
+float GeometrySchlickGGX(float cos_theta, float roughness)
 {
     float a = roughness;
-    float k = (a * a) / 2.0;
+    //float k = (a * a) / 2.0;
+	float k = pow(roughness + 1,2) / 8;// UE4
 
-    float nom   = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
+    float nom   = cos_theta;
+    float denom = cos_theta * (1.0 - k) + k;
 
     return nom / denom;
 }
@@ -247,53 +253,33 @@ float3 EnvBRDF(float metallic, float3 base_color, float2 lut)
 }
 //--------------------------------------------------Env----------------------------------------------------------
 
-float3 CookTorranceBRDF(SurfaceData surface,ShadingData s)
+float3 CookTorranceBRDF(SurfaceData surface, ShadingData s)
 {
     if (s.nl <= 0.0 || s.nv <= 0.0)
         return 0.0.xxx;
 
-    // -------------------------
-    // Diffuse term
-    // -------------------------
-    float3 diffuse_color =surface.albedo.rgb *(1.0 - surface.metallic);
+    float3 diffuse_color = surface.albedo.rgb;
+
+    float alpha = max(surface.roughness, 1e-4);
+
+    float D = D_GTR2(alpha, s.nh);
+
+    float G = V_SmithGGXCorrelated(s.nv, s.nl, alpha);
+
+    float3 f0 = lerp(DIELECTRIC_SPECULAR.xxx,
+                     surface.albedo.rgb,
+                     surface.metallic.xxx);
+
+    float3 F = F_Schlick(f0, s.vh);
+
+    float3 specular = D * G * F;
+
+    float3 kd = (1 - F) * (1 - surface.metallic);
+	kd = saturate(kd);
 
     float3 diffuse = Diffuse_Lambert(diffuse_color);
 
-    // -------------------------
-    // Specular term
-    // -------------------------
-
-    // Roughness remap (Disney / UE 风格)
-    float alpha = max(surface.roughness * surface.roughness, 1e-4);
-
-    // Isotropic / Anisotropic D
-    float D_iso = D_GTR2(alpha, s.nh);
-
-    float ax, ay;
-    GetAnisotropicRoughness(alpha, surface.anisotropy, ax, ay);
-
-    float D_aniso = D_GGXaniso(ax, ay, s.nh, s.th, s.bh);
-
-    float D = lerp(D_iso, D_aniso, abs(surface.anisotropy));
-
-    // Geometry (correlated Smith)
-    float G = V_SmithGGXCorrelated(s.nv, s.nl, alpha);
-
-    // Fresnel
-    float3 f0 =lerp(DIELECTRIC_SPECULAR.xxx,surface.albedo.rgb,surface.metallic.xxx);
-
-    float3 F =F_Schlick(f0, s.vh);
-    // -------------------------
-    // Energy conservation
-    // -------------------------
-    float3 kd = (1.0.xxx - F) * (1.0 - surface.metallic);
-
-    // -------------------------
-    // Final BRDF (IMPORTANT)
-    // -------------------------
-    float3 specular = (D * G) * F;
-
-    return diffuse * kd + specular;
+    return kd * diffuse + specular;
 }
 
 

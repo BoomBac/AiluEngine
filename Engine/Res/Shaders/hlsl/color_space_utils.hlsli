@@ -209,4 +209,10 @@ float3 YCoCgToRGB(float3 YCoCg)
     rgb.b = Y - Co - Cg;
     return rgb;
 }
+
+float Luminance(float3 c)
+{
+    return dot(c, float3(0.2126, 0.7152, 0.0722));
+}
+
 #endif//__COLOR_SPACE_UTILS

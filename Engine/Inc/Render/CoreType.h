@@ -1,12 +1,14 @@
 #ifndef __CORE_TYPE_H__
 #define __CORE_TYPE_H__
 #include "GlobalMarco.h"
+#include "generated/CoreType.gen.h"
 
 
 namespace Ailu
 {
     namespace Render
     {
+        AENUM()
         enum class EResourceUsage : u32
         {
             kNone = 0,
@@ -40,6 +42,7 @@ namespace Ailu
 
         const static u32 kTotalSubRes = 0XFFFFFFFF;
 
+        AENUM()
         enum class EResourceState
         {
             kCommon = 0,
@@ -70,16 +73,24 @@ namespace Ailu
             kVideoEncodeRead = 0x200000,
             kVideoEncodeWrite = 0x800000
         };
+
+        inline bool operator&(EResourceState a, EResourceState b)
+        {
+            return (static_cast<u32>(a) & static_cast<u32>(b)) != 0;
+        }
+
         enum class EGpuResType
         {
             kBuffer,
-            KRWBuffer,
+            kRWBuffer,
             kTexture,
             kRenderTexture,
             kVertexBuffer,
-            kIndexBUffer,
+            kIndexBuffer,
             kConstBuffer,
             kGraphicsPSO,
+            kBottomAS,
+            kTopAS
         };
 
         struct ClearValue

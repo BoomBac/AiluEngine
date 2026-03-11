@@ -1,5 +1,5 @@
 guid: a40c454a-c967-4810-88c9-651706104062
-type: kScene
+type: Ailu::SceneManagement::Scene
 name: default_scene
 scene_register:
 Entity:1
@@ -70,7 +70,7 @@ Entity:4
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:0.000000000,-24.367187500,-3.650000095
+                _position:-13.749519348,-35.442382812,-50.537269592
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:163.044464111,1.000000000,163.044464111
         _static_mesh_component:
@@ -169,13 +169,13 @@ Entity:8
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:2.719373226,-3.329529047,-4.919124603
+                _position:2.719372988,-3.346129894,-4.919125080
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:0.999885678,0.999972641,0.999899328
+                _scale:0.999885976,0.999972999,0.999899030
         _light_component:
             _type:kArea
             _light:
-                _light_color:1,1,1,0.935
+                _light_color:1,1,1,8.29181
                 _light_param:15,2,2,0
                 _is_two_side:1
             _shadow:
@@ -223,8 +223,8 @@ _layer_mask:1
         _transform_component:
             _transform:
                 _position:2.635401011,-5.781130791,-10.013072968
-                _rotation:-0.000000037,0.000000068,-0.000000000,1.000000000
-                _scale:3.724302053,2.646023512,0.101077698
+                _rotation:-0.000000035,0.000000068,0.000000000,1.000000000
+                _scale:3.724302053,2.646023989,0.101078004
         _static_mesh_component:
             _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
             _material_num:1
@@ -249,9 +249,9 @@ Entity:11
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:4.173592091,-6.366880417,-3.117548227
-                _rotation:-0.000012346,0.508040249,0.000134285,0.861333311
-                _scale:0.639600813,1.905314326,0.639605641
+                _position:4.173592091,-6.366879940,-3.117547989
+                _rotation:-0.000012350,0.508040249,0.000134289,0.861333311
+                _scale:0.639600992,1.905313969,0.639605999
         _static_mesh_component:
             _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
             _material_num:1
@@ -276,11 +276,11 @@ Entity:12
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:-20.637634277,-21.727737427,-1.892302990
-                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:2.369344950,2.369282007,2.369344950
+                _position:-11.453358650,-3.451858044,-3.645704985
+                _rotation:0.040117569,0.000000068,0.000000006,0.999194980
+                _scale:1.091115952,1.091053009,1.091115952
         _static_mesh_component:
-            _p_mesh:2ff30e48-6661-479b-a90c-863e606734f6
+            _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
             _material_num:1
             _p_mats[0]:58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5
         _hierarchy_component:
@@ -327,9 +327,9 @@ Entity:14
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:-0.913319349,-5.712336063,-5.156910896
+                _position:-0.913318992,-5.712336063,-5.156910896
                 _rotation:-0.000000000,0.707228780,-0.000000000,0.706984758
-                _scale:4.795448303,2.646114349,0.101081021
+                _scale:4.795447826,2.646114111,0.101080999
         _static_mesh_component:
             _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
             _material_num:1
@@ -381,9 +381,9 @@ Entity:16
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:2.607530117,-3.128616333,-5.259710312
-                _rotation:-0.707107127,0.000000195,-0.000000100,0.707106411
-                _scale:3.723622561,5.206820011,0.101056159
+                _position:2.773056984,-3.128616095,-5.259709835
+                _rotation:-0.707107127,0.000000196,-0.000000100,0.707106411
+                _scale:3.723623037,5.206820011,0.101056002
         _static_mesh_component:
             _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
             _material_num:1
@@ -408,9 +408,9 @@ Entity:17
 _layer_mask:1
         _transform_component:
             _transform:
-                _position:2.618528843,-8.374788284,-4.761664391
-                _rotation:0.707818627,-0.005775543,-0.003821882,0.706360221
-                _scale:3.724031925,5.207654476,0.101069197
+                _position:2.618529081,-8.374788284,-4.761663914
+                _rotation:0.707818627,-0.005775545,-0.003821885,0.706360221
+                _scale:3.724031925,5.207653999,0.101069003
         _static_mesh_component:
             _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
             _material_num:1
@@ -429,3 +429,23 @@ _layer_mask:1
             _is_trigger:1
             _center:0.00,0.00,0.00
             _param:1.00,1.00,1.00
+Entity:18
+        _tag_component:
+            _name:new_object_18
+_layer_mask:0
+        _transform_component:
+            _transform:
+                _position:1.834542036,-1.794940948,-4.035486221
+                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
+                _scale:1.128424048,1.128424048,1.128424048
+        _static_mesh_component:
+            _p_mesh:7baa598b-7eb4-478d-91ae-bf758da25d3b
+            _material_num:1
+            _p_mats[0]:bbc9ad8e-1533-47f1-ac06-886158e971a9
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0

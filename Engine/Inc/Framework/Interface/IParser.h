@@ -56,6 +56,7 @@ namespace Ailu
         //virtual void operator delete[](void* ptr) = 0;)
     };
 
+    //默认纹理导入设置：sRGB(伽马空间)，生成mipmap，不可读
     struct AILU_API TextureImportSetting : public ImportSetting
     {
     public:
@@ -64,9 +65,9 @@ namespace Ailu
             static TextureImportSetting s_default;
             return s_default;
         }
-        bool _is_srgb = false;
+        bool _is_sRGB = true;
         bool _generate_mipmap = true;
-        bool _is_readble = true;
+        bool _is_readable = false;
     };
     struct AILU_API MeshImportSetting : public ImportSetting
     {

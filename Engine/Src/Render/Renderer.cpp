@@ -442,6 +442,7 @@ namespace Ailu::Render
                     obj_cb->_MatrixWorld = t._world_matrix;
                     obj_cb->_MatrixInvWorld = world_to_local;
                     obj_cb->_ObjectID = (i32) entity;
+                    obj_cb->_SubmeshID = i;
                     obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == ECS::EMotionVectorType::kPerObject? 1.0f : 0.0f; //dynamic object
                     obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == ECS::EMotionVectorType::kForceZero? 1.0f : 0.0f; //force off
                     s_instance_data[obj_index]._local_to_world = t._world_matrix;
@@ -696,7 +697,7 @@ namespace Ailu::Render
         cam_cb_data->_CameraPos = cam.Position();
         cam_cb_data->_MatrixV = cam.GetView();
         cam_cb_data->_MatrixP = cam.GetProj();
-        cam_cb_data->_MatrixVP = cam_cb_data->_MatrixV * cam_cb_data->_MatrixP;
+        cam_cb_data->_MatrixVP = cam.GetViewProj();
         cam_cb_data->_MatrixVP_NoJitter = cam.GetViewProj();
         cam_cb_data->_MatrixIVP = MatrixInverse(cam_cb_data->_MatrixVP);
         auto prev_cam_cb_data = ConstantBuffer::As<CBufferPerCameraData>(_prev_fs->GetCameraCB(_active_camera_hash));
@@ -729,7 +730,7 @@ namespace Ailu::Render
             prop = std_mat->MainProperty(ETextureUsage::kMetallic);
             dst._metallic          = prop.GetValue<f32>();
             prop = std_mat->MainProperty(ETextureUsage::kRoughness);
-            dst._roughness         = prop.GetValue<f32>();
+            dst._roughness         = std::max(0.03f,prop.GetValue<f32>());
             if (auto normal_tex = std_mat->MainTex(ETextureUsage::kNormal); normal_tex)
             {
                 dst._normal_tex = normal_tex->GetBindlessSRVIndex();
@@ -740,6 +741,8 @@ namespace Ailu::Render
             }
             prop = std_mat->MainProperty(ETextureUsage::kEmission);
             dst._emission          = prop.GetValue<Color>().xyz;
+            dst._ior = std_mat->GetFloat("_IOR");
+            dst._transmission = std_mat->GetFloat("_Transmission");
         }
         //dst._base_color        = Vector3f::kOne;
         //dst._metallic          = src.metallic;

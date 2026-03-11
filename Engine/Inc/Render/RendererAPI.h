@@ -2,8 +2,7 @@
 #ifndef __RENDERER_API_H__
 #define __RENDERER_API_H__
 
-#include "Buffer.h"
-#include "Framework/Math/ALMath.hpp"
+#include "GlobalMarco.h"
 namespace Ailu::Render
 {
 	class RendererAPI

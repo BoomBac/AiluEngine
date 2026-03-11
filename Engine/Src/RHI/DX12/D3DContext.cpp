@@ -30,11 +30,20 @@
 #include <d3d11.h>
 #include <d3d12sdklayers.h>
 
+#include "RHI/DX12/RayTracing/D3DRayTracingGeometry.h"
+#include "RHI/DX12/RayTracing/D3DRayTracingScene.h"
+
 #ifdef _PIX_DEBUG
+#define USE_PIX 1
 #include "Ext/pix/Include/WinPixEventRuntime/pix3.h"
 #include "Ext/renderdoc_app.h"//1.35
 #endif                        // _PIX_DEBUG
 #include <Render/ImGuiRenderer.h>
+
+#include "RHI/DX12/DXRSample.h"
+
+
+#define D3D_DEBUG_LAYER 0
 
 using namespace Ailu::Render;
 
@@ -120,7 +129,7 @@ namespace Ailu::RHI::DX12
                     if (shader->PreProcessShader())
                     {
                         bool is_all_succeed = true;
-                        is_all_succeed = shader->Compile();//暂时重编所有变体，避免材质切换变体后使用的是旧的shader
+                        is_all_succeed = shader->Compile(false);//暂时重编所有变体，避免材质切换变体后使用的是旧的shader
                         for (auto &mat: shader->GetAllReferencedMaterials())
                         {
                             mat->ConstructKeywords(shader);
@@ -141,7 +150,7 @@ namespace Ailu::RHI::DX12
                     if (shader->Preprocess())
                     {
                         shader->_is_compiling.store(true);// shader Compile()也会设置这个值，这里设置一下防止读取该值时还没执行compile
-                        shader->Compile();
+                        shader->Compile(false);
                         compiled_compute_shader_num++;
                     }
                 }
@@ -262,6 +271,16 @@ namespace Ailu::RHI::DX12
     static RENDERDOC_API_1_1_2 *g_rdc_api = nullptr;
 
 #endif// _PIX_DEBUG
+
+    static inline bool IsDirectXRaytracingSupported(IDXGIAdapter4* adapter)
+    {
+        ComPtr<ID3D12Device> testDevice;
+        D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
+
+        return SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice)))
+            && SUCCEEDED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData)))
+            && featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+    }
 
     static void RdcLoadLatestRdcGpuCapturerLibrary()
     {
@@ -532,7 +551,8 @@ namespace Ailu::RHI::DX12
         }
     };
 
-
+    //todo 删除
+    static Scope<DXRSample> g_dxrsample = nullptr;
 
     D3DContext::D3DContext()
     {
@@ -685,11 +705,17 @@ namespace Ailu::RHI::DX12
         }
     }
 
+    bool D3DContext::IsHardwareRayTracingSupported() const
+    {
+        AL_ASSERT(_p_adapter != nullptr);
+        return IsDirectXRaytracingSupported(_p_adapter.Get());
+    }
+
     void D3DContext::LoadPipeline()
     {
         UINT dxgiFactoryFlags = 0;
 
-#if defined(_DEBUG)
+#if D3D_DEBUG_LAYER
         // Enable the debug layer (requires the Graphics Tools "optional feature").
         // NOTE: Enabling the debug layer after device creation will invalidate the active device.
         {
@@ -724,6 +750,8 @@ namespace Ailu::RHI::DX12
         ThrowIfFailed(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&factory)));
         GetHardwareAdapter(factory.Get(), _p_adapter.GetAddressOf(), &_local_video_memory_info, &_non_local_video_memory_info);
         ThrowIfFailed(D3D12CreateDevice(_p_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device)));
+        _is_hardware_ray_tracing_supported = IsDirectXRaytracingSupported(_p_adapter.Get());
+        LOG_INFO(" DirectX Raytracing Supported: {}", _is_hardware_ray_tracing_supported? "Yes" : "No");
 
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
@@ -877,7 +905,7 @@ namespace Ailu::RHI::DX12
     {
         UINT dxgiFactoryFlags = 0;
 
-#if defined(_DEBUG)
+#if D3D_DEBUG_LAYER
         // Enable the debug layer (requires the Graphics Tools "optional feature").
         // NOTE: Enabling the debug layer after device creation will invalidate the active device.
         {
@@ -985,6 +1013,10 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::PresentImpl(D3DCommandBuffer *cmd)
     {
+        if (_is_hardware_ray_tracing_supported && g_dxrsample == nullptr)
+        {
+            g_dxrsample = MakeScope<DXRSample>(m_device.Get(), m_commandQueue.Get());
+        }
         static TimeMgr s_timer;
         CPUProfileBlock b("Reslove");
 #ifdef DEAR_IMGUI
@@ -994,6 +1026,22 @@ namespace Ailu::RHI::DX12
         //dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
         ImGuiRenderer::Get().Render(cmd);
 #endif// DEAR_IMGUI
+
+        if (_is_hardware_ray_tracing_supported)
+        {
+            g_dxrsample->Render(cmd,_render_windows[0]->_width,_render_windows[0]->_height);
+            
+            if (auto output = g_dxrsample->Output(); output != nullptr)
+            {
+                _render_windows[0]->_swapchain->StateTranslation(cmd, EResourceState::kCopyDest, kTotalSubRes);
+                output->StateTranslation(cmd, EResourceState::kCopySource,kTotalSubRes);
+                ID3D12Resource* src = static_cast<D3DTexture2D*>(output)->NativeResource().As<ID3D12Resource>();
+                ID3D12Resource* dst = _render_windows[0]->_swapchain->NativeResource().As<ID3D12Resource>();
+                dxcmd->CopyResource(dst,src);
+                _render_windows[0]->_swapchain->StateTranslation(cmd, EResourceState::kRenderTarget, kTotalSubRes);
+                output->StateTranslation(cmd, EResourceState::kUnorderedAccess,kTotalSubRes);
+            }
+        }
         // Present the frame.
         for (auto &ctx: _render_windows)
         {
@@ -1258,7 +1306,7 @@ namespace Ailu::RHI::DX12
             auto d3dcmd = static_cast<D3DCommandBuffer *>(cmd.get());
             auto dxcmd = d3dcmd->NativeCmdList();
             res->StateTranslation(cmd.get(), EResourceState::kCopySource, UINT32_MAX);
-            dxcmd->CopyResource(copy_dst.Get(), reinterpret_cast<ID3D12Resource *>(res->NativeResource()));
+            dxcmd->CopyResource(copy_dst.Get(), res->NativeResource().As<ID3D12Resource>());
             //_state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             ExecuteRHICommandBuffer(cmd.get());
             u64 cmd_fence_value = d3dcmd->_fence_value;
@@ -1347,7 +1395,7 @@ namespace Ailu::RHI::DX12
             auto cmd = RHICommandBufferPool::Get("Readback");
             auto dxcmd = static_cast<D3DCommandBuffer *>(cmd.get())->NativeCmdList();
             res->StateTranslation(cmd.get(), EResourceState::kCopySource, UINT32_MAX);
-            dxcmd->CopyResource(copy_dst.Get(), reinterpret_cast<ID3D12Resource *>(res->NativeResource()));
+            dxcmd->CopyResource(copy_dst.Get(), res->NativeResource().As<ID3D12Resource>());
             //_state_guard.MakesureResourceState(dxcmd, _p_d3d_res.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             ExecuteRHICommandBuffer(cmd.get());
             u64 cmd_fence_value = static_cast<D3DCommandBuffer *>(cmd.get())->_fence_value;
@@ -1376,6 +1424,10 @@ namespace Ailu::RHI::DX12
         CreateResource(res, nullptr);
     }
 
+    void D3DContext::CreateResourceSync(GpuResource *res)
+    {
+        CreateResourceSync(res, nullptr);
+    }
 
     void D3DContext::CreateResource(GpuResource *res, UploadParams *params)
     {
@@ -1383,6 +1435,8 @@ namespace Ailu::RHI::DX12
         {
             res->Upload(this, nullptr, params);
             DESTORY_PTR(params);
+            //不需要cmd参与的资源直接将其create fence置为0，否则在实际构建之后进行
+            ResourceStateTracker::Get().AddResource(res, 0u);
         }
         else
         {
@@ -1394,9 +1448,24 @@ namespace Ailu::RHI::DX12
         }
     }
 
+    void D3DContext::CreateResourceSync(GpuResource *res, UploadParams *params)
+    {
+        if (res->GetResourceType() == EGpuResType::kGraphicsPSO || res->GetResourceType() == EGpuResType::kRenderTexture)
+        {
+            res->Upload(this, nullptr, params);
+            DESTORY_PTR(params);
+            ResourceStateTracker::Get().AddResource(res, 0u);
+            return;
+        }
+
+        auto cmd = CommandPool::Get().Alloc<CommandGpuResourceUpload>();
+        cmd->_res = res;
+        cmd->_params = params;
+        SubmitGpuCommandSync(cmd);
+    }
+
     void D3DContext::ProcessGpuCommand(GfxCommand *cmd, RHICommandBuffer *cmd_buffer)
     {
-        CPUProfileBlock _CPU(cmd->GetName());
         D3DCommandBuffer *d3dcmd = static_cast<D3DCommandBuffer *>(cmd_buffer);
         auto dxcmd = d3dcmd->NativeCmdList();
         static std::stack<CommandProfiler *> s_begin_profiler_stack{};
@@ -1498,14 +1567,27 @@ namespace Ailu::RHI::DX12
             auto upload_cmd = static_cast<CommandGpuResourceUpload *>(cmd);
             if (ObjectRegister::Get().Alive(upload_cmd->_res))
             {
-                upload_cmd->_res->Upload(this, cmd_buffer, upload_cmd->_params);
-                upload_cmd->_res->Name(upload_cmd->_res->Name());//这里将name写入d3d resource，之前resource一直为空
+                auto res = upload_cmd->_res;
+                res->Upload(this, cmd_buffer, upload_cmd->_params);
+                res->Name(res->Name());//这里将name写入d3d resource，之前resource一直为空
+                auto res_type = res->GetResourceType();
+                //对于AS资源，upload完成后会有一个build过程，才能真正使用，所以在这里不加入状态跟踪，等build完成后再加入
+                if (res_type != EGpuResType::kBottomAS && res_type != EGpuResType::kTopAS)
+                    ResourceStateTracker::Get().AddResource(res, _fence_value+1);
             }
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kTransResourceState)
         {
             auto transf_cmd = static_cast<CommandTranslateState *>(cmd);
             transf_cmd->_res->StateTranslation(cmd_buffer, transf_cmd->_new_state, transf_cmd->_sub_res);
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kUAVBarrier)
+        {
+            auto barrier_cmd = static_cast<CommandUAVBarrier *>(cmd);
+            if (barrier_cmd->_res)
+                barrier_cmd->_res->InsertUAVBarrier(cmd_buffer);
+            else
+                cmd_buffer->InsertUAVBarrier();
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kDraw)
         {
@@ -1557,7 +1639,7 @@ namespace Ailu::RHI::DX12
                 {
                     D3DGPUBuffer *d3d_buf = static_cast<D3DGPUBuffer *>(draw_cmd->_arg_buffer);
                     dxcmd->ExecuteIndirect(is_indexed_draw ? _draw_indexed_cmd_sig.Get() : _draw_cmd_sig.Get(), 1u,
-                                           d3d_buf->GetNativeResource(), draw_cmd->_arg_offset, d3d_buf->GetCounterBuffer(), 0u);
+                                           d3d_buf->NativeResource().As<ID3D12Resource>(), draw_cmd->_arg_offset, d3d_buf->GetCounterBuffer(), 0u);
                 }
                 else
                 {
@@ -1581,7 +1663,7 @@ namespace Ailu::RHI::DX12
             auto dst_old_state = dst_d3d_buf->_state_guard.CurState();
             src_d3d_buf->_counter_state_guard.MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_SOURCE);
             dst_d3d_buf->_state_guard.MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_DEST);
-            dxcmd->CopyBufferRegion(dst_d3d_buf->GetNativeResource(), cmd_cpc->_dst_offset, src_d3d_buf->GetCounterBuffer(), 0u, sizeof(u32));
+            dxcmd->CopyBufferRegion(dst_d3d_buf->NativeResource().As<ID3D12Resource>(), cmd_cpc->_dst_offset, src_d3d_buf->GetCounterBuffer(), 0u, sizeof(u32));
             src_d3d_buf->_counter_state_guard.MakesureResourceState(dxcmd, src_old_state);
             dst_d3d_buf->_state_guard.MakesureResourceState(dxcmd, dst_old_state);
         }
@@ -1602,7 +1684,7 @@ namespace Ailu::RHI::DX12
             if (is_indirect)
             {
                 D3DGPUBuffer *d3d_buf = static_cast<D3DGPUBuffer *>(cmd_disp->_arg_buffer);
-                dxcmd->ExecuteIndirect(_dispatch_cmd_sig.Get(), 1u, d3d_buf->GetNativeResource(), cmd_disp->_arg_offset,
+                dxcmd->ExecuteIndirect(_dispatch_cmd_sig.Get(), 1u, d3d_buf->NativeResource().As<ID3D12Resource>(), cmd_disp->_arg_offset,
                                        d3d_buf->GetCounterBuffer(), 0u);
             }
             else
@@ -1676,7 +1758,7 @@ namespace Ailu::RHI::DX12
             auto copy_dst = _readback_pool->Acquire(size, _frame_count);
             D3DGPUBuffer *d3dbuffer = static_cast<D3DGPUBuffer *>(cmd_rb->_res);
             D3DResourceStateGuard *state_guard = cmd_rb->_is_counter_value ? &d3dbuffer->_counter_state_guard : &d3dbuffer->_state_guard;
-            ID3D12Resource *copy_src = cmd_rb->_is_counter_value ? d3dbuffer->GetCounterBuffer() : d3dbuffer->GetNativeResource();
+            ID3D12Resource *copy_src = cmd_rb->_is_counter_value ? d3dbuffer->GetCounterBuffer() : d3dbuffer->NativeResource().As<ID3D12Resource>();
             auto old_state = state_guard->CurState();
             state_guard->MakesureResourceState(dxcmd, D3D12_RESOURCE_STATE_COPY_SOURCE);
             dxcmd->CopyBufferRegion(copy_dst.Get(), 0u, copy_src, 0u, size);
@@ -1697,6 +1779,44 @@ namespace Ailu::RHI::DX12
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kPresent)
             PresentImpl(d3dcmd);
+        else if (cmd->GetCmdType() == EGpuCommandType::kBuildAS)
+        {
+            auto cmd_bas = static_cast<CommandBuildAS *>(cmd);
+            if (cmd_bas->_is_blas)
+            {
+                if (cmd_bas->_is_update)
+                {
+                    AL_ASSERT_MSG(false,"BLAS update is not supported yet!");
+                }
+                else
+                {
+                    auto blas = static_cast<D3DRayTracingGeometry *>(cmd_bas->_dst);
+                    auto scratch_res = blas->_scratch_buffer->NativeResource().As<ID3D12Resource>();
+                    auto blas_res = blas->_blas_buffer->NativeResource().As<ID3D12Resource>();
+                    AL_ASSERT(scratch_res != nullptr && blas_res != nullptr);
+                    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
+                    bottomLevelBuildDesc.Inputs = blas->_inputs;
+                    bottomLevelBuildDesc.ScratchAccelerationStructureData = scratch_res->GetGPUVirtualAddress();
+                    bottomLevelBuildDesc.DestAccelerationStructureData = blas_res->GetGPUVirtualAddress();
+                    d3dcmd->NativeCmdList()->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+                    ResourceStateTracker::Get().AddResource(blas, _fence_value+1);
+                    //d3dcmd->InsertUAVBarrier();
+                }
+            }
+            else
+            {
+                if (cmd_bas->_is_update)
+                {
+                    AL_ASSERT_MSG(false,"BLAS update is not supported yet!");
+                }
+                else
+                {
+                    auto tlas = static_cast<D3DRayTracingScene *>(cmd_bas->_dst);
+                    d3dcmd->NativeCmdList()->BuildRaytracingAccelerationStructure(&tlas->GetBuildDesc(), 0, nullptr);
+                    ResourceStateTracker::Get().AddResource(tlas, _fence_value+1);
+                }
+            }
+        }
         else {};
     }
     void D3DContext::SubmitGpuCommandSync(GfxCommand *cmd)

@@ -390,7 +390,7 @@ namespace Ailu
                         _target_offset.x = std::clamp(_drag_start_offset + offset_delta, -scrollable_width, 0.0f);
                     }
                 }
-                if (!Input::IsKeyPressed(EKey::kLBUTTON))
+                if (!Input::IsKeyDown(EKey::kLBUTTON))
                 {
                     _is_hover_hbar = false;
                     _is_hover_vbar = false;

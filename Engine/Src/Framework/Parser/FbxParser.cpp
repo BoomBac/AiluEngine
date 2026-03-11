@@ -253,16 +253,16 @@ namespace Ailu
 
     Ailu::FbxParser::~FbxParser()
     {
-        //        try
-        //        {
-        //            fbx_manager_->Destroy();
-        //            fbx_importer_->Destroy();
-        //            fbx_ios_->Destroy();
-        //        }
-        //        catch (const std::exception& e)
-        //        {
-        //            std::cout << e.what() << std::endl;
-        //        }
+        // try
+        // {
+        //     fbx_manager_->Destroy();
+        //     fbx_importer_->Destroy();
+        //     fbx_ios_->Destroy();
+        // }
+        // catch (const std::exception& e)
+        // {
+        //     std::cout << e.what() << std::endl;
+        // }
     }
 
     void FbxParser::Parser(const WString &sys_path, const MeshImportSetting &import_setting)
@@ -359,7 +359,7 @@ namespace Ailu
         {
             FbxTextureInfo info{};
 
-            // ----------- 1️⃣ 颜色部分 -----------
+            // -----------颜色部分 -----------
             if (prop.IsValid())
             {
                 FbxDataType type = prop.GetPropertyDataType();
@@ -382,7 +382,7 @@ namespace Ailu
                 }
             }
 
-            // ----------- 2️⃣ 贴图部分 -----------
+            // -----------贴图部分 -----------
             int layeredCount = prop.GetSrcObjectCount<FbxLayeredTexture>();
             if (layeredCount > 0)
             {
@@ -417,16 +417,27 @@ namespace Ailu
             return info;
         };
         _cur_node_transform = GetNodeGlobalTransformAtTime(node);
+        bool is_multithread = false;
         Vector<std::future<bool>> rets;
         if (_import_setting._import_flag & MeshImportSetting::kImportFlagMesh)
         {
             RawMeshData mesh_data;
-            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, std::ref(mesh_data._positions), std::ref(mesh_data._bone_weights), std::ref(mesh_data._bone_indices)));
-            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, node, std::ref(mesh_data._normals)));
-            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), std::ref(mesh_data._uvs)));
-            rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, node, std::ref(_cur_skeleton)));
-            for (auto &ret: rets)
-                ret.get();
+            if (is_multithread)
+            {
+                rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, std::ref(mesh_data._positions), std::ref(mesh_data._bone_weights), std::ref(mesh_data._bone_indices)));
+                rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, node, std::ref(mesh_data._normals)));
+                rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), std::ref(mesh_data._uvs)));
+                rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, node, std::ref(_cur_skeleton)));
+                for (auto &ret: rets)
+                    ret.get();
+            }
+            else
+            {
+                ReadVertex(node, mesh_data._positions, mesh_data._bone_weights, mesh_data._bone_indices);
+                ReadNormal(node, mesh_data._normals);
+                ReadUVs(*fbx_mesh, mesh_data._uvs);
+                ParserAnimation(node, _cur_skeleton);
+            }
             GenerateIndexdMesh(&mesh_data,mesh.get());
             CalculateTangant(mesh.get());
             auto const ShininessToRoughness = [](f32 shininess)
@@ -465,7 +476,7 @@ namespace Ailu
                         {
                             FbxTextureInfo tex_info;
                             tex_info = fill_tex(prop);
-                            mat_info._emissive = tex_info.color;
+                            mat_info._emissive = Vector3f::kZero;//.color;
                         }
                         if (auto prop = mat->FindProperty(FbxSurfaceMaterial::sShininess); prop.IsValid())
                         {
@@ -1207,6 +1218,7 @@ namespace Ailu
 
     void FbxParser::ParserImpl(WString sys_path)
     {
+        TimerBlock b("FbxParser::ParserImpl:  " + ToChar(sys_path.data()));
         _cur_file_sys_path = sys_path;
         String path = ToChar(sys_path.data());
         _p_cur_fbx_scene = FbxScene::Create(fbx_manager_, "RootScene");

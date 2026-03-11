@@ -64,7 +64,7 @@ SurfaceData SurfaceData_Constructor(
 {
 	SurfaceData data;
 	data.wnormal = wnormal;
-	data.roughness = roughness;
+	data.roughness = max(roughness,1e-3);
 	data.albedo = albedo;
 	data.emssive = emssive;
 	data.metallic = metallic;

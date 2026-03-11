@@ -11,6 +11,22 @@ using namespace Ailu::Render;
 
 namespace Ailu::RHI::DX12
 {
+    namespace
+    {
+        inline String DebugTextureName(const char* prefix, const String& name)
+        {
+            return name.empty() ? std::format("{}_unnamed", prefix) : std::format("{}_{}", prefix, name);
+        }
+
+        inline void NameAndLogTextureResource(ID3D12Resource* resource, const String& name)
+        {
+            if (resource == nullptr)
+                return;
+            SetName(resource, ToWChar(name).c_str());
+            LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
+        }
+    }
+
     static DXGI_FORMAT GetCompatibleSRVFormat(DXGI_FORMAT dx_format)
     {
         if (dx_format == DXGI_FORMAT_D24_UNORM_S8_UINT) return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
@@ -74,6 +90,7 @@ namespace Ailu::RHI::DX12
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         D3D12_RESOURCE_STATES init_state = is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("tex2d", _name));
         _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
         if (is_data_filed)
         {
@@ -84,6 +101,7 @@ namespace Ailu::RHI::DX12
             auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
             ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
                                                             nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
+            NameAndLogTextureResource(pTextureUpload.Get(), DebugTextureName("tex2d_upload", _name));
             Vector<D3D12_SUBRESOURCE_DATA> subres_datas = {};
             for (size_t i = 0; i < _mipmap_count; i++)
             {
@@ -127,7 +145,6 @@ namespace Ailu::RHI::DX12
             _bindless_uav_index = desc_mgr.AllocBindlessUAVIndex();
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, desc_mgr.GetBindlessUAVCpuHandle(_bindless_uav_index));
         }
-        _p_d3dres->SetName(ToWChar(_name).c_str());
         _is_ready_for_rendering = true;
         Texture2D::CreateView();
     }
@@ -148,6 +165,12 @@ namespace Ailu::RHI::DX12
             D3DDescriptorMgr::Get().ReleaseBindlessUAVIndex(_bindless_uav_index);
             _bindless_uav_index = -1;
         }
+    }
+
+    void D3DTexture2D::StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res)
+    {
+        auto d3dcmd = static_cast<D3DCommandBuffer *>(rhi_cmd);
+        _state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res);
     }
 
     void D3DTexture2D::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams &params)
@@ -234,6 +257,11 @@ namespace Ailu::RHI::DX12
         if (_p_d3dres) _p_d3dres->SetName(ToWChar(new_name).c_str());
     }
 
+    void D3DTexture2D::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    {
+        _state_guard.InsertTrackedUAVBarrier(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
+    }
+
     void D3DTexture2D::GenerateMipmap()
     {
         auto mipmap_gen = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/cs_mipmap_gen.alasset");
@@ -318,12 +346,14 @@ namespace Ailu::RHI::DX12
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         auto init_state = _is_random_access ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_COPY_DEST;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("cubemap", _name));
         const u32 subresourceCount = textureDesc.DepthOrArraySize * textureDesc.MipLevels;
         const UINT64 uploadBufferSize = GetRequiredIntermediateSize(_p_d3dres.Get(), 0, subresourceCount);
         heap_prop.Type = D3D12_HEAP_TYPE_UPLOAD;
         auto upload_buf_desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &upload_buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
                                                         nullptr, IID_PPV_ARGS(pTextureUpload.GetAddressOf())));
+        NameAndLogTextureResource(pTextureUpload.Get(), DebugTextureName("cubemap_upload", _name));
         Vector<D3D12_SUBRESOURCE_DATA> cubemap_datas;
         for (int j = 0; j < 6; ++j)
         {
@@ -367,7 +397,6 @@ namespace Ailu::RHI::DX12
             if (_is_random_access) CreateView(ETextureViewType::kUAV, (ECubemapFace::ECubemapFace) face, 0);
             else CreateView(ETextureViewType::kSRV, (ECubemapFace::ECubemapFace) face, 0);
         }
-        _p_d3dres->SetName(ToWChar(_name).c_str());
         CubeMap::CreateView();
     }
 
@@ -453,6 +482,11 @@ namespace Ailu::RHI::DX12
             else { AL_ASSERT(false); }
         }
     }
+
+    void D3DCubeMap::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    {
+        _state_guard.InsertTrackedUAVBarrier(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
+    }
 #pragma endregion
     //----------------------------------------------------------------------------D3DCubeMap-----------------------------------------------------------------------------
 
@@ -507,6 +541,7 @@ namespace Ailu::RHI::DX12
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         auto init_state = is_data_filed ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_COMMON;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &textureDesc, init_state, nullptr, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("tex3d", _name));
         _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,textureDesc)));
         if (is_data_filed)
         {
@@ -519,13 +554,14 @@ namespace Ailu::RHI::DX12
 
             CD3DX12_RESOURCE_DESC uploadBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
 
-            if (FAILED(p_device->CreateCommittedResource(
+            ThrowIfFailed(p_device->CreateCommittedResource(
                 &heap_prop,
                 D3D12_HEAP_FLAG_NONE,
                 &uploadBufferDesc,
                 D3D12_RESOURCE_STATE_GENERIC_READ,
                 nullptr,
-                IID_PPV_ARGS(&uploadBuffer)))) { throw std::runtime_error("Failed to create upload buffer"); }
+                IID_PPV_ARGS(&uploadBuffer)));
+            NameAndLogTextureResource(uploadBuffer.Get(), DebugTextureName("tex3d_upload", _name));
             // 3. 填充上传缓冲区并复制每个 Mipmap 级别
             UINT8 *mappedData;
             D3D12_RANGE readRange = {};// 不需要读取回数据
@@ -603,7 +639,6 @@ namespace Ailu::RHI::DX12
         }
         CreateView(ETextureViewType::kSRV, 0, UINT16_MAX);
         if (_is_random_access) CreateView(ETextureViewType::kUAV, 0, UINT16_MAX);
-        _p_d3dres->SetName(ToWChar(_name).c_str());
         _is_ready_for_rendering = true;
         Texture3D::CreateView();
     }
@@ -709,7 +744,7 @@ namespace Ailu::RHI::DX12
         _p_mipmapgen_cs0->SetTexture("_OutMip4", this, 4);
         //保证线程数和第一级输出的mipmap像素数一一对应
         cmd->Dispatch(_p_mipmapgen_cs0.get(), kernel, mip1w / thread_num_x, mip1h / thread_num_y, mip1d / thread_num_z);
-        cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_UNORDERED_ACCESS), 0);
+        cmd->InsertUAVBarrier(this);
         if (_mipmap_count > 4)
         {
             auto [mip5w, mip5h, mip5d] = CalculateMipSize(_width, _height, _depth, 5);
@@ -724,7 +759,7 @@ namespace Ailu::RHI::DX12
             _p_mipmapgen_cs1->SetTexture("_OutMip3", this, 7);
             _p_mipmapgen_cs1->SetTexture("_OutMip4", this, 8);
             cmd->Dispatch(_p_mipmapgen_cs1.get(), kernel, mip5w / thread_num_x, mip5h / thread_num_y, mip5d / thread_num_z);
-            cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_UNORDERED_ACCESS), 4);
+            cmd->InsertUAVBarrier(this);
         }
         cmd->StateTransition(this, D3DConvertUtils::ToALResState(D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE));
         GraphicsContext::Get().ExecuteCommandBuffer(cmd);
@@ -742,6 +777,11 @@ namespace Ailu::RHI::DX12
     void D3DTexture3D::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) 
     { 
         _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res); 
+    }
+
+    void D3DTexture3D::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    {
+        _state_guard.InsertTrackedUAVBarrier(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
     }
     //----------------------------------------------------------------------------D3D3DTexture-----------------------------------------------------------------------------
 #pragma endregion
@@ -764,7 +804,10 @@ namespace Ailu::RHI::DX12
 
     D3DRenderTexture::D3DRenderTexture(const TextureDesc &desc) : RenderTexture(desc) {}
 
-    D3DRenderTexture::~D3DRenderTexture() { g_pGfxContext->WaitForFence(_fence_value); }
+    D3DRenderTexture::~D3DRenderTexture() 
+    { 
+        g_pGfxContext->WaitForFence(_fence_value);
+    }
 
     void D3DRenderTexture::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
@@ -812,8 +855,8 @@ namespace Ailu::RHI::DX12
         CD3DX12_HEAP_PROPERTIES heap_prop(D3D12_HEAP_TYPE_DEFAULT);
         auto init_state = is_for_depth ? D3D12_RESOURCE_STATE_DEPTH_WRITE : D3D12_RESOURCE_STATE_RENDER_TARGET;
         ThrowIfFailed(p_device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &_tex_desc, init_state, &clear_value, IID_PPV_ARGS(_p_d3dres.GetAddressOf())));
+        NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("rt", _name));
         _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,_tex_desc)));
-        _p_d3dres->SetName(ToWChar(_name).c_str());
         u16 view_slice_count = std::max<u16>(1, _slice_num);
         _is_ready_for_rendering = true;
         //Main srv
@@ -1254,7 +1297,15 @@ namespace Ailu::RHI::DX12
         if (_p_d3dres) _p_d3dres->SetName(ToWChar(value).c_str());
     }
 
-    void D3DRenderTexture::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) { _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res); }
+    void D3DRenderTexture::InsertUAVBarrier(RHICommandBuffer *rhi_cmd)
+    {
+        _state_guard.InsertTrackedUAVBarrier(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList());
+    }
+
+    void D3DRenderTexture::StateTranslation(RHICommandBuffer *rhi_cmd, EResourceState new_state, u32 sub_res) 
+    { 
+        _state_guard.MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state), sub_res);
+    }
 
     TextureHandle D3DRenderTexture::ColorTexture(u16 view_index)
     {

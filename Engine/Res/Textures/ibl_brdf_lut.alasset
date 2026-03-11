@@ -1,4 +1,5 @@
 guid: 7b23d109-715f-4944-8669-d0ba3c40e06a
-type: kTexture2D
+type: Ailu::Render::Texture2D
 name: ibl_brdf_lut
   file: Textures/ibl_brdf_lut.dds
+  sRGB: 0

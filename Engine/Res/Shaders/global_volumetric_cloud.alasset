@@ -1,5 +1,5 @@
 guid: 13dbddd5-0785-405b-af21-435a472a3813
-type: kShader
+type: Ailu::Render::Shader
 name: global_volumetric_cloud
   file: Shaders/hlsl/global_volumetric_cloud.hlsl
   vs_entry: FullscreenVSMain

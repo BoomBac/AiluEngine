@@ -29,13 +29,14 @@ namespace Ailu::RHI::DX12
 		D3DGPUBuffer(BufferDesc desc);
 		~D3DGPUBuffer();
 		void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
+		void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
 		void Name(const String &name) final;
 		void ReadBack(u8 *dst, u32 size) final;
 		void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete);
 		void GetCounter(std::function<void(u32)> callback) final;
 		void SetCounter(u32 counter) final;
 		ID3D12Resource* GetCounterBuffer() {return _counter_buffer.Get();}
-		ID3D12Resource* GetNativeResource() {return _p_d3d_res.Get();}
+		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3d_res.Get()}; }
 	protected:
 		void OnDataChanged() final;
 	public:
@@ -44,7 +45,6 @@ namespace Ailu::RHI::DX12
 	private:
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
-		void* NativeResource() {return reinterpret_cast<void*>(_p_d3d_res.Get());};
     private:
         GPUVisibleDescriptorAllocation _uav_alloc,_srv_alloc,_counter_uav;
         ComPtr<ID3D12Resource> _p_d3d_res;
@@ -59,7 +59,9 @@ namespace Ailu::RHI::DX12
 		D3DVertexBuffer(VertexBufferLayout layout);
 		~D3DVertexBuffer();
 		void Name(const String& name) final;
-		private:
+		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _vertex_buffers.empty() ? nullptr : _vertex_buffers[0].Get()}; }
+		Render::NativeHandle NativeResource(u16 stream_idx) { return {Render::RendererAPI::ERenderAPI::kDirectX12, _vertex_buffers.empty() ? nullptr : _vertex_buffers[stream_idx].Get()}; }
+	private:
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
 	private:
@@ -75,6 +77,7 @@ namespace Ailu::RHI::DX12
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
 		void Name(const String& name) final;
         void Resize(u32 new_size) final;
+		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _index_buf.Get()}; }
 	private:
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
 	private:
@@ -88,6 +91,7 @@ namespace Ailu::RHI::DX12
 		D3DConstantBuffer(u32 size);
 		~D3DConstantBuffer() override;
         void Reset() final;
+		Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, GpuResourceManager::Get()->NativeResource(_alloc)}; }
 	private:
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
 	private:

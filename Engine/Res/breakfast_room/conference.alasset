@@ -1,5 +1,5 @@
 guid: aab1797f-d730-4302-8982-7fc075364eba
-type: kMesh
+type: Ailu::Render::Mesh
 name: conference
 file: breakfast_room/conference.fbx
 inner_file_name: conference

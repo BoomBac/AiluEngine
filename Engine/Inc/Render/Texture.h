@@ -17,6 +17,7 @@
 
 #include "Framework/Common/Asset.h"
 #include "Framework/Common/Reflect.h"
+#include "generated/Texture.gen.h"
 
 namespace Ailu
 {
@@ -439,8 +440,10 @@ namespace Ailu
         class CommandBuffer;
         using TextureHandle = size_t;
 
+        ACLASS()
         class AILU_API Texture : public GpuResource
         {
+            GENERATED_BODY()
             DECLARE_PROTECTED_PROPERTY(mipmap_count, MipmapLevel, u16)
             DECLARE_PROTECTED_PROPERTY(is_readble, Readble, bool)
             DECLARE_PROTECTED_PROPERTY(is_srgb, sRGB, bool)
@@ -520,11 +523,14 @@ namespace Ailu
             i32 _bindless_srv_index = -1, _bindless_uav_index = -1;
         };
 
+        ACLASS()
         class AILU_API Texture2D : public Texture
         {
+            GENERATED_BODY()
         public:
             static Ref<Texture2D> Create(const TextureDesc &initializer);
             static Ref<Texture2D> Create(u16 w, u16 h, ETextureFormat::ETextureFormat format, bool is_mip = false, bool is_random_access = false);
+            Texture2D() = default;
             Texture2D(const TextureDesc &initializer);
             virtual ~Texture2D();
             virtual void ReCreate(const TextureDesc &initializer);
@@ -550,11 +556,14 @@ namespace Ailu
             void Construct(const TextureDesc &initializer);
         };
 
+        ACLASS()
         class AILU_API Texture3D : public Texture
         {
+            GENERATED_BODY()
             DECLARE_PROTECTED_PROPERTY_RO(depth, Depth, u16)
         public:
             static Ref<Texture3D> Create(const TextureDesc &initializer);
+            Texture3D() = default;
             Texture3D(const TextureDesc &initializer);
             virtual ~Texture3D();
             virtual void GenerateMipmap() override;
@@ -579,10 +588,13 @@ namespace Ailu
         {
         };
 
+        ACLASS()
         class CubeMap : public Texture
         {
+            GENERATED_BODY()
         public:
             static Ref<CubeMap> Create(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
+            CubeMap() = default;
             CubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
             virtual ~CubeMap();
             Color GetPixel32(ECubemapFace::ECubemapFace face, u16 x, u16 y);
@@ -617,8 +629,10 @@ namespace Ailu
         };
         using RTHash = Math::ALHash::Hash<64>;
 
+        ACLASS()
         class AILU_API RenderTexture : public Texture
         {
+            GENERATED_BODY()
             DECLARE_PROTECTED_PROPERTY_RO(depth, Depth, u16)
         public:
             void DepthBit(const u16 &value) { _depth_bit = value; }
@@ -653,6 +667,7 @@ namespace Ailu
             //cubemap array not support mipmap
             static Ref<RenderTexture> Create(u16 width, String name = "", ERenderTargetFormat::ERenderTargetFormat format = ERenderTargetFormat::kDefault, u16 array_slice = 1, bool linear = false, bool random_access = false);
         public:
+            RenderTexture() = default;
             RenderTexture(const TextureDesc &desc);
             virtual ~RenderTexture();
             void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) override {};

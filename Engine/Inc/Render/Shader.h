@@ -10,6 +10,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include "generated/Shader.gen.h"
 
 
 namespace Ailu::Render
@@ -21,7 +22,8 @@ namespace Ailu::Render
         kGeometry,
         kHull,
         kDomain,
-        kCompute
+        kCompute,
+        kRayTracing
     };
 
     struct ShaderPropertyType
@@ -338,8 +340,10 @@ namespace Ailu::Render
         kReady
     };
 
+    ACLASS()
     class AILU_API Shader : public Object
     {
+        GENERATED_BODY()
         friend class Material;
         struct ShaderHashStruct
         {
@@ -381,15 +385,15 @@ namespace Ailu::Render
 
         //0 is normal, 4001 is compiling, 4000 is error,same with render queue id
         static u32 GetShaderState(Shader *shader, u16 pass_index, ShaderVariantHash variant_hash);
-
+        Shader() = default;
         Shader(const WString &sys_path);
         virtual ~Shader() = default;
         virtual void Bind(u16 pass_index, ShaderVariantHash variant_hash);
         //call this before compile
         virtual bool PreProcessShader();
-        virtual bool Compile(u16 pass_id, ShaderVariantHash variant_hash);
+        virtual bool Compile(u16 pass_id, ShaderVariantHash variant_hash, bool is_load_cache = true);
         //compile all pass's variants
-        virtual bool Compile();
+        virtual bool Compile(bool is_load_cache = true);
         virtual void *GetByteCode(EShaderType type, u16 pass_index, ShaderVariantHash variant_hash);
         const WString &GetMainSourceFile() { return _src_file_path; }
         void SetVertexShader(u16 pass_index, const WString &sys_path, const String &entry);
@@ -451,7 +455,7 @@ namespace Ailu::Render
         u8 _stencil_ref = 0u;
 
     protected:
-        virtual bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash);
+        virtual bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache);
 
     protected:
         WString _src_file_path;
@@ -474,8 +478,10 @@ namespace Ailu::Render
         static std::set<String> s_predefined_macros;
     };
 
+    ACLASS()
     class AILU_API ComputeShader : public Object
     {
+        GENERATED_BODY()
         struct KernelElement
         {
             static bool IsKernelKeyword(const KernelElement &ker, const String &kw)
@@ -546,6 +552,7 @@ namespace Ailu::Render
         };
     public:
         static Ref<ComputeShader> Create(const WString &sys_path);
+        ComputeShader() = default;
         ComputeShader(const WString &sys_path);
         virtual ~ComputeShader() = default;
         virtual void Bind(RHICommandBuffer *cmd, u16 kernel);
@@ -605,14 +612,14 @@ namespace Ailu::Render
         bool IsDependencyFile(const WString &sys_path) const;
         /// @brief 预处理shader，必须在compile之前调用！
         bool Preprocess();
-        bool Compile();
+        bool Compile(bool is_load_cache = true);
         ShaderVariantHash ActiveVariant(u16 kernel_index) const { return _kernels[kernel_index]._active_variant; }
         void PushState(u16 kernel = 0u);
     public:
         std::atomic<bool> _is_compiling = false;
     protected:
-        bool Compile(u16 kernel_index, ShaderVariantHash variant_hash);
-        virtual bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash);
+        bool Compile(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache = true);
+        virtual bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash, bool is_load_cache);
 
     private:
 

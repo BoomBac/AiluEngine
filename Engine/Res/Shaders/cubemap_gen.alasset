@@ -1,5 +1,5 @@
 guid: 97913004-ecc3-4cbb-b226-f8d68e5903ab
-type: kShader
+type: Ailu::Render::Shader
 name: cubemap_gen
   file: Shaders/hlsl/cubemap_gen.hlsl
   vs_entry: VSMain

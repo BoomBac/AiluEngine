@@ -341,7 +341,7 @@ namespace Ailu
         {
             Vector2f pen = {10.f, 10.f};
             f32 font_size = 14.f;
-            if (auto hover = UIManager::Get()->_hover_target)
+            if (auto hover = UIManager::Get()->_capture_target)
             {
                 const f32 line_height = _text_renderer->GetDefaultFont()->_line_height * font_size;
                 auto abs_rect = hover->GetArrangeRect();

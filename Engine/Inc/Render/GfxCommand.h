@@ -8,11 +8,15 @@
 #include "GlobalMarco.h"
 #include "GpuResource.h"
 #include "RenderConstants.h"
+#include <cstddef>
 #include <functional>
 #include <mutex>
+#include <new>
+#include <type_traits>
 
 namespace Ailu::Render
 {
+    struct RayTracingGeometryDesc;
     class RenderTexture;
     class VertexBuffer;
     class IndexBuffer;
@@ -21,7 +25,7 @@ namespace Ailu::Render
     class Material;
     class ConstantBuffer;
     class GPUBuffer;
-    enum class EGpuCommandType
+    enum class EGpuCommandType : u8
     {
         kSetTarget,
         kClearTarget,
@@ -29,24 +33,34 @@ namespace Ailu::Render
         kDispatch,
         kResourceUpload,
         kTransResourceState,
+        kUAVBarrier,
         kAllocConstBuffer,
         kCommandProfiler,
         kCopyCounter,
         kReadBack,
         kPresent,
         kScissorRect,
+        kBuildAS,
         kCustom
     };
-#define CMD_CLASS_TYPE(type)                                                        \
-    static EGpuCommandType GetStaticType() { return EGpuCommandType::type; }        \
-    virtual EGpuCommandType GetCmdType() const override { return GetStaticType(); } \
-    virtual const char *GetName() const override { return #type; }
+
+    const char *GfxCommandTypeName(EGpuCommandType type);
+
+
     struct GfxCommand
     {
-        virtual ~GfxCommand() = default;
-        virtual EGpuCommandType GetCmdType() const = 0;
-        virtual const char *GetName() const = 0;
-        virtual void Reset() = 0;
+        explicit constexpr GfxCommand(EGpuCommandType type) : _type(type) {}
+        EGpuCommandType GetCmdType() const { return _type; }
+        const char *GetName() const { return GfxCommandTypeName(_type); }
+
+        EGpuCommandType _type;
+    };
+
+    template<EGpuCommandType Type>
+    struct TypedGfxCommand : public GfxCommand
+    {
+        TypedGfxCommand() : GfxCommand(Type) {}
+        static constexpr EGpuCommandType GetStaticType() { return Type; }
     };
 
     template<typename T, typename TBase = GfxCommand>
@@ -59,9 +73,8 @@ namespace Ailu::Render
                 sizeof(T) - sizeof(TBase));
     }
 
-    struct CommandSetTarget : public GfxCommand
+    struct CommandSetTarget : public TypedGfxCommand<EGpuCommandType::kSetTarget>
     {
-        CMD_CLASS_TYPE(kSetTarget)
         Array<RenderTexture *, RenderConstants::kMaxMRTNum> _color_target;
         RenderTexture *_depth_target;
         u16 _color_target_num;
@@ -69,7 +82,7 @@ namespace Ailu::Render
         Array<Rect, RenderConstants::kMaxMRTNum> _viewports;
         u16 _depth_index;
         bool _is_scissor_rect;
-        void Reset() final 
+        void Reset()
         {
             SafeResetCommand(this);
         }
@@ -81,21 +94,19 @@ namespace Ailu::Render
         kStencil = BIT(2),
         kAll = kColor | kDepth | kStencil
     };
-    struct CommandClearTarget : public GfxCommand
+    struct CommandClearTarget : public TypedGfxCommand<EGpuCommandType::kClearTarget>
     {
-        CMD_CLASS_TYPE(kClearTarget);
         EClearFlag _flag;
         u16 _color_target_num;
         Array<Color, RenderConstants::kMaxMRTNum> _colors;
         f32 _depth;
         u8 _stencil;
-        void Reset() final {
+        void Reset() {
             SafeResetCommand(this);
         }
     };
-    struct CommandDraw : public GfxCommand
+    struct CommandDraw : public TypedGfxCommand<EGpuCommandType::kDraw>
     {
-        CMD_CLASS_TYPE(kDraw);
         struct
         {
             u8* _data;
@@ -114,14 +125,13 @@ namespace Ailu::Render
         GPUBuffer* _arg_buffer;
         u32 _arg_offset;
 
-        void Reset() final 
+        void Reset()
         {
             SafeResetCommand(this);
         }
     };
-    struct CommandDispatch : public GfxCommand
+    struct CommandDispatch : public TypedGfxCommand<EGpuCommandType::kDispatch>
     {
-        CMD_CLASS_TYPE(kDispatch);
         ComputeShader *_cs;
         u16 _kernel;
         u16 _group_num_x;
@@ -129,47 +139,83 @@ namespace Ailu::Render
         u16 _group_num_z;
         GPUBuffer* _arg_buffer;
         u16 _arg_offset;
-        void Reset() final 
+        void Reset()
         {
             SafeResetCommand(this);
         }
     };
-    struct CommandGpuResourceUpload : public GfxCommand
+    struct CommandGpuResourceUpload : public TypedGfxCommand<EGpuCommandType::kResourceUpload>
     {
-        CMD_CLASS_TYPE(kResourceUpload);
         GpuResource *_res;
         UploadParams *_params;
         ~CommandGpuResourceUpload()
         {
             DESTORY_PTR(_params);
         }
-        void Reset() final {
+        void Reset() {
             SafeResetCommand(this);
         }
     };
-    struct CommandTranslateState : public GfxCommand
+    struct CommandTranslateState : public TypedGfxCommand<EGpuCommandType::kTransResourceState>
     {
-        CMD_CLASS_TYPE(kTransResourceState);
         GpuResource *_res;
         EResourceState _new_state;
         u32 _sub_res;
         CommandTranslateState() : _res(nullptr), _new_state(EResourceState::kCommon), _sub_res(UINT32_MAX) {}
         CommandTranslateState(GpuResource *res, EResourceState new_state, u32 sub_res = UINT32_MAX) : _res(res), _new_state(new_state), _sub_res(sub_res) {}
-        void Reset() final {
+        void Reset() {
             SafeResetCommand(this);
         }
     };
-    struct CommandCustom : public GfxCommand
+    struct CommandUAVBarrier : public TypedGfxCommand<EGpuCommandType::kUAVBarrier>
     {
-        CMD_CLASS_TYPE(kCustom);
+        GpuResource *_res;
+        CommandUAVBarrier() : _res(nullptr) {}
+        explicit CommandUAVBarrier(GpuResource *res) : _res(res) {}
+        void Reset() {
+            SafeResetCommand(this);
+        }
+    };
+
+    struct CommandBuildAS : public TypedGfxCommand<EGpuCommandType::kBuildAS>
+    {
+        bool _is_update;
+        bool _is_blas;
+        // 通用
+        GpuResource* _dst;      // 目标AS
+        GpuResource* _src;      // update用（BLAS/TLAS都可能用到）
+
+        u64 _scratch_size;
+
+        // ===== BLAS =====
+        struct
+        {
+            const RayTracingGeometryDesc* _geometries;
+            u32 _geometry_count;
+        } _blas;
+
+        // ===== TLAS =====
+        struct
+        {
+            GPUBuffer* _instance_buffer;
+            u32 _instance_count;
+        } _tlas;
+
+        void Reset()
+        {
+            SafeResetCommand(this);
+        }
+    };
+
+    struct CommandCustom : public TypedGfxCommand<EGpuCommandType::kCustom>
+    {
         std::function<void()> _func;
-        void Reset() final {
+        void Reset() {
             SafeResetCommand(this);
         }
     };
-    struct CommandAllocConstBuffer : public GfxCommand
+    struct CommandAllocConstBuffer : public TypedGfxCommand<EGpuCommandType::kAllocConstBuffer>
     {
-        CMD_CLASS_TYPE(kAllocConstBuffer);
         char _name[64];
         u8 *_data;
         u32 _size;
@@ -178,20 +224,19 @@ namespace Ailu::Render
         {
             AL_FREE(_data);
         }
-        void Reset() final {
+        void Reset() {
             AL_FREE(_data);
             SafeResetCommand(this);
         }
     };
     //同时也会创建一个cpu profile
-    struct CommandProfiler : public GfxCommand
+    struct CommandProfiler : public TypedGfxCommand<EGpuCommandType::kCommandProfiler>
     {
-        CMD_CLASS_TYPE(kCommandProfiler);
         String _name;
         bool _is_start;
         u32 _cpu_index;//用于索引具体的profiler，处理begin事件时赋值，遇到end事件时，找最近的begin事件
         u32 _gpu_index;//用于索引具体的profiler，处理begin事件时赋值，遇到end事件时，找最近的begin事件
-        void Reset() final {
+        void Reset() {
             _name.clear();
             _is_start = false;
             _cpu_index = 0u;
@@ -199,50 +244,110 @@ namespace Ailu::Render
         }
     };
 
-    struct CommandCopyCounter : public GfxCommand
+    struct CommandCopyCounter : public TypedGfxCommand<EGpuCommandType::kCopyCounter>
     {
-        CMD_CLASS_TYPE(kCopyCounter);
         GPUBuffer* _src;
         GPUBuffer* _dst;
         u32 _dst_offset;
-        void Reset() final {
+        void Reset() {
             SafeResetCommand(this);
         }
     };
 
-    struct CommandPresent : public GfxCommand
+    struct CommandPresent : public TypedGfxCommand<EGpuCommandType::kPresent>
     {
-        CMD_CLASS_TYPE(kPresent);
-        void Reset() final {}
+        void Reset() {}
     };
 
-    struct CommandScissor : public GfxCommand
+    struct CommandScissor : public TypedGfxCommand<EGpuCommandType::kScissorRect>
     {
-        CMD_CLASS_TYPE(kScissorRect);
         Array<Rect, RenderConstants::kMaxMRTNum> _rects;
         u16 _num;
-        void Reset() final {
+        void Reset() {
             SafeResetCommand(this);
         }
     };
 
     using ReadbackCallback = std::function<void(const u8*,u32)>;
-    struct CommandReadBack : public GfxCommand
+    struct CommandReadBack : public TypedGfxCommand<EGpuCommandType::kReadBack>
     {
-        CMD_CLASS_TYPE(kReadBack);
         GpuResource *_res;
         bool _is_buffer;
         bool _is_counter_value;
         u32 _size;
         ReadbackCallback _callback;
-        void Reset() final 
+        void Reset()
         {
             SafeResetCommand(this);
         }
     };
 
+    constexpr size_t MaxCommandValue(size_t lhs, size_t rhs)
+    {
+        return lhs > rhs ? lhs : rhs;
+    }
+
+    inline constexpr size_t kCommandPayloadSize = MaxCommandValue(sizeof(CommandSetTarget),
+        MaxCommandValue(sizeof(CommandClearTarget),
+        MaxCommandValue(sizeof(CommandDraw),
+        MaxCommandValue(sizeof(CommandDispatch),
+        MaxCommandValue(sizeof(CommandGpuResourceUpload),
+        MaxCommandValue(sizeof(CommandTranslateState),
+        MaxCommandValue(sizeof(CommandUAVBarrier),
+        MaxCommandValue(sizeof(CommandCustom),
+        MaxCommandValue(sizeof(CommandAllocConstBuffer),
+        MaxCommandValue(sizeof(CommandProfiler),
+        MaxCommandValue(sizeof(CommandCopyCounter),
+        MaxCommandValue(sizeof(CommandPresent),
+        MaxCommandValue(sizeof(CommandScissor),
+        MaxCommandValue(sizeof(CommandReadBack), sizeof(CommandBuildAS)))))))))))))));
+
+    inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(alignof(CommandSetTarget),
+        MaxCommandValue(alignof(CommandClearTarget),
+        MaxCommandValue(alignof(CommandDraw),
+        MaxCommandValue(alignof(CommandDispatch),
+        MaxCommandValue(alignof(CommandGpuResourceUpload),
+        MaxCommandValue(alignof(CommandTranslateState),
+        MaxCommandValue(alignof(CommandUAVBarrier),
+        MaxCommandValue(alignof(CommandCustom),
+        MaxCommandValue(alignof(CommandAllocConstBuffer),
+        MaxCommandValue(alignof(CommandProfiler),
+        MaxCommandValue(alignof(CommandCopyCounter),
+        MaxCommandValue(alignof(CommandPresent),
+        MaxCommandValue(alignof(CommandScissor), 
+        MaxCommandValue(alignof(CommandReadBack), alignof(CommandBuildAS)))))))))))))));
+
+    struct alignas(kCommandPayloadAlign) CommandPayload
+    {
+        u8 _storage[kCommandPayloadSize];
+
+        void *Data() { return _storage; }
+        const void *Data() const { return _storage; }
+
+        static CommandPayload *FromCommand(GfxCommand *cmd)
+        {
+            return reinterpret_cast<CommandPayload *>(cmd);
+        }
+    };
+
+    static_assert(offsetof(CommandPayload, _storage) == 0, "Command payload storage must start at byte 0");
+
+    template<typename T>
+    inline T *ConstructCommand(CommandPayload *payload)
+    {
+        static_assert(std::is_base_of_v<GfxCommand, T>, "T must inherit from GfxCommand");
+        static_assert(sizeof(T) <= sizeof(CommandPayload), "payload block is too small for command type");
+        static_assert(alignof(T) <= alignof(CommandPayload), "payload block alignment is too small for command type");
+        return new (payload->Data()) T();
+    }
+
+    void DestroyCommand(GfxCommand *cmd);
+
+
     class CommandPool
     {
+    public:
+        inline static constexpr u32 kCommandPoolPayloadCount = 5000u;
     public:
         CommandPool() = default;
         ~CommandPool() = default;
@@ -252,133 +357,21 @@ namespace Ailu::Render
         template<typename T>
         T *Alloc()
         {
-            if constexpr (std::is_same_v<T, CommandSetTarget>)
-            {
-                return _pool_set_target.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandClearTarget>)
-            {
-                return _pool_clear_target.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandDraw>)
-            {
-                return _pool_draw.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandDispatch>)
-            {
-                return _pool_dispatch.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandGpuResourceUpload>)
-            {
-                return _pool_resource_upload.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandTranslateState>)
-            {
-                return _pool_resource_translate.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandCustom>)
-            {
-                return _pool_custom.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandAllocConstBuffer>)
-            {
-                return _pool_alloc_const_buffer.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandProfiler>)
-            {
-                return _pool_profiler.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandCopyCounter>)
-            {
-                return _pool_cp_counter.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandPresent>)
-            {
-                return _pool_present.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandReadBack>)
-            {
-                return _pool_rb.Pop().value_or(nullptr);
-            }
-            else if constexpr (std::is_same_v<T, CommandScissor>)
-            {
-                return _pool_scissor.Pop().value_or(nullptr);
-            }
-            else {}
-            return nullptr;
+            auto payload = _payload_pool.Pop().value_or(nullptr);
+            if (payload == nullptr)
+                return nullptr;
+            return ConstructCommand<T>(payload);
         }
         void DeAlloc(GfxCommand *cmd)
         {
-            cmd->Reset();
-            if (cmd->GetCmdType() == EGpuCommandType::kSetTarget)
-            {
-                _pool_set_target.Push(static_cast<CommandSetTarget*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kClearTarget)
-            {
-                _pool_clear_target.Push(static_cast<CommandClearTarget*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kDraw)
-            {
-                _pool_draw.Push(static_cast<CommandDraw*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kDispatch)
-            {
-                _pool_dispatch.Push(static_cast<CommandDispatch*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kResourceUpload)
-            {
-                _pool_resource_upload.Push(static_cast<CommandGpuResourceUpload*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kTransResourceState)
-            {
-                _pool_resource_translate.Push(static_cast<CommandTranslateState*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kCustom)
-            {
-                _pool_custom.Push(static_cast<CommandCustom*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kAllocConstBuffer)
-            {
-                _pool_alloc_const_buffer.Push(static_cast<CommandAllocConstBuffer*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kCommandProfiler)
-            {
-                _pool_profiler.Push(static_cast<CommandProfiler*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kCopyCounter)
-            {
-               _pool_cp_counter.Push(static_cast<CommandCopyCounter*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kPresent)
-            {
-                _pool_present.Push(static_cast<CommandPresent*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kReadBack)
-            {
-                _pool_rb.Push(static_cast<CommandReadBack*>(cmd));
-            }
-            else if (cmd->GetCmdType() == EGpuCommandType::kScissorRect)
-            {
-                _pool_scissor.Push(static_cast<CommandScissor *>(cmd));
-            }
-            else {}
+            if (cmd == nullptr)
+                return;
+            DestroyCommand(cmd);
+            _payload_pool.Push(CommandPayload::FromCommand(cmd));
         }
 
     private:
-        Core::LockFreeQueue<CommandSetTarget *, 256> _pool_set_target;
-        Core::LockFreeQueue<CommandClearTarget *, 128> _pool_clear_target;
-        Core::LockFreeQueue<CommandDraw *, 512> _pool_draw;
-        Core::LockFreeQueue<CommandDispatch *, 128> _pool_dispatch;
-        Core::LockFreeQueue<CommandGpuResourceUpload *, 512> _pool_resource_upload;
-        Core::LockFreeQueue<CommandTranslateState *, 64> _pool_resource_translate;
-        Core::LockFreeQueue<CommandCustom *, 256> _pool_custom;
-        Core::LockFreeQueue<CommandAllocConstBuffer *, 128> _pool_alloc_const_buffer;
-        Core::LockFreeQueue<CommandProfiler *, 512> _pool_profiler;
-        Core::LockFreeQueue<CommandPresent *, 32> _pool_present;
-        Core::LockFreeQueue<CommandCopyCounter *, 32> _pool_cp_counter;
-        Core::LockFreeQueue<CommandReadBack *, 32> _pool_rb;
-        Core::LockFreeQueue<CommandScissor *, 32> _pool_scissor;
+        Core::LockFreeQueue<CommandPayload *, kCommandPoolPayloadCount + 1u> _payload_pool;
     };
 }// namespace Ailu
 

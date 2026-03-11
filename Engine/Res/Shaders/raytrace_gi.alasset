@@ -1,5 +1,5 @@
 guid: d3075919-313e-45b5-8de1-fdf4247232dd
-type: kComputeShader
+type: Ailu::Render::ComputeShader
 name: RayTraceGI
   file: Shaders/hlsl/ray_trace/raytrace_gi.hlsl
   kernel: Noname

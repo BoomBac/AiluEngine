@@ -6,11 +6,52 @@
 #include "Render/GpuResource.h"
 #include "d3dx12.h"
 #include <mutex>
+#include <vector>
 
 namespace Ailu::RHI::DX12
 {
     struct D3DResourceStateGuard
     {
+        static String DebugObjectName(ID3D12Resource *resource)
+        {
+            if (resource == nullptr)
+                return "null";
+
+            UINT name_len = 0;
+            if (FAILED(resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &name_len, nullptr)) || name_len == 0)
+            {
+                if (FAILED(resource->GetPrivateData(WKPDID_D3DDebugObjectName, &name_len, nullptr)) || name_len == 0)
+                    return "Unnamed";
+
+                std::vector<char> name_buf(name_len);
+                if (SUCCEEDED(resource->GetPrivateData(WKPDID_D3DDebugObjectName, &name_len, name_buf.data())))
+                    return String(name_buf.data(), name_len > 0 ? name_len - 1 : 0);
+                return "Unnamed";
+            }
+
+            std::vector<wchar_t> name_buf(name_len / sizeof(wchar_t));
+            if (SUCCEEDED(resource->GetPrivateData(WKPDID_D3DDebugObjectNameW, &name_len, name_buf.data())))
+                return ToChar(WString(name_buf.data()));
+            return "Unnamed";
+        }
+
+        static void LogBarrier(ID3D12Resource *resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after, u32 sub_res)
+        {
+            LOG_WARNING("D3D12 barrier: resource={}, ptr={}, subRes={}, before=0x{:X}, after=0x{:X}",
+                        DebugObjectName(resource),
+                        static_cast<const void *>(resource),
+                        sub_res,
+                        static_cast<u32>(before),
+                        static_cast<u32>(after));
+        }
+
+        static void LogUAVBarrier(ID3D12Resource *resource)
+        {
+            LOG_WARNING("D3D12 UAV barrier: resource={}, ptr={}",
+                        DebugObjectName(resource),
+                        static_cast<const void *>(resource));
+        }
+
         static constexpr u16 kMaxSubresources = 64u;
         D3DResourceStateGuard() = default;
 
@@ -48,6 +89,18 @@ namespace Ailu::RHI::DX12
             return _cur_states[sub_res];
         }
 
+        static void InsertUAVBarrier(ID3D12GraphicsCommandList *cmd, ID3D12Resource *resource = nullptr)
+        {
+            auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(resource);
+            cmd->ResourceBarrier(1, &barrier);
+        }
+
+        void InsertTrackedUAVBarrier(ID3D12GraphicsCommandList *cmd)
+        {
+            std::unique_lock lock(_mutex);
+            InsertUAVBarrier(cmd, _resource);
+        }
+
         void MakesureResourceState(ID3D12GraphicsCommandList *cmd, D3D12_RESOURCE_STATES target_state, u32 sub_res = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
         {
             std::unique_lock lock(_mutex);
@@ -57,6 +110,7 @@ namespace Ailu::RHI::DX12
                 {
                     if (_cur_states[i] != target_state)
                     {
+                        //LogBarrier(_resource, _cur_states[i], target_state, i);
                         auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, _cur_states[i], target_state, i);
                         cmd->ResourceBarrier(1, &barrier);
                         _cur_states[i] = target_state;
@@ -68,6 +122,7 @@ namespace Ailu::RHI::DX12
                 AL_ASSERT(sub_res < kMaxSubresources);
                 if (_cur_states[sub_res] != target_state)
                 {
+                    //LogBarrier(_resource, _cur_states[sub_res], target_state, sub_res);
                     auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(_resource, _cur_states[sub_res], target_state, sub_res);
                     cmd->ResourceBarrier(1, &barrier);
                     _cur_states[sub_res] = target_state;

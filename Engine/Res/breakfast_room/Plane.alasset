@@ -1,5 +1,5 @@
 guid: beccf997-dcb3-4217-b213-42059ec71ce8
-type: kMesh
+type: Ailu::Render::Mesh
 name: Plane
 file: breakfast_room/untitled.fbx
 inner_file_name: Plane

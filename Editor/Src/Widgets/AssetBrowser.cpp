@@ -54,7 +54,7 @@ namespace Ailu
             slider->_on_value_change += [&](f32 value)
             {
                 _icon_size = value;
-                _is_dirty = true;
+                _is_icon_layout_dirty = true;
             };
             DropHandler handler;
             handler._can_drop = [](const DragPayload &payload) -> bool
@@ -95,8 +95,16 @@ namespace Ailu
             static auto s_animclip_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset");
             static auto s_skeleton_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/skeleton.alasset");
 
-            static Vector2f last_size = Vector2f::kZero;
-            Vector2f parent_size = _icon_area->GetArrangeRect().zw;
+            Vector2f parent_size = _icon_area->GetContentRect().zw;
+            if (parent_size.x <= 0.0f || parent_size.y <= 0.0f)
+                return;
+
+            if (!NearbyEqual(parent_size, _last_icon_area_size))
+            {
+                _last_icon_area_size = parent_size;
+                _is_icon_layout_dirty = true;
+            }
+
             if (_is_dirty)
             {
                 if (fs::exists(_current_path))
@@ -167,7 +175,7 @@ namespace Ailu
                         icon->Name(asset-> Name());
                         text->SetText(asset->_p_obj ? asset->_p_obj->Name() : asset->Name());
                         icon->_tint_color = tint;
-                        if (asset->_asset_type == EAssetType::kMesh)
+                        if (asset->_asset_type == StaticClass<Render::Mesh>())
                         {
                             if (asset->_p_obj)
                             {
@@ -183,15 +191,15 @@ namespace Ailu
                             else
                             icon->SetTexture(s_mesh_icon);
                         }
-                        else if (asset->_asset_type == EAssetType::kShader)
+                        else if (asset->_asset_type == StaticClass<Render::Shader>())
                         {
                             icon->SetTexture(s_shader_icon);
                         }
-                        else if (asset->_asset_type == EAssetType::kScene)
+                        else if (asset->_asset_type == StaticClass<SceneManagement::Scene>())
                         {
                             icon->SetTexture(s_scene_icon);
                         }
-                        else if (asset->_asset_type == EAssetType::kTexture2D)
+                        else if (asset->_asset_type == StaticClass<Render::Texture2D>())
                         {
                             if (asset->_p_obj == nullptr)
                             {
@@ -203,11 +211,11 @@ namespace Ailu
                                 icon->SetTexture(asset->As<Texture>());
                             }
                         }
-                        else if (asset->_asset_type == EAssetType::kMaterial)
+                        else if (asset->_asset_type == StaticClass<Render::Material>())
                             icon->SetTexture(s_material_icon);
-                        else if (asset->_asset_type == EAssetType::kAnimClip)
+                        else if (asset->_asset_type == StaticClass<AnimationClip>())
                             icon->SetTexture(s_animclip_icon);
-                        else if (asset->_asset_type == EAssetType::kSkeletonMesh)
+                        else if (asset->_asset_type == StaticClass<Render::SkeletonMesh>())
                             icon->SetTexture(s_skeleton_icon);
                         else {};
                         icon->OnMouseEnter() += [this, icon](UI::UIEvent &e)
@@ -225,21 +233,25 @@ namespace Ailu
                         };
                         icon->OnMouseDoubleClick() += [this, asset](UI::UIEvent &e)
                         {
-                            if (asset->_asset_type == EAssetType::kScene)
+                            if (asset->_asset_type == StaticClass<SceneManagement::Scene>())
                             {
                                 SceneManagement::SceneMgr::Get().OpenScene(asset->_asset_path);
                             }
-                            else if (asset->_asset_type == EAssetType::kMesh)
+                            else if (asset->_asset_type == StaticClass<Render::Mesh>())
                             {
                                 if (asset->_p_obj == nullptr)
                                 {
                                     g_pResourceMgr->Load<Mesh>(asset->_asset_path);
                                     _is_dirty = true;
+                                    // g_pResourceMgr->LoadAsync<Mesh>(asset->_asset_path,nullptr,[this](Ref<Mesh> loaded_asset)
+                                    // {
+                                    //     _is_dirty = true;
+                                    // });
                                 }
                             }
                         };
                         _icon_content->AddChild(vb);
-                        if (asset->_asset_type == EAssetType::kMesh)
+                        if (asset->_asset_type == StaticClass<Render::Mesh>())
                         {
                             icon->OnMouseDown() += [this, icon, asset](UI::UIEvent &e)
                             {
@@ -248,7 +260,7 @@ namespace Ailu
                             };
                             icon->OnMouseMove() += [this, icon, asset](UI::UIEvent &e)
                             {
-                                if (Input::IsKeyPressed(EKey::kLBUTTON))
+                                if (Input::IsKeyDown(EKey::kLBUTTON))
                                 {
                                     if (!_is_dragging)
                                     {
@@ -266,6 +278,12 @@ namespace Ailu
                         }
                     }
                 }
+                _is_icon_layout_dirty = true;
+                _is_dirty = false;
+            }
+
+            if (_is_icon_layout_dirty)
+            {
                 f32 x = 0.0f, y = 0.0f;
                 u32 num_per_row = (u32) (parent_size.x / _icon_size);
                 if (num_per_row == 0) num_per_row = 1;
@@ -284,7 +302,7 @@ namespace Ailu
                         x += _icon_size;
                     }
                 }
-                _is_dirty = false;
+                _is_icon_layout_dirty = false;
             }
         }
     }// namespace Editor

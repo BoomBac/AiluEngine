@@ -35,6 +35,7 @@ namespace Ailu
                 InvalidateLayout(); 
                 e->_transform._p_parent = nullptr;
             };
+            _is_visible = true;
         }
         UIElement::UIElement(const String &name) : UIElement()
         {

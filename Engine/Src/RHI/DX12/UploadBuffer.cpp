@@ -9,6 +9,17 @@ using namespace Ailu::Render;
 
 namespace Ailu::RHI::DX12
 {
+    namespace
+    {
+        inline void NameAndLogUploadResource(ID3D12Resource* resource, const String& name)
+        {
+            if (resource == nullptr)
+                return;
+            SetName(resource, ToWChar(name).c_str());
+            LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
+        }
+    }
+
 #pragma region UploadBuffer
     UploadBuffer::UploadBuffer(const String &name, u64 page_size) : m_PageSize(page_size)
     {
@@ -89,7 +100,7 @@ namespace Ailu::RHI::DX12
 
         m_GPUPtr = m_d3d12Resource->GetGPUVirtualAddress();
         m_d3d12Resource->Map(0, nullptr, &m_CPUPtr);
-        m_d3d12Resource->SetName(ToWChar(name).c_str());
+        NameAndLogUploadResource(m_d3d12Resource.Get(), name);
     }
     UploadBuffer::Page::~Page()
     {
@@ -152,6 +163,7 @@ namespace Ailu::RHI::DX12
         _device->CreateCommittedResource(&heap_prop, D3D12_HEAP_FLAG_NONE, &res_desc,
                                          D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
                                          IID_PPV_ARGS(resource.GetAddressOf()));
+        NameAndLogUploadResource(resource.Get(), std::format("ReadbackBuffer_{}", _buffers.size()));
         _total_used += size;
         _buffers.push_back({resource, size, current_frame});
         return resource;

@@ -9,6 +9,7 @@
 #include "Framework/Common/Utils.h"
 #include "Framework/Interface/IRuntimeModule.h"
 #include "Framework/Parser/AssetParser.h"
+#include "Objects/Type.h"
 #include "Path.h"
 #include "Render/Font.h"
 #include "Render/Material.h"
@@ -102,8 +103,11 @@ namespace Ailu
         using ResourcePoolContainer = Map<WString, Ref<Object>>;
         using ResourcePoolContainerIter = ResourcePoolContainer::iterator;
         using ResourcePoolLut = Map<u32, ResourcePoolContainer::iterator>;
+        using ResourceTypeLut = Map<const Type *, Vector<ResourcePoolContainerIter>>;
         using ResourceTask = std::function<bool()>;
         using OnResourceTaskCompleted = std::function<void(Ref<void> asset)>;
+        template<typename T>
+        using OnLoadTaskCompleted = std::function<void(Ref<T> asset)>;
         inline const static std::set<String> kLDRImageExt = {".png", ".PNG", ".tga", ".TGA", ".jpg", ".JPG", ".jpg", ".JPEG"};
         inline const static std::set<String> kHDRImageExt = {".exr", ".EXR", ".hdr", ".HDR"};
         inline const static std::set<String> kMeshExt = {".obj", ".OBJ", ".fbx", ".FBX"};
@@ -168,9 +172,9 @@ namespace Ailu
         template<typename T>
         Ref<T> Load(const Guid &guid, const ImportSetting *setting = nullptr);
         template<typename T>
-        void LoadAsync(const WString &asset_path, const ImportSetting *setting = nullptr);
+        void LoadAsync(const WString &asset_path, const ImportSetting *setting = nullptr, OnLoadTaskCompleted<T> callback = {});
         template<typename T>
-        void LoadAsync(const Guid &guid, const ImportSetting *setting = nullptr);
+        void LoadAsync(const Guid &guid, const ImportSetting *setting = nullptr, OnLoadTaskCompleted<T> callback = {});
         template<typename T>
         T *Get(const WString &res_id);
         template<typename T>
@@ -210,9 +214,90 @@ namespace Ailu
         Ref<Font> _default_font;
 
     private:
+        using Loader = std::function<Scope<Asset>(ResourceMgr *, const WString &, const ImportSetting &)>;
+
+        static Loader GetAssetLoader(const Type *type);
+        static WString GetAssetTypeName(const Type *type);
+        static const Type *FindAssetType(const WString &type_name);
+
+        static bool IsTypeCompatible(const Type *requested_type, const Type *actual_type)
+        {
+            while (actual_type != nullptr)
+            {
+                if (actual_type == requested_type)
+                    return true;
+                actual_type = actual_type->BaseType();
+            }
+            return false;
+        }
+
+        static const Type *GetObjectResourceType(Object *obj);
+
+        static bool IsAssetType(const Asset *asset, const Type *type)
+        {
+            return asset != nullptr && asset->_asset_type == type;
+        }
+
+        template<typename T>
+        static const ImportSetting *ResolveImportSetting(const ImportSetting *setting, const T *)
+        {
+            return setting ? setting : &ImportSetting::Default();
+        }
+        static const ImportSetting *ResolveImportSetting(const ImportSetting *setting, const Texture2D *)
+        {
+            return setting ? setting : &TextureImportSetting::Default();
+        }
+
+        template<typename T>
+        static ImportSetting CopyAsyncImportSetting(const ImportSetting *setting, const T *)
+        {
+            return setting ? *setting : ImportSetting::Default();
+        }
+        static TextureImportSetting CopyAsyncImportSetting(const ImportSetting *setting, const Texture2D *)
+        {
+            auto typed_setting = dynamic_cast<const TextureImportSetting *>(setting);
+            return typed_setting ? *typed_setting : TextureImportSetting::Default();
+        }
+        static MeshImportSetting CopyAsyncImportSetting(const ImportSetting *setting, const Mesh *)
+        {
+            auto typed_setting = dynamic_cast<const MeshImportSetting *>(setting);
+            return typed_setting ? *typed_setting : MeshImportSetting::Default();
+        }
+        static MeshImportSetting CopyAsyncImportSetting(const ImportSetting *setting, const SkeletonMesh *)
+        {
+            auto typed_setting = dynamic_cast<const MeshImportSetting *>(setting);
+            return typed_setting ? *typed_setting : MeshImportSetting::Default();
+        }
+        static ShaderImportSetting CopyAsyncImportSetting(const ImportSetting *setting, const Shader *)
+        {
+            auto typed_setting = dynamic_cast<const ShaderImportSetting *>(setting);
+            return typed_setting ? *typed_setting : ShaderImportSetting::Default();
+        }
+        static ShaderImportSetting CopyAsyncImportSetting(const ImportSetting *setting, const ComputeShader *)
+        {
+            auto typed_setting = dynamic_cast<const ShaderImportSetting *>(setting);
+            return typed_setting ? *typed_setting : ShaderImportSetting::Default();
+        }
+
+        template<typename T>
+        static T *GetDefaultResource(const T *)
+        {
+            return nullptr;
+        }
+        static Texture2D *GetDefaultResource(const Texture2D *)
+        {
+            return dynamic_cast<Texture2D *>(Texture::s_p_default_white);
+        }
+
+        template<typename T>
+        static Ref<T> GetDefaultResourceRef(const T *)
+        {
+            return nullptr;
+        }
+        static Ref<Texture2D> GetDefaultResourceRef(const Texture2D*);
+
         static void FormatLine(const String &line, String &key, String &value);
-        static void ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, EAssetType::EAssetType &type);
-        static EAssetType::EAssetType GetObjectAssetType(Object *obj);
+        static void ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, const Type *&type);
 
         bool IsFileOnDiskUpdated(const WString &sys_path);
         void MarkFileTimeStamp(const WString &sys_path);
@@ -272,12 +357,12 @@ namespace Ailu
 
         ResourcePoolContainer _global_resources;
         ResourcePoolLut _lut_global_resources;
-        Map<EAssetType::EAssetType, Vector<ResourcePoolContainerIter>> _lut_global_resources_by_type;
+        ResourceTypeLut _lut_global_resources_by_type;
         Vector<std::function<void()>> _asset_changed_callbacks;
         Queue<std::function<void()>> _sync_tasks;
         Queue<std::function<void()>> _async_tasks;
         Queue<Asset *> _pending_delete_assets;
-        HashMap<u64, MeshImportSetting> _mesh_importer;
+        HashMap<u64, ImportSetting*> _importers;
     };
     extern AILU_API ResourceMgr *g_pResourceMgr;
 
@@ -299,55 +384,32 @@ namespace Ailu
         AL_ASSERT(is_engine_asset);
         WString asset_name;
         Guid guid;
-        EAssetType::EAssetType type = EAssetType::kUndefined;
+        const Type *type = nullptr;
         ExtractCommonAssetInfo(asset_path, asset_name, guid, type);
-        //AL_ASSERT(type != EAssetType::kUndefined);
-        if (type == EAssetType::kUndefined)
+        if (type == nullptr)
         {
             LOG_ERROR(L"Load asset {} failed with invalid asset type after {}ms", asset_path, timer.GetElapsedSinceLastMark());
             return nullptr;
         }
-        Loader asset_loader = nullptr;
+        auto requested_type = StaticClass<T>();
+        auto asset_loader = GetAssetLoader(type);
+        if (requested_type == nullptr || !IsTypeCompatible(requested_type, type))
+        {
+            LOG_ERROR(L"Load asset {} failed with mismatched asset type {} after {}ms", asset_path, GetAssetTypeName(type), timer.GetElapsedSinceLastMark());
+            return nullptr;
+        }
+        if (asset_loader == nullptr)
+        {
+            LOG_ERROR(L"Load asset {} failed because no loader is registered for asset type {} after {}ms", asset_path, GetAssetTypeName(type), timer.GetElapsedSinceLastMark());
+            return nullptr;
+        }
         // bool is_skip_load = false;
         // if (!IsFileOnDiskUpdated(sys_path))
         // {
         //     LogMgr::Get().LogWarningFormat(L"Load asset {} succeed with everything is new after {}ms", asset_path, timer.GetElapsedSinceLastMark());
         //     return _global_resources.contains(asset_path) ? std::static_pointer_cast<T>(_global_resources[asset_path]) : nullptr;
         // }
-        ImportSetting *cur_setting = setting ? const_cast<ImportSetting *>(setting) : &ImportSetting::Default();
-        if constexpr (std::is_same<T, Texture2D>::value)
-        {
-            asset_loader = &ResourceMgr::LoadTexture;
-            cur_setting = setting? cur_setting : &TextureImportSetting::Default();
-        }
-        else if constexpr (std::is_same<T, Mesh>::value)
-        {
-            asset_loader = &ResourceMgr::LoadMesh;
-        }
-        else if constexpr (std::is_same<T, SkeletonMesh>::value)
-        {
-            asset_loader = &ResourceMgr::LoadMesh;
-        }
-        else if constexpr (std::is_same<T, Shader>::value)
-        {
-            asset_loader = &ResourceMgr::LoadShader;
-        }
-        else if constexpr (std::is_same<T, ComputeShader>::value)
-        {
-            asset_loader = &ResourceMgr::LoadComputeShader;
-        }
-        else if constexpr (std::is_same<T, Material>::value)
-        {
-            asset_loader = &ResourceMgr::LoadMaterial;
-        }
-        else if constexpr (std::is_same<T, SceneManagement::Scene>::value)
-        {
-            asset_loader = &ResourceMgr::LoadScene;
-        }
-        else if constexpr (std::is_same<T, AnimationClip>::value)
-        {
-            asset_loader = &ResourceMgr::LoadAnimClip;
-        }
+        auto cur_setting = ResolveImportSetting(setting, static_cast<const T *>(nullptr));
         if (!IsAssetLoaded(asset_path))
         {
             Scope<Asset> out_asset;
@@ -383,54 +445,54 @@ namespace Ailu
     }
 
     template<typename T>
-    inline void ResourceMgr::LoadAsync(const WString &asset_path, const ImportSetting *setting)
+    inline void ResourceMgr::LoadAsync(const WString &asset_path, const ImportSetting *setting, OnLoadTaskCompleted<T> callback)
     {
-        g_pThreadTool->Enqueue([&]()
-                               { this->Load<T>(asset_path,setting); });
+        auto execute_callback = [callback = std::move(callback)](Ref<T> asset) mutable
+        {
+            if (callback)
+                callback(std::move(asset));
+        };
+
+        auto async_setting = CopyAsyncImportSetting(setting, static_cast<const T *>(nullptr));
+        g_pThreadTool->Enqueue([this, asset_path, async_setting, callback = std::move(execute_callback)]() mutable
+                               {
+                                   auto asset = this->Load<T>(asset_path, &async_setting);
+                                   callback(std::move(asset));
+                               });
     }
     template<typename T>
-    inline void ResourceMgr::LoadAsync(const Guid &guid, const ImportSetting *setting)
+    inline void ResourceMgr::LoadAsync(const Guid &guid, const ImportSetting *setting, OnLoadTaskCompleted<T> callback)
     {
-        g_pThreadTool->Enqueue([&]()
-                               { this->Load<T>(guid,setting); });
+        auto execute_callback = [callback = std::move(callback)](Ref<T> asset) mutable
+        {
+            if (callback)
+                callback(std::move(asset));
+        };
+
+        auto async_setting = CopyAsyncImportSetting(setting, static_cast<const T *>(nullptr));
+        g_pThreadTool->Enqueue([this, guid, async_setting, callback = std::move(execute_callback)]() mutable
+                               {
+                                   auto asset = this->Load<T>(guid, &async_setting);
+                                   callback(std::move(asset));
+                               });
     }
     template<typename T>
     inline T *ResourceMgr::Get(const WString &res_id)
     {
-        if constexpr (std::is_same<T, Texture2D>::value)
+        if (_global_resources.contains(res_id))
         {
-            if (_global_resources.contains(res_id))
-                return std::static_pointer_cast<T>(_global_resources[res_id]).get();
-            else
-            {
-                return dynamic_cast<T *>(Texture::s_p_default_white);
-            }
+            return std::static_pointer_cast<T>(_global_resources[res_id]).get();
         }
-        else
-        {
-            if (_global_resources.contains(res_id))
-                return std::static_pointer_cast<T>(_global_resources[res_id]).get();
-        }
-        return nullptr;
+        return GetDefaultResource(static_cast<const T *>(nullptr));
     }
     template<typename T>
     inline Ref<T> ResourceMgr::GetRef(const WString &res_id)
     {
-        if constexpr (std::is_same<T, Texture2D>::value)
+        if (_global_resources.contains(res_id))
         {
-            if (_global_resources.contains(res_id))
-                return std::static_pointer_cast<T>(_global_resources[res_id]);
-            else
-            {
-                std::static_pointer_cast<Texture2D>(_lut_global_resources[Texture::s_p_default_white->ID()]->second);
-            }
+            return std::static_pointer_cast<T>(_global_resources[res_id]);
         }
-        else
-        {
-            if (_global_resources.contains(res_id))
-                return std::static_pointer_cast<T>(_global_resources[res_id]);
-        }
-        return nullptr;
+        return GetDefaultResourceRef(static_cast<const T *>(nullptr));
     }
     template<typename T>
     inline T *ResourceMgr::Get(const Guid &guid)
@@ -454,127 +516,23 @@ namespace Ailu
     template<typename T>
     inline u32 ResourceMgr::TotalNum() const
     {
-        if constexpr (std::is_same<T, Texture2D>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kTexture2D).size();
-        }
-        else if constexpr (std::is_same<T, Shader>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kShader).size();
-        }
-        else if constexpr (std::is_same<T, ComputeShader>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kComputeShader).size();
-        }
-        else if constexpr (std::is_same<T, Mesh>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kMesh).size();
-        }
-        else if constexpr (std::is_same<T, SkeletonMesh>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kSkeletonMesh).size();
-        }
-        else if constexpr (std::is_same<T, Material>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kMaterial).size();
-        }
-        else if constexpr (std::is_same<T, SceneManagement::Scene>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kScene).size();
-        }
-        else if constexpr (std::is_same<T, AnimationClip>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kAnimClip).size();
-        }
-        else if constexpr (std::is_same<T, Texture3D>::value)
-        {
-            return (u32)_lut_global_resources_by_type.at(EAssetType::kTexture3D).size();
-        }
-        else
-        {
-            AL_ASSERT(false);
-        }
-        return 0;
+        auto resource_type = StaticClass<T>();
+        AL_ASSERT(resource_type != nullptr);
+        return _lut_global_resources_by_type.contains(resource_type) ? (u32) _lut_global_resources_by_type.at(resource_type).size() : 0u;
     }
     template<typename T>
     inline auto ResourceMgr::ResourceBegin()
     {
-        if constexpr (std::is_same<T, Texture2D>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kTexture2D].begin();
-        }
-        else if constexpr (std::is_same<T, Shader>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kShader].begin();
-        }
-        else if constexpr (std::is_same<T, ComputeShader>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kComputeShader].begin();
-        }
-        else if constexpr (std::is_same<T, Mesh>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kMesh].begin();
-        }
-        else if constexpr (std::is_same<T, SkeletonMesh>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kSkeletonMesh].begin();
-        }
-        else if constexpr (std::is_same<T, Material>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kMaterial].begin();
-        }
-        else if constexpr (std::is_same<T, SceneManagement::Scene>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kScene].begin();
-        }
-        else if constexpr (std::is_same<T, AnimationClip>::value)
-            return _lut_global_resources_by_type.at(EAssetType::kAnimClip).begin();
-        else if constexpr (std::is_same<T, Texture3D>::value)
-            return _lut_global_resources_by_type.at(EAssetType::kTexture3D).begin();
-        else
-        {
-            AL_ASSERT(false);
-        }
+        auto resource_type = StaticClass<T>();
+        AL_ASSERT(resource_type != nullptr);
+        return _lut_global_resources_by_type[resource_type].begin();
     }
     template<typename T>
     inline auto ResourceMgr::ResourceEnd()
     {
-        if constexpr (std::is_same<T, Texture2D>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kTexture2D].end();
-        }
-        else if constexpr (std::is_same<T, Shader>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kShader].end();
-        }
-        else if constexpr (std::is_same<T, ComputeShader>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kComputeShader].end();
-        }
-        else if constexpr (std::is_same<T, Mesh>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kMesh].end();
-        }
-        else if constexpr (std::is_same<T, SkeletonMesh>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kSkeletonMesh].end();
-        }
-        else if constexpr (std::is_same<T, Material>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kMaterial].end();
-        }
-        else if constexpr (std::is_same<T, SceneManagement::Scene>::value)
-        {
-            return _lut_global_resources_by_type[EAssetType::kScene].end();
-        }
-        else if constexpr (std::is_same<T, AnimationClip>::value)
-            return _lut_global_resources_by_type.at(EAssetType::kAnimClip).end();
-        else if constexpr (std::is_same<T, Texture3D>::value)
-            return _lut_global_resources_by_type.at(EAssetType::kTexture3D).end();
-        else
-        {
-            AL_ASSERT(false);
-        }
+        auto resource_type = StaticClass<T>();
+        AL_ASSERT(resource_type != nullptr);
+        return _lut_global_resources_by_type[resource_type].end();
     }
     template<typename T>
     inline Ref<T> ResourceMgr::IterToRefPtr(const Vector<ResourcePoolContainer::iterator>::iterator &iter)

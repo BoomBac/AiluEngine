@@ -13,7 +13,7 @@ namespace Ailu
     using JobFunction = std::function<void()>;
 
     class JobSystem;
-    class Job
+    class AILU_API Job
     {
     public:
         Job() : _index(s_global_index++) {};
@@ -74,7 +74,7 @@ namespace Ailu
         Ref<std::promise<void>> _promise;
     };
 
-    struct JobHandle
+    struct AILU_API JobHandle
     {
         u32 _job_index;
         u64 _fence_value;
@@ -83,7 +83,7 @@ namespace Ailu
         bool operator<(const JobHandle &other) const { return _job_index < other._job_index; }
     };
 
-    class WaitHandle
+    class AILU_API WaitHandle
     {
     public:
         DISALLOW_COPY_AND_ASSIGN(WaitHandle)
@@ -98,6 +98,7 @@ namespace Ailu
         WaitHandle &operator=(WaitHandle &&other) noexcept
         {
             _future = std::move(other._future);
+            return *this;
         }
         //void Wait() const
         //{
@@ -112,9 +113,9 @@ namespace Ailu
         Ref<std::future<void>> _future;
     };
 
-    class JobSystem
+    class AILU_API JobSystem
     {
-        class JobPool
+        class AILU_API JobPool
         {
         public:
             explicit JobPool(u32 capacity);
@@ -128,7 +129,7 @@ namespace Ailu
             Map<Job *, u32> _job_to_index;
             std::mutex _mutex;
         };
-        class LockFreeJobQueue
+        class AILU_API LockFreeJobQueue
         {
         public:
             explicit LockFreeJobQueue(size_t capacity = 1024)

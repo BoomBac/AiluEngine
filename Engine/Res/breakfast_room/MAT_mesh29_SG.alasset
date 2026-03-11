@@ -1,5 +1,5 @@
 guid: fffd867d-f513-4aef-a344-369a461f79a8
-type: kMaterial
+type: Ailu::Render::Material
 name: MAT_mesh29_SG
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
 keywords: 

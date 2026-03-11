@@ -5,7 +5,9 @@
 #include <fstream>
 #include <iostream>
 #include <regex>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
@@ -86,40 +88,361 @@ static void ParserEnumClass(const std::string &line, AiluHeadTool::EnumInfo &inf
     }
 }
 
+static std::string Trim(std::string_view text)
+{
+    const auto begin = text.find_first_not_of(" \t\r\n");
+    if (begin == std::string_view::npos)
+    {
+        return "";
+    }
+    const auto end = text.find_last_not_of(" \t\r\n");
+    return std::string(text.substr(begin, end - begin + 1));
+}
+
+class EnumExprParser
+{
+public:
+    EnumExprParser(std::string_view expression, const std::unordered_map<std::string, uint32_t> &known_values)
+        : _expression(expression), _known_values(known_values)
+    {
+    }
+
+    std::optional<uint32_t> Parse()
+    {
+        auto value = ParseBitwiseOr();
+        SkipWhitespace();
+        if (!value.has_value() || _cursor != _expression.size())
+        {
+            return std::nullopt;
+        }
+        return static_cast<uint32_t>(*value);
+    }
+
+private:
+    std::optional<uint64_t> ParsePrimary()
+    {
+        SkipWhitespace();
+        if (_cursor >= _expression.size())
+        {
+            return std::nullopt;
+        }
+
+        if (_expression[_cursor] == '(')
+        {
+            ++_cursor;
+            auto value = ParseBitwiseOr();
+            SkipWhitespace();
+            if (!value.has_value() || _cursor >= _expression.size() || _expression[_cursor] != ')')
+            {
+                return std::nullopt;
+            }
+            ++_cursor;
+            return value;
+        }
+
+        if (std::isdigit(static_cast<unsigned char>(_expression[_cursor])))
+        {
+            return ParseNumber();
+        }
+
+        if (_expression[_cursor] == '_'
+            || std::isalpha(static_cast<unsigned char>(_expression[_cursor])))
+        {
+            return ParseIdentifier();
+        }
+
+        return std::nullopt;
+    }
+
+    std::optional<uint64_t> ParseUnary()
+    {
+        SkipWhitespace();
+        if (_cursor >= _expression.size())
+        {
+            return std::nullopt;
+        }
+
+        const char token = _expression[_cursor];
+        if (token == '+' || token == '-' || token == '~')
+        {
+            ++_cursor;
+            auto value = ParseUnary();
+            if (!value.has_value())
+            {
+                return std::nullopt;
+            }
+            if (token == '+')
+            {
+                return value;
+            }
+            if (token == '-')
+            {
+                return static_cast<uint64_t>(-static_cast<int64_t>(*value));
+            }
+            return ~(*value);
+        }
+        return ParsePrimary();
+    }
+
+    std::optional<uint64_t> ParseAdditive()
+    {
+        auto lhs = ParseUnary();
+        while (lhs.has_value())
+        {
+            SkipWhitespace();
+            if (_cursor >= _expression.size() || (_expression[_cursor] != '+' && _expression[_cursor] != '-'))
+            {
+                break;
+            }
+            const char op = _expression[_cursor++];
+            auto rhs = ParseUnary();
+            if (!rhs.has_value())
+            {
+                return std::nullopt;
+            }
+            lhs = (op == '+') ? *lhs + *rhs : *lhs - *rhs;
+        }
+        return lhs;
+    }
+
+    std::optional<uint64_t> ParseShift()
+    {
+        auto lhs = ParseAdditive();
+        while (lhs.has_value())
+        {
+            SkipWhitespace();
+            if (_cursor + 1 >= _expression.size())
+            {
+                break;
+            }
+
+            std::string_view op = _expression.substr(_cursor, 2);
+            if (op != "<<" && op != ">>")
+            {
+                break;
+            }
+            _cursor += 2;
+            auto rhs = ParseAdditive();
+            if (!rhs.has_value())
+            {
+                return std::nullopt;
+            }
+            lhs = (op == "<<") ? (*lhs << *rhs) : (*lhs >> *rhs);
+        }
+        return lhs;
+    }
+
+    std::optional<uint64_t> ParseBitwiseAnd()
+    {
+        auto lhs = ParseShift();
+        while (lhs.has_value())
+        {
+            SkipWhitespace();
+            if (_cursor >= _expression.size() || _expression[_cursor] != '&')
+            {
+                break;
+            }
+            if (_cursor + 1 < _expression.size() && _expression[_cursor + 1] == '&')
+            {
+                return std::nullopt;
+            }
+            ++_cursor;
+            auto rhs = ParseShift();
+            if (!rhs.has_value())
+            {
+                return std::nullopt;
+            }
+            lhs = *lhs & *rhs;
+        }
+        return lhs;
+    }
+
+    std::optional<uint64_t> ParseBitwiseXor()
+    {
+        auto lhs = ParseBitwiseAnd();
+        while (lhs.has_value())
+        {
+            SkipWhitespace();
+            if (_cursor >= _expression.size() || _expression[_cursor] != '^')
+            {
+                break;
+            }
+            ++_cursor;
+            auto rhs = ParseBitwiseAnd();
+            if (!rhs.has_value())
+            {
+                return std::nullopt;
+            }
+            lhs = *lhs ^ *rhs;
+        }
+        return lhs;
+    }
+
+    std::optional<uint64_t> ParseBitwiseOr()
+    {
+        auto lhs = ParseBitwiseXor();
+        while (lhs.has_value())
+        {
+            SkipWhitespace();
+            if (_cursor >= _expression.size() || _expression[_cursor] != '|')
+            {
+                break;
+            }
+            if (_cursor + 1 < _expression.size() && _expression[_cursor + 1] == '|')
+            {
+                return std::nullopt;
+            }
+            ++_cursor;
+            auto rhs = ParseBitwiseXor();
+            if (!rhs.has_value())
+            {
+                return std::nullopt;
+            }
+            lhs = *lhs | *rhs;
+        }
+        return lhs;
+    }
+
+    std::optional<uint64_t> ParseNumber()
+    {
+        const auto begin = _cursor;
+        while (_cursor < _expression.size())
+        {
+            const char ch = _expression[_cursor];
+            if (!(std::isalnum(static_cast<unsigned char>(ch)) || ch == '\'' || ch == 'x' || ch == 'X'))
+            {
+                break;
+            }
+            ++_cursor;
+        }
+
+        std::string token = std::string(_expression.substr(begin, _cursor - begin));
+        token.erase(std::remove(token.begin(), token.end(), '\''), token.end());
+        while (!token.empty())
+        {
+            const char suffix = token.back();
+            if (suffix == 'u' || suffix == 'U' || suffix == 'l' || suffix == 'L')
+            {
+                token.pop_back();
+                continue;
+            }
+            break;
+        }
+        if (token.empty())
+        {
+            return std::nullopt;
+        }
+
+        try
+        {
+            size_t consumed = 0;
+            const auto value = std::stoull(token, &consumed, 0);
+            if (consumed != token.size())
+            {
+                return std::nullopt;
+            }
+            return value;
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+    }
+
+    std::optional<uint64_t> ParseIdentifier()
+    {
+        const auto begin = _cursor;
+        while (_cursor < _expression.size())
+        {
+            const char ch = _expression[_cursor];
+            if (!(std::isalnum(static_cast<unsigned char>(ch)) || ch == '_'))
+            {
+                break;
+            }
+            ++_cursor;
+        }
+        const std::string name = std::string(_expression.substr(begin, _cursor - begin));
+        if (_known_values.contains(name))
+        {
+            return _known_values.at(name);
+        }
+        return std::nullopt;
+    }
+
+    void SkipWhitespace()
+    {
+        while (_cursor < _expression.size() && std::isspace(static_cast<unsigned char>(_expression[_cursor])))
+        {
+            ++_cursor;
+        }
+    }
+
+private:
+    std::string_view _expression;
+    const std::unordered_map<std::string, uint32_t> &_known_values;
+    size_t _cursor = 0;
+};
+
+static std::optional<uint32_t> EvaluateEnumValue(std::string_view expression, const std::unordered_map<std::string, uint32_t> &known_values)
+{
+    EnumExprParser parser(expression, known_values);
+    return parser.Parse();
+}
+
 static void ParserEnumValues(const std::string &line, AiluHeadTool::EnumInfo &info, AiluHeadTool &aht)
 {
-    // 正则表达式解释：
-    // - `(\w+)`：匹配枚举项的名称
-    // - `(?:\s*=\s*(-?\d+))?`：可选的赋值操作，如 `= 1`，支持负数
-    // - `(?:\s*,\s*)?`：可选的逗号和空格，用于分隔多个枚举项
-    std::regex pattern(R"((\w+)(?:\s*=\s*(-?\d+))?(?:\s*,\s*)?)");
-    std::smatch matches;
     std::string line_no_comment = line;
-    if (auto pos = line_no_comment.find("//"); pos != std::string::npos)
+    if (const auto pos = line_no_comment.find("//"); pos != std::string::npos)
     {
         line_no_comment = line_no_comment.substr(0, pos);
     }
 
-    auto begin = line_no_comment.cbegin();
-    auto end = line_no_comment.cend();
-    int parser_num = 0;
-    // 逐个解析枚举项
-    while (std::regex_search(begin, end, matches, pattern))
+    line_no_comment = Trim(line_no_comment);
+    if (line_no_comment.empty())
     {
-        std::pair<std::string, uint32_t> value;
-        auto &[name, id] = value;
-        name = matches[1].str();// 获取枚举项名称
-
-        if (matches[2].matched)
-        {
-            id = std::stoi(matches[2].str());// 解析赋值
-        }
-        else { id = (uint32_t) info._members.size(); }
-        info._members.emplace_back(value);
-        begin = matches.suffix().first;
-        ++parser_num;
+        return;
     }
-    if (parser_num == 0) { aht.Log(std::format("ParserEnumValues failed with line: {}", line)); }
+    if (line_no_comment.back() == ',')
+    {
+        line_no_comment.pop_back();
+        line_no_comment = Trim(line_no_comment);
+    }
+    if (line_no_comment.empty())
+    {
+        return;
+    }
+
+    static const std::regex pattern(R"(^([A-Za-z_]\w*)(?:\s*=\s*(.+))?$)");
+    std::smatch matches;
+    if (!std::regex_match(line_no_comment, matches, pattern))
+    {
+        aht.Log(std::format("ParserEnumValues failed with line: {}", line));
+        return;
+    }
+
+    const std::string name = matches[1].str();
+    uint32_t value = info._members.empty() ? 0u : (std::get<1>(info._members.back()) + 1u);
+
+    if (matches[2].matched)
+    {
+        std::unordered_map<std::string, uint32_t> known_values;
+        known_values.reserve(info._members.size());
+        for (const auto &[member_name, member_value]: info._members)
+        {
+            known_values.emplace(member_name, member_value);
+        }
+
+        const std::string expression = Trim(matches[2].str());
+        const auto evaluated = EvaluateEnumValue(expression, known_values);
+        if (!evaluated.has_value())
+        {
+            aht.Log(std::format("ParserEnumValues failed to evaluate expression '{}' in line: {}", expression, line));
+            return;
+        }
+        value = *evaluated;
+    }
+
+    info._members.emplace_back(name, value);
 }
 
 static void ParserPropertyInfo(const std::string &line, AiluHeadTool::MemberInfo &info, AiluHeadTool &aht)

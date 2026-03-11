@@ -16,12 +16,15 @@ namespace Ailu
             RayTraceGI();
             ~RayTraceGI() = default;
             void AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data);
+            void OnPropertyChanged(const PropertyInfo& prop) override;
             //temp
-            Vector2f _debug_pos;
+            Vector2f _debug_pos = Vector2f{-1.0f,-1.0f};
             APROPERTY(Range(0,20))
             u32 _debug_hit_box = 0u;
             APROPERTY()
             bool _is_temporal_denoise = false;
+            APROPERTY()
+            bool _is_show_debug = false;
         private:
             Scope<GIPass> _gi_pass;
             Ref<ComputeShader> _gi_compute_shader;
@@ -38,7 +41,7 @@ namespace Ailu
             Vector2f _debug_pos;
             bool _is_temporal_denoise = false;
         private:
-            void MakesureTarget(const RenderingData& rendering_data);
+            bool MakesureTarget(const RenderingData& rendering_data);
         private:
             ComputeShader *_gi_compute_shader;
             u32 _kernel_ray_gen = 0u,_kernel_denoise = 0u;
@@ -49,6 +52,7 @@ namespace Ailu
             Ref<Texture2D> _gi_texture_a;
             Ref<Texture2D> _gi_texture_b;
             bool _is_cur_a = true;
+            u32 _tile_frame_counter = 0u;
         };
     }
 } // namespace Ailu

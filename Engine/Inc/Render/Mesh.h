@@ -12,6 +12,7 @@
 #include <span>
 #include <unordered_map>
 #include "Framework/Math/BVHBuilder.h"
+#include "generated/Mesh.gen.h"
 
 
 namespace Ailu
@@ -20,8 +21,10 @@ namespace Ailu
 
     namespace Render
     {
+        ACLASS()
         class AILU_API Mesh : public Object
         {
+            GENERATED_BODY()
             friend class FbxParser;
 
         public:
@@ -161,8 +164,10 @@ namespace Ailu
             u32 _triangle_count = 0u;
         };
 
+        ACLASS()
         class AILU_API SkeletonMesh : public Mesh
         {
+            GENERATED_BODY()
         public:
             inline static bool s_use_local_transf = false;
             SkeletonMesh();

@@ -26,11 +26,11 @@ namespace Ailu
                 return _slot._size;
             return Vector2f(80.0f,20.0f);
         }
-        void Button::SetText(const String &text)
+        void Button::SetText(const String &text, bool trigger_event)
         {
             if (_text == nullptr)
                 _text = AddChild<Text>(text);
-            _text->SetText(text);
+            _text->SetText(text, trigger_event);
         }
         String Button::GetText() const
         {
@@ -74,31 +74,33 @@ namespace Ailu
 #pragma region Text
         Text::Text() : UIElement("Text")
         {
-            _on_text_change += [this](const String &new_text)
-            {
-                Vector2f new_size = TextRenderer::CalculateTextSize(new_text,_font_size);
-                new_size.x += _padding._l + _padding._r;
-                new_size.y += _padding._t + _padding._b;
-                Vector2f dv = Abs(new_size - _text_size);
-                f32 tolerance = std::max(1.0f, (f32)_font_size * 0.1f);
-                if (dv.x > tolerance || dv.y > tolerance)
-                {
-                    _text_size = new_size;
-                    InvalidateLayout();
-                }
-            };
             SetText("text");
         }
         Text::Text(String text) : Text()
         {
             SetText(text);
         }
-        void Text::SetText(const String &text)
+        void Text::SetText(const String &text, bool trigger_event)
         {
             if (_text == text)
                 return;
             _text = text;
-            _on_text_change_delegate.Invoke(_text);
+            UpdateTextLayout();
+            if (trigger_event)
+                _on_text_change_delegate.Invoke(_text);
+        }
+        void Text::UpdateTextLayout()
+        {
+            Vector2f new_size = TextRenderer::CalculateTextSize(_text,_font_size);
+            new_size.x += _padding._l + _padding._r;
+            new_size.y += _padding._t + _padding._b;
+            Vector2f dv = Abs(new_size - _text_size);
+            f32 tolerance = std::max(1.0f, (f32)_font_size * 0.1f);
+            if (dv.x > tolerance || dv.y > tolerance)
+            {
+                _text_size = new_size;
+                InvalidateLayout();
+            }
         }
         void Text::RenderImpl(UIRenderer &r)
         {
@@ -154,7 +156,7 @@ namespace Ailu
         void Text::PostDeserialize()
         {
             UIElement::PostDeserialize();
-            _on_text_change_delegate.Invoke(_text);
+            UpdateTextLayout();
         }
 
         Vector2f Text::MeasureDesiredSize()
@@ -169,6 +171,7 @@ namespace Ailu
         void Text::FontSize(f32 size)
         {
             _font_size = size;
+            UpdateTextLayout();
             _on_text_change_delegate.Invoke(_text);
         }
 #pragma endregion
@@ -230,13 +233,14 @@ namespace Ailu
                 return _slot._size;
             return Vector2f(100.0f,20.0f);
         }
-        void Slider::SetValue(f32 v)
+        void Slider::SetValue(f32 v, bool trigger_event)
         {
             if (NearbyEqual(v,_value))
                 return;
             _value = v;
             Clamp(_value,_range.x,_range.y);
-            _on_value_change_delegate.Invoke(_value);
+            if (trigger_event)
+                _on_value_change_delegate.Invoke(_value);
         }
         #pragma endregion
 
@@ -349,9 +353,6 @@ namespace Ailu
 #pragma region InputBlock
         InputBlock::InputBlock(const String &content) : UIElement("InputBlock")
         {
-            _on_content_changed += [this](String content) {
-                FillCursorOffsetTable();
-            };
             _on_focus_gained += [this]()
             {
                 FillCursorOffsetTable();
@@ -542,7 +543,7 @@ namespace Ailu
             }
             if (_is_drag_adjusting)
             {
-                if (Input::IsKeyPressed(EKey::kLBUTTON))
+                if (Input::IsKeyDown(EKey::kLBUTTON))
                 {
                     f32 delta = Input::GetMousePos().x - _drag_start_x;
                     f32 new_value = _drag_start_value + delta;
@@ -564,10 +565,12 @@ namespace Ailu
             }
         }
 
-        void InputBlock::SetContent(String content)
+        void InputBlock::SetContent(String content, bool trigger_event)
         {
             _content = content;
-            _on_content_changed_delegate.Invoke(content);
+            FillCursorOffsetTable();
+            if (trigger_event)
+                _on_content_changed_delegate.Invoke(content);
         }
 
         void InputBlock::RenderImpl(UIRenderer &r)

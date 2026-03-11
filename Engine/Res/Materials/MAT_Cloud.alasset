@@ -1,5 +1,5 @@
 guid: a5ad5353-4bed-47b7-a4c2-aa26036f7ac2
-type: kMaterial
+type: Ailu::Render::Material
 name: MAT_Cloud
 shader_guid: 0cd86d2c-e28b-4816-a032-0ef7fb1843f5
 keywords: 

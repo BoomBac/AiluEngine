@@ -35,6 +35,7 @@ namespace Ailu::RHI::DX12
         u64 GetPageSize() const { return m_PageSize; }
         Allocation Allocate(size_t sizeInBytes, size_t alignment);
         void Reset();
+        Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, m_CurrentPage ? m_CurrentPage->NativeResource() : nullptr}; }
         void BindImpl(Render::RHICommandBuffer *rhi_cmd, const Render::BindParams& params) final;
 
     private:
@@ -46,6 +47,7 @@ namespace Ailu::RHI::DX12
             bool HasSpace(u64 byte_size, u64 alignment) const;
             Allocation Allocate(size_t sizeInBytes, size_t alignment);
             void Reset();
+            ID3D12Resource *NativeResource() const { return m_d3d12Resource.Get(); }
 
         private:
             ComPtr<ID3D12Resource> m_d3d12Resource;

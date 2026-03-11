@@ -25,6 +25,24 @@ namespace Ailu::Render
 		AL_ASSERT_MSG(false, "Unsupported render api!");
 		return nullptr;
 	}
+	Ref<GPUBuffer> GPUBuffer::CreateSync(BufferDesc desc, const String &name)
+	{
+		switch (Renderer::GetAPI())
+		{
+			case RendererAPI::ERenderAPI::kNone:
+				AL_ASSERT_MSG(false, "None render api used!");
+				return nullptr;
+			case RendererAPI::ERenderAPI::kDirectX12:
+			{
+				auto buf = MakeRef<RHI::DX12::D3DGPUBuffer>(desc);
+				buf->Name(name);
+				GraphicsContext::Get().CreateResourceSync(buf.get());
+				return buf;
+			}
+		}
+		AL_ASSERT_MSG(false, "Unsupported render api!");
+		return nullptr;
+	}
 
 	Ref<GPUBuffer> GPUBuffer::Create(EGPUBufferTarget target, u32 element_size, u32 element_num, const String &name)
 	{
@@ -59,7 +77,6 @@ namespace Ailu::Render
 	{
 		_buffer_layout = std::move(layout);
 		u16 stream_count = _buffer_layout.GetStreamCount();
-		_mapped_data.resize(RenderConstants::kMaxVertexAttrNum);
 		_stream_data.resize(RenderConstants::kMaxVertexAttrNum);
 		_res_type = EGpuResType::kVertexBuffer;
 	}
@@ -67,9 +84,9 @@ namespace Ailu::Render
 	{
 		if (!_is_ready_for_rendering)
 			return;
-		AL_ASSERT(stream_index < _mapped_data.size());
+		AL_ASSERT(stream_index < _stream_data.size());
 		AL_ASSERT(offset + size <= _stream_data[stream_index]._size);
-		memcpy(_mapped_data[stream_index], data + offset, size);
+		memcpy(_stream_data[stream_index]._data, data + offset, size);
 		_vertices_count = size / _buffer_layout[stream_index].Size;
 	}
 	void VertexBuffer::SetStream(u8 *data, u32 size, u8 stream_index, bool is_dynamic)
@@ -107,7 +124,7 @@ namespace Ailu::Render
 	: _data((u8*)indices),_count(count), _capacity(count), _is_dynamic(is_dynamic)
 	{
 		_mem_size = sizeof(u32) * count;
-		_res_type = EGpuResType::kIndexBUffer;
+		_res_type = EGpuResType::kIndexBuffer;
 	}
 	void IndexBuffer::SetData(u8* data,u32 size)
 	{

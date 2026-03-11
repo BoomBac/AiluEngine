@@ -21,6 +21,8 @@
 //	_RoughnessValue("Roughness",Range(0,1)) = 0
 //	_MetallicValue("Metallic",Range(0,1)) = 0
 //	_Anisotropy("Anisotropy",Range(0,1)) = 0
+//	_IOR("IOR",Range(0,3)) = 1
+//	_Transmission("_Transmission",Range(0,1)) = 0
 //}
 //info end
 

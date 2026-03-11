@@ -56,6 +56,23 @@ namespace Ailu
             ue._type = EventToUIEvent(e);
             ue._mouse_position = Input::GetMousePos(e._window);
             ue._mouse_delta = Input::GetMousePosDelta();
+            UIElement *capture_target = s_mgr->_capture_target;
+            const bool has_capture = s_mgr->_capture_target != nullptr;
+            const bool is_capture_sensitive_mouse_event = has_capture &&
+                                                         (ue._type == UI::UIEvent::EType::kMouseUp);
+            const auto is_capture_owner_widget = [capture_target](Widget *w)
+            {
+                if (!capture_target || !w || !w->Root())
+                    return false;
+                UIElement *node = capture_target;
+                while (node)
+                {
+                    if (node == w->Root())
+                        return true;
+                    node = node->GetParent();
+                }
+                return false;
+            };
             bool is_in_zone = false;
             for (const auto &zone: s_mgr->GetInteractionZones())
             {
@@ -65,6 +82,7 @@ namespace Ailu
                     break;
                 }
             }
+            Input::BlockInput(false);
             if (!is_in_zone)
             {
                 if (e.GetCategoryFlags() & EEventCategory::kEventCategoryKeyboard)
@@ -98,6 +116,11 @@ namespace Ailu
                     auto w = widget[i].get();
                     if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
                         continue;
+                    if (is_capture_sensitive_mouse_event && is_capture_owner_widget(w))
+                    {
+                        w->OnEvent(ue);
+                        break;
+                    }
                     if (w->IsHover(ue._mouse_position))//上层已经生成了事件，下次就不再响应
                     {
                         w->OnEvent(ue);
@@ -109,6 +132,20 @@ namespace Ailu
             else
             {
                 auto &widget = s_mgr->_widgets;
+                if (is_capture_sensitive_mouse_event)
+                {
+                    for (i32 i = (i32) widget.size() - 1; i >= 0; i--)
+                    {
+                        auto w = widget[i].get();
+                        if (w->_visibility != EVisibility::kVisible || w->_is_receive_event == false || w->Parent() != e._window)
+                            continue;
+                        if (is_capture_owner_widget(w))
+                        {
+                            w->OnEvent(ue);
+                            break;
+                        }
+                    }
+                }
                 for (i32 i = (i32) widget.size() - 1; i >= 0; i--)
                 {
                     auto w = widget[i].get();
@@ -120,6 +157,7 @@ namespace Ailu
                         break;
                     }
                 }
+                Input::BlockInput(cur_hover_widget != nullptr);
             }
             if (s_mgr->_pre_hover_widget)
             {

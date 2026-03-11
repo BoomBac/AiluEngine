@@ -18,7 +18,7 @@ namespace Ailu
         virtual void Serialize(Archive &arch) = 0;
         virtual void Deserialize(Archive &arch) = 0;
     };
-    class Archive
+    class AILU_API Archive
     {
     public:
         Archive(std::ostream *os) : _os(os) {};
@@ -76,7 +76,7 @@ namespace Ailu
         std::istream *_is;
         u32 _version = 0;
     };
-    struct IndentBlock
+    struct AILU_API IndentBlock
     {
         IndentBlock(Archive &arch) : _arch(arch) 
         { 
@@ -85,7 +85,7 @@ namespace Ailu
         ~IndentBlock() { _arch.DecreaseIndent(); }
         Archive& _arch;
     };
-    class TextOArchive : public Archive
+    class AILU_API TextOArchive : public Archive
     {
     public:
         TextOArchive(std::ostream *os) : Archive(os), _indentLevel(0) {}
@@ -110,7 +110,7 @@ namespace Ailu
         inline static String indents[] = {"", "    ", "        ", "            ", "                ", "                    "};
     };
 
-    class TextIArchive : public Archive
+    class AILU_API TextIArchive : public Archive
     {
     public:
         TextIArchive(std::istream *is) : Archive(is) {}

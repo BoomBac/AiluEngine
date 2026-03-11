@@ -65,11 +65,14 @@ namespace Ailu::RHI::DX12
         D3DTexture2D(const Render::TextureDesc& initializer);
         ~D3DTexture2D();
         void Release() final;
+        Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
+        void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
         //for texture2d(s)
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
         void Name(const String &new_name) final;
+        void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
         D3D12_GPU_DESCRIPTOR_HANDLE GetMainGPUSRVHandle() const { return _views.at(0)._gpu_handle; };
         void GenerateMipmap() final;
         
@@ -87,10 +90,11 @@ namespace Ailu::RHI::DX12
     public:
         D3DCubeMap(u16 width, bool mipmap_chain = true, ETextureFormat::ETextureFormat format = ETextureFormat::kRGBA32, bool linear = false, bool random_access = false);
         ~D3DCubeMap();
-        
+        Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
         void CreateView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
         TextureHandle GetView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) const final;
         void ReleaseView(ETextureViewType view_type, ECubemapFace::ECubemapFace face, u16 mipmap, u16 array_slice = 0) final;
+        void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
 
         private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
@@ -106,12 +110,14 @@ namespace Ailu::RHI::DX12
     public:
         explicit D3DTexture3D(const Render::TextureDesc &initializer);
         ~D3DTexture3D() override;
+        Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) final;
         [[nodiscard]] TextureHandle GetView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) const final;
         void ReleaseView(ETextureViewType view_type, u16 mipmap, u16 dpeth_slice) final;
         void Name(const String &new_name) final;
         void GenerateMipmap() final;
         void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
+        void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
     private:
         void UploadImpl(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params) final;
         void BindImpl(RHICommandBuffer* rhi_cmd, const BindParams& params) final;
@@ -132,6 +138,7 @@ namespace Ailu::RHI::DX12
     public:
         D3DRenderTexture(const TextureDesc &desc);
         ~D3DRenderTexture() final;
+        Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_d3dres.Get()}; }
         void StateTranslation(RHICommandBuffer* rhi_cmd,EResourceState new_state,u32 sub_res) final;
         //for texture2d(s)
         void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) final;
@@ -145,6 +152,7 @@ namespace Ailu::RHI::DX12
         TextureHandle ColorTexture(u16 view_index = kMainSRVIndex) final;
         TextureHandle DepthTexture(u16 view_index = kMainSRVIndex) final;
         void GenerateMipmap() final;
+        void InsertUAVBarrier(RHICommandBuffer* rhi_cmd) final;
         void *ReadBack(u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
         void ReadBackAsync(std::function<void(void *)> callback, u16 mipmap, u16 array_slice = 0, ECubemapFace::ECubemapFace face = ECubemapFace::kUnknown) final;
         D3D12_CPU_DESCRIPTOR_HANDLE *TargetCPUHandle(RHICommandBuffer *cmd, u16 index);

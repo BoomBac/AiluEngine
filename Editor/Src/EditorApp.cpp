@@ -4,19 +4,20 @@
 #include "Widgets/RenderView.h"
 
 #include "Framework/Common/FileManager.h"
+#include "Framework/Common/JobSystem.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Objects/Type.h"
 #include "Render/Camera.h"
 #include "Render/CommonRenderPipeline.h"
 #include "Render/Renderer.h"
 
-#include "Objects/JsonArchive.h"
 #include "Framework/Parser/TextParser.h"
+#include "Objects/JsonArchive.h"
 
-#include "UI/Widget.h"
-#include "UI/Container.h"
-#include "Common/EditorStyle.h"
 #include "Common/CameraControllers.h"
+#include "Common/EditorStyle.h"
+#include "UI/Container.h"
+#include "UI/Widget.h"
 
 using namespace Ailu;
 
@@ -49,12 +50,10 @@ namespace Ailu
 
         EditorApp::EditorApp()
         {
-
         }
 
         EditorApp::~EditorApp()
         {
-
         }
         int EditorApp::Initialize()
         {
@@ -132,7 +131,8 @@ namespace Ailu
                         }
                     }
                 } };
-            _on_file_changed += [](const fs::path &file) {
+            _on_file_changed += [](const fs::path &file)
+            {
                 for (auto it = g_pResourceMgr->ResourceBegin<ComputeShader>(); it != g_pResourceMgr->ResourceEnd<ComputeShader>(); it++)
                 {
                     const WString cur_path = PathUtils::FormatFilePath(file.wstring());
@@ -144,7 +144,8 @@ namespace Ailu
                     }
                 }
             };
-            _on_file_changed += [](const fs::path &file) {
+            _on_file_changed += [](const fs::path &file)
+            {
                 const WString cur_path = PathUtils::FormatFilePath(file.wstring());
                 WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
                 for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
@@ -160,13 +161,14 @@ namespace Ailu
                     }
                 }
             };
-            _on_file_changed += [this](const fs::path &file) {
+            _on_file_changed += [this](const fs::path &file)
+            {
                 if (auto pos = file.filename().string().find("EditorStyle"); pos == String::npos)
                     return;
                 JsonArchive ar;
                 ar.Load(file);
                 auto t = EditorStyle::StaticType();
-                for (auto& p : t->GetProperties())
+                for (auto &p: t->GetProperties())
                     p.Deserialize(&g_editor_style, ar);
             };
             return ret;
@@ -213,7 +215,7 @@ namespace Ailu
             //auto work_dir = PathUtils::ExtarctDirectory(Application::GetWorkingPath());
             JsonArchive ar;
             ar.Load(s_editor_config_path);
-            Type* type = EditorConfig::StaticType();
+            Type *type = EditorConfig::StaticType();
             for (auto &it: type->GetProperties())
                 it.Deserialize(&_editor_config, ar);
             //INIParser parser;
@@ -246,7 +248,7 @@ namespace Ailu
         void EditorApp::SaveEditorConfig()
         {
             Camera::sCurrent = _p_scene_camera;
-            _editor_config._window_size = Vector2UInt(_p_window->GetWidth(),_p_window->GetHeight());
+            _editor_config._window_size = Vector2UInt(_p_window->GetWidth(), _p_window->GetHeight());
             //_editor_config._viewport_size = Vector2UInt((u32)_p_editor_layer->_p_scene_view->Size().x, (u32)_p_editor_layer->_p_scene_view->Size().y);
             _editor_config._position = Camera::sCurrent->Position();
             _editor_config._rotation = Vector4f(Camera::sCurrent->Rotation().x, Camera::sCurrent->Rotation().y, Camera::sCurrent->Rotation().z, Camera::sCurrent->Rotation().w);
@@ -254,7 +256,7 @@ namespace Ailu
             _editor_config._aspect = Camera::sCurrent->Aspect();
             _editor_config._near = Camera::sCurrent->Near();
             _editor_config._far = Camera::sCurrent->Far();
-            _editor_config._move_speed =     _camera_controller->_base_camera_move_speed;
+            _editor_config._move_speed = _camera_controller->_base_camera_move_speed;
             _editor_config._controller_rot = _camera_controller->_rotation;
             _editor_config._scene_path = ToChar(g_pResourceMgr->GetAssetPath(SceneManagement::SceneMgr::Get().ActiveScene()));
 
@@ -274,25 +276,39 @@ namespace Ailu
         }
         void EditorApp::LoadEditorResource()
         {
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"folder.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"file.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"dark/material.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"dark/scene.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"point_light.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"directional_light.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"spot_light.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"area_light.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"camera.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"light_probe.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineIconPathW + L"dark/skeleton.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_N.alasset");
-            g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_M.alasset");
-            auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name)->Material*
+            TimerBlock t("LoadEditorResource");
+            TextureImportSetting color_tex_setting, normal_tex_setting;
+            color_tex_setting._generate_mipmap = false;
+            normal_tex_setting._is_sRGB = false;
+            auto& job_sys = JobSystem::Get();
+            Vector<WString> texture_sys_path = {
+                    EnginePath::kEngineIconPathW + L"folder.alasset",
+                    EnginePath::kEngineIconPathW + L"file.alasset",
+                    EnginePath::kEngineIconPathW + L"3d.alasset",
+                    EnginePath::kEngineIconPathW + L"shader.alasset",
+                    EnginePath::kEngineIconPathW + L"image.alasset",
+                    EnginePath::kEngineIconPathW + L"dark/material.alasset",
+                    EnginePath::kEngineIconPathW + L"dark/scene.alasset",
+                    EnginePath::kEngineIconPathW + L"point_light.alasset",
+                    EnginePath::kEngineIconPathW + L"directional_light.alasset",
+                    EnginePath::kEngineIconPathW + L"spot_light.alasset",
+                    EnginePath::kEngineIconPathW + L"area_light.alasset",
+                    EnginePath::kEngineIconPathW + L"camera.alasset",
+                    EnginePath::kEngineIconPathW + L"light_probe.alasset",
+                    EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset",
+                    EnginePath::kEngineIconPathW + L"dark/skeleton.alasset",
+                    EnginePath::kEngineTexturePathW + L"ibl_brdf_lut.alasset",
+                    EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_M.alasset"
+                };
+            for (auto &path: texture_sys_path)
+            {
+                job_sys.Dispatch([path, color_tex_setting]()
+                                          { g_pResourceMgr->Load<Texture2D>(path, &color_tex_setting); });
+            }
+            job_sys.Dispatch([normal_tex_setting]()
+                            { g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_N.alasset", &normal_tex_setting); });
+            job_sys.Wait();
+            auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name) -> Material *
             {
                 auto mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(shader_path), mat_name);
                 g_pResourceMgr->RegisterResource(mat_path, mat);
@@ -310,7 +326,7 @@ namespace Ailu
             g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"area_light.alasset");
             g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"camera.alasset");
             g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
-            mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane")->SetFloat("_grid_alpha",1.0f);
+            mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane")->SetFloat("_grid_alpha", 1.0f);
             Material::s_checker = g_pResourceMgr->Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
             WatchDirectory();
         }
@@ -321,11 +337,11 @@ namespace Ailu
             u16 _reload_tex2d_count;
             bool Empty() const
             {
-                return !(_reload_shader_count+_reload_compute_count+_reload_tex2d_count);
+                return !(_reload_shader_count + _reload_compute_count + _reload_tex2d_count);
             }
         };
 
-        static void ReloadAsset(const fs::path &file, ReloadReocrd& record)
+        static void ReloadAsset(const fs::path &file, ReloadReocrd &record)
         {
             const WString cur_path = PathUtils::FormatFilePath(file.wstring());
             WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
@@ -392,17 +408,15 @@ namespace Ailu
         void EditorApp::WatchDirectory()
         {
             namespace fs = std::filesystem;
-            static Vector<fs::path> s_watching_paths
-            {
-                ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW,
-                        ResourceMgr::EngineResRootPath() + EnginePath::kEngineTexturePathW,
-                    s_editor_root_path + L"/Res/UI/"
-            };
+            static Vector<fs::path> s_watching_paths{
+                    ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW,
+                    ResourceMgr::EngineResRootPath() + EnginePath::kEngineTexturePathW,
+                    s_editor_root_path + L"/Res/UI/"};
             static bool is_first_execute = true;
             static std::set<fs::path> path_set{};
             static std::unordered_map<fs::path, fs::file_time_type> s_cache_files_time;
             std::unordered_map<fs::path, fs::file_time_type> cur_files_time;
-            for(auto& dir : s_watching_paths)
+            for (auto &dir: s_watching_paths)
                 TraverseDirectory(dir, path_set);
             if (is_first_execute)
             {
@@ -435,7 +449,7 @@ namespace Ailu
             }
             if (!record.Empty())
             {
-                LOG_INFO("Reload {} shader, {} compute shader,{} texture2d", record._reload_shader_count, record._reload_compute_count,record._reload_tex2d_count);
+                LOG_INFO("Reload {} shader, {} compute shader,{} texture2d", record._reload_shader_count, record._reload_compute_count, record._reload_tex2d_count);
             }
         }
     }// namespace Editor

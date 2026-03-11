@@ -1,4 +1,5 @@
 guid: 012efc02-825c-42e9-b512-35c19e7eb1db
-type: kTexture2D
+type: Ailu::Render::Texture2D
 name: light_probe
   file: Icons/light_probe.png
+  sRGB: 1

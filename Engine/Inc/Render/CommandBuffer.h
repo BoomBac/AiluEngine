@@ -36,6 +36,9 @@ namespace Ailu
         // D3D12_COMMAND_LIST_TYPE_VIDEO_ENCODE	= 6
     };
 
+    class RayTracingScene;
+    class RayTracingGeometry;
+
     class Render::RDG::RenderGraph;
 
     class RHICommandBuffer : public Object
@@ -48,6 +51,7 @@ namespace Ailu
         virtual ~RHICommandBuffer() {};
         virtual void Clear() {};
         virtual bool IsReady() const { return true; }
+        virtual void InsertUAVBarrier() {}
         [[nodiscard]] ECommandBufferType GetCommandBufferType() const { return _cmd_type; }
         [[nodiscard]] bool IsExecuted() const { return _is_executed; }
 
@@ -160,6 +164,9 @@ namespace Ailu
         void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
         void Dispatch(ComputeShader *cs, u16 kernel, GPUBuffer *arg_buffer, u16 arg_offset);
 
+        void BuildAS(RayTracingScene* scene,bool is_update = false);
+        void BuildAS(RayTracingGeometry* geometry,bool is_update = false);
+
         void BeginProfiler(const String &name);
         void EndProfiler();
         /// @brief 拷贝src的counter value到dst的目标位置，dst无需counter buffer
@@ -169,6 +176,7 @@ namespace Ailu
         void CopyCounterValue(GPUBuffer *src, GPUBuffer *dst, u32 dst_offset);
 
         void StateTransition(GpuResource *res, EResourceState new_state, u32 sub_res = kTotalSubRes);
+        void InsertUAVBarrier(GpuResource *res = nullptr);
 
         void ReadbackBuffer(GPUBuffer* buffer,bool is_counter,u32 size,ReadbackCallback callback);
 

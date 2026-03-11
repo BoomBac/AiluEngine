@@ -56,6 +56,12 @@ namespace Ailu::RHI::DX12
         _cur_backbuf_index = _swapchain->GetCurrentBackBufferIndex();
     }
 
+    void D3DSwapchainTexture::StateTranslation(RHICommandBuffer *rhi_cmd, Render::EResourceState new_state, u32 sub_res)
+    {
+        _state_guard[_cur_backbuf_index]->MakesureResourceState(static_cast<D3DCommandBuffer *>(rhi_cmd)->NativeCmdList(), D3DConvertUtils::FromALResState(new_state));
+    }
+
+
     D3D12_CPU_DESCRIPTOR_HANDLE *D3DSwapchainTexture::TargetCPUHandle(RHICommandBuffer *cmd)
     {
         _state_guard[_cur_backbuf_index]->MakesureResourceState(static_cast<D3DCommandBuffer *>(cmd)->NativeCmdList(), D3D12_RESOURCE_STATE_RENDER_TARGET);

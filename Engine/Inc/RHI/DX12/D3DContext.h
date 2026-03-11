@@ -38,6 +38,7 @@ using Ailu::Render::ComputeShader;
 using Ailu::Render::CommandBuffer;
 using Ailu::Render::RHICommandBuffer;
 using Ailu::Render::UploadParams;
+using Ailu::Render::BuildParams;
 
 namespace Ailu::RHI::DX12
 {
@@ -125,7 +126,7 @@ namespace Ailu::RHI::DX12
         void TryReleaseUnusedResources() final;
         f32 TotalGPUMemeryUsage() final;
 
-        ID3D12Device* GetDevice() { return m_device.Get(); };
+        ID3D12Device5* GetDevice() { return m_device.Get(); };
         void TrackResource(ComPtr<ID3D12Resource> resource);
 
         void ReadBack(GpuResource* res,u8* data,u32 size);
@@ -144,7 +145,11 @@ namespace Ailu::RHI::DX12
         void ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd) final;
         void ExecuteRHICommandBuffer(RHICommandBuffer* cmd) final;
         void WaitForGpu() final;
+        void CreateResourceSync(GpuResource* res) final;
+        void CreateResourceSync(GpuResource* res,UploadParams* params) final;
         void WaitForFence(u64 fence_value) final;
+
+        bool IsHardwareRayTracingSupported() const final;
     private:
         void Destroy();
         void LoadPipeline();
@@ -169,7 +174,7 @@ namespace Ailu::RHI::DX12
         u32 _cur_ctx_index = 0u;
         //u32 _cbv_desc_num = 0u;
         // Pipeline objects.
-        ComPtr<ID3D12Device> m_device;
+        ComPtr<ID3D12Device5> m_device;
         ComPtr<ID3D12CommandQueue> m_commandQueue;
 
         TracyD3D12Ctx _tracy_d3d12_ctx = nullptr;
@@ -214,6 +219,7 @@ namespace Ailu::RHI::DX12
         ComPtr<ID3D12CommandSignature> _draw_cmd_sig;
         ComPtr<ID3D12CommandSignature> _draw_indexed_cmd_sig;
         Scope<ReadbackBufferPool> _readback_pool;
+        bool _is_hardware_ray_tracing_supported = false;
     };
 
 

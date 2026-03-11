@@ -7,6 +7,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AHT_ROOT_PATH}/bin/x64)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${AHT_ROOT_PATH}/bin/x64/debug)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${AHT_ROOT_PATH}/bin/x64/release)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${AHT_ROOT_PATH}/bin/x64/relwithdebinfo)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${AHT_ROOT_PATH}/bin/x64/minsizerel)
 
 #set(ENGINE_LIB_ROOT ${ENGINE_ROOT_PATH}/lib/x64)
 # 设置 C++ 标准
@@ -24,7 +26,7 @@ add_executable(AiluHeadTool "AiluHeadTool.h" "AiluHeadTool.cpp" "main.cpp"
 # target_include_directories(Test PUBLIC ${ENGINE_ROOT_PATH}/Ext)
 
 # 宏定义
-target_compile_definitions(AiluHeadTool PUBLIC _DEBUG)
+target_compile_definitions(AiluHeadTool PUBLIC $<$<CONFIG:Debug>:_DEBUG>)
 set_target_properties (AiluHeadTool PROPERTIES OUTPUT_NAME "AiluHeadTool")
 # 编译器参数
 # if(MSVC)

@@ -8,8 +8,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AiluBuildPath}/out/editor/bin/x64)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${AiluBuildPath}/out/editor/bin/x64/debug)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${AiluBuildPath}/out/editor/bin/x64/release)
-
-set(ENGINE_LIB_ROOT ${AiluBuildPath}/out/engine/lib/x64)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${AiluBuildPath}/out/editor/bin/x64/relwithdebinfo)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${AiluBuildPath}/out/editor/bin/x64/minsizerel)
 # 设置 C++ 标准
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,7 +29,9 @@ endfunction()
 add_source_files_recursive(${EDITOR_ROOT_PATH}/Src)
 add_source_files_recursive(${EDITOR_ROOT_PATH}/Inc)
 
-add_executable(Editor WIN32 ${PROJECT_SOURCES})
+set(EDITOR_RESOURCE ${EDITOR_ROOT_PATH}/Res/Editor.rc)
+
+add_executable(Editor WIN32 ${PROJECT_SOURCES} ${EDITOR_RESOURCE})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${PROJECT_SOURCES})
 
 # 包含路径
@@ -45,7 +47,11 @@ target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk)
 target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 # 宏定义
-target_compile_definitions(Editor PUBLIC _DEBUG;Editor_EXPORTS;_WINDOWS;_REVERSED_Z)
+target_compile_definitions(Editor PUBLIC
+    Editor_EXPORTS
+    _WINDOWS
+    _REVERSED_Z
+    $<$<CONFIG:Debug>:_DEBUG>)
 
 if (AILU_ENABLE_TRACY)
     target_compile_definitions(Editor PUBLIC TRACY_ENABLE TRACY_IMPORTS)
@@ -68,5 +74,5 @@ set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 #        )
 add_dependencies(Editor Engine)
 target_link_libraries(Editor PRIVATE
-        $<$<CONFIG:Debug>:${ENGINE_LIB_ROOT}/Debug/Engine_d.lib>
-        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release/Engine.lib> ${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib) # msvcrtd.lib
+    ${AILU_ENGINE_IMPORT_LIB}
+    ${AILU_FBXSDK_LINK_LIB}) # msvcrtd.lib

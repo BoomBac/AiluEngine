@@ -60,7 +60,8 @@ float4 PSMain(PSInput input) : SV_TARGET
 
 uint PSMainPickBuffer(PSInput input) : SV_TARGET
 {
-    //float alpha = SAMPLE_TEXTURE2D(_MainTex,g_LinearClampSampler,input.uv).a;
-    //clip(alpha - 0.5f);
-	return uint(_ObjectID);
+	uint packed = 0;
+	packed |= (_ObjectID & 0xFFFFFF) << 8; // 使用高 24 位存储 Entity ID
+	packed |= (_SubmeshID & 0xFF); // 使用低 8 位存储 Submesh ID
+	return packed;
 }

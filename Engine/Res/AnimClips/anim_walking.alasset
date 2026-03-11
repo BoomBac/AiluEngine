@@ -1,5 +1,5 @@
 guid: f07795d2-c287-416e-81df-b0a62064b76a
-type: kAnimClip
+type: Ailu::AnimationClip
 name: anim_walking
 _name:Walking_Alpha_Surface
 _frame_count:31

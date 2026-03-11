@@ -47,7 +47,7 @@ namespace Ailu
                 _is_drag_start = true;
             if (!_is_drag_start)
                 return;
-            Input::IsKeyPressed(EKey::kLBUTTON);
+            Input::IsKeyDown(EKey::kLBUTTON);
             Input::BlockInput(true);
             auto mp = Input::GetMousePos(Application::FocusedWindow());
             UI::UIRenderer::Get()->DrawText(std::format("{} draging...",_display_name), mp, 9u);
@@ -62,7 +62,7 @@ namespace Ailu
             {
                 UI::UIRenderer::Get()->DrawBox(hover->GetArrangeRect().xy, hover->GetArrangeRect().zw, 2.0f, Colors::kYellow, 0.0f);
             }
-            if (Input::JustReleased(EKey::kLBUTTON))
+            if (Input::IsKeyJustReleased(EKey::kLBUTTON))
             {
                 if (_hover_target)
                     _hover_target->_on_drop(*_payload, mp.x, mp.y);

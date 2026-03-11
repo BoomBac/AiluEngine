@@ -24,6 +24,14 @@
     #define int4 Vector4Int
     #define uint u32
 #endif//__cplusplus
+
+#if defined(__cplusplus) || defined(AL_SHADER_INTEROP_CBUFFER_AS_STRUCT)
+    #define AL_SHADER_INTEROP_CBUFFER_BEGIN(name, slot) struct name
+    #define AL_SHADER_INTEROP_CBUFFER_END ;
+#else
+    #define AL_SHADER_INTEROP_CBUFFER_BEGIN(name, slot) cbuffer name : register(slot)
+    #define AL_SHADER_INTEROP_CBUFFER_END
+#endif
 // C++
 #ifdef __cplusplus
 namespace Ailu::Render
@@ -115,8 +123,9 @@ namespace Ailu::Render
 
         float  _roughness;           // perceptual roughness [0,1]
         float  _specular;            // specular weight (dielectric F0 control)
+        float _anisotropy;          // anisotropy [0,1], 0 is isotropic, 1 is fully anisotropic
         float  _ior;                 // index of refraction (1.0 ~ 2.5)
-        float  _opacity;             // 1 = opaque, <1 transmission
+        float  _transmission;             // 1 = opaque, <1 transmission
 
         // -------------------------------------------------
         // Texture indices (bindless / array)
@@ -142,26 +151,19 @@ namespace Ailu::Render
         float _neg_right_or_tri_count;
     };
 
-#ifdef __cplusplus
-    struct CBufferPerObjectData
-#else
-cbuffer CBufferPerObjectData : register(b0)
-#endif//__cplusplus
+    AL_SHADER_INTEROP_CBUFFER_BEGIN(CBufferPerObjectData, b0)
     {
         float4x4 _MatrixWorld;
         float4x4 _MatrixInvWorld;
         float4x4 _MatrixWorld_Pre;
         //x is dynamic,y is force off
         float4 _MotionVectorParam;
-        int _ObjectID;
-        float _cbo_paddings[11];// Padding so the constant buffer is 256-byte aligned.
-    };
+        uint _ObjectID;
+        uint _SubmeshID;
+        float _cbo_paddings[10];// Padding so the constant buffer is 256-byte aligned.
+    } AL_SHADER_INTEROP_CBUFFER_END
 
-#ifdef __cplusplus
-    struct CBufferPerSceneData
-#else
-cbuffer CBufferPerSceneData : register(b2)
-#endif//__cplusplus
+    AL_SHADER_INTEROP_CBUFFER_BEGIN(CBufferPerSceneData, b2)
     {
         float3 _MainlightWorldPosition;
         uint   _FrameIndex;
@@ -189,13 +191,9 @@ cbuffer CBufferPerSceneData : register(b2)
         float g_IndirectLightingIntensity;
         float _cbs_paddings[23];
         //float4x4 _JointMatrix[80];
-    };
+    } AL_SHADER_INTEROP_CBUFFER_END
 
-#ifdef __cplusplus
-    struct CBufferPerCameraData
-#else
-cbuffer CBufferPerCameraData : register(b3)
-#endif//__cplusplus
+    AL_SHADER_INTEROP_CBUFFER_BEGIN(CBufferPerCameraData, b3)
     {
         float4x4 _MatrixV;
         float4x4 _MatrixP;
@@ -229,7 +227,7 @@ cbuffer CBufferPerCameraData : register(b3)
         float _uv_jitter_x;
         float3 _RB;
         float _uv_jitter_y;
-    };
+    } AL_SHADER_INTEROP_CBUFFER_END
 
 #ifdef __cplusplus
     //	struct ScenePerMaterialData
@@ -260,6 +258,10 @@ cbuffer CBufferPerCameraData : register(b3)
 #ifdef __cplusplus
 }
 #endif//__cplusplus
+
+
+#undef AL_SHADER_INTEROP_CBUFFER_BEGIN
+#undef AL_SHADER_INTEROP_CBUFFER_END
 
 
 #endif// !COMMON_CBUFFER__

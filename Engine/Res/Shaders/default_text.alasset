@@ -1,5 +1,5 @@
 guid: 266fceb5-389b-4a08-892c-1e9b2f58d83f
-type: kShader
+type: Ailu::Render::Shader
 name: default_text
   file: Shaders/hlsl/default_text.hlsl
   vs_entry: VSMain

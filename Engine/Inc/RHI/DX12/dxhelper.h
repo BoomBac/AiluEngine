@@ -48,6 +48,11 @@ inline void ThrowIfFailed(HRESULT hr)
     }
 }
 
+inline void ThrowIfFalse(bool value)
+{
+    ThrowIfFailed(value ? S_OK : E_FAIL);
+}
+
 inline void GetAssetsPath(_Out_writes_(pathSize) WCHAR* path, UINT pathSize)
 {
     if (path == nullptr)

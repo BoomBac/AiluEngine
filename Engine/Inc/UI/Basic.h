@@ -22,7 +22,7 @@ namespace Ailu
             Button();
             explicit Button(const String &name);
             Vector2f MeasureDesiredSize() override;
-            void SetText(const String &text);
+            void SetText(const String &text, bool trigger_event = true);
             String GetText() const;
             void SetTexture(Render::Texture *tex);
             Render::Texture *GetTexture() const;
@@ -42,12 +42,13 @@ namespace Ailu
         public:
             Text();
             explicit Text(String text);
-            void SetText(const String &text);
+            void SetText(const String &text, bool trigger_event = true);
             const String &GetText() const { return _text; }
             Vector2f MeasureDesiredSize() override;
             f32 FontSize() const { return _font_size; }
             void FontSize(f32 size);
         private:
+            void UpdateTextLayout();
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
         public:
@@ -78,7 +79,7 @@ namespace Ailu
             UIElement *HitTest(Vector2f pos) final;
             Vector2f MeasureDesiredSize() override;
             f32 GetValue() const { return _value; }
-            void SetValue(f32 v);
+            void SetValue(f32 v, bool trigger_event = true);
         private:
             void RenderImpl(UIRenderer &r) override;
         public:
@@ -143,7 +144,7 @@ namespace Ailu
             InputBlock();
             InputBlock(const String &content);
             void Update(f32 dt) final;
-            void SetContent(String content);
+            void SetContent(String content, bool trigger_event = true);
             Vector2f MeasureDesiredSize() override;
             bool IsEditing() const { return _is_editing; }
         private:

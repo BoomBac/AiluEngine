@@ -1,18 +1,12 @@
 #include "pch.h"
 //#include <atlcomcli.h>
-#include <d3dcompiler.h>
-#include <dxcapi.h>
-#include <mutex>
 
-#include "Framework/Common/Application.h"
-#include "Framework/Common/FileManager.h"
 #include "Framework/Common/Log.h"
-#include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/Utils.h"
-#include "GlobalMarco.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DShader.h"
+#include "RHI/DX12/D3DShaderCompiler.h"
 #include "RHI/DX12/D3DTexture.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Render/GraphicsPipelineStateObject.h"
@@ -21,419 +15,6 @@
 
 namespace Ailu::RHI::DX12
 {
-//-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
-#pragma region D3DShaderInclude
-    class D3DShaderInclude : public ID3DInclude
-    {
-        HRESULT Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes) override;
-
-        HRESULT Close(LPCVOID pData) override;
-
-    public:
-        WString _cur_source_file_path;
-        std::set<WString> _include_files;
-
-    private:
-        std::set<WString> _addi_include_pathes = {
-                L"Shaders/",
-                L"Shaders/hlsl/",
-                L"Shaders/hlsl/Compute/",
-                L"Shaders/hlsl/PostProcess/"};
-        u8 *_data;
-        inline static std::mutex s_compile_lock;
-    };
-    HRESULT D3DShaderInclude::Open(D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID *ppData, UINT *pBytes)
-    {
-        auto pwd = PathUtils::ExtractAssetPath(PathUtils::Parent(_cur_source_file_path));
-        _addi_include_pathes.insert(pwd);
-        for (auto &include_path: _addi_include_pathes)
-        {
-            std::lock_guard<std::mutex> l(s_compile_lock);
-            WString p;
-            if ((const char *) pFileName[0] == ".")
-            {
-                p = PathUtils::ResolveRelPath(pFileName, _cur_source_file_path);
-            }
-            else
-            {
-                p = ResourceMgr::GetResSysPath(include_path) + ToWChar(pFileName);
-            }
-            if (FileManager::Exist(p))
-            {
-                auto [file_data, byte_size] = FileManager::ReadFile(p);
-                _data = file_data;
-                *ppData = _data;
-                *pBytes = (u32) byte_size;
-                _include_files.insert(p);
-                return S_OK;
-            }
-            //else
-            //{
-            //    LOG_ERROR(L"D3DShaderInclude::Open: include file:{} not exist!", p);
-            //}
-            //AL_ASSERT(true);
-        }
-        AL_ASSERT(true);
-        return E_FAIL;
-    }
-
-    HRESULT D3DShaderInclude::Close(LPCVOID pData)
-    {
-        delete[] pData;
-        return S_OK;
-    }
-
-    class DxcIncludeHandlerEx final : public IDxcIncludeHandler
-    {
-    public:
-        DxcIncludeHandlerEx(IDxcUtils *utils)
-            : _utils(utils)
-        {
-            _utils->AddRef();
-        }
-
-        ~DxcIncludeHandlerEx()
-        {
-            if (_utils)
-                _utils->Release();
-        }
-
-        // ================= IUnknown =================
-        HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) override
-        {
-            if (riid == __uuidof(IDxcIncludeHandler) ||
-                riid == __uuidof(IUnknown))
-            {
-                *ppvObject = static_cast<IDxcIncludeHandler *>(this);
-                AddRef();
-                return S_OK;
-            }
-            *ppvObject = nullptr;
-            return E_NOINTERFACE;
-        }
-
-        ULONG STDMETHODCALLTYPE AddRef() override
-        {
-            return ++_ref_count;
-        }
-
-        ULONG STDMETHODCALLTYPE Release() override
-        {
-            ULONG ref = --_ref_count;
-            if (ref == 0)
-                delete this;
-            return ref;
-        }
-
-        // ================= IDxcIncludeHandler =================
-        HRESULT STDMETHODCALLTYPE LoadSource(
-                LPCWSTR pFilename,
-                IDxcBlob **ppIncludeSource) override
-        {
-            std::lock_guard<std::mutex> l(s_compile_lock);
-
-            *ppIncludeSource = nullptr;
-
-            // 当前源文件所在目录（和 FXC 逻辑一致）
-            auto pwd = PathUtils::ExtractAssetPath(
-                    PathUtils::Parent(_cur_source_file_path));
-
-            _addi_include_pathes.insert(pwd);
-
-            for (auto &include_path: _addi_include_pathes)
-            {
-                WString full_path;
-
-                // 相对 include
-                if (pFilename[0] == L'.')
-                {
-                    full_path = PathUtils::ResolveRelPath(pFilename, PathUtils::Parent(_cur_source_file_path));
-                }
-                else
-                {
-                    full_path = ResourceMgr::GetResSysPath(include_path) + pFilename;
-                }
-
-                if (!FileManager::Exist(full_path))
-                    continue;
-
-                // 读取文件
-                auto [file_data, byte_size] = FileManager::ReadFile(full_path);
-                //LOG_INFO(L"DxcIncludeHandlerEx::LoadSource: include file: {},src: {}", full_path,_cur_source_file_path);
-                // 创建 DXC blob（DXC 会管理生命周期）
-                ComPtr<IDxcBlobEncoding> blob;
-                HRESULT hr = _utils->CreateBlob(
-                        file_data,
-                        (UINT32) byte_size,
-                        DXC_CP_UTF8,
-                        blob.GetAddressOf());
-
-                delete[] file_data;
-
-                if (FAILED(hr))
-                    return hr;
-
-                *ppIncludeSource = blob.Detach();
-                _include_files.insert(PathUtils::FormatFilePath(full_path));
-                return S_OK;
-            }
-
-            return E_FAIL;
-        }
-
-    public:
-        WString _cur_source_file_path;
-        std::set<WString> _include_files;
-
-    private:
-        std::atomic<ULONG> _ref_count{1};
-        IDxcUtils *_utils = nullptr;
-
-        std::set<WString> _addi_include_pathes = {
-                L"Shaders/",
-                L"Shaders/hlsl/",
-                L"Shaders/hlsl/Compute/",
-                L"Shaders/hlsl/PostProcess/"};
-
-        inline static std::mutex s_compile_lock;
-    };
-
-#pragma endregion
-    //-------------------------------------------------------------D3DShaderInclude------------------------------------------------------------------
-#pragma region CompileUtils
-    //shader model 6.0 and higher,can't see cbuffer info in PIX!!!!
-    static bool CreateFromFileDXC(const std::wstring &filename, const std::string &entryPoint, const std::string &target, const Vector<D3D_SHADER_MACRO> &keywords, ComPtr<ID3DBlob> &p_blob,
-                                  ComPtr<ID3D12ShaderReflection> &shader_reflection,
-                                  std::set<WString> &include_files,
-                                  bool is_load_cache = true)
-    {
-        // ===== hash & cache（和 FXC 一致） =====
-        Vector<String> keyword_str;
-        for (auto &kw: keywords)
-            if (kw.Name) keyword_str.emplace_back(kw.Name);
-
-        String unique = std::format("{}_{}_{}_{}",
-                                    ToChar(filename),
-                                    entryPoint,
-                                    target,
-                                    su::Join(keyword_str, "_"));
-
-        u64 hash = std::hash<String>{}(unique);
-
-        auto working = Application::GetWorkingPath();
-        WString cached_shader_blob_path = working + std::format(L"cache/shader_cache/dxc/{}.dxil", hash);
-        WString cached_reflection_blob_path = working + std::format(L"cache/shader_cache/dxc/{}.rft", hash);
-
-        if (is_load_cache &&
-            FileManager::Exist(cached_shader_blob_path) &&
-            FileManager::IsFileNewer(cached_shader_blob_path, filename))
-        {
-            auto hr = D3DReadFileToBlob(cached_shader_blob_path.c_str(), p_blob.GetAddressOf());
-            AL_ASSERT(SUCCEEDED(hr));
-            ComPtr<ID3DBlob> refl_blob;
-            D3DReadFileToBlob(cached_reflection_blob_path.c_str(), refl_blob.GetAddressOf());
-            DxcBuffer rb{};
-            rb.Ptr = refl_blob->GetBufferPointer();
-            rb.Size = refl_blob->GetBufferSize();
-            ComPtr<IDxcUtils> utils;
-            DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
-            utils->CreateReflection(&rb, IID_PPV_ARGS(shader_reflection.GetAddressOf()));
-
-            AL_ASSERT(SUCCEEDED(hr));
-            //ThrowIfFailed(hr);
-            return true;
-        }
-
-        // ===== DXC init =====
-        ComPtr<IDxcUtils> utils;
-        ComPtr<IDxcCompiler3> compiler;
-        DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils));
-        DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
-
-        auto base_path = std::filesystem::path(filename).parent_path().wstring();
-        auto include = std::make_unique<DxcIncludeHandlerEx>(utils.Get());
-        include->_cur_source_file_path = filename;
-
-        // ===== load source =====
-        ComPtr<IDxcBlobEncoding> source;
-        utils->LoadFile(filename.c_str(), nullptr, &source);
-
-        DxcBuffer src = {};
-        src.Ptr = source->GetBufferPointer();
-        src.Size = source->GetBufferSize();
-        src.Encoding = DXC_CP_UTF8;
-
-        // ===== arguments =====
-        std::vector<LPCWSTR> args;
-        auto entry_point_w = ToWChar(entryPoint);
-        auto target_w = ToWChar(target);
-        args.push_back(L"-E");
-        args.push_back(entry_point_w.c_str());
-        args.push_back(L"-T");
-        args.push_back(target_w.c_str());
-        args.push_back(L"-Zi");
-        args.push_back(L"-Zss");
-#if defined(_DEBUG)
-        args.push_back(L"-Od");
-        args.push_back(L"-Qembed_debug");
-#else
-        args.push_back(L"-O3");
-#endif
-
-        // defines
-        std::vector<std::wstring> define_strings;
-        for (auto &kw: keywords)
-        {
-            if (!kw.Name) continue;
-            define_strings.emplace_back(
-                    ToWChar(kw.Name) + L"=" +
-                    (kw.Definition ? ToWChar(kw.Definition) : L"1"));
-            args.push_back(L"-D");
-            args.push_back(define_strings.back().c_str());
-        }
-        args.push_back(L"-D");
-        args.push_back(L"SHADER_DXC=1");
-
-        // ===== compile =====
-        ComPtr<IDxcResult> result;
-        compiler->Compile(
-                &src,
-                args.data(),
-                (UINT) args.size(),
-                include.get(),
-                IID_PPV_ARGS(&result));
-
-        HRESULT hr;
-        result->GetStatus(&hr);
-        if (FAILED(hr))
-        {
-            ComPtr<IDxcBlobUtf8> err;
-            result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&err), nullptr);
-            LOG_ERROR("DXC error: {}", err->GetStringPointer());
-            return false;
-        }
-
-        // ===== output =====
-        //shader blob
-        result->GetOutput(DXC_OUT_OBJECT,IID_PPV_ARGS(&p_blob),nullptr);
-        FileManager::WriteFile(cached_shader_blob_path, false,(u8 *) p_blob->GetBufferPointer(),p_blob->GetBufferSize());
-
-        // reflection
-        ComPtr<IDxcBlob> refl;
-        hr = result->GetOutput(DXC_OUT_REFLECTION, IID_PPV_ARGS(&refl), nullptr);
-
-        if (SUCCEEDED(hr) && refl)
-        {
-            DxcBuffer rb{};
-            rb.Ptr = refl->GetBufferPointer();
-            rb.Size = refl->GetBufferSize();
-            utils->CreateReflection(&rb, IID_PPV_ARGS(shader_reflection.GetAddressOf()));
-            FileManager::WriteFile(cached_reflection_blob_path, false, (u8 *) refl->GetBufferPointer(), refl->GetBufferSize());
-        }
-        else
-        {
-            LOG_WARNING(L"DXC generate reflection failed for shader {}", filename);
-        }
-        //pdb
-        ComPtr<IDxcBlob> pdb;
-        hr = result->GetOutput(DXC_OUT_PDB,IID_PPV_ARGS(&pdb), nullptr);
-        if (SUCCEEDED(hr) && pdb)
-        {
-            ComPtr<IDxcBlob> hash_blob;
-            result->GetOutput(DXC_OUT_SHADER_HASH,IID_PPV_ARGS(&hash_blob), nullptr);
-            const DxcShaderHash* shader_hash =reinterpret_cast<const DxcShaderHash*>(hash_blob->GetBufferPointer());
-            std::wstring hash_str;
-            for (int i = 0; i < 16; ++i)
-            {
-                wchar_t buf[3];
-                swprintf(buf, 3, L"%02x", shader_hash->HashDigest[i]);
-                hash_str += buf;
-            }
-            WString pdb_cache_path = working + std::format(L"cache/shader_cache/dxc/{}.pdb", hash_str);
-            FileManager::WriteFile(pdb_cache_path, false, (u8 *) pdb->GetBufferPointer(), pdb->GetBufferSize());
-        }
-        else
-        {
-            LOG_WARNING(L"DXC generate pdb failed for shader {}", filename);
-        }
-        include_files = include->_include_files;
-        return true;
-    }
-
-
-    static bool CreateFromFileFXC(const std::wstring &filename, const std::string &entryPoint, const std::string &pTarget, const Vector<D3D_SHADER_MACRO> &keywords, ComPtr<ID3DBlob> &p_blob,
-                                  ComPtr<ID3D12ShaderReflection> &shader_reflection, std::set<WString> &include_files, bool is_load_cache = true)
-    {
-        D3DShaderInclude include;
-        include._cur_source_file_path = filename;
-        Vector<String> keyword_str;
-        for (auto &kw: keywords)
-        {
-            if (kw.Name != nullptr)
-                keyword_str.emplace_back(kw.Name);
-        }
-        String unique_str = std::format("{}_{}_{}", ToChar(filename), entryPoint, su::Join(keyword_str, "_"));
-        std::hash<String> hash_fn;
-        u64 shader_hash = hash_fn(unique_str);
-        auto working_path = Application::GetWorkingPath();
-        WString cached_blob_path = working_path + std::format(L"cache/shader_cache/fxc/{}.cso", shader_hash);
-        if (is_load_cache && FileManager::Exist(cached_blob_path) && FileManager::IsFileNewer(cached_blob_path, filename))
-        {
-            LOG_INFO(L"[D3DShader compiler]: load cache: {},entry : {}", filename, ToWChar(entryPoint));
-            ThrowIfFailed(D3DReadFileToBlob(cached_blob_path.c_str(), p_blob.GetAddressOf()));
-        }
-        else
-        {
-            LOG_INFO(L"[D3DShader compiler]: compile : {},entry : {},defines: {}", filename, ToWChar(entryPoint), ToWChar(su::Join(keyword_str, ",")));
-            ID3DBlob *pErrorBlob = nullptr;
-            //D3D_SHADER_MACRO macros[] = { {"D3D_COMPILE","1"},{NULL,NULL} };
-            UINT compileFlags = 0;
-#if defined(_DEBUG)
-            if (pTarget == RenderConstants::kCSModel_5_0)
-            {
-                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE | D3DCOMPILE_SKIP_OPTIMIZATION;//跳过优化的话，compute shader算brdf lut时值有点异常
-            }
-            else
-            {
-                // Enable better shader debugging with the graphics debugging tools.
-                compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION | D3DCOMPILE_DEBUG_NAME_FOR_SOURCE;
-            }
-#else
-            compileFlags = 0;
-#endif
-            D3DCompileFromFile(filename.c_str(), keywords.data(), &include, entryPoint.c_str(), pTarget.c_str(), compileFlags, 0, &p_blob, &pErrorBlob);
-            if (pErrorBlob)
-            {
-                //OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
-                String text(reinterpret_cast<const char *>(pErrorBlob->GetBufferPointer()));
-                // 使用 std::stringstream 分割文本并提取每一行
-                std::istringstream iss(text);
-                //std::vector<std::string> lines;
-                std::string line;
-                while (std::getline(iss, line))
-                {
-                    if (line.find("ERROR") != line.npos || line.find("error") != line.npos)
-                    {
-                        LOG_ERROR("{} when compile shader {}", line, ToChar(filename))
-                    }
-                }
-                pErrorBlob->Release();
-            }
-            if (p_blob != nullptr)
-                FileManager::WriteFile(cached_blob_path, false, (u8 *) p_blob->GetBufferPointer(), p_blob->GetBufferSize());
-        }
-
-        if (p_blob != nullptr)
-        {
-            ID3D12ShaderReflection *pReflection = NULL;
-            D3DReflect(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), IID_ID3D12ShaderReflection, (void **) &shader_reflection);
-            for (auto &p: include._include_files)
-                include_files.insert(p);
-            return true;
-        }
-        return false;
-    }
-
     static D3D12_PRIMITIVE_TOPOLOGY ConvertTopologyToType(D3D12_PRIMITIVE_TOPOLOGY_TYPE type)
     {
         switch (type)
@@ -794,175 +375,6 @@ namespace Ailu::RHI::DX12
     D3DShader::~D3DShader()
     {
     }
-    /*
-    void D3DShader::GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash)
-    {
-        struct SrvUavRangeBuildInfo
-        {
-            D3D12_DESCRIPTOR_RANGE_TYPE type; // SRV / UAV
-            u32 space;
-
-            u32 base_register = UINT32_MAX;
-            u32 max_register  = 0;
-
-            Vector<ShaderBindResourceInfo*> resources;
-        };
-        AL_ASSERT(pass_index < _passes.size());
-        auto& pass_variant = _passes[pass_index]._variants[variant_hash];
-        auto& bind_infos   = pass_variant._bind_res_infos;
-        auto& root_params = _pass_elements[pass_index]._variants[variant_hash]._root_parameters;
-        root_params.resize(32);
-
-        // ---------------------------------------------------------------------
-        // Root signature version
-        // ---------------------------------------------------------------------
-        D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData{};
-        featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-
-        auto device = static_cast<D3DContext&>(GraphicsContext::Get()).GetDevice();
-        if (FAILED(device->CheckFeatureSupport(
-                D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData))))
-        {
-            featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-        }
-
-        //CD3DX12_ROOT_PARAMETER1 root_params[32]{};
-        CD3DX12_DESCRIPTOR_RANGE1 ranges[32]{};
-        u32 root_param_index = 0;
-
-        // ---------------------------------------------------------------------
-        // 1. CBV
-        // ---------------------------------------------------------------------
-        auto bind_cbv = [&](const char* name, u32 b_reg)->u32
-        {
-            auto it = bind_infos.find(name);
-            if (it == bind_infos.end()) 
-                return UINT32_MAX;
-            it->second._bind_slot = root_param_index;
-            root_params[root_param_index++]
-                .InitAsConstantBufferView(b_reg);
-                return root_param_index-1;
-        };
-
-        bind_infos[RenderConstants::kCBufNamePerObject]._bind_slot = bind_cbv(RenderConstants::kCBufNamePerObject.c_str(),0);
-        bind_infos[RenderConstants::kCBufNamePerMaterial]._bind_slot = bind_cbv(RenderConstants::kCBufNamePerMaterial.c_str(),1);
-        bind_infos[RenderConstants::kCBufNamePerScene]._bind_slot = bind_cbv(RenderConstants::kCBufNamePerScene.c_str(),2);
-        bind_infos[RenderConstants::kCBufNamePerCamera]._bind_slot = bind_cbv(RenderConstants::kCBufNamePerCamera.c_str(),3);
-
-        // ---------------------------------------------------------------------
-        // 2. 收集 SRV / UAV（按 type + space 分组）
-        // ---------------------------------------------------------------------
-        Vector<SrvUavRangeBuildInfo> range_builders;
-
-        auto find_or_create_range = [&](D3D12_DESCRIPTOR_RANGE_TYPE type, u32 space)
-            -> SrvUavRangeBuildInfo&
-        {
-            for (auto& r : range_builders)
-            {
-                if (r.type == type && r.space == space)
-                    return r;
-            }
-            range_builders.push_back({ type, space });
-            return range_builders.back();
-        };
-
-        for (auto& [name, desc] : bind_infos)
-        {
-            switch (desc._res_type)
-            {
-                case EBindResDescType::kTexture2D:
-                case EBindResDescType::kTexture3D:
-                case EBindResDescType::kCubeMap:
-                case EBindResDescType::kBuffer:
-                {
-                    auto& r = find_or_create_range(
-                        D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-                        desc._register_space);
-
-                    r.base_register = std::min(r.base_register, desc._res_slot);
-                    r.max_register  = std::max(r.max_register,  desc._res_slot);
-                    r.resources.push_back(&desc);
-                }
-                break;
-
-                case EBindResDescType::kUAVTexture2D:
-                case EBindResDescType::kRWBuffer:
-                {
-                    auto& r = find_or_create_range(
-                        D3D12_DESCRIPTOR_RANGE_TYPE_UAV,
-                        desc._register_space);
-
-                    r.base_register = std::min(r.base_register, desc._res_slot);
-                    r.max_register  = std::max(r.max_register,  desc._res_slot);
-                    r.resources.push_back(&desc);
-                }
-                break;
-
-                default:
-                    break;
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // 3. 生成 descriptor tables（真正关键的地方）
-        // ---------------------------------------------------------------------
-        for (auto& r : range_builders)
-        {
-            const u32 num_desc = r.max_register - r.base_register + 1;
-
-            ranges[root_param_index].Init(
-                r.type,
-                num_desc,
-                r.base_register,
-                r.space,
-                D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-
-            root_params[root_param_index]
-                .InitAsDescriptorTable(1, &ranges[root_param_index],
-                                    D3D12_SHADER_VISIBILITY_ALL);
-
-            // 所有落在这个 range 里的资源，共享同一个 root slot
-            for (auto* res : r.resources)
-            {
-                res->_bind_slot = root_param_index;
-            }
-
-            ++root_param_index;
-        }
-
-        // ---------------------------------------------------------------------
-        // 4. Root Signature flags
-        // ---------------------------------------------------------------------
-        D3D12_ROOT_SIGNATURE_FLAGS flags =
-            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-            D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
-
-        if (_pass_elements[pass_index]._variants[variant_hash]._p_gblob == nullptr)
-            flags |= D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-
-        auto samplers = CreateStaticSampler();
-
-        CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rs_desc;
-        rs_desc.Init_1_1(
-            root_param_index,
-            root_params.data(),
-            (UINT)samplers.size(),
-            samplers.data(),
-            flags);
-
-        ComPtr<ID3DBlob> sig, err;
-        ThrowIfFailed(D3DX12SerializeVersionedRootSignature(
-            &rs_desc, featureData.HighestVersion, &sig, &err));
-
-        if (err)
-            LOG_ERROR("RootSignature error: {}", (char*)err->GetBufferPointer());
-
-        ThrowIfFailed(device->CreateRootSignature(
-            0, sig->GetBufferPointer(), sig->GetBufferSize(),
-            IID_PPV_ARGS(&_pass_elements[pass_index]._variants[variant_hash]._p_sig)));
-    }
-*/
 
     void D3DShader::GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash)
     {
@@ -1068,7 +480,7 @@ namespace Ailu::RHI::DX12
         ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&_pass_elements[pass_index]._variants[variant_hash]._p_sig)));
     }
 
-    bool D3DShader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash)
+    bool D3DShader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache)
     {
         bool succeed = true;
         ComPtr<ID3DBlob> tmp_p_vblob;
@@ -1087,17 +499,15 @@ namespace Ailu::RHI::DX12
             auto &pass = _passes[pass_index];
             keyword_defines = ConstructVariantMarcos(pass._variants[variant_hash]._active_keywords);
 #ifdef SHADER_DXC
-            succeed &= CreateFromFileDXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_6_1, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files, _is_first_compile);
-            succeed &= CreateFromFileDXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_6_1, keyword_defines, tmp_p_pblob, tmp_p_preflect, pass._source_files, _is_first_compile);
+            succeed &= CreateFromFileDXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_6_1, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files, is_load_cache);
+            succeed &= CreateFromFileDXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_6_1, keyword_defines, tmp_p_pblob, tmp_p_preflect, pass._source_files, is_load_cache);
             if (!pass._geometry_entry.empty())
-                succeed &= CreateFromFileDXC(pass._geom_src_file, pass._geometry_entry, RenderConstants::kGSModel_6_1, keyword_defines, tmp_p_gblob, tmp_p_greflect, pass._source_files, _is_first_compile);
-            _is_first_compile = false;
+                succeed &= CreateFromFileDXC(pass._geom_src_file, pass._geometry_entry, RenderConstants::kGSModel_6_1, keyword_defines, tmp_p_gblob, tmp_p_greflect, pass._source_files, is_load_cache);
 #else
-            succeed &= CreateFromFileFXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_5_0, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files, _is_first_compile);
-            succeed &= CreateFromFileFXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_5_0, keyword_defines, tmp_p_pblob, tmp_p_preflect, pass._source_files, _is_first_compile);
+            succeed &= CreateFromFileFXC(pass._vert_src_file, pass._vert_entry, RenderConstants::kVSModel_5_0, keyword_defines, tmp_p_vblob, tmp_p_vreflect, pass._source_files, is_load_cache);
+            succeed &= CreateFromFileFXC(pass._pixel_src_file, pass._pixel_entry, RenderConstants::kPSModel_5_0, keyword_defines, tmp_p_pblob, tmp_p_preflect, pass._source_files, is_load_cache);
             if (!pass._geometry_entry.empty())
-                succeed &= CreateFromFileFXC(pass._geom_src_file, pass._geometry_entry, RenderConstants::kGSModel_5_0, keyword_defines, tmp_p_gblob, tmp_p_greflect, pass._source_files, _is_first_compile);
-            _is_first_compile = false;
+                succeed &= CreateFromFileFXC(pass._geom_src_file, pass._geometry_entry, RenderConstants::kGSModel_5_0, keyword_defines, tmp_p_gblob, tmp_p_greflect, pass._source_files, is_load_cache);
 #endif// SHADER_DXC
         }
         catch (const std::exception &)
@@ -1488,7 +898,7 @@ namespace Ailu::RHI::DX12
         }
     }
 
-    bool D3DComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash)
+    bool D3DComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache)
     {
         if (kernel_index >= _kernels.size())
             return false;
@@ -1507,9 +917,9 @@ namespace Ailu::RHI::DX12
         try
         {
 #ifdef SHADER_DXC
-            succeed &= CreateFromFileDXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_6_1, marcos, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes);
+            succeed &= CreateFromFileDXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_6_1, marcos, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes, is_load_cache);
 #else
-            succeed &= CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_5_0, marcos, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes);
+            succeed &= CreateFromFileFXC(_src_file_path, _kernels[kernel_index]._name, RenderConstants::kCSModel_5_0, marcos, tmp_blob, tmp_reflection, tmp_all_dep_file_pathes, is_load_cache);
 #endif// SHADER_DXC
         }
         catch (const std::exception &)

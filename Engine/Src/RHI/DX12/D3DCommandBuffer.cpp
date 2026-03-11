@@ -83,6 +83,11 @@ namespace Ailu::RHI::DX12
         _is_executed = true;
     }
 
+    void D3DCommandBuffer::InsertUAVBarrier()
+    {
+        D3DResourceStateGuard::InsertUAVBarrier(_p_cmd.Get(), nullptr);
+    }
+
     void D3DCommandBuffer::UploadDataToBuffer(void* src,u64 src_size,ID3D12Resource* dst,D3DResourceStateGuard& state_guard)
     {
         auto alloc = _upload_buf->Allocate(src_size,256);
@@ -113,4 +118,4 @@ namespace Ailu::RHI::DX12
     {
         return GraphicsContext::Get().GetFenceValueGPU() > _fence_value;
     }
-}// namespace Ailu
+}// namespace Ailu::RHI::DX12

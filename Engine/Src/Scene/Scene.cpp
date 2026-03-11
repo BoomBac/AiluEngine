@@ -212,7 +212,7 @@ namespace Ailu::SceneManagement
         buf_desc._is_random_write = false;
         buf_desc._target = EGPUBufferTarget::kStructured | EGPUBufferTarget::kConstant;
         buf_desc._size = buf_desc._element_size * buf_desc._element_num;
-        buf_desc._element_num = RenderConstants::kMaxRenderObjectCount * 4;
+        buf_desc._element_num = 2000;
         buf_desc._element_size = sizeof(LBVHNode);
         buf_desc._size = buf_desc._element_size * buf_desc._element_num;
         _tlas_buffer = GPUBuffer::Create(buf_desc);
@@ -482,7 +482,7 @@ namespace Ailu::SceneManagement
         }
     }
 
-    static Vector<LBVHNode> s_temp_tlas_gpu_data(RenderConstants::kMaxRenderObjectCount*2);
+    static Vector<LBVHNode> s_temp_tlas_gpu_data;
 
     void Scene::RebuildBVHTree()
     {
@@ -504,15 +504,16 @@ namespace Ailu::SceneManagement
         auto ret = builder.Build(1);
         u64 node_size = ret._nodes.size();
         _tlas_nodes = std::move(ret._nodes);
-        AL_ASSERT(_tlas_nodes.size() < RenderConstants::kMaxRenderObjectCount * 2);
+        //AL_ASSERT(_tlas_nodes.size() < RenderConstants::kMaxRenderObjectCount * 2);
         for (u64 i = 0; i < node_size; i++)
         {
             if (_tlas_nodes[i].IsLeaf())
                 _tlas_nodes[i]._child_index_or_first = ret._reordered_indices[_tlas_nodes[i]._child_index_or_first];
             const auto &node = _tlas_nodes[i];
-            s_temp_tlas_gpu_data[i] = {node._aabb._min, (f32) node._child_index_or_first, node._aabb._max, (f32) node._count_or_flag};
+            s_temp_tlas_gpu_data.emplace_back(node._aabb._min, (f32) node._child_index_or_first, node._aabb._max, (f32) node._count_or_flag);
         }
         _tlas_buffer->SetData(reinterpret_cast<const u8 *>(s_temp_tlas_gpu_data.data()), (u32) (node_size * sizeof(LBVHNode)));
+        s_temp_tlas_gpu_data.clear();
     }
 
     void Scene::UpdateGpuScene()

@@ -817,7 +817,7 @@ namespace Ailu
                 {
                     UI::UIRenderer::Get()->DrawQuad({pos - Vector2f{100.0f, 70.0f}, Vector2f{200.0f, 140.0f}}, g_editor_style._dock_hint_color);
                     OnWindowFloat();
-                    if (!Input::IsKeyPressed(EKey::kLBUTTON) && _floating_preview_node)
+                    if (!Input::IsKeyDown(EKey::kLBUTTON) && _floating_preview_node)
                     {
                         EndFloatWindow(pos);
                         _can_draw_float_preview = false;
@@ -1260,7 +1260,7 @@ namespace Ailu
                         _resizing_node->_position = _resizing_node->_position + delta * Vector2f{0.0f, 1.0f};
                         _resizing_node->_size = _resizing_node->_size - delta * Vector2f{0.0f, 1.0f};
                     }
-                    if (!Input::IsKeyPressed(EKey::kLBUTTON))
+                    if (!Input::IsKeyDown(EKey::kLBUTTON))
                     {
                         _resizing_node = nullptr;
                         _resizing_edge_dir = 0u;
@@ -1293,7 +1293,7 @@ namespace Ailu
                         UpdateResizeMouseCursor(_resizing_edge_dir);
                         LOG_INFO("UpdateResizeMouseCursor: {}", _resizing_edge_dir);
                     }
-                    if (edge_hover_node && Input::IsKeyPressed(EKey::kLBUTTON))
+                    if (edge_hover_node && Input::IsKeyDown(EKey::kLBUTTON))
                     {
                         _resizing_node = edge_hover_node;
                     }
@@ -1306,7 +1306,7 @@ namespace Ailu
                 //adjust split ratio
                 if (_adj_split_node)
                 {
-                    if (Input::IsKeyPressed(EKey::kLBUTTON))
+                    if (Input::IsKeyDown(EKey::kLBUTTON))
                     {
                         Vector2f pos = Input::GetMousePos(_adj_split_node->_own_window);
                         Vector2f node_pos = _adj_split_node->_position;
@@ -1349,7 +1349,7 @@ namespace Ailu
                             if (tmp)
                             {
                                 UpdateResizeMouseCursor(tmp->_is_vertical_split ? EHoverEdgeDir::kLeft : EHoverEdgeDir::kTop);
-                                if (Input::IsKeyPressed(EKey::kLBUTTON))
+                                if (Input::IsKeyJustPressed(EKey::kLBUTTON))
                                 {
                                     _adj_split_node = tmp;
                                     break;
@@ -1366,7 +1366,7 @@ namespace Ailu
                 if (_drag_move_node)
                 {
                     Vector2f pos = Input::GetMousePosAccurate(_drag_move_node->_own_window);
-                    if (Input::IsKeyPressed(EKey::kLBUTTON))
+                    if (Input::IsKeyDown(EKey::kLBUTTON))
                     {
                         _drag_move_node->_position = pos + _drag_start_offset;
                         //处理节点拖出窗口
@@ -1414,7 +1414,7 @@ namespace Ailu
                             Vector2f pos = Input::GetMousePos(n->_own_window);
                             if (_focused_node && _focused_node != n.get() && _focused_node->IsHover(pos))
                                 continue;
-                            if (n->HoverDragArea(pos) && Input::IsKeyPressed(EKey::kLBUTTON))
+                            if (n->HoverDragArea(pos) && Input::IsKeyJustPressed(EKey::kLBUTTON))
                             {
                                 _drag_move_node = n.get();
                                 _drag_start_offset = n->_position - pos;
@@ -1583,7 +1583,7 @@ namespace Ailu
                     {
                         if (n->_own_window != main_window && n->_own_window == Application::FocusedWindow())
                         {
-                            if (Input::IsKeyPressed(EKey::kLBUTTON))
+                            if (Input::IsKeyDown(EKey::kLBUTTON))
                             {
                                 auto [x, y] = n->_own_window->GetClientPosition();
                                 if (x >= mw_x && x <= mw_x + mw_w && y >= mw_y && y <= mw_y + mw_h)

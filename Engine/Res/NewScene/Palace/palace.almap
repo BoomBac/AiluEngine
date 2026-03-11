@@ -1,5 +1,5 @@
 guid: 7ac5d887-551f-4363-b38f-299f318b23dc
-type: kScene
+type: Ailu::SceneManagement::Scene
 name: palace
 Entity:1
     _tag_component:

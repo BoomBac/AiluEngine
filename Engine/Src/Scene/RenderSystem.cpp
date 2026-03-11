@@ -368,12 +368,6 @@ namespace Ailu
                 }
                 else //Area light
                 {
-                    if (!comp->_shadow._is_cast_shadow)
-                    {
-                        comp->_shadow._shaodwcam_num = 0u;
-                        continue;
-                    }
-                    comp->_shadow._shaodwcam_num = 1u;
                     memset(comp->_light._area_points, 0, sizeof(comp->_light._area_points));
                     f32 w = comp->_light._light_param.y * 0.5f, h = comp->_light._light_param.z * 0.5f;
                     comp->_light._area_points[0].x = -w;
@@ -389,6 +383,12 @@ namespace Ailu
                     TransformCoord(comp->_light._area_points[1], mat);
                     TransformCoord(comp->_light._area_points[2], mat);
                     TransformCoord(comp->_light._area_points[3], mat);
+                    if (!comp->_shadow._is_cast_shadow)
+                    {
+                        comp->_shadow._shaodwcam_num = 0u;
+                        continue;
+                    }
+                    comp->_shadow._shaodwcam_num = 1u;
                     f32 n = 0.01f, f = comp->_light._light_param.x * 1.5f;
                     comp->_shadow_cameras[0].SetLens(90, 1, n, f);
                     comp->_shadow_cameras[0].Position(comp->_light._light_pos.xyz);

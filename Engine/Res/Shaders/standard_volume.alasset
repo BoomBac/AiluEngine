@@ -1,5 +1,5 @@
 guid: 0cd86d2c-e28b-4816-a032-0ef7fb1843f5
-type: kShader
+type: Ailu::Render::Shader
 name: standard_volume
   file: Shaders/hlsl/standard_volume.hlsl
   vs_entry: VSMain

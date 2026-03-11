@@ -1,5 +1,5 @@
 guid: 0c0c98a5-1f90-4caa-9b72-bc4257ef17ae
-type: kShader
+type: Ailu::Render::Shader
 name: texture3d_drawer
   file: Shaders/hlsl/texture3d_drawer.hlsl
   vs_entry: VSMain

@@ -117,7 +117,16 @@ target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/rapidjson)
 # 宏定义
-target_compile_definitions(Engine PRIVATE AILU_BUILD_DLL;_DEBUG;ENGINE_EXPORTS;_WINDOWS;_USRDLL;FBXSDK_SHARED;NOMINMAX;_REVERSED_Z;DEAR_IMGUI)
+target_compile_definitions(Engine PRIVATE
+        AILU_BUILD_DLL
+        ENGINE_EXPORTS
+        _WINDOWS
+        _USRDLL
+        FBXSDK_SHARED
+        NOMINMAX
+        _REVERSED_Z
+        DEAR_IMGUI
+        $<$<CONFIG:Debug>:_DEBUG>)
 
 if (AILU_ENABLE_TRACY)
         target_compile_definitions(Engine PRIVATE TRACY_ENABLE)
@@ -152,7 +161,8 @@ target_precompile_headers(Engine PRIVATE Inc/pch.h)
 target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;
 d2d1.lib;dwrite.lib;d3d11.lib;
 imm32.lib;
-        ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;${ENGINE_ROOT_PATH}/Ext/fbxsdk/lib/vs2019/x64/debug/libfbxsdk.lib) # ;msvcrtd.lib
+        ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;
+        ${AILU_FBXSDK_LINK_LIB}) # ;msvcrtd.lib
 
 if (WIN32 AND AILU_ENABLE_TRACY)
         target_link_libraries(Engine PRIVATE ws2_32 dbghelp)
@@ -163,7 +173,7 @@ endif()
 # 添加自定义命令来运行批处理脚本
 add_custom_command(TARGET Engine POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E echo "Running post-build script..."
-        COMMAND cmd /c "${PROJECT_SOURCE_DIR}/post_build_script.bat"
+        COMMAND cmd /c "${PROJECT_SOURCE_DIR}/post_build_script.bat" "$<CONFIG>" "$<TARGET_FILE:Engine>" "${AiluBuildPath}"
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         COMMENT "Running post-build script..."
         VERBATIM

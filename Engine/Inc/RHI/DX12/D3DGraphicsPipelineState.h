@@ -100,6 +100,7 @@ namespace Ailu::RHI::DX12
     public:
         D3DGraphicsPipelineState(const GraphicsPipelineStateInitializer &initializer);
         ~D3DGraphicsPipelineState();
+        Render::NativeHandle NativeResource() final { return {Render::RendererAPI::ERenderAPI::kDirectX12, _p_plstate.Get()}; }
         void SetTopology(ETopology topology) final;
 
     private:

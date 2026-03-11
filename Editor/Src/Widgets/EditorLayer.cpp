@@ -570,7 +570,7 @@ namespace Ailu
                 }
                 if (key_e.GetKeyCode() == EKey::kS)
                 {
-                    if (Input::IsKeyPressed(EKey::kCONTROL))
+                    if (Input::IsKeyDownAccurate(EKey::kCONTROL))
                     {
                         LOG_INFO("Save assets...");
                         g_pThreadTool->Enqueue([]()
@@ -586,9 +586,9 @@ namespace Ailu
                 }
                 if (key_e.GetKeyCode() == EKey::kZ)
                 {
-                    if (Input::IsKeyPressed(EKey::kCONTROL))
+                    if (Input::IsKeyDownAccurate(EKey::kCONTROL))
                     {
-                        if (Input::IsKeyPressed(EKey::kSHIFT))
+                        if (Input::IsKeyDownAccurate(EKey::kSHIFT))
                         {
                             g_pCommandMgr->Redo();
                         }
@@ -600,7 +600,7 @@ namespace Ailu
                 }
                 if (key_e.GetKeyCode() == EKey::kD)
                 {
-                    if (Input::IsKeyPressed(EKey::kCONTROL))
+                    if (Input::IsKeyDownAccurate(EKey::kCONTROL))
                     {
                         List<ECS::Entity> new_entities;
                         for (auto e: Selection::SelectedEntities())

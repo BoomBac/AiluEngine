@@ -6,6 +6,94 @@
 
 namespace Ailu::Render
 {
+    const char *GfxCommandTypeName(EGpuCommandType type)
+    {
+        switch (type)
+        {
+        case EGpuCommandType::kSetTarget:
+            return "kSetTarget";
+        case EGpuCommandType::kClearTarget:
+            return "kClearTarget";
+        case EGpuCommandType::kDraw:
+            return "kDraw";
+        case EGpuCommandType::kDispatch:
+            return "kDispatch";
+        case EGpuCommandType::kResourceUpload:
+            return "kResourceUpload";
+        case EGpuCommandType::kTransResourceState:
+            return "kTransResourceState";
+        case EGpuCommandType::kUAVBarrier:
+            return "kUAVBarrier";
+        case EGpuCommandType::kAllocConstBuffer:
+            return "kAllocConstBuffer";
+        case EGpuCommandType::kCommandProfiler:
+            return "kCommandProfiler";
+        case EGpuCommandType::kCopyCounter:
+            return "kCopyCounter";
+        case EGpuCommandType::kReadBack:
+            return "kReadBack";
+        case EGpuCommandType::kPresent:
+            return "kPresent";
+        case EGpuCommandType::kScissorRect:
+            return "kScissorRect";
+        case EGpuCommandType::kCustom:
+            return "kCustom";
+        default:
+            return "Unknown";
+        }
+    }
+
+    void DestroyCommand(GfxCommand *cmd)
+    {
+        switch (cmd->GetCmdType())
+        {
+        case EGpuCommandType::kSetTarget:
+            static_cast<CommandSetTarget *>(cmd)->~CommandSetTarget();
+            break;
+        case EGpuCommandType::kClearTarget:
+            static_cast<CommandClearTarget *>(cmd)->~CommandClearTarget();
+            break;
+        case EGpuCommandType::kDraw:
+            static_cast<CommandDraw *>(cmd)->~CommandDraw();
+            break;
+        case EGpuCommandType::kDispatch:
+            static_cast<CommandDispatch *>(cmd)->~CommandDispatch();
+            break;
+        case EGpuCommandType::kResourceUpload:
+            static_cast<CommandGpuResourceUpload *>(cmd)->~CommandGpuResourceUpload();
+            break;
+        case EGpuCommandType::kTransResourceState:
+            static_cast<CommandTranslateState *>(cmd)->~CommandTranslateState();
+            break;
+        case EGpuCommandType::kUAVBarrier:
+            static_cast<CommandUAVBarrier *>(cmd)->~CommandUAVBarrier();
+            break;
+        case EGpuCommandType::kAllocConstBuffer:
+            static_cast<CommandAllocConstBuffer *>(cmd)->~CommandAllocConstBuffer();
+            break;
+        case EGpuCommandType::kCommandProfiler:
+            static_cast<CommandProfiler *>(cmd)->~CommandProfiler();
+            break;
+        case EGpuCommandType::kCopyCounter:
+            static_cast<CommandCopyCounter *>(cmd)->~CommandCopyCounter();
+            break;
+        case EGpuCommandType::kReadBack:
+            static_cast<CommandReadBack *>(cmd)->~CommandReadBack();
+            break;
+        case EGpuCommandType::kPresent:
+            static_cast<CommandPresent *>(cmd)->~CommandPresent();
+            break;
+        case EGpuCommandType::kScissorRect:
+            static_cast<CommandScissor *>(cmd)->~CommandScissor();
+            break;
+        case EGpuCommandType::kCustom:
+            static_cast<CommandCustom *>(cmd)->~CommandCustom();
+            break;
+        default:
+            break;
+        }
+    }
+    
     static CommandPool *g_pCommandPool = nullptr;
     CommandPool &CommandPool::Get()
     {
@@ -16,61 +104,21 @@ namespace Ailu::Render
         if (g_pCommandPool == nullptr)
         {
             g_pCommandPool = new CommandPool();
-            for (u32 i = 0; i < g_pCommandPool->_pool_set_target.Capacity(); i++)
-                g_pCommandPool->_pool_set_target.Push(AL_NEW(CommandSetTarget));
-            for (u32 i = 0; i < g_pCommandPool->_pool_clear_target.Capacity(); i++)
-                g_pCommandPool->_pool_clear_target.Push(AL_NEW(CommandClearTarget));
-            for (u32 i = 0; i < g_pCommandPool->_pool_draw.Capacity(); i++)
-                g_pCommandPool->_pool_draw.Push(AL_NEW(CommandDraw));
-            for (u32 i = 0; i < g_pCommandPool->_pool_dispatch.Capacity(); i++)
-                g_pCommandPool->_pool_dispatch.Push(AL_NEW(CommandDispatch));
-            for (u32 i = 0; i < g_pCommandPool->_pool_resource_upload.Capacity(); i++)
-                g_pCommandPool->_pool_resource_upload.Push(AL_NEW(CommandGpuResourceUpload));
-            for (u32 i = 0; i < g_pCommandPool->_pool_resource_translate.Capacity(); i++)
-                g_pCommandPool->_pool_resource_translate.Push(AL_NEW(CommandTranslateState));
-            for (u32 i = 0; i < g_pCommandPool->_pool_custom.Capacity(); i++)
-                g_pCommandPool->_pool_custom.Push(AL_NEW(CommandCustom));
-            for (u32 i = 0; i < g_pCommandPool->_pool_alloc_const_buffer.Capacity(); i++)
-                g_pCommandPool->_pool_alloc_const_buffer.Push(AL_NEW(CommandAllocConstBuffer));
-            for (u32 i = 0; i < g_pCommandPool->_pool_profiler.Capacity(); i++)
-                g_pCommandPool->_pool_profiler.Push(AL_NEW(CommandProfiler));
-            for (u32 i = 0; i < g_pCommandPool->_pool_present.Capacity(); i++)
-                g_pCommandPool->_pool_present.Push(AL_NEW(CommandPresent));
-            for (u32 i = 0; i < g_pCommandPool->_pool_cp_counter.Capacity(); i++)
-                g_pCommandPool->_pool_cp_counter.Push(AL_NEW(CommandCopyCounter));
-            for (u32 i = 0; i < g_pCommandPool->_pool_rb.Capacity(); i++)
-                g_pCommandPool->_pool_rb.Push(AL_NEW(CommandReadBack));
-            for (u32 i = 0; i < g_pCommandPool->_pool_scissor.Capacity(); i++)
-                g_pCommandPool->_pool_scissor.Push(AL_NEW(CommandScissor));
+            for (u32 i = 0; i < kCommandPoolPayloadCount; ++i)
+                g_pCommandPool->_payload_pool.Push(AL_NEW(CommandPayload));
         }
     }
     void CommandPool::Shutdown()
     {
-        /*
-        for (u32 i = 0; i < g_pCommandPool->_pool_set_target.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_set_target.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_clear_target.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_clear_target.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_draw.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_draw.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_dispatch.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_dispatch.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_resource_upload.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_resource_upload.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_resource_translate.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_resource_translate.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_custom.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_custom.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_alloc_const_buffer.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_alloc_const_buffer.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_profiler.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_profiler.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_present.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_present.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_cp_counter.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_cp_counter.Pop().value());
-        for (u32 i = 0; i < g_pCommandPool->_pool_rb.Capacity(); i++)
-            AL_DELETE(g_pCommandPool->_pool_rb.Pop().value());
-            */
+        if (g_pCommandPool == nullptr)
+            return;
+
+        while (auto payload = g_pCommandPool->_payload_pool.Pop())
+        {
+            AL_DELETE(payload.value());
+        }
+
+        delete g_pCommandPool;
+        g_pCommandPool = nullptr;
     }
 }// namespace Ailu

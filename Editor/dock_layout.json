@@ -1,9 +1,9 @@
 {
     "_node_data": [{
-            "_type_id": "Ailu::Editor::SceneView",
             "_split_ratio": 0.5,
-            "_window_size": [1286.0, 756.0],
+            "_type_id": "Ailu::Editor::SceneView",
             "_type": 2,
+            "_window_size": [1255.0, 644.0],
             "_parent_id": 4294967295,
             "_id": 0,
             "_window_id": 0,
@@ -11,14 +11,14 @@
             "_title": "SceneView",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [376.0, 60.0],
+            "_position": [268.0, 48.0],
             "_size": [862.0, 482.0],
             "_flags": 0
         }, {
-            "_split_ratio": 0.5,
             "_type_id": "Ailu::Editor::AssetBrowser",
+            "_split_ratio": 0.5,
+            "_window_size": [1255.0, 644.0],
             "_type": 2,
-            "_window_size": [1286.0, 756.0],
             "_parent_id": 4294967295,
             "_id": 1,
             "_window_id": 0,
@@ -30,10 +30,10 @@
             "_size": [903.0, 513.0],
             "_flags": 0
         }, {
-            "_type_id": "Ailu::Editor::ObjectDetail",
             "_split_ratio": 0.5,
-            "_window_size": [1286.0, 756.0],
+            "_type_id": "Ailu::Editor::ObjectDetail",
             "_type": 2,
+            "_window_size": [1255.0, 644.0],
             "_parent_id": 4294967295,
             "_id": 2,
             "_window_id": 0,
@@ -41,7 +41,7 @@
             "_title": "ObjectDetail",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [720.0, 171.0],
+            "_position": [868.0, 533.0],
             "_size": [377.0, 493.0],
             "_flags": 0
         }]

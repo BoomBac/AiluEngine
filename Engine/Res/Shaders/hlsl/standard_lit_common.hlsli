@@ -20,17 +20,18 @@ PerMaterialCBufferBegin
 	uint   _SamplerMask; //44
 	uint   _MaterialID;
 	float  _AlphaCulloff;
+	float _IOR;
+	float _Transmission;
 PerMaterialCBufferEnd
 
 
 void InitSurfaceData(StandardPSInput input,out SurfaceData surface)
 {
+	surface.albedo = _AlbedoValue;
 	if (_SamplerMask & 1)
 	{
-		surface.albedo = _AlbedoTex.Sample(g_LinearWrapSampler, input.uv0);
+		surface.albedo *= _AlbedoTex.Sample(g_LinearWrapSampler, input.uv0);
 	}
-	else
-		surface.albedo = _AlbedoValue;
 	if(_SamplerMask & 2)
 	{
 		surface.wnormal = _NormalTex.Sample(g_LinearWrapSampler, input.uv0).xyz * 2.0 - 1.0;

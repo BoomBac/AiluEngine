@@ -13,6 +13,9 @@
 #include "Render/FrameResource.h"
 #include "Render/FrameAllocator.h"
 
+#include "Render/RayTracing/RayTracingScene.h"
+#include "Render/RayTracing/RayTracingGeometry.h"
+
 namespace Ailu::Render
 {
     static CommandBufferPool *s_pCommandBufferPool = nullptr;
@@ -653,6 +656,13 @@ namespace Ailu::Render
             _commands.emplace_back(cmd);
         }
 
+        void InsertUAVBarrier(GpuResource *res)
+        {
+            auto cmd = CommandPool::Get().Alloc<CommandUAVBarrier>();
+            cmd->_res = res;
+            _commands.emplace_back(cmd);
+        }
+
         void ReadbackBuffer(GPUBuffer *buffer, bool is_counter, u32 size, ReadbackCallback callback)
         {
             auto cmd = CommandPool::Get().Alloc<CommandReadBack>();
@@ -661,6 +671,31 @@ namespace Ailu::Render
             cmd->_res = buffer;
             cmd->_size = size;
             cmd->_callback = callback;
+            _commands.emplace_back(cmd);
+        }
+
+        void BuildAS(RayTracingScene* scene,bool is_update = false)
+        {
+            auto cmd = CommandPool::Get().Alloc<CommandBuildAS>();
+            cmd->_dst = scene;
+            cmd->_src = is_update ? cmd->_dst : nullptr;
+            cmd->_scratch_size = 0u;
+            cmd->_tlas._instance_buffer = nullptr;
+            cmd->_tlas._instance_count = 0u;
+            cmd->_is_blas = false;
+            cmd->_is_update = is_update;
+            _commands.emplace_back(cmd);
+        }
+
+        void BuildAS(RayTracingGeometry* geometry,bool is_update = false)
+        {
+            auto cmd = CommandPool::Get().Alloc<CommandBuildAS>();
+            cmd->_blas._geometries = &geometry->GetDesc();
+            cmd->_blas._geometry_count = 1u;
+            cmd->_dst = geometry;
+            cmd->_src = is_update ? cmd->_dst : nullptr;
+            cmd->_scratch_size = geometry->GetScratchBufferSize();
+            cmd->_is_blas = true;
             _commands.emplace_back(cmd);
         }
         Vector<GfxCommand *> _commands;
@@ -907,6 +942,21 @@ namespace Ailu::Render
     void CommandBuffer::StateTransition(GpuResource* res,EResourceState new_state,u32 sub_res)
     {
         _impl->StateTransition(res, new_state, sub_res);
+    }
+
+    void CommandBuffer::InsertUAVBarrier(GpuResource *res)
+    {
+        _impl->InsertUAVBarrier(res);
+    }
+
+    void CommandBuffer::BuildAS(RayTracingScene* scene,bool is_update)
+    {
+        _impl->BuildAS(scene, is_update);
+    }
+
+    void CommandBuffer::BuildAS(RayTracingGeometry* geometry,bool is_update)
+    {
+        _impl->BuildAS(geometry, is_update);
     }
 
     void CommandBuffer::ReadbackBuffer(GPUBuffer *buffer, bool is_counter, u32 size, ReadbackCallback callback)

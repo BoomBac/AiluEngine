@@ -158,13 +158,15 @@ namespace Ailu
                         const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
                         if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
                         {
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                            auto submesh = Selection::GetSelectedSubIndex(entity);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 1, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
                         {
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                            auto submesh = Selection::GetSelectedSubIndex(entity);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 1, 1);
                             Gizmo::DrawAABB(comp->_transformed_aabbs[0], Colors::kGreen);
                         }
                         if (auto c = r.GetComponent<ECS::CCollider>(entity))
@@ -326,13 +328,15 @@ namespace Ailu
                         const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
                         if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
                         {
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                            auto submesh = Selection::GetSelectedSubIndex(entity);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 1, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
                         {
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, 0, 1, 1);
+                            auto submesh = Selection::GetSelectedSubIndex(entity);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 1, 1);
                             Gizmo::DrawAABB(comp->_transformed_aabbs[0],Colors::kGreen);
                         }
                         if (auto c = r.GetComponent<ECS::CCollider>(entity))
@@ -515,7 +519,7 @@ namespace Ailu
                 }
             }
         }
-        void PickFeature::GetPickID(u16 x, u16 y, std::function<void(u32)> on_value_get) const
+        void PickFeature::GetPickID(u16 x, u16 y, std::function<void(u32,u32)> on_value_get) const
         {
             if (_is_active)
             {
@@ -526,8 +530,7 @@ namespace Ailu
                 _read_pickbuf->SetVector("pixel_pos", Vector4f((f32) x, (f32) y, 0.0f, 0.0f));
                 cmd->Dispatch(_read_pickbuf.get(), kernel, 1, 1, 1);
                 cmd->ReadbackBuffer(_readback_buf.get(), false, 4u, [on_value_get](const u8 *data, u32 size)
-                                    { on_value_get(*(u32 *) data);
-                    });
+                                    { on_value_get((*(u32 *) data) >> 8, (*(u32 *) data) & 0xFF); });
                 GraphicsContext::Get().ExecuteCommandBuffer(cmd);
                 CommandBufferPool::Release(cmd);
             }

@@ -73,7 +73,7 @@ public:
         std::string _underlying_type;
         std::string _decl_type;
         std::string _namespace;
-        std::vector<std::tuple<std::string, int>> _members;
+        std::vector<std::tuple<std::string, uint32_t>> _members;
         bool _is_enum_class;
     };
 private:

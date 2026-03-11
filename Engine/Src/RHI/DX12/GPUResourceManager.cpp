@@ -11,6 +11,17 @@ using namespace Ailu::Render;
 
 namespace Ailu::RHI::DX12
 {
+    namespace
+    {
+        inline void NameAndLogGpuPage(ID3D12Resource* resource, const String& name)
+        {
+            if (resource == nullptr)
+                return;
+            SetName(resource, ToWChar(name).c_str());
+            LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
+        }
+    }
+
     GPUResourcePage::GPUResourcePage(u16 id, D3D12_HEAP_TYPE type, u32 size) : Page(id,size),_type(type)
     {
         auto heap_prop = CD3DX12_HEAP_PROPERTIES(type);
@@ -24,7 +35,7 @@ namespace Ailu::RHI::DX12
                                                                             D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(_res.GetAddressOf())));
             _res->Map(0, nullptr, reinterpret_cast<void **>(&_ptr_cpu));
             _ptr_gpu = _res->GetGPUVirtualAddress();
-            _res->SetName(std::format(L"UploadPage_{}",s_global_id++).c_str());
+            NameAndLogGpuPage(_res.Get(), std::format("UploadPage_{}", s_global_id++));
         }
         else
         {
@@ -98,6 +109,12 @@ namespace Ailu::RHI::DX12
     {
         AL_ASSERT(handle._page_id < _pages.size());
         _pages[handle._page_id].Free(handle._offset, handle._size,Application::Application::Get().GetFrameCount());
+    }
+    ID3D12Resource *GpuResourceManager::NativeResource(const GpuResourceManager::Allocation &handle) const
+    {
+        if (handle._page_id >= _pages.size())
+            return nullptr;
+        return _pages[handle._page_id]._res.Get();
     }
     u32 GpuResourceManager::ReleaseSpace()
     {

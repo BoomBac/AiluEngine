@@ -1,5 +1,5 @@
 guid: 2800bee2-b69e-46af-8111-e454ff8a5660
-type: kShader
+type: Ailu::Render::Shader
 name: GpuTerrain
   file: Shaders/hlsl/terrain.hlsl
   vs_entry: VSMain

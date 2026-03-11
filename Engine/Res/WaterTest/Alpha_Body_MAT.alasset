@@ -1,5 +1,5 @@
 guid: 3671e9ff-13b9-4a7b-8592-edb17832b9b5
-type: kMaterial
+type: Ailu::Render::Material
 name: Alpha_Body_MAT
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
 keywords: 

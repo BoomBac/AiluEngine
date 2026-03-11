@@ -21,6 +21,7 @@ namespace Ailu
         }
         enum EGPUBufferTarget
         {
+            kNone = 0,
             kVertex = 1,
             kIndex = 2,
             kCopySource = 4,
@@ -36,7 +37,8 @@ namespace Ailu
             kAppend = 0x40,
             kCounter = 0x80,
             kIndirectArguments = 0x100,
-            kConstant = 0x200
+            kConstant = 0x200,
+            kRaytraceAS = 0x400
         };
         static EGPUBufferTarget operator|(EGPUBufferTarget a, EGPUBufferTarget b)
         {
@@ -84,28 +86,35 @@ namespace Ailu
                 {
                     u32 _is_readable     : 1;
                     u32 _is_random_write : 1;
+                    u32 _is_create_srv   : 1;
+                    u32 _is_create_uav   : 1;
                 };
                 u32 _flags;
             };
 
             EALGFormat::EALGFormat _format;
+            EResourceState _init_state;
             EGPUBufferTarget _target;
             BufferDesc() : _size(0), _element_num(1u), _element_size(0u), _flags(0), _format(EALGFormat::kALGFormatUNKOWN),
-                           _target(EGPUBufferTarget::kConstant)
+                           _target(EGPUBufferTarget::kConstant), _init_state(EResourceState::kCommon)
             {
                 _is_readable = false;
                 _is_random_write = true;
+                _is_create_srv = true;
+                _is_create_uav = true;
             }
         };
         class AILU_API GPUBuffer : public GpuResource
         {
         public:
             static Ref<GPUBuffer> Create(BufferDesc desc, const String &name = std::format("common_buffer_{}", s_global_buffer_index++));
+            static Ref<GPUBuffer> CreateSync(BufferDesc desc, const String &name = std::format("common_buffer_{}", s_global_buffer_index++));
             static Ref<GPUBuffer> Create(EGPUBufferTarget target, u32 element_size, u32 element_num, const String &name = std::format("common_buffer_{}", s_global_buffer_index++));
             GPUBuffer(BufferDesc desc) : _desc(desc)
             {
                 _desc._is_random_write |= static_cast<bool>(desc._target & EGPUBufferTarget::kAppend);
                 _res_type = EGpuResType::kBuffer;
+                _desc._size = desc._size == 0 ? desc._element_num * desc._element_size : desc._size;
             }
             virtual ~GPUBuffer() = default;
             virtual void ReadBack(u8 *dst, u32 size) {};
@@ -167,7 +176,7 @@ namespace Ailu
             virtual ~VertexBuffer() = default;
             void SetStream(u8 *data, u32 size, u8 stream_index, bool is_dynamic);
             void SetData(u8 *data, u32 size, u8 stream_index, u32 offset);
-            u8 *GetStream(u8 index) { return _mapped_data[index]; };
+            u8 *GetStream(u8 index) { return _stream_data[index]._data; };
             void SetLayout(VertexBufferLayout layout) { _buffer_layout = std::move(layout); };
             [[nodiscard]] const VertexBufferLayout &GetLayout() const { return _buffer_layout; };
             u32 GetVertexCount() const { return _vertices_count; };
@@ -183,8 +192,6 @@ namespace Ailu
                 bool _is_dynamic;
             };
             Vector<StreamData> _stream_data;
-            //just for dynamic buffer
-            Vector<u8 *> _mapped_data;
             std::map<String, u8> _buffer_layout_indexer;
         };
 

@@ -1,5 +1,5 @@
 guid: 6abca545-d271-4c76-b214-913472735574
-type: kScene
+type: Ailu::SceneManagement::Scene
 name: empty_scene
 scene_register:
 Entity:1
@@ -54,7 +54,7 @@ Entity:3
 _layer_mask:0
         _transform_component:
             _transform:
-                _position:0.000000000,0.000000000,0.000000000
+                _position:0.000000000,-0.218750000,0.000000000
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:14.933902740,14.933902740,14.933902740
         _static_mesh_component:
@@ -68,3 +68,22 @@ _layer_mask:0
             _parent:0
             _children_num:0
             _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
+Entity:4
+        _tag_component:
+            _name:LightProbe_4
+_layer_mask:1
+        _transform_component:
+            _transform:
+                _position:21.469730377,7.310354233,0.000000000
+                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
+                _scale:1.000000000,1.000000000,1.000000000
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
+        _lightprobe_component:
+            _size:9
+            _is_update_every_tick:0

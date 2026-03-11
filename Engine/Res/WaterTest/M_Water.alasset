@@ -1,5 +1,5 @@
 guid: abcb7c17-1767-4b43-9850-f7a36a428b96
-type: kMaterial
+type: Ailu::Render::Material
 name: M_Water
 shader_guid: f891ec73-10c8-404b-91ac-5bac15cda5fb
 keywords: 

@@ -39,9 +39,11 @@ namespace Ailu
             UI::Text *_path_title;
 
             bool _is_dirty = true;
+            bool _is_icon_layout_dirty = true;
             f32 _icon_size = 64.0f;
             UI::UIElement *_hover_item = nullptr;
             fs::path _current_path;
+            Vector2f _last_icon_area_size = Vector2f::kZero;
             Vector<Asset *> _cur_dir_assets;
             HashMap<Render::Mesh *, Ref<Render::RenderTexture>> _mesh_preview_icons;
             bool _is_dragging = false;

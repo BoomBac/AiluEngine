@@ -28,14 +28,29 @@ namespace Ailu
         friend class Application;
     public:
         inline const static u32 kMaxKeyNum = 512u;
-        inline static bool IsKeyPressed(EKey keycode) 
+        /// <summary>
+        /// Snapshot state for the current frame. Use this for continuous input.
+        /// </summary>
+        inline static bool IsKeyDown(EKey keycode)
         {
-            bool is_press = sp_instance->IsKeyPressed(keycode);
-            s_cur_key_state[keycode] = is_press;
-            return is_press;
+            return s_cur_key_state[keycode];
         }
         /// <summary>
-        /// Determines if a key was just pressed in the current frame.
+        /// Immediate platform query. Use only when frame snapshot precision is not enough.
+        /// </summary>
+        inline static bool IsKeyDownAccurate(EKey keycode)
+        {
+            return sp_instance != nullptr && sp_instance->IsKeyPressed(keycode);
+        }
+        /// <summary>
+        /// Legacy alias. Prefer IsKeyDown for continuous state.
+        /// </summary>
+        inline static bool IsKeyPressed(EKey keycode) 
+        {
+            return IsKeyDown(keycode);
+        }
+        /// <summary>
+        /// Determines if a key was pressed in the current frame.
         /// </summary>
         /// <param name="keycode">The key code representing the key to check.</param>
         /// <returns>True if the key was pressed in the current frame and was not pressed in the previous frame; otherwise, false.</returns>
@@ -44,11 +59,11 @@ namespace Ailu
             return s_cur_key_state[keycode] && !s_pre_key_state[keycode];
         }
         /// <summary>
-        /// Checks if a key was just released in the current frame.
+        /// Determines if a key was released in the current frame.
         /// </summary>
-        /// <param name="code">The key code to check.</param>
-        /// <returns>True if the key was released in the current frame; otherwise, false.</returns>
-        inline static bool JustReleased(EKey code)
+        /// <param name="code">The key code representing the key to check.</param>
+        /// <returns>True if the key was released in the current frame and was pressed in the previous frame; otherwise, false.</returns>
+        inline static bool IsKeyJustReleased(EKey code)
         {
             return !s_cur_key_state[code] && s_pre_key_state[code];
         }
@@ -104,6 +119,18 @@ namespace Ailu
             sp_instance = std::move(input);
         }
     protected:
+        inline static void RefreshKeyStates()
+        {
+            if (sp_instance == nullptr)
+            {
+                s_cur_key_state.reset();
+                return;
+            }
+            for (u32 key = 0; key < kMaxKeyNum; ++key)
+            {
+                s_cur_key_state[key] = sp_instance->IsKeyPressed(static_cast<EKey>(key));
+            }
+        }
         inline static Scope<InputPlatform> sp_instance;
         inline static bool s_block_input = false;
         inline static Vector2f s_mouse_pos_delta = Vector2f::kZero;

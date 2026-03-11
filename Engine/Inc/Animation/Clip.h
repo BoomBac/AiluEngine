@@ -7,10 +7,13 @@
 #include "Objects/Serialize.h"
 #include "TransformTrack.h"
 #include "Pose.h"
+#include "generated/Clip.gen.h"
 namespace Ailu
 {
+    ACLASS()
     class AILU_API AnimationClip : public Object, public IPersistentable
 	{
+        GENERATED_BODY()
 	public:
 		AnimationClip();
 		~AnimationClip() override = default;

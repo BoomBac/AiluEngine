@@ -1,4 +1,5 @@
 guid: d7e07be5-55ed-4b47-ad7f-107a64cda4bf
-type: kTexture2D
+type: Ailu::Render::Texture2D
 name: spot_light
   file: Icons/spot_light.png
+  sRGB: 1

@@ -361,14 +361,13 @@ namespace Ailu::RHI::DX12
         std::pair<D3D12_INPUT_ELEMENT_DESC *, u8> GetVertexInputLayout(u16 pass_index, ShaderVariantHash variant_hash);
 
     private:
-        bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash) final;
+        bool RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache) final;
         void Reset();
         void LoadShaderReflection(u16 pass_index, ShaderVariantHash variant_hash, ID3D12ShaderReflection *ref_vs, ID3D12ShaderReflection *ref_ps);
         void LoadAdditionalShaderReflection(const WString &sys_path, u16 pass_index, ShaderVariantHash variant_hash);
         void GenerateInternalPSO(u16 pass_index, ShaderVariantHash variant_hash);
     private:
         Vector<D3DShaderElement> _pass_elements;
-        bool _is_first_compile = true;
     };
 
     class D3DComputeShader : public ComputeShader
@@ -396,7 +395,7 @@ namespace Ailu::RHI::DX12
         /// @param thread_group_z 
         void Bind(RHICommandBuffer *cmd, u16 kernel) final;
     private:
-        bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash) final;
+        bool RHICompileImpl(u16 kernel_index,ShaderVariantHash variant_hash, bool is_load_cache) final;
         void GenerateInternalPSO(u16 kernel_index,ShaderVariantHash variant_hash);
         void LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index,ShaderVariantHash variant_hash);
         void LoadAdditionalShaderReflection(const WString &sys_path, u16 kernel_index, ShaderVariantHash variant_hash);

@@ -808,6 +808,7 @@ namespace Ailu::Render
     }
     StandardMaterial::StandardMaterial(String name) : Material(Shader::s_p_defered_standart_lit.lock().get(), name)
     {
+        Construct(true);
         SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, Colors::kWhite);
         SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, 1.0f);
         SetFloat(StandardMaterial::StandardPropertyName::kMetallic._value_name, 0.0f);
@@ -949,7 +950,6 @@ namespace Ailu::Render
     }
     void StandardMaterial::Construct(bool first_time)
     {
-        Material::Construct(first_time);
         //只有首个pass支持默认着色
         for (i16 i = 0; i < _p_shader->PassCount(); i++)
         {

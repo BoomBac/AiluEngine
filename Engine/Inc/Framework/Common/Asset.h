@@ -4,16 +4,16 @@
 #include "Framework/Math/Guid.h"
 #include "GlobalMarco.h"
 #include "Objects/Object.h"
+#include "Objects/Type.h"
 
 namespace Ailu
 {
-    DECLARE_ENUM(EAssetType, kUndefined, kMesh, kMaterial, kTexture2D, kTexture3D, kShader, kComputeShader, kScene, kSkeletonMesh, kAnimClip)
     class AILU_API Asset : public Object
     {
     public:
         Asset() = default;
-        Asset(EAssetType::EAssetType type, const WString &asset_path);
-        Asset(Guid guid, EAssetType::EAssetType type, const WString &asset_path);
+        Asset(const Type *type, const WString &asset_path);
+        Asset(Guid guid, const Type *type, const WString &asset_path);
         Asset(const Asset &other) = delete;
         Asset &operator=(const Asset &other) = delete;
         void CopyFrom(const Asset &other);
@@ -42,7 +42,7 @@ namespace Ailu
         //使用额外的信息来定位资源对象，对于对于fbx文件，使用资源路径和文件内对象的名称来确定一个mesh，对于shader，目前使用vs/ps的入口。
         WString _addi_info;
         WString _external_asset_path;
-        EAssetType::EAssetType _asset_type;
+        const Type *_asset_type = nullptr;
         Ref<Object> _p_obj;
 
     private:

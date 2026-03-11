@@ -92,7 +92,7 @@ namespace Ailu::RHI::DX12
             inputLayoutDesc.pInputElementDescs = v.data();
             inputLayoutDesc.NumElements = (UINT) v.size();
             _d3d_pso_desc.InputLayout = inputLayoutDesc;
-            AL_ASSERT(static_cast<D3DContext &>(GraphicsContext::Get()).GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)) == 0);
+            AL_ASSERT(static_cast<D3DContext &>(GraphicsContext::Get()).GetDevice()->CreateGraphicsPipelineState(&_d3d_pso_desc, IID_PPV_ARGS(&_p_plstate)) == S_OK);
             _is_ready_for_rendering = true;
             _hash = ConstructPSOHash(_state_desc, pass_index, variant_hash);
             //u8 input_layout, topology, blend_state, raster_state, ds_state, rt_state;
@@ -128,6 +128,7 @@ namespace Ailu::RHI::DX12
         {
             if (_bind_res_signature & (1 << i))
                 BindResource(rhi_cmd, _bind_res[i]);
+            _bind_res_signature &= ~(1 << i);
         }
     }
 

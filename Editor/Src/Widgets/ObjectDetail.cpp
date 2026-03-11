@@ -133,6 +133,19 @@ namespace Ailu
                         .SlotFillRate(1.0f)
                         .As<UI::Dropdown>();
             }
+
+            inline UI::CheckBox* AddCheckBoxRow(UI::UIElement *parent, const String &label, bool initial_state)
+            {
+                UI::HorizontalBox *value_box = nullptr;
+                AddPropertyRow(parent, label, &value_box);
+                auto checkbox = value_box->AddChild<UI::CheckBox>()
+                                         ->SlotMargin(kPropInnerMargin)
+                                         .SlotAlignmentH(UI::EAlignment::kRight)
+                                         .SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kAuto)
+                                         .As<UI::CheckBox>();
+                checkbox->SetChecked(initial_state);
+                return checkbox;
+            }
         }// namespace
 
         inline void ShowPopupListView(UI::UIElement *anchor, float viewport_height, const std::function<void(const Ref<UI::ListView> &)> &fill_fn)
@@ -159,20 +172,41 @@ namespace Ailu
         {
             UI::HorizontalBox *value_box = nullptr;
             AddPropertyRow(root, prop._prop_name, &value_box);
-            String prop_name = prop._prop_name;//保存名称，这里传入的prop引用可能会失效当shader重载时
+            String value_name = prop._value_name;//保存名称(HLSL中实际使用的属性名称)，这里传入的prop引用可能会失效当shader重载时
             if (prop._type == Render::EShaderPropertyType::kRange)
             {
                 auto slider = value_box->AddChild<UI::Slider>()
                                       ->SlotMargin(kPropInnerMargin)
                                       .SlotAlignmentH(UI::EAlignment::kRight)
                                       .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                                      .SlotFillRate(1.0f)
+                                      .SlotFillRate(3.0f)
                                       .As<UI::Slider>();
+                f32 current_value = prop.GetValue<f32>();
+                current_value = std::max(std::min(current_value, prop._default_value[1]), prop._default_value[0]);
+                slider->SetValue((current_value - prop._default_value[0]) / (prop._default_value[1] - prop._default_value[0]));
                 slider->_range = {prop._default_value[0], prop._default_value[1]};
-                slider->_on_value_change += [prop_name,obj](f32 v) {
-                    auto p = obj->GetShaderProperty(prop_name);
+                auto input = value_box->AddChild<UI::InputBlock>()
+                                     ->SlotMargin(kPropInnerMargin)
+                                     .SlotAlignmentH(UI::EAlignment::kRight)
+                                     .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                     .SlotFillRate(1.0f)
+                                     .As<UI::InputBlock>();
+                input->SetContent(std::format("{:.2f}", prop.GetValue<f32>()));
+                input->_on_content_changed += [value_name,obj,slider](String content)
+                {
+                    if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                    {
+                        auto p = obj->GetShaderProperty(value_name);
+                        if (p)
+                            p->SetValue<f32>(opt.value());
+                        slider->SetValue((opt.value() - p->_default_value[0]) / (p->_default_value[1] - p->_default_value[0]), false);
+                    }
+                };
+                slider->_on_value_change += [value_name,obj,input](f32 v) {
+                    auto p = obj->GetShaderProperty(value_name);
                     if (p)
                         p->SetValue<f32>(v);
+                    input->SetContent(std::format("{:.2f}", v), false);
                 };
             }
             else if (prop._type == Render::EShaderPropertyType::kFloat)
@@ -183,11 +217,12 @@ namespace Ailu
                                      .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                                      .SlotFillRate(1.0f)
                                      .As<UI::InputBlock>();
-                input->_on_content_changed += [prop_name,obj](String content)
+                input->SetContent(std::format("{:.2f}", prop.GetValue<f32>()));
+                input->_on_content_changed += [value_name,obj](String content)
                 {
                     if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
                     {
-                        auto p = obj->GetShaderProperty(prop_name);
+                        auto p = obj->GetShaderProperty(value_name);
                         if (p)
                             p->SetValue<f32>(opt.value());
                     }
@@ -201,15 +236,15 @@ namespace Ailu
                                    .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                                    .SlotFillRate(1.0f)
                                    .As<UI::Button>();
-                btn->OnMouseClick() += [prop_name,obj](UI::UIEvent &e)
+                btn->OnMouseClick() += [value_name,obj](UI::UIEvent &e)
                 {
-                    auto color_picker = MakeRef<UI::ColorPicker>(obj->GetShaderProperty(prop_name)->GetValue<Vector4f>());
-                    color_picker->Name(std::format("ColorPicker_{}", prop_name));
+                    auto color_picker = MakeRef<UI::ColorPicker>(obj->GetShaderProperty(value_name)->GetValue<Vector4f>());
+                    color_picker->Name(std::format("ColorPicker_{}", value_name));
                     color_picker->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
                     color_picker->SlotSize(260.0f, 220.0f);
-                    color_picker->OnValueChanged() += [prop_name,obj](Vector4f color)
+                    color_picker->OnValueChanged() += [value_name,obj](Vector4f color)
                     {
-                        auto p = obj->GetShaderProperty(prop_name);
+                        auto p = obj->GetShaderProperty(value_name);
                         if (p)
                             p->SetValue<Vector4f>(color);
                     };
@@ -227,16 +262,16 @@ namespace Ailu
                                    .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                                    .SlotFillRate(1.0f)
                                    .As<UI::Button>();
-                btn->OnMouseClick() += [prop_name,obj](UI::UIEvent &e)
+                btn->OnMouseClick() += [value_name,obj](UI::UIEvent &e)
                 {
-                    ShowPopupListView(e._current_target, 200.0f, [prop_name,obj](const Ref<UI::ListView> &list_view)
+                    ShowPopupListView(e._current_target, 200.0f, [value_name,obj](const Ref<UI::ListView> &list_view)
                                       {
                         auto none_item = MakeRef<UI::Text>("None");
                         none_item->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
                         none_item->SlotSize(64.0f, 64.0f);
-                        none_item->OnMouseClick() += [prop_name,obj](UI::UIEvent &e)
+                        none_item->OnMouseClick() += [value_name,obj](UI::UIEvent &e)
                         {
-                            obj->SetTexture(prop_name,nullptr);
+                            obj->SetTexture(value_name,nullptr);
                             UIManager::Get()->HidePopup();
                         };
                         list_view->AddItem(none_item);
@@ -247,9 +282,9 @@ namespace Ailu
                             auto img = item_hb->AddChild<UI::Image>(tex);
                             img->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
                             img->SlotSize(64.0f, 64.0f);
-                            img->OnMouseClick() += [prop_name, tex, obj](UI::UIEvent &e)
+                            img->OnMouseClick() += [value_name, tex, obj](UI::UIEvent &e)
                             {
-                                obj->SetTexture(prop_name,tex);
+                                obj->SetTexture(value_name,tex);
                                 //prop.SetValue<Texture2D*>(tex);
                                 UIManager::Get()->HidePopup();
                             };
@@ -424,7 +459,7 @@ namespace Ailu
                     auto set_block = [&](UI::InputBlock *block, f32 value)
                     {
                         if (!block->IsEditing())
-                            block->SetContent(std::to_string(value));
+                            block->SetContent(std::to_string(value), false);
                     };
                     set_block(_pos_block[0], comp->_transform._position.x);
                     set_block(_pos_block[1], comp->_transform._position.y);
@@ -451,22 +486,62 @@ namespace Ailu
                                               { comp->_light._light_color.a = value; });
                         }
                         {
-                            AddVec3InputRow(content, "Color",
-                                            std::format("{}", comp->_light._light_color.r),
-                                            std::format("{}", comp->_light._light_color.g),
-                                            std::format("{}", comp->_light._light_color.b),
-                                            [=](int axis, f32 v)
-                                            {
-                                                if (axis == 0)
-                                                    comp->_light._light_color.r = v;
-                                                else if (axis == 1)
-                                                    comp->_light._light_color.g = v;
-                                                else
-                                                    comp->_light._light_color.b = v;
-                                                Clamp(comp->_light._light_color.r, 0.0f, 1.0f);
-                                                Clamp(comp->_light._light_color.g, 0.0f, 1.0f);
-                                                Clamp(comp->_light._light_color.b, 0.0f, 1.0f);
-                                            });
+                            auto btn = content->AddChild<UI::Button>()
+                            ->SlotMargin(kPropInnerMargin)
+                            .SlotAlignmentH(UI::EAlignment::kRight)
+                            .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                            .SlotFillRate(1.0f)
+                            .As<UI::Button>();
+                            btn->OnMouseClick() += [comp](UI::UIEvent &e)
+                            {
+                                auto color_picker = MakeRef<UI::ColorPicker>("LightColor");
+                                color_picker->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
+                                color_picker->SlotSize(260.0f, 220.0f);
+                                color_picker->OnValueChanged() += [comp](Vector4f color)
+                                {
+                                    comp->_light._light_color.r = color.r;
+                                    comp->_light._light_color.g = color.g;
+                                    comp->_light._light_color.b = color.b;
+                                };
+                                auto abs_rect = e._current_target->GetArrangeRect();
+                                Vector2f show_pos = abs_rect.xy;
+                                show_pos.y += abs_rect.w;
+                                UI::UIManager::Get()->ShowPopupAt(show_pos.x, show_pos.y, color_picker);
+                            };
+                        }
+                        if (comp->_type == ECS::ELightType::kArea)
+                        {
+                            static const Vector<String> kShapes = {"Rectangle", "Disc"};
+                            auto &light_data = comp->_light;
+                            auto dropdown = AddDropdownRow(content, "Shape", kShapes);
+                            dropdown->SetSelectedIndex(static_cast<i32>(light_data._light_param.w));
+                            dropdown->_on_selected_changed += [&light_data](i32 idx){
+                                light_data._light_param.w = static_cast<f32>(idx);
+                            };
+                            AddFloatSliderRow(content, "Range", 0.0f, 500.0f, light_data._light_param.x, [&light_data](f32 value)
+                                      { light_data._light_param.x = value; });
+                            AddCheckBoxRow(content, "TwoSide", light_data._is_two_side)->_on_click += [&light_data](bool checked)
+                            {
+                                light_data._is_two_side = checked;
+                            };
+                            if (light_data._light_param.w == 0)
+                            {
+                                AddFloatInputRow(content, "Width", std::to_string(light_data._light_param.y), [&light_data](f32 value)
+                                {
+                                    light_data._light_param.y = value;
+                                });
+                                AddFloatInputRow(content, "Height", std::to_string(light_data._light_param.z), [&light_data](f32 value)
+                                {
+                                    light_data._light_param.z = value;
+                                });
+                            }
+                            else
+                            {
+                                AddFloatSliderRow(content, "Radius", 0.0f, 500.0f, light_data._light_param.y, [&light_data](f32 value)
+                                {
+                                    light_data._light_param.y = value;
+                                });
+                            }
                         }
                     }
                     _prev_comp_block = _light_block;
@@ -505,28 +580,29 @@ namespace Ailu
                         }
                         //material
                         {
-                            auto btn = AddButtonRow(content, "Material", (comp->_p_mats[0] != nullptr) ? comp->_p_mats[0]->Name() : "None");
-                            btn->OnMouseClick() += [comp, btn](UI::UIEvent &e)
+                            auto subindex = Selection::GetSelectedSubIndex(selected);
+                            auto btn = AddButtonRow(content, std::format("Material[{}]", subindex), (comp->_p_mats[subindex] != nullptr) ? comp->_p_mats[subindex]->Name() : "None");
+                            btn->OnMouseClick() += [comp, btn, subindex](UI::UIEvent &e)
                             {
-                                ShowPopupListView(e._current_target, 200.0f, [comp, btn](const Ref<UI::ListView> &list_view)
+                                ShowPopupListView(e._current_target, 200.0f, [comp, btn, subindex](const Ref<UI::ListView> &list_view)
                                                   {
                                         for (auto it = g_pResourceMgr->ResourceBegin<Render::Material>(); it != g_pResourceMgr->ResourceEnd<Render::Material>(); it++)
                                         {
                                             const auto &mat = g_pResourceMgr->IterToRefPtr<Render::Material>(it);
                                             auto text = MakeRef<Text>(mat->Name());
-                                            text->OnMouseClick() += [mat, comp, btn](UIEvent &e)
+                                            text->OnMouseClick() += [mat, comp, btn, subindex](UIEvent &e)
                                             {
                                                 LOG_INFO("Material item clicked: {}", mat->Name());
-                                                if (comp->_p_mats[0] == mat)
+                                                if (comp->_p_mats[subindex] == mat)
                                                     return;
-                                                comp->_p_mats[0] = mat;
-                                                btn->SetText(comp->_p_mats[0]->Name());
+                                                comp->_p_mats[subindex] = mat;
+                                                btn->SetText(comp->_p_mats[subindex]->Name());
                                                 UIManager::Get()->HidePopup();
                                             };
                                             list_view->AddItem(text);
                                         } });
                             };
-                            if (auto mat = comp->_p_mats[0]; mat != nullptr)
+                            if (auto mat = comp->_p_mats[subindex]; mat != nullptr)
                             {
                                 auto dropdown = AddDropdownRow(content, "CullMode", Vector<String>{"Off", "Front", "Back"});
                                 dropdown->SetSelectedIndex(static_cast<i32>(mat->GetCullMode()));

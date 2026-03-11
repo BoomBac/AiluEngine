@@ -9,12 +9,15 @@
 #include "Texture.h"
 #include <map>
 #include <unordered_set>
+#include "generated/Material.gen.h"
 
 
 namespace Ailu::Render
 {
+    ACLASS()
     class AILU_API Material : public Object
     {
+        GENERATED_BODY()
         friend class ResourceMgr;
         struct PassVariantInfo
         {
@@ -38,8 +41,8 @@ namespace Ailu::Render
         inline static std::weak_ptr<Material> s_standard_forward_lit;
         inline static std::weak_ptr<Material> s_checker;
 
+        Material() = default;
         Material(Shader *shader, String name);
-
         Material(const Material &other);
         Material &operator=(const Material &other);
         Material &operator=(Material &&other) noexcept;
@@ -142,8 +145,10 @@ namespace Ailu::Render
     DECLARE_ENUM(EMaterialID, kStandard, kSubsurface, kChecker)
     DECLARE_ENUM(ESurfaceType, kOpaque, kTransparent, kAlphaTest)
 
+    ACLASS()
     class AILU_API StandardMaterial : public Material
     {
+        GENERATED_BODY()
     public:
         struct StandardPropertyName
         {
@@ -189,6 +194,7 @@ namespace Ailu::Render
                 return kAlbedo;
             }
         };
+        StandardMaterial() = default;
         explicit StandardMaterial(String name);
         void Construct(bool first_time) final;
         ~StandardMaterial();

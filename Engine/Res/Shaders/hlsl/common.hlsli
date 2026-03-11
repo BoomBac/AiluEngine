@@ -232,15 +232,22 @@ float3 ComputeWorldSpacePosition(float2 ndc_pos, float depth, float4x4 inv_vp)
     return hpositionWS.xyz / hpositionWS.w;
 }
 
-//reconstruct world pos from screen pos and depth
-float3 Unproject(float2 screen_pos,float depth)
+float3 Unproject(float2 screen_pos,float depth,float4x4 inv_vp)
 {
 	screen_pos.y = 1.0 - screen_pos.y;
 	float4 clipPos = float4(2.0f * screen_pos - 1.0f, depth, 1.0);
-	float4 world_pos = mul(_MatrixIVP, clipPos);
+	float4 world_pos = mul(inv_vp, clipPos);
 	world_pos /= world_pos.w;
 	return world_pos.xyz;
 }
+
+//reconstruct world pos from screen pos and depth
+float3 Unproject(float2 screen_pos,float depth)
+{
+	return Unproject(screen_pos, depth, _MatrixIVP);
+}
+
+
 //reconstruct world pos from camera corners
 // float3 UnprojectByCameraRay(float2 screen_pos,float depth)
 // {

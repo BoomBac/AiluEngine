@@ -29,5 +29,8 @@ PSInput VSMain(VSInput v)
 
 uint PSMain(PSInput input) : SV_TARGET
 {
-	return uint(_ObjectID);
+	uint packed = 0;
+	packed |= (_ObjectID & 0xFFFFFF) << 8; // 使用高 24 位存储 Entity ID
+	packed |= (_SubmeshID & 0xFF); // 使用低 8 位存储 Submesh ID
+	return packed;
 }

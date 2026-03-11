@@ -46,6 +46,14 @@ namespace Ailu::RHI::DX12
             UNREFERENCED_PARAMETER(end);
 #endif
         }
+
+        inline void NameAndLogTimerResource(ID3D12Resource* resource, const String& name)
+        {
+            if (resource == nullptr)
+                return;
+            SetName(resource, ToWChar(name).c_str());
+            LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
+        }
     };
 
     void D3DGPUTimer::BeginFrame(RHICommandBuffer * cmd)
@@ -104,6 +112,7 @@ namespace Ailu::RHI::DX12
 
     void D3DGPUTimer::Stop(RHICommandBuffer * cmd, u32 timerid)
     {
+        static u32 frame = 0u;
         auto commandList = static_cast<D3DCommandBuffer*>(cmd)->NativeCmdList();
         if (timerid >= RenderConstants::kMaxGpuTimerNum)
             throw std::out_of_range("Timer ID out of range");
@@ -117,7 +126,7 @@ namespace Ailu::RHI::DX12
         //开始查询和结束查询分别进行 query_index 和 query_index + 1两个查询
         u64 dst_offset = (GraphicsContext::Get().CurBackbufIndex() * c_timerSlots + start_query_index) * sizeof(u64);
         //这里第四个参数应该是实际使用的timer数量 * 2，对没查询索引的解析结果会报错
-        commandList->ResolveQueryData(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, start_query_index, 2, m_buffer.Get(), dst_offset);
+        //commandList->ResolveQueryData(m_heap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, start_query_index, 2, m_buffer.Get(), dst_offset);
     }
 
     void D3DGPUTimer::Reset()
@@ -199,6 +208,6 @@ namespace Ailu::RHI::DX12
             nullptr,
             IID_GRAPHICS_PPV_ARGS(m_buffer.ReleaseAndGetAddressOf()))
         );
-        SetName(m_buffer.Get(), L"D3DGPUTimerBuffer");
+        NameAndLogTimerResource(m_buffer.Get(), "D3DGPUTimerBuffer");
     }
 }

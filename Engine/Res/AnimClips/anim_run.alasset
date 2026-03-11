@@ -1,5 +1,5 @@
 guid: aaa391ce-746b-445d-9dda-c678ad8b41b7
-type: kAnimClip
+type: Ailu::AnimationClip
 name: anim_run
 _name:RunningM_Alpha_Joints
 _frame_count:19

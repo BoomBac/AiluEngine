@@ -230,7 +230,7 @@ namespace Ailu
                                                   hb->ChildAt(i + 1)
                                                           ->As<UI::InputBlock>()
                                                           ->SetContent(
-                                                                  std::format("{:.2f}", Traits::Get(vec, i)));
+                                                                  std::format("{:.2f}", Traits::Get(vec, i)), false);
                                               }
                                           }));
 
@@ -280,7 +280,7 @@ namespace Ailu
                     text = std::format("{:.2f}", data);
                 else
                     text = std::to_string(data);
-                input_x->SetContent(text);
+                input_x->SetContent(text, false);
             })));
             return hb;
         }
@@ -305,7 +305,7 @@ namespace Ailu
             { 
                 auto data = property->Get<T>(instance);
                 auto slider = hb->ChildAt(1)->As<UI::Slider>();
-                slider->SetValue(static_cast<f32>(data));
+                slider->SetValue(static_cast<f32>(data), false);
             })));
             return hb;
         }

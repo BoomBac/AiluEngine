@@ -295,7 +295,7 @@ namespace Ailu::Render
         // }
     }
 
-    bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash)
+    bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash, bool is_load_cache)
     {
         LOG_INFO(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWChar(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
         g_pTimeMgr->Mark();
@@ -303,7 +303,7 @@ namespace Ailu::Render
         auto &pass = _passes[pass_id];
         AL_ASSERT(pass._variants.contains(variant_hash));
         _variant_state[pass_id][variant_hash] = EShaderVariantState::kCompiling;
-        if (RHICompileImpl(pass_id, variant_hash))
+        if (RHICompileImpl(pass_id, variant_hash, is_load_cache))
         {
             pass._variants[variant_hash]._pipeline_input_layout.Hash(PipelineStateHash<VertexInputLayout>::GenHash(pass._variants[variant_hash]._pipeline_input_layout));
             pass._pipeline_raster_state.Hash(PipelineStateHash<RasterizerState>::GenHash(pass._pipeline_raster_state));
@@ -321,7 +321,7 @@ namespace Ailu::Render
         return _variant_state[pass_id][variant_hash] == EShaderVariantState::kReady;
     }
 
-    bool Shader::Compile()
+    bool Shader::Compile(bool is_load_cache)
     {
         u16 pass_index = 0;
         u32 variant_index = 0;
@@ -331,7 +331,7 @@ namespace Ailu::Render
             for (auto &variant_it: pass._variants)
             {
                 auto &[vhash, kw_seq] = variant_it;
-                if (!Compile(pass_index, vhash))
+                if (!Compile(pass_index, vhash, is_load_cache))
                     ++error_variant_count;
                 ++variant_index;
             }
@@ -522,7 +522,7 @@ namespace Ailu::Render
     {
         _reference_mats.erase(mat);
     }
-    bool Shader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash)
+    bool Shader::RHICompileImpl(u16 pass_index, ShaderVariantHash variant_hash, bool is_load_cache)
     {
         return true;
     }
@@ -1388,7 +1388,7 @@ namespace Ailu::Render
     }
     HashMap<String, ShaderBindResourceInfo> s_old_bind_infos;
 
-    bool ComputeShader::Compile()
+    bool ComputeShader::Compile(bool is_load_cache)
     {
         _is_compiling.store(true);
         if (!FileManager::Exist(_src_file_path))
@@ -1403,7 +1403,7 @@ namespace Ailu::Render
         {
             for (auto &v: k._variants)
             {
-                is_succeed &= Compile(k._id, v.first);
+                is_succeed &= Compile(k._id, v.first, is_load_cache);
                 //将之前绑定的资源重新绑定上去
                 if (is_succeed)
                 {
@@ -1517,15 +1517,15 @@ namespace Ailu::Render
     }
 
 
-    bool ComputeShader::Compile(u16 kernel_index, ShaderVariantHash variant_hash)
+    bool ComputeShader::Compile(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache)
     {
         _is_compiling.store(true);
-        bool is_succeed = RHICompileImpl(kernel_index, variant_hash);
+        bool is_succeed = RHICompileImpl(kernel_index, variant_hash, is_load_cache);
         _variant_state[kernel_index][variant_hash] = is_succeed ? EShaderVariantState::kReady : EShaderVariantState::kError;
         _is_compiling.store(false);
         return is_succeed;
     }
-    bool ComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash)
+    bool ComputeShader::RHICompileImpl(u16 kernel_index, ShaderVariantHash variant_hash, bool is_load_cache)
     {
         return false;
     }

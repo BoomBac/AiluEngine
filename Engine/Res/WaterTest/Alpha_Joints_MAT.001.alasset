@@ -1,5 +1,5 @@
 guid: 86ff4fb6-27ed-4041-9029-1ff7661361a2
-type: kMaterial
+type: Ailu::Render::Material
 name: Alpha_Joints_MAT.001
 shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
 keywords: 

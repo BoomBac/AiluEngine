@@ -52,17 +52,17 @@ namespace Ailu
         TextureLoadData load_data;
         if (!LoadTextureData(sys_path, load_data))
         {
-            return Texture2D::Create(4,4,ETextureFormat::kRGBA32);
+            return Texture2D::Create(4,4,ETextureFormat::kRGBA8UNormSRGB);
         }
         else
         {
             TextureDesc desc;
             desc._width = load_data._width;
             desc._height = load_data._height;
-            desc._is_linear = import_settings._is_srgb;
+            desc._is_linear = !import_settings._is_sRGB;
             desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
-            desc._is_readable = import_settings._is_readble;
-            desc._format = ConvertTextureFormatToPixelFormat(ETextureFormat::kRGBA32);
+            desc._is_readable = import_settings._is_readable;
+            desc._format = ConvertTextureFormatToPixelFormat(import_settings._is_sRGB? ETextureFormat::kRGBA8UNormSRGB : ETextureFormat::kRGBA8UNorm);
             if (desc._mip_num > 1)
             {
                 auto mip_level = desc._mip_num - 1;
@@ -94,10 +94,10 @@ namespace Ailu
             TextureDesc desc;
             desc._width = load_data._width;
             desc._height = load_data._height;
-            desc._is_linear = import_settings._is_srgb;
+            desc._is_linear = !import_settings._is_sRGB;
             desc._mip_num = import_settings._generate_mipmap? Texture::MaxMipmapCount(desc._width,desc._height) : 1;
-            desc._is_readable = import_settings._is_readble;
-            desc._format = ConvertTextureFormatToPixelFormat(ETextureFormat::kRGBA32);
+            desc._is_readable = import_settings._is_readable;
+            desc._format = ConvertTextureFormatToPixelFormat(import_settings._is_sRGB? ETextureFormat::kRGBA8UNormSRGB : ETextureFormat::kRGBA8UNorm);
             texture->ReCreate(desc);
             for(u16 i = 0; i < load_data._data.size(); ++i)
             {

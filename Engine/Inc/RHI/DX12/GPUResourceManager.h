@@ -48,6 +48,7 @@ namespace Ailu::RHI::DX12
     public:
         Allocation Allocate(u32 size = 1024u,D3D12_HEAP_TYPE type = D3D12_HEAP_TYPE_UPLOAD);
         void Free(Allocation&& handle);
+        ID3D12Resource *NativeResource(const Allocation &handle) const;
         u32 ReleaseSpace();
     private:
         std::multimap<u32,u16>::iterator AddNewPage(D3D12_HEAP_TYPE type,u32 size = kPerPageSize);

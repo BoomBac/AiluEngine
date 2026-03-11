@@ -148,14 +148,14 @@ namespace Ailu
                     {
                         Vector4f rect = e._current_target->GetArrangeRect();
                         Vector2f local_pos = e._mouse_position - rect.xy;
-                        s_editor_layer->_pick.GetPickID((u16) local_pos.x, (u16) local_pos.y, [this, local_pos](u32 closest_entity)
-                                                        {
-                                                    LOG_INFO("Pick entity: {} on pos {}", closest_entity, local_pos.ToString());
-                        Selection::AddAndRemovePreSelection(closest_entity);
-                        auto tcomp = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(closest_entity);
-                        _transform_gizmo->SetTarget(&tcomp->_transform);
-                        ray_trace->_debug_pos = local_pos;
-                            });
+                        s_editor_layer->_pick.GetPickID((u16) local_pos.x, (u16) local_pos.y, [this, local_pos](u32 closest_entity,u32 submesh_index)
+                        {
+                            LOG_INFO("Pick entity: {},subidex: {} on pos {}", closest_entity, submesh_index, local_pos.ToString());
+                            Selection::AddAndRemovePreSelection(closest_entity,submesh_index);
+                            auto tcomp = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(closest_entity);
+                            _transform_gizmo->SetTarget(&tcomp->_transform);
+                            ray_trace->_debug_pos = local_pos;
+                        });
                     }
                 }
                 else if (e._key_code == EKey::kRBUTTON)
@@ -245,7 +245,7 @@ namespace Ailu
                 static Vector2f pre_mouse_pos;
                 target_rotation = _camera_controller->_rotation;
                 auto cur_mouse_pos = Input::GetMousePos();
-                if (Input::IsKeyPressed(EKey::kRBUTTON))
+                if (Input::IsKeyDown(EKey::kRBUTTON))
                 {
                     if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f &&
                         abs(cur_mouse_pos.y - pre_mouse_pos.y) < 100.0f)
@@ -257,31 +257,31 @@ namespace Ailu
                 }
                 pre_mouse_pos = cur_mouse_pos;
                 _camera_controller->SetTargetRotation(target_rotation.x, target_rotation.y);
-                _camera_controller->Accelerate(Input::IsKeyPressed(EKey::kSHIFT));
+                _camera_controller->Accelerate(Input::IsKeyDown(EKey::kSHIFT));
                 static const f32 move_distance = 1.0f;// 1 m
                 f32 final_move_distance = move_distance * _camera_controller->_cur_move_speed * _camera_controller->_cur_move_speed;
                 Vector3f move_dis{0, 0, 0};
-                if (Input::IsKeyPressed(EKey::kW))
+                if (Input::IsKeyDown(EKey::kW))
                 {
                     move_dis += Camera::sCurrent->Forward();
                 }
-                if (Input::IsKeyPressed(EKey::kS))
+                if (Input::IsKeyDown(EKey::kS))
                 {
                     move_dis -= Camera::sCurrent->Forward();
                 }
-                if (Input::IsKeyPressed(EKey::kD))
+                if (Input::IsKeyDown(EKey::kD))
                 {
                     move_dis += Camera::sCurrent->Right();
                 }
-                if (Input::IsKeyPressed(EKey::kA))
+                if (Input::IsKeyDown(EKey::kA))
                 {
                     move_dis -= Camera::sCurrent->Right();
                 }
-                if (Input::IsKeyPressed(EKey::kE))
+                if (Input::IsKeyDown(EKey::kE))
                 {
                     move_dis += Camera::sCurrent->Up();
                 }
-                if (Input::IsKeyPressed(EKey::kQ))
+                if (Input::IsKeyDown(EKey::kQ))
                 {
                     move_dis -= Camera::sCurrent->Up();
                 }

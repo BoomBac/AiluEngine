@@ -25,7 +25,8 @@ namespace Ailu
         public:
             D3DCommandBuffer(String name, ECommandBufferType type);
             bool IsReady() const final;
-            ID3D12GraphicsCommandList *NativeCmdList() { return _p_cmd.Get(); };
+            void InsertUAVBarrier() final;
+            ID3D12GraphicsCommandList4 *NativeCmdList() { return _p_cmd.Get(); };
             void AllocConstBuffer(const String &name, u32 size, u8 *data);
             UploadBuffer::Allocation AllocConstBuffer(const u8* data, u32 size);
             void Name(const String &name) final;
@@ -44,7 +45,7 @@ namespace Ailu
 
         private:
             D3D12_COMMAND_LIST_TYPE _dx_cmd_type;
-            ComPtr<ID3D12GraphicsCommandList> _p_cmd;
+            ComPtr<ID3D12GraphicsCommandList4> _p_cmd;
             ComPtr<ID3D12CommandAllocator> _p_alloc;
             Scope<UploadBuffer> _upload_buf;
             //存储用于管线资源的uploadbuffer，需要名字来绑定

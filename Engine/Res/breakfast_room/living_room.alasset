@@ -1,0 +1,6 @@
+guid: 7fa3f1ac-fa22-4613-b60c-54cae46bdf4e
+type: Ailu::Render::Mesh
+name: living_room
+file: breakfast_room/living_room.fbx
+inner_file_name: living_room
+is_combine_mesh: true

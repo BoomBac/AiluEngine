@@ -1,4 +1,5 @@
 guid: ef3ed829-387b-4013-8492-95e574d5e949
-type: kTexture2D
+type: Ailu::Render::Texture2D
 name: material
   file: Icons/dark/material.png
+  sRGB: 1

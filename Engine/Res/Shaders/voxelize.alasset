@@ -1,5 +1,5 @@
 guid: 14af7970-dcc5-461f-af8c-9940c52e4766
-type: kComputeShader
+type: Ailu::Render::ComputeShader
 name: voxelize
   file: Shaders/hlsl/Compute/voxelize.hlsl
   kernel: Noname

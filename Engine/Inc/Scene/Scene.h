@@ -6,6 +6,7 @@
 #include "Framework/Math/Geometry.h"
 #include "GlobalMarco.h"
 #include "Objects/Serialize.h"
+#include "generated/Scene.gen.h"
 
 
 namespace Ailu
@@ -17,13 +18,16 @@ namespace Ailu
             f32 _indirect_lighting_intensity = 0.25f;
         };
 
+        ACLASS()
         class AILU_API Scene final : public Object, public IPersistentable
         {
+            GENERATED_BODY()
             friend class SceneMgr;
         public:
             void Serialize(Archive &arch) final;
             void Deserialize(Archive &arch) final;
-            Scene(const String &name);
+            Scene() = default;
+            explicit Scene(const String &name);
             ECS::Entity AddObject(String name = "");
             ECS::Entity AddObject(Ref<Mesh> mesh, Ref<Material> mat);
             ECS::Entity AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>>& mats);
