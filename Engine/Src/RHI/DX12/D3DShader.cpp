@@ -7,6 +7,7 @@
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DShader.h"
 #include "RHI/DX12/D3DShaderCompiler.h"
+#include "RHI/DX12/D3DShaderReflectionUtils.h"
 #include "RHI/DX12/D3DTexture.h"
 #include "RHI/DX12/dxhelper.h"
 #include "Render/GraphicsPipelineStateObject.h"
@@ -58,43 +59,6 @@ namespace Ailu::RHI::DX12
                 CD3DX12_STATIC_SAMPLER_DESC(7, D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP)};
         samplers[2].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
         return samplers;
-    }
-
-    static std::pair<String, ShaderBindResourceInfo> ParserBindResource(D3D12_SHADER_INPUT_BIND_DESC bind_desc, EShaderType shader_type)
-    {
-        std::pair<String, ShaderBindResourceInfo> ret;
-        auto res_type = bind_desc.Type;
-        if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_CBUFFER)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kConstBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_TEXTURE)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_SAMPLER)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kSampler, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_APPEND_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_CONSUME_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
-        }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWTYPED)
-        {
-            ret = std::make_pair(bind_desc.Name, ShaderBindResourceInfo{EBindResDescType::kUAVTexture2D, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
-        }
-        else
-        {
-            AL_ASSERT(false);
-        }
-        ret.second._register_space = bind_desc.Space;
-        //ret.second._register_space = static_cast<u16>(shader_type);
-        return ret;
     }
 
     static void ParserBindResourceAddiInfo(HashMap<String, ShaderBindResourceInfo> &bind_res_infos, String line, bool is_in_cbuf_scope)
@@ -304,27 +268,6 @@ namespace Ailu::RHI::DX12
         else
         {
         };
-    }
-
-    static ShaderBindResourceInfo ParserBindVariable(const D3D12_SHADER_VARIABLE_DESC &desc)
-    {
-        u16 offset = (u16) desc.StartOffset;
-        u16 size = (u16) desc.Size;
-        u32 variable_info = 0u;
-        variable_info |= offset;
-        variable_info <<= 16;
-        variable_info |= size;
-        auto value_type = EBindResDescType::kCBufferAttribute;
-        if (size == 4) value_type = (EBindResDescType) (EBindResDescType::kCBufferFloat | value_type);
-        else if (size == 16 || size == 12 || size == 8)
-            value_type = (EBindResDescType) (EBindResDescType::kCBufferFloats | value_type);
-        else if (size == 64)
-            value_type = (EBindResDescType) (EBindResDescType::kCBufferMatrix | value_type);
-        else
-        {
-        }
-        auto info = ShaderBindResourceInfo{value_type, variable_info, 255u, desc.Name};
-        return info;
     }
 
     static bool IsValidMacroName(const String &s)
@@ -620,59 +563,12 @@ namespace Ailu::RHI::DX12
             pass_variant._vertex_input_num = (u8) vb_input_desc.size();
             pass_variant._pipeline_input_layout = VertexBufferLayout(vb_input_desc);
             pass_variant._bind_res_infos.clear();
-            for (u32 i = 0u; i < desc.BoundResources; i++)
-            {
-                D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
-                ref_vs->GetResourceBindingDesc(i, &bind_desc);
-                pass_variant._bind_res_infos.insert(ParserBindResource(bind_desc, EShaderType::kVertex));
-            }
-            for (u32 i = 0u; i < desc.ConstantBuffers; i++)
-            {
-                auto cbuf = ref_vs->GetConstantBufferByIndex(i);
-                D3D12_SHADER_BUFFER_DESC desc{};
-                cbuf->GetDesc(&desc);
-                u8 flag = ShaderBindResourceInfo::GetBindResourceFlag(desc.Name);
-                for (u32 j = 0u; j < desc.Variables; j++)
-                {
-                    auto variable = cbuf->GetVariableByIndex(j);
-                    D3D12_SHADER_VARIABLE_DESC vdesc{};
-                    variable->GetDesc(&vdesc);
-                    auto info = ParserBindVariable(vdesc);
-                    info._bind_flag = flag;
-                    info._p_root_cbuf = &pass_variant._bind_res_infos.find(desc.Name)->second;
-                    info._p_root_cbuf->_cbuf_size += vdesc.Size;
-                    pass_variant._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
-                }
-            }
+            ShaderReflectionUtils::AppendShaderResources(ref_vs, pass_variant._bind_res_infos);
         }
         //parser ps reflecton
         {
             ref_ps->GetDesc(&desc);
-            for (u32 i = 0u; i < desc.BoundResources; i++)
-            {
-                D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
-                ref_ps->GetResourceBindingDesc(i, &bind_desc);
-                //LOG_INFO("Name:{},Slot{},Space{}", bind_desc.Name, bind_desc.BindPoint, bind_desc.Space);
-                pass_variant._bind_res_infos.insert(ParserBindResource(bind_desc, EShaderType::kPixel));
-            }
-            for (u32 i = 0u; i < desc.ConstantBuffers; i++)
-            {
-                auto cbuf = ref_ps->GetConstantBufferByIndex(i);
-                D3D12_SHADER_BUFFER_DESC desc{};
-                cbuf->GetDesc(&desc);
-                u8 flag = ShaderBindResourceInfo::GetBindResourceFlag(desc.Name);
-                for (u32 j = 0u; j < desc.Variables; j++)
-                {
-                    auto variable = cbuf->GetVariableByIndex(j);
-                    D3D12_SHADER_VARIABLE_DESC vdesc{};
-                    variable->GetDesc(&vdesc);
-                    auto info = ParserBindVariable(vdesc);
-                    info._bind_flag = flag;
-                    info._p_root_cbuf = &pass_variant._bind_res_infos.find(desc.Name)->second;
-                    info._p_root_cbuf->_cbuf_size += vdesc.Size;
-                    pass_variant._bind_res_infos.insert(std::make_pair(vdesc.Name, info));
-                }
-            }
+            ShaderReflectionUtils::AppendShaderResources(ref_ps, pass_variant._bind_res_infos);
         }
         //parser additon info
         LoadAdditionalShaderReflection(_src_file_path, pass_index, variant_hash);
@@ -830,34 +726,9 @@ namespace Ailu::RHI::DX12
     void D3DComputeShader::LoadReflectionInfo(ID3D12ShaderReflection *p_reflect, u16 kernel_index, ShaderVariantHash variant_hash)
     {
         auto &cs_ele = _kernels[kernel_index]._variants[variant_hash];
-        D3D12_SHADER_DESC desc{};
         cs_ele._temp_bind_res_infos.clear();
-        //parser vs reflecton
-        p_reflect->GetDesc(&desc);
         p_reflect->GetThreadGroupSize(&_kernels[kernel_index]._thread_num.x, &_kernels[kernel_index]._thread_num.y, &_kernels[kernel_index]._thread_num.z);
-        for (u32 i = 0u; i < desc.BoundResources; i++)
-        {
-            D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
-            p_reflect->GetResourceBindingDesc(i, &bind_desc);
-            cs_ele._temp_bind_res_infos.insert(ParserBindResource(bind_desc, EShaderType::kCompute));
-        }
-        for (u32 i = 0u; i < desc.ConstantBuffers; i++)
-        {
-            auto cbuf = p_reflect->GetConstantBufferByIndex(i);
-            D3D12_SHADER_BUFFER_DESC desc{};
-            cbuf->GetDesc(&desc);
-            cs_ele._temp_bind_res_infos.find(desc.Name)->second._bind_flag = ShaderBindResourceInfo::GetBindResourceFlag(desc.Name);
-            for (u32 j = 0u; j < desc.Variables; j++)
-            {
-                auto variable = cbuf->GetVariableByIndex(j);
-                D3D12_SHADER_VARIABLE_DESC vdesc{};
-                variable->GetDesc(&vdesc);
-                auto info = ParserBindVariable(vdesc);
-                info._p_root_cbuf = &cs_ele._temp_bind_res_infos.find(desc.Name)->second;
-                info._p_root_cbuf->_cbuf_size += vdesc.Size;
-                cs_ele._temp_bind_res_infos.insert(std::make_pair(vdesc.Name, info));
-            }
-        }
+        ShaderReflectionUtils::AppendShaderResources(p_reflect, cs_ele._temp_bind_res_infos);
     }
     //https://rtarun9.github.io/blogs/shader_reflection/#reflecting-input-parameters
     void D3DComputeShader::LoadAdditionalShaderReflection(const WString &sys_path, u16 kernel_index, ShaderVariantHash variant_hash)

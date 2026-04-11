@@ -13,6 +13,7 @@
 #include "Render/Buffer.h"
 #include "Render/Gizmo.h"
 #include "Render/GpuResource.h"
+#include "Render/RenderingStates.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/Material.h"
 #include "Render/RenderingData.h"
@@ -32,6 +33,8 @@
 
 #include "RHI/DX12/RayTracing/D3DRayTracingGeometry.h"
 #include "RHI/DX12/RayTracing/D3DRayTracingScene.h"
+#include "RHI/DX12/RayTracing/D3DRayTracingShader.h"
+#include "Render/RayTracing/RayTracingShader.h"
 
 #ifdef _PIX_DEBUG
 #define USE_PIX 1
@@ -43,7 +46,7 @@
 #include "RHI/DX12/DXRSample.h"
 
 
-#define D3D_DEBUG_LAYER 0
+#define D3D_DEBUG_LAYER 1
 
 using namespace Ailu::Render;
 
@@ -119,7 +122,7 @@ namespace Ailu::RHI::DX12
     }
     void GpuCommandWorker::EndFrame()
     {
-        u16 compiled_shader_num = 0u, compiled_compute_shader_num = 0u;
+        u16 compiled_shader_num = 0u, compiled_compute_shader_num = 0u, compiled_raytracing_shader_num = 0u;
         while (!_pending_update_shaders.Empty())
         {
             if (auto obj = _pending_update_shaders.Pop(); obj.has_value())
@@ -154,11 +157,17 @@ namespace Ailu::RHI::DX12
                         compiled_compute_shader_num++;
                     }
                 }
+                else if (RayTracingShader *shader = dynamic_cast<RayTracingShader *>(obj.value()); shader != nullptr)
+                {
+                    shader->_is_compiling.store(true);
+                    shader->Compile(false);
+                    compiled_raytracing_shader_num++;
+                }
             }
         }
-        if (compiled_shader_num + compiled_compute_shader_num > 0u)
+        if (compiled_shader_num + compiled_compute_shader_num + compiled_raytracing_shader_num > 0u)
         {
-            LOG_INFO("Compiled {} shaders and {} compute shaders!", compiled_shader_num, compiled_compute_shader_num);
+            LOG_INFO("Compiled {} shaders, {} compute shaders and {} ray tracing shaders!", compiled_shader_num, compiled_compute_shader_num, compiled_raytracing_shader_num);
         }
         if (Application::Get()._is_multi_thread_rendering)
             Application::Get().NotifyMain();
@@ -1030,7 +1039,6 @@ namespace Ailu::RHI::DX12
         if (_is_hardware_ray_tracing_supported)
         {
             g_dxrsample->Render(cmd,_render_windows[0]->_width,_render_windows[0]->_height);
-            
             if (auto output = g_dxrsample->Output(); output != nullptr)
             {
                 _render_windows[0]->_swapchain->StateTranslation(cmd, EResourceState::kCopyDest, kTotalSubRes);
@@ -1058,7 +1066,7 @@ namespace Ailu::RHI::DX12
                 //WaitForGpu();
                 ctx->MoveToNextFrame(m_commandQueue.Get());
                 //if (Application::Get().GetFrameCount() % 60 == 0)
-                Render::RenderingStates::s_gpu_latency = s_timer.GetElapsedSinceLastLocalMark();
+                Render::RenderingStates::SetGpuLatency(s_timer.GetElapsedSinceLastLocalMark());
             }
             if (_is_cur_frame_capturing)
             {
@@ -1156,8 +1164,8 @@ namespace Ailu::RHI::DX12
         }
         //if (Application::Get().GetFrameCount() % 60 == 0)
         {
-            Render::RenderingStates::s_frame_time = s_timer.GetElapsedSinceLastLocalMark();
-            Render::RenderingStates::s_frame_rate = 1000.0f / Render::RenderingStates::s_frame_time;
+            Render::RenderingStates::SetFrameTime(s_timer.GetElapsedSinceLastLocalMark());
+            Render::RenderingStates::SetFrameRate(1000.0f / Render::RenderingStates::GetFrameTime());
         }
         s_timer.MarkLocal();
     }
@@ -1601,10 +1609,16 @@ namespace Ailu::RHI::DX12
                 BindParams params;
                 params._params._vb_binder._layout = &draw_cmd->_mat->GetShader()->PipelineInputLayout(draw_cmd->_pass_index);
                 bool is_produced = draw_cmd->_vb == nullptr;
-                if (!is_produced)
+                if (!is_produced && (!d3dcmd->IsVertexBufferActive(draw_cmd->_vb)))
+                {
                     draw_cmd->_vb->Bind(d3dcmd, params);
-                if (is_indexed_draw)
+                    d3dcmd->SetVertexBufferActive(draw_cmd->_vb);
+                }
+                if (is_indexed_draw && (!d3dcmd->IsIndexBufferActive(draw_cmd->_ib)))
+                {
                     draw_cmd->_ib->Bind(d3dcmd, params);
+                    d3dcmd->SetIndexBufferActive(draw_cmd->_ib);
+                }
                 for (auto &it: d3dcmd->_allocations)
                 {
                     auto &[name, alloc] = it;
@@ -1626,13 +1640,13 @@ namespace Ailu::RHI::DX12
                 if (draw_cmd->_per_obj_cb != nullptr)
                     pso->SetPipelineResource(PipelineResource(draw_cmd->_per_obj_cb, EBindResDescType::kConstBuffer, RenderConstants::kCBufNamePerObject, PipelineResource::kPriorityCmd));
                 
-                ++Render::RenderingStates::s_temp_draw_call;
+                Render::RenderingStates::IncrementDrawCallCount();
                 u32 vertex_count = is_produced ? 3u : draw_cmd->_vb->GetVertexCount() * draw_cmd->_instance_count;//目前只有程序化矩形
                 vertex_count = draw_cmd->_vertex_count > 0 ? draw_cmd->_vertex_count : vertex_count;
                 u32 triangle_count = is_indexed_draw ? draw_cmd->_ib->GetCount() / 3 : draw_cmd->_vb? draw_cmd->_vb->GetVertexCount() / 3 : 0u;
                 triangle_count *= draw_cmd->_instance_count;
-                Render::RenderingStates::s_temp_triangle_num += triangle_count;
-                Render::RenderingStates::s_temp_vertex_num += vertex_count;
+                Render::RenderingStates::IncrementTriangleCount(triangle_count);
+                Render::RenderingStates::IncrementVertexCount(vertex_count);
                 pso->Bind(cmd_buffer, params);
                 d3dcmd->MarkUsedResource(pso);
                 if (draw_cmd->_arg_buffer)
@@ -1691,7 +1705,7 @@ namespace Ailu::RHI::DX12
             {
                 dxcmd->Dispatch(cmd_disp->_group_num_x, cmd_disp->_group_num_y, cmd_disp->_group_num_z);
             }
-            ++Render::RenderingStates::s_temp_dispatch_call;
+            Render::RenderingStates::IncrementDispatchCallCount();
         }
         else if (cmd->GetCmdType() == EGpuCommandType::kCommandProfiler)
         {
@@ -1791,31 +1805,41 @@ namespace Ailu::RHI::DX12
                 else
                 {
                     auto blas = static_cast<D3DRayTracingGeometry *>(cmd_bas->_dst);
-                    auto scratch_res = blas->_scratch_buffer->NativeResource().As<ID3D12Resource>();
-                    auto blas_res = blas->_blas_buffer->NativeResource().As<ID3D12Resource>();
+                    auto scratch_res = blas->_scratch_resource.Get();
+                    auto blas_res = blas->_blas_resource.Get();
                     AL_ASSERT(scratch_res != nullptr && blas_res != nullptr);
+                    blas->_scratch_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                    blas->_blas_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
                     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
                     bottomLevelBuildDesc.Inputs = blas->_inputs;
                     bottomLevelBuildDesc.ScratchAccelerationStructureData = scratch_res->GetGPUVirtualAddress();
                     bottomLevelBuildDesc.DestAccelerationStructureData = blas_res->GetGPUVirtualAddress();
-                    d3dcmd->NativeCmdList()->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+                    auto dxcmd = d3dcmd->NativeCmdList();
+                    dxcmd->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+                    blas->_blas_state_guard.InsertTrackedUAVBarrier(dxcmd);
                     ResourceStateTracker::Get().AddResource(blas, _fence_value+1);
                     //d3dcmd->InsertUAVBarrier();
                 }
             }
             else
             {
-                if (cmd_bas->_is_update)
+                auto tlas = static_cast<D3DRayTracingScene *>(cmd_bas->_dst);
+                if (tlas->_scratch_resource)
+                    tlas->_scratch_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                if (tlas->_tlas_resource)
+                    tlas->_tlas_state_guard.MakesureResourceState(d3dcmd->NativeCmdList(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
+                d3dcmd->NativeCmdList()->BuildRaytracingAccelerationStructure(&tlas->GetBuildDesc(cmd_bas->_is_update), 0, nullptr);
+                if (!cmd_bas->_is_update)
                 {
-                    AL_ASSERT_MSG(false,"BLAS update is not supported yet!");
-                }
-                else
-                {
-                    auto tlas = static_cast<D3DRayTracingScene *>(cmd_bas->_dst);
-                    d3dcmd->NativeCmdList()->BuildRaytracingAccelerationStructure(&tlas->GetBuildDesc(), 0, nullptr);
                     ResourceStateTracker::Get().AddResource(tlas, _fence_value+1);
                 }
             }
+        }
+        else if (cmd->GetCmdType() == EGpuCommandType::kDispatchRays)
+        {
+            auto cmd_dr = static_cast<CommandDispatchRays *>(cmd);
+            cmd_dr->_shader->SetScene(cmd_dr->_scene);
+            cmd_dr->_shader->DispatchRays(d3dcmd,cmd_dr->_w,cmd_dr->_h,cmd_dr->_depth);
         }
         else {};
     }

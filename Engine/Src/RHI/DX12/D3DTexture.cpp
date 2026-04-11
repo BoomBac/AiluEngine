@@ -145,7 +145,6 @@ namespace Ailu::RHI::DX12
             _bindless_uav_index = desc_mgr.AllocBindlessUAVIndex();
             p_device->CreateUnorderedAccessView(_p_d3dres.Get(), nullptr, &slice_uav_desc, desc_mgr.GetBindlessUAVCpuHandle(_bindless_uav_index));
         }
-        _is_ready_for_rendering = true;
         Texture2D::CreateView();
     }
 
@@ -639,7 +638,6 @@ namespace Ailu::RHI::DX12
         }
         CreateView(ETextureViewType::kSRV, 0, UINT16_MAX);
         if (_is_random_access) CreateView(ETextureViewType::kUAV, 0, UINT16_MAX);
-        _is_ready_for_rendering = true;
         Texture3D::CreateView();
     }
 
@@ -858,7 +856,6 @@ namespace Ailu::RHI::DX12
         NameAndLogTextureResource(_p_d3dres.Get(), DebugTextureName("rt", _name));
         _state_guard = std::move(D3DResourceStateGuard(_p_d3dres.Get(), init_state,CalculateSubResourceNum(p_device,_tex_desc)));
         u16 view_slice_count = std::max<u16>(1, _slice_num);
-        _is_ready_for_rendering = true;
         //Main srv
         {
             GPUVisibleDescriptorAllocation alloc = D3DDescriptorMgr::Get().AllocGPU(1u);

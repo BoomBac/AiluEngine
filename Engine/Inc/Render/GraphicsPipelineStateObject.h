@@ -9,6 +9,7 @@
 #include "Framework/Math/ALMath.hpp"
 #include "GlobalMarco.h"
 #include "PipelineState.h"
+#include "CoreType.h"
 #include "Shader.h"
 #include "Texture.h"
 
@@ -53,87 +54,7 @@ namespace Ailu::Render
             return pso_desc;
         }
     };
-    struct PipelineResource
-    {
-        inline static const u16 kPriorityGlobal = 0x0u;
-        inline static const u16 kPriorityCmd = 0x1u;
-        inline static const u16 kPriorityLocal = 0x2u;
-        struct AddiInfo
-        {
-            //目前给upload buffer使用
-            u64 _gpu_handle = 0u;
-            //texture
-            void *_native_res_ptr = nullptr;
-            u16 _view_index = Texture::kMainSRVIndex;
-            u32 _sub_res = UINT32_MAX;
-            bool operator==(const AddiInfo &other) const
-            {
-                return _gpu_handle == other._gpu_handle && _native_res_ptr == other._native_res_ptr && _view_index == other._view_index && _sub_res == other._sub_res;
-            }
-        };
-        EBindResDescType _res_type = EBindResDescType::kUnknown;
-        String _name;
-        u16 _priority;
-        u16 _slot;//构造时不赋值，实际绑定时由pso mgr/pso赋值
-        bool _is_compute = false;
-        PipelineResource() = default;
-        PipelineResource(GpuResource *res, EBindResDescType resType, String name, u16 priority, bool is_compute = false, u16 register_space = 0u)
-            : _p_resource(res), _res_type(resType), _name(std::move(name)), _priority(priority), _is_compute(is_compute) {}
-        PipelineResource(GpuResource *res, EBindResDescType resType, u16 slot, u16 priority, bool is_compute = false, u16 register_space = 0u)
-            : _p_resource(res), _res_type(resType), _slot(slot), _priority(priority), _is_compute(is_compute) {}
-        bool operator<(const PipelineResource &other) const
-        {
-            return _priority > other._priority;
-        }
-        bool operator==(const PipelineResource &other) const
-        {
-            return _res_type == other._res_type && _priority == other._priority && _is_compute == other._is_compute && _p_resource == other._p_resource && _addi_info == other._addi_info;
-        }
-        PipelineResource(const PipelineResource &other)
-        {
-            _p_resource = other._p_resource;
-            _res_type = other._res_type;
-            _name = other._name;
-            _priority = other._priority;
-            _slot = other._slot;
-            _is_compute = other._is_compute;
-            _addi_info = other._addi_info;
-        }
-        PipelineResource(PipelineResource &&other) noexcept
-        {
-            _p_resource = other._p_resource;
-            _res_type = other._res_type;
-            _name = std::move(other._name);
-            _priority = other._priority;
-            _slot = other._slot;
-            _is_compute = other._is_compute;
-            _addi_info = other._addi_info;
-        }
-        PipelineResource &operator=(const PipelineResource &other)
-        {
-            _p_resource = other._p_resource;
-            _res_type = other._res_type;
-            _name = other._name;
-            _priority = other._priority;
-            _slot = other._slot;
-            _is_compute = other._is_compute;
-            _addi_info = other._addi_info;
-            return *this;
-        }
-        PipelineResource &operator=(PipelineResource &&other) noexcept
-        {
-            _p_resource = other._p_resource;
-            _res_type = other._res_type;
-            _name = std::move(other._name);
-            _priority = other._priority;
-            _slot = other._slot;
-            _is_compute = other._is_compute;
-            _addi_info = other._addi_info;
-            return *this;
-        }
-        GpuResource *_p_resource;
-        AddiInfo _addi_info;
-    };
+
     struct UploadParamsGPSO : public UploadParams
     {
         u16 _pass_index;
@@ -171,6 +92,7 @@ namespace Ailu::Render
         GraphicsPipelineStateObject(const GraphicsPipelineStateInitializer &initializer);
         virtual ~GraphicsPipelineStateObject() = default;
         /// 填充已经验证的管线资源
+        void ResetPipelineResources();
         void SetPipelineResource(const PipelineResource &pipeline_res);
         void SetPipelineResource(const String &name, GpuResource *res);
         bool IsValidPipelineResource(const EBindResDescType &res_type, i16 slot) const;

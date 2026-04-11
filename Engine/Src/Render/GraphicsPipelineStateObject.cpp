@@ -114,6 +114,21 @@ namespace Ailu::Render
     {
         return IsValidPipelineResource(res_type,NameToSlot(name));
     }
+    void GraphicsPipelineStateObject::ResetPipelineResources()
+    {
+        const u32 old_signature = _bind_res_signature;
+        const u16 old_max_slot = _max_slot;
+
+        _bind_res_signature = 0u;
+        _max_slot = 0u;
+
+        for (u16 slot = 0; slot <= old_max_slot; ++slot)
+        {
+            if ((old_signature & (1u << slot)) == 0u)
+                continue;
+            _bind_res[slot].Clear();
+        }
+    }
     void GraphicsPipelineStateObject::SetPipelineResource(const PipelineResource& pipeline_res)
     {
         bool valid_res = pipeline_res._name.empty()? IsValidPipelineResource(pipeline_res._res_type,pipeline_res._slot) :
@@ -386,6 +401,7 @@ namespace Ailu::Render
             AL_ASSERT(pso->StateDescriptor()._p_vertex_shader == new_shader);
             pso->SetTopology(new_shader->GetTopology());
             pso->SetStencilRef(new_shader->_stencil_ref);
+            pso->ResetPipelineResources();
 
             std::array<PipelineResource*, 32> best{};
             std::bitset<32> has{};

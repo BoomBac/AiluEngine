@@ -55,7 +55,8 @@ PSInput VSMain(VSInput v)
 float4 PSMain(PSInput input) : SV_TARGET
 {
     float alpha = SAMPLE_TEXTURE2D(_MainTex,g_LinearClampSampler,input.uv).a;
-    return float4(1.0,1.0,1.0,alpha * lerp(0.0f,1.0f,distance(input.world_pos,GetCameraPositionWS()) / 100.0f));
+    float dis_attenuation = distance(input.world_pos,GetCameraPositionWS()) / 100.0f;
+    return float4(1.0,1.0,1.0,alpha * lerp(0.0f,1.0f,dis_attenuation));
 }
 
 uint PSMainPickBuffer(PSInput input) : SV_TARGET

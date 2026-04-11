@@ -41,6 +41,7 @@
 #include "Animation/Solver.h"
 #include "Common/Undo.h"
 #include "Framework/Events/KeyEvent.h"
+#include "Framework/Common/EngineConfig.h"
 #include "Render/CommonRenderPipeline.h"
 
 #include "Widgets/CommonView.h"
@@ -48,6 +49,8 @@
 
 #include "Framework/Parser/TextParser.h"
 #include "Platform/Process.h"
+//todo remove
+#include "Render/RenderingStates.h"
 
 namespace Ailu
 {
@@ -131,7 +134,7 @@ namespace Ailu
                 //下方
                 const auto &all_thread = GetAllThreadNameMap();
                 {
-                    if (s_engine_config.isMultiThreadRender)
+                    if (g_engine_config.isMultiThreadRender)
                     {
                         ImGui::BeginChild("TimeLineMain", ImVec2(_content_size.x, 200.0f), ImGuiChildFlags_Border | ImGuiChildFlags_ResizeY);
                         //ImGui::GetStyle().Colors[ImGuiCol_ChildBg] = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
@@ -843,13 +846,15 @@ namespace Ailu
             ImGui::End();
             */
             ImGui::Begin("Common");// Create a window called "Hello, world!" and append into it.
-            ImGui::Text("FrameRate: %.2f", RenderingStates::s_frame_rate);
-            ImGui::Text("FrameTime: %.2f ms", RenderingStates::s_frame_time);
-            ImGui::Text("GpuLatency: %.2f ms", RenderingStates::s_gpu_latency);
-            ImGui::Text("Draw Call: %d", RenderingStates::s_draw_call);
-            ImGui::Text("Dispatch Call: %d", RenderingStates::s_dispatch_call);
-            ImGui::Text("VertCount: %d", RenderingStates::s_vertex_num);
-            ImGui::Text("TriCount: %d", RenderingStates::s_triangle_num);
+            ImGui::Text("FrameRate: %.2f", RenderingStates::GetFrameRate());
+            ImGui::Text("FrameTime: %.2f ms", RenderingStates::GetFrameTime());
+            ImGui::Text("GpuLatency: %.2f ms", RenderingStates::GetGpuLatency());
+            ImGui::Text("Draw Call: %d", RenderingStates::GetDrawCallCount());
+            ImGui::Text("Dispatch Call: %d", RenderingStates::GetDispatchCallCount());
+            ImGui::Text("VertCount: %d", RenderingStates::GetVertexCount());
+            ImGui::Text("TriCount: %d", RenderingStates::GetTriangleCount());
+            ImGui::Text("Gfx PSO: %d", RenderingStates::GetGfxPsoBindCount());
+            ImGui::Text("Gfx Res: %d", RenderingStates::GetGfxResBindCount());
             if (ImGui::CollapsingHeader("Features"))
             {
                 for (auto feature: Render::RenderPipeline::Get().GetRenderer()->GetFeatures())
@@ -925,6 +930,13 @@ namespace Ailu
             ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
             ImGui::SliderFloat("Game Time Scale:", &TimeMgr::s_time_scale, 0.0f, 2.0f, "%.2f");
             ImGui::SliderFloat("ShadowDistance m", &QuailtySetting::s_main_light_shaodw_distance, 0.f, 100.0f, "%.2f");
+            
+            static bool s_state_batching = g_engine_config.EnableCpuStateBatchedSubmission;
+            if (ImGui::Checkbox("State Batching", &s_state_batching))
+            {
+                g_engine_config.EnableCpuStateBatchedSubmission = s_state_batching;
+                g_engine_config.EnableIncrementalGraphicsBinding = s_state_batching;
+            }
 
             //g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
             static bool s_show_anim_clip = false;

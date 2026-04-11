@@ -163,6 +163,13 @@ namespace Ailu
             };
             _on_file_changed += [this](const fs::path &file)
             {
+                const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+                if (cur_path != _engin_config_path)
+                    return;
+                ReloadEngineConfig();
+            };
+            _on_file_changed += [this](const fs::path &file)
+            {
                 if (auto pos = file.filename().string().find("EditorStyle"); pos == String::npos)
                     return;
                 JsonArchive ar;
@@ -412,12 +419,19 @@ namespace Ailu
                     ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW,
                     ResourceMgr::EngineResRootPath() + EnginePath::kEngineTexturePathW,
                     s_editor_root_path + L"/Res/UI/"};
+            static Vector<fs::path> s_watching_files{
+                    s_editor_root_path + L"/EngineConfig.json"};
             static bool is_first_execute = true;
             static std::set<fs::path> path_set{};
             static std::unordered_map<fs::path, fs::file_time_type> s_cache_files_time;
             std::unordered_map<fs::path, fs::file_time_type> cur_files_time;
             for (auto &dir: s_watching_paths)
                 TraverseDirectory(dir, path_set);
+            for (auto &file: s_watching_files)
+            {
+                if (fs::exists(file))
+                    path_set.insert(file);
+            }
             if (is_first_execute)
             {
                 for (auto &cur_path: path_set)

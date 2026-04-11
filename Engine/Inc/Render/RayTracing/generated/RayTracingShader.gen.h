@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __RAYTRACINGSHADER_GEN_H__
 //Class RayTracingShader begin...........................
-#define RAYTRACINGSHADER_GEN_H_12_GENERATED_BODY \
+#define RAYTRACINGSHADER_GEN_H_15_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_RayTracingShader_Type();\
                                 static Type* GetPrivateStaticClass();\

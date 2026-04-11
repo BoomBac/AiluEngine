@@ -1,7 +1,9 @@
 #ifndef __CORE_TYPE_H__
 #define __CORE_TYPE_H__
 #include "GlobalMarco.h"
+#include "RenderConstants.h"
 #include "generated/CoreType.gen.h"
+#include <set>
 
 
 namespace Ailu
@@ -12,12 +14,12 @@ namespace Ailu
         enum class EResourceUsage : u32
         {
             kNone = 0,
-            kReadSRV = 1 << 0,  // SRV - 着色器读取
-            kWriteUAV = 1 << 1, // UAV - 无序访问
-            kWriteRTV = 1 << 2,    // RTV - 渲染目标
-            kDSV = 1 << 3,    // DSV - 深度模板
-            kCopySrc = 1 << 4,      // 拷贝源
-            kCopyDst = 1 << 5,        // 拷贝目标
+            kReadSRV = 1 << 0,         // SRV - 着色器读取
+            kWriteUAV = 1 << 1,        // UAV - 无序访问
+            kWriteRTV = 1 << 2,        // RTV - 渲染目标
+            kDSV = 1 << 3,             // DSV - 深度模板
+            kCopySrc = 1 << 4,         // 拷贝源
+            kCopyDst = 1 << 5,         // 拷贝目标
             kIndirectArgument = 1 << 6,// 间接绘制参数
             kRaytracingAccel = 1 << 7  // 光追加速结构
         };
@@ -132,7 +134,291 @@ namespace Ailu
                 return v;
             }
         };
-    };
-};
+
+        enum class EShaderType : u8
+        {
+            kVertex,
+            kPixel,
+            kGeometry,
+            kHull,
+            kDomain,
+            kCompute,
+            kRayTracing
+        };
+
+        struct ShaderPropertyType
+        {
+            inline static String Vector = "Vector";
+            inline static String IntVector = "IntVector";
+            inline static String Float = "Float";
+            inline static String Uint = "Uint";
+            inline static String Color = "Color";
+            inline static String Texture2D = "Texture2D";
+            inline static String Texture3D = "Texture3D";
+            inline static String CubeMap = "CubeMap";
+        };
+
+        enum EBindResDescType
+        {
+            kConstBuffer = 0x01,
+            kCBufferAttribute = 0x02,
+            kCBufferFloat = 0x04,
+            kCBufferFloats = 0x08,
+            kCBufferUInt = 0x10,
+            kCBufferUInts = 0x20,
+            kCBufferMatrix = 0x40,
+            kCBufferBool = 0x80,
+            kTexture2D = 0x100,
+            kTexture2DArray = 0x400,
+            kCubeMap = 0x200,
+            kSampler = 0x800,
+            kUAVTexture2D = 0x1000,
+            kConstBufferRaw = 0x2000,//为了兼容uploadbuffer直接绑定gpu address而不改变现有接口
+            kBuffer = 0x4000,
+            kRWBuffer = 0x8000,
+            kTexture3D = 0x10000,
+            kRWTexture3D = 0x20000,
+            kCBufferInt = 0x40000,
+            kCBufferInts = 0x80000,
+            kAccelerationStructure = 0x100000,
+            kUnknown
+        };
+        class GpuResource;
+        struct ShaderBindResourceInfo
+        {
+            inline static const u8 kBindFlagPerObject = 0x01;
+            inline static const u8 kBindFlagPerMaterial = 0x02;
+            inline static const u8 kBindFlagPerCamera = 0x04;
+            inline static const u8 kBindFlagPerScene = 0x08;
+            inline static const u8 kBindFlagInternal = 0x10;
+            inline static const u8 kBindFlagLocal = 0x20;
+            static u8 GetBindResourceFlag(const char *name)
+            {
+                String name_str(name);
+                if (name_str == RenderConstants::kCBufNamePerObject)
+                    return kBindFlagPerObject;
+                else if (name_str == RenderConstants::kCBufNamePerMaterial)
+                    return kBindFlagPerMaterial;
+                else if (name_str == RenderConstants::kCBufNamePerCamera)
+                    return kBindFlagPerCamera;
+                else if (name_str == RenderConstants::kCBufNamePerScene)
+                    return kBindFlagPerScene;
+                else
+                {
+                    return kBindFlagInternal;
+                }
+            }
+            inline const static std::set<String> s_reversed_res_name{
+                    "SceneObjectBuffer",
+                    "_MatrixWorld",
+                    "SceneMaterialBuffer",
+                    "SceneStatetBuffer",
+                    "_MatrixV",
+                    "_MatrixP",
+                    "_MatrixVP",
+                    "_CameraPos",
+                    "_DirectionalLights",
+                    "_PointLights",
+                    "_SpotLights",
+                    "padding",
+                    "padding0",
+                    "padding1"};
+            inline static u16 GetVariableSize(const ShaderBindResourceInfo &info) { return info._cbuf_member_offset & 0XFFFF; }
+            inline static u16 GetVariableOffset(const ShaderBindResourceInfo &info) { return info._cbuf_member_offset >> 16; }
+            ShaderBindResourceInfo() = default;
+            ShaderBindResourceInfo(EBindResDescType res_type, u32 slot_or_offset, u8 bind_slot, const String &name)
+                : _res_type(res_type), _bind_slot(bind_slot), _name(name)
+            {
+                if (res_type & EBindResDescType::kCBufferAttribute)
+                    _cbuf_member_offset = slot_or_offset;
+                else
+                    _res_slot = slot_or_offset;
+            }
+            bool operator==(const ShaderBindResourceInfo &other) const
+            {
+                return _name == other._name;
+            }
+            EBindResDescType _res_type;
+            union
+            {
+                u32 _res_slot;
+                u32 _cbuf_member_offset;
+            };
+            u8 _bind_slot;
+            String _name;
+            GpuResource *_p_res = nullptr;
+            ShaderBindResourceInfo *_p_root_cbuf;
+            //1 for per obj,2for per mat,4 for per pass,8 for per frame
+            u8 _bind_flag = 0u;
+            u16 _register_space = 0u;
+            u8 _array_size = 0u;
+            u16 _cbuf_size = 0u;
+        };
+
+        // Hash function for ShaderBindResourceInfo
+        struct ShaderBindResourceInfoHash
+        {
+            std::size_t operator()(const ShaderBindResourceInfo &info) const
+            {
+                return std::hash<String>{}(info._name);
+            }
+        };
+
+        // Equality function for ShaderBindResourceInfo
+        struct ShaderBindResourceInfoEqual
+        {
+            bool operator()(const ShaderBindResourceInfo &lhs, const ShaderBindResourceInfo &rhs) const
+            {
+                return lhs._name == rhs._name;
+            }
+        };
+
+        enum class EShaderPropertyType
+        {
+            kUndefined,
+            kBool,
+            kFloat,
+            kRange,
+            kVector,
+            kColor,
+            kTexture2D,
+            kTexture3D,
+            kEnum
+        };
+
+        struct ShaderPropertyInfo
+        {
+            bool IsHDRProperty() const
+            {
+                return _params.x == 1;
+            }
+            void SetHDRIntensity(f32 intensity)
+            {
+                if (IsHDRProperty())
+                    _params.y = intensity;
+            };
+            f32 GetHDRIntensity() const
+            {
+                if (IsHDRProperty())
+                    return _params.y;
+            };
+            String _value_name;
+            String _prop_name;
+            u32 _offset = 0;
+            void *_value_ptr = nullptr;
+            EShaderPropertyType _type;
+            Vector4f _default_value;
+            //目前用于标识hdr属性，x为1表示hdr，y为强度
+            Vector4f _params;
+            ShaderPropertyInfo() = default;
+            ShaderPropertyInfo(const String &value_name, const String &prop_name, EShaderPropertyType prop_type, const Vector4f &default_value)
+                : _value_name(value_name), _prop_name(prop_name), _type(prop_type), _default_value(default_value), _params(Vector4f::kZero)
+            {
+            }
+            template<typename T>
+            T GetValue() const
+            {
+                return *static_cast<T *>(_value_ptr);
+            }
+            template<typename T>
+            void SetValue(T value)
+            {
+                *static_cast<T *>(_value_ptr) = value;
+            }
+        };
+
+        struct PipelineResource
+        {
+            inline static const u16 kPriorityGlobal = 0x0u;
+            inline static const u16 kPriorityCmd = 0x1u;
+            inline static const u16 kPriorityLocal = 0x2u;
+            struct AddiInfo
+            {
+                //目前给upload buffer使用
+                u64 _gpu_handle = 0u;
+                //texture
+                void *_native_res_ptr = nullptr;
+                u16 _view_index = 9999u; //sync with Texture::kMainSRVIndex
+                u32 _sub_res = UINT32_MAX;
+                bool operator==(const AddiInfo &other) const
+                {
+                    return _gpu_handle == other._gpu_handle && _native_res_ptr == other._native_res_ptr && _view_index == other._view_index && _sub_res == other._sub_res;
+                }
+            };
+            EBindResDescType _res_type = EBindResDescType::kUnknown;
+            String _name;
+            u16 _priority;
+            u16 _slot;//构造时不赋值，实际绑定时由pso mgr/pso赋值
+            bool _is_compute = false;
+            PipelineResource() = default;
+            PipelineResource(GpuResource *res, EBindResDescType resType, String name, u16 priority, bool is_compute = false, u16 register_space = 0u)
+                : _p_resource(res), _res_type(resType), _name(std::move(name)), _priority(priority), _is_compute(is_compute) {}
+            PipelineResource(GpuResource *res, EBindResDescType resType, u16 slot, u16 priority, bool is_compute = false, u16 register_space = 0u)
+                : _p_resource(res), _res_type(resType), _slot(slot), _priority(priority), _is_compute(is_compute) {}
+            bool operator<(const PipelineResource &other) const
+            {
+                return _priority > other._priority;
+            }
+            bool operator==(const PipelineResource &other) const
+            {
+                return _res_type == other._res_type && _priority == other._priority && _is_compute == other._is_compute && _p_resource == other._p_resource && _addi_info == other._addi_info;
+            }
+            PipelineResource(const PipelineResource &other)
+            {
+                _p_resource = other._p_resource;
+                _res_type = other._res_type;
+                _name = other._name;
+                _priority = other._priority;
+                _slot = other._slot;
+                _is_compute = other._is_compute;
+                _addi_info = other._addi_info;
+            }
+            PipelineResource(PipelineResource &&other) noexcept
+            {
+                _p_resource = other._p_resource;
+                _res_type = other._res_type;
+                _name = std::move(other._name);
+                _priority = other._priority;
+                _slot = other._slot;
+                _is_compute = other._is_compute;
+                _addi_info = other._addi_info;
+            }
+            PipelineResource &operator=(const PipelineResource &other)
+            {
+                _p_resource = other._p_resource;
+                _res_type = other._res_type;
+                _name = other._name;
+                _priority = other._priority;
+                _slot = other._slot;
+                _is_compute = other._is_compute;
+                _addi_info = other._addi_info;
+                return *this;
+            }
+            PipelineResource &operator=(PipelineResource &&other) noexcept
+            {
+                _p_resource = other._p_resource;
+                _res_type = other._res_type;
+                _name = std::move(other._name);
+                _priority = other._priority;
+                _slot = other._slot;
+                _is_compute = other._is_compute;
+                _addi_info = other._addi_info;
+                return *this;
+            }
+            void Clear() noexcept
+            {
+                _p_resource = nullptr;
+                _res_type = EBindResDescType::kUnknown;
+                _name.clear();
+                _priority = 0u;
+                _slot = 0u;
+                _is_compute = false;
+                _addi_info = {};
+            }
+            GpuResource *_p_resource;
+            AddiInfo _addi_info;
+        };
+    };// namespace Render
+};// namespace Ailu
 
 #endif

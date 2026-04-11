@@ -5,6 +5,7 @@
 #include "Framework/Math/ALMath.hpp"
 #include "GlobalMarco.h"
 #include "RenderConstants.h"
+#include "CoreType.h"
 #include <mutex>
 
 
@@ -575,31 +576,6 @@ namespace Ailu
             static ETopology v[4]{ETopology::kPoint, ETopology::kLine, ETopology::kTriangle, ETopology::kPatch};
             return v[hash];
         }
-
-        enum EBindResDescType
-        {
-            kConstBuffer = 0x01,
-            kCBufferAttribute = 0x02,
-            kCBufferFloat = 0x04,
-            kCBufferFloats = 0x08,
-            kCBufferUInt = 0x10,
-            kCBufferUInts = 0x20,
-            kCBufferMatrix = 0x40,
-            kCBufferBool = 0x80,
-            kTexture2D = 0x100,
-            kTexture2DArray = 0x400,
-            kCubeMap = 0x200,
-            kSampler = 0x800,
-            kUAVTexture2D = 0x1000,
-            kConstBufferRaw = 0x2000,//为了兼容uploadbuffer直接绑定gpu address而不改变现有接口
-            kBuffer = 0x4000,
-            kRWBuffer = 0x8000,
-            kTexture3D = 0x10000,
-            kRWTexture3D = 0x20000,
-            kCBufferInt = 0x40000,
-            kCBufferInts = 0x80000,
-            kUnknown
-        };
     }
 }// namespace Ailu
 

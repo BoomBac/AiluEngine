@@ -43,6 +43,22 @@ namespace Ailu
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     Scope<Core::ThreadPool> g_pThreadTool = MakeScope<Core::ThreadPool>(6u, "GlobalThreadPool");
 
+    void Application::LoadEngineConfig()
+    {
+        JsonArchive ar;
+        ar.Load(_engin_config_path);
+        Type *type = EngineConfig::StaticType();
+        for (auto &it: type->GetProperties())
+            it.Deserialize(&g_engine_config, ar);
+        _is_multi_thread_rendering = g_engine_config.isMultiThreadRender;
+    }
+
+    void Application::ReloadEngineConfig()
+    {
+        LoadEngineConfig();
+        LOG_INFO(L"Reloaded engine config: {}", _engin_config_path);
+    }
+
     WString Application::GetWorkingPath()
     {
 #ifdef PLATFORM_WINDOWS
@@ -101,15 +117,10 @@ namespace Ailu
             WString prex_w = work_path + L"OneDrive/AiluEngine/";
             ResourceMgr::ConfigRootPath(prex_w);
             _engin_config_path = prex_w + L"Editor/EngineConfig.json";
-            JsonArchive ar;
-            ar.Load(_engin_config_path);
-            Type *type = EngineConfig::StaticType();
-            for (auto &it: type->GetProperties())
-                it.Deserialize(&s_engine_config, ar);
+            LoadEngineConfig();
         }
-        _is_multi_thread_rendering = s_engine_config.isMultiThreadRender;
         //LogMgr::Get().AddAppender(new ConsoleAppender());
-        _p_window = std::move(WindowFactory::Create(s_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine", desc._window_width, desc._window_height));
+        _p_window = std::move(WindowFactory::Create(g_engine_config.isMultiThreadRender ? L"AiluEngine -mt" : L"AiluEngine", desc._window_width, desc._window_height));
         _p_window->SetEventHandler(BIND_EVENT_HANDLER(OnEvent));
         s_focus_window = _p_window.get();
         _layer_stack = new LayerStack();
@@ -157,7 +168,7 @@ namespace Ailu
         JsonArchive ar;
         Type *type = EngineConfig::StaticType();
         for (auto &it: type->GetProperties())
-            it.Serialize(&s_engine_config,ar);
+            it.Serialize(&g_engine_config,ar);
         ar.Save(_engin_config_path);
         DESTORY_PTR(_layer_stack);
         UI::UIManager::Shutdown();
@@ -347,6 +358,36 @@ namespace Ailu
 
     void Application::OnEvent(Event &e)
     {
+        switch (e.GetEventType())
+        {
+        case EEventType::kWindowClose:
+            Input::NotifyWindowClosed(e._window);
+            break;
+        case EEventType::kWindowLostFocus:
+            Input::NotifyFocusLost();
+            break;
+        case EEventType::kKeyPressed:
+            Input::NotifyKeyPressed(static_cast<EKey>(static_cast<KeyPressedEvent &>(e).GetKeyCode()));
+            break;
+        case EEventType::kKeyReleased:
+            Input::NotifyKeyReleased(static_cast<EKey>(static_cast<KeyReleasedEvent &>(e).GetKeyCode()));
+            break;
+        case EEventType::kMouseButtonPressed:
+            Input::NotifyKeyPressed(static_cast<EKey>(static_cast<MouseButtonPressedEvent &>(e).GetButton()));
+            break;
+        case EEventType::kMouseButtonReleased:
+            Input::NotifyKeyReleased(static_cast<EKey>(static_cast<MouseButtonReleasedEvent &>(e).GetButton()));
+            break;
+        case EEventType::kMouseMoved:
+        {
+            auto &mouse_event = static_cast<MouseMovedEvent &>(e);
+            Input::NotifyMouseMove(e._window, Vector2f(mouse_event.GetX(), mouse_event.GetY()));
+            break;
+        }
+        default:
+            break;
+        }
+
         EventDispather dispather(e);
         dispather.Dispatch<WindowCloseEvent>(BIND_EVENT_HANDLER(OnWindowClose));
         dispather.Dispatch<WindowFocusEvent>(BIND_EVENT_HANDLER(OnGetFocus));

@@ -15,6 +15,7 @@
 
 #include "Render/RayTracing/RayTracingScene.h"
 #include "Render/RayTracing/RayTracingGeometry.h"
+#include "Render/RayTracing/RayTracingShader.h"
 
 namespace Ailu::Render
 {
@@ -614,6 +615,17 @@ namespace Ailu::Render
             cmd->_arg_offset = arg_offset;
             _commands.emplace_back(cmd);
         }
+        void DispatchRays(RayTracingShader *shader, RayTracingScene *scene, u16 width, u16 height, u16 depth)
+        {
+            auto cmd = CommandPool::Get().Alloc<CommandDispatchRays>();
+            cmd->_shader = shader;
+            cmd->_scene = scene;
+            cmd->_w = std::max<u16>(1u, width);
+            cmd->_h = std::max<u16>(1u, height);
+            cmd->_depth = std::max<u16>(1u, depth);
+            cmd->_shader->PushState(scene);
+            _commands.emplace_back(cmd);
+        }
         void BeginProfiler(const String &name)
         {
             auto cmd = CommandPool::Get().Alloc<CommandProfiler>();
@@ -957,6 +969,11 @@ namespace Ailu::Render
     void CommandBuffer::BuildAS(RayTracingGeometry* geometry,bool is_update)
     {
         _impl->BuildAS(geometry, is_update);
+    }
+
+    void CommandBuffer::DispatchRays(RayTracingShader *shader, RayTracingScene *scene, u16 width, u16 height, u16 depth)
+    {
+        _impl->DispatchRays(shader, scene, width, height, depth);
     }
 
     void CommandBuffer::ReadbackBuffer(GPUBuffer *buffer, bool is_counter, u32 size, ReadbackCallback callback)

@@ -2,74 +2,106 @@
 #include "RHI/DX12/D3DBuffer.h"
 #include "RHI/DX12/D3DContext.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
+#include "RHI/DX12/dxhelper.h"
 
 
 namespace Ailu::RHI::DX12
 {
+    namespace
+    {
+        void CreateBufferResource(D3DContext* ctx,
+                                  u64 size,
+                                  D3D12_RESOURCE_STATES init_state,
+                                  bool allow_uav,
+                                  const String& name,
+                                  ComPtr<ID3D12Resource>& resource,
+                                  D3DResourceStateGuard& state_guard)
+        {
+            auto desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+            if (allow_uav)
+                desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+
+            auto heap_prop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+            ThrowIfFailed(ctx->GetDevice()->CreateCommittedResource(
+                &heap_prop,
+                D3D12_HEAP_FLAG_NONE,
+                &desc,
+                init_state,
+                nullptr,
+                IID_PPV_ARGS(resource.ReleaseAndGetAddressOf())));
+            resource->SetName(ToWChar(name).c_str());
+            state_guard = D3DResourceStateGuard(resource.Get(), init_state, 1u);
+        }
+    }
+
     D3DRayTracingGeometry::D3DRayTracingGeometry(const Render::RayTracingGeometryDesc &desc) : Render::RayTracingGeometry(desc)
     {
     }
 
     D3DRayTracingGeometry::~D3DRayTracingGeometry()
     {
+        if (::Ailu::Render::g_pGfxContext)
+            ::Ailu::Render::g_pGfxContext->WaitForFence(_fence_value);
     }
 
     void D3DRayTracingGeometry::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
     {
-        if (_desc._vertex_buffer == nullptr || _desc._index_buffer == nullptr)
-            return;
-
         AL_ASSERT(rhi_cmd != nullptr);
-
         auto *vb = dynamic_cast<D3DVertexBuffer *>(_desc._vertex_buffer);
-        auto *ib = dynamic_cast<D3DIndexBuffer *>(_desc._index_buffer);
-        if (vb == nullptr || ib == nullptr)
-            return;
+        _geometry_descs.clear();
+        _geometry_descs.reserve(_desc._index_buffer.size());
+        for (u32 i = 0; i < _desc._index_buffer.size(); ++i)
+        {
+            auto *ib = dynamic_cast<D3DIndexBuffer *>(_desc._index_buffer[i]);
+            if (vb == nullptr || ib == nullptr)
+                continue;
+            D3D12_RAYTRACING_GEOMETRY_DESC geometry_desc = {};
+            geometry_desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+            geometry_desc.Triangles.IndexBuffer = ib->NativeResource().As<ID3D12Resource>()->GetGPUVirtualAddress();
+            geometry_desc.Triangles.IndexCount = ib->GetCount();
+            geometry_desc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+            geometry_desc.Triangles.Transform3x4 = 0;
+            geometry_desc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+            geometry_desc.Triangles.VertexCount = _desc._vertex_count;
+            geometry_desc.Triangles.VertexBuffer.StartAddress = vb->NativeResource(0u).As<ID3D12Resource>()->GetGPUVirtualAddress();
+            geometry_desc.Triangles.VertexBuffer.StrideInBytes = vb->GetLayout().GetStride(0);
+            geometry_desc.Flags = _desc._opaque ? D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE : D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
+            _geometry_descs.push_back(geometry_desc);
+        }
 
-
-        _geometry_desc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-        _geometry_desc.Triangles.IndexBuffer = ib->NativeResource().As<ID3D12Resource>()->GetGPUVirtualAddress();
-        _geometry_desc.Triangles.IndexCount = _desc._index_count;
-        _geometry_desc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-        _geometry_desc.Triangles.Transform3x4 = 0;
-        _geometry_desc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-        _geometry_desc.Triangles.VertexCount = _desc._vertex_count;
-        _geometry_desc.Triangles.VertexBuffer.StartAddress = vb->NativeResource(0u).As<ID3D12Resource>()->GetGPUVirtualAddress();
-        _geometry_desc.Triangles.VertexBuffer.StrideInBytes = vb->GetLayout().GetStride(0);
-        _geometry_desc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+        AL_ASSERT_MSG(!_geometry_descs.empty(), "RayTracingGeometry({}) has no valid submesh index buffer for BLAS build", Name());
 
         _inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
         _inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-        _inputs.NumDescs = 1;
+        _inputs.NumDescs = static_cast<UINT>(_geometry_descs.size());
         _inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-        _inputs.pGeometryDescs = &_geometry_desc;
+        _inputs.pGeometryDescs = _geometry_descs.data();
+
 
         auto* dev = dynamic_cast<D3DContext *>(ctx)->GetDevice();
-
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
         dev->GetRaytracingAccelerationStructurePrebuildInfo(&_inputs, &bottomLevelPrebuildInfo);
         AL_ASSERT(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes > 0);
         _scratch_buffer_size = static_cast<u32>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
-        BufferDesc buffer_desc = {};
-        buffer_desc._target = Render::EGPUBufferTarget::kRaytraceAS;
-        buffer_desc._size = _scratch_buffer_size;
-        buffer_desc._is_random_write = true;
-        buffer_desc._init_state = EResourceState::kUnorderedAccess;
-        buffer_desc._is_create_srv = false;
-        buffer_desc._is_create_uav = false;
-        _scratch_buffer = MakeRef<D3DGPUBuffer>(buffer_desc);
-        _scratch_buffer->Name(std::format("blas_{}_scratch", _desc._vertex_buffer->Name()));
-        _scratch_buffer->Upload(ctx, rhi_cmd, nullptr);
-        _mem_size += buffer_desc._size;
+        CreateBufferResource(dynamic_cast<D3DContext *>(ctx),
+                             bottomLevelPrebuildInfo.ScratchDataSizeInBytes,
+                             D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                             true,
+                             std::format("blas_{}_scratch", _desc._vertex_buffer->Name()),
+                             _scratch_resource,
+                             _scratch_state_guard);
+        _mem_size += static_cast<u32>(bottomLevelPrebuildInfo.ScratchDataSizeInBytes);
 
-        buffer_desc._size = static_cast<u32>(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes);
-        buffer_desc._init_state = EResourceState::kRaytracingAccelerationStructure;
-        auto blas_buffer = MakeRef<D3DGPUBuffer>(buffer_desc);
-        blas_buffer->Name(std::format("blas_{}", _desc._vertex_buffer->Name()));
-        blas_buffer->Upload(ctx, rhi_cmd, nullptr);
-        _blas_gpu_address = blas_buffer->NativeResource().As<ID3D12Resource>()->GetGPUVirtualAddress();
-        _blas_buffer = blas_buffer;
-        _mem_size += buffer_desc._size;
+        CreateBufferResource(dynamic_cast<D3DContext *>(ctx),
+                             bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes,
+                             D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                             true,
+                             std::format("blas_{}", _desc._vertex_buffer->Name()),
+                             _blas_resource,
+                             _blas_state_guard);
+        _blas_gpu_address = _blas_resource->GetGPUVirtualAddress();
+        _native_resource = {Render::RendererAPI::ERenderAPI::kDirectX12, _blas_resource.Get()};
+        _mem_size += static_cast<u32>(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes);
         //调用基类的UploadImpl以便正确统计内存使用量等
         GpuResource::UploadImpl(ctx, rhi_cmd, params);
     }

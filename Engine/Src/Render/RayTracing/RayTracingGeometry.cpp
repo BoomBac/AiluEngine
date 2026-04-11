@@ -1,5 +1,4 @@
 #include "Render/RayTracing/RayTracingGeometry.h"
-#include "Render/Buffer.h"
 #include "Render/Mesh.h"
 #include "Render/GraphicsContext.h"
 #include "RHI/DX12/RayTracing/D3DRayTracingGeometry.h"
@@ -7,18 +6,20 @@
 #include "pch.h"
 namespace Ailu::Render
 {
-    RayTracingGeometryDesc::RayTracingGeometryDesc(Mesh *mesh, u16 sub_mesh, bool opaque)
+    RayTracingGeometryDesc::RayTracingGeometryDesc(Mesh *mesh, bool opaque)
     {
-        AL_ASSERT(sub_mesh < mesh->SubmeshCount());
         _vertex_buffer = mesh->GetVertexBuffer().get();
-        _index_buffer = mesh->GetIndexBuffer().get();
+        _index_buffer.reserve(mesh->SubmeshCount());
+        for(u32 i = 0; i < mesh->SubmeshCount(); ++i)
+        {
+            _index_buffer.push_back(mesh->GetIndexBuffer(i).get());
+        }
         _vertex_stride = _vertex_buffer->GetLayout().GetStride(0);
         _vertex_count = _vertex_buffer->GetVertexCount();
-        _index_count = _index_buffer->GetCount();
         _opaque = opaque;
     }
 
-    Ref<RayTracingGeometry> RayTracingGeometry::Create(const RayTracingGeometryDesc &desc)
+    Ref<RayTracingGeometry> RayTracingGeometry::Create(const RayTracingGeometryDesc &desc,const String& name)
     {
         switch (RendererAPI::GetAPI())
         {
@@ -27,7 +28,11 @@ namespace Ailu::Render
                 return nullptr;
             case RendererAPI::ERenderAPI::kDirectX12:
             {
-                return MakeRef<RHI::DX12::D3DRayTracingGeometry>(desc);
+                auto geometry = MakeRef<RHI::DX12::D3DRayTracingGeometry>(desc);
+                geometry->Name(name);
+                geometry->Apply();
+                geometry->Build();
+                return geometry;
             }
         }
         AL_ASSERT_MSG(false, "Unsupported render api!");
@@ -36,6 +41,7 @@ namespace Ailu::Render
     
     RayTracingGeometry::RayTracingGeometry(const RayTracingGeometryDesc &desc) : _desc(desc)
     {
+        _res_type = Render::EGpuResType::kBottomAS;
     }
 
     RayTracingGeometry::~RayTracingGeometry()
@@ -43,9 +49,7 @@ namespace Ailu::Render
     }
     NativeHandle RayTracingGeometry::NativeResource()
     {
-        if (_blas_buffer == nullptr)
-            return NativeHandle();
-        return _blas_buffer->NativeResource();
+        return _native_resource;
     }
 
     void RayTracingGeometry::Build()

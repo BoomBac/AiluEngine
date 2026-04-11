@@ -117,6 +117,7 @@ namespace Ailu
         int Initialize(ApplicationDesc desc);
         void Finalize() override;
         void Tick(f32 delta_time) override;
+        void ReloadEngineConfig();
 
         void PushLayer(Layer *layer);
         void PushOverLayer(Layer *layer);
@@ -160,6 +161,7 @@ namespace Ailu
         virtual void OnEvent(Event &e);
 
         void LogicLoop();
+        void LoadEngineConfig();
         void SetCursorInternal();
     protected:
         inline static Application *sp_instance = nullptr;

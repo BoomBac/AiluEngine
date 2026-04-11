@@ -6,6 +6,7 @@
 #include "GlobalMarco.h"
 #include "Framework/Math/ALMath.hpp"
 #include "KeyCode.h"
+#include <mutex>
 #include <tuple>
 
 namespace Ailu
@@ -56,7 +57,7 @@ namespace Ailu
         /// <returns>True if the key was pressed in the current frame and was not pressed in the previous frame; otherwise, false.</returns>
         inline static bool IsKeyJustPressed(EKey keycode)
         {
-            return s_cur_key_state[keycode] && !s_pre_key_state[keycode];
+            return s_pressed_key_state[keycode];
         }
         /// <summary>
         /// Determines if a key was released in the current frame.
@@ -65,7 +66,7 @@ namespace Ailu
         /// <returns>True if the key was released in the current frame and was pressed in the previous frame; otherwise, false.</returns>
         inline static bool IsKeyJustReleased(EKey code)
         {
-            return !s_cur_key_state[code] && s_pre_key_state[code];
+            return s_released_key_state[code];
         }
         /// <summary>
         /// 获取鼠标位置，起始点为客户区左上角,每帧开始时缓存的值
@@ -74,7 +75,17 @@ namespace Ailu
         /// <returns></returns>
         inline static Vector2f GetMousePos(Window *w = nullptr)
         {
-            return s_window_mouse_pos_map[w];
+            std::lock_guard lock(s_mouse_state_mutex);
+            auto it = s_window_mouse_pos_map.find(w);
+            if (it != s_window_mouse_pos_map.end())
+                return it->second;
+            if (w != nullptr)
+            {
+                auto default_it = s_window_mouse_pos_map.find(nullptr);
+                if (default_it != s_window_mouse_pos_map.end())
+                    return default_it->second;
+            }
+            return Vector2f::kZero;
         }
         /// <summary>
         /// Retrieves the current mouse position with high accuracy, optionally for a specific window.
@@ -119,26 +130,29 @@ namespace Ailu
             sp_instance = std::move(input);
         }
     protected:
-        inline static void RefreshKeyStates()
-        {
-            if (sp_instance == nullptr)
-            {
-                s_cur_key_state.reset();
-                return;
-            }
-            for (u32 key = 0; key < kMaxKeyNum; ++key)
-            {
-                s_cur_key_state[key] = sp_instance->IsKeyPressed(static_cast<EKey>(key));
-            }
-        }
+        static void NotifyKeyPressed(EKey keycode);
+        static void NotifyKeyReleased(EKey keycode);
+        static void NotifyMouseMove(Window *w, const Vector2f &local_pos);
+        static void NotifyFocusLost();
+        static void NotifyWindowClosed(Window *w);
         inline static Scope<InputPlatform> sp_instance;
         inline static bool s_block_input = false;
+        inline static std::mutex s_input_state_mutex;
+        inline static std::mutex s_mouse_state_mutex;
         inline static Vector2f s_mouse_pos_delta = Vector2f::kZero;
         inline static Vector2f s_cur_global_mouse_pos = Vector2f::kZero;
+        inline static Vector2f s_pending_global_mouse_pos = Vector2f::kZero;
+        inline static bool s_has_pending_mouse_state = false;
         inline static HashMap<Window *, Vector2f> s_window_mouse_pos_map;
+        inline static HashMap<Window *, Vector2f> s_pending_window_mouse_pos_map;
 
         inline static std::bitset<kMaxKeyNum> s_cur_key_state;
         inline static std::bitset<kMaxKeyNum> s_pre_key_state;
+        inline static std::bitset<kMaxKeyNum> s_pending_key_state;
+        inline static std::bitset<kMaxKeyNum> s_pressed_key_state;
+        inline static std::bitset<kMaxKeyNum> s_released_key_state;
+        inline static std::bitset<kMaxKeyNum> s_pending_pressed_state;
+        inline static std::bitset<kMaxKeyNum> s_pending_released_state;
     private:
         static void BeginFrame();
     };

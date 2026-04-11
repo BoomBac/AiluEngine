@@ -59,7 +59,7 @@ namespace Ailu::Render
     }
     void GpuResource::Bind(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {
-        if (_is_ready_for_rendering)
+        if (IsReady())
             BindImpl(rhi_cmd, params);
         else
         {
@@ -69,14 +69,15 @@ namespace Ailu::Render
     void GpuResource::Upload(GraphicsContext* ctx,RHICommandBuffer* rhi_cmd,UploadParams* params)
     {
         UploadImpl(ctx,rhi_cmd,params);
-        _is_ready_for_rendering = true;
     }
 
     bool GpuResource::IsReady()
     {
         if (!_is_ready_for_rendering)
         {
-            _is_ready_for_rendering = GraphicsContext::Get().GetFenceValueGPU() >= ResourceStateTracker::Get().GetCreatedFence(this);
+            const u64 created_fence = ResourceStateTracker::Get().GetCreatedFence(this);
+            const u64 gpu_fence_value = GraphicsContext::Get().GetFenceValueGPU();
+            _is_ready_for_rendering = gpu_fence_value >= created_fence;
         }
         return _is_ready_for_rendering;
     }
@@ -101,6 +102,7 @@ namespace Ailu::Render
         tracked_states._cur_states.fill(res->_state);
         tracked_states._new_states.fill(res->_state);
         _res_state_map.insert_or_assign(res, tracked_states);
+        LOG_INFO("ResourceStateTracker::AddResource({}) {},num is {}", res->Name(),static_cast<const void*>(res), _res_state_map.size());
     }
 
     void ResourceStateTracker::RemoveResource(GpuResource* res)
@@ -110,6 +112,7 @@ namespace Ailu::Render
 
         std::scoped_lock lock(_mutex);
         _res_state_map.erase(res);
+        LOG_INFO("ResourceStateTracker::RemoveResource({}) {},num is {}", res->Name(),static_cast<const void*>(res), _res_state_map.size());
     }
 
     EResourceState ResourceStateTracker::GetResourceState(GpuResource* res, u32 sub_res) const
@@ -154,12 +157,16 @@ namespace Ailu::Render
 
     u64 ResourceStateTracker::GetCreatedFence(GpuResource* res) const
     {
-        if (res == nullptr)
-            return 0u;
-
+        AL_ASSERT(res != nullptr);
         std::scoped_lock lock(_mutex);
-        if (auto it = _res_state_map.find(res); it != _res_state_map.end())
-            return it->second._created_fence;
-        return 0u;
+        auto it = _res_state_map.find(res); 
+        if (it == _res_state_map.end())
+        {
+            LOG_WARNING("ResourceStateTracker::GetCreatedFence: resource {} {} not found in tracker, maybe it's not tracked or already removed?", res->Name(), static_cast<const void*>(res));
+            return 0xFFFFFFFFFFFFFFFFu;
+        }
+        AL_ASSERT(it != _res_state_map.end());
+        AL_ASSERT(it->first->ID() == res->ID());
+        return it->second._created_fence;
     }
 }// namespace Ailu

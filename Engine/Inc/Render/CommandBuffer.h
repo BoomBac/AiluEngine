@@ -38,6 +38,7 @@ namespace Ailu
 
     class RayTracingScene;
     class RayTracingGeometry;
+    class RayTracingShader;
 
     class Render::RDG::RenderGraph;
 
@@ -163,6 +164,7 @@ namespace Ailu
         void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y);
         void Dispatch(ComputeShader *cs, u16 kernel, u16 thread_group_x, u16 thread_group_y, u16 thread_group_z);
         void Dispatch(ComputeShader *cs, u16 kernel, GPUBuffer *arg_buffer, u16 arg_offset);
+        void DispatchRays(RayTracingShader *shader, RayTracingScene *scene, u16 width, u16 height, u16 depth = 1u);
 
         void BuildAS(RayTracingScene* scene,bool is_update = false);
         void BuildAS(RayTracingGeometry* geometry,bool is_update = false);

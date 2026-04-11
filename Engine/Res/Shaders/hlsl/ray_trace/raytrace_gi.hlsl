@@ -844,7 +844,7 @@ void RayGen(CSInput input)
     jitter = (jitter * 2.0 - 1.0) * 0.5;
     uv += jitter * _ScreenParams.xy;
     float3 ray_origin = _CameraPos.xyz;
-    uint depth = 3;
+    uint depth = 2;
     float3 ray_dir = normalize(Unproject(uv,1.0f) - ray_origin);
     bool is_debug = (pixel.x == _PickPixel.x && pixel.y == _PickPixel.y);
     float4 debug_color = float4(1, 1, 1, 0);
@@ -858,7 +858,7 @@ void RayGen(CSInput input)
     float3 prev = _GI_Texture[pixel].rgb;
     debug_output = ApplySRGBCurve(ACESFilm(debug_output));
     float a = 1.0 / clamp((float)_frame_index, 1.0, MAX_ACCUMULATED_FRAMES);
-    a = 1;
+    //a = 1;
     prev = lerp(prev, debug_output, a);
     _GI_Texture[pixel] = float4(prev, 1.0); 
 }

@@ -40,6 +40,7 @@ namespace Ailu::RHI::DX12
         _upload_buf->Reset();
         _used_res.clear();
         _is_executed = false;
+        _graphics_state_cache.Reset();
     }
 
     void D3DCommandBuffer::Close()

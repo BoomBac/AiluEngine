@@ -5,6 +5,33 @@ namespace Ailu
 {
     namespace PathUtils
     {
+        namespace
+        {
+            template<typename TString>
+            void NormalizePathSeparators(TString &path)
+            {
+                using CharT = typename TString::value_type;
+                constexpr CharT kBackwardSlash = static_cast<CharT>('\\');
+                constexpr CharT kForwardSlash = static_cast<CharT>('/');
+
+                for (auto &ch : path)
+                {
+                    if (ch == kBackwardSlash)
+                    {
+                        ch = kForwardSlash;
+                    }
+                }
+
+                size_t pos = 0;
+                TString duplicated_sep(2, kForwardSlash);
+                TString normalized_sep(1, kForwardSlash);
+                while ((pos = path.find(duplicated_sep, pos)) != TString::npos)
+                {
+                    path.replace(pos, 2, normalized_sep);
+                }
+            }
+        }
+
         bool IsSystemPath(const String &path)
         {
             return path.find_first_of(":") == 1;
@@ -68,61 +95,25 @@ namespace Ailu
         String FormatFilePath(const String &file_path)
         {
             std::string formattedPath = file_path;
-            size_t pos = 0;
-            while ((pos = formattedPath.find("\\\\", pos)) != std::string::npos)
-            {
-                formattedPath.replace(pos, 2, "/");
-            }
-            pos = 0;
-            while ((pos = formattedPath.find("\\", pos)) != std::string::npos)
-            {
-                formattedPath.replace(pos, 1, "/");
-            }
+            NormalizePathSeparators(formattedPath);
             return formattedPath;
         }
 
         WString FormatFilePath(const WString &file_path)
         {
             std::wstring formattedPath = file_path;
-            size_t pos = 0;
-            while ((pos = formattedPath.find(L"\\\\", pos)) != std::wstring::npos)
-            {
-                formattedPath.replace(pos, 2, L"/");
-            }
-            pos = 0;
-            while ((pos = formattedPath.find(L"\\", pos)) != std::wstring::npos)
-            {
-                formattedPath.replace(pos, 1, L"/");
-            }
+            NormalizePathSeparators(formattedPath);
             return formattedPath;
         }
 
         void FormatFilePathInPlace(WString &file_path)
         {
-            size_t pos = 0;
-            while ((pos = file_path.find(L"\\\\", pos)) != std::wstring::npos)
-            {
-                file_path.replace(pos, 2, L"/");
-            }
-            pos = 0;
-            while ((pos = file_path.find(L"\\", pos)) != std::wstring::npos)
-            {
-                file_path.replace(pos, 1, L"/");
-            }
+            NormalizePathSeparators(file_path);
         }
 
         void FormatFilePathInPlace(String &file_path)
         {
-            size_t pos = 0;
-            while ((pos = file_path.find("\\\\", pos)) != std::wstring::npos)
-            {
-                file_path.replace(pos, 2, "/");
-            }
-            pos = 0;
-            while ((pos = file_path.find("\\", pos)) != std::wstring::npos)
-            {
-                file_path.replace(pos, 1, "/");
-            }
+            NormalizePathSeparators(file_path);
         }
 
         std::filesystem::path ResolveRelPath(const std::filesystem::path &relative_path, const std::filesystem::path &base_path)

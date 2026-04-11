@@ -427,12 +427,13 @@ namespace Ailu::SceneManagement
     void Scene::Update(f32 dt)
     {
         auto &r = _register;
+        u32 index = 0;
         for (auto &comp: r.View<ECS::TransformComponent>())
         {
             comp._transform._world_matrix = Transform::GetWorldMatrix(comp._transform);
-            //Transform::ToMatrix(comp._transform, comp._transform._world_matrix);
+            ++index;
         }
-        u32 index = 0;
+        index = 0;
         for (auto &comp: r.View<ECS::StaticMeshComponent>())
         {
             if (comp._p_mesh)

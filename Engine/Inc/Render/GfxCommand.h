@@ -16,7 +16,6 @@
 
 namespace Ailu::Render
 {
-    struct RayTracingGeometryDesc;
     class RenderTexture;
     class VertexBuffer;
     class IndexBuffer;
@@ -25,6 +24,9 @@ namespace Ailu::Render
     class Material;
     class ConstantBuffer;
     class GPUBuffer;
+    struct RayTracingGeometryDesc;
+    class RayTracingScene;
+    class RayTracingShader;
     enum class EGpuCommandType : u8
     {
         kSetTarget,
@@ -41,6 +43,7 @@ namespace Ailu::Render
         kPresent,
         kScissorRect,
         kBuildAS,
+        kDispatchRays,
         kCustom
     };
 
@@ -282,6 +285,19 @@ namespace Ailu::Render
         }
     };
 
+    struct CommandDispatchRays : public TypedGfxCommand<EGpuCommandType::kDispatchRays>
+    {
+        RayTracingShader *_shader;
+        RayTracingScene *_scene;
+        u16 _w;
+        u16 _h;
+        u16 _depth;
+        void Reset()
+        {
+            SafeResetCommand(this);
+        }
+    };
+
     constexpr size_t MaxCommandValue(size_t lhs, size_t rhs)
     {
         return lhs > rhs ? lhs : rhs;
@@ -300,7 +316,8 @@ namespace Ailu::Render
         MaxCommandValue(sizeof(CommandCopyCounter),
         MaxCommandValue(sizeof(CommandPresent),
         MaxCommandValue(sizeof(CommandScissor),
-        MaxCommandValue(sizeof(CommandReadBack), sizeof(CommandBuildAS)))))))))))))));
+        MaxCommandValue(sizeof(CommandDispatchRays),
+        MaxCommandValue(sizeof(CommandReadBack), sizeof(CommandBuildAS))))))))))))))));
 
     inline constexpr size_t kCommandPayloadAlign = MaxCommandValue(alignof(CommandSetTarget),
         MaxCommandValue(alignof(CommandClearTarget),
@@ -315,7 +332,8 @@ namespace Ailu::Render
         MaxCommandValue(alignof(CommandCopyCounter),
         MaxCommandValue(alignof(CommandPresent),
         MaxCommandValue(alignof(CommandScissor), 
-        MaxCommandValue(alignof(CommandReadBack), alignof(CommandBuildAS)))))))))))))));
+        MaxCommandValue(alignof(CommandDispatchRays), 
+        MaxCommandValue(alignof(CommandReadBack), alignof(CommandBuildAS))))))))))))))));
 
     struct alignas(kCommandPayloadAlign) CommandPayload
     {

@@ -196,7 +196,7 @@ namespace Ailu::Render
         bool is_linear = initializer._is_linear && !initializer._is_random_access;
         _pixel_format = initializer._format;
         _dimension = ETextureDimension::kTex2D;
-        _mipmap_count = initializer._mip_num > 0 ? MaxMipmapCount(_width, _height) : 1;
+        _mipmap_count = initializer._mip_num > 1 ? MaxMipmapCount(_width, _height) : 1;
         _is_readble = initializer._is_readable;
         _is_srgb = is_linear;
         _pixel_size = GetPixelByteSize(_pixel_format);
@@ -411,7 +411,7 @@ namespace Ailu::Render
         bool is_linear = initializer._is_linear && !initializer._is_random_access;
         _pixel_format = initializer._format;
         _dimension = ETextureDimension::kTex3D;
-        _mipmap_count = initializer._mip_num >0 ? MaxMipmapCount(_width, _height, _depth) : 1;
+        _mipmap_count = initializer._mip_num >1 ? MaxMipmapCount(_width, _height, _depth) : 1;
         _is_readble = initializer._is_readable;
         _is_srgb = is_linear;
         _pixel_size = GetPixelByteSize(_pixel_format);

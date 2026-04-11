@@ -21,7 +21,11 @@ namespace Ailu
         u32 MaxRenderObjectPerTask;
         APROPERTY(Category = "Render")
         bool isMultiThreadRender;
+        APROPERTY(Category = "Render")
+        bool EnableCpuStateBatchedSubmission;
+        APROPERTY(Category = "Render")
+        bool EnableIncrementalGraphicsBinding;
     };
-    static EngineConfig s_engine_config;
+    inline EngineConfig g_engine_config;
 }
 #endif  __ENGINE_CONFIG_H__

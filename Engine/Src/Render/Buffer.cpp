@@ -82,7 +82,7 @@ namespace Ailu::Render
 	}
 	void VertexBuffer::SetData(u8 *data, u32 size, u8 stream_index, u32 offset)
 	{
-		if (!_is_ready_for_rendering)
+		if (!IsReady())
 			return;
 		AL_ASSERT(stream_index < _stream_data.size());
 		AL_ASSERT(offset + size <= _stream_data[stream_index]._size);

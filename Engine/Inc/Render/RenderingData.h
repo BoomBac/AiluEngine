@@ -22,35 +22,6 @@ namespace Ailu::Render
         kShaderedWireFrame
     };
 
-    struct AILU_API RenderingStates
-    {
-        friend class Ailu::RHI::DX12::D3DContext;
-
-        inline static u32 s_vertex_num = 0u;
-        inline static u32 s_triangle_num = 0u;
-        inline static u32 s_draw_call = 0u;
-        inline static u32 s_dispatch_call = 0u;
-        inline static f32 s_gpu_latency = 0.0f;
-        inline static f32 s_frame_time = 0.0f;
-        inline static f32 s_frame_rate = 0.0f;
-        static void Reset()
-        {
-            s_vertex_num = s_temp_vertex_num;
-            s_triangle_num = s_temp_triangle_num;
-            s_draw_call = s_temp_draw_call;
-            s_dispatch_call = s_temp_dispatch_call;
-            s_temp_vertex_num = 0u;
-            s_temp_triangle_num = 0u;
-            s_temp_draw_call = 0u;
-            s_temp_dispatch_call = 0u;
-        }
-    private:
-        inline static u32 s_temp_vertex_num = 0u;
-        inline static u32 s_temp_triangle_num = 0u;
-        inline static u32 s_temp_draw_call = 0u;
-        inline static u32 s_temp_dispatch_call = 0u;
-    };
-
     DECLARE_ENUM(ERenderLayer, kDefault = 0x01, kSkyBox = 0x08)
 
     struct AILU_API QuailtySetting

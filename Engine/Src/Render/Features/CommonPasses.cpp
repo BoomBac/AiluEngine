@@ -11,6 +11,8 @@
 #include "UI/TextRenderer.h"
 #include "pch.h"
 
+#include "Framework/Common/EngineConfig.h"
+
 #include "Render/Renderer.h"
 #include "Render/RenderGraph/RenderGraph.h"
 
@@ -22,6 +24,62 @@
 
 namespace Ailu::Render
 {
+    namespace
+    {
+        struct QueuedDrawItem
+        {
+            Mesh *_mesh = nullptr;
+            Material *_material = nullptr;
+            ConstantBuffer *_per_obj_cb = nullptr;
+            u16 _submesh_index = 0u;
+            u16 _pass_index = 0u;
+            u32 _instance_count = 1u;
+            u32 _render_queue = Shader::kRenderQueueOpaque;
+            uintptr_t _shader_ptr = 0u;
+            uintptr_t _material_ptr = 0u;
+            uintptr_t _mesh_ptr = 0u;
+            ShaderVariantHash _variant_hash = 0u;
+        };
+
+        QueuedDrawItem MakeQueuedDrawItem(u32 render_queue, Mesh *mesh, Material *material, ConstantBuffer *per_obj_cb, u16 submesh_index, u16 pass_index, u32 instance_count)
+        {
+            QueuedDrawItem item{};
+            item._mesh = mesh;
+            item._material = material;
+            item._per_obj_cb = per_obj_cb;
+            item._submesh_index = submesh_index;
+            item._pass_index = pass_index;
+            item._instance_count = instance_count;
+            item._render_queue = render_queue;
+            item._shader_ptr = reinterpret_cast<uintptr_t>(material->GetShader());
+            item._material_ptr = reinterpret_cast<uintptr_t>(material);
+            item._mesh_ptr = reinterpret_cast<uintptr_t>(mesh);
+            item._variant_hash = material->ActiveVariantHash(pass_index);
+            return item;
+        }
+
+        bool CompareQueuedDrawItem(const QueuedDrawItem &lhs, const QueuedDrawItem &rhs)
+        {
+            return std::tie(lhs._render_queue, lhs._shader_ptr, lhs._pass_index, lhs._variant_hash, lhs._material_ptr, lhs._mesh_ptr, lhs._submesh_index)
+                 < std::tie(rhs._render_queue, rhs._shader_ptr, rhs._pass_index, rhs._variant_hash, rhs._material_ptr, rhs._mesh_ptr, rhs._submesh_index);
+        }
+
+        void EmitQueuedDraws(CommandBuffer *cmd, Vector<QueuedDrawItem> &items)
+        {
+            EngineConfig &config = Ailu::g_engine_config;
+            if (config.EnableCpuStateBatchedSubmission && items.size() > 1u)
+                std::stable_sort(items.begin(), items.end(), CompareQueuedDrawItem);
+
+            for (auto &item: items)
+                cmd->DrawMesh(item._mesh, item._material, item._per_obj_cb, item._submesh_index, item._pass_index, item._instance_count);
+        }
+
+        void EmitQueuedDraws(const Ref<CommandBuffer> &cmd, Vector<QueuedDrawItem> &items)
+        {
+            EmitQueuedDraws(cmd.get(), items);
+        }
+    }
+
 #pragma region ForwardPass
     //-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
     ForwardPass::ForwardPass() : RenderPass("TransparentPass")
@@ -167,6 +225,7 @@ namespace Ailu::Render
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._cascade_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                    Vector<QueuedDrawItem> draw_items;
                     for (auto &it: *rendering_data._cascade_shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
@@ -175,10 +234,11 @@ namespace Ailu::Render
                             if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
-                                cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
                             }
                         }
                     }
+                    EmitQueuedDraws(cmd, draw_items);
                 }
             }
             //投灯阴影
@@ -194,6 +254,7 @@ namespace Ailu::Render
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._spot_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                    Vector<QueuedDrawItem> draw_items;
                     for (auto &it: *rendering_data._spot_shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
@@ -202,10 +263,11 @@ namespace Ailu::Render
                             if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
-                                cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
                             }
                         }
                     }
+                    EmitQueuedDraws(cmd, draw_items);
                     obj_index = 0;
                 }
                 for (int i = 0; i < RenderConstants::kMaxAreaLightNum; i++)
@@ -218,6 +280,7 @@ namespace Ailu::Render
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._area_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                    Vector<QueuedDrawItem> draw_items;
                     for (auto &it: *rendering_data._area_shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
@@ -226,10 +289,11 @@ namespace Ailu::Render
                             if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
-                                cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
                             }
                         }
                     }
+                    EmitQueuedDraws(cmd, draw_items);
                     obj_index = 0;
                 }
             }
@@ -256,6 +320,7 @@ namespace Ailu::Render
                         camera_data._MatrixVP = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._shadow_matrices[j];
                         camera_data._ZBufferParams = light_pos;
                         cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                        Vector<QueuedDrawItem> draw_items;
                         for (auto &it: *rendering_data._point_shadow_data[shadow_data._shadowmap_index]._cull_results[j])
                         {
                             auto &[queue, objs] = it;
@@ -264,10 +329,11 @@ namespace Ailu::Render
                                 if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                                 {
                                     obj._material->EnableKeyword("CAST_POINT_SHADOW");
-                                    cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                    draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
                                 }
                             }
                         }
+                        EmitQueuedDraws(cmd, draw_items);
                         obj_index = 0;
                     }
                 }
@@ -302,6 +368,7 @@ namespace Ailu::Render
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._cascade_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                    Vector<QueuedDrawItem> draw_items;
                     for (auto &it: *rendering_data._cascade_shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
@@ -310,10 +377,11 @@ namespace Ailu::Render
                             if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
-                                cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
                             }
                         }
                     }
+                    EmitQueuedDraws(cmd, draw_items);
                 }
             }
             //投灯阴影
@@ -329,6 +397,7 @@ namespace Ailu::Render
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._spot_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                    Vector<QueuedDrawItem> draw_items;
                     for (auto &it: *rendering_data._spot_shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
@@ -337,10 +406,11 @@ namespace Ailu::Render
                             if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
-                                cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
                             }
                         }
                     }
+                    EmitQueuedDraws(cmd, draw_items);
                     obj_index = 0;
                 }
                 for (int i = 0; i < RenderConstants::kMaxAreaLightNum; i++)
@@ -353,6 +423,7 @@ namespace Ailu::Render
                     cmd->ClearRenderTarget(kZFar, 0u);
                     camera_data._MatrixVP = rendering_data._area_shadow_data[i]._shadow_matrix;
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                    Vector<QueuedDrawItem> draw_items;
                     for (auto &it: *rendering_data._area_shadow_data[i]._cull_results)
                     {
                         auto &[queue, objs] = it;
@@ -361,10 +432,11 @@ namespace Ailu::Render
                             if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                             {
                                 obj._material->DisableKeyword("CAST_POINT_SHADOW");
-                                cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
                             }
                         }
                     }
+                    EmitQueuedDraws(cmd, draw_items);
                     obj_index = 0;
                 }
             }
@@ -391,6 +463,7 @@ namespace Ailu::Render
                         camera_data._MatrixVP = rendering_data._point_shadow_data[shadow_data._shadowmap_index]._shadow_matrices[j];
                         camera_data._ZBufferParams = light_pos;
                         cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &camera_data, RenderConstants::kPerCameraDataSize);
+                        Vector<QueuedDrawItem> draw_items;
                         for (auto &it: *rendering_data._point_shadow_data[shadow_data._shadowmap_index]._cull_results[j])
                         {
                             auto &[queue, objs] = it;
@@ -399,10 +472,11 @@ namespace Ailu::Render
                                 if (i16 shadow_pass = obj._material->GetShader()->FindPass("ShadowCaster"); shadow_pass != -1)
                                 {
                                     obj._material->EnableKeyword("CAST_POINT_SHADOW");
-                                    cmd->DrawMesh(obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count);
+                                    draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
                                 }
                             }
                         }
+                        EmitQueuedDraws(cmd, draw_items);
                         obj_index = 0;
                     }
                 }
@@ -668,7 +742,7 @@ namespace Ailu::Render
                       {
                           cmd->SetRenderTargets(rendering_data._rg_handles._gbuffers, rendering_data._rg_handles._depth_target);
                         cmd->ClearRenderTarget(kZFar, 0u);
-                        u32 obj_index = 0;
+                        Vector<QueuedDrawItem> draw_items;
                         for (auto &it: *rendering_data._cull_results)
                         {
                             auto &[queue, objs] = it;
@@ -678,10 +752,10 @@ namespace Ailu::Render
                             {
                                 auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
                                 obj._material->GetShader()->_stencil_ref = ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x ? 1 : 0;
-                                cmd->DrawMesh(obj._mesh, obj._material, obj_cb, obj._submesh_index, 0, obj._instance_count);
-                                ++obj_index;
+                                draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, obj_cb, obj._submesh_index, 0u, obj._instance_count));
                             }
                         }
+                        EmitQueuedDraws(cmd, draw_items);
                       });
     }
 
@@ -694,18 +768,20 @@ namespace Ailu::Render
             cmd->SetRenderTargetLoadAction(rendering_data._camera_color_target_handle, ELoadStoreAction::kNotCare);
             cmd->SetRenderTargetLoadAction(rendering_data._camera_depth_target_handle, ELoadStoreAction::kClear);
             cmd->SetRenderTargets(rendering_data._gbuffers, rendering_data._camera_depth_target_handle);
-            u32 obj_index = 0;
+            Vector<QueuedDrawItem> draw_items;
             for (auto &it: *rendering_data._cull_results)
             {
                 auto &[queue, objs] = it;
+                if (queue >= Shader::kRenderQueueTransparent)
+                    break;
                 for (auto &obj: objs)
                 {
                     auto obj_cb = (*rendering_data._p_per_object_cbuf)[obj._scene_id];
                     obj._material->GetShader()->_stencil_ref = ConstantBuffer::As<CBufferPerObjectData>(obj_cb)->_MotionVectorParam.x ? 1 : 0;
-                    cmd->DrawMesh(obj._mesh, obj._material, obj_cb, obj._submesh_index, 0, obj._instance_count);
-                    ++obj_index;
+                    draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, obj_cb, obj._submesh_index, 0u, obj._instance_count));
                 }
             }
+            EmitQueuedDraws(cmd.get(), draw_items);
         }
         context->ExecuteCommandBuffer(cmd);
         CommandBufferPool::Release(cmd);

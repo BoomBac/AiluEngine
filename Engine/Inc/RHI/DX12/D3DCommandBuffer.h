@@ -6,6 +6,7 @@
 #include "Render/CommandBuffer.h"
 #include "Render/RenderConstants.h"
 #include "UploadBuffer.h"
+#include <array>
 #include <d3dx12.h>
 #include <wrl/client.h>
 
@@ -21,6 +22,24 @@ namespace Ailu
         class D3DCommandBuffer : public RHICommandBuffer
         {
             friend class D3DContext;
+
+            struct GraphicsStateCache
+            {
+                const void *_pso = nullptr;
+                const void *_vb = nullptr;
+                const void *_ib = nullptr;
+                std::array<u64, 32> _slot_hashes{};
+                u32 _slot_mask = 0u;
+
+                void Reset()
+                {
+                    _pso = nullptr;
+                    _vb = nullptr;
+                    _ib = nullptr;
+                    _slot_hashes.fill(0u);
+                    _slot_mask = 0u;
+                }
+            };
 
         public:
             D3DCommandBuffer(String name, ECommandBufferType type);
@@ -39,6 +58,30 @@ namespace Ailu
             void SetDescriptorHeapId(u16 id) { _cur_cbv_heap_id = id; };
             void PostExecute();
             void UploadDataToBuffer(void *src, u64 src_size, ID3D12Resource *dst, D3DResourceStateGuard &state_guard);
+            bool IsGraphicsPSOActive(const void *pso) const { return _graphics_state_cache._pso == pso; }
+            void SetGraphicsPSOActive(const void *pso)
+            {
+                if (_graphics_state_cache._pso != pso)
+                {
+                    _graphics_state_cache._pso = pso;
+                    _graphics_state_cache._slot_hashes.fill(0u);
+                    _graphics_state_cache._slot_mask = 0u;
+                }
+            }
+            bool IsVertexBufferActive(const void *vb) const { return _graphics_state_cache._vb == vb; }
+            void SetVertexBufferActive(const void *vb) { _graphics_state_cache._vb = vb; }
+            bool IsIndexBufferActive(const void *ib) const { return _graphics_state_cache._ib == ib; }
+            void SetIndexBufferActive(const void *ib) { _graphics_state_cache._ib = ib; }
+            bool IsGraphicsSlotUpToDate(u16 slot, u64 binding_hash) const
+            {
+                return (_graphics_state_cache._slot_mask & (1u << slot)) != 0u && _graphics_state_cache._slot_hashes[slot] == binding_hash;
+            }
+            void UpdateGraphicsSlot(u16 slot, u64 binding_hash)
+            {
+                _graphics_state_cache._slot_mask |= (1u << slot);
+                _graphics_state_cache._slot_hashes[slot] = binding_hash;
+            }
+            void ResetGraphicsStateCache() { _graphics_state_cache.Reset(); }
 
         private:
             void Close();
@@ -61,6 +104,7 @@ namespace Ailu
             bool _is_cmd_closed;
             i16 _cur_cbv_heap_id;
             u64 _fence_value;
+            GraphicsStateCache _graphics_state_cache;
         };
     }// namespace ::RHI::DX12
 }// namespace Ailu

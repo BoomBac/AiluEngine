@@ -168,7 +168,7 @@ namespace Ailu::RHI::DX12
 
     void D3DGPUBuffer::OnDataChanged()
     {
-        if (_is_ready_for_rendering)
+        if (IsReady())
         {
             if (_mapped_data)//upload buffer
             {
