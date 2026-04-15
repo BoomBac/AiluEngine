@@ -141,13 +141,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     lum *= 20.0;
     lum = pow(lum, 1.3.xxx);
     lum /= (smoothstep(0.0, 0.2, clamp(sunDir.y, 0.0, 1.0))*2.0 + 0.15);
-    
     lum = jodieReinhardTonemap(lum);
     
-    //lum = pow(lum, 0.45.xxx);
-    
-    // Defining the color variable and returning it.
-    half4 customColor;
-    customColor = half4(0.5, 0, 0, 1);
     return float4(lum,1.0);
 }

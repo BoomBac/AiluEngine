@@ -18,6 +18,7 @@ namespace Ailu
         class RenderPipeline;
         class Shader;
         class ComputeShader;
+        class RayTracingShader;
         class RHICommandBuffer;
         class AILU_API GraphicsContext
         {
@@ -58,6 +59,9 @@ namespace Ailu
             /// @brief 提交一个compute shader异步编译任务
             /// @param obj
             virtual void CompileShaderAsync(ComputeShader *shader) = 0;
+            /// @brief 提交一个ray tracing shader异步编译任务
+            /// @param obj
+            virtual void CompileShaderAsync(RayTracingShader *shader) = 0;
 
             virtual void TakeCapture() = 0;
             virtual void ResizeSwapChain(void* window_handle,const u32 width, const u32 height) = 0;

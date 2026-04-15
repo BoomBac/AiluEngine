@@ -16,6 +16,6 @@
 
 #define FLOAT_EPSILON 1e-6
 
-#define UINT32_MAX 4294967295U
+#define UINT32_MAX 0xffffffff
 
 #endif //__CONSTANTS_H__

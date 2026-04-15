@@ -114,6 +114,11 @@ namespace Ailu
 
             [[nodiscard]] const Ref<VertexBuffer> &GetVertexBuffer() const noexcept { return _vertex_buffer; }
             [[nodiscard]] const Ref<IndexBuffer> &GetIndexBuffer(u16 submesh_index = 0) const noexcept;
+            [[nodiscard]] i32 GetBindlessVertexStreamIndex(const std::string &semantic_name, u8 semantic_index = 0u) const noexcept;
+            [[nodiscard]] u32 GetTriangleStart(u16 submesh_index) const noexcept;
+            [[nodiscard]] u32 GetTriangleCount(u16 submesh_index) const noexcept;
+            [[nodiscard]] u32 GetBVHNodeStart(u16 submesh_index) const noexcept;
+            [[nodiscard]] u32 GetBVHNodeCount(u16 submesh_index) const noexcept;
 
             [[nodiscard]] std::span<const AABB> GetTriangleBounds() const noexcept { return _triangle_bounds; }
             [[nodiscard]] std::span<const TriangleData> GetTriangleData() const noexcept { return _triangle_data; }
@@ -149,6 +154,7 @@ namespace Ailu
             Vector<AABB> _triangle_bounds;// per-triangle bounds
             Vector<TriangleData> _triangle_data;
             Vector<BVHNode> _bvh_nodes;
+            Vector<Vector2UInt> _submesh_bvh_node_ranges;
             Vector<ImportedMaterialInfo> _imported_taterials;
 
             //-----------------------------------------

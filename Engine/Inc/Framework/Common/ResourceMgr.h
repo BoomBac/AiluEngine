@@ -362,7 +362,7 @@ namespace Ailu
         Queue<std::function<void()>> _sync_tasks;
         Queue<std::function<void()>> _async_tasks;
         Queue<Asset *> _pending_delete_assets;
-        HashMap<u64, ImportSetting*> _importers;
+        HashMap<WString, ImportSetting*> _importers;
     };
     extern AILU_API ResourceMgr *g_pResourceMgr;
 

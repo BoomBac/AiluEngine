@@ -204,7 +204,7 @@ namespace Ailu
                 WString resolved_include_path;
                 if (!TryResolveIncludeFile(normalized_source_path, include_path, effective_search_paths, resolved_include_path))
                 {
-                    LOG_WARNING(L"Failed to resolve include {} from {}", include_path, normalized_source_path);
+                    //LOG_WARNING(L"Failed to resolve include {} from {}", include_path, normalized_source_path);
                     parse_succeed = false;
                     continue;
                 }
@@ -213,7 +213,10 @@ namespace Ailu
                 if (!ParseIncludeDependenciesRecursive(resolved_include_path, search_paths, visited_files, include_files))
                     parse_succeed = false;
             }
-
+            if (!parse_succeed)
+            {
+                //LOG_WARNING(L"Failed to parse include dependencies for {}", normalized_source_path);
+            }
             return parse_succeed;
         }
     }
@@ -344,13 +347,6 @@ namespace Ailu
         return !desc._skip_entry_point && !desc._entry_point.empty() && !IsDxrLibraryTarget(desc._target);
     }
 
-    void AddDxcDefine(std::vector<std::wstring> &define_strings, std::vector<LPCWSTR> &args, const std::wstring &name, const std::wstring &value = L"1")
-    {
-        define_strings.emplace_back(name + L"=" + value);
-        args.push_back(L"-D");
-        args.push_back(define_strings.back().c_str());
-    }
-
     void BuildKeywordStrings(const Vector<D3D_SHADER_MACRO> &keywords, Vector<String> &keyword_str)
     {
         for (auto &kw: keywords)
@@ -434,7 +430,7 @@ namespace Ailu
                         else
                             TryCreateShaderReflection(utils.Get(), output._reflection_blob.Get(), output._library_reflection);
                     }
-                    LOG_INFO(L"Loaded cached shader and reflection for {} from {}", desc._filename, cached_shader_blob_path);
+                    //LOG_INFO(L"Loaded cached shader and reflection for {} from {}", desc._filename, cached_shader_blob_path);
                 }
                 return true;
             }
@@ -478,18 +474,23 @@ namespace Ailu
 #else
             args.push_back(L"-O3");
 #endif
-
             std::vector<std::wstring> define_strings;
             for (auto &kw: desc._keywords)
             {
                 if (!kw.Name)
                     continue;
-                AddDxcDefine(define_strings, args, ToWChar(kw.Name), kw.Definition ? ToWChar(kw.Definition) : L"1");
+                WString def_name = ToWChar(kw.Name);
+                define_strings.emplace_back(def_name + L"=" + (kw.Definition ? ToWChar(kw.Definition) : L"1"));
             }
-            AddDxcDefine(define_strings, args, L"SHADER_DXC");
+            define_strings.emplace_back(L"SHADER_DXC=1");
             if (IsDxrLibraryTarget(desc._target))
             {
-                AddDxcDefine(define_strings, args, L"AL_SHADER_INTEROP_CBUFFER_AS_STRUCT");
+                define_strings.emplace_back(L"AL_SHADER_INTEROP_CBUFFER_AS_STRUCT=1");
+            }
+            for (const auto &def: define_strings)
+            {
+                args.push_back(L"-D");
+                args.push_back(def.c_str());
             }
 
             ComPtr<IDxcResult> result;
@@ -554,8 +555,7 @@ namespace Ailu
             {
                 LOG_WARNING(L"DXC generate pdb failed for shader {}", desc._filename);
             }
-
-            output._include_files = include->_include_files;
+            ParseIncludeDependencies(desc._filename, output._include_files);
             return true;
         }
 
@@ -638,7 +638,7 @@ namespace Ailu
 
             p_blob = output._byte_code;
             shader_reflection = output._shader_reflection;
-            include_files = std::move(output._include_files);
+            include_files.insert(output._include_files.begin(), output._include_files.end());
             return true;
         }
 
@@ -653,7 +653,7 @@ namespace Ailu
 
             p_blob = output._byte_code;
             shader_reflection = output._shader_reflection;
-            include_files = std::move(output._include_files);
+            include_files.insert(output._include_files.begin(), output._include_files.end());
             return true;
         }
     }// namespace RHI::DX12

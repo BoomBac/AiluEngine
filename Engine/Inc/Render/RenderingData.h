@@ -122,9 +122,10 @@ namespace Ailu::Render
             RDG::RGHandle         _motion_vector_tex;
             RDG::RGHandle         _motion_vector_depth;
             RDG::RGHandle         _hzb;
-            RDG::RGHandle _main_light_shadow_map;
-            RDG::RGHandle _addi_shadow_maps;
-            RDG::RGHandle _point_light_shadow_maps;
+            RDG::RGHandle         _main_light_shadow_map;
+            RDG::RGHandle         _addi_shadow_maps;
+            RDG::RGHandle         _point_light_shadow_maps;
+            RDG::RGHandle         _ao_tex;
         } _rg_handles;
         CommandBuffer *cmd;
         const CullResult *_cull_results;

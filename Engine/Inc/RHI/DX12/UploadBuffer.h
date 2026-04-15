@@ -60,8 +60,10 @@ namespace Ailu::RHI::DX12
         // Request a page from the pool of available pages
         // or create a new page if there are no available pages.
         std::shared_ptr<Page> RequestPage();
+        std::shared_ptr<Page> CreateLargePage(size_t sizeInBytes, size_t alignment);
         PagePool m_PagePool;
         PagePool m_AvailablePages;
+        PagePool m_LargePagePool;
         std::shared_ptr<Page> m_CurrentPage;
         // The size of each page of memory.
         size_t m_PageSize;

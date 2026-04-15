@@ -1,0 +1,6 @@
+guid: 596c1845-3f85-4d1c-8965-f3d25f0ebc71
+type: Ailu::Render::Mesh
+name: Arcade
+file: breakfast_room/Arcade.fbx
+inner_file_name: Arcade
+is_combine_mesh: true

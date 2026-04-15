@@ -1,4 +1,5 @@
 #include "UI/ColorPicker.h"
+#include "UI/Basic.h"
 #include "Framework/Common/Input.h"
 #include "UI/TextRenderer.h"
 #include "UI/UIRenderer.h"
@@ -14,6 +15,12 @@ namespace Ailu
         static constexpr u16 SV_RES = 256;
         static constexpr u16 HUE_RES = 256;
         static constexpr u16 CHECK_RES = 8;
+        static constexpr f32 kHdrMaxIntensity = 64.0f;
+
+        static String FormatColorChannelText(f32 value)
+        {
+            return std::format("{:.3f}", value);
+        }
 
         static u8 toByte(float v)
         {
@@ -24,6 +31,54 @@ namespace Ailu
         ColorPicker::ColorPicker() : UIElement("ColorPicker")
         {
             _state._wants_mouse_events = true;
+            const Array<String, 4> channel_names = {"R", "G", "B", "A"};
+            for (u32 i = 0; i < channel_names.size(); ++i)
+            {
+                auto *input = AddChild<InputBlock>(channel_names[i]);
+                input->Name(std::format("ColorChannel_{}", channel_names[i]));
+                _channel_inputs[i] = input;
+            }
+            _channel_inputs[0]->_on_content_changed += [this](String content)
+            {
+                if (auto value = StringUtils::ParseFloat(content); value.has_value())
+                {
+                    auto color = GetColorRGBA();
+                    color.x = std::max(0.0f, value.value());
+                    SyncStateFromRGBA(color);
+                    NotifyValueChanged();
+                }
+            };
+            _channel_inputs[1]->_on_content_changed += [this](String content)
+            {
+                if (auto value = StringUtils::ParseFloat(content); value.has_value())
+                {
+                    auto color = GetColorRGBA();
+                    color.y = std::max(0.0f, value.value());
+                    SyncStateFromRGBA(color);
+                    NotifyValueChanged();
+                }
+            };
+            _channel_inputs[2]->_on_content_changed += [this](String content)
+            {
+                if (auto value = StringUtils::ParseFloat(content); value.has_value())
+                {
+                    auto color = GetColorRGBA();
+                    color.z = std::max(0.0f, value.value());
+                    SyncStateFromRGBA(color);
+                    NotifyValueChanged();
+                }
+            };
+            _channel_inputs[3]->_on_content_changed += [this](String content)
+            {
+                if (auto value = StringUtils::ParseFloat(content); value.has_value())
+                {
+                    auto color = GetColorRGBA();
+                    color.w = std::clamp(value.value(), 0.0f, 1.0f);
+                    SyncStateFromRGBA(color);
+                    NotifyValueChanged();
+                }
+            };
+            SyncInputFields();
 
             // Mouse handling
             OnMouseDown() += [this](UIEvent &e)
@@ -42,7 +97,11 @@ namespace Ailu
                 {
                     _drag_alpha = true;
                 }
-                if (_drag_sv || _drag_hue || _drag_alpha)
+                else if (_show_hdr && IsPointInside(lp, _rect_hdr))
+                {
+                    _drag_hdr = true;
+                }
+                if (_drag_sv || _drag_hue || _drag_alpha || _drag_hdr)
                 {
                     _eventmap[UI::UIEvent::EType::kMouseMove].Invoke(e);// update immediately
                     e._is_handled = true;
@@ -51,7 +110,7 @@ namespace Ailu
             OnMouseUp() += [this](UIEvent &e)
             {
                 if (e._key_code != EKey::kLBUTTON) return;
-                _drag_sv = _drag_hue = _drag_alpha = false;
+                _drag_sv = _drag_hue = _drag_alpha = _drag_hdr = false;
             };
             OnMouseMove() += [this](UIEvent &e)
             {
@@ -91,11 +150,20 @@ namespace Ailu
                         changed = true;
                     }
                 }
+                if (_drag_hdr && _show_hdr)
+                {
+                    f32 normalized = RemapClamped(lp.x, _rect_hdr.x, _rect_hdr.x + _rect_hdr.z);
+                    f32 intensity = HdrIntensityFromNormalized(normalized);
+                    if (!NearbyEqual(intensity, _hdr_intensity))
+                    {
+                        _hdr_intensity = intensity;
+                        changed = true;
+                    }
+                }
                 if (changed)
                 {
-                    _rgba = HsvToRgb(_hsv);
-                    InvalidateLayout();// ensure redraw
-                    _on_value_changed_delegate.Invoke(GetColorRGBA());
+                    SyncRgbFromState();
+                    NotifyValueChanged();
                     e._is_handled = true;
                 }
             };
@@ -106,13 +174,14 @@ namespace Ailu
         ColorPicker::ColorPicker(Vector4f old_color) : ColorPicker("ColorPicker")
         {
             _old_color = old_color;
+            SyncStateFromRGBA(old_color);
         }
 
         Vector2f ColorPicker::MeasureDesiredSize()
         {
             if (_slot._size_policy_h == ESizePolicy::kFixed) return _slot._size;
             // default minimum footprint
-            return {240.0f, 200.0f};
+            return {320.0f, 240.0f};
         }
 
         void ColorPicker::Update(f32 dt)
@@ -124,7 +193,11 @@ namespace Ailu
             // Layout sub-rects within content
             const f32 spacing = 6.0f;
             Vector4f c = _content_rect;// ltwh in local space
-            f32 barsH = 16.0f + spacing + (_show_alpha ? 16.0f : 0.0f);
+            f32 barsH = 16.0f;
+            if (_show_alpha)
+                barsH += spacing + 16.0f;
+            if (_show_hdr)
+                barsH += spacing + 16.0f;
             f32 svSize = std::min(c.z, c.w - barsH - spacing);
 
             // SV square at top-left
@@ -137,22 +210,42 @@ namespace Ailu
             if (_show_alpha)
             {
                 _rect_alpha = {c.x, curY, svSize, 16.0f};
+                curY += 16.0f + spacing;
             }
             else
             {
                 _rect_alpha = {0, 0, 0, 0};
+            }
+            if (_show_hdr)
+            {
+                _rect_hdr = {c.x, curY, svSize, 16.0f};
+            }
+            else
+            {
+                _rect_hdr = {0, 0, 0, 0};
             }
 
             // Preview box to the right if room, else below
             f32 rightW = c.z - svSize - spacing;
             if (rightW > 40.0f)
             {
-                _rect_preview = {c.x + svSize + spacing, c.y, rightW, 40.0f};
+                _rect_preview = {c.x + svSize + spacing, c.y, rightW, 24.0f};
+                _rect_inputs = {c.x + svSize + spacing, c.y + 24.0f + spacing, rightW, 20.0f * 4.0f + spacing * 3.0f};
             }
             else
             {
-                _rect_preview = {c.x, curY + (_show_alpha ? 16.0f + spacing : 0.0f), svSize, 20.0f};
+                _rect_preview = {c.x, curY + (_show_hdr ? 16.0f + spacing : 0.0f), svSize, 24.0f};
+                _rect_inputs = {c.x, _rect_preview.y + _rect_preview.w + spacing, svSize, 20.0f * 4.0f + spacing * 3.0f};
             }
+
+            for (u32 i = 0; i < _channel_inputs.size(); ++i)
+            {
+                if (_channel_inputs[i] == nullptr)
+                    continue;
+                const f32 row_y = _rect_inputs.y + i * (20.0f + spacing);
+                _channel_inputs[i]->Arrange(_rect_inputs.x, row_y, _rect_inputs.z, 20.0f);
+            }
+            SyncInputFields();
 
             // Rebuild SV texture if hue changed significantly
             if (std::abs(_hsv.x - _last_h_for_sv) > 1e-6f || !_tex_sv)
@@ -217,6 +310,23 @@ namespace Ailu
                 //r.DrawImage(texA.get(), _rect_alpha, opt);
             }
 
+            if (_show_hdr)
+            {
+                constexpr u32 kHdrBarSegments = 24u;
+                Vector3f base_rgb = HsvToRgb(_hsv);
+                for (u32 i = 0; i < kHdrBarSegments; ++i)
+                {
+                    f32 t0 = static_cast<f32>(i) / static_cast<f32>(kHdrBarSegments);
+                    f32 t1 = static_cast<f32>(i + 1u) / static_cast<f32>(kHdrBarSegments);
+                    f32 intensity = HdrIntensityFromNormalized((t0 + t1) * 0.5f);
+                    Vector3f preview_rgb = ToneMapPreview(base_rgb * intensity);
+                    r.DrawQuad({_rect_hdr.x + _rect_hdr.z * t0, _rect_hdr.y, _rect_hdr.z * (t1 - t0), _rect_hdr.w}, _matrix,
+                               {preview_rgb.x, preview_rgb.y, preview_rgb.z, 1.0f});
+                }
+                r.DrawBox(_rect_hdr.xy, _rect_hdr.zw, _matrix, 1.0f, Colors::kWhite);
+                r.DrawText(std::format("HDR {:.2f}x", _hdr_intensity), {_rect_hdr.x + 4.0f, _rect_hdr.y + 1.0f}, _matrix, 12.0f, Colors::kWhite);
+            }
+
             // Preview: left old (not tracked), right current
             Vector4f pr = _rect_preview;
             if (pr.z > 0 && pr.w > 0)
@@ -224,9 +334,22 @@ namespace Ailu
                 // Two halves
                 Vector4f left = {pr.x, pr.y, pr.z * 0.5f, pr.w};
                 Vector4f right = {pr.x + pr.z * 0.5f, pr.y, pr.z * 0.5f, pr.w};
-                r.DrawQuad(left, _matrix, _old_color);
-                r.DrawQuad(right, _matrix, {_rgba.x, _rgba.y, _rgba.z, _alpha});
+                Vector3f old_preview = ToneMapPreview({_old_color.x, _old_color.y, _old_color.z});
+                Vector3f new_preview = ToneMapPreview(_rgba);
+                r.DrawQuad(left, _matrix, {old_preview.x, old_preview.y, old_preview.z, std::clamp(_old_color.w, 0.0f, 1.0f)});
+                r.DrawQuad(right, _matrix, {new_preview.x, new_preview.y, new_preview.z, _alpha});
                 r.DrawBox(pr.xy, pr.zw, _matrix, 1.0f, Colors::kWhite);
+                r.DrawText("Old", {left.x + 4.0f, left.y + 4.0f}, _matrix, 12.0f, Colors::kWhite);
+                r.DrawText(std::format("New {:.2f}x", _hdr_intensity), {right.x + 4.0f, right.y + 4.0f}, _matrix, 12.0f, Colors::kWhite);
+            }
+
+            for (u32 i = 0; i < _channel_inputs.size(); ++i)
+            {
+                static const Array<String, 4> kLabels = {"R", "G", "B", "A"};
+                if (_channel_inputs[i] == nullptr)
+                    continue;
+                r.DrawText(kLabels[i], {_rect_inputs.x - 14.0f, _rect_inputs.y + i * 26.0f + 2.0f}, _matrix, 12.0f, Colors::kWhite);
+                _channel_inputs[i]->Render(r);
             }
 
             // Handles
@@ -248,32 +371,89 @@ namespace Ailu
                 f32 ax = _rect_alpha.x + _alpha * _rect_alpha.z;
                 r.DrawLine({ax, _rect_alpha.y}, {ax, _rect_alpha.y + _rect_alpha.w}, _matrix, 4.0f, Colors::kWhite);
             }
+            if (_show_hdr && _rect_hdr.z > 0)
+            {
+                f32 hdr_x = _rect_hdr.x + NormalizedFromHdrIntensity(_hdr_intensity) * _rect_hdr.z;
+                r.DrawLine({hdr_x, _rect_hdr.y}, {hdr_x, _rect_hdr.y + _rect_hdr.w}, _matrix, 4.0f, Colors::kWhite);
+            }
         }
 
         void ColorPicker::SetColorRGBA(Vector4f rgba)
         {
-            Vector3f rgb{rgba.x, rgba.y, rgba.z};
-            _hsv = RgbToHsv(rgb);
-            _rgba = rgb;
-            _alpha = rgba.w;
-            InvalidateLayout();
-            _on_value_changed_delegate.Invoke(GetColorRGBA());
+            SyncStateFromRGBA(rgba);
+            NotifyValueChanged();
         }
 
         void ColorPicker::SetColorHSVA(Vector4f hsva)
         {
-            _hsv = {hsva.x, hsva.y, hsva.z};
-            _alpha = hsva.w;
-            _rgba = HsvToRgb(_hsv);
+            SyncStateFromHSVA(hsva);
+            NotifyValueChanged();
+        }
+
+        UIElement *ColorPicker::HitTest(Vector2f pos)
+        {
+            Vector2f lpos = TransformCoord(_inv_matrix, {pos, 0.0f}).xy;
+            if (!IsPointInside(lpos))
+                return nullptr;
+
+            for (auto &child: _children)
+            {
+                if (auto *hit = child->HitTest(pos); hit != nullptr)
+                    return hit;
+            }
+            return this;
+        }
+
+        void ColorPicker::SyncRgbFromState()
+        {
+            _rgba = HsvToRgb(_hsv) * _hdr_intensity;
+        }
+
+        void ColorPicker::SyncStateFromRGBA(Vector4f rgba)
+        {
+            Vector3f rgb = {std::max(rgba.x, 0.0f), std::max(rgba.y, 0.0f), std::max(rgba.z, 0.0f)};
+            _hdr_intensity = std::clamp(std::max({1.0f, rgb.x, rgb.y, rgb.z}), 1.0f, kHdrMaxIntensity);
+            Vector3f normalized_rgb = _hdr_intensity > 0.0f ? rgb / _hdr_intensity : Vector3f::kZero;
+            _hsv = RgbToHsv(normalized_rgb);
+            _alpha = std::clamp(rgba.w, 0.0f, 1.0f);
+            SyncRgbFromState();
+        }
+
+        void ColorPicker::SyncStateFromHSVA(Vector4f hsva)
+        {
+            f32 effective_value = std::max(hsva.z, 0.0f);
+            _hsv.x = hsva.x - std::floor(hsva.x);
+            _hsv.y = std::clamp(hsva.y, 0.0f, 1.0f);
+            _hdr_intensity = std::clamp(std::max(1.0f, effective_value), 1.0f, kHdrMaxIntensity);
+            _hsv.z = std::clamp(effective_value / _hdr_intensity, 0.0f, 1.0f);
+            _alpha = std::clamp(hsva.w, 0.0f, 1.0f);
+            SyncRgbFromState();
+        }
+
+        void ColorPicker::NotifyValueChanged()
+        {
             InvalidateLayout();
+            SyncInputFields();
             _on_value_changed_delegate.Invoke(GetColorRGBA());
+        }
+
+        void ColorPicker::SyncInputFields()
+        {
+            Vector4f color = GetColorRGBA();
+            const Array<f32, 4> channel_values = {color.x, color.y, color.z, color.w};
+            for (u32 i = 0; i < _channel_inputs.size(); ++i)
+            {
+                if (_channel_inputs[i] != nullptr && !_channel_inputs[i]->IsEditing())
+                    _channel_inputs[i]->SetContent(FormatColorChannelText(channel_values[i]), false);
+            }
         }
 
         void ColorPicker::EnsureStaticTextures()
         {
             if (!s_tex_hue)
             {
-                s_tex_hue = Texture2D::Create(HUE_RES, 1, Render::ETextureFormat::kRGBA8UNorm, false, false);
+                s_tex_hue = Texture2D::Create(HUE_RES, 1, Render::ETextureFormat::kRGBA8UNormSRGB, false, false);
+                s_tex_hue->Name("ColorPicker_HueBar");
                 Vector<u8> row(HUE_RES * 4);
                 for (u32 x = 0; x < HUE_RES; ++x)
                 {
@@ -289,7 +469,8 @@ namespace Ailu
             }
             if (!s_tex_checker)
             {
-                s_tex_checker = Texture2D::Create(CHECK_RES, CHECK_RES, Render::ETextureFormat::kRGBA8UNorm, false, false);
+                s_tex_checker = Texture2D::Create(CHECK_RES, CHECK_RES, Render::ETextureFormat::kRGBA8UNormSRGB, false, false);
+                s_tex_checker->Name("ColorPicker_Checker");
                 Vector<u8> data(CHECK_RES * CHECK_RES * 4);
                 for (u32 y = 0; y < CHECK_RES; ++y)
                 {
@@ -311,7 +492,8 @@ namespace Ailu
 
         void ColorPicker::RebuildSVTexture()
         {
-            _tex_sv = Texture2D::Create(SV_RES, SV_RES, Render::ETextureFormat::kRGBA8UNorm, false, false);
+            _tex_sv = Texture2D::Create(SV_RES, SV_RES, Render::ETextureFormat::kRGBA8UNormSRGB, false, false);
+            _tex_sv->Name("ColorPicker_SVSquare");
             Vector<u8> data(SV_RES * SV_RES * 4);
             for (u32 y = 0; y < SV_RES; ++y)
             {
@@ -389,6 +571,27 @@ namespace Ailu
                 default:
                     return {v, p, q};
             }
+        }
+
+        Vector3f ColorPicker::ToneMapPreview(const Vector3f &rgb)
+        {
+            return {
+                rgb.x / (1.0f + std::max(rgb.x, 0.0f)),
+                rgb.y / (1.0f + std::max(rgb.y, 0.0f)),
+                rgb.z / (1.0f + std::max(rgb.z, 0.0f))
+            };
+        }
+
+        f32 ColorPicker::HdrIntensityFromNormalized(f32 normalized_value)
+        {
+            normalized_value = std::clamp(normalized_value, 0.0f, 1.0f);
+            return std::pow(2.0f, normalized_value * std::log2(kHdrMaxIntensity));
+        }
+
+        f32 ColorPicker::NormalizedFromHdrIntensity(f32 intensity)
+        {
+            intensity = std::clamp(intensity, 1.0f, kHdrMaxIntensity);
+            return std::log2(intensity) / std::log2(kHdrMaxIntensity);
         }
 
     }// namespace UI

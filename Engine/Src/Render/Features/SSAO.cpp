@@ -48,13 +48,13 @@ namespace Ailu::Render
         TextureDesc desc(w, h, ERenderTargetFormat::kRFloat);
         desc._is_random_access = true;
         desc._mip_num = 1u;
-        static RDG::RGHandle ao_result,blur_temp;
+        static RDG::RGHandle blur_temp;
         graph.AddPass("SSAO Compute", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
-                {
-                    ao_result = builder.AllocTexture(desc, "_OcclusionTex");
+            {
+                    rendering_data._rg_handles._ao_tex = builder.AllocTexture(desc, "_OcclusionTex");
                     builder.Read(rendering_data._rg_handles._depth_tex);
                     builder.Read(rendering_data._rg_handles._gbuffers[0]);
-                    ao_result = builder.Write(ao_result,EResourceUsage::kWriteUAV); 
+                    rendering_data._rg_handles._ao_tex = builder.Write(rendering_data._rg_handles._ao_tex,EResourceUsage::kWriteUAV); 
             }, 
             [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                 {
@@ -73,7 +73,7 @@ namespace Ailu::Render
                 _ssao_computer->SetFloat("_Range_Sigma", 0.31f);
                 _ssao_computer->SetTexture("_CameraNormalsTexture", graph.Resolve<Texture>(data._rg_handles._gbuffers[0]));
                 _ssao_computer->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_tex));
-                _ssao_computer->SetTexture("_AOResult", graph.Resolve<Texture>(graph.GetTexture("_OcclusionTex")));
+                _ssao_computer->SetTexture("_AOResult", graph.Resolve<Texture>(data._rg_handles._ao_tex));
                 {
                     auto kernel = _ssao_computer->FindKernel("SSAOGen");
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel,_is_cbr? w >> 1 : w,_is_cbr? h >> 1 : h,1);
@@ -83,7 +83,7 @@ namespace Ailu::Render
         graph.AddPass("SSAO Blur", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                     {
                         blur_temp = builder.AllocTexture(desc, "AO_BlurTemp");
-                        builder.Read(ao_result);
+                        builder.Read(rendering_data._rg_handles._ao_tex);
                         blur_temp = builder.Write(blur_temp); 
                     }, [w,h, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
@@ -95,15 +95,15 @@ namespace Ailu::Render
                 {
                     auto kernel = _ssao_computer->FindKernel("SSAOBlurX");
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel, w, h, 1);
-                    _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(graph.GetTexture("_OcclusionTex")));
-                    _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(graph.GetTexture("AO_BlurTemp")));
+                    _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(data._rg_handles._ao_tex));
+                    _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(blur_temp));
                     cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
                 }
             });
         graph.AddPass("SSAO Final", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
                       {
                     builder.Read(blur_temp);
-                    ao_result = builder.Write(ao_result);
+                    rendering_data._rg_handles._ao_tex = builder.Write(rendering_data._rg_handles._ao_tex);
                      }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       { 
                 _ssao_computer->SetVector("_AOScreenParams", params);
@@ -114,22 +114,21 @@ namespace Ailu::Render
                 {
                     auto kernel = _ssao_computer->FindKernel("SSAOBlurY");
                     auto [x,y,z] = _ssao_computer->CalculateDispatchNum(kernel, w, h, 1);
-                    _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(graph.GetTexture("AO_BlurTemp")));
-                    _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(graph.GetTexture("_OcclusionTex")));
+                    _ssao_computer->SetTexture("_SourceTex", graph.Resolve<Texture>(blur_temp));
+                    _ssao_computer->SetTexture("_DenoiseResult", graph.Resolve<Texture>(data._rg_handles._ao_tex));
                     cmd->Dispatch(_ssao_computer.get(), kernel, x, y, 1);
                 }
-                Shader::SetGlobalTexture("_OcclusionTex", graph.Resolve<Texture>(graph.GetTexture("_OcclusionTex"))); });
+                });
         if (_is_debug_mode)
         {
             graph.AddPass("SSAO Debug", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
-                          {
-                    auto handle = builder.GetTexture("_OcclusionTex");
-                    builder.Read(handle);
+                {
+                    builder.Read(rendering_data._rg_handles._ao_tex);
                     rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
-                }, [&, this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
-                          { 
-                        cmd->Blit(graph.GetTexture("_OcclusionTex"), data._rg_handles._color_target);
-                    });
+                }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                { 
+                        cmd->Blit(graph.Resolve<Texture>(data._rg_handles._ao_tex), graph.Resolve<RenderTexture>(data._rg_handles._color_target));
+                });
         }
     }
     void SSAOPass::Execute(GraphicsContext *context, RenderingData &rendering_data)

@@ -8,6 +8,52 @@ using namespace Ailu::Render;
 
 namespace Ailu
 {
+    namespace
+    {
+        constexpr u32 kInvalidProfileIndex = u32(-1);
+
+        bool CanRecycleProfileSlot(const ProfileData &profile, u64 current_frame)
+        {
+            return !profile._is_start &&
+                   profile._is_finished &&
+                   !profile._is_active &&
+                   profile._record.empty() &&
+                   (profile._last_used_frame + 1u) < current_frame;
+        }
+
+        void ResetProfileSlot(ProfileData &profile, const String &name, bool is_cpu_profile, u64 current_frame)
+        {
+            profile = ProfileData{};
+            profile.Name = name;
+            profile._is_cpu_profile = is_cpu_profile;
+            profile._last_used_frame = current_frame;
+        }
+
+        template <size_t N>
+        u32 FindProfileSlot(Array<ProfileData, N> &profiles, u32 used_count, const String &name, u64 current_frame)
+        {
+            u32 reusable_idx = kInvalidProfileIndex;
+            for (u32 i = 0; i < used_count; ++i)
+            {
+                auto &profile = profiles[i];
+                if (profile.Name == name)
+                {
+                    return i;
+                }
+                if (reusable_idx == kInvalidProfileIndex && CanRecycleProfileSlot(profile, current_frame))
+                {
+                    reusable_idx = i;
+                }
+            }
+            if (reusable_idx != kInvalidProfileIndex)
+            {
+                return reusable_idx;
+            }
+            AL_ASSERT(used_count < N);
+            return used_count;
+        }
+    }
+
     static Profiler g_Profiler;
     std::thread::id s_main_thread_id;
     Profiler &Profiler::Get()
@@ -30,26 +76,22 @@ namespace Ailu
     u32 Profiler::StartGpuProfile(RHICommandBuffer *cmdList, const String &name)
     {
         //std::lock_guard<std::mutex> lock(_lock);
-        u32 profileIdx = u32(-1);
-        for (u32 i = 0; i < numProfiles; ++i)
-        {
-            if (_gpu_profiles[i].Name == name)
-            {
-                profileIdx = i;
-                break;
-            }
-        }
-        if (profileIdx == u32(-1))
+        u32 profileIdx = FindProfileSlot(_gpu_profiles, numProfiles, name, _cur_frame);
+        if (profileIdx == numProfiles)
         {
             AL_ASSERT(numProfiles < kMaxProfileNum);
-            profileIdx = numProfiles++;
-            _gpu_profiles[profileIdx].Name = name;
+            ++numProfiles;
         }
-        ProfileData &profile_data = _gpu_profiles[profileIdx];
+        auto &profile_data = _gpu_profiles[profileIdx];
+        if (profile_data.Name != name)
+        {
+            ResetProfileSlot(profile_data, name, false, _cur_frame);
+        }
         AL_ASSERT(profile_data._is_start != true);
         AL_ASSERT(profile_data._is_finished != false);
         profile_data._is_cpu_profile = false;
         profile_data._is_active = true;
+        profile_data._last_used_frame = _cur_frame;
         _p_gpu_timer->Start(cmdList, profileIdx);
         profile_data._is_start = true;
         profile_data._is_finished = false;
@@ -67,33 +109,30 @@ namespace Ailu
         profile_data._time = (f32)_p_gpu_timer->GetElapsedMS(idx);
         profile_data._is_start = false;
         profile_data._is_finished = true;
+        profile_data._last_used_frame = _cur_frame;
         // if (_is_record_mode)
         //     profile_data.PushRecord(_cur_frame);
     }
     u32 Profiler::StartCPUProfile(const String &name)
     {
         std::lock_guard<std::mutex> lock(_lock);
-        u32 profileIdx = u32(-1);
-        for (u32 i = 0; i < numCPUProfiles; ++i)
-        {
-            if (_cpu_profiles[i].Name == name)
-            {
-                profileIdx = i;
-                break;
-            }
-        }
-        if (profileIdx == u32(-1))
+        u32 profileIdx = FindProfileSlot(_cpu_profiles, numCPUProfiles, name, _cur_frame);
+        if (profileIdx == numCPUProfiles)
         {
             AL_ASSERT(numCPUProfiles < kMaxProfileNum);
-            profileIdx = numCPUProfiles++;
-            _cpu_profiles[profileIdx].Name = name;
+            ++numCPUProfiles;
         }
-        ProfileData &profile_data = _cpu_profiles[profileIdx];
+        auto &profile_data = _cpu_profiles[profileIdx];
+        if (profile_data.Name != name)
+        {
+            ResetProfileSlot(profile_data, name, true, _cur_frame);
+        }
         AL_ASSERT(profile_data._is_start != true);
         AL_ASSERT(profile_data._is_finished != false);
         profile_data.Name = name;
         profile_data._is_cpu_profile = true;
         profile_data._is_active = true;
+        profile_data._last_used_frame = _cur_frame;
         g_pTimeMgr->Mark();
         //g_pTimeMgr _cpu_timer.Mark();
         profile_data._is_start = true;
@@ -112,6 +151,7 @@ namespace Ailu
         profile_data._time = g_pTimeMgr->GetElapsedSinceLastMark();
         profile_data._is_start = false;
         profile_data._is_finished = true;
+        profile_data._last_used_frame = _cur_frame;
         if (_is_record_mode)
             profile_data.PushRecord(_cur_frame);
     }

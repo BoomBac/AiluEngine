@@ -89,8 +89,10 @@ namespace Ailu::Render
 
     void RenderPipeline::Setup()
     {
-        _cur_frame_packet = &_frame_packets[Application::Application::Get().GetFrameCount() % _frame_packets.size()];
-        _cur_frame_res = &_frame_res[Application::Application::Get().GetFrameCount() % _frame_res.size()];
+        const u32 cur_slot = _frame_res_manager->GetActiveFrameSlot();
+        const u32 prev_slot = _frame_res_manager->GetPreviousFrameSlot();
+        _cur_frame_packet = &_frame_packets[cur_slot];
+        _cur_frame_res = &_frame_res[cur_slot];
         //ProcessPendingRenderObjects();
         //{
         //    PROFILE_BLOCK_CPU(CollectView)
@@ -104,11 +106,17 @@ namespace Ailu::Render
         _cameras.clear();
         _cameras.emplace_back(Camera::sCurrent);
         for (auto &r: _renderers)
-            r->SetupFrameResource(&_frame_res[(Application::Application::Get().GetFrameCount() - 1) % _frame_res.size()], _cur_frame_res);
+            r->SetupFrameResource(&_frame_res[prev_slot], _cur_frame_res);
     }
 
     void RenderPipeline::Render()
     {
+        if (Application::Get()._is_multi_thread_rendering && _is_need_wait_for_render_thread && Application::Get().GetFrameCount() > 0u)
+        {
+            Application::Get().NotifyRender();
+            Application::Get().WaitForRender();
+            _is_need_wait_for_render_thread = false;
+        }
         _frame_res_manager->NewFrame();
         Setup();
         for (auto cam: _cameras)

@@ -45,6 +45,7 @@ namespace Ailu::Render
         using TextureHandle = TexturePool::PoolResourceHandle;
         using BufferHandle = BufferPool::PoolResourceHandle;
         inline static constexpr u32 kMaxResourceStaleFrame = 15u;
+        inline static constexpr u32 kFrameResourceSlotCount = RenderConstants::kFrameCount + 1u;
     public:
         static FrameResourceManager &Get();
         static void Init();
@@ -59,11 +60,17 @@ namespace Ailu::Render
         void FreeBuffer(BufferHandle handle);
         void CleanupStaleResources();
         FrameAllocator* GetActiveFrameAllocator() const { return _active_allocator; }
+        u32 GetActiveFrameSlot() const { return _active_slot; }
+        u32 GetPreviousFrameSlot() const { return _prev_slot; }
     private:
         TexturePool _texture_pool;
         BufferPool _buffer_pool;
-        Array<Scope<FrameAllocator>, 2> _frame_allocators{};
+        Array<Scope<FrameAllocator>, kFrameResourceSlotCount> _frame_allocators{};
+        Array<u64, kFrameResourceSlotCount> _frame_slot_fence_values{};
         FrameAllocator* _active_allocator = nullptr;
+        u32 _active_slot = 0u;
+        u32 _prev_slot = 0u;
+        bool _has_active_slot = false;
     };
 
 }// namespace Ailu

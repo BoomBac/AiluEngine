@@ -32,6 +32,14 @@
     #define AL_SHADER_INTEROP_CBUFFER_BEGIN(name, slot) cbuffer name : register(slot)
     #define AL_SHADER_INTEROP_CBUFFER_END
 #endif
+
+#define AL_UNIFIED_LIGHT_TYPE_DIRECTIONAL 0u
+#define AL_UNIFIED_LIGHT_TYPE_POINT 1u
+#define AL_UNIFIED_LIGHT_TYPE_SPOT 2u
+#define AL_UNIFIED_LIGHT_TYPE_RECT_AREA 3u
+#define AL_UNIFIED_LIGHT_TYPE_TRIANGLE_AREA 4u
+
+#define AL_UNIFIED_LIGHT_FLAG_TWO_SIDED 0x1u
 // C++
 #ifdef __cplusplus
 namespace Ailu::Render
@@ -84,6 +92,39 @@ namespace Ailu::Render
         float4x4 _shadow_matrix;
     };
 
+    struct UnifiedLightData
+    {
+        uint _type;
+        uint _flags;
+        int _shadow_index;
+        int _emissive_map;
+
+        float3 _radiance;
+        float _range;
+
+        float3 _position;
+        float _source_radius;
+
+        float3 _direction;
+        float _spot_angle_scale;
+
+        float3 _shape_u;
+        float _spot_angle_offset;
+
+        float3 _shape_v;
+        uint  _tri_index;
+
+        float4 _shadow_params;
+    };
+
+    struct UnifiedLightBufferConfig
+    {
+        uint _light_count;
+        uint _finite_light_count;
+        uint _triangle_light_count;
+        uint _reserved0;
+    };
+
     struct ObjectInstanceData
     {
         float4x4 _local_to_world;
@@ -94,6 +135,14 @@ namespace Ailu::Render
         uint _global_triangle_offset;
         uint _blas_node_start;
         uint _blas_node_count;
+        uint _position_bindless_idx;
+        uint _normal_bindless_idx;
+        uint _uv_bindless_idx;
+        uint _tangent_bindless_idx;
+        uint _index_bindless_idx;
+        uint _submesh_triangle_offset;
+        uint _submesh_triangle_count;
+        uint _reserved0;
     };
 
     struct TriangleData
@@ -247,6 +296,8 @@ namespace Ailu::Render
     static_assert((sizeof(CBufferPerSceneData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
     //static_assert((sizeof(ScenePerMaterialData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
     static_assert((sizeof(CBufferPerCameraData) % 256) == 0, "Constant Buffer size must be 256-byte aligned");
+    static_assert((sizeof(UnifiedLightData) % 16) == 0, "Unified light data must be 16-byte aligned");
+    static_assert((sizeof(UnifiedLightBufferConfig) % 16) == 0, "Unified light config must be 16-byte aligned");
 #else
 #define PerMaterialCBufferBegin                   \
     cbuffer CBufferPerMaterialData : register(b1) \

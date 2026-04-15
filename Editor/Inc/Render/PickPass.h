@@ -26,6 +26,8 @@ namespace Ailu
             Scope<Material> _editor_outline;
             RenderTexture *_color;
             RenderTexture *_depth;
+            RDG::RGHandle _color_handle;
+            RDG::RGHandle _depth_handle;
         };
         class PickFeature : public RenderFeature
         {

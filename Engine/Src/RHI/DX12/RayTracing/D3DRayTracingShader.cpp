@@ -14,6 +14,10 @@ namespace Ailu::RHI::DX12
 {
     namespace
     {
+        constexpr u32 kDxrHitAttributeSize = 2u * sizeof(float);
+        constexpr u32 kDxrRayPayloadSize = 96u;
+        constexpr u32 kDxrMaxRecursionDepth = 1u;
+
         const Vector<CD3DX12_STATIC_SAMPLER_DESC> &CreateStaticSampler()
         {
             static Vector<CD3DX12_STATIC_SAMPLER_DESC> samplers{
@@ -487,8 +491,16 @@ namespace Ailu::RHI::DX12
             }
         }
 
+        const auto bindless_srv_base = D3DDescriptorMgr::Get().GetBindlessSRVBaseGpuHandle();
+        const auto bindless_uav_base = D3DDescriptorMgr::Get().GetBindlessUAVBaseGpuHandle();
         if (_has_bindless_texture2d)
-            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_texture_slot, D3DDescriptorMgr::Get().GetBindlessSRVBaseGpuHandle());
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_texture_slot, bindless_srv_base);
+        if (_has_bindless_buffer)
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_buffer_slot, bindless_srv_base);
+        if (_has_bindless_rw_texture2d)
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_rw_texture_slot, bindless_uav_base);
+        if (_has_bindless_rw_buffer)
+            d3d_cmd->NativeCmdList()->SetComputeRootDescriptorTable(_bindless_rw_buffer_slot, bindless_uav_base);
     }
 
     const D3D12_DISPATCH_RAYS_DESC& D3DRayTracingShader::GetDispatchDesc(u32 w,u32 h, u32 depth)
@@ -537,10 +549,9 @@ namespace Ailu::RHI::DX12
 
         builder.AddHitGroup(c_hitGroupName0, c_closestHitShaderName0)
             .AddHitGroup(c_hitGroupName1, c_closestHitShaderName1)
-            .AddShaderConfig(2 * sizeof(float), 4 * sizeof(float))
-            .AddLocalRootSignature(_local_root_signature.Get(), {c_raygenShaderName})
+            .AddShaderConfig(kDxrHitAttributeSize, kDxrRayPayloadSize)
             .SetGlobalRootSignature(_global_root_signature.Get())
-            .SetMaxRecursionDepth(2);
+            .SetMaxRecursionDepth(kDxrMaxRecursionDepth);
 
         _state_object.Attach(builder.Build(_dev));
         _state_object->SetName(ToWChar(Name()).c_str());
@@ -628,15 +639,33 @@ namespace Ailu::RHI::DX12
         auto static_samplers = CreateStaticSampler();
         ShaderReflectionUtils::GenerateRootSignature(_dev, _bind_res_infos, &_global_root_signature, false, static_samplers);
 
-        ShaderReflectionUtils::ShaderBindResourceMap empty_local_bind_res_infos;
-        ShaderReflectionUtils::GenerateRootSignature(_dev, empty_local_bind_res_infos, &_local_root_signature, true);
-
         _has_bindless_texture2d = false;
+        _has_bindless_buffer = false;
+        _has_bindless_rw_texture2d = false;
+        _has_bindless_rw_buffer = false;
         _bindless_texture_slot = static_cast<u16>(-1);
+        _bindless_buffer_slot = static_cast<u16>(-1);
+        _bindless_rw_texture_slot = static_cast<u16>(-1);
+        _bindless_rw_buffer_slot = static_cast<u16>(-1);
         if (auto it = _bind_res_infos.find("g_bindless_texture2d"); it != _bind_res_infos.end())
         {
             _has_bindless_texture2d = true;
             _bindless_texture_slot = it->second._bind_slot;
+        }
+        if (auto it = _bind_res_infos.find("g_bindless_buffer"); it != _bind_res_infos.end())
+        {
+            _has_bindless_buffer = true;
+            _bindless_buffer_slot = it->second._bind_slot;
+        }
+        if (auto it = _bind_res_infos.find("g_bindless_rw_texture2d"); it != _bind_res_infos.end())
+        {
+            _has_bindless_rw_texture2d = true;
+            _bindless_rw_texture_slot = it->second._bind_slot;
+        }
+        if (auto it = _bind_res_infos.find("g_bindless_rw_buffer"); it != _bind_res_infos.end())
+        {
+            _has_bindless_rw_buffer = true;
+            _bindless_rw_buffer_slot = it->second._bind_slot;
         }
 
         for (auto &[name, bind_info] : _bind_res_infos)

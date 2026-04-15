@@ -18,6 +18,13 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
             {
                 D3D12_SHADER_INPUT_BIND_DESC bind_desc{};
                 get_bind_desc(index, &bind_desc);
+
+                if (bind_desc.BindPoint == UINT_MAX || bind_desc.Space == UINT_MAX)
+                {
+                    LOG_WARNING("Skipping shader resource reflection entry '{}' with invalid register binding t/u/b/s{} space{}.", bind_desc.Name ? bind_desc.Name : "<unnamed>", bind_desc.BindPoint, bind_desc.Space);
+                    continue;
+                }
+
                 bind_res_infos.insert(ParseBindResource(bind_desc));
             }
         }
@@ -80,11 +87,11 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
         {
             ret = std::make_pair(bind_desc.Name, Render::ShaderBindResourceInfo{Render::EBindResDescType::kSampler, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED)
+        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_BYTEADDRESS)
         {
             ret = std::make_pair(bind_desc.Name, Render::ShaderBindResourceInfo{Render::EBindResDescType::kBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
-        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_APPEND_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_CONSUME_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER)
+        else if (res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_APPEND_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_CONSUME_STRUCTURED || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWSTRUCTURED_WITH_COUNTER || res_type == D3D_SHADER_INPUT_TYPE::D3D_SIT_UAV_RWBYTEADDRESS)
         {
             ret = std::make_pair(bind_desc.Name, Render::ShaderBindResourceInfo{Render::EBindResDescType::kRWBuffer, static_cast<uint16_t>(bind_desc.BindPoint), 255u, bind_desc.Name});
         }
@@ -224,20 +231,33 @@ namespace Ailu::RHI::DX12::ShaderReflectionUtils
             AL_ASSERT_MSG(index < kMaxRootParameterCount, "GenerateRootSignature root parameter count exceeds 32");
         };
 
-        auto bindless_tex2d_it = std::find_if(bind_res_infos.begin(), bind_res_infos.end(), [](auto it) -> bool
-                                                             { return it.second._name == "g_bindless_texture2d"; });
-        if (bindless_tex2d_it != bind_res_infos.end())
+        auto append_bindless_table = [&](const char* resource_name, D3D12_DESCRIPTOR_RANGE_TYPE range_type, u32 capacity)
         {
+            auto bindless_it = std::find_if(bind_res_infos.begin(), bind_res_infos.end(), [resource_name](auto it) -> bool
+            {
+                return it.second._name == resource_name;
+            });
+            if (bindless_it == bind_res_infos.end())
+                return;
+
             assert_capacity(root_param_index);
-            ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity, bindless_tex2d_it->second._res_slot
-                ,bindless_tex2d_it->second._register_space,D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
+            ranges[root_param_index].Init(range_type,
+                                          capacity,
+                                          bindless_it->second._res_slot,
+                                          bindless_it->second._register_space,
+                                          D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
             rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
-            bindless_tex2d_it->second._bind_slot = root_param_index++;
-        }
+            bindless_it->second._bind_slot = root_param_index++;
+        };
+
+        append_bindless_table("g_bindless_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity);
+        append_bindless_table("g_bindless_buffer", D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity);
+        append_bindless_table("g_bindless_rw_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_UAV, GPUVisibleDescriptorAllocator::kBindlessUAVCapacity);
+        append_bindless_table("g_bindless_rw_buffer", D3D12_DESCRIPTOR_RANGE_TYPE_UAV, GPUVisibleDescriptorAllocator::kBindlessUAVCapacity);
         for (auto it = bind_res_infos.begin(); it != bind_res_infos.end(); it++)
         {
             auto &desc = it->second;
-            if (desc._name == "g_bindless_texture2d")
+            if (desc._name == "g_bindless_texture2d" || desc._name == "g_bindless_buffer" || desc._name == "g_bindless_rw_texture2d" || desc._name == "g_bindless_rw_buffer")
                 continue;
             switch (desc._res_type)
             {

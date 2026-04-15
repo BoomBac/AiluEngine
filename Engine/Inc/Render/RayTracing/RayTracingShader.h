@@ -3,14 +3,14 @@
 #define __RAY_TRACING_SHADER_H__
 #include "../Shader.h"
 #include "generated/RayTracingShader.gen.h"
-
+#include <mutex>
 namespace Ailu::Render
 {
     class Camera;
     class RayTracingScene;
     class RHICommandBuffer;
     ACLASS()
-    class RayTracingShader : public Object
+    class AILU_API RayTracingShader : public Object
     {
         GENERATED_BODY()
     public:
@@ -40,7 +40,8 @@ namespace Ailu::Render
     public:
         RayTracingShader() = default;
         RayTracingShader(const WString &sys_path);
-        ~RayTracingShader() = default;
+        ~RayTracingShader();
+        static Vector<RayTracingShader *> GetLiveInstances();
         void SetScene(RayTracingScene* scene);
         void SetTexture(const String &name, Texture *texture);
         void SetTexture(const String &name, RTHandle handle);
@@ -77,16 +78,21 @@ namespace Ailu::Render
         };
         struct BindState
         {
+            inline static u32 s_global_id = 0u;
+            u32 _id;
             u16 _max_bind_slot = 0u;
             Array<GpuResource*, 32> _bind_res{};
             Array<u16, 32> _bind_res_priority{};
             Array<RayTracingBindParams, 32> _bind_params{};
+
         };
         inline static Map<String, ConstantBuffer *> s_global_cbuffer_bind_info{};
         inline static Map<String, GPUBuffer *> s_global_buffer_bind_info{};
         inline static Map<String, Texture *> s_global_textures_bind_info{};
         inline static Map<String, f32> s_global_floats{};
         inline static Map<String, i32> s_global_ints{};
+        inline static std::mutex s_live_instances_mutex{};
+        inline static Vector<RayTracingShader *> s_live_instances{};
         RayTracingScene* _scene = nullptr;
         WString _src_file_path;
         std::set<WString> _all_dep_file_pathes;

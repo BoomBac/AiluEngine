@@ -10,6 +10,7 @@
 #include "Render/Camera.h"
 #include "Render/CommonRenderPipeline.h"
 #include "Render/Renderer.h"
+#include "Render/RayTracing/RayTracingShader.h"
 
 #include "Framework/Parser/TextParser.h"
 #include "Objects/JsonArchive.h"
@@ -27,6 +28,15 @@ namespace Ailu
     namespace Editor
     {
         namespace fs = std::filesystem;
+
+        static void ReloadRayTracingShader(const WString &cur_path)
+        {
+            for (auto *shader : RayTracingShader::GetLiveInstances())
+            {
+                if (shader != nullptr && shader->IsDependencyFile(cur_path))
+                    GraphicsContext::Get().CompileShaderAsync(shader);
+            }
+        }
 
         //填充监听路径下的所有文件
         static void TraverseDirectory(const fs::path &directoryPath, std::set<fs::path> &path_set)
@@ -143,6 +153,11 @@ namespace Ailu
                         GraphicsContext::Get().CompileShaderAsync(cs.get());
                     }
                 }
+            };
+            _on_file_changed += [](const fs::path &file)
+            {
+                const WString cur_path = PathUtils::FormatFilePath(file.wstring());
+                ReloadRayTracingShader(cur_path);
             };
             _on_file_changed += [](const fs::path &file)
             {
@@ -386,6 +401,8 @@ namespace Ailu
                     ++record._reload_compute_count;
                 }
             }
+
+            ReloadRayTracingShader(cur_path);
 
             for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
             {

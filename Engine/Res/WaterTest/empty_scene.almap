@@ -12,9 +12,9 @@ _layer_mask:1
                 _rotation:0.000000000,0.000000068,0.000000000,1.000000000
                 _scale:1.000000000,1.000000000,1.000000000
         _static_mesh_component:
-            _p_mesh:2ff30e48-6661-479b-a90c-863e606734f6
+            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
             _material_num:1
-            _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
+            _p_mats[0]:46601513-96ea-4cc4-86db-0400c8824ec1
         _hierarchy_component:
             _first_child:0
             _prev_sibling:0
@@ -60,7 +60,7 @@ _layer_mask:0
         _static_mesh_component:
             _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
             _material_num:1
-            _p_mats[0]:e3891c79-694a-4968-bb84-49c409a611ce
+            _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
         _hierarchy_component:
             _first_child:0
             _prev_sibling:0
@@ -87,3 +87,55 @@ _layer_mask:1
         _lightprobe_component:
             _size:9
             _is_update_every_tick:0
+Entity:5
+        _tag_component:
+            _name:spot_light_7
+_layer_mask:1
+        _transform_component:
+            _transform:
+                _position:-10.056591988,4.290918827,10.141222000
+                _rotation:0.203136086,-0.685256302,0.129798919,0.687249422
+                _scale:1.003400445,1.003397226,1.003400445
+        _light_component:
+            _type:kPoint
+            _light:
+                _light_color:0.758406,0.170501,0.919916,1
+                _light_param:9.9856,0.2,0,0
+                _is_two_side:0
+            _shadow:
+                _is_cast_shadow:0
+                _constant_bias:0
+                _slope_bias:0.012
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
+Entity:6
+        _tag_component:
+            _name:new_object_10
+_layer_mask:1
+        _transform_component:
+            _transform:
+                _position:0.576794863,2.900664806,-4.290546894
+                _rotation:-0.314299524,-0.006058856,-0.018304901,0.949128032
+                _scale:0.999885976,0.999972999,0.999899030
+        _light_component:
+            _type:kArea
+            _light:
+                _light_color:0,1,0.336207,8.29181
+                _light_param:15,2,2,0
+                _is_two_side:1
+            _shadow:
+                _is_cast_shadow:0
+                _constant_bias:0
+                _slope_bias:0
+        _hierarchy_component:
+            _first_child:0
+            _prev_sibling:0
+            _next_sibling:0
+            _parent:0
+            _children_num:0
+            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0

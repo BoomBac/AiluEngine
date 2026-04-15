@@ -2,6 +2,13 @@
 #define __CONTAINER_H__
 #include "GlobalMarco.h"
 
+#include <atomic>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <optional>
+#include <vector>
+
 namespace Ailu
 {
     namespace Core
@@ -85,6 +92,100 @@ namespace Ailu
             u64 _capacity;
             std::atomic<u64> _head;  // 头指针
             std::atomic<u64> _tail;  // 尾指针
+        };
+
+        template<typename T>
+        class ParallelQueue
+        {
+        public:
+            ParallelQueue() = default;
+            ParallelQueue(const ParallelQueue&) = delete;
+            ParallelQueue& operator=(const ParallelQueue&) = delete;
+
+            bool Push(const T& value)
+            {
+                {
+                    std::lock_guard<std::mutex> lock(_mutex);
+                    _queue.push_back(value);
+                }
+                _cv.notify_one();
+                return true;
+            }
+            bool Push(T&& value)
+            {
+                {
+                    std::lock_guard<std::mutex> lock(_mutex);
+                    _queue.push_back(std::move(value));
+                }
+                _cv.notify_one();
+                return true;
+            }
+            template<typename... Args>
+            bool Emplace(Args&&... args)
+            {
+                {
+                    std::lock_guard<std::mutex> lock(_mutex);
+                    _queue.emplace_back(std::forward<Args>(args)...);
+                }
+                _cv.notify_one();
+                return true;
+            }
+            std::optional<T> Pop()
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                if (_queue.empty())
+                    return std::nullopt;
+
+                T value = std::move(_queue.front());
+                _queue.pop_front();
+                return std::make_optional(std::move(value));
+            }
+            bool TryPop(T& value)
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                if (_queue.empty())
+                    return false;
+
+                value = std::move(_queue.front());
+                _queue.pop_front();
+                return true;
+            }
+            T WaitPop()
+            {
+                std::unique_lock<std::mutex> lock(_mutex);
+                _cv.wait(lock, [this] { return !_queue.empty(); });
+
+                T value = std::move(_queue.front());
+                _queue.pop_front();
+                return value;
+            }
+            void WaitPop(T& value)
+            {
+                std::unique_lock<std::mutex> lock(_mutex);
+                _cv.wait(lock, [this] { return !_queue.empty(); });
+
+                value = std::move(_queue.front());
+                _queue.pop_front();
+            }
+            bool Empty() const
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                return _queue.empty();
+            }
+            u32 Size() const
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                return static_cast<u32>(_queue.size());
+            }
+            void Clear()
+            {
+                std::lock_guard<std::mutex> lock(_mutex);
+                _queue.clear();
+            }
+        private:
+            mutable std::mutex _mutex;
+            std::condition_variable _cv;
+            std::deque<T> _queue;
         };
     }
 }

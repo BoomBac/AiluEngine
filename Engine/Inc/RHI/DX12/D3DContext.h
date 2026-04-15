@@ -28,6 +28,7 @@
 #include "UploadBuffer.h"
 #include "Render/RenderPipeline.h"
 #include "Render/Shader.h"
+#include "Render/RayTracing/RayTracingShader.h"
 
 using Microsoft::WRL::ComPtr;
 using Ailu::Render::RenderPipeline;
@@ -35,6 +36,7 @@ using Ailu::Render::GpuResource;
 using Ailu::Render::GfxCommand;
 using Ailu::Render::Shader;
 using Ailu::Render::ComputeShader;
+using Ailu::Render::RayTracingShader;
 using Ailu::Render::CommandBuffer;
 using Ailu::Render::RHICommandBuffer;
 using Ailu::Render::UploadParams;
@@ -59,6 +61,7 @@ namespace Ailu::RHI::DX12
         void Stop();
         void SubmitUpdateShader(Object* obj)
         {
+            LOG_INFO("Submit shader update for {}", obj->Name());
             _pending_update_shaders.Push(obj);
         }
     private:
@@ -100,7 +103,7 @@ namespace Ailu::RHI::DX12
         void EndFrame();
     private:
         Core::LockFreeQueue<Object*,64> _pending_update_shaders;
-        Core::LockFreeQueue<CommandGroup,512> _cmd_queue;
+        Core::ParallelQueue<CommandGroup> _cmd_queue;
         std::thread* _worker_thread;
         Render::GraphicsContext* _ctx;
         bool _is_stop;
@@ -140,6 +143,7 @@ namespace Ailu::RHI::DX12
         void SubmitGpuCommandSync(GfxCommand * cmd) final;
         void CompileShaderAsync(Shader* shader) final {_cmd_worker->SubmitUpdateShader(shader);};
         void CompileShaderAsync(Render::ComputeShader* shader) {_cmd_worker->SubmitUpdateShader(shader);};
+        void CompileShaderAsync(Render::RayTracingShader* shader) final {_cmd_worker->SubmitUpdateShader(shader);};
         const u32 CurBackbufIndex() const;
         void ExecuteCommandBuffer(Ref<CommandBuffer>& cmd) final;
         void ExecuteCommandBufferSync(Ref<CommandBuffer> &cmd) final;

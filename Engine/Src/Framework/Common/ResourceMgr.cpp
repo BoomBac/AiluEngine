@@ -404,37 +404,37 @@ namespace Ailu
 
         if (asset->_asset_type == Mesh::StaticType() || asset->_asset_type == SkeletonMesh::StaticType())
         {
-            SaveMesh(sys_path, asset);
+            SaveMesh(asset->_asset_path, asset);
             return;
         }
         if (asset->_asset_type == Shader::StaticType())
         {
-            SaveShader(sys_path, asset);
+            SaveShader(asset->_asset_path, asset);
             return;
         }
         if (asset->_asset_type == ComputeShader::StaticType())
         {
-            SaveComputeShader(sys_path, asset);
+            SaveComputeShader(asset->_asset_path, asset);
             return;
         }
         if (asset->_asset_type == Material::StaticType())
         {
-            SaveMaterial(sys_path, asset->As<Material>());
+            SaveMaterial(asset->_asset_path, asset->As<Material>());
             return;
         }
         if (asset->_asset_type == Texture2D::StaticType())
         {
-            SaveTexture2D(sys_path, asset);
+            SaveTexture2D(asset->_asset_path, asset);
             return;
         }
         if (asset->_asset_type == Scene::StaticType())
         {
-            SaveScene(sys_path, asset);
+            SaveScene(asset->_asset_path, asset);
             return;
         }
         if (asset->_asset_type == AnimationClip::StaticType())
         {
-            SaveAnimClip(sys_path, asset);
+            SaveAnimClip(asset->_asset_path, asset);
             return;
         }
         AL_ASSERT(false);
@@ -625,7 +625,7 @@ namespace Ailu
             std::wstringstream wss;
             wss << L"file: " << asset->_external_asset_path << std::endl;
             wss << L"inner_file_name: " << ToWChar(asset->_p_obj->Name().c_str()) << std::endl;
-            wss << L"is_combine_mesh: " << (dynamic_cast<const MeshImportSetting *>(_importers[addr])->_is_combine_mesh ? L"true" : L"false") << std::endl;
+            wss << L"is_combine_mesh: " << (dynamic_cast<const MeshImportSetting *>(_importers[asset_path])->_is_combine_mesh ? L"true" : L"false") << std::endl;
             if (FileManager::WriteFile(sys_path, true, wss.str()))
             {
                 return;
@@ -642,7 +642,7 @@ namespace Ailu
             std::wstringstream wss;
             WString indent = L"  ";
             wss << indent << L"file: " << asset->_external_asset_path << std::endl;
-            wss << indent << L"sRGB: " << dynamic_cast<const TextureImportSetting *>(_importers[reinterpret_cast<u64>(asset)])->_is_sRGB << std::endl;
+            wss << indent << L"sRGB: " << dynamic_cast<const TextureImportSetting *>(_importers[asset_path])->_is_sRGB << std::endl;
             if (FileManager::WriteFile(sys_path, true, wss.str()))
             {
                 return;
@@ -784,10 +784,12 @@ namespace Ailu
                 asset->_asset_type = Texture2D::StaticType();
                 asset->_external_asset_path = file;
                 asset->_p_obj = tex;
+                _importers[asset_path] = AL_NEW(TextureImportSetting,setting);
                 return asset;
             }
             else
             {
+                AL_ASSERT(false);
                 auto exist_asset = GetAsset(asset_path);
                 auto tex = exist_asset->AsRef<Texture2D>();
                 LoadExternalTexture(file,tex,setting);
@@ -948,6 +950,7 @@ namespace Ailu
             asset->_p_obj = mesh_list.front();
             asset->_name = PathUtils::GetFileName(asset_path);
             CreateAndRegisterEmbeddedMaterial(mesh_list.front().get());
+            _importers[asset_path] = AL_NEW(MeshImportSetting,setting);
             return asset;
         }
         return nullptr;
@@ -1592,11 +1595,10 @@ namespace Ailu
             auto &[path, obj] = loaded_objects.front();
             auto new_asset = CreateAsset(path, obj);
             new_asset->_external_asset_path = external_asset_path;
-            u64 addr = (u64)new_asset;
             if (obj->GetType() == Mesh::StaticType() || obj->GetType() == SkeletonMesh::StaticType())
-                _importers[addr] = AL_NEW(MeshImportSetting,(*dynamic_cast<const MeshImportSetting *>(setting)));
+                _importers[new_asset->_asset_path] = AL_NEW(MeshImportSetting,(*dynamic_cast<const MeshImportSetting *>(setting)));
             else if (obj->GetType() == Texture2D::StaticType() || obj->GetType() == Texture3D::StaticType())
-                _importers[addr] = AL_NEW(TextureImportSetting,(*dynamic_cast<const TextureImportSetting *>(setting)));
+                _importers[new_asset->_asset_path] = AL_NEW(TextureImportSetting,(*dynamic_cast<const TextureImportSetting *>(setting)));
             LOG_INFO(L"Create asset at path {}", path);
             loaded_objects.pop();
         }

@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 自定义递归函数
 function(add_source_files_recursive dir)
-    file(GLOB_RECURSE SOURCES RELATIVE ${dir} ${dir}/*.cpp ${dir}/*.hpp ${dir}/*.h)
+        file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS RELATIVE ${dir} ${dir}/*.cpp ${dir}/*.hpp ${dir}/*.h)
     foreach(source ${SOURCES})
         if(IS_DIRECTORY ${dir}/${source})
             add_source_files_recursive(${dir}/${source})

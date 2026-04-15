@@ -7,6 +7,7 @@
 
 #include "Render/Shader.h"
 #include "Render/Buffer.h"
+#include "Render/RayTracing/SceneRayTracingProxy.h"
 #include "Render/RayTracing/RayTracingScene.h"
 #include "Render/RayTracing/RayTracingGeometry.h"
 #include "Render/RayTracing/RayTracingShader.h"
@@ -44,33 +45,18 @@ namespace Ailu
             DXRSample(ID3D12Device5 *device, ID3D12CommandQueue *cmd_queue);
             ~DXRSample();
             void Render(Render::RHICommandBuffer *cmd, u16 w, u16 h);
-            void SetInstanceTransform(u32 instance_index, const Matrix4x4f &transform);
             Render::Texture2D* Output() {return m_uav_output.get();}
             
         private:
             void Init(u16 w, u16 h);
-            void BuildRaytracingAccelerationStructures();
             void MakesureOutput(u16 w, u16 h);
-            static void FillInstanceTransform(const Matrix4x4f &matrix, D3D12_RAYTRACING_INSTANCE_DESC &instance_desc);
 
         private:
             ID3D12Device5 *m_dxrDevice;
             ID3D12CommandQueue *m_commandQueue;
 
-            Ref<Render::VertexBuffer> m_vertexBuffer;
-            Ref<Render::IndexBuffer> m_indexBuffer;
-            Ref<Render::GPUBuffer> _vertex_data;
-            Ref<Render::GPUBuffer> _normal_data;
-            Ref<Render::GPUBuffer> _indices_data;
-            Ref<Render::GPUBuffer> _instance_geometry_data;
-            Vector<D3D12_RAYTRACING_INSTANCE_DESC> m_instanceDescs;
-            u32 m_instanceCount = 0u;
-            bool m_tlasDirty = false;
-
-            Ref<Render::RayTracingScene> m_scene;
-            Ref<Render::RayTracingGeometry> m_cube;
-            Ref<Render::RayTracingGeometry> m_plane;
             Ref<Render::RayTracingShader> m_raytracing_shader;
+            Scope<Render::SceneRayTracingProxy> m_sceneProxy;
 
             // Raytracing scene
             RayGenConstantBuffer m_rayGenCB;

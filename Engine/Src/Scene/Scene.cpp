@@ -521,6 +521,8 @@ namespace Ailu::SceneManagement
     {
         _triangle_count = 0u;
         u64 mesh_bvh_node_count = 0u;
+        _bvh_nodes_range.clear();
+        _mesh_bvh_node_triangle_offset.clear();
         for (auto& c: _register.View<ECS::StaticMeshComponent>())
         {
             _triangle_count += c._p_mesh->GetTriangleCount();
@@ -537,14 +539,30 @@ namespace Ailu::SceneManagement
             for (auto &c: _register.View<ECS::StaticMeshComponent>())
             {
                 auto current_entity = _register.GetEntity<ECS::StaticMeshComponent>(entity_idx++);
-                auto current_tri_count = c._p_mesh->GetTriangleCount();
-                auto cur_bvh_node_count = c._p_mesh->GetBVHNodes().size();
-                triangles.insert(triangles.end(),c._p_mesh->GetTriangleData().begin(),c._p_mesh->GetTriangleData().end());
-                mesh_bvh_nodes.insert(mesh_bvh_nodes.end(), c._p_mesh->GetBVHNodes().begin(), c._p_mesh->GetBVHNodes().end());
-                _bvh_nodes_range[current_entity] = Vector2UInt{(u32) bvh_offset, (u32) (cur_bvh_node_count)};
-                _mesh_bvh_node_triangle_offset[current_entity] = (u32)triangle_offset;
-                triangle_offset += current_tri_count;
-                bvh_offset += cur_bvh_node_count;
+                auto *mesh = c._p_mesh.get();
+                if (mesh == nullptr)
+                    continue;
+
+                const auto mesh_triangles = mesh->GetTriangleData();
+                const auto mesh_bvh = mesh->GetBVHNodes();
+                for (u16 submesh_index = 0u; submesh_index < mesh->SubmeshCount(); ++submesh_index)
+                {
+                    const u32 current_tri_count = mesh->GetTriangleCount(submesh_index);
+                    const u32 mesh_tri_start = mesh->GetTriangleStart(submesh_index);
+                    const u32 cur_bvh_node_count = mesh->GetBVHNodeCount(submesh_index);
+                    const u32 mesh_bvh_start = mesh->GetBVHNodeStart(submesh_index);
+                    if (current_tri_count == 0u || cur_bvh_node_count == 0u)
+                        continue;
+
+                    triangles.insert(triangles.end(), mesh_triangles.begin() + mesh_tri_start, mesh_triangles.begin() + mesh_tri_start + current_tri_count);
+                    mesh_bvh_nodes.insert(mesh_bvh_nodes.end(), mesh_bvh.begin() + mesh_bvh_start, mesh_bvh.begin() + mesh_bvh_start + cur_bvh_node_count);
+
+                    const u64 key = (static_cast<u64>(current_entity) << 32u) | static_cast<u64>(submesh_index);
+                    _bvh_nodes_range[key] = Vector2UInt{ static_cast<u32>(bvh_offset), cur_bvh_node_count };
+                    _mesh_bvh_node_triangle_offset[key] = static_cast<u32>(triangle_offset);
+                    triangle_offset += current_tri_count;
+                    bvh_offset += cur_bvh_node_count;
+                }
             }
             if (_scene_mesh_data)
             {

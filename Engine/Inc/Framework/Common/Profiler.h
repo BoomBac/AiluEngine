@@ -29,6 +29,7 @@ namespace Ailu
         f32 _max_time = 0.0f;
         f32 _avg_time = 0.0f;
         f32 _start_time = 0.0f;//since launch
+        u64 _last_used_frame = 0u;
 
         f32 _time_samples[kFilterSize] = {};
         u32 _index = 0u;

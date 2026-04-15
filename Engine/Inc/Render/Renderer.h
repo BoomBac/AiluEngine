@@ -81,6 +81,7 @@ namespace Ailu
             bool _is_render_light_probe = false;
             bool _is_hiz_active = true;
             bool _is_use_render_graph = true;
+            bool _is_use_raytracing = false;
         private:
             void PrepareScene(const Scene &s);
             void PrepareLight(const Scene &s);
@@ -120,6 +121,7 @@ namespace Ailu
             Scope<GUIPass> _gui_pass;
             Scope<WireFramePass> _wireframe_pass;
             Scope<HZBPass> _hzb_pass;
+            Scope<DepthOnlyPass> _depth_only_pass;
             Vector<RenderPass *> _render_passes;
             RenderFeature *_vxgi;
             RenderFeature *_cloud;

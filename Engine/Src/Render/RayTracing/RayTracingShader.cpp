@@ -47,6 +47,20 @@ namespace Ailu::Render
         _name = ToChar(PathUtils::GetFileName(sys_path));
         memset(_cbuf_data, 0, sizeof(_cbuf_data));
         memset(_cache_cbuf_data, 0, sizeof(_cache_cbuf_data));
+        std::scoped_lock lock(s_live_instances_mutex);
+        s_live_instances.emplace_back(this);
+    }
+
+    RayTracingShader::~RayTracingShader()
+    {
+        std::scoped_lock lock(s_live_instances_mutex);
+        std::erase(s_live_instances, this);
+    }
+
+    Vector<RayTracingShader *> RayTracingShader::GetLiveInstances()
+    {
+        std::scoped_lock lock(s_live_instances_mutex);
+        return s_live_instances;
     }
 
     void RayTracingShader::SetGlobalTexture(const String &name, RTHandle texture)
@@ -288,6 +302,7 @@ namespace Ailu::Render
             SetInt(name, value);
 
         std::unique_lock lock(_state_mutex);
+        cur_state._id = BindState::s_global_id++;
         _bind_state.push(cur_state);
     }
 

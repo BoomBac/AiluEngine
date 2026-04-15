@@ -18,7 +18,7 @@ namespace Ailu::RHI::DX12
             if (resource == nullptr)
                 return;
             SetName(resource, ToWChar(name).c_str());
-            LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
+            //LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
         }
     }
 

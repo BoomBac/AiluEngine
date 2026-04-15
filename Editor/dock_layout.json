@@ -12,7 +12,7 @@
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
             "_position": [268.0, 48.0],
-            "_size": [862.0, 482.0],
+            "_size": [800.0, 450.0],
             "_flags": 0
         }, {
             "_type_id": "Ailu::Editor::AssetBrowser",
@@ -41,7 +41,7 @@
             "_title": "ObjectDetail",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [868.0, 533.0],
+            "_position": [907.0, 180.0],
             "_size": [377.0, 493.0],
             "_flags": 0
         }]

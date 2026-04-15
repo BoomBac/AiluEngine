@@ -89,6 +89,10 @@ namespace Ailu
         private:
             bool _is_src_cubemap = false;
             Texture *_input_src = nullptr;
+            RDG::RGHandle _src_texture_handle;
+            RDG::RGHandle _src_map_handle;
+            RDG::RGHandle _radiance_handle;
+            RDG::RGHandle _env_handle;
             CBufferPerCameraData _camera_data[6];
             Scope<ConstantBuffer> _per_camera_cb[6];
             Scope<ConstantBuffer> _per_obj_cb;
@@ -227,6 +231,13 @@ namespace Ailu
             void EndPass(GraphicsContext *context) final;
         private:
             Ref<ComputeShader> _hzb_gen;
+        };
+
+        class DepthOnlyPass : public RenderPass
+        {
+        public:
+            DepthOnlyPass();
+            void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
         };
     }
 }

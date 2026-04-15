@@ -43,6 +43,7 @@
 #include "Framework/Events/KeyEvent.h"
 #include "Framework/Common/EngineConfig.h"
 #include "Render/CommonRenderPipeline.h"
+#include "Render/RenderGraph/RenderGraph.h"
 
 #include "Widgets/CommonView.h"
 #include "Widgets/RenderView.h"
@@ -615,6 +616,17 @@ namespace Ailu
                             Selection::AddSelection(e);
                     }
                 }
+                if (key_e.GetKeyCode() == EKey::kDELETE)
+                {
+                    List<ECS::Entity> to_delete;
+                    for (auto e: Selection::SelectedEntities())
+                    {
+                        to_delete.push_back(e);
+                    }
+                    for (auto &e: to_delete)
+                        SceneMgr::Get().ActiveScene()->RemoveObject(e);
+                    Selection::RemoveSlection();
+                }
                 if (key_e.GetKeyCode() == EKey::kF)
                 {
                     static u16 s_count = 1;
@@ -940,6 +952,7 @@ namespace Ailu
 
             //g_pRenderer->_shadow_distance = shadow_dis_m * 100.0f;
             static bool s_show_anim_clip = false;
+            static bool s_raytracing_pipeline = false;
             ImGui::Checkbox("Expand", &show);
             ImGui::Checkbox("ShowPlotDemo", &s_show_plot_demo);
             ImGui::Checkbox("ShowAssetTable", &s_show_asset_table);
@@ -948,7 +961,13 @@ namespace Ailu
             ImGui::Checkbox("ShowAnimClip", &s_show_anim_clip);
             ImGui::Checkbox("ShowThreadPoolView", &s_show_threadpool_view);
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
-            ImGui::Checkbox("UseRenderGraph", &RenderPipeline::Get().GetRenderer()->_is_use_render_graph);
+            ImGui::Checkbox("Raytracing Pipeline", &s_raytracing_pipeline);
+            RenderPipeline::Get().GetRenderer()->_is_use_raytracing = s_raytracing_pipeline;
+            if (ImGui::Button("Capture RDG"))
+            {
+                RenderPipeline::Get().GetRenderer()->GetRenderGraph()._is_debug = true;
+            }
+            //ImGui::Checkbox("UseRenderGraph", &RenderPipeline::Get().GetRenderer()->_is_use_render_graph);
 
             // for (auto &info: g_pResourceMgr->GetImportInfos())
             // {

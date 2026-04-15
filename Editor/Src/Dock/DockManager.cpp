@@ -1288,9 +1288,9 @@ namespace Ailu
                                 break;
                         }
                     }
+                    UpdateResizeMouseCursor(_resizing_edge_dir);
                     if (edge_hover_node != s_last_edge_hover_node)
                     {
-                        UpdateResizeMouseCursor(_resizing_edge_dir);
                         LOG_INFO("UpdateResizeMouseCursor: {}", _resizing_edge_dir);
                     }
                     if (edge_hover_node && Input::IsKeyDown(EKey::kLBUTTON))

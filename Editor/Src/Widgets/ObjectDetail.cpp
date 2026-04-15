@@ -23,6 +23,13 @@ namespace Ailu
             inline constexpr f32 kPropLabelFill = 1.0f;
             inline constexpr f32 kPropValueFill = 3.0f;
 
+            inline String FormatColorButtonText(const Vector4f &color, bool include_alpha = false)
+            {
+                if (include_alpha)
+                    return std::format("R:{:.2f} G:{:.2f} B:{:.2f} A:{:.2f}", color.x, color.y, color.z, color.w);
+                return std::format("R:{:.2f} G:{:.2f} B:{:.2f}", color.x, color.y, color.z);
+            }
+
             inline UI::HorizontalBox *AddPropertyRow(UI::UIElement *parent, const String &label, UI::HorizontalBox **out_value_box = nullptr)
             {
                 auto row = parent->AddChild<UI::HorizontalBox>();
@@ -74,10 +81,25 @@ namespace Ailu
                                       ->SlotMargin(kPropInnerMargin)
                                       .SlotAlignmentH(UI::EAlignment::kRight)
                                       .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                                      .SlotFillRate(1.0f)
+                                      .SlotFillRate(3.0f)
                                       .As<UI::Slider>();
-                if (on_value_changed)
-                    slider->_on_value_change += [on_value_changed](f32 v) { on_value_changed(v); };
+                auto input = value_box->AddChild<UI::InputBlock>(std::format("{:.2f}", value))
+                                     ->SlotMargin(kPropInnerMargin)
+                                     .SlotAlignmentH(UI::EAlignment::kRight)
+                                     .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                     .SlotFillRate(1.0f)
+                                     .As<UI::InputBlock>();
+                slider->_on_value_change += [input, on_value_changed](f32 v)
+                {
+                    input->SetContent(std::format("{:.2f}", v), false);
+                    if (on_value_changed)
+                        on_value_changed(v);
+                };
+                input->_on_content_changed += [slider](String content)
+                {
+                    if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
+                        slider->SetValue(opt.value());
+                };
                 return slider;
             }
 
@@ -236,17 +258,19 @@ namespace Ailu
                                    .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
                                    .SlotFillRate(1.0f)
                                    .As<UI::Button>();
-                btn->OnMouseClick() += [value_name,obj](UI::UIEvent &e)
+                btn->SetText(FormatColorButtonText(prop.GetValue<Vector4f>(), true));
+                btn->OnMouseClick() += [value_name,obj,btn](UI::UIEvent &e)
                 {
                     auto color_picker = MakeRef<UI::ColorPicker>(obj->GetShaderProperty(value_name)->GetValue<Vector4f>());
                     color_picker->Name(std::format("ColorPicker_{}", value_name));
                     color_picker->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
-                    color_picker->SlotSize(260.0f, 220.0f);
-                    color_picker->OnValueChanged() += [value_name,obj](Vector4f color)
+                    color_picker->SlotSize(320.0f, 240.0f);
+                    color_picker->OnValueChanged() += [value_name,obj,btn](Vector4f color)
                     {
                         auto p = obj->GetShaderProperty(value_name);
                         if (p)
                             p->SetValue<Vector4f>(color);
+                        btn->SetText(FormatColorButtonText(color, true));
                     };
                     auto abs_rect = e._current_target->GetArrangeRect();
                     Vector2f show_pos = abs_rect.xy;
@@ -459,7 +483,7 @@ namespace Ailu
                     auto set_block = [&](UI::InputBlock *block, f32 value)
                     {
                         if (!block->IsEditing())
-                            block->SetContent(std::to_string(value), false);
+                            block->SetContent(std::format("{:.2f}", value), false);
                     };
                     set_block(_pos_block[0], comp->_transform._position.x);
                     set_block(_pos_block[1], comp->_transform._position.y);
@@ -480,34 +504,45 @@ namespace Ailu
                         _light_block = _vb->AddChild<UI::CollapsibleView>("LightComp")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
                         auto content = _light_block->GetContent()->AddChild<UI::VerticalBox>();
                         auto items = Vector<String>{"Directional", "Point", "Spot", "Area"};
-                        AddDropdownRow(content, "Type", items);
+                        auto light_type_dropdown = AddDropdownRow(content, "Type", items);
+                        light_type_dropdown->SetSelectedIndex(static_cast<i32>(comp->_type));
+                        light_type_dropdown->_on_selected_changed += [comp](i32 idx){
+                            comp->_type = static_cast<ECS::ELightType::ELightType>(idx);
+                        };
                         {
                             AddFloatSliderRow(content, "Intensity", 0.0f, 100.0f, comp->_light._light_color.a, [=](f32 value)
                                               { comp->_light._light_color.a = value; });
                         }
                         {
-                            auto btn = content->AddChild<UI::Button>()
-                            ->SlotMargin(kPropInnerMargin)
-                            .SlotAlignmentH(UI::EAlignment::kRight)
-                            .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
-                            .SlotFillRate(1.0f)
-                            .As<UI::Button>();
-                            btn->OnMouseClick() += [comp](UI::UIEvent &e)
+                            auto btn = AddButtonRow(content, "Color", FormatColorButtonText(Vector4f(comp->_light._light_color.r, comp->_light._light_color.g, comp->_light._light_color.b, comp->_light._light_color.a)));
+                            btn->OnMouseClick() += [comp, btn](UI::UIEvent &e)
                             {
-                                auto color_picker = MakeRef<UI::ColorPicker>("LightColor");
+                                auto color_picker = MakeRef<UI::ColorPicker>(Vector4f(comp->_light._light_color.r, comp->_light._light_color.g, comp->_light._light_color.b, 1.0f));
+                                color_picker->Name("LightColor");
                                 color_picker->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
-                                color_picker->SlotSize(260.0f, 220.0f);
-                                color_picker->OnValueChanged() += [comp](Vector4f color)
+                                color_picker->SlotSize(320.0f, 240.0f);
+                                color_picker->OnValueChanged() += [comp, btn](Vector4f color)
                                 {
                                     comp->_light._light_color.r = color.r;
                                     comp->_light._light_color.g = color.g;
                                     comp->_light._light_color.b = color.b;
+                                    btn->SetText(FormatColorButtonText(Vector4f(color.r, color.g, color.b, comp->_light._light_color.a)));
                                 };
                                 auto abs_rect = e._current_target->GetArrangeRect();
                                 Vector2f show_pos = abs_rect.xy;
                                 show_pos.y += abs_rect.w;
                                 UI::UIManager::Get()->ShowPopupAt(show_pos.x, show_pos.y, color_picker);
                             };
+                        }
+                        if (comp->_type == ECS::ELightType::kDirectional)
+                        {
+                            auto &light_data = comp->_light;
+                            if (light_data._light_param.w <= 0.0f)
+                                light_data._light_param.w = 0.265f;
+                            AddFloatSliderRow(content, "AngularRadius", 0.01f, 5.0f, light_data._light_param.w, [&light_data](f32 value)
+                            {
+                                light_data._light_param.w = value;
+                            });
                         }
                         if (comp->_type == ECS::ELightType::kArea)
                         {
@@ -537,11 +572,33 @@ namespace Ailu
                             }
                             else
                             {
-                                AddFloatSliderRow(content, "Radius", 0.0f, 500.0f, light_data._light_param.y, [&light_data](f32 value)
+                                AddFloatSliderRow(content, "Radius", 0.0f, 10.0f, light_data._light_param.x, [&light_data](f32 value)
                                 {
-                                    light_data._light_param.y = value;
+                                    light_data._light_param.x = value;
                                 });
                             }
+                        }
+                        else if (comp->_type == ECS::ELightType::kSpot)
+                        {
+                            auto &light_data = comp->_light;
+                            AddFloatSliderRow(content, "Range", 0.0f, 500.0f, light_data._light_param.x, [&light_data](f32 value)
+                                      { light_data._light_param.x = value; });
+                            AddFloatSliderRow(content, "InnerAngle", 0.0f, 180.0f, light_data._light_param.y, [&light_data](f32 value)
+                                      { light_data._light_param.y = value; });
+                            AddFloatSliderRow(content, "OuterAngle", 0.0f, 180.0f, light_data._light_param.z, [&light_data](f32 value)
+                                      { light_data._light_param.z = value; });
+                        }
+                        else if (comp->_type == ECS::ELightType::kPoint)
+                        {
+                            auto &light_data = comp->_light;
+                            AddFloatSliderRow(content, "Range", 0.0f, 80.0f, light_data._light_param.x, [&light_data](f32 value)
+                            {
+                                light_data._light_param.x = value;
+                            });
+                            AddFloatSliderRow(content, "Radius", 0.0f, 1.0f, light_data._light_param.y, [&light_data](f32 value)
+                            {
+                                light_data._light_param.y = value;
+                            });
                         }
                     }
                     _prev_comp_block = _light_block;

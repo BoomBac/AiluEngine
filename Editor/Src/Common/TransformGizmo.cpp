@@ -3,11 +3,29 @@
 #include "Framework/Common/ResourceMgr.h"
 #include "Inc/Physics/Collision.h"
 #include "Render/Gizmo.h"
+#include "Scene/Scene.h"
 
 namespace Ailu
 {
     namespace Editor
     {
+        void TransformGizmo::ClearTarget()
+        {
+            if (_is_dragging)
+                EndDrag();
+            _hover_axis = 0u;
+            _target_scene = nullptr;
+            _target_entity = ECS::kInvalidEntity;
+        }
+
+        Transform *TransformGizmo::Target() const
+        {
+            if (_target_scene == nullptr || _target_entity == ECS::kInvalidEntity)
+                return nullptr;
+            auto *comp = _target_scene->GetRegister().GetComponent<ECS::TransformComponent>(_target_entity);
+            return comp ? &comp->_transform : nullptr;
+        }
+
         TransformGizmo::TransformGizmo()
         {
             auto shader = g_pResourceMgr->Load<Shader>(L"Shaders/transform_gizmo.alasset");
@@ -170,8 +188,11 @@ namespace Ailu
 
         u32 TransformGizmo::PickAxis(Vector3f start, Vector3f dir) const
         {
+            auto *target = Target();
+            if (!target)
+                return 0u;
             Ray ray(start, dir);
-            Vector3f origin = Transform::GetWorldPosition(*_target);
+            Vector3f origin = Transform::GetWorldPosition(*target);
             f32 min_d = std::numeric_limits<f32>::max();
             u32 result = 0u;
             for (auto &a: _translate_axis)
@@ -203,7 +224,10 @@ namespace Ailu
 
             // 本地空间：把本地轴旋到世界
             // 假设存在 Transform::GetWorldRotation
-            Quaternion worldRot = Transform::GetWorldRotation(*_target);
+            auto *target = Target();
+            if (!target)
+                return Normalize(localAxis);
+            Quaternion worldRot = Transform::GetWorldRotation(*target);
             return Normalize(worldRot * localAxis);
         }
         // 让轴线段足够长，避免s被夹在[0, axis_length]
@@ -229,7 +253,8 @@ namespace Ailu
 
         void TransformGizmo::BeginDrag(Vector2f mouse_pos)
         {
-            if (!_target) return;
+            auto *target = Target();
+            if (!target) return;
 
             // 锁定当前轴
             _drag_axis = _hover_axis;
@@ -238,13 +263,13 @@ namespace Ailu
             _is_dragging = true;
             _mouse_pos = mouse_pos;
             _drag_start_mouse_pos = mouse_pos;
-            _drag_origin = Transform::GetWorldPosition(*_target);
+            _drag_origin = Transform::GetWorldPosition(*target);
             _drag_axis_num = 0u;
             if (_mode == EGizmoMode::kRotate)
             {
                 _drag_start_hit = CollisionDetection::Intersect(Ray{_cam->Position(), _cam->ScreenToWorld(_mouse_pos)}, s_rotate_plane[_drag_axis>>1])._point;
                 _drag_start_hit = _cur_target_pos + Normalize(_drag_start_hit - _cur_target_pos) * _scaled_axis_length;
-                _drag_start_rot = _target->_rotation;
+                _drag_start_rot = target->_rotation;
             }
             else
             {
@@ -277,7 +302,7 @@ namespace Ailu
                     _drag_start_hit = CollisionDetection::Intersect(ray, s_drag_plane)._point;
                     _drag_start_target_delta = _drag_start_mouse_pos - _cam->WorldToScreen(_drag_start_pos);
                 }
-                _drag_start_scale = _target->_scale;
+                _drag_start_scale = target->_scale;
             }
 
             if (_mode == EGizmoMode::kTranslate)
@@ -318,9 +343,16 @@ namespace Ailu
         {
             _mouse_pos = mouse_pos;
             _cam = cam;
-            if (_target)
+            auto *target = Target();
+            if (target == nullptr)
             {
-                _cur_target_pos = Transform::GetWorldPosition(*_target);
+                if (_target_scene != nullptr || _target_entity != ECS::kInvalidEntity)
+                    ClearTarget();
+                return;
+            }
+            if (target)
+            {
+                _cur_target_pos = Transform::GetWorldPosition(*target);
                 _dis_scale = ComputeGizmoScale(*_cam, _is_dragging ? _drag_start_pos : _cur_target_pos, 100.0f);
                 if (!_is_dragging)
                 {
@@ -423,7 +455,7 @@ namespace Ailu
                         }
                         else {}
                         // 注意：有父节点层级时，需要把world_delta转换到local空间再叠加到local position
-                        _target->_position = _drag_start_pos + world_delta;
+                        target->_position = _drag_start_pos + world_delta;
                     }
                     else if (_mode == EGizmoMode::kScale)
                     {
@@ -440,7 +472,7 @@ namespace Ailu
                             Vector2f p = mouse_pos + Vector2f{20, 20};
                             Render::Gizmo::DrawText(std::format("start_s: {},now s: {}", ctx._drag_start_s,s_now), p, 10u, Colors::kCyan);
                             _drag_scale_factor[_drag_axis >> 1] = delta_s;
-                            _target->_scale = _drag_start_scale * world_scale;
+                            target->_scale = _drag_start_scale * world_scale;
                         }
                         else if (_drag_axis_num == 3)//多轴不能简单叠加，因为两轴的最近点可能不在同一平面
                         {
@@ -481,7 +513,7 @@ namespace Ailu
                             world_scale = Vector3f(s);
 
                             // 应用到目标
-                            _target->_scale = _drag_start_scale + world_scale;
+                            target->_scale = _drag_start_scale + world_scale;
                             _drag_scale_factor = Vector3f::kOne + world_scale;
                             Vector2f p = mouse_pos + Vector2f{20, 20};
                             Render::Gizmo::DrawText(std::format("now s: {}", s), p, 10u, Colors::kCyan);
@@ -489,7 +521,7 @@ namespace Ailu
                         else {}
                         // 注意：有父节点层级时，需要把world_delta转换到local空间再叠加到local position
 
-                        Render::Gizmo::DrawLine(Vector3f::kZero, _target->_position);
+                        Render::Gizmo::DrawLine(Vector3f::kZero, target->_position);
                     }
                     else//if (_mode == EGizmoMode::kRotate)
                     {
@@ -507,7 +539,7 @@ namespace Ailu
                         Vector2f p = mouse_pos + Vector2f{20, 20};
                         Render::Gizmo::DrawText(std::format("angle: {}", angle * k2Angle), p, 10u, Colors::kCyan);
                         _drag_rot = Quaternion::AngleAxis(angle * k2Angle, axis);
-                        _target->_rotation = _drag_start_rot * _drag_rot;
+                        target->_rotation = _drag_start_rot * _drag_rot;
                     }
                 }
             }
@@ -515,7 +547,7 @@ namespace Ailu
 
         void TransformGizmo::Draw()
         {
-            if (!_target) 
+            if (!Target()) 
                 return;
             if (_mode == EGizmoMode::kTranslate)
             {
@@ -593,7 +625,7 @@ namespace Ailu
 
         bool TransformGizmo::IsHover(Vector2f pos, Render::Camera *cam, u32 *hover_axis) const
         {
-            if (!_target)
+            if (!Target())
                 return false;
             u32 hover = 0u;
             if (_mode == EGizmoMode::kTranslate)

@@ -16,7 +16,7 @@ namespace Ailu::RHI::DX12
             if (resource == nullptr)
                 return;
             SetName(resource, ToWChar(name).c_str());
-            LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
+            //LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
         }
     }
 
@@ -31,7 +31,8 @@ namespace Ailu::RHI::DX12
     {
         if (sizeInBytes > m_PageSize)
         {
-            throw std::bad_alloc();
+            auto large_page = CreateLargePage(sizeInBytes, alignment);
+            return large_page->Allocate(sizeInBytes, alignment);
         }
 
         // If there is no current page, or the requested allocation exceeds the
@@ -60,11 +61,19 @@ namespace Ailu::RHI::DX12
 
         return page;
     }
+    std::shared_ptr<UploadBuffer::Page> UploadBuffer::CreateLargePage(size_t sizeInBytes, size_t alignment)
+    {
+        const size_t page_size = AlignTo(sizeInBytes, alignment);
+        auto page = std::make_shared<Page>(std::format("{}_Large_{}", _name, m_LargePagePool.size()), page_size);
+        m_LargePagePool.push_back(page);
+        return page;
+    }
     void UploadBuffer::Reset()
     {
         m_CurrentPage = nullptr;
         // Reset all available pages.
         m_AvailablePages = m_PagePool;
+        m_LargePagePool.clear();
 
         for (auto page: m_AvailablePages)
         {

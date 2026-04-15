@@ -42,6 +42,11 @@ namespace Ailu::Render
     RayTracingGeometry::RayTracingGeometry(const RayTracingGeometryDesc &desc) : _desc(desc)
     {
         _res_type = Render::EGpuResType::kBottomAS;
+        _index_buffers.reserve(desc._index_buffer.size());
+        for (auto ib : desc._index_buffer)
+        {
+            _index_buffers.push_back(ib);
+        }
     }
 
     RayTracingGeometry::~RayTracingGeometry()

@@ -32,10 +32,12 @@ namespace Ailu::Render
         u32 GetScratchBufferSize() const { return _scratch_buffer_size; }
         void Build();
         void Update();
+        IndexBuffer* GetIndexBuffer(u32 gem_index = 0) const { return gem_index < _index_buffers.size() ? _index_buffers[gem_index] : nullptr; }
     protected:
         RayTracingGeometryDesc _desc;
         NativeHandle _native_resource;
         u32 _scratch_buffer_size = 0u;
+        Vector<IndexBuffer*> _index_buffers;
     };
 }
 #endif// !__RAY_TRACING_GEOMETRY_H__

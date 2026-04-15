@@ -22,7 +22,8 @@ namespace Ailu::Render::RDG
         kGraphics,
         kCompute,
         kAsyncCompute,
-        kCopy
+        kCopy,
+        kRayTracing
     };
     struct AILU_API PassDesc
     {

@@ -8,6 +8,8 @@
 namespace Ailu {
 namespace UI {
 
+class InputBlock;
+
 ACLASS()
 class AILU_API ColorPicker : public UIElement 
 {
@@ -20,6 +22,7 @@ public:
 
     Vector2f MeasureDesiredSize() override;
     void Update(f32 dt) override;
+    UIElement *HitTest(Vector2f pos) override;
 
     Vector4f GetColorRGBA() const { return {_rgba.x, _rgba.y, _rgba.z, _alpha}; }
     void SetColorRGBA(Vector4f rgba);
@@ -31,14 +34,24 @@ public:
 
     void SetShowAlpha(bool v) { _show_alpha = v; InvalidateLayout(); }
     bool GetShowAlpha() const { return _show_alpha; }
+    void SetShowHDR(bool v) { _show_hdr = v; InvalidateLayout(); }
+    bool GetShowHDR() const { return _show_hdr; }
 
 private:
     void RenderImpl(UIRenderer& r) override;
     void RebuildSVTexture();
     void EnsureStaticTextures();
+    void SyncRgbFromState();
+    void SyncStateFromRGBA(Vector4f rgba);
+    void SyncStateFromHSVA(Vector4f hsva);
+    void SyncInputFields();
+    void NotifyValueChanged();
 
     static Vector3f RgbToHsv(const Vector3f& rgb);
     static Vector3f HsvToRgb(const Vector3f& hsv);
+    static Vector3f ToneMapPreview(const Vector3f& rgb);
+    static f32 HdrIntensityFromNormalized(f32 normalized_value);
+    static f32 NormalizedFromHdrIntensity(f32 intensity);
 
     // Helpers converting mouse -> local and clamping to rect
     Vector2f ToLocal(Vector2f screen) const;
@@ -57,7 +70,9 @@ private:
     Vector4f _rect_sv{0,0,0,0};
     Vector4f _rect_hue{0,0,0,0};
     Vector4f _rect_alpha{0,0,0,0};
+    Vector4f _rect_hdr{0,0,0,0};
     Vector4f _rect_preview{0,0,0,0};
+    Vector4f _rect_inputs{0,0,0,0};
 
     Vector4f _old_color = Colors::kWhite;
 
@@ -65,6 +80,7 @@ private:
     bool _drag_sv = false;
     bool _drag_hue = false;
     bool _drag_alpha = false;
+    bool _drag_hdr = false;
 
     // Textures
     Ref<Render::Texture2D> _tex_sv;     // 256x256, depends on hue
@@ -75,6 +91,10 @@ private:
     // Options
     APROPERTY()
     bool _show_alpha = true;
+    bool _show_hdr = true;
+
+    f32 _hdr_intensity = 1.0f;
+    Array<InputBlock*, 4> _channel_inputs{};
 
     // Cached last hue to rebuild SV
     f32 _last_h_for_sv = -1.0f;

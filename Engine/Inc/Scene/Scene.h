@@ -49,19 +49,21 @@ namespace Ailu
             Render::GPUBuffer *GetSceneMeshDataBuffer() const{ return &*_scene_mesh_data; };
             u32 TriangleCount() const { return _triangle_count; };
             //指示实际三角形数据在buffer中的偏移，计算时读取到node.start + offset来索引三角形
-            u32 GetTriangleBufferOffset(ECS::Entity entity) const 
+            u32 GetTriangleBufferOffset(ECS::Entity entity, u16 submesh_index) const 
             {
-                if (_mesh_bvh_node_triangle_offset.contains(entity))
+                const u64 key = (static_cast<u64>(entity) << 32u) | static_cast<u64>(submesh_index);
+                if (_mesh_bvh_node_triangle_offset.contains(key))
                 {
-                    return _mesh_bvh_node_triangle_offset.at(entity);
+                    return _mesh_bvh_node_triangle_offset.at(key);
                 }
                 return 0;
             };
-            Vector2UInt GetBVHNodeRange(ECS::Entity entity) const
+            Vector2UInt GetBVHNodeRange(ECS::Entity entity, u16 submesh_index) const
             {
-                if (_bvh_nodes_range.contains(entity))
+                const u64 key = (static_cast<u64>(entity) << 32u) | static_cast<u64>(submesh_index);
+                if (_bvh_nodes_range.contains(key))
                 {
-                    return _bvh_nodes_range.at(entity);
+                    return _bvh_nodes_range.at(key);
                 }
                 return Vector2UInt::kZero;
             };
@@ -86,8 +88,8 @@ namespace Ailu
             Ref<Render::GPUBuffer> _tlas_buffer;
             u32 _triangle_count = 0u;
             u32 _blas_node_count = 0u;
-            HashMap<ECS::Entity, Vector2UInt> _bvh_nodes_range;
-            HashMap<ECS::Entity, u32> _mesh_bvh_node_triangle_offset;//指示实际三角形数据在buffer中的偏移，计算时读取到node.start + offset来索引三角形
+            HashMap<u64, Vector2UInt> _bvh_nodes_range;
+            HashMap<u64, u32> _mesh_bvh_node_triangle_offset;//按 entity/submesh 记录三角形数据在 buffer 中的偏移
             Vector<BVHNode> _tlas_nodes;
         };
 

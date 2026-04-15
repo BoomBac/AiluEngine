@@ -84,15 +84,15 @@ namespace Ailu::Render
     {
         struct ResourceHandle
         {
-            Ref<T> _res;
-            bool _is_available;
-            u64 _last_access_frame_count;
+            Ref<T> _res = nullptr;
+            bool _is_available = false;
+            u64 _last_access_frame_count = 0;
         };
     public:
         struct PoolResourceHandle
         {
-            u64 _key_hash;
-            T *_res;
+            u64 _key_hash = 0u;
+            T *_res = nullptr;
         };
         THashableResourcePool() = default;
         ~THashableResourcePool() 

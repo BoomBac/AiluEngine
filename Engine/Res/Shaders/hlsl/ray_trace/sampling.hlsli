@@ -4,6 +4,35 @@
 #include "../color_space_utils.hlsli"
 #include "rt_common.hlsli"
 
+struct RandomCtx
+{
+    uint4 seed;
+    uint2 pixel;
+};
+void InitSeed(inout RandomCtx ctx,uint2 pixel, uint frame, uint bounce = 0)
+{
+    ctx.seed.x = pixel.x * 1973 + pixel.y * 9277 + frame * 26699 + bounce * 104729;
+    ctx.pixel = pixel;
+}
+
+void pcg_hash(inout uint seed)
+{
+    uint state = seed * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    seed = (word >> 22u) ^ word;
+}
+
+float rand(inout RandomCtx ctx)
+{
+    pcg_hash(ctx.seed.x);
+    return float(ctx.seed.x) / 4294967296.0;
+}
+
+float2 rand2(inout RandomCtx ctx)
+{
+    return float2(rand(ctx), rand(ctx));
+}
+
 //#define SAMPLE_BRDF_VNDF_GGX 1
 //#define SAMPLE_BRDF_COSINE_HEMISPHERE 1
 // n：单位法线（世界空间）
@@ -203,6 +232,20 @@ float PdfMicrofacetNormal(float alpha, float nh)
     return D_GTR2(max(alpha, 1e-4), nh) * nh;
 }
 
+float PdfAreaFromSolidAngle(float pdf_omega, float dist2, float cos_theta_l)
+{
+    if (pdf_omega <= 0.0 || dist2 <= 1e-6 || cos_theta_l <= 0.0)
+        return 0.0;
+    return pdf_omega * cos_theta_l / dist2;
+}
+
+float PdfSolidAngleFromArea(float pdf_area, float dist2, float cos_theta_l)
+{
+    if (pdf_area <= 0.0 || dist2 <= 1e-6 || cos_theta_l <= 0.0)
+        return 0.0;
+    return pdf_area * dist2 / cos_theta_l;
+}
+
 // SampleBRDFResult SampleSpecularBRDF_Direction(float3 n, float3 wo, float alpha, float r1, float r2)
 // {
 //     SampleBRDFResult result = (SampleBRDFResult)0;
@@ -310,7 +353,7 @@ float3 EvalBRDF(TraceContext ctx,float3 n, float3 h,float3 wo, float3 wi,out flo
     float G1 = SmithG1GGX(max(nv, 1e-4), alpha);
     specular_pdf = D * G1 * nh / (4.0 * vh * max(nv, 1e-4) + 1e-6);
 #endif
-    pdf = lerp(diffuse_pdf, specular_pdf, specular_prob);
+    pdf = lerp(diffuse_pdf, specular_pdf, specular_prob); 
     return kd * f_diffuse + f_specular;
 }
 
@@ -349,6 +392,235 @@ SampleBRDFResult SampleBRDF(TraceContext ctx,float3 n,float3 wo,float r_select,f
 
     result.wi = sample_cosine_hemisphere(n, r1, r2);
     result.h = normalize(result.wi + wo);
+    return result;
+}
+
+float PointLightDistanceAttenuation(float3 light_pos, float light_range, float3 x)
+{
+    float atten_radius = max(light_range, 1e-6);
+    float distance_to_center = distance(light_pos, x);
+    float inv_sqr_atten = atten_radius * atten_radius / (distance_to_center * distance_to_center + 1.0);
+    float window_func = Pow2(saturate(1.0 - pow(distance_to_center / atten_radius, 4.0)));
+    return inv_sqr_atten * window_func;
+}
+
+float PointLightSolidAngle(float3 light_pos, float light_radius, float3 x)
+{
+    float3 to_center = light_pos - x;
+    float dist2 = dot(to_center, to_center);
+    float radius = max(light_radius, 1e-6);
+    if (dist2 <= radius * radius)
+        return 4.0 * PI;
+
+    float sin_theta_max2 = saturate(radius * radius / dist2);
+    float cos_theta_max = sqrt(max(0.0, 1.0 - sin_theta_max2));
+    return 2.0 * PI * (1.0 - cos_theta_max);
+}
+
+float SpotLightAngleAttenuation(float3 light_pos, float3 light_dir, float light_angle_scale, float light_angle_offset, float3 x)
+{
+    float3 light_to_surface = normalize(x - light_pos);
+    float cd = dot(normalize(light_dir), light_to_surface);
+    float attenuation = saturate(cd * light_angle_scale + light_angle_offset);
+    return attenuation * attenuation;
+}
+
+//返回指向光源的入射方向wi，pdf为该方向的概率密度
+LightSample SampleLight(SampleLightData light, float3 x, float3 n, inout RandomCtx ctx)
+{
+    float2 u = rand2(ctx);
+    LightSample result = (LightSample)0;
+    if (light._type == LIGHT_TYPE_DIRECTIONAL)
+    {
+        float3 light_dir = normalize(light._direction);
+        float angular_radius = max(light._radius_or_sun_angle, 1e-6);
+        float cos_theta_max = cos(angular_radius);
+        float cos_theta = 1.0 - u.x * (1.0 - cos_theta_max);
+        float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+        float phi = 2.0 * PI * u.y;
+
+        float3 tangent;
+        float3 bitangent;
+        build_onb(light_dir, tangent, bitangent);
+
+        float3 wi = normalize(
+            cos(phi) * sin_theta * tangent +
+            sin(phi) * sin_theta * bitangent +
+            cos_theta * light_dir);
+
+        result._pdf = 1.0 / max(2.0 * PI * (1.0 - cos_theta_max), 1e-6);
+        result._wi = wi;
+        result._t = 1e6; // directional light 没有具体位置，设置一个很大的距离
+        float sun_solid_angle = 2.0 * PI * (1.0 - cos(angular_radius));
+        result._radiance = light._color / max(sun_solid_angle, 1e-6);
+        return result;
+    }
+    else if (light._type == LIGHT_TYPE_RECT_AREA)
+    {
+        float3 light_u = light._light_u;
+        float3 light_v = light._light_v;
+        float3 light_normal = -normalize(cross(light_u, light_v));
+        u -= 0.5;
+        float3 y =light._position + u.x * light_u + u.y * light_v;
+        float3 wi = y - x;
+        float r2 = dot(wi, wi);
+        float r = sqrt(r2);
+        wi = normalize(wi);
+        float cos_theta_l = dot(light_normal, -wi);
+        if (light._is_double_sided)
+            cos_theta_l = abs(cos_theta_l);
+        if (cos_theta_l <= 0)
+        {
+            result._pdf = 0;
+            return result;
+        }
+        float area = length(cross(light_u, light_v));
+
+        result._pdf = 1.0 / max(area, 1e-6);
+        result._pdf = PdfSolidAngleFromArea(result._pdf, r2, cos_theta_l);
+        result._wi = wi;
+        result._t = r;
+        result._normal = light_normal;
+        result._radiance = light._color;
+        return result;
+    }
+    else if (light._type == LIGHT_TYPE_SPOT)
+    {
+        LightSample spot_sample = (LightSample)0;
+        return spot_sample;
+        // SampleLightData sphere_light = light;
+        // sphere_light._type = LIGHT_TYPE_POINT;
+        // LightSample spot_sample = SampleLight(sphere_light, x, n, ctx);
+        // if (spot_sample._pdf <= 0.0)
+        //     return spot_sample;
+
+        // float angle_atten = SpotLightAngleAttenuation(light._position, light._direction, light._light_u.x, light._light_u.y, x);
+        // if (angle_atten <= 0.0)
+        // {
+        //     spot_sample._pdf = 0.0;
+        //     spot_sample._radiance = 0.0.xxx;
+        //     return spot_sample;
+        // }
+
+        // spot_sample._radiance *= angle_atten;
+        // return spot_sample;
+    }
+    else if (light._type == LIGHT_TYPE_POINT)
+    {
+        float3 center = light._position;
+        float radius = light._radius_or_sun_angle;
+
+        float3 wc = center - x;
+        float dist2 = dot(wc, wc);
+        float dist = sqrt(dist2);
+
+        // inside sphere fallback
+        if (dist <= radius)
+        {
+            float z = 1.0 - 2.0 * u.x;
+            float xy = sqrt(max(0.0, 1.0 - z * z));
+            float phi = 2.0 * PI * u.y;
+
+            // Keep point-light PDFs in solid-angle measure for MIS.
+            float3 wi = float3(xy * cos(phi), xy * sin(phi), z);
+            float3 oc = x - center;
+            float b = dot(wi, oc);
+            float c = dot(oc, oc) - radius * radius;
+            float h = b * b - c;
+            if (h < 0.0)
+            {
+                result._pdf = 0;
+                return result;
+            }
+
+            float t = -b + sqrt(h);
+            if (t <= 1e-6)
+            {
+                result._pdf = 0;
+                return result;
+            }
+
+            float3 y = x + t * wi;
+            float3 light_normal = normalize(y - center);
+
+            result._pdf = 1.0 / (4.0 * PI);
+            result._wi = wi;
+            result._t = t;
+            result._normal = light_normal;
+            float irradiance = PointLightDistanceAttenuation(light._position, light._range, x);
+            float solid_angle = PointLightSolidAngle(light._position, light._radius_or_sun_angle, x);
+            result._radiance = light._color * irradiance / max(solid_angle, 1e-6);
+            return result;
+        }
+
+        // ===== solid angle sampling =====
+
+        float3 w = wc / dist;
+
+        float sin_theta_max2 = radius * radius / dist2;
+        float cos_theta_max = sqrt(max(0.0, 1.0 - sin_theta_max2));
+
+        // sample θ
+        float cos_theta = 1.0 - u.x * (1.0 - cos_theta_max);
+        float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+
+        float phi = 2.0 * PI * u.y;
+
+        // local direction
+        float3 local_dir = float3(
+            cos(phi) * sin_theta,
+            sin(phi) * sin_theta,
+            cos_theta);
+        // build ONB
+        float3 up = abs(w.z) < 0.999 ? float3(0,0,1) : float3(1,0,0);
+        float3 tangent = normalize(cross(up, w));
+        float3 bitangent = cross(w, tangent);
+        // float3 tangent, bitangent;
+        // build_onb(w, tangent, bitangent);
+
+        float3 wi = 
+            local_dir.x * tangent +
+            local_dir.y * bitangent +
+            local_dir.z * w;
+
+        wi = normalize(wi);
+
+        // ===== ray-sphere intersection =====
+
+        float3 oc = x - center;
+
+        float b = dot(wi, oc);
+        float c = dot(oc, oc) - radius * radius;
+
+        float h = b * b - c;
+        if (h < 0.0)
+        {
+            result._pdf = 0;
+            return result;
+        }
+
+        float t = -b - sqrt(h); // 最近交点
+        float3 y = x + t * wi;
+
+        float3 light_normal = normalize(y - center);
+
+        float cos_theta_l = dot(light_normal, -wi);
+        if (cos_theta_l <= 0.0)
+        {
+            result._pdf = 0;
+            return result;
+        }
+        // solid angle pdf
+        float pdf_omega = 1.0 / (2.0 * PI * (1.0 - cos_theta_max));
+        result._pdf = pdf_omega;//PdfAreaFromSolidAngle(pdf_omega, t * t, cos_theta_l);
+        result._wi = wi;
+        result._t = t;
+        result._normal = light_normal;
+        float irradiance = PointLightDistanceAttenuation(light._position, light._range, x);
+        float solid_angle = PointLightSolidAngle(light._position, light._radius_or_sun_angle, x);
+        result._radiance = light._color * irradiance / max(solid_angle, 1e-6);
+        return result;
+    }
     return result;
 }
 

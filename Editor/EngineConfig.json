@@ -1,10 +1,10 @@
 {
     "None": 0,
     "Default": 1,
+    "EnableCpuStateBatchedSubmission": true,
     "ShadowCaster": 65536,
     "All": 4294967295,
     "MaxRenderObjectPerTask": 0,
     "isMultiThreadRender": false,
-    "EnableCpuStateBatchedSubmission": true,
     "EnableIncrementalGraphicsBinding": true
 }

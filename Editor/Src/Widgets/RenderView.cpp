@@ -152,8 +152,7 @@ namespace Ailu
                         {
                             LOG_INFO("Pick entity: {},subidex: {} on pos {}", closest_entity, submesh_index, local_pos.ToString());
                             Selection::AddAndRemovePreSelection(closest_entity,submesh_index);
-                            auto tcomp = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(closest_entity);
-                            _transform_gizmo->SetTarget(&tcomp->_transform);
+                            _transform_gizmo->SetTarget(SceneMgr::Get().ActiveScene(), closest_entity);
                             ray_trace->_debug_pos = local_pos;
                         });
                     }
@@ -244,7 +243,7 @@ namespace Ailu
                 static Vector2f target_rotation = {0.f, 0.f};
                 static Vector2f pre_mouse_pos;
                 target_rotation = _camera_controller->_rotation;
-                auto cur_mouse_pos = Input::GetMousePos();
+                auto cur_mouse_pos = Input::GetGlobalMousePosAccurate();
                 if (Input::IsKeyDown(EKey::kRBUTTON))
                 {
                     if (abs(cur_mouse_pos.x - pre_mouse_pos.x) < 100.0f &&

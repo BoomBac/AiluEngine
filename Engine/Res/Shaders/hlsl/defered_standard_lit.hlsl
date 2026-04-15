@@ -40,6 +40,16 @@
 //multi_compile _ ALPHA_TEST
 //multi_compile _ CPU_DEFORM
 //pass end::
+//pass begin::
+//name: DepthOnly
+//vert: DepthOnlyVSMain
+//pixel: DepthOnlyPSMain
+//Cull: Back
+//Queue: Opaque
+//ZTest: LEqual
+//ZWrite: On
+//multi_compile _ ALPHA_TEST
+//pass end::
 //Properties
 //{
 //	_AlphaCulloff("AlphaCulloff",Range(0,1)) = 0
@@ -88,6 +98,21 @@ StandardPSInput GBufferVSMain(StandardVSInput v)
 	return result;
 }
 
+float3 Checkerboard(float2 uv, float scale)
+{
+    // 放大 UV，控制棋盘密度
+    float2 grid = uv * scale;
+
+    // 取整，得到当前格子坐标
+    int2 cell = int2(floor(grid));
+
+    // 奇偶判断：x + y 为偶数/奇数
+    int checker = (cell.x + cell.y) & 1;
+
+    // 返回黑白
+    return checker ? float3(1.0, 1.0, 1.0) : float3(0.0, 0.0, 0.0);
+}
+
 GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 {
 	SurfaceData surface_data;
@@ -98,6 +123,7 @@ GBuffer GBufferPSMain(StandardPSInput input) : SV_TARGET
 	else if (_MaterialID == 2) // scheckboard
 	{
 		InitSurfaceDataCheckboard(input, surface_data);
+		surface_data.albedo.rgb = Checkerboard(input.uv0, 20);
 	}
 	else {};
 #ifdef ALPHA_TEST
@@ -201,5 +227,11 @@ void VoxelPSMain(StandardPSInput input)
 //---------------------motion vector--------------------------------------------------
 #include "motion_vector.hlsl"
 VertOutput MotionVectorVSMain(VertInput v);
-float2 MotionVectorPSMain(VertOutput input);
+float4 MotionVectorPSMain(VertOutput input);
 //---------------------motion vector---------------------------------------------------
+
+//---------------------depth only pass---------------------------------------------------
+#include "depth_only.hlsli"
+DepthPSInput DepthOnlyVSMain(DepthVSInput v);
+float DepthOnlyPSMain(DepthPSInput input) : SV_Depth;
+//---------------------depth only pass---------------------------------------------------

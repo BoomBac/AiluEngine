@@ -23,7 +23,77 @@ namespace Ailu::RHI::DX12
             if (resource == nullptr)
                 return;
             SetName(resource, ToWChar(name).c_str());
-            LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
+            //LOG_INFO("D3D12 resource created: name={}, ptr={}", name, static_cast<const void*>(resource));
+        }
+
+        inline D3D12_SHADER_RESOURCE_VIEW_DESC CreateRawBufferSrvDesc(u64 byte_size)
+        {
+            AL_ASSERT_MSG((byte_size % sizeof(u32)) == 0u, "Bindless ByteAddressBuffer requires 4-byte aligned size");
+
+            D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+            srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            srv_desc.Format = DXGI_FORMAT_R32_TYPELESS;
+            srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srv_desc.Buffer.FirstElement = 0;
+            srv_desc.Buffer.NumElements = static_cast<UINT>(byte_size / sizeof(u32));
+            srv_desc.Buffer.StructureByteStride = 0u;
+            srv_desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+            return srv_desc;
+        }
+
+        inline D3D12_UNORDERED_ACCESS_VIEW_DESC CreateRawBufferUavDesc(u64 byte_size)
+        {
+            AL_ASSERT_MSG((byte_size % sizeof(u32)) == 0u, "Bindless RWByteAddressBuffer requires 4-byte aligned size");
+
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
+            uav_desc.Format = DXGI_FORMAT_R32_TYPELESS;
+            uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            uav_desc.Buffer.FirstElement = 0;
+            uav_desc.Buffer.NumElements = static_cast<UINT>(byte_size / sizeof(u32));
+            uav_desc.Buffer.StructureByteStride = 0u;
+            uav_desc.Buffer.CounterOffsetInBytes = 0u;
+            uav_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+            return uav_desc;
+        }
+
+        inline void CreateBindlessBufferSrv(ID3D12Device* device, ID3D12Resource* resource, u64 byte_size, i32& bindless_srv_index)
+        {
+            if (device == nullptr || resource == nullptr)
+                return;
+
+            auto& desc_mgr = D3DDescriptorMgr::Get();
+            bindless_srv_index = static_cast<i32>(desc_mgr.AllocBindlessSRVIndex());
+            auto srv_desc = CreateRawBufferSrvDesc(byte_size);
+            device->CreateShaderResourceView(resource, &srv_desc, desc_mgr.GetBindlessSRVCpuHandle(bindless_srv_index));
+        }
+
+        inline void CreateBindlessBufferUav(ID3D12Device* device, ID3D12Resource* resource, u64 byte_size, i32& bindless_uav_index)
+        {
+            if (device == nullptr || resource == nullptr)
+                return;
+
+            auto& desc_mgr = D3DDescriptorMgr::Get();
+            bindless_uav_index = static_cast<i32>(desc_mgr.AllocBindlessUAVIndex());
+            auto uav_desc = CreateRawBufferUavDesc(byte_size);
+            device->CreateUnorderedAccessView(resource, nullptr, &uav_desc, desc_mgr.GetBindlessUAVCpuHandle(bindless_uav_index));
+        }
+
+        inline void ReleaseBindlessSrvIndex(i32& bindless_srv_index)
+        {
+            if (bindless_srv_index < 0)
+                return;
+
+            D3DDescriptorMgr::Get().ReleaseBindlessSRVIndex(static_cast<u32>(bindless_srv_index));
+            bindless_srv_index = -1;
+        }
+
+        inline void ReleaseBindlessUavIndex(i32& bindless_uav_index)
+        {
+            if (bindless_uav_index < 0)
+                return;
+
+            D3DDescriptorMgr::Get().ReleaseBindlessUAVIndex(static_cast<u32>(bindless_uav_index));
+            bindless_uav_index = -1;
         }
     }
 
@@ -37,6 +107,8 @@ namespace Ailu::RHI::DX12
     {
         D3DDescriptorMgr::Get().Free(std::move(_srv_alloc));
         D3DDescriptorMgr::Get().Free(std::move(_uav_alloc));
+        ReleaseBindlessSrvIndex(_bindless_srv_index);
+        ReleaseBindlessUavIndex(_bindless_uav_index);
         g_pGfxContext->WaitForFence(_fence_value);
     }
     void D3DGPUBuffer::UploadImpl(GraphicsContext *ctx, RHICommandBuffer *rhi_cmd, UploadParams *params)
@@ -114,6 +186,9 @@ namespace Ailu::RHI::DX12
                     if (is_with_counter)
                         AL_ASSERT(uav_desc.Buffer.StructureByteStride > 0);
                     p_device->CreateUnorderedAccessView(_p_d3d_res.Get(), is_with_counter ? _counter_buffer.Get() : nullptr, &uav_desc, cpu_handle);
+
+                    ReleaseBindlessUavIndex(_bindless_uav_index);
+                    CreateBindlessBufferUav(p_device, _p_d3d_res.Get(), _mem_size, _bindless_uav_index);
                 }
             }
         }
@@ -141,6 +216,12 @@ namespace Ailu::RHI::DX12
                     AL_ASSERT(srv_desc.Buffer.StructureByteStride > 0);
             }
             p_device->CreateShaderResourceView(is_raytracing_as? nullptr : _p_d3d_res.Get(), &srv_desc, cpu_handle);
+
+            if (!is_raytracing_as)
+            {
+                ReleaseBindlessSrvIndex(_bindless_srv_index);
+                CreateBindlessBufferSrv(p_device, _p_d3d_res.Get(), _mem_size, _bindless_srv_index);
+            }
         }
     }
     void D3DGPUBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
@@ -179,7 +260,8 @@ namespace Ailu::RHI::DX12
                 auto cmd = RHICommandBufferPool::Get("ChangeData");
                 auto d3dcmd = dynamic_cast<D3DCommandBuffer *>(cmd.get());
                 d3dcmd->UploadDataToBuffer(_data, _fill_data_size, _p_d3d_res.Get(), _state_guard);
-                d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
+                if (_counter_buffer)
+                    d3dcmd->UploadDataToBuffer(&_counter, sizeof(u32), _counter_buffer.Get(), _counter_state_guard);
                 GraphicsContext::Get().ExecuteRHICommandBuffer(cmd.get());
                 RHICommandBufferPool::Release(cmd);
             }
@@ -291,6 +373,8 @@ namespace Ailu::RHI::DX12
     }
     D3DVertexBuffer::~D3DVertexBuffer()
     {
+        for (auto& bindless_srv_index : _bindless_srv_indices)
+            ReleaseBindlessSrvIndex(bindless_srv_index);
         if (g_pGfxContext)
             g_pGfxContext->WaitForFence(_fence_value);
     }
@@ -368,6 +452,9 @@ namespace Ailu::RHI::DX12
             _buffer_views[stream_index].StrideInBytes = _buffer_layout.GetStride(stream_index);
             _buffer_views[stream_index].SizeInBytes = (u32) _stream_data[i]._size;
             _buffer_layout_indexer.emplace(std::make_pair(_buffer_layout[stream_index].Name, stream_index));
+
+            ReleaseBindlessSrvIndex(_bindless_srv_indices[stream_index]);
+            CreateBindlessBufferSrv(d3d_dev, _vertex_buffers[stream_index].Get(), _stream_data[i]._size, _bindless_srv_indices[stream_index]);
         }
     }
 
@@ -391,6 +478,7 @@ namespace Ailu::RHI::DX12
     }
     D3DIndexBuffer::~D3DIndexBuffer()
     {
+        ReleaseBindlessSrvIndex(_bindless_srv_index);
         g_pGfxContext->WaitForFence(_fence_value);
     }
 
@@ -429,6 +517,9 @@ namespace Ailu::RHI::DX12
         _index_buf_view.BufferLocation = _index_buf->GetGPUVirtualAddress();
         _index_buf_view.Format = DXGI_FORMAT_R32_UINT;
         _index_buf_view.SizeInBytes = static_cast<u32>(_mem_size);
+
+        ReleaseBindlessSrvIndex(_bindless_srv_index);
+        CreateBindlessBufferSrv(d3d_conetxt->GetDevice(), _index_buf.Get(), _mem_size, _bindless_srv_index);
     }
     void D3DIndexBuffer::BindImpl(RHICommandBuffer *rhi_cmd, const BindParams& params)
     {

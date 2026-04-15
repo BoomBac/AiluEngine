@@ -103,6 +103,46 @@ namespace Ailu::Render
 		}
 		return _index_buffers[submesh_index];
 	}
+	i32 Mesh::GetBindlessVertexStreamIndex(const std::string &semantic_name, u8 semantic_index) const noexcept
+	{
+		if (_vertex_buffer == nullptr)
+			return -1;
+
+		for (const auto &desc : _vertex_buffer->GetLayout().GetBufferDesc())
+		{
+			if (desc.Name == semantic_name && desc._semantic_index == semantic_index)
+				return _vertex_buffer->GetBindlessSRVIndex(desc.Stream);
+		}
+		return -1;
+	}
+	u32 Mesh::GetTriangleStart(u16 submesh_index) const noexcept
+	{
+		if (submesh_index >= (u16)_submeshes.size())
+			return 0u;
+
+		u32 triangle_start = 0u;
+		for (u16 index = 0u; index < submesh_index; ++index)
+			triangle_start += static_cast<u32>(_submeshes[index]._indices.size() / 3u);
+		return triangle_start;
+	}
+	u32 Mesh::GetTriangleCount(u16 submesh_index) const noexcept
+	{
+		if (submesh_index >= (u16)_submeshes.size())
+			return 0u;
+		return static_cast<u32>(_submeshes[submesh_index]._indices.size() / 3u);
+	}
+	u32 Mesh::GetBVHNodeStart(u16 submesh_index) const noexcept
+	{
+		if (submesh_index >= (u16)_submesh_bvh_node_ranges.size())
+			return 0u;
+		return _submesh_bvh_node_ranges[submesh_index].x;
+	}
+	u32 Mesh::GetBVHNodeCount(u16 submesh_index) const noexcept
+	{
+		if (submesh_index >= (u16)_submesh_bvh_node_ranges.size())
+			return 0u;
+		return _submesh_bvh_node_ranges[submesh_index].y;
+	}
 
 	static void CalculateTriangleBounds(u64 start_triangle_index, u64 end_triangle_index, const Vector<Vector3f>& vertices, 
 		const Vector<Vector3f>& normals,const Vector<Vector2f>& uv0,const Vector<u32>& indices, Vector<AABB>& triangle_bounds,Vector<TriangleData>& triangle_data)
@@ -142,47 +182,52 @@ namespace Ailu::Render
 	{
 		if (_vertices.empty())
 			return;
-		Vector<u32> flat_indices;
-		for (auto &sm: _submeshes)
-			flat_indices.insert(flat_indices.end(), sm._indices.begin(), sm._indices.end());
-        _triangle_count = (u32) (flat_indices.size() / 3u);
-		_triangle_data.resize(_triangle_count);
-		_triangle_bounds.resize(_triangle_count);
-		const static u64 kTriNumPerJob = 800;
-		auto &job_sys = JobSystem::Get();
-		Vector<WaitHandle> wait_handles;
+		_triangle_count = 0u;
+		for (const auto &submesh : _submeshes)
+			_triangle_count += static_cast<u32>(submesh._indices.size() / 3u);
+		_triangle_data.clear();
+		_triangle_bounds.clear();
+		_bvh_nodes.clear();
+		_submesh_bvh_node_ranges.clear();
+		_triangle_data.reserve(_triangle_count);
+		_triangle_bounds.reserve(_triangle_count);
+		_submesh_bvh_node_ranges.resize(_submeshes.size(), Vector2UInt::kZero);
 		{
             TIMER_BLOCK(std::format("Mesh::Generate Bounds and BVH({})", _name))
-            //for (u64 i = 0; i < _triangle_count; i += kTriNumPerJob)
-            //{
-            //	u64 index_end = std::min<u64>(i + kTriNumPerJob, _triangle_count);
-            //	wait_handles.push_back(job_sys.Dispatch(CalculateTriangleBounds, i, index_end, std::ref(_vertices), std::ref(_normals),std::ref(_uvs[0]),
-            //	std::ref(flat_indices), std::ref(_triangle_bounds),std::ref(_triangle_data)));
-            //}
-            //for (auto &handle: wait_handles)
-            //{
-            //	job_sys.Wait(handle);
-            //}
-            CalculateTriangleBounds(0, _triangle_count, _vertices, _normals, _uvs[0],flat_indices, _triangle_bounds, _triangle_data);
-			BVHBuilder builder(_triangle_bounds);
-			auto&& result = builder.Build();
-			_bvh_nodes = std::move(result._nodes);
-			Vector<TriangleData> reordered;
-			reordered.resize(_triangle_data.size());
-			for (u32 new_idx = 0; new_idx < result._reordered_indices.size(); new_idx++)
+			u32 global_triangle_offset = 0u;
+			for (u16 submesh_index = 0u; submesh_index < static_cast<u16>(_submeshes.size()); ++submesh_index)
 			{
-				u32 old_idx = result._reordered_indices[new_idx];
-				reordered[new_idx] = _triangle_data[old_idx];
+				auto &submesh = _submeshes[submesh_index];
+				const u32 triangle_count = static_cast<u32>(submesh._indices.size() / 3u);
+				if (triangle_count == 0u)
+					continue;
+
+				Vector<AABB> local_triangle_bounds(triangle_count);
+				Vector<TriangleData> local_triangle_data(triangle_count);
+				CalculateTriangleBounds(0, triangle_count, _vertices, _normals, _uvs[0], submesh._indices, local_triangle_bounds, local_triangle_data);
+
+				BVHBuilder builder(local_triangle_bounds);
+				auto result = builder.Build();
+
+				Vector<u32> reordered_indices(submesh._indices.size());
+				for (u32 new_idx = 0u; new_idx < result._reordered_indices.size(); ++new_idx)
+				{
+					const u32 old_idx = result._reordered_indices[new_idx];
+					_triangle_data.push_back(local_triangle_data[old_idx]);
+					_triangle_bounds.push_back(local_triangle_bounds[old_idx]);
+
+					const u32 old_base = old_idx * 3u;
+					const u32 new_base = new_idx * 3u;
+					reordered_indices[new_base + 0u] = submesh._indices[old_base + 0u];
+					reordered_indices[new_base + 1u] = submesh._indices[old_base + 1u];
+					reordered_indices[new_base + 2u] = submesh._indices[old_base + 2u];
+				}
+				submesh._indices = std::move(reordered_indices);
+
+				_submesh_bvh_node_ranges[submesh_index] = Vector2UInt{ static_cast<u32>(_bvh_nodes.size()), static_cast<u32>(result._nodes.size()) };
+				_bvh_nodes.insert(_bvh_nodes.end(), result._nodes.begin(), result._nodes.end());
+				global_triangle_offset += triangle_count;
 			}
-			_triangle_data = std::move(reordered);
-            Vector<AABB> tri_bounds_reordered;
-            tri_bounds_reordered.resize(_triangle_bounds.size());
-			for (u32 new_idx = 0; new_idx < result._reordered_indices.size(); new_idx++)
-			{
-				u32 old_idx = result._reordered_indices[new_idx];
-				tri_bounds_reordered[new_idx] = _triangle_bounds[old_idx];
-            }
-            _triangle_bounds = std::move(tri_bounds_reordered);
 		}
 	}
 	void Mesh::SetUVs(std::span<const Vector2f> uv, u8 channel)
@@ -240,6 +285,7 @@ namespace Ailu::Render
 		}
 		if (!desc_list.empty())
 		{
+			GenerateTriangleBounds();
 			_vertex_buffer.reset(VertexBuffer::Create(desc_list, _name));
 			if (_vertices.size()) 
 				_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_vertices.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, false);
@@ -264,7 +310,6 @@ namespace Ailu::Render
 				GraphicsContext::Get().CreateResource(_index_buffers[i].get());
 			}
 		}
-		GenerateTriangleBounds();
 	}
 #pragma endregion
 

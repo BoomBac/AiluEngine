@@ -60,6 +60,9 @@ namespace Ailu
             Texture3D* _cur_light_texture;
             Texture3D* _history_light_texture;
             Texture3D* _accum_texture;
+            RDG::RGHandle _inject_handle;
+            RDG::RGHandle _history_light_handle;
+            RDG::RGHandle _accum_handle;
             Ref<Material> _debug_material;
             Matrix4x4f _matrix_prev_v, _matrix_prev_p;
         };

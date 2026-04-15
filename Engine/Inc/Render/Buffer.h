@@ -120,6 +120,8 @@ namespace Ailu
             virtual void ReadBack(u8 *dst, u32 size) {};
             virtual void ReadBackAsync(u8 *dst, u32 size, std::function<void()> on_complete) {};
             [[nodiscard]] bool IsRandomAccess() const { return _desc._is_random_write; };
+            [[nodiscard]] i32 GetBindlessSRVIndex() const { return _bindless_srv_index; }
+            [[nodiscard]] i32 GetBindlessUAVIndex() const { return _bindless_uav_index; }
             /// @brief  异步获取append/consume中元素个数，可能会延迟数帧
             /// @return
             virtual void GetCounter(std::function<void(u32)> callback) {};
@@ -166,6 +168,8 @@ namespace Ailu
             u8 *_data = nullptr;
             //每次设置data时的实际大小，使用容量拷贝时可能会有越界错误
             u64 _fill_data_size = 0u;
+            i32 _bindless_srv_index = -1;
+            i32 _bindless_uav_index = -1;
         };
 
         class VertexBuffer : public GpuResource
@@ -180,6 +184,7 @@ namespace Ailu
             void SetLayout(VertexBufferLayout layout) { _buffer_layout = std::move(layout); };
             [[nodiscard]] const VertexBufferLayout &GetLayout() const { return _buffer_layout; };
             u32 GetVertexCount() const { return _vertices_count; };
+            [[nodiscard]] i32 GetBindlessSRVIndex(u8 stream_index = 0u) const { return stream_index < _bindless_srv_indices.size() ? _bindless_srv_indices[stream_index] : -1; }
 
         protected:
             VertexBufferLayout _buffer_layout;
@@ -193,6 +198,7 @@ namespace Ailu
             };
             Vector<StreamData> _stream_data;
             std::map<String, u8> _buffer_layout_indexer;
+            Vector<i32> _bindless_srv_indices;
         };
 
         class IndexBuffer : public GpuResource
@@ -207,12 +213,14 @@ namespace Ailu
             u8 *GetData() { return _data; };
             void SetData(u8 *data, u32 size);
             virtual void Resize(u32 new_size) = 0;
+            [[nodiscard]] i32 GetBindlessSRVIndex() const { return _bindless_srv_index; }
 
         protected:
             u32 _capacity;//最大可容纳的个数
             u32 _count;   //当前索引个数
             bool _is_dynamic;
             u8 *_data = nullptr;
+            i32 _bindless_srv_index = -1;
         };
 
         class ConstantBuffer : public GpuResource

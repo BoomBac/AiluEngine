@@ -297,12 +297,13 @@ namespace Ailu::Render
 
     bool Shader::Compile(u16 pass_id, ShaderVariantHash variant_hash, bool is_load_cache)
     {
-        LOG_INFO(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWChar(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
+        //LOG_INFO(L"Begin compile shader: {},pass: {},variant: {} with keywords {}...", _src_file_path, pass_id, variant_hash, ToWChar(su::Join(ActiveKeywords(pass_id, variant_hash), ",")));
         g_pTimeMgr->Mark();
         AL_ASSERT(pass_id < _passes.size());
         auto &pass = _passes[pass_id];
         AL_ASSERT(pass._variants.contains(variant_hash));
         _variant_state[pass_id][variant_hash] = EShaderVariantState::kCompiling;
+        String variant_str = std::format("{}_{}_{},keywords: {}", _name, pass_id, variant_hash, su::Join(ActiveKeywords(pass_id, variant_hash), ","));
         if (RHICompileImpl(pass_id, variant_hash, is_load_cache))
         {
             pass._variants[variant_hash]._pipeline_input_layout.Hash(PipelineStateHash<VertexInputLayout>::GenHash(pass._variants[variant_hash]._pipeline_input_layout));
@@ -311,12 +312,12 @@ namespace Ailu::Render
             pass._pipeline_ds_state.Hash(PipelineStateHash<DepthStencilState>::GenHash(pass._pipeline_ds_state));
             GraphicsPipelineStateMgr::Get().OnShaderCompiled(this, pass_id, variant_hash);
             _variant_state[pass_id][variant_hash] = EShaderVariantState::kReady;
-            LOG_INFO("Shader compile success with {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
+            LOG_INFO("Shader({}) compile success with {}ms", variant_str, g_pTimeMgr->GetElapsedSinceLastMark());
         }
         else
         {
             _variant_state[pass_id][variant_hash] = EShaderVariantState::kError;
-            LOG_ERROR("Shader compile failed with {}ms", g_pTimeMgr->GetElapsedSinceLastMark());
+            LOG_ERROR("Shader({}) compile failed with {}ms", variant_str, g_pTimeMgr->GetElapsedSinceLastMark());
         }
         return _variant_state[pass_id][variant_hash] == EShaderVariantState::kReady;
     }

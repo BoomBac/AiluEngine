@@ -20,8 +20,6 @@ namespace Ailu
         }
         void VolumetricFogPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
         {
-            static RDG::RGHandle s_inject_handle;
-            static RDG::RGHandle s_cur_acc_handle;
             //static RDG::RGHandle s_max_z_handle;
             //static Vector2f maxz_sample_uv_scale;
             // graph.AddPass("MaxZ", RDG::PassDesc(RDG::EPassType::kCompute), [&, this](RDG::RenderGraphBuilder &builder)
@@ -49,11 +47,17 @@ namespace Ailu
             graph.AddPass("VolumetricFog_LightInject", RDG::PassDesc(RDG::EPassType::kCompute), [&, this](RDG::RenderGraphBuilder &builder)
             {
                 builder.Read(rendering_data._rg_handles._main_light_shadow_map);
-                s_inject_handle = builder.Import(_cur_light_texture);
-                s_inject_handle = builder.Write(s_inject_handle);
+                _history_light_handle = builder.Import(_history_light_texture);
+                builder.Read(_history_light_handle);
+                _inject_handle = builder.Import(_cur_light_texture);
+                _inject_handle = builder.Write(_inject_handle,EResourceUsage::kWriteUAV);
             }, 
             [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             {
+                auto *cur_light = graph.Resolve<Texture3D>(_inject_handle);
+                auto *history_light = graph.Resolve<Texture3D>(_history_light_handle);
+                if (cur_light == nullptr || history_light == nullptr)
+                    return;
                 const Camera* cam = Camera::sSelected? Camera::sSelected : data._camera;
                 _volumetric_fog->SetMatrix("_matrix_iv",MatrixInverse(cam->GetView()));
                 _volumetric_fog->SetMatrix("_matrix_ip",MatrixInverse(cam->GetProjNoJitter()));
@@ -64,22 +68,26 @@ namespace Ailu
                 _volumetric_fog->SetVector("_cam_pos", cam->Position());
                 //_volumetric_fog->SetVector("_zmax_uv_scale", maxz_sample_uv_scale);
                 auto kernel = _volumetric_fog->FindKernel("LightInjection");
-                _volumetric_fog->SetTexture("_VolumetricLight", _cur_light_texture);
-                _volumetric_fog->SetTexture("_History_VolumetricLight", _history_light_texture);
-                auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(kernel, _cur_light_texture->Width(), _cur_light_texture->Height(), _cur_light_texture->Depth());
+                _volumetric_fog->SetTexture("_VolumetricLight", cur_light);
+                _volumetric_fog->SetTexture("_History_VolumetricLight", history_light);
+                auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(kernel, cur_light->Width(), cur_light->Height(), cur_light->Depth());
                 cmd->Dispatch(_volumetric_fog, kernel, x, y, z);
                 _matrix_prev_p = cam->GetProjNoJitter();
                 _matrix_prev_v = cam->GetView();
             });
             graph.AddPass("VolumetricFog_LightIntegration", RDG::PassDesc(RDG::EPassType::kCompute), [&, this](RDG::RenderGraphBuilder &builder)
             {
-                builder.Read(s_inject_handle);
+                builder.Read(_inject_handle);
                 //builder.Read(s_max_z_handle);
-                s_cur_acc_handle = builder.Import(_accum_texture);
-                s_cur_acc_handle = builder.Write(s_cur_acc_handle);
+                _accum_handle = builder.Import(_accum_texture);
+                _accum_handle = builder.Write(_accum_handle, EResourceUsage::kWriteUAV);
             },
             [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
             {
+                auto *cur_light = graph.Resolve<Texture3D>(_inject_handle);
+                auto *accum_tex = graph.Resolve<Texture3D>(_accum_handle);
+                if (cur_light == nullptr || accum_tex == nullptr)
+                    return;
                 // const Camera* cam = Camera::sSelected? Camera::sSelected : data._camera;
                 // _volumetric_fog->SetMatrix("_matrix_iv",MatrixInverse(cam->GetView()));
                 // _volumetric_fog->SetMatrix("_matrix_ip",MatrixInverse(cam->GetProjNoJitter()));
@@ -87,12 +95,12 @@ namespace Ailu
                 // _volumetric_fog->SetFloat("_cam_far", cam->Far());
                 // _volumetric_fog->SetVector("_cam_pos", cam->Position());
                 auto kernel = _volumetric_fog->FindKernel("LightIntegration");
-                _volumetric_fog->SetTexture("_VolumetricLight", _cur_light_texture);
-                _volumetric_fog->SetTexture("_FogAccum", _accum_texture);
+                _volumetric_fog->SetTexture("_VolumetricLight", cur_light);
+                _volumetric_fog->SetTexture("_FogAccum", accum_tex);
                 //_volumetric_fog->SetTexture("_MaxZ_Texture", graph.Resolve<Texture>(s_max_z_handle));
-                auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(kernel, _cur_light_texture->Width(), _cur_light_texture->Height(), _cur_light_texture->Depth());
+                auto [x,y,z] = _volumetric_fog->CalculateDispatchNum(kernel, cur_light->Width(), cur_light->Height(), cur_light->Depth());
                 cmd->Dispatch(_volumetric_fog, kernel, x, y, 1);
-                Shader::SetGlobalTexture("_VolumetricLightTexture", _accum_texture);
+                Shader::SetGlobalTexture("_VolumetricLightTexture", accum_tex);
             });
             if (_debug_voxel_pos)
             {
@@ -105,11 +113,14 @@ namespace Ailu
                 }, 
                 [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                             { 
-                    auto w = _cur_light_texture->Width();
-                    auto h = _cur_light_texture->Height();
-                    auto d = _cur_light_texture->Depth();
+                    auto *cur_light = graph.Resolve<Texture3D>(_inject_handle);
+                    if (cur_light == nullptr)
+                        return;
+                    auto w = cur_light->Width();
+                    auto h = cur_light->Height();
+                    auto d = cur_light->Depth();
                     _debug_material->SetVector("_GridNum", Vector4Int(w,h,d,1));
-                    _debug_material->SetTexture("_VoxelSrc", _cur_light_texture);
+                    _debug_material->SetTexture("_VoxelSrc", cur_light);
                     cmd->SetRenderTarget(data._rg_handles._color_target,data._rg_handles._depth_target);
                     cmd->DrawProcedural(_debug_material.get(), 1u, 2u,w*h*d);
                 });

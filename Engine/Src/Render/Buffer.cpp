@@ -78,6 +78,7 @@ namespace Ailu::Render
 		_buffer_layout = std::move(layout);
 		u16 stream_count = _buffer_layout.GetStreamCount();
 		_stream_data.resize(RenderConstants::kMaxVertexAttrNum);
+		_bindless_srv_indices.resize(RenderConstants::kMaxVertexAttrNum, -1);
 		_res_type = EGpuResType::kVertexBuffer;
 	}
 	void VertexBuffer::SetData(u8 *data, u32 size, u8 stream_index, u32 offset)

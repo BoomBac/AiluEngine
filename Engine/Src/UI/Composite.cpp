@@ -2,6 +2,8 @@
 #include "UI/Basic.h"
 #include "UI/Container.h"
 
+#include <type_traits>
+
 namespace Ailu
 {
     namespace UI
@@ -43,6 +45,24 @@ namespace Ailu
                 default:
                     return 1.2f;
             }
+        }
+
+        template<typename T>
+        static String FormatNumericFieldValue(T value)
+        {
+            if constexpr (std::is_floating_point_v<T>)
+                return std::format("{:.2f}", value);
+            else
+                return std::to_string(value);
+        }
+
+        template<typename T>
+        static std::optional<T> ParseNumericFieldValue(const String &content)
+        {
+            if constexpr (std::is_floating_point_v<T>)
+                return StringUtils::ParseFloat(content);
+            else
+                return StringUtils::ParseInt32(content);
         }
 
         template<typename T>
@@ -297,15 +317,30 @@ namespace Ailu
                                 .As<UI::Slider>();
             slider->_range = range;
             slider->SetValue(static_cast<f32>(data));
+            auto input_block = hb->AddChild<UI::InputBlock>(FormatNumericFieldValue(data))
+                                ->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f})
+                                .SlotAlignmentH(UI::EAlignment::kRight)
+                                .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                .SlotFillRate(1.2f)
+                                .As<UI::InputBlock>();
             slider->_on_value_change += [property, instance](f32 v)
             {
                 property->Set<T>(instance,static_cast<T>(v),PropertyInfo::EPropertyChangeSource::kUI);
+            };
+            input_block->_on_content_changed += [property, instance](String content)
+            {
+                if (auto value = ParseNumericFieldValue<T>(content); value.has_value())
+                {
+                    property->Set<T>(instance, value.value(), PropertyInfo::EPropertyChangeSource::kUI);
+                }
             };
             hb->AddPropertyObserver(std::move(property->AddObserver(instance, [hb, property, instance](void *)
             { 
                 auto data = property->Get<T>(instance);
                 auto slider = hb->ChildAt(1)->As<UI::Slider>();
+                auto input = hb->ChildAt(2)->As<UI::InputBlock>();
                 slider->SetValue(static_cast<f32>(data), false);
+                input->SetContent(FormatNumericFieldValue(data), false);
             })));
             return hb;
         }
@@ -409,9 +444,21 @@ namespace Ailu
             auto slider = hb->AddChild<UI::Slider>();
             slider->SlotMargin({10.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             slider->_range = {min, max};
-            slider->_on_value_change += [data](f32 v)
+            slider->SetValue(*data, false);
+            auto input_block = hb->AddChild<UI::InputBlock>(FormatNumericFieldValue(*data));
+            input_block->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f}).SlotAlignmentH(UI::EAlignment::kRight).SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).SlotFillRate(1.2f);
+            slider->_on_value_change += [data, input_block](f32 v)
             {
                 *data = v;
+                input_block->As<UI::InputBlock>()->SetContent(FormatNumericFieldValue(v), false);
+            };
+            input_block->As<UI::InputBlock>()->_on_content_changed += [data, slider](String content)
+            {
+                if (auto value = ParseNumericFieldValue<f32>(content); value.has_value())
+                {
+                    *data = value.value();
+                    slider->As<UI::Slider>()->SetValue(value.value(), false);
+                }
             };
             return hb;
         }

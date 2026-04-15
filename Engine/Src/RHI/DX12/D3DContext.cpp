@@ -43,9 +43,6 @@
 #endif                        // _PIX_DEBUG
 #include <Render/ImGuiRenderer.h>
 
-#include "RHI/DX12/DXRSample.h"
-
-
 #define D3D_DEBUG_LAYER 1
 
 using namespace Ailu::Render;
@@ -67,8 +64,6 @@ namespace Ailu::RHI::DX12
 
     void GpuCommandWorker::Push(Vector<GfxCommand *> &&cmds, SubmitParams &&params)
     {
-        while (_cmd_queue.Full())
-            std::this_thread::yield();
         _cmd_queue.Push(CommandGroup(std::move(cmds), std::move(params)));
     }
     void GpuCommandWorker::RunAsync()
@@ -116,7 +111,7 @@ namespace Ailu::RHI::DX12
                 }
             }
         }
-        LOG_INFO("GpuCommandWorker::RunAsync: Release {} un-executed cmd", _cmd_queue.Size())
+        LOG_INFO("GpuCommandWorker::RunAsync: Release {} un-executed cmd", _cmd_queue.Size());
         while (!_cmd_queue.Empty())
             _cmd_queue.Pop();
     }
@@ -200,8 +195,11 @@ namespace Ailu::RHI::DX12
             auto &&group_opt = _cmd_queue.Pop();
             CPUProfileBlock b(group_opt.value()._params._name + "_Execute");
             auto cmd = RHICommandBufferPool::Get(group_opt.value()._params._name);
-            for (auto *task: group_opt.value()._cmds)
+            for (u32 i = 0; i < group_opt.value()._cmds.size(); i++)
+            {
+                auto *task = group_opt.value()._cmds[i];
                 _ctx->ProcessGpuCommand(task, cmd.get());
+            }
             _ctx->ExecuteRHICommandBuffer(cmd.get());
             RenderTexture::ResetRenderTarget();
             RHICommandBufferPool::Release(cmd);
@@ -560,9 +558,6 @@ namespace Ailu::RHI::DX12
         }
     };
 
-    //todo 删除
-    static Scope<DXRSample> g_dxrsample = nullptr;
-
     D3DContext::D3DContext()
     {
 #ifdef _PIX_DEBUG
@@ -590,6 +585,7 @@ namespace Ailu::RHI::DX12
         {
             _cmd_worker->Start();
         }
+        _is_hardware_ray_tracing_supported = IsDirectXRaytracingSupported(_p_adapter.Get());
     }
 
     void D3DContext::TryReleaseUnusedResources()
@@ -716,8 +712,7 @@ namespace Ailu::RHI::DX12
 
     bool D3DContext::IsHardwareRayTracingSupported() const
     {
-        AL_ASSERT(_p_adapter != nullptr);
-        return IsDirectXRaytracingSupported(_p_adapter.Get());
+        return _is_hardware_ray_tracing_supported;
     }
 
     void D3DContext::LoadPipeline()
@@ -1022,10 +1017,6 @@ namespace Ailu::RHI::DX12
 
     void D3DContext::PresentImpl(D3DCommandBuffer *cmd)
     {
-        if (_is_hardware_ray_tracing_supported && g_dxrsample == nullptr)
-        {
-            g_dxrsample = MakeScope<DXRSample>(m_device.Get(), m_commandQueue.Get());
-        }
         static TimeMgr s_timer;
         CPUProfileBlock b("Reslove");
 #ifdef DEAR_IMGUI
@@ -1035,21 +1026,6 @@ namespace Ailu::RHI::DX12
         //dxcmd->ClearRenderTargetView(rtv_handle, Colors::kBlack, 0, nullptr);
         ImGuiRenderer::Get().Render(cmd);
 #endif// DEAR_IMGUI
-
-        if (_is_hardware_ray_tracing_supported)
-        {
-            g_dxrsample->Render(cmd,_render_windows[0]->_width,_render_windows[0]->_height);
-            if (auto output = g_dxrsample->Output(); output != nullptr)
-            {
-                _render_windows[0]->_swapchain->StateTranslation(cmd, EResourceState::kCopyDest, kTotalSubRes);
-                output->StateTranslation(cmd, EResourceState::kCopySource,kTotalSubRes);
-                ID3D12Resource* src = static_cast<D3DTexture2D*>(output)->NativeResource().As<ID3D12Resource>();
-                ID3D12Resource* dst = _render_windows[0]->_swapchain->NativeResource().As<ID3D12Resource>();
-                dxcmd->CopyResource(dst,src);
-                _render_windows[0]->_swapchain->StateTranslation(cmd, EResourceState::kRenderTarget, kTotalSubRes);
-                output->StateTranslation(cmd, EResourceState::kUnorderedAccess,kTotalSubRes);
-            }
-        }
         // Present the frame.
         for (auto &ctx: _render_windows)
         {

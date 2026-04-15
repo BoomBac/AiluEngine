@@ -210,7 +210,7 @@ namespace Ailu
                 UIManager::Get()->SetFocus(target);
             }
             UIManager::Get()->_hover_target = target;
-            //if (target)
+            // if (target)
             //    LOG_INFO("target is {}",target->Name());
             // 2. 构造 HoverPath
             Vector<UIElement *> cur_hover_path;

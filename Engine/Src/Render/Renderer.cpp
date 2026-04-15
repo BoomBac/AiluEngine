@@ -49,6 +49,7 @@ namespace Ailu::Render
         _wireframe_pass = MakeScope<WireFramePass>();
         _gui_pass = MakeScope<GUIPass>();
         _hzb_pass = MakeScope<HZBPass>();
+        _depth_only_pass = MakeScope<DepthOnlyPass>();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new TemporalAA())));
         _taa = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VoxelGI())));
@@ -231,6 +232,7 @@ namespace Ailu::Render
             _rendering_data._rg_handles._point_light_shadow_maps = _rd_graph->CreateResource(sm_desc, RenderResourceName::kPointLightShadowMap);
 
             auto mv_desc = TextureDesc(_rendering_data._width, _rendering_data._height, ERenderTargetFormat::kRGHalf);
+            mv_desc._format = EALGFormat::kALGFormatR16G16B16A16_FLOAT;
             _rendering_data._rg_handles._motion_vector_tex = _rd_graph->CreateResource(mv_desc, RenderResourceName::kMotionVectorTex);
             mv_desc = TextureDesc(_rendering_data._width, _rendering_data._height, ERenderTargetFormat::kDepth);
             _rendering_data._rg_handles._motion_vector_depth = _rd_graph->CreateResource(mv_desc, RenderResourceName::kMotionVectorDepth);
@@ -288,42 +290,60 @@ namespace Ailu::Render
         _rendering_data._camera_depth_tex_handle = _camera_depth_tex_handle;
         _rendering_data._final_rt_handle = _gameview_rt_handle;
         _vxgi->SetActive(cam._is_gen_voxel || _vxgi->IsActive());
-        if (_mode & EShadingMode::kLit)
+        if (_is_use_raytracing)
         {
-            _skybox_pass->Setup(false);
-            if (cam._is_render_shadow)
-                _render_passes.emplace_back(_shadowcast_pass.get());
-            if (!_rendering_data._is_debug_voxel)
-            {
-                _render_passes.emplace_back(_gbuffer_pass.get());
-                _render_passes.emplace_back(_lighting_pass.get());
-                _render_passes.emplace_back(_motion_vector_pass.get());
-                _render_passes.emplace_back(_forward_pass.get());
-                _render_passes.emplace_back(_coptdepth_pass.get());
-                _render_passes.emplace_back(_copycolor_pass.get());
-                if (cam._is_enable_postprocess)
-                    _render_passes.emplace_back(_postprocess_pass.get());
-            }
-            else
-                _skybox_pass->Setup(true);
+            _raytrace_gi->SetActive(true);
+            _fog->SetActive(false);
+            _ssao->SetActive(false);
+            _render_passes.emplace_back(_gbuffer_pass.get());
+            _render_passes.emplace_back(_motion_vector_pass.get());
+            _render_passes.emplace_back(_coptdepth_pass.get());
+            //_render_passes.emplace_back(_depth_only_pass.get());
         }
-        if (_is_hiz_active)
-            _render_passes.emplace_back(_hzb_pass.get());
-        _render_passes.emplace_back(_gui_pass.get());
+        else
+        {
+            _ssao->SetActive(true);
+            _fog->SetActive(true);
+            _raytrace_gi->SetActive(false);
+            if (_mode & EShadingMode::kLit)
+            {
+                _skybox_pass->Setup(false);
+                if (cam._is_render_shadow)
+                    _render_passes.emplace_back(_shadowcast_pass.get());
+                if (!_rendering_data._is_debug_voxel)
+                {
+                    _render_passes.emplace_back(_gbuffer_pass.get());
+                    _render_passes.emplace_back(_lighting_pass.get());
+                    _render_passes.emplace_back(_motion_vector_pass.get());
+                    _render_passes.emplace_back(_forward_pass.get());
+                    _render_passes.emplace_back(_coptdepth_pass.get());
+                }
+                else
+                    _skybox_pass->Setup(true);
+            }
+            if (_is_hiz_active)
+                _render_passes.emplace_back(_hzb_pass.get());
+            //_render_passes.emplace_back(_gui_pass.get());
+            if (_mode & EShadingMode::kWireframe)
+            {
+                _skybox_pass->Setup(!(_mode & EShadingMode::kLit));
+                _render_passes.emplace_back(_wireframe_pass.get());
+            }
+            if (cam._is_render_sky_box)
+                _render_passes.emplace_back(_skybox_pass.get());
+        }
+        if (cam._is_scene_camera)
+            _render_passes.emplace_back(_gizmo_pass.get());
+        if (cam._is_enable_postprocess)
+        {
+            _render_passes.emplace_back(_copycolor_pass.get());
+            _render_passes.emplace_back(_postprocess_pass.get());
+        }
         for (auto &feature: _features)
         {
             if (feature->IsActive())
                 feature->AddRenderPasses(*this, _rendering_data);
         }
-        if (_mode & EShadingMode::kWireframe)
-        {
-            _skybox_pass->Setup(!(_mode & EShadingMode::kLit));
-            _render_passes.emplace_back(_wireframe_pass.get());
-        }
-        if (cam._is_scene_camera)
-            _render_passes.emplace_back(_gizmo_pass.get());
-        if (cam._is_render_sky_box)
-            _render_passes.emplace_back(_skybox_pass.get());
         std::stable_sort(_render_passes.begin(), _render_passes.end(), [](RenderPass *a, RenderPass *b) -> bool
                          { return *a < *b; });
         _target_tex = g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle);
@@ -344,7 +364,10 @@ namespace Ailu::Render
             _rendering_data._postprocess_input = nullptr;//taa关闭时，这个不赋值会导致bloom输入为空
             {
                 for (auto *pass: _render_passes)
+                {
+                    CPUProfileBlock b(std::format("Record {}", pass->Name()).c_str());
                     pass->OnRecordRenderGraph(*_rd_graph, _rendering_data);
+                }
                 _rd_graph->Compile();
             }
         }
@@ -449,10 +472,24 @@ namespace Ailu::Render
                     s_instance_data[obj_index]._world_to_local = world_to_local;
                     s_instance_data[obj_index]._object_id = obj_index;
                     s_instance_data[obj_index]._material_id = materials.size() > i ? _material_data_lut[materials[i]->HashCode()] : 0u;
-                    s_instance_data[obj_index]._global_triangle_offset = s.GetTriangleBufferOffset(entity);
-                    auto range = s.GetBVHNodeRange(entity);
+                    s_instance_data[obj_index]._global_triangle_offset = 0u;
+                    auto range = s.GetBVHNodeRange(entity, static_cast<u16>(i));
                     s_instance_data[obj_index]._blas_node_start = range.x;
                     s_instance_data[obj_index]._blas_node_count = range.y;
+                    auto *mesh = static_mesh._p_mesh.get();
+                    const i32 position_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("POSITION") : -1;
+                    const i32 normal_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("NORMAL") : -1;
+                    const i32 uv_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("TEXCOORD") : -1;
+                    const i32 tangent_bindless_idx = mesh ? mesh->GetBindlessVertexStreamIndex("TANGENT") : -1;
+                    s_instance_data[obj_index]._position_bindless_idx = position_bindless_idx >= 0 ? static_cast<u32>(position_bindless_idx) : Render::RenderConstants::kInvalidBindlessHandle;
+                    s_instance_data[obj_index]._normal_bindless_idx = normal_bindless_idx >= 0 ? static_cast<u32>(normal_bindless_idx) : Render::RenderConstants::kInvalidBindlessHandle;
+                    s_instance_data[obj_index]._uv_bindless_idx = uv_bindless_idx >= 0 ? static_cast<u32>(uv_bindless_idx) : Render::RenderConstants::kInvalidBindlessHandle;
+                    s_instance_data[obj_index]._tangent_bindless_idx = tangent_bindless_idx >= 0 ? static_cast<u32>(tangent_bindless_idx) : Render::RenderConstants::kInvalidBindlessHandle;
+                    auto index_buffer = mesh->GetIndexBuffer(i).get();
+                    s_instance_data[obj_index]._index_bindless_idx = index_buffer ? static_cast<u32>(index_buffer->GetBindlessSRVIndex()) : Render::RenderConstants::kInvalidBindlessHandle;
+                    s_instance_data[obj_index]._submesh_triangle_offset = 0u;
+                    s_instance_data[obj_index]._submesh_triangle_count = mesh->GetTriangleCount(i);
+                    s_instance_data[obj_index]._reserved0 = 0u;
                     Vector3f inv_scale = Vector3f::kOne / t._scale;
                     s_instance_data[obj_index]._max_inv_scale = std::max(inv_scale.x,std::max(inv_scale.y,inv_scale.z));
                     ++obj_index;
@@ -467,6 +504,7 @@ namespace Ailu::Render
         ComputeShader::SetGlobalBuffer("g_tlas_buffer", s.GetTLASBuffer());
         ComputeShader::SetGlobalBuffer("g_blas_buffer", s.GetBLASBuffer());
         ComputeShader::SetGlobalBuffer("g_material_buffer", _cur_fs->GetMaterialBuffer());
+        ComputeShader::SetGlobalInt("_scene_bindless_idx", s.GetSceneMeshDataBuffer()->GetBindlessSRVIndex());
         ComputeShader::SetGlobalInt("_tlas_count", s.GetTLASNodeCount());
         ComputeShader::SetGlobalInt("_blas_count", s.GetBLASNodeCount());
         ComputeShader::SetGlobalInt("_inst_count", obj_index);
@@ -529,6 +567,7 @@ namespace Ailu::Render
                 if (!is_cur_light_comp_active)
                 {
                     per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = Vector3f::kZero;
+                    per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightParam0 = 0.0f;
                     per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = Colors::kBlack.xyz;
                     continue;
                 }
@@ -552,6 +591,7 @@ namespace Ailu::Render
                 }
                 per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightColor = color.xyz;
                 per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightDir = light_data._light_dir.xyz;
+                per_scene_cbuf_data->_DirectionalLights[direction_light_index]._LightParam0 = light_data._light_param.w;
                 per_scene_cbuf_data->_MainlightWorldPosition = light_data._light_dir.xyz;
                 per_scene_cbuf_data->_MainlightColor = color.xyz;
                 _rendering_data._mainlight_world_position = per_scene_cbuf_data->_MainlightWorldPosition;

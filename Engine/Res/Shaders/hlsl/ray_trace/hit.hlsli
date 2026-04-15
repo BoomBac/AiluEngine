@@ -1,7 +1,17 @@
 #ifndef __HIT_HLSLI__
 #define __HIT_HLSLI__
 #include "rt_common.hlsli"
-#include "../common.hlsli"
+#include "../constants.hlsli"
+#include "../geometry.hlsli"
+#include "gpu_scene.hlsli"
+#define RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS 1
+#ifndef RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS
+    #define RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS 0
+#endif
+
+#if RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS
+    #include "../bindless.hlsli"
+#endif
 
 #define MAX_STACK 64
 #define CULL_NONE 0u
@@ -35,12 +45,6 @@ struct TriangleHitCandidate
     float3 world_pos;
 };
 
-struct Ray
-{
-    float3 o;
-    float3 d;
-};
-
 struct HitRecord
 {
     float3 p;
@@ -57,10 +61,33 @@ struct HitRecord
 };
 
 
-StructuredBuffer<TriangleData> g_scene;
-StructuredBuffer<ObjectInstanceData> g_instance_data;
-StructuredBuffer<LBVHNode> g_tlas_buffer;
-StructuredBuffer<LBVHNode> g_blas_buffer;
+#if RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS
+float3 HitLoadBindlessFloat3(ByteAddressBuffer buffer, uint byte_offset)
+{
+    return asfloat(buffer.Load3(byte_offset));
+}
+
+bool LoadTraversalTriangleFromOriginalMesh(ObjectInstanceData inst, uint scene_triangle_index, out TriangleData tri)
+{
+    tri = (TriangleData)0;
+
+    if (!valid_bindless_buffer(inst._position_bindless_idx) || !valid_bindless_buffer(inst._index_bindless_idx))
+        return false;
+
+    uint submesh_local_triangle_index = scene_triangle_index;
+    if (submesh_local_triangle_index >= inst._submesh_triangle_count)
+        return false;
+
+    ByteAddressBuffer index_buffer = g_bindless_index_buffer[inst._index_bindless_idx];
+    uint3 tri_indices = index_buffer.Load3(submesh_local_triangle_index * 12u);
+
+    ByteAddressBuffer position_buffer = g_bindless_vertex_buffer[inst._position_bindless_idx];
+    tri.v0 = HitLoadBindlessFloat3(position_buffer, tri_indices.x * 12u);
+    tri.v1 = HitLoadBindlessFloat3(position_buffer, tri_indices.y * 12u);
+    tri.v2 = HitLoadBindlessFloat3(position_buffer, tri_indices.z * 12u);
+    return true;
+}
+#endif
 
 // cull_mode:
 // 0 = no culling (double sided)
@@ -162,16 +189,24 @@ void InitInstanceRayCtx(TraversalRayCtx world_ray, ObjectInstanceData inst, floa
 
 bool IntersectWorldNode(LBVHNode node, TraversalRayCtx ray_ctx, out float tmin, out float tmax)
 {
-    return AABBHitFast(node._min, node._max,
+    float ltmin, lmax;
+    bool hit = AABBHitFast(node._min, node._max,
                        ray_ctx.origin, ray_ctx.inv_dir, ray_ctx.parallel, ray_ctx.sign,
-                       tmin, tmax);
+                       ltmin, lmax);
+    tmin = ltmin;
+    tmax = lmax;
+    return hit;
 }
 
 bool IntersectInstanceNode(LBVHNode node, InstanceRayCtx ray_ctx, out float tmin, out float tmax)
 {
-    return AABBHitFast(node._min, node._max,
+    float ltmin, lmax;
+    bool hit = AABBHitFast(node._min, node._max,
                        ray_ctx.origin, ray_ctx.inv_dir, ray_ctx.parallel, ray_ctx.sign,
-                       tmin, tmax);
+                       ltmin, lmax);
+    tmin = ltmin;
+    tmax = lmax;
+    return hit;
 }
 
 void PushNearFirst(uint left, uint right,
@@ -254,11 +289,17 @@ bool TraverseBLASClosest(ObjectInstanceData inst, TraversalRayCtx world_ray, ino
 
         if (blas_node._neg_right_or_tri_count > 0)
         {
-            int tri_start = blas_node._left_or_tri_offset_or_inst_idx + inst._global_triangle_offset;
+            int tri_start = blas_node._left_or_tri_offset_or_inst_idx;
             int tri_count = blas_node._neg_right_or_tri_count;
             for (int tri_idx = tri_start; tri_idx < tri_start + tri_count; ++tri_idx)
             {
-                TriangleData tri = g_scene[tri_idx];
+                TriangleData tri;
+#if RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS
+                if (!LoadTraversalTriangleFromOriginalMesh(inst, tri_idx, tri))
+                    continue;
+#else
+                tri = g_scene[tri_idx];
+#endif
                 float local_t, u, v;
                 if (!TriangleHitFast(inst_ray.origin, inst_ray.dir, tri, local_t, u, v, CULL_NONE))
                     continue;
@@ -315,11 +356,17 @@ bool TraverseBLASAny(ObjectInstanceData inst, TraversalRayCtx world_ray, float r
 
         if (blas_node._neg_right_or_tri_count > 0)
         {
-            int tri_start = blas_node._left_or_tri_offset_or_inst_idx + inst._global_triangle_offset;
+            int tri_start = blas_node._left_or_tri_offset_or_inst_idx;
             int tri_count = blas_node._neg_right_or_tri_count;
             for (int tri_idx = tri_start; tri_idx < tri_start + tri_count; ++tri_idx)
             {
-                TriangleData tri = g_scene[tri_idx];
+                TriangleData tri;
+#if RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS
+                if (!LoadTraversalTriangleFromOriginalMesh(inst, tri_idx, tri))
+                    continue;
+#else
+                tri = g_scene[tri_idx];
+#endif
                 float local_t, u, v;
                 if (!TriangleHitFast(inst_ray.origin, inst_ray.dir, tri, local_t, u, v, CULL_NONE))
                     continue;

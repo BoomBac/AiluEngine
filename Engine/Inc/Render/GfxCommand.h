@@ -389,7 +389,7 @@ namespace Ailu::Render
         }
 
     private:
-        Core::LockFreeQueue<CommandPayload *, kCommandPoolPayloadCount + 1u> _payload_pool;
+        Core::ParallelQueue<CommandPayload *> _payload_pool;
     };
 }// namespace Ailu
 

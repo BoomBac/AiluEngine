@@ -33,7 +33,7 @@ namespace Ailu::Render::RDG
 {
     struct ResourceAccess
     {
-        EResourceUsage _usage;
+        EResourceUsage _usage = EResourceUsage::kNone;
         ELoadStoreAction _load = ELoadStoreAction::kLoad;
         ELoadStoreAction _store = ELoadStoreAction::kStore;
         ClearValue _clear_value = ClearValue::Color(0.0f, 0.0f, 0.0f, 0.0f);
@@ -70,6 +70,8 @@ namespace Ailu::Render::RDG
             {
                 pass->_input_handles.clear();
                 pass->_output_handles.clear();
+                pass->_input_accesses.clear();
+                pass->_output_accesses.clear();
                 pass->_callback = nullptr;
                 pass->_name = "noname";
             }
@@ -106,6 +108,8 @@ namespace Ailu::Render::RDG
         EPassType _type;
         Vector<RGHandle> _input_handles; // 输入资源句柄
         Vector<RGHandle> _output_handles;// 输出资源句柄
+        HashMap<RGHandle, ResourceAccess> _input_accesses;
+        HashMap<RGHandle, ResourceAccess> _output_accesses;
         ExecuteFunction _callback;
     };
 
@@ -157,14 +161,11 @@ namespace Ailu::Render::RDG
     private:
         struct ResourceNode;
         RGHandle *FindHandlePtr(RGHandle handle);
+        void ResetResourceNodeVersions(ResourceNode &node);
+        void ReleaseTransientResource(ResourceNode &node);
         void CreatePhysicalResources(RGHandle handle);
         Texture *CreatePhysicsTexture(RGHandle handle);
         GPUBuffer *CreatePhysicsBuffer(RGHandle handle);
-        // 拓扑排序Pass执行顺序
-        void TopologicalSort();
-
-        // 插入资源屏障
-        void InsertResourceBarriers(GraphicsContext *context);
 
         ResourceNode *GetResourceNode(RGHandle handle)
         {
@@ -176,11 +177,20 @@ namespace Ailu::Render::RDG
         }
         //export to a .dot file for graphviz
         void ExportToFile(const WString &filename);
+        void ExportTimelineToFile(const WString &filename);
     private:
     private:
         using PassPool = TResourcePool<RenderPass>;
         using TexturePool = THashableResourcePool<TextureDesc, Texture>;
         using BufferPool = THashableResourcePool<BufferDesc, GPUBuffer>;
+        struct ResourceVersion
+        {
+            RGHandle _handle;
+            RenderPass* _producer = nullptr;
+            Vector<RenderPass*> _consumers;
+            i16 _first_use = -1;
+            i16 _last_use = -1;
+        };
         struct ResourceNode
         {
         public:
@@ -235,6 +245,7 @@ namespace Ailu::Render::RDG
             };
             bool _is_allocated = false;//是否创建了物理资源
             RGHandle *_handle_ptr = nullptr;
+            Vector<ResourceVersion> _versions;
         };
         inline static std::atomic<u32> s_next_handle_id = 0u;
         std::mutex _mutex;
@@ -258,24 +269,64 @@ namespace Ailu::Render::RDG
         RenderGraphBuilder(RenderGraph &graph, RenderPass &pass) : _graph(&graph), _pass(&pass) {};
         void Read(RGHandle handle,ResourceAccess accessor)
         {
-            _pass->Read(handle);
+            if (auto node = _graph->GetResourceNode(handle); node != nullptr)
+            {
+                if (handle._version >= node->_versions.size())
+                {
+                    LOG_ERROR("RenderGraphBuilder::Read: invalid version!");
+                    return;
+                }
+
+                auto& ver = node->_versions[handle._version];
+                ver._consumers.push_back(_pass);
+
+                _pass->Read(handle);
+                if (auto it = _pass->_input_accesses.find(handle); it != _pass->_input_accesses.end())
+                {
+                    it->second._usage = it->second._usage | accessor._usage;
+                    it->second._load = accessor._load;
+                    it->second._store = accessor._store;
+                    it->second._clear_value = accessor._clear_value;
+                    it->second._mip_level = accessor._mip_level;
+                    it->second._array_slice = accessor._array_slice;
+                }
+                else
+                {
+                    _pass->_input_accesses.emplace(handle, accessor);
+                }
+                return;
+            }
+            LOG_ERROR("RenderGraphBuilder::Read: Attempted to read from a resource that does not exist in the graph.");
         }
 
         [[nodiscard]] RGHandle Write(RGHandle handle, ResourceAccess accessor)
         {
-            if (auto handle_ptr = _graph->FindHandlePtr(handle); handle_ptr != nullptr)
+            if (auto node = _graph->GetResourceNode(handle); node != nullptr)
             {
-                handle_ptr->_version++;
-                RGHandle new_handle = *handle_ptr;
-
+                u32 new_version = ++node->_handle_ptr->_version;
+                RGHandle new_handle = *node->_handle_ptr;
+                node->_versions.emplace_back();
+                auto& ver = node->_versions.back();
+                ver._handle = new_handle;
+                ver._producer = _pass;
                 _pass->Write(new_handle);
+                if (auto it = _pass->_output_accesses.find(new_handle); it != _pass->_output_accesses.end())
+                {
+                    it->second._usage = it->second._usage | accessor._usage;
+                    it->second._load = accessor._load;
+                    it->second._store = accessor._store;
+                    it->second._clear_value = accessor._clear_value;
+                    it->second._mip_level = accessor._mip_level;
+                    it->second._array_slice = accessor._array_slice;
+                }
+                else
+                {
+                    _pass->_output_accesses.emplace(new_handle, accessor);
+                }
                 return new_handle;
             }
-            else
-            {
-                LOG_ERROR("RenderGraphBuilder::Write: Invalid handle!");
-                return RGHandle{0u};
-            }
+            LOG_ERROR("RenderGraphBuilder::Write: Attempted to write to a resource that does not exist in the graph.");
+            return RGHandle(0u);
         }
 
         void Read(RGHandle handle,EResourceUsage usage = EResourceUsage::kReadSRV)

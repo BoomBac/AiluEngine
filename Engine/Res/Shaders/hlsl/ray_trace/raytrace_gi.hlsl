@@ -4,6 +4,7 @@
 #include "../color_space_utils.hlsli"
 #include "sampling.hlsli"
 #include "hit.hlsli"
+#include "restir_di.hlsli"
 
 // ===== Ray Trace GI Debug 功能使用说明 =====
 //
@@ -19,7 +20,7 @@
 // DEBUG_MODE = 7  (DEBUG_MODE_G_SMITH)      - 可视化 G 项 (Smith 几何遮蔽)
 // DEBUG_MODE = 8  (DEBUG_MODE_F_FRESNEL)    - 可视化 F 项 (Fresnel 反射)
 // DEBUG_MODE = 9  (DEBUG_MODE_COS_THETA)    - 可视化 cos(theta) = dot(n, v)
-// DEBUG_MODE = 10 (DEBUG_MODE_ROUGHNESS)    - 可视化粗糙度
+// DEBUG_MODE = 10 (DEBUG_MODE_ROUGHNESS)   - 可视化粗糙度
 // DEBUG_MODE = 11 (DEBUG_MODE_THROUGHPUT)   - 可视化 throughput 衰减
 // DEBUG_MODE = 12 (DEBUG_MODE_EMISSION)     - 可视化自发光
 // DEBUG_MODE = 99 (DEBUG_MODE_ALL)          - 完整分析模式 (RGB 分别显示 D/G/PDF)
@@ -31,9 +32,12 @@
 // ============================================
 
 #pragma kernel RayGen
+#pragma kernel PrimaryRay
 #pragma kernel Denoise
 
 #define MAX_ACCUMULATED_FRAMES 4096
+#define ADDITIONAL_SAMPLING 1
+#define PER_FRAME_SAMPLES 6
 
 RWTEXTURE2D(_GI_Texture,float4)
 
@@ -48,6 +52,10 @@ CBUFFER_START(ComputeCB)
     uint _debug_hit_box_idx;
     uint _frame_index;
     bool _show_debug;
+    uint _light_count;
+    uint _scene_bindless_idx;
+    bool _enable_ris;
+    uint _surface_buffer_idx;
 CBUFFER_END
 
 // ===== Debug 宏定义 =====
@@ -81,18 +89,39 @@ CBUFFER_END
 #define DEBUG_MODE_EMISSION     12
 #define DEBUG_MODE_ALL          99
 
+//#define DEBUG_MODE DEBUG_MODE_NORMAL
+#define RAYTRACE_GI_HIT_USE_BINDLESS_TRIANGLE_BUFFER 1
+#define RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS 1
+
 #ifndef DEBUG_MODE
-#define DEBUG_MODE DEBUG_MODE_NONE
+    #define DEBUG_MODE DEBUG_MODE_NONE
+#endif
+#ifndef RAYTRACE_GI_HIT_USE_BINDLESS_TRIANGLE_BUFFER
+    #define RAYTRACE_GI_HIT_USE_BINDLESS_TRIANGLE_BUFFER 0
+#endif
+#ifndef RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS
+    #define RAYTRACE_GI_HIT_USE_BINDLESS_MESH_BUFFERS 0
 #endif
 
-//#define DEBUG_MODE DEBUG_MODE_WI
 
 AppendStructuredBuffer<DebugRay>   _debug_rays;
 AppendStructuredBuffer<uint>   _debug_ray_indices;
 
+StructuredBuffer<Reservoir>    g_prev_reservoir;
+RWStructuredBuffer<Reservoir>  g_curr_reservoir;
 
 
 StructuredBuffer<MaterialData> g_material_buffer;
+TEXTURE2D(_MotionVectorTexture)
+//ConstantBuffer<UnifiedLightBufferConfig> _UnifiedLightConfig;
+
+
+uint GetUnifiedLightCount()
+{
+    return _light_count;
+}
+
+#include "path_tracer_light_common.hlsli"
 
 // 固定的每层颜色
 static const float3 kDepthColors[kMaxDepth] =
@@ -109,57 +138,10 @@ static const float3 kDepthColors[kMaxDepth] =
 };
 
 
-
-
-struct RandomCtx
+uint PixelToLinearIndex(uint2 pixel)
 {
-    uint4 seed;
-    uint2 pixel;
-};
-
-
-// void InitSeed(inout RandomCtx ctx,uint2 pixel, uint frame, uint bounce = 0)
-// {
-//     ctx.seed = uint4(pixel, frame, pixel.x + pixel.y);
-//     ctx.pixel = pixel;
-// }
-
-// void pcg4d(inout uint4 v)
-// {
-//     v = v * 1664525u + 1013904223u;
-//     v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
-//     v = v ^ (v >> 16u);
-//     v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
-// }
-
-// float rand(inout RandomCtx ctx)
-// {
-//     pcg4d(ctx.seed);
-//     return float(ctx.seed.x) / float(0xffffffffu);
-// }
-
-void InitSeed(inout RandomCtx ctx,uint2 pixel, uint frame, uint bounce = 0)
-{
-    ctx.seed.x = pixel.x * 1973 + pixel.y * 9277 + frame * 26699 + bounce * 104729;
-    ctx.pixel = pixel;
-}
-
-void pcg_hash(inout uint seed)
-{
-    uint state = seed * 747796405u + 2891336453u;
-    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    seed = (word >> 22u) ^ word;
-}
-
-float rand(inout RandomCtx ctx)
-{
-    pcg_hash(ctx.seed.x);
-    return float(ctx.seed.x) / 4294967296.0;
-}
-
-float2 rand2(inout RandomCtx ctx)
-{
-    return float2(rand(ctx), rand(ctx));
+    uint2 tile_pixel = pixel - uint2(_GI_TileOffset);
+    return tile_pixel.y * _GI_TileSize.x + tile_pixel.x;
 }
 
 static float reflectance(float cosine, float refraction_index) 
@@ -245,51 +227,15 @@ void DebugDrawTriangle(float3 v0, float3 v1, float3 v2,float4 color = float4(1,0
     _debug_rays.Append(dr);
 }
 
-
-bool HitAreaLight(ShaderArealLightData light,float3 ray_origin,float3 ray_dir,inout float t)
+void AppendDebugLine(float3 start, float3 end, float4 color)
 {
-    float3 p0 = light._points[0].xyz;
-    float3 e1 = light._points[1].xyz - p0;
-    float3 e2 = light._points[3].xyz - p0;
-    float3 n = -normalize(cross(e1, e2));
-    float denom = dot(ray_dir, n);
-
-    // Single-sided area light only emits on the normal side.
-    if (light._is_twosided == 0 && denom >= -FLOAT_EPSILON)
-        return false;
-
-    if (abs(denom) < FLOAT_EPSILON)
-        return false;
-
-    float light_t = dot(p0 - ray_origin, n) / denom;
-    if (light_t <= FLOAT_EPSILON)
-        return false;
-
-    float3 hit = ray_origin + light_t * ray_dir;
-    float3 rel = hit - p0;
-    float uu = dot(e1, e1);
-    float vv = dot(e2, e2);
-    float uv = dot(e1, e2);
-    float ru = dot(rel, e1);
-    float rv = dot(rel, e2);
-    float det = uu * vv - uv * uv;
-    if (abs(det) < FLOAT_EPSILON)
-        return false;
-
-    float inv_det = 1.0 / det;
-    float a = (ru * vv - rv * uv) * inv_det;
-    float b = (rv * uu - ru * uv) * inv_det;
-
-    if (a < 0.0 || a > 1.0 || b < 0.0 || b > 1.0)
-        return false;
-    t = light_t;
-    return true;
-}
-float PowerHeuristic(float pdfA, float pdfB)
-{
-    float a2 = pdfA * pdfA;
-    float b2 = pdfB * pdfB;
-    return a2 / max(a2 + b2, 1e-6);
+    DebugRay dr = (DebugRay)0;
+    dr.pos = start;
+    dr.color = PackFloat4(color);
+    dr.aabb_idx = -1;
+    _debug_rays.Append(dr);
+    dr.pos = end;
+    _debug_rays.Append(dr);
 }
 
 //返回指向光源的入射方向wi，pdf为该方向的概率密度
@@ -304,7 +250,8 @@ float3 SampleAreaLight(ShaderArealLightData light,float3 x,float3 n,RandomCtx ct
     float3 wi = y - x;
     float r2 = dot(wi, wi);
     float r = sqrt(r2);
-    wi /= r;
+    wi = normalize(wi);
+    //wi /= r;
     float cos_theta_l = dot(light_normal, -wi);
     if (light._is_twosided != 0)
         cos_theta_l = abs(cos_theta_l);
@@ -313,60 +260,120 @@ float3 SampleAreaLight(ShaderArealLightData light,float3 x,float3 n,RandomCtx ct
         pdf = 0;
         return 0;
     }
+    if (is_debug)
+    {
+        AppendDebugLine(light._points[0].xyz,light._points[1].xyz, float4(1, 0, 0, 1));
+        AppendDebugLine(light._points[1].xyz,light._points[2].xyz, float4(1, 0, 0, 1));
+        AppendDebugLine(light._points[2].xyz,light._points[3].xyz, float4(1, 0, 0, 1));
+        AppendDebugLine(light._points[3].xyz,light._points[0].xyz, float4(1, 0, 0, 1));
+    }
     float area = length(cross(light_u, light_v));
 
-    pdf = r2 / (area * cos_theta_l);
+    pdf = 1.0 / max(area, 1e-6);
     return wi;
 }
 
-float PdfAreaLight(ShaderArealLightData light,float3 x,float3 wi)
+float3 SampleSphereLight(ShaderDirectionalAndPointLightData light,float3 x,float3 n,RandomCtx ctx,out float pdf,bool is_debug = false)
 {
-    float3 light_u = light._points[1].xyz - light._points[0].xyz;
-    float3 light_v = light._points[3].xyz - light._points[0].xyz;
-    float3 light_normal = -normalize(cross(light_u, light_v));
+    float2 u = rand2(ctx);
 
-    float denom = dot(wi, light_normal);
-    if (light._is_twosided == 0 && denom >= -FLOAT_EPSILON)
-        return 0;
-    if (abs(denom) < FLOAT_EPSILON)
-        return 0;
+    float3 center = light._LightPosOrDir;
+    float radius = light._LightParam1;
+    float sphere_area = 4.0 * PI * radius * radius;
 
-    float t = dot(light._points[0].xyz - x, light_normal) / denom;
-    if (t <= FLOAT_EPSILON)
-        return 0;
+    float3 wc = center - x;
+    float dist2 = dot(wc, wc);
+    float dist = sqrt(dist2);
 
-    float3 y = x + wi * t;
-    float3 rel = y - light._points[0].xyz;
-    float uu = dot(light_u, light_u);
-    float vv = dot(light_v, light_v);
-    float uv = dot(light_u, light_v);
-    float ru = dot(rel, light_u);
-    float rv = dot(rel, light_v);
-    float det = uu * vv - uv * uv;
-    if (abs(det) < FLOAT_EPSILON)
-        return 0;
+    // inside sphere fallback
+    if (dist <= radius)
+    {
+        float z = 1.0 - 2.0 * u.x;
+        float xy = sqrt(max(0.0, 1.0 - z * z));
+        float phi = 2.0 * PI * u.y;
 
-    float inv_det = 1.0 / det;
-    float a = (ru * vv - rv * uv) * inv_det;
-    float b = (rv * uu - ru * uv) * inv_det;
-    if (a < 0.0 || a > 1.0 || b < 0.0 || b > 1.0)
-        return 0;
+        float3 light_normal = float3(xy * cos(phi), xy * sin(phi), z);
+        float3 y = center + radius * light_normal;
+        float3 wi = normalize(y - x);
 
-    float r2 = t * t;
+        pdf = 1.0 / max(sphere_area, 1e-6);
+        return wi;
+    }
+
+    // ===== solid angle sampling =====
+
+    float3 w = wc / dist;
+
+    float sin_theta_max2 = radius * radius / dist2;
+    float cos_theta_max = sqrt(max(0.0, 1.0 - sin_theta_max2));
+
+    // sample θ
+    float cos_theta = 1.0 - u.x * (1.0 - cos_theta_max);
+    float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+
+    float phi = 2.0 * PI * u.y;
+
+    // local direction
+    float3 local_dir = float3(
+        cos(phi) * sin_theta,
+        sin(phi) * sin_theta,
+        cos_theta);
+    // build ONB
+    float3 up = abs(w.z) < 0.999 ? float3(0,0,1) : float3(1,0,0);
+    float3 tangent = normalize(cross(up, w));
+    float3 bitangent = cross(w, tangent);
+    // float3 tangent, bitangent;
+    // build_onb(w, tangent, bitangent);
+
+    float3 wi = 
+        local_dir.x * tangent +
+        local_dir.y * bitangent +
+        local_dir.z * w;
+
+    wi = normalize(wi);
+
+    // ===== ray-sphere intersection =====
+
+    float3 oc = x - center;
+
+    float b = dot(wi, oc);
+    float c = dot(oc, oc) - radius * radius;
+
+    float h = b * b - c;
+    if (h < 0.0)
+    {
+        pdf = 0;
+        return 0;
+    }
+
+    float t = -b - sqrt(h); // 最近交点
+    float3 y = x + t * wi;
+
+    float3 light_normal = normalize(y - center);
+
     float cos_theta_l = dot(light_normal, -wi);
-    if (light._is_twosided != 0)
-        cos_theta_l = abs(cos_theta_l);
-    if (cos_theta_l <= 0)
+    if (cos_theta_l <= 0.0)
+    {
+        pdf = 0;
         return 0;
+    }
 
-    float area = length(cross(light_u, light_v));
-    return r2 / (area * cos_theta_l);
+    // ===== PDF =====
+
+    // solid angle pdf
+    float pdf_omega = 1.0 / (2.0 * PI * (1.0 - cos_theta_max));
+
+    // convert to area pdf（关键）
+    float dist_y2 = t * t;
+    pdf = PdfAreaFromSolidAngle(pdf_omega, dist_y2, cos_theta_l);
+
+    return wi;
 }
 
 
-
-bool HitWorld(float3 ray_origin,float3 ray_dir,bool is_debug,out HitRecord rec,out float3 debug_color)
+bool HitWorld(float3 ray_origin,float3 ray_dir,bool is_debug,out HitRecord rec,out LightSample light_sample,out float3 debug_color)
 {
+    rec = (HitRecord)0;
     rec.t = 1e20;
     rec.is_light = false;
     rec.emission = 0;
@@ -375,35 +382,38 @@ bool HitWorld(float3 ray_origin,float3 ray_dir,bool is_debug,out HitRecord rec,o
     debug_color = 0;
     bool hit_anything = false;
 
-    uint area_light_count = min((uint)(_ActiveLightCount.w),MAX_AREA_LIGHT);
-    for (uint z = 0; z < area_light_count; z++)
+    for (uint light_index = 0; light_index < _light_count; ++light_index)
     {
-        ShaderArealLightData light = _AreaLights[z];
-        float light_t;
-        if (HitAreaLight(light, ray_origin, ray_dir, light_t) && light_t < rec.t)
+        float light_t = 0.0;
+        LightSample hit_light_sample = (LightSample)0;
+        if (EvaluateUnifiedLightHit(_light_count,light_index, ray_origin, ray_dir, light_t, hit_light_sample) && light_t < rec.t)
         {
-             rec.t = light_t;
-             rec.p = ray_origin + rec.t * ray_dir;
-             rec.normal = 0;
-             rec.front_face = false;
-             rec.uv = 0;
-             rec.material_type = 0;
-             rec.material_idx = 0;
-             rec.is_light = true;
-             rec.light_idx = z;
-             rec.emission = light._LightColor;
-             hit_anything = true;
-             debug_color = float3(1.0, 0.8, 0.2);
-             rec.pdf = PdfAreaLight(light, ray_origin, ray_dir);
+            rec.t = light_t;
+            rec.p = ray_origin + rec.t * ray_dir;
+            rec.normal = hit_light_sample._normal;
+            rec.front_face = dot(ray_dir, rec.normal) < 0.0;
+            rec.uv = 0;
+            rec.material_type = 0;
+            rec.material_idx = 0;
+            rec.is_light = true;
+            rec.light_idx = light_index;
+            rec.emission = hit_light_sample._radiance;
+            hit_anything = true;
+            light_sample = hit_light_sample;
+            debug_color = float3(1.0, 0.8, 0.2);
+            rec.pdf = light_sample._pdf; 
         }
     }
-
+    if (hit_anything)
+        return true;
     TriangleHitCandidate best_hit;
     ObjectInstanceData best_inst;
     if (!TraverseSceneClosest(ray_origin, ray_dir, rec, best_hit, best_inst))
         return hit_anything;
 
-    TriangleData tri = g_scene[best_hit.tri_idx];
+    TriangleData tri;
+    LoadHitTriangleData(best_hit.tri_idx,best_inst._position_bindless_idx,best_inst._normal_bindless_idx,best_inst._uv_bindless_idx,best_inst._index_bindless_idx, tri); 
+
     float3 n_local = normalize(
         tri.n0 * (1 - best_hit.bary.x - best_hit.bary.y) +
         tri.n1 * best_hit.bary.x +
@@ -468,41 +478,6 @@ bool IsOccluded(float3 origin, float3 dir, float max_t)
     return false;
 }
 
-float3 ProceduralSky(float3 d)
-{
-    float h = saturate(d.y);
-
-    float3 zenith  = float3(0.22, 0.35, 0.95);
-    float3 horizon = float3(0.8, 0.85, 0.9);
-    float3 ground  = float3(0.1, 0.1, 0.1);
-
-    // 天空渐变
-    float3 sky = lerp(horizon, zenith, pow(h, 0.2));
-    float horizon_boost = exp(-abs(d.y) * 20.0);
-    sky += horizon * horizon_boost * 0.2;
-
-    // ===== 关键修改 ===== 
-    // 过渡范围控制地平线宽度
-    float horizon_width = 0.05;  // 可调 0.02~0.1
-
-    float t = smoothstep(-horizon_width, horizon_width, d.y);
-
-    float3 env = lerp(ground, sky, t);
-
-    return env;
-}
-
-void AppendDebugLine(float3 start, float3 end, float4 color)
-{
-    DebugRay dr = (DebugRay)0;
-    dr.pos = start;
-    dr.color = PackFloat4(color);
-    dr.aabb_idx = -1;
-    _debug_rays.Append(dr);
-    dr.pos = end;
-    _debug_rays.Append(dr);
-}
-
 // 将方向向量转换为颜色 (用于可视化 wi, wo 等方向)
 float3 DirectionToColor(float3 dir)
 {
@@ -550,11 +525,6 @@ struct DebugData
 
 // 调试打印函数：在 pick 像素处输出详细数据到 debug buffer
 
-float DirectLightCosTheta(Material mat, float3 n, float3 wi)
-{
-    float ndotl = dot(n, wi);
-    return mat._is_glass ? abs(ndotl) : saturate(ndotl);
-}
 void DebugPrint(uint2 pixel, DebugData data)
 {
     // 只在 pick 像素处输出
@@ -586,19 +556,353 @@ void DebugPrint(uint2 pixel, DebugData data)
 
 float3 DirectLight(TraceContext trace_ctx,float3 ray_dir,float3 p,float3 n,Material mat,inout RandomCtx ctx)
 {
-    float pdf_light = 1.0;
-    float3 wi = SampleAreaLight(_AreaLights[0], p, n, ctx, pdf_light);
-    float cos_theta = saturate(dot(n, wi));
-    float3 Li = _AreaLights[0]._LightColor;
-    bool is_occluded = IsOccluded(p + 0.002 * n, wi, 1e20);
-    //if (cos_theta > 0.0 && !is_occluded)
-    {
-        float pdf = 1.0;
-        float3 h = normalize(wi + ray_dir);
-        float3 f = EvalBRDF(trace_ctx, n, h, ray_dir, wi, pdf);
-        return Li * f;
-    }
     return 0.0.xxx;
+}
+
+struct MisContext
+{
+    float _pl;
+    float _pb;
+};
+
+bool EvaluateRISDirectCandidate(
+    TraceContext trace_ctx,
+    Material mat,
+    float3 p,
+    float3 n,
+    float3 wo,
+    LightSample light_sample,
+    out float3 numerator,
+    out float target)
+{
+    numerator = 0.0.xxx;
+    target = 0.0;
+
+    if (light_sample._pdf <= 1e-6 || !any(light_sample._radiance > 0.0.xxx))
+        return false;
+    // float3 shadow_origin = p + light_sample._wi * 0.002;
+    // float shadow_ray_tmax = GetLightShadowRayTMax(light_sample) * 0.98;
+    // bool is_occluded = IsOccluded(shadow_origin, light_sample._wi, shadow_ray_tmax);
+    // if (is_occluded)
+    //     return false;
+
+    float cos_theta = DirectLightCosTheta(mat, n, light_sample._wi);
+    if (cos_theta <= 1e-6)
+        return false;
+
+    float3 h = normalize(light_sample._wi + wo);
+    float pdf_brdf = 0.0;
+    float3 f = EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf);
+    numerator = light_sample._radiance * f * cos_theta;
+    target = max(Luminance(numerator), 0);
+    return target > 0.0;
+}
+
+float ComputeReSTIRPowerHeuristicMIS(float technique_pdf, uint technique_candidate_count, float other_pdf, uint other_candidate_count)
+{
+    float weighted_technique_pdf = (float)technique_candidate_count * max(technique_pdf, 0.0);
+    float weighted_other_pdf = (float)other_candidate_count * max(other_pdf, 0.0);
+    float technique_pdf2 = weighted_technique_pdf * weighted_technique_pdf;
+    float other_pdf2 = weighted_other_pdf * weighted_other_pdf;
+    return technique_pdf2 / max(technique_pdf2 + other_pdf2, 1e-6);
+}
+
+float ComputeReSTIREffectivePDF(float technique_pdf, uint technique_candidate_count, float other_pdf, uint other_candidate_count)
+{
+    float mis_weight = ComputeReSTIRPowerHeuristicMIS(technique_pdf, technique_candidate_count, other_pdf, other_candidate_count);
+    return technique_pdf / max(mis_weight, 1e-6);
+}
+
+Material BuildSurfaceMaterial(SurfaceData surface_data)
+{
+    Material mat = (Material)0;
+    mat._albedo = surface_data.albedo.rgb;
+    mat._roughness = surface_data.roughness;
+    mat._metallic = surface_data.metallic;
+    mat._anisotropy = surface_data.anisotropy;
+    mat._ior = 1.5;
+    mat._transmission = 0.0;
+    mat._emission = surface_data.emssive;
+    mat._is_glass = false;
+    return mat;
+}
+
+bool IsValidPixel(int2 pixel)
+{
+    return pixel.x >= 0 && pixel.y >= 0 && pixel.x < _ScreenParams.z && pixel.y < _ScreenParams.w;
+}
+
+bool IsValidSurface(Surface s)
+{
+#if defined(_REVERSED_Z)
+    return s._linear_depth > kZFar;
+#else
+    return s._linear_depth < kZFar;
+#endif
+}
+
+Surface GetPrevSurface(int2 pixel)
+{
+    Surface s;
+    if (!IsValidPixel(pixel) || !valid_bindless_handle(_surface_buffer_idx))
+    {
+        s._linear_depth = kZFar;
+        return s;
+    }
+    uint history_index = PixelToLinearIndex(pixel);
+    s = BINDLESS_RWBUFFER_LOAD(Surface,_surface_buffer_idx, history_index * sizeof(Surface));
+    return s;
+}
+
+bool IsValidNeighbor(float3 normal,float depth01,float3 neighbor_normal,float neighbor_depth01,float depth_threshold,float normal_threshold)
+{
+    float normal_similarity = dot(normal, neighbor_normal);
+    float depth_delta = abs(depth01 - neighbor_depth01);
+    return normal_similarity > normal_threshold && depth_delta < depth_threshold;
+}
+
+Reservoir TemporalSpatialResampling(uint2 pixel,Reservoir r,Surface surface,inout RandomCtx ctx)
+{
+    float3 motion = _MotionVectorTexture[pixel].rgb;
+    float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
+    float2 history_uv = uv - motion.xy;
+    bool is_valid_history = all(history_uv >= 0) && all(history_uv < 1.0.xx);
+    if (!is_valid_history)
+    {
+        return r;
+    }
+
+    int2 history_pixel = int2(history_uv * _ScreenParams.zw);
+    int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
+    history_pixel = clamp(history_pixel, int2(0, 0), history_max);
+
+    const static uint kSpatialRadius = 8;
+    const static float kDepthThreshold = 0.02; // 视深阈值
+    const static float kNormalThreshold = 0.95; // 法线相似度
+    float expected01_depth = surface._linear_depth - motion.z;
+    bool has_valid_surface = false;
+    Surface history_surface;
+    uint2 ts_offset = uint2(0,0);
+    for (uint i = 0; i < 9; i++)
+    {
+        uint2 offset = uint2(0,0);
+        if (i > 0)
+        {
+            offset = uint2((rand2(ctx) - 0.5) * kSpatialRadius);
+        }
+        int2 neighbor_pixel = history_pixel + offset;
+        Surface s = GetPrevSurface(neighbor_pixel);
+        if (IsValidSurface(s) && IsValidNeighbor(surface._normal, expected01_depth, s._normal, s._linear_depth, kDepthThreshold, kNormalThreshold))
+        {
+            history_surface = s;
+            has_valid_surface = true;
+            ts_offset = offset;
+            break;
+        }
+    }
+    if (!has_valid_surface)
+    {
+        return r;
+    }
+
+    for (uint j = 0; j < 1; j++)
+    {
+        uint2 offset;
+        if (j == 0 && has_valid_surface)
+        {
+            offset = ts_offset;
+        }
+        else
+        {
+            offset = uint2((rand2(ctx) - 0.5) * kSpatialRadius);
+        }
+        int2 neighbor_pixel = history_pixel + offset;
+        if (!IsValidPixel(neighbor_pixel))
+            continue;
+        Surface s = GetPrevSurface(neighbor_pixel);
+        if (!IsValidSurface(s))
+            continue;
+        if (IsValidNeighbor(surface._normal, expected01_depth, s._normal, s._linear_depth, kDepthThreshold, kNormalThreshold))
+            continue;
+        uint neighbor_index = PixelToLinearIndex(neighbor_pixel);
+        Reservoir neighbor_r = g_prev_reservoir[neighbor_index];
+        neighbor_r = ClampReservoirHistory(neighbor_r, r.M * 20);
+        MergeReservoir(r, neighbor_r, rand(ctx));
+    }
+    return r;
+}
+
+float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_data,Surface surface,float3 wo,bool is_debug,inout RandomCtx ctx,inout DebugData debug_data)
+{
+    Material mat = BuildSurfaceMaterial(surface_data);
+    float3 n = surface_data.wnormal;
+
+    TraceContext trace_ctx = (TraceContext)0;
+    trace_ctx._mat = mat;
+    trace_ctx._ior_i = 1.0;
+    trace_ctx._ior_t = mat._ior;
+    trace_ctx._eta = trace_ctx._ior_i / trace_ctx._ior_t;
+
+    debug_data = (DebugData)0;
+    debug_data.wo = wo;
+    debug_data.normal = n;
+    debug_data.roughness = mat._roughness;
+    debug_data.emission = mat._emission;
+    debug_data.throughput = 1.0.xxx;
+    debug_data.has_hit = true;
+
+    float3 radiance = mat._emission;
+    if (_light_count == 0u)
+        return radiance;
+    if (_enable_ris)
+    {
+        const uint brdf_candidate_count = 2u;
+        MisContext mis_ctx = (MisContext)0;
+        float sample_count = float(PER_FRAME_SAMPLES + brdf_candidate_count);
+        mis_ctx._pl = float(PER_FRAME_SAMPLES) / sample_count;
+        mis_ctx._pb = float(brdf_candidate_count) / sample_count;
+
+        float select_pmf = GetUnifiedLightSelectionPMF(_light_count);
+        uint reservoir_index = PixelToLinearIndex(pixel);
+        Reservoir r = InitReservoir();
+        for (uint i = 0; i < PER_FRAME_SAMPLES; ++i)
+        {
+            float select_r = rand(ctx);
+            uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
+            LightSample light_sample = SampleUnifiedLight(sampled_light_idx, world_pos, n, ctx);
+            float proposal_pdf = light_sample._pdf * select_pmf;
+
+            float3 numerator = 0.0.xxx;
+            float target = 0.0;
+            bool valid = EvaluateRISDirectCandidate(trace_ctx, mat, world_pos, n, wo, light_sample, numerator, target);
+            float pdf_brdf = 0.0;
+            if (valid)
+            {
+                float3 h = normalize(light_sample._wi + wo);
+                EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf);
+            }
+            TinyLightSample ts = (TinyLightSample)0;
+            ts._light_idx = sampled_light_idx;
+            ts._pdf = max(mis_ctx._pl * proposal_pdf + mis_ctx._pb * pdf_brdf, 1e-6);
+            ts._position = world_pos + light_sample._wi * light_sample._t;
+            ts._le = light_sample._radiance;
+            ts._weight =  target / ts._pdf;
+            UpdateReservoir(r, ts, ts._weight, 1, rand(ctx));
+        }
+
+        for (uint i = 0; i < brdf_candidate_count; ++i)
+        {
+            float3 r3 = float3(rand(ctx), rand(ctx), rand(ctx));
+            SampleBRDFResult result = SampleBRDF(trace_ctx,n,wo,r3.x,r3.y,r3.z);
+            if (all(result.wi == 0.0.xxx))
+                continue;
+
+            float cos_theta = DirectLightCosTheta(mat, n, result.wi);
+            if (cos_theta <= 1e-6)
+                continue;
+
+            float pdf_brdf = 0.0;
+            float3 f = EvalBRDF(trace_ctx, n, result.h, wo, result.wi, pdf_brdf);
+            if (pdf_brdf <= 1e-6 || all(f == 0.0.xxx))
+                continue;
+
+            float3 brdf_origin = world_pos + result.wi * 0.002;
+
+            uint hit_light_idx = 0u;
+            float hit_light_t = 0.0;
+            LightSample hit_light_sample = (LightSample)0;
+            if (!FindClosestUnifiedLightHit(_light_count, brdf_origin, result.wi, 1e5, hit_light_idx, hit_light_t, hit_light_sample))
+                continue;
+
+            float light_pdf = PdfUnifiedLight(hit_light_idx, world_pos, result.wi) * select_pmf;
+            float3 numerator = hit_light_sample._radiance * f * cos_theta;
+            float target = max(Luminance(numerator), 0.0);
+            if (target <= 1e-8)
+                continue;
+
+            TinyLightSample ts = (TinyLightSample)0;
+            ts._light_idx = hit_light_idx;
+            ts._pdf = max(mis_ctx._pl * light_pdf + mis_ctx._pb * pdf_brdf, 1e-6);
+            ts._position = brdf_origin + result.wi * hit_light_t;
+            ts._le = hit_light_sample._radiance;
+            ts._weight = target / ts._pdf;
+            UpdateReservoir(r, ts, ts._weight, 1, rand(ctx));
+        }
+        
+        float2 motion = _MotionVectorTexture[pixel].rg;
+        float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
+        float2 history_uv = uv - motion;
+        bool is_valid_history = all(history_uv >= 0) && all(history_uv < 1.0.xx);
+        Reservoir prev_r = InitReservoir();
+        if (is_valid_history)
+        {
+            int2 history_pixel = int2(history_uv * _ScreenParams.zw);
+            int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
+            history_pixel = clamp(history_pixel, int2(0, 0), history_max);
+            prev_r = g_prev_reservoir[PixelToLinearIndex(history_pixel)];
+            prev_r = ClampReservoirHistory(prev_r, r.M * 20);
+            MergeReservoir(r, prev_r, rand(ctx));
+        }
+
+        
+
+        //r = TemporalSpatialResampling(pixel, r, surface, ctx);
+
+        g_curr_reservoir[reservoir_index] = r;
+        TinyLightSample selected_sample = r.y;
+        if (r.M > 0u && r.w_sum > 1e-6)
+        {
+            float3 wi = normalize(selected_sample._position - world_pos);
+            float cos_theta = DirectLightCosTheta(mat, n, wi);
+            debug_data.nl = cos_theta;
+            debug_data.wi = wi;
+
+            float3 shadow_origin = world_pos + wi * 0.002;
+            float shadow_ray_tmax = length(selected_sample._position - world_pos) * 0.98;
+            bool is_occluded = IsOccluded(shadow_origin, wi, shadow_ray_tmax);
+            if (is_debug)
+                AppendDebugLine(shadow_origin, shadow_origin + wi * 20, float4(1, 0, 0, 1));
+
+            if (!is_occluded)
+            {
+                float3 h = normalize(wi + wo);
+                float pdf_brdf = 0.0;
+                float3 f = EvalBRDF(trace_ctx, n, h, wo, wi, pdf_brdf);
+                float3 numerator = selected_sample._le * f * cos_theta;// * mis;
+                float target = max(Luminance(numerator), 0);
+                if (target > 1e-6)
+                {
+                    float ris_normalization = r.w_sum / max((float)r.M, 1.0);
+                    radiance += numerator * ris_normalization / target;
+                }
+            }
+        }
+    }
+    else
+    {
+        float select_r = rand(ctx);
+        uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
+        LightSample light_sample = SampleUnifiedLight(sampled_light_idx, world_pos, n, ctx);
+        light_sample._pdf *= GetUnifiedLightSelectionPMF(_light_count);
+        float cos_theta = DirectLightCosTheta(mat, n, light_sample._wi);
+        debug_data.nl = cos_theta;
+        debug_data.wi = light_sample._wi;
+        float3 shadow_origin = world_pos + light_sample._wi * 0.002;
+        float shadow_ray_tmax = GetLightShadowRayTMax(light_sample) * 0.98;
+        bool is_occluded = IsOccluded(shadow_origin, light_sample._wi, shadow_ray_tmax);
+        if (is_debug)
+            AppendDebugLine(shadow_origin, shadow_origin + light_sample._wi * shadow_ray_tmax, float4(1, 0, 0, 1));
+        if (!is_occluded && light_sample._pdf > 1e-6 && cos_theta > 1e-6 && any(light_sample._radiance > 0.0.xxx))
+        {
+            float3 h = normalize(light_sample._wi + wo);
+            float pdf_brdf_for_light = 0.0;
+            float3 f = EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf_for_light);
+            float weight = PowerHeuristic(light_sample._pdf, pdf_brdf_for_light);
+            radiance += light_sample._radiance * f * cos_theta / light_sample._pdf;
+        }
+    }
+
+    return max(radiance, 0.0.xxx);
 }
 
 
@@ -608,7 +912,8 @@ float3 Trace(uint2 pixel,float3 ray_dir, float3 ray_origin, uint max_depth,bool 
     float3 throughput = float3(1, 1, 1);
     HitRecord temp_rec;
     float3 c;
-    uint area_light_count = min((uint)(_ActiveLightCount.w), MAX_AREA_LIGHT);
+    LightSample g_light_sample;
+    uint unified_light_count = _light_count;
     float prev_bsdf_pdf = 0.0;
     bool has_prev_bsdf_sample = false;
 
@@ -617,9 +922,10 @@ float3 Trace(uint2 pixel,float3 ray_dir, float3 ray_origin, uint max_depth,bool 
     debug_data.throughput = throughput;
     bool hit_anything = false;
     TraceContext trace_ctx = (TraceContext)0;
+
     for (uint depth = 0; depth < max_depth; ++depth)
     {
-        hit_anything = HitWorld(ray_origin, ray_dir,is_debug, temp_rec, c); 
+        hit_anything = HitWorld(ray_origin, ray_dir,is_debug, temp_rec, g_light_sample, c); 
         debug_data.has_hit = hit_anything;
 
         if (is_debug)
@@ -636,26 +942,21 @@ float3 Trace(uint2 pixel,float3 ray_dir, float3 ray_origin, uint max_depth,bool 
             if (is_debug)
                 AppendDebugLine(ray_origin, ray_origin + ray_dir * 10, float4(0, 0, 0, 1)); // 黑色线表示环境光照射线
             float3 env_Li = ProceduralSky(ray_dir);
-            radiance += env_Li * throughput;
+            //radiance += env_Li * throughput;
             debug_data.normal = ray_dir;
             break;
         }
         if (temp_rec.is_light)
         {
             float mis_weight = 1.0;
-            if (has_prev_bsdf_sample) 
-            {
-                float select_pmf = (area_light_count > 0) ? (1.0 / (float)area_light_count) : 0.0;
-                float pdf_light = PdfAreaLight(_AreaLights[temp_rec.light_idx], ray_origin, ray_dir) * select_pmf;
-                mis_weight = PowerHeuristic(prev_bsdf_pdf, pdf_light);
-            }
-            radiance += temp_rec.emission * throughput * mis_weight; 
+            float3 emission = temp_rec.emission;
+            float mis_weight_bsdf = has_prev_bsdf_sample ? PowerHeuristic(prev_bsdf_pdf, g_light_sample._pdf) : 1.0;
+            radiance += emission * throughput * mis_weight_bsdf;
             break;
         }
-        //radiance += DirectLight(ray_dir, temp_rec.p, temp_rec.normal, g_material_buffer[temp_rec.material_idx], ctx) * throughput;
         float3 p = temp_rec.p;
         float3 n = temp_rec.normal;
-        float3 wo = -ray_dir; // 出射方向（指向相机） 
+        float3 wo = -ray_dir; // 出射方向（指向相机）
 
         // 存储 debug 数据
         debug_data.wo = wo;
@@ -666,7 +967,7 @@ float3 Trace(uint2 pixel,float3 ray_dir, float3 ray_origin, uint max_depth,bool 
         MaterialData mat_data = g_material_buffer[temp_rec.material_idx];
         Material mat;
         mat._albedo = mat_data._base_color.rgb;
-        if(valid_bindless_srv(mat_data._base_color_tex))
+        if(valid_bindless_handle(mat_data._base_color_tex))
         {
             mat._albedo *= pow(SAMPLE_TEXTURE2D_LOD(g_bindless_texture2d[mat_data._base_color_tex], g_LinearClampSampler, temp_rec.uv, 0).rgb, 2.2);
         }
@@ -681,60 +982,205 @@ float3 Trace(uint2 pixel,float3 ray_dir, float3 ray_origin, uint max_depth,bool 
         trace_ctx._ior_t = temp_rec.front_face ? mat._ior : 1.0; // 出射介质的 IOR
         trace_ctx._eta = trace_ctx._ior_i / trace_ctx._ior_t;
 
-        // 直接光照 - 方向光
-        float3 wi_light = -_MainlightWorldPosition; // 入射方向（指向光源）
-        float cos_theta_l = DirectLightCosTheta(mat, n, wi_light);
-        debug_data.nl = cos_theta_l;
-
-        if (cos_theta_l > 1e-6)
+#ifdef ADDITIONAL_SAMPLING
+    if (_light_count > 0u)
+    {
+        if (_enable_ris)
         {
-            bool is_occluded = IsOccluded(p + 0.002 * wi_light, wi_light, 1e20);
-            if (!is_occluded)
+            float select_pmf = GetUnifiedLightSelectionPMF(_light_count);
+            if (depth == 0)
             {
-                float pdf_brdf;
-                float3 f = EvalBRDF(trace_ctx, n, normalize(wi_light + wo), wo, wi_light, pdf_brdf); 
-                float3 Li = _DirectionalLights[0]._LightColor;
-                // 方向光是 delta 分布，不使用 MIS，直接计算
-                radiance += throughput * f * Li * cos_theta_l;
+                Reservoir r;
+                uint reservoir_index = PixelToLinearIndex(pixel);
+                if (_frame_index == 0)
+                {
+                    // 首帧采集多个样本
+                    r = InitReservoir();
+                    [unroll]
+                    for (uint i = 0; i < PER_FRAME_SAMPLES; ++i)
+                    {
+                        float select_r = rand(ctx);
+                        uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
+                        LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
+                        float proposal_pdf = light_sample._pdf * select_pmf;
 
-#if DEBUG_MODE == DEBUG_MODE_ALL
-                // 在 debug 模式下记录直接光照的 BRDF 数据
-                debug_data.brdf_value = f;
-                debug_data.pdf = pdf_brdf;
+                        float3 numerator = 0.0.xxx;
+                        float target = 0.0;
+                        bool valid = EvaluateRISDirectCandidate(trace_ctx, mat, p, n, wo, light_sample, numerator, target);
+                        TinyLightSample ts = (TinyLightSample)0;
+                        ts._light_idx = sampled_light_idx;
+                        ts._pdf = proposal_pdf;
+                        ts._position = p + light_sample._wi * light_sample._t;
+                        ts._le = light_sample._radiance;
+
+                        ts._weight = (valid && proposal_pdf > 1e-8) ? target / proposal_pdf : 0.0;
+                        UpdateReservoir(r, ts, ts._weight, 1, rand(ctx));
+                    }
+                }
+                else
+                {
+                    Reservoir prev_r = g_prev_reservoir[reservoir_index];
+                    r = InitReservoir();
+                    [unroll]
+                    for (uint i = 0; i < 1; ++i)
+                    {
+                        float select_r = rand(ctx);
+                        uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
+                        LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
+                        float proposal_pdf = light_sample._pdf * select_pmf;
+
+                        float3 numerator = 0.0.xxx;
+                        float target = 0.0;
+                        bool valid = EvaluateRISDirectCandidate(trace_ctx, mat, p, n, wo, light_sample, numerator, target);
+                        TinyLightSample ts = (TinyLightSample)0;
+                        ts._light_idx = sampled_light_idx;
+                        ts._pdf = proposal_pdf;
+                        ts._position = p + light_sample._wi * light_sample._t;
+                        ts._le = light_sample._radiance;
+
+                        ts._weight = (valid && proposal_pdf > 1e-8) ? target / proposal_pdf : 0.0;
+                        UpdateReservoir(r, ts, ts._weight, 1, rand(ctx));
+                    }
+                    prev_r = ClampReservoirHistory(prev_r,r.M*20);
+                    MergeReservoir(r, prev_r, rand(ctx));
+                }
+                g_curr_reservoir[reservoir_index] = r;
+                TinyLightSample selected_sample = r.y;
+                if (r.M > 0u && r.w_sum > 1e-6)
+                {
+                    float3 light_normal = ReconstructLightNormal(selected_sample._light_idx, selected_sample._position);
+                    float3 wi = normalize(selected_sample._position - p);
+                    float cos_theta = DirectLightCosTheta(mat, n, wi);
+                    float3 shadow_origin = p + wi * 0.002;
+                    float shadow_ray_tmax = length(selected_sample._position - p) * 0.98;
+                    bool is_occluded = IsOccluded(shadow_origin, wi, shadow_ray_tmax);
+                    if (is_debug)
+                    {
+                        AppendDebugLine(shadow_origin, shadow_origin + wi * 20, float4(1, 0, 0, 1));
+                    }
+
+                    if (!is_occluded)
+                    {
+                        float3 h = normalize(wi + wo);
+                        float pdf_brdf = 0.0;
+                        float3 f = EvalBRDF(trace_ctx, n, h, wo, wi, pdf_brdf);
+                        float mis = PowerHeuristic(selected_sample._pdf,pdf_brdf);
+                        float3 numerator = selected_sample._le * f * cos_theta * mis;
+                        float target = max(Luminance(numerator), 0);
+                        float ris_normalization = r.w_sum / max((float)r.M, 1.0);
+                        radiance += throughput * numerator * ris_normalization / target;
+                        //radiance = kDepthColors[selected_sample._light_idx];
+                    }
+                }
             }
-#endif
+            else
+            {
+                if (_light_count > 0)
+                {
+                    float select_r = rand(ctx);
+                    uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
+                    LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
+                    light_sample._pdf *= GetUnifiedLightSelectionPMF(_light_count);
+                    float cos_theta = DirectLightCosTheta(mat, n, light_sample._wi);
+                    debug_data.nl = cos_theta;
+                    debug_data.wi = light_sample._wi;
+                    float3 shadow_origin = p + light_sample._wi * 0.002;
+                    float shadow_ray_tmax = GetLightShadowRayTMax(light_sample) * 0.98;
+                    bool is_occluded = IsOccluded(shadow_origin, light_sample._wi, shadow_ray_tmax);
+                    if (is_debug)
+                        AppendDebugLine(shadow_origin, shadow_origin + light_sample._wi * shadow_ray_tmax, float4(1, 0, 0, 1));
+                    if (!is_occluded && light_sample._pdf > 1e-6 && cos_theta > 1e-6 && any(light_sample._radiance > 0.0.xxx))
+                    {
+                        float3 h = normalize(light_sample._wi + wo);
+                        float pdf_brdf_for_light = 0.0;
+                        float3 f = EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf_for_light);
+                        float weight = PowerHeuristic(light_sample._pdf, pdf_brdf_for_light);
+                        radiance += throughput * light_sample._radiance * f * cos_theta * weight / light_sample._pdf;
+                    }
+                }
             }
-        }
+            
+            /*
+            Reservoir r = InitReservoir();
+            const uint ris_candidate_count = 8u;
+            LightSample ris_samples[8];
+            float  ris_targets[8];
+            float3 ris_numerators[8];
 
+            [loop]
+            for (uint i = 0; i < ris_candidate_count; ++i)
+            {
+                float select_r = rand(ctx);
+                uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
+                LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
+                light_sample._pdf *= GetUnifiedLightSelectionPMF(_light_count);
+                bool valid = EvaluateRISDirectCandidate(trace_ctx, mat, p, n, wo, light_sample, 
+                    ris_numerators[i], ris_targets[i]);
+                ris_samples[i] = light_sample;
 
-        // //间接光照 - 使用新的采样接口
-        float3 random_values = float3(rand(ctx), rand(ctx), rand(ctx));
+                TinyLightSample ts = (TinyLightSample)0;
+                ts._light_idx = sampled_light_idx;
+                ts._pdf = light_sample._pdf;
+                ts._position = p + light_sample._wi * light_sample._t;
+                ts._le = light_sample._radiance;
+                float candidate_weight = valid ? ris_targets[i] / light_sample._pdf : 0.0;
+                UpdateReservoir(r, ts, candidate_weight, 1u, rand(ctx));
+            }
 
-        // 直接光照 - 面光源
-        if (area_light_count > 0)
+            TinyLightSample selected_sample = r.y;
+            if (r.M > 0u && r.w_sum > 1e-6)
+            {
+                float3 light_normal = ReconstructLightNormal(selected_sample._light_idx, selected_sample._position);
+                float3 wi = normalize(selected_sample._position - p);
+                float cos_theta = DirectLightCosTheta(mat, n, wi);
+                float3 shadow_origin = p + wi * 0.002;
+                float shadow_ray_tmax = length(selected_sample._position - p) * 0.98;
+                bool is_occluded = IsOccluded(shadow_origin, wi, shadow_ray_tmax);
+                if (is_debug)
+                {
+                    AppendDebugLine(shadow_origin, shadow_origin + wi * 20, float4(1, 0, 0, 1));
+                }
+
+                if (!is_occluded)
+                {
+                    float3 h = normalize(wi + wo);
+                    float pdf_brdf = 0.0;
+                    float3 f = EvalBRDF(trace_ctx, n, h, wo, wi, pdf_brdf);
+                    float mis = PowerHeuristic(selected_sample._pdf,pdf_brdf);
+                    float3 numerator = selected_sample._le * f * cos_theta * mis;
+                    float target = max(Luminance(numerator), 0);
+                    float ris_normalization = r.w_sum / max((float)r.M, 1.0);
+                    radiance += throughput * numerator * ris_normalization / target;
+                }
+            }*/
+    }
+        else
         {
             float select_r = rand(ctx);
-            uint sampled_light_idx = min((uint)(select_r * area_light_count), area_light_count - 1);
-            ShaderArealLightData sampled_light = _AreaLights[sampled_light_idx];
-
-            float pdf_light_dir = 0.0;
-            float3 wi_light = SampleAreaLight(sampled_light, p, n, ctx, pdf_light_dir, is_debug);
-            float select_pmf = 1.0 / (float)area_light_count;
-            float pdf_light = pdf_light_dir * select_pmf;
-
-            float cos_theta = DirectLightCosTheta(mat, n, wi_light);
-            float3 Li = sampled_light._LightColor;
-            bool is_occluded = IsOccluded(p + 0.002 * wi_light, wi_light, 1e20);
-            if (cos_theta > 1e-6 && !is_occluded && pdf_light > 1e-6)
+            uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
+            LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
+            light_sample._pdf *= GetUnifiedLightSelectionPMF(_light_count);
+            float cos_theta = DirectLightCosTheta(mat, n, light_sample._wi);
+            debug_data.nl = cos_theta;
+            debug_data.wi = light_sample._wi;
+            float3 shadow_origin = p + light_sample._wi * 0.002;
+            float shadow_ray_tmax = GetLightShadowRayTMax(light_sample) * 0.98;
+            bool is_occluded = IsOccluded(shadow_origin, light_sample._wi, shadow_ray_tmax);
+            if (is_debug)
+                AppendDebugLine(shadow_origin, shadow_origin + light_sample._wi * shadow_ray_tmax, float4(1, 0, 0, 1));
+            if (!is_occluded && light_sample._pdf > 1e-6 && cos_theta > 1e-6 && any(light_sample._radiance > 0.0.xxx))
             {
-                float3 h = normalize(wi_light + wo);
+                float3 h = normalize(light_sample._wi + wo);
                 float pdf_brdf_for_light = 0.0;
-                float3 f = EvalBRDF(trace_ctx, n, h, wo, wi_light, pdf_brdf_for_light);
-                float weight = PowerHeuristic(pdf_light, pdf_brdf_for_light);
-                radiance += max(0.0,throughput * Li * f * cos_theta * weight / pdf_light);
+                float3 f = EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf_for_light);
+                float weight = PowerHeuristic(light_sample._pdf, pdf_brdf_for_light);
+                radiance += throughput * light_sample._radiance * f * cos_theta * weight / light_sample._pdf;
+                //radiance = kDepthColors[sampled_light_idx];
             }
         }
-
+    }
+#endif
+        float3 random_values = float3(rand(ctx), rand(ctx), rand(ctx));
         SampleBRDFResult brdf_sample = SampleBRDF(trace_ctx,n,wo,random_values.x,random_values.y,random_values.z); 
         float3 wi = brdf_sample.wi;
         float3 h = brdf_sample.h;
@@ -826,25 +1272,95 @@ void HandleDebugOutput(DebugData data, float3 debug_color, float3 color,out floa
     #endif
 }
 
+TEXTURE2D(_GBuffer0)
+TEXTURE2D(_GBuffer1)
+TEXTURE2D(_GBuffer2)
+TEXTURE2D(_GBuffer3)
+TEXTURE2D(_CameraDepthTexture)
+
+[shader("compute")]
 [numthreads(16,16,1)]
 void RayGen(CSInput input)
 {
-    if (_frame_index > MAX_ACCUMULATED_FRAMES)
-    {
-        // 超过累积帧数上限后不再更新，保持最后的结果
-        return;
-    }
     uint2 pixel = input.DispatchThreadID.xy + uint2(_GI_TileOffset);
     if (pixel.x >= (_GI_TileOffset.x + _GI_TileSize.x) || pixel.y >= (_GI_TileOffset.y + _GI_TileSize.y))
         return;
     RandomCtx ctx;
-    InitSeed(ctx, pixel, _FrameIndex);
+    InitSeed(ctx, pixel + _FrameIndex, _FrameIndex);
+    float2 uv = (pixel + 0.5) * _ScreenParams.xy;
+    float2 jitter = rand2(ctx); 
+    jitter = (jitter * 2.0 - 1.0) * 0.5;
+    //uv += jitter * _ScreenParams.xy;
+    float2 gbuf0 = SAMPLE_TEXTURE2D_LOD(_GBuffer0, g_LinearClampSampler, uv,0).xy;
+	float4 gbuf1 = SAMPLE_TEXTURE2D_LOD(_GBuffer1, g_LinearClampSampler, uv,0);
+	float4 gbuf2 = SAMPLE_TEXTURE2D_LOD(_GBuffer2, g_LinearClampSampler, uv,0);
+	half4 emssion = SAMPLE_TEXTURE2D_LOD(_GBuffer3, g_LinearClampSampler, uv,0);
+	float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearClampSampler,uv,0).r;
+    if (depth >= 1.0)
+    {
+        _GI_Texture[pixel] = float4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+	float3 world_pos = ComputeWorldSpacePosition(uv,depth,_MatrixIVP);
+	//float3 world_pos = _CameraPos.xyz + UnprojectByCameraRay(input.uv,depth);
+	SurfaceData surface_data;
+	surface_data.wnormal = UnpackNormal(gbuf0);
+	surface_data.albedo = float4(gbuf1.rgb,1.0f);
+	surface_data.roughness = gbuf1.w;
+	surface_data.metallic = gbuf2.w;
+	surface_data.specular = 1.0.xxx;
+	surface_data.anisotropy = gbuf2.z;
+	surface_data.emssive = emssion.rgb;
+    // _GI_Texture[pixel] = surface_data.albedo;
+    // return;
+
+	OrthonormalBasis(surface_data.wnormal,surface_data.tangent,surface_data.bitangent);
+
+    Surface surface;
+    surface._position = world_pos;
+    surface._normal = surface_data.wnormal;
+    surface._albedo = surface_data.albedo.rgb;
+    surface._roughness = surface_data.roughness;
+    surface._metallic = surface_data.metallic;
+    surface._geo_normal = surface_data.wnormal;
+    surface._linear_depth = Linear01Depth(depth,_ProjectionParams.y,_ProjectionParams.z);
+    if (!IsValidSurface(surface))
+    {
+        _GI_Texture[pixel] = 0.0;
+        return;
+    }
+
+    float3 wo = normalize(_CameraPos.xyz - world_pos);
+    bool is_debug = (pixel.x == _PickPixel.x && pixel.y == _PickPixel.y);
+    DebugData debug_data;
+    float3 color = EvaluateSurfaceReSTIRDI(pixel, world_pos, surface_data,surface, wo, is_debug, ctx, debug_data);
+
+    float3 debug_output = color;
+    HandleDebugOutput(debug_data, surface_data.wnormal * 0.5 + 0.5, color, debug_output);
+    _GI_Texture[pixel] = float4(debug_output,1.0f);
+
+    // if (valid_bindless_handle(_surface_buffer_idx))
+    // {
+    //     uint surface_index = PixelToLinearIndex(pixel);
+    //     BINDLESS_RWBUFFER_STORE(_surface_buffer_idx, surface_index * sizeof(Surface), surface);
+    // }
+}
+
+[shader("compute")]
+[numthreads(16,16,1)]
+void PrimaryRay(CSInput input)
+{
+    uint2 pixel = input.DispatchThreadID.xy + uint2(_GI_TileOffset);
+    if (pixel.x >= (_GI_TileOffset.x + _GI_TileSize.x) || pixel.y >= (_GI_TileOffset.y + _GI_TileSize.y))
+        return;
+    RandomCtx ctx;
+    InitSeed(ctx, pixel, 0);
     float2 uv = (pixel + 0.5) * _ScreenParams.xy;
     float2 jitter = rand2(ctx); 
     jitter = (jitter * 2.0 - 1.0) * 0.5;
     uv += jitter * _ScreenParams.xy;
     float3 ray_origin = _CameraPos.xyz;
-    uint depth = 2;
+    uint depth = 1;
     float3 ray_dir = normalize(Unproject(uv,1.0f) - ray_origin);
     bool is_debug = (pixel.x == _PickPixel.x && pixel.y == _PickPixel.y);
     float4 debug_color = float4(1, 1, 1, 0);
@@ -854,30 +1370,62 @@ void RayGen(CSInput input)
 
     float3 debug_output = color;
     HandleDebugOutput(debug_data, debug_color.rgb, color, debug_output);
-
-    float3 prev = _GI_Texture[pixel].rgb;
-    debug_output = ApplySRGBCurve(ACESFilm(debug_output));
-    float a = 1.0 / clamp((float)_frame_index, 1.0, MAX_ACCUMULATED_FRAMES);
-    //a = 1;
-    prev = lerp(prev, debug_output, a);
-    _GI_Texture[pixel] = float4(prev, 1.0); 
+    _GI_Texture[pixel] = float4(debug_output, 1.0);
 }
 
 TEXTURE2D(_HistoryTarget)
 RWTEXTURE2D(_CurrentTarget,float4)
 
+[shader("compute")]
 [numthreads(16,16,1)]
 void Denoise(CSInput input)
 {
-    return; // 先禁用降噪，专注调试光照计算
     uint2 pixel = input.DispatchThreadID.xy;
     float3 current = _CurrentTarget[pixel].rgb;
+    float2 motion = _MotionVectorTexture[pixel].rg;
+    float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
+    float2 history_uv = uv - motion;
 
-    // Clamp frame count to avoid unstable weights and hard-freeze artifacts.
-    float n = clamp((float)_frame_index, 1.0, 2560.0);
-    float alpha = 0.01;//1.0 / n;
+    if (any(history_uv != saturate(history_uv)))
+    {
+        _CurrentTarget[pixel] = float4(current, 1.0);
+        return;
+    }
 
-    float3 history = _HistoryTarget[pixel].rgb;
-    float3 blended = lerp(history, current, alpha);
+    int2 history_pixel = int2(history_uv * _ScreenParams.zw);
+    int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
+    history_pixel = clamp(history_pixel, int2(0, 0), history_max);
+
+    float3 history = SAMPLE_TEXTURE2D_LOD(_HistoryTarget,g_LinearClampSampler,history_uv,0).rgb;//  _HistoryTarget[history_pixel].rgb;
+    _CurrentTarget[pixel].rgb = lerp(history, current, 0.05);
+    return;
+
+    int2 max_pixel = int2(_ScreenParams.zw) - int2(1, 1);
+    float3 neighborhood_min = 1e20.xxx;
+    float3 neighborhood_max = -1e20.xxx;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            int2 sample_pixel = clamp(int2(pixel) + int2(x, y), int2(0, 0), max_pixel);
+            float3 sample_color = _CurrentTarget[uint2(sample_pixel)].rgb;
+            neighborhood_min = min(neighborhood_min, sample_color);
+            neighborhood_max = max(neighborhood_max, sample_color);
+        }
+    }
+
+    float3 clamped_history = clamp(history, neighborhood_min, neighborhood_max);
+    float motion_pixels = length(motion * _ScreenParams.zw);
+    float history_luma = Luminance(clamped_history);
+    float current_luma = Luminance(current);
+    float luma_delta = abs(history_luma - current_luma) / max(max(history_luma, current_luma), 1e-3);
+    float a = 1.0 / clamp((float)_frame_index + 1.0, 1.0, MAX_ACCUMULATED_FRAMES);
+    float current_weight = max(a, saturate(0.08 + motion_pixels * 0.12 + luma_delta * 0.4));
+
+    float3 blended = lerp(clamped_history, current, current_weight);
     _CurrentTarget[pixel] = float4(blended, 1.0);
+    //_CurrentTarget[pixel] = float4(motion.xy * 4,0.0, 1.0);
 }

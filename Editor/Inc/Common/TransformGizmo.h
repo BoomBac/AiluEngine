@@ -1,8 +1,13 @@
 #include "Framework/Math/Transform.h"
+#include "Scene/Entity.hpp"
 
 namespace Ailu
 {
     struct OBB;
+    namespace SceneManagement
+    {
+        class Scene;
+    }
     namespace Render
     {
         class Material;
@@ -26,11 +31,13 @@ namespace Ailu
         {
         public:
             TransformGizmo();
-            void SetTarget(Transform *target)
+            void SetTarget(SceneManagement::Scene *scene, ECS::Entity target)
             {
                 _hover_axis = -1;
-                _target = target;
+                _target_scene = scene;
+                _target_entity = target;
             }
+            void ClearTarget();
             void SetMode(EGizmoMode mode) { _mode = mode; }
             void SetSpace(EGizmoSpace space) { _space = space; }
 
@@ -42,6 +49,7 @@ namespace Ailu
             void EndDrag();
             bool IsDragging() const { return _is_dragging; }
         private:
+            Transform *Target() const;
             u32 PickAxis(Vector3f start, Vector3f dir) const;
 
             // 轴方向（根据世界/本地空间）
@@ -51,7 +59,8 @@ namespace Ailu
             float ComputeAxisParamS(Vector2f mouse_pos, const Vector3f &origin, const Vector3f &axisDir) const;
 
         private:
-            Transform *_target = nullptr;
+            SceneManagement::Scene *_target_scene = nullptr;
+            ECS::Entity _target_entity = ECS::kInvalidEntity;
             EGizmoMode _mode = EGizmoMode::kTranslate;
             EGizmoSpace _space = EGizmoSpace::kWorld;
             Render::Camera *_cam;

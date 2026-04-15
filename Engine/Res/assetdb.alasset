@@ -43,6 +43,7 @@
 54238902-542d-44ca-9bed-dbe40c90cdcb,Shaders/wireframe.alasset,Ailu::Render::Shader
 5879cd73-a132-423e-a89a-c15fbf33737e,NewScene/Palace/textures/lion_baseColor.alasset,Ailu::Render::Texture2D
 58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5,WaterTest/MAT_Grass.alasset,Ailu::Render::Material
+596c1845-3f85-4d1c-8965-f3d25f0ebc71,breakfast_room/Arcade.alasset,Ailu::Render::Mesh
 60fb44b6-864f-4c6a-b49b-f4b26829b57d,Shaders/defered_standard_lit.alasset,Ailu::Render::Shader
 61719aa4-e2e6-4ba7-bab7-5d6e6b78935f,WaterTest/Alpha_Joints.alasset,Ailu::Render::SkeletonMesh
 687dd7a6-c8d4-40f1-8a33-694707d9c423,Icons/directional_light.alasset,Ailu::Render::Texture2D

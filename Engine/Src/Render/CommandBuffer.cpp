@@ -172,7 +172,12 @@ namespace Ailu::Render
         void SetRenderTarget(RenderTexture *color, RenderTexture *depth)
         {
             auto cmd = CommandPool::Get().Alloc<CommandSetTarget>();
-            cmd->_color_target_num = 1u;
+            if (color)
+            {
+                cmd->_color_target_num = 1u;
+            }
+            else
+                cmd->_color_target_num = 0u;
             cmd->_color_target[0] = color;
             cmd->_depth_target = depth;
             cmd->_color_indices[0] = 0u;

@@ -16,7 +16,7 @@ keywords:
     _MetallicValue: 0
     _RoughnessValue: 0
     _SamplerMask: 0
-    _Transmission: 0.45
+    _Transmission: 0
   prop_type: Vector
     _AlbedoValue: 1,1,1,1
     _EmissionValue: 0,0,0,-1

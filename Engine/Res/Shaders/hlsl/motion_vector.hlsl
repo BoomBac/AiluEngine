@@ -13,14 +13,18 @@
 #include "common.hlsli"
 #include "fullscreen_quad.hlsli"
 
-float2 CalculateNdcMotionFormClip(float4 clip_pos_cur, float4 clip_pos_pre)
+float3 CalculateNdcMotionFormClip(float4 clip_pos_cur, float4 clip_pos_pre)
 {
-    float2 cur_ndc = clip_pos_cur.xy * rcp(clip_pos_cur.w);
-    float2 pre_ndc = clip_pos_pre.xy * rcp(clip_pos_pre.w);
+    clip_pos_cur *= rcp(clip_pos_cur.w);
+    clip_pos_pre *= rcp(clip_pos_pre.w);
+    float2 cur_ndc = clip_pos_cur.xy;
+    float2 pre_ndc = clip_pos_pre.xy;
     float2 velocity = cur_ndc - pre_ndc;
     velocity.y = -velocity.y;
     velocity *= 0.5;
-    return velocity;
+    float depth = Linear01Depth(clip_pos_cur.z, _ProjectionParams.y, _ProjectionParams.z);
+    depth -= Linear01Depth(clip_pos_pre.z, _ProjectionParams.y, _ProjectionParams.z);
+    return float3(velocity, depth);
 }
 
 //---------------------------------------------object motion vector---------------------------------------------
@@ -63,27 +67,27 @@ VertOutput MotionVectorVSMain(VertInput v)
     return result;
 }
 
-float2 MotionVectorPSMain(VertOutput input) : SV_TARGET
+float4 MotionVectorPSMain(VertOutput input) : SV_TARGET
 {
     if (_MotionVectorParam.y)
-        return float2(0,0);
+        return float4(0,0,0,0);
 #if defined(ALPHA_TEST)
 	float4 base_color = _SamplerMask & 1? _AlbedoTex.Sample(g_LinearWrapSampler, input.uv) : _AlbedoValue;
 	clip(base_color.a - _AlphaCulloff);
 #endif
-	return CalculateNdcMotionFormClip(input.clip_pos_cur, input.clip_pos_pre);
+	return float4(CalculateNdcMotionFormClip(input.clip_pos_cur, input.clip_pos_pre), 1.0);
 }
 //---------------------------------------------object motion vector---------------------------------------------
 
 FullScreenPSInput FullscreenVSMain(FullScreenVSInput v);
 TEXTURE2D(_CameraDepthTexture)
 
-float2 CameraMotionVectorPSMain(FullScreenPSInput input) : SV_TARGET
+float4 CameraMotionVectorPSMain(FullScreenPSInput input) : SV_TARGET
 {
     float2 uv = input.uv;
-    float depth = LOAD_TEXTURE2D(_CameraDepthTexture,input.uv * _ScreenParams.zw).r;
+    float depth =  SAMPLE_TEXTURE2D(_CameraDepthTexture,g_PointClampSampler,uv).r;
     float3 world_pos = ComputeWorldSpacePosition(uv,depth,_MatrixIVP);
     float4 cur_clip_pos = mul(_MatrixVP_NoJitter, float4(world_pos,1.0f));
     float4 pre_clip_pos = mul(_MatrixVP_Pre, float4(world_pos,1.0f));
-	return CalculateNdcMotionFormClip(cur_clip_pos, pre_clip_pos);
+	return float4(CalculateNdcMotionFormClip(cur_clip_pos, pre_clip_pos), 1.0);
 }

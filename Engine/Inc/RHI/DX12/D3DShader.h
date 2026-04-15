@@ -380,6 +380,13 @@ namespace Ailu::RHI::DX12
             ComPtr<ID3D12RootSignature> _p_sig = nullptr;
             ComPtr<ID3D12PipelineState> _pso = nullptr;
             bool _has_bindless_texture2d = false;
+            bool _has_bindless_buffer = false;
+            bool _has_bindless_rw_texture2d = false;
+            bool _has_bindless_rw_buffer = false;
+            u16 _bindless_texture_slot = static_cast<u16>(-1);
+            u16 _bindless_buffer_slot = static_cast<u16>(-1);
+            u16 _bindless_rw_texture_slot = static_cast<u16>(-1);
+            u16 _bindless_rw_buffer_slot = static_cast<u16>(-1);
         };
         struct D3DKernelElement
         {

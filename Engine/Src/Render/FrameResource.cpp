@@ -110,16 +110,39 @@ namespace Ailu::Render
     }
     FrameResourceManager::FrameResourceManager()
     {
-        _frame_allocators[0] = MakeScope<FrameAllocator>();
-        _frame_allocators[1] = MakeScope<FrameAllocator>();
+        for (u32 i = 0; i < kFrameResourceSlotCount; ++i)
+        {
+            _frame_allocators[i] = MakeScope<FrameAllocator>();
+            _frame_slot_fence_values[i] = 0u;
+        }
     }
     FrameResourceManager::~FrameResourceManager()
     {
     }
     void FrameResourceManager::NewFrame()
     {
-        const u64 cur_frame = GraphicsContext::Get().GetFrameCount();
-        _active_allocator = _frame_allocators[cur_frame % 2].get();
+        auto &gfx = GraphicsContext::Get();
+        if (_has_active_slot)
+        {
+            _frame_slot_fence_values[_active_slot] = gfx.GetFenceValueCPU();
+            _prev_slot = _active_slot;
+            _active_slot = (_active_slot + 1u) % kFrameResourceSlotCount;
+        }
+        else
+        {
+            _active_slot = 0u;
+            _prev_slot = 0u;
+            _has_active_slot = true;
+        }
+
+        const u64 slot_fence = _frame_slot_fence_values[_active_slot];
+        if (slot_fence != 0u && gfx.GetFenceValueGPU() < slot_fence)
+        {
+            gfx.WaitForFence(slot_fence);
+        }
+
+        const u64 cur_frame = gfx.GetFrameCount();
+        _active_allocator = _frame_allocators[_active_slot].get();
         _active_allocator->NewFrame(cur_frame);
     }
     void FrameResourceManager::FrameCleanup()
@@ -157,7 +180,6 @@ namespace Ailu::Render
         {
             CleanupStaleResources();
         }
-        _active_allocator->Reset();
     }
 
     FrameResourceManager::TextureHandle FrameResourceManager::AllocTexture(TextureDesc desc)

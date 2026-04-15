@@ -1,5 +1,11 @@
 #ifndef __GEOMETRY_H__
 #define __GEOMETRY_H__
+#include "constants.hlsli"
+
+#define CULL_NONE 0u
+#define CULL_BACK_FACE 1u
+#define CULL_FRONT_FACE 2u
+
 struct Ray
 {
     float3 o;
@@ -51,6 +57,47 @@ bool RaySphereIntersection(Ray ray, Sphere sphere, out float3 intersection)
     intersection = ray.o + t * ray.d;
     return true;
 }
+
+bool RayTriangleIntersection(Ray ray, float3 v0,float3 v1,float3 v2,out float t, out float u, out float v,uint cull_mode)
+{
+    float3 e1 = v1 - v0;
+    float3 e2 = v2 - v0;
+    float3 p  = cross(ray.d, e2);
+    float  det = dot(p, e1);
+    t = u = v = 0.0;
+    //e1 · (dir x e2) = -dir · (e1 x e2)
+    // ---- CULLING ----
+    if (cull_mode == 1) // back-face cull
+    {
+        if (det < FLOAT_EPSILON) 
+            return false;
+    }
+    else if (cull_mode == 2) // front-face cull
+    {
+        if (det > -FLOAT_EPSILON) 
+            return false;
+    }
+    else // double-sided
+    {
+        if (abs(det) < FLOAT_EPSILON) return false;
+    }
+
+    float inv_det = 1.0 / det;
+
+    float3 s = ray.o - v0;
+    u = dot(p, s) * inv_det;
+    if (u < -FLOAT_EPSILON || u > 1.0 + FLOAT_EPSILON) 
+        return false;
+
+    float3 q = cross(s, e1);
+    v = dot(q, ray.d) * inv_det;
+    if (v < -FLOAT_EPSILON || (u + v) > 1.0 + FLOAT_EPSILON) 
+        return false;
+
+    t = dot(q, e2) * inv_det;
+    return t > FLOAT_EPSILON;
+}
+
 
 bool FrustumCullAABB(float3 center, float3 extent, Plane planes[6])
 {

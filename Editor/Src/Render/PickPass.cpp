@@ -37,16 +37,15 @@ namespace Ailu
             static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
             static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
             static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
-            static RDG::RGHandle color, depth;
             graph.AddPass("PickBuffer", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                           {
-                            color = builder.Import(_color);
-                            depth = builder.Import(_depth);
-                            color = builder.Write(color);
-                            depth = builder.Write(depth,EResourceUsage::kDSV);
+                                     _color_handle = builder.Import(_color);
+                                     _depth_handle = builder.Import(_depth);
+                                     _color_handle = builder.Write(_color_handle);
+                                     _depth_handle = builder.Write(_depth_handle,EResourceUsage::kDSV);
                 }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &rendering_data)
                 {
-                 cmd->SetRenderTarget(color, depth);
+                      cmd->SetRenderTarget(_color_handle, _depth_handle);
                 ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
              for (const auto &queue_data: *rendering_data._cull_results)
                 {
@@ -394,9 +393,14 @@ namespace Ailu
                 }
                 case Ailu::ECS::ELightType::kPoint:
                 {
+                    //范围球
                     Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color, MatrixRotationX(ToRadius(90.0f)));
                     Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color, MatrixRotationZ(ToRadius(90.0f)));
                     Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color);
+                    //光源大小
+                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.y, 24, comp->_light._light_color, MatrixRotationX(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.y, 24, comp->_light._light_color, MatrixRotationZ(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.y, 24, comp->_light._light_color);
                     return;
                 }
                 case Ailu::ECS::ELightType::kSpot:

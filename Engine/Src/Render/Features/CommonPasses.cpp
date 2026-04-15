@@ -570,52 +570,60 @@ namespace Ailu::Render
     void Ailu::Render::CubeMapGenPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
         Texture *src_tex = _input_src ? _input_src : _src_cubemap.get();
-        static RDG::RGHandle src_map_handle;
-        static RDG::RGHandle radiance_handle;
-        static RDG::RGHandle env_handle;
         if(!_is_src_cubemap)
         {
             graph.AddPass("GenCubeMap",RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder) { 
-                builder.Read(builder.Import(src_tex));
-                src_map_handle = builder.Import(_src_cubemap.get());
-                src_map_handle = builder.Write(src_map_handle);
-            }, [this,src_tex](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data) {
+                _src_texture_handle = builder.Import(src_tex);
+                builder.Read(_src_texture_handle);
+                _src_map_handle = builder.Import(_src_cubemap.get());
+                _src_map_handle = builder.Write(_src_map_handle);
+            }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data) {
                         //image tp cubemap
+                auto *src_tex = graph.Resolve<Texture>(_src_texture_handle);
+                auto *dst_cubemap = graph.Resolve<RenderTexture>(_src_map_handle);
+                if (src_tex == nullptr || dst_cubemap == nullptr)
+                    return;
                 for (u16 i = 0; i < 6; i++)
                 {
-                    u16 rt_index = src_tex->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), 0, 0);
-                    cmd->SetRenderTarget(_src_cubemap.get(), rt_index);
+                    u16 rt_index = dst_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), 0, 0);
+                    cmd->SetRenderTarget(dst_cubemap, rt_index);
                     cmd->ClearRenderTarget(Colors::kBlack);
                     cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
                     cmd->DrawMesh(Mesh::s_cube.lock().get(), _p_gen_material, _per_obj_cb.get(), 0, 0, 1);
                 }
-                _src_cubemap->GenerateMipmap();
+                dst_cubemap->GenerateMipmap();
             });
         }
         else
         {
             graph.AddPass("GenMipmap", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                           { 
-                builder.Read(builder.Import(_input_src));
-                src_map_handle = builder.Import(_input_src);
-                src_map_handle = builder.Write(src_map_handle); 
-                          }, [this, src_tex](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+                _src_map_handle = builder.Import(_input_src);
+                builder.Read(_src_map_handle);
+                _src_map_handle = builder.Write(_src_map_handle); 
+                          }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                           { 
-                              dynamic_cast<RenderTexture *>(_input_src)->GenerateMipmap(); });
+                              if (auto *src_map = graph.Resolve<RenderTexture>(_src_map_handle); src_map != nullptr)
+                                  src_map->GenerateMipmap(); });
         }
         //gen radiance map
         graph.AddPass("RadianceGen", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                 { 
-        builder.Read(builder.Import(src_tex));
-        radiance_handle = builder.Import(_radiance_map.get());
-        radiance_handle = builder.Write(radiance_handle); },
-        [this, src_tex](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        _src_texture_handle = builder.Import(src_tex);
+        builder.Read(_src_texture_handle);
+        _radiance_handle = builder.Import(_radiance_map.get());
+        _radiance_handle = builder.Write(_radiance_handle); },
+        [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
         {
+        auto *src_tex = graph.Resolve<Texture>(_src_texture_handle);
+        auto *radiance_map = graph.Resolve<RenderTexture>(_radiance_handle);
+        if (src_tex == nullptr || radiance_map == nullptr)
+            return;
         _p_filter_material->SetTexture("EnvMap", src_tex);
         for (u16 i = 0; i < 6; i++)
         {
-            u16 rt_index = _radiance_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), 0, 0);
-            cmd->SetRenderTarget(_radiance_map.get(), rt_index);
+            u16 rt_index = radiance_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), 0, 0);
+            cmd->SetRenderTarget(radiance_map, rt_index);
             //cmd->ClearRenderTarget(_radiance_map.get(), Colors::kBlack, rt_index);
             cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
             cmd->DrawMesh(Mesh::s_cube.lock().get(), _p_filter_material, _per_obj_cb.get());
@@ -624,11 +632,16 @@ namespace Ailu::Render
         //filter envmap
         graph.AddPass("EnvmapGen", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                       { 
-        builder.Read(builder.Import(src_tex));
-        env_handle = builder.Import(_prefilter_cubemap.get());
-        env_handle = builder.Write(env_handle); }, [this, src_tex](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        _src_texture_handle = builder.Import(src_tex);
+        builder.Read(_src_texture_handle);
+        _env_handle = builder.Import(_prefilter_cubemap.get());
+        _env_handle = builder.Write(_env_handle); }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
                       {
-        const auto mipmap_level = _prefilter_cubemap->MipmapLevel();
+        auto *src_tex = graph.Resolve<Texture>(_src_texture_handle);
+        auto *prefilter_map = graph.Resolve<RenderTexture>(_env_handle);
+        if (src_tex == nullptr || prefilter_map == nullptr)
+            return;
+        const auto mipmap_level = prefilter_map->MipmapLevel();
         for (u16 i = 0; i < 6; i++)
         {
             //Rect r(0, 0, _prefilter_cubemap->Width(), _prefilter_cubemap->Height());
@@ -638,10 +651,10 @@ namespace Ailu::Render
                 //auto [w, h] = Texture::CalculateMipSize(_prefilter_cubemap->Width(), _prefilter_cubemap->Height(), j);
                 //r.width = w;
                 //r.height = h;
-                u16 rt_index = _prefilter_cubemap->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), j, 0);
+                u16 rt_index = prefilter_map->CalculateViewIndex(Texture::ETextureViewType::kRTV, (ECubemapFace::ECubemapFace)(i + 1), j, 0);
                 //cmd->SetViewport(r);
                 //cmd->SetScissorRect(r);
-                cmd->SetRenderTarget(_prefilter_cubemap.get(), rt_index);
+                cmd->SetRenderTarget(prefilter_map, rt_index);
                 cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _per_camera_cb[i].get());
                 cmd->DrawMesh(Mesh::s_cube.lock().get(), _reflection_prefilter_mateirals[j].get(), _per_obj_cb.get(), 0, 1, 1);
             }
@@ -818,7 +831,7 @@ namespace Ailu::Render
                           builder.Read(rendering_data._rg_handles._main_light_shadow_map);
                           builder.Read(rendering_data._rg_handles._addi_shadow_maps);
                           builder.Read(rendering_data._rg_handles._point_light_shadow_maps);
-                          builder.Read(builder.GetTexture("_OcclusionTex"));
+                          builder.Read(rendering_data._rg_handles._ao_tex);
                           rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
                       },
                           [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
@@ -828,7 +841,8 @@ namespace Ailu::Render
                             _p_lighting_material->SetTexture("_GBuffer2", graph.Resolve<Texture>(data._rg_handles._gbuffers[2]));
                             _p_lighting_material->SetTexture("_GBuffer3", graph.Resolve<Texture>(data._rg_handles._gbuffers[3]));
                             _p_lighting_material->SetTexture("_CameraDepthTexture", graph.Resolve<Texture>(data._rg_handles._depth_target));
-                            Shader::SetGlobalTexture("IBLLut", _brdf_lut.get());
+                            _p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
+                            _p_lighting_material->SetTexture("_OcclusionTex",graph.Resolve<Texture>(data._rg_handles._ao_tex));
                             cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kNotCare);
                             cmd->SetRenderTarget(data._rg_handles._color_target);
                             cmd->DrawFullScreenQuad(_p_lighting_material.get());
@@ -842,7 +856,7 @@ namespace Ailu::Render
         _p_lighting_material->SetTexture("_GBuffer2", rendering_data._gbuffers[2]);
         _p_lighting_material->SetTexture("_GBuffer3", rendering_data._gbuffers[3]);
         _p_lighting_material->SetTexture("_CameraDepthTexture", rendering_data._camera_depth_tex_handle);
-        Shader::SetGlobalTexture("IBLLut", _brdf_lut.get());
+        _p_lighting_material->SetTexture("IBLLut", _brdf_lut.get());
         auto cmd = CommandBufferPool::Get("DeferredLightingPass");
         {
             GpuProfileBlock profile(cmd.get(), _name);
@@ -1695,5 +1709,39 @@ namespace Ailu::Render
     }
     void HZBPass::BeginPass(GraphicsContext *context) {}
     void HZBPass::EndPass(GraphicsContext *context) {}
+#pragma endregion
+
+#pragma region DepthOnlyPass
+
+    DepthOnlyPass::DepthOnlyPass() : RenderPass("DepthOnlyPass")
+    {
+        _event = ERenderPassEvent::kBeforeGbuffer;
+    }
+
+    void DepthOnlyPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData & rendering_data)
+    {
+        graph.AddPass(_name,RDG::PassDesc(),[&,this](RDG::RenderGraphBuilder &builder)
+        {
+            rendering_data._rg_handles._depth_target = builder.Write(rendering_data._rg_handles._depth_target,EResourceUsage::kDSV);
+        },
+        [this](RDG::RenderGraph& graph, CommandBuffer *cmd, const RenderingData &data){
+            cmd->SetRenderTarget(nullptr,graph.Resolve<RenderTexture>(data._rg_handles._depth_target));
+            cmd->ClearRenderTarget(kZFar, 0u);
+            Vector<QueuedDrawItem> draw_items;
+            for (auto &it: *data._cull_results)
+            {
+                auto &[queue, objs] = it;
+                for (auto &obj: objs)
+                {
+                    if (i16 shadow_pass = obj._material->GetShader()->FindPass("DepthOnly"); shadow_pass != -1)
+                    {
+                        draw_items.emplace_back(MakeQueuedDrawItem(queue, obj._mesh, obj._material, (*data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, (u16) shadow_pass, obj._instance_count));
+                    }
+                }
+            }
+            EmitQueuedDraws(cmd, draw_items);
+        });
+    }
+
 #pragma endregion
 }// namespace Ailu::Render

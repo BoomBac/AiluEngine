@@ -714,10 +714,16 @@ namespace Ailu::RHI::DX12
                 }
             }
         }
+        const auto bindless_srv_base = D3DDescriptorMgr::Get().GetBindlessSRVBaseGpuHandle();
+        const auto bindless_uav_base = D3DDescriptorMgr::Get().GetBindlessUAVBaseGpuHandle();
         if (d3d_ele._has_bindless_texture2d)
-        {
-            d3dcmd->SetComputeRootDescriptorTable(0, D3DDescriptorMgr::Get().GetBindlessSRVBaseGpuHandle());
-        }
+            d3dcmd->SetComputeRootDescriptorTable(d3d_ele._bindless_texture_slot, bindless_srv_base);
+        if (d3d_ele._has_bindless_buffer)
+            d3dcmd->SetComputeRootDescriptorTable(d3d_ele._bindless_buffer_slot, bindless_srv_base);
+        if (d3d_ele._has_bindless_rw_texture2d)
+            d3dcmd->SetComputeRootDescriptorTable(d3d_ele._bindless_rw_texture_slot, bindless_uav_base);
+        if (d3d_ele._has_bindless_rw_buffer)
+            d3dcmd->SetComputeRootDescriptorTable(d3d_ele._bindless_rw_buffer_slot, bindless_uav_base);
         _bind_state.pop();
         //d3dcmd->Dispatch(thread_group_x, thread_group_y, thread_group_z);
     }
@@ -827,22 +833,43 @@ namespace Ailu::RHI::DX12
         int cbuf_mask = 0, texture_count = 0;
         u8 root_param_index = 0;
         auto &cs_ele = _kernels[kernel_index]._variants[variant_hash];
-        auto bindless_tex2d_it = std::find_if(cs_ele._temp_bind_res_infos.begin(), cs_ele._temp_bind_res_infos.end(), [](auto it) -> bool
-                                                             { return it.second._name == "g_bindless_texture2d"; });
-        if (bindless_tex2d_it != cs_ele._temp_bind_res_infos.end())
+        auto &d3d_ele = _elements[kernel_index]._variants[variant_hash];
+        auto append_bindless_table = [&](const char* resource_name, D3D12_DESCRIPTOR_RANGE_TYPE range_type, u32 capacity, bool& has_bindless, u16& bindless_slot)
         {
+            auto bindless_it = std::find_if(cs_ele._temp_bind_res_infos.begin(), cs_ele._temp_bind_res_infos.end(), [resource_name](auto it) -> bool
+            {
+                return it.second._name == resource_name;
+            });
+            if (bindless_it == cs_ele._temp_bind_res_infos.end())
+                return;
+
             rootParameters[root_param_index].InitAsDescriptorTable(1, &ranges[root_param_index]);
-            
-            ranges[root_param_index].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity, bindless_tex2d_it->second._res_slot
-                ,bindless_tex2d_it->second._register_space,D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
-            bindless_tex2d_it->second._bind_slot = root_param_index;
-            _elements[kernel_index]._variants[variant_hash]._has_bindless_texture2d = true;
+            ranges[root_param_index].Init(range_type,
+                                          capacity,
+                                          bindless_it->second._res_slot,
+                                          bindless_it->second._register_space,
+                                          D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE);
+            bindless_it->second._bind_slot = root_param_index;
+            has_bindless = true;
+            bindless_slot = root_param_index;
             ++root_param_index;
-        }
+        };
+        d3d_ele._has_bindless_texture2d = false;
+        d3d_ele._has_bindless_buffer = false;
+        d3d_ele._has_bindless_rw_texture2d = false;
+        d3d_ele._has_bindless_rw_buffer = false;
+        d3d_ele._bindless_texture_slot = static_cast<u16>(-1);
+        d3d_ele._bindless_buffer_slot = static_cast<u16>(-1);
+        d3d_ele._bindless_rw_texture_slot = static_cast<u16>(-1);
+        d3d_ele._bindless_rw_buffer_slot = static_cast<u16>(-1);
+        append_bindless_table("g_bindless_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity, d3d_ele._has_bindless_texture2d, d3d_ele._bindless_texture_slot);
+        append_bindless_table("g_bindless_buffer", D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GPUVisibleDescriptorAllocator::kBindlessSRVCapacity, d3d_ele._has_bindless_buffer, d3d_ele._bindless_buffer_slot);
+        append_bindless_table("g_bindless_rw_texture2d", D3D12_DESCRIPTOR_RANGE_TYPE_UAV, GPUVisibleDescriptorAllocator::kBindlessUAVCapacity, d3d_ele._has_bindless_rw_texture2d, d3d_ele._bindless_rw_texture_slot);
+        append_bindless_table("g_bindless_rw_buffer", D3D12_DESCRIPTOR_RANGE_TYPE_UAV, GPUVisibleDescriptorAllocator::kBindlessUAVCapacity, d3d_ele._has_bindless_rw_buffer, d3d_ele._bindless_rw_buffer_slot);
         for (auto it = cs_ele._temp_bind_res_infos.begin(); it != cs_ele._temp_bind_res_infos.end(); it++)
         {
             auto &desc = it->second;
-            if (desc._name == "g_bindless_texture2d")
+            if (desc._name == "g_bindless_texture2d" || desc._name == "g_bindless_buffer" || desc._name == "g_bindless_rw_texture2d" || desc._name == "g_bindless_rw_buffer")
                 continue;
             if (desc._res_type == EBindResDescType::kTexture2D || desc._res_type == EBindResDescType::kTexture3D)
             {
@@ -881,7 +908,6 @@ namespace Ailu::RHI::DX12
                 ++root_param_index;
             }
         }
-        auto &d3d_ele = _elements[kernel_index]._variants[variant_hash];
         auto &sig = d3d_ele._p_sig;
         auto &pso = d3d_ele._pso;
 
