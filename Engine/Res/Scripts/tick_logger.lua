@@ -1,0 +1,19 @@
+local tick_logger = {}
+
+function tick_logger:OnInit()
+    local pos = self.entity:get_position()
+    self.base_x = pos[1]
+    self.base_y = pos[2]
+    self.base_z = pos[3]
+end
+
+function tick_logger:OnUpdate(delta_time)
+    local t = engine.time()
+    local y = self.base_y + (math.sin(t*8) + 1) * 6
+    self.entity:set_position(self.base_x, y, self.base_z)
+end
+
+function tick_logger:OnDestroy()
+end
+
+return tick_logger

@@ -32,23 +32,23 @@ namespace Ailu
             void SubmitVertexData();
 
         private:
-            void AppendNode(u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex = nullptr, Rect scissor = {})
+            void AppendNode(u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex = nullptr, Rect scissor = {}, f32 msdf_px_range = 0.0f)
             {
                 if (vert_num == 0u || index_num == 0u)
                     return;
                 bool is_custom_scissor = scissor.width != 0u;
                 if (_nodes.empty())
-                    _nodes.emplace_back(DrawNode{_cur_vert_num, vert_num, _cur_index_num, index_num, mat, tex, is_custom_scissor, scissor});
+                    _nodes.emplace_back(DrawNode{_cur_vert_num, vert_num, _cur_index_num, index_num, mat, tex, is_custom_scissor, scissor, msdf_px_range});
                 else
                 {
                     auto &pre_node = _nodes.back();
-                    if (pre_node._mat == mat && pre_node._main_tex == tex && pre_node._is_custom_scissor == is_custom_scissor && pre_node._scissor == scissor)
+                    if (pre_node._mat == mat && pre_node._main_tex == tex && pre_node._is_custom_scissor == is_custom_scissor && pre_node._scissor == scissor && pre_node._msdf_px_range == msdf_px_range)
                     {
                         pre_node._vert_num += vert_num;
                         pre_node._index_num += index_num;
                     }
                     else
-                        _nodes.emplace_back(DrawNode{_cur_vert_num, vert_num, _cur_index_num, index_num, mat, tex, is_custom_scissor, scissor});
+                        _nodes.emplace_back(DrawNode{_cur_vert_num, vert_num, _cur_index_num, index_num, mat, tex, is_custom_scissor, scissor, msdf_px_range});
                 }
                 _cur_vert_num += vert_num;
                 _cur_index_num += index_num;
@@ -73,6 +73,7 @@ namespace Ailu
                 Render::Texture *_main_tex;
                 bool _is_custom_scissor;
                 Rect _scissor;
+                f32 _msdf_px_range;
             };
             Vector<DrawNode> _nodes;
         private:

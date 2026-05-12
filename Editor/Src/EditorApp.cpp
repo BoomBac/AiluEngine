@@ -5,6 +5,7 @@
 
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/JobSystem.h"
+#include "Framework/Script/ScriptSystem.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Objects/Type.h"
 #include "Render/Camera.h"
@@ -192,6 +193,10 @@ namespace Ailu
                 auto t = EditorStyle::StaticType();
                 for (auto &p: t->GetProperties())
                     p.Deserialize(&g_editor_style, ar);
+            };
+            _on_file_changed += [](const fs::path &file)
+            {
+                ScriptSystem::Get().OnScriptFileChanged(file);
             };
             return ret;
         }
@@ -435,6 +440,7 @@ namespace Ailu
             static Vector<fs::path> s_watching_paths{
                     ResourceMgr::EngineResRootPath() + EnginePath::kEngineShaderPathW,
                     ResourceMgr::EngineResRootPath() + EnginePath::kEngineTexturePathW,
+                    ResourceMgr::EngineResRootPath() + EnginePath::kEngineScriptPathW,
                     s_editor_root_path + L"/Res/UI/"};
             static Vector<fs::path> s_watching_files{
                     s_editor_root_path + L"/EngineConfig.json"};

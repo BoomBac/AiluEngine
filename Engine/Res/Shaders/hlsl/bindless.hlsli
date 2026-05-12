@@ -21,6 +21,9 @@ RWByteAddressBuffer g_bindless_rw_buffer[]: register(u0,space9);
 #define g_bindless_structured_buffer g_bindless_buffer
 #define BINDLESS_BUFFER_LOAD(type, index, byte_offset) g_bindless_buffer[index].Load<type>(byte_offset)
 
-#define BINDLESS_RWBUFFER_STORE(index, byte_offset, value) g_bindless_rw_buffer[index].Store(byte_offset, (uint)value)
-#define BINDLESS_RWBUFFER_LOAD(type, index, byte_offset) g_bindless_rw_buffer[index].Load<type>(byte_offset)
+#define BINDLESS_RWBUFFER_STORE_OFFSET(type,handle,byte_offset,value) g_bindless_rw_buffer[handle].Store<type>(byte_offset, value)
+#define BINDLESS_RWBUFFER_STORE_INDEX(type,handle,index,value) g_bindless_rw_buffer[handle].Store<type>(index * sizeof(type), value)
+
+#define BINDLESS_RWBUFFER_LOAD_OFFSET(type,handle,byte_offset) g_bindless_rw_buffer[handle].Load<type>(byte_offset)
+#define BINDLESS_RWBUFFER_LOAD_INDEX(type,handle,index) g_bindless_rw_buffer[handle].Load<type>(index * sizeof(type))
 #endif

@@ -259,12 +259,12 @@ namespace Ailu
             return _text_renderer->CalculateTextSize(text, font_size, font, scale);
         }
 
-        void UIRenderer::AppendNode(DrawerBlock *block, u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex)
+        void UIRenderer::AppendNode(DrawerBlock *block, u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex, f32 msdf_px_range)
         {
             if (!_scissor_stack.empty())
-                block->AppendNode(vert_num, index_num, mat, tex,_scissor_stack.back());
+                block->AppendNode(vert_num, index_num, mat, tex, _scissor_stack.back(), msdf_px_range);
             else
-                block->AppendNode(vert_num, index_num, mat, tex);
+                block->AppendNode(vert_num, index_num, mat, tex, {}, msdf_px_range);
         }
 
         DrawerBlock *UIRenderer::GetAvailableBlock(u32 vert_num, u32 index_num)
@@ -321,6 +321,7 @@ namespace Ailu
             for (const auto& node: b->_nodes)
             {
                 node._mat->SetTexture("_MainTex", node._main_tex? node._main_tex : Texture::s_p_default_white);
+                node._mat->SetFloat("_MsdfPxRange", node._msdf_px_range);
                 if (node._is_custom_scissor)
                 {
                     if (prev_scissor != node._scissor)

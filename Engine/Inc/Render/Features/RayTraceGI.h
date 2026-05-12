@@ -31,6 +31,8 @@ namespace Ailu
             bool _use_hardware_ray_tracing = false;
             APROPERTY()
             bool _enable_ris = true;
+            APROPERTY()
+            bool _enable_resampling = true;
         private:
             Scope<GIPass> _gi_pass;
             Ref<ComputeShader> _gi_compute_shader;
@@ -87,7 +89,8 @@ namespace Ailu
             u32 _tile_frame_counter = 0u;
             Ref<GPUBuffer> _reservoir_a = nullptr;
             Ref<GPUBuffer> _reservoir_b = nullptr;
-            Ref<GPUBuffer> _surface_buffer = nullptr;
+            Ref<GPUBuffer> _surface_buffer_a = nullptr;
+            Ref<GPUBuffer> _surface_buffer_b = nullptr;
         };
     }
 } // namespace Ailu

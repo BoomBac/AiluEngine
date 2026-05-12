@@ -56,6 +56,7 @@ namespace Ailu::Render
         f32 _bottom_padding;
         f32 _ascent;
         f32 _descent;
+        f32 _msdf_distance_range = 0.0f;
         bool _is_bold;
         bool _is_italic;
         bool _is_packed;

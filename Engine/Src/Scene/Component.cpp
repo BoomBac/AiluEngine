@@ -49,6 +49,26 @@ namespace Ailu::ECS
         return ar;
     }
 
+    Archive &operator<<(Archive &ar, const ScriptComponent &c)
+    {
+        ar.IncreaseIndent();
+        ar.InsertIndent();
+        ar << "_script_path:" << c._script_path;
+        ar.DecreaseIndent();
+        ar.NewLine();
+        return ar;
+    }
+
+    Archive &operator>>(Archive &ar, ScriptComponent &c)
+    {
+        String buffer;
+        ar >> buffer;
+        AL_ASSERT(su::BeginWith(buffer, "_script_path"));
+        c._script_path = su::Split(buffer, ":")[1];
+        c.ResetRuntime();
+        return ar;
+    }
+
     Archive &operator<<(Archive &ar, const LightData &c)
     {
         ar.IncreaseIndent();

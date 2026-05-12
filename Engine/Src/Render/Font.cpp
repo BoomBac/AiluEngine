@@ -216,6 +216,10 @@ namespace Ailu::Render
         String y_origin = parser.GetString("atlas.yOrigin", "bottom");
         f32 tex_w = (f32) parser.GetInt("atlas.width");
         f32 tex_h = (f32) parser.GetInt("atlas.height");
+        font->_tex_width = (u16) tex_w;
+        font->_tex_height = (u16) tex_h;
+        font->_size = (u16) parser.GetInt("atlas.size");
+        font->_msdf_distance_range = (f32) parser.GetFloat("atlas.distanceRange");
         // --- metrics (values are in ems; typically emSize == 1)
         f32 em_size = 1.0f;
         em_size = (f32)parser.GetFloat("metrics.emSize");

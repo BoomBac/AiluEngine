@@ -33,6 +33,8 @@ namespace Ailu
             UI::CollapsibleView *_static_mesh_block = nullptr;
             UI::CollapsibleView *_light_probe_block = nullptr;
             UI::CollapsibleView *_cam_block = nullptr;
+            UI::CollapsibleView *_script_block = nullptr;
+            UI::InputBlock *_script_path_block = nullptr;
             UI::UIElement *_prev_comp_block = nullptr;
         };
     }// namespace Editor

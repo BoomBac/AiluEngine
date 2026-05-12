@@ -4,6 +4,7 @@
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Framework/Script/ScriptSystem.h"
 #include "Framework/Common/TimeMgr.h"
 #include "Framework/ImGui/ImGuiLayer.h"
 #include "Platform/WinWindow.h"
@@ -135,6 +136,7 @@ namespace Ailu
         RenderTexture::s_backbuffer = RenderTexture::WindowBackBuffer(&Application::Get().GetWindow());
         g_pGfxContext->ResizeSwapChain(_p_window->GetNativeWindowPtr(), desc._window_width, desc._window_height);
         g_pResourceMgr->Initialize();
+        ScriptSystem::Get().Initialize();
         Gizmo::Initialize();
         UI::UIManager::Init();
         SceneManagement::SceneMgr::Init();
@@ -174,6 +176,7 @@ namespace Ailu
         UI::UIManager::Shutdown();
         Gizmo::Shutdown();
         SceneManagement::SceneMgr::Shutdown();
+        ScriptSystem::Get().Finalize();
         g_pResourceMgr->Finalize();
         DESTORY_PTR(g_pResourceMgr);
         GraphicsContext::Get().UnRegisterWindow(_p_window.get());
@@ -546,6 +549,7 @@ namespace Ailu
                     ZoneScopedN("SceneTick");
 #endif
                     SceneManagement::SceneMgr::Get().Tick(delta_time);
+                    ScriptSystem::Get().Tick(delta_time);
                 }
                 {
                     CPUProfileBlock b("RenderScene");

@@ -24,6 +24,7 @@ namespace Ailu
             _gi_pass = MakeScope<GIPass>(_gi_compute_shader.get(), _gi_raytracing_shader.get());
             _gi_compute_shader->SetInts("_PickPixel",{200,200});
             _gi_compute_shader->SetBool("_enable_ris", _enable_ris);
+            _gi_compute_shader->SetBool("_enable_resampling", _enable_resampling);
         }
         void RayTraceGI::AddRenderPasses(Renderer &renderer, const RenderingData &rendering_data)
         {
@@ -66,10 +67,15 @@ namespace Ailu
             {
                 _gi_compute_shader->SetBool("_show_debug", _is_show_debug);
             }
-            if (prop.Name() == "_enable_ris")
+            else if (prop.Name() == "_enable_ris")
             {
                 _gi_compute_shader->SetBool("_enable_ris", _enable_ris);
             }
+            else if (prop.Name() == "_enable_resampling")
+            {
+                _gi_compute_shader->SetBool("_enable_resampling", _enable_resampling);
+            }
+            else {}
         }
 
 #pragma endregion
@@ -170,7 +176,8 @@ namespace Ailu
             _cur_target_handle = graph.Import(_is_cur_a ? _gi_texture_a.get() : _gi_texture_b.get());
             _history_target_handle = graph.Import(_is_cur_a ? _gi_texture_b.get() : _gi_texture_a.get());
             _gi_compute_shader->SetInt("_frame_index", s_frame_counter);
-            _gi_compute_shader->SetInt("_surface_buffer_idx",_surface_buffer? _surface_buffer->GetBindlessUAVIndex() : -1);
+            _gi_compute_shader->SetInt("_prev_surface_buffer_idx", _is_cur_a ? (_surface_buffer_b ? _surface_buffer_b->GetBindlessUAVIndex() : -1) : (_surface_buffer_a ? _surface_buffer_a->GetBindlessUAVIndex() : -1));
+            _gi_compute_shader->SetInt("_curr_surface_buffer_idx", _is_cur_a ? (_surface_buffer_a ? _surface_buffer_a->GetBindlessUAVIndex() : -1) : (_surface_buffer_b ? _surface_buffer_b->GetBindlessUAVIndex() : -1));
 
             const bool use_hardware_ray_tracing = CanUseHardwareRayTracing();
             if (!use_hardware_ray_tracing && _scene_rt_proxy != nullptr)
@@ -337,7 +344,7 @@ namespace Ailu
                 recreated = true;
                 BufferDesc buf_desc;
                 buf_desc._element_num = rendering_data._width * rendering_data._height;
-                buf_desc._element_size = 44;//sizeof(Reservoir) restir_di.hlsli
+                buf_desc._element_size = 40u;//sizeof(Reservoir) restir_di.hlsli
                 buf_desc._size = buf_desc._element_num * buf_desc._element_size;
                 buf_desc._is_random_write = true;
                 buf_desc._format = EALGFormat::kALGFormatUNKOWN;
@@ -346,10 +353,18 @@ namespace Ailu
                 _reservoir_b = GPUBuffer::Create(buf_desc);
                 _reservoir_a->Name("RayTraceGI_ReservoirA");
                 _reservoir_b->Name("RayTraceGI_ReservoirB");
+                // Vector<u8> reservoir_zero(buf_desc._size, 0u);
+                // _reservoir_a->SetData(reservoir_zero);
+                // _reservoir_b->SetData(reservoir_zero);
                 buf_desc._element_size = 64u;//sizeof(Surface) restir_di.hlsli
                 buf_desc._size = buf_desc._element_num * buf_desc._element_size;
-                _surface_buffer = GPUBuffer::Create(buf_desc);
-                _surface_buffer->Name("RayTraceGI_SurfaceBuffer");
+                _surface_buffer_a = GPUBuffer::Create(buf_desc);
+                _surface_buffer_b = GPUBuffer::Create(buf_desc);
+                _surface_buffer_a->Name("RayTraceGI_SurfaceBufferA");
+                _surface_buffer_b->Name("RayTraceGI_SurfaceBufferB");
+                // Vector<u8> surface_zero(buf_desc._size, 0u);
+                // _surface_buffer_a->SetData(surface_zero);
+                // _surface_buffer_b->SetData(surface_zero);
             }
             return recreated;
         }

@@ -50,6 +50,8 @@ target_include_directories(Editor PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 target_compile_definitions(Editor PUBLIC
     Editor_EXPORTS
     _WINDOWS
+    UNICODE
+    _UNICODE
     _REVERSED_Z
     $<$<CONFIG:Debug>:_DEBUG>)
 
@@ -61,11 +63,9 @@ if (AILU_ENABLE_TRACY)
 endif()
 set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 # 编译器参数
-# if(MSVC)
-    target_compile_options(Editor PUBLIC /MP)
-    # MSVC 编译器的警告选项不同，以下是一个示例
-    target_compile_options(Editor PUBLIC /D_UNICODE /DUNICODE /wd4819) # /wd4100 禁用未使用的参数警告
-# endif()
+if (MSVC)
+    target_compile_options(Editor PUBLIC /MP /wd4819)
+endif()
 # 链接库
 # 设置不同配置的库路径
 #target_link_directories(Editor PRIVATE
@@ -74,5 +74,5 @@ set_target_properties (Editor PROPERTIES OUTPUT_NAME "Editor")
 #        )
 add_dependencies(Editor Engine)
 target_link_libraries(Editor PRIVATE
-    ${AILU_ENGINE_IMPORT_LIB}
+    Engine
     ${AILU_FBXSDK_LINK_LIB}) # msvcrtd.lib

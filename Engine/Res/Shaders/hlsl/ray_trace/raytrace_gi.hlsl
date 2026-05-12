@@ -55,7 +55,9 @@ CBUFFER_START(ComputeCB)
     uint _light_count;
     uint _scene_bindless_idx;
     bool _enable_ris;
-    uint _surface_buffer_idx;
+    bool _enable_resampling;
+    uint _prev_surface_buffer_idx;
+    uint _curr_surface_buffer_idx;
 CBUFFER_END
 
 // ===== Debug 宏定义 =====
@@ -140,8 +142,7 @@ static const float3 kDepthColors[kMaxDepth] =
 
 uint PixelToLinearIndex(uint2 pixel)
 {
-    uint2 tile_pixel = pixel - uint2(_GI_TileOffset);
-    return tile_pixel.y * _GI_TileSize.x + tile_pixel.x;
+    return pixel.y * (uint)_ScreenParams.z + pixel.x;
 }
 
 static float reflectance(float cosine, float refraction_index) 
@@ -644,14 +645,80 @@ bool IsValidSurface(Surface s)
 Surface GetPrevSurface(int2 pixel)
 {
     Surface s;
-    if (!IsValidPixel(pixel) || !valid_bindless_handle(_surface_buffer_idx))
+    if (!IsValidPixel(pixel) || !valid_bindless_handle(_prev_surface_buffer_idx))
     {
         s._linear_depth = kZFar;
         return s;
     }
-    uint history_index = PixelToLinearIndex(pixel);
-    s = BINDLESS_RWBUFFER_LOAD(Surface,_surface_buffer_idx, history_index * sizeof(Surface));
+    uint history_index = PixelToLinearIndex(uint2(pixel));
+    s = BINDLESS_RWBUFFER_LOAD_INDEX(Surface,_prev_surface_buffer_idx, history_index);
     return s;
+}
+
+void StoreCurrentSurface(uint2 pixel, Surface s)
+{
+    if (!valid_bindless_handle(_curr_surface_buffer_idx))
+        return;
+
+    uint surface_index = PixelToLinearIndex(pixel);
+    BINDLESS_RWBUFFER_STORE_INDEX(Surface, _curr_surface_buffer_idx, surface_index, s);
+}
+
+Material BuildStoredSurfaceMaterial(Surface surface)
+{
+    Material mat = (Material)0;
+    mat._albedo = surface._albedo;
+    mat._roughness = surface._roughness;
+    mat._metallic = surface._metallic;
+    mat._anisotropy = surface._padding;
+    mat._ior = 1.5;
+    mat._transmission = 0.0;
+    mat._emission = 0.0.xxx;
+    mat._is_glass = false;
+    return mat;
+}
+
+TraceContext BuildSurfaceTraceContext(Material mat)
+{
+    TraceContext trace_ctx = (TraceContext)0;
+    trace_ctx._mat = mat;
+    trace_ctx._ior_i = 1.0;
+    trace_ctx._ior_t = mat._ior;
+    trace_ctx._eta = trace_ctx._ior_i / trace_ctx._ior_t;
+    return trace_ctx;
+}
+
+bool EvaluateReservoirTargetAtSurface(TinyLightSample sample, Surface surface, out float target)
+{
+    target = 0.0;
+
+    if (!any(sample._le > 0.0.xxx))
+        return false;
+
+    float3 to_light = sample._position - surface._position;
+    float dist2 = dot(to_light, to_light);
+    if (dist2 <= 1e-6)
+        return false;
+
+    float3 wi = to_light * rsqrt(dist2);
+    Material mat = BuildStoredSurfaceMaterial(surface);
+    float cos_theta = DirectLightCosTheta(mat, surface._normal, wi);
+    if (cos_theta <= 1e-6)
+        return false;
+
+    float3 wo = normalize(_CameraPos.xyz - surface._position);
+    float3 h = normalize(wi + wo);
+    if (all(h == 0.0.xxx))
+        return false;
+
+    float pdf_brdf = 0.0;
+    TraceContext trace_ctx = BuildSurfaceTraceContext(mat);
+    float3 f = EvalBRDF(trace_ctx, surface._normal, h, wo, wi, pdf_brdf);
+    if (all(f == 0.0.xxx))
+        return false;
+
+    target = max(Luminance(sample._le * f * cos_theta), 0.0);
+    return target > 1e-8;
 }
 
 bool IsValidNeighbor(float3 normal,float depth01,float3 neighbor_normal,float neighbor_depth01,float depth_threshold,float normal_threshold)
@@ -661,8 +728,47 @@ bool IsValidNeighbor(float3 normal,float depth01,float3 neighbor_normal,float ne
     return normal_similarity > normal_threshold && depth_delta < depth_threshold;
 }
 
-Reservoir TemporalSpatialResampling(uint2 pixel,Reservoir r,Surface surface,inout RandomCtx ctx)
+Reservoir TemporalReuse(uint2 pixel,Reservoir r,Surface surface,inout RandomCtx ctx,out float3 debug_color)
 {
+    if (!valid_bindless_handle(_prev_surface_buffer_idx) || r.M == 0u)
+        return r;
+    debug_color = 1;
+    Reservoir state = InitReservoir();
+    CombineDIReservoirs(state, r, rand(ctx), r.target);
+
+    float3 motion = _MotionVectorTexture[pixel].rgb;
+    float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
+    float2 history_uv = uv - motion.xy;
+    bool is_valid_history = all(history_uv >= 0) && all(history_uv < 1.0.xx);
+    if (!is_valid_history)
+    {
+        return r;
+    }
+
+    int2 history_pixel = int2(history_uv * _ScreenParams.zw);
+    int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
+    history_pixel = clamp(history_pixel, int2(0, 0), history_max);
+    Reservoir history_r = g_prev_reservoir[PixelToLinearIndex(uint2(history_pixel))];
+    if (history_r.M == 0)
+        return state;
+    float history_target = 0.0;
+    if (!EvaluateReservoirTargetAtSurface(history_r.y, surface, history_target))
+        return state;
+    history_r.M = min(history_r.M, 16u);
+    CombineDIReservoirs(state, history_r, rand(ctx), history_target);
+    debug_color = 0.0.xxx;
+    FinalizeResampling(state, 1.0, (float)state.M);
+    return state;
+}
+
+Reservoir TemporalSpatialResampling(uint2 pixel,Reservoir r,Surface surface,inout RandomCtx ctx,out float3 debug_color)
+{
+    if (_frame_index == 0u || !valid_bindless_handle(_prev_surface_buffer_idx) || r.M == 0u)
+        return r;
+    debug_color = 1;
+    Reservoir state = InitReservoir();
+    CombineDIReservoirs(state, r, 0.5, r.target);
+
     float3 motion = _MotionVectorTexture[pixel].rgb;
     float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
     float2 history_uv = uv - motion.xy;
@@ -676,61 +782,110 @@ Reservoir TemporalSpatialResampling(uint2 pixel,Reservoir r,Surface surface,inou
     int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
     history_pixel = clamp(history_pixel, int2(0, 0), history_max);
 
+    const static uint kTemporalSearchCount = 9;
+    const static uint kMaxReuseCandidates = 1;
+    const static uint kSpatialSamples = 1;
+    const static uint kDisocclusionBoostSamples = 8;
     const static uint kSpatialRadius = 8;
-    const static float kDepthThreshold = 0.02; // 视深阈值
-    const static float kNormalThreshold = 0.95; // 法线相似度
+    const static float kDepthThreshold = 0.02;
+    const static float kNormalThreshold = 0.95;
     float expected01_depth = surface._linear_depth - motion.z;
     bool has_valid_surface = false;
-    Surface history_surface;
-    uint2 ts_offset = uint2(0,0);
-    for (uint i = 0; i < 9; i++)
+    Surface history_surface = (Surface)0;
+    int2 temporal_offset = int2(0, 0);
+    for (uint i = 0; i < kTemporalSearchCount; ++i)
     {
-        uint2 offset = uint2(0,0);
+        int2 offset = int2(0, 0);
         if (i > 0)
         {
-            offset = uint2((rand2(ctx) - 0.5) * kSpatialRadius);
+            offset = int2((rand2(ctx) - 0.5) * kSpatialRadius);
         }
         int2 neighbor_pixel = history_pixel + offset;
         Surface s = GetPrevSurface(neighbor_pixel);
+        debug_color = 1.0.xxx;
         if (IsValidSurface(s) && IsValidNeighbor(surface._normal, expected01_depth, s._normal, s._linear_depth, kDepthThreshold, kNormalThreshold))
         {
             history_surface = s;
             has_valid_surface = true;
-            ts_offset = offset;
+            temporal_offset = offset;
+            history_pixel = neighbor_pixel;
             break;
         }
     }
-    if (!has_valid_surface)
-    {
-        return r;
-    }
+    debug_color = has_valid_surface? history_surface._normal : float3(1, 0, 0);
+    Surface candidate_surfaces[kMaxReuseCandidates];
+    uint candidate_m[kMaxReuseCandidates];
+    uint candidate_count = 0u;
+    int selected_candidate_idx = -1;
+    uint sample_count = has_valid_surface ? kSpatialSamples : kDisocclusionBoostSamples;
 
-    for (uint j = 0; j < 1; j++)
+    for (uint i = 0; i < sample_count && candidate_count < kMaxReuseCandidates; ++i)
     {
-        uint2 offset;
-        if (j == 0 && has_valid_surface)
+        int2 neighbor_pixel;
+        Surface prev_surface;
+        if (i == 0 && has_valid_surface)
         {
-            offset = ts_offset;
+            neighbor_pixel = history_pixel;
+            prev_surface = history_surface;
         }
         else
         {
-            offset = uint2((rand2(ctx) - 0.5) * kSpatialRadius);
+            int2 offset = int2((rand2(ctx) - 0.5) * kSpatialRadius);
+            neighbor_pixel = clamp(history_pixel + offset, int2(0, 0), history_max);
+            prev_surface = GetPrevSurface(neighbor_pixel);
+            if (!IsValidSurface(prev_surface))
+                continue;
+            if (!IsValidNeighbor(surface._normal, expected01_depth, prev_surface._normal, prev_surface._linear_depth, kDepthThreshold, kNormalThreshold))
+                continue;
         }
-        int2 neighbor_pixel = history_pixel + offset;
+
         if (!IsValidPixel(neighbor_pixel))
             continue;
-        Surface s = GetPrevSurface(neighbor_pixel);
-        if (!IsValidSurface(s))
+
+        Reservoir neighbor_r = g_prev_reservoir[PixelToLinearIndex(uint2(neighbor_pixel))];
+        neighbor_r = ClampReservoirHistory(neighbor_r, 32);
+        if (neighbor_r.M == 0u || neighbor_r.w_sum <= 1e-6)
             continue;
-        if (IsValidNeighbor(surface._normal, expected01_depth, s._normal, s._linear_depth, kDepthThreshold, kNormalThreshold))
+
+        float neighbor_target = 0.0;
+        if (!EvaluateReservoirTargetAtSurface(neighbor_r.y, surface, neighbor_target))
             continue;
-        uint neighbor_index = PixelToLinearIndex(neighbor_pixel);
-        Reservoir neighbor_r = g_prev_reservoir[neighbor_index];
-        neighbor_r = ClampReservoirHistory(neighbor_r, r.M * 20);
-        MergeReservoir(r, neighbor_r, rand(ctx));
+
+        candidate_surfaces[candidate_count] = prev_surface;
+        candidate_m[candidate_count] = neighbor_r.M;
+        if (CombineDIReservoirs(state, neighbor_r, rand(ctx), neighbor_target))
+        {
+            selected_candidate_idx = (int)candidate_count;
+        }
+        ++candidate_count;
     }
-    return r;
+
+    if (candidate_count == 0u)
+        return r;
+
+    if (state.w_sum <= 1e-6)
+        return r;
+
+    float pi = r.target;
+    if (selected_candidate_idx >= 0)
+    {
+        EvaluateReservoirTargetAtSurface(state.y, candidate_surfaces[selected_candidate_idx], pi);
+    }
+
+    float pi_sum = r.target * r.M;
+    for (uint i = 0; i < candidate_count; ++i)
+    {
+        float ps = 0.0;
+        if (!EvaluateReservoirTargetAtSurface(state.y, candidate_surfaces[i], ps))
+            continue;
+        pi_sum += ps * candidate_m[i];
+    }
+
+    FinalizeResampling(state, 1.0, pi_sum);
+    return state;
 }
+
+
 
 float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_data,Surface surface,float3 wo,bool is_debug,inout RandomCtx ctx,inout DebugData debug_data)
 {
@@ -745,7 +900,7 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
 
     debug_data = (DebugData)0;
     debug_data.wo = wo;
-    debug_data.normal = n;
+    debug_data.normal = -1;//n;
     debug_data.roughness = mat._roughness;
     debug_data.emission = mat._emission;
     debug_data.throughput = 1.0.xxx;
@@ -765,6 +920,7 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
         float select_pmf = GetUnifiedLightSelectionPMF(_light_count);
         uint reservoir_index = PixelToLinearIndex(pixel);
         Reservoir r = InitReservoir();
+        Reservoir local_r = InitReservoir();
         for (uint i = 0; i < PER_FRAME_SAMPLES; ++i)
         {
             float select_r = rand(ctx);
@@ -783,13 +939,16 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
             }
             TinyLightSample ts = (TinyLightSample)0;
             ts._light_idx = sampled_light_idx;
-            ts._pdf = max(mis_ctx._pl * proposal_pdf + mis_ctx._pb * pdf_brdf, 1e-6);
             ts._position = world_pos + light_sample._wi * light_sample._t;
             ts._le = light_sample._radiance;
-            ts._weight =  target / ts._pdf;
-            UpdateReservoir(r, ts, ts._weight, 1, rand(ctx));
+            float inv_pdf = 1.0 / max(mis_ctx._pl * proposal_pdf + mis_ctx._pb * pdf_brdf, 1e-6);
+            UpdateReservoir(local_r, ts, target, rand(ctx), inv_pdf);
         }
+        FinalizeResampling(local_r,1.0,sample_count);
+        local_r.M = 1;
+        CombineDIReservoirs(r, local_r,0.5,local_r.target);
 
+        Reservoir brdf_r = InitReservoir();
         for (uint i = 0; i < brdf_candidate_count; ++i)
         {
             float3 r3 = float3(rand(ctx), rand(ctx), rand(ctx));
@@ -822,32 +981,20 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
 
             TinyLightSample ts = (TinyLightSample)0;
             ts._light_idx = hit_light_idx;
-            ts._pdf = max(mis_ctx._pl * light_pdf + mis_ctx._pb * pdf_brdf, 1e-6);
+            float inv_pdf = 1.0 / max(mis_ctx._pl * light_pdf + mis_ctx._pb * pdf_brdf, 1e-6);
             ts._position = brdf_origin + result.wi * hit_light_t;
             ts._le = hit_light_sample._radiance;
-            ts._weight = target / ts._pdf;
-            UpdateReservoir(r, ts, ts._weight, 1, rand(ctx));
+            UpdateReservoir(brdf_r, ts, target, rand(ctx), inv_pdf);
         }
-        
-        float2 motion = _MotionVectorTexture[pixel].rg;
-        float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
-        float2 history_uv = uv - motion;
-        bool is_valid_history = all(history_uv >= 0) && all(history_uv < 1.0.xx);
-        Reservoir prev_r = InitReservoir();
-        if (is_valid_history)
-        {
-            int2 history_pixel = int2(history_uv * _ScreenParams.zw);
-            int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
-            history_pixel = clamp(history_pixel, int2(0, 0), history_max);
-            prev_r = g_prev_reservoir[PixelToLinearIndex(history_pixel)];
-            prev_r = ClampReservoirHistory(prev_r, r.M * 20);
-            MergeReservoir(r, prev_r, rand(ctx));
-        }
-
-        
-
-        //r = TemporalSpatialResampling(pixel, r, surface, ctx);
-
+        FinalizeResampling(brdf_r,1.0,sample_count);
+        brdf_r.M = 1;
+        CombineDIReservoirs(r, brdf_r, rand(ctx), brdf_r.target);
+        FinalizeResampling(r,1.0,(float)r.M);
+        r.M = 1;
+        float3 debug_color = 0;
+        if (_enable_resampling)
+            //r = TemporalSpatialResampling(pixel, r, surface, ctx,debug_color);
+            r = TemporalReuse(pixel, r, surface, ctx,debug_color);
         g_curr_reservoir[reservoir_index] = r;
         TinyLightSample selected_sample = r.y;
         if (r.M > 0u && r.w_sum > 1e-6)
@@ -868,15 +1015,10 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
                 float3 h = normalize(wi + wo);
                 float pdf_brdf = 0.0;
                 float3 f = EvalBRDF(trace_ctx, n, h, wo, wi, pdf_brdf);
-                float3 numerator = selected_sample._le * f * cos_theta;// * mis;
-                float target = max(Luminance(numerator), 0);
-                if (target > 1e-6)
-                {
-                    float ris_normalization = r.w_sum / max((float)r.M, 1.0);
-                    radiance += numerator * ris_normalization / target;
-                }
+                radiance += selected_sample._le * f * cos_theta * r.w_sum;
             }
         }
+        //radiance = debug_color;
     }
     else
     {
@@ -902,7 +1044,8 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
         }
     }
 
-    return max(radiance, 0.0.xxx);
+    //return max(radiance, 0.0.xxx);
+    return min(radiance,float3(20,20,20));
 }
 
 
@@ -985,176 +1128,6 @@ float3 Trace(uint2 pixel,float3 ray_dir, float3 ray_origin, uint max_depth,bool 
 #ifdef ADDITIONAL_SAMPLING
     if (_light_count > 0u)
     {
-        if (_enable_ris)
-        {
-            float select_pmf = GetUnifiedLightSelectionPMF(_light_count);
-            if (depth == 0)
-            {
-                Reservoir r;
-                uint reservoir_index = PixelToLinearIndex(pixel);
-                if (_frame_index == 0)
-                {
-                    // 首帧采集多个样本
-                    r = InitReservoir();
-                    [unroll]
-                    for (uint i = 0; i < PER_FRAME_SAMPLES; ++i)
-                    {
-                        float select_r = rand(ctx);
-                        uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
-                        LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
-                        float proposal_pdf = light_sample._pdf * select_pmf;
-
-                        float3 numerator = 0.0.xxx;
-                        float target = 0.0;
-                        bool valid = EvaluateRISDirectCandidate(trace_ctx, mat, p, n, wo, light_sample, numerator, target);
-                        TinyLightSample ts = (TinyLightSample)0;
-                        ts._light_idx = sampled_light_idx;
-                        ts._pdf = proposal_pdf;
-                        ts._position = p + light_sample._wi * light_sample._t;
-                        ts._le = light_sample._radiance;
-
-                        ts._weight = (valid && proposal_pdf > 1e-8) ? target / proposal_pdf : 0.0;
-                        UpdateReservoir(r, ts, ts._weight, 1, rand(ctx));
-                    }
-                }
-                else
-                {
-                    Reservoir prev_r = g_prev_reservoir[reservoir_index];
-                    r = InitReservoir();
-                    [unroll]
-                    for (uint i = 0; i < 1; ++i)
-                    {
-                        float select_r = rand(ctx);
-                        uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
-                        LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
-                        float proposal_pdf = light_sample._pdf * select_pmf;
-
-                        float3 numerator = 0.0.xxx;
-                        float target = 0.0;
-                        bool valid = EvaluateRISDirectCandidate(trace_ctx, mat, p, n, wo, light_sample, numerator, target);
-                        TinyLightSample ts = (TinyLightSample)0;
-                        ts._light_idx = sampled_light_idx;
-                        ts._pdf = proposal_pdf;
-                        ts._position = p + light_sample._wi * light_sample._t;
-                        ts._le = light_sample._radiance;
-
-                        ts._weight = (valid && proposal_pdf > 1e-8) ? target / proposal_pdf : 0.0;
-                        UpdateReservoir(r, ts, ts._weight, 1, rand(ctx));
-                    }
-                    prev_r = ClampReservoirHistory(prev_r,r.M*20);
-                    MergeReservoir(r, prev_r, rand(ctx));
-                }
-                g_curr_reservoir[reservoir_index] = r;
-                TinyLightSample selected_sample = r.y;
-                if (r.M > 0u && r.w_sum > 1e-6)
-                {
-                    float3 light_normal = ReconstructLightNormal(selected_sample._light_idx, selected_sample._position);
-                    float3 wi = normalize(selected_sample._position - p);
-                    float cos_theta = DirectLightCosTheta(mat, n, wi);
-                    float3 shadow_origin = p + wi * 0.002;
-                    float shadow_ray_tmax = length(selected_sample._position - p) * 0.98;
-                    bool is_occluded = IsOccluded(shadow_origin, wi, shadow_ray_tmax);
-                    if (is_debug)
-                    {
-                        AppendDebugLine(shadow_origin, shadow_origin + wi * 20, float4(1, 0, 0, 1));
-                    }
-
-                    if (!is_occluded)
-                    {
-                        float3 h = normalize(wi + wo);
-                        float pdf_brdf = 0.0;
-                        float3 f = EvalBRDF(trace_ctx, n, h, wo, wi, pdf_brdf);
-                        float mis = PowerHeuristic(selected_sample._pdf,pdf_brdf);
-                        float3 numerator = selected_sample._le * f * cos_theta * mis;
-                        float target = max(Luminance(numerator), 0);
-                        float ris_normalization = r.w_sum / max((float)r.M, 1.0);
-                        radiance += throughput * numerator * ris_normalization / target;
-                        //radiance = kDepthColors[selected_sample._light_idx];
-                    }
-                }
-            }
-            else
-            {
-                if (_light_count > 0)
-                {
-                    float select_r = rand(ctx);
-                    uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
-                    LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
-                    light_sample._pdf *= GetUnifiedLightSelectionPMF(_light_count);
-                    float cos_theta = DirectLightCosTheta(mat, n, light_sample._wi);
-                    debug_data.nl = cos_theta;
-                    debug_data.wi = light_sample._wi;
-                    float3 shadow_origin = p + light_sample._wi * 0.002;
-                    float shadow_ray_tmax = GetLightShadowRayTMax(light_sample) * 0.98;
-                    bool is_occluded = IsOccluded(shadow_origin, light_sample._wi, shadow_ray_tmax);
-                    if (is_debug)
-                        AppendDebugLine(shadow_origin, shadow_origin + light_sample._wi * shadow_ray_tmax, float4(1, 0, 0, 1));
-                    if (!is_occluded && light_sample._pdf > 1e-6 && cos_theta > 1e-6 && any(light_sample._radiance > 0.0.xxx))
-                    {
-                        float3 h = normalize(light_sample._wi + wo);
-                        float pdf_brdf_for_light = 0.0;
-                        float3 f = EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf_for_light);
-                        float weight = PowerHeuristic(light_sample._pdf, pdf_brdf_for_light);
-                        radiance += throughput * light_sample._radiance * f * cos_theta * weight / light_sample._pdf;
-                    }
-                }
-            }
-            
-            /*
-            Reservoir r = InitReservoir();
-            const uint ris_candidate_count = 8u;
-            LightSample ris_samples[8];
-            float  ris_targets[8];
-            float3 ris_numerators[8];
-
-            [loop]
-            for (uint i = 0; i < ris_candidate_count; ++i)
-            {
-                float select_r = rand(ctx);
-                uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
-                LightSample light_sample = SampleUnifiedLight(sampled_light_idx, p, n, ctx);
-                light_sample._pdf *= GetUnifiedLightSelectionPMF(_light_count);
-                bool valid = EvaluateRISDirectCandidate(trace_ctx, mat, p, n, wo, light_sample, 
-                    ris_numerators[i], ris_targets[i]);
-                ris_samples[i] = light_sample;
-
-                TinyLightSample ts = (TinyLightSample)0;
-                ts._light_idx = sampled_light_idx;
-                ts._pdf = light_sample._pdf;
-                ts._position = p + light_sample._wi * light_sample._t;
-                ts._le = light_sample._radiance;
-                float candidate_weight = valid ? ris_targets[i] / light_sample._pdf : 0.0;
-                UpdateReservoir(r, ts, candidate_weight, 1u, rand(ctx));
-            }
-
-            TinyLightSample selected_sample = r.y;
-            if (r.M > 0u && r.w_sum > 1e-6)
-            {
-                float3 light_normal = ReconstructLightNormal(selected_sample._light_idx, selected_sample._position);
-                float3 wi = normalize(selected_sample._position - p);
-                float cos_theta = DirectLightCosTheta(mat, n, wi);
-                float3 shadow_origin = p + wi * 0.002;
-                float shadow_ray_tmax = length(selected_sample._position - p) * 0.98;
-                bool is_occluded = IsOccluded(shadow_origin, wi, shadow_ray_tmax);
-                if (is_debug)
-                {
-                    AppendDebugLine(shadow_origin, shadow_origin + wi * 20, float4(1, 0, 0, 1));
-                }
-
-                if (!is_occluded)
-                {
-                    float3 h = normalize(wi + wo);
-                    float pdf_brdf = 0.0;
-                    float3 f = EvalBRDF(trace_ctx, n, h, wo, wi, pdf_brdf);
-                    float mis = PowerHeuristic(selected_sample._pdf,pdf_brdf);
-                    float3 numerator = selected_sample._le * f * cos_theta * mis;
-                    float target = max(Luminance(numerator), 0);
-                    float ris_normalization = r.w_sum / max((float)r.M, 1.0);
-                    radiance += throughput * numerator * ris_normalization / target;
-                }
-            }*/
-    }
-        else
         {
             float select_r = rand(ctx);
             uint sampled_light_idx = min((uint)(select_r * _light_count), _light_count - 1u);
@@ -1298,6 +1271,10 @@ void RayGen(CSInput input)
 	float depth = SAMPLE_TEXTURE2D_LOD(_CameraDepthTexture,g_LinearClampSampler,uv,0).r;
     if (depth >= 1.0)
     {
+        Surface invalid_surface = (Surface)0;
+        invalid_surface._linear_depth = kZFar;
+        StoreCurrentSurface(pixel, invalid_surface);
+        g_curr_reservoir[PixelToLinearIndex(pixel)] = InitReservoir();
         _GI_Texture[pixel] = float4(0.0, 0.0, 0.0, 1.0);
         return;
     }
@@ -1323,27 +1300,31 @@ void RayGen(CSInput input)
     surface._roughness = surface_data.roughness;
     surface._metallic = surface_data.metallic;
     surface._geo_normal = surface_data.wnormal;
+    surface._padding = surface_data.anisotropy;
     surface._linear_depth = Linear01Depth(depth,_ProjectionParams.y,_ProjectionParams.z);
     if (!IsValidSurface(surface))
     {
+        Surface invalid_surface = (Surface)0;
+        invalid_surface._linear_depth = kZFar;
+        StoreCurrentSurface(pixel, invalid_surface);
+        g_curr_reservoir[PixelToLinearIndex(pixel)] = InitReservoir();
         _GI_Texture[pixel] = 0.0;
         return;
     }
+
+    StoreCurrentSurface(pixel, surface);
+
 
     float3 wo = normalize(_CameraPos.xyz - world_pos);
     bool is_debug = (pixel.x == _PickPixel.x && pixel.y == _PickPixel.y);
     DebugData debug_data;
     float3 color = EvaluateSurfaceReSTIRDI(pixel, world_pos, surface_data,surface, wo, is_debug, ctx, debug_data);
+    if (!_enable_ris || _light_count == 0u)
+        g_curr_reservoir[PixelToLinearIndex(pixel)] = InitReservoir();
 
     float3 debug_output = color;
     HandleDebugOutput(debug_data, surface_data.wnormal * 0.5 + 0.5, color, debug_output);
     _GI_Texture[pixel] = float4(debug_output,1.0f);
-
-    // if (valid_bindless_handle(_surface_buffer_idx))
-    // {
-    //     uint surface_index = PixelToLinearIndex(pixel);
-    //     BINDLESS_RWBUFFER_STORE(_surface_buffer_idx, surface_index * sizeof(Surface), surface);
-    // }
 }
 
 [shader("compute")]

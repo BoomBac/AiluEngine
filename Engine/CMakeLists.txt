@@ -1,6 +1,11 @@
 # https://blog.csdn.net/weixin_43717839/article/details/128032486
 cmake_minimum_required(VERSION 4.1)
 project (AiluEngine)
+option(AILU_ENABLE_LUA_SCRIPTING "Enable Lua + sol2 scripting support" OFF)
+set(AILU_SOL2_INCLUDE_DIR "" CACHE PATH "Path to sol2 include root containing sol/sol.hpp")
+set(AILU_LUA_INCLUDE_DIR "" CACHE PATH "Path to Lua headers containing lua.hpp")
+set(AILU_LUA_LIBRARY "" CACHE FILEPATH "Path to the Lua library file")
+set(AILU_LUA_SOURCE_DIR "" CACHE PATH "Path to vendored Lua source tree")
 # 设置输出目录的根目录
 set(OUTPUT_ROOT "${AiluBuildPath}/out/engine/lib/x64")
 # 设置 C++ 标准
@@ -20,6 +25,53 @@ function(add_source_files_recursive dir)
 endfunction()
 
 set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
+set(AILU_LUA_SOURCES)
+set(AILU_LUA_GENERATED_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated/lua_include)
+
+set(AILU_LUA_SCRIPTING_ENABLED 0)
+if (AILU_ENABLE_LUA_SCRIPTING)
+        if (NOT AILU_SOL2_INCLUDE_DIR AND EXISTS ${ENGINE_ROOT_PATH}/Ext/sol2/include/sol/sol.hpp)
+                set(AILU_SOL2_INCLUDE_DIR ${ENGINE_ROOT_PATH}/Ext/sol2/include CACHE PATH "Path to sol2 include root containing sol/sol.hpp" FORCE)
+        endif()
+        if (NOT AILU_SOL2_INCLUDE_DIR)
+                find_path(AILU_SOL2_INCLUDE_DIR sol/sol.hpp
+                        PATHS
+                        ${ENGINE_ROOT_PATH}/Ext/sol2/include
+                        ${ENGINE_ROOT_PATH}/Ext/sol2/single/include)
+        endif()
+        if (NOT AILU_LUA_SOURCE_DIR AND EXISTS ${ENGINE_ROOT_PATH}/Ext/lua/onelua.c)
+                set(AILU_LUA_SOURCE_DIR ${ENGINE_ROOT_PATH}/Ext/lua CACHE PATH "Path to vendored Lua source tree" FORCE)
+        endif()
+        if (AILU_LUA_SOURCE_DIR AND EXISTS ${AILU_LUA_SOURCE_DIR}/onelua.c)
+                file(MAKE_DIRECTORY ${AILU_LUA_GENERATED_INCLUDE_DIR})
+                file(WRITE ${AILU_LUA_GENERATED_INCLUDE_DIR}/lua.hpp "#pragma once\n\nextern \"C\" {\n#include \"lua.h\"\n#include \"lauxlib.h\"\n#include \"lualib.h\"\n}\n")
+                set(AILU_LUA_INCLUDE_DIR ${AILU_LUA_GENERATED_INCLUDE_DIR} CACHE PATH "Path to Lua headers containing lua.hpp" FORCE)
+        endif()
+        if (NOT AILU_LUA_INCLUDE_DIR)
+                find_path(AILU_LUA_INCLUDE_DIR lua.hpp
+                        PATHS
+                        ${AILU_LUA_GENERATED_INCLUDE_DIR}
+                        ${AILU_LUA_SOURCE_DIR}
+                        ${ENGINE_ROOT_PATH}/Ext/lua/include
+                        ${ENGINE_ROOT_PATH}/Ext/lua/src
+                        ${ENGINE_ROOT_PATH}/Ext/lua)
+        endif()
+        if (NOT AILU_LUA_LIBRARY AND NOT AILU_LUA_SOURCE_DIR)
+                find_library(AILU_LUA_LIBRARY
+                        NAMES lua54 lua5.4 lua
+                        PATHS
+                        ${ENGINE_ROOT_PATH}/Ext/lua/lib
+                        ${ENGINE_ROOT_PATH}/Ext/lua/lib/x64)
+        endif()
+        if (AILU_LUA_SOURCE_DIR AND EXISTS ${AILU_LUA_SOURCE_DIR}/onelua.c)
+                set(AILU_LUA_SOURCES ${AILU_LUA_SOURCE_DIR}/onelua.c)
+        endif()
+        if (AILU_SOL2_INCLUDE_DIR AND AILU_LUA_INCLUDE_DIR AND (AILU_LUA_LIBRARY OR AILU_LUA_SOURCES))
+                set(AILU_LUA_SCRIPTING_ENABLED 1)
+        else()
+                message(WARNING "AILU_ENABLE_LUA_SCRIPTING is ON, but sol2 or Lua paths are missing. ScriptSystem will compile in stub mode.")
+        endif()
+endif()
 
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Src)
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Inc)
@@ -81,6 +133,9 @@ file(GLOB_RECURSE NO_PCH_SOURCES "${ENGINE_ROOT_PATH}/Ext/imgui/*.cpp")
 foreach(SOURCE_FILE IN LISTS NO_PCH_SOURCES)
     set_source_files_properties(${SOURCE_FILE} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 endforeach()
+if (AILU_LUA_SOURCES)
+        set_source_files_properties(${AILU_LUA_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
+endif()
 
 set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # set_source_files_properties(IMGUI_BACKENDS PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
@@ -99,7 +154,7 @@ add_custom_target(pre_build_cmd ALL
 #         Ext/imnodes/imnodes.cpp
 #         Src/Render/Font.cpp)
 set(SOURCE_LIST ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
-${HDR_LOADER} ${IMNODE} "Ext/tracy/public/TracyClient.cpp")
+${HDR_LOADER} ${IMNODE} ${AILU_LUA_SOURCES} "Ext/tracy/public/TracyClient.cpp")
 
 add_library (Engine SHARED ${SOURCE_LIST})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
@@ -116,17 +171,27 @@ target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/fbxsdk/include)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/ImGuizmo)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/implot)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/rapidjson)
+if (AILU_LUA_SCRIPTING_ENABLED)
+        target_include_directories(Engine PUBLIC ${AILU_SOL2_INCLUDE_DIR})
+        target_include_directories(Engine PUBLIC ${AILU_LUA_INCLUDE_DIR})
+        if (AILU_LUA_SOURCE_DIR)
+                target_include_directories(Engine PUBLIC ${AILU_LUA_SOURCE_DIR})
+        endif()
+endif()
 # 宏定义
 target_compile_definitions(Engine PRIVATE
         AILU_BUILD_DLL
         ENGINE_EXPORTS
         _WINDOWS
         _USRDLL
+        UNICODE
+        _UNICODE
         FBXSDK_SHARED
         NOMINMAX
         _REVERSED_Z
         DEAR_IMGUI
         $<$<CONFIG:Debug>:_DEBUG>)
+target_compile_definitions(Engine PUBLIC AILU_ENABLE_LUA_SCRIPTING=${AILU_LUA_SCRIPTING_ENABLED})
 
 if (AILU_ENABLE_TRACY)
         target_compile_definitions(Engine PRIVATE TRACY_ENABLE)
@@ -143,19 +208,14 @@ set_target_properties (Engine PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>"
         RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_ROOT}/$<CONFIG>")
 # 编译器参数
-# if(MSVC)
-    target_compile_options(Engine PRIVATE /MP /bigobj)
-    # MSVC 编译器的警告选项不同，以下是一个示例
-    target_compile_options(Engine PRIVATE /D_UNICODE /DUNICODE /wd4819 /wd4251) # /wd4100 禁用未使用的参数警告
 if (MSVC)
+        target_compile_options(Engine PRIVATE /MP /bigobj /wd4819 /wd4251)
     # Enable RTC checks in Debug
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTC1")
     # or: set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /RTCs /RTCu")
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
-    add_link_options(-fsanitize=address)
+        target_compile_options(Engine PRIVATE -Winvalid-pch)
 endif()
-# endif()
 target_precompile_headers(Engine PRIVATE Inc/pch.h)
 # 链接库
 target_link_libraries(Engine PUBLIC ${ENGINE_ROOT_PATH}/Ext/pix/WinPixEventRuntime.lib;d3d12.lib;dxgi.lib;
@@ -163,6 +223,11 @@ d2d1.lib;dwrite.lib;d3d11.lib;
 imm32.lib;
         ${ENGINE_ROOT_PATH}/Ext/dxc/lib/x64/dxcompiler.lib;d3dcompiler.lib;dxguid.lib;
         ${AILU_FBXSDK_LINK_LIB}) # ;msvcrtd.lib
+if (AILU_LUA_SCRIPTING_ENABLED)
+        if (AILU_LUA_LIBRARY)
+                target_link_libraries(Engine PUBLIC ${AILU_LUA_LIBRARY})
+        endif()
+endif()
 
 if (WIN32 AND AILU_ENABLE_TRACY)
         target_link_libraries(Engine PRIVATE ws2_32 dbghelp)

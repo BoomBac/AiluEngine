@@ -10,3 +10,10 @@
 [submodule "Engine/Ext/tracy"]
 	path = Engine/Ext/tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "Engine/Ext/sol2"]
+	path = Engine/Ext/sol2
+	url = https://github.com/ThePhD/sol2
+[submodule "Engine/Ext/lua"]
+	path = Engine/Ext/lua
+	url = https://github.com/lua/lua
+	branch = v5.4

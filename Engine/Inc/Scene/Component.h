@@ -14,6 +14,12 @@
 #include "Render/Features/CommonPasses.h"
 #include "Objects/Type.h"
 
+#include <optional>
+
+#if AILU_ENABLE_LUA_SCRIPTING
+#include <sol/sol.hpp>
+#endif
+
 #include "generated/Component.gen.h"
 
 using Ailu::Render::Camera;
@@ -50,6 +56,49 @@ namespace Ailu
 
         Archive &operator<<(Archive &ar, TransformComponent &c);
         Archive &operator>>(Archive &ar, TransformComponent &c);
+
+        struct AILU_API ScriptComponent
+        {
+            DECLARE_CLASS(ScriptComponent)
+            String _script_path;
+            bool _is_initialized = false;
+            String _resolved_script_path;
+            u32 _loaded_script_version = 0u;
+#if AILU_ENABLE_LUA_SCRIPTING
+            std::optional<sol::table> _instance;
+#endif
+
+            ScriptComponent() = default;
+            explicit ScriptComponent(String script_path) : _script_path(std::move(script_path)) {}
+            ScriptComponent(const ScriptComponent &other)
+                : _script_path(other._script_path)
+            {
+            }
+            ScriptComponent &operator=(const ScriptComponent &other)
+            {
+                if (this != &other)
+                {
+                    _script_path = other._script_path;
+                    ResetRuntime();
+                }
+                return *this;
+            }
+            ScriptComponent(ScriptComponent &&other) noexcept = default;
+            ScriptComponent &operator=(ScriptComponent &&other) noexcept = default;
+
+            void ResetRuntime()
+            {
+                _is_initialized = false;
+                _resolved_script_path.clear();
+                _loaded_script_version = 0u;
+#if AILU_ENABLE_LUA_SCRIPTING
+                _instance.reset();
+#endif
+            }
+        };
+
+        Archive &operator<<(Archive &ar, const ScriptComponent &c);
+        Archive &operator>>(Archive &ar, ScriptComponent &c);
 
         struct LightData
         {

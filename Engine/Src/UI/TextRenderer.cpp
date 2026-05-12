@@ -95,7 +95,12 @@ namespace Ailu
                 block->_index_buf[i_base + 4] = v_base + 2;
                 block->_index_buf[i_base + 5] = v_base + 3;
 
-                UIRenderer::Get()->AppendNode(block, 4u, 6u, font->_is_msdf? _msdf_mat.get() : _bitmap_mat.get(), font->_pages[font->GetChar(text[0])._page]._texture.get());
+                UIRenderer::Get()->AppendNode(block,
+                                              4u,
+                                              6u,
+                                              font->_is_msdf ? _msdf_mat.get() : _bitmap_mat.get(),
+                                              font->_pages[g._page]._texture.get(),
+                                              font->_is_msdf ? font->_msdf_distance_range : 0.0f);
             }
         }
 

@@ -63,7 +63,7 @@ namespace Ailu
             void PopScissor();
             Vector2f CalculateTextSize(const String &text, u16 font_size = 14u, Vector2f scale = Vector2f::kOne, Render::Font *font = nullptr);
             //统一走这个接口方便设置裁切矩形
-            void AppendNode(DrawerBlock* block,u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex = nullptr);
+            void AppendNode(DrawerBlock* block,u32 vert_num, u32 index_num, Render::Material *mat, Render::Texture *tex = nullptr, f32 msdf_px_range = 0.0f);
         private:
             void DrawDebugPannel();
             Vector<struct DrawerBlock *> &FrameBlocks() {return _drawer_blocks[_frame_index];};

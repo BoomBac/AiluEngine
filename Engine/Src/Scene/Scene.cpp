@@ -3,6 +3,7 @@
 #include "Framework/Common/Application.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
+#include "Framework/Script/ScriptSystem.h"
 #include "Physics/PhysicsSystem.h"
 #include "Scene/RenderSystem.h"
 //#include "pch.h"
@@ -39,6 +40,13 @@ namespace Ailu::SceneManagement
             {
                 arch.InsertIndent();
                 arch << "_transform_component:";
+                arch.NewLine();
+                arch << (*c);
+            }
+            if (auto c = _register.GetComponent<ECS::ScriptComponent>(e); c != nullptr)
+            {
+                arch.InsertIndent();
+                arch << "_script_component:";
                 arch.NewLine();
                 arch << (*c);
             }
@@ -137,6 +145,10 @@ namespace Ailu::SceneManagement
             {
                 arch >> _register.AddComponent<ECS::TransformComponent>(e);
             }
+            else if (su::BeginWith(line, "_script_component"))
+            {
+                arch >> _register.AddComponent<ECS::ScriptComponent>(e);
+            }
             else if (su::BeginWith(line, "_static_mesh_component"))
             {
                 arch >> _register.AddComponent<ECS::StaticMeshComponent>(e);
@@ -185,6 +197,7 @@ namespace Ailu::SceneManagement
     {
         _register.RegisterComponent<ECS::TagComponent>();
         _register.RegisterComponent<ECS::TransformComponent>();
+        _register.RegisterComponent<ECS::ScriptComponent>();
         _register.RegisterComponent<ECS::StaticMeshComponent>();
         _register.RegisterComponent<ECS::LightComponent>();
         _register.RegisterComponent<ECS::CCamera>();
@@ -354,6 +367,8 @@ namespace Ailu::SceneManagement
         }
         tag_comp._name += "(" + std::to_string(max_index + 1) + ")";
         _register.AddComponent<ECS::TransformComponent>(new_one, *_register.GetComponent<ECS::TransformComponent>(e));
+        if (_register.HasComponent<ECS::ScriptComponent>(e))
+            _register.AddComponent<ECS::ScriptComponent>(new_one, *_register.GetComponent<ECS::ScriptComponent>(e));
         if (_register.HasComponent<ECS::StaticMeshComponent>(e))
             _register.AddComponent<ECS::StaticMeshComponent>(new_one, *_register.GetComponent<ECS::StaticMeshComponent>(e));
         if (_register.HasComponent<ECS::LightComponent>(e))
@@ -414,6 +429,10 @@ namespace Ailu::SceneManagement
         {
             auto actor = _pending_delete_entities.front();
             _pending_delete_entities.pop();
+            if (auto *script_comp = _register.GetComponent<ECS::ScriptComponent>(actor))
+            {
+                ScriptSystem::Get().DestroyComponent(*script_comp);
+            }
             _register.Destory(actor);
         }
         MarkDirty();
@@ -428,6 +447,12 @@ namespace Ailu::SceneManagement
     {
         auto &r = _register;
         u32 index = 0;
+        for (auto &comp: r.View<ECS::ScriptComponent>())
+        {
+            const ECS::Entity entity = r.GetEntity<ECS::ScriptComponent>(index++);
+            ScriptSystem::Get().UpdateComponent(this, entity, comp, dt);
+        }
+        index = 0;
         for (auto &comp: r.View<ECS::TransformComponent>())
         {
             comp._transform._world_matrix = Transform::GetWorldMatrix(comp._transform);

@@ -72,6 +72,27 @@ namespace Ailu
                 return input;
             }
 
+            inline UI::InputBlock *AddTextInputRow(UI::UIElement *parent, const String &label, const String &initial_text, const std::function<void(const String &)> &on_value_changed)
+            {
+                UI::HorizontalBox *value_box = nullptr;
+                AddPropertyRow(parent, label, &value_box);
+
+                auto input = value_box->AddChild<UI::InputBlock>(initial_text)
+                                     ->SlotMargin(kPropInnerMargin)
+                                     .SlotAlignmentH(UI::EAlignment::kRight)
+                                     .SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                     .SlotFillRate(1.0f)
+                                     .As<UI::InputBlock>();
+                if (on_value_changed)
+                {
+                    input->_on_content_changed += [on_value_changed](String content)
+                    {
+                        on_value_changed(content);
+                    };
+                }
+                return input;
+            }
+
             inline UI::Slider *AddFloatSliderRow(UI::UIElement *parent, const String &label, f32 min_value, f32 max_value, f32 value, const std::function<void(f32)> &on_value_changed)
             {
                 UI::HorizontalBox *value_box = nullptr;
@@ -496,6 +517,49 @@ namespace Ailu
                     set_block(_scale_block[1], comp->_transform._scale.y);
                     set_block(_scale_block[2], comp->_transform._scale.z);
                 }
+                if (auto comp = r.GetComponent<ECS::ScriptComponent>(selected); comp != nullptr)
+                {
+                    if (s_prev_selected != selected || _script_path_block == nullptr)
+                    {
+                        if (_script_block != nullptr)
+                            _vb->RemoveChild(_script_block);
+                        _script_block = _vb->AddChild<UI::CollapsibleView>("Script")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
+                        auto content = _script_block->GetContent()->AddChild<UI::VerticalBox>();
+                        _script_path_block = AddTextInputRow(content, "Path", comp->_script_path, [comp](const String &content)
+                        {
+                            if (comp->_script_path == content)
+                                return;
+                            comp->_script_path = content;
+                            comp->ResetRuntime();
+                            SceneMgr::Get().MarkCurSceneDirty();
+                        });
+                        auto hint = content->AddChild<UI::Text>("Example: Scripts/tick_logger.lua");
+                        hint->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f});
+                    }
+                    if (_script_path_block != nullptr && !_script_path_block->IsEditing())
+                        _script_path_block->SetContent(comp->_script_path, false);
+                }
+                else if (s_prev_selected != selected || _script_block == nullptr || _script_path_block != nullptr)
+                {
+                    if (_script_block != nullptr)
+                        _vb->RemoveChild(_script_block);
+                    _script_block = _vb->AddChild<UI::CollapsibleView>("Script")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
+                    auto content = _script_block->GetContent()->AddChild<UI::VerticalBox>();
+                    auto add_btn = AddButtonRow(content, "Component", "Add ScriptComponent");
+                    add_btn->OnMouseClick() += [selected](UI::UIEvent &e)
+                    {
+                        auto &scene_register = SceneMgr::Get().ActiveScene()->GetRegister();
+                        if (scene_register.GetComponent<ECS::ScriptComponent>(selected) != nullptr)
+                            return;
+                        auto &script_comp = scene_register.AddComponent<ECS::ScriptComponent>(selected);
+                        script_comp._script_path = "Scripts/tick_logger.lua";
+                        script_comp.ResetRuntime();
+                        SceneMgr::Get().MarkCurSceneDirty();
+                    };
+                    auto hint = content->AddChild<UI::Text>("Click to attach the sample logger script");
+                    hint->SlotMargin({2.0f, 0.0f, 2.0f, 2.0f});
+                    _script_path_block = nullptr;
+                }
                 if (auto comp = r.GetComponent<ECS::LightComponent>(selected); comp != nullptr)
                 {
                     if (s_prev_selected != selected)
@@ -724,6 +788,12 @@ namespace Ailu
             else
             {
                 _vb->ChildAt(0)->As<UI::Text>()->SetText("Name: (No Selection)");
+                if (_script_block != nullptr)
+                {
+                    _vb->RemoveChild(_script_block);
+                    _script_block = nullptr;
+                }
+                _script_path_block = nullptr;
             }
         }
     }// namespace Editor

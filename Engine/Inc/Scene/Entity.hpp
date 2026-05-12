@@ -298,8 +298,9 @@ namespace Ailu
                     Signature acquired_sig = _sys_signatures[type_name];
                     if ((acquired_sig & _entities[entity]) == acquired_sig)
                     {
-                        sys->_entities.insert(entity);
-                        sys->OnPushEntity(entity);
+                        const auto [insert_it, inserted] = sys->_entities.insert(entity);
+                        if (inserted)
+                            sys->OnPushEntity(entity);
                     }
                     else
                         sys->_entities.erase(entity);
@@ -354,11 +355,12 @@ namespace Ailu
                 AL_ASSERT(entity < kMaxEntityNum);
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(_mgrs.contains(type_name));
+                auto &component = static_cast<ComponentManager<T> *>(_mgrs[type_name].get())->Create(entity, std::forward<Args>(args)...);
                 _entities[entity].set(_comp_types[type_name], true);
                 EntitySignatureChanged(entity);
                 for(auto& f : _on_comp_add_callback[type_name])
                     f(entity);
-                return static_cast<ComponentManager<T> *>(_mgrs[type_name].get())->Create(entity, std::forward<Args>(args)...);
+                return component;
             }
 
             template<typename T>

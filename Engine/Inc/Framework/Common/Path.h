@@ -12,10 +12,12 @@ namespace Ailu
         static const String kEngineMaterialPath = "Materials/";
         static const String kEngineMeshPath = "Meshs/";
         static const String kEngineTexturePath = "Textures/";
+        static const String kEngineScriptPath = "Scripts/";
         static const WString kEngineShaderPathW = L"Shaders/";
         static const WString kEngineMaterialPathW = L"Materials/";
         static const WString kEngineMeshPathW = L"Meshs/";
         static const WString kEngineTexturePathW = L"Textures/";
+        static const WString kEngineScriptPathW = L"Scripts/";
         static const String kEngineIconPath = "Icons/";
         static const WString kEngineIconPathW = L"Icons/";
     }// namespace EnginePath
