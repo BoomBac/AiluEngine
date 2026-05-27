@@ -17,6 +17,39 @@ using namespace Ailu::Render;
 namespace Ailu
 {
     using namespace SceneManagement;
+    namespace
+    {
+        WString NormalizeDirectoryPath(const WString &path)
+        {
+            WString normalized = PathUtils::FormatFilePath(path);
+            if (!normalized.empty() && normalized.back() != L'/')
+                normalized.push_back(L'/');
+            return normalized;
+        }
+
+        std::optional<EMeshLoader> ResolveMeshLoader(const WString &path)
+        {
+            const String ext = StringUtils::ToLower(fs::path(ToChar(path)).extension().string());
+            if (ext == ".fbx")
+                return EMeshLoader::kFbx;
+            if (ext == ".gltf")
+                return EMeshLoader::kGltf;
+            return std::nullopt;
+        }
+
+        void CopyGltfDependencies(const WString &source_gltf_path, const fs::path &copied_gltf_path)
+        {
+            for (const auto &uri: GltfParser::CollectExternalDependencyUris(source_gltf_path))
+            {
+                const fs::path source_path = fs::path(source_gltf_path).parent_path() / fs::path(ToWChar(uri));
+                const fs::path destination_path = (copied_gltf_path.parent_path() / fs::path(ToWChar(uri))).lexically_normal();
+                if (!destination_path.parent_path().empty())
+                    FileManager::CreateDirectory(destination_path.parent_path().wstring());
+                FileManager::CopyFile(source_path.wstring(), destination_path.wstring());
+            }
+        }
+    }
+
     String ResourceMgr::GetResSysPath(const String &sub_path)
     {
         String path = sub_path;
@@ -84,7 +117,7 @@ namespace Ailu
         _lut_global_resources_by_type[ComputeShader::StaticType()] = {};
         _lut_global_resources_by_type[Scene::StaticType()] = {};
         _lut_global_resources_by_type[AnimationClip::StaticType()] = {};
-        _project_root_path = s_engine_res_root_pathw.substr(0, s_engine_res_root_pathw.find_last_of(L"/"));
+        _project_root_path = s_project_root_pathw;
         LoadAssetDB();
         Vector<WString> shader_asset_pathes = {
                 L"Shaders/deferred_lighting.alasset",
@@ -459,10 +492,26 @@ namespace Ailu
     }
 
 
+    void ResourceMgr::ConfigProjectRoot(const WString &project_root)
+    {
+        s_project_root_pathw = NormalizeDirectoryPath(project_root);
+        s_engine_res_root_pathw = s_project_root_pathw + L"Engine/Res/";
+        kAssetDatabasePath = ToChar(s_engine_res_root_pathw) + "assetdb.alasset";
+    }
+
+    void ResourceMgr::ConfigEngineResRoot(const WString &engine_res_root)
+    {
+        s_engine_res_root_pathw = NormalizeDirectoryPath(engine_res_root);
+        fs::path res_path(s_engine_res_root_pathw);
+        if (res_path.filename().empty())
+            res_path = res_path.parent_path();
+        s_project_root_pathw = NormalizeDirectoryPath(res_path.parent_path().parent_path().wstring());
+        kAssetDatabasePath = ToChar(s_engine_res_root_pathw) + "assetdb.alasset";
+    }
+
     void ResourceMgr::ConfigRootPath(const WString &prex)
     {
-        s_engine_res_root_pathw = prex + L"Engine/Res/";
-        kAssetDatabasePath = ToChar(s_engine_res_root_pathw) + "assetdb.alasset";
+        ConfigProjectRoot(prex);
     }
     Ref<Shader> ResourceMgr::LoadExternalShader(const WString &asset_path)
     {
@@ -702,7 +751,20 @@ namespace Ailu
     List<Ref<Mesh>> ResourceMgr::LoadExternalMesh(const WString &asset_path, const MeshImportSetting &setting, List<Ref<AnimationClip>> &clips)
     {
         std::unique_lock<std::mutex> lock(g_mesh_load_mutex);
-        auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(EMeshLoader::kFbx);
+        auto loader = ResolveMeshLoader(asset_path);
+        if (!loader.has_value())
+        {
+            LOG_ERROR(L"Unsupported mesh format: {}", asset_path);
+            return {};
+        }
+
+        auto parser = TStaticAssetLoader<EResourceType::kStaticMesh, EMeshLoader>::GetParser(*loader);
+        if (parser == nullptr)
+        {
+            LOG_ERROR(L"Failed to create mesh parser for {}", asset_path);
+            return {};
+        }
+
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         parser->Parser(sys_path, setting);
         List<Ref<Mesh>> mesh_list{};
@@ -1495,6 +1557,7 @@ namespace Ailu
 
     Ref<void> ResourceMgr::ImportResourceImpl(const WString &sys_path, const WString &target_dir, const ImportSetting *setting)
     {
+        const ImportSetting *resolved_setting = setting ? setting : &ImportSetting::Default();
         fs::path p(sys_path),dir(target_dir);
         if (!FileManager::Exist(sys_path))
         {
@@ -1518,9 +1581,11 @@ namespace Ailu
             return nullptr;
         }
         auto res_copy_path = dir / p.filename();
-        if (setting->_is_copy)
+        if (resolved_setting->_is_copy)
         {
             FileManager::CopyFile(sys_path, res_copy_path.wstring());
+            if (StringUtils::ToLower(ext) == ".gltf")
+                CopyGltfDependencies(sys_path, res_copy_path);
         }
         WString external_asset_path = PathUtils::ExtractAssetPath(PathUtils::FormatFilePath(res_copy_path.wstring()));
         TimeMgr time_mgr;
@@ -1536,12 +1601,13 @@ namespace Ailu
             LOG_WARNING(L"Asset with path {} already exist in database,skip import!", external_asset_path);
             return nullptr;
         }
-        if (ext == ".fbx" || ext == ".FBX")
+        if (auto mesh_loader = ResolveMeshLoader(sys_path); mesh_loader.has_value())
         {
-            auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(setting);
+            auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(resolved_setting);
             mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
             List<Ref<AnimationClip>> clips;
-            auto mesh_list = std::move(LoadExternalMesh(external_asset_path, *mesh_import_setting, clips));
+            const WString mesh_source_path = *mesh_loader == EMeshLoader::kGltf ? sys_path : external_asset_path;
+            auto mesh_list = std::move(LoadExternalMesh(mesh_source_path, *mesh_import_setting, clips));
             for (auto &mesh: mesh_list)
             {
                 WString imported_asset_path = created_asset_dir;
@@ -1560,7 +1626,9 @@ namespace Ailu
                         }
                         if (!it->_textures[1].empty())
                         {
-                            auto normal = ImportResource(ToWChar(it->_textures[1]),target_dir);
+                            auto normal_setting = TextureImportSetting::Default();
+                            normal_setting._is_sRGB = false;
+                            auto normal = ImportResource(ToWChar(it->_textures[1]), target_dir, normal_setting);
                             if (normal != nullptr)
                                 mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());
                         }
@@ -1584,7 +1652,9 @@ namespace Ailu
         }
         else if (kHDRImageExt.contains(ext) || kLDRImageExt.contains(ext))
         {
-            auto tex = LoadExternalTexture(external_asset_path,dynamic_cast<const TextureImportSetting&>(*setting));
+            auto tex_import_setting = dynamic_cast<const TextureImportSetting *>(resolved_setting);
+            tex_import_setting = tex_import_setting ? tex_import_setting : &TextureImportSetting::Default();
+            auto tex = LoadExternalTexture(external_asset_path,*tex_import_setting);
             WString imported_asset_path = created_asset_dir;
             imported_asset_path.append(std::format(L"{}.alasset", ToWChar(tex->Name().c_str())));
             loaded_objects.push(std::make_tuple(imported_asset_path, tex));
@@ -1596,9 +1666,17 @@ namespace Ailu
             auto new_asset = CreateAsset(path, obj);
             new_asset->_external_asset_path = external_asset_path;
             if (obj->GetType() == Mesh::StaticType() || obj->GetType() == SkeletonMesh::StaticType())
-                _importers[new_asset->_asset_path] = AL_NEW(MeshImportSetting,(*dynamic_cast<const MeshImportSetting *>(setting)));
+            {
+                auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(resolved_setting);
+                mesh_import_setting = mesh_import_setting ? mesh_import_setting : &MeshImportSetting::Default();
+                _importers[new_asset->_asset_path] = AL_NEW(MeshImportSetting,(*mesh_import_setting));
+            }
             else if (obj->GetType() == Texture2D::StaticType() || obj->GetType() == Texture3D::StaticType())
-                _importers[new_asset->_asset_path] = AL_NEW(TextureImportSetting,(*dynamic_cast<const TextureImportSetting *>(setting)));
+            {
+                auto tex_import_setting = dynamic_cast<const TextureImportSetting *>(resolved_setting);
+                tex_import_setting = tex_import_setting ? tex_import_setting : &TextureImportSetting::Default();
+                _importers[new_asset->_asset_path] = AL_NEW(TextureImportSetting,(*tex_import_setting));
+            }
             LOG_INFO(L"Create asset at path {}", path);
             loaded_objects.pop();
         }

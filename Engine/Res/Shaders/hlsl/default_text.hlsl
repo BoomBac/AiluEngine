@@ -3,7 +3,7 @@
 //name: default_font
 //vert: VSMain
 //pixel: PSMain
-//Cull: Front
+//Cull: Off
 //Queue: Transparent
 //Blend: Src,OneMinusSrc
 //ZTest: Always

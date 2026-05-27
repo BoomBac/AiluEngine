@@ -7,6 +7,7 @@
 #include "Inc/Render/Gizmo.h"
 #include "Inc/Render/Renderer.h"
 #include "Render/CommandBuffer.h"
+#include "Render/RenderGraph/RenderGraph.h"
 #include "pch.h"
 
 #pragma region NoiseUtils
@@ -94,13 +95,106 @@ namespace Ailu::Render
     VolumetricCloudsPass::~VolumetricCloudsPass()
     {
     }
+    void VolumetricCloudsPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
+    {
+        EnsureRenderTargets(rendering_data);
+        UpdateShaderParams();
+
+        if (_params._is_tile_render)
+            _cloud_gen->EnableKeyword("_TILE_RENDER");
+        else
+            _cloud_gen->DisableKeyword("_TILE_RENDER");
+
+        static const Vector2UInt kOffsetTable[16] = {
+                Vector2UInt(0u, 0u),
+                Vector2UInt(2u, 2u),
+                Vector2UInt(2u, 0u),
+                Vector2UInt(0u, 2u),
+                Vector2UInt(1u, 1u),
+                Vector2UInt(3u, 3u),
+                Vector2UInt(3u, 1u),
+                Vector2UInt(1u, 3u),
+                Vector2UInt(1u, 0u),
+                Vector2UInt(3u, 2u),
+                Vector2UInt(3u, 0u),
+                Vector2UInt(1u, 2u),
+                Vector2UInt(0u, 1u),
+                Vector2UInt(2u, 3u),
+                Vector2UInt(2u, 1u),
+                Vector2UInt(0u, 3u),
+        };
+        const auto cur_offset = kOffsetTable[g_pGfxContext->GetFrameCount() % 16];
+
+        graph.AddPass("VolumetricClouds_Compute", RDG::PassDesc{RDG::EPassType::kCompute}, [&, this](RDG::RenderGraphBuilder &builder)
+        {
+            _cloud_cur_handle = builder.Import(_is_cur_a ? _cloud_rt_a.get() : _cloud_rt_b.get());
+            _cloud_history_handle = builder.Import(_is_cur_a ? _cloud_rt_b.get() : _cloud_rt_a.get());
+            builder.Read(rendering_data._rg_handles._depth_tex);
+            builder.Read(_cloud_history_handle);
+            _cloud_cur_handle = builder.Write(_cloud_cur_handle, EResourceUsage::kWriteUAV);
+            }, [this, cur_offset](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        {
+            auto *cur_rt = graph.Resolve<RenderTexture>(_cloud_cur_handle);
+            auto *history_rt = graph.Resolve<RenderTexture>(_cloud_history_handle);
+            auto *depth_tex = graph.Resolve<Texture>(data._rg_handles._depth_tex);
+            if (cur_rt == nullptr || history_rt == nullptr || depth_tex == nullptr)
+                return;
+
+            auto rt_desc = data._camera_data._camera_color_target_desc;
+            _cloud_gen->SetTexture("_ShapeNoise", _shape_noise.get());
+            _cloud_gen->SetTexture("_NoiseTex", _blue_noise.get());
+            _cloud_gen->SetTexture("_DetailNoise", _detail_noise.get());
+            _cloud_gen->SetTexture("_WeatherMap", _weather_map.get());
+            _cloud_gen->SetVector("_CloudTex_TexelSize", cur_rt->TexelSize());
+            _cloud_gen->SetTexture("_CameraDepthTexture", depth_tex);
+            _cloud_gen->SetVector("_pixel_offset", Vector4f((f32) cur_offset.x, (f32) cur_offset.y, 0.f, 0.f));
+            auto kernel = _cloud_gen->FindKernel("CloudMain");
+            _cloud_gen->SetTexture("_CloudTex", cur_rt);
+            {
+                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(kernel, rt_desc._width >> (_params._is_tile_render ? 2 : 0), rt_desc._height >> (_params._is_tile_render ? 2 : 0), 1);
+                cmd->Dispatch(_cloud_gen.get(), kernel, x, y, 1);
+            }
+        });
+        if (_params._is_tile_render)
+        {
+            graph.AddPass("VolumetricClouds_TileReproject", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
+            {
+                builder.Read(_cloud_cur_handle);
+                builder.Read(_cloud_history_handle);
+                builder.Read(rendering_data._rg_handles._motion_vector_tex);
+                _cloud_cur_handle = builder.Write(_cloud_cur_handle, EResourceUsage::kWriteUAV);
+            }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+            {
+                auto rt_desc = data._camera_data._camera_color_target_desc;
+                _cloud_gen->SetTexture("_CloudHistoryTex", graph.Resolve<RenderTexture>(_cloud_history_handle));
+                auto kernel = _cloud_gen->FindKernel("CloudReprojection");
+                auto [x, y, z] = _cloud_gen->CalculateDispatchNum(kernel, rt_desc._width, rt_desc._height, 1);
+                cmd->Dispatch(_cloud_gen.get(), kernel, x, y, 1);
+            });
+        }
+
+
+        graph.AddPass("VolumetricClouds_Compose", RDG::PassDesc(), [&, this](RDG::RenderGraphBuilder &builder)
+        {
+            builder.Read(_cloud_cur_handle);
+            builder.Read(rendering_data._rg_handles._color_target);
+            rendering_data._rg_handles._color_target = builder.Write(rendering_data._rg_handles._color_target);
+        }, [this](RDG::RenderGraph &graph, CommandBuffer *cmd, const RenderingData &data)
+        {
+            auto *cur_rt = graph.Resolve<RenderTexture>(_cloud_cur_handle);
+            if (cur_rt == nullptr)
+                return;
+
+            cmd->SetRenderTargetLoadAction(data._rg_handles._color_target, ELoadStoreAction::kNotCare);
+            cmd->SetRenderTarget(data._rg_handles._color_target);
+            _global_cloud->SetTexture("_CloudTex", cur_rt);
+            cmd->DrawFullScreenQuad(_global_cloud.get(), 1);
+            _is_cur_a = !_is_cur_a;
+        });
+    }
     void VolumetricCloudsPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
-        if (rendering_data._is_res_changed)
-        {
-            _cloud_rt_a = RenderTexture::Create(rendering_data._width, rendering_data._height, "CloudTexA", ERenderTargetFormat::kRGBAHalf, false, false, true);
-            _cloud_rt_b = RenderTexture::Create(rendering_data._width, rendering_data._height, "CloudTexB", ERenderTargetFormat::kRGBAHalf, false, false, true);
-        }
+        EnsureRenderTargets(rendering_data);
         //https://www.diva-portal.org/smash/get/diva2:1223894/FULLTEXT01.pdf  Real-time rendering of volumetric clouds 3.2.1.4
         static const Vector2UInt kOffsetTable[16] = {
                 Vector2UInt(0u, 0u),
@@ -158,7 +252,7 @@ namespace Ailu::Render
             }
             cmd->SetRenderTargetLoadAction(rendering_data._camera_color_target_handle,ELoadStoreAction::kNotCare);
             cmd->SetRenderTarget(rendering_data._camera_color_target_handle);
-            _global_cloud->SetTexture("_CloudTex", _cloud_rt_a.get());
+            _global_cloud->SetTexture("_CloudTex", cur_rt);
             cmd->DrawFullScreenQuad(_global_cloud.get(), 1);
         }
         context->ExecuteCommandBuffer(cmd);
@@ -174,6 +268,14 @@ namespace Ailu::Render
     void VolumetricCloudsPass::Setup(f32 speed)
     {
         //_cloud_mat->SetFloat("_Speed", speed);
+    }
+    void VolumetricCloudsPass::EnsureRenderTargets(const RenderingData &rendering_data)
+    {
+        if (_cloud_rt_a == nullptr || _cloud_rt_b == nullptr || rendering_data._is_res_changed)
+        {
+            _cloud_rt_a = RenderTexture::Create(rendering_data._width, rendering_data._height, "CloudTexA", ERenderTargetFormat::kRGBAHalf, false, false, true);
+            _cloud_rt_b = RenderTexture::Create(rendering_data._width, rendering_data._height, "CloudTexB", ERenderTargetFormat::kRGBAHalf, false, false, true);
+        }
     }
     void VolumetricCloudsPass::UpdateShaderParams()
     {
@@ -201,11 +303,11 @@ namespace Ailu::Render
 #pragma endregion
 
 #pragma region VolumetricClouds
-    VolumetricClouds::VolumetricClouds() : RenderFeature("VolumetricClouds")
+    Ailu::Render::VolumetricClouds::VolumetricClouds() : RenderFeature("VolumetricClouds")
     {
     }
 
-    VolumetricClouds::~VolumetricClouds()
+    Ailu::Render::VolumetricClouds::~VolumetricClouds()
     {
     }
 

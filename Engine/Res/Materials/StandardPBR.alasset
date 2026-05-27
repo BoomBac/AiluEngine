@@ -14,7 +14,7 @@ keywords:
     _IOR: 1.45
     _MaterialID: 0
     _MetallicValue: 0
-    _RoughnessValue: 0
+    _RoughnessValue: 0.0810237
     _SamplerMask: 0
     _Transmission: 0
   prop_type: Vector

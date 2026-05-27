@@ -110,10 +110,11 @@ namespace Ailu
         using OnLoadTaskCompleted = std::function<void(Ref<T> asset)>;
         inline const static std::set<String> kLDRImageExt = {".png", ".PNG", ".tga", ".TGA", ".jpg", ".JPG", ".jpg", ".JPEG"};
         inline const static std::set<String> kHDRImageExt = {".exr", ".EXR", ".hdr", ".HDR"};
-        inline const static std::set<String> kMeshExt = {".obj", ".OBJ", ".fbx", ".FBX"};
+        inline const static std::set<String> kMeshExt = {".obj", ".OBJ", ".fbx", ".FBX", ".gltf", ".GLTF"};
 
     public:
         static const WString &EngineResRootPath() { return s_engine_res_root_pathw; };
+        static const WString &ProjectRootPath() { return s_project_root_pathw; };
         static String GetResSysPath(const String &sub_path);
         static WString GetResSysPath(const WString &sub_path);
         DISALLOW_COPY_AND_ASSIGN(ResourceMgr)
@@ -132,6 +133,8 @@ namespace Ailu
         void SaveAsset(const Asset *asset);
         void SaveAllUnsavedAssets();
         Asset *GetLinkedAsset(Object *obj);
+        static void ConfigProjectRoot(const WString &project_root);
+        static void ConfigEngineResRoot(const WString &engine_res_root);
         static void ConfigRootPath(const WString &prex);
         //.../Res，最后不带斜杠
         const WString &GetEngineRootSysPath() const
@@ -342,6 +345,7 @@ namespace Ailu
     private:
         inline static String kAssetDatabasePath;
         inline static WString s_engine_res_root_pathw;
+        inline static WString s_project_root_pathw;
         inline static Map<u32, WString> s_object_sys_path_map;
         inline static Queue<Asset *> s_pending_save_assets;
         HashMap<WString, fs::file_time_type> _file_last_load_time;

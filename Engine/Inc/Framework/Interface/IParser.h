@@ -22,7 +22,8 @@ namespace Ailu
     enum class EMeshLoader : u8
     {
         kFbx = 0,
-        kObj
+        kObj,
+        kGltf
     };
     enum class EImageLoader : u8
     {

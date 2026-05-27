@@ -58,6 +58,26 @@ namespace Ailu
     using namespace Render;
     namespace Editor
     {
+        namespace
+        {
+            const wchar_t *GetPackagePlayerPresetName()
+            {
+#ifdef _DEBUG
+                return L"build-debug";
+#else
+                return L"build-release";
+#endif
+            }
+
+            WString BuildPackagePlayerCommandLine()
+            {
+                WString command = L"cmd.exe /c \"cmake --build --preset ";
+                command += GetPackagePlayerPresetName();
+                command += L" --target package_player --parallel 6\"";
+                return command;
+            }
+        }
+
         using SceneManagement::SceneMgr;
         
         class ProfileWindow
@@ -526,7 +546,7 @@ namespace Ailu
 
             _main_widget = MakeRef<UI::Widget>();
 
-            auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
+            auto p = Application::ResolveProjectPath(L"Editor/Res/UI/main_widget.json");
             JsonArchive ar;
             ar.Load(p);
             ar >> *_main_widget;
@@ -555,7 +575,7 @@ namespace Ailu
             DockManager::Shutdown();
             JsonArchive ar;
             ar << *_main_widget;
-            auto p = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/main_widget.json";
+            auto p = Application::ResolveProjectPath(L"Editor/Res/UI/main_widget.json");
             LOG_INFO(L"Save widget to ", p);
             ar.Save(p);
         }
@@ -781,6 +801,29 @@ namespace Ailu
         void EditorLayer::OnImguiRender()
         {
             static bool s_show_undo_view = false;
+            static Scope<Process> s_package_player_process;
+            static String s_package_player_status = "Idle";
+
+            if (s_package_player_process && s_package_player_process->IsValid() && !s_package_player_process->IsRunning())
+            {
+                u32 exit_code = 0u;
+                if (s_package_player_process->TryGetExitCode(exit_code) && exit_code == 0u)
+                {
+                    s_package_player_status = "package_player finished";
+                    LOG_INFO("package_player finished");
+                }
+                else
+                {
+                    s_package_player_status = "package_player failed";
+                    if (s_package_player_process->TryGetExitCode(exit_code))
+                        s_package_player_status += " (exit=" + std::to_string(exit_code) + ")";
+                    LOG_ERROR("{}", s_package_player_status);
+                }
+                s_package_player_process->Close();
+                s_package_player_process.reset();
+            }
+
+            const bool is_packaging_player = s_package_player_process && s_package_player_process->IsValid() && s_package_player_process->IsRunning();
             //ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
             //if (ImGui::BeginMainMenuBar())
             //{
@@ -967,6 +1010,31 @@ namespace Ailu
             {
                 RenderPipeline::Get().GetRenderer()->GetRenderGraph()._is_debug = true;
             }
+            if (is_packaging_player)
+                ImGui::BeginDisabled();
+            if (ImGui::Button(is_packaging_player ? "Packaging Player..." : "Build/Package Player"))
+            {
+                ProcessStartInfo psi(BuildPackagePlayerCommandLine());
+                psi.WorkingDirectory = Application::GetProjectRootPath();
+                auto process = ProcessFactory::Create();
+                if (process && process->Start(psi))
+                {
+                    s_package_player_status = "package_player running";
+                    LOG_INFO(L"Start package_player in {}", psi.WorkingDirectory);
+                    s_package_player_process = std::move(process);
+                }
+                else
+                {
+                    s_package_player_status = "failed to start package_player";
+                    LOG_ERROR("failed to start package_player");
+                }
+            }
+            if (is_packaging_player)
+                ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::TextUnformatted(s_package_player_status.c_str());
+            
+            ImGui::Checkbox("Postprocess", &Camera::sCurrent->_is_enable_postprocess);
             //ImGui::Checkbox("UseRenderGraph", &RenderPipeline::Get().GetRenderer()->_is_use_render_graph);
 
             // for (auto &info: g_pResourceMgr->GetImportInfos())
@@ -1127,7 +1195,7 @@ namespace Ailu
             }
             if (ImGui::Button("Tracy Profiler"))
             {
-                auto tarcy_path = Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Tools/Tracy/tracy-profiler.exe";
+                auto tarcy_path = Application::ResolveProjectPath(L"Tools/Tracy/tracy-profiler.exe");
                 ProcessStartInfo psi(tarcy_path);
                 auto p = ProcessFactory::Create();
                 if (p)

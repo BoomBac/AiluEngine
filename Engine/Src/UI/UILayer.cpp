@@ -92,10 +92,7 @@ namespace Ailu
                 else if (e.GetEventType() == EEventType::kMouseButtonReleased)
                 {
                     ue._key_code = static_cast<MouseButtonReleasedEvent *>(&e)->GetButton();
-                    if (ue._key_code == EKey::kRBUTTON)
-                    {
-                    }
-                    if (s_mgr->GetPopupWidget() != s_mgr->_pre_hover_widget)
+                    if (ue._key_code != EKey::kRBUTTON && s_mgr->GetPopupWidget() != s_mgr->_pre_hover_widget)
                     {
                         s_mgr->HidePopup();
                     }

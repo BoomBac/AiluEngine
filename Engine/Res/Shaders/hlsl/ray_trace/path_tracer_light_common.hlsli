@@ -176,6 +176,40 @@ LightSample SampleTriangleAreaLight(SampleLightData light, float3 x, inout Rando
     return result;
 }
 
+LightSample SampleTriangleAreaLight(SampleLightData light, float3 x, float2 random_uv)
+{
+    LightSample result = (LightSample)0;
+    TriangleData tri = LoadTriangleAreaLightData(light);
+    float sqrt_r0 = sqrt(random_uv.x);
+    float bary0 = 1.0 - sqrt_r0;
+    float bary1 = sqrt_r0 * (1.0 - random_uv.y);
+    float bary2 = sqrt_r0 * random_uv.y;
+
+    float3 y = tri.v0 * bary0 + tri.v1 * bary1 + tri.v2 * bary2;
+    float3 wi = y - x;
+    float r2 = dot(wi, wi);
+    if (r2 <= FLOAT_EPSILON)
+        return result;
+
+    float r = sqrt(r2);
+    wi /= r;
+
+    float3 light_normal = GetTriangleAreaLightNormal(tri);
+    float cos_theta_l = dot(light_normal, -wi);
+    if (light._is_double_sided)
+        cos_theta_l = abs(cos_theta_l);
+    if (cos_theta_l <= FLOAT_EPSILON)
+        return result;
+
+    float area = 0.5 * length(cross(tri.v1 - tri.v0, tri.v2 - tri.v0));
+    result._pdf = PdfSolidAngleFromArea(rcp(max(area, 1e-6)), r2, cos_theta_l);
+    result._wi = wi;
+    result._t = r;
+    result._normal = light_normal;
+    result._radiance = EvaluateTriangleLightRadiance(light, tri.uv0 * bary0 + tri.uv1 * bary1 + tri.uv2 * bary2);
+    return result;
+}
+
 bool HitAreaLight(SampleLightData light, float3 ray_origin, float3 ray_dir, inout float t)
 {
     float3 p0 = light._position - 0.5 * light._light_u - 0.5 * light._light_v;
@@ -390,6 +424,14 @@ LightSample SampleUnifiedLight(uint light_index, float3 x, float3 n, inout Rando
     if (light._type == LIGHT_TYPE_TRIANGLE_AREA)
         return SampleTriangleAreaLight(light, x, ctx);
     return SampleLight(light, x, n, ctx);
+}
+
+LightSample SampleUnifiedLight(uint light_index, float3 x, float3 n, float2 random_uv)
+{
+    SampleLightData light = DecodeUnifiedLightEntry(LoadUnifiedLight(light_index));
+    if (light._type == LIGHT_TYPE_TRIANGLE_AREA)
+        return SampleTriangleAreaLight(light, x, random_uv);
+    return SampleLight(light, x, n, random_uv);
 }
 
 bool EvaluateUnifiedLightHit(uint light_num,uint light_index, float3 ray_origin, float3 ray_dir, out float light_t, out LightSample light_sample)

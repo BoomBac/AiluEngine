@@ -44,6 +44,17 @@ namespace Ailu
     ResourceMgr *g_pResourceMgr = new ResourceMgr();
     Scope<Core::ThreadPool> g_pThreadTool = MakeScope<Core::ThreadPool>(6u, "GlobalThreadPool");
 
+    namespace
+    {
+        WString NormalizeDirectoryPath(const WString &path)
+        {
+            WString normalized = PathUtils::FormatFilePath(path);
+            if (!normalized.empty() && normalized.back() != L'/')
+                normalized.push_back(L'/');
+            return normalized;
+        }
+    }
+
     void Application::LoadEngineConfig()
     {
         JsonArchive ar;
@@ -73,6 +84,22 @@ namespace Ailu
     WString Application::GetAppCachePath()
     {
         return GetWorkingPath() + L"cache/";
+    }
+    void Application::SetProjectRootPath(const WString &project_root)
+    {
+        s_project_root_path = NormalizeDirectoryPath(project_root);
+    }
+    void Application::SetEngineConfigPath(const WString &engine_config_path)
+    {
+        s_default_engine_config_path = PathUtils::FormatFilePath(engine_config_path);
+    }
+    WString Application::ResolveProjectPath(const WString &relative_path)
+    {
+        if (relative_path.empty())
+            return relative_path;
+        if (PathUtils::IsSystemPath(relative_path))
+            return PathUtils::FormatFilePath(relative_path);
+        return PathUtils::FormatFilePath((fs::path(s_project_root_path) / fs::path(relative_path)).wstring());
     }
     WString Application::GetUseHomePath()
     {
@@ -111,13 +138,12 @@ namespace Ailu
         LogMgr::Get().AddAppender(new FileAppender());
         //Load ini
         {
-            auto work_path = GetWorkingPath();
-            work_path = Application::GetUseHomePath();
-            LOG_INFO(L"WorkPath: {}", work_path);
-            //AlluEngine/
-            WString prex_w = work_path + L"OneDrive/AiluEngine/";
-            ResourceMgr::ConfigRootPath(prex_w);
-            _engin_config_path = prex_w + L"Editor/EngineConfig.json";
+            if (s_project_root_path.empty())
+                SetProjectRootPath(GetWorkingPath());
+            LOG_INFO(L"ProjectRoot: {}", s_project_root_path);
+            if (ResourceMgr::EngineResRootPath().empty())
+                ResourceMgr::ConfigProjectRoot(s_project_root_path);
+            _engin_config_path = s_default_engine_config_path.empty() ? ResolveProjectPath(L"Editor/EngineConfig.json") : PathUtils::FormatFilePath(s_default_engine_config_path);
             LoadEngineConfig();
         }
         //LogMgr::Get().AddAppender(new ConsoleAppender());

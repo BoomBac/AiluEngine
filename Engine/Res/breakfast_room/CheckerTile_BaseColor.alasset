@@ -1,0 +1,5 @@
+guid: d87b7ee4-c46d-493b-9603-fbb0c7394a73
+type: Ailu::Render::Texture2D
+name: CheckerTile_BaseColor
+  file: breakfast_room/CheckerTile_BaseColor.png
+  sRGB: 1

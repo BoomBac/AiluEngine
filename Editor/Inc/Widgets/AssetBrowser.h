@@ -2,6 +2,7 @@
 #define __ASSETBROWSER_H__
 #include "Dock/DockWindow.h"
 #include "generated/AssetBrowser.gen.h"
+
 namespace Ailu
 {
     class Asset;
@@ -31,6 +32,26 @@ namespace Ailu
             void Update(f32 dt) final;
 
         private:
+            void QueueImportFiles(const Vector<WString> &files, Vector2f popup_pos);
+            void ShowNextImportPopup();
+            void ShowImportPopupForFile(const WString &sys_path);
+            void AdvanceImportQueue();
+            void OpenAsset(Asset *asset);
+            void ShowBlankAreaContextMenu(Vector2f popup_pos);
+            void ShowFolderContextMenu(const WString &folder_sys_path, Vector2f popup_pos);
+            void ShowAssetContextMenu(Asset *asset, Vector2f popup_pos);
+            bool RenameAssetEntry(Asset *asset, const String &new_name);
+            bool RenameFolderEntry(const WString &folder_sys_path, const String &new_name);
+            void DeleteAssetEntry(Asset *asset);
+            void DeleteFolderEntry(const WString &folder_sys_path);
+            bool CreateFolderEntry(const String &name);
+            bool CreateSceneEntry(const String &name);
+            bool CreateMaterialEntry(const String &name);
+            WString CurrentAssetDirectoryPath() const;
+            WString BuildCurrentAssetPath(const WString &file_name) const;
+            Vector<Asset *> CollectAssetsUnderDirectory(const WString &directory_asset_path) const;
+            String MakeUniqueEntryName(const WString &directory_sys_path, const String &base_name, const WString &extension, bool is_directory) const;
+
             inline static const f32 kDragThreshold = 5.0f;
             UI::SplitView *_sv = nullptr;
             UI::VerticalBox *_right = nullptr;
@@ -45,6 +66,8 @@ namespace Ailu
             fs::path _current_path;
             Vector2f _last_icon_area_size = Vector2f::kZero;
             Vector<Asset *> _cur_dir_assets;
+            Vector<WString> _pending_import_files;
+            Vector2f _import_popup_pos = Vector2f::kZero;
             HashMap<Render::Mesh *, Ref<Render::RenderTexture>> _mesh_preview_icons;
             bool _is_dragging = false;
             Vector2f _drag_start_pos;

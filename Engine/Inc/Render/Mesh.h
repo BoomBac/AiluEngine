@@ -18,6 +18,7 @@
 namespace Ailu
 {
     class FbxParser;
+    class GltfParser;
 
     namespace Render
     {
@@ -26,6 +27,7 @@ namespace Ailu
         {
             GENERATED_BODY()
             friend class FbxParser;
+            friend class GltfParser;
 
         public:
             inline static constexpr u8 kMaxUVChannels = 4u;

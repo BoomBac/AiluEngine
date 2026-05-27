@@ -76,14 +76,15 @@ namespace Ailu
             //ar >> *c.get();
 
 
-            auto work_path = GetWorkingPath();
-            work_path = Application::GetUseHomePath();
-            LOG_INFO(L"WorkPath: {}", work_path);
-            //AlluEngine/
-            WString prex_w = work_path + L"OneDrive/AiluEngine/";
-            ResourceMgr::ConfigRootPath(prex_w);
-            s_editor_root_path = prex_w + L"Editor/";
-            s_editor_config_path = prex_w + L"Editor/EditorConfig.json";
+            WString project_root = PathUtils::FormatFilePath(ToWChar(AILU_PROJECT_SOURCE_ROOT));
+            if (!project_root.empty() && project_root.back() != L'/')
+                project_root.push_back(L'/');
+            Application::SetProjectRootPath(project_root);
+            Application::SetEngineConfigPath(Application::ResolveProjectPath(L"Editor/EngineConfig.json"));
+            ResourceMgr::ConfigProjectRoot(project_root);
+            s_editor_root_path = Application::ResolveProjectPath(L"Editor/");
+            s_editor_config_path = Application::ResolveProjectPath(L"Editor/EditorConfig.json");
+            LOG_INFO(L"ProjectRoot: {}", project_root);
 
             ApplicationDesc desc;
             desc._window_width = 1600;
@@ -103,7 +104,7 @@ namespace Ailu
             }
             LoadEditorResource();
             //JsonArchive ar;
-            //ar.Load(Application::Get().GetUseHomePath() + L"OneDrive/AiluEngine/Editor/Res/UI/EditorStyle.json");
+            //ar.Load(Application::ResolveProjectPath(L"Editor/Res/UI/EditorStyle.json"));
             //auto t = EditorStyle::StaticType();
             //auto ps = &g_editor_style;
             //for (auto &p: t->GetProperties())

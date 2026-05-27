@@ -14,12 +14,12 @@ keywords:
     _IOR: 1.45
     _MaterialID: 0
     _MetallicValue: 0
-    _RoughnessValue: 0
+    _RoughnessValue: 1
     _SamplerMask: 0
     _Transmission: 0
   prop_type: Vector
     _AlbedoValue: 1,1,1,1
-    _EmissionValue: 1,0,0,1
+    _EmissionValue: 5.96941,0,0,1
     _SpecularValue: 0,0,0,0
   prop_type: IntVector
   prop_type: Texture2D

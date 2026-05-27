@@ -483,6 +483,11 @@ namespace Ailu
                 define_strings.emplace_back(def_name + L"=" + (kw.Definition ? ToWChar(kw.Definition) : L"1"));
             }
             define_strings.emplace_back(L"SHADER_DXC=1");
+            const WString packaged_shader_interop = PathUtils::ResolveRelPath(L"../ShaderInterop.h", PathUtils::Parent(desc._filename)).wstring();
+            if (FileManager::Exist(packaged_shader_interop))
+            {
+                define_strings.emplace_back(L"AL_PACKAGE_SHADER_INTEROP=1");
+            }
             if (IsDxrLibraryTarget(desc._target))
             {
                 define_strings.emplace_back(L"AL_SHADER_INTEROP_CBUFFER_AS_STRUCT=1");

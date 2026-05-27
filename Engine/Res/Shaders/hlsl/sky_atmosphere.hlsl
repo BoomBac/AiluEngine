@@ -126,7 +126,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // Bloom should be added at the end, but this is subtle and works well.
     float3 sunLum = sunWithBloom(rayDir, sunDir);
     // Use smoothstep to limit the effect, so it drops off to actual zero.
-    sunLum = smoothstep(0.02, 1.0, sunLum);
+    //sunLum = smoothstep(0.02, 1.0, sunLum);
     if (length(sunLum) > 0.0) {
         if (rayIntersectSphere(viewPos, rayDir, groundRadiusMM) >= 0.0) {
             sunLum *= 0.0;
@@ -138,10 +138,10 @@ float4 PSMain(PSInput input) : SV_TARGET
     lum += sunLum;
     
     // Tonemapping and gamma. Super ad-hoc, probably a better way to do this.
-    lum *= 20.0;
-    lum = pow(lum, 1.3.xxx);
-    lum /= (smoothstep(0.0, 0.2, clamp(sunDir.y, 0.0, 1.0))*2.0 + 0.15);
-    lum = jodieReinhardTonemap(lum);
+    lum *= 8.0;
+    //lum = pow(lum, 1.3.xxx);
+    //lum /= (smoothstep(0.0, 0.2, clamp(sunDir.y, 0.0, 1.0))*2.0 + 0.15);
+    //lum = jodieReinhardTonemap(lum);
     
     return float4(lum,1.0);
 }

@@ -285,7 +285,7 @@ namespace Ailu::Render
 		}
 		if (!desc_list.empty())
 		{
-			GenerateTriangleBounds();
+			//GenerateTriangleBounds();
 			_vertex_buffer.reset(VertexBuffer::Create(desc_list, _name));
 			if (_vertices.size()) 
 				_vertex_buffer->SetStream(reinterpret_cast<u8 *>(_vertices.data()), _vertex_count * ShaderDateTypeSize(EShaderDateType::kFloat3), vert_index, false);

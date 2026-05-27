@@ -135,7 +135,8 @@ float3 TransformPreviousObjectToWorld(float3 object_pos)
 
 float3 TransformNormal(float3 object_normal)
 {
-	return normalize(mul(_MatrixWorld, float4(object_normal, 0.0f)).xyz);
+    float3x3 normal_matrix = transpose((float3x3)_MatrixInvWorld);
+    return normalize(mul(normal_matrix, object_normal));
 }
 
 // Transforms vector from world space to view space

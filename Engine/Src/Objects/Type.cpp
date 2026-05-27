@@ -375,6 +375,7 @@ namespace Ailu
         MAKE_BASE_TYPE(Vector2UInt);
         MAKE_BASE_TYPE(Vector3UInt);
         MAKE_BASE_TYPE(Vector4UInt);
+        MAKE_BASE_TYPE(Color);
         for (auto *type: all_base_types)
             s_global_types[type->FullName()] = type;
     }

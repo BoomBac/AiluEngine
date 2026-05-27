@@ -111,6 +111,10 @@ namespace Ailu
             LOG_WARNING(L"CreateFile: File {} already exist!", sys_path);
             return false;
         }
+        if (!p.parent_path().empty() && !fs::exists(p.parent_path()))
+        {
+            CreateDirectory(p.parent_path());
+        }
         std::wofstream out_file(sys_path);
         AL_ASSERT(out_file.is_open());
         out_file.close();

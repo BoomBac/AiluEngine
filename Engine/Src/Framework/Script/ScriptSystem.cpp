@@ -322,6 +322,7 @@ namespace Ailu
         (*component._instance)["entity"] = entity;
         component._is_initialized = true;
         _loaded_script_files[component._resolved_script_path] = *resolved;
+        LOG_INFO("ScriptComponent instance created for entity '{}' with script '{}'", entity.GetName(), *resolved);
         return true;
     }
 

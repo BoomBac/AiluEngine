@@ -2796,21 +2796,17 @@ namespace Ailu
 
         namespace ALHash
         {
+            static inline std::size_t HashCombineStable(std::size_t seed, std::size_t value)
+            {
+                return seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+            }
+
             struct Vector2fHash
             {
                 inline std::size_t operator()(const Vector2f &v) const
                 {
-                    // Generate random seeds
-                    static std::random_device rd;
-                    static std::mt19937 gen(rd());
-                    std::uniform_int_distribution<std::size_t> dis;
-                    std::size_t seed1 = dis(gen);
-                    std::size_t seed2 = dis(gen);
-                    std::size_t h1 = std::hash<float>{}(v.x) + seed1;
-                    std::size_t h2 = std::hash<float>{}(v.y) + seed2;
-                    // Combine hashes with XOR and bit shifts
-                    return ((h1 << 7) ^ (h2 << 13)) +
-                           ((h1 >> 11) ^ (h2 >> 17));
+                    std::size_t seed = std::hash<float>{}(v.x);
+                    return HashCombineStable(seed, std::hash<float>{}(v.y));
                 }
             };
 
@@ -2826,22 +2822,9 @@ namespace Ailu
             {
                 inline std::size_t operator()(const Vector3f &v) const
                 {
-                    // Generate random seeds
-                    static std::random_device rd;
-                    static std::mt19937 gen(rd());
-                    std::uniform_int_distribution<std::size_t> dis;
-                    std::size_t seed1 = dis(gen);
-                    std::size_t seed2 = dis(gen);
-                    std::size_t seed3 = dis(gen);
-
-                    // Use more complex combination
-                    std::size_t h1 = std::hash<float>{}(v.x) + seed1;
-                    std::size_t h2 = std::hash<float>{}(v.y) + seed2;
-                    std::size_t h3 = std::hash<float>{}(v.z) + seed3;
-
-                    // Combine hashes with XOR and bit shifts
-                    return ((h1 << 7) ^ (h2 << 13) ^ (h3 << 19)) +
-                           ((h1 >> 11) ^ (h2 >> 17) ^ (h3 >> 23));
+                    std::size_t seed = std::hash<float>{}(v.x);
+                    seed = HashCombineStable(seed, std::hash<float>{}(v.y));
+                    return HashCombineStable(seed, std::hash<float>{}(v.z));
                 }
             };
 
@@ -2857,20 +2840,10 @@ namespace Ailu
             {
                 inline std::size_t operator()(const Vector4f &v) const
                 {
-                    // Generate random seeds
-                    static std::random_device rd;
-                    static std::mt19937 gen(rd());
-                    std::uniform_int_distribution<std::size_t> dis;
-                    std::size_t seed1 = dis(gen);
-                    std::size_t seed2 = dis(gen);
-                    std::size_t seed3 = dis(gen);
-                    std::size_t seed4 = dis(gen);
-
-                    std::size_t h1 = std::hash<float>{}(v.x) + seed1;
-                    std::size_t h2 = std::hash<float>{}(v.y) + seed2;
-                    std::size_t h3 = std::hash<float>{}(v.z) + seed3;
-                    std::size_t h4 = std::hash<float>{}(v.w) + seed4;
-                    return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
+                    std::size_t seed = std::hash<float>{}(v.x);
+                    seed = HashCombineStable(seed, std::hash<float>{}(v.y));
+                    seed = HashCombineStable(seed, std::hash<float>{}(v.z));
+                    return HashCombineStable(seed, std::hash<float>{}(v.w));
                 }
             };
 

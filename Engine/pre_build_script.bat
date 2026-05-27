@@ -1,10 +1,12 @@
 @echo off
-:: 获取当前批处理文件所在目录
-set currentDir=%~dp0
+setlocal
 
-:: 获取上一级目录（去除尾部的反斜杠）
-set parentDir=%currentDir:~0,-1%
-set parentDir=%parentDir%\..
+set "AHT_EXE=%~1"
+if "%AHT_EXE%"=="" set "AHT_EXE=%~dp0..\AiluHeadTool\bin\x64\debug\AiluHeadTool.exe"
 
-:: 强制用 cmd 运行 exe
-cmd /c "%parentDir%\AiluHeadTool\bin\x64\debug\AiluHeadTool.exe"
+if not exist "%AHT_EXE%" (
+	echo [AiluHeadTool] executable not found: %AHT_EXE%
+	exit /b 1
+)
+
+"%AHT_EXE%" -force

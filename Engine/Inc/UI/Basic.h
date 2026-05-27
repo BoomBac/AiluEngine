@@ -144,7 +144,7 @@ namespace Ailu
             InputBlock();
             InputBlock(const String &content);
             void Update(f32 dt) final;
-            void SetContent(String content, bool trigger_event = true);
+            void SetContent(const String& content, bool trigger_event = true);
             Vector2f MeasureDesiredSize() override;
             bool IsEditing() const { return _is_editing; }
         private:
@@ -172,6 +172,7 @@ namespace Ailu
             Vector<f32> _cursor_offsets;
             Vector2f _text_rect_size;
             bool _is_editing = false;
+            bool _is_need_recalc_offset_table = true;
         };
 
         ACLASS()

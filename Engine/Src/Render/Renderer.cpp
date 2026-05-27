@@ -12,6 +12,7 @@
 #include "Render/Features/VoxelGI.h"
 #include "Render/Features/GpuTerrain.h"
 #include "Render/Features/RayTraceGI.h"
+#include "Render/Features/RTXDI.h"
 #include "Render/Features/VolumetricFog.h"
 #include "Render/RenderPipeline.h"
 #include "Render/RenderingData.h"
@@ -62,6 +63,8 @@ namespace Ailu::Render
         _gpu_terrain = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new RayTraceGI())));
         _raytrace_gi = _owned_features.back().get();
+        _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new RTXDI())));
+        _rtxdi = _owned_features.back().get();
         _owned_features.push_back(std::move(std::unique_ptr<RenderFeature>(new VolumetricFog())));
         _fog = _owned_features.back().get();
         //_features.push_back(_vxgi);
@@ -70,6 +73,8 @@ namespace Ailu::Render
         _features.push_back(_ssao);
         _features.push_back(_raytrace_gi);
         _raytrace_gi->SetActive(false);
+        _features.push_back(_rtxdi);
+        _rtxdi->SetActive(false);
         _features.push_back(_fog);
         _fog->SetActive(true);
         _material_data_lut[0] = 0; //default material
@@ -292,7 +297,8 @@ namespace Ailu::Render
         _vxgi->SetActive(cam._is_gen_voxel || _vxgi->IsActive());
         if (_is_use_raytracing)
         {
-            _raytrace_gi->SetActive(true);
+            //_raytrace_gi->SetActive(true);
+            _rtxdi->SetActive(true);
             _fog->SetActive(false);
             _ssao->SetActive(false);
             _render_passes.emplace_back(_gbuffer_pass.get());
@@ -304,7 +310,8 @@ namespace Ailu::Render
         {
             _ssao->SetActive(true);
             _fog->SetActive(true);
-            _raytrace_gi->SetActive(false);
+            //_raytrace_gi->SetActive(false);
+            _rtxdi->SetActive(false);
             if (_mode & EShadingMode::kLit)
             {
                 _skybox_pass->Setup(false);
@@ -500,11 +507,12 @@ namespace Ailu::Render
         auto inst_buffer = _cur_fs->GetSceneInstanceBuffer(s.HashCode());
         inst_buffer->SetData(reinterpret_cast<const u8 *>(s_instance_data.data()), (u32) (s_instance_data.size() * sizeof(ObjectInstanceData)));
         ComputeShader::SetGlobalBuffer("g_instance_data", inst_buffer);
-        ComputeShader::SetGlobalBuffer("g_scene", s.GetSceneMeshDataBuffer());
+        auto scene_data_buffer = s.GetSceneMeshDataBuffer();
+        ComputeShader::SetGlobalBuffer("g_scene", scene_data_buffer);
         ComputeShader::SetGlobalBuffer("g_tlas_buffer", s.GetTLASBuffer());
         ComputeShader::SetGlobalBuffer("g_blas_buffer", s.GetBLASBuffer());
         ComputeShader::SetGlobalBuffer("g_material_buffer", _cur_fs->GetMaterialBuffer());
-        ComputeShader::SetGlobalInt("_scene_bindless_idx", s.GetSceneMeshDataBuffer()->GetBindlessSRVIndex());
+        ComputeShader::SetGlobalInt("_scene_bindless_idx", scene_data_buffer ? scene_data_buffer->GetBindlessSRVIndex() : RenderConstants::kInvalidBindlessHandle);
         ComputeShader::SetGlobalInt("_tlas_count", s.GetTLASNodeCount());
         ComputeShader::SetGlobalInt("_blas_count", s.GetBLASNodeCount());
         ComputeShader::SetGlobalInt("_inst_count", obj_index);

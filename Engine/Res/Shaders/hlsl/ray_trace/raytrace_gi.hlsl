@@ -37,7 +37,7 @@
 
 #define MAX_ACCUMULATED_FRAMES 4096
 #define ADDITIONAL_SAMPLING 1
-#define PER_FRAME_SAMPLES 6
+#define PER_FRAME_SAMPLES 4
 
 RWTEXTURE2D(_GI_Texture,float4)
 
@@ -618,7 +618,7 @@ Material BuildSurfaceMaterial(SurfaceData surface_data)
 {
     Material mat = (Material)0;
     mat._albedo = surface_data.albedo.rgb;
-    mat._roughness = surface_data.roughness;
+    mat._roughness = max(surface_data.roughness,0.04);
     mat._metallic = surface_data.metallic;
     mat._anisotropy = surface_data.anisotropy;
     mat._ior = 1.5;
@@ -717,7 +717,7 @@ bool EvaluateReservoirTargetAtSurface(TinyLightSample sample, Surface surface, o
     if (all(f == 0.0.xxx))
         return false;
 
-    target = max(Luminance(sample._le * f * cos_theta), 0.0);
+    target = max(Luminance(sample._le * f * cos_theta / pdf_brdf), 0.0);
     return target > 1e-8;
 }
 
@@ -728,166 +728,93 @@ bool IsValidNeighbor(float3 normal,float depth01,float3 neighbor_normal,float ne
     return normal_similarity > normal_threshold && depth_delta < depth_threshold;
 }
 
+bool IsValidTemporalNeighbor(Surface current, Surface history, float expected01_depth)
+{
+    if (!IsValidSurface(history))
+        return false;
+
+    // float3 position_delta = current._position - history._position;
+    // const float kMaxPositionError = 0.1;
+    // if (dot(position_delta, position_delta) > kMaxPositionError * kMaxPositionError)
+    //     return false;
+
+    const float kDepthThreshold = 0.02;
+    const float kNormalThreshold = 0.95;
+    return IsValidNeighbor(current._normal, expected01_depth, history._normal,
+        history._linear_depth, kDepthThreshold, kNormalThreshold);
+}
+
 Reservoir TemporalReuse(uint2 pixel,Reservoir r,Surface surface,inout RandomCtx ctx,out float3 debug_color)
 {
     if (!valid_bindless_handle(_prev_surface_buffer_idx) || r.M == 0u)
         return r;
-    debug_color = 1;
+    debug_color = float3(0, 0, 0);
     Reservoir state = InitReservoir();
     CombineDIReservoirs(state, r, rand(ctx), r.target);
 
     float3 motion = _MotionVectorTexture[pixel].rgb;
     float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
     float2 history_uv = uv - motion.xy;
+    float expected01_depth = surface._linear_depth - motion.z;
     bool is_valid_history = all(history_uv >= 0) && all(history_uv < 1.0.xx);
     if (!is_valid_history)
-    {
         return r;
-    }
 
     int2 history_pixel = int2(history_uv * _ScreenParams.zw);
     int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
     history_pixel = clamp(history_pixel, int2(0, 0), history_max);
+
+    Surface history_surface = GetPrevSurface(history_pixel);
+    if (!IsValidTemporalNeighbor(surface, history_surface, expected01_depth))
+    {
+        debug_color = float3(1, 0, 0);
+        return r;
+    }
+
     Reservoir history_r = g_prev_reservoir[PixelToLinearIndex(uint2(history_pixel))];
     if (history_r.M == 0)
-        return state;
+    {
+        debug_color = float3(1, 0, 0);
+        return r;
+    }
     float history_target = 0.0;
     if (!EvaluateReservoirTargetAtSurface(history_r.y, surface, history_target))
-        return state;
-    history_r.M = min(history_r.M, 16u);
+    {
+        debug_color = float3(1, 0, 0);
+        return r;
+    }
+    const uint kMaxHistoryFrames = 14;
+    history_r.M = min(history_r.M, kMaxHistoryFrames);
     CombineDIReservoirs(state, history_r, rand(ctx), history_target);
-    debug_color = 0.0.xxx;
+
+    const int kSpatialNeighborCount = 5;
+    const float kSpatialRadius = 14.0;
+    for (int i = 0; i < kSpatialNeighborCount; i++)
+    {
+        int2 offset = int2((rand2(ctx) - 0.5) * kSpatialRadius);
+        int2 neighbor_pixel = clamp(history_pixel + offset, int2(0, 0), history_max);
+        if (all(neighbor_pixel == history_pixel))
+            continue;
+
+        Surface neighbor_surface = GetPrevSurface(neighbor_pixel);
+        if (!IsValidTemporalNeighbor(surface, neighbor_surface, expected01_depth))
+            continue;
+
+        Reservoir neighbor_r = g_prev_reservoir[PixelToLinearIndex(uint2(neighbor_pixel))];
+        if (neighbor_r.M == 0)
+            continue;
+        float neighbor_target = 0.0;
+        if (!EvaluateReservoirTargetAtSurface(neighbor_r.y, surface, neighbor_target))
+            continue;
+        neighbor_r.M = min(neighbor_r.M, kMaxHistoryFrames);
+        CombineDIReservoirs(state, neighbor_r, rand(ctx), neighbor_target);
+    }
+
     FinalizeResampling(state, 1.0, (float)state.M);
     return state;
 }
 
-Reservoir TemporalSpatialResampling(uint2 pixel,Reservoir r,Surface surface,inout RandomCtx ctx,out float3 debug_color)
-{
-    if (_frame_index == 0u || !valid_bindless_handle(_prev_surface_buffer_idx) || r.M == 0u)
-        return r;
-    debug_color = 1;
-    Reservoir state = InitReservoir();
-    CombineDIReservoirs(state, r, 0.5, r.target);
-
-    float3 motion = _MotionVectorTexture[pixel].rgb;
-    float2 uv = (float2(pixel) + 0.5.xx) * _ScreenParams.xy;
-    float2 history_uv = uv - motion.xy;
-    bool is_valid_history = all(history_uv >= 0) && all(history_uv < 1.0.xx);
-    if (!is_valid_history)
-    {
-        return r;
-    }
-
-    int2 history_pixel = int2(history_uv * _ScreenParams.zw);
-    int2 history_max = int2(_ScreenParams.zw) - int2(1, 1);
-    history_pixel = clamp(history_pixel, int2(0, 0), history_max);
-
-    const static uint kTemporalSearchCount = 9;
-    const static uint kMaxReuseCandidates = 1;
-    const static uint kSpatialSamples = 1;
-    const static uint kDisocclusionBoostSamples = 8;
-    const static uint kSpatialRadius = 8;
-    const static float kDepthThreshold = 0.02;
-    const static float kNormalThreshold = 0.95;
-    float expected01_depth = surface._linear_depth - motion.z;
-    bool has_valid_surface = false;
-    Surface history_surface = (Surface)0;
-    int2 temporal_offset = int2(0, 0);
-    for (uint i = 0; i < kTemporalSearchCount; ++i)
-    {
-        int2 offset = int2(0, 0);
-        if (i > 0)
-        {
-            offset = int2((rand2(ctx) - 0.5) * kSpatialRadius);
-        }
-        int2 neighbor_pixel = history_pixel + offset;
-        Surface s = GetPrevSurface(neighbor_pixel);
-        debug_color = 1.0.xxx;
-        if (IsValidSurface(s) && IsValidNeighbor(surface._normal, expected01_depth, s._normal, s._linear_depth, kDepthThreshold, kNormalThreshold))
-        {
-            history_surface = s;
-            has_valid_surface = true;
-            temporal_offset = offset;
-            history_pixel = neighbor_pixel;
-            break;
-        }
-    }
-    debug_color = has_valid_surface? history_surface._normal : float3(1, 0, 0);
-    Surface candidate_surfaces[kMaxReuseCandidates];
-    uint candidate_m[kMaxReuseCandidates];
-    uint candidate_count = 0u;
-    int selected_candidate_idx = -1;
-    uint sample_count = has_valid_surface ? kSpatialSamples : kDisocclusionBoostSamples;
-
-    for (uint i = 0; i < sample_count && candidate_count < kMaxReuseCandidates; ++i)
-    {
-        int2 neighbor_pixel;
-        Surface prev_surface;
-        if (i == 0 && has_valid_surface)
-        {
-            neighbor_pixel = history_pixel;
-            prev_surface = history_surface;
-        }
-        else
-        {
-            int2 offset = int2((rand2(ctx) - 0.5) * kSpatialRadius);
-            neighbor_pixel = clamp(history_pixel + offset, int2(0, 0), history_max);
-            prev_surface = GetPrevSurface(neighbor_pixel);
-            if (!IsValidSurface(prev_surface))
-                continue;
-            if (!IsValidNeighbor(surface._normal, expected01_depth, prev_surface._normal, prev_surface._linear_depth, kDepthThreshold, kNormalThreshold))
-                continue;
-        }
-
-        if (!IsValidPixel(neighbor_pixel))
-            continue;
-
-        Reservoir neighbor_r = g_prev_reservoir[PixelToLinearIndex(uint2(neighbor_pixel))];
-        neighbor_r = ClampReservoirHistory(neighbor_r, 32);
-        if (neighbor_r.M == 0u || neighbor_r.w_sum <= 1e-6)
-            continue;
-
-        float neighbor_target = 0.0;
-        if (!EvaluateReservoirTargetAtSurface(neighbor_r.y, surface, neighbor_target))
-            continue;
-
-        candidate_surfaces[candidate_count] = prev_surface;
-        candidate_m[candidate_count] = neighbor_r.M;
-        if (CombineDIReservoirs(state, neighbor_r, rand(ctx), neighbor_target))
-        {
-            selected_candidate_idx = (int)candidate_count;
-        }
-        ++candidate_count;
-    }
-
-    if (candidate_count == 0u)
-        return r;
-
-    if (state.w_sum <= 1e-6)
-        return r;
-
-    float pi = r.target;
-    if (selected_candidate_idx >= 0)
-    {
-        EvaluateReservoirTargetAtSurface(state.y, candidate_surfaces[selected_candidate_idx], pi);
-    }
-
-    float pi_sum = r.target * r.M;
-    for (uint i = 0; i < candidate_count; ++i)
-    {
-        float ps = 0.0;
-        if (!EvaluateReservoirTargetAtSurface(state.y, candidate_surfaces[i], ps))
-            continue;
-        pi_sum += ps * candidate_m[i];
-    }
-
-    FinalizeResampling(state, 1.0, pi_sum);
-    return state;
-}
-
-
-
-float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_data,Surface surface,float3 wo,bool is_debug,inout RandomCtx ctx,inout DebugData debug_data)
+float4 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_data,Surface surface,float3 wo,bool is_debug,inout RandomCtx ctx,inout DebugData debug_data)
 {
     Material mat = BuildSurfaceMaterial(surface_data);
     float3 n = surface_data.wnormal;
@@ -906,12 +833,12 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
     debug_data.throughput = 1.0.xxx;
     debug_data.has_hit = true;
 
-    float3 radiance = mat._emission;
+    float4 radiance = float4(mat._emission,1.0);
     if (_light_count == 0u)
         return radiance;
     if (_enable_ris)
     {
-        const uint brdf_candidate_count = 2u;
+        const uint brdf_candidate_count = 4u;
         MisContext mis_ctx = (MisContext)0;
         float sample_count = float(PER_FRAME_SAMPLES + brdf_candidate_count);
         mis_ctx._pl = float(PER_FRAME_SAMPLES) / sample_count;
@@ -989,7 +916,7 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
         FinalizeResampling(brdf_r,1.0,sample_count);
         brdf_r.M = 1;
         CombineDIReservoirs(r, brdf_r, rand(ctx), brdf_r.target);
-        FinalizeResampling(r,1.0,(float)r.M);
+        FinalizeResampling(r,1.0,1.0);
         r.M = 1;
         float3 debug_color = 0;
         if (_enable_resampling)
@@ -1015,10 +942,11 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
                 float3 h = normalize(wi + wo);
                 float pdf_brdf = 0.0;
                 float3 f = EvalBRDF(trace_ctx, n, h, wo, wi, pdf_brdf);
-                radiance += selected_sample._le * f * cos_theta * r.w_sum;
+                radiance.rgb += selected_sample._le * f * cos_theta * r.w_sum;
+                radiance.a = r.w_sum;
             }
         }
-        //radiance = debug_color;
+        //radiance = float4(debug_color,1.0);
     }
     else
     {
@@ -1040,12 +968,12 @@ float3 EvaluateSurfaceReSTIRDI(uint2 pixel,float3 world_pos,SurfaceData surface_
             float pdf_brdf_for_light = 0.0;
             float3 f = EvalBRDF(trace_ctx, n, h, wo, light_sample._wi, pdf_brdf_for_light);
             float weight = PowerHeuristic(light_sample._pdf, pdf_brdf_for_light);
-            radiance += light_sample._radiance * f * cos_theta / light_sample._pdf;
+            radiance.rgb += light_sample._radiance * f * cos_theta / light_sample._pdf;
         }
     }
 
     //return max(radiance, 0.0.xxx);
-    return min(radiance,float3(20,20,20));
+    return radiance;
 }
 
 
@@ -1318,13 +1246,13 @@ void RayGen(CSInput input)
     float3 wo = normalize(_CameraPos.xyz - world_pos);
     bool is_debug = (pixel.x == _PickPixel.x && pixel.y == _PickPixel.y);
     DebugData debug_data;
-    float3 color = EvaluateSurfaceReSTIRDI(pixel, world_pos, surface_data,surface, wo, is_debug, ctx, debug_data);
+    float4 color = EvaluateSurfaceReSTIRDI(pixel, world_pos, surface_data,surface, wo, is_debug, ctx, debug_data);
     if (!_enable_ris || _light_count == 0u)
         g_curr_reservoir[PixelToLinearIndex(pixel)] = InitReservoir();
 
-    float3 debug_output = color;
-    HandleDebugOutput(debug_data, surface_data.wnormal * 0.5 + 0.5, color, debug_output);
-    _GI_Texture[pixel] = float4(debug_output,1.0f);
+    float3 debug_output = color.rgb;
+    HandleDebugOutput(debug_data, surface_data.wnormal * 0.5 + 0.5, color.rgb, debug_output);
+    _GI_Texture[pixel] = float4(debug_output,color.a);
 }
 
 [shader("compute")]
@@ -1378,7 +1306,8 @@ void Denoise(CSInput input)
     history_pixel = clamp(history_pixel, int2(0, 0), history_max);
 
     float3 history = SAMPLE_TEXTURE2D_LOD(_HistoryTarget,g_LinearClampSampler,history_uv,0).rgb;//  _HistoryTarget[history_pixel].rgb;
-    _CurrentTarget[pixel].rgb = lerp(history, current, 0.05);
+    float a = 1.0 / clamp((float)_frame_index + 1.0, 1.0, MAX_ACCUMULATED_FRAMES);
+    _CurrentTarget[pixel].rgb = lerp(history, current, a);
     return;
 
     int2 max_pixel = int2(_ScreenParams.zw) - int2(1, 1);
@@ -1403,7 +1332,7 @@ void Denoise(CSInput input)
     float history_luma = Luminance(clamped_history);
     float current_luma = Luminance(current);
     float luma_delta = abs(history_luma - current_luma) / max(max(history_luma, current_luma), 1e-3);
-    float a = 1.0 / clamp((float)_frame_index + 1.0, 1.0, MAX_ACCUMULATED_FRAMES);
+    //float a = 1.0 / clamp((float)_frame_index + 1.0, 1.0, MAX_ACCUMULATED_FRAMES);
     float current_weight = max(a, saturate(0.08 + motion_pixels * 0.12 + luma_delta * 0.4));
 
     float3 blended = lerp(clamped_history, current, current_weight);

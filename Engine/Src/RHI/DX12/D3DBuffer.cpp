@@ -178,15 +178,25 @@ namespace Ailu::RHI::DX12
                 {
                     auto [cpu_handle, gpu_handle] = _uav_alloc.At(0);
                     D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
-                    uav_desc.Format = is_structured ? DXGI_FORMAT_UNKNOWN : ConvertToDXGIFormat(_desc._format);
                     uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
                     uav_desc.Buffer.FirstElement = 0;
-                    uav_desc.Buffer.NumElements = _desc._element_num;
-                    uav_desc.Buffer.StructureByteStride = is_structured || is_with_counter ? _desc._element_size : 0u;
-                    if (is_with_counter)
-                        AL_ASSERT(uav_desc.Buffer.StructureByteStride > 0);
+                    if (_desc._target & EGPUBufferTarget::kRaw)
+                    {
+                        uav_desc.Format = DXGI_FORMAT_R32_TYPELESS;
+                        uav_desc.Buffer.NumElements = static_cast<UINT>(_mem_size / sizeof(u32));
+                        uav_desc.Buffer.StructureByteStride = 0u;
+                        uav_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+                        uav_desc.Buffer.CounterOffsetInBytes = 0u;
+                    }
+                    else
+                    {
+                        uav_desc.Format = is_structured ? DXGI_FORMAT_UNKNOWN : ConvertToDXGIFormat(_desc._format);
+                        uav_desc.Buffer.NumElements = _desc._element_num;
+                        uav_desc.Buffer.StructureByteStride = is_structured || is_with_counter ? _desc._element_size : 0u;
+                        if (is_with_counter)
+                            AL_ASSERT(uav_desc.Buffer.StructureByteStride > 0);
+                    }
                     p_device->CreateUnorderedAccessView(_p_d3d_res.Get(), is_with_counter ? _counter_buffer.Get() : nullptr, &uav_desc, cpu_handle);
-
                     ReleaseBindlessUavIndex(_bindless_uav_index);
                     CreateBindlessBufferUav(p_device, _p_d3d_res.Get(), _mem_size, _bindless_uav_index);
                 }
@@ -204,6 +214,15 @@ namespace Ailu::RHI::DX12
                 srv_desc.Format = DXGI_FORMAT_UNKNOWN;
                 srv_desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
                 srv_desc.RaytracingAccelerationStructure.Location = _p_d3d_res->GetGPUVirtualAddress();
+            }
+            else if (_desc._target & EGPUBufferTarget::kRaw)
+            {
+                srv_desc.Format = DXGI_FORMAT_R32_TYPELESS;
+                srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+                srv_desc.Buffer.FirstElement = 0;
+                srv_desc.Buffer.NumElements = static_cast<UINT>(_mem_size / sizeof(u32));
+                srv_desc.Buffer.StructureByteStride = 0u;
+                srv_desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
             }
             else
             {

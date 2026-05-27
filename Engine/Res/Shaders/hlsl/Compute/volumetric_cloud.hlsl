@@ -199,9 +199,8 @@ float3 LightMarch(float3 p,float cos_theta,float3 light_dir,float dist,float3 si
                transmittance, 
                0.5 + 0.5 * cos_theta);
 }
-float3 ACESFilm(float3 x){
-    return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
-}
+
+[shader("compute")]
 [numthreads(THREAD_NUM,THREAD_NUM,1)]
 void CloudMain(CSInput input)
 {
@@ -352,7 +351,7 @@ void CloudMain(CSInput input)
 
 TEXTURE2D(_CloudHistoryTex)
 TEXTURE2D(_MotionVectorTexture)
-
+[shader("compute")]
 [numthreads(THREAD_NUM,THREAD_NUM,1)]
 void CloudReprojection(CSInput input)
 {

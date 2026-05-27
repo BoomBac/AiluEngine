@@ -1,0 +1,5 @@
+guid: f6841cc3-6dc8-4a5e-9d06-c8bac3968a0c
+type: Ailu::Render::Texture2D
+name: CheckerTile_Normal
+  file: breakfast_room/CheckerTile_Normal.png
+  sRGB: 0

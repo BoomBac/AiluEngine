@@ -1,0 +1,7 @@
+{
+    "resourceRoot": "Engine/Res",
+    "startupScene": "WaterTest/empty_scene.almap",
+    "windowWidth": 1600,
+    "windowHeight": 900,
+    "developmentMode": false
+}

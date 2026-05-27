@@ -66,20 +66,20 @@ namespace Ailu
                 u32 v_base = block->CurrentVertNum();
                 u32 i_base = block->CurrentIndexNum();
                 /*
-                 0----3
+                 0----1
                  |   /|
                  |  / |
                  | /  |
-                 1----2
+                 2----3
                 */
                 block->_uv_buf[v_base]     = {uv_rect.x, uv_rect.y};
-                block->_uv_buf[v_base + 1] = {uv_rect.x, uv_rect.y + uv_rect.w};
-                block->_uv_buf[v_base + 2] = {uv_rect.x + uv_rect.z, uv_rect.y + uv_rect.w};
-                block->_uv_buf[v_base + 3] = {uv_rect.x + uv_rect.z, uv_rect.y};
+                block->_uv_buf[v_base + 1] = {uv_rect.x + uv_rect.z, uv_rect.y};
+                block->_uv_buf[v_base + 2] = {uv_rect.x, uv_rect.y + uv_rect.w};
+                block->_uv_buf[v_base + 3] = {uv_rect.x + uv_rect.z, uv_rect.y + uv_rect.w};
                 block->_pos_buf[v_base]     = {pos_rect.xy, 1.0};
-                block->_pos_buf[v_base + 1] = {pos_rect.x, pos_rect.y + pos_rect.w, 1.0};
-                block->_pos_buf[v_base + 2] = {pos_rect.x + pos_rect.z, pos_rect.y + pos_rect.w, 1.0};
-                block->_pos_buf[v_base + 3] = {pos_rect.x + pos_rect.z, pos_rect.y, 1.0};
+                block->_pos_buf[v_base + 1] = {pos_rect.x + pos_rect.z, pos_rect.y, 1.0};
+                block->_pos_buf[v_base + 2] = {pos_rect.x, pos_rect.y + pos_rect.w, 1.0};
+                block->_pos_buf[v_base + 3] = {pos_rect.x + pos_rect.z, pos_rect.y + pos_rect.w, 1.0};
                 TransformCoord(block->_pos_buf[v_base],matrix);
                 TransformCoord(block->_pos_buf[v_base + 1], matrix);
                 TransformCoord(block->_pos_buf[v_base + 2], matrix);
@@ -90,10 +90,10 @@ namespace Ailu
                 block->_color_buf[v_base + 3] = color;
                 block->_index_buf[i_base] = v_base;
                 block->_index_buf[i_base + 1] = v_base + 1;
-                block->_index_buf[i_base + 2] = v_base + 3;
+                block->_index_buf[i_base + 2] = v_base + 2;
                 block->_index_buf[i_base + 3] = v_base + 1;
-                block->_index_buf[i_base + 4] = v_base + 2;
-                block->_index_buf[i_base + 5] = v_base + 3;
+                block->_index_buf[i_base + 4] = v_base + 3;
+                block->_index_buf[i_base + 5] = v_base + 2;
 
                 UIRenderer::Get()->AppendNode(block,
                                               4u,

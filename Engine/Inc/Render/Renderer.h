@@ -129,6 +129,7 @@ namespace Ailu
             RenderFeature *_ssao;
             RenderFeature *_gpu_terrain;
             RenderFeature *_raytrace_gi;
+            RenderFeature *_rtxdi;
             RenderFeature *_fog;
             u64 _active_camera_hash;
 

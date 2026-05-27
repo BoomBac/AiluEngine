@@ -21,7 +21,9 @@ if /I "%CONFIG%"=="RelWithDebInfo" set "CONFIG_DIR=relwithdebinfo"
 if /I "%CONFIG%"=="MinSizeRel" set "CONFIG_DIR=minsizerel"
 
 if not exist "%AILU_BUILD_ROOT%\out\editor\bin\x64\%CONFIG_DIR%\" mkdir "%AILU_BUILD_ROOT%\out\editor\bin\x64\%CONFIG_DIR%\"
+if not exist "%AILU_BUILD_ROOT%\out\player\bin\x64\%CONFIG_DIR%\" mkdir "%AILU_BUILD_ROOT%\out\player\bin\x64\%CONFIG_DIR%\"
 if not exist "%AILU_BUILD_ROOT%\out\test\bin\x64\%CONFIG_DIR%\" mkdir "%AILU_BUILD_ROOT%\out\test\bin\x64\%CONFIG_DIR%\"
 
 copy /y "%ENGINE_DLL%" "%AILU_BUILD_ROOT%\out\editor\bin\x64\%CONFIG_DIR%\%ENGINE_DLL_NAME%" >nul
+copy /y "%ENGINE_DLL%" "%AILU_BUILD_ROOT%\out\player\bin\x64\%CONFIG_DIR%\%ENGINE_DLL_NAME%" >nul
 copy /y "%ENGINE_DLL%" "%AILU_BUILD_ROOT%\out\test\bin\x64\%CONFIG_DIR%\%ENGINE_DLL_NAME%" >nul

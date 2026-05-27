@@ -11,7 +11,7 @@
             "_title": "SceneView",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [268.0, 48.0],
+            "_position": [361.0, 25.0],
             "_size": [800.0, 450.0],
             "_flags": 0
         }, {
@@ -26,7 +26,7 @@
             "_title": "AssetBrowser",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [-357.0, 596.0],
+            "_position": [-151.0, 508.0],
             "_size": [903.0, 513.0],
             "_flags": 0
         }, {
@@ -41,7 +41,7 @@
             "_title": "ObjectDetail",
             "_tab_id": "",
             "_window_position": [-858993472.0, -858993472.0],
-            "_position": [907.0, 180.0],
+            "_position": [846.0, 345.0],
             "_size": [377.0, 493.0],
             "_flags": 0
         }]

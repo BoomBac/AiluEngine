@@ -3,6 +3,7 @@
 #define __ASSET_PARSER_H__
 #include "DDSParser.h"
 #include "FbxParser.h"
+#include "GltfParser.h"
 #include "HDRParser.h"
 #include "PngParser.h"
 
@@ -16,6 +17,13 @@ namespace Ailu
     {
     public:
         static Scope<FbxParser> GetParser() { return MakeScope<FbxParser>(); }
+    };
+
+    template<>
+    class TStaticMeshLoader <EResourceType::kStaticMesh, EMeshLoader::kGltf>
+    {
+    public:
+        static Scope<GltfParser> GetParser() { return MakeScope<GltfParser>(); }
     };
 
     template<EResourceType res_type, EImageLoader loader_type>
@@ -37,6 +45,7 @@ namespace Ailu
         static Scope<IMeshParser> GetParser(EMeshLoader loader) 
         { 
             if (loader == EMeshLoader::kFbx) return MakeScope<FbxParser>();
+            else if (loader == EMeshLoader::kGltf) return MakeScope<GltfParser>();
             else return nullptr;
         }
     };

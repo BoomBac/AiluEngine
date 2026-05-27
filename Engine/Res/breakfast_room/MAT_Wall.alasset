@@ -1,0 +1,29 @@
+guid: 8a2b0354-cef6-48e3-9998-7dc16228c280
+type: Ailu::Render::Material
+name: MAT_Wall
+shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
+keywords: 
+  prop_type: Uint
+    _MaterialID: 0
+    _cull: 0
+    _surface: 0
+  prop_type: Float
+    _AlphaCulloff: 0
+    _Anisotropy: 0
+    _IOR: 0
+    _MaterialID: 0
+    _MetallicValue: 0
+    _RoughnessValue: 0.272166
+    _SamplerMask: 0
+    _Transmission: 0
+  prop_type: Vector
+    _AlbedoValue: 0.8,0.8,0.8,1
+    _EmissionValue: 0,0,0,0
+    _SpecularValue: 0,0,0,0
+  prop_type: IntVector
+  prop_type: Texture2D
+    _AlbedoTex: null
+    _EmissionTex: null
+    _NormalTex: null
+    _RoughnessMetallicTex: null
+    _SpecularTex: null

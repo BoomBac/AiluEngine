@@ -44,7 +44,18 @@ if (AILU_ENABLE_LUA_SCRIPTING)
         endif()
         if (AILU_LUA_SOURCE_DIR AND EXISTS ${AILU_LUA_SOURCE_DIR}/onelua.c)
                 file(MAKE_DIRECTORY ${AILU_LUA_GENERATED_INCLUDE_DIR})
-                file(WRITE ${AILU_LUA_GENERATED_INCLUDE_DIR}/lua.hpp "#pragma once\n\nextern \"C\" {\n#include \"lua.h\"\n#include \"lauxlib.h\"\n#include \"lualib.h\"\n}\n")
+                set(AILU_LUA_HPP_CONTENT "#pragma once\n\nextern \"C\" {\n#include \"lua.h\"\n#include \"lauxlib.h\"\n#include \"lualib.h\"\n}\n")
+                set(AILU_LUA_HPP_PATH ${AILU_LUA_GENERATED_INCLUDE_DIR}/lua.hpp)
+                set(AILU_WRITE_LUA_HPP ON)
+                if (EXISTS ${AILU_LUA_HPP_PATH})
+                        file(READ ${AILU_LUA_HPP_PATH} AILU_EXISTING_LUA_HPP_CONTENT)
+                        if (AILU_EXISTING_LUA_HPP_CONTENT STREQUAL AILU_LUA_HPP_CONTENT)
+                                set(AILU_WRITE_LUA_HPP OFF)
+                        endif()
+                endif()
+                if (AILU_WRITE_LUA_HPP)
+                        file(WRITE ${AILU_LUA_HPP_PATH} ${AILU_LUA_HPP_CONTENT})
+                endif()
                 set(AILU_LUA_INCLUDE_DIR ${AILU_LUA_GENERATED_INCLUDE_DIR} CACHE PATH "Path to Lua headers containing lua.hpp" FORCE)
         endif()
         if (NOT AILU_LUA_INCLUDE_DIR)
@@ -75,6 +86,7 @@ endif()
 
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Src)
 add_source_files_recursive(${ENGINE_ROOT_PATH}/Inc)
+list(APPEND PROJECT_SOURCES ${AILU_ENGINE_GENERATED_SOURCES})
 # 文件夹结构映射
 # source_group(TREE "${ENGINE_ROOT_PATH}/Src" PREFIX "Src" FILES ${PROJECT_SOURCES})
 # source_group(TREE "${ENGINE_ROOT_PATH}/Inc" PREFIX "Inc" FILES ${PROJECT_SOURCES})
@@ -141,9 +153,6 @@ set_source_files_properties(IMGUIZMO_SRC PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # set_source_files_properties(IMGUI_BACKENDS PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 # aux_source_directory (Src engine_src_dir)
 # 为目标添加 include 目录
-add_custom_target(pre_build_cmd ALL
-        COMMAND ${CMAKE_COMMAND} -E echo "Running pre-build script..."
-        COMMAND cmd /c "${PROJECT_SOURCE_DIR}/pre_build_script.bat")
 
 # add_library (Engine SHARED ${PROJECT_SOURCES};${IMGUI_ROOT};${IMPLOT_ROOT};${IMGUI_BACKENDS};${IMGUIZMO_SRC};${RENDER_MODULE};${RHI_DX12};${UI_MODULE};${DDS_LOADER} ${IMGUI_PLOT} ${ANIM_MODULE}
 # ${HDR_LOADER}
@@ -159,7 +168,7 @@ ${HDR_LOADER} ${IMNODE} ${AILU_LUA_SOURCES} "Ext/tracy/public/TracyClient.cpp")
 add_library (Engine SHARED ${SOURCE_LIST})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
 
-add_dependencies(Engine pre_build_cmd)
+add_dependencies(Engine ailu_reflection_codegen)
 # 包含路径
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/)
 target_include_directories(Engine PUBLIC ${ENGINE_ROOT_PATH}/Inc)

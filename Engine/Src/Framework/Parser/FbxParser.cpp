@@ -438,7 +438,7 @@ namespace Ailu
                 ReadUVs(*fbx_mesh, mesh_data._uvs);
                 ParserAnimation(node, _cur_skeleton);
             }
-            GenerateIndexdMesh(&mesh_data,mesh.get());
+            GenerateIndexdMesh(&mesh_data, mesh.get());
             CalculateTangant(mesh.get());
             auto const ShininessToRoughness = [](f32 shininess)
             {
@@ -613,58 +613,70 @@ namespace Ailu
 
     bool FbxParser::ReadNormal(fbxsdk::FbxNode *node, Vector<Vector3f> &normals)
     {
-        FbxMesh* fbx_mesh = node->GetMesh();
-        if (!fbx_mesh || fbx_mesh->GetElementNormalCount() < 1) 
+        FbxMesh *fbx_mesh = node->GetMesh();
+        if (!fbx_mesh || fbx_mesh->GetElementNormalCount() < 1)
             return false;
+
         auto *fbx_normals = fbx_mesh->GetElementNormal(0);
-        int vertex_count = fbx_mesh->GetControlPointsCount(), data_size = 0;
+        int control_points_count = fbx_mesh->GetControlPointsCount();
         normals.clear();
+
+        // 计算法线变换矩阵（逆转置矩阵）
         FbxAMatrix final_transform = GetNodeGlobalTransformAtTime(node);
-        // 法线矩阵 = (final_transform 的 3x3 部分) 的 逆转置
-        FbxAMatrix normal_matrix = final_transform.Inverse();
-        normal_matrix = normal_matrix.Transpose();
+        FbxAMatrix normal_matrix = final_transform.Inverse().Transpose();
 
+        auto mapping_mode = fbx_normals->GetMappingMode();
+        auto ref_mode = fbx_normals->GetReferenceMode();
 
-        if (fbx_normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByControlPoint)
+        if (mapping_mode == fbxsdk::FbxLayerElement::EMappingMode::eByControlPoint)
         {
             _b_normal_by_controlpoint = true;
-            //data = new float[vertex_count * 3];
-            normals.reserve(vertex_count);
-            for (int i = 0; i < vertex_count; ++i)
+            normals.reserve(control_points_count);
+
+            for (int i = 0; i < control_points_count; ++i)
             {
-                int normal_index = 0;
-                if (fbx_normals->GetReferenceMode() == fbxsdk::FbxLayerElement::EReferenceMode::eDirect)
-                    normal_index = i;
-                else if (fbx_normals->GetReferenceMode() == fbxsdk::FbxLayerElement::EReferenceMode::eIndexToDirect)
-                    normal_index = fbx_normals->GetIndexArray().GetAt(i);
-                auto normal = fbx_normals->GetDirectArray().GetAt(normal_index);
+                int normal_index = (ref_mode == fbxsdk::FbxLayerElement::EReferenceMode::eDirect) ? i : fbx_normals->GetIndexArray().GetAt(i);
+
+                FbxVector4 normal = fbx_normals->GetDirectArray().GetAt(normal_index);
+
+                // 如果你需要世界空间的法线，请解开下面两行的注释
                 normal[3] = 0.0;
                 normal = normal_matrix.MultT(normal);
+
                 normal.Normalize();
                 normals.emplace_back(Vector3f{(f32) normal[0], (f32) normal[1], (f32) normal[2]});
             }
         }
-        else if (fbx_normals->GetMappingMode() == fbxsdk::FbxLayerElement::EMappingMode::eByPolygonVertex)
+        else if (mapping_mode == fbxsdk::FbxLayerElement::EMappingMode::eByPolygonVertex)
         {
             _b_normal_by_controlpoint = false;
-            int trangle_count = fbx_mesh->GetPolygonCount();
-            vertex_count = trangle_count * 3;
-            normals.reserve(vertex_count);
-            int cur_vertex_id = 0;
-            for (int i = 0; i < trangle_count; ++i)
+            int polygon_count = fbx_mesh->GetPolygonCount();
+
+            // 统计总的顶点数量（兼容非三角形情况）
+            int total_vertex_count = 0;
+            for (int i = 0; i < polygon_count; ++i)
             {
-                for (int j = 0; j < 3; ++j)
+                total_vertex_count += fbx_mesh->GetPolygonSize(i);
+            }
+            normals.reserve(total_vertex_count);
+
+            int cur_vertex_id = 0;// 这里的全局计数器在标准遍历下是安全的
+            for (int i = 0; i < polygon_count; ++i)
+            {
+                int polygon_size = fbx_mesh->GetPolygonSize(i);// 获取当前多边形的实际顶点数
+                for (int j = 0; j < polygon_size; ++j)
                 {
-                    int normal_index = 0;
-                    if (fbx_normals->GetReferenceMode() == fbxsdk::FbxLayerElement::EReferenceMode::eDirect)
-                        normal_index = cur_vertex_id;
-                    else if (fbx_normals->GetReferenceMode() == fbxsdk::FbxLayerElement::EReferenceMode::eIndexToDirect)
-                        normal_index = fbx_normals->GetIndexArray().GetAt(cur_vertex_id);
-                    auto normal = fbx_normals->GetDirectArray().GetAt(normal_index);
+                    int normal_index = (ref_mode == fbxsdk::FbxLayerElement::EReferenceMode::eDirect) ? cur_vertex_id : fbx_normals->GetIndexArray().GetAt(cur_vertex_id);
+
+                    FbxVector4 normal = fbx_normals->GetDirectArray().GetAt(normal_index);
+
+                    // 如果你需要世界空间的法线，请解开下面两行的注释
                     normal[3] = 0.0;
                     normal = normal_matrix.MultT(normal);
+
                     normal.Normalize();
                     normals.emplace_back(Vector3f{(f32) normal[0], (f32) normal[1], (f32) normal[2]});
+
                     ++cur_vertex_id;
                 }
             }
@@ -893,7 +905,10 @@ namespace Ailu
                     }
                 }
             }
-            else { AL_ASSERT(false); }
+            else
+            {
+                AL_ASSERT(false);
+            }
             uvs.push_back(std::move(uv_set));
         }
         return true;
@@ -1041,7 +1056,7 @@ namespace Ailu
             continue;
         }
     }
-    
+
     void FbxParser::GenerateIndexdMesh(RawMeshData *mesh_data, Mesh *out_mesh)
     {
         if (!mesh_data)
@@ -1090,7 +1105,8 @@ namespace Ailu
                 auto n = raw_normals[_b_normal_by_controlpoint ? _positon_conrtol_index_mapper[i] : i];
                 auto uv = raw_uv0[i];
                 auto hash0 = v3hash(n), hash1 = v2hash(uv);
-                auto vertex_hash = hash1;//Math::ALHash::CombineHashes(hash0, hash1);
+                auto vertex_hash = Math::ALHash::CombineHashes(hash0, hash1);
+                vertex_hash = Math::ALHash::CombineHashes(vertex_hash, v3hash(p));
                 auto bi = raw_bonei[i];
                 auto bw = raw_bonew[i];
                 auto it = vertex_map.find(vertex_hash);
@@ -1133,8 +1149,13 @@ namespace Ailu
                 auto n = raw_normals[_b_normal_by_controlpoint ? _positon_conrtol_index_mapper[i] : i];
                 auto uv = raw_uv0[i];
                 auto hash0 = v3hash(n), hash1 = v2hash(uv);
-                auto vertex_hash = hash1;//Math::ALHash::CombineHashes(hash0, hash1);
+                auto vertex_hash = Math::ALHash::CombineHashes(hash0, hash1);
+                vertex_hash = Math::ALHash::CombineHashes(vertex_hash, v3hash(p));
                 auto it = vertex_map.find(vertex_hash);
+                if (_cur_file_sys_path.find(L"cube") != std::wstring::npos)
+                {
+                    LOG_INFO("vertex count{}, normal hash {},uv hash {},vert hash {}", i, hash0, hash1, vertex_hash);
+                }
                 if (it == vertex_map.end())
                 {
                     vertex_map[vertex_hash] = cur_index_count;
@@ -1215,7 +1236,6 @@ namespace Ailu
     }
 
 
-
     void FbxParser::ParserImpl(WString sys_path)
     {
         TimerBlock b("FbxParser::ParserImpl:  " + ToChar(sys_path.data()));
@@ -1253,7 +1273,7 @@ namespace Ailu
                 //}
                 //LOG_ERROR("********************************************************************************");
             }
-            auto& global_settings = _p_cur_fbx_scene->GetGlobalSettings();
+            auto &global_settings = _p_cur_fbx_scene->GetGlobalSettings();
             FbxNode *fbx_rt = _p_cur_fbx_scene->GetRootNode();
             auto axis_sys = global_settings.GetAxisSystem();
             if (axis_sys != FbxAxisSystem::DirectX)

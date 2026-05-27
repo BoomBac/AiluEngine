@@ -16,7 +16,11 @@
 #define DXR
 
 //#include "RaytracingDef.hlsli"
+#if defined(AL_PACKAGE_SHADER_INTEROP)
+#include "../../ShaderInterop.h"
+#else
 #include "../../../../Inc/Render/ShaderInterop.h"
+#endif
 #include "../ray_trace/rt_common.hlsli"
 #include "../ray_trace/sampling.hlsli"
 #include "../ray_trace/hit.hlsli"

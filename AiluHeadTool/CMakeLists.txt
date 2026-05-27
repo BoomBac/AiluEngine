@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 4.1)
 project (AiluHeadTool)
 set(AHT_ROOT_PATH ${CMAKE_SOURCE_DIR}/AiluHeadTool)
+set(AHT_RUNTIME_CONFIG ${AHT_ROOT_PATH}/aht.ini)
 #set(ENGINE_ROOT_PATH ${CMAKE_SOURCE_DIR}/Engine)
 #set(ENGINE_LIB_ROOT ${ENGINE_ROOT_PATH}/lib/x64)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${AHT_ROOT_PATH}/bin/x64)
@@ -35,3 +36,11 @@ endif()
 #target_link_libraries(AiluHeadTool PRIVATE
 #        $<$<CONFIG:Debug>:${ENGINE_LIB_ROOT}/Debug/Engine_d.lib>
 #        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release/Engine.lib>)
+
+add_custom_command(TARGET AiluHeadTool POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:AiluHeadTool>/AHT"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${AHT_RUNTIME_CONFIG}" "$<TARGET_FILE_DIR:AiluHeadTool>/AHT/aht.ini"
+        COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_FILE_DIR:AiluHeadTool>/AHT/cache.txt"
+        COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_FILE_DIR:AiluHeadTool>/AHT/class_ns_map.txt"
+        COMMENT "Preparing AiluHeadTool runtime config"
+        VERBATIM)

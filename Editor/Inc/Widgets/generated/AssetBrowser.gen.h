@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __ASSETBROWSER_GEN_H__
 //Class AssetBrowser begin...........................
-#define ASSETBROWSER_GEN_H_28_GENERATED_BODY \
+#define ASSETBROWSER_GEN_H_29_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_AssetBrowser_Type();\
                                 static Type* GetPrivateStaticClass();\

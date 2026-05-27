@@ -109,6 +109,10 @@ namespace Ailu
         /// @brief 返回当前应用程序缓存目录
         /// @return 目录 working_path/cache/
         static WString GetAppCachePath();
+        static void SetProjectRootPath(const WString &project_root);
+        static const WString &GetProjectRootPath() { return s_project_root_path; }
+        static void SetEngineConfigPath(const WString &engine_config_path);
+        static WString ResolveProjectPath(const WString &relative_path);
         /// @brief 获取用户目录，c:/UserName/
         /// @return 用户目录
         static WString GetUseHomePath();
@@ -166,6 +170,8 @@ namespace Ailu
     protected:
         inline static Application *sp_instance = nullptr;
         inline static Window *s_focus_window = nullptr;
+        inline static WString s_project_root_path;
+        inline static WString s_default_engine_config_path;
 
         LayerStack *_layer_stack;
         ImGUILayer *_p_imgui_layer;

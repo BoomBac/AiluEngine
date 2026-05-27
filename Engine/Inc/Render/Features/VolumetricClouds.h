@@ -28,6 +28,7 @@ namespace Ailu::Render
     public:
         VolumetricCloudsPass();
         ~VolumetricCloudsPass();
+        void OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data) final;
         void Execute(GraphicsContext *context, RenderingData &rendering_data) final;
         void BeginPass(GraphicsContext *context) final;
         void EndPass(GraphicsContext *context) final;
@@ -37,6 +38,7 @@ namespace Ailu::Render
         CloudsShaderParams _params;
 
     private:
+        void EnsureRenderTargets(const RenderingData &rendering_data);
         void UpdateShaderParams();
 
     private:
@@ -50,6 +52,8 @@ namespace Ailu::Render
         Ref<ComputeShader> _cloud_gen;
         Ref<RenderTexture> _cloud_rt_a;
         Ref<RenderTexture> _cloud_rt_b;
+        RDG::RGHandle _cloud_cur_handle{};
+        RDG::RGHandle _cloud_history_handle{};
         bool _is_cur_a;
     };
     ACLASS()

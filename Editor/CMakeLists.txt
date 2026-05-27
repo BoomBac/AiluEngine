@@ -28,6 +28,7 @@ endfunction()
 
 add_source_files_recursive(${EDITOR_ROOT_PATH}/Src)
 add_source_files_recursive(${EDITOR_ROOT_PATH}/Inc)
+list(APPEND PROJECT_SOURCES ${AILU_EDITOR_GENERATED_SOURCES})
 
 set(EDITOR_RESOURCE ${EDITOR_ROOT_PATH}/Res/Editor.rc)
 
@@ -52,6 +53,7 @@ target_compile_definitions(Editor PUBLIC
     _WINDOWS
     UNICODE
     _UNICODE
+    AILU_PROJECT_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
     _REVERSED_Z
     $<$<CONFIG:Debug>:_DEBUG>)
 
@@ -73,6 +75,7 @@ endif()
 #        $<$<CONFIG:Release>:${ENGINE_LIB_ROOT}/Release>
 #        )
 add_dependencies(Editor Engine)
+add_dependencies(Editor ailu_reflection_codegen)
 target_link_libraries(Editor PRIVATE
     Engine
     ${AILU_FBXSDK_LINK_LIB}) # msvcrtd.lib

@@ -368,32 +368,44 @@ namespace Ailu
 
                 if (e._key_code == EKey::kBACK)
                 {
+                    String new_content = _content;
+                    bool content_changed = false;
                     if (has_selection)
                     {
                         // 删除选区
-                        _content.erase(sb, se - sb);
+                        new_content.erase(sb, se - sb);
                         _cursor_pos = sb;
                         ClearSelection();
+                        content_changed = true;
                     }
-                    else if (_cursor_pos > 0 && !_content.empty())
+                    else if (_cursor_pos > 0 && !new_content.empty())
                     {
-                        _content.erase(_cursor_pos - 1, 1);
+                        new_content.erase(_cursor_pos - 1, 1);
                         _cursor_pos--;
+                        content_changed = true;
                     }
+                    if (content_changed)
+                        SetContent(new_content);
                     CommitEdit(false);
                 }
                 else if (e._key_code == EKey::kDELETE)
                 {
+                    String new_content = _content;
+                    bool content_changed = false;
                     if (has_selection)
                     {
-                        _content.erase(sb, se - sb);
+                        new_content.erase(sb, se - sb);
                         _cursor_pos = sb;
                         ClearSelection();
+                        content_changed = true;
                     }
-                    else if (_cursor_pos < _content.size() && !_content.empty())
+                    else if (_cursor_pos < new_content.size() && !new_content.empty())
                     {
-                        _content.erase(_cursor_pos, 1);
+                        new_content.erase(_cursor_pos, 1);
+                        content_changed = true;
                     }
+                    if (content_changed)
+                        SetContent(new_content);
                     CommitEdit(false);
                 }
                 else if (e._key_code == EKey::kLEFT)
@@ -437,16 +449,18 @@ namespace Ailu
                     char c = ToChar(Input::GetCharFromKeyCode((EKey)e._key_code))[0];
                     if (c != '\0')
                     {
+                        String new_content = _content;
                         if (has_selection)
                         {
                             // 覆盖选区
-                            _content.erase(sb, se - sb);
+                            new_content.erase(sb, se - sb);
                             _cursor_pos = sb;
                             ClearSelection();
                         }
 
-                        _content.insert(_cursor_pos, 1, c);
+                        new_content.insert(_cursor_pos, 1, c);
                         _cursor_pos++;
+                        SetContent(new_content);
                         CommitEdit(false);
                     }
                 }
@@ -471,6 +485,7 @@ namespace Ailu
                     _select_start = IndexFromMouseX(e._mouse_position.x);
                     _select_end = _select_start;
                     _cursor_pos = _select_end;
+                    _cursor_visible = true;
                 }
                 _is_editing = true;
             };
@@ -518,6 +533,7 @@ namespace Ailu
             {
                 CommitEdit();
             };
+            _is_selecting = false;
         }
 
         InputBlock::InputBlock() : InputBlock("placeholder")
@@ -527,6 +543,10 @@ namespace Ailu
         void InputBlock::Update(f32 dt)
         {
             UIElement::Update(dt);
+            if (_is_need_recalc_offset_table)
+            {
+                FillCursorOffsetTable();
+            }
             if (_state._is_focused)// 只有获得焦点才需要闪烁
             {
                 _cursor_timer += dt;
@@ -550,10 +570,9 @@ namespace Ailu
                     Application::Get().SetCursor(ECursorType::kSizeEW);
                     if (delta)
                     {
-                        // 更新文本
-                        _content = std::format("{:.3}", new_value);
-                        SetContent(_content);
-                        _cursor_pos = (u32) _content.size();
+                        const String new_content = std::format("{:.3}", new_value);
+                        SetContent(new_content);
+                        _cursor_pos = (u32) new_content.size();
                     }
                 }
                 else
@@ -565,10 +584,12 @@ namespace Ailu
             }
         }
 
-        void InputBlock::SetContent(String content, bool trigger_event)
+        void InputBlock::SetContent(const String& content, bool trigger_event)
         {
+            if (_content == content)
+                return;
             _content = content;
-            FillCursorOffsetTable();
+            _is_need_recalc_offset_table = true;
             if (trigger_event)
                 _on_content_changed_delegate.Invoke(content);
         }
@@ -591,6 +612,18 @@ namespace Ailu
         }
         void InputBlock::FillCursorOffsetTable()
         {
+            if (_content.empty())
+            {
+                _cursor_offsets = {1.0f};
+                _text_rect_size = {0.0f,0.0f};
+                _is_numeric = true;
+                return;
+            }
+            if (_content_rect.w <= 4.0)
+            {
+                LOG_ERROR("InputBlock({}) content rect is too small to calculate cursor offsets",_name);
+                return;
+            }
             _cursor_offsets.clear();
             _cursor_offsets.reserve(_content.size() + 1);
             _cursor_offsets.push_back(1.0f);
@@ -605,6 +638,7 @@ namespace Ailu
             _text_rect_size = TextRenderer::CalculateTextSize(_content, (u16) font_height);
             _is_numeric = StringUtils::IsNumeric(_content);
             _select_start = _select_end = _cursor_pos;
+            _is_need_recalc_offset_table = false;
         }
         u32 InputBlock::IndexFromMouseX(f32 x)
         {
@@ -635,7 +669,6 @@ namespace Ailu
         void InputBlock::CommitEdit(bool is_finish_edit)
         {
             _is_editing = !is_finish_edit;
-            SetContent(_content);
             LOG_INFO("Committed edit({}): {}",_name, _content);
         }
 

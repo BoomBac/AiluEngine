@@ -1,0 +1,5 @@
+guid: 3cac8833-101e-45db-bb76-d252e8607908
+type: Ailu::Render::Texture2D
+name: Wall_Normal
+  file: breakfast_room/Wall_Normal.png
+  sRGB: 0
