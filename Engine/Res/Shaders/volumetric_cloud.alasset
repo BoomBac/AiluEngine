@@ -1,5 +1,10 @@
-guid: fc17adc1-f67a-4a15-a756-09c672438b53
-type: Ailu::Render::ComputeShader
-name: volumetric_cloud
-  file: Shaders/hlsl/Compute/volumetric_cloud.hlsl
-  kernel: Noname
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "fc17adc1-f67a-4a15-a756-09c672438b53",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "volumetric_cloud"
+    },
+    "_kernel": "Noname",
+    "_file": "Shaders/hlsl/Compute/volumetric_cloud.hlsl"
+}

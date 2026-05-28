@@ -178,6 +178,7 @@ namespace Ailu
 
         void Save(const Path &sys_path) final;
         void Load(const Path &sys_path) final;
+        bool HasField(const String &name);
     private:
         JsonValue *FindNode();
         void Reset()

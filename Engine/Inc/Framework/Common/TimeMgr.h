@@ -18,6 +18,9 @@ namespace Ailu
 	class AILU_API TimeMgr : IRuntimeModule
 	{
 	public:
+		static void Init();
+		static void Shutdown();
+		static TimeMgr &Get();
 		using ALSecond      = std::chrono::duration<f32>;                     // 秒
 		using ALMilliSecond = std::chrono::duration<f32, std::milli>;        // 毫秒
 		using ALMicroSecond = std::chrono::duration<f32, std::micro>;        // 微秒
@@ -61,17 +64,15 @@ namespace Ailu
 		f32 _last_pause_time = 0.0f;
 		bool _b_stop = false;
 	};
-	extern AILU_API TimeMgr* g_pTimeMgr;
-
 	struct TimerBlock
     {
-        TimerBlock(const String &msg, TimeMgr *timer = g_pTimeMgr) : _timer(timer), _msg(msg)
+		TimerBlock(const String &msg, TimeMgr &timer = TimeMgr::Get()) : _timer(timer), _msg(msg)
         {
-            _timer->Mark();
+			_timer.Mark();
         }
         ~TimerBlock()
         {
-			f32 cost = _timer->GetElapsedSinceLastMark();
+			f32 cost = _timer.GetElapsedSinceLastMark();
             if (cost > 1000.0f)
             {
                 LOG_INFO("Time cost {}s : {}", cost * 0.001f, _msg);
@@ -80,7 +81,7 @@ namespace Ailu
                 LOG_INFO("Time cost {}ms : {}", cost, _msg);
         }
     private:
-        TimeMgr *_timer;
+		TimeMgr &_timer;
 		String _msg;
     };
 #ifdef _DEBUG

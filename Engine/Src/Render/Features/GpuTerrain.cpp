@@ -1,4 +1,4 @@
-#include "Render/Features/GpuTerrain.h"
+﻿#include "Render/Features/GpuTerrain.h"
 #include "Render/CommandBuffer.h"
 #include "Framework/Common/Profiler.h"
 #include "Render/Renderer.h"
@@ -11,11 +11,11 @@ namespace Ailu::Render
     GpuTerrain::GpuTerrain() : RenderFeature("GpuTerrain")
     {
         _terrain_pass = AL_NEW(TerrainPass);
-        _terrain_gen = g_pResourceMgr->Load<ComputeShader>(L"Shaders/gpu_terrain.alasset");
-        _plane = g_pResourceMgr->Load<Mesh>(L"Meshs/terrain_plane.alasset");
-        _terrain_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/terrain.alasset"),"DefaultTerrain");
-        _terrain_mat->SetTexture("_BaseColor", g_pResourceMgr->Get<Texture2D>(L"Textures/TerrainDiffuse"));
-        _terrain_mat->SetTexture("_HeightMap", g_pResourceMgr->Get<Texture2D>(L"Textures/TerrainHeight"));
+        _terrain_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/gpu_terrain.alasset");
+        _plane = ResourceMgr::Get().Load<Mesh>(L"Meshs/terrain_plane.alasset");
+        _terrain_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/terrain.alasset"),"DefaultTerrain");
+        _terrain_mat->SetTexture("_BaseColor", ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainDiffuse"));
+        _terrain_mat->SetTexture("_HeightMap", ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainHeight"));
         _terrain_pass->Setup(_terrain_gen.get(),_plane.get(),_terrain_mat.get(),&_max_height);
         _terrain_mat->EnableKeyword("DEBUG_LOD");
     }
@@ -102,7 +102,7 @@ namespace Ailu::Render
             _terrain_gen->SetInt("lod", i);
             if (i == 0)
             {
-                _terrain_gen->SetTexture("HeightMap", g_pResourceMgr->Get<Texture2D>(L"Textures/TerrainHeight"));
+                _terrain_gen->SetTexture("HeightMap", ResourceMgr::Get().Get<Texture2D>(L"Textures/TerrainHeight"));
                 _terrain_gen->SetTexture("MinMaxMap", _minmax_height.get(), 0);
             }
             else

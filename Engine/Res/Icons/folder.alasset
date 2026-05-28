@@ -1,5 +1,10 @@
-guid: 881f94ee-2dbb-48e9-b084-72c9bfb729ea
-type: Ailu::Render::Texture2D
-name: folder
-  file: Icons/folder.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "881f94ee-2dbb-48e9-b084-72c9bfb729ea",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "folder"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/folder.png"
+}

@@ -1,5 +1,0 @@
-guid: 4c66b646-9e1a-489c-8344-133b5036bf17
-type: Ailu::Render::Texture2D
-name: Default_emissive
-  file: NewScene/Default_emissive.jpg
-  sRGB: 1

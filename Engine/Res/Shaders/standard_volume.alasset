@@ -1,6 +1,11 @@
-guid: 0cd86d2c-e28b-4816-a032-0ef7fb1843f5
-type: Ailu::Render::Shader
-name: standard_volume
-  file: Shaders/hlsl/standard_volume.hlsl
-  vs_entry: VSMain
-  ps_entry: PSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "0cd86d2c-e28b-4816-a032-0ef7fb1843f5",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "standard_volume"
+    },
+    "_file": "Shaders/hlsl/standard_volume.hlsl",
+    "_ps_entry": "PSMain",
+    "_vs_entry": "VSMain"
+}

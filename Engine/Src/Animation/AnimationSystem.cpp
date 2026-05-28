@@ -147,7 +147,7 @@ namespace Ailu
                         {
                             u32 start_idx = i * s_vertex_num_per_skin_task;
                             u32 end_idx = std::min<u32>(start_idx + s_vertex_num_per_skin_task, vert_count);
-                            skin_tasks.emplace_back(g_pThreadTool->Enqueue("AnimationSystem::Skin", SkinTask, c->_p_mesh.get(), s_mat_palette[mesh_id], vert, normal, start_idx, end_idx));
+                            skin_tasks.emplace_back(Core::ThreadPool::Get().Enqueue("AnimationSystem::Skin", SkinTask, c->_p_mesh.get(), s_mat_palette[mesh_id], vert, normal, start_idx, end_idx));
                         }
                     }
                 }

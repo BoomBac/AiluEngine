@@ -1,4 +1,4 @@
-#include "EditorApp.h"
+﻿#include "EditorApp.h"
 #include "Common/Undo.h"
 #include "Widgets/InputLayer.h"
 #include "Widgets/RenderView.h"
@@ -99,10 +99,11 @@ namespace Ailu
             _pipeline.reset(new CommonRenderPipeline());
             Render::RenderPipeline::Register(_pipeline.get());
             {
-                //g_pResourceMgr->Load<Scene>(_opened_scene_path);
+                //ResourceMgr::Get().Load<Scene>(_opened_scene_path);
                 SceneManagement::SceneMgr::Get().OpenScene(_opened_scene_path);
             }
             LoadEditorResource();
+            ResourceMgr::Get().MigrateLegacyAssetDocuments();
             //JsonArchive ar;
             //ar.Load(Application::ResolveProjectPath(L"Editor/Res/UI/EditorStyle.json"));
             //auto t = EditorStyle::StaticType();
@@ -120,7 +121,7 @@ namespace Ailu
             {
                 const WString cur_path = PathUtils::FormatFilePath(file.wstring());
                 WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
-                for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
+                for (auto it = ResourceMgr::Get().ResourceBegin<Shader>(); it != ResourceMgr::Get().ResourceEnd<Shader>(); it++)
                 {
                     auto shader = ResourceMgr::IterToRefPtr<Shader>(it);
                     if (shader)
@@ -145,7 +146,7 @@ namespace Ailu
                 } };
             _on_file_changed += [](const fs::path &file)
             {
-                for (auto it = g_pResourceMgr->ResourceBegin<ComputeShader>(); it != g_pResourceMgr->ResourceEnd<ComputeShader>(); it++)
+                for (auto it = ResourceMgr::Get().ResourceBegin<ComputeShader>(); it != ResourceMgr::Get().ResourceEnd<ComputeShader>(); it++)
                 {
                     const WString cur_path = PathUtils::FormatFilePath(file.wstring());
                     WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
@@ -165,10 +166,10 @@ namespace Ailu
             {
                 const WString cur_path = PathUtils::FormatFilePath(file.wstring());
                 WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
-                for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
+                for (auto it = ResourceMgr::Get().ResourceBegin<Texture2D>(); it != ResourceMgr::Get().ResourceEnd<Texture2D>(); it++)
                 {
                     auto tex = ResourceMgr::IterToRefPtr<Texture2D>(it);
-                    auto linked_asset = g_pResourceMgr->GetLinkedAsset(tex.get());
+                    auto linked_asset = ResourceMgr::Get().GetLinkedAsset(tex.get());
                     if (linked_asset && !linked_asset->_external_asset_path.empty())
                     {
                         if (cur_asset_path == linked_asset->_external_asset_path)
@@ -286,7 +287,7 @@ namespace Ailu
             _editor_config._far = Camera::sCurrent->Far();
             _editor_config._move_speed = _camera_controller->_base_camera_move_speed;
             _editor_config._controller_rot = _camera_controller->_rotation;
-            _editor_config._scene_path = ToChar(g_pResourceMgr->GetAssetPath(SceneManagement::SceneMgr::Get().ActiveScene()));
+            _editor_config._scene_path = ToChar(ResourceMgr::Get().GetAssetPath(SceneManagement::SceneMgr::Get().ActiveScene()));
 
             JsonArchive ar;
             Type *type = EditorConfig::StaticType();
@@ -331,15 +332,15 @@ namespace Ailu
             for (auto &path: texture_sys_path)
             {
                 job_sys.Dispatch([path, color_tex_setting]()
-                                          { g_pResourceMgr->Load<Texture2D>(path, &color_tex_setting); });
+                                          { ResourceMgr::Get().Load<Texture2D>(path, &color_tex_setting); });
             }
             job_sys.Dispatch([normal_tex_setting]()
-                            { g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_N.alasset", &normal_tex_setting); });
+                            { ResourceMgr::Get().Load<Texture2D>(EnginePath::kEngineTexturePathW + L"T_Default_Material_Grid_N.alasset", &normal_tex_setting); });
             job_sys.Wait();
             auto mat_creator = [this](const WString &shader_path, const WString &mat_path, const String &mat_name) -> Material *
             {
-                auto mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(shader_path), mat_name);
-                g_pResourceMgr->RegisterResource(mat_path, mat);
+                auto mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(shader_path), mat_name);
+                ResourceMgr::Get().RegisterResource(mat_path, mat);
                 return mat.get();
             };
             mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/PointLightBillboard", "PointLightBillboard");
@@ -348,14 +349,14 @@ namespace Ailu
             mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/AreaLightBillboard", "AreaLightBillboard");
             mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/CameraBillboard", "CameraBillboard");
             mat_creator(L"Shaders/hlsl/billboard.hlsl", L"Runtime/Material/LightProbeBillboard", "LightProbeBillboard");
-            g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"point_light.alasset");
-            g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"directional_light.alasset");
-            g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"spot_light.alasset");
-            g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"area_light.alasset");
-            g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"camera.alasset");
-            g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
+            ResourceMgr::Get().Get<Material>(L"Runtime/Material/PointLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"point_light.alasset");
+            ResourceMgr::Get().Get<Material>(L"Runtime/Material/DirectionalLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"directional_light.alasset");
+            ResourceMgr::Get().Get<Material>(L"Runtime/Material/SpotLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"spot_light.alasset");
+            ResourceMgr::Get().Get<Material>(L"Runtime/Material/AreaLightBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"area_light.alasset");
+            ResourceMgr::Get().Get<Material>(L"Runtime/Material/CameraBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"camera.alasset");
+            ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard")->SetTexture("_MainTex", EnginePath::kEngineIconPathW + L"light_probe.alasset");
             mat_creator(L"Shaders/hlsl/plane_grid.hlsl", L"Runtime/Material/GridPlane", "GridPlane")->SetFloat("_grid_alpha", 1.0f);
-            Material::s_checker = g_pResourceMgr->Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
+            Material::s_checker = ResourceMgr::Get().Load<Material>(EnginePath::kEngineMaterialPathW + L"M_Default.alasset");
             WatchDirectory();
         }
         struct ReloadReocrd
@@ -374,7 +375,7 @@ namespace Ailu
             const WString cur_path = PathUtils::FormatFilePath(file.wstring());
             WString cur_asset_path = PathUtils::ExtractAssetPath(cur_path);
             LOG_INFO("Asset {} changed...", file.string());
-            for (auto it = g_pResourceMgr->ResourceBegin<Shader>(); it != g_pResourceMgr->ResourceEnd<Shader>(); it++)
+            for (auto it = ResourceMgr::Get().ResourceBegin<Shader>(); it != ResourceMgr::Get().ResourceEnd<Shader>(); it++)
             {
                 auto shader = ResourceMgr::IterToRefPtr<Shader>(it);
                 if (shader)
@@ -398,7 +399,7 @@ namespace Ailu
                 }
             }
 
-            for (auto it = g_pResourceMgr->ResourceBegin<ComputeShader>(); it != g_pResourceMgr->ResourceEnd<ComputeShader>(); it++)
+            for (auto it = ResourceMgr::Get().ResourceBegin<ComputeShader>(); it != ResourceMgr::Get().ResourceEnd<ComputeShader>(); it++)
             {
                 auto cs = ResourceMgr::IterToRefPtr<ComputeShader>(it);
                 if (cs->IsDependencyFile(cur_path))
@@ -410,21 +411,21 @@ namespace Ailu
 
             ReloadRayTracingShader(cur_path);
 
-            for (auto it = g_pResourceMgr->ResourceBegin<Texture2D>(); it != g_pResourceMgr->ResourceEnd<Texture2D>(); it++)
+            for (auto it = ResourceMgr::Get().ResourceBegin<Texture2D>(); it != ResourceMgr::Get().ResourceEnd<Texture2D>(); it++)
             {
                 auto tex = ResourceMgr::IterToRefPtr<Texture2D>(it);
-                auto linked_asset = g_pResourceMgr->GetLinkedAsset(tex.get());
+                auto linked_asset = ResourceMgr::Get().GetLinkedAsset(tex.get());
                 if (linked_asset && !linked_asset->_external_asset_path.empty())
                 {
                     if (cur_asset_path == linked_asset->_external_asset_path)
                     {
                         LOG_WARNING(L"Texture2d {} has changed,but reload not support yet", linked_asset->_asset_path);
-                        // g_pResourceMgr->SubmitTaskSync([=]()->bool
+                        // ResourceMgr::Get().SubmitTaskSync([=]()->bool
                         // {
                         //    auto handle = ImGuiWidget::DisplayProgressBar(std::format("Reload texture2d: {}...",tex->Name()).c_str(),0.5f);
                         //    TextureImportSetting setting = TextureImportSetting::Default();
                         //    setting._is_reimport = true;
-                        //    g_pResourceMgr->Load<Texture2D>(linked_asset->_asset_path,&setting);
+                        //    ResourceMgr::Get().Load<Texture2D>(linked_asset->_asset_path,&setting);
                         //    ImGuiWidget::RemoveProgressBar(handle);
                         //    return true;
                         // });

@@ -1,4 +1,4 @@
-#include "Widgets/ObjectDetail.h"
+﻿#include "Widgets/ObjectDetail.h"
 #include "Common/Selection.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Scene/Scene.h"
@@ -320,9 +320,9 @@ namespace Ailu
                             UIManager::Get()->HidePopup();
                         };
                         list_view->AddItem(none_item);
-                        for (auto it = g_pResourceMgr->ResourceBegin<Render::Texture2D>(); it != g_pResourceMgr->ResourceEnd<Render::Texture2D>(); it++)
+                        for (auto it = ResourceMgr::Get().ResourceBegin<Render::Texture2D>(); it != ResourceMgr::Get().ResourceEnd<Render::Texture2D>(); it++)
                         {
-                            auto tex = g_pResourceMgr->IterToRefPtr<Render::Texture2D>(it).get();
+                            auto tex = ResourceMgr::Get().IterToRefPtr<Render::Texture2D>(it).get();
                             auto item_hb = MakeRef<UI::HorizontalBox>();
                             auto img = item_hb->AddChild<UI::Image>(tex);
                             img->SlotSizePolicy(ESizePolicy::kFixed, ESizePolicy::kFixed);
@@ -341,15 +341,15 @@ namespace Ailu
             }
         }
 
-        ObjectDetail::ObjectDetail() : DockWindow("Object Detail")
+        void ObjectDetail::CreateTransformBlock()
         {
-            _root = _content_root->AddChild<UI::ScrollView>();
-            _root->SlotSizePolicy(UI::ESizePolicy::kFill);
-            _vb = _root->AddChild<UI::VerticalBox>();
-            _vb->SlotPadding({4.0f, 6.0f, 0.0f, 0.0f});
-            _vb->AddChild<UI::Text>("Name");
-            _vb->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
-            auto transf_block = _vb->AddChild<UI::CollapsibleView>("Transform")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>()->GetContent()->AddChild<UI::VerticalBox>();
+            if (_transform_block != nullptr)
+                return;
+
+            _transform_block = _vb->AddChild<UI::CollapsibleView>("Transform")
+                                       ->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto)
+                                       .As<UI::CollapsibleView>();
+            auto transf_block = _transform_block->GetContent()->AddChild<UI::VerticalBox>();
             _pos_block = AddVec3InputRow(transf_block, "Position", "0000");
             _rot_block = AddVec3InputRow(transf_block, "Rotation");
             _scale_block = AddVec3InputRow(transf_block, "Scale");
@@ -475,7 +475,28 @@ namespace Ailu
                     }
                 }
             };
+        }
 
+        void ObjectDetail::RemoveTransformBlock()
+        {
+            if (_transform_block != nullptr)
+            {
+                _vb->RemoveChild(_transform_block);
+                _transform_block = nullptr;
+            }
+            _pos_block = {};
+            _rot_block = {};
+            _scale_block = {};
+        }
+
+        ObjectDetail::ObjectDetail() : DockWindow("Object Detail")
+        {
+            _root = _content_root->AddChild<UI::ScrollView>();
+            _root->SlotSizePolicy(UI::ESizePolicy::kFill);
+            _vb = _root->AddChild<UI::VerticalBox>();
+            _vb->SlotPadding({4.0f, 6.0f, 0.0f, 0.0f});
+            _vb->AddChild<UI::Text>("Name");
+            _vb->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             //auto color_picker = _vb->AddChild<UI::ColorPicker>(Colors::kBlue);
             //color_picker->OnValueChanged() += [](Vector4f color)
             //{
@@ -491,9 +512,35 @@ namespace Ailu
         void ObjectDetail::Update(f32 dt)
         {
             DockWindow::Update(dt);
+            static ECS::Entity s_prev_selected = ECS::kInvalidEntity;
+            static u32 s_prev_selected_subindex = 0;
+
+            auto remove_block = [&](UI::CollapsibleView *&block)
+            {
+                if (block == nullptr)
+                    return;
+                _vb->RemoveChild(block);
+                block = nullptr;
+            };
+            auto clear_dynamic_blocks = [&]()
+            {
+                RemoveTransformBlock();
+                remove_block(_script_block);
+                remove_block(_light_block);
+                remove_block(_static_mesh_block);
+                remove_block(_light_probe_block);
+                remove_block(_cam_block);
+                _script_path_block = nullptr;
+                _prev_comp_block = nullptr;
+            };
+
             if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
             {
-                static ECS::Entity s_prev_selected = ECS::kInvalidEntity;
+                const u32 selected_subindex = Selection::GetSelectedSubIndex(selected);
+                const bool selection_changed = s_prev_selected != selected;
+                const bool submesh_changed = s_prev_selected_subindex != selected_subindex;
+                if (selection_changed)
+                    clear_dynamic_blocks();
                 auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                 if (auto comp = r.GetComponent<ECS::TagComponent>(selected); comp != nullptr)
                 {
@@ -501,6 +548,8 @@ namespace Ailu
                 }
                 if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                 {
+                    if (_transform_block == nullptr)
+                        CreateTransformBlock();
                     auto set_block = [&](UI::InputBlock *block, f32 value)
                     {
                         if (!block->IsEditing())
@@ -517,12 +566,15 @@ namespace Ailu
                     set_block(_scale_block[1], comp->_transform._scale.y);
                     set_block(_scale_block[2], comp->_transform._scale.z);
                 }
+                else
+                {
+                    RemoveTransformBlock();
+                }
                 if (auto comp = r.GetComponent<ECS::ScriptComponent>(selected); comp != nullptr)
                 {
-                    if (s_prev_selected != selected || _script_path_block == nullptr)
+                    if (_script_path_block == nullptr)
                     {
-                        if (_script_block != nullptr)
-                            _vb->RemoveChild(_script_block);
+                        remove_block(_script_block);
                         _script_block = _vb->AddChild<UI::CollapsibleView>("Script")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
                         auto content = _script_block->GetContent()->AddChild<UI::VerticalBox>();
                         _script_path_block = AddTextInputRow(content, "Path", comp->_script_path, [comp](const String &content)
@@ -539,10 +591,9 @@ namespace Ailu
                     if (_script_path_block != nullptr && !_script_path_block->IsEditing())
                         _script_path_block->SetContent(comp->_script_path, false);
                 }
-                else if (s_prev_selected != selected || _script_block == nullptr || _script_path_block != nullptr)
+                else if (_script_block == nullptr || _script_path_block != nullptr)
                 {
-                    if (_script_block != nullptr)
-                        _vb->RemoveChild(_script_block);
+                    remove_block(_script_block);
                     _script_block = _vb->AddChild<UI::CollapsibleView>("Script")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
                     auto content = _script_block->GetContent()->AddChild<UI::VerticalBox>();
                     auto add_btn = AddButtonRow(content, "Component", "Add ScriptComponent");
@@ -562,9 +613,9 @@ namespace Ailu
                 }
                 if (auto comp = r.GetComponent<ECS::LightComponent>(selected); comp != nullptr)
                 {
-                    if (s_prev_selected != selected)
+                    if (_light_block == nullptr)
                     {
-                        _vb->RemoveChild(_prev_comp_block);
+                        remove_block(_light_block);
                         _light_block = _vb->AddChild<UI::CollapsibleView>("LightComp")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
                         auto content = _light_block->GetContent()->AddChild<UI::VerticalBox>();
                         auto items = Vector<String>{"Directional", "Point", "Spot", "Area"};
@@ -665,13 +716,16 @@ namespace Ailu
                             });
                         }
                     }
-                    _prev_comp_block = _light_block;
+                }
+                else
+                {
+                    remove_block(_light_block);
                 }
                 if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(selected); comp != nullptr)
                 {
-                    if (s_prev_selected != selected)
+                    if (_static_mesh_block == nullptr || submesh_changed)
                     {
-                        _vb->RemoveChild(_prev_comp_block);
+                        remove_block(_static_mesh_block);
                         _static_mesh_block = _vb->AddChild<UI::CollapsibleView>("StaticMesh")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
                         auto content = _static_mesh_block->GetContent()->AddChild<UI::VerticalBox>();
                         //mesh
@@ -681,9 +735,9 @@ namespace Ailu
                             {
                                 ShowPopupListView(e._current_target, 200.0f, [comp, btn](const Ref<UI::ListView> &list_view)
                                                   {
-                                    for (auto it = g_pResourceMgr->ResourceBegin<Render::Mesh>(); it != g_pResourceMgr->ResourceEnd<Render::Mesh>(); it++)
+                                    for (auto it = ResourceMgr::Get().ResourceBegin<Render::Mesh>(); it != ResourceMgr::Get().ResourceEnd<Render::Mesh>(); it++)
                                     {
-                                        const auto &mesh = g_pResourceMgr->IterToRefPtr<Render::Mesh>(it);
+                                        const auto &mesh = ResourceMgr::Get().IterToRefPtr<Render::Mesh>(it);
                                         auto text = MakeRef<Text>(mesh->Name());
                                         text->OnMouseClick() += [mesh, comp, btn](UIEvent &e)
                                         {
@@ -701,15 +755,15 @@ namespace Ailu
                         }
                         //material
                         {
-                            auto subindex = Selection::GetSelectedSubIndex(selected);
+                            auto subindex = selected_subindex;
                             auto btn = AddButtonRow(content, std::format("Material[{}]", subindex), (comp->_p_mats[subindex] != nullptr) ? comp->_p_mats[subindex]->Name() : "None");
                             btn->OnMouseClick() += [comp, btn, subindex](UI::UIEvent &e)
                             {
                                 ShowPopupListView(e._current_target, 200.0f, [comp, btn, subindex](const Ref<UI::ListView> &list_view)
                                                   {
-                                        for (auto it = g_pResourceMgr->ResourceBegin<Render::Material>(); it != g_pResourceMgr->ResourceEnd<Render::Material>(); it++)
+                                        for (auto it = ResourceMgr::Get().ResourceBegin<Render::Material>(); it != ResourceMgr::Get().ResourceEnd<Render::Material>(); it++)
                                         {
-                                            const auto &mat = g_pResourceMgr->IterToRefPtr<Render::Material>(it);
+                                            const auto &mat = ResourceMgr::Get().IterToRefPtr<Render::Material>(it);
                                             auto text = MakeRef<Text>(mat->Name());
                                             text->OnMouseClick() += [mat, comp, btn, subindex](UIEvent &e)
                                             {
@@ -738,13 +792,16 @@ namespace Ailu
                             }
                         }
                     }
-                    _prev_comp_block = _static_mesh_block;
+                }
+                else
+                {
+                    remove_block(_static_mesh_block);
                 }
                 if (auto comp = r.GetComponent<ECS::CLightProbe>(selected); comp != nullptr)
                 {
-                    if (s_prev_selected != selected)
+                    if (_light_probe_block == nullptr)
                     {
-                        _vb->RemoveChild(_prev_comp_block);
+                        remove_block(_light_probe_block);
                         _light_probe_block = _vb->AddChild<UI::CollapsibleView>("LightProbe")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
                         auto content = _light_probe_block->GetContent()->AddChild<UI::VerticalBox>();
                         {
@@ -756,13 +813,16 @@ namespace Ailu
                             };
                         }
                     }
-                    _prev_comp_block = _light_probe_block;
+                }
+                else
+                {
+                    remove_block(_light_probe_block);
                 }
                 if (auto comp = r.GetComponent<ECS::CCamera>(selected); comp != nullptr)
                 {
-                    if (s_prev_selected != selected)
+                    if (_cam_block == nullptr)
                     {
-                        _vb->RemoveChild(_prev_comp_block);
+                        remove_block(_cam_block);
                         _cam_block = _vb->AddChild<UI::CollapsibleView>("Camera")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
                         auto content = _cam_block->GetContent()->AddChild<UI::VerticalBox>();
                         //camera type
@@ -781,19 +841,20 @@ namespace Ailu
                                              { comp->_camera.Aspect(v); });
                         }
                     }
-                    _prev_comp_block = _cam_block;
+                }
+                else
+                {
+                    remove_block(_cam_block);
                 }
                 s_prev_selected = selected;
+                s_prev_selected_subindex = selected_subindex;
             }
             else
             {
                 _vb->ChildAt(0)->As<UI::Text>()->SetText("Name: (No Selection)");
-                if (_script_block != nullptr)
-                {
-                    _vb->RemoveChild(_script_block);
-                    _script_block = nullptr;
-                }
-                _script_path_block = nullptr;
+                clear_dynamic_blocks();
+                s_prev_selected = ECS::kInvalidEntity;
+                s_prev_selected_subindex = 0;
             }
         }
     }// namespace Editor

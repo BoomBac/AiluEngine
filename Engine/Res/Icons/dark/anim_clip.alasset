@@ -1,5 +1,10 @@
-guid: 3bc80454-31f8-4ad0-a5ab-0d85ca43ca15
-type: Ailu::Render::Texture2D
-name: anim_clip
-  file: Icons/dark/anim_clip.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "3bc80454-31f8-4ad0-a5ab-0d85ca43ca15",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "anim_clip"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/dark/anim_clip.png"
+}

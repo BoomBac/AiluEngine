@@ -1,5 +1,0 @@
-guid: cae32c64-ef2d-4668-8969-cf35ab91903b
-type: Ailu::Render::Texture2D
-name: Poster_BaseColor
-  file: breakfast_room/Poster_BaseColor.png
-  sRGB: 1

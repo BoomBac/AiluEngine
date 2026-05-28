@@ -1,5 +1,10 @@
-guid: ea68f293-f49a-45f7-a91d-7ac04bfd3433
-type: Ailu::Render::Texture2D
-name: T_Default_Material_Grid_N
-  file: Textures/T_Default_Material_Grid_N.TGA
-  sRGB: 0
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "ea68f293-f49a-45f7-a91d-7ac04bfd3433",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "T_Default_Material_Grid_N"
+    },
+    "_is_srgb": false,
+    "_file": "Textures/T_Default_Material_Grid_N.TGA"
+}

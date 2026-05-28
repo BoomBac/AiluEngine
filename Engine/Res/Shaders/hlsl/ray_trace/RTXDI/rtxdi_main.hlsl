@@ -1302,6 +1302,7 @@ void RayGen(CSInput input)
 
         RTXDI_FinalizeResampling(reservoir, 1.0, 1.0);
         reservoir.M = 1;
+        shadingOutput = surface_data.emssive;
 
         if (_enable_resampling)
         {
@@ -1335,8 +1336,8 @@ void RayGen(CSInput input)
             if (!is_occluded)
                 shadingOutput = ShadeSurfaceWithLightSample(lightSample, rab_surface) * RTXDI_GetDIReservoirInvPdf(reservoir);
             shadingOutput += surface_data.emssive;
-            _GI_Texture[pixel] = float4(shadingOutput,1.0);
         }
+        _GI_Texture[pixel] = float4(shadingOutput,1.0);
     }
     else
     {

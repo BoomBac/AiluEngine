@@ -1,6 +1,11 @@
-guid: 05027d6c-b9f3-4e05-aa86-e62a2067e69a
-type: Ailu::Render::Mesh
-name: Torus
-file: Meshs/src_res/torus.fbx
-inner_file_name: Torus
-is_combine_mesh: false
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "05027d6c-b9f3-4e05-aa86-e62a2067e69a",
+        "_asset_type": "Ailu::Render::Mesh",
+        "_asset_name": "Torus"
+    },
+    "_file": "Meshs/src_res/torus.fbx",
+    "_inner_file_name": "Torus",
+    "_is_combine_mesh": false
+}

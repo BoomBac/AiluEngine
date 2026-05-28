@@ -1,6 +1,11 @@
-guid: 953c51c3-fcd0-49d0-89f9-151fdfbe0e33
-type: Ailu::Render::Mesh
-name: Arcade
-file: breakfast_room/Arcade.fbx
-inner_file_name: Arcade
-is_combine_mesh: true
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "953c51c3-fcd0-49d0-89f9-151fdfbe0e33",
+        "_asset_type": "Ailu::Render::Mesh",
+        "_asset_name": "Arcade"
+    },
+    "_file": "breakfast_room/Arcade.fbx",
+    "_inner_file_name": "Arcade",
+    "_is_combine_mesh": true
+}

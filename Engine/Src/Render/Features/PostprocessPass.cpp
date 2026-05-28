@@ -1,4 +1,4 @@
-#include "Render/Features/PostprocessPass.h"
+﻿#include "Render/Features/PostprocessPass.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
@@ -10,18 +10,18 @@ namespace Ailu::Render
     PostProcessPass::PostProcessPass() : RenderPass("PostProcessPass")
     {
         _cs_blur = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/blur.hlsl"));
-        _p_bloom_thread_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/bloom.alasset"), "BloomThread");
-        _p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
+        _p_bloom_thread_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/bloom.alasset"), "BloomThread");
+        _p_blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
         _p_obj_cb = ConstantBuffer::Create(256);
         memcpy(_p_obj_cb->GetData(), &BuildIdentityMatrix(), sizeof(Matrix4x4f));
         _bloom_thread_rect = Rect(0, 0, 800, 450);
-        _p_quad_mesh = g_pResourceMgr->Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
+        _p_quad_mesh = ResourceMgr::Get().Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
         for (u16 i = 0; i < _bloom_iterator_count; i++)
         {
-            _bloom_mats.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/bloom.alasset"), std::format("bloom_mip_{}", i)));
+            _bloom_mats.emplace_back(MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/bloom.alasset"), std::format("bloom_mip_{}", i)));
         }
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforePostprocess + 25);
-        _nose_tex = g_pResourceMgr->Get<Texture2D>(L"Textures/noise_medium.png");
+        _nose_tex = ResourceMgr::Get().Get<Texture2D>(L"Textures/noise_medium.png");
         _noise_texel_size = {0.0f, 0.0f,(f32) _nose_tex->Width(), (f32) _nose_tex->Height()};
         _noise_texel_size.x = 1.0f / _noise_texel_size.z;
         _noise_texel_size.y = 1.0f / _noise_texel_size.w;

@@ -37,11 +37,23 @@ namespace Ailu
     {
         return _pos_track;
     }
+    const VectorTrack &TransformTrack::GetPositionTrack() const
+    {
+        return _pos_track;
+    }
     QuaternionTrack &TransformTrack::GetRotationTrack()
     {
         return _rot_track;
     }
+    const QuaternionTrack &TransformTrack::GetRotationTrack() const
+    {
+        return _rot_track;
+    }
     VectorTrack &TransformTrack::GetScaleTrack()
+    {
+        return _scale_track;
+    }
+    const VectorTrack &TransformTrack::GetScaleTrack() const
     {
         return _scale_track;
     }

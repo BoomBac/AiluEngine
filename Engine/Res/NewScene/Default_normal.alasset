@@ -1,5 +1,0 @@
-guid: 880ca96c-98e3-4b02-904a-0146448b47e0
-type: Ailu::Render::Texture2D
-name: Default_normal
-  file: NewScene/Default_normal.jpg
-  sRGB: 0

@@ -1,6 +1,7 @@
 #include "Render/RayTracing/SceneRayTracingProxy.h"
 #include "Framework/Common/Profiler.h"
 #include "Render/Mesh.h"
+#include "Render/Texture.h"
 #include "pch.h"
 
 namespace Ailu::Render
@@ -37,6 +38,143 @@ namespace Ailu::Render
         }
 
         constexpr float kDefaultSpotSourceRadius = 0.05f;
+        constexpr float kEmissiveTriangleSampleThreshold = 1.0e-4f;
+
+        struct EmissiveTriangleCacheKey
+        {
+            const Mesh *_mesh = nullptr;
+            u16 _submesh = 0u;
+            u16 _texture_width = 0u;
+            u16 _texture_height = 0u;
+            u64 _texture_hash = 0u;
+            EALGFormat::EALGFormat _texture_format = EALGFormat::kALGFormatUNKOWN;
+            Vector3f _emission = Vector3f::kZero;
+
+            bool operator==(const EmissiveTriangleCacheKey &other) const
+            {
+                return _mesh == other._mesh &&
+                       _submesh == other._submesh &&
+                       _texture_width == other._texture_width &&
+                       _texture_height == other._texture_height &&
+                       _texture_hash == other._texture_hash &&
+                       _texture_format == other._texture_format &&
+                       _emission == other._emission;
+            }
+        };
+
+        struct EmissiveTriangleCacheKeyHasher
+        {
+            size_t operator()(const EmissiveTriangleCacheKey &key) const
+            {
+                size_t hash = std::hash<const void *>{}(key._mesh);
+                hash = ALHash::HashCombineStable(hash, std::hash<u16>{}(key._submesh));
+                hash = ALHash::HashCombineStable(hash, std::hash<u16>{}(key._texture_width));
+                hash = ALHash::HashCombineStable(hash, std::hash<u16>{}(key._texture_height));
+                hash = ALHash::HashCombineStable(hash, std::hash<u64>{}(key._texture_hash));
+                hash = ALHash::HashCombineStable(hash, std::hash<int>{}(static_cast<int>(key._texture_format)));
+                return ALHash::HashCombineStable(hash, ALHash::Vector3fHash{}(key._emission));
+            }
+        };
+
+        HashMap<EmissiveTriangleCacheKey, Vector<u32>, EmissiveTriangleCacheKeyHasher> s_emissive_triangle_cache;
+
+        bool HasEmissiveContribution(const Vector3f &emission_radiance, const Vector3f &texture_sample)
+        {
+            const Vector3f emitted_radiance(
+                emission_radiance.x * texture_sample.x,
+                emission_radiance.y * texture_sample.y,
+                emission_radiance.z * texture_sample.z);
+            return std::max(emitted_radiance.x, std::max(emitted_radiance.y, emitted_radiance.z)) > kEmissiveTriangleSampleThreshold;
+        }
+
+        Vector<u32> BuildAllTriangleIndices(u32 triangle_count)
+        {
+            Vector<u32> triangle_indices;
+            triangle_indices.reserve(triangle_count);
+            for (u32 tri_index = 0u; tri_index < triangle_count; ++tri_index)
+                triangle_indices.push_back(tri_index);
+            return triangle_indices;
+        }
+
+        bool TriangleHasEmissiveContribution(const Texture2D &texture, const Vector3f &emission_radiance, const Vector2f &uv0, const Vector2f &uv1, const Vector2f &uv2)
+        {
+            const Vector2f sample_uvs[] = {
+                uv0,
+                uv1,
+                uv2,
+                (uv0 + uv1) * 0.5f,
+                (uv1 + uv2) * 0.5f,
+                (uv2 + uv0) * 0.5f,
+                (uv0 + uv1 + uv2) * (1.0f / 3.0f),
+            };
+
+            for (const auto &sample_uv : sample_uvs)
+            {
+                Color texture_sample = Colors::kBlack;
+                if (!texture.TryGetPixelBilinear(sample_uv.x, sample_uv.y, texture_sample))
+                    return true;
+                if (HasEmissiveContribution(emission_radiance, texture_sample.xyz))
+                    return true;
+            }
+
+            return false;
+        }
+
+        const Vector<u32> &GetEmissiveTriangleIndices(const Mesh &mesh, u16 submesh, StandardMaterial &material)
+        {
+            const auto emission_color = material.MainProperty(ETextureUsage::kEmission).GetValue<Color>();
+            const Vector3f emission_radiance = emission_color.xyz;
+            const auto *emission_texture = dynamic_cast<const Texture2D *>(material.MainTex(ETextureUsage::kEmission));
+            EmissiveTriangleCacheKey cache_key{};
+            cache_key._mesh = &mesh;
+            cache_key._submesh = submesh;
+            cache_key._texture_width = emission_texture ? emission_texture->Width() : 0u;
+            cache_key._texture_height = emission_texture ? emission_texture->Height() : 0u;
+            cache_key._texture_hash = emission_texture ? emission_texture->HashCode() : 0u;
+            cache_key._texture_format = emission_texture ? emission_texture->PixelFormat() : EALGFormat::kALGFormatUNKOWN;
+            cache_key._emission = emission_radiance;
+
+            if (auto cache_it = s_emissive_triangle_cache.find(cache_key); cache_it != s_emissive_triangle_cache.end())
+                return cache_it->second;
+
+            const auto &submesh_data = mesh.GetIndices(submesh);
+            const u32 triangle_count = static_cast<u32>(submesh_data.size() / 3u);
+            Vector<u32> triangle_indices;
+            if (triangle_count == 0u)
+                return s_emissive_triangle_cache.emplace(cache_key, std::move(triangle_indices)).first->second;
+
+            if (emission_texture == nullptr)
+            {
+                triangle_indices = BuildAllTriangleIndices(triangle_count);
+                return s_emissive_triangle_cache.emplace(cache_key, std::move(triangle_indices)).first->second;
+            }
+
+            const auto uvs = mesh.GetUVs();
+            if (uvs.empty())
+            {
+                triangle_indices = BuildAllTriangleIndices(triangle_count);
+                return s_emissive_triangle_cache.emplace(cache_key, std::move(triangle_indices)).first->second;
+            }
+
+            triangle_indices.reserve(triangle_count);
+            for (u32 tri_index = 0u; tri_index < triangle_count; ++tri_index)
+            {
+                const u32 base_index = tri_index * 3u;
+                const u32 i0 = submesh_data[base_index + 0u];
+                const u32 i1 = submesh_data[base_index + 1u];
+                const u32 i2 = submesh_data[base_index + 2u];
+                if (i0 >= uvs.size() || i1 >= uvs.size() || i2 >= uvs.size())
+                {
+                    triangle_indices = BuildAllTriangleIndices(triangle_count);
+                    break;
+                }
+
+                if (TriangleHasEmissiveContribution(*emission_texture, emission_radiance, uvs[i0], uvs[i1], uvs[i2]))
+                    triangle_indices.push_back(tri_index);
+            }
+
+            return s_emissive_triangle_cache.emplace(cache_key, std::move(triangle_indices)).first->second;
+        }
 
         Vector3f GetPremultipliedLightColor(const ECS::LightData &light_data)
         {
@@ -112,6 +250,7 @@ namespace Ailu::Render
 
         Vector<UnifiedLightData> BuildUnifiedLight(const ECS::StaticMeshComponent  &comp, u32 scene_triangle_offset, u32 base_instance_index)
         {
+            (void)scene_triangle_offset;
             if (!comp._p_mesh)
                 return {};
             Vector<UnifiedLightData> lights{};
@@ -127,19 +266,20 @@ namespace Ailu::Render
                     auto emission_color = mat->MainProperty(ETextureUsage::kEmission).GetValue<Color>();
                     if (emission_color.x <= 0.0f && emission_color.y <= 0.0f && emission_color.z <= 0.0f)
                         continue;
+                    const Vector3f emission_radiance = emission_color.xyz;
                     UnifiedLightData light = {};
                     light._type  = AL_UNIFIED_LIGHT_TYPE_TRIANGLE_AREA;
                     light._flags = AL_UNIFIED_LIGHT_FLAG_TWO_SIDED;
                     light._shadow_index = static_cast<int>(base_instance_index + submesh);
-                    light._radiance = mat->MainProperty(ETextureUsage::kEmission).GetValue<Color>().xyz;
+                    light._radiance = emission_radiance;
                     light._emissive_map = mat->MainTex(ETextureUsage::kEmission) ? mat->MainTex(ETextureUsage::kEmission)->GetBindlessSRVIndex() : RenderConstants::kInvalidBindlessHandle;
-                    const auto &submesh_data = mesh->GetIndices(submesh);
-                    const u32 submesh_triangle_start = mesh->GetTriangleStart(submesh);
-                    for(u32 tri = 0; tri < submesh_data.size(); tri += 3)
+                    const auto &triangle_indices = GetEmissiveTriangleIndices(*mesh, submesh, *mat);
+                    lights.reserve(lights.size() + triangle_indices.size());
+                    for (u32 tri_index : triangle_indices)
                     {
                         lights.push_back(light);
-                        auto& cur_light = lights.back();
-                        cur_light._tri_index = tri / 3u;
+                        auto &cur_light = lights.back();
+                        cur_light._tri_index = tri_index;
                     }
                 }
             }

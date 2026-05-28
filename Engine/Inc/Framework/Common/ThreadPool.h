@@ -33,6 +33,9 @@ namespace Ailu
 		class AILU_API ThreadPool
 		{
 		public:
+			static void Init(u8 thread_num, std::string name = "GlobalThreadPool");
+			static void Shutdown();
+			static ThreadPool &Get();
 			DISALLOW_COPY_AND_ASSIGN(ThreadPool);
 			struct Task
 			{
@@ -163,7 +166,6 @@ namespace Ailu
 			Vector<List<std::tuple<String,f32,f32>>> _task_time_records;
 		};
 	}
-	extern AILU_API Scope<Core::ThreadPool> g_pThreadTool;
 }
 
 

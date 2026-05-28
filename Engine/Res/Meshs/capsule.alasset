@@ -1,6 +1,11 @@
-guid: 04f85376-b16b-43cc-b53e-e5c236755e53
-type: Ailu::Render::Mesh
-name: Capsule
-file: Meshs/src_res/capsule.fbx
-inner_file_name: Capsule
-is_combine_mesh: false
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "04f85376-b16b-43cc-b53e-e5c236755e53",
+        "_asset_type": "Ailu::Render::Mesh",
+        "_asset_name": "Capsule"
+    },
+    "_file": "Meshs/src_res/capsule.fbx",
+    "_inner_file_name": "Capsule",
+    "_is_combine_mesh": false
+}

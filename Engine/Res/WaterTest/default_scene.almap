@@ -1,451 +1,1449 @@
-guid: a40c454a-c967-4810-88c9-651706104062
-type: Ailu::SceneManagement::Scene
-name: default_scene
-scene_register:
-Entity:1
-        _tag_component:
-            _name:empty
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:0.000000000,-5.897542000,0.000000000
-                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:1.000000000,1.000000000,1.000000000
-        _hierarchy_component:
-            _first_child:2
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:1
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-Entity:2
-        _tag_component:
-            _name:new_object_2
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:28.909343719,-3.706213951,-8.555307388
-                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:4.000000000,1.000000000,4.000000000
-        _static_mesh_component:
-            _p_mesh:2ff30e48-6661-479b-a90c-863e606734f6
-            _material_num:1
-            _p_mats[0]:abcb7c17-1767-4b43-9850-f7a36a428b96
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:1
-            _children_num:0
-            _inv_matrix_attach:1,0,0,0;0,1,0,0;0,0,1,0;0,0,0,1
-Entity:3
-        _tag_component:
-            _name:directional_light
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:14.517980576,3.078702927,8.787034988
-                _rotation:0.360687047,-0.185371488,0.073382407,0.911129653
-                _scale:0.999831975,0.999866009,0.999836028
-        _light_component:
-            _type:kDirectional
-            _light:
-                _light_color:1,1,1,2
-                _light_param:10,4.9,5,0
-                _is_two_side:0
-            _shadow:
-                _is_cast_shadow:1
-                _constant_bias:0.243
-                _slope_bias:0.214
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-Entity:4
-        _tag_component:
-            _name:cube_19
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:-13.749519348,-35.442382812,-50.537269592
-                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:163.044464111,1.000000000,163.044464111
-        _static_mesh_component:
-            _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
-            _material_num:1
-            _p_mats[0]:e3891c79-694a-4968-bb84-49c409a611ce
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kBox
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,0.01,1.00
-Entity:5
-        _tag_component:
-            _name:LightProbe_4
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:21.469730377,23.685842514,0.000000000
-                _rotation:0.000000000,0.000000038,0.000000000,1.000000000
-                _scale:1.000000000,1.000000000,1.000000000
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _lightprobe_component:
-            _size:9
-            _is_update_every_tick:0
-Entity:6
-        _tag_component:
-            _name:cloud
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:8.041076660,3.107604027,16.163330078
-                _rotation:-0.002445312,0.000344436,0.000377063,0.999996901
-                _scale:1.000000000,1.000000000,1.000000000
-        _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
-            _material_num:1
-            _p_mats[0]:a5ad5353-4bed-47b7-a4c2-aa26036f7ac2
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kBox
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,1.00
-Entity:7
-        _tag_component:
-            _name:spot_light_7
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:14.303318024,-3.196385860,23.583135605
-                _rotation:0.203136086,-0.685256302,0.129798919,0.687249422
-                _scale:1.003400445,1.003397226,1.003400445
-        _light_component:
-            _type:kSpot
-            _light:
-                _light_color:0.333215,0.911628,0.32225,1
-                _light_param:10,32.642,81.215,0
-                _is_two_side:0
-            _shadow:
-                _is_cast_shadow:0
-                _constant_bias:0
-                _slope_bias:0.012
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-Entity:8
-        _tag_component:
-            _name:new_object_10
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:2.719372988,-3.346129894,-4.919125080
-                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:0.999885976,0.999972999,0.999899030
-        _light_component:
-            _type:kArea
-            _light:
-                _light_color:1,1,1,8.29181
-                _light_param:15,2,2,0
-                _is_two_side:1
-            _shadow:
-                _is_cast_shadow:0
-                _constant_bias:0
-                _slope_bias:0
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-Entity:9
-        _tag_component:
-            _name:cube_9
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:51.185043335,-18.155273438,-91.594482422
-                _rotation:-0.959146321,0.000000078,0.000000048,0.282910556
-                _scale:3.000000000,3.000000000,3.000000000
-        _static_mesh_component:
-            _p_mesh:beccf997-dcb3-4217-b213-42059ec71ce8
-            _material_num:1
-            _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kBox
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,1.00
-Entity:10
-        _tag_component:
-            _name:cube_10
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:2.635401011,-5.781130791,-10.013072968
-                _rotation:-0.000000035,0.000000068,0.000000000,1.000000000
-                _scale:3.724302053,2.646023989,0.101078004
-        _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
-            _material_num:1
-            _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kBox
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,1.00
-Entity:11
-        _tag_component:
-            _name:sphere_11
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:4.173592091,-6.366879940,-3.117547989
-                _rotation:-0.000012350,0.508040249,0.000134289,0.861333311
-                _scale:0.639600992,1.905313969,0.639605999
-        _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
-            _material_num:1
-            _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kSphere
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,0.00
-Entity:12
-        _tag_component:
-            _name:sphere_18
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:-11.453358650,-3.451858044,-3.645704985
-                _rotation:0.040117569,0.000000068,0.000000006,0.999194980
-                _scale:1.091115952,1.091053009,1.091115952
-        _static_mesh_component:
-            _p_mesh:c3315e03-1052-4825-98f7-a676beae0615
-            _material_num:1
-            _p_mats[0]:58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kSphere
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,0.00
-Entity:13
-        _tag_component:
-            _name:camera
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:54.000000000,31.000000000,-1.341308951
-                _rotation:-0.025419002,0.000000038,0.000000001,0.999676883
-                _scale:0.999921978,0.999931991,0.999934018
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _camera_component:
-            _camera:
-                _type:kPerspective
-                _aspect:1.875
-                _far:50
-                _near:0.1
-                _fovh:41.269
-                _size:15.651
-Entity:14
-        _tag_component:
-            _name:cube_10(1)
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:-0.913318992,-5.712336063,-5.156910896
-                _rotation:-0.000000000,0.707228780,-0.000000000,0.706984758
-                _scale:4.795447826,2.646114111,0.101080999
-        _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
-            _material_num:1
-            _p_mats[0]:bbc9ad8e-1533-47f1-ac06-886158e971a9
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kBox
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,1.00
-Entity:15
-        _tag_component:
-            _name:cube_10(2)
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:6.114803314,-5.775127411,-5.299366474
-                _rotation:0.000000000,-0.706984758,0.000000000,0.707228839
-                _scale:5.006343842,2.645932913,0.101074770
-        _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
-            _material_num:1
-            _p_mats[0]:1a2e2991-11c9-4052-84b0-ebcdf455b61b
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kBox
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,1.00
-Entity:16
-        _tag_component:
-            _name:cube_10(1)
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:2.773056984,-3.128616095,-5.259709835
-                _rotation:-0.707107127,0.000000196,-0.000000100,0.707106411
-                _scale:3.723623037,5.206820011,0.101056002
-        _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
-            _material_num:1
-            _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kBox
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,1.00
-Entity:17
-        _tag_component:
-            _name:cube_10(2)
-_layer_mask:1
-        _transform_component:
-            _transform:
-                _position:2.618529081,-8.374788284,-4.761663914
-                _rotation:0.707818627,-0.005775545,-0.003821885,0.706360221
-                _scale:3.724031925,5.207653999,0.101069003
-        _static_mesh_component:
-            _p_mesh:d137d2a7-0d2b-40bc-9c76-6d2708923869
-            _material_num:1
-            _p_mats[0]:4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0.2685,-0.00053322,-0.134261,0;-0.00364533,-0.000392444,-9.89328,0;0.000738132,0.192024,-0.0205919,0;-0.73009,0.912463,-82.6006,1
-        _rigidbody_component:
-            _mass:1
-        _collider_component:
-            _type:kBox
-            _is_trigger:1
-            _center:0.00,0.00,0.00
-            _param:1.00,1.00,1.00
-Entity:18
-        _tag_component:
-            _name:new_object_18
-_layer_mask:0
-        _transform_component:
-            _transform:
-                _position:1.834542036,-1.794940948,-4.035486221
-                _rotation:0.000000000,0.000000068,0.000000000,1.000000000
-                _scale:1.128424048,1.128424048,1.128424048
-        _static_mesh_component:
-            _p_mesh:7baa598b-7eb4-478d-91ae-bf758da25d3b
-            _material_num:1
-            _p_mats[0]:bbc9ad8e-1533-47f1-ac06-886158e971a9
-        _hierarchy_component:
-            _first_child:0
-            _prev_sibling:0
-            _next_sibling:0
-            _parent:0
-            _children_num:0
-            _inv_matrix_attach:0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "a40c454a-c967-4810-88c9-651706104062",
+        "_asset_type": "Ailu::SceneManagement::Scene",
+        "_asset_name": "default_scene"
+    },
+    "_entities": [{
+            "_has_static_mesh_component": false,
+            "_entity_id": 1,
+            "_transform_component": {
+                "_position": [0.0, -5.8975419998168945, 0.0],
+                "_scale": [1.0, 1.0, 1.0],
+                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0]
+            },
+            "_collider_component": {
+                "_type": "",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_tag_component": {
+                "_name": "empty",
+                "_layer_mask": 1
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_camera_component": false,
+            "_has_script_component": false,
+            "_has_skeleton_mesh_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": []
+            },
+            "_has_light_component": false,
+            "_light_component": {
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_type": "",
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_first_child": 2,
+                "_parent": 0,
+                "_next_sibling": 0,
+                "_prev_sibling": 0,
+                "_children_num": 1
+            },
+            "_camera_component": {
+                "_fov_h": 60.0,
+                "_aspect": 1.0,
+                "_type": "",
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": false,
+            "_has_vxgi_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_anim_clip_guid": "",
+                "_material_guids": []
+            },
+            "_has_collider_component": false,
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 2,
+            "_transform_component": {
+                "_position": [28.909343719482422, -3.70621395111084, -8.555307388305664],
+                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0],
+                "_scale": [4.0, 1.0, 4.0]
+            },
+            "_tag_component": {
+                "_name": "new_object_2",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "2ff30e48-6661-479b-a90c-863e606734f6",
+                "_material_guids": ["abcb7c17-1767-4b43-9850-f7a36a428b96"]
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": false,
+            "_light_component": {
+                "_type": "",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "1,0,0,0;0,1,0,0;0,0,1,0;0,0,0,1",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 1,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": false,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": false,
+            "_entity_id": 3,
+            "_transform_component": {
+                "_position": [14.517980575561523, 3.078702926635742, 8.78703498840332],
+                "_scale": [0.9998319745063782, 0.9998660087585449, 0.9998360276222229],
+                "_rotation": [0.3606870472431183, -0.1853714883327484, 0.0733824074268341, 0.9111296534538269]
+            },
+            "_collider_component": {
+                "_type": "",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_tag_component": {
+                "_name": "directional_light",
+                "_layer_mask": 1
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_camera_component": false,
+            "_has_script_component": false,
+            "_has_skeleton_mesh_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": []
+            },
+            "_has_light_component": true,
+            "_light_component": {
+                "_shadow": {
+                    "_is_cast_shadow": true,
+                    "_constant_bias": 0.24300000071525574,
+                    "_slope_bias": 0.21400000154972076
+                },
+                "_type": "kDirectional",
+                "_light": {
+                    "_light_color": [1.0, 1.0, 1.0, 2.0],
+                    "_light_param": [10.0, 4.900000095367432, 5.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_first_child": 0,
+                "_parent": 0,
+                "_next_sibling": 0,
+                "_prev_sibling": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_fov_h": 60.0,
+                "_aspect": 1.0,
+                "_type": "",
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": false,
+            "_has_vxgi_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_anim_clip_guid": "",
+                "_material_guids": []
+            },
+            "_has_collider_component": false,
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 4,
+            "_transform_component": {
+                "_position": [-13.749519348144531, -35.4423828125, -50.537269592285156],
+                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0],
+                "_scale": [163.04446411132813, 1.0, 163.04446411132813]
+            },
+            "_tag_component": {
+                "_name": "cube_19",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "kBox",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 0.009999999776482582, 1.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "c3315e03-1052-4825-98f7-a676beae0615",
+                "_material_guids": ["e3891c79-694a-4968-bb84-49c409a611ce"]
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": false,
+            "_light_component": {
+                "_type": "",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": true,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": false,
+            "_entity_id": 5,
+            "_transform_component": {
+                "_position": [21.469730377197266, 23.685842514038086, 0.0],
+                "_scale": [1.0, 1.0, 1.0],
+                "_rotation": [0.0, 3.799999959142042e-8, 0.0, 1.0]
+            },
+            "_collider_component": {
+                "_type": "",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_tag_component": {
+                "_name": "LightProbe_4",
+                "_layer_mask": 1
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_camera_component": false,
+            "_has_script_component": false,
+            "_has_skeleton_mesh_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": []
+            },
+            "_has_light_component": false,
+            "_light_component": {
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_type": "",
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_first_child": 0,
+                "_parent": 0,
+                "_next_sibling": 0,
+                "_prev_sibling": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_fov_h": 60.0,
+                "_aspect": 1.0,
+                "_type": "",
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": true,
+            "_lightprobe_component": {
+                "_size": 9.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": false,
+            "_has_vxgi_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_anim_clip_guid": "",
+                "_material_guids": []
+            },
+            "_has_collider_component": false,
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 6,
+            "_transform_component": {
+                "_position": [8.04107666015625, 3.1076040267944336, 16.163330078125],
+                "_scale": [1.0, 1.0, 1.0],
+                "_rotation": [-0.0024453119840472937, 0.0003444360045250505, 0.0003770629991777241, 0.9999969005584717]
+            },
+            "_collider_component": {
+                "_type": "kBox",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 1.0]
+            },
+            "_tag_component": {
+                "_name": "cloud",
+                "_layer_mask": 1
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_camera_component": false,
+            "_has_script_component": false,
+            "_has_skeleton_mesh_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+                "_material_guids": ["a5ad5353-4bed-47b7-a4c2-aa26036f7ac2"]
+            },
+            "_has_light_component": false,
+            "_light_component": {
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_type": "",
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_first_child": 0,
+                "_parent": 0,
+                "_next_sibling": 0,
+                "_prev_sibling": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_fov_h": 60.0,
+                "_aspect": 1.0,
+                "_type": "",
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_has_vxgi_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_anim_clip_guid": "",
+                "_material_guids": []
+            },
+            "_has_collider_component": true,
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": false,
+            "_entity_id": 7,
+            "_transform_component": {
+                "_position": [14.30331802368164, -3.1963858604431152, 23.5831356048584],
+                "_rotation": [0.20313608646392822, -0.68525630235672, 0.12979891896247864, 0.6872494220733643],
+                "_scale": [1.003400444984436, 1.0033972263336182, 1.003400444984436]
+            },
+            "_tag_component": {
+                "_name": "spot_light_7",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": []
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": true,
+            "_light_component": {
+                "_type": "kSpot",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.012000000104308128
+                },
+                "_light": {
+                    "_light_color": [0.33321499824523926, 0.911628007888794, 0.32225000858306885, 1.0],
+                    "_light_param": [10.0, 32.641998291015625, 81.21499633789063, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": false,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": false,
+            "_entity_id": 8,
+            "_transform_component": {
+                "_position": [2.7193729877471924, -3.346129894256592, -4.919125080108643],
+                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0],
+                "_scale": [0.9998859763145447, 0.9999729990959167, 0.9998990297317505]
+            },
+            "_tag_component": {
+                "_name": "new_object_10",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": []
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": true,
+            "_light_component": {
+                "_type": "kArea",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [1.0, 1.0, 1.0, 8.291810035705566],
+                    "_light_param": [15.0, 2.0, 2.0, 0.0],
+                    "_is_two_side": true
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": false,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 9,
+            "_transform_component": {
+                "_position": [51.18504333496094, -18.1552734375, -91.594482421875],
+                "_rotation": [-0.9591463208198547, 7.799999934832158e-8, 4.800000041882413e-8, 0.28291055560112],
+                "_scale": [3.0, 3.0, 3.0]
+            },
+            "_tag_component": {
+                "_name": "cube_9",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "kBox",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 1.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "beccf997-dcb3-4217-b213-42059ec71ce8",
+                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": false,
+            "_light_component": {
+                "_type": "",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": true,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 10,
+            "_transform_component": {
+                "_position": [2.6354010105133057, -5.781130790710449, -10.013072967529297],
+                "_scale": [3.724302053451538, 2.646023988723755, 0.10107800364494324],
+                "_rotation": [-3.4999999343199306e-8, 6.799999852091787e-8, 0.0, 1.0]
+            },
+            "_collider_component": {
+                "_type": "kBox",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 1.0]
+            },
+            "_tag_component": {
+                "_name": "cube_10",
+                "_layer_mask": 1
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_camera_component": false,
+            "_has_script_component": false,
+            "_has_skeleton_mesh_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
+            },
+            "_has_light_component": false,
+            "_light_component": {
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_type": "",
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_first_child": 0,
+                "_parent": 0,
+                "_next_sibling": 0,
+                "_prev_sibling": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_fov_h": 60.0,
+                "_aspect": 1.0,
+                "_type": "",
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_has_vxgi_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_anim_clip_guid": "",
+                "_material_guids": []
+            },
+            "_has_collider_component": true,
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 11,
+            "_transform_component": {
+                "_position": [4.1735920906066895, -6.366879940032959, -3.1175479888916016],
+                "_scale": [0.6396009922027588, 1.9053139686584473, 0.6396059989929199],
+                "_rotation": [-0.000012350000361038838, 0.5080402493476868, 0.00013428900274448097, 0.8613333106040955]
+            },
+            "_collider_component": {
+                "_type": "kSphere",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_tag_component": {
+                "_name": "sphere_11",
+                "_layer_mask": 1
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_camera_component": false,
+            "_has_script_component": false,
+            "_has_skeleton_mesh_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
+            },
+            "_has_light_component": false,
+            "_light_component": {
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_type": "",
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_first_child": 0,
+                "_parent": 0,
+                "_next_sibling": 0,
+                "_prev_sibling": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_fov_h": 60.0,
+                "_aspect": 1.0,
+                "_type": "",
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_has_vxgi_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_anim_clip_guid": "",
+                "_material_guids": []
+            },
+            "_has_collider_component": true,
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 12,
+            "_transform_component": {
+                "_position": [-11.45335865020752, -3.4518580436706543, -3.645704984664917],
+                "_scale": [1.091115951538086, 1.0910530090332031, 1.091115951538086],
+                "_rotation": [0.040117569267749786, 6.799999852091787e-8, 6.000000052353016e-9, 0.9991949796676636]
+            },
+            "_collider_component": {
+                "_type": "kSphere",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_tag_component": {
+                "_name": "sphere_18",
+                "_layer_mask": 1
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_camera_component": false,
+            "_has_script_component": false,
+            "_has_skeleton_mesh_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "c3315e03-1052-4825-98f7-a676beae0615",
+                "_material_guids": ["58ec7c7a-220d-4d5c-a84d-dcc7faaf38e5"]
+            },
+            "_has_light_component": false,
+            "_light_component": {
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_type": "",
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_first_child": 0,
+                "_parent": 0,
+                "_next_sibling": 0,
+                "_prev_sibling": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_fov_h": 60.0,
+                "_aspect": 1.0,
+                "_type": "",
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_has_vxgi_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_anim_clip_guid": "",
+                "_material_guids": []
+            },
+            "_has_collider_component": true,
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": false,
+            "_entity_id": 13,
+            "_transform_component": {
+                "_position": [54.0, 31.0, -1.3413089513778687],
+                "_scale": [0.999921977519989, 0.9999319911003113, 0.9999340176582336],
+                "_rotation": [-0.025419002398848534, 3.799999959142042e-8, 9.999999717180685e-10, 0.9996768832206726]
+            },
+            "_collider_component": {
+                "_type": "",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_tag_component": {
+                "_name": "camera",
+                "_layer_mask": 1
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_camera_component": true,
+            "_has_script_component": false,
+            "_has_skeleton_mesh_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": []
+            },
+            "_has_light_component": false,
+            "_light_component": {
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_type": "",
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_first_child": 0,
+                "_parent": 0,
+                "_next_sibling": 0,
+                "_prev_sibling": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_fov_h": 41.26900100708008,
+                "_aspect": 1.875,
+                "_type": "kPerspective",
+                "_far_clip": 50.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 15.651000022888184
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": false,
+            "_has_vxgi_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_anim_clip_guid": "",
+                "_material_guids": []
+            },
+            "_has_collider_component": false,
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 14,
+            "_transform_component": {
+                "_position": [-0.9133189916610718, -5.71233606338501, -5.1569108963012695],
+                "_rotation": [-0.0, 0.7072287797927856, -0.0, 0.7069847583770752],
+                "_scale": [4.795447826385498, 2.6461141109466553, 0.1010809987783432]
+            },
+            "_tag_component": {
+                "_name": "cube_10(1)",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "kBox",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 1.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+                "_material_guids": ["bbc9ad8e-1533-47f1-ac06-886158e971a9"]
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": false,
+            "_light_component": {
+                "_type": "",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": true,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 15,
+            "_transform_component": {
+                "_position": [6.114803314208984, -5.775127410888672, -5.299366474151611],
+                "_rotation": [0.0, -0.7069847583770752, 0.0, 0.7072288393974304],
+                "_scale": [5.006343841552734, 2.645932912826538, 0.10107477009296417]
+            },
+            "_tag_component": {
+                "_name": "cube_10(2)",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "kBox",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 1.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+                "_material_guids": ["1a2e2991-11c9-4052-84b0-ebcdf455b61b"]
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": false,
+            "_light_component": {
+                "_type": "",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": true,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 16,
+            "_transform_component": {
+                "_position": [2.773056983947754, -3.1286160945892334, -5.25970983505249],
+                "_rotation": [-0.7071071267127991, 1.96000002006258e-7, -1.0000000116860974e-7, 0.7071064114570618],
+                "_scale": [3.723623037338257, 5.206820011138916, 0.10105600208044052]
+            },
+            "_tag_component": {
+                "_name": "cube_10(1)",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "kBox",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 1.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": false,
+            "_light_component": {
+                "_type": "",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": true,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 17,
+            "_transform_component": {
+                "_position": [2.6185290813446045, -8.374788284301758, -4.761663913726807],
+                "_rotation": [0.7078186273574829, -0.0057755447924137115, -0.0038218849804252386, 0.7063602209091187],
+                "_scale": [3.724031925201416, 5.207653999328613, 0.10106900334358215]
+            },
+            "_tag_component": {
+                "_name": "cube_10(2)",
+                "_layer_mask": 1
+            },
+            "_collider_component": {
+                "_type": "kBox",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 1.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+                "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": false,
+            "_light_component": {
+                "_type": "",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0.2685,-0.00053322,-0.134261,0;-0.00364533,-0.000392444,-9.89328,0;0.000738132,0.192024,-0.0205919,0;-0.73009,0.912463,-82.6006,1",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": true,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": true,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }, {
+            "_has_static_mesh_component": true,
+            "_entity_id": 18,
+            "_transform_component": {
+                "_position": [1.8345420360565186, -1.7949409484863281, -4.035486221313477],
+                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0],
+                "_scale": [1.128424048423767, 1.128424048423767, 1.128424048423767]
+            },
+            "_tag_component": {
+                "_name": "new_object_18",
+                "_layer_mask": 0
+            },
+            "_collider_component": {
+                "_type": "",
+                "_is_trigger": true,
+                "_center": [0.0, 0.0, 0.0],
+                "_param": [1.0, 1.0, 0.0]
+            },
+            "_script_component": {
+                "_script_path": ""
+            },
+            "_has_transform_component": true,
+            "_has_script_component": false,
+            "_has_camera_component": false,
+            "_static_mesh_component": {
+                "_mesh_guid": "7baa598b-7eb4-478d-91ae-bf758da25d3b",
+                "_material_guids": ["bbc9ad8e-1533-47f1-ac06-886158e971a9"]
+            },
+            "_has_skeleton_mesh_component": false,
+            "_has_light_component": false,
+            "_light_component": {
+                "_type": "",
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
+                },
+                "_light": {
+                    "_light_color": [0.0, 0.0, 0.0, 0.0],
+                    "_light_param": [0.0, 0.0, 0.0, 0.0],
+                    "_is_two_side": false
+                }
+            },
+            "_has_hierarchy_component": true,
+            "_hierarchy_component": {
+                "_first_child": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
+                "_prev_sibling": 0,
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0
+            },
+            "_camera_component": {
+                "_type": "",
+                "_aspect": 1.0,
+                "_fov_h": 60.0,
+                "_far_clip": 1000.0,
+                "_near_clip": 0.10000000149011612,
+                "_size": 1.0
+            },
+            "_has_lightprobe_component": false,
+            "_lightprobe_component": {
+                "_size": 10.0,
+                "_is_update_every_tick": false
+            },
+            "_has_rigidbody_component": false,
+            "_rigidbody_component": {
+                "_mass": 1.0
+            },
+            "_has_vxgi_component": false,
+            "_has_collider_component": false,
+            "_skeleton_mesh_component": {
+                "_mesh_guid": "",
+                "_material_guids": [],
+                "_anim_clip_guid": ""
+            },
+            "_vxgi_component": {
+                "_grid_num": [64, 64, 64],
+                "_distance": 20.0
+            }
+        }]
+}

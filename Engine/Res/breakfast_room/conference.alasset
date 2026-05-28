@@ -1,6 +1,11 @@
-guid: aab1797f-d730-4302-8982-7fc075364eba
-type: Ailu::Render::Mesh
-name: conference
-file: breakfast_room/conference.fbx
-inner_file_name: conference
-is_combine_mesh: true
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "aab1797f-d730-4302-8982-7fc075364eba",
+        "_asset_type": "Ailu::Render::Mesh",
+        "_asset_name": "conference"
+    },
+    "_file": "breakfast_room/conference.fbx",
+    "_inner_file_name": "conference",
+    "_is_combine_mesh": true
+}

@@ -1,4 +1,4 @@
-#include "Widgets/AssetBrowser.h"
+﻿#include "Widgets/AssetBrowser.h"
 #include "Common/EditorPopup.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -127,7 +127,7 @@ namespace Ailu
                 auto t = _content_root->Thickness();
                 _sv->SlotSize(new_size.x, new_size.y - kTitleBarHeight);
             };
-            _current_path = g_pResourceMgr->EngineResRootPath();
+            _current_path = ResourceMgr::Get().EngineResRootPath();
             auto hb = _right->AddChild<UI::HorizontalBox>();
             hb->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
             hb->SlotAlignmentH(UI::EAlignment::kFill);
@@ -216,7 +216,7 @@ namespace Ailu
                     return;
                 case EImportPopupType::kDirect:
                 default:
-                    g_pResourceMgr->ImportResource(sys_path, _current_path.wstring());
+                    ResourceMgr::Get().ImportResource(sys_path, _current_path.wstring());
                     _pending_import_files.erase(_pending_import_files.begin());
                     _is_dirty = true;
                     break;
@@ -267,7 +267,7 @@ namespace Ailu
                                           {
                                                   {"Import", [this, setting, sys_path, finish_popup]() -> std::optional<String>
                                                    {
-                                                       g_pResourceMgr->ImportResource(sys_path, _current_path.wstring(), *setting);
+                                                       ResourceMgr::Get().ImportResource(sys_path, _current_path.wstring(), *setting);
                                                        _is_dirty = true;
                                                        finish_popup();
                                                        return std::nullopt;
@@ -317,7 +317,7 @@ namespace Ailu
                                           {
                                                   {"Import", [this, setting, sys_path, finish_popup]() -> std::optional<String>
                                                    {
-                                                       g_pResourceMgr->ImportResource(sys_path, _current_path.wstring(), *setting);
+                                                       ResourceMgr::Get().ImportResource(sys_path, _current_path.wstring(), *setting);
                                                        _is_dirty = true;
                                                        finish_popup();
                                                        return std::nullopt;
@@ -332,7 +332,7 @@ namespace Ailu
             }
             case EImportPopupType::kDirect:
             default:
-                g_pResourceMgr->ImportResource(sys_path, _current_path.wstring());
+                ResourceMgr::Get().ImportResource(sys_path, _current_path.wstring());
                 _is_dirty = true;
                 AdvanceImportQueue();
                 return;
@@ -349,15 +349,15 @@ namespace Ailu
         void AssetBrowser::Update(f32 dt)
         {
             DockWindow::Update(dt);
-            static auto s_folder_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"folder.alasset");
-            static auto s_file_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"file.alasset");
-            static auto s_mesh_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset");
-            static auto s_shader_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
-            static auto s_image_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
-            static auto s_scene_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/scene.alasset");
-            static auto s_material_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/material.alasset");
-            static auto s_animclip_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset");
-            static auto s_skeleton_icon = g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/skeleton.alasset");
+            static auto s_folder_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"folder.alasset");
+            static auto s_file_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"file.alasset");
+            static auto s_mesh_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"3d.alasset");
+            static auto s_shader_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"shader.alasset");
+            static auto s_image_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"image.alasset");
+            static auto s_scene_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/scene.alasset");
+            static auto s_material_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/material.alasset");
+            static auto s_animclip_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/anim_clip.alasset");
+            static auto s_skeleton_icon = ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineIconPathW + L"dark/skeleton.alasset");
 
             Vector2f parent_size = _icon_area->GetContentRect().zw;
             if (parent_size.x <= 0.0f || parent_size.y <= 0.0f)
@@ -378,7 +378,7 @@ namespace Ailu
                     //更新当前资产列表
                     SearchFilterByDirectory filter({PathUtils::ExtractAssetPath(_current_path.wstring())});
                     _cur_dir_assets.clear();
-                    _cur_dir_assets = std::move(g_pResourceMgr->GetAssets(filter));
+                    _cur_dir_assets = std::move(ResourceMgr::Get().GetAssets(filter));
                     _path_title->SetText(_current_path.string());
                     const auto create_icon_group = []() -> std::tuple<Ref<UI::VerticalBox>,UI::Image*,UI::Text*>
                     {
@@ -483,7 +483,7 @@ namespace Ailu
                             if (asset->_p_obj == nullptr)
                             {
                                 //并非当帧完成
-                                icon->SetTexture(g_pResourceMgr->Load<Texture2D>(asset->_asset_path).get());
+                                icon->SetTexture(ResourceMgr::Get().Load<Texture2D>(asset->_asset_path).get());
                             }
                             else
                             {
@@ -583,7 +583,7 @@ namespace Ailu
             {
                 if (asset->_p_obj == nullptr)
                 {
-                    g_pResourceMgr->Load<Mesh>(asset->_asset_path);
+                    ResourceMgr::Get().Load<Mesh>(asset->_asset_path);
                     _is_dirty = true;
                 }
             }
@@ -781,7 +781,7 @@ namespace Ailu
             const WString old_sys_path = ResourceMgr::GetResSysPath(old_asset_path);
             const WString new_asset_path = PathUtils::RenameFile(old_asset_path, ToWChar(name.c_str()));
             const WString new_sys_path = ResourceMgr::GetResSysPath(new_asset_path);
-            if (g_pResourceMgr->GetAsset(new_asset_path) != nullptr || fs::exists(new_sys_path))
+            if (ResourceMgr::Get().GetAsset(new_asset_path) != nullptr || fs::exists(new_sys_path))
                 return false;
 
             std::error_code rename_error;
@@ -791,7 +791,7 @@ namespace Ailu
                 LOG_WARNING("AssetBrowser: rename file failed, {}", rename_error.message());
                 return false;
             }
-            if (!g_pResourceMgr->RenameAsset(asset, ToWChar(name.c_str())))
+            if (!ResourceMgr::Get().RenameAsset(asset, ToWChar(name.c_str())))
             {
                 std::error_code rollback_error;
                 fs::rename(new_sys_path, old_sys_path, rollback_error);
@@ -803,7 +803,7 @@ namespace Ailu
             if (asset->_p_obj)
                 asset->_p_obj->Name(name);
             RewriteAssetHeaderName(new_sys_path, name);
-            g_pResourceMgr->SaveAllUnsavedAssets();
+            ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
             return true;
         }
@@ -844,11 +844,11 @@ namespace Ailu
                     continue;
                 WString suffix = asset_path.substr(old_prefix.size());
                 WString new_asset_path = AppendChildAssetPath(new_dir_asset_path, suffix);
-                if (!g_pResourceMgr->MoveAsset(asset, new_asset_path))
+                if (!ResourceMgr::Get().MoveAsset(asset, new_asset_path))
                     LOG_WARNING(L"AssetBrowser: move asset {} to {} failed after folder rename.", asset->_asset_path, new_asset_path);
             }
 
-            g_pResourceMgr->SaveAllUnsavedAssets();
+            ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
             return true;
         }
@@ -867,9 +867,9 @@ namespace Ailu
                 return;
             }
 
-            g_pResourceMgr->DeleteAsset(asset);
-            g_pResourceMgr->Tick(0.0f);
-            g_pResourceMgr->SaveAllUnsavedAssets();
+            ResourceMgr::Get().DeleteAsset(asset);
+            ResourceMgr::Get().Tick(0.0f);
+            ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
         }
 
@@ -891,9 +891,9 @@ namespace Ailu
             }
 
             for (auto *asset: assets_to_delete)
-                g_pResourceMgr->DeleteAsset(asset);
-            g_pResourceMgr->Tick(0.0f);
-            g_pResourceMgr->SaveAllUnsavedAssets();
+                ResourceMgr::Get().DeleteAsset(asset);
+            ResourceMgr::Get().Tick(0.0f);
+            ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
         }
 
@@ -919,15 +919,15 @@ namespace Ailu
                 return false;
 
             const WString asset_path = BuildCurrentAssetPath(ToWChar(trimmed_name.c_str()) + WString(L".almap"));
-            if (g_pResourceMgr->GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
                 return false;
 
             auto scene = SceneManagement::SceneMgr::Get().Create(trimmed_name);
             if (!scene)
                 return false;
 
-            g_pResourceMgr->CreateAsset(asset_path, scene);
-            g_pResourceMgr->SaveAllUnsavedAssets();
+            ResourceMgr::Get().CreateAsset(asset_path, scene);
+            ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
             return true;
         }
@@ -939,21 +939,21 @@ namespace Ailu
                 return false;
 
             const WString asset_path = BuildCurrentAssetPath(ToWChar(trimmed_name.c_str()) + WString(L".alasset"));
-            if (g_pResourceMgr->GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
+            if (ResourceMgr::Get().GetAsset(asset_path) != nullptr || fs::exists(ResourceMgr::GetResSysPath(asset_path)))
                 return false;
 
             auto shader = Render::Shader::s_p_defered_standart_lit.lock();
             if (!shader)
             {
-                shader = g_pResourceMgr->Load<Render::Shader>(L"Shaders/defered_standard_lit.alasset");
+                shader = ResourceMgr::Get().Load<Render::Shader>(L"Shaders/defered_standard_lit.alasset");
                 Render::Shader::s_p_defered_standart_lit = shader;
             }
             if (!shader)
                 return false;
 
             auto material = MakeRef<Render::StandardMaterial>(trimmed_name);
-            g_pResourceMgr->CreateAsset(asset_path, material);
-            g_pResourceMgr->SaveAllUnsavedAssets();
+            ResourceMgr::Get().CreateAsset(asset_path, material);
+            ResourceMgr::Get().SaveAllUnsavedAssets();
             _is_dirty = true;
             return true;
         }
@@ -961,7 +961,7 @@ namespace Ailu
         WString AssetBrowser::CurrentAssetDirectoryPath() const
         {
             const WString current_path = NormalizePathWithoutTrailingSlash(_current_path.wstring());
-            const WString root_path = NormalizePathWithoutTrailingSlash(g_pResourceMgr->EngineResRootPath());
+            const WString root_path = NormalizePathWithoutTrailingSlash(ResourceMgr::Get().EngineResRootPath());
             if (current_path == root_path)
                 return L"";
             return NormalizePathWithoutTrailingSlash(PathUtils::ExtractAssetPath(current_path));
@@ -977,7 +977,7 @@ namespace Ailu
             Vector<Asset *> assets;
             const WString normalized_dir = NormalizePathWithoutTrailingSlash(directory_asset_path);
             const WString normalized_prefix = NormalizeDirectoryPath(normalized_dir);
-            for (auto it = g_pResourceMgr->Begin(); it != g_pResourceMgr->End(); ++it)
+            for (auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); ++it)
             {
                 Asset *asset = it->second.get();
                 WString asset_path = NormalizePathWithoutTrailingSlash(asset->_asset_path);

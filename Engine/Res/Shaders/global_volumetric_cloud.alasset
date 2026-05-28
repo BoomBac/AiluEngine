@@ -1,6 +1,11 @@
-guid: 13dbddd5-0785-405b-af21-435a472a3813
-type: Ailu::Render::Shader
-name: global_volumetric_cloud
-  file: Shaders/hlsl/global_volumetric_cloud.hlsl
-  vs_entry: FullscreenVSMain
-  ps_entry: ComputePSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "13dbddd5-0785-405b-af21-435a472a3813",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "global_volumetric_cloud"
+    },
+    "_file": "Shaders/hlsl/global_volumetric_cloud.hlsl",
+    "_ps_entry": "ComputePSMain",
+    "_vs_entry": "FullscreenVSMain"
+}

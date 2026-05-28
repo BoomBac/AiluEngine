@@ -1,4 +1,4 @@
-#include "Common/TransformGizmo.h"
+﻿#include "Common/TransformGizmo.h"
 #include "Framework/Common/Input.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Inc/Physics/Collision.h"
@@ -28,7 +28,7 @@ namespace Ailu
 
         TransformGizmo::TransformGizmo()
         {
-            auto shader = g_pResourceMgr->Load<Shader>(L"Shaders/transform_gizmo.alasset");
+            auto shader = ResourceMgr::Get().Load<Shader>(L"Shaders/transform_gizmo.alasset");
             auto mat_x = MakeRef<Render::Material>(shader.get(), "TransformGizmoMat");
             mat_x->SetVector("_color", Colors::kRed);
             auto mat_y = MakeRef<Render::Material>(shader.get(), "TransformGizmoMat");

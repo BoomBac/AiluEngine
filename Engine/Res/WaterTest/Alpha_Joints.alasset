@@ -1,5 +1,11 @@
-guid: 61719aa4-e2e6-4ba7-bab7-5d6e6b78935f
-type: Ailu::Render::SkeletonMesh
-name: Alpha_Joints
-file: WaterTest/YBot_Walking_M.fbx
-inner_file_name: Alpha_Joints
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "61719aa4-e2e6-4ba7-bab7-5d6e6b78935f",
+        "_asset_type": "Ailu::Render::SkeletonMesh",
+        "_asset_name": "Alpha_Joints"
+    },
+    "_file": "WaterTest/YBot_Walking_M.fbx",
+    "_inner_file_name": "Alpha_Joints",
+    "_is_combine_mesh": false
+}

@@ -1,6 +1,11 @@
-guid: f891ec73-10c8-404b-91ac-5bac15cda5fb
-type: Ailu::Render::Shader
-name: water
-  file: Shaders/hlsl/water.hlsl
-  vs_entry: ForwardVSMain
-  ps_entry: ForwardPSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "f891ec73-10c8-404b-91ac-5bac15cda5fb",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "water"
+    },
+    "_file": "Shaders/hlsl/water.hlsl",
+    "_ps_entry": "ForwardPSMain",
+    "_vs_entry": "ForwardVSMain"
+}

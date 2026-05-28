@@ -1,4 +1,4 @@
-#include "Render/Features/VolumetricClouds.h"
+﻿#include "Render/Features/VolumetricClouds.h"
 #include "Inc/Framework/Common/Application.h"
 #include "Inc/Framework/Common/JobSystem.h"
 #include "Inc/Framework/Common/Profiler.h"
@@ -31,12 +31,12 @@ namespace Ailu::Render
         //r覆盖率,g降雨概率,b类型(0.0层云，0.5积云，1.0积雨云)
         TextureImportSetting setting;
         setting._generate_mipmap = true;
-        _weather_map = g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"weather_map.alasset", &setting);
-        auto cloud_shader = g_pResourceMgr->Load<Shader>(L"Shaders/global_volumetric_cloud.alasset");
+        _weather_map = ResourceMgr::Get().Load<Texture2D>(EnginePath::kEngineTexturePathW + L"weather_map.alasset", &setting);
+        auto cloud_shader = ResourceMgr::Get().Load<Shader>(L"Shaders/global_volumetric_cloud.alasset");
         _global_cloud = MakeRef<Material>(cloud_shader.get(), "Runtime/VolumetricClouds");
         _event = ERenderPassEvent::kAfterSkybox;
-        _noise_gen = g_pResourceMgr->Load<ComputeShader>(L"Shaders/volumetric_noise_generator.alasset");
-        _cloud_gen = g_pResourceMgr->Load<ComputeShader>(L"Shaders/volumetric_cloud.alasset");
+        _noise_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/volumetric_noise_generator.alasset");
+        _cloud_gen = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/volumetric_cloud.alasset");
         _cloud_gen->EnableKeyword("_QUALITY_HIGH");
         u16 w = 128, h = w, d = w;
         TextureDesc desc;
@@ -88,8 +88,8 @@ namespace Ailu::Render
         CommandBufferPool::Release(cmd);
         _shape_noise->GenerateMipmap();
         _detail_noise->GenerateMipmap();
-        g_pResourceMgr->RegisterResource(L"Runtime/CloudTex", _shape_noise);
-        _blue_noise = g_pResourceMgr->Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset");
+        ResourceMgr::Get().RegisterResource(L"Runtime/CloudTex", _shape_noise);
+        _blue_noise = ResourceMgr::Get().Load<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset");
         _is_cur_a = true;
     }
     VolumetricCloudsPass::~VolumetricCloudsPass()

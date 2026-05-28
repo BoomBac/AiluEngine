@@ -1,5 +1,10 @@
-guid: 352bbe93-08cc-4780-bacf-2eb126bfba98
-type: Ailu::Render::Texture2D
-name: shader
-  file: Icons/shader.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "352bbe93-08cc-4780-bacf-2eb126bfba98",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "shader"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/shader.png"
+}

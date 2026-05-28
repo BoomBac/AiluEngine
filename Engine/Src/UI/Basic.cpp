@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "UI/Basic.h"
 #include "UI/UIRenderer.h"
 #include "UI/TextRenderer.h"
@@ -717,7 +717,7 @@ namespace Ailu
         {
             if (!_texture_guid.empty())
             {
-                SetTexture(g_pResourceMgr->Load<Texture2D>(Guid(_texture_guid)).get());
+                SetTexture(ResourceMgr::Get().Load<Texture2D>(Guid(_texture_guid)).get());
             }
         }
 #pragma endregion

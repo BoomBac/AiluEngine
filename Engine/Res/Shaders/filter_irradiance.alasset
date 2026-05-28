@@ -1,6 +1,11 @@
-guid: 0d1b35fd-6d5e-4166-aa95-f44e2f8905ed
-type: Ailu::Render::Shader
-name: filter_irradiance
-  file: Shaders/hlsl/filter_irradiance.hlsl
-  vs_entry: VSMain
-  ps_entry: PSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "0d1b35fd-6d5e-4166-aa95-f44e2f8905ed",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "filter_irradiance"
+    },
+    "_file": "Shaders/hlsl/filter_irradiance.hlsl",
+    "_ps_entry": "PSMain",
+    "_vs_entry": "VSMain"
+}

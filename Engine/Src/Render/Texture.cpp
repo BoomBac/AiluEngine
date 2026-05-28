@@ -11,6 +11,207 @@
 
 namespace Ailu::Render
 {
+    namespace
+    {
+        float SRGBToLinear(float value)
+        {
+            if (value <= 0.04045f)
+                return value / 12.92f;
+            return std::pow((value + 0.055f) / 1.055f, 2.4f);
+        }
+
+        Vector3f SRGBToLinear(const Vector3f &value)
+        {
+            return Vector3f(SRGBToLinear(value.x), SRGBToLinear(value.y), SRGBToLinear(value.z));
+        }
+
+        float HalfToFloat(u16 value)
+        {
+            const u32 sign = static_cast<u32>(value & 0x8000u) << 16u;
+            const u32 exponent = (value & 0x7C00u) >> 10u;
+            const u32 mantissa = value & 0x03FFu;
+
+            u32 float_bits = 0u;
+            if (exponent == 0u)
+            {
+                if (mantissa == 0u)
+                {
+                    float_bits = sign;
+                }
+                else
+                {
+                    u32 normalized_mantissa = mantissa;
+                    int normalized_exponent = -1;
+                    while ((normalized_mantissa & 0x0400u) == 0u)
+                    {
+                        normalized_mantissa <<= 1u;
+                        --normalized_exponent;
+                    }
+                    normalized_mantissa &= 0x03FFu;
+                    const u32 float_exponent = static_cast<u32>(normalized_exponent + (127 - 15 + 1));
+                    float_bits = sign | (float_exponent << 23u) | (normalized_mantissa << 13u);
+                }
+            }
+            else if (exponent == 0x1Fu)
+            {
+                float_bits = sign | 0x7F800000u | (mantissa << 13u);
+            }
+            else
+            {
+                const u32 float_exponent = exponent + (127 - 15);
+                float_bits = sign | (float_exponent << 23u) | (mantissa << 13u);
+            }
+
+            float result = 0.0f;
+            memcpy(&result, &float_bits, sizeof(result));
+            return result;
+        }
+
+        template<typename T>
+        T ReadUnaligned(const u8 *data)
+        {
+            T value{};
+            memcpy(&value, data, sizeof(T));
+            return value;
+        }
+
+        bool DecodeTexture2DPixel(const Texture2D &texture, const u8 *pixel_data, Color &color)
+        {
+            if (pixel_data == nullptr)
+                return false;
+
+            using namespace EALGFormat;
+            switch (texture.PixelFormat())
+            {
+            case kALGFormatR8_UNORM:
+            {
+                const float red = static_cast<float>(pixel_data[0]) * (1.0f / 255.0f);
+                color = Color(red, 0.0f, 0.0f, 1.0f);
+                return true;
+            }
+            case kALGFormatR8G8_UNORM:
+            {
+                color = Color(static_cast<float>(pixel_data[0]) * (1.0f / 255.0f), static_cast<float>(pixel_data[1]) * (1.0f / 255.0f), 0.0f, 1.0f);
+                return true;
+            }
+            case kALGFormatR8G8B8A8_UNORM:
+            {
+                color = Color(static_cast<float>(pixel_data[0]) * (1.0f / 255.0f),
+                              static_cast<float>(pixel_data[1]) * (1.0f / 255.0f),
+                              static_cast<float>(pixel_data[2]) * (1.0f / 255.0f),
+                              static_cast<float>(pixel_data[3]) * (1.0f / 255.0f));
+                return true;
+            }
+            case kALGFormatR8G8B8A8_UNORM_SRGB:
+            {
+                const Vector3f linear_rgb = SRGBToLinear(Vector3f(static_cast<float>(pixel_data[0]) * (1.0f / 255.0f),
+                                                                  static_cast<float>(pixel_data[1]) * (1.0f / 255.0f),
+                                                                  static_cast<float>(pixel_data[2]) * (1.0f / 255.0f)));
+                color = Color(linear_rgb.x, linear_rgb.y, linear_rgb.z, static_cast<float>(pixel_data[3]) * (1.0f / 255.0f));
+                return true;
+            }
+            case kALGFormatB8G8R8A8_UNORM:
+            {
+                color = Color(static_cast<float>(pixel_data[2]) * (1.0f / 255.0f),
+                              static_cast<float>(pixel_data[1]) * (1.0f / 255.0f),
+                              static_cast<float>(pixel_data[0]) * (1.0f / 255.0f),
+                              static_cast<float>(pixel_data[3]) * (1.0f / 255.0f));
+                return true;
+            }
+            case kALGFormatB8G8R8A8_UNORM_SRGB:
+            {
+                const Vector3f linear_rgb = SRGBToLinear(Vector3f(static_cast<float>(pixel_data[2]) * (1.0f / 255.0f),
+                                                                  static_cast<float>(pixel_data[1]) * (1.0f / 255.0f),
+                                                                  static_cast<float>(pixel_data[0]) * (1.0f / 255.0f)));
+                color = Color(linear_rgb.x, linear_rgb.y, linear_rgb.z, static_cast<float>(pixel_data[3]) * (1.0f / 255.0f));
+                return true;
+            }
+            case kALGFormatR16_UNORM:
+            {
+                const u16 red = ReadUnaligned<u16>(pixel_data);
+                color = Color(static_cast<float>(red) * (1.0f / 65535.0f), 0.0f, 0.0f, 1.0f);
+                return true;
+            }
+            case kALGFormatR16_FLOAT:
+            {
+                color = Color(HalfToFloat(ReadUnaligned<u16>(pixel_data)), 0.0f, 0.0f, 1.0f);
+                return true;
+            }
+            case kALGFormatR16G16_UNORM:
+            {
+                color = Color(static_cast<float>(ReadUnaligned<u16>(pixel_data + 0u)) * (1.0f / 65535.0f),
+                              static_cast<float>(ReadUnaligned<u16>(pixel_data + sizeof(u16))) * (1.0f / 65535.0f),
+                              0.0f,
+                              1.0f);
+                return true;
+            }
+            case kALGFormatR16G16_FLOAT:
+            {
+                color = Color(HalfToFloat(ReadUnaligned<u16>(pixel_data + 0u)),
+                              HalfToFloat(ReadUnaligned<u16>(pixel_data + sizeof(u16))),
+                              0.0f,
+                              1.0f);
+                return true;
+            }
+            case kALGFormatR16G16B16A16_UNORM:
+            {
+                color = Color(static_cast<float>(ReadUnaligned<u16>(pixel_data + 0u)) * (1.0f / 65535.0f),
+                              static_cast<float>(ReadUnaligned<u16>(pixel_data + sizeof(u16))) * (1.0f / 65535.0f),
+                              static_cast<float>(ReadUnaligned<u16>(pixel_data + sizeof(u16) * 2u)) * (1.0f / 65535.0f),
+                              static_cast<float>(ReadUnaligned<u16>(pixel_data + sizeof(u16) * 3u)) * (1.0f / 65535.0f));
+                return true;
+            }
+            case kALGFormatR16G16B16A16_FLOAT:
+            {
+                color = Color(HalfToFloat(ReadUnaligned<u16>(pixel_data + 0u)),
+                              HalfToFloat(ReadUnaligned<u16>(pixel_data + sizeof(u16))),
+                              HalfToFloat(ReadUnaligned<u16>(pixel_data + sizeof(u16) * 2u)),
+                              HalfToFloat(ReadUnaligned<u16>(pixel_data + sizeof(u16) * 3u)));
+                return true;
+            }
+            case kALGFormatR32_FLOAT:
+            {
+                color = Color(ReadUnaligned<float>(pixel_data), 0.0f, 0.0f, 1.0f);
+                return true;
+            }
+            case kALGFormatR32G32_FLOAT:
+            {
+                color = Color(ReadUnaligned<float>(pixel_data + 0u), ReadUnaligned<float>(pixel_data + sizeof(float)), 0.0f, 1.0f);
+                return true;
+            }
+            case kALGFormatR32G32B32_FLOAT:
+            {
+                color = Color(ReadUnaligned<float>(pixel_data + 0u),
+                              ReadUnaligned<float>(pixel_data + sizeof(float)),
+                              ReadUnaligned<float>(pixel_data + sizeof(float) * 2u),
+                              1.0f);
+                return true;
+            }
+            case kALGFormatR32G32B32A32_FLOAT:
+            {
+                color = Color(ReadUnaligned<float>(pixel_data + 0u),
+                              ReadUnaligned<float>(pixel_data + sizeof(float)),
+                              ReadUnaligned<float>(pixel_data + sizeof(float) * 2u),
+                              ReadUnaligned<float>(pixel_data + sizeof(float) * 3u));
+                return true;
+            }
+            case kALGFormatR10G10B10A2_UNORM:
+            {
+                const u32 packed = ReadUnaligned<u32>(pixel_data);
+                color = Color(static_cast<float>(packed & 0x3FFu) * (1.0f / 1023.0f),
+                              static_cast<float>((packed >> 10u) & 0x3FFu) * (1.0f / 1023.0f),
+                              static_cast<float>((packed >> 20u) & 0x3FFu) * (1.0f / 1023.0f),
+                              static_cast<float>((packed >> 30u) & 0x3u) * (1.0f / 3.0f));
+                return true;
+            }
+            default:
+                break;
+            }
+
+            return false;
+        }
+    }
+
 #pragma region Texture
     //-----------------------------------------------------------------------TextureNew----------------------------------------------------------------------------------
     u16 Texture::MaxMipmapCount(u16 w, u16 h)
@@ -234,19 +435,67 @@ namespace Ailu::Render
     {
         AL_ASSERT(true);
     }
-    Color Texture2D::GetPixel32(u16 x, u16 y)
+    Color Texture2D::GetPixel32(u16 x, u16 y) const
     {
-        return Color();
+        return GetPixel(x, y);
     }
 
-    Color Texture2D::GetPixel(u16 x, u16 y)
+    Color Texture2D::GetPixel(u16 x, u16 y) const
     {
-        return Color();
+        Color color = Colors::kBlack;
+        TryGetPixel(x, y, color);
+        return color;
     }
 
-    Color Texture2D::GetPixelBilinear(float u, float v)
+    Color Texture2D::GetPixelBilinear(float u, float v) const
     {
-        return Color();
+        Color color = Colors::kBlack;
+        TryGetPixelBilinear(u, v, color);
+        return color;
+    }
+
+    bool Texture2D::TryGetPixel(u16 x, u16 y, Color &color) const
+    {
+        if (_pixel_data.empty() || _pixel_data[0] == nullptr || _pixel_size == 0u || x >= _width || y >= _height)
+            return false;
+        if (!_is_data_filled.empty() && !_is_data_filled[0])
+            return false;
+
+        const u8 *pixel_data = _pixel_data[0] + (static_cast<u32>(y) * _width + x) * _pixel_size;
+        return DecodeTexture2DPixel(*this, pixel_data, color);
+    }
+
+    bool Texture2D::TryGetPixelBilinear(float u, float v, Color &color) const
+    {
+        if (_width == 0u || _height == 0u)
+            return false;
+
+        const float x = std::clamp(u, 0.0f, 1.0f) * static_cast<float>(_width - 1u);
+        const float y = std::clamp(v, 0.0f, 1.0f) * static_cast<float>(_height - 1u);
+        const u16 x0 = static_cast<u16>(std::floor(x));
+        const u16 y0 = static_cast<u16>(std::floor(y));
+        const u16 x1 = std::min<u16>(static_cast<u16>(x0 + 1u), static_cast<u16>(_width - 1u));
+        const u16 y1 = std::min<u16>(static_cast<u16>(y0 + 1u), static_cast<u16>(_height - 1u));
+        const float tx = x - static_cast<float>(x0);
+        const float ty = y - static_cast<float>(y0);
+
+        Color c00 = Colors::kBlack;
+        Color c10 = Colors::kBlack;
+        Color c01 = Colors::kBlack;
+        Color c11 = Colors::kBlack;
+        if (!TryGetPixel(x0, y0, c00) ||
+            !TryGetPixel(x1, y0, c10) ||
+            !TryGetPixel(x0, y1, c01) ||
+            !TryGetPixel(x1, y1, c11))
+        {
+            return false;
+        }
+
+        color = c00 * ((1.0f - tx) * (1.0f - ty)) +
+                c10 * (tx * (1.0f - ty)) +
+                c01 * ((1.0f - tx) * ty) +
+                c11 * (tx * ty);
+        return true;
     }
 
     Ptr Texture2D::GetPixelData(u16 mipmap)

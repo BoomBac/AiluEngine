@@ -1,5 +1,10 @@
-guid: b456b5ba-1a04-4e85-9744-ecdf9aee3773
-type: Ailu::Render::Texture2D
-name: camera
-  file: Icons/camera.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "b456b5ba-1a04-4e85-9744-ecdf9aee3773",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "camera"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/camera.png"
+}

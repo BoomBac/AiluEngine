@@ -1,6 +1,11 @@
-guid: 54238902-542d-44ca-9bed-dbe40c90cdcb
-type: Ailu::Render::Shader
-name: wireframe
-  file: Shaders/hlsl/wireframe.hlsl
-  vs_entry: VSMain
-  ps_entry: PSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "54238902-542d-44ca-9bed-dbe40c90cdcb",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "wireframe"
+    },
+    "_file": "Shaders/hlsl/wireframe.hlsl",
+    "_ps_entry": "PSMain",
+    "_vs_entry": "VSMain"
+}

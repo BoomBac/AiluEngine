@@ -1,5 +1,10 @@
-guid: 7dc9d93a-4d0f-4d22-b1f3-f6da63526010
-type: Ailu::Render::ComputeShader
-name: RTXDI
-  file: Shaders/hlsl/ray_trace/RTXDI/rtxdi_main.hlsl
-  kernel: Noname
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "7dc9d93a-4d0f-4d22-b1f3-f6da63526010",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "RTXDI"
+    },
+    "_kernel": "Noname",
+    "_file": "Shaders/hlsl/ray_trace/RTXDI/rtxdi_main.hlsl"
+}

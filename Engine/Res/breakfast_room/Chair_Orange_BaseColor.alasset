@@ -1,5 +1,0 @@
-guid: a8915bd7-4204-486b-92ad-e9841677986b
-type: Ailu::Render::Texture2D
-name: Chair_Orange_BaseColor
-  file: breakfast_room/Chair_Orange_BaseColor.png
-  sRGB: 1

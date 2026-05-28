@@ -597,13 +597,13 @@ namespace Ailu
                     if (Input::IsKeyDownAccurate(EKey::kCONTROL))
                     {
                         LOG_INFO("Save assets...");
-                        g_pThreadTool->Enqueue([]()
+                        Core::ThreadPool::Get().Enqueue([]()
                                                {
                                                    f32 asset_count = 1.0f;
-                                                   for(auto it = g_pResourceMgr->Begin(); it != g_pResourceMgr->End(); it++)
+                                                   for(auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); it++)
                                                    {
-                                                       g_pResourceMgr->SaveAsset(it->second.get());
-                                                       //ImGuiWidget::DisplayProgressBar("SaveAsset...",asset_count / (f32)g_pResourceMgr->AssetNum());
+                                                       ResourceMgr::Get().SaveAsset(it->second.get());
+                                                       //ImGuiWidget::DisplayProgressBar("SaveAsset...",asset_count / (f32)ResourceMgr::Get().AssetNum());
                                                        asset_count += 1.0;
                                                    } });
                     }
@@ -773,15 +773,15 @@ namespace Ailu
             ImGui::Begin("ThreadPoolView", is_show);
             if (ImGui::Button("Capture"))
             {
-                s_foucs_records = g_pThreadTool->TaskTimeRecordView();
+                s_foucs_records = Core::ThreadPool::Get().TaskTimeRecordView();
                 s_foucs_record = !s_foucs_record;
             }
-            for (u16 i = 0; i < g_pThreadTool->ThreadNum(); i++)
+            for (u16 i = 0; i < Core::ThreadPool::Get().ThreadNum(); i++)
             {
                 ImGui::Text("Thread %d", i);
                 ImGui::Indent();
-                ImGui::Text("ThreadStatus: %s", Core::EThreadStatus::ToString(g_pThreadTool->Status(i)));
-                const auto &records = s_foucs_record ? s_foucs_records[i] : g_pThreadTool->TaskTimeRecord(i);
+                ImGui::Text("ThreadStatus: %s", Core::EThreadStatus::ToString(Core::ThreadPool::Get().Status(i)));
+                const auto &records = s_foucs_record ? s_foucs_records[i] : Core::ThreadPool::Get().TaskTimeRecord(i);
                 if (records.size() > 0)
                 {
                     u16 record_index = 0;
@@ -1037,9 +1037,9 @@ namespace Ailu
             ImGui::Checkbox("Postprocess", &Camera::sCurrent->_is_enable_postprocess);
             //ImGui::Checkbox("UseRenderGraph", &RenderPipeline::Get().GetRenderer()->_is_use_render_graph);
 
-            // for (auto &info: g_pResourceMgr->GetImportInfos())
+            // for (auto &info: ResourceMgr::Get().GetImportInfos())
             // {
-            //     float x = g_pTimeMgr->GetScaledWorldTime(0.25f);
+            //     float x = TimeMgr::Get().GetScaledWorldTime(0.25f);
             //     ImGui::Text("%s", info._msg.c_str());
             //     ImGui::SameLine();
             //     ImGui::ProgressBar(x - static_cast<int>(x), ImVec2(0.f, 0.f));

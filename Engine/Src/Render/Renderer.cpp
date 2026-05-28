@@ -356,8 +356,8 @@ namespace Ailu::Render
         _target_tex = g_pRenderTexturePool->Get(_rendering_data._camera_color_target_handle);
         Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerScene, _cur_fs->GetSceneCB(s.HashCode()));
         Shader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cur_fs->GetCameraCB(cam.HashCode()));
-        Shader::SetGlobalTexture("_LTC_Lut1", g_pResourceMgr->Get<Texture2D>(L"Runtime/ltc_lut1"));
-        Shader::SetGlobalTexture("_LTC_Lut2", g_pResourceMgr->Get<Texture2D>(L"Runtime/ltc_lut2"));
+        Shader::SetGlobalTexture("_LTC_Lut1", ResourceMgr::Get().Get<Texture2D>(L"Runtime/ltc_lut1"));
+        Shader::SetGlobalTexture("_LTC_Lut2", ResourceMgr::Get().Get<Texture2D>(L"Runtime/ltc_lut2"));
         ComputeShader::SetGlobalBuffer(RenderConstants::kCBufNamePerScene, _cur_fs->GetSceneCB(s.HashCode()));
         ComputeShader::SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, _cur_fs->GetCameraCB(cam.HashCode()));
         {
@@ -545,7 +545,7 @@ namespace Ailu::Render
                                                     1.0f / QuailtySetting::s_shadow_fade_out_factor, 1.0f / cascade_shaodw_max_dis, 0.f);
         scene_data->g_IndirectLightingIntensity = s._light_data._indirect_lighting_intensity;
         PrepareLight(s);
-        f32 t = g_pTimeMgr->TickTimeSinceLoad, dt = g_pTimeMgr->s_delta_time, sdt = g_pTimeMgr->s_smooth_delta_time;
+        f32 t = TimeMgr::Get().TickTimeSinceLoad, dt = TimeMgr::Get().s_delta_time, sdt = TimeMgr::Get().s_smooth_delta_time;
         scene_data->_Time = Vector4f(t / 20, t, t * 2, (f32) g_pGfxContext->GetFrameCount());
         scene_data->_SinTime = Vector4f(sin(t / 8), sin(t / 4), sin(t / 2), sin(t));
         scene_data->_CosTime = Vector4f(cos(t / 8), cos(t / 4), cos(t / 2), cos(t));

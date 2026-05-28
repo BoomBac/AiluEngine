@@ -1,4 +1,4 @@
-#include "Render/Features/VolumetricFog.h"
+﻿#include "Render/Features/VolumetricFog.h"
 #include "Render/Renderer.h"
 #include "Render/CommandBuffer.h"
 #include "Render/RenderGraph/RenderGraph.h"
@@ -12,7 +12,7 @@ namespace Ailu
         VolumetricFogPass::VolumetricFogPass()
         {
             _event = ERenderPassEvent::kAfterDeferedLighting;
-            _debug_material = MakeRef<Material>(g_pResourceMgr->Load<Shader>(L"Shaders/voxel_drawer.alasset").get(), "VolumeRayDebugLineMat");
+            _debug_material = MakeRef<Material>(ResourceMgr::Get().Load<Shader>(L"Shaders/voxel_drawer.alasset").get(), "VolumeRayDebugLineMat");
             _debug_material->SetVector("_GridNum", Vector4Int(8,8,8,0));
         }
         VolumetricFogPass::~VolumetricFogPass()
@@ -154,8 +154,8 @@ namespace Ailu
             _volumetric_light_b->Name("VolumetricLightTextureB");
             _volumetric_light_b->Apply();
             _volumetric_light_b->CreateView();
-            _volumetric_fog_cs = g_pResourceMgr->Load<ComputeShader>(L"Shaders/volumetric_light.alasset");
-            _max_z_cs = g_pResourceMgr->Load<ComputeShader>(L"Shaders/max_z.alasset");
+            _volumetric_fog_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/volumetric_light.alasset");
+            _max_z_cs = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/max_z.alasset");
             _accum_texture = Texture3D::Create(desc);
             _accum_texture->Name("VolumetricFogAccumTexture");
             _accum_texture->Apply();
@@ -165,7 +165,7 @@ namespace Ailu
             _volumetric_fog_cs->SetBool("_temporal_reprojection", _temporal_reprojection);
             _volumetric_fog_cs->SetFloat("_intensity", _intensity);
             _volumetric_fog_cs->SetFloat("_g", _g);
-            _volumetric_fog_cs->SetTexture("_BlueNoise", g_pResourceMgr->Get<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset"));
+            _volumetric_fog_cs->SetTexture("_BlueNoise", ResourceMgr::Get().Get<Texture2D>(EnginePath::kEngineTexturePathW + L"blue_noise.alasset"));
             _volumetric_fog_pass->_volumetric_fog = _volumetric_fog_cs.get();
             _volumetric_fog_pass->_max_z_cs = _max_z_cs.get();
             _volumetric_fog_pass->_voxel_num = _voxel_num;

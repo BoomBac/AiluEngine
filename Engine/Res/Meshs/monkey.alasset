@@ -1,6 +1,11 @@
-guid: 7baa598b-7eb4-478d-91ae-bf758da25d3b
-type: Ailu::Render::Mesh
-name: Monkey
-file: Meshs/src_res/monkey.fbx
-inner_file_name: Monkey
-is_combine_mesh: false
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "7baa598b-7eb4-478d-91ae-bf758da25d3b",
+        "_asset_type": "Ailu::Render::Mesh",
+        "_asset_name": "Monkey"
+    },
+    "_file": "Meshs/src_res/monkey.fbx",
+    "_inner_file_name": "Monkey",
+    "_is_combine_mesh": false
+}

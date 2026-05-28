@@ -19,6 +19,7 @@ namespace Ailu
 		~AnimationClip() override = default;
         //特定轨道索引的关节标识
         u16 GetIdAtIndex(u32 index) const;
+        const TransformTrack& GetTrackAtIndex(u32 index) const { return _tracks[index]; }
         void SetIdAtIndex(u32 index, u32 id);
         //包含的关节数量
         [[nodiscard]] u32 Size() const;
@@ -37,10 +38,13 @@ namespace Ailu
 		[[nodiscard]] f32 FrameRate() const { return _frame_rate; }
         void FrameRate(f32 frame_rate) { _frame_rate = frame_rate; }
         [[nodiscard]] f32 FrameDuration() const { return _frame_duration;}
+        void FrameDuration(f32 frame_duration) { _frame_duration = frame_duration; }
         [[nodiscard]] bool IsLooping() const { return _is_looping; }
         void IsLooping(bool is_looping) { _is_looping = is_looping; };
         [[nodiscard]] f32 GetStartTime() const { return _start_time; }
+        void StartTime(f32 start_time) { _start_time = start_time; }
         [[nodiscard]] f32 GetEndTime() const { return _end_time; }
+        void EndTime(f32 end_time) { _end_time = end_time; }
         [[nodiscard]] f32 GetNormalizedTime(f32 in_time) const;
     private:
         f32 AdjustTimeToFitRange(f32 in_time) const;

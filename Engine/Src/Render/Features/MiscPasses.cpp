@@ -1,4 +1,4 @@
-#include "Render/Features/MiscPasses.h"
+﻿#include "Render/Features/MiscPasses.h"
 #include "Render/CommandBuffer.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -9,7 +9,7 @@ namespace Ailu
     {
         VolumeTexturePreviewPass::VolumeTexturePreviewPass()
         {
-            _slice_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/texture3d_drawer.alasset"), "Runtime/VolumeSliceView");
+            _slice_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/texture3d_drawer.alasset"), "Runtime/VolumeSliceView");
             _slice_mat->EnableKeyword("_DrawMode_Slice");
         }
         VolumeTexturePreviewPass::~VolumeTexturePreviewPass()

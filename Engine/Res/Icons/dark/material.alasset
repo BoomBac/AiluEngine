@@ -1,5 +1,10 @@
-guid: ef3ed829-387b-4013-8492-95e574d5e949
-type: Ailu::Render::Texture2D
-name: material
-  file: Icons/dark/material.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "ef3ed829-387b-4013-8492-95e574d5e949",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "material"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/dark/material.png"
+}

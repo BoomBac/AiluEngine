@@ -1,4 +1,4 @@
-#include "Scene/Scene.h"
+﻿#include "Scene/Scene.h"
 #include "Animation/AnimationSystem.h"
 #include "Framework/Common/Application.h"
 #include "Framework/Common/Profiler.h"
@@ -673,7 +673,7 @@ namespace Ailu::SceneManagement
             _p_current = it->second.get();
             return it->second;
         }
-        auto s = g_pResourceMgr->Load<Scene>(scene_path);
+        auto s = ResourceMgr::Get().Load<Scene>(scene_path);
         _all_scene[scene_path] = s;
         _p_current = s.get();
         return s;
@@ -682,14 +682,14 @@ namespace Ailu::SceneManagement
         //{
         //    Ref<Scene> default_scene = MakeRef<Scene>("DefaultScene");
         //    auto p = default_scene->AddObject("empty");
-        //    auto child1 = default_scene->AddObject(g_pResourceMgr->GetRef<Mesh>(L"Meshs/plane.alasset"), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR.alasset"));
+        //    auto child1 = default_scene->AddObject(ResourceMgr::Get().GetRef<Mesh>(L"Meshs/plane.alasset"), ResourceMgr::Get().GetRef<Material>(L"Materials/StandardPBR.alasset"));
         //    default_scene->Attach(child1, p);
         //    {
         //        auto &comp = default_scene->GetRegister().AddComponent<LightComponent>(default_scene->AddObject("directional_light"));
         //        comp._type = ELightType::kDirectional;
         //        comp._light._light_color = Colors::kWhite;
         //    }
-        //    auto cube = default_scene->AddObject(Mesh::s_cube.lock(), g_pResourceMgr->GetRef<Material>(L"Materials/StandardPBR.alasset"));
+        //    auto cube = default_scene->AddObject(Mesh::s_cube.lock(), ResourceMgr::Get().GetRef<Material>(L"Materials/StandardPBR.alasset"));
         //    default_scene->GetRegister().GetComponent<TagComponent>(cube)->_name = "cube";
         //    _all_scene.push_back(std::move(default_scene));
         //    _all_scene

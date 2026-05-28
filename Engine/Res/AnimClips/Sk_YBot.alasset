@@ -1,5 +1,11 @@
-guid: 7f0dc87f-001c-4dfd-8f3c-f6aca6fdc32f
-type: Ailu::Render::SkeletonMesh
-name: Sk_YBot
-file: AnimClips/Walking.fbx
-inner_file_name: Alpha_Surface
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "7f0dc87f-001c-4dfd-8f3c-f6aca6fdc32f",
+        "_asset_type": "Ailu::Render::SkeletonMesh",
+        "_asset_name": "Sk_YBot"
+    },
+    "_file": "AnimClips/Walking.fbx",
+    "_inner_file_name": "Alpha_Surface",
+    "_is_combine_mesh": false
+}

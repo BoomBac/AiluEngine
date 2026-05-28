@@ -40,9 +40,6 @@ using namespace Ailu::Render;
 namespace Ailu
 {
 #define BIND_EVENT_HANDLER(f) std::bind(&Application::f, this, std::placeholders::_1)
-    TimeMgr *g_pTimeMgr = new TimeMgr();
-    ResourceMgr *g_pResourceMgr = new ResourceMgr();
-    Scope<Core::ThreadPool> g_pThreadTool = MakeScope<Core::ThreadPool>(6u, "GlobalThreadPool");
 
     namespace
     {
@@ -132,8 +129,9 @@ namespace Ailu
         Enum::InitTypeInfo();
         Core::Allocator::Init();
         _raw_event_queue = MakeScope<Core::RawEventQueue>();
-        g_pTimeMgr->Initialize();
-        g_pTimeMgr->Mark();
+        TimeMgr::Init();
+        TimeMgr::Get().Initialize();
+        TimeMgr::Get().Mark();
         sp_instance = this;
         LogMgr::Get().AddAppender(new FileAppender());
         //Load ini
@@ -156,12 +154,14 @@ namespace Ailu
         //初始化imgui gfx时要求imgui window已经初始化
         _p_imgui_layer = new ImGUILayer();
 #endif// DEAR_IMGUI
-        JobSystem::Init(6u);
+    Core::ThreadPool::Init(6u, "GlobalThreadPool");
+    JobSystem::Init(6u);
         GraphicsContext::InitGlobalContext();
         GraphicsContext::Get().RegisterWindow(_p_window.get());
         RenderTexture::s_backbuffer = RenderTexture::WindowBackBuffer(&Application::Get().GetWindow());
         g_pGfxContext->ResizeSwapChain(_p_window->GetNativeWindowPtr(), desc._window_width, desc._window_height);
-        g_pResourceMgr->Initialize();
+        ResourceMgr::Init();
+        ResourceMgr::Get().Initialize();
         ScriptSystem::Get().Initialize();
         Gizmo::Initialize();
         UI::UIManager::Init();
@@ -177,7 +177,7 @@ namespace Ailu
         _render_lag = s_target_lag;
         _update_lag = s_target_lag;
         _is_handling_event.store(true);
-        LOG_INFO("Application Initialize Success with {} s", 0.001f * g_pTimeMgr->GetElapsedSinceLastMark());
+        LOG_INFO("Application Initialize Success with {} s", 0.001f * TimeMgr::Get().GetElapsedSinceLastMark());
         _before_update += []()
         {
             Profiler::Get().BeginFrame();
@@ -185,7 +185,7 @@ namespace Ailu
         _after_update += [this]()
         {
             Profiler::Get().EndFrame();
-            g_pThreadTool->ClearRecords();
+            Core::ThreadPool::Get().ClearRecords();
             _frame_count++;
         };
         return 0;
@@ -203,12 +203,13 @@ namespace Ailu
         Gizmo::Shutdown();
         SceneManagement::SceneMgr::Shutdown();
         ScriptSystem::Get().Finalize();
-        g_pResourceMgr->Finalize();
-        DESTORY_PTR(g_pResourceMgr);
+        ResourceMgr::Get().Finalize();
+        ResourceMgr::Shutdown();
         GraphicsContext::Get().UnRegisterWindow(_p_window.get());
         GraphicsContext::FinalizeGlobalContext();
-        g_pTimeMgr->Finalize();
-        DESTORY_PTR(g_pTimeMgr);
+        Core::ThreadPool::Shutdown();
+        TimeMgr::Get().Finalize();
+        TimeMgr::Shutdown();
         JobSystem::Shutdown();
         ObjectRegister::Shutdown();
         Core::Allocator::Get().PrintLeaks();
@@ -217,7 +218,7 @@ namespace Ailu
 
     void Application::Tick(f32 delta_time)
     {
-        g_pTimeMgr->Reset();
+        TimeMgr::Get().Reset();
 #if defined(SEPARATE_LOGIC_THREAD)
         std::thread logic_thread = std::thread([&]()
                                                {
@@ -349,7 +350,7 @@ namespace Ailu
     bool Application::OnWindowMinimize(WindowMinimizeEvent &e)
     {
         _state = EApplicationState::EApplicationState_Pause;
-        g_pTimeMgr->Reset();
+        TimeMgr::Get().Reset();
         LOG_WARNING("Application state: {}", EApplicationState::ToString(_state))
         return false;
     }
@@ -367,11 +368,11 @@ namespace Ailu
     {
         if (e.IsBegin())
         {
-            g_pTimeMgr->Pause();
+            TimeMgr::Get().Pause();
         }
         else
         {
-            g_pTimeMgr->Resume();
+            TimeMgr::Get().Resume();
         }
         return true;
     }
@@ -497,12 +498,12 @@ namespace Ailu
             return;
         }
         _before_update_delegate.Invoke();
-        auto last_mark = g_pTimeMgr->GetElapsedSinceLastMark();
-        g_pTimeMgr->Tick(last_mark);
+        auto last_mark = TimeMgr::Get().GetElapsedSinceLastMark();
+        TimeMgr::Get().Tick(last_mark);
         _render_lag += last_mark;
         _update_lag += last_mark;
         Input::BeginFrame();
-        g_pTimeMgr->Mark();
+        TimeMgr::Get().Mark();
         {
             CPUProfileBlock main_b("Application::Tick");
             {
@@ -556,7 +557,7 @@ namespace Ailu
 #endif
                 //if (_update_lag >= s_target_lag)
                 {
-                    g_pResourceMgr->Tick(delta_time);
+                    ResourceMgr::Get().Tick(delta_time);
                     for (Layer *layer: *_layer_stack)
                     {
                         //layer->OnUpdate((f32)(_update_lag / s_target_lag));

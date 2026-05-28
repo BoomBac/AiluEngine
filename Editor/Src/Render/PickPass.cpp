@@ -1,4 +1,4 @@
-#include "Render/PickPass.h"
+﻿#include "Render/PickPass.h"
 #include "Common/Selection.h"
 #include "Framework/Common/Profiler.h"
 #include "Render/CommandBuffer.h"
@@ -15,9 +15,9 @@ namespace Ailu
         using SceneManagement::SceneMgr;
         PickPass::PickPass() : RenderPass("PickPass")
         {
-            _pick_gen = MakeScope<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/pick_buffer.hlsl"), "Runtime/PickGen");
-            _select_gen = MakeScope<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/select_buffer.hlsl"), "Runtime/SelectGen");
-            _editor_outline = MakeScope<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/editor_outline.hlsl"), "Runtime/EditorOutline");
+            _pick_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/pick_buffer.hlsl"), "Runtime/PickGen");
+            _select_gen = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/select_buffer.hlsl"), "Runtime/SelectGen");
+            _editor_outline = MakeScope<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/editor_outline.hlsl"), "Runtime/EditorOutline");
             _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kAfterPostprocess - 1);//before gizmo pass
         }
         PickPass::~PickPass()
@@ -30,13 +30,13 @@ namespace Ailu
         }
         void PickPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
         {
-            static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
-            static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
-            static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
-            static auto mat_area_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard");
-            static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
-            static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
-            static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
+            static auto mat_point_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/PointLightBillboard");
+            static auto mat_directional_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
+            static auto mat_spot_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/SpotLightBillboard");
+            static auto mat_area_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/AreaLightBillboard");
+            static auto mat_camera = ResourceMgr::Get().Get<Material>(L"Runtime/Material/CameraBillboard");
+            static auto mat_gird_plane = ResourceMgr::Get().Get<Material>(L"Runtime/Material/GridPlane");
+            static auto mat_lightprobe = ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard");
             graph.AddPass("PickBuffer", RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                           {
                                      _color_handle = builder.Import(_color);
@@ -209,13 +209,13 @@ namespace Ailu
         }
         void PickPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
         {
-            static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
-            static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
-            static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
-            static auto mat_area_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard");
-            static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
-            static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
-            static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
+            static auto mat_point_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/PointLightBillboard");
+            static auto mat_directional_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
+            static auto mat_spot_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/SpotLightBillboard");
+            static auto mat_area_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/AreaLightBillboard");
+            static auto mat_camera = ResourceMgr::Get().Get<Material>(L"Runtime/Material/CameraBillboard");
+            static auto mat_gird_plane = ResourceMgr::Get().Get<Material>(L"Runtime/Material/GridPlane");
+            static auto mat_lightprobe = ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard");
 
             auto cmd = CommandBufferPool::Get(_name);
             {

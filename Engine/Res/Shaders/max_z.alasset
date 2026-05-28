@@ -1,5 +1,10 @@
-guid: 6d1148fb-00a4-4720-8ca0-7dd877b0da55
-type: Ailu::Render::ComputeShader
-name: MaxZ
-  file: Shaders/hlsl/Compute/max_z.hlsl
-  kernel: Noname
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "6d1148fb-00a4-4720-8ca0-7dd877b0da55",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "MaxZ"
+    },
+    "_kernel": "Noname",
+    "_file": "Shaders/hlsl/Compute/max_z.hlsl"
+}

@@ -1,6 +1,8 @@
 #include "Common/EditorPopup.h"
 
+#include "UI/Widget.h"
 #include "UI/UIFramework.h"
+#include "Framework/Common/KeyCode.h"
 
 namespace Ailu
 {

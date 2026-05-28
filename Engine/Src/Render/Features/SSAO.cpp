@@ -1,4 +1,4 @@
-#include "Render/Features/SSAO.h"
+﻿#include "Render/Features/SSAO.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
@@ -28,8 +28,8 @@ namespace Ailu::Render
     #pragma region SSAOPass
     SSAOPass::SSAOPass() : RenderPass("SSAOPass")
     {
-        _ssao_computer = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/ssao_cs.alasset");
-        _ssao_gen = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/ssao.hlsl"), "Runtime/SSAOGen");
+        _ssao_computer = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/ssao_cs.alasset");
+        _ssao_gen = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/ssao.hlsl"), "Runtime/SSAOGen");
         _event = ERenderPassEvent::kBeforeDeferedLighting;
     }
     SSAOPass::~SSAOPass()

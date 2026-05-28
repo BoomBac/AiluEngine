@@ -1,6 +1,11 @@
-guid: 266fceb5-389b-4a08-892c-1e9b2f58d83f
-type: Ailu::Render::Shader
-name: default_text
-  file: Shaders/hlsl/default_text.hlsl
-  vs_entry: VSMain
-  ps_entry: PSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "266fceb5-389b-4a08-892c-1e9b2f58d83f",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "default_text"
+    },
+    "_file": "Shaders/hlsl/default_text.hlsl",
+    "_ps_entry": "PSMain",
+    "_vs_entry": "VSMain"
+}

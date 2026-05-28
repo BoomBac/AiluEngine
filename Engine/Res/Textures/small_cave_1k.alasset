@@ -1,5 +1,10 @@
-guid: cffbfce1-eb20-4319-aa0e-20a68eb19f22
-type: Ailu::Render::Texture2D
-name: small_cave_1k
-  file: Textures/small_cave_1k.hdr
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "cffbfce1-eb20-4319-aa0e-20a68eb19f22",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "small_cave_1k"
+    },
+    "_is_srgb": true,
+    "_file": "Textures/small_cave_1k.hdr"
+}

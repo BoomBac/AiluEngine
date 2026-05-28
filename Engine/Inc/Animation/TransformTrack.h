@@ -15,8 +15,11 @@ namespace Ailu
         [[nodiscard]] u16 GetId() const;
         void SetId(u16 id);
         VectorTrack& GetPositionTrack();
+        const VectorTrack& GetPositionTrack() const;
         QuaternionTrack& GetRotationTrack();
+        const QuaternionTrack& GetRotationTrack() const;
         VectorTrack& GetScaleTrack();
+        const VectorTrack& GetScaleTrack() const;
         f32 GetStartTime();
         f32 GetEndTime();
         bool IsValid();

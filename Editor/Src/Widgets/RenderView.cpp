@@ -1,4 +1,4 @@
-#include "Widgets/RenderView.h"
+﻿#include "Widgets/RenderView.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "Render/Camera.h"
@@ -207,7 +207,7 @@ namespace Ailu
                 Vector<Ref<Render::Material>> mats;
                 for (u16 i = 0; i < _drag_preview_mesh->SubmeshCount(); i++)
                 {
-                    auto mat = g_pResourceMgr->GetEmbeddedMaterial(_drag_preview_mesh.get(), i);
+                    auto mat = ResourceMgr::Get().GetEmbeddedMaterial(_drag_preview_mesh.get(), i);
                     mats.push_back(mat? mat : Render::Material::s_checker.lock());
                 }
                 auto new_entity = SceneMgr::Get().ActiveScene()->AddObject(_drag_preview_mesh, mats);

@@ -1,4 +1,4 @@
-#include "Render/Features/TemporalAA.h"
+﻿#include "Render/Features/TemporalAA.h"
 #include "Render/CommandBuffer.h"
 #include "pch.h"
 
@@ -14,7 +14,7 @@ namespace Ailu::Render
     {
         _prepare_pass._event = ERenderPassEvent::kBeforeGbuffer;
         _execute_pass._event = ERenderPassEvent::kBeforePostprocess;
-        _taa = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/taa.hlsl"), "Runtime/TAA");
+        _taa = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/taa.hlsl"), "Runtime/TAA");
     };
 
     TemporalAA::~TemporalAA()
@@ -102,7 +102,7 @@ namespace Ailu::Render
     TAAExecutePass::TAAExecutePass() : RenderPass("TAAExecutePass")
     {
         _origin_camera_cbuf = std::unique_ptr<ConstantBuffer>(ConstantBuffer::Create(RenderConstants::kPerCameraDataSize));
-        _taa_gen = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/taa.alasset");
+        _taa_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/taa.alasset");
     }
     void TAAExecutePass::Setup(Matrix4x4f pre_matrix, Matrix4x4f cur_matrix, Material *taa_mat, int camera_hash, Vector2f jitter,Vector4f params,Vector4f quality)
     {

@@ -1,5 +1,11 @@
-guid: 0f97befc-6131-4cd1-a041-c56ce694dce9
-type: Ailu::Render::SkeletonMesh
-name: Cylinder
-file: AnimClips/anim.fbx
-inner_file_name: Cylinder
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "0f97befc-6131-4cd1-a041-c56ce694dce9",
+        "_asset_type": "Ailu::Render::SkeletonMesh",
+        "_asset_name": "Cylinder"
+    },
+    "_file": "AnimClips/anim.fbx",
+    "_inner_file_name": "Cylinder",
+    "_is_combine_mesh": false
+}

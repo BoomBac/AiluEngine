@@ -1,5 +1,10 @@
-guid: 094a838b-c1fe-4d9b-a05b-a5df05378c96
-type: Ailu::Render::Texture2D
-name: scene
-  file: Icons/dark/scene.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "094a838b-c1fe-4d9b-a05b-a5df05378c96",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "scene"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/dark/scene.png"
+}

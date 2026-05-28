@@ -1,5 +1,10 @@
-guid: 012efc02-825c-42e9-b512-35c19e7eb1db
-type: Ailu::Render::Texture2D
-name: light_probe
-  file: Icons/light_probe.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "012efc02-825c-42e9-b512-35c19e7eb1db",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "light_probe"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/light_probe.png"
+}

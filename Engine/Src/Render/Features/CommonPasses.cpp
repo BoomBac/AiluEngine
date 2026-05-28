@@ -1,4 +1,4 @@
-#include "Render/Features/CommonPasses.h"
+﻿#include "Render/Features/CommonPasses.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Buffer.h"
@@ -84,10 +84,10 @@ namespace Ailu::Render
     //-------------------------------------------------------------OpaqueRenderPass-------------------------------------------------------------
     ForwardPass::ForwardPass() : RenderPass("TransparentPass")
     {
-        shader_state_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/debug.hlsl"), "ShaderStateDebug");
+        shader_state_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/debug.hlsl"), "ShaderStateDebug");
         _error_shader_pass_id = 0;
         _compiling_shader_pass_id = 1;
-        _forward_lit_shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
+        _forward_lit_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/forwardlit.alasset");
         AL_ASSERT(_forward_lit_shader != nullptr);
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeTransparent + 25u);
     }
@@ -519,9 +519,9 @@ namespace Ailu::Render
         _prefilter_cubemap->_load_action = ELoadStoreAction::kNotCare;
         _radiance_map = RenderTexture::Create(size / 4, src_tex->Name() + "_radiance", ERenderTargetFormat::kDefaultHDR, false);
         _radiance_map->_load_action = ELoadStoreAction::kNotCare;
-        _p_gen_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/CubemapGen");
+        _p_gen_material = ResourceMgr::Get().Get<Material>(L"Runtime/Material/CubemapGen");
         _p_gen_material->SetTexture("env", src_tex);
-        _p_filter_material = g_pResourceMgr->Get<Material>(L"Runtime/Material/EnvmapFilter");
+        _p_filter_material = ResourceMgr::Get().Get<Material>(L"Runtime/Material/EnvmapFilter");
         Matrix4x4f view, proj;
         BuildPerspectiveFovLHMatrix(proj, 90 * k2Radius, 1.0f, 0.01f, 100.f);
         //BuildPerspectiveFovLHMatrix(proj, 2.0 * atan((f32)size / ((f32)size - 0.5)), 1.0, 1.0, 100000);
@@ -559,7 +559,7 @@ namespace Ailu::Render
         for (f32 i = 0.0f; i < mipmap_level; i++)
         {
             u16 cur_mipmap_size = size >> (u16) i;
-            _reflection_prefilter_mateirals.emplace_back(MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/filter_irradiance.alasset"), "ReflectionPrefilter"));
+            _reflection_prefilter_mateirals.emplace_back(MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/filter_irradiance.alasset"), "ReflectionPrefilter"));
             _reflection_prefilter_mateirals.back()->SetFloat("_roughness", i / mipmap_level);
             _reflection_prefilter_mateirals.back()->SetFloat("_width", cur_mipmap_size);
             //_reflection_prefilter_mateirals.back()->SetTexture("SrcTex", ToWChar(src_texture_name));
@@ -814,8 +814,8 @@ namespace Ailu::Render
     //-------------------------------------------------------------DeferedLightingPass-------------------------------------------------------------
     DeferredLightingPass::DeferredLightingPass() : RenderPass("DeferredLightingPass")
     {
-        _p_lighting_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/deferred_lighting.alasset"), "DeferedGbufferLighting");
-        _brdf_lut = g_pResourceMgr->Load<Texture2D>(L"Textures/ibl_brdf_lut.alasset");
+        _p_lighting_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/deferred_lighting.alasset"), "DeferedGbufferLighting");
+        _brdf_lut = ResourceMgr::Get().Load<Texture2D>(L"Textures/ibl_brdf_lut.alasset");
         _event = (ERenderPassEvent::ERenderPassEvent)(ERenderPassEvent::kBeforeDeferedLighting + 25u);
     }
 
@@ -883,7 +883,7 @@ namespace Ailu::Render
     SkyboxPass::SkyboxPass() : RenderPass("SkyboxPass")
     {
         _p_lut_gen = ComputeShader::Create(ResourceMgr::GetResSysPath(L"Shaders/hlsl/Compute/atmosphere_lut_gen.hlsl"));
-        _p_skybox_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
+        _p_skybox_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/skybox.alasset"), "Skybox");
         Matrix4x4f world_mat;
         MatrixScale(world_mat, 1000000.f, 1000000.f, 1000000.f);
         _p_cbuffer.reset(ConstantBuffer::Create(RenderConstants::kPerObjectDataSize));
@@ -1060,13 +1060,13 @@ namespace Ailu::Render
 
     void Ailu::Render::GizmoPass::OnRecordRenderGraph(RDG::RenderGraph &graph, RenderingData &rendering_data)
     {
-        static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
-        static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
-        static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
-        static auto mat_area_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard");
-        static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
-        static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
-        static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
+        static auto mat_point_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/PointLightBillboard");
+        static auto mat_directional_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
+        static auto mat_spot_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/SpotLightBillboard");
+        static auto mat_area_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/AreaLightBillboard");
+        static auto mat_camera = ResourceMgr::Get().Get<Material>(L"Runtime/Material/CameraBillboard");
+        static auto mat_gird_plane = ResourceMgr::Get().Get<Material>(L"Runtime/Material/GridPlane");
+        static auto mat_lightprobe = ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard");
         graph.AddPass(_name, RDG::PassDesc(), [&](RDG::RenderGraphBuilder &builder)
                 { 
                     builder.Read(rendering_data._rg_handles._color_target);
@@ -1150,13 +1150,13 @@ namespace Ailu::Render
     void GizmoPass::Execute(GraphicsContext *context, RenderingData &rendering_data)
     {
         auto cmd = CommandBufferPool::Get("GizmoPass");
-        static auto mat_point_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/PointLightBillboard");
-        static auto mat_directional_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
-        static auto mat_spot_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/SpotLightBillboard");
-        static auto mat_area_light = g_pResourceMgr->Get<Material>(L"Runtime/Material/AreaLightBillboard");
-        static auto mat_camera = g_pResourceMgr->Get<Material>(L"Runtime/Material/CameraBillboard");
-        static auto mat_gird_plane = g_pResourceMgr->Get<Material>(L"Runtime/Material/GridPlane");
-        static auto mat_lightprobe = g_pResourceMgr->Get<Material>(L"Runtime/Material/LightProbeBillboard");
+        static auto mat_point_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/PointLightBillboard");
+        static auto mat_directional_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/DirectionalLightBillboard");
+        static auto mat_spot_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/SpotLightBillboard");
+        static auto mat_area_light = ResourceMgr::Get().Get<Material>(L"Runtime/Material/AreaLightBillboard");
+        static auto mat_camera = ResourceMgr::Get().Get<Material>(L"Runtime/Material/CameraBillboard");
+        static auto mat_gird_plane = ResourceMgr::Get().Get<Material>(L"Runtime/Material/GridPlane");
+        static auto mat_lightprobe = ResourceMgr::Get().Get<Material>(L"Runtime/Material/LightProbeBillboard");
         cmd->Clear();
         {
             Vector4f axis[3];
@@ -1251,10 +1251,10 @@ namespace Ailu::Render
 #pragma region CopyColorPass
     CopyColorPass::CopyColorPass() : RenderPass("CopyColor")
     {
-        _p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
+        _p_blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
         _p_obj_cb = ConstantBuffer::Create(256);
         memcpy(_p_obj_cb->GetData(), &BuildIdentityMatrix(), sizeof(Matrix4x4f));
-        _p_quad_mesh = g_pResourceMgr->Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
+        _p_quad_mesh = ResourceMgr::Get().Get<Mesh>(L"Runtime/Mesh/FullScreenQuad");
         _event = ERenderPassEvent::kAfterTransparent;
     }
     CopyColorPass::~CopyColorPass()
@@ -1298,7 +1298,7 @@ namespace Ailu::Render
     //-------------------------------------------------------------CopyDepthPass-------------------------------------------------------------
     CopyDepthPass::CopyDepthPass() : RenderPass("CopyDepthPass")
     {
-        _p_blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
+        _p_blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
         _event = ERenderPassEvent::kAfterGbuffer;
     }
     CopyDepthPass::~CopyDepthPass()
@@ -1345,7 +1345,7 @@ namespace Ailu::Render
     WireFramePass::WireFramePass() : RenderPass("WireFramePass")
     {
 
-        _wireframe_mat = g_pResourceMgr->GetRef<Material>(L"Runtime/Material/Wireframe");
+        _wireframe_mat = ResourceMgr::Get().GetRef<Material>(L"Runtime/Material/Wireframe");
         _event = ERenderPassEvent::kAfterPostprocess;
     }
     WireFramePass::~WireFramePass()
@@ -1378,11 +1378,11 @@ namespace Ailu::Render
                                         auto &pass = obj._material->GetShader()->GetPassInfo(0);
                                         wireframe_shader->SetVertexShader(0, pass._vert_src_file, pass._vert_entry);
                                         wireframe_shader->Compile();
-                                        g_pResourceMgr->RegisterResource(shader_name_w, wireframe_shader);
+                                        ResourceMgr::Get().RegisterResource(shader_name_w, wireframe_shader);
                                         _wireframe_shaders.insert(shader_name_w);
                                     }
                                     auto mat = MakeRef<Material>(*obj._material);
-                                    mat->ChangeShader(g_pResourceMgr->Get<Shader>(shader_name_w));
+                                    mat->ChangeShader(ResourceMgr::Get().Get<Shader>(shader_name_w));
                                     _wireframe_mats[obj._material->Name()] = mat;
                                 }
                                 cmd->DrawMesh(obj._mesh, _wireframe_mats[obj._material->Name()].get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
@@ -1412,11 +1412,11 @@ namespace Ailu::Render
                             auto &pass = obj._material->GetShader()->GetPassInfo(0);
                             wireframe_shader->SetVertexShader(0, pass._vert_src_file, pass._vert_entry);
                             wireframe_shader->Compile();
-                            g_pResourceMgr->RegisterResource(shader_name_w, wireframe_shader);
+                            ResourceMgr::Get().RegisterResource(shader_name_w, wireframe_shader);
                             _wireframe_shaders.insert(shader_name_w);
                         }
                         auto mat = MakeRef<Material>(*obj._material);
-                        mat->ChangeShader(g_pResourceMgr->Get<Shader>(shader_name_w));
+                        mat->ChangeShader(ResourceMgr::Get().Get<Shader>(shader_name_w));
                         _wireframe_mats[obj._material->Name()] = mat;
                     }
                     cmd->DrawMesh(obj._mesh, _wireframe_mats[obj._material->Name()].get(), (*rendering_data._p_per_object_cbuf)[obj._scene_id], obj._submesh_index, 0, obj._instance_count);
@@ -1441,7 +1441,7 @@ namespace Ailu::Render
     {
         _event = ERenderPassEvent::kAfterPostprocess;
         const u16 vertex_count = 1000u;
-        _ui_default_shader = g_pResourceMgr->GetRef<Shader>(L"Shaders/default_ui.alasset");
+        _ui_default_shader = ResourceMgr::Get().GetRef<Shader>(L"Shaders/default_ui.alasset");
         _ui_default_mat = MakeRef<Material>(_ui_default_shader.get(), "DefaultUIMaterial");
         _ui_default_mat->SetTexture("_MainTex", Texture::s_p_default_white);
         _ui_default_mat->SetVector("_Color", Colors::kWhite);
@@ -1514,7 +1514,7 @@ namespace Ailu::Render
     MotionVectorPass::MotionVectorPass() : RenderPass("MotionVectorPass")
     {
         _event = ERenderPassEvent::kBeforeTransparent;
-        _motion_vector_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/motion_vector.alasset"), "Runtime/MotionVector");
+        _motion_vector_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/motion_vector.alasset"), "Runtime/MotionVector");
     }
 
     MotionVectorPass::~MotionVectorPass()
@@ -1612,7 +1612,7 @@ namespace Ailu::Render
 #pragma region HZB
     HZBPass::HZBPass() : RenderPass("HZB")
     {
-        _hzb_gen = g_pResourceMgr->GetRef<ComputeShader>(L"Shaders/hzb.alasset");
+        _hzb_gen = ResourceMgr::Get().GetRef<ComputeShader>(L"Shaders/hzb.alasset");
         _event = ERenderPassEvent::kAfterGbuffer;
     }
     HZBPass::~HZBPass()

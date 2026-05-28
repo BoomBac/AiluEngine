@@ -1,6 +1,11 @@
-guid: efa47da5-c477-49df-a31a-58f086da3946
-type: Ailu::Render::Mesh
-name: Plane
-file: WaterTest/water_plane.fbx
-inner_file_name: Plane
-is_combine_mesh: false
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "efa47da5-c477-49df-a31a-58f086da3946",
+        "_asset_type": "Ailu::Render::Mesh",
+        "_asset_name": "Plane"
+    },
+    "_file": "WaterTest/water_plane.fbx",
+    "_inner_file_name": "Plane",
+    "_is_combine_mesh": false
+}

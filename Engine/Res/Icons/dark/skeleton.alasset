@@ -1,5 +1,10 @@
-guid: 4428ffdf-97de-4732-b74b-240a0bce3872
-type: Ailu::Render::Texture2D
-name: skeleton
-  file: Icons/dark/skeleton.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "4428ffdf-97de-4732-b74b-240a0bce3872",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "skeleton"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/dark/skeleton.png"
+}

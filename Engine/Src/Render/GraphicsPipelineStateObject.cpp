@@ -181,9 +181,9 @@ namespace Ailu::Render
     void GraphicsPipelineStateMgr::BuildPSOCache()
     {
         LOG_WARNING("Begin initialize PSO cache...");
-        g_pTimeMgr->Mark();
+        TimeMgr::Get().Mark();
 
-        Shader *shader = g_pResourceMgr->Get<Shader>(L"Shaders/defered_standard_lit.alasset");
+        Shader *shader = ResourceMgr::Get().Get<Shader>(L"Shaders/defered_standard_lit.alasset");
         auto pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
@@ -198,7 +198,7 @@ namespace Ailu::Render
         AddPSO(std::move(stand_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = g_pResourceMgr->Get<Shader>(L"Shaders/deferred_lighting.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/deferred_lighting.alasset");
         pso_desc = GraphicsPipelineStateInitializer::GetNormalOpaquePSODesc();
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._p_vertex_shader = shader;
@@ -210,7 +210,7 @@ namespace Ailu::Render
         AddPSO(std::move(stand_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = g_pResourceMgr->Get<Shader>(L"Shaders/blit.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/blit.alasset");
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -227,7 +227,7 @@ namespace Ailu::Render
 
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = g_pResourceMgr->Get<Shader>(L"Shaders/wireframe.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/wireframe.alasset");
         pso_desc._p_vertex_shader = shader;
         pso_desc._p_pixel_shader = shader;
         pso_desc._depth_stencil_state = TStaticDepthStencilState<false, ECompareFunc::kLessEqual>::GetRHI();
@@ -238,7 +238,7 @@ namespace Ailu::Render
         AddPSO(std::move(wireframe_pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = g_pResourceMgr->Get<Shader>(L"Shaders/cubemap_gen.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/cubemap_gen.alasset");
         pso_desc._input_layout = shader->PipelineInputLayout();
         pso_desc._blend_state = shader->PipelineBlendState();
         pso_desc._raster_state = shader->PipelineRasterizerState();
@@ -252,7 +252,7 @@ namespace Ailu::Render
         GraphicsPipelineStateMgr::AddPSO(std::move(pso));
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = g_pResourceMgr->Get<Shader>(L"Shaders/filter_irradiance.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/filter_irradiance.alasset");
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -270,7 +270,7 @@ namespace Ailu::Render
         }
 
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/debug.hlsl");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/debug.hlsl");
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -287,7 +287,7 @@ namespace Ailu::Render
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
         memset(&pso_desc, 0, sizeof(GraphicsPipelineStateInitializer));
-        shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
+        shader = ResourceMgr::Get().Get<Shader>(L"Shaders/forwardlit.alasset");
         for (i16 i = 0; i < shader->PassCount(); i++)
         {
             auto &pass = shader->GetPassInfo(i);
@@ -304,7 +304,7 @@ namespace Ailu::Render
             GraphicsPipelineStateMgr::AddPSO(std::move(pso));
         }
 
-        LOG_WARNING("Initialize PSO cache done after {}ms!", g_pTimeMgr->GetElapsedSinceLastMark());
+        LOG_WARNING("Initialize PSO cache done after {}ms!", TimeMgr::Get().GetElapsedSinceLastMark());
     }
 
     void GraphicsPipelineStateMgr::AddPSO(Scope<GraphicsPipelineStateObject> p_gpso)
@@ -350,7 +350,7 @@ namespace Ailu::Render
         ShaderVariantHash variant_hash = 0;
         Shader::ExtractInfoFromHash(shader_hash, shader_id, pass_index, variant_hash);
         GraphicsPipelineStateObject* matched_pso = nullptr;
-        auto new_shader = g_pResourceMgr->Get<Shader>(shader_id);
+        auto new_shader = ResourceMgr::Get().Get<Shader>(shader_id);
         if (it != g_pPSOMgr->_pso_library.end())
         {
             if (it->second->IsReady())

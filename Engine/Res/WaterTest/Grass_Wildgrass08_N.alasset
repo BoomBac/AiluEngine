@@ -1,5 +1,10 @@
-guid: 6fd672ec-676e-41b4-9da8-b367d6ab6d2b
-type: Ailu::Render::Texture2D
-name: Grass_Wildgrass08_N.alasset
-  file: WaterTest/Grass_Wildgrass08_N.tga
-  sRGB: 0
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "6fd672ec-676e-41b4-9da8-b367d6ab6d2b",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "Grass_Wildgrass08_N.alasset"
+    },
+    "_is_srgb": false,
+    "_file": "WaterTest/Grass_Wildgrass08_N.tga"
+}

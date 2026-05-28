@@ -1,5 +1,10 @@
-guid: 19e162eb-c2bf-4ea6-a9a2-26bb81437c33
-type: Ailu::Render::Texture2D
-name: image
-  file: Icons/image.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "19e162eb-c2bf-4ea6-a9a2-26bb81437c33",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "image"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/image.png"
+}

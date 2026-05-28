@@ -1,5 +1,10 @@
-guid: 7b23d109-715f-4944-8669-d0ba3c40e06a
-type: Ailu::Render::Texture2D
-name: ibl_brdf_lut
-  file: Textures/ibl_brdf_lut.dds
-  sRGB: 0
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "7b23d109-715f-4944-8669-d0ba3c40e06a",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "ibl_brdf_lut"
+    },
+    "_is_srgb": false,
+    "_file": "Textures/ibl_brdf_lut.dds"
+}

@@ -1,6 +1,11 @@
-guid: af5bde0d-2248-4b7c-aaec-04f3f8ba67f3
-type: Ailu::Render::Mesh
-name: Cube
-file: WaterTest/water_bottom.fbx
-inner_file_name: Cube
-is_combine_mesh: false
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "af5bde0d-2248-4b7c-aaec-04f3f8ba67f3",
+        "_asset_type": "Ailu::Render::Mesh",
+        "_asset_name": "Cube"
+    },
+    "_file": "WaterTest/water_bottom.fbx",
+    "_inner_file_name": "Cube",
+    "_is_combine_mesh": false
+}

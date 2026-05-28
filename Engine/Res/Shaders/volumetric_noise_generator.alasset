@@ -1,5 +1,10 @@
-guid: 10806073-d5d1-45c9-b7c4-bd55d68184e9
-type: Ailu::Render::ComputeShader
-name: volumetric_noise_generator
-  file: Shaders/hlsl/Compute/volumetric_noise_generator.hlsl
-  kernel: Noname
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "10806073-d5d1-45c9-b7c4-bd55d68184e9",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "volumetric_noise_generator"
+    },
+    "_kernel": "Noname",
+    "_file": "Shaders/hlsl/Compute/volumetric_noise_generator.hlsl"
+}

@@ -711,6 +711,40 @@ namespace Ailu
         else
             _is_loaded = true;
     }
+    bool JsonArchive::HasField(const String &name)
+    {
+        String key = _cur_key.empty() ? name : std::format("{}.{}", _cur_key, name);
+        JsonValue *node = &_root;
+
+        auto &&keys = SplitPath(key);
+        for (const auto &p: keys)
+        {
+            if (std::holds_alternative<JsonObject>(node->value))
+            {
+                auto &obj_map = std::get<JsonObject>(node->value);
+                auto it = obj_map.find(p);
+                if (it == obj_map.end())
+                    return false;
+                node = &it->second;
+            }
+            else if (std::holds_alternative<JsonArray>(node->value))
+            {
+                u64 idx;
+                auto res = std::from_chars(p.data(), p.data() + p.size(), idx);
+                if (res.ec != std::errc{})
+                    return false;
+                auto &arr = std::get<JsonArray>(node->value);
+                if (idx >= arr.size())
+                    return false;
+                node = &arr[idx];
+            }
+            else
+            {
+                return false;
+            }
+        }
+        return true;
+    }
     JsonArchive::JsonValue *JsonArchive::FindNode()
     {
         JsonValue *node = &_root;

@@ -1,5 +1,10 @@
-guid: 0f4943a3-8df4-4917-8730-92c9de6ef6ce
-type: Ailu::Render::Texture2D
-name: blue_noise
-  file: Textures/blue_noise.jpg
-  sRGB: 0
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "0f4943a3-8df4-4917-8730-92c9de6ef6ce",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "blue_noise"
+    },
+    "_is_srgb": false,
+    "_file": "Textures/blue_noise.jpg"
+}

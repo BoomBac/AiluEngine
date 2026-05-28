@@ -1,5 +1,0 @@
-guid: aa2a7d98-3371-46b0-b6e8-b921fee1cb50
-type: Ailu::Render::Texture2D
-name: Wall_BaseColor
-  file: breakfast_room/Wall_BaseColor.png
-  sRGB: 1

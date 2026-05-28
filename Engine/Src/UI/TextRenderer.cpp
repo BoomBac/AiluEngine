@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by 22292 on 2024/10/24.
 //
 #include "UI/TextRenderer.h"
@@ -20,10 +20,10 @@ namespace Ailu
         void TextRenderer::Initialize()
         {
             TIMER_BLOCK("TextRenderer::Init")
-            s_default_font = g_pResourceMgr->_default_font.get();
-            _bitmap_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial");
+            s_default_font = ResourceMgr::Get()._default_font.get();
+            _bitmap_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial");
             _bitmap_mat->SetTexture("_MainTex", s_default_font->_pages[0]._texture.get());
-            _msdf_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial");
+            _msdf_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial");
             _msdf_mat->SetTexture("_MainTex", s_default_font->_pages[0]._texture.get());
             _msdf_mat->EnableKeyword("_MSDF");
             _default_block = new DrawerBlock(_bitmap_mat);

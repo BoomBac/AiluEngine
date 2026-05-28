@@ -1,4 +1,5 @@
-#include "Framework/Common/ResourceMgr.h"
+﻿#include "Framework/Common/ResourceMgr.h"
+#include "Framework/Common/AssetDocument.h"
 #include "Framework/Common/FileManager.h"
 #include "Framework/Common/JobSystem.h"
 #include "Framework/Common/Log.h"
@@ -9,6 +10,7 @@
 #include "Render/Material.h"
 #include "pch.h"
 
+#include "Objects/JsonArchive.h"
 #include "Objects/Serialize.h"
 #include "Render/GraphicsPipelineStateObject.h"
 
@@ -19,6 +21,8 @@ namespace Ailu
     using namespace SceneManagement;
     namespace
     {
+        ResourceMgr *g_pResourceMgr = nullptr;
+
         WString NormalizeDirectoryPath(const WString &path)
         {
             WString normalized = PathUtils::FormatFilePath(path);
@@ -48,6 +52,153 @@ namespace Ailu
                 FileManager::CopyFile(source_path.wstring(), destination_path.wstring());
             }
         }
+
+        bool IsLikelyJsonAssetDocument(const WString &data)
+        {
+            const WString trimmed = StringUtils::Trim(data);
+            return !trimmed.empty() && trimmed.front() == L'{';
+        }
+
+        template<typename TDocument>
+        bool SaveAssetDocument(const WString &sys_path, TDocument &document)
+        {
+            Type *type = document.GetType();
+            if (type == nullptr)
+            {
+                LOG_ERROR(L"Save asset document to {} failed, document type is nullptr", sys_path);
+                return false;
+            }
+            JsonArchive ar;
+            for (auto &prop: type->GetProperties())
+            {
+                prop.Serialize(&document, ar);
+            }
+            ar.Save(sys_path);
+            return true;
+        }
+
+        template<typename TDocument>
+        bool LoadAssetDocument(const WString &sys_path, TDocument &document)
+        {
+            JsonArchive ar;
+            ar.Load(sys_path);
+            if (!ar.IsLoaded())
+                return false;
+            Type *type = document.GetType();
+            if (type == nullptr)
+            {
+                LOG_ERROR(L"Load asset document from {} failed, document type is nullptr", sys_path);
+                return false;
+            }
+            for (auto &prop: type->GetProperties())
+            {
+                prop.Deserialize(&document, ar);
+            }
+            return true;
+        }
+
+        AssetDocumentHeader MakeAssetDocumentHeader(const Asset *asset)
+        {
+            AssetDocumentHeader header;
+            header._format_version = kSerializedAssetDocumentVersion;
+            header._guid = asset->GetGuid().ToString();
+            header._asset_type = asset->_asset_type ? asset->_asset_type->FullName() : String{};
+            header._asset_name = ToChar(asset->_name);
+            return header;
+        }
+
+        bool TryLoadAssetDocumentHeader(const WString &sys_path, AssetDocumentHeader &header)
+        {
+            WString data;
+            if (!FileManager::ReadFile(sys_path, data) || !IsLikelyJsonAssetDocument(data))
+                return false;
+
+            AssetHeaderProbeDocument probe;
+            if (!LoadAssetDocument(sys_path, probe))
+                return false;
+            if (probe._header._format_version != kSerializedAssetDocumentVersion)
+            {
+                LOG_ERROR(L"Unsupported asset document version {} in {}", probe._header._format_version, sys_path);
+                return false;
+            }
+            if (probe._header._guid.empty() || probe._header._asset_type.empty())
+                return false;
+            header = probe._header;
+            return true;
+        }
+
+        String GetLinkedAssetGuidString(Object *obj)
+        {
+            if (obj == nullptr)
+                return {};
+
+            const Guid &guid = ResourceMgr::Get().GetAssetGuid(obj);
+            return guid == Guid::EmptyGuid() ? String{} : guid.ToString();
+        }
+
+        void FillMaterialGuidList(const Vector<Ref<Material>> &materials, Vector<String> &out_guids)
+        {
+            out_guids.clear();
+            out_guids.reserve(materials.size());
+            for (const auto &material: materials)
+            {
+                out_guids.emplace_back(GetLinkedAssetGuidString(material.get()));
+            }
+        }
+
+        void LoadMaterialRefs(const Vector<String> &material_guids, Mesh *mesh, Vector<Ref<Material>> &materials)
+        {
+            materials.clear();
+            materials.reserve(material_guids.size());
+            for (u32 index = 0u; index < material_guids.size(); ++index)
+            {
+                Ref<Material> loaded_material = nullptr;
+                const String &material_guid_str = material_guids[index];
+                if (!material_guid_str.empty())
+                {
+                    const Guid material_guid(material_guid_str);
+                    ResourceMgr::Get().Load<Material>(material_guid);
+                    loaded_material = ResourceMgr::Get().GetRef<Material>(material_guid);
+                }
+                if (loaded_material == nullptr && mesh != nullptr)
+                {
+                    loaded_material = ResourceMgr::Get().GetEmbeddedMaterial(mesh, static_cast<u16>(index));
+                }
+                if (loaded_material != nullptr)
+                {
+                    materials.emplace_back(loaded_material);
+                }
+                else
+                {
+                    LOG_WARNING("Load material slot {} failed for mesh {}", index, mesh != nullptr ? mesh->Name() : String("null"));
+                }
+            }
+        }
+
+        ECS::Entity RemapSceneEntityId(const HashMap<ECS::Entity, ECS::Entity> &old_to_new_entities, u64 legacy_entity_id)
+        {
+            if (legacy_entity_id == ECS::kInvalidEntity)
+                return ECS::kInvalidEntity;
+
+            const auto it = old_to_new_entities.find(static_cast<ECS::Entity>(legacy_entity_id));
+            return it != old_to_new_entities.end() ? it->second : ECS::kInvalidEntity;
+        }
+    }
+
+    void ResourceMgr::Init()
+    {
+        AL_ASSERT_MSG(g_pResourceMgr == nullptr, "ResourceMgr already init!");
+        g_pResourceMgr = new ResourceMgr();
+    }
+
+    void ResourceMgr::Shutdown()
+    {
+        DESTORY_PTR(g_pResourceMgr);
+    }
+
+    ResourceMgr& ResourceMgr::Get()
+    {
+        return *g_pResourceMgr;
     }
 
     String ResourceMgr::GetResSysPath(const String &sub_path)
@@ -153,11 +304,11 @@ namespace Ailu
         //		{
         //			Shader::s_p_defered_standart_lit = Load<Shader>(L"Shaders/defered_standard_lit.alasset");
         //            for (auto &p: shader_asset_pathes)
-        //                g_pThreadTool->Enqueue([&](WString p)
+        //                Core::ThreadPool::Get().Enqueue([&](WString p)
         //                                       { Load<Shader>(p); --shader_load_count ; }, p);
         //
         //            for (auto &p: shader_pathes)
-        //                g_pThreadTool->Enqueue([&](WString p)
+        //                Core::ThreadPool::Get().Enqueue([&](WString p)
         //                                       { RegisterResource(p, LoadExternalShader(p)); --shader_load_count ; }, p);
         //			//RegisterResource(L"Shaders/hlsl/forwardlit.hlsl",LoadExternalShader(L"Shaders/hlsl/forwardlit.hlsl"));
         //
@@ -348,7 +499,7 @@ namespace Ailu
             p._texture = LoadExternalTexture(p._file, setting);
             RegisterResource(PathUtils::ExtractAssetPath(p._file), p._texture);
         }
-        //g_pThreadTool->Enqueue("ResourceMgr::WatchDirectory", &ResourceMgr::WatchDirectory, this);
+        //Core::ThreadPool::Get().Enqueue("ResourceMgr::WatchDirectory", &ResourceMgr::WatchDirectory, this);
         //        std::ifstream is(GetResSysPath(L"AnimClips/a.clip"));
         //        TextIArchive ar(&is);
         //        auto clip = MakeRef<AnimationClip>();
@@ -412,29 +563,19 @@ namespace Ailu
         }
         while (!_async_tasks.empty())
         {
-            g_pThreadTool->Enqueue(std::move(_async_tasks.front()));
+            Core::ThreadPool::Get().Enqueue(std::move(_async_tasks.front()));
             _async_tasks.pop();
         }
     }
 
     void ResourceMgr::SaveAsset(const Asset *asset)
     {
-        using std::endl;
         if (asset->_p_obj == nullptr)
         {
             LOG_WARNING(L"SaveAsset: Asset: {} save failed!it hasn't a instanced object!", asset->_name);
             return;
         }
         AL_ASSERT(!asset->_asset_path.empty());
-        //写入公共头
-        auto sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
-        std::wofstream out_asset_file(sys_path, std::ios::out | std::ios::trunc);
-        AL_ASSERT(out_asset_file.is_open());
-        out_asset_file << "guid: " << ToWChar(asset->GetGuid().ToString()) << endl;
-        out_asset_file << "type: " << GetAssetTypeName(asset->_asset_type) << endl;
-        out_asset_file << "name: " << asset->_name << endl;
-        out_asset_file.close();
-
         if (asset->_asset_type == Mesh::StaticType() || asset->_asset_type == SkeletonMesh::StaticType())
         {
             SaveMesh(asset->_asset_path, asset);
@@ -460,6 +601,7 @@ namespace Ailu
             SaveTexture2D(asset->_asset_path, asset);
             return;
         }
+
         if (asset->_asset_type == Scene::StaticType())
         {
             SaveScene(asset->_asset_path, asset);
@@ -470,6 +612,7 @@ namespace Ailu
             SaveAnimClip(asset->_asset_path, asset);
             return;
         }
+
         AL_ASSERT(false);
     }
 
@@ -482,6 +625,89 @@ namespace Ailu
             s_pending_save_assets.pop();
         }
         SaveAssetDB();
+    }
+
+    void ResourceMgr::MigrateLegacyAssetDocuments(const WString &root_asset_dir)
+    {
+        const fs::path root_path = root_asset_dir.empty() ? fs::path(s_engine_res_root_pathw) : fs::path(ResourceMgr::GetResSysPath(root_asset_dir));
+        if (!fs::exists(root_path))
+        {
+            LOG_ERROR(L"MigrateLegacyAssetDocuments: root {} does not exist", root_path.wstring());
+            return;
+        }
+
+        u32 migrated_count = 0u;
+        u32 skipped_count = 0u;
+        u32 failed_count = 0u;
+        for (const auto &entry: fs::recursive_directory_iterator(root_path))
+        {
+            if (!entry.is_regular_file())
+                continue;
+
+            const String ext = StringUtils::ToLower(entry.path().extension().string());
+            if (ext != ".alasset" && ext != ".almap")
+                continue;
+            if (StringUtils::ToLower(entry.path().filename().string()) == "assetdb.alasset")
+                continue;
+
+            const WString sys_path = PathUtils::FormatFilePath(entry.path().wstring());
+            WString data;
+            if (!FileManager::ReadFile(sys_path, data))
+            {
+                ++failed_count;
+                continue;
+            }
+            if (IsLikelyJsonAssetDocument(data))
+            {
+                ++skipped_count;
+                continue;
+            }
+
+            const WString asset_path = PathUtils::FormatFilePath(fs::relative(entry.path(), fs::path(s_engine_res_root_pathw)).wstring());
+            WString asset_name;
+            Guid guid;
+            const Type *type = nullptr;
+            ExtractCommonAssetInfo(asset_path, asset_name, guid, type);
+            if (type == nullptr)
+            {
+                ++skipped_count;
+                continue;
+            }
+
+            Ref<Object> loaded_asset = nullptr;
+            if (type == Shader::StaticType())
+                loaded_asset = Load<Shader>(asset_path);
+            else if (type == ComputeShader::StaticType())
+                loaded_asset = Load<ComputeShader>(asset_path);
+            else if (type == Texture2D::StaticType())
+                loaded_asset = Load<Texture2D>(asset_path);
+            else if (type == Material::StaticType())
+                loaded_asset = Load<Material>(asset_path);
+            else if (type == Mesh::StaticType() || type == SkeletonMesh::StaticType())
+                loaded_asset = Load<Mesh>(asset_path);
+            else if (type == Scene::StaticType())
+                loaded_asset = Load<Scene>(asset_path);
+            else if (type == AnimationClip::StaticType())
+                loaded_asset = Load<AnimationClip>(asset_path);
+            else
+            {
+                ++skipped_count;
+                continue;
+            }
+
+            Asset *asset = GetAsset(asset_path);
+            if (!loaded_asset || asset == nullptr)
+            {
+                LOG_ERROR(L"MigrateLegacyAssetDocuments: failed to reload legacy asset {}", asset_path);
+                ++failed_count;
+                continue;
+            }
+
+            SaveAsset(asset);
+            ++migrated_count;
+        }
+
+        LOG_INFO(L"Legacy asset migration finished under {}. migrated={}, skipped={}, failed={}", root_path.wstring(), migrated_count, skipped_count, failed_count);
     }
 
     Asset *ResourceMgr::GetLinkedAsset(Object *obj)
@@ -531,50 +757,56 @@ namespace Ailu
     void ResourceMgr::SaveShader(const WString &asset_path, const Asset *asset)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
-        if (FileManager::Exist(sys_path))
+        auto shader = asset->As<Shader>();
+        auto [vs, ps] = shader->GetShaderEntry();
+        ShaderAssetDocument doc;
+        doc._header = MakeAssetDocumentHeader(asset);
+        doc._file = ToChar(asset->_external_asset_path);
+        doc._vs_entry = vs;
+        doc._ps_entry = ps;
+        if (!SaveAssetDocument(sys_path, doc))
         {
-            auto shader = asset->As<Shader>();
-            auto [vs, ps] = shader->GetShaderEntry();
-            std::wstringstream wss;
-            WString indent = L"  ";
-            wss << indent << L"file: " << asset->_external_asset_path << std::endl;
-            wss << indent << L"vs_entry: " << ToWChar(vs.c_str()) << std::endl;
-            wss << indent << L"ps_entry: " << ToWChar(ps.c_str()) << std::endl;
-            if (FileManager::WriteFile(sys_path, true, wss.str()))
-            {
-                return;
-            }
+            LOG_ERROR(L"Save shader to {} failed!", sys_path);
         }
-        LOG_ERROR(L"Save shader to {} failed!", sys_path);
     }
 
     void ResourceMgr::SaveComputeShader(const WString &asset_path, const Asset *asset)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
-        if (FileManager::Exist(sys_path))
+        ComputeShaderAssetDocument doc;
+        doc._header = MakeAssetDocumentHeader(asset);
+        doc._file = ToChar(asset->_external_asset_path);
+        doc._kernel = "Noname";
+        if (auto *setting = dynamic_cast<const ShaderImportSetting *>(_importers[asset_path]); setting != nullptr && !setting->_cs_kernel.empty())
         {
-            auto cs = asset->As<ComputeShader>();
-            //String kernel = cs->KernelName();
-            std::wstringstream wss;
-            WString indent = L"  ";
-            wss << indent << L"file: " << asset->_external_asset_path << std::endl;
-            //wss << indent << L"kernel: " << ToWChar(kernel.c_str()) << std::endl;
-            wss << indent << L"kernel: " << L"Noname" << std::endl;
-            if (FileManager::WriteFile(sys_path, true, wss.str()))
-            {
-                return;
-            }
+            doc._kernel = setting->_cs_kernel;
         }
-        LOG_ERROR(L"Save compute shader to {} failed!", sys_path);
+        if (!SaveAssetDocument(sys_path, doc))
+        {
+            LOG_ERROR(L"Save compute shader to {} failed!", sys_path);
+        }
     }
 
     Scope<Asset> ResourceMgr::LoadShader(const WString &asset_path,const ImportSetting& settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
-        Ref<Shader> shader;
         if (FileManager::ReadFile(sys_path, data))
         {
+            if (IsLikelyJsonAssetDocument(data))
+            {
+                ShaderAssetDocument doc;
+                if (!LoadAssetDocument(sys_path, doc))
+                    return nullptr;
+
+                auto file = ToWChar(doc._file);
+                auto asset = MakeScope<Asset>();
+                asset->_asset_path = asset_path;
+                asset->_asset_type = Shader::StaticType();
+                asset->_external_asset_path = file;
+                asset->_p_obj = LoadExternalShader(file);
+                return asset;
+            }
             auto c = StringUtils::Split(data, L"\n");
             AL_ASSERT_MSG(c.size() > 4, "Invalid shader asset file format!");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
@@ -595,49 +827,55 @@ namespace Ailu
 
     void ResourceMgr::SaveMaterial(const WString &asset_path, Material *mat)
     {
-        using std::endl;
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         std::multimap<std::string, ShaderPropertyInfo *> props{};
-        //为了写入通用资产头信息，暂时使用追加方式打开
-        std::ofstream out_mat(sys_path, std::ios::out | std::ios::app);
-        out_mat << "shader_guid: " << GetAssetGuid(mat->_p_shader).ToString() << endl;
-        out_mat << "keywords: " << su::Join(mat->_all_keywords, ",") << endl;
+        auto linked_asset = GetLinkedAsset(mat);
+        if (linked_asset == nullptr)
+        {
+            LOG_ERROR(L"Save material to {} failed, material is not linked to an asset", sys_path);
+            return;
+        }
+
+        MaterialAssetDocument doc;
+        doc._header = MakeAssetDocumentHeader(linked_asset);
+        doc._shader_guid = GetAssetGuid(mat->_p_shader).ToString();
+        doc._keywords.assign(mat->_all_keywords.begin(), mat->_all_keywords.end());
         for (auto &prop: mat->_properties)
         {
             props.insert(std::make_pair(prop.second._value_name, &prop.second));
         }
-        //out_mat << endl;
         auto float_props = mat->GetAllFloatValue();
         auto vector_props = mat->GetAllVectorValue();
         auto int_vector_props = mat->GetAllIntVectorValue();
         auto uint_props = mat->GetAllUintValue();
-        //auto tex_props = mat->GetAllTexture();
-        out_mat << "  prop_type: "
-                << ShaderPropertyType::Uint << endl;
         for (auto &[name, value]: uint_props)
         {
-            out_mat << "    " << name << ": " << value << endl;
+            AssetNamedUIntProperty entry;
+            entry._name = name;
+            entry._value = value;
+            doc._uint_properties.push_back(entry);
         }
-        out_mat << "  prop_type: "
-                << ShaderPropertyType::Float << endl;
         for (auto &[name, value]: float_props)
         {
-            out_mat << "    " << name << ": " << value << endl;
+            AssetNamedFloatProperty entry;
+            entry._name = name;
+            entry._value = value;
+            doc._float_properties.push_back(entry);
         }
-        out_mat << "  prop_type: "
-                << ShaderPropertyType::Vector << endl;
         for (auto &[name, value]: vector_props)
         {
-            out_mat << "    " << name << ": " << value << endl;
+            AssetNamedVectorProperty entry;
+            entry._name = name;
+            entry._value = value;
+            doc._vector_properties.push_back(entry);
         }
-        out_mat << "  prop_type: "
-                << ShaderPropertyType::IntVector << endl;
         for (auto &[name, value]: int_vector_props)
         {
-            out_mat << "    " << name << ": " << value << endl;
+            AssetNamedIntVectorProperty entry;
+            entry._name = name;
+            entry._value = value;
+            doc._int_vector_properties.push_back(entry);
         }
-        out_mat << "  prop_type: "
-                << "Texture2D" << endl;
         for (auto &[prop_name, prop]: props)
         {
             if (prop->_type == EShaderPropertyType::kTexture2D)
@@ -658,65 +896,159 @@ namespace Ailu
                 }
                 else
                     tex_guid = Guid::EmptyGuid();
-                out_mat << "    " << prop->_value_name << ": " << tex_guid.ToString() << endl;
+                AssetTextureBinding entry;
+                entry._name = prop->_value_name;
+                entry._texture_guid = tex_guid == Guid::EmptyGuid() ? String{} : tex_guid.ToString();
+                doc._texture_properties.push_back(entry);
             }
         }
-        out_mat.close();
+        if (!SaveAssetDocument(sys_path, doc))
+        {
+            LOG_ERROR(L"Save material to {} failed!", sys_path);
+            return;
+        }
         LOG_WARNING(L"Save material to {}", sys_path);
     }
 
     void ResourceMgr::SaveMesh(const WString &asset_path, const Asset *asset)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
-        if (FileManager::Exist(sys_path))
+        MeshAssetDocument doc;
+        doc._header = MakeAssetDocumentHeader(asset);
+        doc._file = ToChar(asset->_external_asset_path);
+        doc._inner_file_name = asset->_p_obj->Name();
+        if (auto *setting = dynamic_cast<const MeshImportSetting *>(_importers[asset_path]); setting != nullptr)
         {
-            auto addr = reinterpret_cast<u64>(asset);
-            std::wstringstream wss;
-            wss << L"file: " << asset->_external_asset_path << std::endl;
-            wss << L"inner_file_name: " << ToWChar(asset->_p_obj->Name().c_str()) << std::endl;
-            wss << L"is_combine_mesh: " << (dynamic_cast<const MeshImportSetting *>(_importers[asset_path])->_is_combine_mesh ? L"true" : L"false") << std::endl;
-            if (FileManager::WriteFile(sys_path, true, wss.str()))
-            {
-                return;
-            }
+            doc._is_combine_mesh = setting->_is_combine_mesh;
         }
-        LOG_ERROR(L"Save mesh to {} failed!", sys_path);
+        if (!SaveAssetDocument(sys_path, doc))
+        {
+            LOG_ERROR(L"Save mesh to {} failed!", sys_path);
+        }
     }
 
     void ResourceMgr::SaveTexture2D(const WString &asset_path, const Asset *asset)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
-        if (FileManager::Exist(sys_path))
+        Texture2DAssetDocument doc;
+        doc._header = MakeAssetDocumentHeader(asset);
+        doc._file = ToChar(asset->_external_asset_path);
+        if (auto *setting = dynamic_cast<const TextureImportSetting *>(_importers[asset_path]); setting != nullptr)
         {
-            std::wstringstream wss;
-            WString indent = L"  ";
-            wss << indent << L"file: " << asset->_external_asset_path << std::endl;
-            wss << indent << L"sRGB: " << dynamic_cast<const TextureImportSetting *>(_importers[asset_path])->_is_sRGB << std::endl;
-            if (FileManager::WriteFile(sys_path, true, wss.str()))
-            {
-                return;
-            }
+            doc._is_srgb = setting->_is_sRGB;
         }
-        LOG_ERROR(L"Save texture2d to {} failed!", sys_path);
+        if (!SaveAssetDocument(sys_path, doc))
+        {
+            LOG_ERROR(L"Save texture2d to {} failed!", sys_path);
+        }
     }
 
     void ResourceMgr::SaveScene(const WString &asset_path, const Asset *asset)
     {
         Scene *scene = asset->As<Scene>();
-        using namespace std;
-        std::ostringstream ss;
-        TextOArchive ar(&ss);
-        try
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
+        SceneAssetDocument doc;
+        doc._header = MakeAssetDocumentHeader(asset);
+
+        const ECS::Register &reg = scene->GetRegister();
+        const auto &tag_view = reg.View<ECS::TagComponent>();
+        doc._entities.reserve(tag_view.size());
+        for (u64 index = 0u; index < tag_view.size(); ++index)
         {
-            scene->Serialize(ar);
+            ECS::Entity entity = reg.GetEntity<ECS::TagComponent>(index);
+            const ECS::TagComponent &tag = tag_view[index];
+
+            SceneEntityDocument entity_doc;
+            entity_doc._entity_id = entity;
+            entity_doc._tag_component._name = tag._name;
+            entity_doc._tag_component._layer_mask = tag._layer_mask;
+
+            if (const auto *transform = reg.GetComponent<ECS::TransformComponent>(entity); transform != nullptr)
+            {
+                entity_doc._has_transform_component = true;
+                entity_doc._transform_component._position = transform->_transform._position;
+                entity_doc._transform_component._rotation = transform->_transform._rotation;
+                entity_doc._transform_component._scale = transform->_transform._scale;
+            }
+            if (const auto *script = reg.GetComponent<ECS::ScriptComponent>(entity); script != nullptr)
+            {
+                entity_doc._has_script_component = true;
+                entity_doc._script_component._script_path = script->_script_path;
+            }
+            if (const auto *static_mesh = reg.GetComponent<ECS::StaticMeshComponent>(entity); static_mesh != nullptr)
+            {
+                entity_doc._has_static_mesh_component = true;
+                entity_doc._static_mesh_component._mesh_guid = GetLinkedAssetGuidString(static_mesh->_p_mesh.get());
+                FillMaterialGuidList(static_mesh->_p_mats, entity_doc._static_mesh_component._material_guids);
+            }
+            if (const auto *light = reg.GetComponent<ECS::LightComponent>(entity); light != nullptr)
+            {
+                entity_doc._has_light_component = true;
+                entity_doc._light_component._type = ECS::ELightType::ToString(light->_type);
+                entity_doc._light_component._light._light_color = light->_light._light_color;
+                entity_doc._light_component._light._light_param = light->_light._light_param;
+                entity_doc._light_component._light._is_two_side = light->_light._is_two_side;
+                entity_doc._light_component._shadow._is_cast_shadow = light->_shadow._is_cast_shadow;
+                entity_doc._light_component._shadow._constant_bias = light->_shadow._constant_bias;
+                entity_doc._light_component._shadow._slope_bias = light->_shadow._slope_bias;
+            }
+            if (const auto *hierarchy = reg.GetComponent<ECS::CHierarchy>(entity); hierarchy != nullptr)
+            {
+                entity_doc._has_hierarchy_component = true;
+                entity_doc._hierarchy_component._first_child = hierarchy->_first_child;
+                entity_doc._hierarchy_component._prev_sibling = hierarchy->_prev_sibling;
+                entity_doc._hierarchy_component._next_sibling = hierarchy->_next_sibling;
+                entity_doc._hierarchy_component._parent = hierarchy->_parent;
+                entity_doc._hierarchy_component._children_num = hierarchy->_children_num;
+                entity_doc._hierarchy_component._inv_matrix_attach = hierarchy->_inv_matrix_attach.ToString();
+            }
+            if (const auto *camera = reg.GetComponent<ECS::CCamera>(entity); camera != nullptr)
+            {
+                entity_doc._has_camera_component = true;
+                entity_doc._camera_component._type = ECameraType::ToString(camera->_camera.Type());
+                entity_doc._camera_component._aspect = camera->_camera.Aspect();
+                entity_doc._camera_component._far_clip = camera->_camera.Far();
+                entity_doc._camera_component._near_clip = camera->_camera.Near();
+                entity_doc._camera_component._fov_h = camera->_camera.FovH();
+                entity_doc._camera_component._size = camera->_camera.Size();
+            }
+            if (const auto *lightprobe = reg.GetComponent<ECS::CLightProbe>(entity); lightprobe != nullptr)
+            {
+                entity_doc._has_lightprobe_component = true;
+                entity_doc._lightprobe_component._size = lightprobe->_size;
+                entity_doc._lightprobe_component._is_update_every_tick = lightprobe->_is_update_every_tick;
+            }
+            if (const auto *rigidbody = reg.GetComponent<ECS::CRigidBody>(entity); rigidbody != nullptr)
+            {
+                entity_doc._has_rigidbody_component = true;
+                entity_doc._rigidbody_component._mass = rigidbody->_mass;
+            }
+            if (const auto *collider = reg.GetComponent<ECS::CCollider>(entity); collider != nullptr)
+            {
+                entity_doc._has_collider_component = true;
+                entity_doc._collider_component._type = ECS::EColliderType::ToString(collider->_type);
+                entity_doc._collider_component._is_trigger = collider->_is_trigger;
+                entity_doc._collider_component._center = collider->_center;
+                entity_doc._collider_component._param = collider->_param;
+            }
+            if (const auto *skeleton_mesh = reg.GetComponent<ECS::CSkeletonMesh>(entity); skeleton_mesh != nullptr)
+            {
+                entity_doc._has_skeleton_mesh_component = true;
+                entity_doc._skeleton_mesh_component._mesh_guid = GetLinkedAssetGuidString(skeleton_mesh->_p_mesh.get());
+                FillMaterialGuidList(skeleton_mesh->_p_mats, entity_doc._skeleton_mesh_component._material_guids);
+                entity_doc._skeleton_mesh_component._anim_clip_guid = GetLinkedAssetGuidString(skeleton_mesh->_anim_clip.get());
+            }
+            if (const auto *vxgi = reg.GetComponent<ECS::CVXGI>(entity); vxgi != nullptr)
+            {
+                entity_doc._has_vxgi_component = true;
+                entity_doc._vxgi_component._grid_num = vxgi->_grid_num;
+                entity_doc._vxgi_component._distance = vxgi->_distance;
+            }
+
+            doc._entities.emplace_back(std::move(entity_doc));
         }
-        catch (const std::exception &e)
-        {
-            LOG_ERROR("Serialize failed when save scene: {} with exce {}", scene->Name(), e.what());
-            return;
-        }
-        WString sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
-        if (!FileManager::WriteFile(sys_path, true, ss.str()))
+
+        if (!SaveAssetDocument(sys_path, doc))
         {
             LOG_ERROR(L"Save scene failed to {}", sys_path);
             return;
@@ -726,20 +1058,38 @@ namespace Ailu
     void ResourceMgr::SaveAnimClip(const WString &asset_path, const Asset *asset)
     {
         AnimationClip *clip = asset->As<AnimationClip>();
-        using namespace std;
-        std::ostringstream ss;
-        TextOArchive ar(&ss);
-        try
+        auto sys_path = ResourceMgr::GetResSysPath(asset_path);
+        AnimationClipAssetDocument doc;
+        doc._header = MakeAssetDocumentHeader(asset);
+        doc._clip_name = clip->Name();
+        doc._frame_count = clip->FrameCount();
+        doc._duration = clip->Duration();
+        doc._frame_rate = clip->FrameRate();
+        doc._frame_duration = clip->FrameDuration();
+        doc._is_looping = clip->IsLooping();
+        doc._tracks.reserve(clip->Size());
+        for (u32 index = 0u; index < clip->Size(); ++index)
         {
-            clip->Serialize(ar);
+            const TransformTrack &track = clip->GetTrackAtIndex(index);
+            const auto &pos_track = track.GetPositionTrack();
+            const auto &rot_track = track.GetRotationTrack();
+            const auto &scale_track = track.GetScaleTrack();
+
+            AnimationClipTrackDocument track_doc;
+            track_doc._joint_index = clip->GetIdAtIndex(index);
+            track_doc._frames.reserve(pos_track.Size());
+            for (u32 frame_index = 0u; frame_index < pos_track.Size(); ++frame_index)
+            {
+                AnimationClipFrameDocument frame_doc;
+                frame_doc._position = TrackHelpers::ToVector(pos_track[frame_index]);
+                frame_doc._rotation = TrackHelpers::ToQuaternion(rot_track[frame_index]);
+                frame_doc._scale = TrackHelpers::ToVector(scale_track[frame_index]);
+                track_doc._frames.emplace_back(std::move(frame_doc));
+            }
+            doc._tracks.emplace_back(std::move(track_doc));
         }
-        catch (const std::exception &)
-        {
-            LOG_ERROR("Serialize failed when save animclip: {}!", clip->Name());
-            return;
-        }
-        WString sys_path = ResourceMgr::GetResSysPath(asset->_asset_path);
-        if (!FileManager::WriteFile(sys_path, true, ss.str()))
+
+        if (!SaveAssetDocument(sys_path, doc))
         {
             LOG_ERROR(L"Save animclip failed to {}", sys_path);
             return;
@@ -781,6 +1131,11 @@ namespace Ailu
     Ref<Texture2D> ResourceMgr::LoadExternalTexture(const WString &asset_path,const ImportSetting& settings)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
+        if (!FileManager::Exist(sys_path))
+        {
+            LOG_ERROR(L"External texture file {} does not exist!", sys_path);
+            return nullptr;
+        }
         String ext = fs::path(ToChar(asset_path.c_str())).extension().string();
         Scope<ITextureParser> tex_parser = nullptr;
         if (kLDRImageExt.contains(ext))
@@ -834,6 +1189,37 @@ namespace Ailu
         auto setting = dynamic_cast<const TextureImportSetting&>(settings);
         if (FileManager::ReadFile(sys_path, data))
         {
+            if (IsLikelyJsonAssetDocument(data))
+            {
+                Texture2DAssetDocument doc;
+                if (!LoadAssetDocument(sys_path, doc))
+                    return nullptr;
+                auto file = ToWChar(doc._file);
+                auto json_setting = setting;
+                json_setting._is_sRGB = doc._is_srgb;
+                if (!IsAssetLoaded(asset_path))
+                {
+                    auto tex = LoadExternalTexture(file, json_setting);
+                    auto asset = MakeScope<Asset>();
+                    asset->_asset_path = asset_path;
+                    asset->_asset_type = Texture2D::StaticType();
+                    asset->_external_asset_path = file;
+                    asset->_p_obj = tex;
+                    _importers[asset_path] = AL_NEW(TextureImportSetting, json_setting);
+                    return asset;
+                }
+
+                AL_ASSERT(false);
+                auto exist_asset = GetAsset(asset_path);
+                auto tex = exist_asset->AsRef<Texture2D>();
+                LoadExternalTexture(file, tex, json_setting);
+                auto asset = MakeScope<Asset>();
+                asset->_asset_path = asset_path;
+                asset->_asset_type = Texture2D::StaticType();
+                asset->_external_asset_path = file;
+                asset->_p_obj = tex;
+                return asset;
+            }
             auto c = StringUtils::Split(data, L"\n");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
             bool is_srgb = StringUtils::ParseUInt32(ToChar(c[4].substr(c[4].find_first_of(L":") + 2))).value_or(1) == 1;
@@ -884,6 +1270,72 @@ namespace Ailu
             ++line_count;
         }
         file.close();
+
+        if (!lines.empty() && IsLikelyJsonAssetDocument(ToWChar(lines.front())))
+        {
+            MaterialAssetDocument doc;
+            if (!LoadAssetDocument(sys_path, doc))
+                return nullptr;
+
+            Shader *shader = Load<Shader>(Guid(doc._shader_guid)).get();
+            if (shader == nullptr)
+            {
+                LOG_ERROR(L"Load material with path: {} failed, shader {} is unavailable", sys_path, ToWChar(doc._shader_guid));
+                return nullptr;
+            }
+            bool is_standard_mat = shader->Name() == "defered_standard_lit";
+            Ref<Material> mat = is_standard_mat ? std::static_pointer_cast<Material>(MakeRef<StandardMaterial>(doc._header._asset_name)) : MakeRef<Material>(shader, doc._header._asset_name);
+            mat->_all_keywords.clear();
+            for (auto &kw: doc._keywords)
+            {
+                if (!kw.empty())
+                    mat->_all_keywords.insert(kw);
+            }
+            mat->Construct(true);
+            for (auto &prop: doc._float_properties)
+            {
+                mat->SetFloat(prop._name, prop._value);
+            }
+            for (auto &prop: doc._vector_properties)
+            {
+                mat->SetVector(prop._name, prop._value);
+            }
+            for (auto &prop: doc._uint_properties)
+            {
+                mat->SetInt(prop._name, prop._value);
+            }
+            for (auto &prop: doc._int_vector_properties)
+            {
+                mat->SetVector(prop._name, prop._value);
+            }
+            for (auto &prop: doc._texture_properties)
+            {
+                if (prop._texture_guid.empty())
+                    continue;
+                auto texture_asset_path = ResourceMgr::Get().GuidToAssetPath(Guid(prop._texture_guid));
+                if (!texture_asset_path.empty())
+                {
+                    mat->SetTexture(prop._name, Load<Texture2D>(texture_asset_path).get());
+                }
+                else
+                {
+                    LOG_WARNING("Load material: {}, property {} failed!", mat->_name, prop._name);
+                }
+            }
+            mat->GetUint("_MaterialID");
+            if (is_standard_mat)
+            {
+                auto standard_mat = static_cast<StandardMaterial *>(mat.get());
+                standard_mat->SurfaceType((ESurfaceType::ESurfaceType) standard_mat->GetUint("_surface"));
+                standard_mat->MaterialID((EMaterialID::EMaterialID) standard_mat->GetUint("_MaterialID"));
+            }
+            auto asset = MakeScope<Asset>();
+            asset->_asset_path = asset_path;
+            asset->_asset_type = Material::StaticType();
+            asset->_p_obj = mat;
+            return asset;
+        }
+
         AL_ASSERT_MSG(line_count > 3, "material file error");
         String key{}, guid_str{}, type_str{}, name{}, shader_guid{}, keywords;
         FormatLine(lines[0], key, guid_str);
@@ -891,7 +1343,12 @@ namespace Ailu
         FormatLine(lines[2], key, name);
         FormatLine(lines[3], key, shader_guid);
         FormatLine(lines[4], key, keywords);
-        Shader *shader = Get<Shader>(Guid(shader_guid));
+        Shader *shader = Load<Shader>(Guid(shader_guid)).get();
+        if (shader == nullptr)
+        {
+            LOG_ERROR(L"Load material with path: {} failed, shader {} is unavailable", sys_path, ToWChar(shader_guid));
+            return nullptr;
+        }
         bool is_standard_mat = shader->Name() == "defered_standard_lit";
         Ref<Material> mat = nullptr;
         if (is_standard_mat)
@@ -960,7 +1417,7 @@ namespace Ailu
             else if (cur_type == ShaderPropertyType::Texture2D)
             {
                 if (v.empty() || v == "null guid") continue;
-                auto asset_path = g_pResourceMgr->GuidToAssetPath(Guid(v));
+                auto asset_path = ResourceMgr::Get().GuidToAssetPath(Guid(v));
                 if (!asset_path.empty())
                 {
                     mat->SetTexture(k, Load<Texture2D>(asset_path).get());
@@ -993,6 +1450,30 @@ namespace Ailu
         List<Ref<AnimationClip>> clips;
         if (FileManager::ReadFile(sys_path, data))
         {
+            if (IsLikelyJsonAssetDocument(data))
+            {
+                MeshAssetDocument doc;
+                if (!LoadAssetDocument(sys_path, doc))
+                    return nullptr;
+                auto file = ToWChar(doc._file);
+                MeshImportSetting setting;
+                setting._import_flag |= MeshImportSetting::kImportFlagMesh;
+                setting._is_import_material = false;
+                setting._mesh_name = doc._inner_file_name;
+                setting._is_combine_mesh = doc._is_combine_mesh;
+                auto &&mesh_list = std::move(LoadExternalMesh(file, setting, clips));
+                AL_ASSERT(mesh_list.size() != 0);
+                bool is_sk_mesh = dynamic_cast<SkeletonMesh *>(mesh_list.front().get()) != nullptr;
+                auto asset = MakeScope<Asset>();
+                asset->_asset_path = asset_path;
+                asset->_asset_type = is_sk_mesh ? SkeletonMesh::StaticType() : Mesh::StaticType();
+                asset->_external_asset_path = file;
+                asset->_p_obj = mesh_list.front();
+                asset->_name = PathUtils::GetFileName(asset_path);
+                CreateAndRegisterEmbeddedMaterial(mesh_list.front().get());
+                _importers[asset_path] = AL_NEW(MeshImportSetting, setting);
+                return asset;
+            }
             auto c = StringUtils::Split(data, L"\n");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
             String innear_file_name = ToChar(c[4].substr(c[4].find_first_of(L":") + 2));
@@ -1000,7 +1481,7 @@ namespace Ailu
             setting._import_flag |= MeshImportSetting::kImportFlagMesh;
             setting._is_import_material = false;
             setting._mesh_name = innear_file_name;
-            setting._is_combine_mesh = c[5].substr(c[5].find_first_of(L":") + 2) == WString(L"true") ? true : false;
+            setting._is_combine_mesh = c.size() > 6 && c[5].substr(c[5].find_first_of(L":") + 2) == WString(L"true") ? true : false;
             //setting._import_flag |= MeshImportSetting::kImportFlagAnimation;
             auto &&mesh_list = std::move(LoadExternalMesh(file, setting, clips));
             AL_ASSERT(mesh_list.size() !=0);
@@ -1022,9 +1503,21 @@ namespace Ailu
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         WString data;
-        Ref<ComputeShader> cs;
         if (FileManager::ReadFile(sys_path, data))
         {
+            if (IsLikelyJsonAssetDocument(data))
+            {
+                ComputeShaderAssetDocument doc;
+                if (!LoadAssetDocument(sys_path, doc))
+                    return nullptr;
+                auto file = ToWChar(doc._file);
+                auto asset = MakeScope<Asset>();
+                asset->_asset_path = asset_path;
+                asset->_asset_type = ComputeShader::StaticType();
+                asset->_external_asset_path = file;
+                asset->_p_obj = LoadExternalComputeShader(file);
+                return asset;
+            }
             auto c = StringUtils::Split(data, L"\n");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
             String kernel = ToChar(c[4].substr(c[4].find_first_of(L":") + 2));
@@ -1041,8 +1534,190 @@ namespace Ailu
     Scope<Asset> ResourceMgr::LoadScene(const WString &asset_path,const ImportSetting& settings)
     {
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
-        String scene_data;
-        FileManager::ReadFile(sys_path, scene_data);
+        WString data;
+        if (!FileManager::ReadFile(sys_path, data))
+            return nullptr;
+
+        if (IsLikelyJsonAssetDocument(data))
+        {
+            SceneAssetDocument doc;
+            if (!LoadAssetDocument(sys_path, doc))
+                return nullptr;
+
+            const String scene_name = !doc._header._asset_name.empty() ? doc._header._asset_name : ToChar(PathUtils::GetFileName(asset_path).c_str());
+            Ref<Scene> loaded_scene = MakeRef<Scene>(scene_name);
+            auto &reg = loaded_scene->GetRegister();
+            HashMap<ECS::Entity, ECS::Entity> old_to_new_entities;
+            old_to_new_entities.reserve(doc._entities.size());
+
+            for (const auto &entity_doc: doc._entities)
+            {
+                ECS::Entity new_entity = reg.Create();
+                old_to_new_entities.emplace(static_cast<ECS::Entity>(entity_doc._entity_id), new_entity);
+
+                auto &tag = reg.AddComponent<ECS::TagComponent>(new_entity);
+                tag._name = entity_doc._tag_component._name;
+                tag._layer_mask = entity_doc._tag_component._layer_mask;
+            }
+
+            for (const auto &entity_doc: doc._entities)
+            {
+                const auto entity_it = old_to_new_entities.find(static_cast<ECS::Entity>(entity_doc._entity_id));
+                if (entity_it == old_to_new_entities.end())
+                    continue;
+                const ECS::Entity entity = entity_it->second;
+
+                if (entity_doc._has_transform_component)
+                {
+                    auto &component = reg.AddComponent<ECS::TransformComponent>(entity);
+                    component._transform._position = entity_doc._transform_component._position;
+                    component._transform._rotation = entity_doc._transform_component._rotation;
+                    component._transform._scale = entity_doc._transform_component._scale;
+                }
+                if (entity_doc._has_script_component)
+                {
+                    auto &component = reg.AddComponent<ECS::ScriptComponent>(entity);
+                    component._script_path = entity_doc._script_component._script_path;
+                    component.ResetRuntime();
+                }
+                if (entity_doc._has_static_mesh_component)
+                {
+                    auto &component = reg.AddComponent<ECS::StaticMeshComponent>(entity);
+                    if (!entity_doc._static_mesh_component._mesh_guid.empty())
+                    {
+                        const Guid mesh_guid(entity_doc._static_mesh_component._mesh_guid);
+                        ResourceMgr::Get().Load<Mesh>(mesh_guid);
+                        component._p_mesh = ResourceMgr::Get().GetRef<Mesh>(mesh_guid);
+                        if (component._p_mesh != nullptr)
+                        {
+                            component._transformed_aabbs.resize(component._p_mesh->SubmeshCount() + 1u);
+                        }
+                    }
+                    LoadMaterialRefs(entity_doc._static_mesh_component._material_guids, component._p_mesh.get(), component._p_mats);
+                }
+                if (entity_doc._has_light_component)
+                {
+                    auto &component = reg.AddComponent<ECS::LightComponent>(entity);
+                    if (!entity_doc._light_component._type.empty())
+                    {
+                        component._type = ECS::ELightType::FromString(entity_doc._light_component._type);
+                    }
+                    component._light._light_color = entity_doc._light_component._light._light_color;
+                    component._light._light_param = entity_doc._light_component._light._light_param;
+                    component._light._is_two_side = entity_doc._light_component._light._is_two_side;
+                    component._shadow._is_cast_shadow = entity_doc._light_component._shadow._is_cast_shadow;
+                    component._shadow._constant_bias = entity_doc._light_component._shadow._constant_bias;
+                    component._shadow._slope_bias = entity_doc._light_component._shadow._slope_bias;
+                }
+                if (entity_doc._has_camera_component)
+                {
+                    auto &component = reg.AddComponent<ECS::CCamera>(entity);
+                    if (!entity_doc._camera_component._type.empty())
+                    {
+                        component._camera.Type(ECameraType::FromString(entity_doc._camera_component._type));
+                    }
+                    component._camera.Aspect(entity_doc._camera_component._aspect);
+                    component._camera.Far(entity_doc._camera_component._far_clip);
+                    component._camera.Near(entity_doc._camera_component._near_clip);
+                    component._camera.FovH(entity_doc._camera_component._fov_h);
+                    component._camera.Size(entity_doc._camera_component._size);
+                    component._camera.MarkDirty();
+                    component._camera.RecalculateMatrix(true);
+                }
+                if (entity_doc._has_lightprobe_component)
+                {
+                    auto &component = reg.AddComponent<ECS::CLightProbe>(entity);
+                    component._size = entity_doc._lightprobe_component._size;
+                    component._is_update_every_tick = entity_doc._lightprobe_component._is_update_every_tick;
+                    component._is_dirty = true;
+                }
+                if (entity_doc._has_rigidbody_component)
+                {
+                    auto &component = reg.AddComponent<ECS::CRigidBody>(entity);
+                    component._mass = entity_doc._rigidbody_component._mass;
+                }
+                if (entity_doc._has_collider_component)
+                {
+                    auto &component = reg.AddComponent<ECS::CCollider>(entity);
+                    if (!entity_doc._collider_component._type.empty())
+                    {
+                        component._type = ECS::EColliderType::FromString(entity_doc._collider_component._type);
+                    }
+                    component._is_trigger = entity_doc._collider_component._is_trigger;
+                    component._center = entity_doc._collider_component._center;
+                    component._param = entity_doc._collider_component._param;
+                }
+                if (entity_doc._has_skeleton_mesh_component)
+                {
+                    auto &component = reg.AddComponent<ECS::CSkeletonMesh>(entity);
+                    if (!entity_doc._skeleton_mesh_component._mesh_guid.empty())
+                    {
+                        const Guid mesh_guid(entity_doc._skeleton_mesh_component._mesh_guid);
+                        ResourceMgr::Get().Load<SkeletonMesh>(mesh_guid);
+                        component._p_mesh = ResourceMgr::Get().GetRef<SkeletonMesh>(mesh_guid);
+                        if (component._p_mesh != nullptr)
+                        {
+                            component._transformed_aabbs.resize(component._p_mesh->SubmeshCount() + 1u);
+                        }
+                    }
+                    LoadMaterialRefs(entity_doc._skeleton_mesh_component._material_guids, component._p_mesh.get(), component._p_mats);
+                    if (!entity_doc._skeleton_mesh_component._anim_clip_guid.empty())
+                    {
+                        const Guid clip_guid(entity_doc._skeleton_mesh_component._anim_clip_guid);
+                        ResourceMgr::Get().Load<AnimationClip>(clip_guid);
+                        component._anim_clip = ResourceMgr::Get().GetRef<AnimationClip>(clip_guid);
+                    }
+                }
+                if (entity_doc._has_vxgi_component)
+                {
+                    auto &component = reg.AddComponent<ECS::CVXGI>(entity);
+                    component._grid_num = entity_doc._vxgi_component._grid_num;
+                    component._distance = entity_doc._vxgi_component._distance;
+                }
+            }
+
+            for (const auto &entity_doc: doc._entities)
+            {
+                if (!entity_doc._has_hierarchy_component)
+                    continue;
+
+                const auto entity_it = old_to_new_entities.find(static_cast<ECS::Entity>(entity_doc._entity_id));
+                if (entity_it == old_to_new_entities.end())
+                    continue;
+                const ECS::Entity entity = entity_it->second;
+
+                auto &component = reg.AddComponent<ECS::CHierarchy>(entity);
+                component._first_child = RemapSceneEntityId(old_to_new_entities, entity_doc._hierarchy_component._first_child);
+                component._prev_sibling = RemapSceneEntityId(old_to_new_entities, entity_doc._hierarchy_component._prev_sibling);
+                component._next_sibling = RemapSceneEntityId(old_to_new_entities, entity_doc._hierarchy_component._next_sibling);
+                component._parent = RemapSceneEntityId(old_to_new_entities, entity_doc._hierarchy_component._parent);
+                component._children_num = entity_doc._hierarchy_component._children_num;
+                if (!entity_doc._hierarchy_component._inv_matrix_attach.empty())
+                {
+                    component._inv_matrix_attach.FromString(entity_doc._hierarchy_component._inv_matrix_attach);
+                }
+                if (auto *transform = reg.GetComponent<ECS::TransformComponent>(entity); transform != nullptr)
+                {
+                    transform->_transform._p_parent = nullptr;
+                    if (component._parent != ECS::kInvalidEntity)
+                    {
+                        if (auto *parent_transform = reg.GetComponent<ECS::TransformComponent>(component._parent); parent_transform != nullptr)
+                        {
+                            transform->_transform._p_parent = &parent_transform->_transform;
+                        }
+                    }
+                }
+            }
+
+            loaded_scene->MarkDirty();
+            auto asset = MakeScope<Asset>();
+            asset->_asset_path = asset_path;
+            asset->_asset_type = Scene::StaticType();
+            asset->_p_obj = loaded_scene;
+            return asset;
+        }
+
+        String scene_data = ToChar(data);
         su::RemoveSpaces(scene_data);
         std::stringstream ss(scene_data);
         String line;
@@ -1064,8 +1739,61 @@ namespace Ailu
     Scope<Asset> ResourceMgr::LoadAnimClip(const WString &asset_path,const ImportSetting& settings)
     {
         WString sys_path = ResourceMgr::GetResSysPath(asset_path);
-        String clip_data;
-        FileManager::ReadFile(sys_path, clip_data);
+        WString data;
+        if (!FileManager::ReadFile(sys_path, data))
+            return nullptr;
+
+        if (IsLikelyJsonAssetDocument(data))
+        {
+            AnimationClipAssetDocument doc;
+            if (!LoadAssetDocument(sys_path, doc))
+                return nullptr;
+
+            Ref<AnimationClip> loaded_clip = MakeRef<AnimationClip>();
+            loaded_clip->Name(!doc._clip_name.empty() ? doc._clip_name : doc._header._asset_name);
+            loaded_clip->FrameCount(doc._frame_count);
+            loaded_clip->Duration(doc._duration);
+            loaded_clip->FrameRate(doc._frame_rate);
+            const f32 frame_duration = doc._frame_duration > 0.0f ? doc._frame_duration : ((doc._frame_count > 0u && doc._duration > 0.0f) ? (doc._duration / static_cast<f32>(doc._frame_count)) : 0.0f);
+            loaded_clip->FrameDuration(frame_duration);
+            loaded_clip->IsLooping(doc._is_looping);
+            loaded_clip->StartTime(0.0f);
+            loaded_clip->EndTime(doc._duration);
+
+            for (const auto &track_doc: doc._tracks)
+            {
+                auto &track = (*loaded_clip)[track_doc._joint_index];
+                track.Resize(track_doc._frames.size());
+                f32 cur_time = 0.0f;
+                for (u32 frame_index = 0u; frame_index < track_doc._frames.size(); ++frame_index)
+                {
+                    const auto &frame_doc = track_doc._frames[frame_index];
+                    auto pos_frame = TrackHelpers::FromVector(frame_doc._position);
+                    pos_frame._time = cur_time;
+                    auto rot_frame = TrackHelpers::FromQuaternion(frame_doc._rotation);
+                    rot_frame._time = cur_time;
+                    auto scale_frame = TrackHelpers::FromVector(frame_doc._scale);
+                    scale_frame._time = cur_time;
+                    track.GetPositionTrack()[frame_index] = pos_frame;
+                    track.GetRotationTrack()[frame_index] = rot_frame;
+                    track.GetScaleTrack()[frame_index] = scale_frame;
+                    cur_time += frame_duration;
+                }
+            }
+            if (doc._duration <= 0.0f)
+            {
+                loaded_clip->RecalculateDuration();
+            }
+
+            auto asset = MakeScope<Asset>();
+            asset->_asset_path = asset_path;
+            asset->_asset_type = AnimationClip::StaticType();
+            asset->_p_obj = loaded_clip;
+            AnimationClipLibrary::AddClip(loaded_clip);
+            return asset;
+        }
+
+        String clip_data = ToChar(data);
         su::RemoveSpaces(clip_data);
         std::stringstream ss(clip_data);
         String line;
@@ -1303,7 +2031,7 @@ namespace Ailu
         u16 index = 0u;
         for (auto it = mesh->GetCacheMaterials().begin(); it != mesh->GetCacheMaterials().end(); it++)
         {
-            auto mat = MakeRef<StandardMaterial>("MAT_" + it->_name);
+            auto mat = MakeRef<StandardMaterial>("MAT_" + it->_name + "_embedded");
             if (!it->_textures[0].empty())
             {
                 String tex_file_name = PathUtils::GetFileName(it->_textures[0]);
@@ -1330,6 +2058,19 @@ namespace Ailu
                     RegisterResource(asset_path, tex);
                 }
                 mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, tex.get());
+            }
+            if (!it->_textures[2].empty())
+            {
+                String tex_file_name = PathUtils::GetFileName(it->_textures[2]);
+                auto asset_path = ToWChar(std::format("EmbeddedMaterial/{}/{}/{}", mesh->Name(), index, tex_file_name));
+                auto tex = GetRef<Texture2D>(asset_path);
+                if (!tex)
+                {
+                    auto setting = TextureImportSetting::Default();
+                    tex = LoadExternalTexture(ToWChar(it->_textures[2]), setting);
+                    RegisterResource(asset_path, tex);
+                }
+                mat->SetTexture(StandardMaterial::StandardPropertyName::kEmission._tex_name, tex.get());
             }
             mat->SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, it->_diffuse);
             mat->SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, it->_roughness);
@@ -1446,15 +2187,6 @@ namespace Ailu
         }
     }
 
-    Ref<Texture2D> ResourceMgr::GetDefaultResourceRef(const Texture2D*)
-    {
-        if (g_pResourceMgr == nullptr || Texture::s_p_default_white == nullptr)
-            return nullptr;
-        if (g_pResourceMgr->_lut_global_resources.contains(Texture::s_p_default_white->ID()))
-            return std::static_pointer_cast<Texture2D>(g_pResourceMgr->_lut_global_resources[Texture::s_p_default_white->ID()]->second);
-        return nullptr;
-    }
-
     void ResourceMgr::FormatLine(const String &line, String &key, String &value)
     {
         std::istringstream iss(line);
@@ -1470,6 +2202,15 @@ namespace Ailu
     void ResourceMgr::ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, const Type *&type)
     {
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
+        AssetDocumentHeader header;
+        if (TryLoadAssetDocumentHeader(sys_path, header))
+        {
+            guid = Guid(header._guid);
+            name = ToWChar(header._asset_name);
+            type = FindAssetType(ToWChar(header._asset_type));
+            return;
+        }
+
         WString data;
         if (FileManager::ReadFile(sys_path, data))
         {
@@ -1632,8 +2373,15 @@ namespace Ailu
                             if (normal != nullptr)
                                 mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, std::static_pointer_cast<Texture>(normal).get());
                         }
+                        if (!it->_textures[2].empty())
+                        {
+                            auto emissive = ImportResource(ToWChar(it->_textures[2]), target_dir);
+                            if (emissive != nullptr)
+                                mat->SetTexture(StandardMaterial::StandardPropertyName::kEmission._tex_name, std::static_pointer_cast<Texture>(emissive).get());
+                        }
                         mat->SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, it->_diffuse);
                         mat->SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, it->_roughness);
+                        mat->SetVector(StandardMaterial::StandardPropertyName::kEmission._value_name, it->_emissive);
                         imported_asset_path = created_asset_dir;
                         imported_asset_path.append(std::format(L"{}.alasset", ToWChar(mat->_name.c_str())));
                         loaded_objects.push(std::make_tuple(imported_asset_path, mat));

@@ -82,7 +82,7 @@ namespace Ailu
                         {
                             for (int j = 0; j < task_num; j++)
                             {
-                                task_status.emplace_back(g_pThreadTool->Enqueue(downsample_sub_task, j * sub_task_block_size, (j + 1) * sub_task_block_size,
+                                task_status.emplace_back(Core::ThreadPool::Get().Enqueue(downsample_sub_task, j * sub_task_block_size, (j + 1) * sub_task_block_size,
                                                                                 i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width));
                                 //downsample_sub_task(j * sub_task_block_size, (j + 1) * sub_task_block_size, i * sub_task_block_size, (i + 1) * sub_task_block_size, new_width);
                             }
@@ -539,9 +539,11 @@ namespace Ailu
             void CreateView() override;
             void CreateView(ETextureViewType view_type, u16 mipmap, u16 array_slice = 0) override {};
             virtual void GenerateMipmap() override;
-            Color GetPixel32(u16 x, u16 y);
-            Color GetPixel(u16 x, u16 y);
-            Color GetPixelBilinear(float u, float v);
+            Color GetPixel32(u16 x, u16 y) const;
+            Color GetPixel(u16 x, u16 y) const;
+            Color GetPixelBilinear(float u, float v) const;
+            bool TryGetPixel(u16 x, u16 y, Color &color) const;
+            bool TryGetPixelBilinear(float u, float v, Color &color) const;
             Ptr GetPixelData(u16 mipmap);
             void SetPixel(u16 x, u16 y, Color color, u16 mipmap);
             void SetPixel32(u16 x, u16 y, Color32 color, u16 mipmap);

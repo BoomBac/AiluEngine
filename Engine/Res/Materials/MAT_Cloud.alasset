@@ -1,24 +1,57 @@
-guid: a5ad5353-4bed-47b7-a4c2-aa26036f7ac2
-type: Ailu::Render::Material
-name: MAT_Cloud
-shader_guid: 0cd86d2c-e28b-4816-a032-0ef7fb1843f5
-keywords: 
-  prop_type: Uint
-    _cull: 2
-  prop_type: Float
-    _DensityMultply: 0.057
-    _Exposure: 0.5
-    _Fade: 1
-    _G: -0.272
-    _StepSize: 0.129
-    _Threshold: 0
-    _padding0: 1
-    _padding1: 0.365
-  prop_type: Vector
-    _AABBMax: 1.01,1.01,1.01,1
-    _AABBMin: -1.01,-1.01,-1.01,1
-    _AABBScale: 1,1,1,1
-    _Absorption: 0,0,0,1
-    _Scattering: 100,100,100,1
-  prop_type: IntVector
-  prop_type: Texture2D
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "a5ad5353-4bed-47b7-a4c2-aa26036f7ac2",
+        "_asset_type": "Ailu::Render::Material",
+        "_asset_name": "MAT_Cloud"
+    },
+    "_texture_properties": [],
+    "_shader_guid": "0cd86d2c-e28b-4816-a032-0ef7fb1843f5",
+    "_int_vector_properties": [],
+    "_keywords": [""],
+    "_uint_properties": [{
+            "_name": "_cull",
+            "_value": 2
+        }],
+    "_float_properties": [{
+            "_name": "_DensityMultply",
+            "_value": 0.05700000002980232
+        }, {
+            "_name": "_Exposure",
+            "_value": 0.5
+        }, {
+            "_name": "_Fade",
+            "_value": 1.0
+        }, {
+            "_name": "_G",
+            "_value": -0.2720000147819519
+        }, {
+            "_name": "_StepSize",
+            "_value": 0.1289999932050705
+        }, {
+            "_name": "_Threshold",
+            "_value": 0.0
+        }, {
+            "_name": "_padding0",
+            "_value": 1.0
+        }, {
+            "_name": "_padding1",
+            "_value": 0.36500000953674316
+        }],
+    "_vector_properties": [{
+            "_name": "_AABBMax",
+            "_value": [1.0099999904632568, 1.0099999904632568, 1.0099999904632568, 1.0]
+        }, {
+            "_name": "_AABBMin",
+            "_value": [-1.0099999904632568, -1.0099999904632568, -1.0099999904632568, 1.0]
+        }, {
+            "_name": "_AABBScale",
+            "_value": [1.0, 1.0, 1.0, 1.0]
+        }, {
+            "_name": "_Absorption",
+            "_value": [0.0, 0.0, 0.0, 1.0]
+        }, {
+            "_name": "_Scattering",
+            "_value": [100.0, 100.0, 100.0, 1.0]
+        }]
+}

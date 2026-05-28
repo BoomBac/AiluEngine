@@ -100,6 +100,9 @@ namespace Ailu
     class AILU_API ResourceMgr : public IRuntimeModule
     {
     public:
+        static void Init();
+        static void Shutdown();
+        static ResourceMgr& Get();
         using ResourcePoolContainer = Map<WString, Ref<Object>>;
         using ResourcePoolContainerIter = ResourcePoolContainer::iterator;
         using ResourcePoolLut = Map<u32, ResourcePoolContainer::iterator>;
@@ -132,6 +135,7 @@ namespace Ailu
         bool MoveAsset(Asset *p_asset, const WString &new_asset_path);
         void SaveAsset(const Asset *asset);
         void SaveAllUnsavedAssets();
+        void MigrateLegacyAssetDocuments(const WString &root_asset_dir = L"");
         Asset *GetLinkedAsset(Object *obj);
         static void ConfigProjectRoot(const WString &project_root);
         static void ConfigEngineResRoot(const WString &engine_res_root);
@@ -282,23 +286,6 @@ namespace Ailu
             return typed_setting ? *typed_setting : ShaderImportSetting::Default();
         }
 
-        template<typename T>
-        static T *GetDefaultResource(const T *)
-        {
-            return nullptr;
-        }
-        static Texture2D *GetDefaultResource(const Texture2D *)
-        {
-            return dynamic_cast<Texture2D *>(Texture::s_p_default_white);
-        }
-
-        template<typename T>
-        static Ref<T> GetDefaultResourceRef(const T *)
-        {
-            return nullptr;
-        }
-        static Ref<Texture2D> GetDefaultResourceRef(const Texture2D*);
-
         static void FormatLine(const String &line, String &key, String &value);
         static void ExtractCommonAssetInfo(const WString &asset_path, WString &name, Guid &guid, const Type *&type);
 
@@ -368,8 +355,6 @@ namespace Ailu
         Queue<Asset *> _pending_delete_assets;
         HashMap<WString, ImportSetting*> _importers;
     };
-    extern AILU_API ResourceMgr *g_pResourceMgr;
-
     template<typename T>
     inline Ref<T> ResourceMgr::Load(const WString &asset_path, const ImportSetting *setting)
     {
@@ -458,7 +443,7 @@ namespace Ailu
         };
 
         auto async_setting = CopyAsyncImportSetting(setting, static_cast<const T *>(nullptr));
-        g_pThreadTool->Enqueue([this, asset_path, async_setting, callback = std::move(execute_callback)]() mutable
+        Core::ThreadPool::Get().Enqueue([this, asset_path, async_setting, callback = std::move(execute_callback)]() mutable
                                {
                                    auto asset = this->Load<T>(asset_path, &async_setting);
                                    callback(std::move(asset));
@@ -474,7 +459,7 @@ namespace Ailu
         };
 
         auto async_setting = CopyAsyncImportSetting(setting, static_cast<const T *>(nullptr));
-        g_pThreadTool->Enqueue([this, guid, async_setting, callback = std::move(execute_callback)]() mutable
+        Core::ThreadPool::Get().Enqueue([this, guid, async_setting, callback = std::move(execute_callback)]() mutable
                                {
                                    auto asset = this->Load<T>(guid, &async_setting);
                                    callback(std::move(asset));
@@ -487,7 +472,7 @@ namespace Ailu
         {
             return std::static_pointer_cast<T>(_global_resources[res_id]).get();
         }
-        return GetDefaultResource(static_cast<const T *>(nullptr));
+        return nullptr;
     }
     template<typename T>
     inline Ref<T> ResourceMgr::GetRef(const WString &res_id)
@@ -496,7 +481,7 @@ namespace Ailu
         {
             return std::static_pointer_cast<T>(_global_resources[res_id]);
         }
-        return GetDefaultResourceRef(static_cast<const T *>(nullptr));
+        return nullptr;
     }
     template<typename T>
     inline T *ResourceMgr::Get(const Guid &guid)

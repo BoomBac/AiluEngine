@@ -1,5 +1,11 @@
-guid: a39101e3-586a-4b9d-ad20-e33970c21509
-type: Ailu::Render::SkeletonMesh
-name: leg_mesh.alasset
-file: AnimClips/ik_test.fbx
-inner_file_name: leg_mesh
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "a39101e3-586a-4b9d-ad20-e33970c21509",
+        "_asset_type": "Ailu::Render::SkeletonMesh",
+        "_asset_name": "leg_mesh.alasset"
+    },
+    "_file": "AnimClips/ik_test.fbx",
+    "_inner_file_name": "leg_mesh",
+    "_is_combine_mesh": false
+}

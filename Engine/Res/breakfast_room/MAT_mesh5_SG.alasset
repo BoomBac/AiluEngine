@@ -1,25 +1,72 @@
-guid: 73af1627-803c-4829-b367-404ad885fbd8
-type: Ailu::Render::Material
-name: MAT_mesh5_SG
-shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
-keywords: 
-  prop_type: Uint
-    _cull: 2
-  prop_type: Float
-    _AlphaCulloff: 0
-    _Anisotropy: 0
-    _MaterialID: 0
-    _MetallicValue: 0
-    _RoughnessValue: 0
-    _SamplerMask: 0
-  prop_type: Vector
-    _AlbedoValue: 0.898039,0.898039,0.898039,1
-    _EmissionValue: 0,0,0,0
-    _SpecularValue: 0,0,0,0
-  prop_type: IntVector
-  prop_type: Texture2D
-    _AlbedoTex: null
-    _EmissionTex: null
-    _NormalTex: null
-    _RoughnessMetallicTex: null
-    _SpecularTex: null
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "73af1627-803c-4829-b367-404ad885fbd8",
+        "_asset_type": "Ailu::Render::Material",
+        "_asset_name": "MAT_mesh5_SG"
+    },
+    "_texture_properties": [{
+            "_name": "_AlbedoTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_EmissionTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_NormalTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_RoughnessMetallicTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_SpecularTex",
+            "_texture_guid": ""
+        }],
+    "_shader_guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
+    "_int_vector_properties": [],
+    "_keywords": [""],
+    "_uint_properties": [{
+            "_name": "_MaterialID",
+            "_value": 0
+        }, {
+            "_name": "_cull",
+            "_value": 2
+        }, {
+            "_name": "_surface",
+            "_value": 0
+        }],
+    "_float_properties": [{
+            "_name": "_AlphaCulloff",
+            "_value": 0.0
+        }, {
+            "_name": "_Anisotropy",
+            "_value": 0.0
+        }, {
+            "_name": "_IOR",
+            "_value": 0.0
+        }, {
+            "_name": "_MaterialID",
+            "_value": 0.0
+        }, {
+            "_name": "_MetallicValue",
+            "_value": 0.0
+        }, {
+            "_name": "_RoughnessValue",
+            "_value": 0.0
+        }, {
+            "_name": "_SamplerMask",
+            "_value": 0.0
+        }, {
+            "_name": "_Transmission",
+            "_value": 0.0
+        }],
+    "_vector_properties": [{
+            "_name": "_AlbedoValue",
+            "_value": [0.8980389833450317, 0.8980389833450317, 0.8980389833450317, 1.0]
+        }, {
+            "_name": "_EmissionValue",
+            "_value": [0.0, 0.0, 0.0, 0.0]
+        }, {
+            "_name": "_SpecularValue",
+            "_value": [0.0, 0.0, 0.0, 0.0]
+        }]
+}

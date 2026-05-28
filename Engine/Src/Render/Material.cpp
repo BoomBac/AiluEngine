@@ -1,4 +1,4 @@
-#include "Render/Material.h"
+﻿#include "Render/Material.h"
 #include "Framework/Common/Asset.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
@@ -343,7 +343,7 @@ namespace Ailu::Render
 
     void Material::SetTexture(const String &name, const WString &texture_path)
     {
-        auto texture = g_pResourceMgr->Get<Texture2D>(texture_path);
+        auto texture = ResourceMgr::Get().Get<Texture2D>(texture_path);
         if (texture == nullptr)
         {
             LOG_ERROR("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);
@@ -881,7 +881,7 @@ namespace Ailu::Render
         else if (value == ESurfaceType::kTransparent)
         {
             DisableKeyword("ALPHA_TEST");
-            _p_active_shader = g_pResourceMgr->Get<Shader>(L"Shaders/forwardlit.alasset");
+            _p_active_shader = ResourceMgr::Get().Get<Shader>(L"Shaders/forwardlit.alasset");
             _render_queue = Shader::kRenderQueueTransparent;
         }
         else if (value == ESurfaceType::kAlphaTest)
@@ -916,7 +916,7 @@ namespace Ailu::Render
 
     void StandardMaterial::SetTexture(const String &name, const WString &texture_path)
     {
-        auto texture = g_pResourceMgr->Get<Texture2D>(texture_path);
+        auto texture = ResourceMgr::Get().Get<Texture2D>(texture_path);
         if (texture == nullptr)
         {
             LOG_ERROR("Cann't find texture: {} when set material {} texture{}!", ToChar(texture_path), _name, name);

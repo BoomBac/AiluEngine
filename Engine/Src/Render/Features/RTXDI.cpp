@@ -1,4 +1,4 @@
-#include "Render/Features/RTXDI.h"
+﻿#include "Render/Features/RTXDI.h"
 
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/CommandBuffer.h"
@@ -11,7 +11,7 @@ namespace Ailu::Render
     #define GET_MEMBER_NAME(member_name) (std::string_view(#member_name))
     RTXDI::RTXDI() : RenderFeature("RTXDI")
     {
-        _rtxdi_compute_shader = g_pResourceMgr->Load<ComputeShader>(L"Shaders/rtxdi.alasset");
+        _rtxdi_compute_shader = ResourceMgr::Get().Load<ComputeShader>(L"Shaders/rtxdi.alasset");
         _rtxdi_pass = MakeScope<RTXDIPass>(_rtxdi_compute_shader.get());
         _rtxdi_compute_shader->SetInt("_light_sample_count", static_cast<i32>(_light_sample_count));
         _rtxdi_compute_shader->SetInt("_brdf_sample_count", static_cast<i32>(_brdf_sample_count));

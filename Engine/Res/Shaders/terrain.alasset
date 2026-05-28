@@ -1,6 +1,11 @@
-guid: 2800bee2-b69e-46af-8111-e454ff8a5660
-type: Ailu::Render::Shader
-name: GpuTerrain
-  file: Shaders/hlsl/terrain.hlsl
-  vs_entry: VSMain
-  ps_entry: PSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "2800bee2-b69e-46af-8111-e454ff8a5660",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "GpuTerrain"
+    },
+    "_file": "Shaders/hlsl/terrain.hlsl",
+    "_ps_entry": "PSMain",
+    "_vs_entry": "VSMain"
+}

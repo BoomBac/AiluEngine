@@ -1,4 +1,4 @@
-#include "Scene/Component.h"
+﻿#include "Scene/Component.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/Gizmo.h"
 #include "pch.h"
@@ -157,7 +157,7 @@ namespace Ailu::ECS
     {
         ar.IncreaseIndent();
         ar.InsertIndent();
-        ar << "_p_mesh:" << (c._p_mesh ? g_pResourceMgr->GetLinkedAsset(c._p_mesh.get())->GetGuid().ToString() : Guid::EmptyGuid().ToString());
+        ar << "_p_mesh:" << (c._p_mesh ? ResourceMgr::Get().GetLinkedAsset(c._p_mesh.get())->GetGuid().ToString() : Guid::EmptyGuid().ToString());
         ar.NewLine();
         ar.InsertIndent();
         ar << "_material_num:" << c._p_mats.size();
@@ -165,7 +165,8 @@ namespace Ailu::ECS
         {
             ar.NewLine();
             ar.InsertIndent();
-            ar << std::format("_p_mats[{}]:{}", i, g_pResourceMgr->GetLinkedAsset(c._p_mats[i].get())->GetGuid().ToString());
+            auto linked_asset = ResourceMgr::Get().GetLinkedAsset(c._p_mats[i].get());
+            ar << std::format("_p_mats[{}]:{}", i, linked_asset ? linked_asset->GetGuid().ToString() : Guid::EmptyGuid().ToString());
         }
         ar.DecreaseIndent();
         ar.NewLine();
@@ -183,8 +184,8 @@ namespace Ailu::ECS
         }
         else
         {
-            g_pResourceMgr->Load<Mesh>(asset_guid);
-            c._p_mesh = g_pResourceMgr->GetRef<Mesh>(asset_guid);
+            ResourceMgr::Get().Load<Mesh>(asset_guid);
+            c._p_mesh = ResourceMgr::Get().GetRef<Mesh>(asset_guid);
             c._transformed_aabbs.resize(c._p_mesh->SubmeshCount() + 1);
         }
         ar >> bufs[0];
@@ -194,14 +195,14 @@ namespace Ailu::ECS
         {
             ar >> bufs[0];
             asset_guid = Guid(su::Split(bufs[0], ":")[1]);
-            auto loaded_mat = g_pResourceMgr->Load<Material>(asset_guid);
+            auto loaded_mat = ResourceMgr::Get().Load<Material>(asset_guid);
             if (loaded_mat)
             {
                 c._p_mats.push_back(loaded_mat);
             }
             else
             {
-                auto embeded_mat = g_pResourceMgr->GetEmbeddedMaterial(c._p_mesh.get(), i);
+                auto embeded_mat = ResourceMgr::Get().GetEmbeddedMaterial(c._p_mesh.get(), i);
                 AL_ASSERT(embeded_mat != nullptr);
                 c._p_mats.push_back(embeded_mat);
             }
@@ -213,7 +214,7 @@ namespace Ailu::ECS
     {
         ar.IncreaseIndent();
         ar.InsertIndent();
-        ar << "_p_mesh:" << (c._p_mesh ? g_pResourceMgr->GetLinkedAsset(c._p_mesh.get())->GetGuid().ToString() : Guid::EmptyGuid().ToString());
+        ar << "_p_mesh:" << (c._p_mesh ? ResourceMgr::Get().GetLinkedAsset(c._p_mesh.get())->GetGuid().ToString() : Guid::EmptyGuid().ToString());
         ar.NewLine();
         ar.InsertIndent();
         ar << "_material_num:" << c._p_mats.size();
@@ -221,11 +222,12 @@ namespace Ailu::ECS
         {
             ar.NewLine();
             ar.InsertIndent();
-            ar << std::format("_p_mats[{}]:{}", i, g_pResourceMgr->GetLinkedAsset(c._p_mats[i].get())->GetGuid().ToString());
+            auto linked_asset = ResourceMgr::Get().GetLinkedAsset(c._p_mats[i].get());
+            ar << std::format("_p_mats[{}]:{}", i, linked_asset ? linked_asset->GetGuid().ToString() : Guid::EmptyGuid().ToString());
         }
         ar.NewLine();
         ar.InsertIndent();
-        ar << "_anim_clip:" << (c._anim_clip ? g_pResourceMgr->GetLinkedAsset(c._anim_clip.get())->GetGuid().ToString() : Guid::EmptyGuid().ToString());
+        ar << "_anim_clip:" << (c._anim_clip ? ResourceMgr::Get().GetLinkedAsset(c._anim_clip.get())->GetGuid().ToString() : Guid::EmptyGuid().ToString());
         ar.DecreaseIndent();
         ar.NewLine();
         return ar;
@@ -242,8 +244,8 @@ namespace Ailu::ECS
         }
         else
         {
-            g_pResourceMgr->Load<SkeletonMesh>(asset_guid);
-            c._p_mesh = g_pResourceMgr->GetRef<SkeletonMesh>(asset_guid);
+            ResourceMgr::Get().Load<SkeletonMesh>(asset_guid);
+            c._p_mesh = ResourceMgr::Get().GetRef<SkeletonMesh>(asset_guid);
             c._transformed_aabbs.resize(c._p_mesh->SubmeshCount() + 1);
         }
         ar >> bufs[0];
@@ -253,8 +255,8 @@ namespace Ailu::ECS
         {
             ar >> bufs[0];
             asset_guid = Guid(su::Split(bufs[0], ":")[1]);
-            g_pResourceMgr->Load<Material>(asset_guid);
-            if (auto mat = g_pResourceMgr->GetRef<Material>(asset_guid); mat != nullptr)
+            ResourceMgr::Get().Load<Material>(asset_guid);
+            if (auto mat = ResourceMgr::Get().GetRef<Material>(asset_guid); mat != nullptr)
                 c._p_mats.push_back(mat);
             else
                 LOG_ERROR("Load material failed:{}", asset_guid.ToString());
@@ -267,8 +269,8 @@ namespace Ailu::ECS
         }
         else
         {
-            g_pResourceMgr->Load<AnimationClip>(asset_guid);
-            c._anim_clip = g_pResourceMgr->GetRef<AnimationClip>(asset_guid);
+            ResourceMgr::Get().Load<AnimationClip>(asset_guid);
+            c._anim_clip = ResourceMgr::Get().GetRef<AnimationClip>(asset_guid);
         }
         return ar;
     }
@@ -360,6 +362,7 @@ namespace Ailu::ECS
         c._size = (f32)std::stoi(su::Split(bufs[0], ":")[1]);
         ar >> bufs[0];
         AL_ASSERT(su::BeginWith(bufs[0], "_is_update_every_tick"));
+        c._is_update_every_tick = static_cast<bool>(std::stoi(su::Split(bufs[0], ":")[1]));
         c._is_dirty = true;
         return ar;
     }

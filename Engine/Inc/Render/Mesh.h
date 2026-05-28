@@ -38,7 +38,7 @@ namespace Ailu
             {
                 std::string _name;
                 u16 _slot = 0;
-                std::array<std::string, 2> _textures;
+                std::array<std::string, 5> _textures;
                 Color _diffuse = Color(1.0f);
                 Color _specular = Color(1.0f);
                 Color _emissive = Color(0.0f);

@@ -121,7 +121,7 @@ namespace Ailu
                 appender->Print(msg);
             }
         }
-        // g_pThreadTool->Enqueue([=](){
+        // Core::ThreadPool::Get().Enqueue([=](){
         //     for (auto &appender: _appenders)
         //     {
         //         if (msg._level >= _output_level)

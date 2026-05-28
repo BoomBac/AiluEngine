@@ -1,6 +1,11 @@
-guid: 97913004-ecc3-4cbb-b226-f8d68e5903ab
-type: Ailu::Render::Shader
-name: cubemap_gen
-  file: Shaders/hlsl/cubemap_gen.hlsl
-  vs_entry: VSMain
-  ps_entry: PSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "97913004-ecc3-4cbb-b226-f8d68e5903ab",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "cubemap_gen"
+    },
+    "_file": "Shaders/hlsl/cubemap_gen.hlsl",
+    "_ps_entry": "PSMain",
+    "_vs_entry": "VSMain"
+}

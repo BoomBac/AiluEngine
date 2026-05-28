@@ -1,5 +1,0 @@
-guid: 39a15cc1-2133-469b-9296-278fbaa7a423
-type: Ailu::Render::Texture2D
-name: Chair_Normal
-  file: breakfast_room/Chair_Normal.png
-  sRGB: 0

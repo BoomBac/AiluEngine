@@ -1,6 +1,11 @@
-guid: D390A432-7AD9-475D-B1A5-726EB91072FB
-type: Ailu::Render::Shader
-name: forwardlit
-  file: Shaders/hlsl/forwardlit.hlsl
-  vs_entry: ForwardVSMain
-  ps_entry: ForwardPSMain
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "D390A432-7AD9-475D-B1A5-726EB91072FB",
+        "_asset_type": "Ailu::Render::Shader",
+        "_asset_name": "forwardlit"
+    },
+    "_file": "Shaders/hlsl/forwardlit.hlsl",
+    "_ps_entry": "ForwardPSMain",
+    "_vs_entry": "ForwardVSMain"
+}

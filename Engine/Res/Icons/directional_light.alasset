@@ -1,5 +1,10 @@
-guid: 687dd7a6-c8d4-40f1-8a33-694707d9c423
-type: Ailu::Render::Texture2D
-name: directional_light
-  file: Icons/directional_light.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "687dd7a6-c8d4-40f1-8a33-694707d9c423",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "directional_light"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/directional_light.png"
+}

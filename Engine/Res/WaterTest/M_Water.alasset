@@ -1,15 +1,30 @@
-guid: abcb7c17-1767-4b43-9850-f7a36a428b96
-type: Ailu::Render::Material
-name: M_Water
-shader_guid: f891ec73-10c8-404b-91ac-5bac15cda5fb
-keywords: 
-  prop_type: Uint
-    _cull: 2
-    shadow_index: 0
-  prop_type: Float
-  prop_type: Vector
-    _DeepColor: 0.211765,0.352941,0.372549,0.8
-    _LightColor: 0.0186043,0,1,0.905882
-  prop_type: IntVector
-  prop_type: Texture2D
-    _NormalTex: null
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "abcb7c17-1767-4b43-9850-f7a36a428b96",
+        "_asset_type": "Ailu::Render::Material",
+        "_asset_name": "M_Water"
+    },
+    "_texture_properties": [{
+            "_name": "_NormalTex",
+            "_texture_guid": ""
+        }],
+    "_shader_guid": "f891ec73-10c8-404b-91ac-5bac15cda5fb",
+    "_int_vector_properties": [],
+    "_keywords": [""],
+    "_uint_properties": [{
+            "_name": "_cull",
+            "_value": 2
+        }, {
+            "_name": "shadow_index",
+            "_value": 0
+        }],
+    "_float_properties": [],
+    "_vector_properties": [{
+            "_name": "_DeepColor",
+            "_value": [0.21176500618457794, 0.35294100642204285, 0.37254899740219116, 0.800000011920929]
+        }, {
+            "_name": "_LightColor",
+            "_value": [0.018604300916194916, 0.0, 1.0, 0.9058820009231567]
+        }]
+}

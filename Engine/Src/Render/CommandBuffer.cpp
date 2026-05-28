@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 
 #include "Framework/Common/ThreadPool.h"
 #include "RHI/DX12/D3DCommandBuffer.h"
@@ -380,7 +380,7 @@ namespace Ailu::Render
         }
         void Blit(Texture *src, RenderTexture *dst, Material *mat, u16 pass_index)
         {
-            static const auto blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
+            static const auto blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
             mat = mat ? mat : blit_mat;
             SetRenderTarget(dst);
             if (dst->_load_action == ELoadStoreAction::kClear)
@@ -390,7 +390,7 @@ namespace Ailu::Render
         }
         void Blit(Texture *src, RenderTexture *dst, u16 src_view_index, u16 dst_view_index, Material *mat, u16 pass_index)
         {
-            static const auto blit_mat = g_pResourceMgr->Get<Material>(L"Runtime/Material/Blit");
+            static const auto blit_mat = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Blit");
             mat = mat ? mat : blit_mat;
             SetRenderTarget(dst, dst_view_index);
             if (dst->_load_action == ELoadStoreAction::kClear)

@@ -1,5 +1,10 @@
-guid: acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c
-type: Ailu::Render::Texture2D
-name: point_light
-  file: Icons/point_light.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "acf26f2f-c3dd-4d1c-a1e8-1c3a22bfea7c",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "point_light"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/point_light.png"
+}

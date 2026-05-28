@@ -95,7 +95,7 @@ namespace Ailu
         _p_gpu_timer->Start(cmdList, profileIdx);
         profile_data._is_start = true;
         profile_data._is_finished = false;
-        profile_data._start_time = g_pTimeMgr->GetElapsedSinceCurrentTick();
+        profile_data._start_time = TimeMgr::Get().GetElapsedSinceCurrentTick();
         return profileIdx;
     }
     void Profiler::EndGpuProfile(RHICommandBuffer *cmdList, u32 idx)
@@ -133,11 +133,11 @@ namespace Ailu
         profile_data._is_cpu_profile = true;
         profile_data._is_active = true;
         profile_data._last_used_frame = _cur_frame;
-        g_pTimeMgr->Mark();
-        //g_pTimeMgr _cpu_timer.Mark();
+        TimeMgr::Get().Mark();
+        // TimeMgr local_cpu_timer.Mark();
         profile_data._is_start = true;
         profile_data._is_finished = false;
-        profile_data._start_time = g_pTimeMgr->GetElapsedSinceLaunch();
+        profile_data._start_time = TimeMgr::Get().GetElapsedSinceLaunch();
         //LOG_INFO("Start CPU Profile: {} at frame {} with name {}", profileIdx,g_pGfxContext->GetFrameCount(),name);
         return profileIdx;
     }
@@ -148,7 +148,7 @@ namespace Ailu
         ProfileData &profile_data = _cpu_profiles[idx];
         AL_ASSERT(profile_data._is_start != false);
         AL_ASSERT(profile_data._is_finished != true);
-        profile_data._time = g_pTimeMgr->GetElapsedSinceLastMark();
+        profile_data._time = TimeMgr::Get().GetElapsedSinceLastMark();
         profile_data._is_start = false;
         profile_data._is_finished = true;
         profile_data._last_used_frame = _cur_frame;
@@ -257,7 +257,7 @@ namespace Ailu
             }
             ProfileFrameData frame_data;
             frame_data._frame_index = Application::Get().GetFrameCount();
-            frame_data._start_time = g_pTimeMgr->TickTimeSinceLoad * 1000;//s->ms
+            frame_data._start_time = TimeMgr::Get().TickTimeSinceLoad * 1000;//s->ms
             frame_data._end_time = 1.0f;
             {
                 std::lock_guard<std::mutex> lock(_lock);
@@ -284,7 +284,7 @@ namespace Ailu
                         }
                     }
                 }
-                frame_data._end_time += g_pTimeMgr->TickTimeSinceLoad * 1000;//s->ms
+                frame_data._end_time += TimeMgr::Get().TickTimeSinceLoad * 1000;//s->ms
                 _cache_data.push_back(frame_data);
                 for(auto& it : _cpu_profiler_queue)
                 {

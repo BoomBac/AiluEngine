@@ -1,5 +1,10 @@
-guid: 7182a502-ba5e-4de5-a517-ed226a6b7805
-type: Ailu::Render::ComputeShader
-name: GpuTerrain
-  file: Shaders/hlsl/Compute/gpu_terrain.hlsl
-  kernel: Noname
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "7182a502-ba5e-4de5-a517-ed226a6b7805",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "GpuTerrain"
+    },
+    "_kernel": "Noname",
+    "_file": "Shaders/hlsl/Compute/gpu_terrain.hlsl"
+}

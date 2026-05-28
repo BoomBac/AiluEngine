@@ -1,30 +1,75 @@
-guid: 4f6e2fa4-c9af-4800-9ff9-70874abfbd50
-type: Ailu::Render::Material
-name: StandardPBR
-shader_guid: 60fb44b6-864f-4c6a-b49b-f4b26829b57d
-keywords: 
-  prop_type: Uint
-    _MaterialID: 0
-    _SamplerMask: 0
-    _cull: 0
-    _surface: 0
-  prop_type: Float
-    _AlphaCulloff: 0
-    _Anisotropy: 0.344141
-    _IOR: 1.45
-    _MaterialID: 0
-    _MetallicValue: 0
-    _RoughnessValue: 0.0810237
-    _SamplerMask: 0
-    _Transmission: 0
-  prop_type: Vector
-    _AlbedoValue: 1,1,1,1
-    _EmissionValue: 0,0,0,-1
-    _SpecularValue: 0,0,0,0
-  prop_type: IntVector
-  prop_type: Texture2D
-    _AlbedoTex: null
-    _EmissionTex: null
-    _NormalTex: null
-    _RoughnessMetallicTex: null
-    _SpecularTex: null
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "4f6e2fa4-c9af-4800-9ff9-70874abfbd50",
+        "_asset_type": "Ailu::Render::Material",
+        "_asset_name": "StandardPBR"
+    },
+    "_texture_properties": [{
+            "_name": "_AlbedoTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_EmissionTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_NormalTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_RoughnessMetallicTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_SpecularTex",
+            "_texture_guid": ""
+        }],
+    "_shader_guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
+    "_int_vector_properties": [],
+    "_keywords": [],
+    "_uint_properties": [{
+            "_name": "_MaterialID",
+            "_value": 0
+        }, {
+            "_name": "_SamplerMask",
+            "_value": 0
+        }, {
+            "_name": "_cull",
+            "_value": 0
+        }, {
+            "_name": "_surface",
+            "_value": 0
+        }],
+    "_float_properties": [{
+            "_name": "_AlphaCulloff",
+            "_value": 0.0
+        }, {
+            "_name": "_Anisotropy",
+            "_value": 0.34414100646972656
+        }, {
+            "_name": "_IOR",
+            "_value": 1.4500000476837158
+        }, {
+            "_name": "_MaterialID",
+            "_value": 0.0
+        }, {
+            "_name": "_MetallicValue",
+            "_value": 0.0
+        }, {
+            "_name": "_RoughnessValue",
+            "_value": 1.0
+        }, {
+            "_name": "_SamplerMask",
+            "_value": 0.0
+        }, {
+            "_name": "_Transmission",
+            "_value": 0.0
+        }],
+    "_vector_properties": [{
+            "_name": "_AlbedoValue",
+            "_value": [1.0, 1.0, 1.0, 1.0]
+        }, {
+            "_name": "_EmissionValue",
+            "_value": [0.0, 0.0, 0.0, -1.0]
+        }, {
+            "_name": "_SpecularValue",
+            "_value": [0.0, 0.0, 0.0, 0.0]
+        }]
+}

@@ -1,4 +1,4 @@
-//
+﻿//
 // Created by 22292 on 2024/10/29.
 //
 
@@ -34,13 +34,13 @@ namespace Ailu
         UIRenderer::UIRenderer()
         {
             _obj_cb.reset(ConstantBuffer::Create(Render::RenderConstants::kPerObjectDataSize));
-            _default_material = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_ui.alasset"), "DefaultUIMaterial");
+            _default_material = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/default_ui.alasset"), "DefaultUIMaterial");
             _default_material->SetTexture("_MainTex", Render::Texture::s_p_default_white);
             for (auto &frame_blocks: _drawer_blocks)
             {
                 frame_blocks.push_back(AL_NEW(DrawerBlock, _default_material,9600u));
             }
-            _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial"));
+            _text_block = AL_NEW(DrawerBlock,MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/default_text.alasset"), "DefaultTextMaterial"));
             _text_renderer = MakeScope<TextRenderer>();
         }
         UIRenderer::~UIRenderer()

@@ -6,8 +6,30 @@
 namespace Ailu
 {
     f32 TimeMgr::s_time_scale = 1.0f;
+    namespace
+    {
+        TimeMgr *s_time_mgr = nullptr;
+    }
+
     static std::mutex s_mark_mutex;
     thread_local static std::stack<TimeMgr::ALTimeStamp> s_mark_stamps{};
+
+    void TimeMgr::Init()
+    {
+        AL_ASSERT_MSG(s_time_mgr == nullptr, "TimeMgr already init!");
+        s_time_mgr = new TimeMgr();
+    }
+
+    void TimeMgr::Shutdown()
+    {
+        DESTORY_PTR(s_time_mgr);
+    }
+
+    TimeMgr &TimeMgr::Get()
+    {
+        AL_ASSERT_MSG(s_time_mgr != nullptr, "TimeMgr has not been initialized!");
+        return *s_time_mgr;
+    }
 
     int TimeMgr::Initialize()
     {

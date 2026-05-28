@@ -1,5 +1,10 @@
-guid: 14af7970-dcc5-461f-af8c-9940c52e4766
-type: Ailu::Render::ComputeShader
-name: voxelize
-  file: Shaders/hlsl/Compute/voxelize.hlsl
-  kernel: Noname
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "14af7970-dcc5-461f-af8c-9940c52e4766",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "voxelize"
+    },
+    "_kernel": "Noname",
+    "_file": "Shaders/hlsl/Compute/voxelize.hlsl"
+}

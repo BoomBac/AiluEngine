@@ -1,4 +1,4 @@
-#include "Scene/RenderSystem.h"
+﻿#include "Scene/RenderSystem.h"
 #include "Framework/Common/Profiler.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Scene/Component.h"
@@ -29,7 +29,7 @@ namespace Ailu
 
         Ailu::ECS::LightingSystem::LightingSystem()
         {
-            _light_probe_debug_mat = MakeRef<Material>(g_pResourceMgr->Get<Shader>(L"Shaders/hlsl/cubemap_debug.hlsl"), "lightprobe_debug");
+            _light_probe_debug_mat = MakeRef<Material>(ResourceMgr::Get().Get<Shader>(L"Shaders/hlsl/cubemap_debug.hlsl"), "lightprobe_debug");
             //TODO: 似乎存在额外的对齐原因导致读写大小不匹配，后续在看看
             //auto [probe_data, data_size] = FileManager::ReadFile(ResourceMgr::GetResSysPath(L"ScreenGrab/light_probe.data"));
             //LightProbeHeadInfo head;

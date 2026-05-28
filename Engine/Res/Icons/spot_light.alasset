@@ -1,5 +1,10 @@
-guid: d7e07be5-55ed-4b47-ad7f-107a64cda4bf
-type: Ailu::Render::Texture2D
-name: spot_light
-  file: Icons/spot_light.png
-  sRGB: 1
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "d7e07be5-55ed-4b47-ad7f-107a64cda4bf",
+        "_asset_type": "Ailu::Render::Texture2D",
+        "_asset_name": "spot_light"
+    },
+    "_is_srgb": true,
+    "_file": "Icons/spot_light.png"
+}

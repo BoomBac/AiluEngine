@@ -424,10 +424,10 @@ namespace Ailu
             RawMeshData mesh_data;
             if (is_multithread)
             {
-                rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadVertex, this, node, std::ref(mesh_data._positions), std::ref(mesh_data._bone_weights), std::ref(mesh_data._bone_indices)));
-                rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadNormal, this, node, std::ref(mesh_data._normals)));
-                rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), std::ref(mesh_data._uvs)));
-                rets.emplace_back(g_pThreadTool->Enqueue(&FbxParser::ParserAnimation, this, node, std::ref(_cur_skeleton)));
+                rets.emplace_back(Core::ThreadPool::Get().Enqueue(&FbxParser::ReadVertex, this, node, std::ref(mesh_data._positions), std::ref(mesh_data._bone_weights), std::ref(mesh_data._bone_indices)));
+                rets.emplace_back(Core::ThreadPool::Get().Enqueue(&FbxParser::ReadNormal, this, node, std::ref(mesh_data._normals)));
+                rets.emplace_back(Core::ThreadPool::Get().Enqueue(&FbxParser::ReadUVs, this, std::ref(*fbx_mesh), std::ref(mesh_data._uvs)));
+                rets.emplace_back(Core::ThreadPool::Get().Enqueue(&FbxParser::ParserAnimation, this, node, std::ref(_cur_skeleton)));
                 for (auto &ret: rets)
                     ret.get();
             }
@@ -474,9 +474,14 @@ namespace Ailu
                         }
                         if (auto prop = mat->FindProperty(FbxSurfaceMaterial::sEmissive); prop.IsValid())
                         {
+                            mat_info._emissive = Colors::kBlack;
                             FbxTextureInfo tex_info;
                             tex_info = fill_tex(prop);
-                            mat_info._emissive = Vector3f::kZero;//.color;
+                            if (tex_info.has_texture)
+                            {
+                                mat_info._textures[2] = tex_info.texture_path;
+                                mat_info._emissive = tex_info.color;
+                            }
                         }
                         if (auto prop = mat->FindProperty(FbxSurfaceMaterial::sShininess); prop.IsValid())
                         {
@@ -552,7 +557,7 @@ namespace Ailu
                 scale_track[i]._time = pos_track[i]._time;
             }
         };
-        //g_pTimeMgr->Mark();
+        //TimeMgr::Get().Mark();
         FbxAnimStack *cur_anim_stack = _p_cur_fbx_scene->GetSrcObject<FbxAnimStack>(0);
         if (deformers_num > 0 && cur_anim_stack)
         {

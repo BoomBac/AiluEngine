@@ -1,5 +1,10 @@
-guid: 92f5350a-f983-4448-93a3-ae0fd06ce1f3
-type: Ailu::Render::ComputeShader
-name: HZB
-  file: Shaders/hlsl/Compute/hzb.hlsl
-  kernel: Noname
+{
+    "_header": {
+        "_format_version": 1,
+        "_guid": "92f5350a-f983-4448-93a3-ae0fd06ce1f3",
+        "_asset_type": "Ailu::Render::ComputeShader",
+        "_asset_name": "HZB"
+    },
+    "_kernel": "Noname",
+    "_file": "Shaders/hlsl/Compute/hzb.hlsl"
+}

@@ -1,4 +1,4 @@
-#include "Render/Gizmo.h"
+﻿#include "Render/Gizmo.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/CommandBuffer.h"
@@ -48,7 +48,7 @@ namespace Ailu::Render
 
         _draw_tex_items.resize(kMaxDrawTextureNum);
         s_color.a = 0.75f;
-        _line_drawer = g_pResourceMgr->Get<Material>(L"Runtime/Material/Gizmo");
+        _line_drawer = ResourceMgr::Get().Get<Material>(L"Runtime/Material/Gizmo");
         _text_renderer = new UI::TextRenderer();
     }
     void Gizmo::Initialize()

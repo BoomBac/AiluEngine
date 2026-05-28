@@ -1,5 +1,0 @@
-guid: 311e7f83-7218-4914-8a16-3fcf5a6022bd
-type: Ailu::Render::Texture2D
-name: Chair_Blue_BaseColor
-  file: breakfast_room/Chair_Blue_BaseColor.png
-  sRGB: 1
