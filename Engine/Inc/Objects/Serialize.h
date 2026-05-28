@@ -427,6 +427,115 @@ namespace Ailu
     };
 
     template<typename T>
+    struct SerializerWrapper<Ref<T>>
+    {
+        static_assert(std::is_base_of_v<SerializeObject, T>, "SerializerWrapper<Ref<T>> only supports SerializeObject-derived types");
+
+        static void Serialize(void *data, FArchive &ar, const String *name = nullptr)
+        {
+            if (data == nullptr)
+            {
+                LOG_ERROR("SerializerWrapper<Ref<T>>::Serialize: data is null");
+                return;
+            }
+
+            FStructedArchive *sar = dynamic_cast<FStructedArchive *>(&ar);
+            if (sar && name) sar->BeginObject(*name);
+
+            auto *ref = reinterpret_cast<Ref<T> *>(data);
+            bool has_value = ref->get() != nullptr;
+            const String has_value_name = "_has_value";
+            SerializerWrapper<bool>::Serialize(&has_value, ar, &has_value_name);
+            if (has_value)
+            {
+                static_cast<SerializeObject *>(ref->get())->Serialize(ar);
+            }
+
+            if (sar && name) sar->EndObject();
+        }
+
+        static void Deserialize(void *data, FArchive &ar, const String *name = nullptr)
+        {
+            if (data == nullptr)
+            {
+                LOG_ERROR("SerializerWrapper<Ref<T>>::Deserialize: data is null");
+                return;
+            }
+
+            FStructedArchive *sar = dynamic_cast<FStructedArchive *>(&ar);
+            if (sar && name) sar->BeginObject(*name);
+
+            auto *ref = reinterpret_cast<Ref<T> *>(data);
+            bool has_value = false;
+            const String has_value_name = "_has_value";
+            SerializerWrapper<bool>::Deserialize(&has_value, ar, &has_value_name);
+            if (!has_value)
+            {
+                ref->reset();
+                if (sar && name) sar->EndObject();
+                return;
+            }
+
+            if (sar == nullptr)
+            {
+                if constexpr (std::is_abstract_v<T>)
+                {
+                    LOG_ERROR("SerializerWrapper<Ref<T>>::Deserialize requires FStructedArchive for abstract SerializeObject refs");
+                    ref->reset();
+                }
+                else
+                {
+                    auto value = MakeRef<T>();
+                    value->Deserialize(ar);
+                    *ref = std::move(value);
+                }
+
+                if (sar && name) sar->EndObject();
+                return;
+            }
+
+            const String type_name_field = "_type_name";
+            String type_name;
+            sar->BeginObject(type_name_field);
+            ar >> type_name;
+            sar->EndObject();
+
+            Type *object_type = Type::Find(type_name);
+            if (object_type == nullptr)
+            {
+                LOG_ERROR("SerializerWrapper<Ref<T>>::Deserialize: type {} not found", type_name);
+                ref->reset();
+                if (sar && name) sar->EndObject();
+                return;
+            }
+
+            Object *raw_instance = object_type->CreateInstance<Object>();
+            if (raw_instance == nullptr)
+            {
+                LOG_ERROR("SerializerWrapper<Ref<T>>::Deserialize: failed to construct type {}", type_name);
+                ref->reset();
+                if (sar && name) sar->EndObject();
+                return;
+            }
+
+            T *instance = dynamic_cast<T *>(raw_instance);
+            if (instance == nullptr)
+            {
+                LOG_ERROR("SerializerWrapper<Ref<T>>::Deserialize: type {} is incompatible with requested ref", type_name);
+                delete raw_instance;
+                ref->reset();
+                if (sar && name) sar->EndObject();
+                return;
+            }
+
+            instance->Deserialize(ar);
+            *ref = Ref<T>(instance);
+
+            if (sar && name) sar->EndObject();
+        }
+    };
+
+    template<typename T>
     void SerializePrimitive(void *data, FArchive &ar, const String *name = nullptr)
     {
         return SerializerWrapper<T>::Serialize(data, ar, name);

@@ -653,52 +653,28 @@ namespace Ailu
                 {
                     Vector2f pos = Input::GetMousePos(this);
                     if (is_point_inside(pos, {(f32) (_data.Width - _reserver_area[3]), 0.0f, (f32) _reserver_area[3], (f32) _reserver_area[3]}))
-                    {
-                        Application::Get().SetCursor(ECursorType::kArrow);
                         return HTCLIENT;
-                    }
                     f32 border = 4.0f;
                     if (pos.y < border)
                     {
                         if (pos.x < border)
-                        {
-                            Application::Get().SetCursor(ECursorType::kSizeNWSE);
                             return HTTOPLEFT;
-                        }
                         else if (pos.x > _data.Width - border)
-                        {
-                            Application::Get().SetCursor(ECursorType::kSizeNWSE);
                             return HTTOPRIGHT;
-                        }
-                        Application::Get().SetCursor(ECursorType::kSizeNS);
                         return HTTOP;
                     }
                     if (pos.y > _data.Height - border)
                     {
                         if (pos.x < border)
-                        {
-                            Application::Get().SetCursor(ECursorType::kSizeNWSE);
                             return HTBOTTOMLEFT;
-                        }
                         else if (pos.x > _data.Width - border)
-                        {
-                            Application::Get().SetCursor(ECursorType::kSizeNWSE);
                             return HTBOTTOMRIGHT;
-                        }
-                        Application::Get().SetCursor(ECursorType::kSizeNS);
                         return HTBOTTOM;
                     }
                     if (pos.x < border)
-                    {
-                        Application::Get().SetCursor(ECursorType::kSizeEW);
                         return HTLEFT;
-                    }
                     if (pos.x > _data.Width - border)
-                    {
-                        Application::Get().SetCursor(ECursorType::kSizeEW);
                         return HTRIGHT;
-                    }
-                    Application::Get().SetCursor(ECursorType::kArrow);
                     //kTitleBarHeight = 20.0f = _reserver_area[3];
                     if (pos.y > border && pos.y < _reserver_area[3] && pos.x > _reserver_area[0] + _reserver_area[2])
                         return HTCAPTION;
@@ -707,32 +683,23 @@ namespace Ailu
             break;
             case WM_SETCURSOR:
             {
-                MouseSetCursorEvent e(0u);//暂时不使用事件里的光标，dock窗口无法产生这个事件，都使用Application::Get().SetCursor的值
-                if (LOWORD(lParam) == HTCLIENT)
-                {
-                    Application::Get().SetCursor(ECursorType::kArrow);
-                }
-                else if (LOWORD(lParam) == HTLEFT || LOWORD(lParam) == HTRIGHT)
-                {
-                    Application::Get().SetCursor(ECursorType::kSizeEW);
-                }
-                else if (LOWORD(lParam) == HTTOP || LOWORD(lParam) == HTBOTTOM)
-                {
-                    Application::Get().SetCursor(ECursorType::kSizeNS);
-                }
-                else if (LOWORD(lParam) == HTTOPLEFT || LOWORD(lParam) == HTBOTTOMRIGHT)
-                {
-                    Application::Get().SetCursor(ECursorType::kSizeNWSE);
-                }
-                else if (LOWORD(lParam) == HTTOPRIGHT || LOWORD(lParam) == HTBOTTOMLEFT)
-                {
-                    Application::Get().SetCursor(ECursorType::kSizeNESW);
-                }
-                else if (LOWORD(lParam) == HTCAPTION)
-                {
-                    Application::Get().SetCursor(ECursorType::kArrow);
-                }
+                const auto hit_area = LOWORD(lParam);
+                MouseSetCursorEvent e(MouseSetCursorEvent::kUseCurrentCursor, hit_area == HTCLIENT);
+                if (hit_area == HTLEFT || hit_area == HTRIGHT)
+                    e = MouseSetCursorEvent(static_cast<u8>(ECursorType::kSizeEW), false);
+                else if (hit_area == HTTOP || hit_area == HTBOTTOM)
+                    e = MouseSetCursorEvent(static_cast<u8>(ECursorType::kSizeNS), false);
+                else if (hit_area == HTTOPLEFT || hit_area == HTBOTTOMRIGHT)
+                    e = MouseSetCursorEvent(static_cast<u8>(ECursorType::kSizeNWSE), false);
+                else if (hit_area == HTTOPRIGHT || hit_area == HTBOTTOMLEFT)
+                    e = MouseSetCursorEvent(static_cast<u8>(ECursorType::kSizeNESW), false);
+                else if (hit_area == HTCAPTION)
+                    e = MouseSetCursorEvent(static_cast<u8>(ECursorType::kArrow), false);
+                else if (hit_area != HTCLIENT)
+                    break;
+                e._window = this;
                 _data.Handler(e);
+                return TRUE;
             }
         }
         // Handle any messages the switch statement didn't.

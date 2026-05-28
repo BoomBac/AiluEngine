@@ -3,6 +3,7 @@
 #define __SELECTION_H__
 #include "Objects/Object.h"
 #include "Scene/Entity.hpp"
+#include "Framework/Events/Event.h"
 namespace Ailu
 {
     namespace Editor
@@ -40,6 +41,8 @@ namespace Ailu
                 {
                     s_selected_entities.emplace_back(entity);
                     s_selected_entities_subindex[entity] = sub_index;
+                    ++_revision;
+                    _on_selection_changed_delegate.Invoke();
                 }
             }
             static void AddAndRemovePreSelection(ECS::Entity entity, u32 sub_index = 0)
@@ -53,22 +56,43 @@ namespace Ailu
                 }
                 if (entity != ECS::kInvalidEntity)
                     AddSelection(entity, sub_index);
+                else
+                {
+                    ++_revision;
+                    _on_selection_changed_delegate.Invoke();
+                }
             }
             static void RemoveSlection(ECS::Entity entity)
             {
+                auto old_size = s_selected_entities.size();
                 std::erase_if(s_selected_entities, [&](auto o) -> bool
                               { return o == entity; });
                 s_selected_entities_subindex.erase(entity);
+                if (s_selected_entities.size() != old_size)
+                {
+                    ++_revision;
+                    _on_selection_changed_delegate.Invoke();
+                }
             }
             static void RemoveSlection()
             {
                 if (!s_can_select)
                     return;
+                if (s_selected_entities.empty() && s_selections.empty())
+                    return;
                 s_selected_entities.clear();
                 s_selections.clear();
                 s_selected_entities_subindex.clear();
+                ++_revision;
+                _on_selection_changed_delegate.Invoke();
             }
 
+            static void SetSelection(ECS::Entity entity)
+            {
+                AddAndRemovePreSelection(entity);
+            }
+
+            static u64 Revision() { return _revision; }
 
             static List<Object *> &Selections() { return s_selections; }
             static List<ECS::Entity> &SelectedEntities() { return s_selected_entities; }
@@ -91,8 +115,16 @@ namespace Ailu
             static bool IsActive() { return s_can_select; }
 
         private:
+            inline static Delegate<> _on_selection_changed_delegate{};
+
+        public:
+            /// @brief Fired whenever the selection set changes (add, remove, clear).
+            inline static Delegate<>::EventView on_selection_changed = _on_selection_changed_delegate.GetEventView();
+
+        private:
             inline static List<ECS::Entity> s_selected_entities{};
             inline static HashMap<ECS::Entity,u32> s_selected_entities_subindex{};//for submesh selection, only used in editor, no need to save in scene
+            inline static u64 _revision = 0u;
             inline static List<Object *> s_selections{};
             inline static bool s_can_select = true;
         };

@@ -51,8 +51,11 @@ namespace Ailu
             WString BuildCurrentAssetPath(const WString &file_name) const;
             Vector<Asset *> CollectAssetsUnderDirectory(const WString &directory_asset_path) const;
             String MakeUniqueEntryName(const WString &directory_sys_path, const String &base_name, const WString &extension, bool is_directory) const;
+            void OnDockLayoutLoaded() override;
 
             inline static const f32 kDragThreshold = 5.0f;
+            APROPERTY(Category = "DockLayout")
+            f32 _split_ratio = 0.5f;
             UI::SplitView *_sv = nullptr;
             UI::VerticalBox *_right = nullptr;
             UI::ScrollView *_icon_area = nullptr;

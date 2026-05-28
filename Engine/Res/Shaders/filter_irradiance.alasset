@@ -6,6 +6,6 @@
         "_asset_name": "filter_irradiance"
     },
     "_file": "Shaders/hlsl/filter_irradiance.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

@@ -34,6 +34,7 @@ namespace Ailu::UI
         Application::Get().PushLayer(_ui_layer);
         _renderer = UIRenderer::Get();
         _capture_target = nullptr;
+        _debug_highlight_target = nullptr;
         auto popup_widget = MakeRef<Widget>();
         popup_widget->Name("PopupWidget");
         popup_widget->AddToWidget(MakeRef<Canvas>());
@@ -80,13 +81,16 @@ namespace Ailu::UI
     {
         auto it = std::find_if(_widgets.begin(), _widgets.end(), [&](Ref<Widget> e) -> bool
                                { return e.get() == w; });
-        if (it == _widgets.end()-1)
+        if (it == _widgets.end())
             return;
         Ref<Widget> current = *it;
-        if (_widgets.size() > 1)
+        if (_widgets.size() > 1 && _widgets.back().get() != w)
             _widgets.back()->_on_lost_focus_delegate.Invoke();
         if (it == _widgets.end() - 1)
+        {
+            w->_on_get_focus_delegate.Invoke();
             return;//already in front
+        }
         if (it != _widgets.end())
         {
             _widgets.erase(it);
@@ -99,6 +103,32 @@ namespace Ailu::UI
         }
         w->_on_get_focus_delegate.Invoke();
         LOG_INFO("{}: BringToFront", GetThreadName());
+    }
+
+    void UIManager::BringToFrontSilently(Widget *w)
+    {
+        auto it = std::find_if(_widgets.begin(), _widgets.end(), [&](const Ref<Widget> &e) -> bool
+                               { return e.get() == w; });
+        if (it == _widgets.end() || it == _widgets.end() - 1)
+            return;
+        Ref<Widget> current = *it;
+        _widgets.erase(it);
+        _widgets.push_back(current);
+        for (u64 i = 0; i < _widgets.size(); i++)
+            _widgets[i]->_sort_order = (u32) i;
+    }
+
+    void UIManager::SendToBack(Widget *w)
+    {
+        auto it = std::find_if(_widgets.begin(), _widgets.end(), [&](const Ref<Widget> &e) -> bool
+                               { return e.get() == w; });
+        if (it == _widgets.end() || it == _widgets.begin())
+            return;
+        Ref<Widget> current = *it;
+        _widgets.erase(it);
+        _widgets.insert(_widgets.begin(), current);
+        for (u64 i = 0; i < _widgets.size(); i++)
+            _widgets[i]->_sort_order = (u32) i;
     }
 
     void UIManager::SetFocus(UIElement *element)
@@ -162,6 +192,8 @@ namespace Ailu::UI
             _focus_target = nullptr;
         if (_hover_target == element)
             _hover_target = nullptr;
+        if (_debug_highlight_target == element)
+            _debug_highlight_target = nullptr;
         for (auto &w: _widgets)
         {
             if (auto it = std::find_if(w->_prev_hover_path.begin(), w->_prev_hover_path.end(), [&](UIElement *e)

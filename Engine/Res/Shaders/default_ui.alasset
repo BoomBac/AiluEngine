@@ -6,6 +6,6 @@
         "_asset_name": "default_ui"
     },
     "_file": "Shaders/hlsl/default_ui.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

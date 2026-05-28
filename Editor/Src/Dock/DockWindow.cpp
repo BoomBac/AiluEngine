@@ -6,6 +6,8 @@
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "UI/UIFramework.h"
+#include "UI/UIRenderer.h"
+#include <memory>
 
 #include "Objects/JsonArchive.h"
 
@@ -49,6 +51,10 @@ namespace Ailu
             hb->SlotSizePolicy(UI::ESizePolicy::kFill);
             _title = hb->AddChild<UI::Text>()->SlotSizePolicy(UI::ESizePolicy::kAuto,UI::ESizePolicy::kFill).As<UI::Text>();
             _title->FontSize(kTitleBarHeight * 0.7f);
+            _title->OnMouseDown() += [&](UI::UIEvent &e)
+            {
+                SetFocus(true);
+            };
             _title->OnMouseMove() += [&](UI::UIEvent &e)
             {
                 if (e._current_target->_state._is_pressed)
@@ -127,13 +133,20 @@ namespace Ailu
         }
         void DockWindow::SetRect(Vector4f rect)
         {
+            if (NearbyEqual(Vector4f{_position,_size}, rect))
+                return;
             _position = rect.xy;
             SetSize(rect.zw);
+            _is_dirty = true;
         }
         void DockWindow::Update(f32 dt)
         {
             if (_is_dirty)
             {
+                const f32 content_offset_y = (_is_title_bar_visible || !_is_expand_content_when_title_hidden)
+                                                 ? kTitleBarHeight
+                                                 : 0.0f;
+                const f32 content_height = std::max(0.0f, _size.y - content_offset_y);
                 _title_widget->SetPosition(_position);
                 _title_widget->SetSize({_size.x, kTitleBarHeight});
                 _title_widget->Root()->SlotSize(Vector2f(_size.x, kTitleBarHeight));
@@ -145,10 +158,10 @@ namespace Ailu
                     _title->SlotSize(s);
                 }
                 _btn_close->SlotSize(Vector2f(kTitleBarHeight, kTitleBarHeight));
-                _content_widget->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
-                _content_widget->SetSize({_size.x, _size.y - kTitleBarHeight});
-                _content_widget->Root()->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
-                _content_root->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
+                _content_widget->SetPosition(_position + Vector2f(0.0f, content_offset_y));
+                _content_widget->SetSize({_size.x, content_height});
+                _content_widget->Root()->SlotSize(Vector2f(_size.x, content_height));
+                _content_root->SlotSize(Vector2f(_size.x, content_height));
                 auto ui_mgr = UI::UIManager::Get();
                 const f32 t = kBorderThickness;
                 const Vector2f &p = _position;
@@ -180,24 +193,10 @@ namespace Ailu
 
         void DockWindow::SetTitleBarVisibility(bool is_visibility, bool is_expand_content)
         {
+            _is_title_bar_visible = is_visibility;
+            _is_expand_content_when_title_hidden = !is_visibility && is_expand_content;
             _title_widget->_visibility = is_visibility ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
-            if (is_visibility)
-            {
-                _content_widget->SetPosition(_position + Vector2f(0.0f, kTitleBarHeight));
-                _content_widget->SetSize({_size.x, _size.y - kTitleBarHeight});
-                _content_widget->Root()->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
-                _content_root->SlotSize(Vector2f(_size.x, _size.y - kTitleBarHeight));
-            }
-            else
-            {
-                if (is_expand_content)
-                {
-                    _content_widget->SetPosition(_position);
-                    _content_widget->SetSize({_size.x, _size.y});
-                    _content_widget->Root()->SlotSize(Vector2f(_size.x, _size.y));
-                    _content_root->SlotSize(Vector2f(_size.x, _size.y));
-                }
-            }
+            _is_dirty = true;
         }
         void DockWindow::SetContentVisibility(bool is_visibility)
         {
@@ -216,18 +215,37 @@ namespace Ailu
         }
         void DockWindow::SetFocus(bool is_focus)
         {
-            if (is_focus == _is_focused)
+            if (!is_focus && !_is_focused)
                 return;
             _is_focused = is_focus;
             if (is_focus)
             {
-                //UI::UIManager::Get()->BringToFront(_title_widget.get());
                 UI::UIManager::Get()->BringToFront(_content_widget.get());//事件会自动将title_widget带到前面
-                _on_get_focus_delegate.Invoke(this);
             }
             else
                 _on_lost_focus_delegate.Invoke(this);
         };
+
+        void DockWindow::SetTabActive(bool is_active)
+        {
+            SetTitleBarVisibility(false);
+            SetContentVisibility(is_active);
+        }
+
+        void DockWindow::RestoreStandaloneFromTab()
+        {
+            SetTitleBarVisibility(true);
+            SetContentVisibility(true);
+        }
+
+        void DockWindow::AttachToWindow(Window *w)
+        {
+            auto new_target = RenderTexture::WindowBackBuffer(w);
+            _content_widget->BindOutput(new_target);
+            _title_widget->BindOutput(new_target);
+            _content_widget->SetParent(w);
+            _title_widget->SetParent(w);
+        }
 
         u32 DockWindow::HoverEdge(Vector2f pos) const
         {
@@ -306,6 +324,9 @@ namespace Ailu
             _tab_bar->AddToWidget(c);
             _tab_root = c->AddChild<UI::Border>();
             _tab_root->Thickness(0.0f);
+            _tab_root->_bg_color = g_editor_style._window_title_bar_color;
+            _tab_root->SlotSizePolicy(UI::ESizePolicy::kFixed);
+            _tab_root->SlotSize(_size);
             _tab_hb = _tab_root->AddChild<UI::HorizontalBox>();
             {
                 auto s = _tab_hb->SlotSize();
@@ -319,20 +340,25 @@ namespace Ailu
                 s.y = DockWindow::kTitleBarHeight;
                 _tab_titles->SlotSize(s);
             }
+            _tab_titles->SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFill);
             //拖拽区
             _drag_area = _tab_hb->AddChild<UI::Border>();
             _drag_area->Thickness(0.0f);
-            _drag_area->_bg_color = Colors::kBlue;
+            _drag_area->_bg_color = g_editor_style._window_title_bar_color;
             _drag_area->SlotSize({300.0f, DockWindow::kTitleBarHeight});
-            _drag_area->SlotSizePolicy(UI::ESizePolicy::kFill);
+            _drag_area->SlotSizePolicy(UI::ESizePolicy::kFill,UI::ESizePolicy::kFixed);
             _drag_area->SetVisible(false);
             _drag_area->OnMouseDown() += [this](UI::UIEvent &e)
             {
-                _tabs[_active_index]->SetFocus(true);
+                if (auto *primary_window = ActivePrimaryWindow())
+                    primary_window->SetFocus(true);
             };
             //右侧按钮
             _btn_close = _tab_hb->AddChild<UI::Button>();
             _btn_close->SlotSize({DockWindow::kTitleBarHeight, DockWindow::kTitleBarHeight});
+            _btn_close->SlotSizePolicy(UI::ESizePolicy::kFixed);
+            _btn_close->SetText("x");
+            _btn_close->SlotAlignmentH(UI::EAlignment::kRight);
             _btn_close->OnMouseClick() += [this](UI::UIEvent &e)
             {
                 LOG_INFO("DockTab close...");
@@ -347,48 +373,56 @@ namespace Ailu
 
         bool DockTab::AddTab(const Ref<DockWindow> &w)
         {
-            if (auto it = std::find_if(_tabs.begin(), _tabs.end(), [&](Ref<DockWindow> e) -> bool
-                                       { return e.get() == w.get(); });
+            return AddTabItem(std::static_pointer_cast<IDockTabItem>(w));
+        }
+
+        bool DockTab::AddTabItem(const Ref<IDockTabItem> &item)
+        {
+            if (!item)
+                return false;
+            if (auto it = std::find_if(_tabs.begin(), _tabs.end(), [&](const Ref<IDockTabItem> &e) -> bool
+                                       { return e.get() == item.get(); });
                 it != _tabs.end())
                 return false;
             if (_tabs.empty())
             {
-                _size = w->Size();
-                _position = w->Position();
+                _size = item->Size();
+                _position = item->Position();
             }
-            _tabs.push_back(w);
-            w->SetTitleBarVisibility(false);
-            w->SetRect({_position.x, _position.y, _size.x, _size.y});
+            _tabs.push_back(item);
+            f32 max_width = 0.0f;
+            for (const auto &tab: _tabs)
+                max_width = std::max(max_width, tab->Size().x);
+            _tab_root->SlotSize({max_width, DockWindow::kTitleBarHeight});
+            item->SetRect({_position.x, _position.y, _size.x, _size.y});
+            item->SetTabActive(false);
             auto bg = _tab_titles->AddChild<UI::Border>();
             bg->_bg_color = g_editor_style._tab_bg_color;
+            bg->SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFill);
+            const f32 tab_width = std::max(80.0f, UI::UIRenderer::Get()->CalculateTextSize(item->GetTitle()).x + DockWindow::kTitleBarHeight * 1.5f);
+            bg->SlotSize({tab_width, DockWindow::kTitleBarHeight});
+            bg->AddChild<UI::Text>()->SlotSizePolicy(UI::ESizePolicy::kAuto, UI::ESizePolicy::kFill)
+                .SlotPadding({5.0f, 0.0f, 5.0f, 0.0f}).As<UI::Text>()->SetText(item->GetTitle());
+            bg->OnMouseClick() += [this, item](UI::UIEvent &e)
             {
-                auto s = bg->SlotSize();
-                s.y = DockWindow::kTitleBarHeight;
-                bg->SlotSize(s);
-            }
-            {
-                auto s = _tab_titles->SlotSize();
-                s.x = 100.0f * _tab_titles->GetChildren().size();
-                _tab_titles->SlotSize(s);
-            }
-            bg->AddChild<UI::Text>()->SetText(w->GetTitle());
-            bg->OnMouseClick() += [this, w](UI::UIEvent &e)
-            {
-                i32 new_index = static_cast<int>(std::distance(_tabs.begin(), std::find_if(_tabs.begin(), _tabs.end(), [&](Ref<DockWindow> e) -> bool
-                                                                                           { return e.get() == w.get(); })));
+                i32 new_index = static_cast<int>(std::distance(_tabs.begin(), std::find_if(_tabs.begin(), _tabs.end(), [&](const Ref<IDockTabItem> &e) -> bool
+                                                                                           { return e.get() == item.get(); })));
                 OnActiveTabChanged(new_index);
             };
-            bg->OnMouseDown() += [this, w](UI::UIEvent &e)
+            bg->OnMouseDown() += [this, item](UI::UIEvent &e)
             {
-                i32 new_index = static_cast<int>(std::distance(_tabs.begin(), std::find_if(_tabs.begin(), _tabs.end(), [&](Ref<DockWindow> e) -> bool
-                                                                                           { return e.get() == w.get(); })));
+                i32 new_index = static_cast<int>(std::distance(_tabs.begin(), std::find_if(_tabs.begin(), _tabs.end(), [&](const Ref<IDockTabItem> &e) -> bool
+                                                                                           { return e.get() == item.get(); })));
                 OnActiveTabChanged(new_index);
+                if (auto *primary_window = ActivePrimaryWindow())
+                    primary_window->SetFocus(true);
             };
             bg->OnMouseMove() += [&](UI::UIEvent &e)
             {
                 if (e._current_target->_state._is_pressed)
                 {
-                    DockManager::Get().BeginFloatWindow(_tabs[_active_index].get());
+                    if (auto *primary_window = ActivePrimaryWindow())
+                        DockManager::Get().BeginFloatWindow(primary_window);
                 }
             };
             bg->OnMouseEnter() += [this](UI::UIEvent &e)
@@ -408,8 +442,8 @@ namespace Ailu
         bool DockTab::RemoveTab(DockWindow *w)
         {
             // 找到对应的 index
-            auto it = std::find_if(_tabs.begin(), _tabs.end(), [&](const Ref<DockWindow> &e)
-                                   { return e.get() == w; });
+            auto it = std::find_if(_tabs.begin(), _tabs.end(), [&](const Ref<IDockTabItem> &e)
+                                   { return e->ContainsWindow(w); });
 
             if (it == _tabs.end())
                 return false;// 没找到
@@ -437,8 +471,7 @@ namespace Ailu
             }
 
             // 恢复窗口状态
-            (*it)->SetTitleBarVisibility(true);
-            (*it)->SetContentVisibility(true);
+            (*it)->RestoreStandaloneFromTab();
 
             // 移除 DockWindow
             _tabs.erase(it);
@@ -450,15 +483,39 @@ namespace Ailu
                 _tab_titles->RemoveChild(child);
             }
 
-            // 调整 tab_titles 宽度
-            {
-                auto s = _tab_titles->SlotSize();
-                s.x = 100.0f * _tab_titles->GetChildren().size();
-                _tab_titles->SlotSize(s);
-            }
-
             // 如果删完了，返回 true 让外部知道这个 DockTab 已经空了
+            if (_tabs.empty())
+                _active_index = -1;
             return _tabs.empty();
+        }
+
+        Ref<IDockTabItem> DockTab::RemoveActiveItem()
+        {
+            if (_active_index < 0 || _active_index >= static_cast<i32>(_tabs.size()))
+                return nullptr;
+            Ref<IDockTabItem> removed_item = _tabs[_active_index];
+            const i32 remove_index = _active_index;
+            if (_tabs.size() > 1)
+            {
+                i32 new_index = remove_index;
+                if (new_index >= static_cast<i32>(_tabs.size()) - 1)
+                    new_index = static_cast<i32>(_tabs.size()) - 2;
+                else
+                    new_index = remove_index + 1;
+                OnActiveTabChanged(new_index);
+                if (new_index > remove_index)
+                    _active_index = new_index - 1;
+            }
+            removed_item->RestoreStandaloneFromTab();
+            _tabs.erase(_tabs.begin() + remove_index);
+            if (remove_index < static_cast<i32>(_tab_titles->GetChildren().size()))
+            {
+                auto child = _tab_titles->GetChildren()[remove_index];
+                _tab_titles->RemoveChild(child);
+            }
+            if (_tabs.empty())
+                _active_index = -1;
+            return removed_item;
         }
 
 
@@ -472,20 +529,58 @@ namespace Ailu
 
         void DockTab::OnActiveTabChanged(i32 new_index)
         {
+            if (new_index < 0 || new_index >= static_cast<i32>(_tabs.size()))
+                return;
             if (_active_index != -1)
             {
                 dynamic_cast<UI::Border *>(_tab_titles->GetChildren()[_active_index].get())->_bg_color = g_editor_style._tab_bg_color;
-                _tabs[_active_index]->SetContentVisibility(false);
-                _tabs[_active_index]->ContentWidget()->_on_get_focus -= _content_focus_handle;
+                _tabs[_active_index]->SetTabActive(false);
+                if (auto *previous_window = _tabs[_active_index]->PrimaryWindow())
+                    previous_window->ContentWidget()->_on_get_focus -= _content_focus_handle;
             }
             _active_index = new_index;
             _tab_titles->GetChildren()[_active_index]->As<UI::Border>()->_bg_color = g_editor_style._tab_active_bg_color;
-            _tabs[_active_index]->SetContentVisibility(true);
-            _content_focus_handle = _tabs[_active_index]->ContentWidget()->_on_get_focus += [this]()
+            _tabs[_active_index]->SetTabActive(_is_visible);
+            _content_focus_handle = -1;
+            if (auto *active_window = _tabs[_active_index]->PrimaryWindow())
             {
-                UI::UIManager::Get()->BringToFront(_tab_bar.get());
-            };
+                _content_focus_handle = active_window->ContentWidget()->_on_get_focus += [this]()
+                {
+                    UI::UIManager::Get()->BringToFront(_tab_bar.get());
+                };
+            }
             LOG_INFO("DockTab::AddTab: active index {}", _active_index);
+        }
+
+        Ref<IDockTabItem> DockTab::ActiveItem() const
+        {
+            if (_active_index < 0 || _active_index >= static_cast<i32>(_tabs.size()))
+                return nullptr;
+            return _tabs[_active_index];
+        }
+
+        DockWindow *DockTab::ActivePrimaryWindow() const
+        {
+            if (auto active_item = ActiveItem())
+                return active_item->PrimaryWindow();
+            return nullptr;
+        }
+
+        void DockTab::SetActiveIndex(i32 new_index)
+        {
+            if (new_index == _active_index)
+                return;
+            OnActiveTabChanged(new_index);
+        }
+
+        void DockTab::SetVisible(bool is_visible)
+        {
+            _is_visible = is_visible;
+            _tab_bar->_visibility = is_visible ? UI::EVisibility::kVisible : UI::EVisibility::kHide;
+            for (i32 i = 0; i < static_cast<i32>(_tabs.size()); ++i)
+            {
+                _tabs[i]->SetTabActive(is_visible && i == _active_index);
+            }
         }
 
         u32 DockTab::HoverEdge(Vector2f pos) const
@@ -495,28 +590,34 @@ namespace Ailu
 
         bool DockTab::HoverDragArea(Vector2f pos) const
         {
-            AL_ASSERT(false);//这里要转屏幕空间？
+            if (!_is_visible || _tabs.empty() || _drag_area == nullptr)
+                return false;
             return UI::UIElement::IsPointInside(pos, _drag_area->GetArrangeRect());
         }
 
         bool DockTab::IsHover(Vector2f pos) const
         {
+            if (_tabs.empty() || _active_index < 0 || _active_index >= static_cast<i32>(_tabs.size()))
+                return false;
             return _tabs[_active_index]->IsHover(pos);
         }
 
         bool DockTab::Contains(DockWindow *w) const
         {
-            auto it = std::find_if(_tabs.begin(), _tabs.end(), [&](const Ref<DockWindow> &e)
-                                   { return e.get() == w; });
+            auto it = std::find_if(_tabs.begin(), _tabs.end(), [&](const Ref<IDockTabItem> &e)
+                                   { return e->ContainsWindow(w); });
             return it != _tabs.end();
         }
 
         void DockTab::SetFocus(bool is_focus)
         {
-            if (is_focus == _is_focused)
+            if (_tabs.empty() || _active_index < 0 || _active_index >= static_cast<i32>(_tabs.size()))
+                return;
+            if (!is_focus && !_is_focused)
                 return;
             _is_focused = is_focus;
-            UI::UIManager::Get()->BringToFront(_tab_bar.get());
+            if (is_focus)
+                UI::UIManager::Get()->BringToFront(_tab_bar.get());
             _tabs[_active_index]->SetFocus(is_focus);
         }
 
@@ -526,6 +627,9 @@ namespace Ailu
             _tab_bar->SetSize({_size.x, DockWindow::kTitleBarHeight});
             _tab_root->SlotSize({_size.x, DockWindow::kTitleBarHeight});
             _tab_hb->SlotSize(_tab_root->SlotSize());
+            _tab_root->_bg_color = _is_focused ? Colors::kBlue : g_editor_style._window_title_bar_color;
+            if (_tabs.empty())
+                return;
             for (auto &w: _tabs)
             {
                 w->SetRect({_position.x, _position.y, _size.x, _size.y});

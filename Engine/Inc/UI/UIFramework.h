@@ -32,10 +32,14 @@ namespace Ailu
             void RegisterWidget(Ref<Widget> w);
             void UnRegisterWidget(Widget *w);
             void BringToFront(Widget *w);
+            void BringToFrontSilently(Widget *w);
+            void SendToBack(Widget *w);
             // 新增：设置 / 清除 / 获取 当前焦点元素
             void SetFocus(UIElement *element);
             void ClearFocus(UIElement *element = nullptr);
             UIElement *GetFocusedElement() const { return _focus_target; }
+            void SetDebugHighlightTarget(UIElement *element) { _debug_highlight_target = element; }
+            UIElement *GetDebugHighlightTarget() const { return _debug_highlight_target; }
             //弹出一个popup widget,位置基于当前窗口左上角，root则会被添加到popup widget的root(canvas)进行显示
             void ShowPopupAt(f32 x, f32 y, Ref<UIElement> root, std::function<void()> on_close = nullptr, Window *win = nullptr);
             void HidePopup();
@@ -50,6 +54,7 @@ namespace Ailu
             UIElement *_capture_target = nullptr;//记录按下时的目标,全局共享，element销毁时检查这个值
             UIElement *_focus_target = nullptr;  //记录按下时的目标,全局共享，element销毁时检查这个值
             UIElement *_hover_target = nullptr;
+            UIElement *_debug_highlight_target = nullptr;
             Widget *_pre_hover_widget = nullptr; //记录上一帧鼠标停留的控件,全局共享，widget销毁时检查这个值
             //sort order大的在后面
             Vector<Ref<Widget>> _widgets;

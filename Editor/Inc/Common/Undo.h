@@ -7,6 +7,7 @@
 
 #include "Framework/Common/Log.h"
 #include "Scene/Component.h"
+#include "Scene/Scene.h"
 #include <stack>
 
 namespace Ailu
@@ -37,7 +38,7 @@ private:                                                                  \
             {
                 for (auto *comp: _comps)
                 {
-                    _new_transforms.push_back(comp->_transform);
+                    _new_transforms.push_back(comp->_local_transform);
                 }
             }
             TransformCommand(const String &obj_name,ECS::TransformComponent *comp, const Transform &old_transf)
@@ -45,16 +46,16 @@ private:                                                                  \
                 _obj_names.emplace_back(obj_name);
                 _comps.emplace_back(comp);
                 _old_transforms.emplace_back(old_transf);
-                _new_transforms.emplace_back(comp->_transform);
+                _new_transforms.emplace_back(comp->_local_transform);
             }
 
             void Execute() override
             {
                 for (size_t i = 0; i < _comps.size(); ++i)
                 {
-                    _comps[i]->_transform._position = _new_transforms[i]._position;
-                    _comps[i]->_transform._rotation = _new_transforms[i]._rotation;
-                    _comps[i]->_transform._scale = _new_transforms[i]._scale;
+                    _comps[i]->_local_transform._position = _new_transforms[i]._position;
+                    _comps[i]->_local_transform._rotation = _new_transforms[i]._rotation;
+                    _comps[i]->_local_transform._scale = _new_transforms[i]._scale;
                     LOG_INFO("Exe or redo {} on obj {}", s_name, _obj_names[i]);
                 }
             }
@@ -63,9 +64,9 @@ private:                                                                  \
             {
                 for (size_t i = 0; i < _comps.size(); ++i)
                 {
-                    _comps[i]->_transform._position = _old_transforms[i]._position;
-                    _comps[i]->_transform._rotation = _old_transforms[i]._rotation;
-                    _comps[i]->_transform._scale = _old_transforms[i]._scale;
+                    _comps[i]->_local_transform._position = _old_transforms[i]._position;
+                    _comps[i]->_local_transform._rotation = _old_transforms[i]._rotation;
+                    _comps[i]->_local_transform._scale = _old_transforms[i]._scale;
                     LOG_INFO("Undo {} on obj {}", s_name, _obj_names[i]);
                 }
             }
@@ -77,6 +78,39 @@ private:                                                                  \
             std::vector<Transform> _new_transforms;
         };
 
+
+        class SceneQueuedCommand : public ICommand
+        {
+        public:
+            SceneQueuedCommand(SceneManagement::Scene *scene, Scope<SceneManagement::ISceneCommand> command)
+                : _scene(scene), _command(std::move(command))
+            {
+            }
+
+            void Execute() override
+            {
+                if (_scene != nullptr && _command != nullptr)
+                    _scene->EnqueueSceneCommand(_command.get(), false);
+            }
+
+            void Undo() override
+            {
+                if (_scene != nullptr && _command != nullptr)
+                    _scene->EnqueueSceneCommand(_command.get(), true);
+            }
+
+            [[nodiscard]] const String &ToString() const override
+            {
+                if (_command != nullptr)
+                    return _command->ToString();
+                static String empty = "SceneCommand";
+                return empty;
+            }
+
+        private:
+            SceneManagement::Scene *_scene = nullptr;
+            Scope<SceneManagement::ISceneCommand> _command;
+        };
 
         class Undo
         {

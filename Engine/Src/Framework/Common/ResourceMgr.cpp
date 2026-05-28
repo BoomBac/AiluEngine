@@ -183,6 +183,29 @@ namespace Ailu
             const auto it = old_to_new_entities.find(static_cast<ECS::Entity>(legacy_entity_id));
             return it != old_to_new_entities.end() ? it->second : ECS::kInvalidEntity;
         }
+
+        WString ResolveExternalAssetPath(const WString &asset_path, const WString &stored_external_path)
+        {
+            if (stored_external_path.empty() || PathUtils::IsSystemPath(stored_external_path))
+                return stored_external_path;
+
+            WString normalized_stored_path = PathUtils::FormatFilePath(stored_external_path);
+            const bool has_directory = normalized_stored_path.find(L'/') != WString::npos;
+            if (has_directory)
+            {
+                return normalized_stored_path;
+            }
+
+            const WString asset_dir = PathUtils::ExtarctDirectory(asset_path);
+            return asset_dir + normalized_stored_path;
+        }
+
+        WString MakeStoredExternalAssetPath(const WString &external_asset_path)
+        {
+            if (external_asset_path.empty() || PathUtils::IsSystemPath(external_asset_path))
+                return external_asset_path;
+            return PathUtils::GetFileName(external_asset_path, true);
+        }
     }
 
     void ResourceMgr::Init()
@@ -761,7 +784,7 @@ namespace Ailu
         auto [vs, ps] = shader->GetShaderEntry();
         ShaderAssetDocument doc;
         doc._header = MakeAssetDocumentHeader(asset);
-        doc._file = ToChar(asset->_external_asset_path);
+        doc._file = ToChar(MakeStoredExternalAssetPath(asset->_external_asset_path));
         doc._vs_entry = vs;
         doc._ps_entry = ps;
         if (!SaveAssetDocument(sys_path, doc))
@@ -775,7 +798,7 @@ namespace Ailu
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         ComputeShaderAssetDocument doc;
         doc._header = MakeAssetDocumentHeader(asset);
-        doc._file = ToChar(asset->_external_asset_path);
+        doc._file = ToChar(MakeStoredExternalAssetPath(asset->_external_asset_path));
         doc._kernel = "Noname";
         if (auto *setting = dynamic_cast<const ShaderImportSetting *>(_importers[asset_path]); setting != nullptr && !setting->_cs_kernel.empty())
         {
@@ -800,16 +823,18 @@ namespace Ailu
                     return nullptr;
 
                 auto file = ToWChar(doc._file);
+                auto resolved_file = ResolveExternalAssetPath(asset_path, file);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
                 asset->_asset_type = Shader::StaticType();
                 asset->_external_asset_path = file;
-                asset->_p_obj = LoadExternalShader(file);
+                asset->_p_obj = LoadExternalShader(resolved_file);
                 return asset;
             }
             auto c = StringUtils::Split(data, L"\n");
             AL_ASSERT_MSG(c.size() > 4, "Invalid shader asset file format!");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+            auto resolved_file = ResolveExternalAssetPath(asset_path, file);
             WString vs_entry = c[4].substr(c[4].find_first_of(L":") + 2);
             WString ps_entry = c[5].substr(c[5].find_first_of(L":") + 2);
             ShaderImportSetting setting;
@@ -819,7 +844,7 @@ namespace Ailu
             asset->_asset_path = asset_path;
             asset->_asset_type = Shader::StaticType();
             asset->_external_asset_path = file;
-            asset->_p_obj = LoadExternalShader(file);
+            asset->_p_obj = LoadExternalShader(resolved_file);
             return asset;
         }
         return nullptr;
@@ -915,7 +940,7 @@ namespace Ailu
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         MeshAssetDocument doc;
         doc._header = MakeAssetDocumentHeader(asset);
-        doc._file = ToChar(asset->_external_asset_path);
+        doc._file = ToChar(MakeStoredExternalAssetPath(asset->_external_asset_path));
         doc._inner_file_name = asset->_p_obj->Name();
         if (auto *setting = dynamic_cast<const MeshImportSetting *>(_importers[asset_path]); setting != nullptr)
         {
@@ -932,7 +957,7 @@ namespace Ailu
         auto sys_path = ResourceMgr::GetResSysPath(asset_path);
         Texture2DAssetDocument doc;
         doc._header = MakeAssetDocumentHeader(asset);
-        doc._file = ToChar(asset->_external_asset_path);
+        doc._file = ToChar(MakeStoredExternalAssetPath(asset->_external_asset_path));
         if (auto *setting = dynamic_cast<const TextureImportSetting *>(_importers[asset_path]); setting != nullptr)
         {
             doc._is_srgb = setting->_is_sRGB;
@@ -966,9 +991,9 @@ namespace Ailu
             if (const auto *transform = reg.GetComponent<ECS::TransformComponent>(entity); transform != nullptr)
             {
                 entity_doc._has_transform_component = true;
-                entity_doc._transform_component._position = transform->_transform._position;
-                entity_doc._transform_component._rotation = transform->_transform._rotation;
-                entity_doc._transform_component._scale = transform->_transform._scale;
+                entity_doc._transform_component._position = transform->_local_transform._position;
+                entity_doc._transform_component._rotation = transform->_local_transform._rotation;
+                entity_doc._transform_component._scale = transform->_local_transform._scale;
             }
             if (const auto *script = reg.GetComponent<ECS::ScriptComponent>(entity); script != nullptr)
             {
@@ -1195,11 +1220,12 @@ namespace Ailu
                 if (!LoadAssetDocument(sys_path, doc))
                     return nullptr;
                 auto file = ToWChar(doc._file);
+                auto resolved_file = ResolveExternalAssetPath(asset_path, file);
                 auto json_setting = setting;
                 json_setting._is_sRGB = doc._is_srgb;
                 if (!IsAssetLoaded(asset_path))
                 {
-                    auto tex = LoadExternalTexture(file, json_setting);
+                    auto tex = LoadExternalTexture(resolved_file, json_setting);
                     auto asset = MakeScope<Asset>();
                     asset->_asset_path = asset_path;
                     asset->_asset_type = Texture2D::StaticType();
@@ -1212,7 +1238,7 @@ namespace Ailu
                 AL_ASSERT(false);
                 auto exist_asset = GetAsset(asset_path);
                 auto tex = exist_asset->AsRef<Texture2D>();
-                LoadExternalTexture(file, tex, json_setting);
+                LoadExternalTexture(resolved_file, tex, json_setting);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
                 asset->_asset_type = Texture2D::StaticType();
@@ -1222,11 +1248,12 @@ namespace Ailu
             }
             auto c = StringUtils::Split(data, L"\n");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+            auto resolved_file = ResolveExternalAssetPath(asset_path, file);
             bool is_srgb = StringUtils::ParseUInt32(ToChar(c[4].substr(c[4].find_first_of(L":") + 2))).value_or(1) == 1;
             setting._is_sRGB = is_srgb;
             if (!IsAssetLoaded(asset_path))
             {
-                auto tex = LoadExternalTexture(file,setting);
+                auto tex = LoadExternalTexture(resolved_file,setting);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
                 asset->_asset_type = Texture2D::StaticType();
@@ -1240,7 +1267,7 @@ namespace Ailu
                 AL_ASSERT(false);
                 auto exist_asset = GetAsset(asset_path);
                 auto tex = exist_asset->AsRef<Texture2D>();
-                LoadExternalTexture(file,tex,setting);
+                LoadExternalTexture(resolved_file,tex,setting);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
                 asset->_asset_type = Texture2D::StaticType();
@@ -1456,12 +1483,13 @@ namespace Ailu
                 if (!LoadAssetDocument(sys_path, doc))
                     return nullptr;
                 auto file = ToWChar(doc._file);
+                auto resolved_file = ResolveExternalAssetPath(asset_path, file);
                 MeshImportSetting setting;
                 setting._import_flag |= MeshImportSetting::kImportFlagMesh;
                 setting._is_import_material = false;
                 setting._mesh_name = doc._inner_file_name;
                 setting._is_combine_mesh = doc._is_combine_mesh;
-                auto &&mesh_list = std::move(LoadExternalMesh(file, setting, clips));
+                auto &&mesh_list = std::move(LoadExternalMesh(resolved_file, setting, clips));
                 AL_ASSERT(mesh_list.size() != 0);
                 bool is_sk_mesh = dynamic_cast<SkeletonMesh *>(mesh_list.front().get()) != nullptr;
                 auto asset = MakeScope<Asset>();
@@ -1476,6 +1504,7 @@ namespace Ailu
             }
             auto c = StringUtils::Split(data, L"\n");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+            auto resolved_file = ResolveExternalAssetPath(asset_path, file);
             String innear_file_name = ToChar(c[4].substr(c[4].find_first_of(L":") + 2));
             MeshImportSetting setting;
             setting._import_flag |= MeshImportSetting::kImportFlagMesh;
@@ -1483,7 +1512,7 @@ namespace Ailu
             setting._mesh_name = innear_file_name;
             setting._is_combine_mesh = c.size() > 6 && c[5].substr(c[5].find_first_of(L":") + 2) == WString(L"true") ? true : false;
             //setting._import_flag |= MeshImportSetting::kImportFlagAnimation;
-            auto &&mesh_list = std::move(LoadExternalMesh(file, setting, clips));
+            auto &&mesh_list = std::move(LoadExternalMesh(resolved_file, setting, clips));
             AL_ASSERT(mesh_list.size() !=0);
             bool is_sk_mesh = dynamic_cast<SkeletonMesh *>(mesh_list.front().get()) != nullptr;
             auto asset = MakeScope<Asset>();
@@ -1511,21 +1540,23 @@ namespace Ailu
                 if (!LoadAssetDocument(sys_path, doc))
                     return nullptr;
                 auto file = ToWChar(doc._file);
+                auto resolved_file = ResolveExternalAssetPath(asset_path, file);
                 auto asset = MakeScope<Asset>();
                 asset->_asset_path = asset_path;
                 asset->_asset_type = ComputeShader::StaticType();
                 asset->_external_asset_path = file;
-                asset->_p_obj = LoadExternalComputeShader(file);
+                asset->_p_obj = LoadExternalComputeShader(resolved_file);
                 return asset;
             }
             auto c = StringUtils::Split(data, L"\n");
             WString file = c[3].substr(c[3].find_first_of(L":") + 2);
+            auto resolved_file = ResolveExternalAssetPath(asset_path, file);
             String kernel = ToChar(c[4].substr(c[4].find_first_of(L":") + 2));
             auto asset = MakeScope<Asset>();
             asset->_asset_path = asset_path;
             asset->_asset_type = ComputeShader::StaticType();
             asset->_external_asset_path = file;
-            asset->_p_obj = LoadExternalComputeShader(file);
+            asset->_p_obj = LoadExternalComputeShader(resolved_file);
             return asset;
         }
         return nullptr;
@@ -1570,9 +1601,9 @@ namespace Ailu
                 if (entity_doc._has_transform_component)
                 {
                     auto &component = reg.AddComponent<ECS::TransformComponent>(entity);
-                    component._transform._position = entity_doc._transform_component._position;
-                    component._transform._rotation = entity_doc._transform_component._rotation;
-                    component._transform._scale = entity_doc._transform_component._scale;
+                    component._local_transform._position = entity_doc._transform_component._position;
+                    component._local_transform._rotation = entity_doc._transform_component._rotation;
+                    component._local_transform._scale = entity_doc._transform_component._scale;
                 }
                 if (entity_doc._has_script_component)
                 {
@@ -1695,17 +1726,6 @@ namespace Ailu
                 if (!entity_doc._hierarchy_component._inv_matrix_attach.empty())
                 {
                     component._inv_matrix_attach.FromString(entity_doc._hierarchy_component._inv_matrix_attach);
-                }
-                if (auto *transform = reg.GetComponent<ECS::TransformComponent>(entity); transform != nullptr)
-                {
-                    transform->_transform._p_parent = nullptr;
-                    if (component._parent != ECS::kInvalidEntity)
-                    {
-                        if (auto *parent_transform = reg.GetComponent<ECS::TransformComponent>(component._parent); parent_transform != nullptr)
-                        {
-                            transform->_transform._p_parent = &parent_transform->_transform;
-                        }
-                    }
                 }
             }
 
@@ -2041,9 +2061,11 @@ namespace Ailu
                 {
                     auto setting = TextureImportSetting::Default();
                     tex = LoadExternalTexture(ToWChar(it->_textures[0]), setting);
-                    RegisterResource(asset_path, tex);
+                    if (tex)
+                        RegisterResource(asset_path, tex);
                 }
-                mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, tex.get());
+                if (tex)
+                    mat->SetTexture(StandardMaterial::StandardPropertyName::kAlbedo._tex_name, tex.get());
             }
             if (!it->_textures[1].empty())
             {
@@ -2055,9 +2077,11 @@ namespace Ailu
                     auto setting = TextureImportSetting::Default();
                     setting._is_sRGB = false;
                     tex = LoadExternalTexture(ToWChar(it->_textures[1]), setting);
-                    RegisterResource(asset_path, tex);
+                    if (tex)
+                        RegisterResource(asset_path, tex);
                 }
-                mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, tex.get());
+                if (tex)
+                    mat->SetTexture(StandardMaterial::StandardPropertyName::kNormal._tex_name, tex.get());
             }
             if (!it->_textures[2].empty())
             {
@@ -2068,9 +2092,11 @@ namespace Ailu
                 {
                     auto setting = TextureImportSetting::Default();
                     tex = LoadExternalTexture(ToWChar(it->_textures[2]), setting);
-                    RegisterResource(asset_path, tex);
+                    if (tex)
+                        RegisterResource(asset_path, tex);
                 }
-                mat->SetTexture(StandardMaterial::StandardPropertyName::kEmission._tex_name, tex.get());
+                if (tex)
+                    mat->SetTexture(StandardMaterial::StandardPropertyName::kEmission._tex_name, tex.get());
             }
             mat->SetVector(StandardMaterial::StandardPropertyName::kAlbedo._value_name, it->_diffuse);
             mat->SetFloat(StandardMaterial::StandardPropertyName::kRoughness._value_name, it->_roughness);
@@ -2412,7 +2438,7 @@ namespace Ailu
         {
             auto &[path, obj] = loaded_objects.front();
             auto new_asset = CreateAsset(path, obj);
-            new_asset->_external_asset_path = external_asset_path;
+            new_asset->_external_asset_path = MakeStoredExternalAssetPath(external_asset_path);
             if (obj->GetType() == Mesh::StaticType() || obj->GetType() == SkeletonMesh::StaticType())
             {
                 auto mesh_import_setting = dynamic_cast<const MeshImportSetting *>(resolved_setting);

@@ -6,6 +6,6 @@
         "_asset_name": "defered_standard_lit"
     },
     "_file": "Shaders/hlsl/defered_standard_lit.hlsl",
-    "_ps_entry": "GBufferPSMain",
-    "_vs_entry": "GBufferVSMain"
+    "_vs_entry": "GBufferVSMain",
+    "_ps_entry": "GBufferPSMain"
 }

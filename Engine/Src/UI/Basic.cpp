@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "UI/Basic.h"
 #include "UI/UIRenderer.h"
 #include "UI/TextRenderer.h"
@@ -29,7 +29,12 @@ namespace Ailu
         void Button::SetText(const String &text, bool trigger_event)
         {
             if (_text == nullptr)
+            {
                 _text = AddChild<Text>(text);
+                _text->SlotAlignmentH(EAlignment::kCenter);
+                _text->SlotAlignmentV(EAlignment::kCenter);
+                _text->_horizontal_align = EAlignment::kCenter;
+            }
             _text->SetText(text, trigger_event);
         }
         String Button::GetText() const
@@ -158,15 +163,24 @@ namespace Ailu
             UIElement::PostDeserialize();
             UpdateTextLayout();
         }
+        void Text::OnPropertyChanged(const PropertyInfo &prop)
+        {
+            UIElement::OnPropertyChanged(prop);
+            const String &name = prop.Name();
+            if (name == "_text" || name == "_font_size" || name == "_color" || name == "_horizontal_align" || name == "_vertical_align")
+                UpdateTextLayout();
+        }
 
         Vector2f Text::MeasureDesiredSize()
         {
+            Vector2f desired_size = TextRenderer::CalculateTextSize(_text, _font_size);
+            desired_size.x += _padding._l + _padding._r;
+            desired_size.y += _padding._t + _padding._b;
             if (_slot._size_policy_h == ESizePolicy::kFixed)
-                return _slot._size;
-            Vector2f text_size = TextRenderer::CalculateTextSize(_text);
-            text_size.x += _padding._l + _padding._r;
-            text_size.y += _padding._t + _padding._b;
-            return text_size;
+                desired_size.x = _slot._size.x;
+            if (_slot._size_policy_v == ESizePolicy::kFixed)
+                desired_size.y = _slot._size.y;
+            return desired_size;
         }
         void Text::FontSize(f32 size)
         {
@@ -328,9 +342,21 @@ namespace Ailu
 
         Vector2f Border::MeasureDesiredSize()
         {
-            if (_slot._size_policy_h == ESizePolicy::kFixed)
-                return _slot._size;
-            return Vector2f(40.0f,20.0f);
+            Vector2f desired_size = _slot._size;
+            if (!_children.empty())
+            {
+                const Vector2f child_desired_size = _children[0]->MeasureDesiredSize();
+                if (_slot._size_policy_h != ESizePolicy::kFixed)
+                    desired_size.x = child_desired_size.x + _padding._l + _padding._r;
+                if (_slot._size_policy_v != ESizePolicy::kFixed)
+                    desired_size.y = child_desired_size.y + _padding._t + _padding._b;
+                return desired_size;
+            }
+            if (_slot._size_policy_h != ESizePolicy::kFixed)
+                desired_size.x = 40.0f;
+            if (_slot._size_policy_v != ESizePolicy::kFixed)
+                desired_size.y = 20.0f;
+            return desired_size;
         }
 
         void Border::MeasureAndArrange(f32 dt)
@@ -338,9 +364,11 @@ namespace Ailu
             if (!_children.empty())
             {
                 Vector2f desired_size = _children[0]->MeasureDesiredSize();
-                if (_children[0]->SlotSizePolicy() == ESizePolicy::kFill)
-                    desired_size = _content_rect.zw;
-                _children[0]->Arrange(_content_rect.x, _content_rect.y, desired_size.x, desired_size.y);
+                if (_children[0]->SlotSizePolicy(true) == ESizePolicy::kFill)
+                    desired_size.x = _content_rect.z;
+                if (_children[0]->SlotSizePolicy(false) == ESizePolicy::kFill)
+                    desired_size.y = _content_rect.w;
+                _children[0]->Arrange(_padding._l, _padding._t, desired_size.x, desired_size.y);
                 _children[0]->InvalidateLayout();
             }
         }
@@ -678,6 +706,15 @@ namespace Ailu
                 return _slot._size;
             return Vector2f(100.0f,20.0f);
         }
+        void InputBlock::OnPropertyChanged(const PropertyInfo &prop)
+        {
+            UIElement::OnPropertyChanged(prop);
+            if (prop.Name() == "_content")
+            {
+                _is_need_recalc_offset_table = true;
+                InvalidateLayout();
+            }
+        }
 
 #pragma endregion
 
@@ -720,6 +757,12 @@ namespace Ailu
                 SetTexture(ResourceMgr::Get().Load<Texture2D>(Guid(_texture_guid)).get());
             }
         }
+        // void Image::OnPropertyChanged(const PropertyInfo &prop)
+        // {
+        //     UIElement::OnPropertyChanged(prop);
+        //     if (prop.Name() == "_texture_guid")
+        //         PostDeserialize();
+        // }
 #pragma endregion
     }// namespace UI
 }

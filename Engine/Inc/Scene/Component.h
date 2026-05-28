@@ -8,11 +8,11 @@
 #include "Entity.hpp"
 #include "Framework/Math/Transform.h"
 #include "Objects/Serialize.h"
+#include "Objects/Type.h"
 #include "Render/Camera.h"
+#include "Render/Features/CommonPasses.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
-#include "Render/Features/CommonPasses.h"
-#include "Objects/Type.h"
 
 #include <optional>
 
@@ -23,17 +23,26 @@
 #include "generated/Component.gen.h"
 
 using Ailu::Render::Camera;
-using Ailu::Render::Mesh;
 using Ailu::Render::Material;
-using Ailu::Render::SkeletonMesh;
+using Ailu::Render::Mesh;
 using Ailu::Render::RenderTexture;
+using Ailu::Render::SkeletonMesh;
 
 namespace Ailu
 {
+    /*
+    只访问自身字段
+    不访问 Registry / World
+    不访问其它 Component
+    不遍历 Entity 层级
+    不触发渲染、物理、脚本等系统行为
+    不产生跨组件副作用
+    主要用于维护数据一致性或提供便捷访问
+    */
     namespace ECS
     {
         AENUM()
-        enum class EMotionVectorType 
+        enum class EMotionVectorType
         {
             kCameraOnly,
             kPerObject,
@@ -51,7 +60,100 @@ namespace Ailu
         struct AILU_API TransformComponent
         {
             DECLARE_CLASS(TransformComponent)
-            Transform _transform;
+            inline static u64 kInvalidVersion = std::numeric_limits<u64>::max();
+            Transform _local_transform;
+
+            Matrix4x4f _local_matrix = Matrix4x4f::Identity();
+            Matrix4x4f _world_matrix = Matrix4x4f::Identity();
+            Matrix4x4f _prev_world_matrix = Matrix4x4f::Identity();
+            Vector3f _position;
+            Vector3f _scale;
+            Quaternion _rotation;
+
+            u64 _local_version = 0u;
+            u64 _world_version = 0u;
+            u64 _cached_parent_world_version = kInvalidVersion;
+
+            bool _local_dirty = true;
+            bool _world_dirty = true;
+            bool _world_to_local_dirty = true;
+
+            bool SetLocalPosition(const Vector3f &position)
+            {
+                if (_local_transform._position == position)
+                    return false;
+
+                _local_transform._position = position;
+                MarkLocalDirty();
+                return true;
+            }
+
+            Vector3f GetLocalPosition() const
+            {
+                return _local_transform._position;
+            }
+
+            bool SetLocalRotation(const Quaternion &rotation)
+            {
+                if (_local_transform._rotation == rotation)
+                    return false;
+
+                _local_transform._rotation = rotation;
+                MarkLocalDirty();
+                return true;
+            }
+
+            Quaternion GetLocalRotation() const
+            {
+                return _local_transform._rotation;
+            }
+
+            bool SetLocalScale(const Vector3f &scale)
+            {
+                if (_local_transform._scale == scale)
+                    return false;
+
+                _local_transform._scale = scale;
+                MarkLocalDirty();
+                return true;
+            }
+
+            Vector3f GetLocalScale() const
+            {
+                return _local_transform._scale;
+            }
+
+            const Matrix4x4f &GetWorldMatrix() const
+            {
+                AL_ASSERT(!_world_dirty);
+                return _world_matrix;
+            }
+            //world space
+            Vector3f GetPosition() const
+            {
+                AL_ASSERT(!_world_dirty);
+                return _position;
+            }
+
+            Vector3f GetScale() const
+            {
+                AL_ASSERT(!_world_dirty);
+                return _scale;
+            }
+
+            Quaternion GetRotation() const
+            {
+                AL_ASSERT(!_world_dirty);
+                return _rotation;
+            }
+
+        private:
+            void MarkLocalDirty()
+            {
+                _local_dirty = true;
+                _world_dirty = true;
+                ++_local_version;
+            }
         };
 
         Archive &operator<<(Archive &ar, TransformComponent &c);
@@ -259,12 +361,12 @@ namespace Ailu
         };
         Archive &operator<<(Archive &ar, const CVXGI &c);
         Archive &operator>>(Archive &ar, CVXGI &c);
-    }
+    }// namespace ECS
 };// namespace Ailu
 
 namespace Ailu::DebugDrawer
 {
-    void AILU_API DebugWireframe(const ECS::CCollider &c, const Transform &t, Color color = Colors::kGreen);
-    void AILU_API DebugWireframe(const ECS::CVXGI &c, const Transform &t, Color color = Colors::kGreen);
-};// namespace DebugDrawer
+    void AILU_API DebugWireframe(const ECS::CCollider &c, const Matrix4x4f &mat, Color color = Colors::kGreen);
+    void AILU_API DebugWireframe(const ECS::CVXGI &c, const Matrix4x4f &mat, Color color = Colors::kGreen);
+};// namespace Ailu::DebugDrawer
 #endif// __COMPONENT_H__

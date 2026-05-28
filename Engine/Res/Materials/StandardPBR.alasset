@@ -5,24 +5,7 @@
         "_asset_type": "Ailu::Render::Material",
         "_asset_name": "StandardPBR"
     },
-    "_texture_properties": [{
-            "_name": "_AlbedoTex",
-            "_texture_guid": ""
-        }, {
-            "_name": "_EmissionTex",
-            "_texture_guid": ""
-        }, {
-            "_name": "_NormalTex",
-            "_texture_guid": ""
-        }, {
-            "_name": "_RoughnessMetallicTex",
-            "_texture_guid": ""
-        }, {
-            "_name": "_SpecularTex",
-            "_texture_guid": ""
-        }],
     "_shader_guid": "60fb44b6-864f-4c6a-b49b-f4b26829b57d",
-    "_int_vector_properties": [],
     "_keywords": [],
     "_uint_properties": [{
             "_name": "_MaterialID",
@@ -71,5 +54,22 @@
         }, {
             "_name": "_SpecularValue",
             "_value": [0.0, 0.0, 0.0, 0.0]
+        }],
+    "_int_vector_properties": [],
+    "_texture_properties": [{
+            "_name": "_AlbedoTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_EmissionTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_NormalTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_RoughnessMetallicTex",
+            "_texture_guid": ""
+        }, {
+            "_name": "_SpecularTex",
+            "_texture_guid": ""
         }]
 }

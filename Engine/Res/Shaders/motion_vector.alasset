@@ -6,6 +6,6 @@
         "_asset_name": "Internal/MotionVector"
     },
     "_file": "Shaders/hlsl/motion_vector.hlsl",
-    "_ps_entry": "CameraMotionVectorPSMain",
-    "_vs_entry": "FullscreenVSMain"
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "CameraMotionVectorPSMain"
 }

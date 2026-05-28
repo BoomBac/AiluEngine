@@ -6,6 +6,6 @@
         "_asset_name": "texture3d_drawer"
     },
     "_file": "Shaders/hlsl/texture3d_drawer.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

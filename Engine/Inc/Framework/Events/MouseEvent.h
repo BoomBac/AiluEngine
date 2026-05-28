@@ -96,17 +96,20 @@ namespace Ailu
     class AILU_API MouseSetCursorEvent : public Event
     {
     public:
+        inline static constexpr u8 kUseCurrentCursor = 0xFF;
         //u8 same with ECursorType(Application.h)
-        MouseSetCursorEvent(u8 cursorType) : _cursorType(cursorType) {}
+        MouseSetCursorEvent(u8 cursorType, bool isClientArea = false) : _cursorType(cursorType), _is_client_area(isClientArea) {}
         inline u8 GetCursorType() const { return _cursorType; }
+        inline bool IsClientArea() const { return _is_client_area; }
         std::string ToString() const override
         {
-            return std::format("MouseSetCursorEvent : {}", static_cast<int>(_cursorType));
+            return std::format("MouseSetCursorEvent : {}, client={}", static_cast<int>(_cursorType), _is_client_area);
         }
         EVENT_CLASS_TYPE(kMouseSetCursor)
         EVENT_CLASS_CATEGORY(kEventCategoryMouse | kEventCategoryInput)
     private:
         u8 _cursorType;
+        bool _is_client_area = false;
     };
 }// namespace Ailu
 

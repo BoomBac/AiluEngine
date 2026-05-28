@@ -236,7 +236,6 @@ namespace Ailu
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             _p_window->OnUpdate();
             _dispatcher.PumpTasks();
-            SetCursorInternal();
             if (_state == EApplicationState::EApplicationState_Pause)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -249,7 +248,6 @@ namespace Ailu
             _p_window->OnUpdate();
             LogicLoop();
             _dispatcher.PumpTasks();
-            SetCursorInternal();
             if (_state == EApplicationState::EApplicationState_Pause)
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
@@ -305,9 +303,13 @@ namespace Ailu
         _render_wait.notify_one();
     }
 
-    void Application::SetCursor(ECursorType type)
+    void Application::SetCursor(ECursorType type, ECursorPriority priority)
     {
+        if ((u8) priority < (u8) _cursor_priority)
+            return;
         _cursor_type = type;
+        _cursor_priority = priority;
+        SetCursorInternal(_cursor_type);
     }
 
     Application &Application::Get()
@@ -426,6 +428,7 @@ namespace Ailu
         dispather.Dispatch<WindowMinimizeEvent>(BIND_EVENT_HANDLER(OnWindowMinimize));
         dispather.Dispatch<WindowResizeEvent>(BIND_EVENT_HANDLER(OnWindowResize));
         dispather.Dispatch<WindowMovedEvent>(BIND_EVENT_HANDLER(OnWindowMove));
+        dispather.Dispatch<MouseSetCursorEvent>(BIND_EVENT_HANDLER(OnSetCursor));
 #if defined(SEPARATE_LOGIC_THREAD)
         dispather.Dispatch<MouseButtonReleasedEvent>(BIND_EVENT_HANDLER(OnMouseUp));
         dispather.Dispatch<MouseButtonPressedEvent>(BIND_EVENT_HANDLER(OnMouseDown));
@@ -433,7 +436,6 @@ namespace Ailu
         dispather.Dispatch<MouseScrollEvent>(BIND_EVENT_HANDLER(OnMouseScroll));
         dispather.Dispatch<KeyPressedEvent>(BIND_EVENT_HANDLER(OnKeyDown));
         dispather.Dispatch<KeyReleasedEvent>(BIND_EVENT_HANDLER(OnKeyUp));
-        dispather.Dispatch<MouseSetCursorEvent>(BIND_EVENT_HANDLER(OnSetCursor));
 #else
         for (auto it = _layer_stack->end(); it != _layer_stack->begin();)
         {
@@ -481,8 +483,14 @@ namespace Ailu
 
     bool Application::OnSetCursor(MouseSetCursorEvent &e)
     {
-        //_cursor_type = static_cast<ECursorType>(e.GetCursorType());
-        SetCursorInternal();
+        _is_client_cursor_context = e.IsClientArea();
+        if (_is_client_cursor_context)
+        {
+            SetCursorInternal(_cursor_type);
+            return true;
+        }
+        if (e.GetCursorType() != MouseSetCursorEvent::kUseCurrentCursor)
+            SetCursorInternal(static_cast<ECursorType>(e.GetCursorType()));
         return true;
     }
 
@@ -503,6 +511,7 @@ namespace Ailu
         _render_lag += last_mark;
         _update_lag += last_mark;
         Input::BeginFrame();
+        BeginCursorFrame();
         TimeMgr::Get().Mark();
         {
             CPUProfileBlock main_b("Application::Tick");
@@ -617,11 +626,16 @@ namespace Ailu
         FrameMark;
     #endif
     }
+
+    void Application::BeginCursorFrame()
+    {
+        _cursor_type = ECursorType::kArrow;
+        _cursor_priority = ECursorPriority::kFallback;
+    }
     
-    void Application::SetCursorInternal()
+    void Application::SetCursorInternal(ECursorType type)
     {
 #if PLATFORM_WINDOWS
-        HCURSOR cursor = nullptr;
         static bool s_init = false;
         static HashMap<ECursorType,HCURSOR> s_cursor_map{};
         if (!s_init)
@@ -634,7 +648,7 @@ namespace Ailu
             s_cursor_map[ECursorType::kSizeNESW] = LoadCursor(NULL, IDC_SIZENESW);
             s_cursor_map[ECursorType::kHand] = LoadCursor(NULL, IDC_HAND);
         }
-        ::SetCursor(s_cursor_map[_cursor_type]);
+        ::SetCursor(s_cursor_map[type]);
 #endif// PLATFORM_WINDOWS
     }
 }// namespace Ailu

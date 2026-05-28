@@ -6,6 +6,7 @@
 #include "Framework/Script/ScriptSystem.h"
 #include "Physics/PhysicsSystem.h"
 #include "Scene/RenderSystem.h"
+#include "Scene/TransformSystem.h"
 //#include "pch.h"
 #include <regex>
 
@@ -17,6 +18,73 @@ using namespace Ailu::Render;
 namespace Ailu::SceneManagement
 {
     #pragma region Scene----------------------------------------------------------------------------
+    ReparentSceneCommand::ReparentSceneCommand(ECS::Entity child, ECS::Entity new_parent, bool keep_world_transform)
+        : _child(child), _new_parent(new_parent), _keep_world_transform(keep_world_transform)
+    {
+    }
+
+    const String &ReparentSceneCommand::ToString() const
+    {
+        static String name = "Reparent";
+        return name;
+    }
+
+    void ReparentSceneCommand::CaptureOldState(Scene &scene)
+    {
+        auto &reg = scene.GetRegister();
+        if (auto *hier = reg.GetComponent<ECS::CHierarchy>(_child))
+            _old_parent = hier->_parent;
+        if (auto *transform = reg.GetComponent<ECS::TransformComponent>(_child))
+            _old_local_transform = transform->_local_transform;
+    }
+
+    void ReparentSceneCommand::CaptureNewState(Scene &scene)
+    {
+        if (auto *transform = scene.GetRegister().GetComponent<ECS::TransformComponent>(_child))
+            _new_local_transform = transform->_local_transform;
+    }
+
+    bool ReparentSceneCommand::Apply(Scene &scene, ECS::Entity parent, const Transform &local_transform) const
+    {
+        if (!scene.IsValidEntity(_child))
+            return false;
+        if (parent != ECS::kInvalidEntity && !scene.IsValidEntity(parent))
+            return false;
+
+        if (!scene.Reparent(_child, parent, false))
+            return false;
+
+        if (auto *transform = scene.GetRegister().GetComponent<ECS::TransformComponent>(_child))
+        {
+            transform->_local_transform = local_transform;
+            transform->_local_dirty = true;
+            transform->_world_dirty = true;
+        }
+        return true;
+    }
+
+    bool ReparentSceneCommand::Execute(Scene &scene)
+    {
+        if (!_has_executed)
+        {
+            CaptureOldState(scene);
+            if (!scene.Reparent(_child, _new_parent, _keep_world_transform))
+                return false;
+            CaptureNewState(scene);
+            _has_executed = true;
+            return true;
+        }
+
+        return Apply(scene, _new_parent, _new_local_transform);
+    }
+
+    bool ReparentSceneCommand::Undo(Scene &scene)
+    {
+        if (!_has_executed)
+            return false;
+        return Apply(scene, _old_parent, _old_local_transform);
+    }
+
     void Scene::Serialize(Archive &arch)
     {
         u64 index = 0;
@@ -190,7 +258,7 @@ namespace Ailu::SceneManagement
                 AL_ASSERT_MSG(true, "Unkown Component");
             };
         }
-        MarkDirty();
+        TouchStructure();
     }
 
     Scene::Scene(const String &name) : Object(name)
@@ -207,6 +275,9 @@ namespace Ailu::SceneManagement
         _register.RegisterComponent<ECS::CCollider>();
         _register.RegisterComponent<ECS::CSkeletonMesh>();
         _register.RegisterComponent<ECS::CVXGI>();
+        ECS::Signature transf_sig;
+        transf_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
+        _register.RegisterSystem<ECS::TransformSystem>(transf_sig);
         ECS::Signature ls_sig;
         ls_sig.set(_register.GetComponentTypeID<ECS::TransformComponent>(), true);
         ls_sig.set(_register.GetComponentTypeID<ECS::LightComponent>(), true);
@@ -232,82 +303,270 @@ namespace Ailu::SceneManagement
         _tlas_buffer->Name(std::format("{}_tlas_buffer", Name()));
     }
 
-    void Scene::Attach(ECS::Entity current, ECS::Entity parent)
+    // =========================================================================
+    // Hierarchy Helpers
+    // =========================================================================
+    void Scene::TouchStructure()
     {
-        if (parent == ECS::kInvalidEntity)
-            return;
-        AL_ASSERT(_register.HasComponent<ECS::CHierarchy>(current) && _register.HasComponent<ECS::CHierarchy>(parent));
-        auto parent_hierarchy = _register.GetComponent<ECS::CHierarchy>(parent);
-        auto cur_hierarchy = _register.GetComponent<ECS::CHierarchy>(current);
-        if (cur_hierarchy->_parent != ECS::kInvalidEntity)
+        ++_structure_revision;
+        MarkDirty();
+    }
+
+    bool Scene::IsValidEntity(ECS::Entity entity) const
+    {
+        return _register.IsAlive(entity);
+    }
+
+    bool Scene::IsDescendantOf(ECS::Entity entity, ECS::Entity potential_ancestor) const
+    {
+        if (entity == ECS::kInvalidEntity || potential_ancestor == ECS::kInvalidEntity)
+            return false;
+        if (!_register.IsAlive(entity) || !_register.IsAlive(potential_ancestor))
+            return false;
+
+        std::unordered_set<ECS::Entity> visited;
+        ECS::Entity current = entity;
+        constexpr u32 kMaxIterations = 1024u;
+        u32 iterations = 0u;
+
+        while (current != ECS::kInvalidEntity && iterations < kMaxIterations)
         {
-            Detach(current);
+            if (!visited.insert(current).second)
+            {
+                LOG_ERROR("IsDescendantOf: cycle detected at entity {}", current);
+                return false;
+            }
+            if (current == potential_ancestor)
+                return true;
+
+            auto *hier = _register.GetComponent<ECS::CHierarchy>(current);
+            if (!hier)
+                break;
+            current = hier->_parent;
+            ++iterations;
+        }
+
+        if (iterations >= kMaxIterations)
+            LOG_ERROR("IsDescendantOf: max iterations exceeded from entity {}", entity);
+
+        return false;
+    }
+
+    bool Scene::UnlinkFromParent(ECS::Entity entity)
+    {
+        auto *child_hier = _register.GetComponent<ECS::CHierarchy>(entity);
+        if (!child_hier || child_hier->_parent == ECS::kInvalidEntity)
+            return false;
+
+        ECS::Entity old_parent_entity = child_hier->_parent;
+        auto *old_parent_hier = _register.GetComponent<ECS::CHierarchy>(old_parent_entity);
+        if (!old_parent_hier)
+            return false;
+
+        ECS::Entity prev = child_hier->_prev_sibling;
+        ECS::Entity next = child_hier->_next_sibling;
+
+        if (prev != ECS::kInvalidEntity)
+        {
+            auto *prev_hier = _register.GetComponent<ECS::CHierarchy>(prev);
+            if (prev_hier)
+                prev_hier->_next_sibling = next;
         }
         else
         {
-            if (parent_hierarchy->_children_num == 0)
+            old_parent_hier->_first_child = next;
+        }
+
+        if (next != ECS::kInvalidEntity)
+        {
+            auto *next_hier = _register.GetComponent<ECS::CHierarchy>(next);
+            if (next_hier)
+                next_hier->_prev_sibling = prev;
+        }
+
+        --old_parent_hier->_children_num;
+
+        child_hier->_parent = ECS::kInvalidEntity;
+        child_hier->_prev_sibling = ECS::kInvalidEntity;
+        child_hier->_next_sibling = ECS::kInvalidEntity;
+
+        _register.TouchHierarchy();
+        return true;
+    }
+
+    bool Scene::LinkAsLastChild(ECS::Entity entity, ECS::Entity parent)
+    {
+        auto *child_hier = _register.GetComponent<ECS::CHierarchy>(entity);
+        auto *parent_hier = _register.GetComponent<ECS::CHierarchy>(parent);
+        if (!child_hier || !parent_hier)
+            return false;
+
+        child_hier->_parent = parent;
+
+        if (parent_hier->_children_num == 0)
+        {
+            parent_hier->_first_child = entity;
+        }
+        else
+        {
+            ECS::Entity last_child_entity = parent_hier->_first_child;
+            auto *last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
+            while (last_child && last_child->_next_sibling != ECS::kInvalidEntity)
             {
-                parent_hierarchy->_first_child = current;
+                last_child_entity = last_child->_next_sibling;
+                last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
             }
+            if (last_child)
+            {
+                last_child->_next_sibling = entity;
+                child_hier->_prev_sibling = last_child_entity;
+            }
+        }
+
+        ++parent_hier->_children_num;
+        _register.TouchHierarchy();
+        return true;
+    }
+
+    void Scene::CollectSubtreePostOrder(ECS::Entity root, Vector<ECS::Entity>& result) const
+    {
+        auto *hier = _register.GetComponent<ECS::CHierarchy>(root);
+        if (!hier)
+        {
+            result.push_back(root);
+            return;
+        }
+
+        ECS::Entity child = hier->_first_child;
+        while (child != ECS::kInvalidEntity)
+        {
+            ECS::Entity next = child;
+            auto *child_hier = _register.GetComponent<ECS::CHierarchy>(child);
+            if (child_hier)
+                next = child_hier->_next_sibling;
+            CollectSubtreePostOrder(child, result);
+            child = next;
+        }
+
+        result.push_back(root);
+    }
+
+    // =========================================================================
+    // Public Hierarchy API
+    // =========================================================================
+    bool Scene::Reparent(ECS::Entity child, ECS::Entity new_parent, bool keep_world_transform)
+    {
+        // --- Validation ---
+        if (child == ECS::kInvalidEntity)
+            return false;
+        if (!_register.IsAlive(child))
+            return false;
+        if (!_register.HasComponent<ECS::CHierarchy>(child))
+            return false;
+        if (new_parent != ECS::kInvalidEntity)
+        {
+            if (!_register.IsAlive(new_parent))
+                return false;
+            if (!_register.HasComponent<ECS::CHierarchy>(new_parent))
+                return false;
+        }
+
+        // child cannot be its own parent
+        if (child == new_parent)
+            return false;
+
+        // new_parent must not be in child's subtree
+        if (new_parent != ECS::kInvalidEntity && IsDescendantOf(new_parent, child))
+            return false;
+
+        // Check current parent — if already correct, no-op
+        auto *child_hier = _register.GetComponent<ECS::CHierarchy>(child);
+        if (child_hier->_parent == new_parent)
+            return true;
+
+        // --- Save world transform ---
+        auto *child_transf = _register.GetComponent<ECS::TransformComponent>(child);
+        Transform old_world;
+        bool has_transform = (child_transf != nullptr);
+        if (has_transform)
+            old_world = Transform::FromMatrix(child_transf->_world_matrix);
+
+        // --- Unlink from old parent ---
+        UnlinkFromParent(child);
+
+        // --- Link to new parent ---
+        if (new_parent != ECS::kInvalidEntity)
+        {
+            LinkAsLastChild(child, new_parent);
+
+            auto *parent_transf = _register.GetComponent<ECS::TransformComponent>(new_parent);
+            if (parent_transf)
+            {
+                child_hier->_inv_matrix_attach = Math::MatrixInverse(parent_transf->_world_matrix);
+            }
+        }
+
+        // --- Restore world transform ---
+        if (keep_world_transform && has_transform)
+        {
+            Matrix4x4f local_matrix = Transform::ToMatrix(old_world);
+            if (new_parent != ECS::kInvalidEntity)
+            {
+                if (auto *parent_transf = _register.GetComponent<ECS::TransformComponent>(new_parent))
+                    local_matrix = local_matrix * Math::MatrixInverse(parent_transf->_world_matrix);
+            }
+            child_transf->_local_transform = Transform::FromMatrix(local_matrix);
+            child_transf->_local_dirty = true;
+            child_transf->_world_dirty = true;
+        }
+
+        TouchStructure();
+        return true;
+    }
+
+    bool Scene::Detach(ECS::Entity child, bool keep_world_transform)
+    {
+        return Reparent(child, ECS::kInvalidEntity, keep_world_transform);
+    }
+
+    void Scene::EnqueueSceneCommand(ISceneCommand *command, bool undo)
+    {
+        if (command == nullptr)
+            return;
+        _pending_scene_commands.push_back({command, undo});
+    }
+
+    void Scene::ProcessSceneCommands()
+    {
+        if (_pending_scene_commands.empty())
+            return;
+
+        Vector<QueuedSceneCommand> pending = std::move(_pending_scene_commands);
+        _pending_scene_commands.clear();
+        for (const auto &entry: pending)
+        {
+            if (entry._command == nullptr)
+                continue;
+            if (entry._undo)
+                entry._command->Undo(*this);
             else
-            {
-                auto last_child = _register.GetComponent<ECS::CHierarchy>(parent_hierarchy->_first_child);
-                ECS::Entity last_child_entity = parent_hierarchy->_first_child;
-                while (last_child->_next_sibling != ECS::kInvalidEntity)
-                {
-                    last_child_entity = last_child->_next_sibling;
-                    last_child = _register.GetComponent<ECS::CHierarchy>(last_child_entity);
-                }
-                last_child->_next_sibling = current;
-                cur_hierarchy->_prev_sibling = last_child_entity;
-            }
+                entry._command->Execute(*this);
         }
-        cur_hierarchy->_parent = parent;
-        parent_hierarchy->_children_num++;
-        auto mgr = _register.GetComponentMgr<ECS::CHierarchy>();
-        mgr->MoveToLast(mgr->GetIndex(current));
-        if (auto parent_transf = _register.GetComponent<ECS::TransformComponent>(parent))
-        {
-            cur_hierarchy->_inv_matrix_attach = Math::MatrixInverse(parent_transf->_transform._world_matrix);
-            if (auto cur_transf = _register.GetComponent<ECS::TransformComponent>(current))
-            {
-                cur_transf->_transform._p_parent = &parent_transf->_transform;
-            }
-        }
-        MarkDirty();
     }
-    void Scene::Detach(ECS::Entity current)
+
+    bool Scene::RenameEntity(ECS::Entity entity, const String& new_name)
     {
-        auto cur_hierarchy = _register.GetComponent<ECS::CHierarchy>(current);
-        if (cur_hierarchy->_parent == ECS::kInvalidEntity)
-            return;
-        auto parent_hierarchy = _register.GetComponent<ECS::CHierarchy>(cur_hierarchy->_parent);
-        if (parent_hierarchy->_children_num == 1)
-        {
-            parent_hierarchy->_first_child = ECS::kInvalidEntity;
-        }
-        else
-        {
-            auto child = _register.GetComponent<ECS::CHierarchy>(parent_hierarchy->_first_child);
-            while (child != cur_hierarchy)
-            {
-                child = _register.GetComponent<ECS::CHierarchy>(child->_next_sibling);
-            }
-            auto prev_child = _register.GetComponent<ECS::CHierarchy>(child->_prev_sibling);
-            auto next_child = _register.GetComponent<ECS::CHierarchy>(child->_next_sibling);
-            prev_child->_next_sibling = child->_next_sibling;
-            next_child->_prev_sibling = child->_prev_sibling;
-        }
-        cur_hierarchy->_parent = ECS::kInvalidEntity;
-        cur_hierarchy->_prev_sibling = ECS::kInvalidEntity;
-        cur_hierarchy->_next_sibling = ECS::kInvalidEntity;
-        parent_hierarchy->_children_num--;
-        if (auto cur_transf = _register.GetComponent<ECS::TransformComponent>(current))
-        {
-            cur_transf->_transform._p_parent = nullptr;
-        }
-        MarkDirty();
+        if (!_register.IsAlive(entity))
+            return false;
+        auto *tag = _register.GetComponent<ECS::TagComponent>(entity);
+        if (!tag)
+            return false;
+        tag->_name = new_name;
+        TouchStructure();
+        return true;
     }
+
+    // --- Old Detach (non-static wrapper removed, now inline in header) ---
     const Vector<ECS::Entity> &Scene::EntityView() const
     {
         return _register.EntityView<ECS::CHierarchy>();
@@ -323,7 +582,7 @@ namespace Ailu::SceneManagement
         comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
         comp._p_mats.emplace_back(mat ? mat : Material::s_standard_defered_lit.lock());
-        MarkDirty();
+        TouchStructure();
         return obj;
     }
     ECS::Entity Scene::AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>> &mats)
@@ -336,7 +595,7 @@ namespace Ailu::SceneManagement
         comp._p_mesh = mesh ? mesh : Mesh::s_plane.lock();
         comp._transformed_aabbs.resize(comp._p_mesh->SubmeshCount() + 1);
         comp._p_mats = mats;
-        MarkDirty();
+        TouchStructure();
         return obj;
     }
     ECS::Entity Scene::AddObject(String name)
@@ -346,7 +605,7 @@ namespace Ailu::SceneManagement
         _register.AddComponent<ECS::TagComponent>(obj, name);
         _register.AddComponent<ECS::TransformComponent>(obj);
         _register.AddComponent<ECS::CHierarchy>(obj);
-        MarkDirty();
+        TouchStructure();
         return obj;
     }
     ECS::Entity Scene::DuplicateEntity(ECS::Entity e)
@@ -366,7 +625,32 @@ namespace Ailu::SceneManagement
             }
         }
         tag_comp._name += "(" + std::to_string(max_index + 1) + ")";
+
+        // Save source local transform before copying
+        Vector3f source_local_pos = Vector3f::kZero;
+        Quaternion source_local_rot = Quaternion();
+        Vector3f source_local_scale = Vector3f::kOne;
+        ECS::Entity source_parent = ECS::kInvalidEntity;
+        bool source_has_hierarchy = _register.HasComponent<ECS::CHierarchy>(e);
+
+        if (auto *src_transf = _register.GetComponent<ECS::TransformComponent>(e))
+        {
+            source_local_pos = src_transf->_local_transform._position;
+            source_local_rot = src_transf->_local_transform._rotation;
+            source_local_scale = src_transf->_local_transform._scale;
+        }
+        if (source_has_hierarchy)
+        {
+            source_parent = _register.GetComponent<ECS::CHierarchy>(e)->_parent;
+        }
+
         _register.AddComponent<ECS::TransformComponent>(new_one, *_register.GetComponent<ECS::TransformComponent>(e));
+
+        // Add default CHierarchy (no sibling/child fields copied)
+        if (source_has_hierarchy)
+            _register.AddComponent<ECS::CHierarchy>(new_one);
+
+        // Copy business components
         if (_register.HasComponent<ECS::ScriptComponent>(e))
             _register.AddComponent<ECS::ScriptComponent>(new_one, *_register.GetComponent<ECS::ScriptComponent>(e));
         if (_register.HasComponent<ECS::StaticMeshComponent>(e))
@@ -375,20 +659,29 @@ namespace Ailu::SceneManagement
             _register.AddComponent<ECS::LightComponent>(new_one, *_register.GetComponent<ECS::LightComponent>(e));
         if (_register.HasComponent<ECS::CCamera>(e))
             _register.AddComponent<ECS::CCamera>(new_one, *_register.GetComponent<ECS::CCamera>(e));
-        if (_register.HasComponent<ECS::CHierarchy>(e))
-        {
-            ECS::CHierarchy src_heri = *_register.GetComponent<ECS::CHierarchy>(e);
-            auto &new_heri = _register.AddComponent<ECS::CHierarchy>(new_one, src_heri);
-            Attach(new_one, src_heri._parent);
-        }
         if (_register.HasComponent<ECS::CLightProbe>(e))
             _register.AddComponent<ECS::CLightProbe>(new_one, *_register.GetComponent<ECS::CLightProbe>(e));
         if (_register.HasComponent<ECS::CRigidBody>(e))
             _register.AddComponent<ECS::CRigidBody>(new_one, *_register.GetComponent<ECS::CRigidBody>(e));
         if (_register.HasComponent<ECS::CCollider>(e))
             _register.AddComponent<ECS::CCollider>(new_one, *_register.GetComponent<ECS::CCollider>(e));
+
+        // Reparent to same parent, then restore local transform
+        if (source_has_hierarchy && source_parent != ECS::kInvalidEntity)
+        {
+            Reparent(new_one, source_parent, false);
+        }
+
+        // Restore saved local transform
+        if (auto *new_transf = _register.GetComponent<ECS::TransformComponent>(new_one))
+        {
+            new_transf->_local_transform._position = source_local_pos;
+            new_transf->_local_transform._rotation = source_local_rot;
+            new_transf->_local_transform._scale = source_local_scale;
+        }
+
         LOG_INFO("Duplicate entity {}", e);
-        MarkDirty();
+        TouchStructure();
         return new_one;
     }
     ECS::Entity Scene::Pick(const Ray &ray)
@@ -425,17 +718,46 @@ namespace Ailu::SceneManagement
     {
         if (_pending_delete_entities.empty())
             return;
-        while (!_pending_delete_entities.empty())
+
+        // Step 1: Collect all entities to delete (roots + all descendants), post-order
+        std::unordered_set<ECS::Entity> all_to_delete;
+        Vector<ECS::Entity> delete_order;
+
+        for (ECS::Entity root : _pending_delete_entities)
         {
-            auto actor = _pending_delete_entities.front();
-            _pending_delete_entities.pop();
+            if (all_to_delete.contains(root))
+                continue;
+            Vector<ECS::Entity> subtree;
+            CollectSubtreePostOrder(root, subtree);
+            for (ECS::Entity entity : subtree)
+            {
+                if (all_to_delete.insert(entity).second)
+                    delete_order.push_back(entity);
+            }
+        }
+
+        // Step 2: Unlink roots whose parent is NOT being deleted
+        for (ECS::Entity root : _pending_delete_entities)
+        {
+            auto *hier = _register.GetComponent<ECS::CHierarchy>(root);
+            if (hier && hier->_parent != ECS::kInvalidEntity && !all_to_delete.contains(hier->_parent))
+                UnlinkFromParent(root);
+        }
+
+        // Step 3: Destroy from leaves to root (post-order)
+        for (ECS::Entity actor : delete_order)
+        {
+            if (!_register.IsAlive(actor))
+                continue;
             if (auto *script_comp = _register.GetComponent<ECS::ScriptComponent>(actor))
             {
                 ScriptSystem::Get().DestroyComponent(*script_comp);
             }
             _register.Destory(actor);
         }
-        MarkDirty();
+
+        _pending_delete_entities.clear();
+        TouchStructure();
     }
 
     void Scene::Clear()
@@ -446,28 +768,39 @@ namespace Ailu::SceneManagement
     void Scene::Update(f32 dt)
     {
         auto &r = _register;
+        ProcessSceneCommands();
         u32 index = 0;
         for (auto &comp: r.View<ECS::ScriptComponent>())
         {
             const ECS::Entity entity = r.GetEntity<ECS::ScriptComponent>(index++);
             ScriptSystem::Get().UpdateComponent(this, entity, comp, dt);
         }
-        index = 0;
-        for (auto &comp: r.View<ECS::TransformComponent>())
+        for (auto &it: _register.SystemView())
         {
-            comp._transform._world_matrix = Transform::GetWorldMatrix(comp._transform);
-            ++index;
+            auto &[type, sys] = it;
+            if (type != ECS::PhysicsSystem::TypeName())
+                continue;
+            sys->Update(_register, dt);
+        }
+        if (auto *transform_system = _register.GetSystem<ECS::TransformSystem>())
+            transform_system->Update(_register, dt);
+        for (auto &it: _register.SystemView())
+        {
+            auto &[type, sys] = it;
+            if (type == ECS::TransformSystem::TypeName() || type == ECS::PhysicsSystem::TypeName())
+                continue;
+            sys->Update(_register, dt);
         }
         index = 0;
         for (auto &comp: r.View<ECS::StaticMeshComponent>())
         {
             if (comp._p_mesh)
             {
-                const auto &transf = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(index)->_transform;
+                const auto *transf = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(index);
                 auto &bound_box = comp._p_mesh->BoundBox();
                 for (int i = 0; i < bound_box.size(); i++)
                 {
-                    comp._transformed_aabbs[i] = bound_box[i] * transf._world_matrix;
+                    comp._transformed_aabbs[i] = bound_box[i] * transf->_world_matrix;
                 }
             }
             ++index;
@@ -477,11 +810,11 @@ namespace Ailu::SceneManagement
         {
             if (comp._p_mesh)
             {
-                const auto &transf = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(index)->_transform;
+                const auto *transf = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(index);
                 auto &bound_box = comp._p_mesh->BoundBox();
                 for (int i = 0; i < bound_box.size(); i++)
                 {
-                    comp._transformed_aabbs[i] = bound_box[i] * transf._world_matrix;
+                    comp._transformed_aabbs[i] = bound_box[i] * transf->_world_matrix;
                 }
             }
             ++index;
@@ -490,14 +823,10 @@ namespace Ailu::SceneManagement
         for (auto &comp: r.View<ECS::CCamera>())
         {
             auto t = r.GetComponent<ECS::CCamera, ECS::TransformComponent>(index);
-            comp._camera.Position(t->_transform._position);
-            comp._camera.Rotation(t->_transform._rotation);
+            const auto &wm = t->_world_matrix;
+            comp._camera.Position(Vector3f(wm[3][0], wm[3][1], wm[3][2]));
+            comp._camera.Rotation(Quaternion::FromMat4f(wm));
             comp._camera.RecalculateMatrix(true);
-        }
-        for (auto &it: _register.SystemView())
-        {
-            auto &[type, sys] = it;
-            sys->Update(_register, dt);
         }
         RebuildBVHTree();
         DeletePendingEntities();
@@ -718,7 +1047,7 @@ namespace Ailu::SceneManagement
         auto &r = _p_current->GetRegister();
         for (auto &t: r.View<ECS::TransformComponent>())
         {
-            _transform_cache.emplace_back(t._transform);
+            _transform_cache.emplace_back(t._local_transform);
         }
         Application::Get()._is_simulate_mode = true;
     }
@@ -728,7 +1057,7 @@ namespace Ailu::SceneManagement
         u32 index = 0;
         for (auto &t: r.View<ECS::TransformComponent>())
         {
-            t._transform = _transform_cache[index++];
+            t._local_transform = _transform_cache[index++];
         }
         for (auto &c: r.View<ECS::CRigidBody>())
         {

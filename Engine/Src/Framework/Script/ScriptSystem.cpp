@@ -74,7 +74,7 @@ namespace Ailu
             if (!IsValid())
                 return {0.0f, 0.0f, 0.0f};
             if (const auto *transform = _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity))
-                return {transform->_transform._position.x, transform->_transform._position.y, transform->_transform._position.z};
+                return {transform->_local_transform._position.x, transform->_local_transform._position.y, transform->_local_transform._position.z};
             return {0.0f, 0.0f, 0.0f};
         }
 
@@ -84,7 +84,7 @@ namespace Ailu
                 return;
             if (auto *transform = _scene->GetRegister().GetComponent<ECS::TransformComponent>(_entity))
             {
-                transform->_transform._position = Vector3f(x, y, z);
+                transform->_local_transform._position = Vector3f(x, y, z);
                 //_scene->MarkDirty();
             }
         }

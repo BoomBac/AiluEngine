@@ -167,6 +167,7 @@ ${HDR_LOADER} ${IMNODE} ${AILU_LUA_SOURCES} "Ext/tracy/public/TracyClient.cpp")
 
 add_library (Engine SHARED ${SOURCE_LIST})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
+set_target_properties(Engine PROPERTIES CXX_SCAN_FOR_MODULES OFF)
 
 add_dependencies(Engine ailu_reflection_codegen)
 # 包含路径

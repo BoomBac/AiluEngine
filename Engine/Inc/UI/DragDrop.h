@@ -31,6 +31,7 @@ namespace Ailu
             kAnimation,
             kPhysicsAsset,
             kBlueprint,
+            kTreeItem,
             kCustomUserData,// 可扩展类型（调试等）
         };
 

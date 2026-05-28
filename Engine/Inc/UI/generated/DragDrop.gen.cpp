@@ -30,7 +30,8 @@ initializer._str_to_enum_lut["kUIWidget"] = 12;
 initializer._str_to_enum_lut["kAnimation"] = 13;
 initializer._str_to_enum_lut["kPhysicsAsset"] = 14;
 initializer._str_to_enum_lut["kBlueprint"] = 15;
-initializer._str_to_enum_lut["kCustomUserData"] = 16;
+initializer._str_to_enum_lut["kTreeItem"] = 16;
+initializer._str_to_enum_lut["kCustomUserData"] = 17;
 s_enum_type_EDragType = std::make_unique<Ailu::Enum>(initializer);
 Ailu::Enum::RegisterEnum(s_enum_type_EDragType.get());
 }

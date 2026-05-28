@@ -1,12 +1,13 @@
 #include "Widgets/EditorLayer.h"
 #include "Common/Selection.h"
-
 #include "Ext/imgui/imgui.h"
 #include "Ext/imgui/imgui_internal.h"
+
 #include "Ext/ImGuizmo/ImGuizmo.h"//必须在imgui之后引入
 #include "Ext/imnodes/imnodes.h"
 #include "Ext/implot/implot.h"
 
+#include "Framework/Common/EngineConfig.h"
 #include "Framework/Common/Log.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Framework/Common/TimeMgr.h"
@@ -16,7 +17,6 @@
 #include "Render/Gizmo.h"
 #include "Render/RenderingData.h"
 #include "UI/TextRenderer.h"
-#include "Framework/Common/EngineConfig.h"
 //#include <Framework/Common/Application.h>
 #include <Objects/Type.h>
 
@@ -40,8 +40,8 @@
 #include "Animation/Curve.hpp"
 #include "Animation/Solver.h"
 #include "Common/Undo.h"
-#include "Framework/Events/KeyEvent.h"
 #include "Framework/Common/EngineConfig.h"
+#include "Framework/Events/KeyEvent.h"
 #include "Render/CommonRenderPipeline.h"
 #include "Render/RenderGraph/RenderGraph.h"
 
@@ -76,10 +76,467 @@ namespace Ailu
                 command += L" --target package_player --parallel 6\"";
                 return command;
             }
-        }
+
+            bool IsElementInSubtree(const UI::UIElement *root, const UI::UIElement *target)
+            {
+                if (root == nullptr || target == nullptr)
+                    return false;
+                if (root == target)
+                    return true;
+                for (const auto &child: root->GetChildren())
+                {
+                    if (IsElementInSubtree(child.get(), target))
+                        return true;
+                }
+                return false;
+            }
+
+            UI::Widget *FindOwningWidget(const UI::UIElement *element)
+            {
+                if (element == nullptr)
+                    return nullptr;
+                auto *ui_mgr = UI::UIManager::Get();
+                if (ui_mgr == nullptr)
+                    return nullptr;
+                for (const auto &widget: ui_mgr->_widgets)
+                {
+                    if (widget != nullptr && IsElementInSubtree(widget->Root(), element))
+                        return widget.get();
+                }
+                return nullptr;
+            }
+
+            String BuildUIReflectorElementLabel(UI::UIElement *element)
+            {
+                const auto *type = element->GetType();
+                const String &type_name = type != nullptr ? type->Name() : String("Unknown");
+                const String &name = element->Name().empty() ? type_name : element->Name();
+                return std::format("{} <{}>", name, type_name);
+            }
+
+            void DrawUIReflectorElementTree(UI::UIElement *element, UI::UIElement *&selected)
+            {
+                if (element == nullptr)
+                    return;
+                const auto &children = element->GetChildren();
+                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+                if (children.empty())
+                    flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                if (element == selected)
+                    flags |= ImGuiTreeNodeFlags_Selected;
+                if (element->GetHierarchyDepth() <= 1u)
+                    flags |= ImGuiTreeNodeFlags_DefaultOpen;
+                const String label = BuildUIReflectorElementLabel(element);
+                const bool is_open = ImGui::TreeNodeEx(static_cast<void *>(element), flags, "%s", label.c_str());
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+                    selected = element;
+                if (!children.empty() && is_open)
+                {
+                    for (const auto &child: children)
+                        DrawUIReflectorElementTree(child.get(), selected);
+                    ImGui::TreePop();
+                }
+            }
+
+            void DrawUIReflectorWidgetTree(UI::Widget *widget, UI::UIElement *&selected)
+            {
+                if (widget == nullptr)
+                    return;
+                UI::UIElement *root = widget->Root();
+                const Vector2f size = widget->GetSize();
+                const String label = std::format("{} [sort:{}{}] ({:.0f}x{:.0f})",
+                                                 widget->Name(),
+                                                 widget->_sort_order,
+                                                 widget->_is_external_output ? ", external" : "",
+                                                 size.x,
+                                                 size.y);
+                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen;
+                if (root == nullptr)
+                    flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                const bool is_open = ImGui::TreeNodeEx(static_cast<void *>(widget), flags, "%s", label.c_str());
+                if (root != nullptr && is_open)
+                {
+                    DrawUIReflectorElementTree(root, selected);
+                    ImGui::TreePop();
+                }
+            }
+
+            bool static DrawMemberProperty(PropertyInfo &prop_info, Object &obj)
+            {
+                bool changed = false;
+                ImGui::PushID(obj.Name().c_str());
+                auto &meta_info = prop_info.MetaInfo();
+                if (!prop_info.IsConst())
+                {
+                    if (prop_info.GetType() == StaticClass<bool>())
+                    {
+                        bool old_value = prop_info.Get<bool>(&obj);
+                        bool new_value = old_value;
+                        if (ImGui::Checkbox(prop_info.Name().c_str(), &new_value))
+                        {
+                            prop_info.Set<bool>(&obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<f32>())
+                    {
+                        f32 old_value = prop_info.Get<f32>(&obj);
+                        f32 new_value = old_value;
+                        if (meta_info.GetBool("IsRange"))
+                        {
+                            ImGui::SliderFloat(prop_info.Name().c_str(), &new_value, meta_info.GetFloat("RangeMin"), meta_info.GetFloat("RangeMax"));
+                        }
+                        else
+                            ImGui::InputFloat(prop_info.Name().c_str(), &new_value);
+                        if (old_value != new_value)
+                        {
+                            prop_info.Set<f32>(&obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<i8>())
+                    {
+                        i32 old_value = prop_info.Get<i8>(&obj);
+                        i32 new_value = old_value;
+                        if (meta_info.GetBool("IsRange"))
+                        {
+                            ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32) meta_info.GetInt("RangeMin"), (i32) meta_info.GetInt("RangeMax"));
+                        }
+                        else
+                            ImGui::InputInt(prop_info.Name().c_str(), &new_value);
+                        if (old_value != new_value)
+                        {
+                            prop_info.Set<i8>(&obj, (i8) new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<i16>())
+                    {
+                        i32 old_value = prop_info.Get<i16>(&obj);
+                        i32 new_value = old_value;
+                        if (meta_info.GetBool("IsRange"))
+                        {
+                            ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32) meta_info.GetInt("RangeMin"), (i32) meta_info.GetInt("RangeMax"));
+                        }
+                        else
+                            ImGui::InputInt(prop_info.Name().c_str(), &new_value);
+                        if (old_value != new_value)
+                        {
+                            prop_info.Set<i16>(&obj, (i16) new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<i32>())
+                    {
+                        i32 old_value = prop_info.Get<i32>(&obj);
+                        i32 new_value = old_value;
+                        if (meta_info.GetBool("IsRange"))
+                        {
+                            ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32) meta_info.GetInt("RangeMin"), (i32) meta_info.GetInt("RangeMax"));
+                        }
+                        else
+                            ImGui::InputInt(prop_info.Name().c_str(), &new_value);
+                        if (old_value != new_value)
+                        {
+                            prop_info.Set<i32>(&obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<u8>())
+                    {
+                        i32 old_value = prop_info.Get<u8>(&obj);
+                        i32 new_value = old_value;
+                        if (meta_info.GetBool("IsRange"))
+                        {
+                            ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetInt("RangeMin") < 0 ? 0 : meta_info.GetInt("RangeMin"), meta_info.GetInt("RangeMax"));
+                        }
+                        else
+                            ImGui::InputInt(prop_info.Name().c_str(), &new_value);
+                        if (old_value != new_value)
+                        {
+                            prop_info.Set<u8>(&obj, (u8) new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<u16>())
+                    {
+                        i32 old_value = prop_info.Get<u16>(&obj);
+                        i32 new_value = old_value;
+                        if (meta_info.GetBool("IsRange"))
+                        {
+                            ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetInt("RangeMin") < 0 ? 0 : meta_info.GetInt("RangeMin"), meta_info.GetInt("RangeMax"));
+                        }
+                        else
+                            ImGui::InputInt(prop_info.Name().c_str(), &new_value);
+                        if (old_value != new_value)
+                        {
+                            prop_info.Set<u16>(&obj, (u16) new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<u32>())
+                    {
+                        i32 old_value = prop_info.Get<u32>(&obj);
+                        i32 new_value = old_value;
+                        if (meta_info.GetBool("IsRange"))
+                        {
+                            ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetInt("RangeMin") < 0 ? 0 : meta_info.GetInt("RangeMin"), meta_info.GetInt("RangeMax"));
+                        }
+                        else
+                            ImGui::InputInt(prop_info.Name().c_str(), &new_value);
+                        if (old_value != new_value)
+                        {
+                            prop_info.Set<u32>(&obj, (u32) new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<String>())
+                    {
+                        String old_value = prop_info.Get<String>(&obj);
+                        auto str_len = old_value.size();
+                        char buf[256];
+                        memcpy(buf, old_value.c_str(), str_len);
+                        buf[str_len] = '\0';
+                        if (ImGui::InputText(prop_info.Name().c_str(), buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
+                        {
+                            prop_info.Set<String>(&obj, buf);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<Vector2f>())
+                    {
+                        Vector2f old_value = prop_info.Get<Vector2f>(&obj);
+                        Vector2f new_value = old_value;
+                        if (ImGui::InputFloat2(prop_info.Name().c_str(), new_value.data))
+                        {
+                            prop_info.Set<Vector2f>(&obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() != nullptr && prop_info.GetType()->IsEnum())
+                    {
+                        const auto *enum_type = static_cast<const Enum *>(prop_info.GetType());
+                        i32 current_value = static_cast<i32>(prop_info.Get<u32>(&obj));
+                        const String &preview = enum_type->GetNameByIndex(static_cast<u32>(current_value));
+                        if (ImGui::BeginCombo(prop_info.Name().c_str(), preview.c_str()))
+                        {
+                            for (const String *name: enum_type->GetEnumNames())
+                            {
+                                if (name == nullptr)
+                                    continue;
+                                const i32 enum_value = enum_type->GetIndexByName(*name);
+                                const bool is_selected = (enum_value == current_value);
+                                if (ImGui::Selectable(name->c_str(), is_selected))
+                                {
+                                    prop_info.Set<u32>(&obj, static_cast<u32>(enum_value));
+                                    changed = true;
+                                    current_value = enum_value;
+                                }
+                                if (is_selected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
+                        }
+                    }
+                    else if (prop_info.TypeName() == "Padding")
+                    {
+                        UI::Padding old_value = prop_info.Get<UI::Padding>(&obj);
+                        Vector4f new_value = {old_value._l, old_value._t, old_value._r, old_value._b};
+                        if (ImGui::InputFloat4(prop_info.Name().c_str(), new_value.data))
+                        {
+                            prop_info.Set<UI::Padding>(&obj, UI::Padding(new_value));
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<Vector3f>())
+                    {
+                        Vector3f old_value = prop_info.Get<Vector3f>(&obj);
+                        Vector3f new_value = old_value;
+                        if (ImGui::InputFloat3(prop_info.Name().c_str(), new_value.data))
+                        {
+                            prop_info.Set<Vector3f>(&obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<Vector4f>())
+                    {
+                        Vector4f old_value = prop_info.Get<Vector4f>(&obj);
+                        Vector4f new_value = old_value;
+                        if (meta_info.GetBool("IsColor"))
+                        {
+                            ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+                            prop_info.Set<Vector4f>(&obj, new_value);
+                            changed = true;
+                        }
+                        else
+                        {
+                            if (ImGui::InputFloat4(prop_info.Name().c_str(), new_value.data))
+                            {
+                                prop_info.Set<Vector4f>(&obj, new_value);
+                                changed = true;
+                            }
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<Vector2Int>())
+                    {
+                        Vector2Int old_value = prop_info.Get<Vector2Int>(&obj);
+                        Vector2Int new_value = old_value;
+                        if (ImGui::InputInt2(prop_info.Name().c_str(), new_value.data))
+                        {
+                            prop_info.Set<Vector2Int>(&obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<Vector3Int>())
+                    {
+                        Vector3Int old_value = prop_info.Get<Vector3Int>(&obj);
+                        Vector3Int new_value = old_value;
+                        if (ImGui::InputInt3(prop_info.Name().c_str(), new_value.data))
+                        {
+                            prop_info.Set<Vector3Int>(&obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else if (prop_info.GetType() == StaticClass<Vector4Int>())
+                    {
+                        Vector4Int old_value = prop_info.Get<Vector4Int>(&obj);
+                        Vector4Int new_value = old_value;
+                        if (ImGui::InputInt4(prop_info.Name().c_str(), new_value.data))
+                        {
+                            prop_info.Set<Vector4Int>(&obj, new_value);
+                            changed = true;
+                        }
+                    }
+                    else
+                    {
+                        ImGui::Text("Unsupported Type: %s", prop_info.TypeName().c_str());
+                    }
+                }
+                else
+                    ImGui::Text("ConstValue %s", prop_info.Name().c_str());
+                ImGui::PopID();
+                return changed;
+            }
+
+            bool DrawReflectedPropertiesByType(Type *type, Object &obj, const std::function<bool(const PropertyInfo &)> &filter = {})
+            {
+                bool any_changed = false;
+                for (Type *cur_type = type; cur_type != nullptr; cur_type = cur_type->BaseType())
+                {
+                    auto &properties = cur_type->GetProperties();
+                    if (properties.empty())
+                        continue;
+                    const bool open = ImGui::CollapsingHeader(cur_type->Name().c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+                    if (!open)
+                        continue;
+                    for (auto &prop: properties)
+                    {
+                        if (filter && !filter(prop))
+                            continue;
+                        any_changed |= DrawMemberProperty(prop, obj);
+                    }
+                }
+                return any_changed;
+            }
+
+            void DrawUIReflectorSelectionDetails(UI::UIElement *selected)
+            {
+                if (selected == nullptr)
+                {
+                    ImGui::TextUnformatted("No UI element selected.");
+                    return;
+                }
+                const auto *type = selected->GetType();
+                const Vector4f arr_rect = selected->GetArrangeRect();
+                const Vector4f cnt_rect = selected->GetContentRect();
+                UI::Widget *widget = FindOwningWidget(selected);
+                const String widget_name = widget != nullptr ? widget->Name() : String("Unknown");
+                const String parent_name = selected->GetParent() != nullptr ? selected->GetParent()->Name() : String("None");
+
+                ImGui::Text("Name: %s", selected->Name().c_str());
+                ImGui::Text("Type: %s", type != nullptr ? type->Name().c_str() : "Unknown");
+                ImGui::Text("Widget: %s", widget_name.c_str());
+                ImGui::Text("Parent: %s", parent_name.c_str());
+                ImGui::Separator();
+                ImGui::Text("AbsRect: %.1f, %.1f, %.1f, %.1f", arr_rect.x, arr_rect.y, arr_rect.z, arr_rect.w);
+                ImGui::Text("ContentRect: %.1f, %.1f, %.1f, %.1f", cnt_rect.x, cnt_rect.y, cnt_rect.z, cnt_rect.w);
+                ImGui::Text("Visible: %s", selected->IsVisible() ? "true" : "false");
+                ImGui::Text("Hovered: %s", selected->_state._is_hovered ? "true" : "false");
+                ImGui::Text("Pressed: %s", selected->_state._is_pressed ? "true" : "false");
+                ImGui::Text("Focused: %s", selected->_state._is_focused ? "true" : "false");
+                ImGui::Separator();
+
+                auto slot = selected->GetSlot();
+                if (slot != nullptr)
+                {
+                    ImGui::Text("Slot Type: %s", slot->GetType() != nullptr ? slot->GetType()->Name().c_str() : "Unknown");
+                    if (ImGui::CollapsingHeader("Slot", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        const bool slot_changed = DrawReflectedPropertiesByType(slot->GetType(), *slot);
+                        if (slot_changed)
+                        {
+                            selected->SlotMargin();
+                            selected->InvalidateLayout();
+                        }
+                    }
+                    ImGui::Separator();
+                }
+
+                DrawReflectedPropertiesByType(selected->GetType(), *selected, [](const PropertyInfo &prop)
+                                              { return prop.Name() != "_slot" && prop.Name() != "_state"; });
+            }
+            void ShowUIReflectorWindow(bool *is_show)
+            {
+                auto *ui_mgr = UI::UIManager::Get();
+                if (ui_mgr == nullptr)
+                    return;
+                UI::UIElement *selected = ui_mgr->GetDebugHighlightTarget();
+                if (selected != nullptr && FindOwningWidget(selected) == nullptr)
+                    selected = nullptr;
+                ui_mgr->SetDebugHighlightTarget(selected);
+
+                const bool is_open = ImGui::Begin("UI Reflector", is_show);
+                if (!is_open)
+                {
+                    ImGui::End();
+                    return;
+                }
+
+                if (ImGui::Button("Select Hover"))
+                    selected = ui_mgr->_hover_target;
+                ImGui::SameLine();
+                if (ImGui::Button("Select Capture"))
+                    selected = ui_mgr->_capture_target;
+                ImGui::SameLine();
+                if (ImGui::Button("Clear"))
+                    selected = nullptr;
+                ImGui::SameLine();
+                ImGui::Text("Widgets: %llu", static_cast<unsigned long long>(ui_mgr->_widgets.size()));
+                auto mpos = Input::GetGlobalMousePos();
+                ImGui::Text("MousePos: %.0f, %.0f", mpos.x, mpos.y);
+                ImGui::Separator();
+
+                const float details_width = std::min(360.0f, ImGui::GetContentRegionAvail().x * 0.4f);
+                const float tree_width = std::max(220.0f, ImGui::GetContentRegionAvail().x - details_width - ImGui::GetStyle().ItemSpacing.x);
+
+                ImGui::BeginChild("UIReflectorTree", ImVec2(tree_width, 0.0f), ImGuiChildFlags_Border);
+                for (const auto &widget: ui_mgr->_widgets)
+                    DrawUIReflectorWidgetTree(widget.get(), selected);
+                ImGui::EndChild();
+
+                ImGui::SameLine();
+
+                ImGui::BeginChild("UIReflectorDetails", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Border);
+                DrawUIReflectorSelectionDetails(selected);
+                ImGui::EndChild();
+
+                ImGui::End();
+                ui_mgr->SetDebugHighlightTarget(selected);
+            }
+        }// namespace
 
         using SceneManagement::SceneMgr;
-        
+
         class ProfileWindow
         {
         public:
@@ -89,9 +546,11 @@ namespace Ailu
             {
                 ShowImpl();
             };
+
         public:
             Vector2f _content_size;
             bool _is_show = false;
+
         private:
             void ShowImpl()
             {
@@ -269,7 +728,7 @@ namespace Ailu
                                 ImU32 color = IM_COL32(c.r * 255, c.g * 255, c.b * 255, 255);
                                 draw_list->AddRectFilled(ImVec2(x_start, y_start), ImVec2(x_end, y_end), color);
                                 // 显示文本
-                                String label = std::format("{} ({:.2f} ms)", data._name,data._duration);
+                                String label = std::format("{} ({:.2f} ms)", data._name, data._duration);
                                 auto label_size = ImGui::CalcTextSize(label.c_str());
                                 if (label_size.x < (x_end - x_start))
                                     draw_list->AddText(ImVec2(x_start + 5, y_start + 3), IM_COL32(0, 0, 0, 255), label.c_str());
@@ -299,222 +758,32 @@ namespace Ailu
         };
 
 
-        void static DrawMemberProperty(PropertyInfo &prop_info, Object &obj)
-        {
-            ImGui::PushID(obj.Name().c_str());
-            auto &meta_info = prop_info.MetaInfo();
-            if (!prop_info.IsConst())
-            {
-                if (prop_info.GetType() == StaticClass<bool>())
-                {
-                    bool old_value = prop_info.Get<bool>(&obj);
-                    bool new_value = old_value;
-                    if (ImGui::Checkbox(prop_info.Name().c_str(), &new_value))
-                    {
-                        prop_info.Set<bool>(&obj, new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<f32>())
-                {
-                    f32 old_value = prop_info.Get<f32>(&obj);
-                    f32 new_value = old_value;
-                    if (meta_info.GetBool("IsRange"))
-                    {
-                        ImGui::SliderFloat(prop_info.Name().c_str(), &new_value, meta_info.GetFloat("RangeMin"), meta_info.GetFloat("RangeMax"));
-                    }
-                    else
-                        ImGui::InputFloat(prop_info.Name().c_str(), &new_value);
-                    if (old_value != new_value)
-                    {
-                        prop_info.Set<f32>(&obj, new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<i8>())
-                {
-                    i32 old_value = prop_info.Get<i8>(&obj);
-                    i32 new_value = old_value;
-                    if (meta_info.GetBool("IsRange"))
-                    {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32) meta_info.GetInt("RangeMin"), (i32) meta_info.GetInt("RangeMax"));
-                    }
-                    else
-                        ImGui::InputInt(prop_info.Name().c_str(), &new_value);
-                    if (old_value != new_value)
-                    {
-                        prop_info.Set<i8>(&obj, (i8) new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<i16>())
-                {
-                    i32 old_value = prop_info.Get<i16>(&obj);
-                    i32 new_value = old_value;
-                    if (meta_info.GetBool("IsRange"))
-                    {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32) meta_info.GetInt("RangeMin"), (i32) meta_info.GetInt("RangeMax"));
-                    }
-                    else
-                        ImGui::InputInt(prop_info.Name().c_str(), &new_value);
-                    if (old_value != new_value)
-                    {
-                        prop_info.Set<i16>(&obj, (i16) new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<i32>())
-                {
-                    i32 old_value = prop_info.Get<i32>(&obj);
-                    i32 new_value = old_value;
-                    if (meta_info.GetBool("IsRange"))
-                    {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, (i32) meta_info.GetInt("RangeMin"), (i32) meta_info.GetInt("RangeMax"));
-                    }
-                    else
-                        ImGui::InputInt(prop_info.Name().c_str(), &new_value);
-                    if (old_value != new_value)
-                    {
-                        prop_info.Set<i32>(&obj, new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<u8>())
-                {
-                    i32 old_value = prop_info.Get<u8>(&obj);
-                    i32 new_value = old_value;
-                    if (meta_info.GetBool("IsRange"))
-                    {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetInt("RangeMin") < 0 ? 0 : meta_info.GetInt("RangeMin"), meta_info.GetInt("RangeMax"));
-                    }
-                    else
-                        ImGui::InputInt(prop_info.Name().c_str(), &new_value);
-                    if (old_value != new_value)
-                    {
-                        prop_info.Set<u8>(&obj, (u8) new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<u16>())
-                {
-                    i32 old_value = prop_info.Get<u16>(&obj);
-                    i32 new_value = old_value;
-                    if (meta_info.GetBool("IsRange"))
-                    {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetInt("RangeMin") < 0 ? 0 : meta_info.GetInt("RangeMin"), meta_info.GetInt("RangeMax"));
-                    }
-                    else
-                        ImGui::InputInt(prop_info.Name().c_str(), &new_value);
-                    if (old_value != new_value)
-                    {
-                        prop_info.Set<u16>(&obj, (u16) new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<u32>())
-                {
-                    i32 old_value = prop_info.Get<u32>(&obj);
-                    i32 new_value = old_value;
-                    if (meta_info.GetBool("IsRange"))
-                    {
-                        ImGui::SliderInt(prop_info.Name().c_str(), &new_value, meta_info.GetInt("RangeMin") < 0 ? 0 : meta_info.GetInt("RangeMin"), meta_info.GetInt("RangeMax"));
-                    }
-                    else
-                        ImGui::InputInt(prop_info.Name().c_str(), &new_value);
-                    if (old_value != new_value)
-                    {
-                        prop_info.Set<u32>(&obj, (u32) new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<String>())
-                {
-                    String old_value = prop_info.Get<String>(&obj);
-                    auto str_len = old_value.size();
-                    char buf[256];
-                    memcpy(buf, old_value.c_str(), str_len);
-                    buf[str_len] = '\0';
-                    if (ImGui::InputText(prop_info.Name().c_str(), buf, 256, ImGuiInputTextFlags_EnterReturnsTrue))
-                    {
-                        prop_info.Set<String>(&obj, buf);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<Vector2f>())
-                {
-                    Vector2f old_value = prop_info.Get<Vector2f>(&obj);
-                    Vector2f new_value = old_value;
-                    if (ImGui::InputFloat2(prop_info.Name().c_str(), new_value.data))
-                    {
-                        prop_info.Set<Vector2f>(&obj, new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<Vector3f>())
-                {
-                    Vector3f old_value = prop_info.Get<Vector3f>(&obj);
-                    Vector3f new_value = old_value;
-                    if (ImGui::InputFloat3(prop_info.Name().c_str(), new_value.data))
-                    {
-                        prop_info.Set<Vector3f>(&obj, new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<Vector4f>())
-                {
-                    Vector4f old_value = prop_info.Get<Vector4f>(&obj);
-                    Vector4f new_value = old_value;
-                    if (meta_info.GetBool("IsColor"))
-                    {
-                        ImGui::ColorEdit4(prop_info.Name().c_str(), new_value.data, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-                        prop_info.Set<Vector4f>(&obj, new_value);
-                    }
-                    else
-                    {
-                        if (ImGui::InputFloat4(prop_info.Name().c_str(), new_value.data))
-                        {
-                            prop_info.Set<Vector4f>(&obj, new_value);
-                        }
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<Vector2Int>())
-                {
-                    Vector2Int old_value = prop_info.Get<Vector2Int>(&obj);
-                    Vector2Int new_value = old_value;
-                    if (ImGui::InputInt2(prop_info.Name().c_str(), new_value.data))
-                    {
-                        prop_info.Set<Vector2Int>(&obj, new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<Vector3Int>())
-                {
-                    Vector3Int old_value = prop_info.Get<Vector3Int>(&obj);
-                    Vector3Int new_value = old_value;
-                    if (ImGui::InputInt3(prop_info.Name().c_str(), new_value.data))
-                    {
-                        prop_info.Set<Vector3Int>(&obj, new_value);
-                    }
-                }
-                else if (prop_info.GetType() == StaticClass<Vector4Int>())
-                {
-                    Vector4Int old_value = prop_info.Get<Vector4Int>(&obj);
-                    Vector4Int new_value = old_value;
-                    if (ImGui::InputInt4(prop_info.Name().c_str(), new_value.data))
-                    {
-                        prop_info.Set<Vector4Int>(&obj, new_value);
-                    }
-                }
-                else
-                {
-                    //auto dt_enum = Enum::GetEnumByName("EDataType");
-                    //const String &dt_name = dt_enum->GetNameByEnum(prop_info.DataType());
-                    ImGui::Text("Unsupported Type: %s", prop_info.TypeName().c_str());
-                }
-            }
-            else
-                ImGui::Text("ConstValue %s", prop_info.Name().c_str());
-            ImGui::PopID();
-        }
-
         static ProfileWindow *s_prifile_wd = nullptr;
         EditorLayer::EditorLayer() : EditorLayer("EditorLayer")
         {
-
         }
 
         EditorLayer::EditorLayer(const String &name) : Layer(name)
         {
             s_prifile_wd = new ProfileWindow();
             s_prifile_wd->_content_size = Vector2f(800.0f, 600.0f);
+
+            Selection::on_selection_changed += [this]()
+            {
+                _selected_entity = Selection::FirstEntity();
+                if (_selected_entity != ECS::kInvalidEntity)
+                {
+                    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
+                    if (r.HasComponent<ECS::CCamera>(_selected_entity))
+                        Camera::sSelected = &r.GetComponent<ECS::CCamera>(_selected_entity)->_camera;
+                    else
+                        Camera::sSelected = nullptr;
+                }
+                else
+                {
+                    Camera::sSelected = nullptr;
+                }
+            };
         }
 
         EditorLayer::~EditorLayer()
@@ -598,7 +867,7 @@ namespace Ailu
                     {
                         LOG_INFO("Save assets...");
                         Core::ThreadPool::Get().Enqueue([]()
-                                               {
+                                                        {
                                                    f32 asset_count = 1.0f;
                                                    for(auto it = ResourceMgr::Get().Begin(); it != ResourceMgr::Get().End(); it++)
                                                    {
@@ -765,6 +1034,7 @@ namespace Ailu
         static bool s_show_renderview = true;
         static bool s_show_threadpool_view = false;
         static bool s_show_imguinode = false;
+        static bool s_show_ui_reflector = false;
 
         static void ShowThreadPoolView(bool *is_show)
         {
@@ -824,82 +1094,6 @@ namespace Ailu
             }
 
             const bool is_packaging_player = s_package_player_process && s_package_player_process->IsValid() && s_package_player_process->IsRunning();
-            //ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
-            //if (ImGui::BeginMainMenuBar())
-            //{
-            //    if (ImGui::BeginMenu("File"))
-            //    {
-            //        ImGui::EndMenu();
-            //    }
-            //    if (ImGui::BeginMenu("Edit"))
-            //    {
-            //        if (ImGui::MenuItem("Undo", "CTRL+Z")) {}
-            //        if (ImGui::MenuItem("Redo", "CTRL+Y", false, false)) {}// Disabled item
-            //        ImGui::Separator();
-            //        if (ImGui::MenuItem("Cut", "CTRL+X")) {}
-            //        if (ImGui::MenuItem("Copy", "CTRL+C")) {}
-            //        if (ImGui::MenuItem("Paste", "CTRL+V")) {}
-            //        ImGui::EndMenu();
-            //    }
-            //    if (ImGui::BeginMenu("Window"))
-            //    {
-            //        if (ImGui::MenuItem("BlendSpace"))
-            //        {
-            //            //g_blend_space_editor->Open(g_blend_space_editor->Handle());
-            //        }
-            //        ImGui::EndMenu();
-            //    }
-            //    ImGui::EndMainMenuBar();
-            //}
-
-            /*
-            ImGui::SetNextWindowSizeConstraints(ImVec2(100, 0), ImVec2(FLT_MAX, ImGui::GetTextLineHeight()));
-            ImGui::Begin("ToolBar", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize);
-            Application* app = &Application::Get();
-            float window_width = ImGui::GetContentRegionAvail().x;// 获取当前窗口的可用宽度
-            float button_width = 100.0f;                          // 假设每个按钮宽度为100，实际可用ImGui::CalcTextSize计算
-
-            if (app->_is_playing_mode || app->_is_simulate_mode)
-            {
-                if (app->_is_playing_mode)
-                {
-                    float total_width = button_width;                         // 只有一个"Stop"按钮
-                    ImGui::SetCursorPosX((window_width - total_width) * 0.5f);// 设置水平居中
-
-                    if (ImGui::Button("Stop", ImVec2(button_width, 0)))
-                    {
-                        SceneMgr::Get().ExitPlayMode();
-                    }
-                }
-                if (app->_is_simulate_mode)
-                {
-                    float total_width = button_width;                         // 只有一个"Stop"按钮
-                    ImGui::SetCursorPosX((window_width - total_width) * 0.5f);// 设置水平居中
-
-                    if (ImGui::Button("Stop", ImVec2(button_width, 0)))
-                    {
-                        SceneMgr::Get().ExitSimulateMode();
-                    }
-                }
-            }
-            else
-            {
-                // 假设"Play"和"Simulate"按钮的总宽度
-                float total_width = button_width * 2 + ImGui::GetStyle().ItemSpacing.x;// 两个按钮 + 间距
-                ImGui::SetCursorPosX((window_width - total_width) * 0.5f);             // 设置水平居中
-
-                if (ImGui::Button("Play", ImVec2(button_width, 0)))
-                {
-                    SceneMgr::Get().EnterPlayMode();
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Simulate", ImVec2(button_width, 0)))
-                {
-                    SceneMgr::Get().EnterSimulateMode();
-                }
-            }
-            ImGui::End();
-            */
             ImGui::Begin("Common");// Create a window called "Hello, world!" and append into it.
             ImGui::Text("FrameRate: %.2f", RenderingStates::GetFrameRate());
             ImGui::Text("FrameTime: %.2f ms", RenderingStates::GetFrameTime());
@@ -985,7 +1179,7 @@ namespace Ailu
             ImGui::SliderFloat("Gizmo Alpha:", &Gizmo::s_color.a, 0.01f, 1.0f, "%.2f");
             ImGui::SliderFloat("Game Time Scale:", &TimeMgr::s_time_scale, 0.0f, 2.0f, "%.2f");
             ImGui::SliderFloat("ShadowDistance m", &QuailtySetting::s_main_light_shaodw_distance, 0.f, 100.0f, "%.2f");
-            
+
             static bool s_state_batching = g_engine_config.EnableCpuStateBatchedSubmission;
             if (ImGui::Checkbox("State Batching", &s_state_batching))
             {
@@ -1004,6 +1198,7 @@ namespace Ailu
             ImGui::Checkbox("ShowAnimClip", &s_show_anim_clip);
             ImGui::Checkbox("ShowThreadPoolView", &s_show_threadpool_view);
             ImGui::Checkbox("ShowNode", &s_show_imguinode);
+            ImGui::Checkbox("ShowUIReflector", &s_show_ui_reflector);
             ImGui::Checkbox("Raytracing Pipeline", &s_raytracing_pipeline);
             RenderPipeline::Get().GetRenderer()->_is_use_raytracing = s_raytracing_pipeline;
             if (ImGui::Button("Capture RDG"))
@@ -1033,7 +1228,7 @@ namespace Ailu
                 ImGui::EndDisabled();
             ImGui::SameLine();
             ImGui::TextUnformatted(s_package_player_status.c_str());
-            
+
             ImGui::Checkbox("Postprocess", &Camera::sCurrent->_is_enable_postprocess);
             //ImGui::Checkbox("UseRenderGraph", &RenderPipeline::Get().GetRenderer()->_is_use_render_graph);
 
@@ -1044,44 +1239,35 @@ namespace Ailu
             //     ImGui::SameLine();
             //     ImGui::ProgressBar(x - static_cast<int>(x), ImVec2(0.f, 0.f));
             // }
-            ECS::Entity e = Selection::FirstEntity();
             auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-            if (e != ECS::kInvalidEntity)
+            if (_selected_entity != ECS::kInvalidEntity)
             {
-                if (r.HasComponent<ECS::CCamera>(e))
+                if (r.HasComponent<ECS::CCamera>(_selected_entity))
                 {
-                    auto &cam = r.GetComponent<ECS::CCamera>(e)->_camera;
+                    auto &cam = r.GetComponent<ECS::CCamera>(_selected_entity)->_camera;
                     cam.SetPixelSize(300, (u16) (300.0f / cam.Aspect()));
-                    //static_cast<RenderView *>(_p_preview_cam_view)->SetSource(Render::RenderPipeline::Get().GetTarget(1));
-                    //_p_preview_cam_view->Open(_p_preview_cam_view->Handle());
-                    Camera::sSelected = &cam;
                 }
-                else
-                {
-                    Camera::sSelected = nullptr;
-                    //_p_preview_cam_view->Close(_p_preview_cam_view->Handle());
-                }
-                if (auto sk_comp = r.GetComponent<ECS::CSkeletonMesh>(e); sk_comp != nullptr)
+                if (auto sk_comp = r.GetComponent<ECS::CSkeletonMesh>(_selected_entity); sk_comp != nullptr)
                 {
                     //g_blend_space_editor->SetTarget(&sk_comp->_blend_space);
                 }
-                if (auto sk_comp = r.GetComponent<ECS::TransformComponent>(e); sk_comp != nullptr)
+                if (auto sk_comp = r.GetComponent<ECS::TransformComponent>(_selected_entity); sk_comp != nullptr)
                 {
-                    ImGui::DragFloat3("Position", sk_comp->_transform._position.data);
-                    Vector3f euler = Quaternion::EulerAngles(sk_comp->_transform._rotation);
+                    ImGui::DragFloat3("Position", sk_comp->_local_transform._position.data);
+                    Vector3f euler = Quaternion::EulerAngles(sk_comp->_local_transform._rotation);
                     ImGui::DragFloat3("Rotation", euler.Data());
-                    sk_comp->_transform._rotation = Quaternion::EulerAngles(euler);
-                    ImGui::DragFloat3("Scale", sk_comp->_transform._scale.data);
+                    sk_comp->_local_transform._rotation = Quaternion::EulerAngles(euler);
+                    ImGui::DragFloat3("Scale", sk_comp->_local_transform._scale.data);
                 }
             }
-            auto& cam_controller = dynamic_cast<EditorApp &>(Application::Get()).GetSceneCameraController();
+            auto &cam_controller = dynamic_cast<EditorApp &>(Application::Get()).GetSceneCameraController();
             ImGui::SliderFloat("CameraNear", &cam_controller._camera_near, 0.0f, 10.0f);
             ImGui::SliderFloat("CameraFar", &cam_controller._camera_far, cam_controller._camera_near, 10000.0f);
             Vector3f cam_pos = cam_controller._target_pos;
             Vector2f cam_rot = cam_controller._rotation;
             ImGui::DragFloat3("CameraPos", cam_pos.data, 0.1f);
             ImGui::DragFloat2("CameraRot", cam_rot.data, 0.1f);
-            cam_controller.SetTargetPosition(cam_pos,true);
+            cam_controller.SetTargetPosition(cam_pos, true);
             cam_controller.SetTargetRotation(cam_rot.x, cam_rot.y, true);
             static bool s_draw_scene_bvh = false;
             static bool s_draw_mesh_bvh = false;
@@ -1093,7 +1279,7 @@ namespace Ailu
                     for (const auto &n: SceneMgr::Get().ActiveScene()->GetBVHNodes())
                         Render::Gizmo::DrawAABB(n._aabb);
                 }
-                if (e != ECS::kInvalidEntity)
+                if (_selected_entity != ECS::kInvalidEntity)
                 {
                     ImGui::Checkbox("DrawMeshBVH", &s_draw_mesh_bvh);
                     static auto draw_tri = [](float3 v0, float3 v1, float3 v2, Color c = Colors::kGreen)
@@ -1113,13 +1299,13 @@ namespace Ailu
                         result._max = b.Center() + dmax;
                         return result;
                     };
-                    if (auto sk_comp = r.GetComponent<ECS::StaticMeshComponent>(e); sk_comp != nullptr)
+                    if (auto sk_comp = r.GetComponent<ECS::StaticMeshComponent>(_selected_entity); sk_comp != nullptr)
                     {
                         if (s_draw_mesh_bvh)
                         {
                             const auto &nodes = sk_comp->_p_mesh->GetBVHNodes();
                             static i32 draw_idx = -1;
-                            ImGui::SliderInt("MeshBVH Index", &draw_idx, -1, (i32)nodes.size() - 1);
+                            ImGui::SliderInt("MeshBVH Index", &draw_idx, -1, (i32) nodes.size() - 1);
                             if (draw_idx == -1)
                             {
                                 const auto &tri_data = sk_comp->_p_mesh->GetTriangleData();
@@ -1165,7 +1351,7 @@ namespace Ailu
                             static i32 draw_idx = -1;
                             const auto &tri = sk_comp->_p_mesh->GetTriangleData();
                             const auto &tri_bounds = sk_comp->_p_mesh->GetTriangleBounds();
-                            ImGui::SliderInt("Tri Index", &draw_idx, -1, (i32)tri.size() - 1);
+                            ImGui::SliderInt("Tri Index", &draw_idx, -1, (i32) tri.size() - 1);
                             if (draw_idx != -1)
                             {
                                 Render::Gizmo::DrawAABB(tri_bounds[draw_idx], Colors::kGreen);
@@ -1179,13 +1365,13 @@ namespace Ailu
                 s_prifile_wd->_is_show = !s_prifile_wd->_is_show;
             if (ImGui::Button("Show3DTexture"))
             {
-                VolumetricFog* fog;
+                VolumetricFog *fog;
                 auto renderer = Render::RenderPipeline::Get().GetRenderer();
-                for (auto& feature : renderer->GetFeatures())
+                for (auto &feature: renderer->GetFeatures())
                 {
                     if (feature->GetType() == VolumetricFog::StaticType())
                     {
-                        fog = dynamic_cast<VolumetricFog*>(feature);
+                        fog = dynamic_cast<VolumetricFog *>(feature);
                         break;
                     }
                 }
@@ -1223,6 +1409,10 @@ namespace Ailu
                 }
                 ImGui::End();
             }
+            if (s_show_ui_reflector)
+                ShowUIReflectorWindow(&s_show_ui_reflector);
+            if (!s_show_ui_reflector)
+                UI::UIManager::Get()->SetDebugHighlightTarget(nullptr);
             s_prifile_wd->Show();
         }
 
@@ -1235,143 +1425,6 @@ namespace Ailu
         }
         void EditorLayer::ProcessTransformGizmo()
         {
-            //auto &selected_entities = Selection::SelectedEntities();
-            //if (_transform_gizmo_type == -1 || selected_entities.empty())
-            //    return;
-            ////snap
-            //f32 snap_value = 0.5f;//50cm
-            //if (_transform_gizmo_type == (i16) ImGuizmo::OPERATION::ROTATE)
-            //{
-            //    snap_value = 22.5f;//degree
-            //}
-            //else if (_transform_gizmo_type == (i16) ImGuizmo::OPERATION::SCALE)
-            //{
-            //    snap_value = 0.25f;
-            //}
-            //else
-            //{
-            //}
-            //Vector3f snap_values = Vector3f(snap_value);
-            //ImGuizmo::SetOrthographic(false);
-            //ImGuizmo::SetDrawlist();
-            //ImGuizmo::SetRect(_scene_vp_rect.x, _scene_vp_rect.y, _scene_vp_rect.z, _scene_vp_rect.w);
-            //const auto &view = Camera::sCurrent->GetView();
-            //auto proj = MatrixReverseZ(Camera::sCurrent->GetProjNoJitter());
-            //_is_transform_gizmo_snap = Input::IsKeyPressed(EKey::kCONTROL);
-            //bool is_pivot_point_center = true;
-            //bool is_single_mode = selected_entities.size() == 1;
-            //Vector3f pivot_point;
-            //if (is_pivot_point_center)
-            //{
-            //    auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
-            //    Matrix4x4f world_mat;
-            //    if (is_single_mode)
-            //        world_mat = r.GetComponent<ECS::TransformComponent>(selected_entities.front())->_transform._world_matrix;
-            //    else
-            //        _is_transform_gizmo_world = true;
-            //    ImGuizmo::Manipulate(view, proj, (ImGuizmo::OPERATION) _transform_gizmo_type, _is_transform_gizmo_world ? ImGuizmo::WORLD : ImGuizmo::LOCAL, world_mat, nullptr,
-            //                         _is_transform_gizmo_snap ? snap_values.data : nullptr);
-            //    static bool s_can_duplicate = true;
-            //    if (ImGuizmo::IsUsing())
-            //    {
-            //        if (!_is_begin_gizmo_transform)
-            //        {
-            //            _is_begin_gizmo_transform = true;
-            //            _is_end_gizmo_transform = false;
-            //            for (auto e: selected_entities)
-            //            {
-            //                _old_trans.push_back(r.GetComponent<ECS::TransformComponent>(e)->_transform);
-            //            }
-            //            if (!is_single_mode)
-            //            {
-            //                for (auto e: selected_entities)
-            //                {
-            //                    pivot_point += r.GetComponent<ECS::TransformComponent>(e)->_transform._position;
-            //                }
-            //                pivot_point /= (f32) selected_entities.size();
-            //                world_mat = MatrixTranslation(pivot_point);
-            //            }
-            //        }
-            //        Vector3f new_pos;
-            //        Vector3f new_scale;
-            //        Quaternion new_rot;
-            //        DecomposeMatrix(world_mat, new_pos, new_rot, new_scale);
-            //        static Vector3f s_pre_tick_new_scale = new_scale;
-            //        if (is_single_mode)
-            //        {
-            //            auto &t = r.GetComponent<ECS::TransformComponent>(selected_entities.front())->_transform;
-            //            t._position = new_pos;
-            //            t._rotation = new_rot;
-            //            t._scale = new_scale;
-            //        }
-            //        else
-            //        {
-            //            u16 index = 0;
-            //            for (auto e: selected_entities)
-            //            {
-            //                auto &t = r.GetComponent<ECS::TransformComponent>(e)->_transform;
-            //                Vector3f rela_pos = t._position - pivot_point;
-            //                t._position = rela_pos + new_pos;
-            //                //rela_pos = new_rot * rela_pos;
-            //                //Vector3f scaled_pos = rela_pos * (new_scale / s_pre_tick_new_scale);
-            //                //Vector3f pivot_offset = new_pos - pivot_point;
-            //                //t._position = pivot_point + scaled_pos + pivot_offset;
-            //                //TODO
-            //                //t._scale = new_scale * _old_trans[index]._scale;
-            //                //t._rotation = new_rot * _old_trans[index++]._rotation;
-            //            }
-            //        }
-            //        s_pre_tick_new_scale = new_scale;
-            //        /*
-            //        区分左侧和右侧的 Alt 键需要结合使用扫描码。在处理低级键盘输入时，可以通过 GetKeyState 或 GetAsyncKeyState 等函数来检测具体的按键位置。
-            //        对于左侧 Alt 键，它的扫描码为：0x38(扫描码)
-            //        右侧 Alt 键(也称 AltGr)：0xE038(扩展扫描码)
-            //        */
-            //        if (s_can_duplicate && Input::IsKeyPressed(EKey::kALT) && _transform_gizmo_type == (i16) ImGuizmo::OPERATION::TRANSLATE)
-            //        {
-            //            s_can_duplicate = false;
-            //            List<ECS::Entity> new_entities;
-            //            for (auto e: selected_entities)
-            //            {
-            //                new_entities.push_back(SceneMgr::Get().ActiveScene()->DuplicateEntity(e));
-            //            }
-            //            Selection::RemoveSlection();
-            //            for (auto &e: new_entities)
-            //                Selection::AddSelection(e);
-            //        }
-            //    }
-            //    else
-            //    {
-            //        if (_is_begin_gizmo_transform)
-            //        {
-            //            s_can_duplicate = true;
-            //            _is_end_gizmo_transform = true;
-            //            _is_begin_gizmo_transform = false;
-            //            if (is_single_mode)
-            //            {
-            //                auto e = selected_entities.front();
-            //                auto t = r.GetComponent<ECS::TransformComponent>(e);
-            //                std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(r.GetComponent<ECS::TagComponent>(e)->_name, t, _old_trans.front());
-            //                g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
-            //                _old_trans.clear();
-            //            }
-            //            else
-            //            {
-            //                Vector<String> obj_names;
-            //                Vector<ECS::TransformComponent *> comps;
-            //                u16 index = 0u;
-            //                for (auto e: selected_entities)
-            //                {
-            //                    obj_names.emplace_back(r.GetComponent<ECS::TagComponent>(e)->_name);
-            //                    comps.emplace_back(r.GetComponent<ECS::TransformComponent>(e));
-            //                }
-            //                std::unique_ptr<ICommand> moveCommand1 = std::make_unique<TransformCommand>(std::move(obj_names), std::move(comps), std::move(_old_trans));
-            //                g_pCommandMgr->ExecuteCommand(std::move(moveCommand1));
-            //            }
-            //        }
-            //    }
-            //    Selection::Active(!ImGuizmo::IsOver());
-            //}
         }
     }// namespace Editor
 }// namespace Ailu

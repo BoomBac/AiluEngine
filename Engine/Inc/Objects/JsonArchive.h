@@ -1,7 +1,8 @@
 #ifndef __JSON_ARCHIVE_H
 #define __JSON_ARCHIVE_H
-#include <variant>
+#include <memory>
 #include <stack>
+#include <variant>
 #include "Serialize.h"
 namespace Ailu
 {
@@ -9,9 +10,53 @@ namespace Ailu
     {
     public:
         struct JsonValue;
+        using JsonValuePtr = std::shared_ptr<JsonValue>;
 
-        using JsonObject = HashMap<String, JsonValue>;
-        using JsonArray = Vector<JsonValue>;
+        struct JsonObjectEntry
+        {
+            String _key;
+            JsonValuePtr _value;
+        };
+
+        struct JsonObject
+        {
+            JsonObject() = default;
+            JsonObject(const JsonObject &other);
+            JsonObject(JsonObject &&other) noexcept = default;
+            JsonObject &operator=(const JsonObject &other);
+            JsonObject &operator=(JsonObject &&other) noexcept = default;
+
+            void reserve(size_t size);
+            JsonValue *Find(const String &key);
+            const JsonValue *Find(const String &key) const;
+            JsonValue &InsertOrAssign(String key, JsonValue value);
+
+            Vector<JsonObjectEntry>::iterator begin() { return _entries.begin(); }
+            Vector<JsonObjectEntry>::iterator end() { return _entries.end(); }
+            Vector<JsonObjectEntry>::const_iterator begin() const { return _entries.begin(); }
+            Vector<JsonObjectEntry>::const_iterator end() const { return _entries.end(); }
+
+            Vector<JsonObjectEntry> _entries;
+            HashMap<String, size_t> _entry_lookup;
+        };
+
+        struct JsonArray
+        {
+            JsonArray() = default;
+            JsonArray(const JsonArray &other);
+            JsonArray(JsonArray &&other) noexcept = default;
+            JsonArray &operator=(const JsonArray &other);
+            JsonArray &operator=(JsonArray &&other) noexcept = default;
+
+            void reserve(size_t size);
+            size_t size() const;
+            bool empty() const;
+            void push_back(JsonValue value);
+            JsonValue &operator[](size_t index);
+            const JsonValue &operator[](size_t index) const;
+
+            Vector<JsonValuePtr> _items;
+        };
 
         struct JsonValue
         {
@@ -178,6 +223,8 @@ namespace Ailu
 
         void Save(const Path &sys_path) final;
         void Load(const Path &sys_path) final;
+        String SaveToString();
+        bool LoadFromString(const String &json_text);
         bool HasField(const String &name);
     private:
         JsonValue *FindNode();

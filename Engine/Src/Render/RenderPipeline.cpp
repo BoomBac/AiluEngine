@@ -201,7 +201,7 @@ namespace Ailu::Render
         {
             auto &obj = _render_objs[i];
             const ECS::TransformComponent *transf = r.GetComponent<ECS::TransformComponent>(obj._game_obj_handle);
-            obj._world_matrix = transf->_transform._world_matrix;
+            obj._world_matrix = transf->GetWorldMatrix();
             if (!obj._is_dynamic)
                 continue;
             Mesh *new_mesh = nullptr;

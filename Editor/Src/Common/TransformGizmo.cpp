@@ -1,9 +1,11 @@
-﻿#include "Common/TransformGizmo.h"
+#include "Common/TransformGizmo.h"
 #include "Framework/Common/Input.h"
+#include "Common/Selection.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Inc/Physics/Collision.h"
 #include "Render/Gizmo.h"
 #include "Scene/Scene.h"
+#include "Scene/Component.h"
 
 namespace Ailu
 {
@@ -18,14 +20,84 @@ namespace Ailu
             _target_entity = ECS::kInvalidEntity;
         }
 
-        Transform *TransformGizmo::Target() const
+        ECS::TransformComponent *TransformGizmo::Target() const
         {
-            if (_target_scene == nullptr || _target_entity == ECS::kInvalidEntity)
+            if (_target_scene == nullptr || _target_entity == ECS::kInvalidEntity ||
+                !_target_scene->IsValidEntity(_target_entity))
                 return nullptr;
             auto *comp = _target_scene->GetRegister().GetComponent<ECS::TransformComponent>(_target_entity);
-            return comp ? &comp->_transform : nullptr;
+            return comp ? comp : nullptr;
         }
 
+        ECS::TransformComponent *TransformGizmo::ParentTarget() const
+        {
+            if (_target_scene == nullptr || _target_entity == ECS::kInvalidEntity ||
+                !_target_scene->IsValidEntity(_target_entity))
+                return nullptr;
+
+            auto &reg = _target_scene->GetRegister();
+            auto *hier = reg.GetComponent<ECS::CHierarchy>(_target_entity);
+            if (hier == nullptr || hier->_parent == ECS::kInvalidEntity || !reg.IsAlive(hier->_parent))
+                return nullptr;
+
+            return reg.GetComponent<ECS::TransformComponent>(hier->_parent);
+        }
+
+        Vector3f TransformGizmo::WorldPositionToTargetLocal(const Vector3f &world_position) const
+        {
+            auto *parent = ParentTarget();
+            if (parent == nullptr)
+                return world_position;
+
+            const Matrix4x4f local_matrix = MatrixTranslation(world_position) * Math::MatrixInverse(parent->GetWorldMatrix());
+            return Vector3f(local_matrix[3][0], local_matrix[3][1], local_matrix[3][2]);
+        }
+
+        Quaternion TransformGizmo::WorldRotationToTargetLocal(const Quaternion &world_rotation) const
+        {
+            auto *parent = ParentTarget();
+            if (parent == nullptr)
+                return world_rotation;
+
+            return world_rotation * Quaternion::Inverse(parent->GetRotation());
+        }
+
+        void TransformGizmo::SetTargetWorldPosition(ECS::TransformComponent *target, const Vector3f &world_position) const
+        {
+            if (target == nullptr)
+                return;
+
+            target->SetLocalPosition(WorldPositionToTargetLocal(world_position));
+        }
+
+        void TransformGizmo::SetTargetWorldRotation(ECS::TransformComponent *target, const Quaternion &world_rotation) const
+        {
+            if (target == nullptr)
+                return;
+
+            target->SetLocalRotation(WorldRotationToTargetLocal(world_rotation));
+        }
+        void TransformGizmo::ToggleSpace()
+        {
+            if (_is_dragging)
+                return;
+            _space = _space == EGizmoSpace::kWorld ? EGizmoSpace::kLocal : EGizmoSpace::kWorld;
+            _hover_axis = 0u;
+        }
+
+        void TransformGizmo::RefreshAxisDirections()
+        {
+            Vector3f view_dir = Vector3f::kForward;
+            if (_cam != nullptr)
+                view_dir = Normalize(_cam->Position() - _cur_target_pos);
+
+            for (auto &a: _translate_axis)
+            {
+                Vector3f axis_dir = GetAxisDirWorld(a._index);
+                f32 dot = DotProduct(axis_dir, view_dir);
+                a._dir = (dot >= 0.0f) ? axis_dir : -axis_dir;
+            }
+        }
         TransformGizmo::TransformGizmo()
         {
             auto shader = ResourceMgr::Get().Load<Shader>(L"Shaders/transform_gizmo.alasset");
@@ -51,6 +123,37 @@ namespace Ailu
                 _rotate_rings[i]->SetVector("_color", kNormalColors[i]);
                 _rotate_rings[i]->EnableKeyword("_CIRCLE");
             }
+
+            _selection_changed_handle = Selection::on_selection_changed += [this]()
+            {
+                SyncTargetFromSelection();
+            };
+            SyncTargetFromSelection();
+        }
+
+        TransformGizmo::~TransformGizmo()
+        {
+            if (_selection_changed_handle.has_value())
+            {
+                Selection::on_selection_changed -= _selection_changed_handle.value();
+                _selection_changed_handle.reset();
+            }
+        }
+
+        void TransformGizmo::SyncTargetFromSelection()
+        {
+            auto *scene = SceneManagement::SceneMgr::Get().ActiveScene();
+            const ECS::Entity entity = Selection::FirstEntity();
+            if (scene == nullptr || entity == ECS::kInvalidEntity ||
+                !scene->IsValidEntity(entity) ||
+                scene->GetRegister().GetComponent<ECS::TransformComponent>(entity) == nullptr)
+            {
+                ClearTarget();
+                return;
+            }
+
+            if (_target_scene != scene || _target_entity != entity)
+                SetTarget(scene, entity);
         }
         static Matrix4x4f MakeGizmoCylinder(const Vector3f &axis, const Vector3f &origin, f32 axis_length, f32 axis_radius)
         {
@@ -113,30 +216,26 @@ namespace Ailu
             return scale * translate * orient * MatrixTranslation(origin);
         }
 
-        static Matrix4x4f MakeGizmoPlane(Vector3f axis, Vector3f sub_axisa,Vector3f sub_axisb,const Vector3f &origin,f32 size)
+        static Matrix4x4f MakeGizmoPlane(Vector3f axis, Vector3f sub_axisa, Vector3f sub_axisb, const Vector3f &origin, f32 size)
         {
-            Vector3f dir = Normalize(axis);
-            Matrix4x4f orient;
+            sub_axisa = Normalize(sub_axisa);
+            sub_axisb = Normalize(sub_axisb);
+            Vector3f normal = Normalize(CrossProduct(sub_axisa, sub_axisb));
+            if (DotProduct(normal, axis) < 0.0f)
+                normal = -normal;
 
-            Vector3f base = Vector3f::kUp;
-            f32 dot = DotProduct(base, dir);
+            Matrix4x4f orient = BuildIdentityMatrix();
+            orient[0][0] = sub_axisa.x;
+            orient[0][1] = sub_axisa.y;
+            orient[0][2] = sub_axisa.z;
+            orient[1][0] = normal.x;
+            orient[1][1] = normal.y;
+            orient[1][2] = normal.z;
+            orient[2][0] = sub_axisb.x;
+            orient[2][1] = sub_axisb.y;
+            orient[2][2] = sub_axisb.z;
 
-            if (fabs(dot - 1.0f) < 1e-6f)
-            {
-                orient = BuildIdentityMatrix();
-            }
-            else if (fabs(dot + 1.0f) < 1e-6f)
-            {
-                orient = MatrixRotationX(Math::kPi);
-            }
-            else
-            {
-                Vector3f axis_rot = Normalize(CrossProduct(base, dir));
-                f32 angle = acosf(dot);
-                MatrixRotationAxis(orient, axis_rot, angle);
-            }
             size *= 0.5f;
-            // 缩放与平移
             Matrix4x4f scale = MatrixScale(size, 0.1f, size);
             return scale * orient * MatrixTranslation(origin + sub_axisa * size + sub_axisb * size);
         }
@@ -192,7 +291,7 @@ namespace Ailu
             if (!target)
                 return 0u;
             Ray ray(start, dir);
-            Vector3f origin = Transform::GetWorldPosition(*target);
+            Vector3f origin = target->GetPosition();
             f32 min_d = std::numeric_limits<f32>::max();
             u32 result = 0u;
             for (auto &a: _translate_axis)
@@ -227,7 +326,7 @@ namespace Ailu
             auto *target = Target();
             if (!target)
                 return Normalize(localAxis);
-            Quaternion worldRot = Transform::GetWorldRotation(*target);
+            Quaternion worldRot = target->GetRotation();
             return Normalize(worldRot * localAxis);
         }
         // 让轴线段足够长，避免s被夹在[0, axis_length]
@@ -263,7 +362,7 @@ namespace Ailu
             _is_dragging = true;
             _mouse_pos = mouse_pos;
             _drag_start_mouse_pos = mouse_pos;
-            _drag_origin = Transform::GetWorldPosition(*target);
+            _drag_origin = target->GetPosition();
             _drag_axis_num = 0u;
             if (_mode == EGizmoMode::kRotate)
             {
@@ -302,7 +401,7 @@ namespace Ailu
                     _drag_start_hit = CollisionDetection::Intersect(ray, s_drag_plane)._point;
                     _drag_start_target_delta = _drag_start_mouse_pos - _cam->WorldToScreen(_drag_start_pos);
                 }
-                _drag_start_scale = target->_scale;
+                _drag_start_scale = target->GetLocalScale();
             }
 
             if (_mode == EGizmoMode::kTranslate)
@@ -343,6 +442,11 @@ namespace Ailu
         {
             _mouse_pos = mouse_pos;
             _cam = cam;
+
+            auto *active_scene = SceneManagement::SceneMgr::Get().ActiveScene();
+            if (_target_scene != nullptr && _target_scene != active_scene)
+                ClearTarget();
+
             auto *target = Target();
             if (target == nullptr)
             {
@@ -352,13 +456,13 @@ namespace Ailu
             }
             if (target)
             {
-                _cur_target_pos = Transform::GetWorldPosition(*target);
+                _cur_target_pos = target->GetPosition();
                 _dis_scale = ComputeGizmoScale(*_cam, _is_dragging ? _drag_start_pos : _cur_target_pos, 100.0f);
                 if (!_is_dragging)
                 {
                     _scaled_axis_length = _axis_length * _dis_scale;
                     _scaled_axis_radius = _axis_radius * _dis_scale;
-                    IsHover(_mouse_pos, _cam, &_hover_axis);
+                    RefreshAxisDirections();
                     if (_mode == EGizmoMode::kTranslate)
                     {
                         //s_p_plane 为2x2
@@ -405,13 +509,11 @@ namespace Ailu
                         for (auto &m: _rotate_rings)
                             m->SetFloat("_radius", _scaled_axis_length);
                     }
+                    IsHover(_mouse_pos, _cam, &_hover_axis);
                     if (_mode == EGizmoMode::kTranslate || _mode == EGizmoMode::kScale)
                     {
-                        Vector3f view_dir = Normalize(_cam->Position() - _cur_target_pos);
                         for (auto &a: _translate_axis)
                         {
-                            f32 dot = DotProduct(a._default_dir, view_dir);
-                            a._dir = (dot >= 0.0f) ? a._default_dir : -a._default_dir;// 朝向相机的方向
                             if (a._axis & _hover_axis)
                                 a._mat->SetVector("_color", kHoverColor);
                             else
@@ -454,8 +556,7 @@ namespace Ailu
                             Render::Gizmo::DrawText(std::format("origin: {}", _drag_start_pos.ToString()), p + Vector2f(0.0f, 118 * 10 / 65.0f) * 2.0f, 10u, Colors::kCyan);
                         }
                         else {}
-                        // 注意：有父节点层级时，需要把world_delta转换到local空间再叠加到local position
-                        target->_position = _drag_start_pos + world_delta;
+                        SetTargetWorldPosition(target, _drag_start_pos + world_delta);
                     }
                     else if (_mode == EGizmoMode::kScale)
                     {
@@ -472,7 +573,7 @@ namespace Ailu
                             Vector2f p = mouse_pos + Vector2f{20, 20};
                             Render::Gizmo::DrawText(std::format("start_s: {},now s: {}", ctx._drag_start_s,s_now), p, 10u, Colors::kCyan);
                             _drag_scale_factor[_drag_axis >> 1] = delta_s;
-                            target->_scale = _drag_start_scale * world_scale;
+                            target->SetLocalScale(_drag_start_scale * world_scale);
                         }
                         else if (_drag_axis_num == 3)//多轴不能简单叠加，因为两轴的最近点可能不在同一平面
                         {
@@ -513,7 +614,7 @@ namespace Ailu
                             world_scale = Vector3f(s);
 
                             // 应用到目标
-                            target->_scale = _drag_start_scale + world_scale;
+                            target->SetLocalScale(_drag_start_scale + world_scale);
                             _drag_scale_factor = Vector3f::kOne + world_scale;
                             Vector2f p = mouse_pos + Vector2f{20, 20};
                             Render::Gizmo::DrawText(std::format("now s: {}", s), p, 10u, Colors::kCyan);
@@ -539,7 +640,7 @@ namespace Ailu
                         Vector2f p = mouse_pos + Vector2f{20, 20};
                         Render::Gizmo::DrawText(std::format("angle: {}", angle * k2Angle), p, 10u, Colors::kCyan);
                         _drag_rot = Quaternion::AngleAxis(angle * k2Angle, axis);
-                        target->_rotation = _drag_start_rot * _drag_rot;
+                        SetTargetWorldRotation(target, _drag_start_rot * _drag_rot);
                     }
                 }
             }

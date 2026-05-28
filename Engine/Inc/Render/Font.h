@@ -99,7 +99,13 @@ namespace Ailu::Render
         f32 _xadvance;// 光标前进量
     };
 
-    Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos,f32 font_size, Vector2f scale, Vector2f padding, Font *font);
+    struct TextLayoutResult
+    {
+        Vector<GlyphRenderInfo> _glyphs;
+        Vector2f _size = Vector2f::kZero;
+    };
+
+    TextLayoutResult LayoutText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Vector2f padding, Font *font);
 
 }// namespace Ailu
 

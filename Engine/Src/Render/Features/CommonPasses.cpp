@@ -1090,7 +1090,7 @@ namespace Ailu::Render
                         if (index >= 20)
                             break;
                         const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
-                        auto world_pos = t->_transform._position;
+                        auto world_pos = t->GetPosition();
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
                         m = MatrixScale(scale, scale, scale) * m;
@@ -1125,7 +1125,7 @@ namespace Ailu::Render
                         if (index >= 20)
                             break;
                         const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
-                        auto world_pos = t->_transform._position;
+                        auto world_pos = t->GetPosition();
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
                         m = MatrixScale(scale, scale, scale) * m;
@@ -1136,7 +1136,7 @@ namespace Ailu::Render
                     for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CCamera>())
                     {
                         const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index++);
-                        auto world_pos = t->_transform._position;
+                        auto world_pos = t->GetPosition();
                         auto m = MatrixTranslation(world_pos);
                         f32 scale = 2.0f;
                         m = MatrixScale(scale, scale, scale) * m;
@@ -1179,7 +1179,7 @@ namespace Ailu::Render
                 if (index >= 20)
                     break;
                 const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index++);
-                auto world_pos = t->_transform._position;
+                auto world_pos = t->GetPosition();
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
                 m = MatrixScale(scale, scale, scale) * m;
@@ -1214,7 +1214,7 @@ namespace Ailu::Render
                 if (index >= 20)
                     break;
                 const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index++);
-                auto world_pos = t->_transform._position;
+                auto world_pos = t->GetPosition();
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
                 m = MatrixScale(scale, scale, scale) * m;
@@ -1225,7 +1225,7 @@ namespace Ailu::Render
             for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CCamera>())
             {
                 const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index++);
-                auto world_pos = t->_transform._position;
+                auto world_pos = t->GetPosition();
                 auto m = MatrixTranslation(world_pos);
                 f32 scale = 2.0f;
                 m = MatrixScale(scale, scale, scale) * m;

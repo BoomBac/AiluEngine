@@ -24,7 +24,7 @@ namespace Ailu
         void DragDropManager::BeginDrag(const DragPayload &payload, String display_name, Render::Texture *preview_tex)
         {
             _payload = payload;
-            _display_name = std::move(_display_name);
+            _display_name = std::move(display_name);
             _preview_tex = preview_tex;
             s_start_mouse_pos = Input::GetGlobalMousePos();
         }
@@ -43,24 +43,39 @@ namespace Ailu
         {
             if (!_payload)
                 return;
+            //Clean up if the left button was released before drag activated
+            if (!Input::IsKeyDown(EKey::kLBUTTON) && !_is_drag_start)
+            {
+                EndDrag();
+                return;
+            }
             if (!_is_drag_start && Magnitude(Input::GetGlobalMousePos() - s_start_mouse_pos) > 5.0f)
                 _is_drag_start = true;
             if (!_is_drag_start)
                 return;
-            Input::IsKeyDown(EKey::kLBUTTON);
             Input::BlockInput(true);
             auto mp = Input::GetMousePos(Application::FocusedWindow());
             UI::UIRenderer::Get()->DrawText(std::format("{} draging...",_display_name), mp, 9u);
             auto ui_mgr = UI::UIManager::Get();
             UIElement *hover = ui_mgr->_hover_target;
-            DropHandler *handle = hover ? hover->GetDropHandler() : nullptr;
-            if (handle && handle->_can_drop && handle->_can_drop(*_payload))
-                _hover_target = handle;
-            else
-                _hover_target = nullptr;
+            DropHandler *handle = nullptr;
+            UIElement *drop_target = nullptr;
+            // Walk up parent chain to find a DropHandler (child elements like Text
+            // inside a row don't have one, but the row/Border does)
+            for (UIElement *node = hover; node != nullptr; node = node->GetParent())
+            {
+                DropHandler *dh = node->GetDropHandler();
+                if (dh && dh->_can_drop && dh->_can_drop(*_payload))
+                {
+                    handle = dh;
+                    drop_target = node;
+                    break;
+                }
+            }
+            _hover_target = handle;
             if (_hover_target)
             {
-                UI::UIRenderer::Get()->DrawBox(hover->GetArrangeRect().xy, hover->GetArrangeRect().zw, 2.0f, Colors::kYellow, 0.0f);
+                UI::UIRenderer::Get()->DrawBox(drop_target->GetArrangeRect().xy, drop_target->GetArrangeRect().zw, 2.0f, Colors::kYellow, 0.0f);
             }
             if (Input::IsKeyJustReleased(EKey::kLBUTTON))
             {

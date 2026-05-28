@@ -5,6 +5,6 @@
         "_asset_type": "Ailu::Render::Texture2D",
         "_asset_name": "ibl_brdf_lut"
     },
-    "_is_srgb": false,
-    "_file": "Textures/ibl_brdf_lut.dds"
+    "_file": "Textures/ibl_brdf_lut.dds",
+    "_is_srgb": false
 }

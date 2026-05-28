@@ -10,7 +10,7 @@ end
 
 function tick_logger:OnUpdate(delta_time)
     local t = engine.time()
-    local y = 1 --(math.sin(t) + 1) * 6
+    local y = (math.sin(t) + 1) * 6
     self.entity:set_position(self.base_x, y, self.base_z)
 end
 

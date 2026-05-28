@@ -5,6 +5,7 @@
 
 namespace Ailu
 {
+    class Type;
     class Window;
     namespace Editor
     {
@@ -23,6 +24,7 @@ namespace Ailu
         struct DockNodeData
         {
             GENERATED_BODY()
+        public:
             APROPERTY()
             String _type_id;
             APROPERTY()
@@ -51,12 +53,15 @@ namespace Ailu
             Vector2f _size;
             APROPERTY()
             u32 _flags;
+            APROPERTY()
+            String _window_state;
         };
 
         ASTRUCT()
         struct DockNodeDataArray
         {
             GENERATED_BODY()
+        public:
             APROPERTY()
             Vector<DockNodeData> _node_data;
         };
@@ -70,6 +75,7 @@ namespace Ailu
             static void Shutdown();
             static DockManager &Get();
             using NodeTravelFunc = bool(DockNode *);
+            friend struct DockNode;
         public:
             DockManager();
             ~DockManager();
@@ -89,6 +95,7 @@ namespace Ailu
             void HandleNodeResize();
             void TryAddFloatNode(Ref<DockNode>& n);
             void TryRemoveFloatNode(DockNode* n);
+            void UntrackFloatNode(DockNode *n);
             void DetachFromTree(DockNode* n);
             void WindowEventHandler(Event &e);
             //将docknode 保存为docknodedata用于序列化
@@ -96,6 +103,9 @@ namespace Ailu
             Window *CreateNewWindow(String title,u16 w,u16 h,bool is_sync = false);
             void RequestFocus(DockWindow *w);
             DockNode *FindNodeByWindow(DockWindow *w);
+            void BringNodeWidgetsToFront(DockNode *node);
+            void SendNodeWidgetsToBack(DockNode *node);
+            void NormalizeWindowWidgetOrder(Window *window);
         public:
             Vector<DockNode*> _roots;
         private:
@@ -120,10 +130,12 @@ namespace Ailu
             bool _is_float_on_cancel_area = false;
             bool _is_any_float_node_invalid = false;
             bool _is_float_node_external_window = false;//当前浮动拖拽的节点是否属于子窗口
+            bool _is_floating_whole_node = false;
             Vector<Scope<Window>> _float_windows;
             DockNodeDataArray _node_data_array;
             WString _dock_layout_path;
             DockNode *_focused_node = nullptr;
+            u32 _next_serialize_node_id = 0u;
         };
     }// namespace Editor
 }// namespace Ailu

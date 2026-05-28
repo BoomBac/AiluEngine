@@ -6,6 +6,6 @@
         "_asset_name": "bloom"
     },
     "_file": "Shaders/hlsl/PostProcess/bloom.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "FullscreenVSMain"
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "PSMain"
 }

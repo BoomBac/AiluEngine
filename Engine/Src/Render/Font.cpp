@@ -343,58 +343,128 @@ namespace Ailu::Render
         return result;
     }
     */
-    Vector<GlyphRenderInfo> LayoutText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Vector2f padding, Font *font)
+    TextLayoutResult LayoutText(const String &text, Vector2f pos, f32 font_size, Vector2f scale, Vector2f padding, Font *font)
     {
         if (text.empty())
             return {};
 
-        Vector<GlyphRenderInfo> result;
-        result.reserve(text.size());
+        TextLayoutResult result;
+        result._glyphs.reserve(text.size());
 
+        if (!font->_is_msdf)
+        {
+            const Vector2f font_scale = scale * (font_size / static_cast<f32>(font->_size));
+            f32 x = pos.x;
+            f32 y = pos.y;
+            const f32 v_padding = (font->_top_padding + font->_bottom_padding) * padding.y;
+            const f32 line_height = font->_line_height * font_scale.y;
+            const f32 line_gap = v_padding * font_scale.y;
+            f32 max_width = 0.0f;
+            u32 line_count = 1u;
+            i32 last_char = -1;
+
+            for (u32 i = 0; i < text.size(); i++)
+            {
+                const char c = text[i];
+                if (c == '\0')
+                    continue;
+
+                if (c == '\n')
+                {
+                    max_width = std::max(max_width, x - pos.x);
+                    x = pos.x;
+                    y += line_height + line_gap;
+                    last_char = -1;
+                    ++line_count;
+                    continue;
+                }
+
+                const auto &char_info = font->GetChar(c);
+                const f32 kerning = last_char >= 0 ? font->GetKerning(last_char, c) * font_scale.x : 0.0f;
+                const f32 advance = char_info._xadvance * font_scale.x;
+                x += kerning;
+
+                if (char_info._width == 0 && char_info._height == 0)
+                {
+                    x += advance;
+                    max_width = std::max(max_width, x - pos.x);
+                    last_char = c;
+                    continue;
+                }
+
+                const Vector4f uv_rect = Vector4f(char_info._u, char_info._v, char_info._twidth, char_info._theight);
+                const Vector4f pos_rect = {
+                    x + char_info._xoffset * font_scale.x,
+                    y + char_info._yoffset * font_scale.y,
+                    char_info._width * font_scale.x,
+                    char_info._height * font_scale.y};
+
+                GlyphRenderInfo info;
+                info._c = c;
+                info._pos = pos_rect.xy;
+                info._size = pos_rect.zw;
+                info._uv = uv_rect.xy;
+                info._uv_size = uv_rect.zw;
+                info._page = char_info._page;
+                info._xadvance = advance;
+                x += advance;
+                max_width = std::max({max_width, x - pos.x, pos_rect.x + pos_rect.z - pos.x});
+                last_char = c;
+                result._glyphs.push_back(info);
+            }
+
+            max_width = std::max(max_width, x - pos.x);
+            result._size = {
+                max_width,
+                line_count * line_height + (line_count - 1u) * line_gap};
+            return result;
+        }
+
+        const Vector2f font_scale = scale * font_size;
         f32 x = pos.x;
-        f32 dy = font_size * scale.y / font->_line_height;
-        f32 baseline_y = dy * font->_ascent + pos.y;
-
-        f32 h_padding = (font->_left_padding + font->_right_padding) * padding.x;
-        f32 v_padding = (font->_top_padding + font->_bottom_padding) * padding.y;
-
+        f32 baseline_y = pos.y + font->_ascent * font_scale.y;
+        const f32 v_padding = (font->_top_padding + font->_bottom_padding) * padding.y;
+        const f32 line_height = font->_line_height * font_scale.y;
+        const f32 line_gap = v_padding * font_scale.y;
+        f32 max_width = 0.0f;
+        u32 line_count = 1u;
         i32 last_char = -1;
 
         for (u32 i = 0; i < text.size(); i++)
         {
-            char c = text[i];
+            const char c = text[i];
             if (c == '\0')
                 continue;
 
-            auto &char_info = font->GetChar(c);
-
-            // 换行
             if (c == '\n')
             {
+                max_width = std::max(max_width, x - pos.x);
                 x = pos.x;
-                // 向下移一行（line_height 包含 ascent + descent）
-                baseline_y += (font->_line_height + v_padding) * scale.y * font_size;
+                baseline_y += line_height + line_gap;
                 last_char = -1;
+                ++line_count;
                 continue;
             }
 
-            // 空格或不可见字符
+            const auto &char_info = font->GetChar(c);
+            const f32 kerning = last_char >= 0 ? font->GetKerning(last_char, c) * font_scale.x : 0.0f;
+            const f32 advance = char_info._xadvance * font_scale.x;
+            x += kerning;
+
             if (char_info._width == 0 && char_info._height == 0)
             {
-                x += char_info._xadvance * scale.x * font_size;
+                x += advance;
+                max_width = std::max(max_width, x - pos.x);
                 last_char = c;
                 continue;
             }
 
-            f32 kerning = (last_char >= 0) ? font->GetKerning(last_char, c) : 0.f;
-
-            // 注意：yoffset 通常相对于 baseline（向下为正），所以这里可以直接加
-            Vector4f uv_rect = Vector4f(char_info._u, char_info._v, char_info._twidth, char_info._theight);
-            Vector4f pos_rect = {
-                    x + (char_info._xoffset + kerning) * scale.x * font_size,
-                    baseline_y - char_info._yoffset * scale.y * font_size,
-                    char_info._width * font_size * scale.x,
-                    abs(char_info._height) * font_size * scale.y};
+            const Vector4f uv_rect = Vector4f(char_info._u, char_info._v, char_info._twidth, char_info._theight);
+            const Vector4f pos_rect = {
+                    x + char_info._xoffset * font_scale.x,
+                    baseline_y - char_info._yoffset * font_scale.y,
+                    char_info._width * font_scale.x,
+                    std::abs(char_info._height) * font_scale.y};
 
             GlyphRenderInfo info;
             info._c = c;
@@ -403,13 +473,17 @@ namespace Ailu::Render
             info._uv = uv_rect.xy;
             info._uv_size = uv_rect.zw;
             info._page = char_info._page;
-            info._xadvance = char_info._xadvance * scale.x;
-
-            x += info._xadvance * font_size;
+            info._xadvance = advance;
+            x += advance;
+            max_width = std::max({max_width, x - pos.x, pos_rect.x + pos_rect.z - pos.x});
             last_char = c;
-            result.push_back(info);
+            result._glyphs.push_back(info);
         }
 
+        max_width = std::max(max_width, x - pos.x);
+        result._size = {
+            max_width,
+            line_count * line_height + (line_count - 1u) * line_gap};
         return result;
     }
 

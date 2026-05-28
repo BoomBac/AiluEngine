@@ -6,6 +6,6 @@
         "_asset_name": "sky_atmosphere"
     },
     "_file": "Shaders/hlsl/sky_atmosphere.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

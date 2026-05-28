@@ -40,6 +40,7 @@ namespace Ailu
             UI::CollapsibleView *_script_block = nullptr;
             UI::InputBlock *_script_path_block = nullptr;
             UI::UIElement *_prev_comp_block = nullptr;
+            bool _needs_rebuild = true;
         };
     }// namespace Editor
 }// namespace Ailu

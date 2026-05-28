@@ -361,7 +361,7 @@ namespace Ailu
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_transform._position.x = opt.value();
+                            comp->_local_transform._position.x = opt.value();
                     }
                 }
             };
@@ -373,7 +373,7 @@ namespace Ailu
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_transform._position.y = opt.value();
+                            comp->_local_transform._position.y = opt.value();
                     }
                 }
             };
@@ -385,7 +385,7 @@ namespace Ailu
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_transform._position.z = opt.value();
+                            comp->_local_transform._position.z = opt.value();
                     }
                 }
             };
@@ -399,9 +399,9 @@ namespace Ailu
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
                         {
-                            Vector3f euler = Quaternion::EulerAngles(comp->_transform._rotation);
+                            Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
                             euler.x = opt.value();
-                            comp->_transform._rotation = Quaternion::EulerAngles(euler);
+                            comp->_local_transform._rotation = Quaternion::EulerAngles(euler);
                         }
                     }
                 }
@@ -415,9 +415,9 @@ namespace Ailu
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
                         {
-                            Vector3f euler = Quaternion::EulerAngles(comp->_transform._rotation);
+                            Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
                             euler.y = opt.value();
-                            comp->_transform._rotation = Quaternion::EulerAngles(euler);
+                            comp->_local_transform._rotation = Quaternion::EulerAngles(euler);
                         }
                     }
                 }
@@ -431,9 +431,9 @@ namespace Ailu
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
                         {
-                            Vector3f euler = Quaternion::EulerAngles(comp->_transform._rotation);
+                            Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
                             euler.z = opt.value();
-                            comp->_transform._rotation = Quaternion::EulerAngles(euler);
+                            comp->_local_transform._rotation = Quaternion::EulerAngles(euler);
                         }
                     }
                 }
@@ -447,7 +447,7 @@ namespace Ailu
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_transform._scale.x = opt.value();
+                            comp->_local_transform._scale.x = opt.value();
                     }
                 }
             };
@@ -459,7 +459,7 @@ namespace Ailu
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_transform._scale.y = opt.value();
+                            comp->_local_transform._scale.y = opt.value();
                     }
                 }
             };
@@ -471,7 +471,7 @@ namespace Ailu
                     if (auto comp = r.GetComponent<ECS::TransformComponent>(selected); comp != nullptr)
                     {
                         if (auto opt = StringUtils::ParseFloat(content); opt.has_value())
-                            comp->_transform._scale.z = opt.value();
+                            comp->_local_transform._scale.z = opt.value();
                     }
                 }
             };
@@ -497,11 +497,11 @@ namespace Ailu
             _vb->SlotPadding({4.0f, 6.0f, 0.0f, 0.0f});
             _vb->AddChild<UI::Text>("Name");
             _vb->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto);
-            //auto color_picker = _vb->AddChild<UI::ColorPicker>(Colors::kBlue);
-            //color_picker->OnValueChanged() += [](Vector4f color)
-            //{
-            //    LOG_WARNING("Color Changed: R:{} G:{} B:{} A:{}", color.r, color.g, color.b, color.a);
-            //};
+
+            Selection::on_selection_changed += [this]()
+            {
+                _needs_rebuild = true;
+            };
         }
         ObjectDetail::~ObjectDetail()
         {
@@ -512,8 +512,6 @@ namespace Ailu
         void ObjectDetail::Update(f32 dt)
         {
             DockWindow::Update(dt);
-            static ECS::Entity s_prev_selected = ECS::kInvalidEntity;
-            static u32 s_prev_selected_subindex = 0;
 
             auto remove_block = [&](UI::CollapsibleView *&block)
             {
@@ -536,11 +534,11 @@ namespace Ailu
 
             if (auto selected = Selection::FirstEntity(); selected != ECS::kInvalidEntity)
             {
-                const u32 selected_subindex = Selection::GetSelectedSubIndex(selected);
-                const bool selection_changed = s_prev_selected != selected;
-                const bool submesh_changed = s_prev_selected_subindex != selected_subindex;
-                if (selection_changed)
+                if (_needs_rebuild)
+                {
                     clear_dynamic_blocks();
+                    _needs_rebuild = false;
+                }
                 auto &r = SceneMgr::Get().ActiveScene()->GetRegister();
                 if (auto comp = r.GetComponent<ECS::TagComponent>(selected); comp != nullptr)
                 {
@@ -555,16 +553,16 @@ namespace Ailu
                         if (!block->IsEditing())
                             block->SetContent(std::format("{:.2f}", value), false);
                     };
-                    set_block(_pos_block[0], comp->_transform._position.x);
-                    set_block(_pos_block[1], comp->_transform._position.y);
-                    set_block(_pos_block[2], comp->_transform._position.z);
-                    Vector3f euler = Quaternion::EulerAngles(comp->_transform._rotation);
+                    set_block(_pos_block[0], comp->_local_transform._position.x);
+                    set_block(_pos_block[1], comp->_local_transform._position.y);
+                    set_block(_pos_block[2], comp->_local_transform._position.z);
+                    Vector3f euler = Quaternion::EulerAngles(comp->_local_transform._rotation);
                     set_block(_rot_block[0], euler.x);
                     set_block(_rot_block[1], euler.y);
                     set_block(_rot_block[2], euler.z);
-                    set_block(_scale_block[0], comp->_transform._scale.x);
-                    set_block(_scale_block[1], comp->_transform._scale.y);
-                    set_block(_scale_block[2], comp->_transform._scale.z);
+                    set_block(_scale_block[0], comp->_local_transform._scale.x);
+                    set_block(_scale_block[1], comp->_local_transform._scale.y);
+                    set_block(_scale_block[2], comp->_local_transform._scale.z);
                 }
                 else
                 {
@@ -723,7 +721,7 @@ namespace Ailu
                 }
                 if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(selected); comp != nullptr)
                 {
-                    if (_static_mesh_block == nullptr || submesh_changed)
+                    if (_static_mesh_block == nullptr || _needs_rebuild)
                     {
                         remove_block(_static_mesh_block);
                         _static_mesh_block = _vb->AddChild<UI::CollapsibleView>("StaticMesh")->SlotSizePolicy(UI::ESizePolicy::kFill, UI::ESizePolicy::kAuto).As<UI::CollapsibleView>();
@@ -755,7 +753,7 @@ namespace Ailu
                         }
                         //material
                         {
-                            auto subindex = selected_subindex;
+                            auto subindex = Selection::GetSelectedSubIndex(selected);
                             auto btn = AddButtonRow(content, std::format("Material[{}]", subindex), (comp->_p_mats[subindex] != nullptr) ? comp->_p_mats[subindex]->Name() : "None");
                             btn->OnMouseClick() += [comp, btn, subindex](UI::UIEvent &e)
                             {
@@ -846,15 +844,12 @@ namespace Ailu
                 {
                     remove_block(_cam_block);
                 }
-                s_prev_selected = selected;
-                s_prev_selected_subindex = selected_subindex;
             }
             else
             {
                 _vb->ChildAt(0)->As<UI::Text>()->SetText("Name: (No Selection)");
                 clear_dynamic_blocks();
-                s_prev_selected = ECS::kInvalidEntity;
-                s_prev_selected_subindex = 0;
+                _needs_rebuild = true;
             }
         }
     }// namespace Editor

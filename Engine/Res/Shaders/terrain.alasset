@@ -6,6 +6,6 @@
         "_asset_name": "GpuTerrain"
     },
     "_file": "Shaders/hlsl/terrain.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

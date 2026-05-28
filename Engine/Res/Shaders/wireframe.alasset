@@ -6,6 +6,6 @@
         "_asset_name": "wireframe"
     },
     "_file": "Shaders/hlsl/wireframe.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

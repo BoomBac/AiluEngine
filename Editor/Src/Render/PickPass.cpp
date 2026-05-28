@@ -59,18 +59,18 @@ namespace Ailu
                 {
                     for (auto entity: selected)
                     {
-                        const auto t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
+                        const auto t = r.GetComponent<ECS::TransformComponent>(entity);
                         if (auto comp = r.GetComponent<ECS::LightComponent>(entity); comp != nullptr)
                         {
-                            DrawLightGizmo(t, comp);
+                            DrawLightGizmo(*t, *comp);
                             continue;
                         }
                         else if (auto comp = r.GetComponent<ECS::CLightProbe>(entity); comp != nullptr)
                         {
                             //Gizmo::DrawCube(t._position, comp->_size);
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
-                            Gizmo::DrawAABB(t._position - ext, t._position + ext);
-                            cmd->DrawMesh(Mesh::s_sphere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
+                            Gizmo::DrawAABB(t->_position - ext, t->_position + ext);
+                            cmd->DrawMesh(Mesh::s_sphere.lock().get(), comp->_debug_material, t->GetWorldMatrix(), 0, 0, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CCamera>(entity); comp != nullptr)
                         {
@@ -82,7 +82,7 @@ namespace Ailu
                 for (auto &light_comp: r.View<ECS::LightComponent>())
                 {
                     const auto &t = r.GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index);
-                    auto world_pos = t->_transform._position;
+                    auto world_pos = t->GetPosition();
                     CBufferPerObjectData obj_data;
                     obj_data._ObjectID = (i32)r.GetEntity<ECS::LightComponent>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
@@ -117,7 +117,7 @@ namespace Ailu
                 for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CLightProbe>())
                 {
                     const auto &t = r.GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index);
-                    auto world_pos = t->_transform._position;
+                    auto world_pos = t->GetPosition();
                     CBufferPerObjectData obj_data;
                     obj_data._ObjectID = (i32)r.GetEntity<ECS::CLightProbe>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
@@ -129,7 +129,7 @@ namespace Ailu
                 for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CCamera>())
                 {
                     const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
-                    auto world_pos = t->_transform._position;
+                    auto world_pos = t->GetPosition();
                     CBufferPerObjectData obj_data;
                     obj_data._ObjectID = (i32)r.GetEntity<ECS::CCamera>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
@@ -154,23 +154,23 @@ namespace Ailu
                     ECS::Register &r = SceneMgr::Get().ActiveScene()->GetRegister();
                     for (auto entity: selected)
                     {
-                        const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
+                        const auto &t = r.GetComponent<ECS::TransformComponent>(entity);
                         if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
                         {
                             auto submesh = Selection::GetSelectedSubIndex(entity);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 1, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 1, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
                         {
                             auto submesh = Selection::GetSelectedSubIndex(entity);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 1, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 1, 1);
                             Gizmo::DrawAABB(comp->_transformed_aabbs[0], Colors::kGreen);
                         }
                         if (auto c = r.GetComponent<ECS::CCollider>(entity))
                         {
-                            DebugDrawer::DebugWireframe(*c, t);
+                            DebugDrawer::DebugWireframe(*c, t->GetWorldMatrix(), Colors::kGreen);
                         }
                     }
                 } });
@@ -226,18 +226,19 @@ namespace Ailu
                 {
                     for (auto entity: selected)
                     {
-                        const auto t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
+                        const ECS::TransformComponent& t = *r.GetComponent<ECS::TransformComponent>(entity);
                         if (auto comp = r.GetComponent<ECS::LightComponent>(entity); comp != nullptr)
                         {
-                            DrawLightGizmo(t, comp);
+                            const ECS::LightComponent& comp_ref = *comp;
+                            DrawLightGizmo(t, comp_ref);
                             continue;
                         }
                         else if (auto comp = r.GetComponent<ECS::CLightProbe>(entity); comp != nullptr)
                         {
                             //Gizmo::DrawCube(t._position, comp->_size);
                             Vector3f ext = Vector3f(comp->_size) * 0.5f;
-                            Gizmo::DrawAABB(t._position - ext,t._position + ext);
-                            cmd->DrawMesh(Mesh::s_sphere.lock().get(), comp->_debug_material, t._world_matrix, 0, 0, 1);
+                            Gizmo::DrawAABB(t.GetPosition() - ext, t.GetPosition() + ext);
+                            cmd->DrawMesh(Mesh::s_sphere.lock().get(), comp->_debug_material, t.GetWorldMatrix(), 0, 0, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CCamera>(entity); comp != nullptr)
                         {
@@ -260,7 +261,7 @@ namespace Ailu
                 for (auto &light_comp: r.View<ECS::LightComponent>())
                 {
                     const auto &t = r.GetComponent<ECS::LightComponent, ECS::TransformComponent>(entity_index);
-                    auto world_pos = t->_transform._position;
+                    auto world_pos = t->_local_transform._position;
                     CBufferPerObjectData obj_data;
                     obj_data._ObjectID = (i32)r.GetEntity<ECS::LightComponent>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
@@ -295,7 +296,7 @@ namespace Ailu
                 for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CLightProbe>())
                 {
                     const auto &t = r.GetComponent<ECS::CLightProbe, ECS::TransformComponent>(entity_index);
-                    auto world_pos = t->_transform._position;
+                    auto world_pos = t->_local_transform._position;
                     CBufferPerObjectData obj_data;
                     obj_data._ObjectID = (i32)r.GetEntity<ECS::CLightProbe>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
@@ -307,7 +308,7 @@ namespace Ailu
                 for (auto &light_comp: SceneMgr::Get().ActiveScene()->GetRegister().View<ECS::CCamera>())
                 {
                     const auto &t = SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::CCamera, ECS::TransformComponent>(entity_index);
-                    auto world_pos = t->_transform._position;
+                    auto world_pos = t->_local_transform._position;
                     CBufferPerObjectData obj_data;
                     obj_data._ObjectID = (i32)r.GetEntity<ECS::CCamera>(entity_index);
                     obj_data._MatrixWorld = MatrixTranslation(world_pos);
@@ -324,23 +325,23 @@ namespace Ailu
                     cmd->SetRenderTarget(select_buf, rendering_data._camera_depth_target_handle);
                     for (auto entity: selected)
                     {
-                        const auto &t = r.GetComponent<ECS::TransformComponent>(entity)->_transform;
+                        const auto &t = r.GetComponent<ECS::TransformComponent>(entity);
                         if (auto comp = r.GetComponent<ECS::StaticMeshComponent>(entity); comp != nullptr)
                         {
                             auto submesh = Selection::GetSelectedSubIndex(entity);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 1, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 1, 1);
                         }
                         else if (auto comp = r.GetComponent<ECS::CSkeletonMesh>(entity); comp != nullptr)
                         {
                             auto submesh = Selection::GetSelectedSubIndex(entity);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 0, 1);
-                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t._world_matrix, submesh, 1, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 0, 1);
+                            cmd->DrawMesh(comp->_p_mesh.get(), _select_gen.get(), t->GetWorldMatrix(), submesh, 1, 1);
                             Gizmo::DrawAABB(comp->_transformed_aabbs[0],Colors::kGreen);
                         }
                         if (auto c = r.GetComponent<ECS::CCollider>(entity))
                         {
-                            DebugDrawer::DebugWireframe(*c,t);
+                            DebugDrawer::DebugWireframe(*c,t->GetWorldMatrix());
                         }
                     }
                     _editor_outline->SetTexture("_SelectBuffer", select_buf);
@@ -364,13 +365,13 @@ namespace Ailu
             context->ExecuteCommandBuffer(cmd);
             CommandBufferPool::Release(cmd);
         }
-        void PickPass::DrawLightGizmo(const Transform &transf, ECS::LightComponent *comp)
+        void PickPass::DrawLightGizmo(const ECS::TransformComponent& transf, const ECS::LightComponent& comp)
         {
-            switch (comp->_type)
+            switch (comp._type)
             {
                 case Ailu::ECS::ELightType::kDirectional:
                 {
-                    Vector3f light_to = comp->_light._light_dir.xyz;
+                    Vector3f light_to = comp._light._light_dir.xyz;
                     light_to.x *= 2.0f;
                     light_to.y *= 2.0f;
                     light_to.z *= 2.0f;
@@ -381,39 +382,39 @@ namespace Ailu
                         Vector3f(1.0f, 0.0f, -1.0f),
                         Vector3f(-1.0f, 0.0f, -1.0f)
                     };
-                    auto mat = Transform::ToMatrix(transf);
+                    auto mat = transf.GetWorldMatrix();
                     for (u16 i = 0; i < 5; ++i)
                     {
                         TransformCoord(points[i], mat);
-                        Gizmo::DrawLine(points[i], points[i] + light_to, comp->_light._light_color);
+                        Gizmo::DrawLine(points[i], points[i] + light_to, comp._light._light_color);
                     }
                     //Gizmo::DrawLine(transf._position, transf._position + light_to, comp->_light._light_color);
-                    Gizmo::DrawCircle(transf._position, 0.5f, 24, comp->_light._light_color, Quaternion::ToMat4f(transf._rotation));
+                    Gizmo::DrawCircle(transf._position, 0.5f, 24, comp._light._light_color, Quaternion::ToMat4f(transf._rotation));
                     return;
                 }
                 case Ailu::ECS::ELightType::kPoint:
                 {
                     //范围球
-                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color, MatrixRotationX(ToRadius(90.0f)));
-                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color, MatrixRotationZ(ToRadius(90.0f)));
-                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.x, 24, comp->_light._light_color);
+                    Gizmo::DrawCircle(transf._position, comp._light._light_param.x, 24, comp._light._light_color, MatrixRotationX(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp._light._light_param.x, 24, comp._light._light_color, MatrixRotationZ(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp._light._light_param.x, 24, comp._light._light_color);
                     //光源大小
-                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.y, 24, comp->_light._light_color, MatrixRotationX(ToRadius(90.0f)));
-                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.y, 24, comp->_light._light_color, MatrixRotationZ(ToRadius(90.0f)));
-                    Gizmo::DrawCircle(transf._position, comp->_light._light_param.y, 24, comp->_light._light_color);
+                    Gizmo::DrawCircle(transf._position, comp._light._light_param.y, 24, comp._light._light_color, MatrixRotationX(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp._light._light_param.y, 24, comp._light._light_color, MatrixRotationZ(ToRadius(90.0f)));
+                    Gizmo::DrawCircle(transf._position, comp._light._light_param.y, 24, comp._light._light_color);
                     return;
                 }
                 case Ailu::ECS::ELightType::kSpot:
                 {
                     float angleIncrement = 90.0;
                     auto rot_mat = Quaternion::ToMat4f(transf._rotation);
-                    Vector3f light_to = comp->_light._light_dir.xyz;
-                    light_to *= comp->_light._light_param.x;
+                    Vector3f light_to = comp._light._light_dir.xyz;
+                    light_to *= comp._light._light_param.x;
                     {
                         Vector3f inner_center = light_to + transf._position;
-                        float inner_radius = tan(ToRadius(comp->_light._light_param.y / 2.0f)) * comp->_light._light_param.x;
+                        float inner_radius = tan(ToRadius(comp._light._light_param.y / 2.0f)) * comp._light._light_param.x;
                         Gizmo::DrawLine(transf._position, transf._position + light_to * 10.f, Colors::kYellow);
-                        Gizmo::DrawCircle(inner_center, inner_radius, 24, comp->_light._light_color, rot_mat);
+                        Gizmo::DrawCircle(inner_center, inner_radius, 24, comp._light._light_color, rot_mat);
                         for (int i = 0; i < 4; ++i)
                         {
                             float angle1 = ToRadius(angleIncrement * static_cast<float>(i));
@@ -428,14 +429,14 @@ namespace Ailu
                             //TransformCoord(point2, rot_mat);
                             point1 += inner_center;
                             point2 += inner_center;
-                            Gizmo::DrawLine(transf._position, point2, comp->_light._light_color);
+                            Gizmo::DrawLine(transf._position, point2, comp._light._light_color);
                         }
                     }
                     light_to *= 0.9f;
                     {
                         Vector3f outer_center = light_to + transf._position;
-                        float outer_radius = tan(ToRadius(comp->_light._light_param.z / 2.0f)) * comp->_light._light_param.x;
-                        Gizmo::DrawCircle(outer_center, outer_radius, 24, comp->_light._light_color, rot_mat);
+                        float outer_radius = tan(ToRadius(comp._light._light_param.z / 2.0f)) * comp._light._light_param.x;
+                        Gizmo::DrawCircle(outer_center, outer_radius, 24, comp._light._light_color, rot_mat);
                         for (int i = 0; i < 4; ++i)
                         {
                             float angle1 = ToRadius(angleIncrement * static_cast<float>(i));
@@ -448,22 +449,22 @@ namespace Ailu
                             TransformCoord(point2, rot_mat);
                             point1 += outer_center;
                             point2 += outer_center;
-                            Gizmo::DrawLine(transf._position, point2, comp->_light._light_color);
+                            Gizmo::DrawLine(transf._position, point2, comp._light._light_color);
                         }
                     }
                     return;
                 }
                 case ECS::ELightType::kArea:
                 {
-                    Vector3f light_to = comp->_light._light_dir.xyz;
-                    light_to.x *= comp->_light._light_param.x;
-                    light_to.y *= comp->_light._light_param.x;
-                    light_to.z *= comp->_light._light_param.x;
-                    Gizmo::DrawLine(transf._position, transf._position + light_to, comp->_light._light_color);
-                    if (comp->_light._light_param.w == 0.0f)
+                    Vector3f light_to = comp._light._light_dir.xyz;
+                    light_to.x *= comp._light._light_param.x;
+                    light_to.y *= comp._light._light_param.x;
+                    light_to.z *= comp._light._light_param.x;
+                    Gizmo::DrawLine(transf._position, transf._position + light_to, comp._light._light_color);
+                    if (comp._light._light_param.w == 0.0f)
                     {
                         Vector3f points[4];
-                        f32 w = comp->_light._light_param.y * 0.5f,h = comp->_light._light_param.z * 0.5f;
+                        f32 w = comp._light._light_param.y * 0.5f,h = comp._light._light_param.z * 0.5f;
                         points[0].x = -w;
                         points[0].z = h;
                         points[1].x = w;
@@ -472,19 +473,19 @@ namespace Ailu
                         points[2].z = -h;
                         points[3].x = -w;
                         points[3].z = -h;
-                        auto mat = Transform::ToMatrix(transf);
+                        auto mat = transf.GetWorldMatrix();
                         TransformCoord(points[0], mat);
                         TransformCoord(points[1], mat);
                         TransformCoord(points[2], mat);
                         TransformCoord(points[3], mat);
-                        Gizmo::DrawLine(points[0], points[1], comp->_light._light_color);
-                        Gizmo::DrawLine(points[1], points[2], comp->_light._light_color);
-                        Gizmo::DrawLine(points[2], points[3], comp->_light._light_color);
-                        Gizmo::DrawLine(points[3], points[0], comp->_light._light_color);
+                        Gizmo::DrawLine(points[0], points[1], comp._light._light_color);
+                        Gizmo::DrawLine(points[1], points[2], comp._light._light_color);
+                        Gizmo::DrawLine(points[2], points[3], comp._light._light_color);
+                        Gizmo::DrawLine(points[3], points[0], comp._light._light_color);
                     }
                     else
                     {
-                        Gizmo::DrawCircle(transf._position, comp->_light._light_param.y, 24, comp->_light._light_color, Quaternion::ToMat4f(transf._rotation));
+                        Gizmo::DrawCircle(transf._position, comp._light._light_param.y, 24, comp._light._light_color, Quaternion::ToMat4f(transf._rotation));
                     }
                 }
             }

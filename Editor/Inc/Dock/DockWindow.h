@@ -6,6 +6,7 @@
 #include "generated/DockWindow.gen.h"
 namespace Ailu
 {
+    class Window;
     namespace UI
     {
         class Text;
@@ -15,6 +16,7 @@ namespace Ailu
     }
     namespace Editor
     {
+        class DockManager;
         enum EHoverEdgeDir
         {
             kLeft = 1,
@@ -31,9 +33,28 @@ namespace Ailu
             kFullSize = 1 << 4//窗口内容区撑满整个窗口
         };
 
+        class DockWindow;
+        class IDockTabItem
+        {
+        public:
+            virtual ~IDockTabItem() = default;
+            virtual String GetTitle() const = 0;
+            virtual Vector2f Position() const = 0;
+            virtual Vector2f Size() const = 0;
+            virtual void SetRect(Vector4f rect) = 0;
+            virtual void Update(f32 dt) = 0;
+            virtual bool IsHover(Vector2f pos) const = 0;
+            virtual void SetFocus(bool is_focus) = 0;
+            virtual void SetTabActive(bool is_active) = 0;
+            virtual void RestoreStandaloneFromTab() = 0;
+            virtual bool ContainsWindow(DockWindow *w) const = 0;
+            virtual DockWindow *PrimaryWindow() const = 0;
+            virtual void AttachToWindow(Window *w) = 0;
+        };
+
         using UI::Widget;
         ACLASS()
-        class DockWindow : public Object
+        class DockWindow : public Object, public IDockTabItem
         {
             GENERATED_BODY()
             friend class DockManager;
@@ -69,10 +90,18 @@ namespace Ailu
             u32 _flags = 0u;
             Widget *ContentWidget() { return _content_widget.get(); };
             Widget *TitleWidget() { return _title_widget.get(); };
-            Vector2f Position() const { return _position; };
-            Vector2f Size() const { return _size; };
+            Ref<Widget> ContentWidgetRef() const { return _content_widget; };
+            Ref<Widget> TitleWidgetRef() const { return _title_widget; };
+            Vector2f Position() const override { return _position; };
+            Vector2f Size() const override { return _size; };
             void SetSize(Vector2f size);
             void SetPosition(Vector2f position);
+            void SetTabActive(bool is_active) override;
+            void RestoreStandaloneFromTab() override;
+            bool ContainsWindow(DockWindow *w) const override { return this == w; }
+            DockWindow *PrimaryWindow() const override { return const_cast<DockWindow *>(this); }
+            void AttachToWindow(Window *w) override;
+            virtual void OnDockLayoutLoaded() {}
         private:
             inline static DockWindow* s_cur_resizing_window = nullptr;
         private:
@@ -94,6 +123,8 @@ namespace Ailu
             Vector2f _drag_start_offset;
             Vector2f _pre_mouse_pos;
             bool _is_dirty = true;
+            bool _is_title_bar_visible = true;
+            bool _is_expand_content_when_title_hidden = false;
             Vector<Ailu::UI::ZoneHandle> _resize_zone_handles;
         };
 
@@ -103,13 +134,16 @@ namespace Ailu
             DockTab();
             ~DockTab();
             bool AddTab(const Ref<DockWindow> &w);
+            bool AddTabItem(const Ref<IDockTabItem> &item);
             /// <summary>
             /// 移除一个标签，返回移除后是否为空
             /// </summary>
             /// <param name="w"></param>
             /// <returns></returns>
             bool RemoveTab(DockWindow *w);
+            Ref<IDockTabItem> RemoveActiveItem();
             void Update(f32 dt);
+            void SetVisible(bool is_visible);
             /// <summary>
             /// 获取鼠标悬浮边缘情况
             /// </summary>
@@ -118,7 +152,11 @@ namespace Ailu
             u32 HoverEdge(Vector2f pos) const;
             bool HoverDragArea(Vector2f pos) const;
             bool IsHover(Vector2f pos) const;
-            Ref<DockWindow> ActiveTab() { return _tabs[_active_index]; };
+            Ref<IDockTabItem> ActiveItem() const;
+            DockWindow *ActivePrimaryWindow() const;
+            i32 ActiveIndex() const { return _active_index; }
+            i32 TabCount() const { return static_cast<i32>(_tabs.size()); }
+            void SetActiveIndex(i32 new_index);
             bool Contains(DockWindow *w) const;
             void SetFocus(bool is_focus);
             bool IsFocus() const { return _is_focused; }
@@ -133,7 +171,7 @@ namespace Ailu
             bool IsActiveTab(UI::UIElement *e) const;
             void OnActiveTabChanged(i32 new_index);
         private:
-            Vector<Ref<DockWindow>> _tabs;
+            Vector<Ref<IDockTabItem>> _tabs;
             int _active_index = -1;
             Ref<Widget> _tab_bar;
             UI::Border *_tab_root;
@@ -142,6 +180,7 @@ namespace Ailu
             UI::Button *_btn_close;
             UI::Border *_drag_area;
             bool _is_focused;
+            bool _is_visible = true;
             i32 _content_focus_handle = -1;//保存当前活跃window content foucs 代理句柄，用于点击窗口内容区使标签栏也获得焦点
         };
     }

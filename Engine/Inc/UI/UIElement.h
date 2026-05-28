@@ -11,98 +11,13 @@
 #include <Render/RendererAPI.h>
 #include "Framework/Common/Allocator.hpp"
 #include "DragDrop.h"
+#include "UISlot.h"
 #include "generated/UIElement.gen.h"
 
 namespace Ailu
 {
     namespace UI
     {
-        AENUM()
-        enum class EAlignment
-        {
-            kLeft,
-            kCenter,
-            kRight,
-            kTop,
-            kBottom,
-            kFill
-        };
-
-        AENUM()
-        enum class ESlotType
-        {
-            kCanvas,
-            kVerticalBox,
-            kHorizontalBox
-        };
-        //用于vertical/horizontal box布局
-        AENUM()
-        enum class ESizePolicy
-        {
-            kFixed,//使用slot.size即使不是canvas
-            kFill, // 填充剩余空间,如果有多个fill则平分剩余空间 
-            kAuto  // 根据内容自适应大小
-        };
-
-        ASTRUCT()
-        struct Padding
-        {
-            GENERATED_BODY()
-            f32 _l = 0.f;
-            f32 _t = 0.f;
-            f32 _r = 0.f;
-            f32 _b = 0.f;
-            Padding() = default;
-            Padding(f32 l, f32 t, f32 r, f32 b) : _l(l), _t(t), _r(r), _b(b) {};
-            Padding(f32 v) : Padding(v, v, v, v) {};
-            Padding(Vector4f v) : Padding(v.x, v.y, v.z, v.w) {};
-            void Serialize(FArchive &ar)
-            {
-                Vector4f v{_l, _t, _r, _b};
-                SerializePrimitive<Vector4f>(&v, ar);
-            };
-            void Deserialize(FArchive &ar)
-            {
-                Vector4f v;
-                DeserializePrimitive<Vector4f>(&v, ar);
-                memcpy(this, &v, sizeof(Padding));
-            };
-            String ToString() const
-            {
-                return std::format("{},{},{},{}", _l, _t, _r, _b);
-            }
-        };
-
-        ASTRUCT()
-        struct Slot
-        {
-            GENERATED_BODY()
-            Slot(Vector2f size) : _anchor(), _position(), _size(size) {};
-            Slot() : Slot({100.f, 100.f}) {};
-            APROPERTY()
-            Vector2f _size;
-            APROPERTY()
-            Vector2f _anchor = Vector2f::kZero;
-            APROPERTY()
-            Vector2f _position = Vector2f::kZero;
-            APROPERTY()
-            EAlignment _alignment_h = EAlignment::kLeft;
-            APROPERTY()
-            EAlignment _alignment_v = EAlignment::kCenter;
-            APROPERTY()
-            Padding _margin;// ltrb，元素外边距
-            APROPERTY()
-            ESlotType _type = ESlotType::kCanvas;
-            APROPERTY()
-            ESizePolicy _size_policy_h = ESizePolicy::kFill;//用于linear box slot
-            APROPERTY()
-            ESizePolicy _size_policy_v = ESizePolicy::kAuto;//用于linear box slot
-            APROPERTY()
-            bool _is_size_to_content = false;//用于canvas slot
-            APROPERTY()
-            f32 _fill_rate = 1.0f;//linear box slot,所有fill的fill_rate之和为总权重
-        }; 
-
         AENUM()
         enum class EVisibility
         {
@@ -265,6 +180,17 @@ namespace Ailu
             /// </summary>
             /// <returns>ltwh</returns>
             [[nodiscard]] Vector4f GetContentRect() const;
+            Ref<UISlot> &GetSlot()
+            {
+                SyncSlotObjectFromLegacy();
+                _legacy_slot_dirty = true;
+                return _slot_obj;
+            }
+            const Ref<UISlot> &GetSlot() const
+            {
+                SyncSlotObjectFromLegacy();
+                return _slot_obj;
+            }
             void SetDepth(f32 depth);
             ElementEvent::EventView OnMouseEnter();
             ElementEvent::EventView OnMouseExit();
@@ -299,6 +225,12 @@ namespace Ailu
             FORCEINLINE UIElement& SlotPosition(Vector2f pos)
             {
                 _slot._position = pos;
+                _slot._type = ESlotType::kCanvas;
+                SyncSlotObjectFromLegacy();
+                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
+                    canvas_slot->_position = pos;
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
@@ -310,24 +242,49 @@ namespace Ailu
             FORCEINLINE UIElement& SlotSize(Vector2f size)
             {
                 _slot._size = size;
+                _slot._type = ESlotType::kCanvas;
+                SyncSlotObjectFromLegacy();
+                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
+                    canvas_slot->_size = size;
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
             FORCEINLINE UIElement& SlotAnchor(Vector2f anchor)
             {
                 _slot._anchor = anchor;
+                _slot._type = ESlotType::kCanvas;
+                SyncSlotObjectFromLegacy();
+                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
+                    canvas_slot->_anchor = anchor;
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
             FORCEINLINE UIElement& SlotAlignmentH(EAlignment h)
             {
                 _slot._alignment_h = h;
+                _slot._type = ESlotType::kCanvas;
+                SyncSlotObjectFromLegacy();
+                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
+                    canvas_slot->_alignment_h = h;
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
             FORCEINLINE UIElement& SlotAlignmentV(EAlignment v)
             {
                 _slot._alignment_v = v;
+                SyncSlotObjectFromLegacy();
+                if (const auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
+                    canvas_slot->_alignment_v = v;
+                if (auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
+                    linear_slot->_cross_align = v;
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
@@ -335,6 +292,11 @@ namespace Ailu
             FORCEINLINE UIElement& SlotMargin(Padding margin)
             {
                 _slot._margin = margin;
+                SyncSlotObjectFromLegacy();
+                if (_slot_obj != nullptr)
+                    _slot_obj->_margin = margin;
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
@@ -342,6 +304,14 @@ namespace Ailu
             {
                 _slot._size_policy_h = policy_h;
                 _slot._size_policy_v = policy_v;
+                SyncSlotObjectFromLegacy();
+                if (auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
+                {
+                    linear_slot->_size_policy_h = policy_h;
+                    linear_slot->_size_policy_v = policy_v;
+                }
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
@@ -349,18 +319,37 @@ namespace Ailu
             {
                 _slot._size_policy_h = policy;
                 _slot._size_policy_v = policy;
+                SyncSlotObjectFromLegacy();
+                if (auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
+                {
+                    linear_slot->_size_policy_h = policy;
+                    linear_slot->_size_policy_v = policy;
+                }
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
             FORCEINLINE UIElement& SlotSizeToContent(bool v)
             {
                 _slot._is_size_to_content = v;
+                _slot._type = ESlotType::kCanvas;
+                SyncSlotObjectFromLegacy();
+                if (auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
+                    canvas_slot->_size_to_content = v;
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
             FORCEINLINE UIElement& SlotFillRate(f32 rate)
             {
                 _slot._fill_rate = rate;
+                SyncSlotObjectFromLegacy();
+                if (auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
+                    linear_slot->_fill_rate = rate;
+                _slot_obj_dirty = false;
+                _legacy_slot_dirty = false;
                 InvalidateLayout();
                 return *this;
             }
@@ -371,15 +360,15 @@ namespace Ailu
                 InvalidateLayout();
                 return *this;
             }
-            Vector2f SlotPosition() const { return _slot._position; }
-            Vector2f SlotSize() const { return _slot._size; }
-            Vector2f SlotAnchor() const { return _slot._anchor; }
-            EAlignment SlotAlignmentH() const { return _slot._alignment_h; }
-            EAlignment SlotAlignmentV() const { return _slot._alignment_v; }
-            Padding SlotMargin() const { return _slot._margin; }
-            ESizePolicy SlotSizePolicy(bool is_h = true) const { return is_h ? _slot._size_policy_h : _slot._size_policy_v; }
-            bool SlotSizeToContent() const { return _slot._is_size_to_content; }
-            f32 SlotFillRate() const { return _slot._fill_rate; }
+            Vector2f SlotPosition() const { SyncLegacyFromSlotObject(); return _slot._position; }
+            Vector2f SlotSize() const { SyncLegacyFromSlotObject(); return _slot._size; }
+            Vector2f SlotAnchor() const { SyncLegacyFromSlotObject(); return _slot._anchor; }
+            EAlignment SlotAlignmentH() const { SyncLegacyFromSlotObject(); return _slot._alignment_h; }
+            EAlignment SlotAlignmentV() const { SyncLegacyFromSlotObject(); return _slot._alignment_v; }
+            Padding SlotMargin() const { SyncLegacyFromSlotObject(); return _slot._margin; }
+            ESizePolicy SlotSizePolicy(bool is_h = true) const { SyncLegacyFromSlotObject(); return is_h ? _slot._size_policy_h : _slot._size_policy_v; }
+            bool SlotSizeToContent() const { SyncLegacyFromSlotObject(); return _slot._is_size_to_content; }
+            f32 SlotFillRate() const { SyncLegacyFromSlotObject(); return _slot._fill_rate; }
             Padding SlotPadding() const { return _padding; }
             //变换
             void Translate(f32 x, f32 y)
@@ -426,7 +415,10 @@ namespace Ailu
         private:
             void SetFocusedInternal(bool v);// 仅 UIManager 使用
             void ApplyTransform();
+            void SyncSlotObjectFromLegacy() const;
+            void SyncLegacyFromSlotObject() const;
         protected:
+            void OnPropertyChanged(const PropertyInfo& prop) override;
             virtual void RenderImpl(UIRenderer &r) {};
             /// <summary>
             /// Calculates the world transformation matrix for the object.
@@ -438,6 +430,9 @@ namespace Ailu
         protected:
             APROPERTY()
             Slot _slot;
+            mutable Ref<UISlot> _slot_obj;
+            mutable bool _slot_obj_dirty = true;
+            mutable bool _legacy_slot_dirty = false;
             APROPERTY()
             Padding _padding;      // ltrb，元素内边距
             Vector4f _desired_rect;//元素所需要的rect，一般而言就是slot.pos/size

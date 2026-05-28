@@ -36,7 +36,7 @@ namespace Ailu::ECS
         ar.InsertIndent();
         ar << "_transform:";
         ar.NewLine();
-        ar << c._transform;
+        ar << c._local_transform;
         ar.DecreaseIndent();
         return ar;
     }
@@ -45,7 +45,7 @@ namespace Ailu::ECS
         String str;
         ar >> str;
         AL_ASSERT(su::BeginWith(str, "_transform"));
-        ar >> c._transform;
+        ar >> c._local_transform;
         return ar;
     }
 
@@ -457,22 +457,22 @@ namespace Ailu
     using namespace Render;
     namespace DebugDrawer
     {
-        void DebugWireframe(const ECS::CCollider &c, const Transform &t,Color color)
+        void DebugWireframe(const ECS::CCollider &c, const Matrix4x4f &mat, Color color)
         {
             if (c._type == ECS::EColliderType::kBox)
             {
-                Gizmo::DrawOBB(ECS::CCollider::AsBox(c) * t._world_matrix, color);
+                Gizmo::DrawOBB(ECS::CCollider::AsBox(c) * mat, color);
             }
             else if (c._type == ECS::EColliderType::kSphere)
             {
-                Gizmo::DrawSphere(ECS::CCollider::AsShpere(c) * t._world_matrix, color);
+                Gizmo::DrawSphere(ECS::CCollider::AsShpere(c) * mat, color);
             }
             else if (c._type == ECS::EColliderType::kCapsule)
             {
-                Gizmo::DrawCapsule(ECS::CCollider::AsCapsule(c) * t._world_matrix, color);
+                Gizmo::DrawCapsule(ECS::CCollider::AsCapsule(c) * mat, color);
             }
         }
-        void DebugWireframe(const ECS::CVXGI &c, const Transform &t, Color color)
+        void DebugWireframe(const ECS::CVXGI &c, const Matrix4x4f &mat, Color color)
         {
             // 计算每个方向上的步长
             float widthX = c._grid_size.x;//(2.0f * c._grid_size.x) / c._grid_num.x;

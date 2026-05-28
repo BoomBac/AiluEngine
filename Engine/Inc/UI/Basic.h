@@ -48,6 +48,7 @@ namespace Ailu
             f32 FontSize() const { return _font_size; }
             void FontSize(f32 size);
         private:
+            void OnPropertyChanged(const PropertyInfo& prop) override;
             void UpdateTextLayout();
             void RenderImpl(UIRenderer &r) override;
             void PostDeserialize() override;
@@ -148,6 +149,7 @@ namespace Ailu
             Vector2f MeasureDesiredSize() override;
             bool IsEditing() const { return _is_editing; }
         private:
+            void OnPropertyChanged(const PropertyInfo& prop) override;
             void RenderImpl(UIRenderer &r) final;
             void FillCursorOffsetTable();
             u32 IndexFromMouseX(f32 x);

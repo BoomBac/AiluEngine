@@ -3,9 +3,13 @@
 #include "EditorApp.h"
 #include "Framework/Common/Input.h"
 #include "UI/Basic.h"
+#include "UI/DragDrop.h"
 #include "UI/UIFramework.h"
 #include "UI/UILayer.h"
 #include "UI/UIRenderer.h"
+#include <algorithm>
+#include <cstdlib>
+#include <memory>
 #include <ranges>
 
 #include "Objects/JsonArchive.h"
@@ -14,6 +18,67 @@ namespace Ailu
 {
     namespace Editor
     {
+        namespace
+        {
+            constexpr StringView kDockLayoutCategory = "DockLayout";
+
+            void CollectDockLayoutProperties(Type *type, Vector<const PropertyInfo *> &out_properties)
+            {
+                if (type == nullptr)
+                    return;
+                CollectDockLayoutProperties(type->BaseType(), out_properties);
+                for (const auto &property : type->GetProperties())
+                {
+                    if (property.MetaInfo().GetString("Category") == kDockLayoutCategory)
+                        out_properties.push_back(&property);
+                }
+            }
+
+            void SaveDockLayoutProperties(DockWindow *window, String &out_state)
+            {
+                out_state.clear();
+                if (window == nullptr)
+                    return;
+
+                Vector<const PropertyInfo *> dock_layout_properties;
+                CollectDockLayoutProperties(window->GetType(), dock_layout_properties);
+                if (dock_layout_properties.empty())
+                    return;
+
+                JsonArchive ar;
+                for (const auto *property : dock_layout_properties)
+                    property->Serialize(window, ar);
+                out_state = ar.SaveToString();
+            }
+
+            void LoadDockLayoutProperties(DockWindow *window, const String &saved_state)
+            {
+                if (window == nullptr)
+                    return;
+
+                Vector<const PropertyInfo *> dock_layout_properties;
+                CollectDockLayoutProperties(window->GetType(), dock_layout_properties);
+                if (!saved_state.empty())
+                {
+                    JsonArchive ar;
+                    if (ar.LoadFromString(saved_state))
+                    {
+                        for (const auto *property : dock_layout_properties)
+                        {
+                            if (!ar.HasField(property->Name()))
+                                continue;
+                            property->Deserialize(window, ar);
+                        }
+                    }
+                    else
+                    {
+                        LOG_WARNING("DockManager: failed to parse dock layout state for {}", window->GetType()->FullName());
+                    }
+                }
+                window->OnDockLayoutLoaded();
+            }
+        }
+
         struct DockNode : public std::enable_shared_from_this<DockNode>
         {
             inline static constexpr f32 kSplitLineWidth = 4.0f;
@@ -36,6 +101,8 @@ namespace Ailu
             bool HoverDragArea(Vector2f pos) const;
             bool IsHoverSplitLine(Vector2f pos) const;
             void AdjustSplitRatio(f32 ratio);
+            void SetDockedWindowState(bool is_docked);
+            void NormalizeTabNode();
             Ref<DockNode> Clone() const
             {
                 auto n = MakeRef<DockNode>();
@@ -53,6 +120,78 @@ namespace Ailu
                 else if (_type == EType::kTab)
                     n->_tab = _tab;
                 return n;
+            }
+            void ResetContent()
+            {
+                _type = EType::kLeaf;
+                _left = nullptr;
+                _right = nullptr;
+                _window = nullptr;
+                _tab = nullptr;
+                _is_vertical_split = true;
+                _split_ratio = 0.5f;
+            }
+            void MoveContentFrom(DockNode *other)
+            {
+                if (other == nullptr || other == this)
+                    return;
+                _type = other->_type;
+                _left = std::move(other->_left);
+                _right = std::move(other->_right);
+                _is_vertical_split = other->_is_vertical_split;
+                _split_ratio = other->_split_ratio;
+                _window = std::move(other->_window);
+                _tab = std::move(other->_tab);
+                if (_left)
+                    _left->_parent = this;
+                if (_right)
+                    _right->_parent = this;
+                other->ResetContent();
+            }
+            Ref<DockNode> ExtractContent(DockNode *new_parent)
+            {
+                auto extracted = MakeRef<DockNode>(_own_window);
+                extracted->_parent = new_parent;
+                extracted->_position = _position;
+                extracted->_size = _size;
+                extracted->_flags = _flags & ~EDockWindowFlag::kFullSize;
+                extracted->_own_window = _own_window;
+                extracted->_is_valid = _is_valid;
+                extracted->MoveContentFrom(this);
+                return extracted;
+            }
+            static void ConfigureSplitNode(DockNode *parent, Ref<DockNode> first, Ref<DockNode> second, bool is_vertical, bool is_second_prime)
+            {
+                AL_ASSERT(parent != nullptr);
+                parent->_type = EType::kSplit;
+                parent->_window = nullptr;
+                parent->_tab = nullptr;
+                parent->_is_vertical_split = is_vertical;
+                parent->_split_ratio = 0.5f;
+                if (is_second_prime)
+                {
+                    parent->_left = second;
+                    parent->_right = first;
+                }
+                else
+                {
+                    parent->_left = first;
+                    parent->_right = second;
+                }
+                if (parent->_left)
+                    parent->_left->_parent = parent;
+                if (parent->_right)
+                    parent->_right->_parent = parent;
+            }
+            bool ContainsNode(const DockNode *node) const
+            {
+                if (node == nullptr)
+                    return false;
+                if (this == node)
+                    return true;
+                if (_type != EType::kSplit)
+                    return false;
+                return (_left && _left->ContainsNode(node)) || (_right && _right->ContainsNode(node));
             }
             void UpdateLayout(f32 dt)
             {
@@ -108,8 +247,10 @@ namespace Ailu
             {
                 if (_type == EType::kSplit)
                 {
-                    _left->Update(dt);
-                    _right->Update(dt);
+                        if (_left)
+                            _left->Update(dt);
+                        if (_right)
+                            _right->Update(dt);
                 }
                 else if (_type == EType::kTab && _tab)
                     _tab->Update(dt);
@@ -136,8 +277,10 @@ namespace Ailu
                 }
                 else if (_type == EType::kSplit)
                 {
-                    _left->SetOwnWindow(w);
-                    _right->SetOwnWindow(w);
+                        if (_left)
+                            _left->SetOwnWindow(w);
+                        if (_right)
+                            _right->SetOwnWindow(w);
                 }
                 else
                 {
@@ -145,12 +288,7 @@ namespace Ailu
                     _tab->TitleWidget()->BindOutput(new_target);
                     _tab->TitleWidget()->SetParent(w);
                     for (auto &t : *_tab)
-                    {
-                        t->ContentWidget()->BindOutput(new_target);
-                        t->TitleWidget()->BindOutput(new_target);
-                        t->ContentWidget()->SetParent(w);
-                        t->TitleWidget()->SetParent(w);
-                    }
+                        t->AttachToWindow(w);
                 }
             }
             void RemoveNode()
@@ -337,141 +475,348 @@ namespace Ailu
             inline static u32 s_global_id = 0u;
         };
 
+        static DockWindow *FindPrimaryWindow(const DockNode *node)
+        {
+            if (node == nullptr)
+                return nullptr;
+            if (node->_type == DockNode::EType::kLeaf)
+                return node->_window.get();
+            if (node->_type == DockNode::EType::kSplit)
+            {
+                if (auto *left_window = FindPrimaryWindow(node->_left.get()))
+                    return left_window;
+                return FindPrimaryWindow(node->_right.get());
+            }
+            return node->_tab ? node->_tab->ActivePrimaryWindow() : nullptr;
+        }
+
+        static void SetNodeSubtreeVisibility(DockNode *node, bool is_visible)
+        {
+            if (node == nullptr)
+                return;
+            if (node->_type == DockNode::EType::kLeaf)
+            {
+                if (node->_window)
+                {
+                    node->_window->SetTitleBarVisibility(is_visible);
+                    node->_window->SetContentVisibility(is_visible);
+                }
+                return;
+            }
+            if (node->_type == DockNode::EType::kSplit)
+            {
+                SetNodeSubtreeVisibility(node->_left.get(), is_visible);
+                SetNodeSubtreeVisibility(node->_right.get(), is_visible);
+                return;
+            }
+            if (node->_tab)
+                node->_tab->SetVisible(is_visible);
+        }
+
+        class DockNodeTabItem final : public IDockTabItem
+        {
+        public:
+            explicit DockNodeTabItem(Ref<DockNode> node) : _node(std::move(node)) {}
+
+            String GetTitle() const override
+            {
+                if (auto *primary_window = PrimaryWindow())
+                    return primary_window->GetTitle();
+                return "DockNode";
+            }
+            Vector2f Position() const override
+            {
+                return _node ? _node->_position : Vector2f::kZero;
+            }
+            Vector2f Size() const override
+            {
+                return _node ? _node->_size : Vector2f::kZero;
+            }
+            void SetRect(Vector4f rect) override
+            {
+                if (!_node)
+                    return;
+                _node->_position = rect.xy;
+                _node->_size = rect.zw;
+                _node->UpdateLayout(0.0f);
+            }
+            void Update(f32 dt) override
+            {
+                if (!_node)
+                    return;
+                _node->UpdateLayout(dt);
+                _node->Update(dt);
+            }
+            bool IsHover(Vector2f pos) const override
+            {
+                return _node && _node->IsHover(pos);
+            }
+            void SetFocus(bool is_focus) override
+            {
+                if (auto *primary_window = PrimaryWindow())
+                    primary_window->SetFocus(is_focus);
+            }
+            void SetTabActive(bool is_active) override
+            {
+                SetNodeSubtreeVisibility(_node.get(), is_active);
+            }
+            void RestoreStandaloneFromTab() override
+            {
+                SetNodeSubtreeVisibility(_node.get(), true);
+            }
+            bool ContainsWindow(DockWindow *w) const override
+            {
+                return _node && _node->ContainsWindow(w);
+            }
+            DockWindow *PrimaryWindow() const override
+            {
+                return FindPrimaryWindow(_node.get());
+            }
+            void AttachToWindow(Window *w) override
+            {
+                if (_node)
+                    _node->SetOwnWindow(w);
+            }
+
+            Ref<DockNode> Node() const { return _node; }
+
+        private:
+            Ref<DockNode> _node;
+        };
+
+        void DockNode::SetDockedWindowState(bool is_docked)
+        {
+            constexpr u32 kDockedFlags = EDockWindowFlag::kNoMove | EDockWindowFlag::kNoResize;
+            auto apply_flags = [is_docked](DockWindow *window)
+            {
+                if (window == nullptr)
+                    return;
+                if (is_docked)
+                    window->_flags |= kDockedFlags;
+                else
+                    window->_flags &= ~kDockedFlags;
+            };
+            if (_type == EType::kLeaf)
+            {
+                apply_flags(_window.get());
+            }
+            else if (_type == EType::kTab)
+            {
+                if (_tab)
+                {
+                    for (const auto &tab_item : *_tab)
+                    {
+                        if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(tab_item))
+                            split_item->Node()->SetDockedWindowState(is_docked);
+                        else
+                            apply_flags(tab_item->PrimaryWindow());
+                    }
+                }
+            }
+            else
+            {
+                if (_left)
+                    _left->SetDockedWindowState(is_docked);
+                if (_right)
+                    _right->SetDockedWindowState(is_docked);
+            }
+        }
+
+        void DockNode::NormalizeTabNode()
+        {
+            if (_type != EType::kTab || _tab == nullptr || _tab->TabCount() != 1)
+                return;
+            auto remaining_item = _tab->ActiveItem();
+            if (!remaining_item)
+                return;
+
+            if (auto remaining_window = std::dynamic_pointer_cast<DockWindow>(remaining_item))
+            {
+                _type = EType::kLeaf;
+                _window = remaining_window;
+                _tab = nullptr;
+                if (_window)
+                    _window->RestoreStandaloneFromTab();
+            }
+            else if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(remaining_item))
+            {
+                Ref<DockNode> remaining_node = split_item->Node();
+                _tab = nullptr;
+                if (remaining_node)
+                    MoveContentFrom(remaining_node.get());
+                SetNodeSubtreeVisibility(this, true);
+            }
+            const bool is_docked = _parent != nullptr || (_flags & EDockWindowFlag::kFullSize) != 0u;
+            SetDockedWindowState(is_docked);
+        }
+
         void DockNode::DockTo(DockNode *other, EDockArea area)
         {
-            //if (_type != EType::kLeaf)
-            //{
-            //    LOG_WARNING("Dock to: self must be leaf node!");
-            //    return;
-            //}
             if (area == EDockArea::kFloat)
                 return;
+            auto &dock_mgr = DockManager::Get();
+            auto self = shared_from_this();
+            auto append_to_tab = [&](DockNode *target_node, DockTab *target_tab, Window *owner) -> bool
+            {
+                if (target_node == nullptr || target_tab == nullptr)
+                    return false;
+                dock_mgr.UntrackFloatNode(this);
+                _flags &= ~EDockWindowFlag::kFullSize;
+                SetOwnWindow(owner);
+                SetDockedWindowState(true);
+
+                bool is_added = false;
+                if (_type == EType::kLeaf && _window)
+                {
+                    _window->_flags |= EDockWindowFlag::kNoMove | EDockWindowFlag::kNoResize;
+                    is_added = target_tab->AddTab(_window);
+                }
+                else if (_type == EType::kTab && _tab)
+                {
+                    for (auto &tab_item : *_tab)
+                    {
+                        if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(tab_item))
+                            split_item->Node()->_parent = target_node;
+                        is_added = target_tab->AddTabItem(tab_item) || is_added;
+                    }
+                }
+                else if (_type == EType::kSplit)
+                {
+                    _parent = target_node;
+                    is_added = target_tab->AddTabItem(MakeRef<DockNodeTabItem>(self));
+                }
+                else
+                {
+                    LOG_WARNING("DockNode::DockTo: center dock source is invalid");
+                }
+                return is_added;
+            };
+            auto dock_as_split_child = [&](DockNode *target, bool is_vertical, bool is_second_prime)
+            {
+                AL_ASSERT(target != nullptr);
+                Ref<DockNode> existing = target->ExtractContent(target);
+                dock_mgr.UntrackFloatNode(this);
+                _flags &= ~EDockWindowFlag::kFullSize;
+                SetOwnWindow(target->_own_window);
+                ConfigureSplitNode(target, existing, self, is_vertical, is_second_prime);
+                target->SetDockedWindowState(true);
+                target->UpdateLayout(0.0f);
+            };
             if (other == nullptr)//停靠至主窗口
             {
-                auto make_split_node = [](DockNode *n, bool is_vertical, bool is_prime)
+                auto &main_window = Application::Get().GetWindow();
+                const Vector2f size = Vector2f{(f32) main_window.GetWidth(), (f32) main_window.GetHeight()};
+                dock_mgr.UntrackFloatNode(this);
+                if (area == EDockArea::kCenter)
                 {
-                    auto &main_window = Application::Get().GetWindow();
-                    auto size = Vector2f{(f32) main_window.GetWidth(), (f32) main_window.GetHeight()};
-                    auto new_node = n->Clone();
-                    if (is_prime)
-                    {
-                        n->_left = new_node;
-                        n->_right = MakeRef<DockNode>();
-                        n->_right->_parent = n;
-                    }
-                    else
-                    {
-                        n->_right = new_node;
-                        n->_left = MakeRef<DockNode>();
-                        n->_left->_parent = n;
-                    }
-                    n->_type = EType::kSplit;
-                    n->_size = size;
-                    n->_position = Vector2f::kZero;
-                    n->_is_vertical_split = is_vertical;
-                    n->_window = nullptr;
-                    new_node->_parent = n;
-                };
-                if (area == EDockArea::kLeft)
-                    make_split_node(this, true, true);
-                else if (area == EDockArea::kRight)
-                    make_split_node(this, true, false);
-                else if (area == EDockArea::kTop)
-                    make_split_node(this, false, true);
-                else if (area == EDockArea::kBottom)
-                    make_split_node(this, false, false);
-                else if (area == EDockArea::kCenter)
-                {
-                    auto &main_window = Application::Get().GetWindow();
-                    _size = Vector2f{(f32) main_window.GetWidth(), (f32) main_window.GetHeight()};
+                    SetOwnWindow(&main_window);
+                    _size = size;
                     _position = Vector2f::kZero;
+                    SetDockedWindowState(true);
+                }
+                else
+                {
+                    Ref<DockNode> current_root = ExtractContent(this);
+                    auto placeholder = MakeRef<DockNode>(&main_window);
+                    placeholder->_parent = this;
+                    placeholder->_own_window = &main_window;
+                    _size = size;
+                    _position = Vector2f::kZero;
+                    ConfigureSplitNode(this,
+                                       placeholder,
+                                       current_root,
+                                       area == EDockArea::kLeft || area == EDockArea::kRight,
+                                       area == EDockArea::kLeft || area == EDockArea::kTop);
+                    SetOwnWindow(&main_window);
+                    SetDockedWindowState(true);
                 }
                 _flags |= EDockWindowFlag::kFullSize;
-                DockManager::Get()._roots.push_back(this);
+                dock_mgr.TryAddFloatNode(self);
+                dock_mgr._roots.push_back(this);
                 UpdateLayout(0.0f);
             }
             else
             {
-                const static auto make_split_node = [](DockNode *first, DockNode *second, bool is_vertical, bool is_second_prime)
+                if (area == EDockArea::kCenter)
                 {
-                    first->_type = EType::kSplit;
-                    first->_split_ratio = 0.5f;
-                    first->_is_vertical_split = is_vertical;
-
-                    first->_left = MakeRef<DockNode>();
-                    first->_left->_type = EType::kLeaf;
-                    first->_left->_window = first->_window;
-                    first->_left->_parent = first;
-                    first->_left->_split_ratio = 0.5f;
-                    first->_left->_is_vertical_split = is_vertical;
-                    if (first->_left->_window)
-                        first->_left->_window->_flags |= EDockWindowFlag::kNoMove | EDockWindowFlag::kNoResize;
-
-                    first->_right = MakeRef<DockNode>();
-                    first->_right->_type = EType::kLeaf;
-                    first->_right->_window = second->_window;
-                    if (first->_right->_window)
-                        first->_right->_window->_flags |= EDockWindowFlag::kNoMove | EDockWindowFlag::kNoResize;
-                    first->_right->_parent = first;
-                    first->_right->_split_ratio = 0.5f;
-                    first->_right->_is_vertical_split = is_vertical;
-                    first->_window = nullptr;
-                };
-
-                if (other->_type == EType::kLeaf)
-                {
-                    if (area == EDockArea::kCenter)
+                    if (other->_type == EType::kLeaf && other->_window == nullptr)
                     {
-                        if (other->_window == nullptr)
-                        {
-                            other->_window = this->_window;
-                            DockManager::Get().MarkDeleteNode(this);
-                        }
-                        else//将目标node转为tab
-                        {
-                            Ref<DockWindow> other_window = std::move(other->_window);
-                            other->_type = EType::kTab;
-                            other->_tab = MakeRef<DockTab>();
-                            other->_window = nullptr;
-                            other->_tab->AddTab(other_window);
-                            other->_tab->AddTab(_window);
-                            DockManager::Get().MarkDeleteNode(this);
-                        }
+                        dock_mgr.UntrackFloatNode(this);
+                        SetOwnWindow(other->_own_window);
+                        other->MoveContentFrom(this);
+                        other->SetDockedWindowState(other->_parent != nullptr || (other->_flags & EDockWindowFlag::kFullSize) != 0u);
+                        other->UpdateLayout(0.0f);
+                        return;
                     }
-                    else if (area == EDockArea::kLeft)
+                    if (other->_type == EType::kLeaf)
                     {
-                        make_split_node(other, this, true, true);
+                        Window *owner = other->_own_window;
+                        Ref<DockWindow> other_window = std::move(other->_window);
+                        other->_type = EType::kTab;
+                        other->_tab = MakeRef<DockTab>();
+                        other->_window = nullptr;
+                        other->_tab->AddTab(other_window);
+                        append_to_tab(other, other->_tab.get(), owner);
+                        other->SetDockedWindowState(true);
+                        other->UpdateLayout(0.0f);
+                        return;
                     }
-                    else if (area == EDockArea::kRight)
+                    if (other->_type == EType::kTab)
                     {
-                        make_split_node(other, this, true, false);
+                        append_to_tab(other, other->_tab.get(), other->_own_window);
+                        other->SetDockedWindowState(true);
+                        other->UpdateLayout(0.0f);
+                        return;
                     }
-                    else if (area == EDockArea::kTop)
-                    {
-                        make_split_node(other, this, false, true);
-                    }
-                    else if (area == EDockArea::kBottom)
-                    {
-                        make_split_node(other, this, false, false);
-                    }
+                    LOG_ERROR("DockNode::DockTo: center dock target is invalid");
+                    return;
                 }
-                else if (other->_type == EType::kTab)
-                {
-                    if (other->_tab)
-                    {
-                        if (other->_tab->AddTab(_window))
-                        {
-                            _parent = other;
-                        }
-                    }
-                    else
-                        LOG_ERROR("DockNode::DockTo: other's tab is null");
-                }
-                else
-                {
-                    AL_ASSERT(false);
-                }
+
+                dock_as_split_child(other,
+                                    area == EDockArea::kLeft || area == EDockArea::kRight,
+                                    area == EDockArea::kLeft || area == EDockArea::kTop);
             }
+        }
+
+        static bool IsFocusedNodeBlockingInteraction(DockNode *candidate, DockNode *focused_node, Vector2f local_pos)
+        {
+            if (candidate == nullptr || focused_node == nullptr)
+                return false;
+            if (candidate->ContainsNode(focused_node))
+                return false;
+            for (DockNode *node = focused_node; node != nullptr; node = node->_parent)
+            {
+                if ((node->_flags & EDockWindowFlag::kFullSize) != 0u)
+                    return false;
+            }
+            return focused_node->IsHover(local_pos);
+        }
+
+        static DockNode *ResolveWholeNodeTitleDragTarget(DockNode *node)
+        {
+            if (node == nullptr)
+                return nullptr;
+            DockNode *drag_target = node;
+            while (drag_target->_parent && drag_target->_parent->_type == DockNode::EType::kSplit &&
+                   drag_target->_parent->_left.get() == drag_target)
+            {
+                drag_target = drag_target->_parent;
+            }
+            return drag_target == node ? nullptr : drag_target;
+        }
+
+        static void FindHoverDragNode(const Ref<DockNode> &node, Vector2f pos, DockNode **out)
+        {
+            if (node == nullptr || !node->_is_valid || out == nullptr || *out != nullptr)
+                return;
+            if (node->_type == DockNode::EType::kSplit)
+            {
+                FindHoverDragNode(node->_left, pos, out);
+                FindHoverDragNode(node->_right, pos, out);
+                return;
+            }
+            if (node->HoverDragArea(pos))
+                *out = node.get();
         }
 
         u32 DockNode::HoverEdge(Vector2f pos, DockNode **out)
@@ -520,10 +865,7 @@ namespace Ailu
             }
             else if (_type == EType::kSplit)
             {
-                bool ret = false;
-                if (_left) ret |= _left->HoverDragArea(pos);
-                if (_right) ret |= _right->HoverDragArea(pos);
-                return ret;
+                return false;
             }
             return _tab->HoverDragArea(pos);
         }
@@ -592,12 +934,9 @@ namespace Ailu
 
         static void UpdateResizeMouseCursor(u32 resize_dir)
         {
-            ECursorType cursor_type = ECursorType::kArrow;
             if (!resize_dir)
-            {
-                Application::Get().SetCursor(cursor_type);
                 return;
-            }
+            ECursorType cursor_type = ECursorType::kArrow;
             // 左右
             if (resize_dir == 1 || resize_dir == 4)
                 cursor_type = ECursorType::kSizeEW;
@@ -611,6 +950,7 @@ namespace Ailu
             else if ((resize_dir & 4 && resize_dir & 2) || (resize_dir & 1 && resize_dir & 8))
                 cursor_type = ECursorType::kSizeNESW;
             Application::Get().SetCursor(cursor_type);
+            Application::Get().SetCursor(cursor_type, ECursorPriority::kHigh);
         }
         //输入屏幕鼠标坐标
         static bool IsMouseInWindow(Window *window, Vector2f pos)
@@ -656,24 +996,36 @@ namespace Ailu
             ar.Load(_dock_layout_path);
             for (auto p: DockNodeDataArray::StaticType()->GetProperties())
                 p.Deserialize(&_node_data_array, ar);
-            for (auto n: _node_data_array._node_data)
+            HashMap<u32, Ref<DockNode>> nodes_by_id;
+            u32 max_node_id = 0u;
+            for (const auto &n : _node_data_array._node_data)
             {
-                auto t = Type::Find(n._type_id);
-                if (!t)
+                max_node_id = std::max(max_node_id, n._id);
+                auto node = MakeRef<DockNode>(Application::Get().GetWindowPtr());
+                node->_id = n._id;
+                node->_position = n._position;
+                node->_size = n._size;
+                node->_flags = n._flags;
+                node->_is_vertical_split = n._is_vertical_split;
+                node->_split_ratio = n._split_ratio;
+                node->_type = static_cast<DockNode::EType>(n._type);
+
+                if (node->_type == DockNode::EType::kLeaf)
                 {
-                    LOG_ERROR("DockManager::DockManager: can't find type {}", n._type_id);
-                    continue;
-                }
-                if (n._type == (u32)DockNode::EType::kLeaf)
-                {
+                    auto t = Type::Find(n._type_id);
+                    if (!t)
+                    {
+                        LOG_ERROR("DockManager::DockManager: can't find type {}", n._type_id);
+                        continue;
+                    }
                     auto w = std::shared_ptr<DockWindow>(t->CreateInstance<DockWindow>());
                     w->SetTitle(n._title);
                     w->SetPosition(n._position);
                     w->SetSize(n._size);
                     w->_on_get_focus += [this](DockWindow *w)
                     {
-                        _focused_node = FindNodeByWindow(w);
-                        LOG_INFO("Focused dock node change to {}", _focused_node->_window ? _focused_node->_window->GetTitle() : "split/tab node");
+                        RequestFocus(w);
+                        LOG_INFO("Focused dock node change to {}", _focused_node && _focused_node->_window ? _focused_node->_window->GetTitle() : "split/tab node");
                     };
                     w->_on_lost_focus += [this](DockWindow *w)
                     {
@@ -684,36 +1036,135 @@ namespace Ailu
                         }
                     };
                     //same with AddDock
-                    UI::UIManager::Get()->RegisterWidget(w->_title_widget);
-                    UI::UIManager::Get()->RegisterWidget(w->_content_widget);
-                    auto leaf_node = MakeRef<DockNode>(Application::Get().GetWindowPtr());
-                    leaf_node->_window = w;
-                    leaf_node->_position = w->_position;
-                    leaf_node->_size = w->_size;
-                    leaf_node->_flags = n._flags;
-                    if (n._window_id != 0)
-                    {
-                        auto window = CreateNewWindow(w->GetTitle(), (u16) n._window_size.x, (u16) n._window_size.y, true);
-                        leaf_node->SetOwnWindow(window);
-                        window->SetPosition((i32) n._window_position.x, (i32) n._window_position.y);
-                    }
-                    TryAddFloatNode(leaf_node);
-                    if (leaf_node->_flags & EDockWindowFlag::kFullSize)
-                        _roots.push_back(leaf_node.get());
+                    UI::UIManager::Get()->RegisterWidget(w->TitleWidgetRef());
+                    UI::UIManager::Get()->RegisterWidget(w->ContentWidgetRef());
+                    LoadDockLayoutProperties(w.get(), n._window_state);
+                    node->_window = w;
+                }
+                else if (node->_type == DockNode::EType::kTab)
+                {
+                    node->_tab = MakeRef<DockTab>();
+                }
+                else if (node->_type != DockNode::EType::kSplit)
+                {
+                    LOG_WARNING("DockManager::DockManager: {} unknown node type {}", n._title, n._type);
+                    continue;
+                }
+                nodes_by_id[n._id] = node;
+            }
+            DockNode::s_global_id = std::max(DockNode::s_global_id, max_node_id + 1u);
+
+            auto attach_split_child = [](DockNode *parent, const Ref<DockNode> &child)
+            {
+                if (parent == nullptr || child == nullptr)
+                    return;
+                child->_parent = parent;
+                const bool place_left = parent->_is_vertical_split
+                                             ? child->_position.x <= parent->_position.x + parent->_size.x * parent->_split_ratio
+                                             : child->_position.y <= parent->_position.y + parent->_size.y * parent->_split_ratio;
+                if (place_left)
+                {
+                    if (!parent->_left)
+                        parent->_left = child;
+                    else
+                        parent->_right = child;
                 }
                 else
-                    LOG_WARNING("DockManager::DockManager: {} unknown node type {}", n._title,n._type);
+                {
+                    if (!parent->_right)
+                        parent->_right = child;
+                    else
+                        parent->_left = child;
+                }
+            };
+
+            for (const auto &n : _node_data_array._node_data)
+            {
+                auto node_it = nodes_by_id.find(n._id);
+                if (node_it == nodes_by_id.end())
+                    continue;
+                auto node = node_it->second;
+                if (n._parent_id == UINT32_MAX)
+                    continue;
+
+                auto parent_it = nodes_by_id.find(n._parent_id);
+                if (parent_it == nodes_by_id.end())
+                {
+                    LOG_WARNING("DockManager::DockManager: missing parent {} for node {}", n._parent_id, n._id);
+                    continue;
+                }
+                auto parent = parent_it->second;
+                if (parent->_type == DockNode::EType::kSplit)
+                {
+                    attach_split_child(parent.get(), node);
+                }
+                else if (parent->_type == DockNode::EType::kTab)
+                {
+                    node->_parent = parent.get();
+                    if (node->_type == DockNode::EType::kLeaf && node->_window)
+                    {
+                        parent->_tab->AddTab(node->_window);
+                    }
+                    else
+                    {
+                        parent->_tab->AddTabItem(MakeRef<DockNodeTabItem>(node));
+                    }
+                }
             }
+
+            for (const auto &n : _node_data_array._node_data)
+            {
+                if (n._parent_id != UINT32_MAX)
+                    continue;
+                auto node_it = nodes_by_id.find(n._id);
+                if (node_it == nodes_by_id.end())
+                    continue;
+                auto node = node_it->second;
+                if (n._window_id != 0)
+                {
+                    auto window = CreateNewWindow(n._title.empty() ? "DockWindow" : n._title,
+                                                  (u16) n._window_size.x,
+                                                  (u16) n._window_size.y,
+                                                  true);
+                    node->SetOwnWindow(window);
+                    window->SetPosition((i32) n._window_position.x, (i32) n._window_position.y);
+                }
+                else
+                {
+                    node->SetOwnWindow(Application::Get().GetWindowPtr());
+                }
+                TryAddFloatNode(node);
+                if (node->_flags & EDockWindowFlag::kFullSize)
+                    _roots.push_back(node.get());
+            }
+
+            for (const auto &n : _node_data_array._node_data)
+            {
+                if (n._type != (u32) DockNode::EType::kTab || n._tab_id.empty())
+                    continue;
+                auto node_it = nodes_by_id.find(n._id);
+                if (node_it == nodes_by_id.end() || !node_it->second->_tab || node_it->second->_tab->TabCount() == 0)
+                    continue;
+                const i32 max_index = node_it->second->_tab->TabCount() - 1;
+                const i32 active_index = std::clamp((i32) std::atoi(n._tab_id.c_str()), 0, max_index);
+                node_it->second->_tab->SetActiveIndex(active_index);
+            }
+            for (auto &[window, nodes] : _float_nodes)
+                NormalizeWindowWidgetOrder(window);
         }
         
         DockManager::~DockManager()
         {
             _node_data_array._node_data.clear();
+            _next_serialize_node_id = DockNode::s_global_id;
             for (auto& it: _float_nodes)
             {
                 auto &[w, nodes] = it;
                 for (auto& n : nodes)
-                    WriteNodeData(n.get());
+                {
+                    if (n && n->_is_valid)
+                        WriteNodeData(n.get());
+                }
             }
             JsonArchive ar;
             for (auto p : DockNodeDataArray::StaticType()->GetProperties())
@@ -724,15 +1175,15 @@ namespace Ailu
         }
         void DockManager::AddDock(Ref<DockWindow> dock)
         {
-            UI::UIManager::Get()->RegisterWidget(dock->_title_widget);
-            UI::UIManager::Get()->RegisterWidget(dock->_content_widget);
+            UI::UIManager::Get()->RegisterWidget(dock->TitleWidgetRef());
+            UI::UIManager::Get()->RegisterWidget(dock->ContentWidgetRef());
 
             auto leaf_node = MakeRef<DockNode>();
             leaf_node->_window = dock;
-            leaf_node->_position = dock->_position;
-            leaf_node->_size = dock->_size;
+            leaf_node->_position = dock->Position();
+            leaf_node->_size = dock->Size();
             dock->_on_get_focus += [this](DockWindow* w) {
-                _focused_node = FindNodeByWindow(w);
+                RequestFocus(w);
                 LOG_INFO("Focused dock node changed!");
             };
             TryAddFloatNode(leaf_node);
@@ -761,6 +1212,7 @@ namespace Ailu
         }
         static void DrawTreeNode(DockNode *node, int depth, int &row)
         {
+            return;
             //if (!node) return;
 
             static const char *s_type_str[] = {"Split", "Tab", "Leaf"};
@@ -853,7 +1305,7 @@ namespace Ailu
 
         static void FindFloatWindow(DockNode *node, DockWindow *w, DockNode **out)
         {
-            if (!node)
+            if (!node || !node->_is_valid)
                 return;
             if (node->_type == DockNode::EType::kLeaf)
             {
@@ -881,8 +1333,10 @@ namespace Ailu
         {
             if (_floating_preview_node || _resizing_edge_dir)
                 return;
+            DockNode *source_node = nullptr;
             _floating_preview_window = w;
             _is_any_floating = true;
+            _is_floating_whole_node = false;
             _floating_preview_node = nullptr;
             _is_float_on_cancel_area = false;
             for (auto &it: _float_nodes)
@@ -890,16 +1344,27 @@ namespace Ailu
                 auto &[window, nodes] = it;
                 for (auto &n: nodes)
                 {
-                    FindFloatWindow(n.get(), w, &_floating_preview_node);
-                    if (_floating_preview_node)
+                    FindFloatWindow(n.get(), w, &source_node);
+                    if (source_node)
                         break;
                 }
+                if (source_node)
+                    break;
             }
-            if (_floating_preview_node)
+            if (source_node)
             {
-                _float_node_start_pos = Input::GetMousePos();
+                if (DockNode *whole_node = ResolveWholeNodeTitleDragTarget(source_node))
+                {
+                    _floating_preview_node = whole_node;
+                    _is_floating_whole_node = true;
+                }
+                else
+                {
+                    _floating_preview_node = source_node;
+                }
+                _float_node_start_pos = Input::GetMousePos(_floating_preview_node->_own_window);
                 _is_float_node_external_window = _floating_preview_node->_own_window != &Application::Get().GetWindow();
-                LOG_INFO("DockManager::BeginFloatWindow: {}", w->_title->GetText());
+                LOG_INFO("DockManager::BeginFloatWindow: {}{}", w->GetTitle(), _is_floating_whole_node ? " (whole split)" : "");
             }
             else
             {
@@ -911,21 +1376,90 @@ namespace Ailu
         {
             if (_floating_preview_node || _resizing_edge_dir)
                 return;
-            if (w->_type != DockNode::EType::kLeaf)
+            if (w == nullptr || w->IsEmpty())
                 return;
-            _floating_preview_window = w->_window.get();
+            if (w->_type == DockNode::EType::kLeaf)
+                _floating_preview_window = w->_window.get();
+            else if (w->_type == DockNode::EType::kTab && w->_tab && w->_tab->TabCount() > 0)
+                _floating_preview_window = w->_tab->ActivePrimaryWindow();
+            else
+                _floating_preview_window = nullptr;
             _is_any_floating = true;
+            _is_floating_whole_node = true;
             _floating_preview_node = w;
             _is_float_on_cancel_area = false;
             _float_node_start_pos = Input::GetMousePos(w->_own_window);
             _is_float_node_external_window = w->_own_window != &Application::Get().GetWindow();
-            LOG_INFO("DockManager::BeginFloatWindow: {}", w->_window->_title->GetText());
+            LOG_INFO("DockManager::BeginFloatNode: {}", _floating_preview_window ? _floating_preview_window->GetTitle() : "composite");
         }
 
         void DockManager::EndFloatWindow(Vector2f drop_pos)
         {
             if (!_floating_preview_node)
                 return;
+            auto make_node_from_tab_item = [&](const Ref<IDockTabItem> &tab_item) -> Ref<DockNode>
+            {
+                if (!tab_item)
+                    return nullptr;
+                if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(tab_item))
+                {
+                    auto new_node = split_item->Node();
+                    new_node->_parent = nullptr;
+                    new_node->_position = drop_pos;
+                    new_node->_size = split_item->Size();
+                    new_node->SetDockedWindowState(false);
+                    return new_node;
+                }
+                if (auto window_item = std::dynamic_pointer_cast<DockWindow>(tab_item))
+                {
+                    auto new_node = MakeRef<DockNode>();
+                    new_node->_position = drop_pos;
+                    new_node->_size = window_item->Size();
+                    new_node->_window = window_item;
+                    new_node->SetDockedWindowState(false);
+                    return new_node;
+                }
+                return nullptr;
+            };
+            auto detach_active_tab = [&](DockNode *tab_node, bool &out_is_tab_empty) -> Ref<DockNode>
+            {
+                AL_ASSERT(tab_node != nullptr && tab_node->_type == DockNode::EType::kTab && tab_node->_tab != nullptr);
+                Ref<IDockTabItem> active_item = tab_node->_tab->RemoveActiveItem();
+                out_is_tab_empty = tab_node->_tab->TabCount() == 0;
+                tab_node->NormalizeTabNode();
+                return make_node_from_tab_item(active_item);
+            };
+            auto finish_float = [&]()
+            {
+                _floating_preview_window = nullptr;
+                _floating_preview_node = nullptr;
+                _is_any_floating = false;
+                _is_float_on_cancel_area = false;
+                _can_draw_float_preview = false;
+                _is_floating_whole_node = false;
+                LOG_INFO("DockManager::EndFloatWindow: at pos: {}", drop_pos.ToString());
+            };
+            if (_is_floating_whole_node)
+            {
+                const bool is_hover_self = _dock_quad_hover_node == _floating_preview_node ||
+                                           (_floating_preview_node->_type == DockNode::EType::kSplit &&
+                                            _floating_preview_node->ContainsNode(_dock_quad_hover_node));
+                if (_dock_quad_hover_node && !is_hover_self)
+                {
+                    if (_dock_quad_hover_area != EDockArea::kFloat)
+                    {
+                        if (_floating_preview_node->_parent)
+                            DetachFromTree(_floating_preview_node);
+                        _floating_preview_node->DockTo(_dock_quad_hover_node, _dock_quad_hover_area);
+                    }
+                }
+                else if (_dock_quad_hover_area != EDockArea::kFloat)
+                {
+                    _floating_preview_node->DockTo(nullptr, _dock_quad_hover_area);
+                }
+                finish_float();
+                return;
+            }
             if (_dock_quad_hover_node)
             {
                 if (_floating_preview_node->_type == DockNode::EType::kLeaf)
@@ -961,12 +1495,8 @@ namespace Ailu
                         if (!_is_float_on_cancel_area)
                         {
                             LOG_INFO("DockManager::EndFloatWindow: detach self...");
-                            Ref<DockWindow> active_tab = _floating_preview_node->_tab->ActiveTab();
-                            const bool is_tab_empty = _floating_preview_node->_tab->RemoveTab(active_tab.get());
-                            auto new_node = MakeRef<DockNode>();
-                            new_node->_position = drop_pos;
-                            new_node->_size = active_tab->_size;
-                            new_node->_window = active_tab;
+                            bool is_tab_empty = false;
+                            auto new_node = detach_active_tab(_floating_preview_node, is_tab_empty);
                             TryAddFloatNode(new_node);
                             if (is_tab_empty)
                                 DetachFromTree(_floating_preview_node);
@@ -974,12 +1504,8 @@ namespace Ailu
                     }
                     else
                     {
-                        Ref<DockWindow> active_tab = _floating_preview_node->_tab->ActiveTab();
-                        const bool is_tab_empty = _floating_preview_node->_tab->RemoveTab(active_tab.get());
-                        auto new_node = MakeRef<DockNode>();
-                        new_node->_position = drop_pos;
-                        new_node->_size = active_tab->_size;
-                        new_node->_window = active_tab;
+                        bool is_tab_empty = false;
+                        auto new_node = detach_active_tab(_floating_preview_node, is_tab_empty);
                         new_node->DockTo(_dock_quad_hover_node, _dock_quad_hover_area);
                         if (is_tab_empty)
                             DetachFromTree(_floating_preview_node);
@@ -988,7 +1514,7 @@ namespace Ailu
                 }
                 else
                 {
-                    LOG_ERROR("DockManager::EndFloatWindow dock to split node not allow")
+                    LOG_ERROR("DockManager::EndFloatWindow dock to split node not allow");
                 }
             }
             else
@@ -1004,12 +1530,8 @@ namespace Ailu
                     }
                     else if (_floating_preview_node->_type == DockNode::EType::kTab)
                     {
-                        Ref<DockWindow> active_tab = _floating_preview_node->_tab->ActiveTab();
-                        const bool is_tab_empty = _floating_preview_node->_tab->RemoveTab(active_tab.get());
-                        auto new_node = MakeRef<DockNode>();
-                        new_node->_position = drop_pos;
-                        new_node->_size = active_tab->_size;
-                        new_node->_window = active_tab;
+                        bool is_tab_empty = false;
+                        auto new_node = detach_active_tab(_floating_preview_node, is_tab_empty);
                         if (is_tab_empty)
                             DetachFromTree(_floating_preview_node);
                         if (_dock_quad_hover_area != EDockArea::kFloat)
@@ -1024,12 +1546,8 @@ namespace Ailu
                 {
                     if (_floating_preview_node->_type == DockNode::EType::kTab)
                     {
-                        Ref<DockWindow> active_tab = _floating_preview_node->_tab->ActiveTab();
-                        const bool is_tab_empty = _floating_preview_node->_tab->RemoveTab(active_tab.get());
-                        auto new_node = MakeRef<DockNode>();
-                        new_node->_position = drop_pos;
-                        new_node->_size = active_tab->_size;
-                        new_node->_window = active_tab;
+                        bool is_tab_empty = false;
+                        auto new_node = detach_active_tab(_floating_preview_node, is_tab_empty);
                         if (is_tab_empty)
                             MarkDeleteNode(_floating_preview_node);
                         if (_dock_quad_hover_area != EDockArea::kFloat)
@@ -1041,15 +1559,15 @@ namespace Ailu
                         if (_dock_quad_hover_area != EDockArea::kFloat)
                             _floating_preview_node->DockTo(nullptr, _dock_quad_hover_area);
                     }
+                    else if (_floating_preview_node->_type == DockNode::EType::kSplit)
+                    {
+                        if (_dock_quad_hover_area != EDockArea::kFloat)
+                            _floating_preview_node->DockTo(nullptr, _dock_quad_hover_area);
+                    }
                     else { AL_ASSERT(false); }
                 }
             }
-            _floating_preview_window = nullptr;
-            _floating_preview_node = nullptr;
-            _is_any_floating = false;
-            _is_float_on_cancel_area = false;
-            _can_draw_float_preview = false;
-            LOG_INFO("DockManager::EndFloatWindow: at pos: {}", drop_pos.ToString());
+            finish_float();
         }
 
         void DockManager::MarkDeleteNode(DockNode *node)
@@ -1067,7 +1585,7 @@ namespace Ailu
                 gpos.y -= (f32) y;
                 return gpos;
             };
-            if (!node)
+            if (!node || !node->_is_valid)
                 return;
             if (node->_type == DockNode::EType::kLeaf)
             {
@@ -1100,9 +1618,17 @@ namespace Ailu
                 auto &[window, nodes] = it;
                 for (auto &node: nodes)
                 {
+                    if (!node || !node->_is_valid)
+                        continue;
                     FindHoverLeafNode(node.get(), pos, &_dock_quad_hover_node);
                     if (_dock_quad_hover_node)
                     {
+                        if (_floating_preview_node->_type == DockNode::EType::kSplit &&
+                            _floating_preview_node->ContainsNode(_dock_quad_hover_node))
+                        {
+                            _dock_quad_hover_node = nullptr;
+                            continue;
+                        }
                         if (_is_float_node_external_window && _dock_quad_hover_node == _floating_preview_node)
                         {
                             _dock_quad_hover_node = nullptr;
@@ -1222,7 +1748,7 @@ namespace Ailu
 
         static void FindHoverSplitNode(Ref<DockNode> node, Vector2f pos, DockNode **out)
         {
-            if (node == nullptr || node->_type != DockNode::EType::kSplit)
+            if (node == nullptr || !node->_is_valid || node->_type != DockNode::EType::kSplit)
                 return;
             FindHoverSplitNode(node->_left, pos, out);
             if (*out != nullptr)
@@ -1234,8 +1760,14 @@ namespace Ailu
 
         void DockManager::HandleNodeResize()
         {
-            if (Input::IsInputBlock())
+            if (UI::DragDropManager::Get().GetPayload().has_value())
+            {
+                _resizing_node = nullptr;
+                _adj_split_node = nullptr;
+                _drag_move_node = nullptr;
+                _resizing_edge_dir = 0u;
                 return;
+            }
             bool can_resize = _adj_split_node == nullptr && _drag_move_node == nullptr && UI::UIManager::Get()->_capture_target == nullptr;
             bool can_adjust_split = _resizing_node == nullptr && _drag_move_node == nullptr;
             bool can_drag_move = _resizing_node == nullptr && _adj_split_node == nullptr;
@@ -1278,10 +1810,12 @@ namespace Ailu
                             continue;
                         for (auto &n: nodes)
                         {
+                            if (!n || !n->_is_valid)
+                                continue;
                             if (n->_flags & EDockWindowFlag::kNoResize)
                                 continue;
                             Vector2f pos = Input::GetMousePos(window);
-                            if (_focused_node && _focused_node != n.get() && _focused_node->IsHover(pos))
+                            if (IsFocusedNodeBlockingInteraction(n.get(), _focused_node, pos))
                                 continue;
                             _resizing_edge_dir = n->HoverEdge(pos, &edge_hover_node);
                             if (_resizing_edge_dir != 0u)
@@ -1341,17 +1875,21 @@ namespace Ailu
                             continue;
                         for (auto &n: nodes)
                         {
+                            if (!n || !n->_is_valid)
+                                continue;
                             DockNode *tmp = nullptr;
                             Vector2f pos = Input::GetMousePos(window);
-                            if (_focused_node && _focused_node != n.get() && _focused_node->IsHover(pos))
+                            if (IsFocusedNodeBlockingInteraction(n.get(), _focused_node, pos))
                                 continue;
                             FindHoverSplitNode(n, pos, &tmp);
                             if (tmp)
                             {
+                                LOG_INFO("Hover split node: {}, vertical: {}", tmp->_id, tmp->_is_vertical_split);
                                 UpdateResizeMouseCursor(tmp->_is_vertical_split ? EHoverEdgeDir::kLeft : EHoverEdgeDir::kTop);
-                                if (Input::IsKeyJustPressed(EKey::kLBUTTON))
+                                if (Input::IsKeyDown(EKey::kLBUTTON))
                                 {
                                     _adj_split_node = tmp;
+                                    LOG_INFO("Begin adjust split node: {}, vertical: {}", _adj_split_node->_id, _adj_split_node->_is_vertical_split);
                                     break;
                                 }
                             }
@@ -1373,14 +1911,17 @@ namespace Ailu
                         Vector2f wsize = {(f32) _drag_move_node->_own_window->GetWidth(), (f32) _drag_move_node->_own_window->GetHeight()};
                         if (pos.x < 0.0f || pos.y < 0.0f || pos.x > wsize.x || pos.y > wsize.y)
                         {
+                            auto drag_node = _drag_move_node->shared_from_this();
                             f32 dx = pos.x - _drag_move_node->_position.x;
                             u16 ww = (u16) _drag_move_node->_size.x, wh = (u16) _drag_move_node->_size.y;
                             auto new_window = CreateNewWindow("DockWindow", ww, wh);
                             auto gm_pos = Input::GetGlobalMousePos();
                             new_window->SetPosition((i32) (gm_pos.x - dx), (i32) gm_pos.y);
+                            UntrackFloatNode(_drag_move_node);
                             _drag_move_node->SetOwnWindow(new_window);
                             _drag_move_node->_position = Vector2f::kZero;
                             _drag_move_node->_flags |= EDockWindowFlag::kNoMove | EDockWindowFlag::kNoResize | EDockWindowFlag::kFullSize;
+                            TryAddFloatNode(drag_node);
                             _roots.push_back(_drag_move_node);
                             if (_drag_move_node->_window)
                             {
@@ -1409,19 +1950,27 @@ namespace Ailu
                             continue;
                         for (auto &n: nodes)
                         {
+                            if (!n || !n->_is_valid)
+                                continue;
                             if (n->_flags & EDockWindowFlag::kNoMove)
                                 continue;
                             Vector2f pos = Input::GetMousePos(n->_own_window);
-                            if (_focused_node && _focused_node != n.get() && _focused_node->IsHover(pos))
+                            if (IsFocusedNodeBlockingInteraction(n.get(), _focused_node, pos))
                                 continue;
-                            if (n->HoverDragArea(pos) && Input::IsKeyJustPressed(EKey::kLBUTTON))
+                            DockNode *drag_hover_node = nullptr;
+                            FindHoverDragNode(n, pos, &drag_hover_node);
+                            if (drag_hover_node && Input::IsKeyDown(EKey::kLBUTTON))
                             {
-                                _drag_move_node = n.get();
-                                _drag_start_offset = n->_position - pos;
-                                if (n->_window)
+                                DockNode *drag_target = n->_type == DockNode::EType::kSplit
+                                                            ? n.get()
+                                                            : drag_hover_node;
+                                _drag_move_node = drag_target;
+                                _drag_start_offset = drag_target->_position - pos;
+                                _float_node_start_pos = Input::GetGlobalMousePos();
+                                if (drag_hover_node->_window)
                                 {
-                                    n->_window->SetFocus(true);
-                                    _focused_node = n.get();
+                                    drag_hover_node->_window->SetFocus(true);
+                                    _focused_node = drag_hover_node;
                                 }
                                 break;
                             }
@@ -1439,6 +1988,7 @@ namespace Ailu
                                            { return n.get() == e.get(); });
             if (it == nodes.end())
                 nodes.push_back(n);
+            NormalizeWindowWidgetOrder(n->_own_window);
         }
         void DockManager::TryRemoveFloatNode(DockNode *n)
         {
@@ -1447,6 +1997,15 @@ namespace Ailu
                 std::erase_if(_float_nodes[n->_own_window], [&](Ref<DockNode> e) -> bool
                                                { return n == e.get(); });
             }
+        }
+        void DockManager::UntrackFloatNode(DockNode *n)
+        {
+            if (n == nullptr)
+                return;
+            TryRemoveFloatNode(n);
+            std::erase_if(_roots, [&](DockNode *root) -> bool
+                          { return root == n; });
+            n->_flags &= ~EDockWindowFlag::kFullSize;
         }
         void DockManager::DetachFromTree(DockNode *n)
         {
@@ -1480,6 +2039,8 @@ namespace Ailu
                         parent->_left.reset();
                         parent->_right.reset();
                         cur_ref->_parent = nullptr;
+                        cur_ref->_flags &= ~EDockWindowFlag::kFullSize;
+                        cur_ref->SetDockedWindowState(false);
                         TryAddFloatNode(cur_ref);
                         if (auto grand_parent = parent->_parent)
                         {
@@ -1493,8 +2054,14 @@ namespace Ailu
                         else// parent is root
                         {
                             sibling->_parent = nullptr;
+                            sibling->_flags |= parent->_flags & EDockWindowFlag::kFullSize;
+                            sibling->SetDockedWindowState((sibling->_flags & EDockWindowFlag::kFullSize) != 0u);
                             if (!sibling->IsEmpty())
+                            {
                                 TryAddFloatNode(sibling);
+                                if ((sibling->_flags & EDockWindowFlag::kFullSize) != 0u)
+                                    _roots.push_back(sibling.get());
+                            }
                             TryRemoveFloatNode(parent);
                             parent->_flags &= ~EDockWindowFlag::kFullSize;
                             std::erase_if(_roots, [&](DockNode *n) -> bool
@@ -1526,6 +2093,8 @@ namespace Ailu
                             TryRemoveFloatNode(parent);
                         }
                         cur_ref->_parent = nullptr;
+                        cur_ref->_flags &= ~EDockWindowFlag::kFullSize;
+                        cur_ref->SetDockedWindowState(false);
                         TryAddFloatNode(cur_ref);
                         cur_ref->_position = mouse_pos;
                     }
@@ -1581,6 +2150,8 @@ namespace Ailu
                     auto [mw_w, mw_h] = main_window->GetWindowSize();
                     for (auto &n: _float_nodes[e._window])
                     {
+                        if (!n || !n->_is_valid)
+                            continue;
                         if (n->_own_window != main_window && n->_own_window == Application::FocusedWindow())
                         {
                             if (Input::IsKeyDown(EKey::kLBUTTON))
@@ -1614,10 +2185,10 @@ namespace Ailu
         
         void DockManager::WriteNodeData(DockNode *n)
         {
-            if (!n)
+            if (!n || !n->_is_valid)
                 return;
             DockNodeData data;
-            data._type_id = n->_type == DockNode::EType::kLeaf ? n->_window->GetType()->FullName() : "null";
+            data._type_id = n->_type == DockNode::EType::kLeaf && n->_window ? n->_window->GetType()->FullName() : "null";
             data._id = n->_id;
             data._parent_id = n->_parent ? n->_parent->_id : UINT32_MAX;
             data._type = static_cast<u32>(n->_type);
@@ -1630,14 +2201,50 @@ namespace Ailu
             data._window_position = {(f32) wx, (f32)wy};
             auto [ww, wh] = n->_own_window->GetWindowSize();
             data._window_size = {(f32) ww, (f32) wh};
-            data._title = n->_type == DockNode::EType::kLeaf ? n->_window->GetTitle() : "null";
+            data._title = n->_type == DockNode::EType::kLeaf && n->_window ? n->_window->GetTitle() : "null";
             data._window_id = n->_own_window == Application::Get().GetWindowPtr() ? 0u : 999u;
-            data._tab_id = n->_tab ? "tab" : "";
+            data._tab_id = n->_tab ? std::to_string(n->_tab->ActiveIndex()) : "";
+            if (n->_type == DockNode::EType::kLeaf && n->_window)
+                SaveDockLayoutProperties(n->_window.get(), data._window_state);
             _node_data_array._node_data.push_back(data);
             if (n->_type == DockNode::EType::kSplit)
             {
                 WriteNodeData(n->_left.get());
                 WriteNodeData(n->_right.get());
+            }
+            else if (n->_type == DockNode::EType::kTab && n->_tab)
+            {
+                for (const auto &tab_item : *n->_tab)
+                {
+                    if (auto tab_window = std::dynamic_pointer_cast<DockWindow>(tab_item))
+                    {
+                        DockNodeData child;
+                        child._type_id = tab_window->GetType()->FullName();
+                        child._id = _next_serialize_node_id++;
+                        child._parent_id = n->_id;
+                        child._type = static_cast<u32>(DockNode::EType::kLeaf);
+                        child._is_vertical_split = true;
+                        child._split_ratio = 0.5f;
+                        child._title = tab_window->GetTitle();
+                        child._window_id = data._window_id;
+                        child._tab_id = "";
+                        child._window_position = data._window_position;
+                        child._window_size = data._window_size;
+                        child._position = n->_position;
+                        child._size = n->_size;
+                        child._flags = tab_window->_flags;
+                        SaveDockLayoutProperties(tab_window.get(), child._window_state);
+                        _node_data_array._node_data.push_back(child);
+                    }
+                    else if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(tab_item))
+                    {
+                        auto split_node = split_item->Node();
+                        DockNode *old_parent = split_node->_parent;
+                        split_node->_parent = n;
+                        WriteNodeData(split_node.get());
+                        split_node->_parent = old_parent;
+                    }
+                }
             }
         }
         Window *DockManager::CreateNewWindow(String title, u16 ww, u16 wh, bool is_sync)
@@ -1657,10 +2264,107 @@ namespace Ailu
             Render::GraphicsContext::Get().RegisterWindow(new_window);
             return new_window;
         }
+
+        void DockManager::BringNodeWidgetsToFront(DockNode *node)
+        {
+            if (node == nullptr)
+                return;
+            auto *ui_manager = UI::UIManager::Get();
+            switch (node->_type)
+            {
+            case DockNode::EType::kLeaf:
+                if (node->_window)
+                {
+                    ui_manager->BringToFrontSilently(node->_window->ContentWidget());
+                    ui_manager->BringToFrontSilently(node->_window->TitleWidget());
+                }
+                break;
+            case DockNode::EType::kSplit:
+                BringNodeWidgetsToFront(node->_left.get());
+                BringNodeWidgetsToFront(node->_right.get());
+                break;
+            case DockNode::EType::kTab:
+                if (node->_tab)
+                {
+                    if (auto active_item = node->_tab->ActiveItem())
+                    {
+                        if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(active_item))
+                            BringNodeWidgetsToFront(split_item->Node().get());
+                        else if (auto *primary_window = active_item->PrimaryWindow())
+                        {
+                            ui_manager->BringToFrontSilently(primary_window->ContentWidget());
+                            ui_manager->BringToFrontSilently(primary_window->TitleWidget());
+                        }
+                    }
+                    ui_manager->BringToFrontSilently(node->_tab->TitleWidget());
+                }
+                break;
+            default:
+                break;
+            }
+        }
+
+        void DockManager::SendNodeWidgetsToBack(DockNode *node)
+        {
+            if (node == nullptr)
+                return;
+            auto *ui_manager = UI::UIManager::Get();
+            switch (node->_type)
+            {
+            case DockNode::EType::kLeaf:
+                if (node->_window)
+                {
+                    ui_manager->SendToBack(node->_window->TitleWidget());
+                    ui_manager->SendToBack(node->_window->ContentWidget());
+                }
+                break;
+            case DockNode::EType::kSplit:
+                SendNodeWidgetsToBack(node->_right.get());
+                SendNodeWidgetsToBack(node->_left.get());
+                break;
+            case DockNode::EType::kTab:
+                if (node->_tab)
+                {
+                    ui_manager->SendToBack(node->_tab->TitleWidget());
+                    if (auto active_item = node->_tab->ActiveItem())
+                    {
+                        if (auto split_item = std::dynamic_pointer_cast<DockNodeTabItem>(active_item))
+                            SendNodeWidgetsToBack(split_item->Node().get());
+                        else if (auto *primary_window = active_item->PrimaryWindow())
+                        {
+                            ui_manager->SendToBack(primary_window->TitleWidget());
+                            ui_manager->SendToBack(primary_window->ContentWidget());
+                        }
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+        }
+
+        void DockManager::NormalizeWindowWidgetOrder(Window *window)
+        {
+            if (window == nullptr)
+                return;
+            auto it = _float_nodes.find(window);
+            if (it == _float_nodes.end())
+                return;
+            for (auto &node : it->second)
+            {
+                if (node && (node->_flags & EDockWindowFlag::kFullSize) != 0u)
+                    SendNodeWidgetsToBack(node.get());
+            }
+        }
         
         void DockManager::RequestFocus(DockWindow *w)
         {
             _focused_node = FindNodeByWindow(w);
+            if (_focused_node == nullptr)
+                return;
+            if ((_focused_node->_flags & EDockWindowFlag::kFullSize) == 0u)
+                BringNodeWidgetsToFront(_focused_node);
+            NormalizeWindowWidgetOrder(_focused_node->_own_window);
         }
         DockNode *DockManager::FindNodeByWindow(DockWindow *w)
         {

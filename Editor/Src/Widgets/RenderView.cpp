@@ -1,4 +1,4 @@
-﻿#include "Widgets/RenderView.h"
+#include "Widgets/RenderView.h"
 #include "UI/Basic.h"
 #include "UI/Container.h"
 #include "Render/Camera.h"
@@ -152,7 +152,6 @@ namespace Ailu
                         {
                             LOG_INFO("Pick entity: {},subidex: {} on pos {}", closest_entity, submesh_index, local_pos.ToString());
                             Selection::AddAndRemovePreSelection(closest_entity,submesh_index);
-                            _transform_gizmo->SetTarget(SceneMgr::Get().ActiveScene(), closest_entity);
                             ray_trace->_debug_pos = local_pos;
                         });
                     }
@@ -176,6 +175,10 @@ namespace Ailu
                 else if (e._key_code == EKey::kR)
                 {
                     _transform_gizmo->SetMode(EGizmoMode::kScale);
+                }
+                else if (e._key_code == EKey::kQ && !Input::IsKeyDown(EKey::kRBUTTON))
+                {
+                    _transform_gizmo->ToggleSpace();
                 }
                 else if (e._key_code == EKey::kSHIFT)
                 {
@@ -211,7 +214,7 @@ namespace Ailu
                     mats.push_back(mat? mat : Render::Material::s_checker.lock());
                 }
                 auto new_entity = SceneMgr::Get().ActiveScene()->AddObject(_drag_preview_mesh, mats);
-                SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_transform._position = _drag_preview_pos;
+                SceneMgr::Get().ActiveScene()->GetRegister().GetComponent<ECS::TransformComponent>(new_entity)->_local_transform._position = _drag_preview_pos;
             };
             _source->SetDropHandler(handler);
         }

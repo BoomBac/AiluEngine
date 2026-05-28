@@ -5,6 +5,6 @@
         "_asset_type": "Ailu::Render::Texture2D",
         "_asset_name": "spot_light"
     },
-    "_is_srgb": true,
-    "_file": "Icons/spot_light.png"
+    "_file": "Icons/spot_light.png",
+    "_is_srgb": true
 }

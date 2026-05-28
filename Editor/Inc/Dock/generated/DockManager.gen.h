@@ -5,7 +5,7 @@
 #include "Objects/ReflectTemplate.h"
 #define __DOCKMANAGER_GEN_H__
 //Struct DockNodeData begin...........................
-#define DOCKMANAGER_GEN_H_25_GENERATED_BODY \
+#define DOCKMANAGER_GEN_H_26_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_DockNodeData_Type();\
                                 static Type* GetPrivateStaticClass();\
@@ -20,7 +20,7 @@ class Ailu::Type* Ailu::StaticClass<struct Ailu::Editor::DockNodeData>();
 //Struct DockNodeData end...........................
 
 //Struct DockNodeDataArray begin...........................
-#define DOCKMANAGER_GEN_H_59_GENERATED_BODY \
+#define DOCKMANAGER_GEN_H_63_GENERATED_BODY \
                             private: \
                                 friend Type* Z_Construct_DockNodeDataArray_Type();\
                                 static Type* GetPrivateStaticClass();\

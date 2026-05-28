@@ -24,6 +24,129 @@ namespace Ailu
         return result;
     }
 
+    static JsonArchive::JsonValuePtr CloneJsonValuePtr(const JsonArchive::JsonValuePtr &value)
+    {
+        return value ? std::make_shared<JsonArchive::JsonValue>(*value) : nullptr;
+    }
+
+    JsonArchive::JsonObject::JsonObject(const JsonObject &other)
+    {
+        *this = other;
+    }
+
+    JsonArchive::JsonObject &JsonArchive::JsonObject::operator=(const JsonObject &other)
+    {
+        if (this == &other)
+            return *this;
+
+        _entries.clear();
+        _entry_lookup.clear();
+        _entries.reserve(other._entries.size());
+        _entry_lookup.reserve(other._entries.size());
+
+        for (const auto &entry: other._entries)
+        {
+            JsonObjectEntry cloned_entry;
+            cloned_entry._key = entry._key;
+            cloned_entry._value = CloneJsonValuePtr(entry._value);
+            _entry_lookup.emplace(cloned_entry._key, _entries.size());
+            _entries.push_back(std::move(cloned_entry));
+        }
+        return *this;
+    }
+
+    void JsonArchive::JsonObject::reserve(size_t size)
+    {
+        _entries.reserve(size);
+        _entry_lookup.reserve(size);
+    }
+
+    JsonArchive::JsonValue *JsonArchive::JsonObject::Find(const String &key)
+    {
+        auto it = _entry_lookup.find(key);
+        if (it == _entry_lookup.end())
+            return nullptr;
+        return _entries[it->second]._value.get();
+    }
+
+    const JsonArchive::JsonValue *JsonArchive::JsonObject::Find(const String &key) const
+    {
+        auto it = _entry_lookup.find(key);
+        if (it == _entry_lookup.end())
+            return nullptr;
+        return _entries[it->second]._value.get();
+    }
+
+    JsonArchive::JsonValue &JsonArchive::JsonObject::InsertOrAssign(String key, JsonValue value)
+    {
+        auto it = _entry_lookup.find(key);
+        if (it != _entry_lookup.end())
+        {
+            auto &entry_value = _entries[it->second]._value;
+            if (!entry_value)
+                entry_value = std::make_shared<JsonValue>(std::move(value));
+            else
+                *entry_value = std::move(value);
+            return *entry_value;
+        }
+
+        JsonObjectEntry entry;
+        entry._key = std::move(key);
+        entry._value = std::make_shared<JsonValue>(std::move(value));
+        _entry_lookup.emplace(entry._key, _entries.size());
+        _entries.push_back(std::move(entry));
+        return *_entries.back()._value;
+    }
+
+    JsonArchive::JsonArray::JsonArray(const JsonArray &other)
+    {
+        *this = other;
+    }
+
+    JsonArchive::JsonArray &JsonArchive::JsonArray::operator=(const JsonArray &other)
+    {
+        if (this == &other)
+            return *this;
+
+        _items.clear();
+        _items.reserve(other._items.size());
+        for (const auto &item: other._items)
+        {
+            _items.push_back(CloneJsonValuePtr(item));
+        }
+        return *this;
+    }
+
+    void JsonArchive::JsonArray::reserve(size_t size)
+    {
+        _items.reserve(size);
+    }
+
+    size_t JsonArchive::JsonArray::size() const
+    {
+        return _items.size();
+    }
+
+    bool JsonArchive::JsonArray::empty() const
+    {
+        return _items.empty();
+    }
+
+    void JsonArchive::JsonArray::push_back(JsonValue value)
+    {
+        _items.push_back(std::make_shared<JsonValue>(std::move(value)));
+    }
+
+    JsonArchive::JsonValue &JsonArchive::JsonArray::operator[](size_t index)
+    {
+        return *_items[index];
+    }
+
+    const JsonArchive::JsonValue &JsonArchive::JsonArray::operator[](size_t index) const
+    {
+        return *_items[index];
+    }
+
     // ========== Impl ==========
     static void ToRapidJsonValue(const JsonArchive::JsonValue &src, rapidjson::Value &dst, rapidjson::Document::AllocatorType &alloc)
     {
@@ -59,11 +182,14 @@ namespace Ailu
             void operator()(const JsonArchive::JsonObject &obj) const
             {
                 dst.SetObject();
-                for (const auto &kv: obj)
+                for (const auto &entry: obj._entries)
                 {
-                    rapidjson::Value key(kv.first.c_str(), static_cast<rapidjson::SizeType>(kv.first.size()), alloc);
+                    rapidjson::Value key(entry._key.c_str(), static_cast<rapidjson::SizeType>(entry._key.size()), alloc);
                     rapidjson::Value val;
-                    ToRapidJsonValue(kv.second, val, alloc);
+                    if (entry._value)
+                        ToRapidJsonValue(*entry._value, val, alloc);
+                    else
+                        val.SetNull();
                     dst.AddMember(key, val, alloc);
                 }
             }
@@ -71,10 +197,13 @@ namespace Ailu
             {
                 dst.SetArray();
                 dst.Reserve(static_cast<rapidjson::SizeType>(arr.size()), alloc);
-                for (const auto &v: arr)
+                for (const auto &value: arr._items)
                 {
                     rapidjson::Value val;
-                    ToRapidJsonValue(v, val, alloc);
+                    if (value)
+                        ToRapidJsonValue(*value, val, alloc);
+                    else
+                        val.SetNull();
                     dst.PushBack(val, alloc);
                 }
             }
@@ -112,12 +241,13 @@ namespace Ailu
         else if (src.IsObject())
         {
             JsonArchive::JsonObject obj;
+            obj.reserve(src.MemberCount());
             for (auto it = src.MemberBegin(); it != src.MemberEnd(); ++it)
             {
                 String key(it->name.GetString(), it->name.GetStringLength());
                 JsonArchive::JsonValue val;
                 FromRapidJsonValue(it->value, val);
-                obj.emplace(std::move(key), std::move(val));
+                obj.InsertOrAssign(std::move(key), std::move(val));
             }
             dst = JsonArchive::JsonValue(std::move(obj));
         }
@@ -231,6 +361,27 @@ namespace Ailu
             doc.Accept(writer);
             fclose(fp);
             delete[] buffer;
+            return true;
+        }
+
+        String SaveToString(const JsonArchive::JsonObject &root)
+        {
+            rapidjson::Document doc;
+            doc.SetObject();
+            ToRapidJsonValue(root, doc, doc.GetAllocator());
+            rapidjson::StringBuffer buffer;
+            rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+            writer.SetFormatOptions(rapidjson::kFormatSingleLineArray);
+            doc.Accept(writer);
+            return String(buffer.GetString(), buffer.GetSize());
+        }
+
+        bool LoadFromString(const String &json_text, JsonArchive::JsonValue &dst)
+        {
+            doc.Parse(json_text.c_str());
+            if (doc.HasParseError())
+                return false;
+            FromRapidJsonValue(doc, dst);
             return true;
         }
 
@@ -596,12 +747,12 @@ namespace Ailu
             }
             else
             {
-                std::get<JsonObject>(parent)[node._path] = std::move(node._value);
+                std::get<JsonObject>(parent).InsertOrAssign(node._path, std::move(node._value));
             }
         }
         else
         {
-            std::get<JsonObject>(_root.value)[old_key] = std::move(node._value);
+            std::get<JsonObject>(_root.value).InsertOrAssign(old_key, std::move(node._value));
         }
     }
 
@@ -711,6 +862,25 @@ namespace Ailu
         else
             _is_loaded = true;
     }
+    String JsonArchive::SaveToString()
+    {
+        String json_text;
+        if (std::holds_alternative<JsonObject>(_root.value))
+            json_text = _impl->SaveToString(std::get<JsonObject>(_root.value));
+        Reset();
+        return json_text;
+    }
+    bool JsonArchive::LoadFromString(const String &json_text)
+    {
+        Reset();
+        if (!_impl->LoadFromString(json_text, _root))
+        {
+            LOG_ERROR("Failed to load JSON archive from string");
+            return false;
+        }
+        _is_loaded = true;
+        return true;
+    }
     bool JsonArchive::HasField(const String &name)
     {
         String key = _cur_key.empty() ? name : std::format("{}.{}", _cur_key, name);
@@ -721,11 +891,10 @@ namespace Ailu
         {
             if (std::holds_alternative<JsonObject>(node->value))
             {
-                auto &obj_map = std::get<JsonObject>(node->value);
-                auto it = obj_map.find(p);
-                if (it == obj_map.end())
+                auto *child = std::get<JsonObject>(node->value).Find(p);
+                if (child == nullptr)
                     return false;
-                node = &it->second;
+                node = child;
             }
             else if (std::holds_alternative<JsonArray>(node->value))
             {
@@ -736,7 +905,7 @@ namespace Ailu
                 auto &arr = std::get<JsonArray>(node->value);
                 if (idx >= arr.size())
                     return false;
-                node = &arr[idx];
+                node = &arr[(size_t) idx];
             }
             else
             {
@@ -755,11 +924,10 @@ namespace Ailu
         {
             if (std::holds_alternative<JsonObject>(node->value))
             {
-                auto &obj_map = std::get<JsonObject>(node->value);
-                auto it = obj_map.find(p);
-                if (it == obj_map.end())
+                auto *child = std::get<JsonObject>(node->value).Find(p);
+                if (child == nullptr)
                     return nullptr;
-                node = &it->second;
+                node = child;
             }
             else if (std::holds_alternative<JsonArray>(node->value))
             {
@@ -770,7 +938,7 @@ namespace Ailu
                 auto &arr = std::get<JsonArray>(node->value);
                 if (idx >= arr.size())
                     return nullptr;
-                node = &arr[idx];
+                node = &arr[(size_t) idx];
             }
             else
             {

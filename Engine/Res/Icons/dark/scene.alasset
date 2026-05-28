@@ -5,6 +5,6 @@
         "_asset_type": "Ailu::Render::Texture2D",
         "_asset_name": "scene"
     },
-    "_is_srgb": true,
-    "_file": "Icons/dark/scene.png"
+    "_file": "Icons/dark/scene.png",
+    "_is_srgb": true
 }

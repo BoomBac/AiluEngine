@@ -38,6 +38,12 @@ namespace Ailu
         kSizeNWSE,// ↗↙ 对角
         kHand
     };
+    enum class ECursorPriority : u8
+    {
+        kFallback = 0,
+        kNormal,
+        kHigh
+    };
 
     struct ObjectLayer
     {
@@ -131,7 +137,7 @@ namespace Ailu
         void NotifyMain();
         void NotifyRender();
 
-        void SetCursor(ECursorType type);
+        void SetCursor(ECursorType type, ECursorPriority priority = ECursorPriority::kNormal);
 
         [[nodiscard]] Window &GetWindow() { return *_p_window; }
         Window *GetWindowPtr() { return _p_window.get(); }
@@ -166,7 +172,8 @@ namespace Ailu
 
         void LogicLoop();
         void LoadEngineConfig();
-        void SetCursorInternal();
+        void BeginCursorFrame();
+        void SetCursorInternal(ECursorType type);
     protected:
         inline static Application *sp_instance = nullptr;
         inline static Window *s_focus_window = nullptr;
@@ -185,6 +192,8 @@ namespace Ailu
         WString _engin_config_path;
         Array<ObjectLayer,32> _object_layers;
         ECursorType _cursor_type = ECursorType::kArrow;
+        ECursorPriority _cursor_priority = ECursorPriority::kFallback;
+        bool _is_client_cursor_context = true;
     private:
         std::mutex _mutex;
         std::condition_variable _main_wait;

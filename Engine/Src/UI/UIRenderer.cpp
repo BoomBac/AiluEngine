@@ -57,7 +57,7 @@ namespace Ailu
 
         void UIRenderer::Render(CommandBuffer *cmd)
         {
-            DrawDebugPannel();
+            //DrawDebugPannel();
             const f32 dt = TimeMgr::s_delta_time;
             auto& widgets = UI::UIManager::Get()->_widgets;
             for (auto it = widgets.begin(); it != widgets.end(); it++)
@@ -342,25 +342,30 @@ namespace Ailu
         {
             Vector2f pen = {10.f, 10.f};
             f32 font_size = 14.f;
-            if (auto hover = UIManager::Get()->_capture_target)
+            UIElement *capture = UIManager::Get()->_capture_target;
+            if (capture)
             {
                 const f32 line_height = _text_renderer->GetDefaultFont()->_line_height * font_size;
-                auto abs_rect = hover->GetArrangeRect();
-                DrawText(std::format("Name: {},type: {}", hover->Name(), hover->GetType()->Name()), pen, font_size);
+                auto abs_rect = capture->GetArrangeRect();
+                DrawText(std::format("Name: {},type: {}", capture->Name(), capture->GetType()->Name()), pen, font_size);
                 pen.y += line_height;
                 DrawText(std::format("Pos: {},Size: {}", Vector2f(abs_rect.xy).ToString(), Vector2f(abs_rect.zw).ToString()), pen, font_size);
                 pen.y += line_height;
-                DrawText(std::format("Padding: {},Margin: {}", hover->SlotPadding().ToString(), hover->SlotMargin().ToString()),pen,font_size);
+                DrawText(std::format("Padding: {},Margin: {}", capture->SlotPadding().ToString(), capture->SlotMargin().ToString()),pen,font_size);
                 pen.y += line_height;
-                DrawText(std::format("SizePolicyH: {},SizePolicyV: {}", StaticEnum<UI::ESizePolicy>()->GetNameByEnum(hover->SlotSizePolicy(true)),
-                                     StaticEnum<UI::ESizePolicy>()->GetNameByEnum(hover->SlotSizePolicy(false))), pen, font_size);
+                DrawText(std::format("SizePolicyH: {},SizePolicyV: {}", StaticEnum<UI::ESizePolicy>()->GetNameByEnum(capture->SlotSizePolicy(true)),
+                                     StaticEnum<UI::ESizePolicy>()->GetNameByEnum(capture->SlotSizePolicy(false))), pen, font_size);
                 pen.y += line_height;
-                DrawText(std::format("AlighH: {},AlighV: {}", StaticEnum<UI::EAlignment>()->GetNameByEnum(hover->SlotAlignmentH()),
-                                     StaticEnum<UI::EAlignment>()->GetNameByEnum(hover->SlotAlignmentV())),
+                DrawText(std::format("AlighH: {},AlighV: {}", StaticEnum<UI::EAlignment>()->GetNameByEnum(capture->SlotAlignmentH()),
+                                     StaticEnum<UI::EAlignment>()->GetNameByEnum(capture->SlotAlignmentV())),
                          pen, font_size);
                 pen.y += line_height;
-                DrawText(std::format("IsFocused: {},IsHover: {},IsPressed: {}", hover->_state._is_focused, hover->_state._is_hovered, hover->_state._is_pressed), pen, font_size);
-                DrawBox(hover->GetArrangeRect().xy, hover->GetArrangeRect().zw, 1.0f, Color(1.0f, 0.5f, 0.0f, 1.0f));
+                DrawText(std::format("IsFocused: {},IsHover: {},IsPressed: {}", capture->_state._is_focused, capture->_state._is_hovered, capture->_state._is_pressed), pen, font_size);
+                DrawBox(capture->GetArrangeRect().xy, capture->GetArrangeRect().zw, 1.0f, Color(1.0f, 0.5f, 0.0f, 1.0f));
+            }
+            if (auto selected = UIManager::Get()->GetDebugHighlightTarget(); selected != nullptr && selected != capture && selected->IsVisible())
+            {
+                DrawBox(selected->GetArrangeRect().xy, selected->GetArrangeRect().zw, 2.0f, Color(0.1f, 0.85f, 1.0f, 1.0f));
             }
         }
     }// namespace UI

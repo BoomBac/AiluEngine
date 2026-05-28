@@ -346,6 +346,11 @@ namespace Ailu
             ShowNextImportPopup();
         }
 
+        void AssetBrowser::OnDockLayoutLoaded()
+        {
+            // Kept for DockWindow extension point; SplitView ratio restore is disabled in current UI API.
+        }
+
         void AssetBrowser::Update(f32 dt)
         {
             DockWindow::Update(dt);

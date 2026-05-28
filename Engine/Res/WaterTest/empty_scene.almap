@@ -7,26 +7,26 @@
     },
     "_entities": [{
             "_entity_id": 1,
-            "_transform_component": {
-                "_position": [0.0, 6.969687461853027, -12.012256622314453],
-                "_scale": [1.0, 1.0, 1.0],
-                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0]
-            },
             "_tag_component": {
                 "_name": "cube",
                 "_layer_mask": 1
             },
+            "_transform_component": {
+                "_position": [0.0, 4.419328689575195, 2.079547882080078],
+                "_rotation": [0.0, 6.755127657243065e-8, 0.0, 1.0],
+                "_scale": [1.0, 1.0, 1.0]
+            },
             "_static_mesh_component": {
-                "_mesh_guid": "d137d2a7-0d2b-40bc-9c76-6d2708923869",
+                "_mesh_guid": "7baa598b-7eb4-478d-91ae-bf758da25d3b",
                 "_material_guids": ["46601513-96ea-4cc4-86db-0400c8824ec1"]
             },
             "_hierarchy_component": {
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_first_child": 0,
-                "_parent": 0,
-                "_next_sibling": 0,
                 "_prev_sibling": 0,
-                "_children_num": 0
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
             "_entity_id": 2,
@@ -41,47 +41,47 @@
             },
             "_light_component": {
                 "_type": "kDirectional",
+                "_light": {
+                    "_light_color": [1.0, 1.0, 1.0, 1.0],
+                    "_light_param": [10.0, 4.900000095367432, 5.0, 0.26499998569488525],
+                    "_is_two_side": false
+                },
                 "_shadow": {
                     "_is_cast_shadow": true,
                     "_constant_bias": 0.24300000071525574,
                     "_slope_bias": 0.21400000154972076
-                },
-                "_light": {
-                    "_light_color": [1.0, 1.0, 1.0, 0.0],
-                    "_light_param": [10.0, 4.900000095367432, 5.0, 0.26499998569488525],
-                    "_is_two_side": false
                 }
             },
             "_hierarchy_component": {
                 "_first_child": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_prev_sibling": 0,
                 "_next_sibling": 0,
                 "_parent": 0,
-                "_children_num": 0
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
             "_entity_id": 3,
-            "_transform_component": {
-                "_position": [0.0, -0.21875, 0.0],
-                "_scale": [14.933902740478516, 14.933902740478516, 14.933902740478516],
-                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0]
-            },
             "_tag_component": {
                 "_name": "new_object_3",
                 "_layer_mask": 0
+            },
+            "_transform_component": {
+                "_position": [0.0, -0.21875, 0.0],
+                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0],
+                "_scale": [14.933902740478516, 14.933902740478516, 14.933902740478516]
             },
             "_static_mesh_component": {
                 "_mesh_guid": "c3315e03-1052-4825-98f7-a676beae0615",
                 "_material_guids": ["4f6e2fa4-c9af-4800-9ff9-70874abfbd50"]
             },
             "_hierarchy_component": {
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_first_child": 0,
-                "_parent": 0,
-                "_next_sibling": 0,
                 "_prev_sibling": 0,
-                "_children_num": 0
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
             "_entity_id": 4,
@@ -91,16 +91,16 @@
             },
             "_transform_component": {
                 "_position": [21.469730377197266, 7.310354232788086, 0.0],
-                "_rotation": [0.0, 6.799999852091787e-8, 0.0, 1.0],
+                "_rotation": [0.0, 6.755127657243065e-8, 0.0, 1.0],
                 "_scale": [1.0, 1.0, 1.0]
             },
             "_hierarchy_component": {
                 "_first_child": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_prev_sibling": 0,
                 "_next_sibling": 0,
                 "_parent": 0,
-                "_children_num": 0
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             },
             "_lightprobe_component": {
                 "_size": 9.0,
@@ -108,90 +108,67 @@
             }
         }, {
             "_entity_id": 5,
-            "_transform_component": {
-                "_position": [-10.056591987609863, 4.290918827056885, 10.14122200012207],
-                "_scale": [1.003400444984436, 1.0033972263336182, 1.003400444984436],
-                "_rotation": [0.20313608646392822, -0.68525630235672, 0.12979891896247864, 0.6872494220733643]
-            },
             "_tag_component": {
                 "_name": "spot_light_7",
                 "_layer_mask": 1
             },
+            "_transform_component": {
+                "_position": [-10.056591987609863, 4.290918827056885, 10.14122200012207],
+                "_rotation": [0.20313608646392822, -0.68525630235672, 0.12979891896247864, 0.6872494220733643],
+                "_scale": [1.003400444984436, 1.0033972263336182, 1.003400444984436]
+            },
             "_light_component": {
-                "_shadow": {
-                    "_is_cast_shadow": false,
-                    "_constant_bias": 0.0,
-                    "_slope_bias": 0.012000000104308128
-                },
                 "_type": "kPoint",
                 "_light": {
                     "_light_color": [0.7584059834480286, 0.1705009937286377, 0.9199159741401672, 1.5329099893569946],
                     "_light_param": [9.985600471496582, 0.20000000298023224, 0.0, 0.0],
                     "_is_two_side": false
+                },
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.012000000104308128
                 }
             },
             "_hierarchy_component": {
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_first_child": 0,
-                "_parent": 0,
-                "_next_sibling": 0,
                 "_prev_sibling": 0,
-                "_children_num": 0
+                "_next_sibling": 0,
+                "_parent": 0,
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }, {
             "_entity_id": 6,
-            "_transform_component": {
-                "_position": [0.5767948627471924, 2.900664806365967, -4.290546894073486],
-                "_scale": [0.9998859763145447, 0.9999729990959167, 0.9998990297317505],
-                "_rotation": [-0.3142995238304138, -0.006058855913579464, -0.01830490119755268, 0.9491280317306519]
-            },
             "_tag_component": {
                 "_name": "new_object_10",
                 "_layer_mask": 1
             },
+            "_transform_component": {
+                "_position": [0.5767948627471924, 2.900664806365967, -4.290546894073486],
+                "_rotation": [-0.3142995238304138, -0.006058855913579464, -0.01830490119755268, 0.9491280317306519],
+                "_scale": [0.9998859763145447, 0.9999729990959167, 0.9998990297317505]
+            },
             "_light_component": {
-                "_shadow": {
-                    "_is_cast_shadow": false,
-                    "_constant_bias": 0.0,
-                    "_slope_bias": 0.0
-                },
                 "_type": "kArea",
                 "_light": {
                     "_light_color": [0.0, 1.0, 0.33620700240135193, 0.0],
                     "_light_param": [15.0, 2.0, 2.0, 0.0],
                     "_is_two_side": true
+                },
+                "_shadow": {
+                    "_is_cast_shadow": false,
+                    "_constant_bias": 0.0,
+                    "_slope_bias": 0.0
                 }
             },
             "_hierarchy_component": {
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_first_child": 0,
-                "_parent": 0,
-                "_next_sibling": 0,
-                "_prev_sibling": 0,
-                "_children_num": 0
-            }
-        }, {
-            "_entity_id": 7,
-            "_tag_component": {
-                "_name": "new_object_7",
-                "_layer_mask": 0
-            },
-            "_transform_component": {
-                "_position": [10.46231460571289, 1.1905889511108398, 2.62799072265625],
-                "_rotation": [0.0, 0.0, 0.0, 1.0],
-                "_scale": [1.0, 1.0, 1.0]
-            },
-            "_static_mesh_component": {
-                "_mesh_guid": "953c51c3-fcd0-49d0-89f9-151fdfbe0e33",
-                "_material_guids": ["", "", "", "", "", ""]
-            },
-            "_hierarchy_component": {
-                "_first_child": 0,
-                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0",
                 "_prev_sibling": 0,
                 "_next_sibling": 0,
                 "_parent": 0,
-                "_children_num": 0
+                "_children_num": 0,
+                "_inv_matrix_attach": "0,0,0,0;0,0,0,0;0,0,0,0;0,0,0,0"
             }
         }]
 }

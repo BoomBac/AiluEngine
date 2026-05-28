@@ -6,6 +6,7 @@
 #include "UI/UIRenderer.h"
 #include "UI/TextRenderer.h"
 #include "UI/UIFramework.h"
+#include <memory>
 
 namespace Ailu
 {
@@ -116,6 +117,7 @@ namespace Ailu
         }
         void UIElement::Update(f32 dt)
         {
+            SyncLegacyFromSlotObject();
             if (!_is_visible)
                 return;
             if (_is_transf_dirty)
@@ -287,6 +289,7 @@ namespace Ailu
         }
         void UIElement::Arrange(f32 x, f32 y, f32 width, f32 height)
         {
+            SyncLegacyFromSlotObject();
             _arrange_rect = {x, y, width, height};
             _content_rect = _arrange_rect;
             _content_rect.x += _padding._l;
@@ -336,9 +339,33 @@ namespace Ailu
         {
             _depth = depth;
         }
-
+        void UIElement::OnPropertyChanged(const PropertyInfo &prop)
+        {
+            Object::OnPropertyChanged(prop);
+            const String &name = prop.Name();
+            if (name == "_slot")
+            {
+                SyncSlotObjectFromLegacy();
+                _legacy_slot_dirty = false;
+                _slot_obj_dirty = false;
+                InvalidateLayout();
+            }
+            else if (name == "_padding")
+            {
+                InvalidateLayout();
+            }
+            else if (name == "_transition" || name == "_rotation" || name == "_scale")
+            {
+                InvalidateTransform();
+            }
+            else if (name == "_visibility")
+            {
+                _is_visible = (_visibility == EVisibility::kVisible);
+            }
+        }
         void UIElement::Serialize(FArchive &ar)
         {
+            SyncLegacyFromSlotObject();
             SerializeObject::Serialize(ar);
             if (auto sar = dynamic_cast<FStructedArchive *>(&ar); sar != nullptr)
             {
@@ -469,7 +496,71 @@ namespace Ailu
         }
         Vector2f UIElement::MeasureDesiredSize()
         {
+            SyncLegacyFromSlotObject();
             return _slot._size;
+        }
+        void UIElement::SyncSlotObjectFromLegacy() const
+        {
+            if (!_slot_obj_dirty && _slot_obj != nullptr)
+                return;
+
+            if (_slot._type == ESlotType::kCanvas)
+            {
+                auto canvas_slot = std::dynamic_pointer_cast<CanvasSlot>(_slot_obj);
+                if (canvas_slot == nullptr)
+                    canvas_slot = MakeRef<CanvasSlot>();
+                canvas_slot->_margin = _slot._margin;
+                canvas_slot->_anchor = _slot._anchor;
+                canvas_slot->_position = _slot._position;
+                canvas_slot->_size = _slot._size;
+                canvas_slot->_size_to_content = _slot._is_size_to_content;
+                canvas_slot->_alignment_h = _slot._alignment_h;
+                canvas_slot->_alignment_v = _slot._alignment_v;
+                _slot_obj = canvas_slot;
+            }
+            else
+            {
+                auto linear_slot = std::dynamic_pointer_cast<LinearSlot>(_slot_obj);
+                if (linear_slot == nullptr)
+                    linear_slot = MakeRef<LinearSlot>();
+                linear_slot->_margin = _slot._margin;
+                linear_slot->_size_policy_h = _slot._size_policy_h;
+                linear_slot->_size_policy_v = _slot._size_policy_v;
+                linear_slot->_fill_rate = _slot._fill_rate;
+                linear_slot->_cross_align = _slot._alignment_v;
+                _slot_obj = linear_slot;
+            }
+
+            _slot_obj_dirty = false;
+        }
+        void UIElement::SyncLegacyFromSlotObject() const
+        {
+            if (!_legacy_slot_dirty || _slot_obj == nullptr)
+                return;
+
+            auto &legacy_slot = const_cast<Slot &>(_slot);
+            legacy_slot._margin = _slot_obj->_margin;
+            if (const auto canvas_slot = dynamic_cast<CanvasSlot *>(_slot_obj.get()); canvas_slot != nullptr)
+            {
+                legacy_slot._type = ESlotType::kCanvas;
+                legacy_slot._anchor = canvas_slot->_anchor;
+                legacy_slot._position = canvas_slot->_position;
+                legacy_slot._size = canvas_slot->_size;
+                legacy_slot._is_size_to_content = canvas_slot->_size_to_content;
+                legacy_slot._alignment_h = canvas_slot->_alignment_h;
+                legacy_slot._alignment_v = canvas_slot->_alignment_v;
+            }
+            else if (const auto linear_slot = dynamic_cast<LinearSlot *>(_slot_obj.get()); linear_slot != nullptr)
+            {
+                if (legacy_slot._type == ESlotType::kCanvas)
+                    legacy_slot._type = ESlotType::kVerticalBox;
+                legacy_slot._size_policy_h = linear_slot->_size_policy_h;
+                legacy_slot._size_policy_v = linear_slot->_size_policy_v;
+                legacy_slot._fill_rate = linear_slot->_fill_rate;
+                legacy_slot._alignment_v = linear_slot->_cross_align;
+            }
+
+            const_cast<UIElement *>(this)->_legacy_slot_dirty = false;
         }
         Matrix4x4f UIElement::CalculateWorldMatrix(bool is_exclude_self_offset) const
         {

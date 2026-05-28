@@ -73,7 +73,7 @@ namespace Ailu
                 {
                     if (comp._is_dirty || comp._is_update_every_tick)
                     {
-                        auto transf = r.GetComponent<CLightProbe, TransformComponent>(index)->_transform;
+                        auto transf = r.GetComponent<CLightProbe, TransformComponent>(index)->_local_transform;
                         Camera cam;
                         cam.Position(transf._position);
                         cam.Near(1.0f);
@@ -160,7 +160,7 @@ namespace Ailu
             static ObjectLayer shadow_cast_layer = Application::Get().NameToLayer("ShadowCaster");
             for (auto &e: _entities)
             {
-                auto transf = r.GetComponent<TransformComponent>(e)->_transform;
+                auto transf = r.GetComponent<TransformComponent>(e)->_local_transform;
                 auto comp = r.GetComponent<LightComponent>(e);
                 comp->_light._light_pos = transf._position;
                 Vector3f light_forward = LightComponent::kDefaultDirectionalLightDir;
@@ -426,7 +426,7 @@ namespace Ailu
                     }
                     if (vxgi._is_draw_grid)
                     {
-                        DebugDrawer::DebugWireframe(vxgi, t->_transform, Colors::kGreen);
+                        DebugDrawer::DebugWireframe(vxgi, t->GetWorldMatrix(), Colors::kGreen);
                     }
                     Camera::sCurrent->_is_gen_voxel = true;
                 }

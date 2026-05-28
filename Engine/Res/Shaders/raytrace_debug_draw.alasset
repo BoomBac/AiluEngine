@@ -6,6 +6,6 @@
         "_asset_name": "RayTraceDebugDraw"
     },
     "_file": "Shaders/hlsl/ray_trace/raytrace_debug_draw.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

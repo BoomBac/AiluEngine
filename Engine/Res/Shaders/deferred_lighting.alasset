@@ -6,6 +6,6 @@
         "_asset_name": "deferred_lighting"
     },
     "_file": "Shaders/hlsl/deferred_lighting.hlsl",
-    "_ps_entry": "DeferredLightingPSMain",
-    "_vs_entry": "FullscreenVSMain"
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "DeferredLightingPSMain"
 }

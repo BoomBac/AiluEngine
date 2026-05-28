@@ -396,7 +396,7 @@ namespace Ailu::Render
             instance_keys.push_back({entity, mesh, material_class});
             for (u32 i = 0u; i < mesh->SubmeshCount(); ++i)
             {
-                transforms.push_back(transform_comp->_transform._world_matrix);
+                transforms.push_back(transform_comp->GetWorldMatrix());
                 auto mat = static_mesh._p_mats.size() > i ? static_mesh._p_mats[i].get() : nullptr;
                 materials.push_back(mat);
             }

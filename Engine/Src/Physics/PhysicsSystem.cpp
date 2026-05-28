@@ -55,13 +55,13 @@ namespace Ailu
             rigid->_force += force;
 
             // 计算力矩：r 是从质心到作用点的向量
-            Vector3f r_vec = apply_pos - r.GetComponent<TransformComponent>(entity)->_transform._position;
+            Vector3f r_vec = apply_pos - r.GetComponent<TransformComponent>(entity)->_local_transform._position;
             rigid->_torque += CrossProduct(r_vec, force);
         }
         void PhysicsSystem::Intergate(Register &r, ECS::Entity entity, f32 delta_time)
         {
             auto rigid = r.GetComponent<CRigidBody>(entity);
-            auto &transf = r.GetComponent<TransformComponent>(entity)->_transform;
+            auto &transf = r.GetComponent<TransformComponent>(entity)->_local_transform;
             //线性移动
             Vector3f acceleration = rigid->_force / rigid->_mass + kGravity;
             rigid->_velocity += acceleration * delta_time;
@@ -78,18 +78,18 @@ namespace Ailu
             //clear accum
             rigid->_force = Vector3f::kZero;
             rigid->_torque = Vector3f::kZero;
-            Transform::ToMatrix(transf, transf._world_matrix);
+            //Transform::ToMatrix(transf, transf._world_matrix);
         }
         void PhysicsSystem::ResolveCollision(Register &r, ECS::Entity entity)
         {
-            auto &transf = r.GetComponent<TransformComponent>(entity)->_transform;
+            auto transf = r.GetComponent<TransformComponent>(entity);
             if (auto c = r.GetComponent<CCollider>(entity))
             {
                 u32 index = 0u;
                 f32 restitution = 0.6f;// 恢复系数
                 if (_collisions.contains(entity))
                 {
-                    DebugDrawer::DebugWireframe(*c, transf, _collisions.contains(entity) ? Colors::kRed : Colors::kGreen);
+                    //DebugDrawer::DebugWireframe(*c, transf, _collisions.contains(entity) ? Colors::kRed : Colors::kGreen);
                     return;
                 }
                 for (auto &other_c: r.View<CCollider>())
@@ -100,13 +100,12 @@ namespace Ailu
                     else
                     {
                         const CCollider &cur_c = *c;
-                        const Matrix4x4f &cur_m = transf._world_matrix, other_m = r.GetComponent<TransformComponent>(other_enrity)->_transform._world_matrix;
+                        const Matrix4x4f cur_m = transf->GetWorldMatrix(), other_m = r.GetComponent<TransformComponent>(other_enrity)->GetWorldMatrix();
                         auto rigid = r.GetComponent<CRigidBody>(entity);
                         if (SqrMagnitude(rigid->_velocity) < 1.f)
                             continue;
                         if (auto hit_result = _collision_matrix[c->_type][other_c._type](cur_c, cur_m, other_c, other_m); hit_result._is_collision)
                         {
-                            LOG_INFO("pos: {}",transf._position.ToString());
                             _collisions.insert(entity);
                             _collisions.insert(other_enrity);
                             DebugDrawer::DebugWireframe(hit_result);
@@ -125,14 +124,14 @@ namespace Ailu
                             Vector3f correction = penetration_depth * correction_ratio * collision_normal;
 
                             // 将物体沿法线方向修正
-                            transf._position += correction;
+                            transf->SetLocalPosition(transf->GetLocalPosition() + correction);
 
                             // 更新世界矩阵
-                            Transform::ToMatrix(transf, transf._world_matrix);
+                            //Transform::ToMatrix(transf, transf._world_matrix);
                         }
                     }
                 }
-                DebugDrawer::DebugWireframe(*c, transf, _collisions.contains(entity) ? Colors::kRed : Colors::kGreen);
+                //DebugDrawer::DebugWireframe(*c, transf, _collisions.contains(entity) ? Colors::kRed : Colors::kGreen);
             }
         }
     }

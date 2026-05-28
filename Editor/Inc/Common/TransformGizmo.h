@@ -1,8 +1,13 @@
-#include "Framework/Math/Transform.h"
+#include "Framework/Events/Event.h"
 #include "Scene/Entity.hpp"
+#include <optional>
 
 namespace Ailu
 {
+    namespace ECS
+    {
+        struct TransformComponent;
+    };
     struct OBB;
     namespace SceneManagement
     {
@@ -31,6 +36,7 @@ namespace Ailu
         {
         public:
             TransformGizmo();
+            ~TransformGizmo();
             void SetTarget(SceneManagement::Scene *scene, ECS::Entity target)
             {
                 _hover_axis = -1;
@@ -40,6 +46,8 @@ namespace Ailu
             void ClearTarget();
             void SetMode(EGizmoMode mode) { _mode = mode; }
             void SetSpace(EGizmoSpace space) { _space = space; }
+            void ToggleSpace();
+            EGizmoSpace Space() const { return _space; }
 
             void Update(f32 dt, Vector2f mouse_pos,Render::Camera* cam);
             void Draw();
@@ -49,8 +57,15 @@ namespace Ailu
             void EndDrag();
             bool IsDragging() const { return _is_dragging; }
         private:
-            Transform *Target() const;
+            ECS::TransformComponent *Target() const;
             u32 PickAxis(Vector3f start, Vector3f dir) const;
+            void SyncTargetFromSelection();
+            void RefreshAxisDirections();
+            ECS::TransformComponent *ParentTarget() const;
+            Vector3f WorldPositionToTargetLocal(const Vector3f &world_position) const;
+            Quaternion WorldRotationToTargetLocal(const Quaternion &world_rotation) const;
+            void SetTargetWorldPosition(ECS::TransformComponent *target, const Vector3f &world_position) const;
+            void SetTargetWorldRotation(ECS::TransformComponent *target, const Quaternion &world_rotation) const;
 
             // 轴方向（根据世界/本地空间）
             Vector3f GetAxisDirWorld(int axisId) const;
@@ -61,6 +76,7 @@ namespace Ailu
         private:
             SceneManagement::Scene *_target_scene = nullptr;
             ECS::Entity _target_entity = ECS::kInvalidEntity;
+            std::optional<Delegate<>::Handle> _selection_changed_handle;
             EGizmoMode _mode = EGizmoMode::kTranslate;
             EGizmoSpace _space = EGizmoSpace::kWorld;
             Render::Camera *_cam;

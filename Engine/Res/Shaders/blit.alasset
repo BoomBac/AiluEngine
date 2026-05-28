@@ -6,6 +6,6 @@
         "_asset_name": "blit"
     },
     "_file": "Shaders/hlsl/blit.hlsl",
-    "_ps_entry": "PSMainCopy",
-    "_vs_entry": "FullscreenVSMain"
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "PSMainCopy"
 }

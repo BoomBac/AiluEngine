@@ -6,6 +6,6 @@
         "_asset_name": "gizmo"
     },
     "_file": "Shaders/hlsl/gizmo.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

@@ -84,7 +84,7 @@ namespace Ailu
                 static f32 s_pre_skin_frame = current_frame;
                 auto &sk = c->_p_mesh->GetSkeleton();
                 auto transf = r.GetComponent<TransformComponent>(e);
-                Matrix4x4f sk_to_world = sk[0]._node_inv_world_mat * transf->_transform._world_matrix;
+                Matrix4x4f sk_to_world = sk[0]._node_inv_world_mat * transf->GetWorldMatrix();
                 Matrix4x4f world_to_sk = MatrixInverse(sk_to_world);
                 if (true)
                 {

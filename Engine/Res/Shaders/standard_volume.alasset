@@ -6,6 +6,6 @@
         "_asset_name": "standard_volume"
     },
     "_file": "Shaders/hlsl/standard_volume.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

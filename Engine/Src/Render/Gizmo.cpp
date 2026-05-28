@@ -1,4 +1,4 @@
-﻿#include "Render/Gizmo.h"
+#include "Render/Gizmo.h"
 #include "Framework/Common/ResourceMgr.h"
 #include "Render/GraphicsPipelineStateObject.h"
 #include "Render/CommandBuffer.h"
@@ -468,7 +468,19 @@ namespace Ailu::Render
                 cmd->DrawInstanced(s_pInstance->_tex_screen_vbufs[i].get(), nullptr, s_pInstance->_line_drawer, 1, 1);
             }
         }
-        s_pInstance->_text_renderer->Render(cmd);
+        if (s_pInstance->_text_renderer != nullptr)
+        {
+            Render::CBufferPerCameraData cb_per_cam;
+            Matrix4x4f view, proj;
+            f32 w = (f32) data->_width, h = (f32) data->_height;
+            BuildViewMatrixLookToLH(view, Vector3f(0.f, 0.f, -50.f), Vector3f::kForward, Vector3f::kUp);
+            BuildOrthographicMatrix(proj, 0.0f, w, 0.0f, h, 1.f, 200.f);
+            cb_per_cam._MatrixVP = view * proj;
+            cb_per_cam._MatrixVP_NoJitter = cb_per_cam._MatrixVP;
+            cb_per_cam._ScreenParams = Vector4f(1.0f / w, 1.0f / h, w, h);
+            cmd->SetGlobalBuffer(RenderConstants::kCBufNamePerCamera, &cb_per_cam, RenderConstants::kPerCameraDataSize);
+            s_pInstance->_text_renderer->Render(cmd);
+        }
     }
     //当GizmoPass未激活时，实际可能还会有数据在填充，所以将顶点偏移置空。一定要调用
     //当激活时，实际就不用调用

@@ -1,6 +1,7 @@
 #pragma once
 #ifndef __SCENE_H__
 #define __SCENE_H__
+#include <unordered_set>
 #include "Component.h"
 #include "Entity.hpp"
 #include "Framework/Math/Geometry.h"
@@ -13,6 +14,40 @@ namespace Ailu
 {
     namespace SceneManagement
     {
+        class Scene;
+
+        class AILU_API ISceneCommand
+        {
+        public:
+            virtual ~ISceneCommand() = default;
+            virtual bool Execute(Scene &scene) = 0;
+            virtual bool Undo(Scene &scene) = 0;
+            virtual const String &ToString() const = 0;
+        };
+
+        class AILU_API ReparentSceneCommand final : public ISceneCommand
+        {
+        public:
+            ReparentSceneCommand(ECS::Entity child, ECS::Entity new_parent, bool keep_world_transform = true);
+            bool Execute(Scene &scene) final;
+            bool Undo(Scene &scene) final;
+            const String &ToString() const final;
+
+        private:
+            bool Apply(Scene &scene, ECS::Entity parent, const Transform &local_transform) const;
+            void CaptureOldState(Scene &scene);
+            void CaptureNewState(Scene &scene);
+
+        private:
+            ECS::Entity _child = ECS::kInvalidEntity;
+            ECS::Entity _new_parent = ECS::kInvalidEntity;
+            ECS::Entity _old_parent = ECS::kInvalidEntity;
+            Transform _old_local_transform;
+            Transform _new_local_transform;
+            bool _keep_world_transform = true;
+            bool _has_executed = false;
+        };
+
         struct LightingData
         {
             f32 _indirect_lighting_intensity = 0.25f;
@@ -33,9 +68,20 @@ namespace Ailu
             ECS::Entity AddObject(Ref<Mesh> mesh, const Vector<Ref<Material>>& mats);
             ECS::Entity DuplicateEntity(ECS::Entity e);
             void RemoveObject(ECS::Entity entity);
-            void Attach(ECS::Entity current, ECS::Entity parent);
-            void Detach(ECS::Entity current);
+
+            // --- Hierarchy API (new) ---
+            bool IsValidEntity(ECS::Entity entity) const;
+            bool IsDescendantOf(ECS::Entity entity, ECS::Entity potential_ancestor) const;
+            bool Reparent(ECS::Entity child, ECS::Entity new_parent, bool keep_world_transform = true);
+            bool Detach(ECS::Entity child, bool keep_world_transform = true);
+            bool RenameEntity(ECS::Entity entity, const String& new_name);
+            u64 StructureRevision() const { return _structure_revision; }
+
+            // --- Compatibility wrappers ---
+            void Attach(ECS::Entity current, ECS::Entity parent) { Reparent(current, parent); }
+            void Detach(ECS::Entity current) { Detach(current, true); }
             void MarkDirty() { _dirty = true; };
+            void EnqueueSceneCommand(ISceneCommand *command, bool undo = false);
             const Vector<ECS::Entity> &EntityView() const;
             ECS::Entity Pick(const Ray &ray);
             LightingData _light_data;
@@ -78,11 +124,28 @@ namespace Ailu
             void Update(f32 dt);
             void RebuildBVHTree();
             void UpdateGpuScene();
+            void ProcessSceneCommands();
+
+            // --- Hierarchy helpers ---
+            void TouchStructure();
+            bool UnlinkFromParent(ECS::Entity entity);
+            bool LinkAsLastChild(ECS::Entity entity, ECS::Entity parent);
+            void CollectSubtreePostOrder(ECS::Entity root, Vector<ECS::Entity>& result) const;
+
+        private:
+            struct QueuedSceneCommand
+            {
+                ISceneCommand *_command = nullptr;
+                bool _undo = false;
+            };
+
         private:
             bool _dirty = true;
+            u64 _structure_revision = 1u;
             u16 _total_renderable_count = 0u;
             ECS::Register _register;
-            Queue<ECS::Entity> _pending_delete_entities;
+            std::unordered_set<ECS::Entity> _pending_delete_entities;
+            Vector<QueuedSceneCommand> _pending_scene_commands;
             Ref<Render::GPUBuffer> _scene_mesh_data;
             Ref<Render::GPUBuffer> _blas_buffer;
             Ref<Render::GPUBuffer> _tlas_buffer;

@@ -169,9 +169,11 @@ namespace Ailu
                 : _comp_types(other._comp_types),
                   _sys_signatures(other._sys_signatures),
                   _entity_num(other._entity_num),
+                  _hierarchy_revision(other._hierarchy_revision),
                   _entities(other._entities),
                   _available_entities(other._available_entities),
-                  _is_init(other._is_init)
+                  _is_init(other._is_init),
+                  _alive_entities(other._alive_entities)
             {
                 for (const auto &pair: other._mgrs)
                 {
@@ -194,9 +196,11 @@ namespace Ailu
                   _systems(std::move(other._systems)),
                   _sys_signatures(std::move(other._sys_signatures)),
                   _entity_num(other._entity_num),
+                  _hierarchy_revision(other._hierarchy_revision),
                   _entities(std::move(other._entities)),
                   _available_entities(std::move(other._available_entities)),
                   _is_init(other._is_init),
+                  _alive_entities(std::move(other._alive_entities)),
                   _on_comp_remove_callback(std::move(other._on_comp_remove_callback)),
                   _on_comp_add_callback(std::move(other._on_comp_add_callback))
             {
@@ -222,9 +226,11 @@ namespace Ailu
                     _comp_types = other._comp_types;
                     _sys_signatures = other._sys_signatures;
                     _entity_num = other._entity_num;
+                    _hierarchy_revision = other._hierarchy_revision;
                     _entities = other._entities;
                     _available_entities = other._available_entities;
                     _is_init = other._is_init;
+                    _alive_entities = other._alive_entities;
                     _on_comp_add_callback = other._on_comp_add_callback;
                     _on_comp_remove_callback = other._on_comp_remove_callback;
                 }
@@ -239,9 +245,11 @@ namespace Ailu
                     _systems = std::move(other._systems);
                     _sys_signatures = std::move(other._sys_signatures);
                     _entity_num = other._entity_num;
+                    _hierarchy_revision = other._hierarchy_revision;
                     _entities = std::move(other._entities);
                     _available_entities = std::move(other._available_entities);
                     _is_init = other._is_init;
+                    _alive_entities = std::move(other._alive_entities);
                     _on_comp_add_callback = std::move(other._on_comp_add_callback);
                     _on_comp_remove_callback = std::move(other._on_comp_remove_callback);
                     other._entity_num = -1;
@@ -254,6 +262,7 @@ namespace Ailu
                 return _comp_types == other._comp_types &&
                        _sys_signatures == other._sys_signatures &&
                        _entity_num == other._entity_num &&
+                       _hierarchy_revision == other._hierarchy_revision &&
                        _entities == other._entities &&
                        _available_entities == other._available_entities &&
                        _is_init == other._is_init;
@@ -264,19 +273,28 @@ namespace Ailu
                 {
                     for (u32 i = 1; i <= kMaxEntityNum; i++)
                     {
-                        _entities[i - 1].reset();
+                        _entities[i].reset();
                         _available_entities.push(i);
                     }
                     _is_init = true;
                 }
                 Entity e = _available_entities.front();
                 _available_entities.pop();
+                _alive_entities[e] = true;
                 ++_entity_num;
                 return e;
                 //return (u32) Random::RandomInt();
             }
+            bool IsAlive(Entity entity) const
+            {
+                return entity != kInvalidEntity && entity <= kMaxEntityNum && _alive_entities[entity];
+            }
             void Destory(Entity entity)
             {
+                if (!IsAlive(entity))
+                    return;
+                if (_comp_types.contains("CHierarchy") && _entities[entity].test(_comp_types.at("CHierarchy")))
+                    TouchHierarchy();
                 for (auto &it: _mgrs)
                 {
                     auto &[type_name, mgr] = it;
@@ -287,11 +305,17 @@ namespace Ailu
                     auto &[type_name, sys] = it;
                     sys->_entities.erase(entity);
                 }
+                _alive_entities[entity] = false;
+                --_entity_num;
                 _available_entities.push(entity);
+            }
+            void Destroy(Entity entity)
+            {
+                Destory(entity);
             }
             void EntitySignatureChanged(Entity entity)
             {
-                AL_ASSERT(entity < kMaxEntityNum);
+                AL_ASSERT(entity <= kMaxEntityNum);
                 for (auto &it: _systems)
                 {
                     auto &[type_name, sys] = it;
@@ -310,7 +334,9 @@ namespace Ailu
             template<typename T>
             bool HasComponent(Entity entity) const
             {
-                AL_ASSERT(entity < kMaxEntityNum);
+                AL_ASSERT(entity <= kMaxEntityNum);
+                if (!IsAlive(entity))
+                    return false;
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(_comp_types.contains(type_name));
                 return _entities[entity].test(_comp_types.at(type_name));
@@ -341,6 +367,13 @@ namespace Ailu
                 _sys_signatures[type_name] = sig;
                 return std::static_pointer_cast<T>(_systems[type_name]).get();
             }
+            template<typename T>
+            T *GetSystem()
+            {
+                const auto &type_name = T::TypeName();
+                auto it = _systems.find(type_name);
+                return it != _systems.end() ? static_cast<T *>(it->second.get()) : nullptr;
+            }
             auto SystemView()
             {
                 return std::views::all(_systems);
@@ -352,11 +385,13 @@ namespace Ailu
             template<typename T, typename... Args>
             T &AddComponent(Entity entity, Args &&...args)
             {
-                AL_ASSERT(entity < kMaxEntityNum);
+                AL_ASSERT(entity <= kMaxEntityNum);
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(_mgrs.contains(type_name));
                 auto &component = static_cast<ComponentManager<T> *>(_mgrs[type_name].get())->Create(entity, std::forward<Args>(args)...);
                 _entities[entity].set(_comp_types[type_name], true);
+                if (type_name == "CHierarchy")
+                    TouchHierarchy();
                 EntitySignatureChanged(entity);
                 for(auto& f : _on_comp_add_callback[type_name])
                     f(entity);
@@ -366,9 +401,11 @@ namespace Ailu
             template<typename T>
             void RemoveComponent(Entity entity)
             {
-                AL_ASSERT(entity < kMaxEntityNum);
+                AL_ASSERT(entity <= kMaxEntityNum);
                 const auto &type_name = T::TypeName();
                 AL_ASSERT(_mgrs.contains(type_name));
+                if (type_name == "CHierarchy" && _entities[entity].test(_comp_types[type_name]))
+                    TouchHierarchy();
                 static_cast<ComponentManager<T> *>(_mgrs[type_name].get())->Remove(entity);
                 _entities[entity].set(_comp_types[type_name], false);
                 for(auto& f : _on_comp_remove_callback[type_name])
@@ -451,6 +488,8 @@ namespace Ailu
                 _on_comp_remove_callback[type_name].emplace_back(callback);
             }
             u32 EntityNum() const { return _entity_num; }
+            u64 HierarchyRevision() const { return _hierarchy_revision; }
+            void TouchHierarchy() { ++_hierarchy_revision; }
 
         private:
             std::unordered_map<String, Ref<IComponentManager>> _mgrs;
@@ -460,7 +499,9 @@ namespace Ailu
             HashMap<String,List<CompAddCallback>> _on_comp_add_callback;
             HashMap<String,List<CompRemoveCallback >> _on_comp_remove_callback;
             u32 _entity_num = 0u;
-            Array<Signature, kMaxEntityNum> _entities;
+            u64 _hierarchy_revision = 1u;
+            Array<Signature, kMaxEntityNum + 1> _entities;
+            Array<bool, kMaxEntityNum + 1> _alive_entities{};
             Queue<Entity> _available_entities;
             bool _is_init = false;
         };

@@ -6,6 +6,6 @@
         "_asset_name": "cubemap_gen"
     },
     "_file": "Shaders/hlsl/cubemap_gen.hlsl",
-    "_ps_entry": "PSMain",
-    "_vs_entry": "VSMain"
+    "_vs_entry": "VSMain",
+    "_ps_entry": "PSMain"
 }

@@ -464,18 +464,18 @@ namespace Ailu::Render
                 u16 submesh_count = static_mesh._p_mesh->SubmeshCount();
                 auto &materials = static_mesh._p_mats;
                 auto entity = r.GetEntity<ECS::StaticMeshComponent>(entity_index);
-                const auto &t = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index)->_transform;
-                auto world_to_local = MatrixInverse(t._world_matrix);
+                const auto &transf_comp = r.GetComponent<ECS::StaticMeshComponent, ECS::TransformComponent>(entity_index);
+                auto world_to_local = MatrixInverse(transf_comp->GetWorldMatrix());
                 for (int i = 0; i < submesh_count; i++)
                 {
                     auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
-                    obj_cb->_MatrixWorld = t._world_matrix;
+                    obj_cb->_MatrixWorld = transf_comp->GetWorldMatrix();
                     obj_cb->_MatrixInvWorld = world_to_local;
                     obj_cb->_ObjectID = (i32) entity;
                     obj_cb->_SubmeshID = i;
                     obj_cb->_MotionVectorParam.x = static_mesh._motion_vector_type == ECS::EMotionVectorType::kPerObject? 1.0f : 0.0f; //dynamic object
                     obj_cb->_MotionVectorParam.y = static_mesh._motion_vector_type == ECS::EMotionVectorType::kForceZero? 1.0f : 0.0f; //force off
-                    s_instance_data[obj_index]._local_to_world = t._world_matrix;
+                    s_instance_data[obj_index]._local_to_world = transf_comp->GetWorldMatrix();
                     s_instance_data[obj_index]._world_to_local = world_to_local;
                     s_instance_data[obj_index]._object_id = obj_index;
                     s_instance_data[obj_index]._material_id = materials.size() > i ? _material_data_lut[materials[i]->HashCode()] : 0u;
@@ -497,7 +497,7 @@ namespace Ailu::Render
                     s_instance_data[obj_index]._submesh_triangle_offset = 0u;
                     s_instance_data[obj_index]._submesh_triangle_count = mesh->GetTriangleCount(i);
                     s_instance_data[obj_index]._reserved0 = 0u;
-                    Vector3f inv_scale = Vector3f::kOne / t._scale;
+                    Vector3f inv_scale = Vector3f::kOne / transf_comp->_local_transform._scale;
                     s_instance_data[obj_index]._max_inv_scale = std::max(inv_scale.x,std::max(inv_scale.y,inv_scale.z));
                     ++obj_index;
                 }
@@ -528,9 +528,9 @@ namespace Ailu::Render
                 auto &materials = static_mesh._p_mats;
                 for (int i = 0; i < submesh_count; i++)
                 {
-                    const auto &t = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(entity_index)->_transform;
+                    const auto &t = r.GetComponent<ECS::CSkeletonMesh, ECS::TransformComponent>(entity_index);
                     auto *obj_cb = ConstantBuffer::As<CBufferPerObjectData>(_cur_fs->GetObjCB(obj_index));
-                    obj_cb->_MatrixWorld = t._world_matrix;
+                    obj_cb->_MatrixWorld = t->GetWorldMatrix();
                     obj_cb->_ObjectID = (i32)r.GetEntity<ECS::CSkeletonMesh>(entity_index);
                     ++obj_index;
                 }
@@ -916,7 +916,7 @@ namespace Ailu::Render
                         }
                         auto e = s.GetRegister().GetEntity<ECS::StaticMeshComponent>(entity_index);
                         cur_cam_cull_results[queue_id].emplace_back(RenderableObjectData{scene_render_obj_index, dis,
-                                                                                         (u16) i, 1, comp._p_mesh.get(), used_mat, &s.GetRegister().GetComponent<ECS::TransformComponent>(e)->_transform._world_matrix});
+                                                                                         (u16) i, 1, comp._p_mesh.get(), used_mat, &s.GetRegister().GetComponent<ECS::TransformComponent>(e)->_world_matrix});
                     }
                 }
                 ++scene_render_obj_index;

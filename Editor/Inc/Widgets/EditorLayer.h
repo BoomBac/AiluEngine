@@ -2,7 +2,9 @@
 #ifndef __EDITOR_LAYER_H__
 #define __EDITOR_LAYER_H__
 #include "Framework/Events/Layer.h"
+#include "Framework/Events/Event.h"
 #include "Render/PickPass.h"
+#include "Scene/Entity.hpp"
 #include "Dock/DockManager.h"
 
 struct ImFont;
@@ -47,6 +49,7 @@ namespace Ailu
             bool _is_begin_gizmo_transform = false;
             bool _is_end_gizmo_transform = true;
             Vector<Transform> _old_trans;
+            ECS::Entity _selected_entity = ECS::kInvalidEntity;
 		};
 	}
 }

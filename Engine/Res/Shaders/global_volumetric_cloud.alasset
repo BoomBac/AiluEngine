@@ -6,6 +6,6 @@
         "_asset_name": "global_volumetric_cloud"
     },
     "_file": "Shaders/hlsl/global_volumetric_cloud.hlsl",
-    "_ps_entry": "ComputePSMain",
-    "_vs_entry": "FullscreenVSMain"
+    "_vs_entry": "FullscreenVSMain",
+    "_ps_entry": "ComputePSMain"
 }

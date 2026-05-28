@@ -57,8 +57,8 @@ namespace Ailu
         {
             if (text.empty())
                 return;
-            auto glyphs = LayoutText(text, pos,font_size, scale, padding, font);
-            for (auto &g: glyphs)
+            auto layout = LayoutText(text, pos, font_size, scale, padding, font);
+            for (auto &g: layout._glyphs)
             {
                 if (!block->CanAppend(4, 6)) break;
                 Vector4f pos_rect = {g._pos.x, g._pos.y, g._size.x, g._size.y};
@@ -156,12 +156,9 @@ namespace Ailu
         {
             if (text.empty())
                 return Vector2f::kZero;
+
             font = font ? font : s_default_font;
-            Vector2f pos = Vector2f::kZero, padding = Vector2f::kZero;
-            auto glyphs = LayoutText(text, pos, font_size, scale, padding, font);
-            Vector2f size = Vector2f::kZero;
-            auto &b = glyphs.back();
-            return {b._pos.x + b._size.x, font->_line_height * scale.y * font_size};
+            return LayoutText(text, Vector2f::kZero, font_size, scale, Vector2f::kZero, font)._size;
         }
     }// namespace UI
 }// namespace Ailu

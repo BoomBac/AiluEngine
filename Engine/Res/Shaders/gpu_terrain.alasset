@@ -5,6 +5,6 @@
         "_asset_type": "Ailu::Render::ComputeShader",
         "_asset_name": "GpuTerrain"
     },
-    "_kernel": "Noname",
-    "_file": "Shaders/hlsl/Compute/gpu_terrain.hlsl"
+    "_file": "Shaders/hlsl/Compute/gpu_terrain.hlsl",
+    "_kernel": "Noname"
 }

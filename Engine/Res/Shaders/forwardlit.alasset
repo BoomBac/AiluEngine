@@ -6,6 +6,6 @@
         "_asset_name": "forwardlit"
     },
     "_file": "Shaders/hlsl/forwardlit.hlsl",
-    "_ps_entry": "ForwardPSMain",
-    "_vs_entry": "ForwardVSMain"
+    "_vs_entry": "ForwardVSMain",
+    "_ps_entry": "ForwardPSMain"
 }
